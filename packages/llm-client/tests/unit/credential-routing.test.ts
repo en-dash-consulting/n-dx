@@ -6,7 +6,7 @@ import { loadLLMConfig } from "../../src/llm-config.js";
 import { loadClaudeConfig } from "../../src/config.js";
 import { resolveVendorCliEnv } from "../../src/child-env.js";
 import { createGoogleApiProvider } from "../../src/google-api-provider.js";
-import { withoutCredentialRouting } from "../../src/credential-routing.js";
+import { withoutTrustGatedFields } from "../../src/credential-routing.js";
 import { evaluateRepoTrust, recordRepoTrust } from "../../src/repo-trust.js";
 
 /**
@@ -162,11 +162,14 @@ describe("credential routing the user chose", () => {
   });
 });
 
-describe("withoutCredentialRouting", () => {
-  it("removes only the routing fields and leaves the input untouched", () => {
-    const input = { llm: { google: { apiKeyEnv: "X", model: "m" } }, claude: { api_endpoint: "e", model: "c" } };
-    const out = withoutCredentialRouting(input);
-    expect(out).toEqual({ llm: { google: { model: "m" } }, claude: { model: "c" } });
+describe("withoutTrustGatedFields", () => {
+  it("removes only the routing and cli_path fields and leaves the input untouched", () => {
+    const input = {
+      llm: { google: { apiKeyEnv: "X", model: "m" }, codex: { cli_path: "p", model: "x" } },
+      claude: { api_endpoint: "e", cli_path: "p", model: "c" },
+    };
+    const out = withoutTrustGatedFields(input);
+    expect(out).toEqual({ llm: { google: { model: "m" }, codex: { model: "x" } }, claude: { model: "c" } });
     expect(input.llm.google.apiKeyEnv).toBe("X");
     expect(input.claude.api_endpoint).toBe("e");
   });

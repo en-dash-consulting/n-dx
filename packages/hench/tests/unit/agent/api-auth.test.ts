@@ -216,16 +216,16 @@ describe("API loop authentication and endpoint config", () => {
       join(projectDir, ".n-dx.json"),
       JSON.stringify({
         claude: {
-          cli_path: "/opt/claude",
           api_key: "sk-ant-all-fields",
           model: "claude-opus-4-20250514",
         },
       }),
       "utf-8",
     );
+    // Endpoint and CLI path apply from the shared file only once trusted.
     await writeFile(
       join(projectDir, ".n-dx.local.json"),
-      JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com" } }),
+      JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com", cli_path: "/opt/claude" } }),
       "utf-8",
     );
 
@@ -334,9 +334,9 @@ describe("CLI loop claude-client integration", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("resolves cli_path from .n-dx.json via @n-dx/llm-client", async () => {
+  it("resolves cli_path from .n-dx.local.json via @n-dx/llm-client", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: { cli_path: "/custom/path/to/claude" },
       }),

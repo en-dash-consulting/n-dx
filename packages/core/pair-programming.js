@@ -26,7 +26,7 @@ import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { relativeToRoot, resolveLayout } from "./layout.js";
-import { loadShellTestEnv, loadVendorCliEnv } from "./config.js";
+import { loadShellTestEnv, loadVendorCliEnv, loadVendorCliPath } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
@@ -294,36 +294,17 @@ export function resolveReviewerVendor(primaryVendor, configured) {
 }
 
 /**
- * Resolve the CLI binary path for a given vendor.
- * Reads llm.<vendor>.cli_path from .n-dx.local.json (where every cli_path is
- * written), then .n-dx.json, and falls back to the bare vendor name
- * (resolved by PATH lookup).
+ * Resolve the CLI binary path for a given vendor: `llm.<vendor>.cli_path`
+ * (legacy `claude.cli_path` for Claude) from `.n-dx.local.json`, then from
+ * `.n-dx.json` once the repository is trusted, else the bare vendor name
+ * (resolved by PATH lookup). See `loadVendorCliPath` in config.js.
  *
  * @param {string} dir  Project root directory.
  * @param {"claude" | "codex"} vendor
- * @returns {string}  CLI binary path or name.
+ * @returns {Promise<string>}  CLI binary path or name.
  */
 export function resolveVendorCliPath(dir, vendor) {
-  const layout = resolveLayout(dir);
-  for (const configPath of [layout.localConfigFile, layout.configFile]) {
-    const found = readCliPath(configPath, vendor);
-    if (found) return found;
-  }
-  return vendor; // "claude" or "codex" — resolved via PATH
-}
-
-/** The trimmed `cli_path` for `vendor` in one config file, or undefined. */
-function readCliPath(configPath, vendor) {
-  try {
-    if (!existsSync(configPath)) return undefined;
-    const data = JSON.parse(readFileSync(configPath, "utf-8"));
-    const candidates = [data?.llm?.[vendor]?.cli_path];
-    // Legacy claude.cli_path key
-    if (vendor === REVIEWER_VENDOR.CLAUDE) candidates.push(data?.claude?.cli_path);
-    return candidates.find((c) => typeof c === "string" && c.trim().length > 0)?.trim();
-  } catch {
-    return undefined; // unreadable config — fall through to the next source
-  }
+  return loadVendorCliPath(dir, vendor);
 }
 
 // ---------------------------------------------------------------------------
@@ -968,7 +949,7 @@ function spawnShellTestCommand(testCommand, dir, timeout, registerChild, env) {
  * @returns {Promise<ReviewResult>}
  */
 export async function runCrossVendorReview({ dir, reviewer, model, testCommand, timeout, contextFiles, registerChild = doNotTrack }) {
-  const cliPath = resolveVendorCliPath(dir, reviewer);
+  const cliPath = await resolveVendorCliPath(dir, reviewer);
   const { available } = checkReviewerAvailability(cliPath);
 
   const ctx = {

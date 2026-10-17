@@ -63,9 +63,24 @@ function gitToplevel(cwd: string): string {
   return resolvePath(git(cwd, "rev-parse", "--show-toplevel"));
 }
 
-/** Write `.n-dx.json` and commit it, so the tree stays clean. */
+/**
+ * Write the project config and commit it, so the tree stays clean. Each
+ * `llm.<vendor>.cli_path` goes to `.n-dx.local.json`, where `ndx config`
+ * writes it: a shared one applies only once the repository is trusted.
+ */
 async function projectConfig(data: Record<string, unknown>): Promise<void> {
-  await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify(data), "utf-8");
+  const llm = { ...((data.llm ?? {}) as Record<string, Record<string, unknown> | unknown>) };
+  const localLlm: Record<string, unknown> = {};
+  for (const vendor of ["claude", "codex"]) {
+    const block = llm[vendor] as Record<string, unknown> | undefined;
+    if (block?.cli_path === undefined) continue;
+    const { cli_path, ...rest } = block;
+    localLlm[vendor] = { cli_path };
+    llm[vendor] = rest;
+  }
+  await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify(data.llm ? { ...data, llm } : data), "utf-8");
+  // Always written, so it replaces the template's as `.n-dx.json` does.
+  await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ llm: localLlm }), "utf-8");
   git(projectDir, "add", "-A");
   git(projectDir, "commit", "-q", "-m", "config", "--allow-empty");
 }
@@ -97,7 +112,9 @@ beforeAll(async () => {
   let templateRexDir: string;
   ({ projectDir: templateDir, rexDir: templateRexDir } = await setupProjectDir("hench-resolve-template-"));
   await (await resolveStore(templateRexDir)).saveDocument(DOC as never);
-  await writeFile(join(templateDir, ".n-dx.json"), JSON.stringify({ llm: CLAUDE }), "utf-8");
+  await writeFile(join(templateDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: CLAUDE.vendor } }), "utf-8");
+  // cli_path is machine-local: a shared one applies only once the repository is trusted.
+  await writeFile(join(templateDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: CLAUDE.claude } }), "utf-8");
   commitGitFixtureBaseline(templateDir);
 });
 

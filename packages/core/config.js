@@ -99,7 +99,10 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  * Two kinds live here, for two different reasons:
  *
  * - **Machine-specific paths** (`*.cli_path`) differ per developer machine, so
- *   sharing them through git would break a teammate's checkout.
+ *   sharing them through git would break a teammate's checkout. The loaders
+ *   also honour them from the shared file only once the repository is
+ *   trusted, since they pick the binary that runs (llm-client
+ *   `credential-routing.ts`).
  * - **Secrets** (`*.api_key`). `.n-dx.json` is meant to be committed — it
  *   carries zone pins, the vendor, the dashboard port — and `ndx init` never
  *   gitignores it. A key written there is one `git add -A` away from the
@@ -1502,24 +1505,29 @@ function getLLMRoutingValidator(settingPath) {
 }
 
 /**
- * Build provider-specific auth preflight command.
- * Returns binary + args for the selected vendor.
+ * The vendor CLI binary n-dx spawns for `vendor`: `llm.<vendor>.cli_path`
+ * (legacy `claude.cli_path` for Claude), else the bare name, resolved on PATH.
+ *
+ * Read through llm-client's `loadLLMConfig`, never the raw merged config: the
+ * binary runs with the user's environment, so a shared `.n-dx.json` may choose
+ * it only once the repository is trusted (llm-client `credential-routing.ts`).
+ * `.n-dx.local.json`, where `ndx config` writes `cli_path`, always applies.
+ *
+ * @param {string} dir  Project directory
+ * @param {"claude" | "codex"} vendor
+ * @returns {Promise<string>}
  */
-function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
-  if (vendor === LLM_VENDOR.CODEX) {
-    const binary = llmConfig?.codex?.cli_path || "codex";
-    return {
-      binary,
-      args: ["exec", "--skip-git-repo-check", "Reply with exactly: ok"],
-    };
-  }
+export async function loadVendorCliPath(dir, vendor) {
+  const { loadLLMConfig } = await import("@n-dx/llm-client");
+  const configured = (await loadLLMConfig(dir))[vendor]?.cli_path?.trim();
+  return configured || vendor;
+}
 
-  const binary =
-    llmConfig?.claude?.cli_path || legacyClaudeConfig?.cli_path || "claude";
-  return {
-    binary,
-    args: ["-p", "Reply with exactly: ok", "--output-format", "json"],
-  };
+/** The auth preflight's arguments for a CLI vendor. */
+function vendorAuthPreflightArgs(vendor) {
+  return vendor === LLM_VENDOR.CODEX
+    ? ["exec", "--skip-git-repo-check", "Reply with exactly: ok"]
+    : ["-p", "Reply with exactly: ok", "--output-format", "json"];
 }
 
 /**
@@ -1528,11 +1536,12 @@ function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
  *
  * For google, performs a lightweight HTTP call to the Gemini API, reading its
  * settings from `dir` through the trust-gated loader rather than `llmConfig`.
- * For claude/codex, spawns the vendor CLI synchronously.
+ * For claude/codex, spawns the vendor CLI ({@link loadVendorCliPath})
+ * synchronously.
  *
  * @returns {Promise<{ ok: boolean, binary?: string, args?: string[], apiKeyEnv?: string, detail?: string, errorCode?: string }>}
  */
-async function runVendorAuthPreflight(dir, vendor, llmConfig, legacyClaudeConfig) {
+async function runVendorAuthPreflight(dir, vendor, llmConfig) {
   if (vendor === LLM_VENDOR.GOOGLE) {
     return runGoogleApiPreflight(dir);
   }
@@ -1541,11 +1550,8 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig, legacyClaudeConfig
     return runLocalApiPreflight(llmConfig);
   }
 
-  const { binary, args } = getVendorAuthPreflightCommand(
-    vendor,
-    llmConfig,
-    legacyClaudeConfig,
-  );
+  const binary = await loadVendorCliPath(dir, vendor === LLM_VENDOR.CODEX ? LLM_VENDOR.CODEX : LLM_VENDOR.CLAUDE);
+  const args = vendorAuthPreflightArgs(vendor);
   try {
     // Windows-safe: routes .cmd shims through cmd.exe with a self-quoted
     // verbatim command line (GH #37/#68/#69) — see execFileSyncCli.
@@ -1585,18 +1591,6 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig, legacyClaudeConfig
       errorCode: typeof err?.code === "string" ? err.code : undefined,
     };
   }
-}
-
-/**
- * Return the exact login command for the selected provider.
- */
-function getVendorLoginCommand(vendor, llmConfig, legacyClaudeConfig) {
-  const { binary } = getVendorAuthPreflightCommand(
-    vendor,
-    llmConfig,
-    legacyClaudeConfig,
-  );
-  return `${binary} login`;
 }
 
 function isBareCommand(binary) {
@@ -1705,12 +1699,7 @@ async function printAuthFailureGuidance(vendor, code) {
   }
 }
 
-async function printVendorPreflightFailure(
-  vendor,
-  preflight,
-  llmConfig,
-  legacyClaudeConfig,
-) {
+async function printVendorPreflightFailure(vendor, preflight, llmConfig) {
   const { red, yellow, dim } = await import("./cli-brand.js");
   // Google uses API-key auth — no binary / CLI args to display.
   if (vendor === LLM_VENDOR.GOOGLE) {
@@ -1773,11 +1762,8 @@ async function printVendorPreflightFailure(
 
   if (vendor !== LLM_VENDOR.CLAUDE) {
     // codex (or other CLI vendor) non-auth launch failure.
-    const loginCommand = getVendorLoginCommand(
-      vendor,
-      llmConfig,
-      legacyClaudeConfig,
-    );
+    // The binary the preflight actually ran, after the trust gate.
+    const loginCommand = `${preflight.binary || vendor} login`;
     console.error(red(`✗ Provider auth preflight failed for "${vendor}".`));
     if (preflight.detail && !looksLikeJson(preflight.detail)) {
       console.error(`  ${preflight.detail}`);
@@ -2438,7 +2424,8 @@ Local overrides (.n-dx.local.json):
   settings without conflicts. Deep-merged over .n-dx.json (local wins).
 
   Machine-specific keys (claude.cli_path, llm.claude.cli_path, llm.codex.cli_path)
-  are automatically written to .n-dx.local.json instead of .n-dx.json.
+  are automatically written to .n-dx.local.json instead of .n-dx.json. A
+  cli_path in .n-dx.json applies only once the repository is trusted.
 
 Options:
   --json                   Output as JSON
@@ -2835,10 +2822,6 @@ async function runLLMVendorPreflight(dir, coerced, configs, soft = false) {
   const currentLLM =
     configs.llm && typeof configs.llm === "object" ? configs.llm : {};
   const llmForPreflight = { ...currentLLM, vendor: coerced };
-  const legacyClaude =
-    configs.claude && typeof configs.claude === "object"
-      ? configs.claude
-      : undefined;
 
   // Local vendor requires a running HTTP server. During soft-preflight (used
   // by `ndx init` and `ndx config llm.vendor local`), skip the connectivity
@@ -2853,19 +2836,9 @@ async function runLLMVendorPreflight(dir, coerced, configs, soft = false) {
     return;
   }
 
-  const preflight = await runVendorAuthPreflight(
-    dir,
-    coerced,
-    llmForPreflight,
-    legacyClaude,
-  );
+  const preflight = await runVendorAuthPreflight(dir, coerced, llmForPreflight);
   if (!preflight.ok) {
-    await printVendorPreflightFailure(
-      coerced,
-      preflight,
-      llmForPreflight,
-      legacyClaude,
-    );
+    await printVendorPreflightFailure(coerced, preflight, llmForPreflight);
     if (!soft) {
       process.exit(1);
     }
@@ -3438,10 +3411,6 @@ export async function runAuthCheck(args) {
 
   const llmConfig =
     configs.llm && typeof configs.llm === "object" ? configs.llm : {};
-  const legacyClaude =
-    configs.claude && typeof configs.claude === "object"
-      ? configs.claude
-      : undefined;
   const vendor =
     typeof llmConfig.vendor === "string" && llmConfig.vendor
       ? llmConfig.vendor
@@ -3457,13 +3426,13 @@ export async function runAuthCheck(args) {
   }
 
   console.log(dim(`Checking ${vendor} credentials…`));
-  const preflight = await runVendorAuthPreflight(dir, vendor, llmConfig, legacyClaude);
+  const preflight = await runVendorAuthPreflight(dir, vendor, llmConfig);
   if (preflight.ok) {
     console.log(green(`✓ Credentials valid — vendor: ${vendor}, model: ${model}`));
     return 0;
   }
 
-  await printVendorPreflightFailure(vendor, preflight, llmConfig, legacyClaude);
+  await printVendorPreflightFailure(vendor, preflight, llmConfig);
   console.error("Re-run 'ndx auth' after fixing the issue above to verify.");
   return 1;
 }

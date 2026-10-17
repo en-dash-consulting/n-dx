@@ -268,6 +268,11 @@ export interface RepoExecutionConfig {
    * sent as one.
    */
   credentialRouting: string[];
+  /**
+   * The project config's {@link VENDOR_CLI_PATH_FIELDS} that are set, as
+   * `path = value`, sorted: the vendor CLI binary n-dx spawns.
+   */
+  vendorCliPaths: string[];
   permissionMode: string | null;
   provider: string | null;
   /** The project config's `rex.test`, else `.rex/config.json` → `test`: the command rex runs. */
@@ -301,11 +306,34 @@ function fieldAt(root: Record<string, unknown>, path: readonly string[]): unknow
   return node;
 }
 
+/**
+ * Project-config fields that choose the vendor CLI binary n-dx spawns. A
+ * repository that sets one runs its own script with the user's environment
+ * the next time `ndx auth` or `ndx work` starts the vendor CLI, so, like
+ * {@link CREDENTIAL_ROUTING_FIELDS}, the project config's values apply only
+ * once the user has trusted it. `cli_path` is machine-local; `ndx config`
+ * writes it to `.n-dx.local.json`, which always applies.
+ */
+export const VENDOR_CLI_PATH_FIELDS: readonly (readonly string[])[] = [
+  ["claude", "cli_path"],
+  ["llm", "claude", "cli_path"],
+  ["llm", "codex", "cli_path"],
+];
+
 /** The {@link CREDENTIAL_ROUTING_FIELDS} a config object sets, as sorted `path = value` lines. */
 export function credentialRoutingIn(config: Record<string, unknown> | null): string[] {
+  return fieldsSetIn(config, CREDENTIAL_ROUTING_FIELDS);
+}
+
+/** The {@link VENDOR_CLI_PATH_FIELDS} a config object sets, as sorted `path = value` lines. */
+export function vendorCliPathsIn(config: Record<string, unknown> | null): string[] {
+  return fieldsSetIn(config, VENDOR_CLI_PATH_FIELDS);
+}
+
+function fieldsSetIn(config: Record<string, unknown> | null, paths: readonly (readonly string[])[]): string[] {
   if (!config) return [];
   const out: string[] = [];
-  for (const path of CREDENTIAL_ROUTING_FIELDS) {
+  for (const path of paths) {
     const value = fieldAt(config, path);
     // Every reader skips an empty string, so it routes nothing.
     if (typeof value === "string" && value) out.push(`${path.join(".")} = ${value}`);
@@ -393,7 +421,10 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     : null;
   const projectTest = projectRex ? optionalString(projectRex.test) : null;
   const credentialRouting = credentialRoutingIn(projectConfig);
-  if ((projectTest || credentialRouting.length) && !projectHench) sources.push(relOf(root, layout.configFile));
+  const vendorCliPaths = vendorCliPathsIn(projectConfig);
+  if ((projectTest || credentialRouting.length || vendorCliPaths.length) && !projectHench) {
+    sources.push(relOf(root, layout.configFile));
+  }
 
   const mcpPath = join(root, ".mcp.json");
   const mcpConfig = readJson(mcpPath);
@@ -429,6 +460,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     ...(envAllow.length ? { envAllow: [...envAllow].sort() } : {}),
     // Present only when set, for the same reason.
     ...(credentialRouting.length ? { credentialRouting } : {}),
+    ...(vendorCliPaths.length ? { vendorCliPaths } : {}),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
     testCommand: projectTest ?? optionalString(rexConfig?.test),
@@ -443,6 +475,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     envAllow: [...envAllow].sort(),
     envDeny: [...envDeny].sort(),
     credentialRouting,
+    vendorCliPaths,
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
 }
@@ -456,6 +489,7 @@ export type RepoTrustFindingCode =
   | "git-subcommands-added"
   | "env-allow-added"
   | "credential-routing"
+  | "vendor-cli-path"
   | "permission-bypass"
   | "test-command"
   | "mcp-servers"
@@ -612,6 +646,15 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
       severity: "warning",
       message: `Chooses where API keys are sent, or which variable is sent as one: ${config.credentialRouting.join(", ")}`,
       values: [...config.credentialRouting],
+    });
+  }
+
+  if (config.vendorCliPaths.length) {
+    findings.push({
+      code: "vendor-cli-path",
+      severity: "warning",
+      message: `Chooses the vendor CLI binary n-dx runs: ${config.vendorCliPaths.join(", ")}`,
+      values: [...config.vendorCliPaths],
     });
   }
 

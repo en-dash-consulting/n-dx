@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A repository's .n-dx.json can choose which environment variable is sent as the Google API key, and where it is sent](./a-repository-s-n-dx-json-can-choose.md) | completed |
-| [A repository's .n-dx.json cli_path chooses the binary ndx auth and ndx work run, while the repository is untrusted](./a-repository-s-n-dx-json-cli-path.md) | pending |
+| [A repository's .n-dx.json cli_path chooses the binary ndx auth and ndx work run, while the repository is untrusted](./a-repository-s-n-dx-json-cli-path.md) | in_progress |
 | [hench's missing-credentials message tells a Codex env_key user the CLI falls back to default credential files](./hench-s-missing-credentials-message.md) | pending |
 | [ndx auth's Google preflight reads llm.google.apiKeyEnv from the untrusted project config](./ndx-auth-s-google-preflight-reads-llm.md) | completed |
 | [ndx config --test-connection sends the Claude API key to an untrusted project's api_endpoint](./ndx-config-test-connection-sends-the.md) | completed |
@@ -30,3 +30,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The agent's shell keeps a repository-supplied guard.env.allow while the repository is untrusted, unlike repository commands](./the-agent-s-shell-keeps-a-repository.md) | pending |
 | [The pair reviewer's shell test command honours a repository-supplied guard.env.allow in an untrusted checkout](./the-pair-reviewer-s-shell-test-command.md) | pending |
 | [Vendor CLI environments keep each vendor mode's credentials from one mode table](./vendor-cli-environments-keep-each.md) | completed |
+| [hench's .hench/config.json claudePath and the dashboard's codex --version probe choose a binary while the repository is untrusted](./hench-s-hench-config-json-claudepath.md) | pending |

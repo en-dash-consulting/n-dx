@@ -1150,6 +1150,7 @@ describe("n-dx config", () => {
       // matching legacy `claude.*` key out of the shared file as it goes. The
       // test would then still pass with the per-field fallback removed
       // entirely, because no legacy value would survive to be preferred over.
+      // The local file, because a shared cli_path applies only once trusted.
       const legacy = await writeFakeBinary(join(tmpDir, "fake-claude-legacy"), {
         stdout: "0.0.1-legacy",
       });
@@ -1158,7 +1159,7 @@ describe("n-dx config", () => {
       });
 
       await writeFile(
-        SHARED_CONFIG_PATH(tmpDir),
+        LOCAL_CONFIG_PATH(tmpDir),
         JSON.stringify(
           { claude: { cli_path: legacy }, llm: { claude: { cli_path: modern } } },
           null,
@@ -1180,7 +1181,7 @@ describe("n-dx config", () => {
       });
 
       await writeFile(
-        SHARED_CONFIG_PATH(tmpDir),
+        LOCAL_CONFIG_PATH(tmpDir),
         JSON.stringify(
           { claude: { cli_path: legacy }, llm: { claude: { model: "claude-sonnet-5" } } },
           null,
@@ -1916,9 +1917,11 @@ describe("n-dx config", () => {
     // A JSON auth blob the way the claude/codex CLI emits it on rejected creds.
     const AUTH_JSON = '{"type":"result","is_error":true,"result":"invalid api key - 401 Unauthorized"}';
 
+    // The local file, where `ndx config` writes cli_path; a shared one applies
+    // only once the repository is trusted.
     async function pointVendorAtFakeBinary(dir, vendor, binPath) {
       await writeFile(
-        SHARED_CONFIG_PATH(dir),
+        LOCAL_CONFIG_PATH(dir),
         JSON.stringify({ llm: { [vendor]: { cli_path: binPath } } }, null, 2) + "\n",
       );
     }

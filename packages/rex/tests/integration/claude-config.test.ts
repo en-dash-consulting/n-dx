@@ -44,9 +44,10 @@ describe("Claude config inheritance (rex)", () => {
       expect(config).toEqual({});
     });
 
-    it("loads cli_path from .n-dx.json claude section", async () => {
+    // From the shared file only once the repository is trusted (llm-client credential-routing.ts).
+    it("loads cli_path from the user's .n-dx.local.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx.local.json"),
         JSON.stringify({ claude: { cli_path: "/usr/local/bin/claude" } }),
       );
       const config = await loadClaudeConfig(rexDir);
@@ -266,10 +267,10 @@ describe("loadClaudeConfig on the .ndx/ layout", () => {
     try {
       const ndxRexDir = join(dir, ".ndx", "rex");
       await mkdir(ndxRexDir, { recursive: true });
-      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ claude: { cli_path: "/opt/claude" } }));
-      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ claude: { cli_path: "/legacy/claude" } }));
+      await writeFile(join(dir, ".ndx", "config.json"), JSON.stringify({ claude: { model: "container-model" } }));
+      await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ claude: { model: "legacy-model" } }));
 
-      expect((await loadClaudeConfig(ndxRexDir)).cli_path).toBe("/opt/claude");
+      expect((await loadClaudeConfig(ndxRexDir)).model).toBe("container-model");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

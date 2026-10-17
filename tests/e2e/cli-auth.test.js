@@ -7,8 +7,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, readFile, chmod } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, mkdir, rm, writeFile, readFile, chmod } from "node:fs/promises";
+import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -204,6 +204,82 @@ describe("ndx auth", () => {
       expect(await requests()).toEqual([{ host: "generativelanguage.googleapis.com", carriesKey: true }]);
       expect(status).toBe(0);
       expect(stdout).toMatch(/credentials valid/i);
+    });
+  });
+
+  describe("vendor CLI binary: a shared cli_path applies only once the repository is trusted", () => {
+    // Each fake binary records that it ran by creating its own marker file.
+    // The PATH ones stand in for the real `claude` / `codex`, so the fallback
+    // never launches a CLI installed on the machine.
+    let env;
+    let pathDir;
+
+    async function writeMarkerBinary(filePath, marker) {
+      if (isWin) {
+        const cmdPath = filePath + ".cmd";
+        await writeFile(cmdPath, `@echo off\r\necho ran> "${marker}"\r\necho {"result":"ok"}\r\n`);
+        return cmdPath;
+      }
+      await writeFile(filePath, `#!/bin/sh\necho ran > '${marker}'\necho '{"result":"ok"}'\n`);
+      await chmod(filePath, 0o755);
+      return filePath;
+    }
+
+    const ran = (name) => readFile(join(tmpDir, `${name}.ran`), "utf-8").then(() => true, () => false);
+
+    beforeEach(async () => {
+      pathDir = join(tmpDir, "path-bin");
+      await mkdir(pathDir);
+      await writeMarkerBinary(join(pathDir, "claude"), join(tmpDir, "path-claude.ran"));
+      await writeMarkerBinary(join(pathDir, "codex"), join(tmpDir, "path-codex.ran"));
+      env = {
+        ...process.env,
+        NDX_HOME: join(tmpDir, "ndx-home"),
+        PATH: `${pathDir}${delimiter}${process.env.PATH ?? ""}`,
+      };
+    });
+
+    async function repoBinary(name) {
+      return writeMarkerBinary(join(tmpDir, name), join(tmpDir, `${name}.ran`));
+    }
+
+    async function writeConfigs(shared, local) {
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify(shared) + "\n");
+      if (local) await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify(local) + "\n");
+    }
+
+    it.each([
+      ["llm.claude.cli_path", (bin) => ({ llm: { vendor: "claude", claude: { cli_path: bin } } }), "path-claude"],
+      ["claude.cli_path", (bin) => ({ llm: { vendor: "claude" }, claude: { cli_path: bin } }), "path-claude"],
+      ["llm.codex.cli_path", (bin) => ({ llm: { vendor: "codex", codex: { cli_path: bin } } }), "path-codex"],
+    ])("ndx auth does not run an untrusted repository's %s", async (field, shared, fallback) => {
+      await writeConfigs(shared(await repoBinary("repo-cli")));
+
+      const { stderr } = runNdx(["auth", tmpDir], env);
+
+      expect(await ran("repo-cli")).toBe(false);
+      expect(await ran(fallback)).toBe(true);
+      expect(stderr).toContain(field);
+    });
+
+    it("ndx config llm.vendor does not run an untrusted repository's cli_path", async () => {
+      await writeConfigs({ llm: { codex: { cli_path: await repoBinary("repo-cli") } } });
+
+      runNdx(["config", "llm.vendor", "codex", tmpDir, "--soft-preflight"], env);
+
+      expect(await ran("repo-cli")).toBe(false);
+      expect(await ran("path-codex")).toBe(true);
+    });
+
+    it("ndx auth runs the cli_path in .n-dx.local.json", async () => {
+      await writeConfigs({ llm: { vendor: "claude" } }, { llm: { claude: { cli_path: await repoBinary("local-cli") } } });
+
+      const { stdout, status } = runNdx(["auth", tmpDir], env);
+
+      expect(status).toBe(0);
+      expect(stdout).toMatch(/credentials valid/i);
+      expect(await ran("local-cli")).toBe(true);
+      expect(await ran("path-claude")).toBe(false);
     });
   });
 
