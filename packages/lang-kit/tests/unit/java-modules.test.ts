@@ -179,6 +179,14 @@ project(':c').projectDir = new File(settingsDir, 'vendor/c')`,
     expect(layout.modules[0].sourceRoots).toEqual(["server/src", "tools"]);
   });
 
+  it("reads package-declaration roots through a target package below src/, not root build output", async () => {
+    await file("lib/src/org/acme/target/Pool.java", "package org.acme.target;\nclass Pool {}");
+    await file("target/classes/com/x/Skipped.java", "package com.x;\nclass Skipped {}");
+
+    const layout = await discoverJavaModules(dir);
+    expect(layout.modules[0].sourceRoots).toEqual(["lib/src"]);
+  });
+
   it("returns no modules for a directory without Java", async () => {
     await file("README.md", "hi");
     expect(await discoverJavaModules(dir)).toEqual({ buildSystem: "none", modules: [] });
