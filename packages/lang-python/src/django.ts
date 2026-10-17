@@ -112,11 +112,11 @@ function patternLists(web: WebFile, value: Capture): Capture[] {
 
 /**
  * A pattern list's entries, with `earlier` spliced in at each `*urlpatterns` in `splats` the list holds
- * directly (not inside a list within it): `[path(x), *urlpatterns]` keeps `earlier` after `x`.
+ * directly (not inside a call or a pattern list within it): `[path(x), *urlpatterns]` keeps `earlier` after `x`.
  */
 function spliceSelf(web: WebFile, list: Capture, splats: readonly Capture[], earlier: readonly Capture[]): { entries: Capture[]; spliced: boolean } {
   // `list` may be the assignment's own capture of a sequence, so compare spans, not identity.
-  const inner = web.sequences.filter((s) => contains(list, s) && !contains(s, list));
+  const inner = [...web.sequences, ...web.calls.map((c) => c.invocation)].filter((s) => contains(list, s) && !contains(s, list));
   const mine = splats.filter((splat) => contains(list, splat) && !inner.some((s) => contains(s, splat)));
   const items = web.itemsOf(list);
   if (mine.length === 0) return { entries: [...items], spliced: false };
