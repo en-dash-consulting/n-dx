@@ -379,7 +379,9 @@ interface IncrementalState {
  * the entries for unchanged files. Files in changedFiles are excluded so they
  * can be re-parsed fresh. Only files still in `fileSet` count as unchanged: a
  * file pruned from the inventory in an earlier run is absent from it without
- * showing up as deleted (#744).
+ * showing up as deleted (#744). An edge target must still exist: an inventoried
+ * file, or a directory holding one, since Go edges point at the imported
+ * package's directory.
  */
 function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet: Set<string>): IncrementalState {
   const edgeMap = new Map<string, ImportEdge>();
@@ -387,9 +389,13 @@ function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet
   const unchangedExternalFiles = new Set<string>();
 
   const unchanged = (f: string) => !changedFiles.has(f) && fileSet.has(f);
+  // "" is the project root: a Go import of the module path itself.
+  const dirSet = new Set<string>();
+  for (const f of fileSet) dirSet.add(f.slice(0, Math.max(f.lastIndexOf("/"), 0)));
+  const targetExists = (to: string) => fileSet.has(to) || dirSet.has(to);
 
   for (const edge of prev.edges) {
-    if (unchanged(edge.from) && fileSet.has(edge.to)) {
+    if (unchanged(edge.from) && targetExists(edge.to)) {
       edgeMap.set(`${edge.from}\0${edge.to}\0${edge.type}`, edge);
     }
   }
