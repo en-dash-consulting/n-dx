@@ -9,6 +9,9 @@
  * must carry sourcevision's own version, since the two are released together.
  * `sv pack add` ({@link INSTALLABLE_PACKS}) installs packs there.
  *
+ * A pack installed only for another sourcevision version (left behind by an
+ * n-dx upgrade) is refused like a pack of another version, not called missing.
+ *
  * A pack that is missing, of another version or not a pack entry is never
  * fatal: the result carries a notice, worded like the notices of a pack that
  * cannot run, naming the `ndx sv pack add` command that installs the right one.
@@ -16,8 +19,8 @@
  * @module sourcevision/language/pack-loader
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { goConfig, isLanguagePackEntry, javaConfig, pythonConfig, terraformConfig, type LanguageConfig, type LanguagePackEntry, type PackDegradation } from "@n-dx/lang-kit";
 import { resolveNdxHome } from "@n-dx/llm-client";
@@ -98,9 +101,41 @@ export type PackLoad =
   | { readonly status: "missing" | "invalid"; readonly notice: PackDegradation }
   | { readonly status: "mismatch"; readonly notice: PackDegradation; /** The version found. */ readonly found: string };
 
+/** `<ndx home>/packs`: one pack directory per sourcevision version below it. */
+const packsRoot = (): string => join(resolveNdxHome(), "packs");
+
 /** `<ndx home>/packs/<version>`: where opt-in packs for this sourcevision version are installed. */
 export function defaultPackDir(version: string = sourcevisionVersion()): string {
-  return join(resolveNdxHome(), "packs", version);
+  return join(packsRoot(), version);
+}
+
+/**
+ * The version of `pack` installed in another version's directory beside
+ * `packDir`, the newest when there are several. Undefined when there is none,
+ * or when `packDir` is not under `<ndx home>/packs`.
+ */
+function versionInSiblingPackDir(pack: InstallablePack, packDir: string): string | undefined {
+  const root = dirname(packDir);
+  if (root !== packsRoot() || !existsSync(root)) return undefined;
+  const found: string[] = [];
+  for (const dir of readdirSync(root, { withFileTypes: true })) {
+    if (!dir.isDirectory() || dir.name === basename(packDir)) continue;
+    const manifestFile = join(root, dir.name, "node_modules", ...pack.packageName.split("/"), "package.json");
+    if (!existsSync(manifestFile)) continue;
+    found.push(manifestVersion(manifestFile) ?? dir.name);
+  }
+  return found.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0];
+}
+
+/** A package.json's version, or undefined when it does not parse or has none. */
+function manifestVersion(file: string): string | undefined {
+  let manifest: PackManifest;
+  try {
+    manifest = JSON.parse(readFileSync(file, "utf-8")) as PackManifest;
+  } catch {
+    return undefined;
+  }
+  return typeof manifest.version === "string" ? manifest.version : undefined;
 }
 
 /** The command that installs the pack matching this sourcevision into the pack directory. */
@@ -180,6 +215,8 @@ export async function loadPack(pack: InstallablePack, options: PackLoaderOptions
       imported = await pack.importByResolution();
     } catch (error) {
       if (isPackNotFound(error, pack.packageName)) {
+        const stale = versionInSiblingPackDir(pack, packDir);
+        if (stale !== undefined) return mismatch(stale);
         return notice("missing", `pack ${pack.packageName} is not installed`, `Install it with \`${install}\`.`);
       }
       return invalid(errorText(error));

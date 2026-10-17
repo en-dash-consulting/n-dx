@@ -155,6 +155,58 @@ describe("loadPack", () => {
   });
 });
 
+describe("loadPack after an n-dx upgrade", () => {
+  const packsRoot = (): string => join(resolveNdxHome(), "packs");
+  afterEach(() => rmSync(packsRoot(), { recursive: true, force: true }));
+
+  /** Install a Java pack package.json for `version` in that version's pack directory. */
+  function installForVersion(dirVersion: string, manifestVersion: string = dirVersion): void {
+    const dir = join(packsRoot(), dirVersion, "node_modules", "@n-dx", "lang-java");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "@n-dx/lang-java", version: manifestVersion }));
+  }
+
+  it("refuses a pack installed only for another sourcevision version, rather than calling it missing", async () => {
+    installForVersion("1.2.2");
+    const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), { version: VERSION });
+    expect(load).toEqual({
+      status: "mismatch",
+      found: "1.2.2",
+      notice: {
+        reason: `pack @n-dx/lang-java@1.2.2 does not match @n-dx/sourcevision@${VERSION} and was not used`,
+        remedy: "Install the matching pack with `ndx sv pack add java`.",
+      },
+    });
+  });
+
+  it("names the newest of several stale installs", async () => {
+    installForVersion("1.2.0");
+    installForVersion("1.10.0");
+    installForVersion("1.9.0");
+    const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), { version: VERSION });
+    expect(load).toMatchObject({ status: "mismatch", found: "1.10.0" });
+  });
+
+  it("still reports a pack missing when no version directory has it", async () => {
+    mkdirSync(join(packsRoot(), "1.2.2", "node_modules"), { recursive: true });
+    const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), { version: VERSION });
+    expect(load.status).toBe("missing");
+  });
+
+  it("does not look beside a pack directory that is not under the ndx home", async () => {
+    const outside = mkdtempSync(join(tmpdir(), "sv-pack-parent-"));
+    try {
+      const sibling = join(outside, "1.2.2", "node_modules", "@n-dx", "lang-java");
+      mkdirSync(sibling, { recursive: true });
+      writeFileSync(join(sibling, "package.json"), JSON.stringify({ name: "@n-dx/lang-java", version: "1.2.2" }));
+      const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), { packDir: join(outside, VERSION), version: VERSION });
+      expect(load.status).toBe("missing");
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("pack locations", () => {
   it("keeps opt-in packs under the ndx home, per sourcevision version", () => {
     expect(defaultPackDir("1.2.3")).toBe(join(resolveNdxHome(), "packs", "1.2.3"));

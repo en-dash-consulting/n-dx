@@ -26,10 +26,10 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
    `<ndx home>/packs/<sourcevision version>/node_modules/<package>` (where
    `npm install --prefix` puts opt-in packs), then by module resolution (the
    optional `@n-dx/lang-go` dependency, or the workspace).
-2. **Refused** when its version differs from sourcevision's (checked from
-   `package.json` before a pack-directory copy is imported, and again on the
-   entry) or when it exports no matching lang-kit `LanguagePackEntry`. The
-   notice names `ndx sv pack add <lang>` (`packInstallCommand`).
+2. **Refused** when its version differs from sourcevision's (`package.json`
+   before import, then the entry; a copy only in another version's directory
+   counts) or it exports no matching lang-kit `LanguagePackEntry`. The notice
+   names `ndx sv pack add <lang>` (`packInstallCommand`).
 3. **Degraded** when it is missing, refused, reports `degraded` (grammar not
    built or not loadable, a query that will not compile, unreadable build
    files) or its `analyzeProject` rejects. `src/analyzers/pack-imports.ts`
