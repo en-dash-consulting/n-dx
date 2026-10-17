@@ -208,14 +208,15 @@ function readDeclarations(file: PackSourceFile, annotations: readonly Annotation
 // ── Routes (rule: routes) ───────────────────────────────────────────────────
 
 const CONTROLLERS: ReadonlySet<string> = new Set(["RestController", "Controller"]);
-const MAPPING_METHODS: Readonly<Record<string, string | undefined>> = {
-  GetMapping: "GET",
-  PostMapping: "POST",
-  PutMapping: "PUT",
-  DeleteMapping: "DELETE",
-  PatchMapping: "PATCH",
-  RequestMapping: undefined,
-};
+/** Mapping annotation → the HTTP method it fixes; `RequestMapping` names its own. A Map, so `@toString` is no mapping. */
+const MAPPING_METHODS: ReadonlyMap<string, string | undefined> = new Map([
+  ["GetMapping", "GET"],
+  ["PostMapping", "POST"],
+  ["PutMapping", "PUT"],
+  ["DeleteMapping", "DELETE"],
+  ["PatchMapping", "PATCH"],
+  ["RequestMapping", undefined],
+]);
 const HTTP_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE"]);
 
 /** A mapping value skipped because it is not a literal. */
@@ -267,8 +268,8 @@ function readRoutes(file: PackSourceFile, declarations: Declarations, skipped: S
     const owner = declarations.ownerOf(method);
     const prefixList = owner && prefixes.get(owner);
     if (!prefixList) continue;
-    for (const mapping of method.annotations.filter((a) => a.name in MAPPING_METHODS)) {
-      const fixed = MAPPING_METHODS[mapping.name];
+    for (const mapping of method.annotations.filter((a) => MAPPING_METHODS.has(a.name))) {
+      const fixed = MAPPING_METHODS.get(mapping.name);
       let verbs: (string | undefined)[] = [fixed];
       if (mapping.name === "RequestMapping") {
         const given = element(mapping, "method");
@@ -330,8 +331,8 @@ interface ClientRule {
   readonly kind: OutboundCallFact["kind"];
   /** Declared types (simple names) that make a receiver this client. */
   readonly types: ReadonlySet<string>;
-  /** Method → the call's target; absent when the method is not an outbound call. */
-  readonly methods: Readonly<Record<string, (args: readonly Capture[]) => Target>>;
+  /** Method → the call's target; absent when the method is not an outbound call. A Map, so `toString` is no method. */
+  readonly methods: ReadonlyMap<string, (args: readonly Capture[]) => Target>;
   /** Methods no other client shares, reported as `likely` when the receiver type is not known. */
   readonly distinctive?: ReadonlySet<string>;
 }
@@ -339,7 +340,7 @@ interface ClientRule {
 const first = (args: readonly Capture[]): Target => targetOf(args[0]);
 /** The first argument when there are at least two; one argument is the payload alone, sent to a configured default. */
 const firstOfTwo = (args: readonly Capture[]): Target => (args.length >= 2 ? targetOf(args[0]) : UNKNOWN);
-const each = <T>(names: readonly string[], value: T): Record<string, T> => Object.fromEntries(names.map((n) => [n, value]));
+const each = <T>(names: readonly string[], value: T): Map<string, T> => new Map(names.map((n) => [n, value]));
 
 const CLIENT_RULES: readonly ClientRule[] = [
   {
@@ -355,7 +356,7 @@ const CLIENT_RULES: readonly ClientRule[] = [
     client: "KafkaTemplate",
     kind: "queue",
     types: new Set(["KafkaTemplate", "KafkaOperations"]),
-    methods: { send: firstOfTwo },
+    methods: each(["send"], firstOfTwo),
   },
   {
     rule: "jms",
@@ -371,13 +372,11 @@ const CLIENT_RULES: readonly ClientRule[] = [
     types: new Set(["RabbitTemplate", "RabbitOperations", "AmqpTemplate"]),
     // (exchange, routingKey, message…): the exchange, or the routing key on the default exchange "";
     // (routingKey, message): the routing key.
-    methods: {
-      convertAndSend: (args) => {
-        if (args.length < 2) return UNKNOWN;
-        const defaultExchange = args[0] !== undefined && literal(args[0]) === "";
-        return args.length >= 3 && defaultExchange ? targetOf(args[1]) : targetOf(args[0]);
-      },
-    },
+    methods: each(["convertAndSend"], (args: readonly Capture[]): Target => {
+      if (args.length < 2) return UNKNOWN;
+      const defaultExchange = args[0] !== undefined && literal(args[0]) === "";
+      return args.length >= 3 && defaultExchange ? targetOf(args[1]) : targetOf(args[0]);
+    }),
   },
 ];
 
@@ -385,12 +384,12 @@ const CLIENT_RULES: readonly ClientRule[] = [
 const CHAIN_CLIENTS: ReadonlySet<string> = new Set(["WebClient", "RestClient"]);
 const CHAIN_VERBS: ReadonlySet<string> = new Set(["get", "post", "put", "delete", "patch", "head", "options", "method"]);
 
-/** Listener annotations and the element naming what they consume (rules: kafka, jms, rabbit). */
-const LISTENERS: Readonly<Record<string, { readonly keys: readonly string[]; readonly rule: string }>> = {
-  KafkaListener: { keys: ["topics"], rule: "kafka" },
-  JmsListener: { keys: ["destination"], rule: "jms" },
-  RabbitListener: { keys: ["queues"], rule: "rabbit" },
-};
+/** Listener annotations and the element naming what they consume (rules: kafka, jms, rabbit). A Map, so `@constructor` is no listener. */
+const LISTENERS: ReadonlyMap<string, { readonly keys: readonly string[]; readonly rule: string }> = new Map([
+  ["KafkaListener", { keys: ["topics"], rule: "kafka" }],
+  ["JmsListener", { keys: ["destination"], rule: "jms" }],
+  ["RabbitListener", { keys: ["queues"], rule: "rabbit" }],
+]);
 
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 const QUALIFIED = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
@@ -468,7 +467,7 @@ function readOutbound(file: PackSourceFile, annotations: readonly Annotation[], 
     const receiverCall = callAt(call.site.receiver);
 
     for (const client of CLIENT_RULES) {
-      const read = client.methods[call.callee];
+      const read = client.methods.get(call.callee);
       if (!read || call.site.receiver === undefined) continue;
       if (receiverType !== undefined && client.types.has(receiverType)) add(call, client.kind, client.client, read(call.args), "certain");
       else if (receiverType === undefined && client.distinctive?.has(call.callee) && call.args.length > 0) {
@@ -510,7 +509,7 @@ function readOutbound(file: PackSourceFile, annotations: readonly Annotation[], 
 
   // Consumers: one fact per topic, destination or queue a listener names.
   for (const annotation of annotations) {
-    const listener = LISTENERS[annotation.name];
+    const listener = LISTENERS.get(annotation.name);
     if (!listener) continue;
     const named = element(annotation, ...listener.keys);
     const at = { position: annotation.use.start };

@@ -73,6 +73,36 @@ describe("Spring Boot routes", () => {
   });
 });
 
+describe("a framework that throws", () => {
+  it("loses only its own facts, as a notice naming it, and leaves the pack undegraded", async (ctx) => {
+    skipUnlessGrammar(ctx, javaGrammarPath());
+    const kinds: readonly FactKind[] = ["imports", "routes", "outboundCalls"];
+    const broken = {
+      ...springBoot,
+      id: "broken",
+      queries: [],
+      read: () => {
+        throw new Error("rule bug on Foo.java");
+      },
+    };
+    const expected = await pack.analyzeProject({ projectDir: dir, files, kinds });
+    const entry = createPackEntry({
+      package: JAVA_PACKAGE,
+      pack: { ...javaPack, frameworks: [broken, springBoot] },
+      symbolRules: JAVA_SYMBOL_RULES,
+    });
+    const result = await entry.analyzeProject({ projectDir: dir, files, kinds });
+    expect(result.degraded).toBeUndefined();
+    expect(result.facts).toEqual(expected.facts);
+    expect(result.facts.some((f) => (f.imports?.external.length ?? 0) + (f.imports?.files.length ?? 0) > 0)).toBe(true);
+    expect(result.facts.some((f) => (f.routes?.length ?? 0) > 0)).toBe(true);
+    expect(result.notices).toEqual([
+      "framework broken failed (rule bug on Foo.java); its routes and outboundCalls were not recorded.",
+      ...(expected.notices ?? []),
+    ]);
+  });
+});
+
 describe("Spring Boot outbound calls", () => {
   it("reads HTTP clients, gRPC and environment reads with their targets and confidence", async (ctx) => {
     const { facts } = await analyze(ctx, ["outboundCalls"]);
@@ -134,6 +164,35 @@ describe("Spring Boot outbound calls", () => {
       );
       const { facts } = await pack.analyzeProject({ projectDir, files: ["Empty.java"], kinds: ["outboundCalls"] });
       expect(facts[0]?.outboundCalls?.map(call)).toEqual(["http FeignClient config:catalog certain", "http RestTemplate unknown: certain"]);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reads nothing from a method or annotation named after an Object.prototype member", async (ctx) => {
+    skipUnlessGrammar(ctx, javaGrammarPath());
+    const projectDir = mkdtempSync(join(tmpdir(), "lang-java-spring-"));
+    try {
+      writeFileSync(
+        join(projectDir, "Prototype.java"),
+        [
+          "@RestController",
+          "class Prototype {",
+          "  private final RestTemplate restTemplate;",
+          "  private final KafkaTemplate<String, String> kafkaTemplate;",
+          "  private final JmsTemplate jmsTemplate;",
+          "  private final RabbitTemplate rabbitTemplate;",
+          "  @toString(\"/a\") String a() { return restTemplate.toString(); }",
+          "  @constructor(\"/b\") int b() { return kafkaTemplate.hashCode(); }",
+          "  @hasOwnProperty(\"/c\") void c() { jmsTemplate.valueOf(\"x\", \"y\"); rabbitTemplate.constructor(\"x\", \"y\"); }",
+          "  @valueOf(topics = \"t\") void d() { restTemplate.hasOwnProperty(\"x\"); }",
+          "  @__proto__(\"/e\") void e() { restTemplate.__proto__(\"x\"); }",
+          "}",
+        ].join("\n"),
+      );
+      const { facts } = await pack.analyzeProject({ projectDir, files: ["Prototype.java"], kinds: ["routes", "outboundCalls"] });
+      expect(facts[0]?.routes).toEqual([]);
+      expect(facts[0]?.outboundCalls).toEqual([]);
     } finally {
       rmSync(projectDir, { recursive: true, force: true });
     }

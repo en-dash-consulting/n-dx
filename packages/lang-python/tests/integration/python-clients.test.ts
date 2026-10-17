@@ -6,7 +6,8 @@
  * the golden in `pack-golden.test.ts`.
  */
 
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import { join } from "node:path";
 import type { FactKind, FileFacts, OutboundCallFact } from "@n-dx/lang-kit";
@@ -152,6 +153,36 @@ describe("Python outbound calls", () => {
       confidence: "certain",
       position: { line: 8, column: 4 },
     });
+  });
+});
+
+describe("a call named after an Object.prototype member", () => {
+  it("is no client method, function or constructor", async (ctx) => {
+    skipUnlessGrammar(ctx, pythonGrammarPath());
+    const dir = mkdtempSync(join(tmpdir(), "lang-python-prototype-"));
+    try {
+      writeFileSync(
+        join(dir, "main.py"),
+        [
+          "import requests",
+          "import pika",
+          "session = requests.Session()",
+          'session.constructor("http://a")',
+          'session.toString("http://b")',
+          'requests.constructor("http://c")',
+          'requests.__proto__("http://d")',
+          'constructor("http://e")',
+          "connection = pika.BlockingConnection()",
+          "channel = connection.constructor(1)",
+          'channel.hasOwnProperty("q")',
+          "",
+        ].join("\n"),
+      );
+      const { facts } = await pack.analyzeProject({ projectDir: dir, files: ["main.py"], kinds: ["outboundCalls"] });
+      expect(callsOf(facts, "main.py")).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

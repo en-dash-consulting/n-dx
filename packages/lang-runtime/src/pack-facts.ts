@@ -91,6 +91,12 @@ const SYMBOLS_GAP = 'produces "symbols" but has no symbol rules';
 const projectGap = (kind: FactKind): string => `produces "${kind}" but has no project facts reader`;
 const frameworkGap = (id: string, kind: FactKind): string => `framework "${id}" produces "${kind}", which the pack does not list`;
 
+/** The kinds a pack produces that neither a per-file read nor a framework covers: its {@link ProjectFactsReader}'s. */
+export function projectKinds(pack: LanguagePack): FactKind[] {
+  const covered = new Set<FactKind>([...PER_FILE_KINDS, ...(pack.frameworks ?? []).flatMap((f) => f.produces)]);
+  return pack.produces.filter((kind) => !covered.has(kind));
+}
+
 /**
  * Where a pack's `produces` disagrees with what can be read for it: a resolver
  * whose imports would never be read, symbols with no rules (`symbolRules`
@@ -104,11 +110,10 @@ export function factGaps(
   projectFacts?: ProjectFactsReader,
 ): string[] {
   const frameworks = pack.frameworks ?? [];
-  const covered = new Set<FactKind>([...PER_FILE_KINDS, ...frameworks.flatMap((f) => f.produces)]);
   return [
     ...(pack.resolver !== undefined && !pack.produces.includes("imports") ? [IMPORTS_GAP] : []),
     ...(pack.produces.includes("symbols") && symbolRules === undefined ? [SYMBOLS_GAP] : []),
-    ...(projectFacts === undefined ? pack.produces.filter((kind) => !covered.has(kind)).map(projectGap) : []),
+    ...(projectFacts === undefined ? projectKinds(pack).map(projectGap) : []),
     ...frameworks.flatMap((f) => f.produces.filter((kind) => !pack.produces.includes(kind)).map((kind) => frameworkGap(f.id, kind))),
   ];
 }

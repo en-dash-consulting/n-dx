@@ -290,20 +290,20 @@ export interface WebValue {
   readonly literal: boolean;
 }
 
-const SIMPLE_ESCAPES: Readonly<Record<string, string>> = {
-  "\\": "\\",
-  "'": "'",
-  '"': '"',
-  n: "\n",
-  t: "\t",
-  r: "\r",
-  "\n": "",
-};
+const SIMPLE_ESCAPES: ReadonlyMap<string, string> = new Map([
+  ["\\", "\\"],
+  ["'", "'"],
+  ['"', '"'],
+  ["n", "\n"],
+  ["t", "\t"],
+  ["r", "\r"],
+  ["\n", ""],
+]);
 
 /** A string body's value: escapes processed unless raw; Python keeps the backslash of an unknown escape. */
 function unescape(body: string, raw: boolean): string {
   if (raw) return body;
-  return body.replace(/\\(.|\n)/g, (all, c: string) => SIMPLE_ESCAPES[c] ?? all);
+  return body.replace(/\\(.|\n)/g, (all, c: string) => SIMPLE_ESCAPES.get(c) ?? all);
 }
 
 /** The end of an f-string replacement field's expression: before a top-level `!conversion`, `:format` or `=`. */

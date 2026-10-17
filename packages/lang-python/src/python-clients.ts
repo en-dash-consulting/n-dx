@@ -221,21 +221,26 @@ const env: Reader = (call) => {
   return [name === undefined ? UNKNOWN : { target: name, targetSource: "env" }];
 };
 
+/**
+ * A rule table read by names taken from source text. A Map, never a plain
+ * object, so a name like `constructor` or `toString` finds nothing rather
+ * than `Object.prototype`'s member.
+ */
+type Table<T> = ReadonlyMap<string, T>;
+const table = <T>(entries: Readonly<Record<string, T>>): Table<T> => new Map(Object.entries(entries));
+
 const HTTP_VERBS = ["get", "post", "put", "patch", "delete", "head", "options"] as const;
 /** `get(url, …)` and friends, and `request(method, url, …)`. */
-const HTTP_METHODS: Readonly<Record<string, Reader>> = {
-  ...Object.fromEntries(HTTP_VERBS.map((verb) => [verb, at(0, "url")])),
-  request: at(1, "url"),
-};
-const onModule = (module: string, methods: Readonly<Record<string, Reader>>): Record<string, Reader> =>
-  Object.fromEntries(Object.entries(methods).map(([name, read]) => [`${module}.${name}`, read]));
+const HTTP_METHODS: Table<Reader> = new Map([...HTTP_VERBS.map((verb) => [verb, at(0, "url")] as const), ["request", at(1, "url")]]);
+const onModule = (module: string, methods: Table<Reader>): Table<Reader> =>
+  new Map([...methods].map(([name, read]) => [`${module}.${name}`, read]));
 
 const REQUEST = "urllib.request.Request";
 const PIKA_CONNECTION = "pika.connection";
 const PIKA_CHANNEL = "pika.channel";
 
 /** Constructors by qualified name → the client the result is. */
-const CONSTRUCTORS: Readonly<Record<string, string>> = {
+const CONSTRUCTORS: Table<string> = table({
   "requests.Session": "requests.Session",
   "httpx.Client": "httpx.Client",
   "httpx.AsyncClient": "httpx.Client",
@@ -248,16 +253,16 @@ const CONSTRUCTORS: Readonly<Record<string, string>> = {
   "celery.Celery": "celery.Celery",
   "pika.BlockingConnection": PIKA_CONNECTION,
   "pika.SelectConnection": PIKA_CONNECTION,
-};
+});
 
 /** Methods that make a new client from one: a pika connection's `channel()`. */
-const METHOD_CONSTRUCTORS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  [PIKA_CONNECTION]: { channel: PIKA_CHANNEL },
-};
+const METHOD_CONSTRUCTORS: Table<Table<string>> = table({
+  [PIKA_CONNECTION]: table({ channel: PIKA_CHANNEL }),
+});
 
 /** The constructor-pattern names in the query, so a test can hold the two in step. */
 export const PYTHON_CLIENT_CONSTRUCTORS: readonly string[] = [
-  ...new Set([...Object.keys(CONSTRUCTORS), ...Object.values(METHOD_CONSTRUCTORS).flatMap(Object.keys)].map((name) => name.split(".").at(-1)!)),
+  ...new Set([...CONSTRUCTORS.keys(), ...[...METHOD_CONSTRUCTORS.values()].flatMap((methods) => [...methods.keys()])].map((name) => name.split(".").at(-1)!)),
 ];
 
 interface ClientRule {
@@ -266,58 +271,61 @@ interface ClientRule {
   readonly client: string;
   readonly kind: OutboundCallFact["kind"];
   /** Functions by qualified name: `requests.get`, `os.getenv`. */
-  readonly functions?: Readonly<Record<string, Reader>>;
+  readonly functions?: Table<Reader>;
   /** Methods by the client the receiver is. */
-  readonly instances?: Readonly<Record<string, Readonly<Record<string, Reader>>>>;
+  readonly instances?: Table<Table<Reader>>;
   /** Methods reported as `likely` when the receiver is not known. */
   readonly distinctive?: ReadonlySet<string>;
 }
 
 const RULES: readonly ClientRule[] = [
-  { rule: "requests", client: "requests", kind: "http", functions: onModule("requests", HTTP_METHODS), instances: { "requests.Session": HTTP_METHODS } },
-  { rule: "httpx", client: "httpx", kind: "http", functions: onModule("httpx", HTTP_METHODS), instances: { "httpx.Client": HTTP_METHODS } },
-  { rule: "aiohttp", client: "aiohttp", kind: "http", instances: { "aiohttp.ClientSession": HTTP_METHODS } },
+  { rule: "requests", client: "requests", kind: "http", functions: onModule("requests", HTTP_METHODS), instances: table({ "requests.Session": HTTP_METHODS }) },
+  { rule: "httpx", client: "httpx", kind: "http", functions: onModule("httpx", HTTP_METHODS), instances: table({ "httpx.Client": HTTP_METHODS }) },
+  { rule: "aiohttp", client: "aiohttp", kind: "http", instances: table({ "aiohttp.ClientSession": HTTP_METHODS }) },
   {
     rule: "urllib",
     client: "urllib",
     kind: "http",
-    functions: {
+    functions: table<Reader>({
       // An urlopen of a Request (inline or a bound name) is reported at the Request.
       "urllib.request.urlopen": (call, reading) => {
         const url = argument(call, 0, "url");
         return url !== undefined && reading.typeOf(url) === REQUEST ? [] : [reading.targets.of(url)];
       },
       [REQUEST]: at(0, "url"),
-    },
+    }),
   },
   {
     rule: "grpc",
     client: "grpc",
     kind: "grpc",
-    functions: Object.fromEntries(
-      ["grpc", "grpc.aio"].flatMap((module) => ["insecure_channel", "secure_channel"].map((name) => [`${module}.${name}`, at(0, "target")])),
+    functions: new Map(
+      ["grpc", "grpc.aio"].flatMap((module) => ["insecure_channel", "secure_channel"].map((name) => [`${module}.${name}`, at(0, "target")] as const)),
     ),
   },
   {
     rule: "confluent-kafka",
     client: "confluent_kafka",
     kind: "queue",
-    instances: { "confluent_kafka.Producer": { produce: at(0, "topic") }, "confluent_kafka.Consumer": { subscribe: topics(0, "topics") } },
+    instances: table({
+      "confluent_kafka.Producer": table({ produce: at(0, "topic") }),
+      "confluent_kafka.Consumer": table({ subscribe: topics(0, "topics") }),
+    }),
   },
   {
     rule: "kafka-python",
     client: "kafka-python",
     kind: "queue",
     // Topics are KafkaConsumer's positional arguments; with none, subscribe(…) names them.
-    functions: { "kafka.KafkaConsumer": (call, { targets }) => call.positional.map((topic) => targets.of(topic)) },
-    instances: { "kafka.KafkaProducer": { send: at(0, "topic") }, "kafka.KafkaConsumer": { subscribe: topics(0, "topics") } },
+    functions: table<Reader>({ "kafka.KafkaConsumer": (call, { targets }) => call.positional.map((topic) => targets.of(topic)) }),
+    instances: table({ "kafka.KafkaProducer": table({ send: at(0, "topic") }), "kafka.KafkaConsumer": table({ subscribe: topics(0, "topics") }) }),
   },
   {
     rule: "pika",
     client: "pika",
     kind: "queue",
-    instances: {
-      [PIKA_CHANNEL]: {
+    instances: table({
+      [PIKA_CHANNEL]: table<Reader>({
         basic_publish: (call, { targets }) => {
           const exchange = argument(call, 0, "exchange");
           const value = exchange === undefined ? undefined : stringValue(exchange.text.trim());
@@ -325,21 +333,27 @@ const RULES: readonly ClientRule[] = [
           return [defaultExchange ? targets.of(argument(call, 1, "routing_key")) : targets.of(exchange)];
         },
         basic_consume: at(0, "queue"),
-      },
-    },
+      }),
+    }),
     distinctive: new Set(["basic_publish", "basic_consume"]),
   },
-  { rule: "celery", client: "celery", kind: "queue", instances: { "celery.Celery": { send_task: at(0, "name") } }, distinctive: new Set(["send_task"]) },
-  { rule: "env", client: "os.getenv", kind: "env", functions: { "os.getenv": env } },
-  { rule: "env", client: "os.environ", kind: "env", functions: { "os.environ.get": env } },
+  {
+    rule: "celery",
+    client: "celery",
+    kind: "queue",
+    instances: table({ "celery.Celery": table({ send_task: at(0, "name") }) }),
+    distinctive: new Set(["send_task"]),
+  },
+  { rule: "env", client: "os.getenv", kind: "env", functions: table({ "os.getenv": env }) },
+  { rule: "env", client: "os.environ", kind: "env", functions: table({ "os.environ.get": env }) },
 ];
 
 /** The method and function names the query's argument pattern must match. */
 export const PYTHON_CLIENT_CALLEES: readonly string[] = [
   ...new Set(
     RULES.flatMap((r) => [
-      ...Object.keys(r.functions ?? {}).map((name) => name.split(".").at(-1)!),
-      ...Object.values(r.instances ?? {}).flatMap(Object.keys),
+      ...[...(r.functions?.keys() ?? [])].map((name) => name.split(".").at(-1)!),
+      ...[...(r.instances?.values() ?? [])].flatMap((methods) => [...methods.keys()]),
     ]),
   ),
 ];
@@ -509,10 +523,10 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
   const typeOfCall = (call: WebCall, scope: string, depth: number): string | undefined => {
     if (call.receiverNode !== undefined) {
       const receiver = typeOf(call.receiverNode, scope, depth + 1);
-      if (receiver !== undefined) return METHOD_CONSTRUCTORS[receiver]?.[call.callee];
+      if (receiver !== undefined) return METHOD_CONSTRUCTORS.get(receiver)?.get(call.callee);
     }
     const name = qualify(call.receiver === undefined ? call.callee : `${call.receiver}.${call.callee}`, scope);
-    return name === undefined ? undefined : CONSTRUCTORS[name];
+    return name === undefined ? undefined : CONSTRUCTORS.get(name);
   };
   const typeOf = (node: Capture, scope: string, depth = 0): string | undefined => {
     if (depth > MAX_DEPTH) return undefined;
@@ -534,18 +548,21 @@ export function readPythonClientFile(file: PackSourceFile): OutboundCallFact[] {
     const receiver = call.receiverNode === undefined ? undefined : typeOf(call.receiverNode, scope);
     if (receiver !== undefined) {
       for (const r of RULES) {
-        const read = r.instances?.[receiver]?.[call.callee];
+        const read = r.instances?.get(receiver)?.get(call.callee);
         if (read) add(call.invocation, r, read(call, reading), "certain");
       }
       return;
     }
     const name = qualify(call.receiver === undefined ? call.callee : `${call.receiver}.${call.callee}`, scope);
-    const matched = name === undefined ? [] : RULES.filter((r) => r.functions?.[name] !== undefined);
-    for (const r of matched) add(call.invocation, r, r.functions![name!]!(call, reading), "certain");
+    const matched = name === undefined ? [] : RULES.flatMap((r) => {
+      const read = r.functions?.get(name);
+      return read ? [{ r, read }] : [];
+    });
+    for (const { r, read } of matched) add(call.invocation, r, read(call, reading), "certain");
     if (matched.length > 0 || call.receiver === undefined) return;
     for (const r of RULES) {
       if (!r.distinctive?.has(call.callee)) continue;
-      const read = Object.values(r.instances ?? {}).find((methods) => methods[call.callee])?.[call.callee];
+      const read = [...(r.instances?.values() ?? [])].find((methods) => methods.has(call.callee))?.get(call.callee);
       if (read) add(call.invocation, r, read(call, reading), "likely");
     }
   });
