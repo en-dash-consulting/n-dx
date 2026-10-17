@@ -490,10 +490,31 @@ export class WebProject {
 
   /** The module file a dotted name written in `from` refers to: `items` after `from app.routes import items`. */
   moduleOf(from: string, segments: readonly string[]): string | undefined {
-    const binding = this.file(from)?.bindings.get(segments[0]!);
+    const base = this.importedModule(from, segments[0]!, 0);
+    return base && this.module(base.file, [base.specifier, ...segments.slice(1)].reduce((m, s) => submodule(m, s)));
+  }
+
+  /**
+   * The module `name` is bound to by an import in `file`, as a specifier
+   * written in the file it resolves from. `from pkg import name` gives
+   * `pkg`'s attribute: when `pkg/__init__.py` binds `name`, the module it
+   * imports there (re-exports followed); the submodule `pkg.name` only when
+   * it binds nothing by that name. Undefined when the name is bound to
+   * something other than a module.
+   */
+  private importedModule(file: string, name: string, depth: number): { file: string; specifier: string } | undefined {
+    const web = this.file(file);
+    const binding = web?.bindings.get(name);
     if (!binding) return undefined;
-    const base = binding.name === undefined ? binding.module : submodule(binding.module, binding.name);
-    return this.module(from, [base, ...segments.slice(1)].reduce((m, s) => submodule(m, s)));
+    // Python's last module-level binding wins: a name bound again after its import is not the imported module.
+    const bound = web!.moduleBound.get(name);
+    if (bound !== undefined && comparePositions(binding.at, bound) < 0) return undefined;
+    if (binding.name === undefined) return { file, specifier: binding.module };
+    const pkg = this.module(file, binding.module);
+    if (pkg !== undefined && pkg !== file && this.binds(pkg, binding.name, () => false)) {
+      return depth + 1 < MAX_REEXPORTS ? this.importedModule(pkg, binding.name, depth + 1) : undefined;
+    }
+    return { file, specifier: submodule(binding.module, binding.name) };
   }
 
   /**
