@@ -16,6 +16,8 @@ source: "review"
 startedAt: "2026-10-17T06:39:40.141Z"
 completedAt: "2026-10-17T06:39:40.141Z"
 endedAt: "2026-10-17T06:39:40.141Z"
+resolutionType: "code-change"
+resolutionDetail: "PR 17 draft #822: Terraform/TypeScript fallback (must-fix), Java build-output skips at module roots, inventory cache fingerprint, Java analysedLanguages, Ryan's missing-pack rule incl. previous-version installs; all verified byte-identical where expected against the restacked stack top."
 acceptanceCriteria:
   - "A markerless repo with JS/TS files and a .tf file keeps TypeScript's skip dirs, test and generated patterns"
   - "Java build-output skips no longer hide real packages named target/build/out/generated"
@@ -23,7 +25,7 @@ acceptanceCriteria:
   - "Java is listed as analysed only when its pack ran"
   - "Missing opt-in packs produce one end-of-run hint; warnings only for listed-but-missing, refused or invalid packs"
 description: "Code fixes from the 2026-10-16 stack review (#760–#807) for language detection, inventory and the notices about missing opt-in packs. These include the review's must-fix: a markerless repo with a .tf file loses the TypeScript fallback. They also implement Ryan's decided rule for missing opt-in packs. Stacked on #807 (PR 16c). Brief: workshop language-scaling/pr17-20-review-fixes-brief.md."
-lastModified: "2026-10-17T06:39:40.503Z"
+lastModified: "2026-10-17T06:54:36.629Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
