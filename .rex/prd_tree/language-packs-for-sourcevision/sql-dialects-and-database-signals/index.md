@@ -30,6 +30,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Add the missing changeset for Terraform zone, detection and role changes](./add-the-missing-changeset-for.md) | completed |
 | [Add the Terraform model as a database-engine source](./add-the-terraform-model-as-a-database.md) | pending |
 | [Classify SQL dialects with evidence](./classify-sql-dialects-with-evidence.md) | completed |
 | [Detect database engines from dependencies, images and config](./detect-database-engines-from.md) | completed |
@@ -44,4 +45,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [sqlc query files lost their route to extractSqlcTables when sqlFiles became schema-only](./sqlc-query-files-lost-their-route-to.md) | completed |
 | [sqlcPaths reads the next sql[] entry as a path when the key sits on the dash line](./sqlcpaths-reads-the-next-sql-entry-as.md) | pending |
 | [sqlcPaths returns nothing for a CRLF sqlc.yaml block list](./sqlcpaths-returns-nothing-for-a-crlf.md) | pending |
-| [Add the missing changeset for Terraform zone, detection and role changes](./add-the-missing-changeset-for.md) | pending |
