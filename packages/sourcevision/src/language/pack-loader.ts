@@ -114,11 +114,12 @@ export function defaultPackDir(version: string = sourcevisionVersion()): string 
  * `packDir`, the newest when there are several. Undefined when there is none,
  * or when `packDir` is not under `<ndx home>/packs`. Dot directories (the
  * `.sv-pack-stage-*` that `sv pack add --from` extracts into) and copies at
- * `version` itself are not stale installs, so they are skipped.
+ * `version` itself are not stale installs, so they are skipped; a staged
+ * load is not scanned at all, since what it lacks is the bundle's fault.
  */
 function versionInSiblingPackDir(pack: InstallablePack, packDir: string, version: string): string | undefined {
   const root = dirname(packDir);
-  if (root !== packsRoot() || !existsSync(root)) return undefined;
+  if (root !== packsRoot() || basename(packDir).startsWith(".") || !existsSync(root)) return undefined;
   const found: string[] = [];
   for (const dir of readdirSync(root, { withFileTypes: true })) {
     if (!dir.isDirectory() || dir.name === basename(packDir) || dir.name.startsWith(".")) continue;
