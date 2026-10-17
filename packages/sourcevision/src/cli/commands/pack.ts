@@ -497,6 +497,9 @@ async function addFromBundle(
 /** The package.json fields naming what a package needs at run time. */
 const DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies"] as const;
 
+/** `name` or `@scope/name`, neither part `.`, `..` or holding a separator: what npm accepts as a package name's shape. */
+const PACKAGE_NAME = /^(?:@(?!\.\.?\/)[^/\\@]+\/)?(?!\.\.?$)[^/\\@]+$/;
+
 /**
  * The packages directly under `nodeModules` that `packageName` needs: itself
  * and, transitively, every package its package.json names in
@@ -534,6 +537,8 @@ export function dependencyClosure(nodeModules: string, packageName: string, excl
       const named = manifest[field];
       if (typeof named !== "object" || named === null) continue;
       for (const name of Object.keys(named)) {
+        // A name is a path below node_modules: one that could climb out of it would move files outside the pack directory.
+        if (!PACKAGE_NAME.test(name)) throw new CLIError(`${manifestFile} in the bundle names ${JSON.stringify(name)}, which is not a package name.`);
         if (exclude.includes(name)) continue;
         const found = resolveFrom(segments, name);
         if (found) visit(found);
