@@ -35,8 +35,8 @@ export { getLanguageConfig, languageConfigsFromIds, mergeLanguageConfigs, VALID_
  * `otherConfigs` are the languages detected without Terraform, so when
  * Terraform is added beside them the skip set equals the one the
  * analyze-phase inventory uses with the result, and the files counted are
- * the files it lists. When Terraform is detected alone (its files outnumber
- * a markerless repository's fallback source) it does not: the search also
+ * the files it lists. When Terraform is detected alone (a markerless
+ * repository with no fallback source) it does not: the search also
  * skipped the fallback's directories (`dist`, `build`, `coverage`, …), so a
  * file found only there is not counted. Without `count`, stops at the first
  * Terraform file.

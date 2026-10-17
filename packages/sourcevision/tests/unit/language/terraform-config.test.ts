@@ -127,11 +127,34 @@ describe("terraform language config", () => {
       expect(await detectLanguages(dir)).toEqual([terraformConfig]);
     });
 
-    it("stays Terraform alone when Terraform files outnumber the fallback's source", async () => {
+    it("keeps the TypeScript fallback in a polyglot repo with more Terraform files than source", async () => {
+      await touch("web/package.json", "{}");
+      await touch("src/app.ts");
+      await touch("src/app.test.ts");
+      await touch("infra/main.tf");
+      await touch("infra/variables.tf");
+      await touch("infra/outputs.tf");
+      await touch("infra/versions.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      const configs = await detectLanguages(dir);
+      expect(configs).toEqual([typescriptConfig, terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: mergeLanguageConfigs(configs) });
+      expect(inv.files.find((f) => f.path === "src/app.test.ts")?.role).toBe("test");
+    });
+
+    it("keeps the TypeScript fallback for one source file among many Terraform files", async () => {
       // cloud-foundation-fabric: 832 .tf files and one Cloud Function at depth 4.
       await touch("modules/api-gateway/recipe-multi-region/function/index.js");
       await touch("modules/api-gateway/main.tf");
       await touch("modules/api-gateway/variables.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      expect(await detectLanguages(dir)).toEqual([typescriptConfig, terraformConfig]);
+    });
+
+    it("stays Terraform alone with no fallback source", async () => {
+      await touch("modules/network/main.tf");
+      await touch("modules/network/variables.tf");
+      await touch("live/prod.tfvars");
       expect(await detectLanguage(dir)).toBe(terraformConfig);
       expect(await detectLanguages(dir)).toEqual([terraformConfig]);
     });

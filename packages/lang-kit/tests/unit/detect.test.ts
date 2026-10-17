@@ -67,6 +67,8 @@ describe("lang-kit detection seam", () => {
   it.each([
     ["a tie", 1, 1],
     ["more fallback source", 2, 5],
+    ["more Terraform files", 3, 1],
+    ["one source file among many Terraform files", 832, 1],
   ])("keeps TypeScript primary beside Terraform on %s", async (_, terraform, fallbackSource) => {
     expect(await detectLanguage(dir, recordingSearch(terraform, fallbackSource))).toBe(typescriptConfig);
     const all = recordingSearch(terraform, fallbackSource);
@@ -74,10 +76,9 @@ describe("lang-kit detection seam", () => {
     expect(all.calls).toEqual([{ others: [typescriptConfig], count: true }]);
   });
 
-  it("is Terraform alone when Terraform files outnumber the fallback's source", async () => {
-    // cloud-foundation-fabric: 832 .tf files and one Cloud Function index.js.
-    expect(await detectLanguage(dir, recordingSearch(832, 1))).toBe(terraformConfig);
-    expect(await detectLanguages(dir, recordingSearch(832, 1))).toEqual([terraformConfig]);
+  it("is Terraform alone only with no fallback source at all", async () => {
+    expect(await detectLanguage(dir, recordingSearch(832, 0))).toBe(terraformConfig);
+    expect(await detectLanguages(dir, recordingSearch(832, 0))).toEqual([terraformConfig]);
   });
 
   it.each([
