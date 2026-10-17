@@ -35,17 +35,17 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
    files) or its `analyzeProject` rejects. `src/analyzers/pack-imports.ts`
    reports it once per run: Java files get inventory only, Go edges come from
    the regex parser (`src/analyzers/go-imports.ts`).
-   `src/analyzers/terraform-infrastructure.ts` reports a Terraform pack the
-   same way, once, and only when `infrastructure.json` lists a resource from a
-   `.tf` file: those resources get no model fields. Analysis never fails on a
-   pack.
+   `src/analyzers/terraform-infrastructure.ts` reports Terraform's once, only
+   when `infrastructure.json` lists a `.tf` resource: those get no model fields. Analysis never fails on a
+   pack. A missing, unlisted opt-in pack (`isSuggestedPack`) only joins
+   analyze's end-of-run `Optional packs` line.
 
 ### Python
 
 `.py` and `.pyi` are parseable (`pythonConfig.parseableExtensions`) only
 through `@n-dx/lang-python`, an opt-in `KNOWN_PACKS` entry with no fallback
-parser: without it, Python files get inventory only and the missing-pack
-notice, and every artifact is the same as before Python was a pack. With
+parser: without it, Python files get inventory only, and every artifact is
+the same as before Python was a pack. With
 it, Python edges and externals reach `imports.json` through
 `buildPackImportGraph` like Go's and Java's (stdlib as `stdlib:<module>`, a
 `TYPE_CHECKING`-only target as a `type` edge), so Python files join zones;

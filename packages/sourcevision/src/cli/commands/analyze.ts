@@ -35,6 +35,8 @@ import {
   runComponentsPhase,
   runCallGraphPhase,
   packFrameworkFacts,
+  suggestPack,
+  optionalPacksLine,
   PhasePrerequsiteError,
   PhaseError,
   MAX_ENRICHMENT_PASS,
@@ -526,6 +528,12 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
       // Non-critical — don't fail the analysis
     }
 
+    const optionalPacks = optionalPacksLine(ctx);
+    if (optionalPacks !== undefined) {
+      info("");
+      info(optionalPacks);
+    }
+
     info("");
     info(green("Done."));
     completed = true;
@@ -747,7 +755,10 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
       toInfrastructureData(computeInfrastructure(ctx.absDir, inventoryPaths)),
       ctx.absDir,
       inventoryPaths,
-      { listed: ((await loadInventoryConfig(ctx.absDir)).packs ?? []).includes(terraformConfig.id) },
+      {
+        listed: ((await loadInventoryConfig(ctx.absDir)).packs ?? []).includes(terraformConfig.id),
+        suggest: (id) => suggestPack(ctx, id),
+      },
     );
     writeFileSync(join(ctx.svDir, DATA_FILES.infrastructure), toCanonicalJSON(infrastructure));
 

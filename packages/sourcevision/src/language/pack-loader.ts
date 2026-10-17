@@ -43,12 +43,29 @@ export interface KnownPack extends InstallablePack {
    * pack is known before the pack is loaded.
    */
   readonly config: LanguageConfig;
+  /**
+   * Installed with sourcevision (an optional dependency, with a fallback
+   * parser), so a missing one means the install went wrong and is warned
+   * about. A missing opt-in pack the project does not list is only suggested
+   * ({@link isSuggestedPack}).
+   */
+  readonly bundled?: boolean;
+}
+
+/**
+ * True when a pack that did not load is only a suggestion, not a fault: an
+ * opt-in pack that is missing and that the project does not list in
+ * `sourcevision.packs`. A listed, bundled, refused or invalid pack is warned
+ * about.
+ */
+export function isSuggestedPack(pack: KnownPack, load: PackLoad, listed: readonly string[]): boolean {
+  return load.status === "missing" && !pack.bundled && !listed.includes(pack.id);
 }
 
 /** The packs sourcevision loads, in the order their languages are analyzed. */
 export const KNOWN_PACKS: readonly KnownPack[] = [
   { id: javaConfig.id, packageName: "@n-dx/lang-java", config: javaConfig, importByResolution: () => import("@n-dx/lang-java") },
-  { id: goConfig.id, packageName: "@n-dx/lang-go", config: goConfig, importByResolution: () => import("@n-dx/lang-go") },
+  { id: goConfig.id, packageName: "@n-dx/lang-go", config: goConfig, bundled: true, importByResolution: () => import("@n-dx/lang-go") },
   // Not an imports pack: its resources enrich infrastructure.json (`analyzers/terraform-infrastructure.ts`).
   { id: terraformConfig.id, packageName: "@n-dx/lang-terraform", config: terraformConfig, importByResolution: () => import("@n-dx/lang-terraform") },
   // No fallback parser: without it, Python files get inventory only.
