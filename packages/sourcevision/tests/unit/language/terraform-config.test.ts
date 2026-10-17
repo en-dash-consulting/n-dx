@@ -121,10 +121,23 @@ describe("terraform language config", () => {
     it("does not count source the inventory ignores", async () => {
       await touch(".gitignore", "generated-site/\n");
       await touch("generated-site/app.js");
-      await touch("dist/bundle.js");
       await touch("main.tf");
       expect(await detectLanguage(dir)).toBe(terraformConfig);
-      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+      const configs = await detectLanguages(dir);
+      expect(configs).toEqual([terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: mergeLanguageConfigs(configs) });
+      expect(inv.files.map((f) => f.path)).toEqual(["main.tf"]);
+    });
+
+    it("counts source only the fallback skips, so the inventory still skips it", async () => {
+      // Terraform alone does not skip dist/; the fallback does.
+      await touch("dist/handler.js");
+      await touch("main.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      const configs = await detectLanguages(dir);
+      expect(configs).toEqual([typescriptConfig, terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: mergeLanguageConfigs(configs) });
+      expect(inv.files.map((f) => f.path)).toEqual(["main.tf"]);
     });
 
     it("keeps the TypeScript fallback in a polyglot repo with more Terraform files than source", async () => {

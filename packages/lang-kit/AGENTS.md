@@ -87,7 +87,9 @@ searchProjectFiles })`); sourcevision's `src/language/detect.ts` supplies both,
 the search being the inventory's own walk. A markerless repository is
 Terraform alone only when that walk finds Terraform files and no
 `isFallbackSourceFile` file (JS/TS, or a language with no config); counts
-are not weighed.
+are not weighed. Before deciding Terraform alone it searches again with no
+other config, so source only the fallback skips (`dist/`) keeps the fallback
+and the result's inventory never lists source detection did not count.
 Resolvers, the parser runner, queries and grammars live in the runtime and the
 packs; pack loading lives in sourcevision. Domain packages import it directly,
 as they do `@n-dx/llm-client`; hench and web have no gateway for it.
