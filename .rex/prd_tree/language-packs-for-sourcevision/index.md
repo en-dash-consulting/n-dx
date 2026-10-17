@@ -23,7 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Install language packs: ndx sv pack add, offline bundles and the project pack list (12b)](./install-language-packs-ndx-sv-pack-add/index.md) | completed |
 | [Java structure through tree-sitter](./java-structure-through-tree-sitter/index.md) | completed |
 | [Language pack interface inside sourcevision](./language-pack-interface-inside/index.md) | completed |
-| [Parser runtime and language packs (12a)](./parser-runtime-and-language-packs-12a/index.md) | completed |
+| [Parser runtime and language packs (12a)](./parser-runtime-and-language-packs-12a/index.md) | pending |
 | [Python structure and import resolution through @n-dx/lang-python (PR 15)](./python-structure-and-import-resolution/index.md) | pending |
 | [Read Maven and Gradle build files](./read-maven-and-gradle-build-files/index.md) | completed |
 | [Resolve Go imports through the pack](./resolve-go-imports-through-the-pack/index.md) | completed |
