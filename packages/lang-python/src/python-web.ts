@@ -87,6 +87,8 @@ export interface Binding {
   readonly name?: string;
   /** Where the import binds it. */
   readonly at: SourcePosition;
+  /** The import is inside a `def` or `class`, so it binds no module-level name. */
+  readonly nested?: true;
 }
 
 /** A name bound by an assignment; `augmented` for `+=`. */
@@ -219,8 +221,12 @@ function readBindings(file: PackSourceFile, aliased: readonly Capture[], aliases
     const text = dotted(name.text);
     entries.push([name.start, aliasOf(name) ?? text, { module: dotted(from.text), name: text, at: name.start }]);
   }
+  const definitions = file.captures.definitions ?? [];
+  const declarations = [...named(definitions, "class.declaration"), ...named(definitions, "function.declaration")];
+  const nested = (at: SourcePosition): boolean =>
+    declarations.some((d) => comparePositions(d.start, at) < 0 && comparePositions(at, d.end) < 0);
   entries.sort(([a], [b]) => comparePositions(a, b));
-  return new Map(entries.map(([, local, binding]) => [local, binding]));
+  return new Map(entries.map(([at, local, binding]) => [local, nested(at) ? { ...binding, nested: true } : binding]));
 }
 
 const comparePositions = (a: SourcePosition, b: SourcePosition): number => a.line - b.line || a.column - b.column;
@@ -511,8 +517,14 @@ export class WebProject {
     if (bound !== undefined && comparePositions(binding.at, bound) < 0) return undefined;
     if (binding.name === undefined) return { file, specifier: binding.module };
     const pkg = this.module(file, binding.module);
-    if (pkg !== undefined && pkg !== file && this.binds(pkg, binding.name, () => false)) {
-      return depth + 1 < MAX_REEXPORTS ? this.importedModule(pkg, binding.name, depth + 1) : undefined;
+    if (pkg !== undefined && pkg !== file) {
+      // Only a module-level binding is `pkg`'s attribute; an import inside a `def` or `class` is not.
+      const init = this.file(pkg)!;
+      const imported = init.bindings.get(binding.name);
+      if (imported && !imported.nested) {
+        return depth + 1 < MAX_REEXPORTS ? this.importedModule(pkg, binding.name, depth + 1) : undefined;
+      }
+      if (init.moduleBound.has(binding.name)) return undefined;
     }
     return { file, specifier: submodule(binding.module, binding.name) };
   }
