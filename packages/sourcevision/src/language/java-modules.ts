@@ -32,7 +32,7 @@ export interface JavaModuleLayout {
 
 const DEFAULT_ROOTS = ["src/main/java", "src/test/java"];
 const GRADLE_SETTINGS = ["settings.gradle", "settings.gradle.kts"];
-const GRADLE_BUILD = ["build.gradle", "build.gradle.kts"];
+export const GRADLE_BUILD = ["build.gradle", "build.gradle.kts"];
 
 /** Find Java modules and their source roots under `projectDir`. */
 export async function discoverJavaModules(projectDir: string): Promise<JavaModuleLayout> {
