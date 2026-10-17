@@ -64,6 +64,11 @@ so `src/main/java/…/target/` stays a package). `skipsDirectory` applies both
 and `skipDirectories`, the caller doing the I/O and passing the directory's
 place; a name both conditional rules list is kept if either keeps it.
 
+Java build files (`pom.xml`, Gradle scripts) are read through
+`src/build-file.ts`, capped at `MAX_BUILD_FILE_BYTES` (1 MiB); a larger file
+is skipped with a notice. Scans of repository content must stay linear: use
+`indexOf` for block and comment spans, not a lazy `[\s\S]*?` regex.
+
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
 so the Java and Go packs share it without depending on each other.
 

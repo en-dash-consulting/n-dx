@@ -13,8 +13,8 @@
  * @module lang-kit/java-maven-build
  */
 
-import { readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
+import { oversizedNotice, readBuildFile } from "./build-file.js";
 import type { BuildDependency, BuildValue, ModuleBuildModel } from "./build-model.js";
 import type { JavaModule } from "./java-modules.js";
 import { child, childText, childrenNamed, parseXml, XmlSyntaxError, type XmlElement } from "./xml-lite.js";
@@ -141,7 +141,11 @@ class MavenReader {
     const path = join(this.projectDir, dir, "pom.xml");
     let result: PomFile | string;
     try {
-      result = toPom(dir, parseXml(await readFile(path, "utf8")));
+      const text = await readBuildFile(path);
+      result =
+        typeof text === "string"
+          ? toPom(dir, parseXml(text))
+          : oversizedNotice(posix.join(dir, "pom.xml"), text.oversized);
     } catch (err) {
       if (err instanceof XmlSyntaxError) result = `${posix.join(dir, "pom.xml")} is not valid XML: ${err.message}`;
       else if ((err as NodeJS.ErrnoException).code === "ENOENT") result = `${posix.join(dir, "pom.xml")} not found`;
