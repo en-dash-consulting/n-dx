@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -7,6 +7,7 @@ import {
   clampGuardToBaseline,
   clearRepoTrust,
   collectRepoExecutionConfig,
+  collectRepoInventory,
   evaluateRepoTrust,
   formatRepoTrustReport,
   guardBaselineForLanguage,
@@ -368,6 +369,64 @@ describe("evaluateRepoTrust and the trust store", () => {
     expect(ev.inventory.prd).toEqual({ items: 2, epics: 1 });
     expect(ev.inventory.analysis).toEqual({ analyzedAt: "2026-10-01T00:00:00Z", version: "0.7.2" });
   });
+});
+
+describe("collectRepoInventory and symlinks (#686 finding 4)", () => {
+  let outside: string;
+
+  beforeEach(() => {
+    outside = mkdtempSync(join(tmpdir(), "ndx-trust-outside-"));
+    for (const name of ["x", "y", "z"]) {
+      mkdirSync(join(outside, name), { recursive: true });
+      writeFileSync(join(outside, name, "index.md"), `# ${name}`);
+    }
+  });
+
+  afterEach(() => {
+    rmSync(outside, { recursive: true, force: true });
+  });
+
+  /** A directory link; a junction on Windows, which needs no privilege. */
+  function linkDir(target: string, path: string): void {
+    symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
+  }
+
+  function item(rel: string): void {
+    mkdirSync(join(repo, rel), { recursive: true });
+    writeFileSync(join(repo, rel, "index.md"), "# item");
+  }
+
+  it("does not count items behind a link to a directory outside the repository", () => {
+    item(".rex/prd_tree/epic-a");
+    linkDir(outside, join(repo, ".rex", "prd_tree", "ext"));
+    expect(collectRepoInventory(repo).prd).toEqual({ items: 1, epics: 1 });
+  });
+
+  it("returns promptly on a symlink loop and counts only the real item", () => {
+    item(".rex/prd_tree/epic-a");
+    linkDir(join(repo, ".rex", "prd_tree"), join(repo, ".rex", "prd_tree", "epic-a", "loop"));
+    expect(collectRepoInventory(repo).prd).toEqual({ items: 1, epics: 1 });
+  });
+
+  it("ignores a tree root that is itself a link out of the repository", () => {
+    mkdirSync(join(repo, ".rex"), { recursive: true });
+    linkDir(outside, join(repo, ".rex", "prd_tree"));
+    expect(collectRepoInventory(repo).prd).toBeNull();
+  });
+
+  for (const rexDir of [".rex", ".ndx/rex"]) {
+    it(`walks prd_tree, product and changes under ${rexDir} with the same rules`, () => {
+      item(`${rexDir}/prd_tree/epic-a`);
+      item(`${rexDir}/product/capability-a`);
+      writeFileSync(join(repo, rexDir, "product", "index.md"), "# product root header");
+      item(`${rexDir}/changes/change-a/task-b`);
+      writeFileSync(join(repo, rexDir, "changes", "change-a", "index.md"), "# change");
+      for (const root of ["prd_tree", "product", "changes"]) {
+        linkDir(outside, join(repo, rexDir, root, "ext"));
+      }
+      expect(collectRepoInventory(repo).prd).toEqual({ items: 4, epics: 3 });
+    });
+  }
 });
 
 describe("formatRepoTrustReport", () => {

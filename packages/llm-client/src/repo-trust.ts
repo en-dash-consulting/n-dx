@@ -62,7 +62,6 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
-  statSync,
   writeFileSync,
   type Dirent,
 } from "node:fs";
@@ -568,31 +567,57 @@ export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrus
 
 /** What else the checkout brought, for the review a user sees at init. */
 export interface RepoInventory {
+  /**
+   * PRD nodes (directories holding `index.md`) across every tree root. `epics`
+   * counts the top-level ones: v1 epics, v2 capabilities and changes.
+   */
   prd: { items: number; epics: number } | null;
   analysis: { analyzedAt: string | null; version: string | null } | null;
   henchRuns: number | null;
 }
 
-function countPrdTree(treeDir: string): { items: number; epics: number } | null {
-  if (!existsSync(treeDir)) return null;
+/** The folder trees under the rex dir: v1 `prd_tree/`, v2 `product/` and `changes/`. */
+const PRD_TREE_ROOTS = ["prd_tree", "product", "changes"] as const;
+
+/** True when `path` resolves to a location inside `realRoot` (itself resolved). */
+function resolvesInside(realRoot: string, path: string): boolean {
+  let real: string;
+  try {
+    real = realpathSync(path);
+  } catch {
+    return false;
+  }
+  return real === realRoot || real.startsWith(realRoot + sep);
+}
+
+/**
+ * Count PRD nodes under every tree root.
+ *
+ * This runs before the user has accepted the repository, so the checkout picks
+ * the directory structure: a tree root that resolves outside the repository is
+ * ignored, and the walk never descends through a link (Dirent types are lstat
+ * types), which rules out both escaping the repository and looping.
+ */
+function countPrdTrees(projectDir: string, rexDir: string): { items: number; epics: number } | null {
+  let realRoot: string;
+  try {
+    realRoot = realpathSync(projectDir);
+  } catch {
+    return null;
+  }
+  let found = false;
   let items = 0;
   let epics = 0;
   const walk = (dir: string, depth: number): void => {
-    let entries: string[];
+    let entries: Dirent[];
     try {
-      entries = readdirSync(dir);
+      entries = readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
-    for (const name of entries) {
-      const full = join(dir, name);
-      let isDir = false;
-      try {
-        isDir = statSync(full).isDirectory();
-      } catch {
-        continue;
-      }
-      if (!isDir) continue;
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const full = join(dir, entry.name);
       if (existsSync(join(full, "index.md"))) {
         items += 1;
         if (depth === 0) epics += 1;
@@ -600,13 +625,18 @@ function countPrdTree(treeDir: string): { items: number; epics: number } | null 
       walk(full, depth + 1);
     }
   };
-  walk(treeDir, 0);
-  return { items, epics };
+  for (const root of PRD_TREE_ROOTS) {
+    const treeDir = join(rexDir, root);
+    if (!resolvesInside(realRoot, treeDir)) continue;
+    found = true;
+    walk(treeDir, 0);
+  }
+  return found ? { items, epics } : null;
 }
 
 export function collectRepoInventory(projectDir: string): RepoInventory {
   const layout = resolveLayout(projectDir);
-  const prd = countPrdTree(join(layout.rexDir, "prd_tree"));
+  const prd = countPrdTrees(projectDir, layout.rexDir);
   const manifest = readJson(join(layout.sourcevisionDir, "manifest.json"));
   const analysis = manifest
     ? {
