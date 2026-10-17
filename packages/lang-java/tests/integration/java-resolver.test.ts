@@ -151,6 +151,77 @@ describe("java resolver", () => {
     }
   });
 
+  describe("a name declared in several files", () => {
+    const MAIN = "src/main/java/com/acme";
+    const TEST = "src/test/java/com/acme";
+    const sources: Record<string, string> = {
+      // The same class in two services.
+      "svc-a/src/main/java/com/acme/config/App.java": "package com.acme.config;\nclass App { SecurityConfig c; }\n",
+      "svc-a/src/main/java/com/acme/config/SecurityConfig.java": "package com.acme.config;\nclass SecurityConfig {}\n",
+      "svc-b/src/main/java/com/acme/config/SecurityConfig.java": "package com.acme.config;\nclass SecurityConfig {}\n",
+      "svc-a/src/main/java/com/acme/web/Ctl.java":
+        "package com.acme.web;\nimport com.acme.config.SecurityConfig;\nclass Ctl { SecurityConfig c; com.acme.config.SecurityConfig q; }\n",
+      // A third service that declares neither: no way to choose.
+      "svc-c/src/main/java/com/acme/web/Other.java":
+        "package com.acme.web;\nimport com.acme.config.SecurityConfig;\nclass Other { SecurityConfig c; }\n",
+      // A main class and a test class of the same name, and a test-only class.
+      [`${MAIN}/Foo.java`]: "package com.acme;\nclass Foo { Helper h; TestOnly t; }\n",
+      [`${MAIN}/Helper.java`]: "package com.acme;\nclass Helper {}\n",
+      [`${TEST}/Helper.java`]: "package com.acme;\nclass Helper {}\n",
+      [`${TEST}/TestOnly.java`]: "package com.acme;\nclass TestOnly {}\n",
+      [`${TEST}/FooTest.java`]: "package com.acme;\nclass FooTest { Foo f; Helper h; TestOnly t; }\n",
+      // A real tie: the same class twice in one source set.
+      "gen/src/main/java/com/acme/Twin.java": "package com.acme;\nclass Twin {}\n",
+      "gen/src/main/java/com/acme/copy/Twin.java": "package com.acme;\nclass Twin {}\n",
+      "gen/src/main/java/com/acme/User.java": "package com.acme;\nclass User { Twin t; }\n",
+    };
+
+    async function resolveSources(ctx: Parameters<typeof skipUnlessGrammar>[0]): Promise<(path: string) => FileReferences> {
+      skipUnlessGrammar(ctx, JAVA_WASM);
+      const runner = createTreeSitterRunner();
+      try {
+        const files: PackSourceFile[] = [];
+        for (const [path, source] of Object.entries(sources)) {
+          const result = await runner.parseSource({ pack: javaPack, grammarPath: JAVA_WASM }, path, source);
+          if (result.status === "parsed") files.push(result);
+        }
+        const prepared = javaPack.resolver!.prepare(files);
+        return (path) => prepared.resolve(path);
+      } finally {
+        runner.dispose();
+      }
+    }
+
+    it("resolves to the declaration in the referencing file's own module", async (ctx) => {
+      const resolve = await resolveSources(ctx);
+      const own = { "svc-a/src/main/java/com/acme/config/SecurityConfig.java": ["SecurityConfig"] };
+      expect(targets(resolve("svc-a/src/main/java/com/acme/config/App.java"))).toEqual(own);
+      expect(targets(resolve("svc-a/src/main/java/com/acme/web/Ctl.java"))).toEqual(own);
+    });
+
+    it("never resolves main code to test code, and prefers a test's own source set", async (ctx) => {
+      const resolve = await resolveSources(ctx);
+      expect(targets(resolve(`${MAIN}/Foo.java`))).toEqual({ [`${MAIN}/Helper.java`]: ["Helper"] });
+      expect(targets(resolve(`${TEST}/FooTest.java`))).toEqual({
+        [`${MAIN}/Foo.java`]: ["Foo"],
+        [`${TEST}/Helper.java`]: ["Helper"],
+        [`${TEST}/TestOnly.java`]: ["TestOnly"],
+      });
+    });
+
+    it("fans out only on a real tie or when no candidate is in the file's own module", async (ctx) => {
+      const resolve = await resolveSources(ctx);
+      expect(targets(resolve("svc-c/src/main/java/com/acme/web/Other.java"))).toEqual({
+        "svc-a/src/main/java/com/acme/config/SecurityConfig.java": ["SecurityConfig"],
+        "svc-b/src/main/java/com/acme/config/SecurityConfig.java": ["SecurityConfig"],
+      });
+      expect(targets(resolve("gen/src/main/java/com/acme/User.java"))).toEqual({
+        "gen/src/main/java/com/acme/Twin.java": ["Twin"],
+        "gen/src/main/java/com/acme/copy/Twin.java": ["Twin"],
+      });
+    });
+  });
+
   it("never reports a project package as external, even for a type not in the repository", async (ctx) => {
     skipUnlessGrammar(ctx, JAVA_WASM);
     // Proto is generated at build time into a package the repository declares.
