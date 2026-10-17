@@ -37,8 +37,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Make uv workspace member globs safe to compile and linear to match](./make-uv-workspace-member-globs-safe-to.md) | completed |
 | [Memoise and cap Maven property interpolation](./memoise-and-cap-maven-property.md) | completed |
 | [OPEN_SOURCE_SCOPE.md's package table can drift from the published packages again](./open-source-scope-md-s-package-table.md) | pending |
-| [Pin and verify the WASM toolchain the grammar build downloads](./pin-and-verify-the-wasm-toolchain-the.md) | pending |
+| [Pin and verify the WASM toolchain the grammar build downloads](./pin-and-verify-the-wasm-toolchain-the.md) | completed |
 | [Remove exponential backtracking from Python requirement specifier parsing](./remove-exponential-backtracking-from.md) | completed |
 | [Run npm without lifecycle scripts in sv pack](./run-npm-without-lifecycle-scripts-in.md) | completed |
 | [Test the Terraform module-instance cap](./test-the-terraform-module-instance-cap.md) | completed |
+| [The grammar build caches each toolchain twice: re-verified archive and trusted extracted tree](./the-grammar-build-caches-each.md) | pending |
 | [Verify offline pack bundles and limit what they replace](./verify-offline-pack-bundles-and-limit.md) | completed |
