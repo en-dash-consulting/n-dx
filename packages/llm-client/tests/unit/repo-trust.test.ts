@@ -481,4 +481,40 @@ describe("formatRepoTrustReport", () => {
       "Repository execution config: matches the defaults (nothing to trust).",
     ]);
   });
+
+  // #686 finding 2 follow-up: a plain test command leaves the checkout
+  // baseline, yet verify_criteria and rex verify refuse it until accepted.
+  it("names an unaccepted test command on a baseline checkout and how to accept it", () => {
+    writeJson(".rex/config.json", { test: 'node -e "process.exit(0)"' });
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    expect(ev.state).toBe("baseline");
+    const lines = formatRepoTrustReport(ev, { acceptCommand: "hench trust accept ." });
+    const text = lines.join("\n");
+    expect(text).not.toContain("nothing to trust");
+    expect(lines[0]).toContain("not accepted");
+    expect(text).toContain('node -e "process.exit(0)"');
+    expect(lines.at(-1)).toContain("hench trust accept .");
+    expect(lines.at(-1)).toContain("verify_criteria and rex verify");
+  });
+
+  it("reports an accepted test command on a baseline checkout", () => {
+    writeJson(".rex/config.json", { test: 'node -e "process.exit(0)"' });
+    const record = recordRepoTrust(repo, { ndxHome: home });
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    expect(ev.state).toBe("baseline");
+    const lines = formatRepoTrustReport(ev);
+    const text = lines.join("\n");
+    expect(text).not.toContain("nothing to trust");
+    expect(lines[0]).toContain(`test command accepted by you on ${record.trustedAt}`);
+    expect(text).not.toContain("ndx trust accept .");
+  });
+
+  it("treats a record for another config as not accepting the test command", () => {
+    writeJson(".rex/config.json", { test: "node a.js" });
+    recordRepoTrust(repo, { ndxHome: home });
+    writeJson(".rex/config.json", { test: "node b.js" });
+    const lines = formatRepoTrustReport(evaluateRepoTrust(repo, { ndxHome: home }));
+    expect(lines[0]).toContain("not accepted");
+    expect(lines.at(-1)).toContain("ndx trust accept .");
+  });
 });
