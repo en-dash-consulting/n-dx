@@ -55,10 +55,13 @@ describe("lang-kit detection seam", () => {
     expect(search.calls).toEqual([]);
   });
 
-  it("counts as the TypeScript fallback when no marker matched", async () => {
+  it("counts as the TypeScript fallback when no marker matched, then as Terraform alone", async () => {
     const yes = recordingSearch(1);
     expect(await detectLanguage(dir, yes)).toBe(terraformConfig);
-    expect(yes.calls).toEqual([{ others: [typescriptConfig], count: true }]);
+    expect(yes.calls).toEqual([
+      { others: [typescriptConfig], count: true },
+      { others: [], count: true },
+    ]);
 
     expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
     expect(await detectLanguages(dir, recordingSearch(0))).toEqual([typescriptConfig]);
@@ -79,6 +82,13 @@ describe("lang-kit detection seam", () => {
   it("is Terraform alone only with no fallback source at all", async () => {
     expect(await detectLanguage(dir, recordingSearch(832, 0))).toBe(terraformConfig);
     expect(await detectLanguages(dir, recordingSearch(832, 0))).toEqual([terraformConfig]);
+  });
+
+  it("keeps the fallback when only Terraform's own skip set finds fallback source", async () => {
+    // { main.tf, dist/handler.js }: the fallback skips dist/, Terraform alone does not.
+    const search = async (others: readonly LanguageConfig[]) => ({ terraform: 1, fallbackSource: others.length === 0 ? 1 : 0 });
+    expect(await detectLanguage(dir, { searchProjectFiles: search })).toBe(typescriptConfig);
+    expect(await detectLanguages(dir, { searchProjectFiles: search })).toEqual([typescriptConfig, terraformConfig]);
   });
 
   it.each([

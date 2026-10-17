@@ -452,7 +452,11 @@ function resolveFile(index: JavaIndex, file: JavaFileFacts): FileReferences {
 
 // ── Resolver ────────────────────────────────────────────────────────────────
 
-function prepareJava(files: readonly PackSourceFile[], testGrants: TestArtifactGrants): PreparedResolver {
+function prepareJava(
+  files: readonly PackSourceFile[],
+  testGrants: TestArtifactGrants,
+  notices: readonly string[] = [],
+): PreparedResolver {
   const facts = files.map(readFacts);
   const index = buildIndex(facts, testGrants);
   const byPath = new Map(facts.map((f) => [f.path, f]));
@@ -465,6 +469,7 @@ function prepareJava(files: readonly PackSourceFile[], testGrants: TestArtifactG
       if (!refs) cache.set(fromFile, (refs = resolveFile(index, file)));
       return refs;
     },
+    notices: () => notices,
   };
 }
 
@@ -474,11 +479,20 @@ const NO_GRANTS: TestArtifactGrants = new Map();
  * The Java resolver. Without {@link PackResolver.forProject} it reads no
  * build file, so a test never links to another module's test code;
  * `forProject` reads the test-jar and test-fixtures dependencies that allow it.
+ * Build files that cannot be read cost only those links: the resolver binds
+ * without them and names the failure in its notices, so every other edge resolves.
  */
 export const javaResolver: PackResolver = {
   prepare: (files) => prepareJava(files, NO_GRANTS),
   async forProject(projectDir) {
-    const grants = await readTestArtifactGrants(projectDir);
+    let grants: TestArtifactGrants;
+    try {
+      grants = await readTestArtifactGrants(projectDir);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      const notice = `Java: the build files could not be read (${reason}); no test links to another module's test code.`;
+      return { prepare: (files) => prepareJava(files, NO_GRANTS, [notice]) };
+    }
     return { prepare: (files) => prepareJava(files, grants) };
   },
 };
