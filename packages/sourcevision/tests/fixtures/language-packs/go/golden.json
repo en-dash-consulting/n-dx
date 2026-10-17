@@ -1867,5 +1867,65 @@
         "struct-tags": []
       }
     }
-  ]
+  ],
+  "references": {
+    "src/orders/service.go": {
+      "files": [],
+      "external": [
+        {
+          "package": "stdlib:embed",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:encoding/json",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:fmt",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:math",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:net/http",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:os",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:strings",
+          "symbols": [
+            "*"
+          ]
+        }
+      ]
+    },
+    "src/util/util.go": {
+      "files": [],
+      "external": [
+        {
+          "package": "stdlib:fmt",
+          "symbols": [
+            "*"
+          ]
+        }
+      ]
+    }
+  }
 }

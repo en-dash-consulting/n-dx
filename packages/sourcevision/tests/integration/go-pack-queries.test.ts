@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
 import { goPack } from "../../src/language/go-pack.js";
+import { goResolver } from "../../src/language/go-resolver.js";
 import { createTreeSitterRunner, type Capture, type ParsedFile } from "../../src/language/runner.js";
 import { skipUnlessGrammar } from "../helpers/grammar.js";
 
@@ -49,8 +50,8 @@ describe("go pack", () => {
     ]);
   });
 
-  it("is structure-only: no resolver, so it never enters the imports phase", () => {
-    expect(goPack.resolver).toBeUndefined();
+  it("carries the Go resolver, so it enters the imports phase", () => {
+    expect(goPack.resolver).toBe(goResolver);
   });
 
   it("reads the package clause", async (ctx) => {

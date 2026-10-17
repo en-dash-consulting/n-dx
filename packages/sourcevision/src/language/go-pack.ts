@@ -1,14 +1,16 @@
 /**
- * Go language pack: the pinned tree-sitter grammar plus the structure
- * queries under `queries/go/`. Structure only — no resolver yet, so Go keeps
- * its regex import parser (`analyzers/go-imports.ts`) and the pack stays out
- * of the imports phase (see `packsFor` in `analyzers/pack-imports.ts`).
+ * Go language pack: the pinned tree-sitter grammar, the structure queries
+ * under `queries/go/`, and the reference resolver (`go-resolver.ts`). When the
+ * pack degrades (grammar missing or unloadable, a query rejected, build files
+ * unreadable), the imports phase falls back to the regex import parser
+ * (`analyzers/go-imports.ts`), so Go never drops to inventory-only.
  *
  * @module sourcevision/language/go-pack
  */
 
 import { join } from "node:path";
 import { goConfig } from "./go.js";
+import { goResolver } from "./go-resolver.js";
 import { queryDir } from "./package-paths.js";
 import type { LanguagePack, RuleProvenance } from "./pack.js";
 
@@ -37,5 +39,6 @@ export const goPack: LanguagePack = {
   get queries() {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
+  resolver: goResolver,
   provenance: Object.fromEntries(QUERY_NAMES.map((name) => [name, VERIFIED])),
 };

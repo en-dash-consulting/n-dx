@@ -1,8 +1,8 @@
 /**
  * Deterministic import graph analyzer.
- * Uses the TypeScript compiler API for JS/TS AST parsing, the Go import
- * parser for .go files and language packs (tree-sitter) for Java — no Claude
- * invocation.
+ * Uses the TypeScript compiler API for JS/TS AST parsing and language packs
+ * (tree-sitter) for Java and Go, with the Go regex import parser as Go's
+ * fallback when its pack degrades — no Claude invocation.
  */
 
 import { readFile } from "node:fs/promises";
@@ -24,6 +24,7 @@ import { buildCSharpImportGraph } from "./csharp-imports.js";
 import { buildPackImportGraph, isPackFile, packsFor, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
 import { getLanguageConfig, languageConfigsFromIds, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
+import { goConfig } from "../language/go.js";
 import type { LanguageConfig } from "../language/registry.js";
 import { csharpConfig } from "../language/csharp.js";
 
@@ -33,6 +34,9 @@ const JS_TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"])
 const GO_EXTENSION = ".go";
 const SWIFT_EXTENSION = ".swift";
 const PROBE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
+
+/** Packs whose language falls back to another parser here when the pack degrades. */
+const PACK_FALLBACKS: ReadonlyMap<string, string> = new Map([[goConfig.id, "the regex import parser"]]);
 
 // ── AST extraction ───────────────────────────────────────────────────────────
 
@@ -343,7 +347,7 @@ export interface ImportsOptions {
   fileSetChanged?: boolean;
   /** Primary language id (e.g. "go", "typescript"). Reads manifest.language / detectLanguage when omitted. */
   language?: string;
-  /** Grammar location and notice sink for language-pack (Java) files. */
+  /** Grammar location and notice sink for language-pack (Java, Go) files. */
   packs?: PackImportsOptions;
 }
 
@@ -743,7 +747,8 @@ export async function analyzeImports(
 
   // Partition into JS/TS, Go, Swift, C# and pack languages to prevent cross-language contamination
   const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
-  const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
+  // Go goes through its pack when one is selected; the regex parser covers the rest.
+  const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION && !isPackFile(f.path, packs));
   const swiftParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === SWIFT_EXTENSION);
   const csharpParseableFiles = parseable.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
 
@@ -752,7 +757,14 @@ export async function analyzeImports(
   await processSwiftFiles(swiftParseableFiles, targetDir, edgeMap, externalMap);
   await processCSharpFiles(csharpParseableFiles, inventory, targetDir, edgeMap, externalMap);
   if (packFiles.length > 0) {
-    mergeGraph(await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs }), edgeMap, externalMap);
+    const graph = await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs, fallbacks: PACK_FALLBACKS });
+    mergeGraph(graph, edgeMap, externalMap);
+    // Go must never drop to inventory-only: a degraded Go pack hands every Go
+    // file (all of them are in the changed set) to the regex parser.
+    if (graph.degraded.includes(goConfig.id)) {
+      const goFiles = packFiles.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
+      await processGoFiles(goFiles, targetDir, goModulePath, edgeMap, externalMap);
+    }
   }
 
   // Incremental cleanup: remove packages whose importers were all changed

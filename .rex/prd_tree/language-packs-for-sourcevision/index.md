@@ -23,7 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Java structure through tree-sitter](./java-structure-through-tree-sitter/index.md) | completed |
 | [Language pack interface inside sourcevision](./language-pack-interface-inside/index.md) | completed |
 | [Read Maven and Gradle build files](./read-maven-and-gradle-build-files/index.md) | completed |
-| [Resolve Go imports through the pack](./resolve-go-imports-through-the-pack/index.md) | pending |
+| [Resolve Go imports through the pack](./resolve-go-imports-through-the-pack/index.md) | completed |
 | [Resolve Java references to files](./resolve-java-references-to-files/index.md) | completed |
 | [Review follow-ups for language packs](./review-follow-ups-for-language-packs/index.md) | pending |
 | [Run tree-sitter grammars in Node through WASM](./run-tree-sitter-grammars-in-node/index.md) | completed |

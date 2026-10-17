@@ -84,10 +84,20 @@ export interface PackSourceFile {
 
 /** A project file one file refers to, with the names that led there. */
 export interface FileReference {
-  /** Project-relative path of the target file. */
+  /**
+   * Project-relative path of the target file. A language whose imports name a
+   * package directory (Go) gives the directory; the zones phase expands it to
+   * the files beneath (`resolveEdgeTarget` in `analyzers/zones.ts`).
+   */
   readonly to: string;
   /** Sorted, distinct; `*` for a wildcard import. */
   readonly symbols: readonly string[];
+}
+
+/** The build-system module an external package comes from, when the resolver knows it. */
+export interface ExternalModule {
+  readonly path: string;
+  readonly version?: string;
 }
 
 /** A package outside the project that one file refers to. */
@@ -96,6 +106,8 @@ export interface ExternalReference {
   readonly package: string;
   /** Sorted, distinct; `*` for a wildcard import. */
   readonly symbols: readonly string[];
+  /** Held in memory only; the imports schema has no field for it. */
+  readonly module?: ExternalModule;
 }
 
 /** Everything one file refers to. Both lists are sorted and deduplicated. */
@@ -111,8 +123,19 @@ export interface FileReferences {
  * analysis by {@link PackResolver.prepare}.
  */
 export interface PackResolver {
-  /** Index every file of the project; call once per analysis. */
-  prepare(files: readonly PackSourceFile[]): PreparedResolver;
+  /**
+   * A resolver bound to what resolution needs from outside the source files
+   * (build files such as `go.mod`), read from `projectDir`. Call once per
+   * analysis, before {@link prepare}. Absent when sources are enough (Java).
+   */
+  forProject?(projectDir: string): Promise<PackResolver>;
+  /**
+   * Index every file of the project; call once per analysis. `unparsed` lists
+   * the pack's files that produced no captures (over the size limit, unreadable):
+   * they exist, so a resolver that maps references to directories must still
+   * count them. They are never passed to {@link PreparedResolver.resolve}.
+   */
+  prepare(files: readonly PackSourceFile[], unparsed?: readonly string[]): PreparedResolver;
 }
 
 /** A resolver bound to one project's index. */
@@ -190,7 +213,16 @@ export interface LoadPacksOptions {
   readonly grammarDir?: string;
   /** Receives one message per degraded pack. Defaults to `console.warn`. */
   readonly warn?: (message: string) => void;
+  /**
+   * What a degraded pack's files get, for the notice. Defaults to
+   * {@link inventoryOnlyOutcome}; a caller with another parser for the
+   * language says so instead.
+   */
+  readonly outcome?: (pack: LanguagePack) => string;
 }
+
+/** The notice clause for a degraded pack whose files get no import edges. */
+export const inventoryOnlyOutcome = (pack: LanguagePack): string => `${pack.config.displayName} files get inventory only`;
 
 /**
  * The step that restores a missing grammar, for the install at hand. A source
@@ -212,6 +244,7 @@ export function loadLanguagePacks(options: LoadPacksOptions = {}): PackStatus[] 
   const packs = options.packs ?? BUILTIN_PACKS;
   const grammarDir = options.grammarDir ?? grammarBuildDir();
   const warn = options.warn ?? ((message: string) => console.warn(message));
+  const outcome = options.outcome ?? inventoryOnlyOutcome;
 
   return packs.map((pack) => {
     const grammarPath = join(grammarDir, `${pack.grammar.name}.wasm`);
@@ -220,7 +253,7 @@ export function loadLanguagePacks(options: LoadPacksOptions = {}): PackStatus[] 
     }
     const notice =
       `${pack.config.displayName}: grammar ${pack.grammar.name}@${pack.grammar.version} is not built ` +
-      `(expected ${grammarPath}); ${pack.config.displayName} files get inventory only. ` +
+      `(expected ${grammarPath}); ${outcome(pack)}. ` +
       missingGrammarStep();
     warn(notice);
     return { pack, grammarPath, grammarAvailable: false, mode: "inventory-only", notice };

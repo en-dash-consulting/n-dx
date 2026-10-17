@@ -79,3 +79,14 @@ export const goConfig: LanguageConfig = {
 
   moduleFile: "go.mod",
 };
+
+/**
+ * Go stdlib packages have no dot in the first path segment.
+ * e.g. "fmt", "net/http", "encoding/json" → stdlib
+ *      "github.com/foo/bar" → not stdlib (has dot)
+ *      "golang.org/x/text" → not stdlib (has dot)
+ */
+export function isGoStdlibPath(importPath: string): boolean {
+  const firstSegment = importPath.split("/")[0];
+  return !firstSegment.includes(".");
+}
