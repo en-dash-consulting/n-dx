@@ -11,7 +11,8 @@
  * finds stay out.
  *
  * The pack is opt-in. Missing, refused or degraded, it costs these fields
- * only: one notice, and the data comes back as it went in.
+ * only: one notice (only a suggestion when it is missing and not listed),
+ * and the data comes back as it went in.
  *
  * @module sourcevision/analyzers/terraform-infrastructure
  */
@@ -20,7 +21,7 @@ import { extname, posix } from "node:path";
 import { terraformConfig, type PackDegradation, type ResourceAttributes, type ResourceFact } from "@n-dx/lang-kit";
 import type { InfraResource, InfrastructureData } from "../schema/v1.js";
 import { noticeListedPacks } from "./pack-imports.js";
-import { KNOWN_PACKS, loadPack, packInstallCommand, type KnownPack, type PackLoaderOptions } from "../language/pack-loader.js";
+import { KNOWN_PACKS, isSuggestedPack, loadPack, packInstallCommand, type KnownPack, type PackLoaderOptions } from "../language/pack-loader.js";
 
 export interface TerraformInfrastructureOptions {
   /** Defaults to the Terraform entry of {@link KNOWN_PACKS}. */
@@ -35,6 +36,11 @@ export interface TerraformInfrastructureOptions {
    * the listed-pack notice itself (the imports phase leaves Terraform to it).
    */
   readonly listed?: boolean;
+  /**
+   * Receives the pack's id when it is missing and not listed (`isSuggestedPack`):
+   * no warning, the caller names it in one end-of-run line.
+   */
+  readonly suggest?: (packId: string) => void;
 }
 
 const ID_PREFIX = "infra:";
@@ -122,7 +128,11 @@ export async function enrichTerraformInfrastructure(
   };
 
   const load = await loadPack(pack, options.loader);
-  if (load.status !== "loaded") return skip(load.notice);
+  if (load.status !== "loaded") {
+    if (!isSuggestedPack(pack, load, options.listed ? [pack.id] : [])) return skip(load.notice);
+    options.suggest?.(pack.id);
+    return data;
+  }
   if (!load.entry.produces.includes("resources")) return skip({ reason: 'the pack does not produce "resources"' });
   let result;
   try {

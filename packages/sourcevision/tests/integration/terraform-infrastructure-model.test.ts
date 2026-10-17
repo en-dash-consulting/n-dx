@@ -92,7 +92,7 @@ describe("analyze with the Terraform model", () => {
     vi.restoreAllMocks();
   });
 
-  async function analyze(missing: boolean): Promise<{ artifacts: Map<string, string>; warnings: string[] }> {
+  async function analyze(missing: boolean): Promise<{ artifacts: Map<string, string>; warnings: string[]; logs: string[] }> {
     // The same project name each run: it is written into llms.txt and CONTEXT.md.
     const parent = mkdtempSync(join(tmpdir(), "sv-tf-model-"));
     dirs.push(parent);
@@ -105,18 +105,21 @@ describe("analyze with the Terraform model", () => {
     }
     terraform.missing = missing;
     const warnings: string[] = [];
+    const logs: string[] = [];
     const warn = vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => void warnings.push(args.join(" ")));
+    const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => void logs.push(args.join(" ")));
     try {
       await cmdAnalyze(dir, ["--fast"]);
     } finally {
       warn.mockRestore();
+      log.mockRestore();
     }
     // Each run's own directory and clock appear in these; masked so only content is compared.
     const artifacts = readTree(join(dir, ".sourcevision"));
     for (const [path, text] of artifacts) {
       artifacts.set(path, text.split(dir).join("<project>").replace(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z/g, "<time>"));
     }
-    return { artifacts, warnings };
+    return { artifacts, warnings, logs };
   }
 
   const infrastructureOf = (artifacts: Map<string, string>): InfrastructureData =>
@@ -127,10 +130,12 @@ describe("analyze with the Terraform model", () => {
     const without = await analyze(true);
     const withPack = await analyze(false);
 
-    expect(without.warnings.filter((w) => w.startsWith("Terraform:"))).toEqual([
-      "Terraform: pack @n-dx/lang-terraform is not installed; infrastructure.json gets no Terraform model fields. Install it with `ndx sv pack add terraform`.",
-    ]);
+    // Not listed in sourcevision.packs: no warning, one end-of-run suggestion.
+    const optional = (logs: string[]) => logs.filter((l) => l.includes("Optional packs"));
+    expect(without.warnings.filter((w) => w.startsWith("Terraform:"))).toEqual([]);
+    expect(optional(without.logs)).toEqual(["Optional packs for this repo: terraform — ndx sv pack add <id>"]);
     expect(withPack.warnings.filter((w) => w.startsWith("Terraform:"))).toEqual([]);
+    expect(optional(withPack.logs)).toEqual([]);
 
     const plain = infrastructureOf(without.artifacts);
     const enriched = infrastructureOf(withPack.artifacts);

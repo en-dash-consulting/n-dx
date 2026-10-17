@@ -9,6 +9,9 @@
  * must carry sourcevision's own version, since the two are released together.
  * `sv pack add` ({@link INSTALLABLE_PACKS}) installs packs there.
  *
+ * A pack installed only for another sourcevision version (left behind by an
+ * n-dx upgrade) is refused like a pack of another version, not called missing.
+ *
  * A pack that is missing, of another version or not a pack entry is never
  * fatal: the result carries a notice, worded like the notices of a pack that
  * cannot run, naming the `ndx sv pack add` command that installs the right one.
@@ -16,8 +19,8 @@
  * @module sourcevision/language/pack-loader
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync, type Dirent } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { goConfig, isLanguagePackEntry, javaConfig, pythonConfig, terraformConfig, type LanguageConfig, type LanguagePackEntry, type PackDegradation } from "@n-dx/lang-kit";
 import { resolveNdxHome } from "@n-dx/llm-client";
@@ -43,12 +46,29 @@ export interface KnownPack extends InstallablePack {
    * pack is known before the pack is loaded.
    */
   readonly config: LanguageConfig;
+  /**
+   * Installed with sourcevision (an optional dependency, with a fallback
+   * parser), so a missing one means the install went wrong and is warned
+   * about. A missing opt-in pack the project does not list is only suggested
+   * ({@link isSuggestedPack}).
+   */
+  readonly bundled?: boolean;
+}
+
+/**
+ * True when a pack that did not load is only a suggestion, not a fault: an
+ * opt-in pack that is missing and that the project does not list in
+ * `sourcevision.packs`. A listed, bundled, refused or invalid pack is warned
+ * about.
+ */
+export function isSuggestedPack(pack: KnownPack, load: PackLoad, listed: readonly string[]): boolean {
+  return load.status === "missing" && !pack.bundled && !listed.includes(pack.id);
 }
 
 /** The packs sourcevision loads, in the order their languages are analyzed. */
 export const KNOWN_PACKS: readonly KnownPack[] = [
   { id: javaConfig.id, packageName: "@n-dx/lang-java", config: javaConfig, importByResolution: () => import("@n-dx/lang-java") },
-  { id: goConfig.id, packageName: "@n-dx/lang-go", config: goConfig, importByResolution: () => import("@n-dx/lang-go") },
+  { id: goConfig.id, packageName: "@n-dx/lang-go", config: goConfig, bundled: true, importByResolution: () => import("@n-dx/lang-go") },
   // Not an imports pack: its resources enrich infrastructure.json (`analyzers/terraform-infrastructure.ts`).
   { id: terraformConfig.id, packageName: "@n-dx/lang-terraform", config: terraformConfig, importByResolution: () => import("@n-dx/lang-terraform") },
   // No fallback parser: without it, Python files get inventory only.
@@ -81,9 +101,53 @@ export type PackLoad =
   | { readonly status: "missing" | "invalid"; readonly notice: PackDegradation }
   | { readonly status: "mismatch"; readonly notice: PackDegradation; /** The version found. */ readonly found: string };
 
+/** `<ndx home>/packs`: one pack directory per sourcevision version below it. */
+const packsRoot = (): string => join(resolveNdxHome(), "packs");
+
 /** `<ndx home>/packs/<version>`: where opt-in packs for this sourcevision version are installed. */
 export function defaultPackDir(version: string = sourcevisionVersion()): string {
-  return join(resolveNdxHome(), "packs", version);
+  return join(packsRoot(), version);
+}
+
+/**
+ * The version of `pack` installed in another version's directory beside
+ * `packDir`, the newest when there are several. Undefined when there is none,
+ * or when `packDir` is not under `<ndx home>/packs`. Dot directories (the
+ * `.sv-pack-stage-*` that `sv pack add --from` extracts into) and copies at
+ * `version` itself are not stale installs, so they are skipped; a staged
+ * load is not scanned at all, since what it lacks is the bundle's fault.
+ * A root that cannot be listed (unreadable, or a file) has no stale install
+ * to name, so the pack is reported missing rather than `loadPack` throwing.
+ */
+function versionInSiblingPackDir(pack: InstallablePack, packDir: string, version: string): string | undefined {
+  const root = dirname(packDir);
+  if (root !== packsRoot() || basename(packDir).startsWith(".")) return undefined;
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+  const found: string[] = [];
+  for (const dir of entries) {
+    if (!dir.isDirectory() || dir.name === basename(packDir) || dir.name.startsWith(".")) continue;
+    const manifestFile = join(root, dir.name, "node_modules", ...pack.packageName.split("/"), "package.json");
+    if (!existsSync(manifestFile)) continue;
+    const stale = manifestVersion(manifestFile) ?? dir.name;
+    if (stale !== version) found.push(stale);
+  }
+  return found.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0];
+}
+
+/** A package.json's version, or undefined when it does not parse or has none. */
+function manifestVersion(file: string): string | undefined {
+  let manifest: PackManifest;
+  try {
+    manifest = JSON.parse(readFileSync(file, "utf-8")) as PackManifest;
+  } catch {
+    return undefined;
+  }
+  return typeof manifest.version === "string" ? manifest.version : undefined;
 }
 
 /** The command that installs the pack matching this sourcevision into the pack directory. */
@@ -163,6 +227,8 @@ export async function loadPack(pack: InstallablePack, options: PackLoaderOptions
       imported = await pack.importByResolution();
     } catch (error) {
       if (isPackNotFound(error, pack.packageName)) {
+        const stale = versionInSiblingPackDir(pack, packDir, version);
+        if (stale !== undefined) return mismatch(stale);
         return notice("missing", `pack ${pack.packageName} is not installed`, `Install it with \`${install}\`.`);
       }
       return invalid(errorText(error));

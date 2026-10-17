@@ -70,14 +70,21 @@ describe("Python files through the Python pack", () => {
     rmSync(emptyPackDir, { recursive: true, force: true });
   });
 
-  async function imports(packs: KnownPack[]): Promise<{ imports: Imports; notices: string[]; analysed: string[] }> {
+  async function imports(packs: KnownPack[]): Promise<{ imports: Imports; notices: string[]; analysed: string[]; suggested: string[] }> {
     const notices: string[] = [];
     const analysed: string[] = [];
+    const suggested: string[] = [];
     const result = await analyzeImports(dir, inventory, {
       language: "python",
-      packs: { packs, loader: { packDir: emptyPackDir }, warn: (m) => notices.push(m), analysed: (id) => analysed.push(id) },
+      packs: {
+        packs,
+        loader: { packDir: emptyPackDir },
+        warn: (m) => notices.push(m),
+        analysed: (id) => analysed.push(id),
+        suggest: (id) => suggested.push(id),
+      },
     });
-    return { imports: result, notices, analysed };
+    return { imports: result, notices, analysed, suggested };
   }
 
   it("lists Python in the inventory but not as an analysed language, as before", async () => {
@@ -87,14 +94,13 @@ describe("Python files through the Python pack", () => {
     expect(toCanonicalJSON(inventory)).toBe(toCanonicalJSON(before));
   });
 
-  it("with the pack missing, writes the same imports as before and says how to install it", async () => {
+  it("with the pack missing and not listed, writes the same imports as before and only suggests the pack", async () => {
     const before = await imports(WITHOUT_PYTHON);
     const missing = await imports(PYTHON_MISSING);
     expect(toCanonicalJSON(missing.imports)).toBe(toCanonicalJSON(before.imports));
     expect(before.imports.edges.map((e) => `${e.from} -> ${e.to}`)).toEqual(["web/app.ts -> web/api.ts"]);
-    expect(missing.notices).toEqual([
-      "Python: pack @n-dx/lang-python is not installed; Python files get inventory only. Install it with `ndx sv pack add python`.",
-    ]);
+    expect(missing.notices).toEqual([]);
+    expect(missing.suggested).toEqual(["python"]);
     // No pack ran, so the inventory summary keeps Python out of analysedLanguages.
     expect(missing.analysed).toEqual([]);
     expect(withPackAnalysedLanguages(inventory.summary, missing.analysed)).toBe(inventory.summary);

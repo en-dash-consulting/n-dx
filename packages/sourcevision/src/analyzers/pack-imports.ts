@@ -8,7 +8,8 @@
  * `produces` omits "imports", or when it reports that it could not run (its
  * grammar is not built or will not load, a query will not compile, the
  * project's build files cannot be read), or when its `analyzeProject` rejects
- * anyway (a defect in the pack). It is reported once, produces no
+ * anyway (a defect in the pack). It is reported once (a missing opt-in pack
+ * the project does not list is only suggested), produces no
  * edges, and is listed in {@link PackImportGraph.degraded} so a caller with
  * another parser for the language (Go's regex parser) can run it.
  *
@@ -23,6 +24,7 @@ import type { ExternalImport, ImportEdge, Inventory } from "../schema/index.js";
 import {
   INSTALLABLE_PACKS,
   KNOWN_PACKS,
+  isSuggestedPack,
   loadPack,
   packInstallCommand,
   type InstallablePack,
@@ -52,6 +54,14 @@ export interface PackImportsOptions {
   readonly framework?: (facts: readonly FileFacts[]) => void;
   /** Receives the id of each pack that ran without degrading. */
   readonly analysed?: (packId: string) => void;
+  /** The project's `sourcevision.packs`: a missing pack listed here is warned about. */
+  readonly listed?: readonly string[];
+  /**
+   * Receives the id of each pack that would help but is only suggested
+   * (`isSuggestedPack`): it gets no warning, and the caller names it in one
+   * end-of-run line.
+   */
+  readonly suggest?: (packId: string) => void;
 }
 
 /** The fact kinds a pack's framework rules produce for later phases. */
@@ -139,7 +149,12 @@ export async function buildPackImportGraph(
 
     const load = await loadPack(pack, options.loader);
     if (load.status !== "loaded") {
-      degrade(pack, load.notice);
+      if (isSuggestedPack(pack, load, options.listed ?? [])) {
+        options.suggest?.(pack.id);
+        degraded.push(pack.id);
+      } else {
+        degrade(pack, load.notice);
+      }
       continue;
     }
     // A pack that does not produce imports would read every file for no

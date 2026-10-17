@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { goConfig } from "../../src/go.js";
 import { typescriptConfig } from "../../src/typescript.js";
 import { pythonConfig } from "../../src/python.js";
+import { javaConfig, javaSecondaryConfig } from "../../src/java.js";
 import { getLanguageConfig, mergeLanguageConfigs } from "../../src/detect.js";
 import { skipsDirectory, type LanguageConfig } from "../../src/registry.js";
 
@@ -164,5 +165,70 @@ describe("skipsDirectory", () => {
 
   it("a merge with no conditional rules has no skipUnlessContains", () => {
     expect(mergeLanguageConfigs([goConfig, typescriptConfig])).not.toHaveProperty("skipUnlessContains");
+    expect(mergeLanguageConfigs([goConfig, typescriptConfig])).not.toHaveProperty("skipBesideMarker");
+  });
+});
+
+describe("skipsDirectory — build output beside a module root", () => {
+  const holdsNothing = () => false;
+  const at = (path: string, parentFiles: string[] = []) => ({
+    path,
+    parentHolds: (file: string) => parentFiles.includes(file),
+  });
+
+  it.each(["target", "build", "out", "generated"])("javaConfig skips %s at the project root", (name) => {
+    expect(skipsDirectory(javaConfig, name, holdsNothing, at(name))).toBe(true);
+  });
+
+  it.each(["pom.xml", "build.gradle", "build.gradle.kts"])("javaConfig skips target beside %s", (marker) => {
+    expect(skipsDirectory(javaConfig, "target", holdsNothing, at("sub/target", [marker]))).toBe(true);
+  });
+
+  it.each(["target", "build", "out", "generated"])("javaConfig keeps a %s package below src/", (name) => {
+    const path = `spring-aop/src/main/java/org/springframework/aop/${name}`;
+    expect(skipsDirectory(javaConfig, name, holdsNothing, at(path))).toBe(false);
+    // Below src/ even when the parent holds a build file.
+    expect(skipsDirectory(javaConfig, name, holdsNothing, at(`src/${name}`, ["pom.xml"]))).toBe(false);
+  });
+
+  it("javaConfig keeps a target directory whose parent is not a module root", () => {
+    expect(skipsDirectory(javaConfig, "target", holdsNothing, at("docs/target"))).toBe(false);
+  });
+
+  it("javaConfig always skips .gradle and generated-sources", () => {
+    for (const name of [".gradle", "generated-sources"]) {
+      expect(skipsDirectory(javaConfig, name, holdsNothing, at(`src/main/${name}`))).toBe(true);
+    }
+  });
+
+  it("javaSecondaryConfig applies the same rule to target only", () => {
+    expect(skipsDirectory(javaSecondaryConfig, "target", holdsNothing, at("target"))).toBe(true);
+    expect(skipsDirectory(javaSecondaryConfig, "target", holdsNothing, at("svc/target", ["pom.xml"]))).toBe(true);
+    expect(skipsDirectory(javaSecondaryConfig, "target", holdsNothing, at("svc/src/main/java/a/target"))).toBe(false);
+    for (const name of ["build", "out", "generated"]) {
+      expect(skipsDirectory(javaSecondaryConfig, name, holdsNothing, at(name))).toBe(false);
+    }
+  });
+
+  it("without a place, a skipBesideMarker name is skipped as if at the root", () => {
+    expect(skipsDirectory(javaConfig, "target", holdsNothing)).toBe(true);
+  });
+
+  it("merged with TypeScript, build stays skipped everywhere and target stays conditional", () => {
+    const merged = mergeLanguageConfigs([typescriptConfig, javaSecondaryConfig]);
+    expect(skipsDirectory(merged, "build", holdsNothing, at("src/main/java/a/build"))).toBe(true);
+    expect(skipsDirectory(merged, "target", holdsNothing, at("src/main/java/a/target"))).toBe(false);
+    expect(skipsDirectory(merged, "target", holdsNothing, at("target"))).toBe(true);
+  });
+
+  it("merged with Python, a directory either language calls source is kept", () => {
+    const merged = mergeLanguageConfigs([javaConfig, pythonConfig]);
+    const holdsInit = (file: string) => file === "__init__.py";
+    // Python package beside a build file: kept.
+    expect(skipsDirectory(merged, "build", holdsInit, at("build"))).toBe(false);
+    // Java package below src/ without __init__.py: kept.
+    expect(skipsDirectory(merged, "build", holdsNothing, at("src/main/java/a/build"))).toBe(false);
+    // Neither: skipped.
+    expect(skipsDirectory(merged, "build", holdsNothing, at("build"))).toBe(true);
   });
 });

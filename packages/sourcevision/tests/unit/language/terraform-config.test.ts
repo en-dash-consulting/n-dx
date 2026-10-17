@@ -82,6 +82,91 @@ describe("terraform language config", () => {
       expect(inv.files.map((f) => f.path)).toEqual(["live/prod/us-east-1/vpc/app/terragrunt.hcl"]);
     });
 
+    it("keeps the TypeScript fallback primary in a markerless repo with JS/TS and a deep .tf", async () => {
+      await touch("src/a.js");
+      await touch("src/a.test.js");
+      await touch("src/types.d.ts");
+      await touch("dist/bundle.js");
+      await touch("deploy/envs/prod/eu/west/main.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      const configs = await detectLanguages(dir);
+      expect(configs).toEqual([typescriptConfig, terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: mergeLanguageConfigs(configs) });
+      expect(Object.fromEntries(inv.files.map((f) => [f.path, f.role]))).toEqual({
+        "deploy/envs/prod/eu/west/main.tf": "config",
+        "src/a.js": "source",
+        "src/a.test.js": "test",
+        "src/types.d.ts": "generated",
+      });
+    });
+
+    it("keeps the TypeScript fallback for a markerless repo in a language with no config", async () => {
+      await touch("lib/app.rb");
+      await touch("tests/app_test.rb");
+      await touch("deploy/envs/prod/eu/west/main.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      const configs = await detectLanguages(dir);
+      expect(configs).toEqual([typescriptConfig, terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: mergeLanguageConfigs(configs) });
+      expect(inv.files.find((f) => f.path === "tests/app_test.rb")?.role).toBe("test");
+    });
+
+    it("keeps the TypeScript fallback when the only source sits deeper than three levels", async () => {
+      await touch("apps/web/src/components/X.tsx");
+      await touch("infra/main.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      expect(await detectLanguages(dir)).toEqual([typescriptConfig, terraformConfig]);
+    });
+
+    it("does not count source the inventory ignores", async () => {
+      await touch(".gitignore", "generated-site/\n");
+      await touch("generated-site/app.js");
+      await touch("dist/bundle.js");
+      await touch("main.tf");
+      expect(await detectLanguage(dir)).toBe(terraformConfig);
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+    });
+
+    it("keeps the TypeScript fallback in a polyglot repo with more Terraform files than source", async () => {
+      await touch("web/package.json", "{}");
+      await touch("src/app.ts");
+      await touch("src/app.test.ts");
+      await touch("infra/main.tf");
+      await touch("infra/variables.tf");
+      await touch("infra/outputs.tf");
+      await touch("infra/versions.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      const configs = await detectLanguages(dir);
+      expect(configs).toEqual([typescriptConfig, terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: mergeLanguageConfigs(configs) });
+      expect(inv.files.find((f) => f.path === "src/app.test.ts")?.role).toBe("test");
+    });
+
+    it("keeps the TypeScript fallback for one source file among many Terraform files", async () => {
+      // cloud-foundation-fabric: 832 .tf files and one Cloud Function at depth 4.
+      await touch("modules/api-gateway/recipe-multi-region/function/index.js");
+      await touch("modules/api-gateway/main.tf");
+      await touch("modules/api-gateway/variables.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      expect(await detectLanguages(dir)).toEqual([typescriptConfig, terraformConfig]);
+    });
+
+    it("stays Terraform alone with no fallback source", async () => {
+      await touch("modules/network/main.tf");
+      await touch("modules/network/variables.tf");
+      await touch("live/prod.tfvars");
+      expect(await detectLanguage(dir)).toBe(terraformConfig);
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+    });
+
+    it("stays Terraform alone when the only other code is in a language that has a config", async () => {
+      // terraform-aws-rds: 104 .tf files and one Python Lambda fixture.
+      await touch("main.tf");
+      await touch("examples/role-association-postgres/fixtures/lambda_function.py");
+      expect(await detectLanguage(dir)).toBe(terraformConfig);
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+    });
+
     /** Detection says Terraform exactly when the analyze-phase inventory lists a Terraform file. */
     async function expectAgreement(expected: boolean): Promise<void> {
       const configs = await detectLanguages(dir);

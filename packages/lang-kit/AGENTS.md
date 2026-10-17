@@ -56,15 +56,24 @@ against the `files` inventory, not the disk. Dependencies reuse
 written) with file and line. `parseTomlLocated` gives each value's line.
 
 A config's `skipUnlessContains` names directories skipped unless they directly
-hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`);
-`skipsDirectory` applies it and `skipDirectories`, the caller doing the I/O.
+hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`).
+`skipBesideMarker` names directories skipped only as build output: under the
+project root or a directory holding a marker, never below `src/` (Java's
+`target`, `build`, `out` and `generated` beside `pom.xml` or `build.gradle*`,
+so `src/main/java/…/target/` stays a package). `skipsDirectory` applies both
+and `skipDirectories`, the caller doing the I/O and passing the directory's
+place; a name both conditional rules list is kept if either keeps it.
 
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
 so the Java and Go packs share it without depending on each other.
 
 Detection takes the config override and the
-Terraform file search as arguments (`detectLanguage(rootDir, { override,
-hasTerraformFile })`); sourcevision's `src/language/detect.ts` supplies both.
+project file search as arguments (`detectLanguage(rootDir, { override,
+searchProjectFiles })`); sourcevision's `src/language/detect.ts` supplies both,
+the search being the inventory's own walk. A markerless repository is
+Terraform alone only when that walk finds Terraform files and no
+`isFallbackSourceFile` file (JS/TS, or a language with no config); counts
+are not weighed.
 Resolvers, the parser runner, queries and grammars live in the runtime and the
 packs; pack loading lives in sourcevision. Domain packages import it directly,
 as they do `@n-dx/llm-client`; hench and web have no gateway for it.

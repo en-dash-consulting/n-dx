@@ -77,18 +77,32 @@ export function getLanguageConfig(id: string): LanguageConfig | undefined {
 
 // ── Detection options ───────────────────────────────────────────────────────
 
+/** What a {@link ProjectFileSearch} found. */
+export interface ProjectFileCounts {
+  /** Files `isTerraformFile` accepts. */
+  terraform: number;
+  /** Files {@link isFallbackSourceFile} accepts; 0 unless counted. */
+  fallbackSource: number;
+}
+
 /**
- * Is there a Terraform file anywhere in the project? `otherConfigs` are the
- * languages detected without Terraform, so the caller can search with the
- * skip set the inventory would use with the result. Should stop at the first
- * match and answer `false` for an unreadable root.
+ * Search the project's files as the inventory would walk them with
+ * `otherConfigs` and Terraform beside them: `otherConfigs` are the languages
+ * detected without Terraform, so the caller builds the inventory's skip set
+ * and ignore filter from them. With `count` false it only needs to know
+ * whether a Terraform file exists, and should stop at the first one; with
+ * `count` true it counts both kinds of file over the whole walk. An
+ * unreadable root counts nothing.
  */
-export type TerraformSearch = (otherConfigs: readonly LanguageConfig[]) => Promise<boolean>;
+export type ProjectFileSearch = (
+  otherConfigs: readonly LanguageConfig[],
+  options: { count: boolean },
+) => Promise<ProjectFileCounts>;
 
 /** What `detectLanguages` needs from its caller. */
 export interface DetectLanguagesOptions {
-  /** The Terraform marker search; called at most once per detection. */
-  hasTerraformFile: TerraformSearch;
+  /** The project file search; called at most once per detection. */
+  searchProjectFiles: ProjectFileSearch;
 }
 
 /** What `detectLanguage` needs from its caller. */
@@ -249,6 +263,39 @@ async function countSourceFiles(
   return counts;
 }
 
+/**
+ * Program-code extensions of languages with no config here (Ruby, Rust, PHP,
+ * Elixir, Kotlin, C/C++ and others). A markerless repository in one of them
+ * is analysed with the TypeScript fallback config.
+ */
+const FALLBACK_LANGUAGE_EXTENSIONS: ReadonlySet<string> = new Set([
+  ".rb", ".rs", ".php", ".ex", ".exs", ".erl", ".hrl", ".scala", ".kt", ".kts",
+  ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".lua", ".dart", ".hs", ".ml",
+  ".mli", ".clj", ".cljs", ".zig", ".nim", ".pl", ".pm", ".r", ".R",
+]);
+
+/**
+ * Is `fileName` source the TypeScript fallback is for: authored JS/TS (not
+ * minified), or a language with no config here? A markerless repository
+ * with any of these keeps the fallback primary, however many Terraform
+ * files it has.
+ */
+export function isFallbackSourceFile(fileName: string): boolean {
+  if (fileName.endsWith(".min.js")) return false;
+  const ext = extname(fileName);
+  return typescriptConfig.extensions.has(ext) || FALLBACK_LANGUAGE_EXTENSIONS.has(ext);
+}
+
+/**
+ * Is a markerless repository Terraform alone? Only when it has Terraform
+ * files and no fallback source at all; counts are not weighed. With any
+ * fallback source, Terraform joins the fallback, which stays primary and
+ * keeps its skip directories and its test and generated patterns.
+ */
+function isTerraformOnly(counts: ProjectFileCounts): boolean {
+  return counts.terraform > 0 && counts.fallbackSource === 0;
+}
+
 // ── Detection ───────────────────────────────────────────────────────────────
 
 /**
@@ -259,7 +306,8 @@ async function countSourceFiles(
  * 2. Exactly one language marker present → that language
  * 3. Several markers present → file-count tiebreak
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. No markers → TypeScript/JS fallback (Terraform when only Terraform files are found)
+ * 5. No markers → TypeScript/JS fallback (Terraform when the repository
+ *    has Terraform files and no source the fallback is for)
  */
 export async function detectLanguage(rootDir: string, options: DetectLanguageOptions): Promise<LanguageConfig> {
   // Step 1: Explicit override
@@ -309,9 +357,11 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   // mixed repositories keep their existing primary language.
   if (await hasJavaMarker(rootDir)) return javaConfig;
 
-  // Terraform is primary only when nothing else matched; Java outranks it.
+  // Java outranks Terraform, and so does any of the fallback's source.
   // Searched as the TypeScript fallback would be inventoried.
-  if (await options.hasTerraformFile([typescriptConfig])) return terraformConfig;
+  if (isTerraformOnly(await options.searchProjectFiles([typescriptConfig], { count: true }))) {
+    return terraformConfig;
+  }
 
   // Step 6: No markers → fallback to TypeScript/JS
   return typescriptConfig;
@@ -355,11 +405,16 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
     if (hasPackageJson) present.push({ config: typescriptConfig, count: counts.ts });
   }
 
-  // No markers → fallback to TypeScript/JS for backward compatibility.
-  // Terraform is searched with the skip set of what would be returned without it.
+  // No markers → fallback to TypeScript/JS for backward compatibility, with
+  // Terraform beside it; Terraform alone only when there is no fallback
+  // source at all (never beside Java). Searched with the skip set of what
+  // would be returned without Terraform.
   if (present.length === 0) {
-    if (hasJava) return (await options.hasTerraformFile([javaConfig])) ? [javaConfig, terraformConfig] : [javaConfig];
-    return [(await options.hasTerraformFile([typescriptConfig])) ? terraformConfig : typescriptConfig];
+    const base = hasJava ? javaConfig : typescriptConfig;
+    const counts = await options.searchProjectFiles([base], { count: !hasJava });
+    if (counts.terraform === 0) return [base];
+    if (hasJava || !isTerraformOnly(counts)) return [base, terraformConfig];
+    return [terraformConfig];
   }
 
   // Stable ordering by descending file count, ties broken by the same
@@ -373,7 +428,7 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
   // secondary variant keeps Java from skipping or flagging the primary
   // language's `out/` and `generated/` files.
   if (hasJava) configs.push(javaSecondaryConfig);
-  if (await options.hasTerraformFile(configs)) configs.push(terraformConfig);
+  if ((await options.searchProjectFiles(configs, { count: false })).terraform > 0) configs.push(terraformConfig);
   return configs;
 }
 
@@ -390,6 +445,7 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
  * - `skipDirectories`: union of all skip directories
  * - `skipUnlessContains`: union of the marker files per name (omitted when
  *   none); a name another config lists in `skipDirectories` stays skipped
+ * - `skipBesideMarker`: likewise (omitted when none)
  * - `generatedFilePatterns`: concatenation of all patterns
  * - `generatedHeaders`: concatenation of all rules (omitted when none)
  * - `entryPointPatterns`: concatenation of all patterns
@@ -412,6 +468,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
   const configFilePatterns: RegExp[] = [];
   const skipDirectories = new Set<string>();
   const skipUnlessContains = new Map<string, string[]>();
+  const skipBesideMarker = new Map<string, string[]>();
   const generatedFilePatterns: RegExp[] = [];
   const generatedHeaders: GeneratedHeaderRule[] = [];
   const entryPointPatterns: RegExp[] = [];
@@ -425,6 +482,9 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     for (const d of config.skipDirectories) skipDirectories.add(d);
     for (const [d, markers] of config.skipUnlessContains ?? []) {
       skipUnlessContains.set(d, [...new Set([...(skipUnlessContains.get(d) ?? []), ...markers])]);
+    }
+    for (const [d, markers] of config.skipBesideMarker ?? []) {
+      skipBesideMarker.set(d, [...new Set([...(skipBesideMarker.get(d) ?? []), ...markers])]);
     }
     for (const p of config.generatedFilePatterns) generatedFilePatterns.push(p);
     for (const r of config.generatedHeaders ?? []) generatedHeaders.push(r);
@@ -441,6 +501,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     ...(configFilePatterns.length > 0 ? { configFilePatterns } : {}),
     skipDirectories,
     ...(skipUnlessContains.size > 0 ? { skipUnlessContains } : {}),
+    ...(skipBesideMarker.size > 0 ? { skipBesideMarker } : {}),
     generatedFilePatterns,
     ...(generatedHeaders.length > 0 ? { generatedHeaders } : {}),
     entryPointPatterns,

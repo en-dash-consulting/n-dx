@@ -26,32 +26,32 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
    `<ndx home>/packs/<sourcevision version>/node_modules/<package>` (where
    `npm install --prefix` puts opt-in packs), then by module resolution (the
    optional `@n-dx/lang-go` dependency, or the workspace).
-2. **Refused** when its version differs from sourcevision's (checked from
-   `package.json` before a pack-directory copy is imported, and again on the
-   entry) or when it exports no matching lang-kit `LanguagePackEntry`. The
-   notice names `ndx sv pack add <lang>` (`packInstallCommand`).
+2. **Refused** when its version differs from sourcevision's (`package.json`
+   before import, then the entry; a copy only in another version's directory
+   counts) or it exports no matching lang-kit `LanguagePackEntry`. The notice
+   names `ndx sv pack add <lang>` (`packInstallCommand`).
 3. **Degraded** when it is missing, refused, reports `degraded` (grammar not
    built or not loadable, a query that will not compile, unreadable build
    files) or its `analyzeProject` rejects. `src/analyzers/pack-imports.ts`
    reports it once per run: Java files get inventory only, Go edges come from
    the regex parser (`src/analyzers/go-imports.ts`).
-   `src/analyzers/terraform-infrastructure.ts` reports a Terraform pack the
-   same way, once, and only when `infrastructure.json` lists a resource from a
-   `.tf` file: those resources get no model fields. Analysis never fails on a
-   pack.
+   `src/analyzers/terraform-infrastructure.ts` reports Terraform's once, only
+   when `infrastructure.json` lists a `.tf` resource: those get no model fields. Analysis never fails on a
+   pack. A missing, unlisted opt-in pack (`isSuggestedPack`) only joins
+   analyze's end-of-run `Optional packs` line.
 
 ### Python
 
 `.py` and `.pyi` are parseable (`pythonConfig.parseableExtensions`) only
 through `@n-dx/lang-python`, an opt-in `KNOWN_PACKS` entry with no fallback
-parser: without it, Python files get inventory only and the missing-pack
-notice, and every artifact is the same as before Python was a pack. With
+parser: without it, Python files get inventory only, and every artifact is
+the same as before Python was a pack. With
 it, Python edges and externals reach `imports.json` through
 `buildPackImportGraph` like Go's and Java's (stdlib as `stdlib:<module>`, a
 `TYPE_CHECKING`-only target as a `type` edge), so Python files join zones;
 a Python repository beside TypeScript (root `pyproject.toml` and
 `package.json`) gets both. The inventory phase cannot know whether the pack
-will load, so it leaves Python out of `analysedLanguages`; the imports phase
+will load, so it leaves Python (and Java) out of `analysedLanguages`; the imports phase
 sets it from the packs that ran (`withPackAnalysedLanguages`), so a re-run
 without the pack drops it; inventory.json is untouched if nothing changes. Its dynamic-import and past-root notices go to the same
 `warn`. Over the pinned corpus (`python-corpus.json`),

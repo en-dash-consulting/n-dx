@@ -74,6 +74,16 @@ export interface LanguageConfig {
    */
   readonly skipUnlessContains?: ReadonlyMap<string, readonly string[]>;
 
+  /**
+   * Directories skipped only where they are build output: directly under the
+   * project root, or directly under a module root (a directory that directly
+   * holds one of the listed files), and never below a `src/` directory. Java's
+   * `target/` beside `pom.xml` is Maven output; `src/main/java/…/target/` is a
+   * package. A name in `skipDirectories` is always skipped. Read with
+   * {@link skipsDirectory}.
+   */
+  readonly skipBesideMarker?: ReadonlyMap<string, readonly string[]>;
+
   /** Patterns that identify generated/machine-written files. */
   readonly generatedFilePatterns: readonly RegExp[];
 
@@ -87,17 +97,46 @@ export interface LanguageConfig {
   readonly moduleFile?: string;
 }
 
+/** Where a directory sits, for a `skipBesideMarker` name. */
+export interface DirectoryPlace {
+  /** The directory's POSIX path relative to the project root (`"sub/target"`). */
+  readonly path: string;
+  /** Whether the directory's parent directly holds `file`. */
+  readonly parentHolds: (file: string) => boolean;
+}
+
+/** The skip rules {@link skipsDirectory} reads. */
+export type DirectorySkipRules = Pick<LanguageConfig, "skipDirectories" | "skipUnlessContains" | "skipBesideMarker">;
+
 /**
  * Whether a traversal skips the directory `name` under `config`'s rules.
- * `holds(file)` answers whether the directory directly holds `file`; it is
- * asked only for a `skipUnlessContains` name, so the caller does the I/O.
+ * `holds(file)` answers whether the directory directly holds `file`, and
+ * `place` where it sits; they are asked only for a `skipUnlessContains` or
+ * `skipBesideMarker` name, so the caller does the I/O. Without `place`, a
+ * `skipBesideMarker` name is taken to sit at the project root (skipped).
+ *
+ * A name in `skipDirectories` is always skipped. A name the conditional rules
+ * list is skipped only when every rule listing it says so: a directory one
+ * language recognises as source is kept.
  */
 export function skipsDirectory(
-  config: Pick<LanguageConfig, "skipDirectories" | "skipUnlessContains">,
+  config: DirectorySkipRules,
   name: string,
   holds: (file: string) => boolean,
+  place?: DirectoryPlace,
 ): boolean {
   if (config.skipDirectories.has(name)) return true;
-  const markers = config.skipUnlessContains?.get(name);
-  return markers !== undefined && !markers.some(holds);
+  const unless = config.skipUnlessContains?.get(name);
+  const beside = config.skipBesideMarker?.get(name);
+  if (unless === undefined && beside === undefined) return false;
+  if (unless !== undefined && unless.some(holds)) return false;
+  if (beside !== undefined && place !== undefined && !isBuildOutputPlace(place, beside)) return false;
+  return true;
+}
+
+/** Under the project root or a module root holding a marker, and not below `src/`. */
+function isBuildOutputPlace(place: DirectoryPlace, markers: readonly string[]): boolean {
+  const segments = place.path.split("/");
+  if (segments.slice(0, -1).includes("src")) return false;
+  return segments.length === 1 || markers.some(place.parentHolds);
 }
