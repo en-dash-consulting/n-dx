@@ -36,4 +36,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Keep imports of Go files over the pack's size cap and of replaced modules in skipped directories](./keep-imports-of-go-files-over-the-pack.md) | completed |
 | [Prefer the referencing module and source set when a Java name has several declarations](./prefer-the-referencing-module-and.md) | completed |
 | [Read Groovy Gradle statements that continue after a trailing comma](./read-groovy-gradle-statements-that.md) | completed |
-| [Read sqlc JSON configs with arrays and multi-line lists](./read-sqlc-json-configs-with-arrays-and.md) | pending |
+| [Read sqlc JSON configs with arrays and multi-line lists](./read-sqlc-json-configs-with-arrays-and.md) | completed |
