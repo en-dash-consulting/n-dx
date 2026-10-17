@@ -23,6 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [A router constructed under the imported name inside a function, or before the import, wins over the import in WebProject.follow](./a-router-constructed-under-the.md) | pending |
 | [A same-package Java name visible only in another module's test code shadows the wildcard import javac would use](./a-same-package-java-name-visible-only.md) | pending |
 | [A throwing project facts reader, project notices or symbol refine still costs the whole language its imports](./a-throwing-project-facts-reader.md) | pending |
+| [A urlpatterns assignment inside a def or class replaces the module's Django urlpatterns](./a-urlpatterns-assignment-inside-a-def.md) | pending |
 | [An import inside a function of a package's __init__.py is followed as the package's attribute in WebProject.follow](./an-import-inside-a-function-of-a.md) | pending |
 | [An imported router or app name rebound locally to a non-router is still followed through its import](./an-imported-router-or-app-name-rebound.md) | completed |
 | [An imports-only re-run keeps Python in analysedLanguages after the Python pack is gone](./an-imports-only-re-run-keeps-python-in.md) | completed |
