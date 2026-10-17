@@ -78,6 +78,22 @@ describe("detectMigrationTools", () => {
     expect(list?.sqlFiles).toEqual(["one.sql"]);
   });
 
+  it("reads every schema and query path of a pretty-printed sqlc.json with arrays", () => {
+    const config = {
+      version: "2",
+      sql: [{ engine: "postgresql", schema: ["db/schema.sql", "db/more.sql"], queries: ["db/q/users.sql"] }],
+    };
+    const [sqlc] = detect({
+      "sqlc.json": JSON.stringify(config, null, 2),
+      "db/schema.sql": "CREATE TABLE a (id int);",
+      "db/more.sql": "CREATE TABLE b (id int);",
+      "db/q/users.sql": "-- name: A :one\nSELECT 1;",
+    });
+    expect(sqlc?.tool).toBe("sqlc");
+    expect(sqlc?.sqlFiles).toEqual(["db/more.sql", "db/schema.sql"]);
+    expect(sqlc?.queryFiles).toEqual(["db/q/users.sql"]);
+  });
+
   it("lists sqlc query files for the scalar, directory and list forms of queries:", () => {
     const q = (queries: string, extra: Record<string, string>) =>
       detect({ "sqlc.yaml": `sql:\n  - schema: s.sql\n    queries: ${queries}\n`, "s.sql": "CREATE TABLE t (id int);", ...extra })[0];
@@ -155,6 +171,50 @@ describe("sqlcPaths", () => {
   it("continues a block list past a comment-only or blank line", () => {
     expect(sqlcPaths("sqlc.yaml", "queries:\n  # main\n  - q.sql\n", "queries")).toEqual(["q.sql"]);
     expect(sqlcPaths("sqlc.yaml", "queries:\n  - a.sql\n\n  # more\n  - b.sql\nengine: x\n", "queries")).toEqual(["a.sql", "b.sql"]);
+  });
+
+  it("parses a .json config and walks sql[] and packages[] for scalars and arrays", () => {
+    const json = JSON.stringify(
+      {
+        version: "2",
+        sql: [
+          { engine: "postgresql", schema: ["db/schema.sql", "db/more.sql"], queries: "db/q" },
+          { engine: "mysql", schema: "other/s.sql", queries: ["other/q1.sql", "other/q2.sql"] },
+        ],
+      },
+      null,
+      2,
+    );
+    expect(sqlcPaths("sqlc.json", json, "schema")).toEqual(["db/schema.sql", "db/more.sql", "other/s.sql"]);
+    expect(sqlcPaths("sqlc.json", json, "queries")).toEqual(["db/q", "other/q1.sql", "other/q2.sql"]);
+    const v1 = '{"version": "1", "packages": [{"path": "db", "schema": ["./s.sql"], "queries": "./q/"}]}';
+    expect(sqlcPaths("cfg/sqlc.json", v1, "schema")).toEqual(["cfg/s.sql"]);
+    expect(sqlcPaths("cfg/sqlc.json", v1, "queries")).toEqual(["cfg/q"]);
+  });
+
+  it("reads a flow array written on one line in a .json config", () => {
+    const json = '{\n  "sql": [{\n    "schema": ["db/schema.sql", "db/more.sql"],\n    "queries": "db/q"\n  }]\n}';
+    expect(sqlcPaths("sqlc.json", json, "schema")).toEqual(["db/schema.sql", "db/more.sql"]);
+  });
+
+  it("names nothing for a .json config that does not parse or is not an object", () => {
+    expect(sqlcPaths("sqlc.json", '{"sql": [{"schema": "s.sql"', "schema")).toEqual([]);
+    expect(sqlcPaths("sqlc.json", '["s.sql"]', "schema")).toEqual([]);
+    expect(sqlcPaths("sqlc.json", '{"sql": [{"schema": 3}, "x"]}', "schema")).toEqual([]);
+  });
+
+  it("reads a YAML flow list followed by a comma", () => {
+    expect(sqlcPaths("sqlc.yaml", '  "schema": ["db/schema.sql", "db/more.sql"],', "schema")).toEqual([
+      "db/schema.sql",
+      "db/more.sql",
+    ]);
+    expect(sqlcPaths("sqlc.yaml", 'schema: "s.sql",', "schema")).toEqual(["s.sql"]);
+  });
+
+  it("reads a YAML flow list that spans several lines", () => {
+    const yaml = 'sql:\n  - schema: [\n      "db/schema.sql",  # tables\n      db/more.sql,\n    ]\n    queries: [q1,\n      q2]\n';
+    expect(sqlcPaths("sqlc.yaml", yaml, "schema")).toEqual(["db/schema.sql", "db/more.sql"]);
+    expect(sqlcPaths("sqlc.yaml", yaml, "queries")).toEqual(["q1", "q2"]);
   });
 
   it("keeps a # inside quotes or not preceded by whitespace", () => {
