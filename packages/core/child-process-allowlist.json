@@ -188,6 +188,10 @@
     {
       "path": "packages/graview-face/scripts/a11y.mjs",
       "reason": "Local harness: starts `vite preview` for the axe-core pass and stops it. Not shipped runtime code, and the package imports no @n-dx/* package by design."
+    },
+    {
+      "path": "packages/sourcevision/scripts/build-grammars.mjs",
+      "reason": "Developer build script — runs the pinned tree-sitter CLI binary to compile grammars to WASM. Runs before sourcevision is built, so it cannot import @n-dx/llm-client's exec()."
     }
   ]
 }
