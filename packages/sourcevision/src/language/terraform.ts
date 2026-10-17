@@ -7,6 +7,7 @@
  * @module sourcevision/language/terraform
  */
 
+import { extname } from "node:path";
 import type { LanguageConfig } from "./registry.js";
 
 /**
@@ -39,3 +40,19 @@ export const terraformConfig: LanguageConfig = {
 
   entryPointPatterns: [],
 };
+
+/**
+ * The one definition of "is this file Terraform", built from `terraformConfig`.
+ * Detection (`detect.ts`) and the inventory (`inventory.ts`) both call it, so
+ * they cannot disagree about which names are Terraform. Takes a file name, not
+ * a path. The extension is matched case-insensitively; names and patterns as
+ * written in the config.
+ */
+export function isTerraformFile(name: string): boolean {
+  return (
+    terraformConfig.extensions.has(extname(name).toLowerCase()) ||
+    terraformConfig.configFilenames.has(name) ||
+    (terraformConfig.configFilePatterns ?? []).some((p) => p.test(name)) ||
+    terraformConfig.testFilePatterns.some((p) => p.test(name))
+  );
+}

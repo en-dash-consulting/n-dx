@@ -3,7 +3,7 @@
  * is pinned independently of the regenerable goldens.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
@@ -11,6 +11,7 @@ import { goPack } from "../../src/language/go-pack.js";
 import { goResolver } from "../../src/language/go-resolver.js";
 import { createTreeSitterRunner, type Capture, type ParsedFile } from "../../src/language/runner.js";
 import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { fixtureDirFor, goldenPathFor, type PackGolden } from "../helpers/pack-golden.js";
 
 const GO_WASM = grammarWasmPath("tree-sitter-go");
 const target = { pack: goPack, grammarPath: GO_WASM };
@@ -30,6 +31,53 @@ const texts = (captures: readonly Capture[] | undefined, name: string): string[]
 
 const lines = (captures: readonly Capture[] | undefined, name: string): number[] =>
   (captures ?? []).filter((c) => c.name === name).map((c) => c.start.line);
+
+type Pos = Capture["start"];
+const atOrBefore = (a: Pos, b: Pos): boolean => a.line < b.line || (a.line === b.line && a.column <= b.column);
+
+/** The innermost @call.arguments containing `s` — the documented pairing rule. */
+function innermostArguments(calls: readonly Capture[], s: Capture): Capture | undefined {
+  return calls
+    .filter((c) => c.name === "call.arguments" && atOrBefore(c.start, s.start) && atOrBefore(s.end, c.end))
+    .sort((p, q) => (atOrBefore(p.start, q.start) ? 1 : -1))[0];
+}
+
+/**
+ * Parenthesis depth inside `list`'s text just before `s`, skipping string and
+ * rune literals and comments. 1 means `s` is a direct argument of `list`'s
+ * own call; more means it sits in a nested call whose list was not captured.
+ */
+function parenDepthBefore(list: Capture, s: Capture): number {
+  const rows = list.text.split("\n");
+  const rel = s.start.line - list.start.line;
+  const end =
+    rel === 0
+      ? s.start.column - list.start.column
+      : rows.slice(0, rel).reduce((n, r) => n + r.length + 1, 0) + s.start.column;
+  const t = list.text;
+  let depth = 0;
+  for (let i = 0; i < end; i++) {
+    const ch = t[i];
+    if (ch === '"' || ch === "'") {
+      for (i++; i < end && t[i] !== ch; i++) if (t[i] === "\\") i++;
+    } else if (ch === "`") {
+      for (i++; i < end && t[i] !== "`"; i++);
+    } else if (ch === "/" && t[i + 1] === "/") {
+      for (; i < end && t[i] !== "\n"; i++);
+    } else if (ch === "/" && t[i + 1] === "*") {
+      for (i += 2; i < end && !(t[i] === "*" && t[i + 1] === "/"); i++);
+      i++;
+    } else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+  }
+  return depth;
+}
+
+/** Text of the argument list a string argument is paired with, if it is that list's own direct argument. */
+function directOwner(calls: readonly Capture[], s: Capture): string | undefined {
+  const list = innermostArguments(calls, s);
+  return list && parenDepthBefore(list, s) === 1 ? list.text : undefined;
+}
 
 describe("go pack", () => {
   it("has every query file and provenance naming the grammar version and a date", () => {
@@ -138,6 +186,52 @@ describe("go pack", () => {
       .filter((c) => c.start.column <= z.start.column && c.end.column >= z.end.column)
       .sort((p, q) => q.start.column - p.start.column)[0]!;
     expect(owner.text).toBe('("z")');
+  });
+
+  it("gives calls whose function is not a name an argument list of their own", async (ctx) => {
+    const { captures } = await parse(
+      ctx,
+      [
+        "package p",
+        "func m() {",
+        '\tlog(f()("z"))',
+        '\tlog(h[0]("a"))',
+        '\tlog(fs[i+1]("b"))',
+        '\tlog(v.(func(string))("c"))',
+        '\tlog((fn)("d"))',
+        '\tlog(func(s string) {}("e"))',
+        '\tlog(h[k]("t1"))',
+        '\tlog(pkg.F[int]("t2"))',
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const calls = captures.calls!;
+    const owner = (arg: string): string | undefined =>
+      directOwner(calls, calls.find((c) => c.name === "call.string_argument" && c.text === arg)!);
+    expect(owner('"z"')).toBe('("z")');
+    expect(owner('"a"')).toBe('("a")');
+    expect(owner('"b"')).toBe('("b")');
+    expect(owner('"c"')).toBe('("c")');
+    expect(owner('"d"')).toBe('("d")');
+    expect(owner('"e"')).toBe('("e")');
+    // Where the index could be a type, tree-sitter-go parses a type
+    // conversion: no argument_list, so no string to hand to log.
+    expect(texts(calls, "call.string_argument")).not.toContain('"t1"');
+    expect(texts(calls, "call.string_argument")).not.toContain('"t2"');
+  });
+
+  it("golden: every string argument is a direct argument of its paired argument list", () => {
+    const golden = JSON.parse(readFileSync(goldenPathFor(fixtureDirFor(goPack)), "utf8")) as PackGolden;
+    let checked = 0;
+    for (const file of golden.files) {
+      const calls = (file.captures as Record<string, Capture[]> | undefined)?.calls ?? [];
+      for (const s of calls.filter((c) => c.name === "call.string_argument")) {
+        expect(directOwner(calls, s), `${file.path}:${s.start.line} ${s.text}`).toBeDefined();
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it("captures struct field tags as written, per name, skipping untagged fields", async (ctx) => {

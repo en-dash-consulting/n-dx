@@ -2982,7 +2982,7 @@ function linkInfrastructure(infrastructure, filePaths, readFile) {
 function isTerraformPath(path) {
   const ext = extname2(path).toLowerCase();
   if (ext === ".tf" || ext === ".tfvars") return true;
-  const name = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+  const name = path.slice(path.lastIndexOf("/") + 1);
   return name === "terragrunt.hcl" || name.endsWith(".tftest.hcl");
 }
 function computeInfrastructure(root, filePaths, readFile) {

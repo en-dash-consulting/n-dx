@@ -30,7 +30,18 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Classify SQL dialects with evidence](./classify-sql-dialects-with-evidence.md) | pending |
-| [Detect database engines from dependencies, images and config](./detect-database-engines-from.md) | pending |
-| [Extract table names from embedded SQL in Java and Go](./extract-table-names-from-embedded-sql.md) | pending |
-| [Find migration and schema files and extract tables with tree-sitter-sql](./find-migration-and-schema-files-and.md) | pending |
+| [Add the missing changeset for Terraform zone, detection and role changes](./add-the-missing-changeset-for.md) | completed |
+| [Add the Terraform model as a database-engine source](./add-the-terraform-model-as-a-database.md) | pending |
+| [Classify SQL dialects with evidence](./classify-sql-dialects-with-evidence.md) | completed |
+| [Detect database engines from dependencies, images and config](./detect-database-engines-from.md) | completed |
+| [Extract table names from embedded SQL in Java and Go](./extract-table-names-from-embedded-sql.md) | completed |
+| [Find migration and schema files and extract tables with tree-sitter-sql](./find-migration-and-schema-files-and.md) | completed |
+| [Go calls query leaves string arguments of unnamed calls without an owning argument list](./go-calls-query-leaves-string-arguments.md) | completed |
+| [Spring Data JDBC and R2DBC @Query and @Table("name") are read with JPA semantics, so their tables are missed](./spring-data-jdbc-and-r2dbc-query-and.md) | completed |
+| [SQL dialect goldens are inline PetClinic-shaped snippets, never checked against PetClinic's real schema files](./sql-dialect-goldens-are-inline.md) | completed |
+| [sqlc block lists stop at a comment-only or blank line, dropping the items after it](./sqlc-block-lists-stop-at-a-comment.md) | completed |
+| [sqlc config values with a trailing YAML comment resolve to a bogus path](./sqlc-config-values-with-a-trailing.md) | completed |
+| [sqlc detection omits the schema files named by sqlc.yaml's schema: key](./sqlc-detection-omits-the-schema-files.md) | completed |
+| [sqlc query files lost their route to extractSqlcTables when sqlFiles became schema-only](./sqlc-query-files-lost-their-route-to.md) | completed |
+| [sqlcPaths reads the next sql[] entry as a path when the key sits on the dash line](./sqlcpaths-reads-the-next-sql-entry-as.md) | pending |
+| [sqlcPaths returns nothing for a CRLF sqlc.yaml block list](./sqlcpaths-returns-nothing-for-a-crlf.md) | pending |

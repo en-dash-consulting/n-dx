@@ -3,12 +3,12 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { toCanonicalJSON } from "@n-dx/llm-client";
-import { detectLanguage, detectLanguages, getLanguageConfig } from "../../../src/language/detect.js";
-import { terraformConfig } from "../../../src/language/terraform.js";
+import { detectLanguage, detectLanguages, getLanguageConfig, mergeLanguageConfigs } from "../../../src/language/detect.js";
+import { terraformConfig, isTerraformFile } from "../../../src/language/terraform.js";
 import { javaConfig, javaSecondaryConfig } from "../../../src/language/java.js";
 import { typescriptConfig } from "../../../src/language/typescript.js";
-import { analyzeInventory, classifyRole } from "../../../src/analyzers/inventory.js";
-import { computeInfrastructure, toInfrastructureData } from "../../../src/analyzers/infrastructure.js";
+import { analyzeInventory, classifyRole, detectLanguage as inventoryLanguage } from "../../../src/analyzers/inventory.js";
+import { computeInfrastructure, toInfrastructureData, isTerraformPath } from "../../../src/analyzers/infrastructure.js";
 import { GRAMMARS } from "../../../scripts/build-grammars.mjs";
 
 describe("terraform language config", () => {
@@ -70,21 +70,115 @@ describe("terraform language config", () => {
       expect(await detectLanguages(dir)).toEqual([typescriptConfig]);
     });
 
-    it("leaves repositories without .tf files unchanged", async () => {
+    it("leaves repositories without any Terraform file unchanged", async () => {
       await touch("package.json", "{}");
-      await touch("main.tfvars");
+      await touch("main.hcl");
       expect(await detectLanguages(dir)).toEqual([typescriptConfig]);
+    });
+
+    it("detects a Terragrunt-only repository the same way the inventory sees it", async () => {
+      await touch("live/prod/terragrunt.hcl");
+      await touch("live/prod/prod.tfvars");
+      expect(await detectLanguage(dir)).toBe(terraformConfig);
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: terraformConfig });
+      expect(inv.files.map((f) => f.path).sort()).toEqual(["live/prod/prod.tfvars", "live/prod/terragrunt.hcl"]);
+    });
+
+    it("detects a Terragrunt leaf deeper than three directories", async () => {
+      await touch("live/root.hcl");
+      await touch("live/prod/us-east-1/vpc/app/terragrunt.hcl");
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+      const inv = await analyzeInventory(dir, { languageConfig: terraformConfig });
+      expect(inv.files.map((f) => f.path)).toEqual(["live/prod/us-east-1/vpc/app/terragrunt.hcl"]);
+    });
+
+    /** Detection says Terraform exactly when the analyze-phase inventory lists a Terraform file. */
+    async function expectAgreement(expected: boolean): Promise<void> {
+      const configs = await detectLanguages(dir);
+      const inv = await analyzeInventory(dir, { languageConfig: mergeLanguageConfigs(configs) });
+      expect(configs.includes(terraformConfig)).toBe(expected);
+      expect(inv.files.some((f) => f.language === "Terraform")).toBe(expected);
+    }
+
+    it.each([
+      "a/b/c/d/vendor/x/main.tf",
+      "a/b/c/d/third_party/x/main.tf",
+      "a/b/c/d/.terraform/modules/x/main.tf",
+      "a/b/c/d/node_modules/x/main.tf",
+      "a/b/c/d/dist/main.tf",
+      "a/b/c/d/ignored/main.tf",
+      "a/b/c/d/extra-skip/main.tf",
+    ])("skips %s in detection and the inventory alike", async (rel) => {
+      await touch("package.json", "{}");
+      await touch(".gitignore", "ignored/\n");
+      await touch(".n-dx.json", JSON.stringify({ sourcevision: { extraSkipDirs: ["extra-skip"] } }));
+      await touch(rel);
+      await expectAgreement(false);
+    });
+
+    it("searches the hidden directories the inventory walks", async () => {
+      await touch("package.json", "{}");
+      await touch(".infra/a/b/c/main.tf");
+      await expectAgreement(true);
+    });
+
+    it.each(["live/prod.tfvars", "live/terragrunt.hcl", "live/x.tftest.hcl"])(
+      "counts %s as a Terraform marker",
+      async (rel) => {
+        await touch(rel);
+        expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+      },
+    );
+  });
+
+  describe("one Terraform file set", () => {
+    const names = [
+      "main.tf", "MAIN.TF", "prod.tfvars", "prod.TFVARS", "terragrunt.hcl", "Terragrunt.hcl", "plan.tftest.hcl", "PLAN.TFTEST.HCL",
+      "main.tf.json", "prod.tfvars.json", "main.tf.bak", "foo.hcl", "tftest.hcl", "terragrunt.hcl.bak",
+      "main.ts", "README.md",
+    ];
+
+    it.each(names)("inventory, detection and infrastructure agree on %s", async (name) => {
+      await touch(name);
+      const inventoried = inventoryLanguage(name) === "Terraform";
+      expect(inventoried).toBe(isTerraformFile(name));
+      expect(isTerraformPath(name)).toBe(inventoried);
+      expect(isTerraformPath(`live/prod/${name}`)).toBe(inventoried);
+      expect((await detectLanguages(dir)).includes(terraformConfig)).toBe(inventoried);
     });
   });
 
   describe("inventory roles", () => {
     const role = (p: string): string => classifyRole(p, "Terraform", terraformConfig);
+    // A TypeScript repo containing Terraform: what inventory receives in practice.
+    const tsWithTerraform = mergeLanguageConfigs([typescriptConfig, terraformConfig]);
+    const tsRole = (p: string): string => classifyRole(p, "Terraform", tsWithTerraform);
 
-    it("classifies roles", () => {
-      expect(role("infra/main.tf")).toBe("source");
-      expect(role("infra/prod.tfvars")).toBe("config");
-      expect(role("live/prod/terragrunt.hcl")).toBe("config");
-      expect(role("infra/tests/basic.tftest.hcl")).toBe("test");
+    it("classifies Terraform outside a test path as config until the structure model lands", () => {
+      for (const r of [role, tsRole]) {
+        expect(r("infra/main.tf")).toBe("config");
+        expect(r("infra/prod.tfvars")).toBe("config");
+        expect(r("live/prod/terragrunt.hcl")).toBe("config");
+      }
+    });
+
+    it("keeps Terraform under a TypeScript test path in test quarantine", () => {
+      expect(tsRole("tests/fixtures/infra/main.tf")).toBe("test");
+      expect(tsRole("tests/fixtures/infra/prod.tfvars")).toBe("test");
+      expect(tsRole("src/__tests__/terragrunt.hcl")).toBe("test");
+      expect(tsRole("infra/tests/basic.tftest.hcl")).toBe("test");
+    });
+
+    it("does not make a file a test by Terraform's own .tftest.hcl pattern", () => {
+      expect(role("basic.tftest.hcl")).toBe("config");
+      expect(tsRole("basic.tftest.hcl")).toBe("config");
+      expect(tsRole("infra/basic.tftest.hcl")).toBe("config");
+    });
+
+    it("has no test path of its own in a Terraform-primary repo", () => {
+      expect(role("tests/fixtures/infra/main.tf")).toBe("config");
+      expect(role("infra/tests/basic.tftest.hcl")).toBe("config");
     });
 
     it("inventories Terraform files and skips .terraform/", async () => {
@@ -96,7 +190,7 @@ describe("terraform language config", () => {
       const inv = await analyzeInventory(dir, { languageConfig: terraformConfig });
       const byPath = Object.fromEntries(inv.files.map((f) => [f.path, f.role]));
       expect(byPath).toEqual({
-        "main.tf": "source",
+        "main.tf": "config",
         "prod.tfvars": "config",
         "live/terragrunt.hcl": "config",
       });
