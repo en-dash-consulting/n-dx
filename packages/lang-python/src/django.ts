@@ -10,7 +10,8 @@
  *   `re_path(regex, view)`. An assignment whose value builds on
  *   `urlpatterns` (`urlpatterns + static(…)`, `urlpatterns + [...]`,
  *   `format_suffix_patterns(urlpatterns)`) keeps the earlier entries and
- *   appends its lists; any other replaces them, and one that leaves none
+ *   appends its lists; a list unpacking `*urlpatterns` keeps them where it
+ *   unpacks them; any other replaces them, and one that leaves none
  *   where there were some is counted in a notice. A route has no method (any); its handler is the
  *   view reduced to its last name (`views.SiteListView.as_view()` →
  *   `SiteListView`, `views.home` → `home`), and absent for any other call.
@@ -110,25 +111,52 @@ function patternLists(web: WebFile, value: Capture): Capture[] {
 }
 
 /**
+ * A pattern list's entries, with `earlier` spliced in at each `*urlpatterns` in `splats` the list holds
+ * directly (not inside a list within it): `[path(x), *urlpatterns]` keeps `earlier` after `x`.
+ */
+function spliceSelf(web: WebFile, list: Capture, splats: readonly Capture[], earlier: readonly Capture[]): { entries: Capture[]; spliced: boolean } {
+  // `list` may be the assignment's own capture of a sequence, so compare spans, not identity.
+  const inner = web.sequences.filter((s) => contains(list, s) && !contains(s, list));
+  const mine = splats.filter((splat) => contains(list, splat) && !inner.some((s) => contains(s, splat)));
+  const items = web.itemsOf(list);
+  if (mine.length === 0) return { entries: [...items], spliced: false };
+  const before = (a: Capture, b: Capture): boolean => a.start.line < b.start.line || (a.start.line === b.start.line && a.start.column < b.start.column);
+  const entries: Capture[] = [];
+  let next = 0;
+  for (const splat of mine) {
+    while (next < items.length && before(items[next]!, splat)) entries.push(items[next++]!);
+    entries.push(...earlier);
+  }
+  entries.push(...items.slice(next));
+  return { entries, spliced: true };
+}
+
+/**
  * Whether a `urlpatterns` value builds on the entries before it: one of `selves` (`urlpatterns` as an
- * operand of `+` or a call's argument) is within it and not inside a pattern list, which starts afresh.
+ * operand of `+`, a call's argument or unpacked in a list) is within it and not inside a pattern list,
+ * which starts afresh unless {@link spliceSelf} finds it unpacked there.
  */
 function extendsItself(web: WebFile, value: Capture, selves: readonly Capture[]): boolean {
   const lists = web.sequences.filter((s) => s.nodeType === "list" && contains(value, s));
   return selves.some((self) => contains(value, self) && !lists.some((list) => contains(list, self)));
 }
 
-/** `selves` are the file's `@django.self` captures; an assignment that leaves no entries where there were some is noted in `dropped`. */
-function readUrlConf(web: WebFile, selves: readonly Capture[], dropped: WebNotes): UrlConf {
+/**
+ * `selves` and `splats` are the file's `@django.self` and `@django.splat` captures; an assignment that
+ * leaves no entries where there were some is noted in `dropped`.
+ */
+function readUrlConf(web: WebFile, selves: readonly Capture[], splats: readonly Capture[], dropped: WebNotes): UrlConf {
   let urlpatterns: Capture[] | undefined;
   const lists = new Map<string, Capture>();
   const routers = new Set<string>();
   for (const { target, value, augmented } of web.assignments) {
     if (target === URLPATTERNS) {
-      const entries = patternLists(web, value).flatMap((list) => web.itemsOf(list));
+      const earlier = urlpatterns ?? [];
+      const read = patternLists(web, value).map((list) => spliceSelf(web, list, splats, earlier));
+      const entries = read.flatMap((r) => r.entries);
       const extend = augmented || extendsItself(web, value, selves);
-      if (!extend && entries.length === 0 && (urlpatterns?.length ?? 0) > 0) dropped.add(web.path, value, "urlpatterns =");
-      urlpatterns = extend ? [...(urlpatterns ?? []), ...entries] : entries;
+      if (!extend && !read.some((r) => r.spliced) && entries.length === 0 && earlier.length > 0) dropped.add(web.path, value, "urlpatterns =");
+      urlpatterns = extend ? [...earlier, ...entries] : entries;
       continue;
     }
     if (value.nodeType === "list") lists.set(target, value);
@@ -151,9 +179,12 @@ export function readDjangoRoutes(files: readonly PackSourceFile[], context: Fram
     files.map((file) => readWebFile(file, DJANGO_QUERY)),
     context,
   );
-  const selves = new Map(files.map((file) => [file.path, (file.captures[DJANGO_QUERY] ?? []).filter((c) => c.name === "django.self")]));
+  const named = (name: string): Map<string, Capture[]> =>
+    new Map(files.map((file) => [file.path, (file.captures[DJANGO_QUERY] ?? []).filter((c) => c.name === name)]));
+  const selves = named("django.self");
+  const splats = named("django.splat");
   const dropped = new WebNotes();
-  const confs = new Map(project.files.map((web) => [web.path, readUrlConf(web, selves.get(web.path) ?? [], dropped)]));
+  const confs = new Map(project.files.map((web) => [web.path, readUrlConf(web, selves.get(web.path) ?? [], splats.get(web.path) ?? [], dropped)]));
   const kept = new WebNotes();
   const unfollowed = new WebNotes();
   const registered = new WebNotes();

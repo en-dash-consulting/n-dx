@@ -161,6 +161,9 @@ describe("Django routes", () => {
       "configure([f(1)], (2, 3))", // 8
       "urlpatterns = format_suffix_patterns(urlpatterns, allowed=urlpatterns) + urlpatterns", // 9
       "total = len(other) + count - urlpatterns", // 10
+      'urlpatterns = [*urlpatterns, path("g/", views.g)]', // 11
+      "merged = [*extra, *urlpatterns]", // 12
+      "call(*urlpatterns)", // 13
       "",
     ].join("\n");
     const runner = createTreeSitterRunner();
@@ -171,6 +174,7 @@ describe("Django routes", () => {
       const at = (name: string): string[] =>
         [...new Set((result.captures[DJANGO_QUERY] ?? []).filter((c) => c.name === name).map((c) => `${c.start.line}:${c.text}`))].sort();
       expect(at("django.sequence")).toEqual([
+        '11:[*urlpatterns, path("g/", views.g)]',
         '1:[path("a/", views.a), url("^old/$", views.old)]',
         '1:[re_path("^b/$", views.b)]',
         '2:[path("c/", include([path("d/", views.d)]))]',
@@ -181,6 +185,7 @@ describe("Django routes", () => {
       ]);
       // A list's entries are its path()/re_path() calls; an include() tuple's are all of them.
       expect(at("django.item")).toEqual([
+        '11:path("g/", views.g)',
         '1:path("a/", views.a)',
         '1:re_path("^b/$", views.b)',
         '2:path("c/", include([path("d/", views.d)]))',
@@ -190,13 +195,16 @@ describe("Django routes", () => {
         '3:path("e/", include(("app.urls", "app"), namespace="app"))',
         '4:path("f/", views.f)',
       ]);
-      expect(at("django.target")).toEqual(["1:urlpatterns", "2:urlpatterns", "3:urlpatterns", "4:extra", "9:urlpatterns"]);
-      // `urlpatterns` only, and only as a `+` operand or a call's argument.
+      expect(at("django.target")).toEqual(["11:urlpatterns", "1:urlpatterns", "2:urlpatterns", "3:urlpatterns", "4:extra", "9:urlpatterns"]);
+      // `urlpatterns` only, and only as a `+` operand, a call's argument or unpacked in a list.
       expect((result.captures[DJANGO_QUERY] ?? []).filter((c) => c.name === "django.self").map((c) => `${c.start.line}:${c.start.column}`)).toEqual([
         "9:37",
         "9:58",
         "9:73",
+        "11:16",
+        "12:19",
       ]);
+      expect(at("django.splat")).toEqual(["11:*urlpatterns", "12:*urlpatterns"]);
     } finally {
       runner.dispose();
     }
@@ -253,6 +261,20 @@ describe("Django routes", () => {
       urls('urlpatterns = urlpatterns + [path("c/", views.c)]', 'urlpatterns = [path("d/", views.d)] + urlpatterns');
       const { facts } = await analyze(ctx, dir);
       expect(routesOf(facts, "urls.py")).toEqual(["ANY /a/ a", "ANY /b/ b", "ANY /c/ c", "ANY /d/ d"]);
+    });
+
+    it("to a list unpacking *urlpatterns keeps the earlier patterns where they are unpacked", async (ctx) => {
+      urls('urlpatterns = [*urlpatterns, path("c/", views.c)]', 'urlpatterns = [path("d/", views.d), *urlpatterns]');
+      const { facts, notices } = await analyze(ctx, dir);
+      expect(routesOf(facts, "urls.py")).toEqual(["ANY /a/ a", "ANY /b/ b", "ANY /c/ c", "ANY /d/ d"]);
+      expect(notices).toBeUndefined();
+    });
+
+    it("to a list whose inner include() list unpacks *urlpatterns replaces the earlier patterns", async (ctx) => {
+      urls('urlpatterns = [path("c/", views.c), path("x/", include([*urlpatterns, path("y/", views.y)]))]');
+      writeFileSync(join(dir, "settings.py"), 'ROOT_URLCONF = "urls"\n');
+      const { facts } = await analyze(ctx, dir);
+      expect(routesOf(facts, "urls.py")).toEqual(["ANY /c/ c", "ANY /x/y/ y"]);
     });
 
     it("to a new list replaces the earlier patterns", async (ctx) => {
