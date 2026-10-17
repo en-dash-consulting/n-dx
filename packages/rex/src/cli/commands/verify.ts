@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths } from "../../store/index.js";
 import { verify } from "../../core/verify.js";
+import { gateRepoTestCommand } from "../../core/test-command-trust.js";
 
 import { info, result } from "../output.js";
 import { CLIError } from "../errors.js";
@@ -18,7 +19,10 @@ export async function cmdVerify(
   const config = await store.loadConfig();
 
   const taskId = flags.task;
-  const runTests = flags["dry-run"] !== "true";
+  // Tests run unless --dry-run, but a repository test command only once the
+  // user has accepted it with `ndx trust accept .`; same rule as
+  // verify_criteria (#686).
+  const gate = gateRepoTestCommand(dir, config.test, flags["dry-run"] !== "true");
   const format = flags.format;
 
   // Validate task ID if provided
@@ -37,13 +41,13 @@ export async function cmdVerify(
     projectDir: dir,
     items: doc.items,
     taskId,
-    testCommand: config.test,
-    runTests,
+    testCommand: gate.testCommand,
+    runTests: gate.runTests,
   });
 
   // JSON output
   if (format === "json") {
-    result(JSON.stringify(verifyResult, null, 2));
+    result(JSON.stringify(gate.refusal ? { ...verifyResult, ...gate.refusal } : verifyResult, null, 2));
     return;
   }
 
@@ -102,6 +106,12 @@ export async function cmdVerify(
     } else if (testRun.error) {
       result(`⚠ ${testRun.error}`);
     }
+  }
+
+  if (gate.refusal) {
+    info("");
+    result(`⚠ ${gate.refusal.testsSkipped}`);
+    for (const finding of gate.refusal.trust.findings) info(`  ${finding}`);
   }
 
   // Exit code: fail if tests ran and failed
