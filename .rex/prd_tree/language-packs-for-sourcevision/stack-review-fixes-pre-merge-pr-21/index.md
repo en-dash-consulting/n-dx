@@ -32,4 +32,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Count fallback source with the skip set of the Terraform-alone result](./count-fallback-source-with-the-skip.md) | pending |
 | [Keep the sv pack add command out of the docs build's HTML parser](./keep-the-sv-pack-add-command-out-of.md) | completed |
 | [Normalise path separators before the Terraform model test filters caches](./normalise-path-separators-before-the.md) | pending |
-| [Pin the Maven and Gradle build goldens to LF so Windows checkouts match](./pin-the-maven-and-gradle-build-goldens.md) | pending |
+| [Pin the Maven and Gradle build goldens to LF so Windows checkouts match](./pin-the-maven-and-gradle-build-goldens.md) | in_progress |
