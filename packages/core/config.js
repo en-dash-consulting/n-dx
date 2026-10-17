@@ -106,13 +106,19 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *   remote. `.n-dx.local.json` is gitignored by init and by the shipped
  *   template, and every reader already merges it over the shared file.
  *
+ * - **Credential routing** (`*.api_endpoint`, `llm.google.apiKeyEnv`): where
+ *   a key is sent and which variable is sent as one. The loaders honour these
+ *   from the shared file only once the repository is trusted (llm-client
+ *   `credential-routing.ts`), so writing the user's own choice there would
+ *   have it ignored and mark their repository untrusted.
+ *
  * Keyed by section, then by the setting path within that section. `llm`
  * entries are matched by suffix so `llm.claude.api_key`, `llm.codex.api_key`
  * and `llm.google.api_key` all route without listing each vendor.
  */
 const LOCAL_ONLY_SETTINGS = {
-  claude: new Set(["cli_path", "api_key"]),
-  llm: { suffixes: [".cli_path", ".api_key"] },
+  claude: new Set(["cli_path", "api_key", "api_endpoint"]),
+  llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
 };
 
 /** Setting-path leaf that marks a secret, for the shared-file scan. */
@@ -2143,6 +2149,8 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     compatible services.
                                     Default: https://api.anthropic.com
                                     Validated: must be a valid HTTP(S) URL.
+                                    Stored in .n-dx.local.json; the shared .n-dx.json's
+                                    value applies only once the repository is trusted.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
                                     Examples: claude-sonnet-5-5, claude-opus-5-5
@@ -2160,6 +2168,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.claude.api_key       string    Claude API key (optional)
                                     Stored in .n-dx.local.json.
   llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.claude.model         string    Claude default model (optional)
   llm.claude.lightModel    string    Claude model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
@@ -2170,6 +2179,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.codex.api_key        string    Codex API key (optional)
                                     Stored in .n-dx.local.json.
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.codex.model          string    Codex default model (optional)
   llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
@@ -2184,7 +2194,9 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     (default: GEMINI_API_KEY). Override when your
                                     key is stored in a custom env var.
                                     Example: n-dx config llm.google.apiKeyEnv MY_GOOGLE_KEY
+                                    Stored in .n-dx.local.json.
   llm.google.api_endpoint  string    Gemini API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.google.model         string    Gemini default model (optional)
                                     Must be a valid Gemini model ID starting with "gemini-".
                                     Known models: gemini-3.5-flash-lite (light),

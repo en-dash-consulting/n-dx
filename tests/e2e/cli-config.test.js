@@ -1196,14 +1196,41 @@ describe("n-dx config", () => {
   // ── API endpoint and model configuration ────────────────────────────────
 
   describe("claude.api_endpoint", () => {
-    it("sets claude.api_endpoint in .n-dx.json", async () => {
+    // Credential routing: the loaders honour the shared file's value only once
+    // the repository is trusted, so the user's own choice goes to the local file.
+    /** The shared `.n-dx.json`, or `{}` when nothing was written to it. */
+    async function readShared() {
+      const raw = await readFile(join(tmpDir, ".n-dx.json"), "utf-8").catch((err) => {
+        if (err.code === "ENOENT") return "{}";
+        throw err;
+      });
+      return JSON.parse(raw);
+    }
+
+    it("sets claude.api_endpoint in .n-dx.local.json, not the shared .n-dx.json", async () => {
       const output = run(["claude.api_endpoint", "https://proxy.example.com", tmpDir]);
       expect(output).toContain("claude.api_endpoint = https://proxy.example.com");
 
-      const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+      const local = JSON.parse(
+        await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"),
       );
-      expect(ndxConfig.llm.claude.api_endpoint).toBe("https://proxy.example.com");
+      expect(local.llm.claude.api_endpoint).toBe("https://proxy.example.com");
+      const shared = await readShared();
+      expect(shared.llm?.claude?.api_endpoint).toBeUndefined();
+    });
+
+    it("sets every vendor's api_endpoint and llm.google.apiKeyEnv in .n-dx.local.json", async () => {
+      run(["llm.codex.api_endpoint", "https://codex.example.com", tmpDir]);
+      run(["llm.google.api_endpoint", "https://gemini.example.com", tmpDir]);
+      run(["llm.google.apiKeyEnv", "MY_GOOGLE_KEY", tmpDir]);
+
+      const local = JSON.parse(await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"));
+      expect(local.llm.codex.api_endpoint).toBe("https://codex.example.com");
+      expect(local.llm.google.api_endpoint).toBe("https://gemini.example.com");
+      expect(local.llm.google.apiKeyEnv).toBe("MY_GOOGLE_KEY");
+      const shared = await readShared();
+      expect(shared.llm?.codex?.api_endpoint).toBeUndefined();
+      expect(shared.llm?.google).toBeUndefined();
     });
 
     it("gets claude.api_endpoint after setting it", () => {
