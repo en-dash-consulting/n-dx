@@ -11,8 +11,8 @@
  * Returns false if prerequisites are missing, true on success, throws on error.
  */
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   DATA_FILES,
   toCanonicalJSON,
@@ -56,7 +56,14 @@ import { info } from "../output.js";
 import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
-import { withPackAnalysedLanguages } from "../../analyzers/inventory.js";
+import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers/inventory.js";
+import { SV_CACHE_DIRNAME } from "../../paths.js";
+
+/**
+ * Machine-local record of the {@link inventoryFingerprint} the last inventory
+ * was made under. Kept out of inventory.json so its bytes depend on content alone.
+ */
+const INVENTORY_FINGERPRINT_FILE = "inventory-fingerprint.json";
 import type { PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
 
 // ── Shared context passed between phases ─────────────────────────────
@@ -131,16 +138,21 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
   updateManifestModule(ctx.absDir, "inventory", "running");
 
   try {
-    const previousInventory = loadPreviousData(join(ctx.svDir, DATA_FILES.inventory));
-
     // Detect all languages and merge into a unified config for skip dirs, etc.
     const langConfigs = await detectLanguages(ctx.absDir);
     const mergedConfig = mergeLanguageConfigs(langConfigs);
 
+    // Cached entries are reused only when the rules that made them still hold.
+    const fingerprintPath = join(ctx.svDir, SV_CACHE_DIRNAME, INVENTORY_FINGERPRINT_FILE);
+    const fingerprint = inventoryFingerprint(mergedConfig);
+    const previousInventory = !ctx.fullMode && loadPreviousData(fingerprintPath)?.fingerprint === fingerprint
+      ? loadPreviousData(join(ctx.svDir, DATA_FILES.inventory))
+      : undefined;
+
     ctx.inventoryResult = await analyzeInventory(
       ctx.absDir,
       {
-        ...((!ctx.fullMode && previousInventory) ? { previousInventory } : {}),
+        ...(previousInventory ? { previousInventory } : {}),
         languageConfig: mergedConfig,
       },
     );
@@ -151,6 +163,8 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
       files: ctx.inventoryResult.files,
       summary: ctx.inventoryResult.summary,
     }));
+    mkdirSync(dirname(fingerprintPath), { recursive: true });
+    writeFileSync(fingerprintPath, JSON.stringify({ fingerprint }) + "\n");
     updateManifestModule(ctx.absDir, "inventory", "complete");
 
     // Record resolved language(s) in manifest for downstream consumers

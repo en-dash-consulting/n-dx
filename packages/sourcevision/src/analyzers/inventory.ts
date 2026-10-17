@@ -12,6 +12,7 @@ import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
+import { sourcevisionVersion } from "../language/package-paths.js";
 import { csharpConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Language detection ───────────────────────────────────────────────────────
@@ -410,6 +411,10 @@ export function isBinary(buf: Buffer): boolean {
 // ── Incremental types ────────────────────────────────────────────────────────
 
 export interface InventoryOptions {
+  /**
+   * Entries reused as they are for files whose mtime and size match. Pass one
+   * only when it was made under the same {@link inventoryFingerprint}.
+   */
   previousInventory?: Inventory;
   /** Pre-resolved language config. When omitted, detectLanguage() auto-detects. */
   languageConfig?: LanguageConfig;
@@ -612,6 +617,32 @@ export async function analyzeInventory(
   }
 
   return result;
+}
+
+/** JSON replacer that writes a language config's sets, maps and patterns in a stable form. */
+function canonicalConfigValue(_key: string, value: unknown): unknown {
+  if (value instanceof RegExp) return `/${value.source}/${value.flags}`;
+  if (value instanceof Set) return [...value].map(String).sort();
+  if (value instanceof Map) return [...value.entries()].sort(([a], [b]) => String(a).localeCompare(String(b)));
+  if (typeof value === "function") return undefined;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(obj).sort().map((k) => [k, obj[k]]));
+  }
+  return value;
+}
+
+/**
+ * Fingerprint of everything that decides a cached {@link FileEntry}: the
+ * sourcevision version (the classifier's code) and the language config's
+ * rules (test, generated, config and entry patterns, header rules, skip
+ * rules). A previous inventory is reusable only under the same fingerprint;
+ * the caller stores it outside inventory.json.
+ */
+export function inventoryFingerprint(langConfig: LanguageConfig, version: string = sourcevisionVersion()): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ version, config: langConfig }, canonicalConfigValue))
+    .digest("hex");
 }
 
 export { toCanonicalJSON };
