@@ -18,9 +18,10 @@ import type { LanguageConfig } from "./registry.js";
  * - `generated-sources/` and `generated/` hold Lombok, MapStruct and
  *   OpenAPI Generator output; they are skipped, and any that are reached
  *   are inventoried as `generated`.
- * - `entryPointPatterns` are path-only. A class is an entry point when it
- *   declares `public static void main`, which needs file content; until the
- *   structure queries land, the conventional file names stand in.
+ * - `entryPointPatterns` is empty. A class is an entry point when it
+ *   declares `public static void main`, which a file name cannot show; the
+ *   Java pack's `entry_point.main` capture (`queries/java/methods.scm`)
+ *   reports those methods instead.
  */
 export const javaConfig: LanguageConfig = {
   id: "java",
@@ -65,10 +66,7 @@ export const javaConfig: LanguageConfig = {
     /(?:^|\/)generated\//,
   ],
 
-  entryPointPatterns: [
-    /(?:^|\/)[^/]*Application\.java$/,
-    /(?:^|\/)Main\.java$/,
-  ],
+  entryPointPatterns: [],
 
   moduleFile: "pom.xml",
 };

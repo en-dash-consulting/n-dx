@@ -28,6 +28,8 @@ export interface JavaModule {
 export interface JavaModuleLayout {
   buildSystem: JavaBuildSystem;
   modules: JavaModule[];
+  /** Directories the search could not list; present only when there are any. */
+  notices?: string[];
 }
 
 const DEFAULT_ROOTS = ["src/main/java", "src/test/java"];
@@ -36,17 +38,23 @@ export const GRADLE_BUILD = ["build.gradle", "build.gradle.kts"];
 
 /** Find Java modules and their source roots under `projectDir`. */
 export async function discoverJavaModules(projectDir: string): Promise<JavaModuleLayout> {
+  const notices: string[] = [];
+  const withNotices = (layout: JavaModuleLayout): JavaModuleLayout =>
+    notices.length ? { ...layout, notices } : layout;
   if (await isFile(join(projectDir, "pom.xml"))) {
-    return { buildSystem: "maven", modules: await readMavenModules(projectDir) };
+    return withNotices({ buildSystem: "maven", modules: await readMavenModules(projectDir, notices) });
   }
   const settings = await firstFile(projectDir, GRADLE_SETTINGS);
   const build = await firstFile(projectDir, GRADLE_BUILD);
   if (settings || build) {
-    return { buildSystem: "gradle", modules: await readGradleModules(projectDir, settings, build) };
+    return withNotices({
+      buildSystem: "gradle",
+      modules: await readGradleModules(projectDir, settings, build, notices),
+    });
   }
-  const roots = await packageDeclarationRoots(projectDir);
+  const roots = await packageDeclarationRoots(projectDir, notices);
   const modules = roots.length ? [{ name: basename(projectDir), dir: "", sourceRoots: roots }] : [];
-  return { buildSystem: "none", modules };
+  return withNotices({ buildSystem: "none", modules });
 }
 
 // ── Maven ────────────────────────────────────────────────────────────────
@@ -65,14 +73,14 @@ function stripXmlComments(xml: string): string {
   }
 }
 
-async function readMavenModules(projectDir: string): Promise<JavaModule[]> {
+async function readMavenModules(projectDir: string, notices: string[]): Promise<JavaModule[]> {
   const modules: JavaModule[] = [];
   const seen = new Set<string>();
 
   async function visit(dir: string): Promise<void> {
     if (seen.has(dir)) return;
     seen.add(dir);
-    const pom = await readText(join(projectDir, dir, "pom.xml"));
+    const pom = await readText(projectDir, join(projectDir, dir, "pom.xml"), notices);
     if (pom === null) return;
     const xml = stripXmlComments(pom);
     // Plugin configuration reuses the tag name (antlr4, protobuf, ...) for non-Java roots.
@@ -128,8 +136,9 @@ async function readGradleModules(
   projectDir: string,
   settingsFile: string | null,
   rootBuildFile: string | null,
+  notices: string[],
 ): Promise<JavaModule[]> {
-  const settings = settingsFile ? stripGradleComments((await readText(settingsFile)) ?? "") : "";
+  const settings = settingsFile ? stripGradleComments((await readText(projectDir, settingsFile, notices)) ?? "") : "";
   const overrides = projectDirOverrides(settings);
 
   const paths = new Set<string>();
@@ -150,7 +159,7 @@ async function readGradleModules(
 
   const modules: JavaModule[] = [];
   for (const e of entries) {
-    const build = e.buildFile ? stripGradleComments((await readText(e.buildFile)) ?? "") : "";
+    const build = e.buildFile ? stripGradleComments((await readText(projectDir, e.buildFile, notices)) ?? "") : "";
     modules.push({
       name: e.name,
       dir: e.dir,
@@ -209,18 +218,29 @@ function statementTail(src: string, from: number): string {
 
 // ── No build file ────────────────────────────────────────────────────────
 
-/** Roots inferred from `package` declarations; skips directories the Java config skips. */
-async function packageDeclarationRoots(projectDir: string): Promise<string[]> {
+/**
+ * Roots inferred from `package` declarations; skips directories the Java config
+ * skips. A directory that cannot be listed is skipped and reported as a notice.
+ */
+async function packageDeclarationRoots(projectDir: string, notices: string[]): Promise<string[]> {
   const roots = new Set<string>();
 
   async function walk(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true });
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "EACCES" && code !== "EPERM" && code !== "ENOENT" && code !== "ENOTDIR") throw err;
+      notices.push(`${toPosix(relative(projectDir, dir)) || "."} is unreadable (${code}); skipped`);
+      return;
+    }
     for (const e of entries) {
       if (e.isDirectory()) {
         if (e.name.startsWith(".") || e.name === "node_modules" || javaConfig.skipDirectories.has(e.name)) continue;
         await walk(join(dir, e.name));
       } else if (e.name.endsWith(".java")) {
-        const root = await rootFromPackage(projectDir, join(dir, e.name));
+        const root = await rootFromPackage(projectDir, join(dir, e.name), notices);
         if (root !== null) roots.add(root);
       }
     }
@@ -231,8 +251,9 @@ async function packageDeclarationRoots(projectDir: string): Promise<string[]> {
 }
 
 /** The directory a file's package path hangs off, or null when path and package disagree. */
-async function rootFromPackage(projectDir: string, file: string): Promise<string | null> {
-  const text = (await readText(file)) ?? "";
+async function rootFromPackage(projectDir: string, file: string, notices: string[]): Promise<string | null> {
+  const text = await readText(projectDir, file, notices);
+  if (text === null) return null;
   const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
   const pkg = /^\s*package\s+([\w.]+)\s*;/m.exec(code)?.[1];
   const fileDir = toPosix(relative(projectDir, dirname(file)));
@@ -264,12 +285,16 @@ function toPosix(p: string): string {
   return sep === "/" ? p : p.split(sep).join("/");
 }
 
-async function readText(path: string): Promise<string | null> {
+/** File text; null when absent, or when unreadable (EACCES/EPERM), which is reported as a notice. */
+async function readText(projectDir: string, path: string, notices: string[]): Promise<string | null> {
   try {
     return await readFile(path, "utf8");
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw err;
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return null;
+    if (code !== "EACCES" && code !== "EPERM") throw err;
+    notices.push(`${toPosix(relative(projectDir, path))} is unreadable (${code}); skipped`);
+    return null;
   }
 }
 

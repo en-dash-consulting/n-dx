@@ -78,12 +78,55 @@ function isTypeSymbol(symbol) {
   return symbol.length > 0 && !symbol.startsWith("local ") && symbol.endsWith("#");
 }
 
-export const edgeKey = (from, to) => `${from}\0${to}`;
+/** `<type>#`<init>`(<disambiguator>).` (any overload) is a constructor of `<type>#`. */
+const CONSTRUCTOR = /^(.+#)`<init>`\([^)]*\)\.$/;
+
+/** The type symbol a reference counts toward: itself, its owner for a constructor, else undefined. */
+function referencedType(symbol) {
+  if (symbol.startsWith("local ")) return undefined;
+  const type = CONSTRUCTOR.exec(symbol)?.[1] ?? symbol;
+  return isTypeSymbol(type) ? type : undefined;
+}
+
+/**
+ * Whether a directory is build output: `target` beside a `pom.xml`, or `build`
+ * beside a Gradle build file. The sibling check keeps a source package that
+ * happens to be named `build` or `target`.
+ *
+ * @param {string} name directory name
+ * @param {Iterable<string>} siblings names of the entries in its parent directory
+ */
+export function isBuildOutputDir(name, siblings) {
+  const names = new Set(siblings);
+  if (name === "target") return names.has("pom.xml");
+  if (name === "build") return ["build.gradle", "build.gradle.kts"].some((f) => names.has(f));
+  return false;
+}
+
+/**
+ * Restrict the walked `.java` files to those the SCIP index has a document for.
+ * scip-java only indexes what the build compiled, so a file outside the index
+ * (a module behind an inactive profile) would count every resolver edge from it
+ * as a false positive. Both edge sets are then built over the returned files.
+ *
+ * @param {string[]} walked repository-relative paths, build output already excluded
+ * @param {{ path: string }[]} documents from {@link readScipDocuments}
+ * @returns {{ files: string[], notIndexed: number }}
+ */
+export function selectComparedFiles(walked, documents) {
+  const indexed = new Set(documents.map((d) => d.path));
+  const files = walked.filter((f) => indexed.has(f));
+  return { files, notIndexed: walked.length - files.length };
+}
+
+export const edgeKey =(from, to) => `${from}\0${to}`;
 
 /**
  * Reduce documents to file-to-file reference edges. Only type symbols count
- * (descriptor ends in `#`): the resolver models type references, so method and
- * field symbols would score its design, not its accuracy. Edges are limited to
+ * (descriptor ends in `#`), plus constructor symbols, which count as references
+ * to their type (`new T()` is recorded as `T#`<init>`().`): the resolver models
+ * type references, so other method and field symbols would score its design,
+ * not its accuracy. Edges are limited to
  * `files` (the repository's own `.java` files) and drop self-references.
  *
  * @returns {Set<string>} {@link edgeKey} values
@@ -101,8 +144,9 @@ export function scipEdges(documents, files) {
   for (const doc of documents) {
     if (!inRepo.has(doc.path)) continue;
     for (const occ of doc.occurrences) {
-      if (occ.definition || !isTypeSymbol(occ.symbol)) continue;
-      const target = definedIn.get(occ.symbol);
+      if (occ.definition) continue;
+      const type = referencedType(occ.symbol);
+      const target = type === undefined ? undefined : definedIn.get(type);
       if (target !== undefined && target !== doc.path) edges.add(edgeKey(doc.path, target));
     }
   }

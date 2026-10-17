@@ -21,7 +21,7 @@ import { join, relative } from "node:path";
 
 import { grammarWasmPath } from "./build-grammars.mjs";
 import { CLONE_COMMAND, CORPUS_DIR_ENV, checkedOutSha, corpusDir, loadCorpus } from "./java-corpus.mjs";
-import { compareEdges, edgeKey, proposeThreshold, readScipDocuments, scipEdges } from "./java-scip.mjs";
+import { compareEdges, edgeKey, isBuildOutputDir, proposeThreshold, readScipDocuments, scipEdges, selectComparedFiles } from "./java-scip.mjs";
 
 const INDEX_FILE = "index.scip";
 const SKIP_DIRS = new Set([".git", "node_modules"]);
@@ -35,14 +35,30 @@ const OPERATOR_COMMANDS = [
   "Per-repository notes: packages/sourcevision/scripts/java-scip-compare.md",
 ];
 
-function* walkJava(dir) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+/** Every `.java` file under `dir` outside build output; `buildOutput` counts the `.java` files skipped there. */
+function walkJava(dir, found = { files: [], buildOutput: 0 }) {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  const siblings = entries.map((e) => e.name);
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) yield* walkJava(join(dir, entry.name));
+      if (SKIP_DIRS.has(entry.name)) continue;
+      if (isBuildOutputDir(entry.name, siblings)) found.buildOutput += countJava(path);
+      else walkJava(path, found);
     } else if (entry.isFile() && entry.name.endsWith(".java")) {
-      yield join(dir, entry.name);
+      found.files.push(path);
     }
   }
+  return found;
+}
+
+function countJava(dir) {
+  let n = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) n += countJava(join(dir, entry.name));
+    else if (entry.isFile() && entry.name.endsWith(".java")) n++;
+  }
+  return n;
 }
 
 const json = process.argv.includes("--json");
@@ -75,15 +91,27 @@ const { buildPackImportGraph } = await import(distGraph.href);
 const results = [];
 for (const repo of present) {
   const dir = join(root, repo.name);
-  const files = [...walkJava(dir)].map((f) => relative(dir, f).split("\\").join("/"));
+  const walked = walkJava(dir);
+  const documents = readScipDocuments(readFileSync(join(dir, INDEX_FILE)));
+  const { files, notIndexed } = selectComparedFiles(
+    walked.files.map((f) => relative(dir, f).split("\\").join("/")),
+    documents,
+  );
   const fileSet = new Set(files);
   const graph = await buildPackImportGraph(
     files.map((path) => ({ path })),
     dir,
   );
   const resolver = new Set(graph.edges.filter((e) => fileSet.has(e.to) && e.to !== e.from).map((e) => edgeKey(e.from, e.to)));
-  const scip = scipEdges(readScipDocuments(readFileSync(join(dir, INDEX_FILE))), files);
-  results.push({ name: repo.name, sha: checkedOutSha(dir), pinnedSha: repo.sha, files: files.length, ...compareEdges(resolver, scip) });
+  const scip = scipEdges(documents, files);
+  results.push({
+    name: repo.name,
+    sha: checkedOutSha(dir),
+    pinnedSha: repo.sha,
+    files: files.length,
+    leftOut: { buildOutput: walked.buildOutput, notIndexed },
+    ...compareEdges(resolver, scip),
+  });
 }
 
 const thresholds = {
@@ -99,7 +127,8 @@ if (json) {
   for (const r of results) {
     const drift = r.sha === r.pinnedSha ? "" : `  (checked out ${r.sha}, pinned ${r.pinnedSha})`;
     console.log(`\n${r.name} @ ${r.pinnedSha.slice(0, 12)}${drift}`);
-    console.log(`  .java files: ${r.files}   edges: resolver ${r.resolver}, scip-java ${r.scip}, matched ${r.matched}`);
+    console.log(`  .java files compared: ${r.files}   left out: ${r.leftOut.buildOutput} build output (target/, build/), ${r.leftOut.notIndexed} not in the SCIP index`);
+    console.log(`  edges: resolver ${r.resolver}, scip-java ${r.scip}, matched ${r.matched}`);
     console.log(`  precision ${pct(r.precision)}   recall ${pct(r.recall)}`);
     for (const [label, side] of [
       ["resolver-only (false positive)", r.extra],
@@ -109,6 +138,6 @@ if (json) {
       for (const t of side.topTargets) console.log(`    ${String(t.count).padStart(5)}  -> ${t.target}   e.g. from ${t.sampleFrom}`);
     }
   }
-  if (absent.length > 0) console.log(`\nno ${INDEX_FILE} (skipped): ${absent.map((r) => r.name).join(", ")}`);
+  for (const r of absent) console.log(`\nno ${INDEX_FILE} (skipped): ${r.name}${r.notBuilt ? ` — not built: ${r.notBuilt}` : ""}`);
   console.log(`\nproposed G2 floors: precision >= ${pct(thresholds.precision)}, recall >= ${pct(thresholds.recall)} (lowest measured less 2 points)`);
 }

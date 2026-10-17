@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, chmod } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { discoverJavaModules } from "../../../src/language/java-modules.js";
@@ -183,4 +183,57 @@ project(':c').projectDir = new File(settingsDir, 'vendor/c')`,
     await file("README.md", "hi");
     expect(await discoverJavaModules(dir)).toEqual({ buildSystem: "none", modules: [] });
   });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "skips a subdirectory it cannot list when there is no build file, and reports it",
+    async () => {
+      await file("src/app/A.java", "package app;\nclass A {}");
+      await dirs("locked");
+      await chmod(join(dir, "locked"), 0o000);
+      try {
+        const layout = await discoverJavaModules(dir);
+        expect(layout.buildSystem).toBe("none");
+        expect(layout.modules[0].sourceRoots).toEqual(["src"]);
+        expect(layout.notices).toEqual(["locked is unreadable (EACCES); skipped"]);
+      } finally {
+        await chmod(join(dir, "locked"), 0o755);
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "skips a .java file it cannot read when there is no build file, and reports it",
+    async () => {
+      await file("src/app/A.java", "package app;\nclass A {}");
+      await file("lib/b/B.java", "package b;\nclass B {}");
+      await chmod(join(dir, "lib/b/B.java"), 0o000);
+      try {
+        const layout = await discoverJavaModules(dir);
+        expect(layout.buildSystem).toBe("none");
+        expect(layout.modules[0].sourceRoots).toEqual(["src"]);
+        expect(layout.notices).toEqual(["lib/b/B.java is unreadable (EACCES); skipped"]);
+      } finally {
+        await chmod(join(dir, "lib/b/B.java"), 0o644);
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "treats an unreadable module pom.xml as absent and reports it",
+    async () => {
+      await file("pom.xml", "<project><artifactId>root</artifactId><modules><module>core</module></modules></project>");
+      await file("core/pom.xml", "<project><artifactId>core</artifactId></project>");
+      await dirs("src/main/java", "core/src/main/java");
+      await chmod(join(dir, "core/pom.xml"), 0o000);
+      try {
+        const { layout, get } = await discover();
+        expect(layout.buildSystem).toBe("maven");
+        expect(layout.modules.map((m) => m.name)).toEqual(["root"]);
+        expect(get("root")?.sourceRoots).toEqual(["src/main/java"]);
+        expect(layout.notices).toEqual(["core/pom.xml is unreadable (EACCES); skipped"]);
+      } finally {
+        await chmod(join(dir, "core/pom.xml"), 0o644);
+      }
+    },
+  );
 });

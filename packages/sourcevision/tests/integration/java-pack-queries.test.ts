@@ -89,6 +89,38 @@ describe("java pack", () => {
     ]);
   });
 
+  it("marks public static void main(String[]) as the entry point, whatever the file is named", async (ctx) => {
+    const { captures } = await parse(
+      ctx,
+      [
+        "class A {",
+        "  public static void main(String[] args) {}",
+        "  static public void main(final String... args) {}",
+        "  @Deprecated public static void main(java.lang.String args[]) {}",
+        "  void main(String[] args) {}",
+        "  static void main(String[] args) {}",
+        "  public static int main(String[] args) { return 0; }",
+        "  public static void main(String args) {}",
+        "  public static void main(Object[] args) {}",
+        "  public static void main(String[][] args) {}",
+        "  public static void main(String[] args[]) {}",
+        "  public static void main(String[]... args) {}",
+        "  public static void main(String[] args, int n) {}",
+        "  public static void start(String[] args) {}",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const entries = captures.methods!.filter((c) => c.name === "entry_point.main");
+    expect(entries.map((c) => [c.nodeType, c.start.line])).toEqual([
+      ["method_declaration", 2],
+      ["method_declaration", 3],
+      ["method_declaration", 4],
+    ]);
+    // Predicate-only captures stay out of the output.
+    expect(captures.methods!.filter((c) => c.name.startsWith("_"))).toEqual([]);
+  });
+
   it("gives calls their receiver and string-literal arguments, nested calls apart", async (ctx) => {
     const { captures } = await parse(
       ctx,
