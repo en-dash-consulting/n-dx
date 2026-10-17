@@ -21,6 +21,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A repository's .n-dx.json cli_path chooses the binary ndx auth and ndx work run, while the repository is untrusted](./a-repository-s-n-dx-json-cli-path.md) | pending |
 | [`ndx trust accept .` tells a user with a repository test command there is "Nothing to trust"](./ndx-trust-accept-tells-a-user-with-a.md) | completed |
 | [`ndx trust .` tells a user with a repository test command there is "nothing to trust"](./ndx-trust-tells-a-user-with-a.md) | pending |
 | [`rex verify` runs the repository's test command by default with no trust check](./rex-verify-runs-the-repository-s-test.md) | completed |

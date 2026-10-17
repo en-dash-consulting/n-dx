@@ -23,7 +23,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A repository's .n-dx.json can choose which environment variable is sent as the Google API key, and where it is sent](./a-repository-s-n-dx-json-can-choose.md) | completed |
 | [hench's missing-credentials message tells a Codex env_key user the CLI falls back to default credential files](./hench-s-missing-credentials-message.md) | pending |
-| [ndx auth's Google preflight reads llm.google.apiKeyEnv from the untrusted project config](./ndx-auth-s-google-preflight-reads-llm.md) | pending |
+| [ndx auth's Google preflight reads llm.google.apiKeyEnv from the untrusted project config](./ndx-auth-s-google-preflight-reads-llm.md) | completed |
 | [ndx config --test-connection sends the Claude API key to an untrusted project's api_endpoint](./ndx-config-test-connection-sends-the.md) | completed |
 | [One sanitized-environment builder for every repository-command subprocess: tests, gate, audit and rex](./one-sanitized-environment-builder-for.md) | completed |
 | [The agent's shell keeps a repository-supplied guard.env.allow while the repository is untrusted, unlike repository commands](./the-agent-s-shell-keeps-a-repository.md) | pending |
