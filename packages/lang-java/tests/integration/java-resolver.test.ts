@@ -174,6 +174,11 @@ describe("java resolver", () => {
       "gen/src/main/java/com/acme/Twin.java": "package com.acme;\nclass Twin {}\n",
       "gen/src/main/java/com/acme/copy/Twin.java": "package com.acme;\nclass Twin {}\n",
       "gen/src/main/java/com/acme/User.java": "package com.acme;\nclass User { Twin t; }\n",
+      // A test naming classes declared only in other modules: one in a test set alone, one in a test set and a main set.
+      "svc-a/src/test/java/com/acme/svc/SvcTest.java": "package com.acme.svc;\nclass SvcTest { TestUtils u; Widget w; }\n",
+      "svc-b/src/test/java/com/acme/svc/TestUtils.java": "package com.acme.svc;\nclass TestUtils {}\n",
+      "svc-b/src/test/java/com/acme/svc/Widget.java": "package com.acme.svc;\nclass Widget {}\n",
+      "svc-c/src/main/java/com/acme/svc/Widget.java": "package com.acme.svc;\nclass Widget {}\n",
     };
 
     async function resolveSources(ctx: Parameters<typeof skipUnlessGrammar>[0]): Promise<(path: string) => FileReferences> {
@@ -206,6 +211,13 @@ describe("java resolver", () => {
         [`${MAIN}/Foo.java`]: ["Foo"],
         [`${TEST}/Helper.java`]: ["Helper"],
         [`${TEST}/TestOnly.java`]: ["TestOnly"],
+      });
+    });
+
+    it("never resolves a test to another module's test code, but still to its main code", async (ctx) => {
+      const resolve = await resolveSources(ctx);
+      expect(targets(resolve("svc-a/src/test/java/com/acme/svc/SvcTest.java"))).toEqual({
+        "svc-c/src/main/java/com/acme/svc/Widget.java": ["Widget"],
       });
     });
 

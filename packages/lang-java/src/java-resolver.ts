@@ -7,8 +7,8 @@
  * top-level type by package and simple name. Package declarations give the
  * qualified names. When several files declare one name, a reference keeps
  * the ones javac could link ({@link visibleCandidates}): its own module and
- * source set, read from the path (`<module>/src/<set>/java/`), and never test
- * code from main code.
+ * source set, read from the path (`<module>/src/<set>/java/`), never test
+ * code from main code, and never another module's test code.
  *
  * Per file:
  * - single-type, static and static-wildcard imports always refer to the file
@@ -257,16 +257,24 @@ function buildIndex(facts: readonly JavaFileFacts[]): JavaIndex {
 
 /**
  * The declarations of one name that `from` can see, as javac would: main code
- * never sees test code; of the rest, those in `from`'s own module, and of
- * those, the ones in its own source set (a test sees main code only when its
- * own set has none). Several remain only on a real tie, or when none is in
- * `from`'s module. A file outside the standard layout narrows nothing.
+ * never sees test code, and test code sees only its own module's; of the
+ * rest, those in `from`'s own module, and of those, the ones in its own source
+ * set (a test sees main code only when its own set has none). Several remain
+ * only on a real tie, or when none is in `from`'s module. A file outside the
+ * standard layout narrows nothing.
+ *
+ * A Maven test-jar or Gradle `testFixtures` dependency does let one module's
+ * tests compile against another's; the resolver reads no build files, so it
+ * drops those edges rather than link every same-named test class across
+ * modules (`testFixtures` is a source set of its own module, so the rule holds there).
  */
 function visibleCandidates(index: JavaIndex, from: string, candidates: ReadonlySet<string>): Iterable<string> {
   const here = index.locations.get(from);
   if (!here) return candidates;
-  let visible = [...candidates];
-  if (!here.isTest) visible = visible.filter((path) => !index.locations.get(path)?.isTest);
+  const visible = [...candidates].filter((path) => {
+    const there = index.locations.get(path);
+    return !there?.isTest || (here.isTest && there.module === here.module);
+  });
   if (visible.length <= 1) return visible;
   const sameModule = visible.filter((path) => index.locations.get(path)?.module === here.module);
   if (sameModule.length === 0) return visible;
