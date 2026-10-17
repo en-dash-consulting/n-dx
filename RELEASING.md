@@ -1,6 +1,6 @@
 # Releasing n-dx
 
-All packages (`@n-dx/core`, `@n-dx/rex`, `@n-dx/hench`, `@n-dx/sourcevision`, `@n-dx/llm-client`, `@n-dx/web`) are published to npm. They share a single version number via a [Changesets fixed group](https://github.com/changesets/changesets/blob/main/docs/fixed-packages.md).
+Every `@n-dx/*` package is published to npm, and all of them share a single version number via a [Changesets fixed group](https://github.com/changesets/changesets/blob/main/docs/fixed-packages.md). The group's member list is `fixed` in [`.changeset/config.json`](.changeset/config.json); that file is the authority, so a new package joins the group there.
 
 ## How versioning works
 
@@ -58,7 +58,7 @@ The sub-packages (`@n-dx/rex`, `@n-dx/hench`, etc.) are published independently 
 
 Verify with `pnpm pack --dry-run` from `packages/core/`.
 
-Each language pack (`@n-dx/lang-java`, `@n-dx/lang-go`, `@n-dx/lang-sql`, `@n-dx/lang-terraform`) ships its own assets: query files (`queries/<lang>/`, none yet for Terraform) and its built tree-sitter grammar (`build/grammars/*.wasm`); `@n-dx/sourcevision` ships no grammar or query. Grammars are never committed, so the release workflow builds them with every package's `build:grammars` script (`pnpm -r --workspace-concurrency=1 run build:grammars`) before its tests and sets `SV_REQUIRE_GRAMMARS=1`. sourcevision's `tests/e2e/packed-tarball.test.ts` packs each pack, installs it into a pack directory and loads it from there, so a release whose pack tarball lacks a grammar or query fails before publish.
+Each language pack (`@n-dx/lang-java`, `@n-dx/lang-go`, `@n-dx/lang-sql`, `@n-dx/lang-terraform`, `@n-dx/lang-python`) ships its own assets: query files (`queries/<lang>/`, none yet for Terraform) and its built tree-sitter grammar (`build/grammars/*.wasm`); `@n-dx/sourcevision` ships no grammar or query. Grammars are never committed, so the release workflow builds them with every package's `build:grammars` script (`pnpm -r --workspace-concurrency=1 run build:grammars`) before its tests and sets `SV_REQUIRE_GRAMMARS=1`. sourcevision's `tests/e2e/packed-tarball.test.ts` packs each pack, installs it into a pack directory and loads it from there, so a release whose pack tarball lacks a grammar or query fails before publish.
 
 ## CLI commands registered on install
 

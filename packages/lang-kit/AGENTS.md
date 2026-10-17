@@ -27,7 +27,11 @@ yet produced). `OutboundCallFact.confidence` means what sourcevision's
 and `attributes` are filled by the Terraform pack; attribute values are kept
 as written, never normalised, except that an optional `instance` marks a fact
 whose attributes were resolved through module calls (one fact per distinct
-resolution, each attribute's `written` expression kept in `instance.resolved`). The contract names no parser type; `@n-dx/lang-runtime`'s
+resolution, each attribute's `written` expression kept in `instance.resolved`). The Python pack fills the optional
+`FileReference.typeOnly` (a target reached only under `if TYPE_CHECKING:`,
+recorded by sourcevision as a `type` edge), `FileReferences.written` (imports as written, each with an `ImportGuard` when
+it might not run), `SymbolFact.decorators` and `SymbolFact.exports`
+(`__all__`), and the `variable` symbol kind. The contract names no parser type; `@n-dx/lang-runtime`'s
 `src/pack-facts.ts` reads tree-sitter captures into it.
 
 The pack entry (`src/pack-entry.ts`) is the one object a pack package exports
@@ -40,6 +44,16 @@ It is per project because resolution needs the whole project. Its doc comment
 says what each field means for a pack that is not tree-sitter based (a TS/JS
 pack on the compiler, a SCIP tier); keep it parser-neutral. sourcevision checks
 what it imports with `isLanguagePackEntry`.
+
+The Python build readers (`src/python-build.ts`, `readPythonProjects(projectDir,
+files)`) read `pyproject.toml` (PEP 621, PEP 735, Poetry, setuptools, hatch,
+uv workspace), `setup.cfg` (`src/ini-lite.ts`), requirements files with
+`-r`/`-c` includes (`src/python-requirements.ts`) and the literal arguments of
+`setup.py`'s `setup(...)` (`src/python-setup-py.ts`; never executed, a
+non-literal is a notice). Projects, includes and uv member globs are matched
+against the `files` inventory, not the disk. Dependencies reuse
+`BuildDependency` (`group` empty, `artifact` PEP 503-normalised, specifier as
+written) with file and line. `parseTomlLocated` gives each value's line.
 
 `src/sql-references.ts` reads table names from embedded SQL text; it is here
 so the Java and Go packs share it without depending on each other.

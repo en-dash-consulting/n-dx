@@ -34,6 +34,7 @@ const PACKAGES = dirname(PACKAGE_ROOT);
 const GRAMMARS: Record<string, string> = {
   "lang-java": "tree-sitter-java",
   "lang-go": "tree-sitter-go",
+  "lang-python": "tree-sitter-python",
   "lang-sql": "tree-sitter-sql",
   "lang-terraform": "tree-sitter-hcl",
 };
@@ -46,6 +47,7 @@ const SAMPLES: Record<string, Record<string, string>> = {
   java: { "src/A.java": "package a;\n\nclass A {}\n" },
   go: { "go.mod": "module example.com/a\n", "a.go": "package a\n" },
   terraform: { "main.tf": 'resource "aws_s3_bucket" "a" {}\n' },
+  python: { "a.py": "import os\n" },
 };
 
 interface Report {

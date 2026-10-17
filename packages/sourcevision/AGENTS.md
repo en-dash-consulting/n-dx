@@ -40,6 +40,27 @@ in `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs.
    `.tf` file: those resources get no model fields. Analysis never fails on a
    pack.
 
+### Python
+
+`.py` and `.pyi` are parseable (`pythonConfig.parseableExtensions`) only
+through `@n-dx/lang-python`, an opt-in `KNOWN_PACKS` entry with no fallback
+parser: without it, Python files get inventory only and the missing-pack
+notice, and every artifact is the same as before Python was a pack. With
+it, Python edges and externals reach `imports.json` through
+`buildPackImportGraph` like Go's and Java's (stdlib as `stdlib:<module>`, a
+`TYPE_CHECKING`-only target as a `type` edge), so Python files join zones;
+a Python repository beside TypeScript (root `pyproject.toml` and
+`package.json`) gets both. The inventory phase cannot know whether the pack
+will load, so it leaves Python out of `analysedLanguages`; the imports phase
+adds it to inventory.json once the pack has run (`withPackAnalysedLanguages`),
+and leaves the file untouched otherwise. Its dynamic-import and past-root notices go to the same
+`warn`. `scripts/python-corpus-report.mjs` measures the pack
+over the pinned corpus (`python-corpus.json`), and
+`scripts/python-build-report.mjs` runs lang-kit's Python build readers over
+it (projects, roots, dependency counts, notices), and
+`scripts/python-resolve-report.mjs` the resolver (resolution rates by
+outcome and a hand-check sample).
+
 ### The Terraform model in infrastructure.json
 
 The Terraform pack produces `resources` facts, not imports.
@@ -93,7 +114,7 @@ and resource types live in `TERRAFORM_ENGINE_TABLE` and
 
 `sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
 the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
-sql; only `KNOWN_PACKS`, all but sql, are analyzed with today):
+python, sql; only `KNOWN_PACKS`, all but sql, are analyzed with today):
 
 - `add <lang>` runs `npm install --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
   creating the directory, then loads the pack from it with `loadPack`; a

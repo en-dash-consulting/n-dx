@@ -75,6 +75,11 @@ export const GRAMMARS = {
     version: "1.2.0",
     sha256: "a95bc6b00271e08dee9e63b895b2563dac802db0015fdf5a24a1b0244f2cb560",
   },
+  "tree-sitter-python": {
+    repo: "tree-sitter/tree-sitter-python",
+    version: "0.25.0",
+    sha256: "4609a3665a620e117acf795ff01b9e965880f81745f287a16336f4ca86cf270c",
+  },
   "tree-sitter-sql": {
     repo: "DerekStride/tree-sitter-sql",
     version: "0.3.11",

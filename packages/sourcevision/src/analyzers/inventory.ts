@@ -12,7 +12,7 @@ import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
 import { loadIgnoreFilter, projectSkipDirs, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
-import { csharpConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
+import { csharpConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Language detection ───────────────────────────────────────────────────────
 
@@ -95,6 +95,38 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   ".svelte": "Svelte",
   ".astro": "Astro",
 };
+
+/** Inventory language names of `extensions`. */
+function languageNames(extensions: Iterable<string>): Set<string> {
+  const names = new Set<string>();
+  for (const ext of extensions) {
+    const lang = EXT_TO_LANGUAGE[ext];
+    if (lang) names.add(lang);
+  }
+  return names;
+}
+
+/**
+ * Languages parsed only through an opt-in pack with no fallback parser
+ * (Python: `@n-dx/lang-python`). The inventory phase runs before anything
+ * loads the pack, so it leaves them out of `analysedLanguages`; listing them
+ * would change inventory.json without the pack. The imports phase adds a
+ * language back with {@link withPackAnalysedLanguages} once its pack has run.
+ */
+const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [pythonConfig];
+
+/**
+ * `summary` with the pack-only languages of the packs in `packIds` that have
+ * files here added to `analysedLanguages`; `summary` itself when that adds
+ * nothing.
+ */
+export function withPackAnalysedLanguages(summary: Inventory["summary"], packIds: readonly string[]): Inventory["summary"] {
+  const ran = languageNames(PACK_ONLY_CONFIGS.filter((c) => packIds.includes(c.id)).flatMap((c) => [...c.parseableExtensions]));
+  const listed = new Set(summary.analysedLanguages ?? []);
+  const added = Object.keys(summary.byLanguage).filter((lang) => ran.has(lang) && !listed.has(lang));
+  if (added.length === 0) return summary;
+  return { ...summary, analysedLanguages: [...listed, ...added].sort() };
+}
 
 export function detectLanguage(filePath: string): string {
   const name = basename(filePath);
@@ -554,16 +586,13 @@ export async function analyzeInventory(
   // detected primary language's own parser handles. Mirrors the extension set
   // analyzeImports() builds in imports.ts. Intersected with byLanguage so the
   // list only names languages actually present in this inventory.
-  const analysedExtensions = new Set<string>([
-    ...typescriptConfig.parseableExtensions,
-    ...csharpConfig.parseableExtensions,
-    ...langConfig.parseableExtensions,
-  ]);
-  const analysedLanguageNames = new Set<string>();
-  for (const ext of analysedExtensions) {
-    const lang = EXT_TO_LANGUAGE[ext];
-    if (lang) analysedLanguageNames.add(lang);
-  }
+  // Pack-only languages are left out; see PACK_ONLY_CONFIGS.
+  const packOnlyExtensions = new Set(PACK_ONLY_CONFIGS.flatMap((c) => [...c.parseableExtensions]));
+  const analysedLanguageNames = languageNames(
+    [...typescriptConfig.parseableExtensions, ...csharpConfig.parseableExtensions, ...langConfig.parseableExtensions].filter(
+      (ext) => !packOnlyExtensions.has(ext),
+    ),
+  );
   summary.analysedLanguages = Object.keys(summary.byLanguage)
     .filter((lang) => analysedLanguageNames.has(lang))
     .sort();

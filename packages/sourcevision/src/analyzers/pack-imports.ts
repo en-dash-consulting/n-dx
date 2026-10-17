@@ -50,6 +50,8 @@ export interface PackImportsOptions {
    * imports are asked for.
    */
   readonly framework?: (facts: readonly FileFacts[]) => void;
+  /** Receives the id of each pack that ran without degrading. */
+  readonly analysed?: (packId: string) => void;
 }
 
 /** The fact kinds a pack's framework rules produce for later phases. */
@@ -164,13 +166,14 @@ export async function buildPackImportGraph(
       degrade(pack, result.degraded);
       continue;
     }
+    options.analysed?.(pack.id);
     for (const notice of result.notices ?? []) warn(notice);
     if (kinds.length > 1) options.framework?.(result.facts);
 
     for (const { path, imports } of result.facts) {
       if (!imports) continue;
       for (const ref of imports.files) {
-        edges.push({ from: path, to: ref.to, type: "static", symbols: [...ref.symbols] });
+        edges.push({ from: path, to: ref.to, type: ref.typeOnly ? "type" : "static", symbols: [...ref.symbols] });
       }
       for (const ext of imports.external) {
         const existing = external.get(ext.package);

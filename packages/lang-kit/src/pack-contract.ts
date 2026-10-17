@@ -46,6 +46,11 @@ export interface FileReference {
   readonly to: string;
   /** Sorted, distinct; `*` for a wildcard import. */
   readonly symbols: readonly string[];
+  /**
+   * Set when every import that leads here is seen by type checkers only
+   * (Python's `if TYPE_CHECKING:`); sourcevision records the edge as `type`.
+   */
+  readonly typeOnly?: true;
 }
 
 /** The build-system module an external package comes from, when the resolver knows it. */
@@ -64,11 +69,36 @@ export interface ExternalReference {
   readonly module?: ExternalModule;
 }
 
+/**
+ * Why an import might not run when its module loads. `type-checking`: under
+ * `if TYPE_CHECKING:` (Python), seen by type checkers only. `optional`: inside
+ * a `try:` whose handler catches the import's failure (Python's `ImportError`
+ * or `ModuleNotFoundError`).
+ */
+export type ImportGuard = "type-checking" | "optional";
+
+/** One import as the file writes it, before resolution. */
+export interface WrittenImport {
+  /** The module as written; a relative import keeps its leading dots (`..pkg`, `.`). */
+  readonly specifier: string;
+  /** Names imported from the module, as written, in order; `*` for a wildcard; empty when the module itself is imported. */
+  readonly names: readonly string[];
+  /** Where the specifier starts. */
+  readonly position: SourcePosition;
+  /** Absent for an import that always runs. */
+  readonly guard?: ImportGuard;
+}
+
 /** Everything one file refers to. Both lists are sorted and deduplicated. */
 export interface FileReferences {
   /** Never contains the file itself. */
   readonly files: readonly FileReference[];
   readonly external: readonly ExternalReference[];
+  /**
+   * The file's imports as written, in document order, for a pack that reports
+   * them (Python). Absent otherwise.
+   */
+  readonly written?: readonly WrittenImport[];
 }
 
 // ── Symbols (produced) ──────────────────────────────────────────────────────
@@ -83,6 +113,10 @@ export interface FileReferences {
  * - `function`, `method`, `constructor`: callables. A Go method's container is
  *   its receiver's base type; a Java method's is its enclosing type.
  * - `table`: a SQL table created by `CREATE TABLE`.
+ * - `variable`: a name assigned at module level (Python).
+ *
+ * Python uses `class`, `function` (sync or async) and `method` (a function
+ * defined directly in a class body).
  */
 export const SYMBOL_KINDS = [
   "class",
@@ -96,6 +130,7 @@ export const SYMBOL_KINDS = [
   "method",
   "constructor",
   "table",
+  "variable",
 ] as const;
 
 export type SymbolKind = (typeof SYMBOL_KINDS)[number];
@@ -116,6 +151,17 @@ export interface SymbolFact {
    * belongs to no named type, so it does not take the one around it.
    */
   readonly container?: string;
+  /**
+   * Python decorators on the declaration, as written without the `@`
+   * (`dataclass`, `app.get("/items")`), outermost first; `span` then starts
+   * at the first decorator. Absent when there are none.
+   */
+  readonly decorators?: readonly string[];
+  /**
+   * On Python's module-level `__all__` assigned a literal list or tuple of
+   * strings: those strings, in order. Absent for any other value.
+   */
+  readonly exports?: readonly string[];
 }
 
 // ── Calls (produced) ────────────────────────────────────────────────────────

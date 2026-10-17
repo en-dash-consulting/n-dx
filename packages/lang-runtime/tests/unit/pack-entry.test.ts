@@ -12,9 +12,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { goConfig, isLanguagePackEntry } from "@n-dx/lang-kit";
 import { createPackEntry } from "../../src/pack-entry.js";
-import { factGaps, mergeFileFacts } from "../../src/pack-facts.js";
+import { factGaps, mergeFileFacts, readSymbols, type PackSymbolRules } from "../../src/pack-facts.js";
 import { packPackage, type PackPackage } from "../../src/pack-package.js";
-import type { FrameworkPack, LanguagePack } from "../../src/pack.js";
+import type { Capture, FrameworkPack, LanguagePack, PackSourceFile } from "../../src/pack.js";
 
 const pack: LanguagePack = {
   id: "go",
@@ -129,6 +129,39 @@ describe("factGaps", () => {
   it("names a framework kind the pack does not list", () => {
     const routesPack: LanguagePack = { ...resourcesPack, produces: [], frameworks: [framework(["routes"])] };
     expect(factGaps(routesPack, undefined)).toEqual(['framework "web" produces "routes", which the pack does not list']);
+  });
+});
+
+describe("readSymbols refine", () => {
+  const capture = (name: string, text: string, line: number, endLine: number): Capture => ({
+    name,
+    nodeType: "x",
+    text,
+    start: { line, column: 0 },
+    end: { line: endLine, column: 1 },
+  });
+  const file: PackSourceFile = {
+    path: "a",
+    captures: { decls: [capture("decl", "B", 3, 4), capture("name", "B", 3, 3), capture("decl", "A", 1, 2), capture("name", "A", 1, 1)] },
+  };
+  const rules: PackSymbolRules = { rules: [{ query: "decls", declaration: "decl", name: "name", kind: "function" }] };
+
+  it("passes the rule-read symbols in document order to refine and sorts its result again", () => {
+    const seen: string[][] = [];
+    const symbols = readSymbols(pack, file, {
+      ...rules,
+      refine: (read, given) => {
+        seen.push([given.path, ...read.map((s) => s.name)]);
+        // Moves B before A, as a decorator above B would.
+        return read.map((s) => (s.name === "B" ? { ...s, span: { ...s.span, start: { line: 0, column: 0 } } } : s));
+      },
+    });
+    expect(seen).toEqual([["a", "A", "B"]]);
+    expect(symbols.map((s) => s.name)).toEqual(["B", "A"]);
+  });
+
+  it("returns the rule-read symbols unchanged without refine", () => {
+    expect(readSymbols(pack, file, rules).map((s) => s.name)).toEqual(["A", "B"]);
   });
 });
 

@@ -56,6 +56,7 @@ import { info } from "../output.js";
 import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
+import { withPackAnalysedLanguages } from "../../analyzers/inventory.js";
 import type { PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
 
 // ── Shared context passed between phases ─────────────────────────────
@@ -192,17 +193,29 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
 
     const packFacts: Array<PackFrameworkFacts[number]> = [];
+    const analysedPacks: string[] = [];
     const imports = await analyzeImports(ctx.absDir, inventory, {
       ...(!ctx.fullMode && previousImports ? {
         previousImports,
         changedFiles: ctx.inventoryResult?.changedFiles,
         fileSetChanged,
       } : {}),
-      packs: { framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls }) => ({ path, routes, outboundCalls }))) },
+      packs: {
+        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls }) => ({ path, routes, outboundCalls }))),
+        analysed: (id) => analysedPacks.push(id),
+      },
     });
     ctx.packFacts = packFacts;
     const outPath = join(ctx.svDir, DATA_FILES.imports);
     writeFileSync(outPath, toCanonicalJSON(imports));
+
+    // A pack-only language (Python) is analysed only when its pack ran, which
+    // the inventory phase could not know; without such a pack inventory.json is untouched.
+    const summary = withPackAnalysedLanguages(inventory.summary, analysedPacks);
+    if (summary !== inventory.summary) {
+      writeFileSync(inventoryPath, toCanonicalJSON({ ...inventory, summary }));
+      if (ctx.inventoryResult) ctx.inventoryResult.summary = summary;
+    }
     updateManifestModule(ctx.absDir, "imports", "complete");
     info(`  ${bold(String(imports.summary.totalEdges))} edges, ${bold(String(imports.summary.totalExternal))} external → ${dim(outPath)}`);
   } catch (err) {

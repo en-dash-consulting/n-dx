@@ -52,6 +52,7 @@
   },
   "devDependencies": {
     "@n-dx/lang-java": "workspace:*",
+    "@n-dx/lang-python": "workspace:*",
     "@n-dx/lang-runtime": "workspace:*",
     "@n-dx/lang-sql": "workspace:*",
     "@n-dx/lang-terraform": "workspace:*",
