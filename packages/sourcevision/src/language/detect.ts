@@ -24,7 +24,7 @@
 import { readFile, readdir, access } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
-import type { LanguageConfig } from "./registry.js";
+import type { GeneratedHeaderRule, LanguageConfig } from "./registry.js";
 import { typescriptConfig } from "./typescript.js";
 import { goConfig } from "./go.js";
 import { swiftConfig } from "./swift.js";
@@ -412,6 +412,7 @@ export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]
  * - `configFilePatterns`: concatenation of all patterns (omitted when none)
  * - `skipDirectories`: union of all skip directories
  * - `generatedFilePatterns`: concatenation of all patterns
+ * - `generatedHeaders`: concatenation of all rules (omitted when none)
  * - `entryPointPatterns`: concatenation of all patterns
  * - `moduleFile`: from the primary config
  */
@@ -432,6 +433,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
   const configFilePatterns: RegExp[] = [];
   const skipDirectories = new Set<string>();
   const generatedFilePatterns: RegExp[] = [];
+  const generatedHeaders: GeneratedHeaderRule[] = [];
   const entryPointPatterns: RegExp[] = [];
 
   for (const config of configs) {
@@ -442,6 +444,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     for (const p of config.configFilePatterns ?? []) configFilePatterns.push(p);
     for (const d of config.skipDirectories) skipDirectories.add(d);
     for (const p of config.generatedFilePatterns) generatedFilePatterns.push(p);
+    for (const r of config.generatedHeaders ?? []) generatedHeaders.push(r);
     for (const p of config.entryPointPatterns) entryPointPatterns.push(p);
   }
 
@@ -455,6 +458,7 @@ export function mergeLanguageConfigs(configs: LanguageConfig[]): LanguageConfig 
     ...(configFilePatterns.length > 0 ? { configFilePatterns } : {}),
     skipDirectories,
     generatedFilePatterns,
+    ...(generatedHeaders.length > 0 ? { generatedHeaders } : {}),
     entryPointPatterns,
     moduleFile: primary.moduleFile,
   };

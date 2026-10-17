@@ -241,7 +241,31 @@ const PROGRAMMING_LANGUAGES = new Set([
   "Astro",
 ]);
 
-export function classifyRole(filePath: string, language: string, langConfig?: LanguageConfig): FileRole {
+/** Bytes of a file's start the generated-header rules look at. */
+const GENERATED_HEADER_BYTES = 8192;
+
+/** Leading text of `buf`, or undefined when no header rule applies to this file's extension. */
+function readHeaderText(filePath: string, buf: Buffer, config: LanguageConfig): string | undefined {
+  const ext = extname(filePath).toLowerCase();
+  if (!config.generatedHeaders?.some((rule) => rule.extensions.has(ext))) return undefined;
+  return buf.subarray(0, GENERATED_HEADER_BYTES).toString("utf-8");
+}
+
+/** True when `head` carries a generated-file header a rule for this file's extension recognises. */
+function hasGeneratedHeader(filePath: string, head: string, config: LanguageConfig): boolean {
+  const ext = extname(filePath).toLowerCase();
+  return (config.generatedHeaders ?? []).some((rule) => {
+    if (!rule.extensions.has(ext)) return false;
+    const end = rule.endOfHeader ? head.search(rule.endOfHeader) : -1;
+    return rule.pattern.test(end === -1 ? head : head.slice(0, end));
+  });
+}
+
+/**
+ * @param head leading text of the file; lets language header rules
+ *   (`LanguageConfig.generatedHeaders`) mark generated files path patterns miss.
+ */
+export function classifyRole(filePath: string, language: string, langConfig?: LanguageConfig, head?: string): FileRole {
   const name = basename(filePath);
   const lower = filePath.toLowerCase();
   const ext = extname(filePath).toLowerCase();
@@ -257,7 +281,8 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
   if (
     LOCKFILE_NAMES.has(name) ||
     lower.includes("generated") ||
-    config.generatedFilePatterns.some((pat) => pat.test(filePath))
+    config.generatedFilePatterns.some((pat) => pat.test(filePath)) ||
+    (head !== undefined && hasGeneratedHeader(filePath, head, config))
   ) {
     return "generated";
   }
@@ -642,7 +667,7 @@ export async function analyzeInventory(
     const buf = await readFile(fullPath);
     const hash = createHash("sha256").update(buf).digest("hex");
     const language = detectLanguage(relPath);
-    const role = classifyRole(relPath, language, langConfig);
+    const role = classifyRole(relPath, language, langConfig, readHeaderText(relPath, buf, langConfig));
     const category = deriveCategory(relPath);
 
     let lineCount = 0;

@@ -9,6 +9,26 @@
  * @module sourcevision/language/registry
  */
 
+// ── Generated-file header rule ──────────────────────────────────────────────
+
+/**
+ * A content check for generated files whose paths no pattern can name. The
+ * inventory reads the leading text of files with a matching extension and
+ * classifies a hit as `generated`.
+ */
+export interface GeneratedHeaderRule {
+  /** Extensions (lowercase, with dot) the rule applies to. Other files are never read for it. */
+  readonly extensions: ReadonlySet<string>;
+  /** Tested against the leading text; use the `m` flag for line anchors. */
+  readonly pattern: RegExp;
+  /** The text is cut at the first match of this, so a hit must precede it (e.g. Go's package clause). */
+  readonly endOfHeader?: RegExp;
+  /** Where the convention is defined. */
+  readonly source: string;
+  /** ISO date the rule was last checked against `source`. */
+  readonly verified: string;
+}
+
 // ── LanguageConfig interface ────────────────────────────────────────────────
 
 /**
@@ -48,6 +68,9 @@ export interface LanguageConfig {
 
   /** Patterns that identify generated/machine-written files. */
   readonly generatedFilePatterns: readonly RegExp[];
+
+  /** Content rules for generated files that carry a header (see {@link GeneratedHeaderRule}). */
+  readonly generatedHeaders?: readonly GeneratedHeaderRule[];
 
   /** Patterns that identify entry point files (e.g. `main.go`, `index.ts`). */
   readonly entryPointPatterns: readonly RegExp[];

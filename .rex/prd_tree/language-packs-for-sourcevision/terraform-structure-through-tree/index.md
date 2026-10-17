@@ -1,0 +1,32 @@
+---
+id: "8b4b34af-ec1d-4593-8266-67e39928289c"
+level: "feature"
+title: "Terraform structure through tree-sitter-hcl"
+status: "pending"
+priority: "medium"
+tags:
+  - "language-packs"
+  - "terraform"
+  - "sourcevision"
+  - "side-stack"
+  - "pr-8"
+blockedBy:
+  - "2fc859c0-090f-43bb-b1b4-36415478bae8"
+source: "roadmap"
+acceptanceCriteria:
+  - "The HCL grammar builds and Terraform files parse with at least 98% clean on the corpus"
+  - "The in-memory model lists resources, data sources, modules, providers and references, and finds every resource infrastructure.ts finds"
+  - "infrastructure.ts, IAC_KINDS and infrastructure.json are unchanged"
+  - "The six static root policy tests pass"
+description: "LS12: Terraform becomes a language pack whose detail will extend Sterling H's infrastructure.json (analyzers/infrastructure.ts, which today extracts resource blocks with a regex and maps types to coarse kinds via IAC_KINDS). In this PR the Terraform model stays in memory: nothing is written to infrastructure.json until the conversation with Sterling H. infrastructure.ts and IAC_KINDS are not edited.\n\nSide stack, PR 8."
+lastModified: "2026-10-08T03:09:05.680Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---
+
+## Children
+
+| Title | Status |
+|-------|--------|
+| [Build the HCL grammar and recognise Terraform files](./build-the-hcl-grammar-and-recognise.md) | pending |
+| [Seed the Terraform drift corpus and measure parse rate](./seed-the-terraform-drift-corpus-and.md) | pending |
+| [Write Terraform structure queries and build the in-memory model](./write-terraform-structure-queries-and.md) | pending |
