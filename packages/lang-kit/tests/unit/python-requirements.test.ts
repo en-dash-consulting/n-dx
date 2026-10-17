@@ -39,4 +39,21 @@ describe("parseRequirement (PEP 508)", () => {
   it.each(["", "-e .", "name >= ", "name[extra", "name; ", "name >=1 junk", "pkg @ "])("rejects %j", (text) => {
     expect(parseRequirement(text)).toBeUndefined();
   });
+
+  it("accepts clauses joined by a comma, by whitespace, or by nothing, and a trailing comma", () => {
+    for (const spec of [">=1,<2", ">=1 , <2", ">=1 <2", ">=1<2", ">=1,", "(>= 1 , < 2 )", "==1!=2", "==1!==2"]) {
+      expect(parseRequirement(`pkg ${spec}`)?.spec).toBe(spec);
+    }
+    for (const spec of [">=1,,<2", ",>=1", ">=1 2"]) expect(parseRequirement(`pkg ${spec}`)).toBeUndefined();
+  });
+
+  // The specifier pattern once let two adjacent `\s*` split the same whitespace
+  // k+1 ways, so a failing tail backtracked as (k+1)^m: m=18 took ~10 s and
+  // this line (m=30) would not return. A regression hangs the suite rather than
+  // failing it — no clock is read, because none could interrupt the match.
+  it("rejects a pathological specifier promptly", () => {
+    const text = "pkg " + "==1  ".repeat(30) + "x";
+    expect(text.length).toBeGreaterThan(100);
+    expect(parseRequirement(text)).toBeUndefined();
+  });
 });

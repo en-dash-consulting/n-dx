@@ -215,6 +215,19 @@ describe("Python projects: layouts", () => {
     ]);
   });
 
+  it("requirements: the egg name is the fragment's last egg= parameter, read from the first #", async () => {
+    const hashes = "#".repeat(20_000);
+    const [p] = await projects({
+      "requirements.txt": [
+        "-e git+https://h/x.git#subdirectory=a&egg=First&egg=Last",
+        "git+https://h/y.git#sha=1#egg=Second",
+        `git+https://h/z.git${hashes}`,
+        "",
+      ].join("\n"),
+    });
+    expect(p.references.map((r) => r.name)).toEqual(["last", "second", undefined]);
+  });
+
   it("a requirements-only directory is a project; a nested project owns its own requirements", async () => {
     const found = await projects({
       "requirements-dev.txt": "pytest\n",
