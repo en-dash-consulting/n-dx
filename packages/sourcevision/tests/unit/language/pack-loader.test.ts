@@ -214,6 +214,15 @@ describe("loadPack after an n-dx upgrade", () => {
     expect(load.status).toBe("missing");
   });
 
+  it("does not blame a previous version's install for a staged load whose bundle lacks the package", async () => {
+    installForVersion("1.2.2");
+    const load = await loadPack(known(() => Promise.reject(notFound("@n-dx/lang-java"))), {
+      packDir: join(packsRoot(), ".sv-pack-stage-z"),
+      version: VERSION,
+    });
+    expect(load.status).toBe("missing");
+  });
+
   it("does not look beside a pack directory that is not under the ndx home", async () => {
     const outside = mkdtempSync(join(tmpdir(), "sv-pack-parent-"));
     try {
