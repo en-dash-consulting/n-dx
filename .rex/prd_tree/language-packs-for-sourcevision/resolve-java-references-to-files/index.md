@@ -28,6 +28,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A Java grammar that fails to load fails the whole imports phase, including JS/TS edges](./a-java-grammar-that-fails-to-load.md) | completed |
+| [Correct the Java resolver changeset that says analysis output is unchanged](./correct-the-java-resolver-changeset.md) | in_progress |
 | [Discover Java modules and source roots](./discover-java-modules-and-source-roots.md) | completed |
 | [Feed Java edges into the analyze pipeline](./feed-java-edges-into-the-analyze.md) | completed |
 | [Include Java in multi-language detection beside other build markers](./include-java-in-multi-language.md) | completed |
@@ -38,4 +39,3 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Resolve pack file paths without the global URL so jsdom tests can load sourcevision](./resolve-pack-file-paths-without-the.md) | completed |
 | [Runner memory test times out under the full test gate](./runner-memory-test-times-out-under-the.md) | completed |
 | [Secondary Java drops TS/Python/Go files under out/ and generated/ from a mixed repo's inventory](./secondary-java-drops-ts-python-go.md) | completed |
-| [Correct the Java resolver changeset that says analysis output is unchanged](./correct-the-java-resolver-changeset.md) | pending |
