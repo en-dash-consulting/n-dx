@@ -63,8 +63,11 @@ hold a marker file (Python's `env`, `build` and `dist` without `__init__.py`);
 so the Java and Go packs share it without depending on each other.
 
 Detection takes the config override and the
-Terraform file search as arguments (`detectLanguage(rootDir, { override,
-hasTerraformFile })`); sourcevision's `src/language/detect.ts` supplies both.
+project file search as arguments (`detectLanguage(rootDir, { override,
+searchProjectFiles })`); sourcevision's `src/language/detect.ts` supplies both,
+the search being the inventory's own walk. A markerless repository is
+Terraform alone only when that walk counts more Terraform files than
+`isFallbackSourceFile` files (JS/TS, or a language with no config).
 Resolvers, the parser runner, queries and grammars live in the runtime and the
 packs; pack loading lives in sourcevision. Domain packages import it directly,
 as they do `@n-dx/llm-client`; hench and web have no gateway for it.

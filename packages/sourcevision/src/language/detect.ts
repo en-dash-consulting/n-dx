@@ -3,8 +3,8 @@
  *
  * The detection chain itself is `@n-dx/lang-kit`'s, which reads no config and
  * walks no tree. This layer supplies both: the project config's `language`
- * override (read through the layout resolver) and the Terraform marker
- * search (the inventory's own walk). The pure names are re-exported so
+ * override (read through the layout resolver) and the project file search
+ * (the inventory's own walk). The pure names are re-exported so
  * existing importers keep one module to reach for.
  *
  * @module sourcevision/language/detect
@@ -16,44 +16,54 @@ import { resolveLayout } from "@n-dx/llm-client";
 import {
   detectLanguage as detectLanguageWith,
   detectLanguages as detectLanguagesWith,
+  isFallbackSourceFile,
   isTerraformFile,
   mergeLanguageConfigs as mergeLanguageConfigsWith,
   terraformConfig,
   type LanguageConfig,
+  type ProjectFileCounts,
 } from "@n-dx/lang-kit";
 import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 
 export { getLanguageConfig, languageConfigsFromIds, mergeLanguageConfigs, VALID_LANGUAGE_IDS } from "@n-dx/lang-kit";
 
 /**
- * Terraform marker present? Any file `isTerraformFile` accepts, at any depth,
- * found by the inventory's own walk: the same skipped directories (base,
- * vendored, `otherConfigs`' and Terraform's `skipDirectories` and
- * `skipUnlessContains`, the
- * user's `extraSkipDirs`) and the same `.gitignore` / `.sourcevisionignore`
- * filter. `otherConfigs` are the languages detected without Terraform, so
- * when Terraform is added beside them the skip set equals the one the
- * analyze-phase inventory uses with the result. When Terraform is detected
- * alone (a markerless repository with no source the TypeScript fallback is
- * for) it does not: the search also skipped the fallback's directories
- * (`dist`, `build`, `coverage`, …), so a `.tf` file found only there leaves
- * the fallback in place. Stops at the first match.
- *
- * `detectLanguage` consults it only when no other marker matched;
- * `detectLanguages` adds Terraform whenever it is present.
+ * lang-kit's project file search, run as the inventory's own walk: the same
+ * skipped directories (base, vendored, `otherConfigs`' and Terraform's
+ * `skipDirectories` and `skipUnlessContains`, the user's `extraSkipDirs`) and
+ * the same `.gitignore` / `.sourcevisionignore` filter, at any depth.
+ * `otherConfigs` are the languages detected without Terraform, so when
+ * Terraform is added beside them the skip set equals the one the
+ * analyze-phase inventory uses with the result, and the files counted are
+ * the files it lists. When Terraform is detected alone (its files outnumber
+ * a markerless repository's fallback source) it does not: the search also
+ * skipped the fallback's directories (`dist`, `build`, `coverage`, …), so a
+ * file found only there is not counted. Without `count`, stops at the first
+ * Terraform file.
  */
-async function hasTerraformMarker(rootDir: string, otherConfigs: readonly LanguageConfig[]): Promise<boolean> {
+async function searchProjectFiles(
+  rootDir: string,
+  otherConfigs: readonly LanguageConfig[],
+  { count }: { count: boolean },
+): Promise<ProjectFileCounts> {
   const { extraSkipDirs } = await loadInventoryConfig(rootDir);
   const skip = projectSkip(mergeLanguageConfigsWith([...otherConfigs, terraformConfig]), extraSkipDirs);
   const ig = await loadIgnoreFilter(rootDir);
+  const counts: ProjectFileCounts = { terraform: 0, fallbackSource: 0 };
   try {
     for await (const relPath of walkProjectFiles(rootDir, rootDir, ig, skip)) {
-      if (isTerraformFile(basename(relPath))) return true;
+      const name = basename(relPath);
+      if (isTerraformFile(name)) {
+        counts.terraform++;
+        if (!count) break;
+      } else if (count && isFallbackSourceFile(name)) {
+        counts.fallbackSource++;
+      }
     }
   } catch {
-    // Unreadable root — no marker, as for the other languages' checks.
+    // Unreadable root — what was counted stands, as for the other languages' checks.
   }
-  return false;
+  return counts;
 }
 
 /**
@@ -123,13 +133,13 @@ export async function loadInventoryConfig(rootDir: string): Promise<InventoryCon
 
 /**
  * Detect the primary project language: the config override first, then
- * `@n-dx/lang-kit`'s marker chain with the walk-backed Terraform search.
+ * `@n-dx/lang-kit`'s marker chain with the walk-backed project file search.
  */
 export async function detectLanguage(rootDir: string): Promise<LanguageConfig> {
   const override = await readConfigOverride(rootDir);
   return detectLanguageWith(rootDir, {
     override,
-    hasTerraformFile: (otherConfigs) => hasTerraformMarker(rootDir, otherConfigs),
+    searchProjectFiles: (otherConfigs, options) => searchProjectFiles(rootDir, otherConfigs, options),
   });
 }
 
@@ -139,6 +149,6 @@ export async function detectLanguage(rootDir: string): Promise<LanguageConfig> {
  */
 export async function detectLanguages(rootDir: string): Promise<LanguageConfig[]> {
   return detectLanguagesWith(rootDir, {
-    hasTerraformFile: (otherConfigs) => hasTerraformMarker(rootDir, otherConfigs),
+    searchProjectFiles: (otherConfigs, options) => searchProjectFiles(rootDir, otherConfigs, options),
   });
 }
