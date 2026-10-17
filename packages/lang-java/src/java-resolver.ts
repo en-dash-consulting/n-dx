@@ -5,7 +5,10 @@
  * `prepare` indexes every declared type by qualified name (nested types
  * included, each mapped to the file of its top-level type) and every
  * top-level type by package and simple name. Package declarations give the
- * qualified names, so source roots and modules need no special handling.
+ * qualified names. When several files declare one name, a reference keeps
+ * the ones javac could link ({@link visibleCandidates}): its own module and
+ * source set, read from the path (`<module>/src/<set>/java/`), and never test
+ * code from main code.
  *
  * Per file:
  * - single-type, static and static-wildcard imports always refer to the file
@@ -203,26 +206,72 @@ class Multimap {
   }
 }
 
+/** Where a file sits in a Maven/Gradle layout: `<module>/src/<set>/java/…`. */
+interface SourceLocation {
+  /** Module directory, "" for the project root. */
+  readonly module: string;
+  /** Source set: `main`, `test`, `integrationTest`, … */
+  readonly set: string;
+  readonly isTest: boolean;
+}
+
+const SOURCE_SET_DIR = /(?:^|\/)src\/([^/]+)\/java\//;
+
+/** A test source set: any name containing `test` (`test`, `integrationTest`, `testFixtures`), or Maven Failsafe's `it`. */
+const isTestSet = (set: string): boolean => set === "it" || /test/i.test(set);
+
+/** Undefined outside the standard layout (custom source roots), where no candidate is narrowed. */
+function sourceLocation(path: string): SourceLocation | undefined {
+  const match = SOURCE_SET_DIR.exec(path);
+  if (!match) return undefined;
+  const set = match[1]!;
+  return { module: path.slice(0, match.index), set, isTest: isTestSet(set) };
+}
+
 interface JavaIndex {
   /** Fully qualified type name (nested included) → declaring files. */
   readonly types: Multimap;
   /** `package\0SimpleName` of each top-level type → declaring files. */
   readonly topLevel: Multimap;
   readonly packages: ReadonlySet<string>;
+  /** Each file's {@link SourceLocation}, absent outside the standard layout. */
+  readonly locations: ReadonlyMap<string, SourceLocation>;
 }
 
 function buildIndex(facts: readonly JavaFileFacts[]): JavaIndex {
   const types = new Multimap();
   const topLevel = new Multimap();
   const packages = new Set<string>();
+  const locations = new Map<string, SourceLocation>();
   for (const file of facts) {
     packages.add(file.pkg);
+    const location = sourceLocation(file.path);
+    if (location) locations.set(file.path, location);
     for (const name of file.declared) {
       types.add(file.pkg ? `${file.pkg}.${name}` : name, file.path);
       if (!name.includes(".")) topLevel.add(`${file.pkg}\0${name}`, file.path);
     }
   }
-  return { types, topLevel, packages };
+  return { types, topLevel, packages, locations };
+}
+
+/**
+ * The declarations of one name that `from` can see, as javac would: main code
+ * never sees test code; of the rest, those in `from`'s own module, and of
+ * those, the ones in its own source set (a test sees main code only when its
+ * own set has none). Several remain only on a real tie, or when none is in
+ * `from`'s module. A file outside the standard layout narrows nothing.
+ */
+function visibleCandidates(index: JavaIndex, from: string, candidates: ReadonlySet<string>): Iterable<string> {
+  const here = index.locations.get(from);
+  if (!here) return candidates;
+  let visible = [...candidates];
+  if (!here.isTest) visible = visible.filter((path) => !index.locations.get(path)?.isTest);
+  if (visible.length <= 1) return visible;
+  const sameModule = visible.filter((path) => index.locations.get(path)?.module === here.module);
+  if (sameModule.length === 0) return visible;
+  const sameSet = sameModule.filter((path) => index.locations.get(path)!.set === here.set);
+  return sameSet.length > 0 ? sameSet : sameModule;
 }
 
 /** The longest prefix of `segments` that names a project type, with its files. */
@@ -307,16 +356,19 @@ class Collector {
 
   constructor(
     private readonly self: string,
-    private readonly projectPackages: ReadonlySet<string>,
+    private readonly index: JavaIndex,
   ) {}
 
-  file(paths: Iterable<string>, symbol: string): void {
-    for (const path of paths) if (path !== this.self) this.files.add(path, symbol);
+  /** Narrowed before `self` is dropped, so a declaration in this file shadows a duplicate elsewhere. */
+  file(candidates: ReadonlySet<string>, symbol: string): void {
+    for (const path of visibleCandidates(this.index, this.self, candidates)) {
+      if (path !== this.self) this.files.add(path, symbol);
+    }
   }
 
   /** A package the project declares is never external, even when the type is missing (e.g. generated at build time). */
   externalPackage(pkg: string, symbol: string): void {
-    if (pkg && !this.projectPackages.has(pkg)) this.external.add(externalName(pkg), symbol);
+    if (pkg && !this.index.packages.has(pkg)) this.external.add(externalName(pkg), symbol);
   }
 
   result(): FileReferences {
@@ -330,7 +382,7 @@ class Collector {
 }
 
 function resolveFile(index: JavaIndex, file: JavaFileFacts): FileReferences {
-  const out = new Collector(file.path, index.packages);
+  const out = new Collector(file.path, index);
   const declaredHere = new Set(file.declared.map((q) => q.slice(q.lastIndexOf(".") + 1)));
   const singles = new Map<string, readonly string[]>();
   const wildcards: string[][] = [];
