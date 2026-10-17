@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type BuildDependency, type ModuleBuildModel, readGradleBuildModels, discoverJavaModules, GradleScript, parseToml, TomlSyntaxError } from "@n-dx/lang-kit";
-import { UPDATE_ENV, updateRequested } from "../../helpers/pack-golden.js";
+import { UPDATE_ENV, updateRequested } from "../../helpers/index.js";
 
 const FIXTURES = fileURLToPath(new URL("../../fixtures/gradle-build", import.meta.url));
 

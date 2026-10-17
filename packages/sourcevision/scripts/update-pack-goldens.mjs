@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Rewrite the language-pack and build-model goldens: runs the golden harness with
- * SV_UPDATE_PACK_GOLDENS=1. Review the resulting diff before committing.
+ * Rewrite the build-model goldens: runs their tests with
+ * SV_UPDATE_PACK_GOLDENS=1. Review the resulting diff before committing. Each
+ * language pack rewrites its own goldens (`pnpm --filter @n-dx/lang-java
+ * test:update-goldens`).
  *
  *   pnpm --filter @n-dx/sourcevision test:update-goldens
  */
@@ -15,7 +17,6 @@ const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 process.env.SV_UPDATE_PACK_GOLDENS = "1";
 
 const GOLDEN_TESTS = [
-  "tests/integration/language-pack-goldens.test.ts",
   "tests/unit/language/java-maven-build.test.ts", // build-model goldens under tests/fixtures/maven-build
   "tests/unit/language/java-gradle-build.test.ts", // build-model goldens under tests/fixtures/gradle-build
 ];

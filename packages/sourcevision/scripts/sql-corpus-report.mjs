@@ -15,7 +15,8 @@
  * writes nothing; not part of the test run. It has no pass/fail gate: the
  * rates are the result, for the rex log.
  *
- * Needs `pnpm --filter @n-dx/sourcevision build` and `build-grammars.mjs`.
+ * Needs `pnpm --filter @n-dx/sourcevision --filter @n-dx/lang-sql build` and
+ * `pnpm --filter @n-dx/lang-sql build:grammars`.
  * Exits 2 when a checkout, the build or the grammar is missing.
  */
 
@@ -23,7 +24,6 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { grammarWasmPath } from "./build-grammars.mjs";
 import { checkedOutSha, CLONE_COMMAND, corpusDir, loadCorpus } from "./java-corpus.mjs";
 
 /** Large enough that no corpus file is skipped: the report measures the grammar, not the size limit. */
@@ -70,19 +70,30 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
-const wasm = grammarWasmPath("tree-sitter-sql");
-if (!existsSync(wasm)) {
-  console.error(`${wasm} is not built — run \`node packages/sourcevision/scripts/build-grammars.mjs\``);
-  process.exit(2);
-}
 const dist = (name) => new URL(`../dist/language/${name}.js`, import.meta.url);
-if (!existsSync(dist("sql-schema"))) {
+if (!existsSync(dist("sql-migrations"))) {
   console.error("sourcevision is not built — run `pnpm --filter @n-dx/sourcevision build`");
   process.exit(2);
 }
-const { createTreeSitterRunner } = await import(dist("runner").href);
-const { extractSqlTables, sqlTarget } = await import(dist("sql-schema").href);
+const runtimeDist = new URL("../../lang-runtime/dist/index.js", import.meta.url);
+if (!existsSync(runtimeDist)) {
+  console.error("lang-runtime is not built — run `pnpm --filter @n-dx/lang-runtime build`");
+  process.exit(2);
+}
+const sqlDist = new URL("../../lang-sql/dist/index.js", import.meta.url);
+if (!existsSync(sqlDist)) {
+  console.error("lang-sql is not built — run `pnpm --filter @n-dx/lang-sql build`");
+  process.exit(2);
+}
+const { createTreeSitterRunner } = await import(runtimeDist.href);
+const { extractSqlTables, sqlGrammarPath, sqlTarget } = await import(sqlDist.href);
 const { detectMigrationTools } = await import(dist("sql-migrations").href);
+
+const wasm = sqlGrammarPath();
+if (!existsSync(wasm)) {
+  console.error(`${wasm} is not built — run \`pnpm --filter @n-dx/lang-sql build:grammars\``);
+  process.exit(2);
+}
 
 const runner = createTreeSitterRunner({ maxFileBytes: MAX_FILE_BYTES });
 const target = sqlTarget(wasm);

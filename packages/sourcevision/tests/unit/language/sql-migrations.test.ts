@@ -1,16 +1,8 @@
-/**
- * Migration-tool detection on one fixture project per tool, and table-name
- * extraction through the tree-sitter-sql grammar built by
- * scripts/build-grammars.mjs (those tests skip when it is not built).
- */
+/** Migration-tool detection on one fixture project per tool. */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { detectMigrationTools, sqlcPaths } from "../../../src/language/sql-migrations.js";
-import { extractSqlTables, splitSqlName, sqlTarget } from "../../../src/language/sql-schema.js";
-import { createTreeSitterRunner, type TreeSitterRunner } from "../../../src/language/runner.js";
-import { grammarWasmPath } from "../../../scripts/build-grammars.mjs";
-import { skipUnlessGrammar } from "../../helpers/grammar.js";
 
 type Fixture = Record<string, string>;
 
@@ -168,60 +160,5 @@ describe("sqlcPaths", () => {
   it("keeps a # inside quotes or not preceded by whitespace", () => {
     expect(sqlcPaths("sqlc.yaml", 'schema: "a #b.sql"', "schema")).toEqual(["a #b.sql"]);
     expect(sqlcPaths("sqlc.yaml", "schema: a#b.sql", "schema")).toEqual(["a#b.sql"]);
-  });
-});
-
-describe("splitSqlName", () => {
-  it("strips quoting and splits on dots outside quotes", () => {
-    expect(splitSqlName('public."Own.ers"')).toEqual(["public", "Own.ers"]);
-    expect(splitSqlName("`db`.`t`")).toEqual(["db", "t"]);
-    expect(splitSqlName("[dbo].[t]")).toEqual(["dbo", "t"]);
-    expect(splitSqlName("plain")).toEqual(["plain"]);
-  });
-});
-
-describe("extractSqlTables", () => {
-  const wasm = grammarWasmPath("tree-sitter-sql");
-  let runner: TreeSitterRunner;
-
-  beforeAll(() => {
-    runner = createTreeSitterRunner();
-  });
-  afterAll(() => runner?.dispose());
-
-  it("names tables from CREATE and ALTER statements", async (ctx) => {
-    skipUnlessGrammar(ctx, wasm);
-    const source = [
-      "CREATE TABLE IF NOT EXISTS public.owners (id int PRIMARY KEY);",
-      'ALTER TABLE ONLY "pets" ADD COLUMN age int;',
-      "create table `shop`.`orders` (id int);",
-      "CREATE TABLE copy AS SELECT 1;",
-    ].join("\n");
-    const result = await extractSqlTables(runner, sqlTarget(wasm), "schema.sql", source);
-    expect(result.hasErrors).toBe(false);
-    expect(result.tables).toEqual([
-      { name: "owners", schema: "public", statement: "create", line: 1 },
-      { name: "pets", statement: "alter", line: 2 },
-      { name: "orders", schema: "shop", statement: "create", line: 3 },
-      { name: "copy", statement: "create", line: 4 },
-    ]);
-  });
-
-  it("reports a file the grammar cannot fully parse instead of assuming it did", async (ctx) => {
-    skipUnlessGrammar(ctx, wasm);
-    const result = await extractSqlTables(runner, sqlTarget(wasm), "x.sql", "CREATE TABLE ok (id int);\nCREATE ??? ;;");
-    expect(result.hasErrors).toBe(true);
-    expect(result.tables.map((t) => t.name)).toContain("ok");
-  });
-
-  it("reports an oversized file as not parsed", async (ctx) => {
-    skipUnlessGrammar(ctx, wasm);
-    const small = createTreeSitterRunner({ maxFileBytes: 4 });
-    try {
-      const result = await extractSqlTables(small, sqlTarget(wasm), "big.sql", "CREATE TABLE t (id int);");
-      expect(result).toEqual({ path: "big.sql", parsed: false, hasErrors: false, tables: [] });
-    } finally {
-      small.dispose();
-    }
   });
 });

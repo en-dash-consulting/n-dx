@@ -25,14 +25,11 @@
   },
   "files": [
     "dist",
-    "src/language/queries",
-    "build/grammars/*.wasm",
     "!dist/**/*.map",
     "!dist/.build-stamp.json"
   ],
   "scripts": {
     "build": "tsc && node ../../scripts/write-build-stamp.mjs",
-    "build:grammars": "node scripts/build-grammars.mjs",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "test": "node ../../scripts/run-vitest-bind-aware.mjs sourcevision",
@@ -48,10 +45,16 @@
     "ora": "^9.4.1",
     "pdfkit": "^0.20.2",
     "typescript": "^6.0.3",
-    "web-tree-sitter": "0.27.0",
     "zod": "^4.6.7"
   },
+  "optionalDependencies": {
+    "@n-dx/lang-go": "workspace:*"
+  },
   "devDependencies": {
+    "@n-dx/lang-java": "workspace:*",
+    "@n-dx/lang-runtime": "workspace:*",
+    "@n-dx/lang-sql": "workspace:*",
+    "@n-dx/lang-terraform": "workspace:*",
     "@types/node": "^26.6.5",
     "@types/pdfkit": "^0.17.6",
     "jsdom": "^30.1.2",

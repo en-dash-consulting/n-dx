@@ -8,19 +8,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { grammarWasmPath } from "../../scripts/build-grammars.mjs";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
 import { detectLanguage, detectLanguages, mergeLanguageConfigs } from "../../src/language/detect.js";
+import { KNOWN_PACKS, type KnownPack } from "../../src/language/pack-loader.js";
+import { sourcevisionVersion } from "../../src/language/package-paths.js";
 import { javaConfig, javaSecondaryConfig, typescriptConfig } from "@n-dx/lang-kit";
 import type { Imports, Inventory } from "../../src/schema/v1.js";
 import { validate, ZonesSchema } from "../../src/schema/validate.js";
-import { skipUnlessGrammar } from "../helpers/grammar.js";
+import { skipUnlessPackRuns } from "../helpers/workspace-pack.js";
 
 const FIXTURE = join(import.meta.dirname, "../fixtures/java-spring-project");
 const TS_FIXTURE = join(import.meta.dirname, "../fixtures/small-ts-project");
-const JAVA_WASM = grammarWasmPath("tree-sitter-java");
+
+/** The Java pack as if it were not installed. */
+const NOT_INSTALLED_JAVA: KnownPack = {
+  ...KNOWN_PACKS.find((p) => p.id === "java")!,
+  importByResolution: () =>
+    Promise.reject(Object.assign(new Error("Cannot find package '@n-dx/lang-java' imported from /x.js"), { code: "ERR_MODULE_NOT_FOUND" })),
+};
 const MAIN = "src/main/java/com/example/clinic";
 
 const edgeKeys = (imports: Imports): string[] => imports.edges.map((e) => `${e.from} -> ${e.to}`);
@@ -33,7 +40,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
   });
 
   it("writes file-to-file edges across the controller, service, repository and entity layers", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const imports = await analyzeImports(FIXTURE, inventory, { language: "java" });
     const edges = edgeKeys(imports);
 
@@ -57,7 +64,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
   });
 
   it("writes external imports attributed by package", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const imports = await analyzeImports(FIXTURE, inventory, { language: "java" });
     const byPackage = new Map(imports.external.map((e) => [e.package, e]));
 
@@ -74,7 +81,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
   });
 
   it("produces schema-valid zones that cover every layer", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const imports = await analyzeImports(FIXTURE, inventory, { language: "java" });
     const { zones } = await analyzeZones(inventory, imports, { enrich: false });
 
@@ -87,7 +94,7 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
   });
 
   it("re-resolves unchanged Java files on an incremental run, dropping their stale edges", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const full = await analyzeImports(FIXTURE, inventory, { language: "java" });
     // PetType references nothing: an edge or external from it can only be stale.
     const petType = `${MAIN}/entity/PetType.java`;
@@ -105,23 +112,25 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
     expect(incremental).toEqual(full);
   });
 
-  describe("without the built grammar", () => {
-    let emptyGrammarDir: string;
+  describe("without the Java pack", () => {
+    let packDir: string;
 
     beforeAll(() => {
-      emptyGrammarDir = mkdtempSync(join(tmpdir(), "sv-no-grammar-"));
+      packDir = mkdtempSync(join(tmpdir(), "sv-no-java-pack-"));
     });
-    afterAll(() => rmSync(emptyGrammarDir, { recursive: true, force: true }));
+    afterAll(() => rmSync(packDir, { recursive: true, force: true }));
 
-    it("leaves Java inventory-only with a single message and still succeeds", async () => {
+    it("leaves Java inventory-only with a single message naming the install command, and still succeeds", async () => {
       const messages: string[] = [];
       const imports = await analyzeImports(FIXTURE, inventory, {
         language: "java",
-        packs: { grammarDir: emptyGrammarDir, warn: (m) => messages.push(m) },
+        packs: { packs: [NOT_INSTALLED_JAVA], loader: { packDir }, warn: (m) => messages.push(m) },
       });
 
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toMatch(/^Java: grammar tree-sitter-java@.* inventory only/);
+      expect(messages).toEqual([
+        `Java: pack @n-dx/lang-java is not installed; Java files get inventory only. ` +
+          `Install it with \`npm install --prefix ${packDir} @n-dx/lang-java@${sourcevisionVersion()}\`.`,
+      ]);
       expect(imports.edges).toEqual([]);
       expect(imports.external).toEqual([]);
 
@@ -147,7 +156,7 @@ describe("Java beside a package.json (Spring Boot with a bundled frontend)", () 
   });
 
   it("analyzes the .java files with the detected language set", async (ctx) => {
-    skipUnlessGrammar(ctx, JAVA_WASM);
+    await skipUnlessPackRuns(ctx, "java");
     const merged = mergeLanguageConfigs(await detectLanguages(dir));
     const inventory = await analyzeInventory(dir, { languageConfig: merged });
     const imports = await analyzeImports(dir, inventory);
@@ -160,12 +169,16 @@ describe("Java beside a package.json (Spring Boot with a bundled frontend)", () 
 });
 
 describe("repositories with no pack language", () => {
-  it("never load a language pack or report a missing grammar", async () => {
+  it("never load a language pack or report a missing one", async () => {
     const tsInventory = await analyzeInventory(TS_FIXTURE, { languageConfig: typescriptConfig });
     const messages: string[] = [];
+    const neverLoaded = KNOWN_PACKS.map((pack) => ({
+      ...pack,
+      importByResolution: () => Promise.reject(new Error(`${pack.packageName} must not be loaded`)),
+    }));
     const imports = await analyzeImports(TS_FIXTURE, tsInventory, {
       language: "typescript",
-      packs: { grammarDir: join(tmpdir(), "sv-no-such-grammar-dir"), warn: (m) => messages.push(m) },
+      packs: { packs: neverLoaded, warn: (m) => messages.push(m) },
     });
     expect(messages).toEqual([]);
     expect(imports.edges.length).toBeGreaterThan(0);

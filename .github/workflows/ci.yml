@@ -344,7 +344,7 @@ jobs:
         group: [root+llm-client, rex+sourcevision, hench+web]
         include:
           - group: root+llm-client
-            suites: root,llm-client,lang-kit
+            suites: root,llm-client,lang-kit,lang-runtime,lang-java,lang-go,lang-sql,lang-terraform
           - group: rex+sourcevision
             suites: rex,sourcevision
           - group: hench+web
@@ -409,15 +409,18 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            packages/sourcevision/build/cache
+            packages/lang-runtime/build/cache
             ~/.cache/tree-sitter
             ~/Library/Caches/tree-sitter
             ~/AppData/Local/tree-sitter
-          key: grammars-${{ runner.os }}-${{ hashFiles('packages/sourcevision/scripts/build-grammars.mjs') }}
+          key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
 
+      # Every language pack builds its own grammar (`build:grammars`) into its
+      # own build/grammars; sourcevision has none. One at a time, since they
+      # share the download cache.
       - name: Build tree-sitter grammars
         if: contains(matrix.suites, 'sourcevision')
-        run: node packages/sourcevision/scripts/build-grammars.mjs
+        run: pnpm -r --workspace-concurrency=1 run build:grammars
 
       # `shell: bash` so the same line works on the Windows leg, whose default
       # shell is PowerShell.

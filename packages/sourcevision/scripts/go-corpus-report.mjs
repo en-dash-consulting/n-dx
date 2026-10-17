@@ -11,22 +11,23 @@
  * regex parser (`analyzers/go-imports.ts`) extracted. Files that differ are
  * listed with the paths and a reason. Then edge parity: the imports phase run
  * twice over the repository, once through the pack and once through the regex
- * fallback (no grammar), with the edges and (importer, external package)
+ * fallback (no pack), with the edges and (importer, external package)
  * pairs only one side produced. Exits 1 when a repository is below the
  * clean-parse gate (98%), 2 when the corpus, the build or the grammar is
  * missing. Never touches the network; clone with go-corpus-clone.mjs. Not
  * part of the test run.
  *
- * Needs `pnpm --filter @n-dx/sourcevision build` and `build-grammars.mjs`.
+ * Needs `pnpm --filter @n-dx/sourcevision build`, `pnpm --filter @n-dx/lang-go
+ * build` and `pnpm --filter @n-dx/lang-go build:grammars`; the pack is
+ * imported from the workspace.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { grammarWasmPath } from "./build-grammars.mjs";
 import { CLONE_COMMAND, CORPUS_DIR_ENV, checkedOutSha, corpusDir, loadCorpus } from "./go-corpus.mjs";
+import { importWorkspacePack, workspaceLoader } from "./workspace-pack.mjs";
 
 /** Share of files that must parse without ERROR or MISSING nodes. */
 const CLEAN_SHARE_GATE = 0.98;
@@ -79,13 +80,14 @@ if (missing.length > 0) {
   process.exit(2);
 }
 
-const wasm = grammarWasmPath("tree-sitter-go");
+const { goGrammarPath, goPack } = await importWorkspacePack("@n-dx/lang-go");
+const wasm = goGrammarPath();
 if (!existsSync(wasm)) {
-  console.error(`${wasm} is not built — run \`node packages/sourcevision/scripts/build-grammars.mjs\``);
+  console.error(`${wasm} is not built — run \`pnpm --filter @n-dx/lang-go build:grammars\``);
   process.exit(2);
 }
-const distRunner = new URL("../dist/language/runner.js", import.meta.url);
-if (!existsSync(distRunner)) {
+const distImports = new URL("../dist/analyzers/imports.js", import.meta.url);
+if (!existsSync(distImports)) {
   console.error("sourcevision is not built — run `pnpm --filter @n-dx/sourcevision build`");
   process.exit(2);
 }
@@ -94,15 +96,16 @@ if (!existsSync(langKitDist)) {
   console.error("lang-kit is not built — run `pnpm --filter @n-dx/lang-kit build`");
   process.exit(2);
 }
-const { createTreeSitterRunner } = await import(distRunner.href);
-const { goPack } = await import(new URL("../dist/language/go-pack.js", import.meta.url).href);
+const runtimeDist = new URL("../../lang-runtime/dist/index.js", import.meta.url);
+if (!existsSync(runtimeDist)) {
+  console.error("lang-runtime is not built — run `pnpm --filter @n-dx/lang-runtime build`");
+  process.exit(2);
+}
+const { createTreeSitterRunner } = await import(runtimeDist.href);
 const { extractGoImports } = await import(new URL("../dist/analyzers/go-imports.js", import.meta.url).href);
 const { analyzeInventory } = await import(new URL("../dist/analyzers/inventory.js", import.meta.url).href);
-const { analyzeImports } = await import(new URL("../dist/analyzers/imports.js", import.meta.url).href);
+const { analyzeImports } = await import(distImports.href);
 const { goConfig } = await import(langKitDist.href);
-
-/** A grammar directory that does not exist, so the imports phase takes the regex fallback. */
-const NO_GRAMMAR_DIR = join(tmpdir(), `ndx-go-corpus-no-grammar-${process.pid}`);
 
 /** `a` minus `b` as sets. */
 const setMinus = (a, b) => [...a].filter((k) => !b.has(k)).sort();
@@ -111,8 +114,9 @@ const setMinus = (a, b) => [...a].filter((k) => !b.has(k)).sort();
 async function edgeParity(dir) {
   const inventory = await analyzeInventory(dir, { languageConfig: goConfig });
   const notices = [];
-  const pack = await analyzeImports(dir, inventory, { language: "go", packs: { warn: (m) => notices.push(m) } });
-  const regex = await analyzeImports(dir, inventory, { language: "go", packs: { grammarDir: NO_GRAMMAR_DIR, warn: () => undefined } });
+  const pack = await analyzeImports(dir, inventory, { language: "go", packs: { loader: workspaceLoader, warn: (m) => notices.push(m) } });
+  // No pack: every Go file goes to the regex parser, as when the Go pack is not installed.
+  const regex = await analyzeImports(dir, inventory, { language: "go", packs: { packs: [], warn: () => undefined } });
   const edges = (imports) => new Set(imports.edges.map((e) => `${e.from} -> ${e.to} [${[...e.symbols].sort().join(",")}]`));
   const pairs = (imports) => new Set(imports.external.flatMap((x) => x.importedBy.map((f) => `${f} -> ${x.package}`)));
   const [packEdges, regexEdges, packPairs, regexPairs] = [edges(pack), edges(regex), pairs(pack), pairs(regex)];

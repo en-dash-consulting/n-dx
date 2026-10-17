@@ -1,14 +1,15 @@
 /**
- * Package-relative paths for language-pack assets.
+ * Package-relative paths: this package's version.
  *
  * Built from the module's own directory with `node:path`, never the global
  * `URL` constructor: under jsdom that global is not Node's, and
- * `fileURLToPath` rejects it. Both functions are lazy so importing the
+ * `fileURLToPath` rejects it. Every function is lazy so importing the
  * library never depends on the filesystem layout.
  *
  * @module sourcevision/language/package-paths
  */
 
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,20 +18,10 @@ function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 }
 
-/** Where `scripts/build-grammars.mjs` writes grammars: `<package>/build/grammars`. */
-export function grammarBuildDir(): string {
-  return join(packageRoot(), "build", "grammars");
-}
+let version: string | undefined;
 
-/**
- * `scripts/build-grammars.mjs`. Present only in a source checkout: the
- * published package ships built grammars instead of the script.
- */
-export function buildGrammarsScript(): string {
-  return join(packageRoot(), "scripts", "build-grammars.mjs");
-}
-
-/** Query files ship in `<package>/src/language/queries/<lang>`, for both src and dist. */
-export function queryDir(lang: string): string {
-  return join(packageRoot(), "src", "language", "queries", lang);
+/** The `version` in this package's `package.json`; a language pack must carry the same. */
+export function sourcevisionVersion(): string {
+  version ??= String((JSON.parse(readFileSync(join(packageRoot(), "package.json"), "utf-8")) as { version?: unknown }).version);
+  return version;
 }

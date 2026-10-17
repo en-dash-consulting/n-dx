@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { hiddenChildProcessAlias } from "../../tests/hidden-child-process-alias.mjs";
 
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
-const langKitRoot = resolve(import.meta.dirname, "../lang-kit");
+const packagesRoot = resolve(import.meta.dirname, "..");
 const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "1";
 
 export default defineConfig({
@@ -13,8 +13,8 @@ export default defineConfig({
       ...hiddenChildProcessAlias,
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/llm-client$/, replacement: `${llmClientRoot}/src/public.ts` },
-      // Map @n-dx/lang-kit to its source barrel the same way
-      { find: /^@n-dx\/lang-kit$/, replacement: `${langKitRoot}/src/index.ts` },
+      // Map @n-dx/lang-kit and the @n-dx/lang-* packs to their source barrels the same way
+      { find: /^@n-dx\/(lang-[a-z]+)$/, replacement: `${packagesRoot}/$1/src/index.ts` },
       // Map local .js imports to .ts files (only relative paths)
       { find: /^(\..+)\.js$/, replacement: "$1.ts" },
     ],
@@ -32,6 +32,8 @@ export default defineConfig({
       "../../tests/setup-session-env.js",
       // Clears TYPESAFE_API_KEY so no test resolves a live judgment route.
       "../../tests/setup-judgment-env.js",
+      // Keeps a pack installed in the developer's ndx home out of the tests.
+      "./tests/setup-ndx-home.ts",
     ],
     include: [
       "tests/**/*.test.ts",

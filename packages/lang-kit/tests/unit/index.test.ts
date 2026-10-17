@@ -26,6 +26,10 @@ describe("@n-dx/lang-kit barrel", () => {
       "parseToml",
       "parseXml",
       "parseYamlSubset",
+      "isLanguagePackEntry",
+      "extractSqlTableReferences",
+      "extractSqlcTables",
+      "looksLikeSql",
     ]) {
       expect(langKit, name).toHaveProperty(name);
     }

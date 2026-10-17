@@ -48,8 +48,9 @@ reported as skipped. Do not hand-edit its build to force one.
 ## 4. Compare
 
 ```sh
+pnpm --filter @n-dx/lang-java... build
 pnpm --filter @n-dx/sourcevision build
-node packages/sourcevision/scripts/build-grammars.mjs
+pnpm --filter @n-dx/lang-java build:grammars
 node packages/sourcevision/scripts/java-scip-compare.mjs [--json]
 ```
 
