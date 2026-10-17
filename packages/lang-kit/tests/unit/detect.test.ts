@@ -4,9 +4,9 @@
  * the search runs and with which configs, which is what keeps the skip set
  * the caller builds from them identical to the inventory's.
  */
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   detectLanguage,
@@ -59,6 +59,24 @@ describe("lang-kit detection seam", () => {
 
     const no = recordingSearch(false);
     expect(await detectLanguage(dir, no)).toBe(typescriptConfig);
+  });
+
+  it.each(["src/index.ts", "lib/app.rb"])("keeps TypeScript primary beside Terraform when %s is present", async (file) => {
+    await mkdir(join(dir, dirname(file)), { recursive: true });
+    await writeFile(join(dir, file), "\n");
+    const one = recordingSearch(true);
+    expect(await detectLanguage(dir, one)).toBe(typescriptConfig);
+    expect(one.calls).toEqual([]);
+
+    const all = recordingSearch(true);
+    expect(await detectLanguages(dir, all)).toEqual([typescriptConfig, terraformConfig]);
+    expect(all.calls).toEqual([[typescriptConfig]]);
+  });
+
+  it("does not count minified JavaScript as fallback source", async () => {
+    await writeFile(join(dir, "vendor.min.js"), "\n");
+    expect(await detectLanguage(dir, recordingSearch(true))).toBe(terraformConfig);
+    expect(await detectLanguages(dir, recordingSearch(true))).toEqual([terraformConfig]);
   });
 
   it("lets a Java root outrank Terraform without searching", async () => {

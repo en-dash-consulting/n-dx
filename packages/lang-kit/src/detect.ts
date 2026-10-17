@@ -80,7 +80,7 @@ export function getLanguageConfig(id: string): LanguageConfig | undefined {
 /**
  * Is there a Terraform file anywhere in the project? `otherConfigs` are the
  * languages detected without Terraform, so the caller can search with the
- * skip set the inventory would use with the result. Should stop at the first
+ * skip set the inventory would use with Terraform beside them. Should stop at the first
  * match and answer `false` for an unreadable root.
  */
 export type TerraformSearch = (otherConfigs: readonly LanguageConfig[]) => Promise<boolean>;
@@ -249,6 +249,35 @@ async function countSourceFiles(
   return counts;
 }
 
+/**
+ * Program-code extensions of languages with no config here (Ruby, Rust, PHP,
+ * Elixir, Kotlin, C/C++ and others). A markerless repository in one of them
+ * is analysed with the TypeScript fallback config.
+ */
+const FALLBACK_LANGUAGE_EXTENSIONS: ReadonlySet<string> = new Set([
+  ".rb", ".rs", ".php", ".ex", ".exs", ".erl", ".hrl", ".scala", ".kt", ".kts",
+  ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".lua", ".dart", ".hs", ".ml",
+  ".mli", ".clj", ".cljs", ".zig", ".nim", ".pl", ".pm", ".r", ".R",
+]);
+
+/**
+ * Does a markerless repository hold source the TypeScript fallback is for:
+ * authored JS/TS, or a language with no config here? Walked as the tiebreak
+ * is. Without it, Terraform files make Terraform the only language; with it,
+ * Terraform joins the fallback, which keeps its skip directories and its
+ * test and generated patterns.
+ */
+async function hasFallbackSource(rootDir: string): Promise<boolean> {
+  let found = false;
+  await walkBounded(rootDir, (name) => {
+    if (name.endsWith(".min.js")) return false;
+    const ext = extname(name);
+    found = typescriptConfig.extensions.has(ext) || FALLBACK_LANGUAGE_EXTENSIONS.has(ext);
+    return found;
+  });
+  return found;
+}
+
 // ── Detection ───────────────────────────────────────────────────────────────
 
 /**
@@ -259,7 +288,8 @@ async function countSourceFiles(
  * 2. Exactly one language marker present → that language
  * 3. Several markers present → file-count tiebreak
  * 4. No other marker, `pom.xml` or a Gradle build at the root → Java
- * 5. No markers → TypeScript/JS fallback (Terraform when only Terraform files are found)
+ * 5. No markers → TypeScript/JS fallback (Terraform when Terraform files are
+ *    found and no JS/TS or other source the fallback is for)
  */
 export async function detectLanguage(rootDir: string, options: DetectLanguageOptions): Promise<LanguageConfig> {
   // Step 1: Explicit override
@@ -309,9 +339,12 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   // mixed repositories keep their existing primary language.
   if (await hasJavaMarker(rootDir)) return javaConfig;
 
-  // Terraform is primary only when nothing else matched; Java outranks it.
-  // Searched as the TypeScript fallback would be inventoried.
-  if (await options.hasTerraformFile([typescriptConfig])) return terraformConfig;
+  // Terraform is primary only when it is the only evidence; Java and any
+  // source the fallback is for outrank it. Searched as the TypeScript
+  // fallback would be inventoried.
+  if (!(await hasFallbackSource(rootDir)) && (await options.hasTerraformFile([typescriptConfig]))) {
+    return terraformConfig;
+  }
 
   // Step 6: No markers → fallback to TypeScript/JS
   return typescriptConfig;
@@ -355,11 +388,15 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
     if (hasPackageJson) present.push({ config: typescriptConfig, count: counts.ts });
   }
 
-  // No markers → fallback to TypeScript/JS for backward compatibility.
+  // No markers → fallback to TypeScript/JS for backward compatibility, with
+  // Terraform beside it; Terraform alone only when it is the only evidence.
   // Terraform is searched with the skip set of what would be returned without it.
   if (present.length === 0) {
-    if (hasJava) return (await options.hasTerraformFile([javaConfig])) ? [javaConfig, terraformConfig] : [javaConfig];
-    return [(await options.hasTerraformFile([typescriptConfig])) ? terraformConfig : typescriptConfig];
+    const base = hasJava ? javaConfig : typescriptConfig;
+    const hasTerraform = await options.hasTerraformFile([base]);
+    if (!hasTerraform) return [base];
+    if (hasJava || (await hasFallbackSource(rootDir))) return [base, terraformConfig];
+    return [terraformConfig];
   }
 
   // Stable ordering by descending file count, ties broken by the same

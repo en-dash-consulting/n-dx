@@ -31,9 +31,13 @@ export { getLanguageConfig, languageConfigsFromIds, mergeLanguageConfigs, VALID_
  * vendored, `otherConfigs`' and Terraform's `skipDirectories` and
  * `skipUnlessContains`, the
  * user's `extraSkipDirs`) and the same `.gitignore` / `.sourcevisionignore`
- * filter. `otherConfigs` are the languages detected without Terraform, so the
- * skip set equals the one the analyze-phase inventory uses with the result.
- * Stops at the first match.
+ * filter. `otherConfigs` are the languages detected without Terraform, so
+ * when Terraform is added beside them the skip set equals the one the
+ * analyze-phase inventory uses with the result. When Terraform is detected
+ * alone (a markerless repository with no source the TypeScript fallback is
+ * for) it does not: the search also skipped the fallback's directories
+ * (`dist`, `build`, `coverage`, …), so a `.tf` file found only there leaves
+ * the fallback in place. Stops at the first match.
  *
  * `detectLanguage` consults it only when no other marker matched;
  * `detectLanguages` adds Terraform whenever it is present.
