@@ -18,6 +18,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A module re-exported under another name by a package's __init__.py is not followed as an attribute base](./a-module-re-exported-under-another.md) | pending |
 | [A rebinding of an imported router name under a module-level if or try is not seen, so the import is still followed](./a-rebinding-of-an-imported-router-name.md) | pending |
 | [A router constructed under the imported name inside a function, or before the import, wins over the import in WebProject.follow](./a-router-constructed-under-the.md) | pending |
 | [An imported router or app name rebound locally to a non-router is still followed through its import](./an-imported-router-or-app-name-rebound.md) | completed |
