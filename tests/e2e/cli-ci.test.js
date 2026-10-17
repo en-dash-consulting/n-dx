@@ -279,6 +279,40 @@ describe("n-dx ci", () => {
     });
   });
 
+  describe("gateway-imports step", () => {
+    let tmpDir;
+    let step;
+
+    async function write(rel, content) {
+      await mkdir(join(tmpDir, rel, ".."), { recursive: true });
+      await writeFile(join(tmpDir, rel), content);
+    }
+
+    beforeAll(async () => {
+      tmpDir = await freshProject();
+      // A dynamic import() of the gated package outside the gateway.
+      await write("packages/hench/src/agent/bad.ts", 'export async function f() { return await import("@n-dx/rex"); }\n');
+      // The gateway itself, a comment, and a subpath specifier are all fine.
+      await write("packages/hench/src/prd/rex-gateway.ts", 'export { x } from "@n-dx/rex";\nawait import("@n-dx/rex");\n');
+      await write("packages/hench/src/agent/ok.ts", '// await import("@n-dx/rex")\nawait import("@n-dx/rex/dist/x.js");\n');
+      // No gateway rule covers core, so its dynamic llm-client import stays clean.
+      await write("packages/core/src/cfg.ts", 'export const m = () => import("@n-dx/llm-client");\n');
+      const args = ["--format=json", "--quiet", tmpDir];
+      step = parseReport(runResult(args), args).steps.find((s) => s.name === "gateway-imports");
+    });
+
+    afterAll(async () => {
+      await removeTmpDir(tmpDir);
+    });
+
+    it("reports a dynamic import() outside the gateway, and only that", () => {
+      expect(step.ok).toBe(false);
+      expect(step.violations.map((v) => `${v.file}:${v.line}`)).toEqual([
+        join("packages", "hench", "src", "agent", "bad.ts") + ":1",
+      ]);
+    });
+  });
+
   // ── Restricted imports: a user project opting in through .n-dx.json ────────
 
   describe("restricted-imports opt-in", () => {

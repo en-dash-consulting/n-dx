@@ -876,6 +876,18 @@ function runtimeImportRegex(pkg) {
 }
 
 /**
+ * Regex to detect a dynamic `import("pkg")` call of a specific package.
+ * Mirrors `hasDynamicImportOf` in tests/e2e/domain-isolation.test.js: the bare
+ * specifier only, so `import("pkg/dist/x.js")` does not match.
+ *
+ * @param {string} pkg  Package name (e.g. "@n-dx/rex")
+ * @returns {RegExp}
+ */
+function dynamicImportRegex(pkg) {
+  return new RegExp(`\\bimport\\s*\\(\\s*["']${pkg}["']\\s*\\)`);
+}
+
+/**
  * Recursively collect all .ts files under a directory.
  * Skips node_modules and dist directories.
  *
@@ -930,6 +942,7 @@ function checkGatewayImports(dir) {
     if (!existsSync(pkgDir)) continue;
 
     const regex = runtimeImportRegex(rule.externalPkg);
+    const dynamicRegex = dynamicImportRegex(rule.externalPkg);
     const files = collectTsFiles(pkgDir);
 
     for (const filePath of files) {
@@ -954,8 +967,10 @@ function checkGatewayImports(dir) {
         // Quick pre-filter: skip lines that don't mention the package
         if (!line.includes(`"${rule.externalPkg}"`) && !line.includes(`'${rule.externalPkg}'`)) continue;
 
-        // Check for runtime (non-type) import/export
-        if (regex.test(line)) {
+        // Check for a runtime (non-type) static import/export or a dynamic import()
+        const trimmed = line.trim();
+        const isDynamic = !trimmed.startsWith("//") && !trimmed.startsWith("*") && dynamicRegex.test(trimmed);
+        if (regex.test(line) || isDynamic) {
           violations.push({
             file: relPath,
             line: i + 1,
