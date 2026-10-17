@@ -792,11 +792,15 @@ export async function analyzeImports(
     const graph = await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs, fallbacks: PACK_FALLBACKS, listed: listedPacks ?? [] });
     mergeGraph(graph, edgeMap, externalMap);
     // Go must never drop to inventory-only: a degraded Go pack hands every Go
-    // file (all of them are in the changed set) to the regex parser.
-    if (graph.degraded.includes(goConfig.id)) {
-      const goFiles = packFiles.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
-      await processGoFiles(goFiles, targetDir, goModulePath, edgeMap, externalMap);
-    }
+    // file (all of them are in the changed set) to the regex parser, and a
+    // pack that ran hands it the files it could not parse (generated files
+    // over the runner's size limit), so their imports are kept.
+    const goDegraded = graph.degraded.includes(goConfig.id);
+    const unparsed = new Set(graph.unparsed);
+    const goFiles = packFiles.filter(
+      (f) => extname(f.path).toLowerCase() === GO_EXTENSION && (goDegraded || unparsed.has(f.path)),
+    );
+    await processGoFiles(goFiles, targetDir, goModulePath, edgeMap, externalMap);
   }
 
   // Incremental cleanup: remove packages whose importers were all changed
