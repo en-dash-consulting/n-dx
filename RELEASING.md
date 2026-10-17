@@ -1,6 +1,6 @@
 # Releasing n-dx
 
-All packages (`@n-dx/core`, `@n-dx/rex`, `@n-dx/hench`, `@n-dx/sourcevision`, `@n-dx/llm-client`, `@n-dx/web`) are published to npm. They share a single version number via a [Changesets fixed group](https://github.com/changesets/changesets/blob/main/docs/fixed-packages.md).
+Every `@n-dx/*` package is published to npm, and all of them share a single version number via a [Changesets fixed group](https://github.com/changesets/changesets/blob/main/docs/fixed-packages.md). The group's member list is `fixed` in [`.changeset/config.json`](.changeset/config.json); that file is the authority, so a new package joins the group there.
 
 ## How versioning works
 
