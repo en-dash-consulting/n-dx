@@ -7,7 +7,11 @@
  *
  * - `urlpatterns`: the entries of `urlpatterns` (a list, lists joined by
  *   `+`, and `urlpatterns += [...]`) that are `path(route, view)` or
- *   `re_path(regex, view)`. A route has no method (any); its handler is the
+ *   `re_path(regex, view)`. An assignment whose value builds on
+ *   `urlpatterns` (`urlpatterns + static(…)`, `urlpatterns + [...]`,
+ *   `format_suffix_patterns(urlpatterns)`) keeps the earlier entries and
+ *   appends its lists; any other replaces them, and one that leaves none
+ *   where there were some is counted in a notice. A route has no method (any); its handler is the
  *   view reduced to its last name (`views.SiteListView.as_view()` →
  *   `SiteListView`, `views.home` → `home`), and absent for any other call.
  *   A `re_path` regex is kept as written.
@@ -105,14 +109,26 @@ function patternLists(web: WebFile, value: Capture): Capture[] {
   return lists.filter((list) => !calls.some((c) => contains(c, list)) && !lists.some((other) => other !== list && contains(other, list)));
 }
 
-function readUrlConf(web: WebFile): UrlConf {
+/**
+ * Whether a `urlpatterns` value builds on the entries before it: one of `selves` (`urlpatterns` as an
+ * operand of `+` or a call's argument) is within it and not inside a pattern list, which starts afresh.
+ */
+function extendsItself(web: WebFile, value: Capture, selves: readonly Capture[]): boolean {
+  const lists = web.sequences.filter((s) => s.nodeType === "list" && contains(value, s));
+  return selves.some((self) => contains(value, self) && !lists.some((list) => contains(list, self)));
+}
+
+/** `selves` are the file's `@django.self` captures; an assignment that leaves no entries where there were some is noted in `dropped`. */
+function readUrlConf(web: WebFile, selves: readonly Capture[], dropped: WebNotes): UrlConf {
   let urlpatterns: Capture[] | undefined;
   const lists = new Map<string, Capture>();
   const routers = new Set<string>();
   for (const { target, value, augmented } of web.assignments) {
     if (target === URLPATTERNS) {
       const entries = patternLists(web, value).flatMap((list) => web.itemsOf(list));
-      urlpatterns = augmented ? [...(urlpatterns ?? []), ...entries] : entries;
+      const extend = augmented || extendsItself(web, value, selves);
+      if (!extend && entries.length === 0 && (urlpatterns?.length ?? 0) > 0) dropped.add(web.path, value, "urlpatterns =");
+      urlpatterns = extend ? [...(urlpatterns ?? []), ...entries] : entries;
       continue;
     }
     if (value.nodeType === "list") lists.set(target, value);
@@ -135,7 +151,9 @@ export function readDjangoRoutes(files: readonly PackSourceFile[], context: Fram
     files.map((file) => readWebFile(file, DJANGO_QUERY)),
     context,
   );
-  const confs = new Map(project.files.map((web) => [web.path, readUrlConf(web)]));
+  const selves = new Map(files.map((file) => [file.path, (file.captures[DJANGO_QUERY] ?? []).filter((c) => c.name === "django.self")]));
+  const dropped = new WebNotes();
+  const confs = new Map(project.files.map((web) => [web.path, readUrlConf(web, selves.get(web.path) ?? [], dropped)]));
   const kept = new WebNotes();
   const unfollowed = new WebNotes();
   const registered = new WebNotes();
@@ -280,6 +298,11 @@ export function readDjangoRoutes(files: readonly PackSourceFile[], context: Fram
       n === 1
         ? "1 Django REST framework router registration is counted, not expanded"
         : `${n} Django REST framework router registrations are counted, not expanded`,
+    ),
+    webNotice("Django", dropped.list(), (n) =>
+      n === 1
+        ? "1 urlpatterns assignment drops the patterns set before it and adds none the rules can read"
+        : `${n} urlpatterns assignments drop the patterns set before them and add none the rules can read`,
     ),
   ].filter((n): n is string => n !== undefined);
   return { facts, notices };
