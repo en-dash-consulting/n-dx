@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { normalizePythonName, parseRequirement } from "../../src/python-requirements.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../helpers/call-within-budget.js";
+
+const SOURCE = new URL("../../src/python-requirements.ts", import.meta.url);
 
 describe("normalizePythonName (PEP 503)", () => {
   it.each([
@@ -49,11 +52,15 @@ describe("parseRequirement (PEP 508)", () => {
 
   // The specifier pattern once let two adjacent `\s*` split the same whitespace
   // k+1 ways, so a failing tail backtracked as (k+1)^m: m=18 took ~10 s and
-  // this line (m=30) would not return. A regression hangs the suite rather than
-  // failing it — no clock is read, because none could interrupt the match.
-  it("rejects a pathological specifier promptly", () => {
-    const text = "pkg " + "==1  ".repeat(30) + "x";
-    expect(text.length).toBeGreaterThan(100);
-    expect(parseRequirement(text)).toBeUndefined();
-  });
+  // this line (m=30) would not return. The call runs in a worker terminated
+  // past its budget, so a regression fails this test by name instead of hanging.
+  it(
+    "rejects a pathological specifier promptly",
+    async () => {
+      const text = "pkg " + "==1  ".repeat(30) + "x";
+      expect(text.length).toBeGreaterThan(100);
+      expect(await callWithinBudget<typeof parseRequirement>(SOURCE, "parseRequirement", text)).toBeUndefined();
+    },
+    BOUNDED_TEST_TIMEOUT_MS,
+  );
 });

@@ -4,6 +4,9 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { type PythonProject, pythonProjectsFrom, readPythonProjects } from "../../src/python-build.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../helpers/call-within-budget.js";
+
+const PYTHON_BUILD = new URL("../../src/python-build.ts", import.meta.url);
 
 /** Projects over an in-memory repository: path → text. */
 function projects(repo: Record<string, string>): Promise<PythonProject[]> {
@@ -154,17 +157,6 @@ describe("Python projects: layouts", () => {
     ]);
   });
 
-  it("uv workspace: a pathological ** glob returns (no backtracking)", async () => {
-    const glob = `${"**/a/".repeat(12)}c`;
-    const dir = Array.from({ length: 25 }, () => "a").join("/");
-    const found = await projects({
-      "pyproject.toml": `[tool.uv.workspace]\nmembers = ["${glob}", "${"*a".repeat(30)}*c"]\n`,
-      [`${dir}/pyproject.toml`]: "",
-      [`${"a".repeat(60)}/pyproject.toml`]: "",
-    });
-    expect(found[0].workspaceMembers).toEqual([]);
-  });
-
   it("merges pyproject, setup.cfg, setup.py and requirements in one directory", async () => {
     const [p] = await projects({
       "pyproject.toml": "[build-system]\nrequires = [\"setuptools\"]\n",
@@ -313,17 +305,40 @@ describe("readPythonProjects", () => {
     for (const d of cleanups.splice(0)) await rm(d, { recursive: true, force: true });
   });
 
-  it("reads the files the inventory lists from disk, and reports one that is gone", async () => {
+  /** Write `repo` (path → text) to a fresh directory, removed after the test. */
+  async function onDisk(repo: Record<string, string>): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), "python-build-"));
     cleanups.push(dir);
-    const write = async (rel: string, text: string): Promise<void> => {
+    for (const [rel, text] of Object.entries(repo)) {
       await mkdir(dirname(join(dir, rel)), { recursive: true });
       await writeFile(join(dir, rel), text);
-    };
-    await write("app/pyproject.toml", '[project]\nname = "app"\ndependencies = ["rich"]\n');
+    }
+    return dir;
+  }
+
+  it("reads the files the inventory lists from disk, and reports one that is gone", async () => {
+    const dir = await onDisk({ "app/pyproject.toml": '[project]\nname = "app"\ndependencies = ["rich"]\n' });
     const found = await readPythonProjects(dir, ["app/pyproject.toml", "app/setup.cfg"]);
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ dir: "app", name: "app", notices: ["app/setup.cfg is unreadable"] });
     expect(deps(found[0])).toEqual(["rich (no version specifier) main app/pyproject.toml:3"]);
   });
+
+  // Read in a worker terminated past its budget, so a backtracking glob fails
+  // this test by name instead of hanging the suite.
+  it(
+    "uv workspace: a pathological ** glob returns (no backtracking)",
+    async () => {
+      const glob = `${"**/a/".repeat(12)}c`;
+      const repo = {
+        "pyproject.toml": `[tool.uv.workspace]\nmembers = ["${glob}", "${"*a".repeat(30)}*c"]\n`,
+        [`${Array.from({ length: 25 }, () => "a").join("/")}/pyproject.toml`]: "",
+        [`${"a".repeat(60)}/pyproject.toml`]: "",
+      };
+      const dir = await onDisk(repo);
+      const found = await callWithinBudget<typeof readPythonProjects>(PYTHON_BUILD, "readPythonProjects", dir, Object.keys(repo));
+      expect(found[0].workspaceMembers).toEqual([]);
+    },
+    BOUNDED_TEST_TIMEOUT_MS,
+  );
 });
