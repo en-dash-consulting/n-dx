@@ -2,7 +2,7 @@
 id: "8a558da2-8724-4e8c-8a44-42b0d70b7f5b"
 level: "feature"
 title: "Stack review fixes: resolvers and build readers (PR 18)"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "language-packs"
@@ -12,6 +12,11 @@ tags:
 blockedBy:
   - "3c7c3ece-83a5-49ac-9358-2a0c0a1a8a9c"
 source: "review"
+startedAt: "2026-10-17T08:26:14.855Z"
+completedAt: "2026-10-17T08:26:14.855Z"
+endedAt: "2026-10-17T08:26:14.855Z"
+resolutionType: "code-change"
+resolutionDetail: "PR 18: python:/java: externals, Java module/source-set preference with test-artifact visibility, Go size-cap fallback and replace externals, Python __init__ re-exports, Gradle continuation, sqlc arrays; verified against PR 17. Low follow-ups moved to the review follow-ups feature."
 acceptanceCriteria:
   - "Python and Java externals carry their language namespace"
   - "Java resolution prefers the referencing module and never links main to test"
@@ -19,7 +24,7 @@ acceptanceCriteria:
   - "Python follows re-exports through __init__.py"
   - "Gradle continuation lines and sqlc JSON arrays are read correctly"
 description: "Code fixes from the 2026-10-16 stack review to the language resolvers and build-file readers, including Ryan's two decided external namespaces (python: and java:). Stacked on #822 (PR 17). Brief: workshop language-scaling/pr17-20-review-fixes-brief.md."
-lastModified: "2026-10-17T06:54:47.932Z"
+lastModified: "2026-10-17T08:26:15.171Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -27,15 +32,11 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [A same-package Java name visible only in another module's test code shadows the wildcard import javac would use](./a-same-package-java-name-visible-only.md) | pending |
 | [Allow cross-module test-to-test Java links when the module depends on the other's test jar or test fixtures](./allow-cross-module-test-to-test-java.md) | completed |
-| [An oversized Go file in a nested module or go.work project gets its internal imports as externals](./an-oversized-go-file-in-a-nested.md) | pending |
-| [Follow Python re-exports through a package's __init__.py](./follow-python-re-exports-through-a.md) | pending |
+| [Follow Python re-exports through a package's __init__.py](./follow-python-re-exports-through-a.md) | completed |
 | [Give Java externals the java: namespace](./give-java-externals-the-java-namespace.md) | completed |
 | [Give Python externals the python: namespace](./give-python-externals-the-python.md) | completed |
-| [Gradle type-safe project accessors (testFixtures(projects.dao)) grant no cross-module Java test link](./gradle-type-safe-project-accessors.md) | pending |
 | [Java test code in one module still links to another module's test classes](./java-test-code-in-one-module-still.md) | completed |
-| [JDK packages outside java/javax/jdk (org.w3c.dom, org.xml.sax, com.sun.*, sun.*) are named java: instead of java:stdlib:](./jdk-packages-outside-java-javax-jdk.md) | pending |
 | [Keep imports of Go files over the pack's size cap and of replaced modules in skipped directories](./keep-imports-of-go-files-over-the-pack.md) | completed |
 | [Prefer the referencing module and source set when a Java name has several declarations](./prefer-the-referencing-module-and.md) | completed |
 | [Read Groovy Gradle statements that continue after a trailing comma](./read-groovy-gradle-statements-that.md) | completed |
