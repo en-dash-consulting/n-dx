@@ -625,6 +625,15 @@ describe("dependencyClosure", () => {
     expect(dependencyClosure(nodeModules, "@n-dx/lang-go", ["@n-dx/lang-java"])).toEqual(["@n-dx/lang-go", "x"]);
   });
 
+  it("refuses a dependency name that would leave node_modules, before anything is moved", () => {
+    for (const name of ["../escape", "@s/../../escape", "..", "@../x", "a\\..\\b"]) {
+      pkg("@n-dx/lang-go", { [name]: "1" });
+      expect(() => dependencyClosure(nodeModules, "@n-dx/lang-go"), name).toThrow(`names ${JSON.stringify(name)}, which is not a package name`);
+    }
+    pkg("@n-dx/lang-go", { "@scope/ok.name": "1", "a.b-c_d": "1" });
+    expect(dependencyClosure(nodeModules, "@n-dx/lang-go")).toEqual(["@n-dx/lang-go"]);
+  });
+
   it("fails naming a package.json in the closure that will not parse", () => {
     pkg("@n-dx/lang-go", { x: "1" });
     mkdirSync(join(nodeModules, "x"));
