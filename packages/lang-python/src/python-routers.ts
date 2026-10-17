@@ -53,10 +53,10 @@ export interface RouterRules {
   readonly name: string;
   /** The framework's query, whose name prefixes its captures. */
   readonly query: string;
-  /** Each constructor, with the keyword its own prefix is given as. */
-  readonly constructors: Readonly<Record<string, { readonly prefix?: string }>>;
-  /** Decorator methods that fix the HTTP method. */
-  readonly verbs: Readonly<Record<string, string>>;
+  /** Each constructor, with the keyword its own prefix is given as. A Map, so `toString()` is no constructor. */
+  readonly constructors: ReadonlyMap<string, { readonly prefix?: string }>;
+  /** Decorator methods that fix the HTTP method. A Map, so `@app.constructor` is no verb. */
+  readonly verbs: ReadonlyMap<string, string>;
   /** Decorator methods taking `methods=[…]`; GET when it is absent. */
   readonly anyVerb: ReadonlySet<string>;
   /** Where a route decorator's path is. */
@@ -99,7 +99,7 @@ export function readRouterRoutes(rules: RouterRules, files: readonly PackSourceF
   for (const web of project.files) {
     for (const assignment of web.assignments) {
       const call = web.callAt(assignment.value);
-      const constructor = call && rules.constructors[call.callee];
+      const constructor = call && rules.constructors.get(call.callee);
       if (!call || !constructor) continue;
       const prefix = constructor.prefix === undefined ? undefined : call.keywords.get(constructor.prefix);
       const key = keyOf(web.path, assignment.target);
@@ -178,7 +178,7 @@ export function readRouterRoutes(rules: RouterRules, files: readonly PackSourceF
     for (const { decorator, handler } of web.decorated) {
       const call = web.callAt(decorator);
       if (!call?.receiver) continue;
-      const fixed = rules.verbs[call.callee];
+      const fixed = rules.verbs.get(call.callee);
       if (fixed === undefined && !rules.anyVerb.has(call.callee)) continue;
       const instance = instanceAt(web.path, call.receiver);
       const pathNode = argument(call, rules.path.position, rules.path.keyword);

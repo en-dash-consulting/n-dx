@@ -261,6 +261,41 @@ describe("an imported name rebound at module level", () => {
   });
 });
 
+describe("a name an Object.prototype member has", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "lang-python-prototype-"));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("is no route decorator and no application constructor", async (ctx) => {
+    writeFileSync(
+      join(dir, "main.py"),
+      [
+        "from fastapi import FastAPI",
+        "from flask import Flask",
+        "app = FastAPI()",
+        "web = Flask(__name__)",
+        "fake = toString()",
+        "other = constructor()",
+        '@app.constructor("/a")',
+        "def a(): ...",
+        '@web.toString("/b")',
+        "def b(): ...",
+        '@app.__proto__("/c")',
+        "def c(): ...",
+        '@fake.get("/d")',
+        "def d(): ...",
+        '@other.route("/e")',
+        "def e(): ...",
+        "",
+      ].join("\n"),
+    );
+    const { facts } = await analyze(ctx, dir);
+    expect(routesOf(facts, "main.py")).toEqual([]);
+  });
+});
+
 describe("a name a package's __init__.py re-exports from its submodule of the same name", () => {
   let dir: string;
   const write = (path: string, text: string): void => {

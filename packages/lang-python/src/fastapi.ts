@@ -45,8 +45,11 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
 export const FASTAPI_RULES: RouterRules = {
   name: "FastAPI",
   query: FASTAPI_QUERY,
-  constructors: { FastAPI: {}, APIRouter: { prefix: "prefix" } },
-  verbs: { get: "GET", post: "POST", put: "PUT", delete: "DELETE", patch: "PATCH", options: "OPTIONS", head: "HEAD" },
+  constructors: new Map([
+    ["FastAPI", {}],
+    ["APIRouter", { prefix: "prefix" }],
+  ]),
+  verbs: new Map(["get", "post", "put", "delete", "patch", "options", "head"].map((verb) => [verb, verb.toUpperCase()])),
   anyVerb: new Set(["api_route"]),
   path: { position: 0, keyword: "path" },
   mounts: [

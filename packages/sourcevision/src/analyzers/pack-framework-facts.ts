@@ -13,7 +13,7 @@
  * @module sourcevision/analyzers/pack-framework-facts
  */
 
-import type { FileFacts } from "@n-dx/lang-kit";
+import type { FileFacts, OutboundCallFact } from "@n-dx/lang-kit";
 import type { HttpMethod, Inventory, OutboundData, OutboundDependency, ServerRoute, ServerRouteGroup } from "../schema/index.js";
 import { sortOutbound } from "../util/sort.js";
 import { inferPrefix } from "./go-route-detection.js";
@@ -75,10 +75,17 @@ export function withPackRouteGroups(
   return [...groups, ...added].sort((a, b) => a.file.localeCompare(b.file));
 }
 
+const TARGET_SOURCES: ReadonlySet<string> = new Set<OutboundDependency["targetSource"]>(["literal", "env", "config", "unknown"]);
+
+/** Whether a pack's fact has the target and client outbound.json requires; a pack is loaded code, so this is checked, not assumed. */
+const writable = (call: OutboundCallFact): boolean =>
+  typeof call.target === "string" && TARGET_SOURCES.has(call.targetSource) && typeof call.client === "string" && call.client !== "";
+
 /**
  * One dependency per outbound-call fact, deduplicated per file on line,
  * kind, client and target as the detectors do. A fact without a confidence
- * is `inferred`.
+ * is `inferred`; one without a target, target source or client is dropped
+ * rather than written as a row outbound.json's schema rejects.
  */
 export function packOutboundDependencies(facts: PackFrameworkFacts, inventory: Inventory): OutboundDependency[] {
   const roles = rolesOf(inventory);
@@ -88,6 +95,7 @@ export function packOutboundDependencies(facts: PackFrameworkFacts, inventory: I
     if (!outboundCalls?.length || role === undefined || SKIP_ROLES.has(role)) continue;
     const seen = new Set<string>();
     for (const call of outboundCalls) {
+      if (!writable(call)) continue;
       const line = call.position.line;
       const key = `${line}|${call.kind}|${call.client}|${call.target}`;
       if (seen.has(key)) continue;

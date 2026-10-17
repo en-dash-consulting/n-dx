@@ -44,8 +44,11 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
 export const FLASK_RULES: RouterRules = {
   name: "Flask",
   query: FLASK_QUERY,
-  constructors: { Flask: {}, Blueprint: { prefix: "url_prefix" } },
-  verbs: { get: "GET", post: "POST", put: "PUT", delete: "DELETE", patch: "PATCH" },
+  constructors: new Map([
+    ["Flask", {}],
+    ["Blueprint", { prefix: "url_prefix" }],
+  ]),
+  verbs: new Map(["get", "post", "put", "delete", "patch"].map((verb) => [verb, verb.toUpperCase()])),
   anyVerb: new Set(["route"]),
   path: { position: 0, keyword: "rule" },
   mounts: [
