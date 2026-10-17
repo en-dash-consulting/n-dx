@@ -318,7 +318,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "then on the offline machine,\n" +
       "  add <lang> --from <bundle>\n" +
       "                  installs it with no npm call; a bundle of another pack or\n" +
-      "                  version, or a corrupt one, is refused",
+      "                  version, or a corrupt one, is refused\n" +
+      "\n" +
+      "add and remove hold <pack dir>.lock while they run: a second one fails\n" +
+      "naming the holder's PID. Run one pack writer at a time.",
     options: [
       { flag: "--from <bundle>", description: "Install from a bundle made by pack bundle, with no network (add)" },
       { flag: "--out <file>", description: "Where to write the bundle; default n-dx-lang-<lang>-<version>.tgz (bundle)" },
