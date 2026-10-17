@@ -27,4 +27,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [Contain a framework rule failure so the language's imports survive](./contain-a-framework-rule-failure-so.md) | pending |
 | [Keep earlier Django URL patterns when urlpatterns is reassigned through itself](./keep-earlier-django-url-patterns-when.md) | pending |
-| [Never read Spring rule tables through the object prototype](./never-read-spring-rule-tables-through.md) | in_progress |
+| [Never read Spring rule tables through the object prototype](./never-read-spring-rule-tables-through.md) | completed |
