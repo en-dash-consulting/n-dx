@@ -128,6 +128,7 @@ export const ROOT_DOCS_TEST_FILES = [
   "tests/e2e/docs-command-refs.test.js",
   "tests/e2e/cli-ui-gap-drift.test.js",
   "tests/unit/cli-smoke-parity.test.js",
+  "tests/e2e/docs-skill-table-drift.test.js",
 ];
 
 /**
@@ -269,6 +270,11 @@ export const VALIDATED_DOC_PAGES = [
     label: ROOT_DOCS_LABEL,
     tests: ["tests/e2e/cli-ui-gap-drift.test.js"],
     match: (file) => file === "docs/cli-ui-gap.md",
+  },
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/e2e/docs-skill-table-drift.test.js"],
+    match: (file) => file === "docs/guide/skills.md",
   },
   {
     label: ROOT_DOCS_LABEL,
