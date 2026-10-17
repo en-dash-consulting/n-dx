@@ -10,7 +10,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { cmdAnalyze } from "../../src/cli/commands/analyze.js";
 import { DATA_FILES } from "../../src/schema/data-files.js";
 import type { InfrastructureData } from "../../src/schema/v1.js";
@@ -73,13 +73,13 @@ const PROJECT: Record<string, string> = {
   ].join("\n"),
 };
 
-/** Every file under `dir`, path → content. */
+/** Every file under `dir`, `/`-separated relative path → content, so path filters hold on Windows. */
 function readTree(dir: string, base = dir): Map<string, string> {
   const out = new Map<string, string>();
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) for (const [k, v] of readTree(full, base)) out.set(k, v);
-    else out.set(full.slice(base.length + 1), readFileSync(full, "utf-8"));
+    else out.set(relative(base, full).split(sep).join("/"), readFileSync(full, "utf-8"));
   }
   return out;
 }
