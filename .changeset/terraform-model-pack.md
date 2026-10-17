@@ -13,8 +13,12 @@ produces `resources` facts.
 `@n-dx/lang-kit` now lists `resources` as a produced fact kind. `ResourceFact` gains
 optional `module`, `provider`, `references` and `attributes` fields. The attributes
 are engine, engine version, runtime, image and cluster version, each kept exactly as
-written. `@n-dx/lang-runtime`'s `createPackEntry` takes a `projectFacts` reader for
-fact kinds that need the whole project.
+written, except when the optional `instance` field is set: then an attribute may hold
+the value resolved through that module instance rather than the value as written.
+`instance` carries the call path, the root call site and, per resolved attribute, the
+`written` expression, its `confidence` and the `from` location. A resource gets one
+fact per distinct resolution. `@n-dx/lang-runtime`'s `createPackEntry` takes a
+`projectFacts` reader for fact kinds that need the whole project.
 
 In a Terraform-first repository, Terraform files under `tests/` or `test/` and
 `.tftest.hcl` files now get the test role. Repositories led by any other language
