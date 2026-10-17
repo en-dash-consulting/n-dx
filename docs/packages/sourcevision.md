@@ -70,6 +70,44 @@ nothing else: what is analysed, and its output, are the same as with no list.
 found (and says so when the list is empty or absent), and `sv pack list` marks
 the listed packs.
 
+### Pack installation internals
+
+`sv pack` (`src/cli/commands/pack.ts`, reached as `ndx sv pack …`) manages
+the pack directory for every pack in `INSTALLABLE_PACKS` (java, go, terraform,
+python, sql; only `KNOWN_PACKS`, all but sql, are analyzed with today). npm
+never runs lifecycle scripts: no pack needs one (grammars are prebuilt WASM),
+and a script anywhere in the dependency tree would otherwise run with the
+user's privileges.
+
+- `add <lang>` runs `npm install --ignore-scripts --no-audit --no-fund --prefix <pack dir> @n-dx/lang-<lang>@<sourcevision version>`,
+  creating the directory, then loads the pack from it with `loadPack`; a
+  mismatch, a load failure or a pack npm did not put there is an error carrying
+  npm's output. `--dry-run` prints the command.
+- `list [--json]` reports each pack as installed (pack directory), resolved
+  (module resolution), missing or refused, with its version.
+- `remove <lang>` runs `npm uninstall --ignore-scripts --prefix`; a pack found
+  only by module resolution is left alone.
+
+Offline, for a machine with no registry access:
+
+- `bundle <lang> [--out <file>]` (connected machine) runs the same npm install
+  into a fresh temporary prefix, loads the pack from it, writes
+  `n-dx-pack-bundle.json` (pack, package, version, sourcevision version,
+  `platform: "any"`: grammars are WASM) and archives the whole prefix as one
+  `.tgz`, default `n-dx-lang-<lang>-<version>.tgz`. The prefix is removed.
+- `add <lang> --from <bundle>` makes no npm call. It reads the manifest first
+  and refuses a bundle of another pack or version, or an archive that will not
+  read (a manifest that is not a JSON object is "not a pack bundle"). It
+  extracts into `.sv-pack-stage-*` beside the pack directory and loads the pack
+  from there; only then does it rename the staged packages over the installed
+  ones, record the pack in the pack directory's `package.json` and load it as
+  `add` does. Any failure leaves the previous install untouched.
+
+The archive is written and read in Node (`src/cli/commands/pack-archive.ts`),
+not by a `tar` process: regular files and directories only, with pax long
+paths; reading refuses links, bad checksums, truncation and any path that is
+absolute or contains `..`.
+
 ## Output Files
 
 All output is written to `.sourcevision/`:
