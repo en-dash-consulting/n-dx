@@ -22,7 +22,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | Title | Status |
 |-------|--------|
 | [`ndx trust accept .` tells a user with a repository test command there is "Nothing to trust"](./ndx-trust-accept-tells-a-user-with-a.md) | pending |
-| [`rex verify` runs the repository's test command by default with no trust check](./rex-verify-runs-the-repository-s-test.md) | in_progress |
+| [`rex verify` runs the repository's test command by default with no trust check](./rex-verify-runs-the-repository-s-test.md) | completed |
 | [The trust baseline comes from host-side detection, never from the repository's declared language](./the-trust-baseline-comes-from-host.md) | completed |
 | [The trust inventory never follows a symlinked directory out of the repository](./the-trust-inventory-never-follows-a.md) | completed |
 | [verify_criteria runs a repository's test command only once its digest is accepted](./verify-criteria-runs-a-repository-s.md) | completed |
