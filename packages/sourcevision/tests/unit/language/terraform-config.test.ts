@@ -111,6 +111,31 @@ describe("terraform language config", () => {
       expect(inv.files.find((f) => f.path === "tests/app_test.rb")?.role).toBe("test");
     });
 
+    it("keeps the TypeScript fallback when the only source sits deeper than three levels", async () => {
+      await touch("apps/web/src/components/X.tsx");
+      await touch("infra/main.tf");
+      expect(await detectLanguage(dir)).toBe(typescriptConfig);
+      expect(await detectLanguages(dir)).toEqual([typescriptConfig, terraformConfig]);
+    });
+
+    it("does not count source the inventory ignores", async () => {
+      await touch(".gitignore", "generated-site/\n");
+      await touch("generated-site/app.js");
+      await touch("dist/bundle.js");
+      await touch("main.tf");
+      expect(await detectLanguage(dir)).toBe(terraformConfig);
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+    });
+
+    it("stays Terraform alone when Terraform files outnumber the fallback's source", async () => {
+      // cloud-foundation-fabric: 832 .tf files and one Cloud Function at depth 4.
+      await touch("modules/api-gateway/recipe-multi-region/function/index.js");
+      await touch("modules/api-gateway/main.tf");
+      await touch("modules/api-gateway/variables.tf");
+      expect(await detectLanguage(dir)).toBe(terraformConfig);
+      expect(await detectLanguages(dir)).toEqual([terraformConfig]);
+    });
+
     it("stays Terraform alone when the only other code is in a language that has a config", async () => {
       // terraform-aws-rds: 104 .tf files and one Python Lambda fixture.
       await touch("main.tf");

@@ -1,17 +1,19 @@
 /**
  * The detection seam: lang-kit reads no config and walks no tree, so the
- * override and the Terraform search arrive as options. These tests pin when
- * the search runs and with which configs, which is what keeps the skip set
- * the caller builds from them identical to the inventory's.
+ * override and the project file search arrive as options. These tests pin
+ * when the search runs, with which configs and whether it counts, which is
+ * what keeps the skip set the caller builds from them identical to the
+ * inventory's, and how its counts decide a markerless repository.
  */
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   detectLanguage,
   detectLanguages,
   goConfig,
+  isFallbackSourceFile,
   javaConfig,
   javaSecondaryConfig,
   terraformConfig,
@@ -19,13 +21,14 @@ import {
   type LanguageConfig,
 } from "../../src/index.js";
 
-function recordingSearch(answer: boolean) {
-  const calls: Array<readonly LanguageConfig[]> = [];
+/** A search answering `terraform` Terraform files and `fallbackSource` fallback source files (when counting). */
+function recordingSearch(terraform: number, fallbackSource = 0) {
+  const calls: Array<{ others: readonly LanguageConfig[]; count: boolean }> = [];
   return {
     calls,
-    hasTerraformFile: async (others: readonly LanguageConfig[]) => {
-      calls.push([...others]);
-      return answer;
+    searchProjectFiles: async (others: readonly LanguageConfig[], { count }: { count: boolean }) => {
+      calls.push({ others: [...others], count });
+      return count ? { terraform, fallbackSource } : { terraform: Math.min(terraform, 1), fallbackSource: 0 };
     },
   };
 }
@@ -40,48 +43,56 @@ describe("lang-kit detection seam", () => {
   });
 
   it("returns the override's config without searching for Terraform", async () => {
-    const search = recordingSearch(true);
+    const search = recordingSearch(1);
     expect(await detectLanguage(dir, { override: "go", ...search })).toBe(goConfig);
     expect(search.calls).toEqual([]);
   });
 
   it("falls through to markers on an unknown override", async () => {
     await writeFile(join(dir, "go.mod"), "module example.com/x\n");
-    const search = recordingSearch(true);
+    const search = recordingSearch(1);
     expect(await detectLanguage(dir, { override: "cobol", ...search })).toBe(goConfig);
     expect(search.calls).toEqual([]);
   });
 
-  it("searches for Terraform as the TypeScript fallback when no marker matched", async () => {
-    const yes = recordingSearch(true);
+  it("counts as the TypeScript fallback when no marker matched", async () => {
+    const yes = recordingSearch(1);
     expect(await detectLanguage(dir, yes)).toBe(terraformConfig);
-    expect(yes.calls).toEqual([[typescriptConfig]]);
+    expect(yes.calls).toEqual([{ others: [typescriptConfig], count: true }]);
 
-    const no = recordingSearch(false);
-    expect(await detectLanguage(dir, no)).toBe(typescriptConfig);
+    expect(await detectLanguage(dir, recordingSearch(0))).toBe(typescriptConfig);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([typescriptConfig]);
   });
 
-  it.each(["src/index.ts", "lib/app.rb"])("keeps TypeScript primary beside Terraform when %s is present", async (file) => {
-    await mkdir(join(dir, dirname(file)), { recursive: true });
-    await writeFile(join(dir, file), "\n");
-    const one = recordingSearch(true);
-    expect(await detectLanguage(dir, one)).toBe(typescriptConfig);
-    expect(one.calls).toEqual([]);
-
-    const all = recordingSearch(true);
+  it.each([
+    ["a tie", 1, 1],
+    ["more fallback source", 2, 5],
+  ])("keeps TypeScript primary beside Terraform on %s", async (_, terraform, fallbackSource) => {
+    expect(await detectLanguage(dir, recordingSearch(terraform, fallbackSource))).toBe(typescriptConfig);
+    const all = recordingSearch(terraform, fallbackSource);
     expect(await detectLanguages(dir, all)).toEqual([typescriptConfig, terraformConfig]);
-    expect(all.calls).toEqual([[typescriptConfig]]);
+    expect(all.calls).toEqual([{ others: [typescriptConfig], count: true }]);
   });
 
-  it("does not count minified JavaScript as fallback source", async () => {
-    await writeFile(join(dir, "vendor.min.js"), "\n");
-    expect(await detectLanguage(dir, recordingSearch(true))).toBe(terraformConfig);
-    expect(await detectLanguages(dir, recordingSearch(true))).toEqual([terraformConfig]);
+  it("is Terraform alone when Terraform files outnumber the fallback's source", async () => {
+    // cloud-foundation-fabric: 832 .tf files and one Cloud Function index.js.
+    expect(await detectLanguage(dir, recordingSearch(832, 1))).toBe(terraformConfig);
+    expect(await detectLanguages(dir, recordingSearch(832, 1))).toEqual([terraformConfig]);
+  });
+
+  it.each([
+    ["src/index.ts", true],
+    ["lib/app.rb", true],
+    ["vendor.min.js", false],
+    ["handler.py", false],
+    ["main.tf", false],
+  ])("counts %s as fallback source: %s", (file, expected) => {
+    expect(isFallbackSourceFile(file)).toBe(expected);
   });
 
   it("lets a Java root outrank Terraform without searching", async () => {
     await writeFile(join(dir, "pom.xml"), "<project/>\n");
-    const search = recordingSearch(true);
+    const search = recordingSearch(1);
     expect(await detectLanguage(dir, search)).toBe(javaConfig);
     expect(search.calls).toEqual([]);
   });
@@ -89,15 +100,16 @@ describe("lang-kit detection seam", () => {
   it("detectLanguages searches with the configs detected so far", async () => {
     await writeFile(join(dir, "package.json"), "{}\n");
     await writeFile(join(dir, "build.gradle"), "\n");
-    const search = recordingSearch(true);
+    const search = recordingSearch(1);
     expect(await detectLanguages(dir, search)).toEqual([typescriptConfig, javaSecondaryConfig, terraformConfig]);
-    expect(search.calls).toEqual([[typescriptConfig, javaSecondaryConfig]]);
+    expect(search.calls).toEqual([{ others: [typescriptConfig, javaSecondaryConfig], count: false }]);
   });
 
-  it("detectLanguages searches as Java on a Java-only root", async () => {
+  it("detectLanguages searches as Java on a Java-only root, without counting", async () => {
     await writeFile(join(dir, "pom.xml"), "<project/>\n");
-    const search = recordingSearch(false);
-    expect(await detectLanguages(dir, search)).toEqual([javaConfig]);
-    expect(search.calls).toEqual([[javaConfig]]);
+    expect(await detectLanguages(dir, recordingSearch(0))).toEqual([javaConfig]);
+    const search = recordingSearch(3, 0);
+    expect(await detectLanguages(dir, search)).toEqual([javaConfig, terraformConfig]);
+    expect(search.calls).toEqual([{ others: [javaConfig], count: false }]);
   });
 });
