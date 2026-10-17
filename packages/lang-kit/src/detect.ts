@@ -88,8 +88,8 @@ export interface ProjectFileCounts {
 /**
  * Search the project's files as the inventory would walk them with
  * `otherConfigs` and Terraform beside them: `otherConfigs` are the languages
- * detected without Terraform, so the caller builds the inventory's skip set
- * and ignore filter from them. With `count` false it only needs to know
+ * detected without Terraform (none for Terraform alone), so the caller builds
+ * the inventory's skip set and ignore filter from them. With `count` false it only needs to know
  * whether a Terraform file exists, and should stop at the first one; with
  * `count` true it counts both kinds of file over the whole walk. An
  * unreadable root counts nothing.
@@ -101,7 +101,11 @@ export type ProjectFileSearch = (
 
 /** What `detectLanguages` needs from its caller. */
 export interface DetectLanguagesOptions {
-  /** The project file search; called at most once per detection. */
+  /**
+   * The project file search; called at most once per detection, except that
+   * a markerless repository it finds to be Terraform alone is searched a
+   * second time, with no `otherConfigs`.
+   */
   searchProjectFiles: ProjectFileSearch;
 }
 
@@ -296,6 +300,22 @@ function isTerraformOnly(counts: ProjectFileCounts): boolean {
   return counts.terraform > 0 && counts.fallbackSource === 0;
 }
 
+/**
+ * Where Terraform stands in a markerless repository with no Java root:
+ * `none` (no Terraform file), `beside` the TypeScript fallback, or `alone`.
+ * Searched first as the fallback would be inventoried. Before answering
+ * `alone`, the fallback's source is counted again as Terraform alone would be
+ * inventoried (no other config's skip set), so a file only the fallback skips
+ * (`dist/handler.js`) keeps the fallback, and the inventory of either result
+ * lists the files that decided it.
+ */
+async function markerlessTerraform(search: ProjectFileSearch): Promise<"none" | "beside" | "alone"> {
+  const counts = await search([typescriptConfig], { count: true });
+  if (counts.terraform === 0) return "none";
+  if (!isTerraformOnly(counts)) return "beside";
+  return (await search([], { count: true })).fallbackSource > 0 ? "beside" : "alone";
+}
+
 // ── Detection ───────────────────────────────────────────────────────────────
 
 /**
@@ -358,10 +378,7 @@ export async function detectLanguage(rootDir: string, options: DetectLanguageOpt
   if (await hasJavaMarker(rootDir)) return javaConfig;
 
   // Java outranks Terraform, and so does any of the fallback's source.
-  // Searched as the TypeScript fallback would be inventoried.
-  if (isTerraformOnly(await options.searchProjectFiles([typescriptConfig], { count: true }))) {
-    return terraformConfig;
-  }
+  if ((await markerlessTerraform(options.searchProjectFiles)) === "alone") return terraformConfig;
 
   // Step 6: No markers → fallback to TypeScript/JS
   return typescriptConfig;
@@ -407,14 +424,16 @@ export async function detectLanguages(rootDir: string, options: DetectLanguagesO
 
   // No markers → fallback to TypeScript/JS for backward compatibility, with
   // Terraform beside it; Terraform alone only when there is no fallback
-  // source at all (never beside Java). Searched with the skip set of what
-  // would be returned without Terraform.
+  // source at all (never beside Java). Searched with the skip set of the
+  // result (see markerlessTerraform).
   if (present.length === 0) {
-    const base = hasJava ? javaConfig : typescriptConfig;
-    const counts = await options.searchProjectFiles([base], { count: !hasJava });
-    if (counts.terraform === 0) return [base];
-    if (hasJava || !isTerraformOnly(counts)) return [base, terraformConfig];
-    return [terraformConfig];
+    if (hasJava) {
+      const { terraform } = await options.searchProjectFiles([javaConfig], { count: false });
+      return terraform > 0 ? [javaConfig, terraformConfig] : [javaConfig];
+    }
+    const terraform = await markerlessTerraform(options.searchProjectFiles);
+    if (terraform === "none") return [typescriptConfig];
+    return terraform === "beside" ? [typescriptConfig, terraformConfig] : [terraformConfig];
   }
 
   // Stable ordering by descending file count, ties broken by the same

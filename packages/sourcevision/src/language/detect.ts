@@ -32,14 +32,13 @@ export { getLanguageConfig, languageConfigsFromIds, mergeLanguageConfigs, VALID_
  * skipped directories (base, vendored, `otherConfigs`' and Terraform's
  * `skipDirectories` and `skipUnlessContains`, the user's `extraSkipDirs`) and
  * the same `.gitignore` / `.sourcevisionignore` filter, at any depth.
- * `otherConfigs` are the languages detected without Terraform, so when
- * Terraform is added beside them the skip set equals the one the
- * analyze-phase inventory uses with the result, and the files counted are
- * the files it lists. When Terraform is detected alone (a markerless
- * repository with no fallback source) it does not: the search also
- * skipped the fallback's directories (`dist`, `build`, `coverage`, …), so a
- * file found only there is not counted. Without `count`, stops at the first
- * Terraform file.
+ * `otherConfigs` are the languages detected without Terraform (none when
+ * lang-kit checks a markerless repository as Terraform alone), so the skip
+ * set equals the one the analyze-phase inventory uses with the result, and
+ * the files counted are the files it lists: Terraform alone is never
+ * decided while its own inventory would list fallback source (`dist/` is
+ * skipped by the fallback, not by Terraform). Without `count`, stops at the
+ * first Terraform file.
  */
 async function searchProjectFiles(
   rootDir: string,

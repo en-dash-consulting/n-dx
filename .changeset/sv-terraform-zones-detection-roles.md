@@ -4,7 +4,7 @@
 
 Recognise Terraform files (`.tf`, `.tfvars`, `terragrunt.hcl`, `*.tftest.hcl`) as the Terraform language. Changes to analysis output:
 
-- Detection: Terraform is detected at any depth. Detection walks the project with the inventory's skip sets and ignore files, so a deep Terragrunt leaf such as `live/prod/us-east-1/vpc/app/terragrunt.hcl` is counted. Any of the four file kinds counts as a Terraform marker. Terraform is a secondary language unless nothing else matches.
+- Detection: Terraform is detected at any depth. Detection walks the project with the inventory's skip sets and ignore files, so a deep Terragrunt leaf such as `live/prod/us-east-1/vpc/app/terragrunt.hcl` is counted. Any of the four file kinds counts as a Terraform marker. Terraform is a secondary language unless nothing else matches. A repository with no language marker is Terraform alone only when it has no JS/TS source (or source in a language with no config), counting source under directories only JS/TS skips such as `dist/`; such source is still not inventoried.
 - `.terraform/` skip: `.terraform/` is skipped as a vendored directory in every repository. Downloaded module code in a `.terraform/` that is not gitignored (for example `.js`, `.py` or `.sh` under `.terraform/modules/`) is no longer inventoried, even in a repository with no Terraform.
 - Roles: Terraform files get the role `config`, so classification does not read them. A Terraform file under another language's test path (such as `tests/fixtures/infra/main.tf` in a TypeScript repository) gets the role `test`. A `.tftest.hcl` name alone does not make a file a test.
 - Zones: Terraform files are left out of zone detection. Adding Terraform to a repository leaves `zones.json` unchanged. The files stay in `inventory.json`.
