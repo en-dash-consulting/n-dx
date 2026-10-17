@@ -57,9 +57,9 @@ describe("readMavenBuildModels", () => {
       return model?.version;
     }
 
-    /** `a0=${a1}${a1}`, …, `a(n-1)=${an}${an}`, `an=x`: `${a0}` expands to 2^n characters. */
-    function doublingChain(n: number): Record<string, string> {
-      const props: Record<string, string> = { [`a${n}`]: "x" };
+    /** `a0=${a1}${a1}`, …, `a(n-1)=${an}${an}`, `an=base`: `${a0}` expands to 2^n copies of `base`. */
+    function doublingChain(n: number, base = "x"): Record<string, string> {
+      const props: Record<string, string> = { [`a${n}`]: base };
       for (let i = 0; i < n; i++) props[`a${i}`] = `\${a${i + 1}}\${a${i + 1}}`;
       return props;
     }
@@ -72,6 +72,11 @@ describe("readMavenBuildModels", () => {
       });
     });
 
+    // The empty base never reaches the cap, so only memoisation keeps this from 2^30 calls.
+    it("expands a doubling chain of empty values at N=30 once per property", async () => {
+      expect(await versionOf(doublingChain(30, ""), "v${a0}")).toEqual({ resolved: true, value: "v" });
+    });
+
     it("expands a doubling chain that stays within the cap", async () => {
       const n = Math.log2(MAX_PROPERTY_EXPANSION);
       expect(await versionOf(doublingChain(n), "${a0}")).toEqual({ resolved: true, value: "x".repeat(MAX_PROPERTY_EXPANSION) });
@@ -81,6 +86,7 @@ describe("readMavenBuildModels", () => {
       const long = "y".repeat(MAX_PROPERTY_EXPANSION);
       expect(await versionOf({ p: long }, "${p}")).toEqual({ resolved: true, value: long });
       expect(await versionOf({ p: long }, "-${p}")).toEqual({ resolved: false, reason: "property expansion too large" });
+      expect(await versionOf({ p: long }, "${p}-")).toEqual({ resolved: false, reason: "property expansion too large" });
       expect(await versionOf({ p: long + "y" }, "${p}")).toEqual({ resolved: false, reason: "property expansion too large" });
     });
 
