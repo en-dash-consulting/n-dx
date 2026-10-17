@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 |-------|--------|
 | [A deep Maven property chain overflows the call stack and rejects readMavenBuildModels](./a-deep-maven-property-chain-overflows.md) | completed |
 | [A failing Maven property chain is re-walked, quadratically, for every reference](./a-failing-maven-property-chain-is-re.md) | completed |
-| [A regressed backtracking regex hangs the lang-kit suite instead of failing a named test](./a-regressed-backtracking-regex-hangs.md) | pending |
+| [A regressed backtracking regex hangs the lang-kit suite instead of failing a named test](./a-regressed-backtracking-regex-hangs.md) | completed |
 | [Guard CI's grammar steps with a test and cover every group that runs a pack suite](./guard-ci-s-grammar-steps-with-a-test.md) | completed |
 | [Hold every published package to the release group, and list them in OPEN_SOURCE_SCOPE.md](./hold-every-published-package-to-the.md) | completed |
 | [Lock the pack directory for sv pack writers](./lock-the-pack-directory-for-sv-pack.md) | completed |
