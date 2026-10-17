@@ -23,15 +23,16 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Install language packs: ndx sv pack add, offline bundles and the project pack list (12b)](./install-language-packs-ndx-sv-pack-add/index.md) | completed |
 | [Java structure through tree-sitter](./java-structure-through-tree-sitter/index.md) | completed |
 | [Language pack interface inside sourcevision](./language-pack-interface-inside/index.md) | completed |
-| [Parser runtime and language packs (12a)](./parser-runtime-and-language-packs-12a/index.md) | pending |
-| [Python structure and import resolution through @n-dx/lang-python (PR 15)](./python-structure-and-import-resolution/index.md) | pending |
+| [Parser runtime and language packs (12a)](./parser-runtime-and-language-packs-12a/index.md) | completed |
+| [Python routes and outbound calls through the Python pack (PR 16)](./python-routes-and-outbound-calls/index.md) | completed |
+| [Python structure and import resolution through @n-dx/lang-python (PR 15)](./python-structure-and-import-resolution/index.md) | completed |
 | [Read Maven and Gradle build files](./read-maven-and-gradle-build-files/index.md) | completed |
 | [Resolve Go imports through the pack](./resolve-go-imports-through-the-pack/index.md) | completed |
 | [Resolve Java references to files](./resolve-java-references-to-files/index.md) | completed |
 | [Review follow-ups for language packs](./review-follow-ups-for-language-packs/index.md) | pending |
 | [Run tree-sitter grammars in Node through WASM](./run-tree-sitter-grammars-in-node/index.md) | completed |
 | [Shared language package (@n-dx/lang-kit)](./shared-language-package-n-dx-lang-kit/index.md) | completed |
-| [Spring Boot routes and outbound calls through the Java pack (PR 14)](./spring-boot-routes-and-outbound-calls/index.md) | completed |
+| [Spring Boot routes and outbound calls through the Java pack (PR 14)](./spring-boot-routes-and-outbound-calls/index.md) | pending |
 | [SQL dialects and database signals](./sql-dialects-and-database-signals/index.md) | pending |
 | [Terraform model in the Terraform pack and infrastructure.json (PR 13)](./terraform-model-in-the-terraform-pack/index.md) | completed |
 | [Terraform structure through tree-sitter-hcl](./terraform-structure-through-tree/index.md) | completed |

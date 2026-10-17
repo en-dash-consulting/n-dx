@@ -9,7 +9,7 @@ describe("@n-dx/lang-python barrel", () => {
       packageName: "@n-dx/lang-python",
       id: "python",
       config: pythonConfig,
-      produces: ["imports", "symbols", "calls"],
+      produces: ["imports", "symbols", "calls", "routes", "outboundCalls"],
     });
   });
 });

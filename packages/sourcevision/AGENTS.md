@@ -54,12 +54,14 @@ a Python repository beside TypeScript (root `pyproject.toml` and
 will load, so it leaves Python out of `analysedLanguages`; the imports phase
 adds it to inventory.json once the pack has run (`withPackAnalysedLanguages`),
 and leaves the file untouched otherwise. Its dynamic-import and past-root notices go to the same
-`warn`. `scripts/python-corpus-report.mjs` measures the pack
-over the pinned corpus (`python-corpus.json`), and
-`scripts/python-build-report.mjs` runs lang-kit's Python build readers over
-it (projects, roots, dependency counts, notices), and
-`scripts/python-resolve-report.mjs` the resolver (resolution rates by
-outcome and a hand-check sample).
+`warn`. Over the pinned corpus (`python-corpus.json`),
+`scripts/python-corpus-report.mjs` measures the pack, `python-build-report.mjs`
+lang-kit's build readers, `python-resolve-report.mjs` the resolver, and
+`python-routes-report.mjs` and `python-outbound-report.mjs` the route and
+outbound rules; the last three print a hand-check sample. With the pack, components.json gains one `serverRoutes` group per
+Python file with routes and the derived `totalServerRoutes`, and
+outbound.json one dependency per Python outbound call; no sourcevision code
+is Python-specific.
 
 ### The Terraform model in infrastructure.json
 
@@ -82,7 +84,8 @@ byte-identical. The field names await Sterling H's review (decision 3).
 ### Pack routes and outbound calls
 
 A pack producing `routes` or `outboundCalls` (Java, through its Spring Boot
-rules) is asked for them in the imports phase's one `analyzeProject` call
+rules; Python, `routes` through its FastAPI, Flask and Django rules and
+`outboundCalls` through its python-clients rules) is asked for them in the imports phase's one `analyzeProject` call
 (`PackImportsOptions.framework`), so no file is parsed twice; the facts ride
 on `AnalyzeContext.packFacts`. A run without the imports phase (`--phase`,
 `sv narrate`) reads them once with `readImportsPackFrameworkFacts`, which asks

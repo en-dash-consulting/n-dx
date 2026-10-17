@@ -31,7 +31,9 @@
           ]
         }
       ],
-      "calls": []
+      "calls": [],
+      "routes": [],
+      "outboundCalls": []
     },
     {
       "path": "src/common/helpers.py",
@@ -167,7 +169,9 @@
           "receiver": "date",
           "strings": []
         }
-      ]
+      ],
+      "routes": [],
+      "outboundCalls": []
     },
     {
       "path": "src/common/util.py",
@@ -214,7 +218,9 @@
           }
         }
       ],
-      "calls": []
+      "calls": [],
+      "routes": [],
+      "outboundCalls": []
     },
     {
       "path": "src/shop/__init__.py",
@@ -284,7 +290,9 @@
           ]
         }
       ],
-      "calls": []
+      "calls": [],
+      "routes": [],
+      "outboundCalls": []
     },
     {
       "path": "src/shop/models.pyi",
@@ -358,7 +366,9 @@
           "callee": "dataclass",
           "strings": []
         }
-      ]
+      ],
+      "routes": [],
+      "outboundCalls": []
     },
     {
       "path": "src/shop/orders.py",
@@ -1062,7 +1072,9 @@
           "receiver": "service",
           "strings": []
         }
-      ]
+      ],
+      "routes": [],
+      "outboundCalls": []
     }
   ],
   "unparsed": [],

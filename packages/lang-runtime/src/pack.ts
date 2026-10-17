@@ -118,9 +118,21 @@ export interface PackResolver {
 export interface PreparedResolver {
   /** References from a prepared file; empty for a path that was not prepared. */
   resolve(fromFile: string): FileReferences;
+  /**
+   * The project file a module names, written as an import in `fromFile`
+   * would write it (Python's `app.urls`, `.routes`); undefined when it names
+   * no project file. Absent for a language with no module names (Java).
+   */
+  module?(fromFile: string, specifier: string): string | undefined;
   /** What resolution skipped, one sentence each, reported as the pack entry's `notices`. */
   notices?(): readonly string[];
 }
+
+/**
+ * What a framework may follow across files: the pack's resolver, prepared
+ * over the whole project. Given only when the pack has a resolver.
+ */
+export type FrameworkContext = Pick<PreparedResolver, "resolve" | "module">;
 
 /** What a framework reads from a project: facts per file path, and what it skipped. */
 export interface FrameworkFacts {
@@ -146,8 +158,11 @@ export interface FrameworkPack extends FactProducer {
   /**
    * Read every parsed file's captures (the language pack's and this
    * framework's) into the wanted kinds it produces. Called once per analysis.
+   * `context` follows a reference into another file (FastAPI's
+   * `include_router(items.router)`); a framework that reads one file at a
+   * time ignores it.
    */
-  read(files: readonly PackSourceFile[], kinds: readonly FactKind[]): FrameworkFacts;
+  read(files: readonly PackSourceFile[], kinds: readonly FactKind[], context?: FrameworkContext): FrameworkFacts;
 }
 
 /** Reserved: an optional precise (SCIP) index tier. Not implemented yet. */

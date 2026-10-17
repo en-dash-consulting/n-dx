@@ -26,6 +26,18 @@
       "shape": "FastAPI backend beside a TypeScript frontend"
     },
     {
+      "name": "ctfd",
+      "url": "https://github.com/CTFd/CTFd.git",
+      "sha": "28dee71cd24ee12f817bab5b5eea82769235e1f1",
+      "shape": "Flask application, blueprints across modules"
+    },
+    {
+      "name": "dispatch",
+      "url": "https://github.com/Netflix/dispatch.git",
+      "sha": "dd2837e82a0bf5565b1b4b4b91ea30b7262d4061",
+      "shape": "FastAPI application, routers included across modules and a mounted API"
+    },
+    {
       "name": "home-assistant-core",
       "url": "https://github.com/home-assistant/core.git",
       "sha": "e92f1bfeca5a9fb31f9c43c07094b4a649757649",

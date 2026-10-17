@@ -11,7 +11,11 @@
 import { join } from "node:path";
 import { pythonConfig } from "@n-dx/lang-kit";
 import type { LanguagePack, RuleProvenance } from "@n-dx/lang-runtime";
+import { django } from "./django.js";
+import { fastapi } from "./fastapi.js";
+import { flask } from "./flask.js";
 import { PYTHON_PACKAGE } from "./package-paths.js";
+import { pythonClients } from "./python-clients.js";
 import { pythonResolver } from "./python-resolver.js";
 import { PYTHON_STDLIB_PROVENANCE } from "./python-stdlib.js";
 
@@ -44,7 +48,9 @@ export const pythonPack: LanguagePack = {
     return QUERY_NAMES.map((name) => ({ name, path: queryPath(`${name}.scm`) }));
   },
   resolver: pythonResolver,
-  produces: ["imports", "symbols", "calls"],
+  // Routes and outbound calls come from the framework packs, whose queries run only when those kinds are wanted.
+  produces: ["imports", "symbols", "calls", "routes", "outboundCalls"],
+  frameworks: [fastapi, flask, django, pythonClients],
   provenance: {
     ...Object.fromEntries(QUERY_NAMES.map((name) => [name, VERIFIED])),
     // What makes an import conditional: `typing.TYPE_CHECKING` is false at run time.
