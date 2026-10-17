@@ -75,12 +75,12 @@ describe("Python imports", () => {
     // A lone file at the root: nothing is a project module, and its relative imports climb past the root.
     expect(imports?.files).toEqual([]);
     expect(imports?.external.map((e) => [e.package, e.symbols])).toEqual([
-      ["a", ["*"]],
-      ["d", ["*"]],
-      ["e", ["g", "h"]],
-      ["j", ["*"]],
-      ["k", ["*"]],
-      ["l", ["m"]],
+      ["python:a", ["*"]],
+      ["python:d", ["*"]],
+      ["python:e", ["g", "h"]],
+      ["python:j", ["*"]],
+      ["python:k", ["*"]],
+      ["python:l", ["m"]],
     ]);
     expect(imports?.written?.map((w) => [w.specifier, w.names])).toEqual([
       ["a.b", []],
@@ -258,8 +258,8 @@ describe("Python pack entry", () => {
       ["app/types.pyi", []],
     ]);
     expect(result.facts.map((f) => [f.path, f.imports?.files, f.imports?.external.map((e) => e.package)])).toEqual([
-      ["app/main.py", [{ to: "app/util.py", symbols: ["helper"] }], ["stdlib:importlib"]],
-      ["app/util.py", [], ["stdlib:importlib"]],
+      ["app/main.py", [{ to: "app/util.py", symbols: ["helper"] }], ["python:stdlib:importlib"]],
+      ["app/util.py", [], ["python:stdlib:importlib"]],
       ["app/types.pyi", [], []],
     ]);
     expect(result.notices).toEqual([

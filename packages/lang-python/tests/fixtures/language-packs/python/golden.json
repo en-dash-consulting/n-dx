@@ -2906,13 +2906,13 @@
       "files": [],
       "external": [
         {
-          "package": "stdlib:datetime",
+          "package": "python:stdlib:datetime",
           "symbols": [
             "date"
           ]
         },
         {
-          "package": "stdlib:re",
+          "package": "python:stdlib:re",
           "symbols": [
             "*"
           ]
@@ -2989,7 +2989,7 @@
       "files": [],
       "external": [
         {
-          "package": "stdlib:dataclasses",
+          "package": "python:stdlib:dataclasses",
           "symbols": [
             "dataclass"
           ]
@@ -3033,87 +3033,87 @@
       ],
       "external": [
         {
-          "package": "lxml",
+          "package": "python:lxml",
           "symbols": [
             "etree"
           ]
         },
         {
-          "package": "orjson",
+          "package": "python:orjson",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "stdlib:collections",
+          "package": "python:stdlib:collections",
           "symbols": [
             "OrderedDict",
             "defaultdict"
           ]
         },
         {
-          "package": "stdlib:decimal",
+          "package": "python:stdlib:decimal",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "stdlib:functools",
+          "package": "python:stdlib:functools",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "stdlib:importlib",
+          "package": "python:stdlib:importlib",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "stdlib:json",
+          "package": "python:stdlib:json",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "stdlib:os",
+          "package": "python:stdlib:os",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "stdlib:shutil",
+          "package": "python:stdlib:shutil",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "stdlib:tomllib",
+          "package": "python:stdlib:tomllib",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "stdlib:typing",
+          "package": "python:stdlib:typing",
           "symbols": [
             "*",
             "TYPE_CHECKING"
           ]
         },
         {
-          "package": "stdlib:xml",
+          "package": "python:stdlib:xml",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "ujson",
+          "package": "python:ujson",
           "symbols": [
             "*"
           ]
         },
         {
-          "package": "yaml",
+          "package": "python:yaml",
           "symbols": [
             "CSafeLoader",
             "SafeLoader"
