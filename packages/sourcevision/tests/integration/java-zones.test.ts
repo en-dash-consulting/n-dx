@@ -119,17 +119,16 @@ describe("Java analyze pipeline — Spring Boot-style fixture", () => {
     });
     afterAll(() => rmSync(packDir, { recursive: true, force: true }));
 
-    it("leaves Java inventory-only with a single message naming the install command, and still succeeds", async () => {
+    it("leaves Java inventory-only, only suggesting the unlisted pack, and still succeeds", async () => {
       const messages: string[] = [];
+      const suggested: string[] = [];
       const imports = await analyzeImports(FIXTURE, inventory, {
         language: "java",
-        packs: { packs: [NOT_INSTALLED_JAVA], loader: { packDir }, warn: (m) => messages.push(m) },
+        packs: { packs: [NOT_INSTALLED_JAVA], loader: { packDir }, warn: (m) => messages.push(m), suggest: (id) => suggested.push(id) },
       });
 
-      expect(messages).toEqual([
-        `Java: pack @n-dx/lang-java is not installed; Java files get inventory only. ` +
-          "Install it with `ndx sv pack add java`.",
-      ]);
+      expect(messages).toEqual([]);
+      expect(suggested).toEqual(["java"]);
       expect(imports.edges).toEqual([]);
       expect(imports.external).toEqual([]);
 

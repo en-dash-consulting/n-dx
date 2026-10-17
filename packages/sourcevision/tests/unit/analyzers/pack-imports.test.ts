@@ -31,6 +31,7 @@ function knownPack(config: typeof javaConfig, found: { entry?: LanguagePackEntry
     id: config.id,
     packageName: `@n-dx/lang-${config.id}`,
     config,
+    bundled: KNOWN_PACKS.find((p) => p.id === config.id)?.bundled,
     importByResolution: () => (found.error ? Promise.reject(found.error) : Promise.resolve({ pack: found.entry })),
   };
 }
@@ -76,15 +77,21 @@ describe("buildPackImportGraph", () => {
   });
   afterAll(() => rmSync(packDir, { recursive: true, force: true }));
 
-  const run = (files: string[], packs: KnownPack[], extra: { fallbacks?: ReadonlyMap<string, string> } = {}) => {
+  const run = (
+    files: string[],
+    packs: KnownPack[],
+    extra: { fallbacks?: ReadonlyMap<string, string>; listed?: readonly string[] } = {},
+  ) => {
     const messages: string[] = [];
+    const suggested: string[] = [];
     const graph = buildPackImportGraph(files.map(file), "/project", {
       packs,
       loader: { packDir, version: VERSION },
       warn: (m) => messages.push(m),
+      suggest: (id) => suggested.push(id),
       ...extra,
     });
-    return graph.then((g) => ({ graph: g, messages }));
+    return graph.then((g) => ({ graph: g, messages, suggested }));
   };
 
   it("loads no pack, and reports nothing, when no file belongs to one", async () => {
@@ -154,29 +161,54 @@ describe("buildPackImportGraph", () => {
     expect(messages).toEqual([]);
   });
 
-  it("reports a missing pack once, however many files, naming the install command, and produces no edges", async () => {
-    const { graph, messages } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })]);
+  it("only suggests a missing opt-in pack the project does not list: no warning, no edges", async () => {
+    const { graph, messages, suggested } = await run(["src/A.java", "src/B.java"], [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })]);
+    expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
+    expect(messages).toEqual([]);
+    expect(suggested).toEqual(["java"]);
+  });
+
+  it("warns once, however many files, naming the install command, about a missing pack the project lists", async () => {
+    const { graph, messages, suggested } = await run(
+      ["src/A.java", "src/B.java"],
+      [knownPack(javaConfig, { error: notInstalled("@n-dx/lang-java") })],
+      { listed: ["java"] },
+    );
     expect(graph).toEqual({ edges: [], external: [], degraded: ["java"] });
     expect(messages).toEqual([
       "Java: pack @n-dx/lang-java is not installed; Java files get inventory only. " +
         "Install it with `ndx sv pack add java`.",
     ]);
+    expect(suggested).toEqual([]);
   });
 
-  it("names the caller's fallback parser, not inventory-only, for a pack that has one", async () => {
-    const { graph, messages } = await run(["a.go"], [knownPack(goConfig, { error: notInstalled("@n-dx/lang-go") })], { fallbacks: GO_FALLBACK });
+  it("warns about a missing bundled Go pack, naming the caller's fallback parser, and never suggests it", async () => {
+    const { graph, messages, suggested } = await run(["a.go"], [knownPack(goConfig, { error: notInstalled("@n-dx/lang-go") })], { fallbacks: GO_FALLBACK });
     expect(graph.degraded).toEqual(["go"]);
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain("Go imports come from the regex import parser");
     expect(messages[0]).not.toContain("inventory only");
+    expect(suggested).toEqual([]);
+  });
+
+  it("warns, and does not suggest, an unlisted pack that is installed but exports no pack entry", async () => {
+    const { graph, messages, suggested } = await run(["src/A.java"], [knownPack(javaConfig, {})]);
+    expect(graph.degraded).toEqual(["java"]);
+    expect(messages).toEqual([
+      "Java: pack @n-dx/lang-java could not be loaded (it exports no java pack entry); Java files get inventory only. " +
+        "Reinstall it with `ndx sv pack add java`.",
+    ]);
+    expect(suggested).toEqual([]);
   });
 
   it("refuses a pack of another version with one notice", async () => {
     const entry = { ...stubEntry(javaConfig, { facts: [], unparsed: [] }), version: "1.0.0" };
-    const { graph, messages } = await run(["src/A.java"], [knownPack(javaConfig, { entry })]);
+    const { graph, messages, suggested } = await run(["src/A.java"], [knownPack(javaConfig, { entry })]);
     expect(graph.degraded).toEqual(["java"]);
     expect(messages).toHaveLength(1);
     expect(messages[0]).toContain(`pack @n-dx/lang-java@1.0.0 does not match @n-dx/sourcevision@${VERSION}`);
+    // Refused, not missing: unlisted or not, it is warned about.
+    expect(suggested).toEqual([]);
   });
 
   it("degrades, with one notice and without running it, a pack whose produces omits imports", async () => {

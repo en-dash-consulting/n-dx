@@ -47,7 +47,14 @@ interface Stub {
 }
 
 /** A Terraform pack answering with `facts`, or whose import or run fails as asked. */
-function stubPack(found: { facts?: FileFacts[]; result?: PackProjectResult; importError?: Error; runError?: Error; produces?: LanguagePackEntry["produces"] }): Stub {
+function stubPack(found: {
+  facts?: FileFacts[];
+  result?: PackProjectResult;
+  importError?: Error;
+  runError?: Error;
+  produces?: LanguagePackEntry["produces"];
+  version?: string;
+}): Stub {
   const stub: Stub = {
     requests: [],
     imports: 0,
@@ -60,7 +67,7 @@ function stubPack(found: { facts?: FileFacts[]; result?: PackProjectResult; impo
         if (found.importError) return Promise.reject(found.importError);
         const entry: LanguagePackEntry = {
           packageName: "@n-dx/lang-terraform",
-          version: VERSION,
+          version: found.version ?? VERSION,
           id: terraformConfig.id,
           config: terraformConfig,
           produces: found.produces ?? ["resources"],
@@ -96,14 +103,17 @@ describe("enrichTerraformInfrastructure", () => {
   });
   afterAll(() => rmSync(packDir, { recursive: true, force: true }));
 
-  const run = (input: InfrastructureData, stub: Stub, paths: readonly string[] = PATHS) => {
+  const run = (input: InfrastructureData, stub: Stub, paths: readonly string[] = PATHS, listed = false) => {
     const messages: string[] = [];
+    const suggested: string[] = [];
     const result = enrichTerraformInfrastructure(input, "/project", paths, {
       pack: stub.pack,
       loader: { packDir, version: VERSION },
       warn: (m) => messages.push(m),
+      suggest: (id) => suggested.push(id),
+      listed,
     });
-    return result.then((out) => ({ out, messages }));
+    return result.then((out) => ({ out, messages, suggested }));
   };
 
   it("adds the model's fields to the resource declared at the same file and address", async () => {
@@ -250,13 +260,31 @@ describe("enrichTerraformInfrastructure", () => {
     expect(out.resources[1]).toEqual({ ...OTHER_BUCKET, module: "module.store" });
   });
 
-  it("returns the data untouched, with one notice, when the pack is missing", async () => {
+  it("returns the data untouched and only suggests the pack when it is missing and not listed", async () => {
     const input = data([DB]);
-    const { out, messages } = await run(input, stubPack({ importError: notInstalled }));
+    const { out, messages, suggested } = await run(input, stubPack({ importError: notInstalled }));
+    expect(out).toBe(input);
+    expect(messages).toEqual([]);
+    expect(suggested).toEqual(["terraform"]);
+  });
+
+  it("returns the data untouched, with one notice, when the pack is listed but missing", async () => {
+    const input = data([DB]);
+    const { out, messages, suggested } = await run(input, stubPack({ importError: notInstalled }), PATHS, true);
     expect(out).toBe(input);
     expect(messages).toEqual([
       "Terraform: pack @n-dx/lang-terraform is not installed; infrastructure.json gets no Terraform model fields. Install it with `ndx sv pack add terraform`.",
     ]);
+    expect(suggested).toEqual([]);
+  });
+
+  it("warns, and does not suggest, when an unlisted pack is of another version", async () => {
+    const input = data([DB]);
+    const { out, messages, suggested } = await run(input, stubPack({ version: "1.0.0" }));
+    expect(out).toBe(input);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain(`pack @n-dx/lang-terraform@1.0.0 does not match @n-dx/sourcevision@${VERSION} and was not used`);
+    expect(suggested).toEqual([]);
   });
 
   it("does not load the pack, or say anything, when no listed resource is declared in Terraform", async () => {

@@ -58,6 +58,7 @@ import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers
 import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
 import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers/inventory.js";
 import { SV_CACHE_DIRNAME } from "../../paths.js";
+import { KNOWN_PACKS } from "../../language/pack-loader.js";
 
 /**
  * Machine-local record of the {@link inventoryFingerprint} the last inventory
@@ -94,6 +95,22 @@ export interface AnalyzeContext {
    * in the call that reads imports; read on demand when it did not run.
    */
   packFacts?: PackFrameworkFacts;
+  /**
+   * Ids of opt-in packs that would help this repo but are neither listed nor
+   * installed. Phases only record them; analyze names them in one line at the end.
+   */
+  suggestedPacks?: Set<string>;
+}
+
+/** Record `packId` as an optional pack for this run's end-of-run line. */
+export function suggestPack(ctx: AnalyzeContext, packId: string): void {
+  (ctx.suggestedPacks ??= new Set()).add(packId);
+}
+
+/** The one line naming the run's suggested packs, in analysis order; undefined when there are none. */
+export function optionalPacksLine(ctx: AnalyzeContext): string | undefined {
+  const ids = KNOWN_PACKS.map((p) => p.id).filter((id) => ctx.suggestedPacks?.has(id));
+  return ids.length === 0 ? undefined : `Optional packs for this repo: ${ids.join(", ")} — ndx sv pack add <id>`;
 }
 
 /**
@@ -217,6 +234,7 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
       packs: {
         framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls }) => ({ path, routes, outboundCalls }))),
         analysed: (id) => analysedPacks.push(id),
+        suggest: (id) => suggestPack(ctx, id),
       },
     });
     ctx.packFacts = packFacts;

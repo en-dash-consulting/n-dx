@@ -789,7 +789,7 @@ export async function analyzeImports(
     await noticeListedPacks(listedPacks, withFiles, { loader: options?.packs?.loader, warn: options?.packs?.warn });
   }
   if (packFiles.length > 0) {
-    const graph = await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs, fallbacks: PACK_FALLBACKS });
+    const graph = await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs, fallbacks: PACK_FALLBACKS, listed: listedPacks ?? [] });
     mergeGraph(graph, edgeMap, externalMap);
     // Go must never drop to inventory-only: a degraded Go pack hands every Go
     // file (all of them are in the changed set) to the regex parser.

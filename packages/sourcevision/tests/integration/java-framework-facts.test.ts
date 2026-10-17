@@ -95,13 +95,14 @@ describe("Java routes and outbound calls in serverRoutes and outbound.json", () 
   async function pipeline(java: KnownPack) {
     const facts: FileFacts[] = [];
     const messages: string[] = [];
+    const suggested: string[] = [];
     const imports = await analyzeImports(dir, inventory, {
       language: "java",
-      packs: { packs: [java], warn: (m) => messages.push(m), framework: (f) => facts.push(...f) },
+      packs: { packs: [java], warn: (m) => messages.push(m), suggest: (id) => suggested.push(id), framework: (f) => facts.push(...f) },
     });
     const components = await analyzeComponents(dir, inventory, imports, { packFacts: facts });
     const outbound = withPackOutbound(await detectOutbound(dir, inventory), inventory, facts);
-    return { components, outbound, messages };
+    return { components, outbound, messages, suggested };
   }
 
   it("parses each Java file once and records controller routes and non-test outbound calls", async (ctx) => {
@@ -177,10 +178,12 @@ describe("Java routes and outbound calls in serverRoutes and outbound.json", () 
   });
 
   it("without the Java pack, records exactly what the detectors alone do", async () => {
-    const { components, outbound, messages } = await pipeline(NOT_INSTALLED_JAVA);
+    const { components, outbound, messages, suggested } = await pipeline(NOT_INSTALLED_JAVA);
     const imports = await analyzeImports(dir, inventory, { language: "java", packs: { packs: [NOT_INSTALLED_JAVA], warn: () => {} } });
     expect(components).toEqual(await analyzeComponents(dir, inventory, imports));
     expect(outbound).toEqual(await detectOutbound(dir, inventory));
-    expect(messages).toHaveLength(1);
+    // Not listed: only suggested, never warned about.
+    expect(messages).toEqual([]);
+    expect(suggested).toEqual(["java"]);
   });
 });
