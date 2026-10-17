@@ -15,7 +15,8 @@ import { join } from "node:path";
 import { grammarSuites, needsGrammars } from "../../scripts/grammar-suites.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
-const CI = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf-8");
+// A Windows checkout (core.autocrlf=true) gives ci.yml CRLF line endings.
+const CI = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf-8").replace(/\r\n/g, "\n");
 const RUNNER = "scripts/run-all-tests.mjs";
 const DECIDER = "scripts/grammar-suites.mjs";
 
@@ -25,7 +26,7 @@ const unquote = (value) => value.trim().replace(/^(['"])(.*)\1$/, "$2");
 
 /** `{ name: lines }` for each job under the top-level `jobs:`. */
 function parseJobs(text) {
-  const lines = text.split("\n");
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
   const start = lines.findIndex((l) => /^jobs:\s*$/.test(l));
   if (start < 0) throw new Error("ci.yml has no top-level `jobs:`");
   const jobs = {};
@@ -188,6 +189,10 @@ function stepRuns(step, steps, combo, where) {
   if (!call || !decider.run.includes("GITHUB_OUTPUT")) {
     throw new Error(`${where}: step ${id} must write ${name}=$(node ${DECIDER} <suites>) to $GITHUB_OUTPUT`);
   }
+  // An empty or stray answer would skip the grammar steps and leave CI green.
+  if (!/true\|false\)/.test(decider.run) || !/exit 1/.test(decider.run)) {
+    throw new Error(`${where}: step ${id} must fail unless ${DECIDER} prints true or false`);
+  }
   return needsGrammars(call[1]);
 }
 
@@ -264,7 +269,10 @@ describe("the guard itself", () => {
     "      - name: Decide",
     "        id: grammars",
     "        shell: bash",
-    '        run: echo "build=$(node scripts/grammar-suites.mjs ${{ matrix.suites }})" >> "$GITHUB_OUTPUT"',
+    "        run: |",
+    "          build=$(node scripts/grammar-suites.mjs ${{ matrix.suites }})",
+    `          case "$build" in true|false) ;; *) exit 1 ;; esac`,
+    '          echo "build=$build" >> "$GITHUB_OUTPUT"',
   ];
   const GUARDED = [
     "      - name: Build tree-sitter grammars",
@@ -317,6 +325,20 @@ describe("the guard itself", () => {
     const problems = problemsOf(job([...bySuite, ...RUN].join("\n") + "\n", MATRIX));
     expect(problems).toHaveLength(4);
     expect(problems.join("\n")).toContain('"group":"one"');
+  });
+
+  it("reads a CRLF workflow the same as an LF one", () => {
+    const text = job([...DECIDE, ...RUN, ...GUARDED].join("\n") + "\n", MATRIX);
+    expect(problemsOf(text.replace(/\n/g, "\r\n"))).toEqual(problemsOf(text));
+    expect(problemsOf(text)).toHaveLength(4);
+  });
+
+  it("refuses a decider that does not fail on an empty answer", () => {
+    const unchecked = [
+      ...DECIDE.slice(0, 3),
+      '        run: echo "build=$(node scripts/grammar-suites.mjs ${{ matrix.suites }})" >> "$GITHUB_OUTPUT"',
+    ];
+    expect(() => problemsOf(job([...unchecked, ...GUARDED, ...RUN].join("\n") + "\n", MATRIX))).toThrow(/must fail unless/);
   });
 
   it("refuses an if: it cannot evaluate", () => {

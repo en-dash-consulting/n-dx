@@ -410,7 +410,12 @@ jobs:
       - name: Decide whether this group needs grammars
         id: grammars
         shell: bash
-        run: echo "build=$(node scripts/grammar-suites.mjs ${{ matrix.suites }})" >> "$GITHUB_OUTPUT"
+        # Fail on anything but true/false: an empty answer would skip the
+        # grammar steps below and leave every grammar test skipping, green.
+        run: |
+          build=$(node scripts/grammar-suites.mjs ${{ matrix.suites }})
+          case "$build" in true|false) ;; *) echo "grammar-suites.mjs printed '$build'"; exit 1 ;; esac
+          echo "build=$build" >> "$GITHUB_OUTPUT"
 
       - name: Cache grammar build downloads
         if: steps.grammars.outputs.build == 'true'
