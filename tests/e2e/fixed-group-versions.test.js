@@ -5,6 +5,10 @@
  * package left behind (a new package added at the previous release's version,
  * say) is published at a version its siblings never had, and the release tags
  * stop lining up. This test names the odd one out.
+ *
+ * It also checks the reverse: every published (non-private) workspace package
+ * is in some fixed group. A new package left out of `.changeset/config.json`
+ * is versioned on its own, and RELEASING.md's single version line is false.
  */
 
 import { describe, it, expect } from "vitest";
@@ -14,20 +18,46 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dirname, "../..");
 const CONFIG = JSON.parse(readFileSync(join(ROOT, ".changeset/config.json"), "utf8"));
 
-/** Workspace package name → version, read from packages/<dir>/package.json. */
-function workspaceVersions() {
-  const versions = new Map();
+/** Every packages/<dir>/package.json, parsed. */
+function workspacePackages() {
+  const packages = [];
   for (const dir of readdirSync(join(ROOT, "packages"))) {
     const path = join(ROOT, "packages", dir, "package.json");
     if (!existsSync(path)) continue;
-    const pkg = JSON.parse(readFileSync(path, "utf8"));
-    versions.set(pkg.name, pkg.version);
+    packages.push(JSON.parse(readFileSync(path, "utf8")));
   }
-  return versions;
+  return packages;
+}
+
+/** Names of the non-private packages that no fixed group lists, sorted. */
+function publishedOutsideFixed(packages, fixed) {
+  const grouped = new Set((fixed ?? []).flat());
+  return packages
+    .filter((pkg) => pkg.private !== true && !grouped.has(pkg.name))
+    .map((pkg) => pkg.name)
+    .sort();
 }
 
 describe("changesets fixed groups", () => {
-  const versions = workspaceVersions();
+  const packages = workspacePackages();
+  const versions = new Map(packages.map((pkg) => [pkg.name, pkg.version]));
+
+  it("holds every published workspace package to a fixed group", () => {
+    expect(
+      publishedOutsideFixed(packages, CONFIG.fixed),
+      "non-private packages in no .changeset/config.json fixed group; add them to one",
+    ).toEqual([]);
+  });
+
+  it("names a published package left out of the fixed groups, and skips private ones", () => {
+    const pkgs = [
+      { name: "@n-dx/core" },
+      { name: "@n-dx/lang-rust" },
+      { name: "@n-dx/scratch", private: true },
+    ];
+    expect(publishedOutsideFixed(pkgs, [["@n-dx/core"]])).toEqual(["@n-dx/lang-rust"]);
+    expect(publishedOutsideFixed(pkgs, undefined)).toEqual(["@n-dx/core", "@n-dx/lang-rust"]);
+  });
 
   it("declares at least one fixed group", () => {
     expect(CONFIG.fixed?.length ?? 0).toBeGreaterThan(0);
