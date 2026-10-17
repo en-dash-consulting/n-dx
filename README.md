@@ -467,6 +467,11 @@ configured `apiKeyEnv` (default `GEMINI_API_KEY`), and with
 `GOOGLE_GENAI_USE_VERTEXAI` on, `GOOGLE_API_KEY`,
 `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` and
 `GOOGLE_CLOUD_LOCATION`.
+Which variable is sent as the key (`llm.google.apiKeyEnv`) and where a key is
+sent (`api_endpoint` for any vendor) are honoured from your git-ignored
+`.n-dx.local.json` always, and from the shared `.n-dx.json` only after you
+trust the repository (`ndx trust accept .`), so a cloned repository cannot
+send `GITHUB_TOKEN` to a host it chose.
 Home, PATH, proxy and CA plumbing still passes unless explicitly denied.
 Other tokens must be explicitly allowed.
 

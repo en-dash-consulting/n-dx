@@ -210,7 +210,12 @@ const VENDOR_ENV: Record<LLMVendor, VendorEnvSpec> = {
     configKey: (config) => config.codex?.api_key,
   },
   [LLM_VENDOR.GOOGLE]: {
-    // A custom apiKeyEnv is an exact name, so it cannot widen credential access.
+    // A custom apiKeyEnv widens credential access by the one exact name it
+    // gives (never a glob). loadLLMConfig takes it from the user's
+    // .n-dx.local.json, or from the project config only once the user has
+    // trusted the repository (credential-routing.ts), so a cloned repository
+    // cannot name GITHUB_TOKEN here. A caller building an LLMConfig by hand
+    // owns that rule.
     keyEnv: (config) => config.google?.apiKeyEnv ?? "GEMINI_API_KEY",
     authNames: [],
     configKey: (config) => config.google?.api_key,

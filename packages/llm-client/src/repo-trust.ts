@@ -262,6 +262,12 @@ export interface RepoExecutionConfig {
    * applies the same policy the agent's shell does.
    */
   envDeny: string[];
+  /**
+   * The project config's {@link CREDENTIAL_ROUTING_FIELDS} that are set, as
+   * `path = value`, sorted: where an API key is sent, and which variable is
+   * sent as one.
+   */
+  credentialRouting: string[];
   permissionMode: string | null;
   provider: string | null;
   /** The project config's `rex.test`, else `.rex/config.json` → `test`: the command rex runs. */
@@ -269,6 +275,42 @@ export interface RepoExecutionConfig {
   mcpServers: RepoMcpServer[];
   /** sha256 over the canonical JSON of everything above except `sources`, `detectedLanguage` and `envDeny`. */
   digest: string;
+}
+
+/**
+ * Project-config fields that decide where an API key is sent or which
+ * environment variable is sent as one. A repository that sets them could
+ * point the key at its own host, or name `GITHUB_TOKEN` as the Google key, so
+ * the project config's values apply only once the user has trusted it; the
+ * user's `.n-dx.local.json` always applies. See `credential-routing.ts`.
+ */
+export const CREDENTIAL_ROUTING_FIELDS: readonly (readonly string[])[] = [
+  ["claude", "api_endpoint"],
+  ["llm", "claude", "api_endpoint"],
+  ["llm", "codex", "api_endpoint"],
+  ["llm", "google", "api_endpoint"],
+  ["llm", "google", "apiKeyEnv"],
+];
+
+function fieldAt(root: Record<string, unknown>, path: readonly string[]): unknown {
+  let node: unknown = root;
+  for (const key of path) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return undefined;
+    node = (node as Record<string, unknown>)[key];
+  }
+  return node;
+}
+
+/** The {@link CREDENTIAL_ROUTING_FIELDS} a config object sets, as sorted `path = value` lines. */
+export function credentialRoutingIn(config: Record<string, unknown> | null): string[] {
+  if (!config) return [];
+  const out: string[] = [];
+  for (const path of CREDENTIAL_ROUTING_FIELDS) {
+    const value = fieldAt(config, path);
+    // Every reader skips an empty string, so it routes nothing.
+    if (typeof value === "string" && value) out.push(`${path.join(".")} = ${value}`);
+  }
+  return out.sort();
 }
 
 function readJson(path: string): Record<string, unknown> | null {
@@ -350,7 +392,8 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     ? (projectConfig.rex as Record<string, unknown>)
     : null;
   const projectTest = projectRex ? optionalString(projectRex.test) : null;
-  if (projectTest && !projectHench) sources.push(relOf(root, layout.configFile));
+  const credentialRouting = credentialRoutingIn(projectConfig);
+  if ((projectTest || credentialRouting.length) && !projectHench) sources.push(relOf(root, layout.configFile));
 
   const mcpPath = join(root, ".mcp.json");
   const mcpConfig = readJson(mcpPath);
@@ -384,6 +427,8 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     // move every existing digest on upgrade, and a repository trusted before
     // this field existed would read as `changed` with nothing having changed.
     ...(envAllow.length ? { envAllow: [...envAllow].sort() } : {}),
+    // Present only when set, for the same reason.
+    ...(credentialRouting.length ? { credentialRouting } : {}),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
     testCommand: projectTest ?? optionalString(rexConfig?.test),
@@ -397,6 +442,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     guard,
     envAllow: [...envAllow].sort(),
     envDeny: [...envDeny].sort(),
+    credentialRouting,
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
 }
@@ -409,6 +455,7 @@ export type RepoTrustFindingCode =
   | "blocked-paths-removed"
   | "git-subcommands-added"
   | "env-allow-added"
+  | "credential-routing"
   | "permission-bypass"
   | "test-command"
   | "mcp-servers"
@@ -526,6 +573,15 @@ export function assessRepoExecutionConfig(config: RepoExecutionConfig): RepoTrus
         values: [],
       });
     }
+  }
+
+  if (config.credentialRouting.length) {
+    findings.push({
+      code: "credential-routing",
+      severity: "warning",
+      message: `Chooses where API keys are sent, or which variable is sent as one: ${config.credentialRouting.join(", ")}`,
+      values: [...config.credentialRouting],
+    });
   }
 
   if (config.permissionMode === "bypassPermissions") {
@@ -835,7 +891,8 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
 
   if (ev.restricted) {
     lines.push("  Until trusted, hench runs with the default guard (the repository's config can only tighten it),");
-    lines.push("  bypassPermissions is lowered to acceptEdits, and verify_criteria does not run the test command.");
+    lines.push("  bypassPermissions is lowered to acceptEdits, verify_criteria does not run the test command,");
+    lines.push("  and the project config's API endpoints and API key variables are ignored.");
     lines.push(`  To accept this configuration: ${accept}`);
   }
   return lines;
