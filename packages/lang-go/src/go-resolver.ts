@@ -28,9 +28,12 @@
  *   gitea.dev/actionslib` in `module gitea.dev`) is third-party, as in Go's
  *   longest-module-prefix rule, where the regex parser emits an edge to a
  *   project directory that does not exist;
- * - an import inside a project module whose directory holds no .go file
- *   (parsed, or passed as unparsed: oversized, unreadable) is dropped, where
- *   the regex parser emits an edge to a node that does not exist;
+ * - an import inside a project module whose directory holds no inventoried
+ *   .go file (parsed, or passed as unparsed: oversized, unreadable), such as
+ *   a local replace into a `third_party/`, `build/` or gitignored directory
+ *   the inventory skips, is an external package attributed to its `require`,
+ *   where the regex parser emits an edge to a node that does not exist (or an
+ *   external for a replaced module);
  * - the module's root package (directory "") targets its non-test files,
  *   because an edge to "" matches no file downstream.
  *
@@ -317,7 +320,11 @@ function resolveFile(index: Index, file: PackSourceFile): FileReferences {
       const rest = imp.path.slice(root.path.length + 1);
       const dir = root.dir === "" ? rest : rest === "" ? root.dir : `${root.dir}/${rest}`;
       const members = index.packages.get(dir);
-      if (!members) continue; // no .go file there: no edge to a node that does not exist
+      // No inventoried .go file there, so no node to point at: keep the import as an external.
+      if (!members) {
+        out.externalPackage(imp.path, module);
+        continue;
+      }
       const symbol = imp.alias ?? "*";
       if (dir !== "") out.file(dir, symbol);
       else for (const member of members) if (!isTestFile(member)) out.file(member, symbol);
