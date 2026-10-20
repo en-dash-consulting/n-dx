@@ -29,7 +29,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
-| [Bound the inflated size of an sv pack bundle before reading it](./bound-the-inflated-size-of-an-sv-pack.md) | pending |
+| [Bound the inflated size of an sv pack bundle before reading it](./bound-the-inflated-size-of-an-sv-pack.md) | completed |
 | [Contain build-file read failures in the Java resolver's forProject](./contain-build-file-read-failures-in.md) | completed |
 | [Correct the language-pack release notes before the stack merges](./correct-the-language-pack-release.md) | completed |
 | [Count fallback source with the skip set of the Terraform-alone result](./count-fallback-source-with-the-skip.md) | completed |
