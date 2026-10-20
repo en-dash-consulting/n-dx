@@ -1,0 +1,25 @@
+---
+id: "88ad9a97-638a-4f7c-81d3-23ff4d6aa53d"
+level: "task"
+title: "toml-lite accepts [[a]] and [a] headers that extend a static array or an inline table"
+status: "completed"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "lang-kit"
+source: "ndx-adversarial-review"
+startedAt: "2026-10-15T22:45:41.690Z"
+completedAt: "2026-10-15T22:45:41.690Z"
+endedAt: "2026-10-15T22:45:41.690Z"
+resolutionType: "code-change"
+resolutionDetail: "tableArrays now filled by appendTable and required by appendTable and descend; tests in lang-kit tests/unit/toml-lite.test.ts. Fixed within task 203cd7bb."
+acceptanceCriteria:
+  - "parseToml(\"a = [1]\\n[[a]]\\nx = 1\\n\") throws TomlSyntaxError"
+  - "parseToml(\"a = [{x = 1}]\\n[a]\\ny = 2\\n\") throws TomlSyntaxError"
+  - "[[a]] followed by [a.b] still descends into the last table of a (regression test)"
+  - "The tableArrays field is used by appendTable and descend, or removed"
+description: "Found by an adversarial review of task 203cd7bb (verdict: should-fix).\n\nFailure: packages/lang-kit/src/toml-lite.ts. `appendTable` checks only `Array.isArray(list)`, and `descend` walks into any array whose last item is a table. As a result, `a = [1]\\n[[a]]\\nx = 1` parses as `{a: [1, {x: 1}]}`, and `a = [{x = 1}]\\n[a]\\ny = 2` adds `y` to the inline table. TOML forbids both. Valid files are unaffected; a malformed pyproject.toml or Gradle catalog is misread silently instead of producing a notice. The `tableArrays` WeakSet field (line ~62) was added for exactly this check, but nothing reads or writes it. It is dead code whose comment claims a guarantee the parser does not give.\n\nReachable through the pyproject.toml readers this feature adds and through `readVersionCatalogs`, but only for TOML that is already invalid.\n\nFix (recommended, cheap): when `appendTable` creates an array, add it to `tableArrays`. Make `appendTable` and `descend` accept only arrays in `tableArrays`, and fail on any other array. Risk: none for valid TOML."
+lastModified: "2026-10-15T22:45:41.992Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

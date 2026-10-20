@@ -1,0 +1,444 @@
+{
+  "facts": [
+    {
+      "path": "src/com/example/client/HttpClients.java",
+      "routes": [],
+      "outboundCalls": [
+        {
+          "kind": "http",
+          "target": "orders.url",
+          "targetSource": "config",
+          "client": "RestTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 26,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "http://billing/charge",
+          "targetSource": "literal",
+          "client": "RestTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 27,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "RestTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 29,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "http://billing/charge/1",
+          "targetSource": "literal",
+          "client": "RestTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 30,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "http://catalog/items",
+          "targetSource": "literal",
+          "client": "RestTemplate",
+          "confidence": "likely",
+          "position": {
+            "line": 32,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "/inventory",
+          "targetSource": "literal",
+          "client": "WebClient",
+          "confidence": "certain",
+          "position": {
+            "line": 38,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "payments.url",
+          "targetSource": "config",
+          "client": "RestClient",
+          "confidence": "certain",
+          "position": {
+            "line": 39,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "http://inventory:8080",
+          "targetSource": "literal",
+          "client": "WebClient",
+          "confidence": "certain",
+          "position": {
+            "line": 40,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "http://payments:8080",
+          "targetSource": "literal",
+          "client": "RestClient",
+          "confidence": "certain",
+          "position": {
+            "line": 41,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "/status",
+          "targetSource": "literal",
+          "client": "RestClient",
+          "confidence": "certain",
+          "position": {
+            "line": 41,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://api.example.com/v1",
+          "targetSource": "literal",
+          "client": "HttpClient",
+          "confidence": "certain",
+          "position": {
+            "line": 45,
+            "column": 4
+          }
+        },
+        {
+          "kind": "http",
+          "target": "https://chain.example.com",
+          "targetSource": "literal",
+          "client": "HttpClient",
+          "confidence": "certain",
+          "position": {
+            "line": 46,
+            "column": 4
+          }
+        },
+        {
+          "kind": "grpc",
+          "target": "orders.internal:9090",
+          "targetSource": "literal",
+          "client": "ManagedChannelBuilder",
+          "confidence": "certain",
+          "position": {
+            "line": 50,
+            "column": 28
+          }
+        },
+        {
+          "kind": "grpc",
+          "target": "dns:///inventory:443",
+          "targetSource": "literal",
+          "client": "ManagedChannelBuilder",
+          "confidence": "certain",
+          "position": {
+            "line": 51,
+            "column": 4
+          }
+        },
+        {
+          "kind": "env",
+          "target": "DATABASE_URL",
+          "targetSource": "env",
+          "client": "System.getenv",
+          "confidence": "certain",
+          "position": {
+            "line": 52,
+            "column": 22
+          }
+        }
+      ]
+    },
+    {
+      "path": "src/com/example/client/InventoryClient.java",
+      "routes": [],
+      "outboundCalls": [
+        {
+          "kind": "http",
+          "target": "inventory.url",
+          "targetSource": "config",
+          "client": "FeignClient",
+          "confidence": "certain",
+          "position": {
+            "line": 7,
+            "column": 0
+          }
+        },
+        {
+          "kind": "http",
+          "target": "catalog",
+          "targetSource": "config",
+          "client": "FeignClient",
+          "confidence": "certain",
+          "position": {
+            "line": 13,
+            "column": 2
+          }
+        }
+      ]
+    },
+    {
+      "path": "src/com/example/messaging/Messaging.java",
+      "routes": [],
+      "outboundCalls": [
+        {
+          "kind": "queue",
+          "target": "orders",
+          "targetSource": "literal",
+          "client": "KafkaTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 24,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "",
+          "targetSource": "unknown",
+          "client": "KafkaTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 26,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "queue.audit",
+          "targetSource": "literal",
+          "client": "JmsTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 27,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "exchange.orders",
+          "targetSource": "literal",
+          "client": "RabbitTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 28,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "orders.retry",
+          "targetSource": "literal",
+          "client": "RabbitTemplate",
+          "confidence": "certain",
+          "position": {
+            "line": 30,
+            "column": 4
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "orders",
+          "targetSource": "literal",
+          "client": "KafkaListener",
+          "confidence": "certain",
+          "position": {
+            "line": 33,
+            "column": 2
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "topics.refunds",
+          "targetSource": "config",
+          "client": "KafkaListener",
+          "confidence": "certain",
+          "position": {
+            "line": 33,
+            "column": 2
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "queue.audit",
+          "targetSource": "literal",
+          "client": "JmsListener",
+          "confidence": "certain",
+          "position": {
+            "line": 36,
+            "column": 2
+          }
+        },
+        {
+          "kind": "queue",
+          "target": "orders.q",
+          "targetSource": "literal",
+          "client": "RabbitListener",
+          "confidence": "certain",
+          "position": {
+            "line": 39,
+            "column": 2
+          }
+        }
+      ]
+    },
+    {
+      "path": "src/com/example/web/OwnerController.java",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/owners",
+          "handler": "list",
+          "position": {
+            "line": 11,
+            "column": 2
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api",
+          "handler": "create",
+          "position": {
+            "line": 15,
+            "column": 2
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/owners/{id}",
+          "handler": "replace",
+          "position": {
+            "line": 18,
+            "column": 2
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/owners/{id}",
+          "handler": "remove",
+          "position": {
+            "line": 21,
+            "column": 2
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/owners/{id}",
+          "handler": "patch",
+          "position": {
+            "line": 24,
+            "column": 2
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/people/{id}",
+          "handler": "patch",
+          "position": {
+            "line": 24,
+            "column": 2
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/legacy",
+          "handler": "legacy",
+          "position": {
+            "line": 27,
+            "column": 2
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/api/bulk",
+          "handler": "bulk",
+          "position": {
+            "line": 30,
+            "column": 2
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/bulk",
+          "handler": "bulk",
+          "position": {
+            "line": 30,
+            "column": 2
+          }
+        },
+        {
+          "path": "/api/any",
+          "handler": "any",
+          "position": {
+            "line": 34,
+            "column": 2
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/kept",
+          "handler": "partly",
+          "position": {
+            "line": 40,
+            "column": 2
+          }
+        }
+      ],
+      "outboundCalls": []
+    },
+    {
+      "path": "src/com/example/web/PetController.java",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/pets/{petId}",
+          "handler": "show",
+          "position": {
+            "line": 11,
+            "column": 2
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/animals/{petId}",
+          "handler": "show",
+          "position": {
+            "line": 11,
+            "column": 2
+          }
+        }
+      ],
+      "outboundCalls": []
+    },
+    {
+      "path": "src/com/example/web/ReportService.java",
+      "routes": [],
+      "outboundCalls": []
+    }
+  ],
+  "notices": [
+    "Spring Boot: 2 request mapping values are not literals and were skipped: src/com/example/web/OwnerController.java:37 (path PATH), src/com/example/web/OwnerController.java:40 (path PATH + \"/dropped\")."
+  ]
+}

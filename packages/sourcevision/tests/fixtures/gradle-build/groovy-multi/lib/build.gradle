@@ -1,0 +1,7 @@
+apply plugin: 'java-library'
+
+sourceCompatibility = '11'
+
+dependencies {
+    api 'org.slf4j:slf4j-api:2.0.13'
+}
