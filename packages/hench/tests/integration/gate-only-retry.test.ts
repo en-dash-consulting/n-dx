@@ -194,6 +194,15 @@ describe("gate-only retry", () => {
     expect(run.gateOnlyRetry).toEqual({ sourceRunId: source.id, base: baseline, commits: source.commits });
     expect(run.spawnCount).toBe(0);
     expect((await loadRun(henchDir, run.id)).gateOnlyRetry).toEqual(run.gateOnlyRetry);
+
+    // The earlier attempt's work commit gains the completion: no `chore(prd)`
+    // record follows it, and its subject is unchanged.
+    const subjects = execFileSync("git", ["log", "--reverse", "--format=%s", `${baseline}..HEAD`], {
+      cwd: projectDir, encoding: "utf-8",
+    }).trim().split("\n");
+    expect(subjects).toEqual(source.commits!.map((c) => c.subject));
+    expect(execFileSync("git", ["show", "--name-only", "--format=", "HEAD"], { cwd: projectDir, encoding: "utf-8" }))
+      .toContain("prd_tree");
   });
 
   it("fails when the gate fails again, and the next retry runs the agent (loop guard)", async () => {

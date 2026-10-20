@@ -685,7 +685,9 @@ status: in_progress
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
 
-  it("populates commits array with commit hash, author, email, timestamp", async () => {
+  // The commit carries the completion; a PRD write recording its SHA could
+  // only land after it, which left every completed run a second commit to make.
+  it("writes nothing to the PRD after the commit, which names the item in its trailer", async () => {
     const { performCommitPromptIfNeeded } = await import(
       "../../src/agent/lifecycle/shared.js"
     );
@@ -746,31 +748,17 @@ status: in_progress
       "task-1",
     );
 
-    // Get the commit info we're expecting
-    const { stdout: sha } = await execAsync("git rev-parse HEAD", { cwd: projectDir });
-    const expectedSha = sha.trim();
-    const { stdout: fullLog } = await execAsync(
-      "git log -1 --format='%an%n%ae%n%cI'",
+    const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
+    expect(subject.trim()).toBe("feat: update x");
+    const { stdout: item } = await execAsync(
+      "git log -1 --format=%(trailers:key=N-DX-Item,valueonly)",
       { cwd: projectDir },
     );
-    const [author, email, timestamp] = fullLog.trim().split("\n");
+    expect(item.trim()).toBe("task-1");
 
-    // Verify updateItem was called with commits array
-    expect(mockStore.updateItem).toHaveBeenCalled();
-
-    // Verify the commits array was updated
-    expect(capturedUpdates).not.toBeNull();
-    expect(capturedUpdates!.updates).toHaveProperty("commits");
-    const commits = capturedUpdates!.updates.commits;
-    expect(commits).toHaveLength(1);
-    expect(commits[0]).toEqual(
-      expect.objectContaining({
-        hash: expectedSha,
-        author: "Test",
-        authorEmail: "test@test.com",
-        timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}/), // ISO 8601 date
-      }),
-    );
+    const commitWrites = mockStore.updateItem.mock.calls.filter(([, updates]) => "commits" in (updates ?? {}));
+    expect(commitWrites).toEqual([]);
+    expect(capturedUpdates?.updates).not.toHaveProperty("commits");
 
     expect(existsSync(join(projectDir, ".hench-commit-msg.txt"))).toBe(false);
   });
