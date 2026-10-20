@@ -35,7 +35,8 @@ export type {
 export { SCHEMA_VERSION } from "../schema/v1.js";
 export { toCanonicalJSON } from "../util/sort.js";
 export { toPosix } from "../util/paths.js";
-export { detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
+export { detectLanguages } from "../language/detect.js";
+export { mergeLanguageConfigs } from "@n-dx/lang-kit";
 export { analyzeInventory } from "../analyzers/inventory.js";
 export type { InventoryResult } from "../analyzers/inventory.js";
 export { analyzeImports } from "../analyzers/imports.js";

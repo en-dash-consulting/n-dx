@@ -1,0 +1,40 @@
+{
+  "name": "@n-dx/lang-kit",
+  "version": "0.9.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Elastic-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/en-dash-consulting/n-dx.git",
+    "directory": "packages/lang-kit"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.map",
+    "!dist/.build-stamp.json"
+  ],
+  "scripts": {
+    "build": "tsc && node ../../scripts/write-build-stamp.mjs",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate": "tsc --noEmit && vitest run",
+    "prepare": "pnpm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
+  }
+}

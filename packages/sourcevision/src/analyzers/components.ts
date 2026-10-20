@@ -31,6 +31,7 @@ import {
   findRoutesDir,
 } from "./route-detection.js";
 import { detectServerRoutes } from "./server-route-detection.js";
+import { withPackRouteGroups, type PackFrameworkFacts } from "./pack-framework-facts.js";
 import { isVerbose, verbose } from "@n-dx/llm-client";
 import { debugTimed, debugTimedAsync, checkpoint } from "../util/debug-timing.js";
 
@@ -669,6 +670,8 @@ export interface ComponentsOptions {
   previousComponents?: Components;
   changedFiles?: Set<string>;
   fileSetChanged?: boolean;
+  /** Language packs' route facts, merged into `serverRoutes` (`pack-framework-facts.ts`). */
+  packFacts?: PackFrameworkFacts;
 }
 
 export async function analyzeComponents(
@@ -812,7 +815,7 @@ export async function analyzeComponents(
 
   // ── Server-side API route detection ────────────────────────────────────────
 
-  const serverRoutes: ServerRouteGroup[] = await detectServerRoutes(targetDir, inventory);
+  const serverRoutes: ServerRouteGroup[] = withPackRouteGroups(await detectServerRoutes(targetDir, inventory), inventory, options?.packFacts);
 
   checkpoint("detectServerRoutes finished");
   if (verboseScan) {

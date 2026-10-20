@@ -21,8 +21,9 @@ number of limitations described under [Licensing boundaries](#licensing-boundari
 ## Included components
 
 Everything in this repository is covered by ELv2 and published to npm under the
-`@n-dx/` scope. All six packages share a single version line and are released
-together.
+`@n-dx/` scope. Every published package shares a single version line and is
+released together; the member list is the `fixed` group in
+[`.changeset/config.json`](.changeset/config.json), which is the authority.
 
 | Package | npm name | License | Description |
 |---------|----------|---------|-------------|
@@ -31,6 +32,15 @@ together.
 | `packages/rex` | `@n-dx/rex` | Elastic-2.0 | PRD management and hierarchical task tracking |
 | `packages/hench` | `@n-dx/hench` | Elastic-2.0 | Autonomous agent execution loop |
 | `packages/llm-client` | `@n-dx/llm-client` | Elastic-2.0 | Vendor-neutral LLM foundation (Claude/Codex adapters) |
+| `packages/lang-kit` | `@n-dx/lang-kit` | Elastic-2.0 | Language facts and the language-pack contract |
+| `packages/lang-runtime` | `@n-dx/lang-runtime` | Elastic-2.0 | Tree-sitter runner and resolvers the language packs share |
+| `packages/lang-java` | `@n-dx/lang-java` | Elastic-2.0 | Java language pack for sourcevision |
+| `packages/lang-go` | `@n-dx/lang-go` | Elastic-2.0 | Go language pack for sourcevision |
+| `packages/lang-python` | `@n-dx/lang-python` | Elastic-2.0 | Python language pack for sourcevision |
+| `packages/lang-sql` | `@n-dx/lang-sql` | Elastic-2.0 | SQL language pack for sourcevision |
+| `packages/lang-terraform` | `@n-dx/lang-terraform` | Elastic-2.0 | Terraform language pack for sourcevision |
+| `packages/graview` | `@n-dx/graview` | Elastic-2.0 | Graview projection of the PRD, analysis and runs |
+| `packages/graview-face` | `@n-dx/graview-face` | Elastic-2.0 | Product face app on Graview, run by `ndx graview serve` |
 | `packages/web` | `@n-dx/web` | Elastic-2.0 | Dashboard and MCP HTTP server |
 
 Also included and covered by ELv2:

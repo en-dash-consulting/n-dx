@@ -1,0 +1,6071 @@
+{
+  "pack": "java",
+  "grammar": {
+    "name": "tree-sitter-java",
+    "version": "0.23.5"
+  },
+  "files": [
+    {
+      "status": "parsed",
+      "path": "src/Default.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "class Default {\n  public static void main(String[] args) {\n    System.out.println(\"hello\");\n  }\n}",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Default",
+            "start": {
+              "line": 2,
+              "column": 6
+            },
+            "end": {
+              "line": 2,
+              "column": 13
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static void main(String[] args) {\n    System.out.println(\"hello\");\n  }",
+            "start": {
+              "line": 3,
+              "column": 2
+            },
+            "end": {
+              "line": 5,
+              "column": 3
+            }
+          },
+          {
+            "name": "entry_point.main",
+            "nodeType": "method_declaration",
+            "text": "public static void main(String[] args) {\n    System.out.println(\"hello\");\n  }",
+            "start": {
+              "line": 3,
+              "column": 2
+            },
+            "end": {
+              "line": 5,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "main",
+            "start": {
+              "line": 3,
+              "column": 21
+            },
+            "end": {
+              "line": 3,
+              "column": 25
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "System.out.println(\"hello\")",
+            "start": {
+              "line": 4,
+              "column": 4
+            },
+            "end": {
+              "line": 4,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "field_access",
+            "text": "System.out",
+            "start": {
+              "line": 4,
+              "column": 4
+            },
+            "end": {
+              "line": 4,
+              "column": 14
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "println",
+            "start": {
+              "line": 4,
+              "column": 15
+            },
+            "end": {
+              "line": 4,
+              "column": 22
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"hello\")",
+            "start": {
+              "line": 4,
+              "column": 22
+            },
+            "end": {
+              "line": 4,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"hello\"",
+            "start": {
+              "line": 4,
+              "column": 23
+            },
+            "end": {
+              "line": 4,
+              "column": 30
+            }
+          }
+        ],
+        "annotations": [],
+        "type-references": [
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 3,
+              "column": 26
+            },
+            "end": {
+              "line": 3,
+              "column": 32
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "System",
+            "start": {
+              "line": 4,
+              "column": 4
+            },
+            "end": {
+              "line": 4,
+              "column": 10
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Cart.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Cart {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 20
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Cart",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 17
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Checkout.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import com.example.model.Customer;",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 34
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.model.Customer",
+            "start": {
+              "line": 4,
+              "column": 7
+            },
+            "end": {
+              "line": 4,
+              "column": 33
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import com.example.model.Customer.Address;",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 42
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.model.Customer.Address",
+            "start": {
+              "line": 5,
+              "column": 7
+            },
+            "end": {
+              "line": 5,
+              "column": 41
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import com.example.time.Clock;",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 30
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.time.Clock",
+            "start": {
+              "line": 7,
+              "column": 7
+            },
+            "end": {
+              "line": 7,
+              "column": 29
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import com.example.util.*;",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 26
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 9,
+              "column": 7
+            },
+            "end": {
+              "line": 9,
+              "column": 23
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "asterisk",
+            "text": "*",
+            "start": {
+              "line": 9,
+              "column": 24
+            },
+            "end": {
+              "line": 9,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import static com.example.util.Numbers.round;",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 45
+            }
+          },
+          {
+            "name": "import.static",
+            "nodeType": "static",
+            "text": "static",
+            "start": {
+              "line": 10,
+              "column": 7
+            },
+            "end": {
+              "line": 10,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util.Numbers.round",
+            "start": {
+              "line": 10,
+              "column": 14
+            },
+            "end": {
+              "line": 10,
+              "column": 44
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import static com.example.util.Constants.*;",
+            "start": {
+              "line": 11,
+              "column": 0
+            },
+            "end": {
+              "line": 11,
+              "column": 43
+            }
+          },
+          {
+            "name": "import.static",
+            "nodeType": "static",
+            "text": "static",
+            "start": {
+              "line": 11,
+              "column": 7
+            },
+            "end": {
+              "line": 11,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util.Constants",
+            "start": {
+              "line": 11,
+              "column": 14
+            },
+            "end": {
+              "line": 11,
+              "column": 40
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "asterisk",
+            "text": "*",
+            "start": {
+              "line": 11,
+              "column": 41
+            },
+            "end": {
+              "line": 11,
+              "column": 42
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import java.util.List;",
+            "start": {
+              "line": 12,
+              "column": 0
+            },
+            "end": {
+              "line": 12,
+              "column": 22
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "java.util.List",
+            "start": {
+              "line": 12,
+              "column": 7
+            },
+            "end": {
+              "line": 12,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import javax.inject.*;",
+            "start": {
+              "line": 13,
+              "column": 0
+            },
+            "end": {
+              "line": 13,
+              "column": 22
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "javax.inject",
+            "start": {
+              "line": 13,
+              "column": 7
+            },
+            "end": {
+              "line": 13,
+              "column": 19
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "asterisk",
+            "text": "*",
+            "start": {
+              "line": 13,
+              "column": 20
+            },
+            "end": {
+              "line": 13,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import org.acme.Missing;",
+            "start": {
+              "line": 14,
+              "column": 0
+            },
+            "end": {
+              "line": 14,
+              "column": 24
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "org.acme.Missing",
+            "start": {
+              "line": 14,
+              "column": 7
+            },
+            "end": {
+              "line": 14,
+              "column": 23
+            }
+          }
+        ],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Checkout {\n  private Customer customer;\n  private Address address;\n  private Clock clock;\n  private Cart cart;\n  private Receipt receipt;\n  private List<Strings> names;\n  private com.example.model.Customer again;\n  private java.time.Instant at;\n  private Line line;\n\n  int total() {\n    Status status = Status.OPEN;\n    return round(Tax.rate()) + MAX;\n  }\n\n  class Line {}\n}",
+            "start": {
+              "line": 16,
+              "column": 0
+            },
+            "end": {
+              "line": 33,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Checkout",
+            "start": {
+              "line": 16,
+              "column": 13
+            },
+            "end": {
+              "line": 16,
+              "column": 21
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "class Line {}",
+            "start": {
+              "line": 32,
+              "column": 2
+            },
+            "end": {
+              "line": 32,
+              "column": 15
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Line",
+            "start": {
+              "line": 32,
+              "column": 8
+            },
+            "end": {
+              "line": 32,
+              "column": 12
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "int total() {\n    Status status = Status.OPEN;\n    return round(Tax.rate()) + MAX;\n  }",
+            "start": {
+              "line": 27,
+              "column": 2
+            },
+            "end": {
+              "line": 30,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "total",
+            "start": {
+              "line": 27,
+              "column": 6
+            },
+            "end": {
+              "line": 27,
+              "column": 11
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "round(Tax.rate())",
+            "start": {
+              "line": 29,
+              "column": 11
+            },
+            "end": {
+              "line": 29,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "round",
+            "start": {
+              "line": 29,
+              "column": 11
+            },
+            "end": {
+              "line": 29,
+              "column": 16
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(Tax.rate())",
+            "start": {
+              "line": 29,
+              "column": 16
+            },
+            "end": {
+              "line": 29,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "Tax.rate()",
+            "start": {
+              "line": 29,
+              "column": 17
+            },
+            "end": {
+              "line": 29,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "Tax",
+            "start": {
+              "line": 29,
+              "column": 17
+            },
+            "end": {
+              "line": 29,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "rate",
+            "start": {
+              "line": 29,
+              "column": 21
+            },
+            "end": {
+              "line": 29,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 29,
+              "column": 25
+            },
+            "end": {
+              "line": 29,
+              "column": 27
+            }
+          }
+        ],
+        "annotations": [],
+        "type-references": [
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Customer",
+            "start": {
+              "line": 17,
+              "column": 10
+            },
+            "end": {
+              "line": 17,
+              "column": 18
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Customer",
+            "start": {
+              "line": 17,
+              "column": 10
+            },
+            "end": {
+              "line": 17,
+              "column": 18
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Address",
+            "start": {
+              "line": 18,
+              "column": 10
+            },
+            "end": {
+              "line": 18,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Address",
+            "start": {
+              "line": 18,
+              "column": 10
+            },
+            "end": {
+              "line": 18,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Clock",
+            "start": {
+              "line": 19,
+              "column": 10
+            },
+            "end": {
+              "line": 19,
+              "column": 15
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Clock",
+            "start": {
+              "line": 19,
+              "column": 10
+            },
+            "end": {
+              "line": 19,
+              "column": 15
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Cart",
+            "start": {
+              "line": 20,
+              "column": 10
+            },
+            "end": {
+              "line": 20,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Cart",
+            "start": {
+              "line": 20,
+              "column": 10
+            },
+            "end": {
+              "line": 20,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Receipt",
+            "start": {
+              "line": 21,
+              "column": 10
+            },
+            "end": {
+              "line": 21,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Receipt",
+            "start": {
+              "line": 21,
+              "column": 10
+            },
+            "end": {
+              "line": 21,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "generic_type",
+            "text": "List<Strings>",
+            "start": {
+              "line": 22,
+              "column": 10
+            },
+            "end": {
+              "line": 22,
+              "column": 23
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "List",
+            "start": {
+              "line": 22,
+              "column": 10
+            },
+            "end": {
+              "line": 22,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Strings",
+            "start": {
+              "line": 22,
+              "column": 15
+            },
+            "end": {
+              "line": 22,
+              "column": 22
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "scoped_type_identifier",
+            "text": "com.example.model.Customer",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 36
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "com.example.model.Customer",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 36
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "com.example.model",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "com.example",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "com",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 13
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "example",
+            "start": {
+              "line": 23,
+              "column": 14
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "model",
+            "start": {
+              "line": 23,
+              "column": 22
+            },
+            "end": {
+              "line": 23,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Customer",
+            "start": {
+              "line": 23,
+              "column": 28
+            },
+            "end": {
+              "line": 23,
+              "column": 36
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.time.Instant",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.time.Instant",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.time",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "java",
+            "start": {
+              "line": 24,
+              "column": 10
+            },
+            "end": {
+              "line": 24,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "time",
+            "start": {
+              "line": 24,
+              "column": 15
+            },
+            "end": {
+              "line": 24,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Instant",
+            "start": {
+              "line": 24,
+              "column": 20
+            },
+            "end": {
+              "line": 24,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "Line",
+            "start": {
+              "line": 25,
+              "column": 10
+            },
+            "end": {
+              "line": 25,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Line",
+            "start": {
+              "line": 25,
+              "column": 10
+            },
+            "end": {
+              "line": 25,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Status",
+            "start": {
+              "line": 28,
+              "column": 4
+            },
+            "end": {
+              "line": 28,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "Status",
+            "start": {
+              "line": 28,
+              "column": 20
+            },
+            "end": {
+              "line": 28,
+              "column": 26
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Clock.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Clock {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 21
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Clock",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 18
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/FooApplication.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class FooApplication {\n  public static void start(String[] args) {}\n}",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "FooApplication",
+            "start": {
+              "line": 4,
+              "column": 13
+            },
+            "end": {
+              "line": 4,
+              "column": 27
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static void start(String[] args) {}",
+            "start": {
+              "line": 5,
+              "column": 2
+            },
+            "end": {
+              "line": 5,
+              "column": 44
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "start",
+            "start": {
+              "line": 5,
+              "column": 21
+            },
+            "end": {
+              "line": 5,
+              "column": 26
+            }
+          }
+        ],
+        "calls": [],
+        "annotations": [],
+        "type-references": [
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 5,
+              "column": 27
+            },
+            "end": {
+              "line": 5,
+              "column": 33
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Receipt.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.record",
+            "nodeType": "record_declaration",
+            "text": "public record Receipt(long cents) {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 36
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Receipt",
+            "start": {
+              "line": 3,
+              "column": 14
+            },
+            "end": {
+              "line": 3,
+              "column": 21
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Status.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.enum",
+            "nodeType": "enum_declaration",
+            "text": "public enum Status {\n  OPEN,\n  CLOSED\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Status",
+            "start": {
+              "line": 3,
+              "column": 12
+            },
+            "end": {
+              "line": 3,
+              "column": 18
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/app/Tax.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.app;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.app",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 23
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Tax {\n  static double rate() {\n    return 0.2;\n  }\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Tax",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 22
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "static double rate() {\n    return 0.2;\n  }",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 6,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "rate",
+            "start": {
+              "line": 4,
+              "column": 16
+            },
+            "end": {
+              "line": 4,
+              "column": 20
+            }
+          }
+        ],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/model/Customer.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.model;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 26
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.model",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Customer {\n  public static class Address {}\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Customer",
+            "start": {
+              "line": 3,
+              "column": 13
+            },
+            "end": {
+              "line": 3,
+              "column": 21
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public static class Address {}",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 4,
+              "column": 32
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Address",
+            "start": {
+              "line": 4,
+              "column": 22
+            },
+            "end": {
+              "line": 4,
+              "column": 29
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/shop/OrderService.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.shop;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.shop",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import java.util.List;",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 22
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "java.util.List",
+            "start": {
+              "line": 3,
+              "column": 7
+            },
+            "end": {
+              "line": 3,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import java.util.Map;",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 21
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "java.util.Map",
+            "start": {
+              "line": 4,
+              "column": 7
+            },
+            "end": {
+              "line": 4,
+              "column": 20
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import java.util.function.*;",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 28
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "java.util.function",
+            "start": {
+              "line": 5,
+              "column": 7
+            },
+            "end": {
+              "line": 5,
+              "column": 25
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "asterisk",
+            "text": "*",
+            "start": {
+              "line": 5,
+              "column": 26
+            },
+            "end": {
+              "line": 5,
+              "column": 27
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import static java.util.stream.Collectors.toList;",
+            "start": {
+              "line": 6,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 49
+            }
+          },
+          {
+            "name": "import.static",
+            "nodeType": "static",
+            "text": "static",
+            "start": {
+              "line": 6,
+              "column": 7
+            },
+            "end": {
+              "line": 6,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "java.util.stream.Collectors.toList",
+            "start": {
+              "line": 6,
+              "column": 14
+            },
+            "end": {
+              "line": 6,
+              "column": 48
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import static java.lang.Math.*;",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 31
+            }
+          },
+          {
+            "name": "import.static",
+            "nodeType": "static",
+            "text": "static",
+            "start": {
+              "line": 7,
+              "column": 7
+            },
+            "end": {
+              "line": 7,
+              "column": 13
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "java.lang.Math",
+            "start": {
+              "line": 7,
+              "column": 14
+            },
+            "end": {
+              "line": 7,
+              "column": 28
+            }
+          },
+          {
+            "name": "import.wildcard",
+            "nodeType": "asterisk",
+            "text": "*",
+            "start": {
+              "line": 7,
+              "column": 29
+            },
+            "end": {
+              "line": 7,
+              "column": 30
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import org.springframework.beans.factory.annotation.Autowired;",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 9,
+              "column": 62
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "org.springframework.beans.factory.annotation.Autowired",
+            "start": {
+              "line": 9,
+              "column": 7
+            },
+            "end": {
+              "line": 9,
+              "column": 61
+            }
+          },
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import org.springframework.stereotype.Service;",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 46
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "org.springframework.stereotype.Service",
+            "start": {
+              "line": 10,
+              "column": 7
+            },
+            "end": {
+              "line": 10,
+              "column": 45
+            }
+          }
+        ],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "@Service\npublic class OrderService extends BaseService<Order> implements Auditable, java.io.Serializable {\n\n  @Autowired\n  private OrderRepository repository;\n\n  private final Map<String, List<Order>> byCustomer = new java.util.HashMap<>();\n\n  public OrderService(OrderRepository repository, Clock... clocks) {\n    this.repository = repository;\n  }\n\n  public List<Order> open(@NonNull String customer) throws NotFoundException {\n    logger.info(\"loading open orders\");\n    List<Order> found = repository.findByStatus(Status.OPEN);\n    return found.stream().filter(o -> o.isFor(customer)).collect(toList());\n  }\n\n  public <T extends Comparable<T>> T largest(List<? extends T> items, Function<T, String> label) {\n    log(label.apply(items.get(0)), \"fixed\");\n    return max(items);\n  }\n\n  String banner() {\n    return \"\"\"\n        Orders\n          \"quoted\" text\n        \"\"\";\n  }\n\n  void nested(Order order) {\n    helper(inner(\"deep\", other(\"x\")), \"y\");\n    Runnable r = () -> System.out.println(\"tick\");\n    log(\"\"\"\n        in a call\n        \"\"\");\n    Object o = new Inner();\n    r.run();\n  }\n\n  class Inner {\n    int count;\n\n    Inner() {}\n  }\n\n  static class Holder<T> {\n    T value;\n\n    T get() {\n      return value;\n    }\n  }\n}",
+            "start": {
+              "line": 12,
+              "column": 0
+            },
+            "end": {
+              "line": 65,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "OrderService",
+            "start": {
+              "line": 13,
+              "column": 13
+            },
+            "end": {
+              "line": 13,
+              "column": 25
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "class Inner {\n    int count;\n\n    Inner() {}\n  }",
+            "start": {
+              "line": 52,
+              "column": 2
+            },
+            "end": {
+              "line": 56,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Inner",
+            "start": {
+              "line": 52,
+              "column": 8
+            },
+            "end": {
+              "line": 52,
+              "column": 13
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "static class Holder<T> {\n    T value;\n\n    T get() {\n      return value;\n    }\n  }",
+            "start": {
+              "line": 58,
+              "column": 2
+            },
+            "end": {
+              "line": 64,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Holder",
+            "start": {
+              "line": 58,
+              "column": 15
+            },
+            "end": {
+              "line": 58,
+              "column": 21
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "constructor.declaration",
+            "nodeType": "constructor_declaration",
+            "text": "public OrderService(OrderRepository repository, Clock... clocks) {\n    this.repository = repository;\n  }",
+            "start": {
+              "line": 20,
+              "column": 2
+            },
+            "end": {
+              "line": 22,
+              "column": 3
+            }
+          },
+          {
+            "name": "constructor.name",
+            "nodeType": "identifier",
+            "text": "OrderService",
+            "start": {
+              "line": 20,
+              "column": 9
+            },
+            "end": {
+              "line": 20,
+              "column": 21
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public List<Order> open(@NonNull String customer) throws NotFoundException {\n    logger.info(\"loading open orders\");\n    List<Order> found = repository.findByStatus(Status.OPEN);\n    return found.stream().filter(o -> o.isFor(customer)).collect(toList());\n  }",
+            "start": {
+              "line": 24,
+              "column": 2
+            },
+            "end": {
+              "line": 28,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "open",
+            "start": {
+              "line": 24,
+              "column": 21
+            },
+            "end": {
+              "line": 24,
+              "column": 25
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public <T extends Comparable<T>> T largest(List<? extends T> items, Function<T, String> label) {\n    log(label.apply(items.get(0)), \"fixed\");\n    return max(items);\n  }",
+            "start": {
+              "line": 30,
+              "column": 2
+            },
+            "end": {
+              "line": 33,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "largest",
+            "start": {
+              "line": 30,
+              "column": 37
+            },
+            "end": {
+              "line": 30,
+              "column": 44
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "String banner() {\n    return \"\"\"\n        Orders\n          \"quoted\" text\n        \"\"\";\n  }",
+            "start": {
+              "line": 35,
+              "column": 2
+            },
+            "end": {
+              "line": 40,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "banner",
+            "start": {
+              "line": 35,
+              "column": 9
+            },
+            "end": {
+              "line": 35,
+              "column": 15
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "void nested(Order order) {\n    helper(inner(\"deep\", other(\"x\")), \"y\");\n    Runnable r = () -> System.out.println(\"tick\");\n    log(\"\"\"\n        in a call\n        \"\"\");\n    Object o = new Inner();\n    r.run();\n  }",
+            "start": {
+              "line": 42,
+              "column": 2
+            },
+            "end": {
+              "line": 50,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "nested",
+            "start": {
+              "line": 42,
+              "column": 7
+            },
+            "end": {
+              "line": 42,
+              "column": 13
+            }
+          },
+          {
+            "name": "constructor.declaration",
+            "nodeType": "constructor_declaration",
+            "text": "Inner() {}",
+            "start": {
+              "line": 55,
+              "column": 4
+            },
+            "end": {
+              "line": 55,
+              "column": 14
+            }
+          },
+          {
+            "name": "constructor.name",
+            "nodeType": "identifier",
+            "text": "Inner",
+            "start": {
+              "line": 55,
+              "column": 4
+            },
+            "end": {
+              "line": 55,
+              "column": 9
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "T get() {\n      return value;\n    }",
+            "start": {
+              "line": 61,
+              "column": 4
+            },
+            "end": {
+              "line": 63,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "get",
+            "start": {
+              "line": 61,
+              "column": 6
+            },
+            "end": {
+              "line": 61,
+              "column": 9
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "logger.info(\"loading open orders\")",
+            "start": {
+              "line": 25,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 38
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "logger",
+            "start": {
+              "line": 25,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 10
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "info",
+            "start": {
+              "line": 25,
+              "column": 11
+            },
+            "end": {
+              "line": 25,
+              "column": 15
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"loading open orders\")",
+            "start": {
+              "line": 25,
+              "column": 15
+            },
+            "end": {
+              "line": 25,
+              "column": 38
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"loading open orders\"",
+            "start": {
+              "line": 25,
+              "column": 16
+            },
+            "end": {
+              "line": 25,
+              "column": 37
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "repository.findByStatus(Status.OPEN)",
+            "start": {
+              "line": 26,
+              "column": 24
+            },
+            "end": {
+              "line": 26,
+              "column": 60
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "repository",
+            "start": {
+              "line": 26,
+              "column": 24
+            },
+            "end": {
+              "line": 26,
+              "column": 34
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "findByStatus",
+            "start": {
+              "line": 26,
+              "column": 35
+            },
+            "end": {
+              "line": 26,
+              "column": 47
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(Status.OPEN)",
+            "start": {
+              "line": 26,
+              "column": 47
+            },
+            "end": {
+              "line": 26,
+              "column": 60
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "found.stream().filter(o -> o.isFor(customer)).collect(toList())",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 74
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "method_invocation",
+            "text": "found.stream().filter(o -> o.isFor(customer))",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 56
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "found.stream().filter(o -> o.isFor(customer))",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 56
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "method_invocation",
+            "text": "found.stream()",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "found.stream()",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "found",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 16
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "stream",
+            "start": {
+              "line": 27,
+              "column": 17
+            },
+            "end": {
+              "line": 27,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 27,
+              "column": 23
+            },
+            "end": {
+              "line": 27,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "filter",
+            "start": {
+              "line": 27,
+              "column": 26
+            },
+            "end": {
+              "line": 27,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(o -> o.isFor(customer))",
+            "start": {
+              "line": 27,
+              "column": 32
+            },
+            "end": {
+              "line": 27,
+              "column": 56
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "o.isFor(customer)",
+            "start": {
+              "line": 27,
+              "column": 38
+            },
+            "end": {
+              "line": 27,
+              "column": 55
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "o",
+            "start": {
+              "line": 27,
+              "column": 38
+            },
+            "end": {
+              "line": 27,
+              "column": 39
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "isFor",
+            "start": {
+              "line": 27,
+              "column": 40
+            },
+            "end": {
+              "line": 27,
+              "column": 45
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(customer)",
+            "start": {
+              "line": 27,
+              "column": 45
+            },
+            "end": {
+              "line": 27,
+              "column": 55
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "collect",
+            "start": {
+              "line": 27,
+              "column": 57
+            },
+            "end": {
+              "line": 27,
+              "column": 64
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(toList())",
+            "start": {
+              "line": 27,
+              "column": 64
+            },
+            "end": {
+              "line": 27,
+              "column": 74
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "toList()",
+            "start": {
+              "line": 27,
+              "column": 65
+            },
+            "end": {
+              "line": 27,
+              "column": 73
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "toList",
+            "start": {
+              "line": 27,
+              "column": 65
+            },
+            "end": {
+              "line": 27,
+              "column": 71
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 27,
+              "column": 71
+            },
+            "end": {
+              "line": 27,
+              "column": 73
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "log(label.apply(items.get(0)), \"fixed\")",
+            "start": {
+              "line": 31,
+              "column": 4
+            },
+            "end": {
+              "line": 31,
+              "column": 43
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "log",
+            "start": {
+              "line": 31,
+              "column": 4
+            },
+            "end": {
+              "line": 31,
+              "column": 7
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(label.apply(items.get(0)), \"fixed\")",
+            "start": {
+              "line": 31,
+              "column": 7
+            },
+            "end": {
+              "line": 31,
+              "column": 43
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "label.apply(items.get(0))",
+            "start": {
+              "line": 31,
+              "column": 8
+            },
+            "end": {
+              "line": 31,
+              "column": 33
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "label",
+            "start": {
+              "line": 31,
+              "column": 8
+            },
+            "end": {
+              "line": 31,
+              "column": 13
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "apply",
+            "start": {
+              "line": 31,
+              "column": 14
+            },
+            "end": {
+              "line": 31,
+              "column": 19
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(items.get(0))",
+            "start": {
+              "line": 31,
+              "column": 19
+            },
+            "end": {
+              "line": 31,
+              "column": 33
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "items.get(0)",
+            "start": {
+              "line": 31,
+              "column": 20
+            },
+            "end": {
+              "line": 31,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "items",
+            "start": {
+              "line": 31,
+              "column": 20
+            },
+            "end": {
+              "line": 31,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "get",
+            "start": {
+              "line": 31,
+              "column": 26
+            },
+            "end": {
+              "line": 31,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(0)",
+            "start": {
+              "line": 31,
+              "column": 29
+            },
+            "end": {
+              "line": 31,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"fixed\"",
+            "start": {
+              "line": 31,
+              "column": 35
+            },
+            "end": {
+              "line": 31,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "max(items)",
+            "start": {
+              "line": 32,
+              "column": 11
+            },
+            "end": {
+              "line": 32,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "max",
+            "start": {
+              "line": 32,
+              "column": 11
+            },
+            "end": {
+              "line": 32,
+              "column": 14
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(items)",
+            "start": {
+              "line": 32,
+              "column": 14
+            },
+            "end": {
+              "line": 32,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "helper(inner(\"deep\", other(\"x\")), \"y\")",
+            "start": {
+              "line": 43,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "helper",
+            "start": {
+              "line": 43,
+              "column": 4
+            },
+            "end": {
+              "line": 43,
+              "column": 10
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(inner(\"deep\", other(\"x\")), \"y\")",
+            "start": {
+              "line": 43,
+              "column": 10
+            },
+            "end": {
+              "line": 43,
+              "column": 42
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "inner(\"deep\", other(\"x\"))",
+            "start": {
+              "line": 43,
+              "column": 11
+            },
+            "end": {
+              "line": 43,
+              "column": 36
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "inner",
+            "start": {
+              "line": 43,
+              "column": 11
+            },
+            "end": {
+              "line": 43,
+              "column": 16
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"deep\", other(\"x\"))",
+            "start": {
+              "line": 43,
+              "column": 16
+            },
+            "end": {
+              "line": 43,
+              "column": 36
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"deep\"",
+            "start": {
+              "line": 43,
+              "column": 17
+            },
+            "end": {
+              "line": 43,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "other(\"x\")",
+            "start": {
+              "line": 43,
+              "column": 25
+            },
+            "end": {
+              "line": 43,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "other",
+            "start": {
+              "line": 43,
+              "column": 25
+            },
+            "end": {
+              "line": 43,
+              "column": 30
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"x\")",
+            "start": {
+              "line": 43,
+              "column": 30
+            },
+            "end": {
+              "line": 43,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"x\"",
+            "start": {
+              "line": 43,
+              "column": 31
+            },
+            "end": {
+              "line": 43,
+              "column": 34
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"y\"",
+            "start": {
+              "line": 43,
+              "column": 38
+            },
+            "end": {
+              "line": 43,
+              "column": 41
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "System.out.println(\"tick\")",
+            "start": {
+              "line": 44,
+              "column": 23
+            },
+            "end": {
+              "line": 44,
+              "column": 49
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "field_access",
+            "text": "System.out",
+            "start": {
+              "line": 44,
+              "column": 23
+            },
+            "end": {
+              "line": 44,
+              "column": 33
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "println",
+            "start": {
+              "line": 44,
+              "column": 34
+            },
+            "end": {
+              "line": 44,
+              "column": 41
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"tick\")",
+            "start": {
+              "line": 44,
+              "column": 41
+            },
+            "end": {
+              "line": 44,
+              "column": 49
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"tick\"",
+            "start": {
+              "line": 44,
+              "column": 42
+            },
+            "end": {
+              "line": 44,
+              "column": 48
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "log(\"\"\"\n        in a call\n        \"\"\")",
+            "start": {
+              "line": 45,
+              "column": 4
+            },
+            "end": {
+              "line": 47,
+              "column": 12
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "log",
+            "start": {
+              "line": 45,
+              "column": 4
+            },
+            "end": {
+              "line": 45,
+              "column": 7
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"\"\"\n        in a call\n        \"\"\")",
+            "start": {
+              "line": 45,
+              "column": 7
+            },
+            "end": {
+              "line": 47,
+              "column": 12
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"\"\"\n        in a call\n        \"\"\"",
+            "start": {
+              "line": 45,
+              "column": 8
+            },
+            "end": {
+              "line": 47,
+              "column": 11
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "r.run()",
+            "start": {
+              "line": 49,
+              "column": 4
+            },
+            "end": {
+              "line": 49,
+              "column": 11
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "r",
+            "start": {
+              "line": 49,
+              "column": 4
+            },
+            "end": {
+              "line": 49,
+              "column": 5
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "run",
+            "start": {
+              "line": 49,
+              "column": 6
+            },
+            "end": {
+              "line": 49,
+              "column": 9
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 49,
+              "column": 9
+            },
+            "end": {
+              "line": 49,
+              "column": 11
+            }
+          }
+        ],
+        "annotations": [
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@Service",
+            "start": {
+              "line": 12,
+              "column": 0
+            },
+            "end": {
+              "line": 12,
+              "column": 8
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Service",
+            "start": {
+              "line": 12,
+              "column": 1
+            },
+            "end": {
+              "line": 12,
+              "column": 8
+            }
+          },
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@Autowired",
+            "start": {
+              "line": 15,
+              "column": 2
+            },
+            "end": {
+              "line": 15,
+              "column": 12
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Autowired",
+            "start": {
+              "line": 15,
+              "column": 3
+            },
+            "end": {
+              "line": 15,
+              "column": 12
+            }
+          },
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@NonNull",
+            "start": {
+              "line": 24,
+              "column": 26
+            },
+            "end": {
+              "line": 24,
+              "column": 34
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "NonNull",
+            "start": {
+              "line": 24,
+              "column": 27
+            },
+            "end": {
+              "line": 24,
+              "column": 34
+            }
+          }
+        ],
+        "type-references": [
+          {
+            "name": "typeref.annotation",
+            "nodeType": "identifier",
+            "text": "Service",
+            "start": {
+              "line": 12,
+              "column": 1
+            },
+            "end": {
+              "line": 12,
+              "column": 8
+            }
+          },
+          {
+            "name": "typeref.extends",
+            "nodeType": "generic_type",
+            "text": "BaseService<Order>",
+            "start": {
+              "line": 13,
+              "column": 34
+            },
+            "end": {
+              "line": 13,
+              "column": 52
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "BaseService",
+            "start": {
+              "line": 13,
+              "column": 34
+            },
+            "end": {
+              "line": 13,
+              "column": 45
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 13,
+              "column": 46
+            },
+            "end": {
+              "line": 13,
+              "column": 51
+            }
+          },
+          {
+            "name": "typeref.implements",
+            "nodeType": "type_identifier",
+            "text": "Auditable",
+            "start": {
+              "line": 13,
+              "column": 64
+            },
+            "end": {
+              "line": 13,
+              "column": 73
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Auditable",
+            "start": {
+              "line": 13,
+              "column": 64
+            },
+            "end": {
+              "line": 13,
+              "column": 73
+            }
+          },
+          {
+            "name": "typeref.implements",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.io.Serializable",
+            "start": {
+              "line": 13,
+              "column": 75
+            },
+            "end": {
+              "line": 13,
+              "column": 95
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.io.Serializable",
+            "start": {
+              "line": 13,
+              "column": 75
+            },
+            "end": {
+              "line": 13,
+              "column": 95
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.io",
+            "start": {
+              "line": 13,
+              "column": 75
+            },
+            "end": {
+              "line": 13,
+              "column": 82
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "java",
+            "start": {
+              "line": 13,
+              "column": 75
+            },
+            "end": {
+              "line": 13,
+              "column": 79
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "io",
+            "start": {
+              "line": 13,
+              "column": 80
+            },
+            "end": {
+              "line": 13,
+              "column": 82
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Serializable",
+            "start": {
+              "line": 13,
+              "column": 83
+            },
+            "end": {
+              "line": 13,
+              "column": 95
+            }
+          },
+          {
+            "name": "typeref.annotation",
+            "nodeType": "identifier",
+            "text": "Autowired",
+            "start": {
+              "line": 15,
+              "column": 3
+            },
+            "end": {
+              "line": 15,
+              "column": 12
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "OrderRepository",
+            "start": {
+              "line": 16,
+              "column": 10
+            },
+            "end": {
+              "line": 16,
+              "column": 25
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "OrderRepository",
+            "start": {
+              "line": 16,
+              "column": 10
+            },
+            "end": {
+              "line": 16,
+              "column": 25
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "generic_type",
+            "text": "Map<String, List<Order>>",
+            "start": {
+              "line": 18,
+              "column": 16
+            },
+            "end": {
+              "line": 18,
+              "column": 40
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Map",
+            "start": {
+              "line": 18,
+              "column": 16
+            },
+            "end": {
+              "line": 18,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 18,
+              "column": 20
+            },
+            "end": {
+              "line": 18,
+              "column": 26
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "List",
+            "start": {
+              "line": 18,
+              "column": 28
+            },
+            "end": {
+              "line": 18,
+              "column": 32
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 18,
+              "column": 33
+            },
+            "end": {
+              "line": 18,
+              "column": 38
+            }
+          },
+          {
+            "name": "typeref.new",
+            "nodeType": "generic_type",
+            "text": "java.util.HashMap<>",
+            "start": {
+              "line": 18,
+              "column": 58
+            },
+            "end": {
+              "line": 18,
+              "column": 77
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.util.HashMap",
+            "start": {
+              "line": 18,
+              "column": 58
+            },
+            "end": {
+              "line": 18,
+              "column": 75
+            }
+          },
+          {
+            "name": "typeref.qualified",
+            "nodeType": "scoped_type_identifier",
+            "text": "java.util",
+            "start": {
+              "line": 18,
+              "column": 58
+            },
+            "end": {
+              "line": 18,
+              "column": 67
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "java",
+            "start": {
+              "line": 18,
+              "column": 58
+            },
+            "end": {
+              "line": 18,
+              "column": 62
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "util",
+            "start": {
+              "line": 18,
+              "column": 63
+            },
+            "end": {
+              "line": 18,
+              "column": 67
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "HashMap",
+            "start": {
+              "line": 18,
+              "column": 68
+            },
+            "end": {
+              "line": 18,
+              "column": 75
+            }
+          },
+          {
+            "name": "typeref.parameter",
+            "nodeType": "type_identifier",
+            "text": "OrderRepository",
+            "start": {
+              "line": 20,
+              "column": 22
+            },
+            "end": {
+              "line": 20,
+              "column": 37
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "OrderRepository",
+            "start": {
+              "line": 20,
+              "column": 22
+            },
+            "end": {
+              "line": 20,
+              "column": 37
+            }
+          },
+          {
+            "name": "typeref.parameter",
+            "nodeType": "type_identifier",
+            "text": "Clock",
+            "start": {
+              "line": 20,
+              "column": 50
+            },
+            "end": {
+              "line": 20,
+              "column": 55
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Clock",
+            "start": {
+              "line": 20,
+              "column": 50
+            },
+            "end": {
+              "line": 20,
+              "column": 55
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "generic_type",
+            "text": "List<Order>",
+            "start": {
+              "line": 24,
+              "column": 9
+            },
+            "end": {
+              "line": 24,
+              "column": 20
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "List",
+            "start": {
+              "line": 24,
+              "column": 9
+            },
+            "end": {
+              "line": 24,
+              "column": 13
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 24,
+              "column": 14
+            },
+            "end": {
+              "line": 24,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.annotation",
+            "nodeType": "identifier",
+            "text": "NonNull",
+            "start": {
+              "line": 24,
+              "column": 27
+            },
+            "end": {
+              "line": 24,
+              "column": 34
+            }
+          },
+          {
+            "name": "typeref.parameter",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 24,
+              "column": 35
+            },
+            "end": {
+              "line": 24,
+              "column": 41
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 24,
+              "column": 35
+            },
+            "end": {
+              "line": 24,
+              "column": 41
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "NotFoundException",
+            "start": {
+              "line": 24,
+              "column": 59
+            },
+            "end": {
+              "line": 24,
+              "column": 76
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "List",
+            "start": {
+              "line": 26,
+              "column": 4
+            },
+            "end": {
+              "line": 26,
+              "column": 8
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 26,
+              "column": 9
+            },
+            "end": {
+              "line": 26,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "Status",
+            "start": {
+              "line": 26,
+              "column": 48
+            },
+            "end": {
+              "line": 26,
+              "column": 54
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 30,
+              "column": 10
+            },
+            "end": {
+              "line": 30,
+              "column": 11
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Comparable",
+            "start": {
+              "line": 30,
+              "column": 20
+            },
+            "end": {
+              "line": 30,
+              "column": 30
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 30,
+              "column": 31
+            },
+            "end": {
+              "line": 30,
+              "column": 32
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 30,
+              "column": 35
+            },
+            "end": {
+              "line": 30,
+              "column": 36
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 30,
+              "column": 35
+            },
+            "end": {
+              "line": 30,
+              "column": 36
+            }
+          },
+          {
+            "name": "typeref.parameter",
+            "nodeType": "generic_type",
+            "text": "List<? extends T>",
+            "start": {
+              "line": 30,
+              "column": 45
+            },
+            "end": {
+              "line": 30,
+              "column": 62
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "List",
+            "start": {
+              "line": 30,
+              "column": 45
+            },
+            "end": {
+              "line": 30,
+              "column": 49
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 30,
+              "column": 60
+            },
+            "end": {
+              "line": 30,
+              "column": 61
+            }
+          },
+          {
+            "name": "typeref.parameter",
+            "nodeType": "generic_type",
+            "text": "Function<T, String>",
+            "start": {
+              "line": 30,
+              "column": 70
+            },
+            "end": {
+              "line": 30,
+              "column": 89
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Function",
+            "start": {
+              "line": 30,
+              "column": 70
+            },
+            "end": {
+              "line": 30,
+              "column": 78
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 30,
+              "column": 79
+            },
+            "end": {
+              "line": 30,
+              "column": 80
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 30,
+              "column": 82
+            },
+            "end": {
+              "line": 30,
+              "column": 88
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 35,
+              "column": 2
+            },
+            "end": {
+              "line": 35,
+              "column": 8
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 35,
+              "column": 2
+            },
+            "end": {
+              "line": 35,
+              "column": 8
+            }
+          },
+          {
+            "name": "typeref.parameter",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 42,
+              "column": 14
+            },
+            "end": {
+              "line": 42,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 42,
+              "column": 14
+            },
+            "end": {
+              "line": 42,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Runnable",
+            "start": {
+              "line": 44,
+              "column": 4
+            },
+            "end": {
+              "line": 44,
+              "column": 12
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "System",
+            "start": {
+              "line": 44,
+              "column": 23
+            },
+            "end": {
+              "line": 44,
+              "column": 29
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Object",
+            "start": {
+              "line": 48,
+              "column": 4
+            },
+            "end": {
+              "line": 48,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.new",
+            "nodeType": "type_identifier",
+            "text": "Inner",
+            "start": {
+              "line": 48,
+              "column": 19
+            },
+            "end": {
+              "line": 48,
+              "column": 24
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Inner",
+            "start": {
+              "line": 48,
+              "column": 19
+            },
+            "end": {
+              "line": 48,
+              "column": 24
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 58,
+              "column": 22
+            },
+            "end": {
+              "line": 58,
+              "column": 23
+            }
+          },
+          {
+            "name": "typeref.field",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 59,
+              "column": 4
+            },
+            "end": {
+              "line": 59,
+              "column": 5
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 59,
+              "column": 4
+            },
+            "end": {
+              "line": 59,
+              "column": 5
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 61,
+              "column": 4
+            },
+            "end": {
+              "line": 61,
+              "column": 5
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 61,
+              "column": 4
+            },
+            "end": {
+              "line": 61,
+              "column": 5
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/shop/Types.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.shop;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.shop",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [
+          {
+            "name": "import.declaration",
+            "nodeType": "import_declaration",
+            "text": "import java.io.Serializable;",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 28
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "scoped_identifier",
+            "text": "java.io.Serializable",
+            "start": {
+              "line": 3,
+              "column": 7
+            },
+            "end": {
+              "line": 3,
+              "column": 27
+            }
+          }
+        ],
+        "declarations": [
+          {
+            "name": "type.interface",
+            "nodeType": "interface_declaration",
+            "text": "public interface Types {\n\n  interface Named extends Serializable, Comparable<Named> {\n    String name();\n  }\n\n  enum Status implements Named {\n    OPEN,\n    CLOSED {\n      @Override\n      public String label() {\n        return \"closed\";\n      }\n    };\n\n    public String label() {\n      return name().toLowerCase();\n    }\n  }\n\n  record Money(long cents, String currency) implements Serializable {\n    public Money {\n      if (cents < 0) throw new IllegalArgumentException(\"negative\");\n    }\n\n    static Money of(long cents) {\n      return new Money(cents, \"USD\");\n    }\n  }\n\n  @interface Audited {\n    String value() default \"none\";\n  }\n\n  @Audited(\"types\")\n  @Deprecated\n  abstract class Base<T extends Number> {\n    abstract T convert(Object source);\n  }\n}",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 44,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Types",
+            "start": {
+              "line": 5,
+              "column": 17
+            },
+            "end": {
+              "line": 5,
+              "column": 22
+            }
+          },
+          {
+            "name": "type.interface",
+            "nodeType": "interface_declaration",
+            "text": "interface Named extends Serializable, Comparable<Named> {\n    String name();\n  }",
+            "start": {
+              "line": 7,
+              "column": 2
+            },
+            "end": {
+              "line": 9,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Named",
+            "start": {
+              "line": 7,
+              "column": 12
+            },
+            "end": {
+              "line": 7,
+              "column": 17
+            }
+          },
+          {
+            "name": "type.enum",
+            "nodeType": "enum_declaration",
+            "text": "enum Status implements Named {\n    OPEN,\n    CLOSED {\n      @Override\n      public String label() {\n        return \"closed\";\n      }\n    };\n\n    public String label() {\n      return name().toLowerCase();\n    }\n  }",
+            "start": {
+              "line": 11,
+              "column": 2
+            },
+            "end": {
+              "line": 23,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Status",
+            "start": {
+              "line": 11,
+              "column": 7
+            },
+            "end": {
+              "line": 11,
+              "column": 13
+            }
+          },
+          {
+            "name": "type.record",
+            "nodeType": "record_declaration",
+            "text": "record Money(long cents, String currency) implements Serializable {\n    public Money {\n      if (cents < 0) throw new IllegalArgumentException(\"negative\");\n    }\n\n    static Money of(long cents) {\n      return new Money(cents, \"USD\");\n    }\n  }",
+            "start": {
+              "line": 25,
+              "column": 2
+            },
+            "end": {
+              "line": 33,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Money",
+            "start": {
+              "line": 25,
+              "column": 9
+            },
+            "end": {
+              "line": 25,
+              "column": 14
+            }
+          },
+          {
+            "name": "type.annotation",
+            "nodeType": "annotation_type_declaration",
+            "text": "@interface Audited {\n    String value() default \"none\";\n  }",
+            "start": {
+              "line": 35,
+              "column": 2
+            },
+            "end": {
+              "line": 37,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Audited",
+            "start": {
+              "line": 35,
+              "column": 13
+            },
+            "end": {
+              "line": 35,
+              "column": 20
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "@Audited(\"types\")\n  @Deprecated\n  abstract class Base<T extends Number> {\n    abstract T convert(Object source);\n  }",
+            "start": {
+              "line": 39,
+              "column": 2
+            },
+            "end": {
+              "line": 43,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Base",
+            "start": {
+              "line": 41,
+              "column": 17
+            },
+            "end": {
+              "line": 41,
+              "column": 21
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "String name();",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 18
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 8,
+              "column": 11
+            },
+            "end": {
+              "line": 8,
+              "column": 15
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "@Override\n      public String label() {\n        return \"closed\";\n      }",
+            "start": {
+              "line": 14,
+              "column": 6
+            },
+            "end": {
+              "line": 17,
+              "column": 7
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "label",
+            "start": {
+              "line": 15,
+              "column": 20
+            },
+            "end": {
+              "line": 15,
+              "column": 25
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public String label() {\n      return name().toLowerCase();\n    }",
+            "start": {
+              "line": 20,
+              "column": 4
+            },
+            "end": {
+              "line": 22,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "label",
+            "start": {
+              "line": 20,
+              "column": 18
+            },
+            "end": {
+              "line": 20,
+              "column": 23
+            }
+          },
+          {
+            "name": "constructor.declaration",
+            "nodeType": "compact_constructor_declaration",
+            "text": "public Money {\n      if (cents < 0) throw new IllegalArgumentException(\"negative\");\n    }",
+            "start": {
+              "line": 26,
+              "column": 4
+            },
+            "end": {
+              "line": 28,
+              "column": 5
+            }
+          },
+          {
+            "name": "constructor.name",
+            "nodeType": "identifier",
+            "text": "Money",
+            "start": {
+              "line": 26,
+              "column": 11
+            },
+            "end": {
+              "line": 26,
+              "column": 16
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "static Money of(long cents) {\n      return new Money(cents, \"USD\");\n    }",
+            "start": {
+              "line": 30,
+              "column": 4
+            },
+            "end": {
+              "line": 32,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "of",
+            "start": {
+              "line": 30,
+              "column": 17
+            },
+            "end": {
+              "line": 30,
+              "column": 19
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "abstract T convert(Object source);",
+            "start": {
+              "line": 42,
+              "column": 4
+            },
+            "end": {
+              "line": 42,
+              "column": 38
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "convert",
+            "start": {
+              "line": 42,
+              "column": 15
+            },
+            "end": {
+              "line": 42,
+              "column": 22
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "name().toLowerCase()",
+            "start": {
+              "line": 21,
+              "column": 13
+            },
+            "end": {
+              "line": 21,
+              "column": 33
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "method_invocation",
+            "text": "name()",
+            "start": {
+              "line": 21,
+              "column": 13
+            },
+            "end": {
+              "line": 21,
+              "column": 19
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "name()",
+            "start": {
+              "line": 21,
+              "column": 13
+            },
+            "end": {
+              "line": 21,
+              "column": 19
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 21,
+              "column": 13
+            },
+            "end": {
+              "line": 21,
+              "column": 17
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 21,
+              "column": 17
+            },
+            "end": {
+              "line": 21,
+              "column": 19
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "toLowerCase",
+            "start": {
+              "line": 21,
+              "column": 20
+            },
+            "end": {
+              "line": 21,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "()",
+            "start": {
+              "line": 21,
+              "column": 31
+            },
+            "end": {
+              "line": 21,
+              "column": 33
+            }
+          }
+        ],
+        "annotations": [
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@Override",
+            "start": {
+              "line": 14,
+              "column": 6
+            },
+            "end": {
+              "line": 14,
+              "column": 15
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Override",
+            "start": {
+              "line": 14,
+              "column": 7
+            },
+            "end": {
+              "line": 14,
+              "column": 15
+            }
+          },
+          {
+            "name": "annotation.use",
+            "nodeType": "annotation",
+            "text": "@Audited(\"types\")",
+            "start": {
+              "line": 39,
+              "column": 2
+            },
+            "end": {
+              "line": 39,
+              "column": 19
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Audited",
+            "start": {
+              "line": 39,
+              "column": 3
+            },
+            "end": {
+              "line": 39,
+              "column": 10
+            }
+          },
+          {
+            "name": "annotation.arguments",
+            "nodeType": "annotation_argument_list",
+            "text": "(\"types\")",
+            "start": {
+              "line": 39,
+              "column": 10
+            },
+            "end": {
+              "line": 39,
+              "column": 19
+            }
+          },
+          {
+            "name": "annotation.string_argument",
+            "nodeType": "string_literal",
+            "text": "\"types\"",
+            "start": {
+              "line": 39,
+              "column": 11
+            },
+            "end": {
+              "line": 39,
+              "column": 18
+            }
+          },
+          {
+            "name": "annotation.use",
+            "nodeType": "marker_annotation",
+            "text": "@Deprecated",
+            "start": {
+              "line": 40,
+              "column": 2
+            },
+            "end": {
+              "line": 40,
+              "column": 13
+            }
+          },
+          {
+            "name": "annotation.name",
+            "nodeType": "identifier",
+            "text": "Deprecated",
+            "start": {
+              "line": 40,
+              "column": 3
+            },
+            "end": {
+              "line": 40,
+              "column": 13
+            }
+          }
+        ],
+        "type-references": [
+          {
+            "name": "typeref.extends",
+            "nodeType": "type_identifier",
+            "text": "Serializable",
+            "start": {
+              "line": 7,
+              "column": 26
+            },
+            "end": {
+              "line": 7,
+              "column": 38
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Serializable",
+            "start": {
+              "line": 7,
+              "column": 26
+            },
+            "end": {
+              "line": 7,
+              "column": 38
+            }
+          },
+          {
+            "name": "typeref.extends",
+            "nodeType": "generic_type",
+            "text": "Comparable<Named>",
+            "start": {
+              "line": 7,
+              "column": 40
+            },
+            "end": {
+              "line": 7,
+              "column": 57
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Comparable",
+            "start": {
+              "line": 7,
+              "column": 40
+            },
+            "end": {
+              "line": 7,
+              "column": 50
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Named",
+            "start": {
+              "line": 7,
+              "column": 51
+            },
+            "end": {
+              "line": 7,
+              "column": 56
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 8,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.implements",
+            "nodeType": "type_identifier",
+            "text": "Named",
+            "start": {
+              "line": 11,
+              "column": 25
+            },
+            "end": {
+              "line": 11,
+              "column": 30
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Named",
+            "start": {
+              "line": 11,
+              "column": 25
+            },
+            "end": {
+              "line": 11,
+              "column": 30
+            }
+          },
+          {
+            "name": "typeref.annotation",
+            "nodeType": "identifier",
+            "text": "Override",
+            "start": {
+              "line": 14,
+              "column": 7
+            },
+            "end": {
+              "line": 14,
+              "column": 15
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 15,
+              "column": 13
+            },
+            "end": {
+              "line": 15,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 15,
+              "column": 13
+            },
+            "end": {
+              "line": 15,
+              "column": 19
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 20,
+              "column": 11
+            },
+            "end": {
+              "line": 20,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 20,
+              "column": 11
+            },
+            "end": {
+              "line": 20,
+              "column": 17
+            }
+          },
+          {
+            "name": "typeref.parameter",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 25,
+              "column": 27
+            },
+            "end": {
+              "line": 25,
+              "column": 33
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 25,
+              "column": 27
+            },
+            "end": {
+              "line": 25,
+              "column": 33
+            }
+          },
+          {
+            "name": "typeref.implements",
+            "nodeType": "type_identifier",
+            "text": "Serializable",
+            "start": {
+              "line": 25,
+              "column": 55
+            },
+            "end": {
+              "line": 25,
+              "column": 67
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Serializable",
+            "start": {
+              "line": 25,
+              "column": 55
+            },
+            "end": {
+              "line": 25,
+              "column": 67
+            }
+          },
+          {
+            "name": "typeref.new",
+            "nodeType": "type_identifier",
+            "text": "IllegalArgumentException",
+            "start": {
+              "line": 27,
+              "column": 31
+            },
+            "end": {
+              "line": 27,
+              "column": 55
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "IllegalArgumentException",
+            "start": {
+              "line": 27,
+              "column": 31
+            },
+            "end": {
+              "line": 27,
+              "column": 55
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "type_identifier",
+            "text": "Money",
+            "start": {
+              "line": 30,
+              "column": 11
+            },
+            "end": {
+              "line": 30,
+              "column": 16
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Money",
+            "start": {
+              "line": 30,
+              "column": 11
+            },
+            "end": {
+              "line": 30,
+              "column": 16
+            }
+          },
+          {
+            "name": "typeref.new",
+            "nodeType": "type_identifier",
+            "text": "Money",
+            "start": {
+              "line": 31,
+              "column": 17
+            },
+            "end": {
+              "line": 31,
+              "column": 22
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Money",
+            "start": {
+              "line": 31,
+              "column": 17
+            },
+            "end": {
+              "line": 31,
+              "column": 22
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 36,
+              "column": 4
+            },
+            "end": {
+              "line": 36,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.annotation",
+            "nodeType": "identifier",
+            "text": "Audited",
+            "start": {
+              "line": 39,
+              "column": 3
+            },
+            "end": {
+              "line": 39,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.annotation",
+            "nodeType": "identifier",
+            "text": "Deprecated",
+            "start": {
+              "line": 40,
+              "column": 3
+            },
+            "end": {
+              "line": 40,
+              "column": 13
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 41,
+              "column": 22
+            },
+            "end": {
+              "line": 41,
+              "column": 23
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Number",
+            "start": {
+              "line": 41,
+              "column": 32
+            },
+            "end": {
+              "line": 41,
+              "column": 38
+            }
+          },
+          {
+            "name": "typeref.return",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 42,
+              "column": 13
+            },
+            "end": {
+              "line": 42,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "T",
+            "start": {
+              "line": 42,
+              "column": 13
+            },
+            "end": {
+              "line": 42,
+              "column": 14
+            }
+          },
+          {
+            "name": "typeref.parameter",
+            "nodeType": "type_identifier",
+            "text": "Object",
+            "start": {
+              "line": 42,
+              "column": 23
+            },
+            "end": {
+              "line": 42,
+              "column": 29
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "Object",
+            "start": {
+              "line": 42,
+              "column": 23
+            },
+            "end": {
+              "line": 42,
+              "column": 29
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/time/Clock.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.time;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.time",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.interface",
+            "nodeType": "interface_declaration",
+            "text": "public interface Clock {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 25
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Clock",
+            "start": {
+              "line": 3,
+              "column": 17
+            },
+            "end": {
+              "line": 3,
+              "column": 22
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/tool/Launcher.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.tool;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.tool",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public class Launcher {\n  public static void main(String... args) {\n    System.out.println(args.length);\n  }\n\n  // Near misses: not static, and not void, so neither is an entry point.\n  public void main(String[] args) {}\n\n  static class Exit {\n    public static int main(String[] args) {\n      return 0;\n    }\n  }\n}",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 17,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Launcher",
+            "start": {
+              "line": 4,
+              "column": 13
+            },
+            "end": {
+              "line": 4,
+              "column": 21
+            }
+          },
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "static class Exit {\n    public static int main(String[] args) {\n      return 0;\n    }\n  }",
+            "start": {
+              "line": 12,
+              "column": 2
+            },
+            "end": {
+              "line": 16,
+              "column": 3
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Exit",
+            "start": {
+              "line": 12,
+              "column": 15
+            },
+            "end": {
+              "line": 12,
+              "column": 19
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static void main(String... args) {\n    System.out.println(args.length);\n  }",
+            "start": {
+              "line": 5,
+              "column": 2
+            },
+            "end": {
+              "line": 7,
+              "column": 3
+            }
+          },
+          {
+            "name": "entry_point.main",
+            "nodeType": "method_declaration",
+            "text": "public static void main(String... args) {\n    System.out.println(args.length);\n  }",
+            "start": {
+              "line": 5,
+              "column": 2
+            },
+            "end": {
+              "line": 7,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "main",
+            "start": {
+              "line": 5,
+              "column": 21
+            },
+            "end": {
+              "line": 5,
+              "column": 25
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public void main(String[] args) {}",
+            "start": {
+              "line": 10,
+              "column": 2
+            },
+            "end": {
+              "line": 10,
+              "column": 36
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "main",
+            "start": {
+              "line": 10,
+              "column": 14
+            },
+            "end": {
+              "line": 10,
+              "column": 18
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static int main(String[] args) {\n      return 0;\n    }",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 15,
+              "column": 5
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "main",
+            "start": {
+              "line": 13,
+              "column": 22
+            },
+            "end": {
+              "line": 13,
+              "column": 26
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "System.out.println(args.length)",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 35
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "field_access",
+            "text": "System.out",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 14
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "println",
+            "start": {
+              "line": 6,
+              "column": 15
+            },
+            "end": {
+              "line": 6,
+              "column": 22
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(args.length)",
+            "start": {
+              "line": 6,
+              "column": 22
+            },
+            "end": {
+              "line": 6,
+              "column": 35
+            }
+          }
+        ],
+        "annotations": [],
+        "type-references": [
+          {
+            "name": "typeref.parameter",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 5,
+              "column": 26
+            },
+            "end": {
+              "line": 5,
+              "column": 32
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 5,
+              "column": 26
+            },
+            "end": {
+              "line": 5,
+              "column": 32
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "System",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 10
+            }
+          },
+          {
+            "name": "typeref.qualifier",
+            "nodeType": "identifier",
+            "text": "args",
+            "start": {
+              "line": 6,
+              "column": 23
+            },
+            "end": {
+              "line": 6,
+              "column": 27
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 10,
+              "column": 19
+            },
+            "end": {
+              "line": 10,
+              "column": 25
+            }
+          },
+          {
+            "name": "typeref.name",
+            "nodeType": "type_identifier",
+            "text": "String",
+            "start": {
+              "line": 13,
+              "column": 27
+            },
+            "end": {
+              "line": 13,
+              "column": 33
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Cart.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Cart {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 26
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Cart",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 23
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Constants.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.interface",
+            "nodeType": "interface_declaration",
+            "text": "public interface Constants {\n  int MAX = 10;\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Constants",
+            "start": {
+              "line": 3,
+              "column": 17
+            },
+            "end": {
+              "line": 3,
+              "column": 26
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Numbers.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Numbers {\n  public static int round(double value) {\n    return (int) Math.round(value);\n  }\n}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Numbers",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 26
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "public static int round(double value) {\n    return (int) Math.round(value);\n  }",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 6,
+              "column": 3
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "identifier",
+            "text": "round",
+            "start": {
+              "line": 4,
+              "column": 20
+            },
+            "end": {
+              "line": 4,
+              "column": 25
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "method_invocation",
+            "text": "Math.round(value)",
+            "start": {
+              "line": 5,
+              "column": 17
+            },
+            "end": {
+              "line": 5,
+              "column": 34
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "Math",
+            "start": {
+              "line": 5,
+              "column": 17
+            },
+            "end": {
+              "line": 5,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "round",
+            "start": {
+              "line": 5,
+              "column": 22
+            },
+            "end": {
+              "line": 5,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(value)",
+            "start": {
+              "line": 5,
+              "column": 27
+            },
+            "end": {
+              "line": 5,
+              "column": 34
+            }
+          }
+        ],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Strings.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Strings {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 29
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Strings",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 26
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/com/example/util/Unused.java",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_declaration",
+            "text": "package com.example.util;",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 25
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "scoped_identifier",
+            "text": "com.example.util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 24
+            }
+          }
+        ],
+        "imports": [],
+        "declarations": [
+          {
+            "name": "type.class",
+            "nodeType": "class_declaration",
+            "text": "public final class Unused {}",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 28
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "identifier",
+            "text": "Unused",
+            "start": {
+              "line": 3,
+              "column": 19
+            },
+            "end": {
+              "line": 3,
+              "column": 25
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [],
+        "annotations": [],
+        "type-references": []
+      }
+    }
+  ],
+  "references": {
+    "src/Default.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Cart.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Checkout.java": {
+      "files": [
+        {
+          "to": "src/com/example/app/Cart.java",
+          "symbols": [
+            "Cart"
+          ]
+        },
+        {
+          "to": "src/com/example/app/Receipt.java",
+          "symbols": [
+            "Receipt"
+          ]
+        },
+        {
+          "to": "src/com/example/app/Status.java",
+          "symbols": [
+            "Status"
+          ]
+        },
+        {
+          "to": "src/com/example/app/Tax.java",
+          "symbols": [
+            "Tax"
+          ]
+        },
+        {
+          "to": "src/com/example/model/Customer.java",
+          "symbols": [
+            "Address",
+            "Customer"
+          ]
+        },
+        {
+          "to": "src/com/example/time/Clock.java",
+          "symbols": [
+            "Clock"
+          ]
+        },
+        {
+          "to": "src/com/example/util/Constants.java",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "to": "src/com/example/util/Numbers.java",
+          "symbols": [
+            "round"
+          ]
+        },
+        {
+          "to": "src/com/example/util/Strings.java",
+          "symbols": [
+            "Strings"
+          ]
+        }
+      ],
+      "external": [
+        {
+          "package": "java:javax.inject",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "java:org.acme",
+          "symbols": [
+            "Missing"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.time",
+          "symbols": [
+            "Instant"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.util",
+          "symbols": [
+            "List"
+          ]
+        }
+      ]
+    },
+    "src/com/example/app/Clock.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/FooApplication.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Receipt.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Status.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/app/Tax.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/model/Customer.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/shop/OrderService.java": {
+      "files": [],
+      "external": [
+        {
+          "package": "java:org.springframework.beans.factory.annotation",
+          "symbols": [
+            "Autowired"
+          ]
+        },
+        {
+          "package": "java:org.springframework.stereotype",
+          "symbols": [
+            "Service"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.io",
+          "symbols": [
+            "Serializable"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.lang",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.util",
+          "symbols": [
+            "HashMap",
+            "List",
+            "Map"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.util.function",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "java:stdlib:java.util.stream",
+          "symbols": [
+            "toList"
+          ]
+        }
+      ]
+    },
+    "src/com/example/shop/Types.java": {
+      "files": [],
+      "external": [
+        {
+          "package": "java:stdlib:java.io",
+          "symbols": [
+            "Serializable"
+          ]
+        }
+      ]
+    },
+    "src/com/example/time/Clock.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/tool/Launcher.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Cart.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Constants.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Numbers.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Strings.java": {
+      "files": [],
+      "external": []
+    },
+    "src/com/example/util/Unused.java": {
+      "files": [],
+      "external": []
+    }
+  }
+}
