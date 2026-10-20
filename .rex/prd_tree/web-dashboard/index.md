@@ -59,3 +59,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Stack the dashboard's floating notices and status pills like toasts instead of overlapping](./stack-the-dashboard-s-floating-notices.md) | pending |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
+| [Work page content paints over the prepare-task modal](./work-page-content-paints-over-the.md) | pending |
