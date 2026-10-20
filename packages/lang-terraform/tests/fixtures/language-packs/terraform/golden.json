@@ -1,0 +1,4817 @@
+{
+  "pack": "terraform",
+  "grammar": {
+    "name": "tree-sitter-hcl",
+    "version": "1.2.0"
+  },
+  "files": [
+    {
+      "status": "parsed",
+      "path": "src/gcp.tf",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "resources": [
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"google_sql_database_instance\" \"orders\" {\n  name             = \"orders\"\n  database_version = \"POSTGRES_15\"\n  settings {\n    tier = \"db-f1-micro\"\n  }\n}",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "google_sql_database_instance",
+            "start": {
+              "line": 1,
+              "column": 10
+            },
+            "end": {
+              "line": 1,
+              "column": 38
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "orders",
+            "start": {
+              "line": 1,
+              "column": 41
+            },
+            "end": {
+              "line": 1,
+              "column": 47
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"google_cloudfunctions2_function\" \"export\" {\n  name = \"orders-export\"\n  build_config {\n    runtime     = \"nodejs20\"\n    entry_point = \"run\"\n  }\n}",
+            "start": {
+              "line": 9,
+              "column": 0
+            },
+            "end": {
+              "line": 15,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "google_cloudfunctions2_function",
+            "start": {
+              "line": 9,
+              "column": 10
+            },
+            "end": {
+              "line": 9,
+              "column": 41
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "export",
+            "start": {
+              "line": 9,
+              "column": 44
+            },
+            "end": {
+              "line": 9,
+              "column": 50
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"google_container_cluster\" \"primary\" {\n  name               = \"orders\"\n  min_master_version = \"1.29\"\n}",
+            "start": {
+              "line": 17,
+              "column": 0
+            },
+            "end": {
+              "line": 20,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "google_container_cluster",
+            "start": {
+              "line": 17,
+              "column": 10
+            },
+            "end": {
+              "line": 17,
+              "column": 34
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "primary",
+            "start": {
+              "line": 17,
+              "column": 37
+            },
+            "end": {
+              "line": 17,
+              "column": 44
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"google_cloud_run_v2_service\" \"api\" {\n  name = \"orders-api\"\n  template {\n    containers {\n      image = \"gcr.io/orders/api:1.4.2\"\n    }\n  }\n}",
+            "start": {
+              "line": 22,
+              "column": 0
+            },
+            "end": {
+              "line": 29,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "google_cloud_run_v2_service",
+            "start": {
+              "line": 22,
+              "column": 10
+            },
+            "end": {
+              "line": 22,
+              "column": 37
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "api",
+            "start": {
+              "line": 22,
+              "column": 40
+            },
+            "end": {
+              "line": 22,
+              "column": 43
+            }
+          }
+        ],
+        "modules": [],
+        "providers": [],
+        "terraform": [],
+        "declarations": [],
+        "arguments": [
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name             = \"orders\"",
+            "start": {
+              "line": 2,
+              "column": 2
+            },
+            "end": {
+              "line": 2,
+              "column": 29
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 2,
+              "column": 2
+            },
+            "end": {
+              "line": 2,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders\"",
+            "start": {
+              "line": 2,
+              "column": 21
+            },
+            "end": {
+              "line": 2,
+              "column": 29
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "database_version = \"POSTGRES_15\"",
+            "start": {
+              "line": 3,
+              "column": 2
+            },
+            "end": {
+              "line": 3,
+              "column": 34
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "database_version",
+            "start": {
+              "line": 3,
+              "column": 2
+            },
+            "end": {
+              "line": 3,
+              "column": 18
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"POSTGRES_15\"",
+            "start": {
+              "line": 3,
+              "column": 21
+            },
+            "end": {
+              "line": 3,
+              "column": 34
+            }
+          },
+          {
+            "name": "nested",
+            "nodeType": "block",
+            "text": "settings {\n    tier = \"db-f1-micro\"\n  }",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 6,
+              "column": 3
+            }
+          },
+          {
+            "name": "nested.type",
+            "nodeType": "identifier",
+            "text": "settings",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 4,
+              "column": 10
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "tier = \"db-f1-micro\"",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 5,
+              "column": 24
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "tier",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 5,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"db-f1-micro\"",
+            "start": {
+              "line": 5,
+              "column": 11
+            },
+            "end": {
+              "line": 5,
+              "column": 24
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name = \"orders-export\"",
+            "start": {
+              "line": 10,
+              "column": 2
+            },
+            "end": {
+              "line": 10,
+              "column": 24
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 10,
+              "column": 2
+            },
+            "end": {
+              "line": 10,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders-export\"",
+            "start": {
+              "line": 10,
+              "column": 9
+            },
+            "end": {
+              "line": 10,
+              "column": 24
+            }
+          },
+          {
+            "name": "nested",
+            "nodeType": "block",
+            "text": "build_config {\n    runtime     = \"nodejs20\"\n    entry_point = \"run\"\n  }",
+            "start": {
+              "line": 11,
+              "column": 2
+            },
+            "end": {
+              "line": 14,
+              "column": 3
+            }
+          },
+          {
+            "name": "nested.type",
+            "nodeType": "identifier",
+            "text": "build_config",
+            "start": {
+              "line": 11,
+              "column": 2
+            },
+            "end": {
+              "line": 11,
+              "column": 14
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "runtime     = \"nodejs20\"",
+            "start": {
+              "line": 12,
+              "column": 4
+            },
+            "end": {
+              "line": 12,
+              "column": 28
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "runtime",
+            "start": {
+              "line": 12,
+              "column": 4
+            },
+            "end": {
+              "line": 12,
+              "column": 11
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"nodejs20\"",
+            "start": {
+              "line": 12,
+              "column": 18
+            },
+            "end": {
+              "line": 12,
+              "column": 28
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "entry_point = \"run\"",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 23
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "entry_point",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 15
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"run\"",
+            "start": {
+              "line": 13,
+              "column": 18
+            },
+            "end": {
+              "line": 13,
+              "column": 23
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name               = \"orders\"",
+            "start": {
+              "line": 18,
+              "column": 2
+            },
+            "end": {
+              "line": 18,
+              "column": 31
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 18,
+              "column": 2
+            },
+            "end": {
+              "line": 18,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders\"",
+            "start": {
+              "line": 18,
+              "column": 23
+            },
+            "end": {
+              "line": 18,
+              "column": 31
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "min_master_version = \"1.29\"",
+            "start": {
+              "line": 19,
+              "column": 2
+            },
+            "end": {
+              "line": 19,
+              "column": 29
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "min_master_version",
+            "start": {
+              "line": 19,
+              "column": 2
+            },
+            "end": {
+              "line": 19,
+              "column": 20
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"1.29\"",
+            "start": {
+              "line": 19,
+              "column": 23
+            },
+            "end": {
+              "line": 19,
+              "column": 29
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name = \"orders-api\"",
+            "start": {
+              "line": 23,
+              "column": 2
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 23,
+              "column": 2
+            },
+            "end": {
+              "line": 23,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders-api\"",
+            "start": {
+              "line": 23,
+              "column": 9
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "nested",
+            "nodeType": "block",
+            "text": "template {\n    containers {\n      image = \"gcr.io/orders/api:1.4.2\"\n    }\n  }",
+            "start": {
+              "line": 24,
+              "column": 2
+            },
+            "end": {
+              "line": 28,
+              "column": 3
+            }
+          },
+          {
+            "name": "nested.type",
+            "nodeType": "identifier",
+            "text": "template",
+            "start": {
+              "line": 24,
+              "column": 2
+            },
+            "end": {
+              "line": 24,
+              "column": 10
+            }
+          },
+          {
+            "name": "nested",
+            "nodeType": "block",
+            "text": "containers {\n      image = \"gcr.io/orders/api:1.4.2\"\n    }",
+            "start": {
+              "line": 25,
+              "column": 4
+            },
+            "end": {
+              "line": 27,
+              "column": 5
+            }
+          },
+          {
+            "name": "nested.type",
+            "nodeType": "identifier",
+            "text": "containers",
+            "start": {
+              "line": 25,
+              "column": 4
+            },
+            "end": {
+              "line": 25,
+              "column": 14
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "image = \"gcr.io/orders/api:1.4.2\"",
+            "start": {
+              "line": 26,
+              "column": 6
+            },
+            "end": {
+              "line": 26,
+              "column": 39
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "image",
+            "start": {
+              "line": 26,
+              "column": 6
+            },
+            "end": {
+              "line": 26,
+              "column": 11
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"gcr.io/orders/api:1.4.2\"",
+            "start": {
+              "line": 26,
+              "column": 14
+            },
+            "end": {
+              "line": 26,
+              "column": 39
+            }
+          }
+        ],
+        "references": []
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/main.tf",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "resources": [
+          {
+            "name": "data.block",
+            "nodeType": "block",
+            "text": "data \"aws_vpc\" \"default\" {\n  default = true\n}",
+            "start": {
+              "line": 45,
+              "column": 0
+            },
+            "end": {
+              "line": 47,
+              "column": 1
+            }
+          },
+          {
+            "name": "data.type",
+            "nodeType": "template_literal",
+            "text": "aws_vpc",
+            "start": {
+              "line": 45,
+              "column": 6
+            },
+            "end": {
+              "line": 45,
+              "column": 13
+            }
+          },
+          {
+            "name": "data.name",
+            "nodeType": "template_literal",
+            "text": "default",
+            "start": {
+              "line": 45,
+              "column": 16
+            },
+            "end": {
+              "line": 45,
+              "column": 23
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"aws_db_subnet_group\" \"main\" {\n  name       = local.name\n  subnet_ids = module.vpc.private_subnets\n}",
+            "start": {
+              "line": 69,
+              "column": 0
+            },
+            "end": {
+              "line": 72,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "aws_db_subnet_group",
+            "start": {
+              "line": 69,
+              "column": 10
+            },
+            "end": {
+              "line": 69,
+              "column": 29
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "main",
+            "start": {
+              "line": 69,
+              "column": 32
+            },
+            "end": {
+              "line": 69,
+              "column": 36
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"aws_db_instance\" \"orders\" {\n  identifier           = local.name\n  engine               = \"postgres\"\n  engine_version       = var.engine_version\n  db_subnet_group_name = aws_db_subnet_group.main.name\n  tags                 = local.tags\n}",
+            "start": {
+              "line": 74,
+              "column": 0
+            },
+            "end": {
+              "line": 80,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "aws_db_instance",
+            "start": {
+              "line": 74,
+              "column": 10
+            },
+            "end": {
+              "line": 74,
+              "column": 25
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "orders",
+            "start": {
+              "line": 74,
+              "column": 28
+            },
+            "end": {
+              "line": 74,
+              "column": 34
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"aws_lambda_function\" \"worker\" {\n  provider      = aws.west\n  function_name = \"orders-worker\"\n  runtime       = \"python3.12\"\n  environment {\n    variables = {\n      DB_HOST = aws_db_instance.orders.address\n      QUEUE   = \"${aws_sqs_queue.jobs.url}\"\n    }\n  }\n}",
+            "start": {
+              "line": 82,
+              "column": 0
+            },
+            "end": {
+              "line": 92,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "aws_lambda_function",
+            "start": {
+              "line": 82,
+              "column": 10
+            },
+            "end": {
+              "line": 82,
+              "column": 29
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "worker",
+            "start": {
+              "line": 82,
+              "column": 32
+            },
+            "end": {
+              "line": 82,
+              "column": 38
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"aws_sqs_queue\" \"jobs\" {\n  count = 1\n  name  = \"orders-jobs\"\n}",
+            "start": {
+              "line": 94,
+              "column": 0
+            },
+            "end": {
+              "line": 97,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "aws_sqs_queue",
+            "start": {
+              "line": 94,
+              "column": 10
+            },
+            "end": {
+              "line": 94,
+              "column": 23
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "jobs",
+            "start": {
+              "line": 94,
+              "column": 26
+            },
+            "end": {
+              "line": 94,
+              "column": 30
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"aws_eks_cluster\" \"main\" {\n  name     = \"orders\"\n  version  = \"1.30\"\n  role_arn = aws_iam_role.cluster.arn\n}",
+            "start": {
+              "line": 99,
+              "column": 0
+            },
+            "end": {
+              "line": 103,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "aws_eks_cluster",
+            "start": {
+              "line": 99,
+              "column": 10
+            },
+            "end": {
+              "line": 99,
+              "column": 25
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "main",
+            "start": {
+              "line": 99,
+              "column": 28
+            },
+            "end": {
+              "line": 99,
+              "column": 32
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"aws_iam_role\" \"cluster\" {\n  name = \"orders-eks\"\n}",
+            "start": {
+              "line": 105,
+              "column": 0
+            },
+            "end": {
+              "line": 107,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "aws_iam_role",
+            "start": {
+              "line": 105,
+              "column": 10
+            },
+            "end": {
+              "line": 105,
+              "column": 22
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "cluster",
+            "start": {
+              "line": 105,
+              "column": 25
+            },
+            "end": {
+              "line": 105,
+              "column": 32
+            }
+          }
+        ],
+        "modules": [
+          {
+            "name": "module.block",
+            "nodeType": "block",
+            "text": "module \"db\" {\n  source = \"./modules/db\"\n  name   = local.name\n  vpc_id = data.aws_vpc.default.id\n}",
+            "start": {
+              "line": 49,
+              "column": 0
+            },
+            "end": {
+              "line": 53,
+              "column": 1
+            }
+          },
+          {
+            "name": "module.name",
+            "nodeType": "template_literal",
+            "text": "db",
+            "start": {
+              "line": 49,
+              "column": 8
+            },
+            "end": {
+              "line": 49,
+              "column": 10
+            }
+          },
+          {
+            "name": "module.source",
+            "nodeType": "expression",
+            "text": "\"./modules/db\"",
+            "start": {
+              "line": 50,
+              "column": 11
+            },
+            "end": {
+              "line": 50,
+              "column": 25
+            }
+          },
+          {
+            "name": "module.block",
+            "nodeType": "block",
+            "text": "module \"vpc\" {\n  source  = \"terraform-aws-modules/vpc/aws\"\n  version = \"~> 5.8\"\n}",
+            "start": {
+              "line": 55,
+              "column": 0
+            },
+            "end": {
+              "line": 58,
+              "column": 1
+            }
+          },
+          {
+            "name": "module.name",
+            "nodeType": "template_literal",
+            "text": "vpc",
+            "start": {
+              "line": 55,
+              "column": 8
+            },
+            "end": {
+              "line": 55,
+              "column": 11
+            }
+          },
+          {
+            "name": "module.source",
+            "nodeType": "expression",
+            "text": "\"terraform-aws-modules/vpc/aws\"",
+            "start": {
+              "line": 56,
+              "column": 12
+            },
+            "end": {
+              "line": 56,
+              "column": 43
+            }
+          },
+          {
+            "name": "module.version",
+            "nodeType": "expression",
+            "text": "\"~> 5.8\"",
+            "start": {
+              "line": 57,
+              "column": 12
+            },
+            "end": {
+              "line": 57,
+              "column": 20
+            }
+          },
+          {
+            "name": "module.block",
+            "nodeType": "block",
+            "text": "module \"rds\" {\n  source  = \"registry.terraform.io/terraform-aws-modules/rds/aws//modules/db_instance\"\n  version = \"6.10.0\"\n}",
+            "start": {
+              "line": 60,
+              "column": 0
+            },
+            "end": {
+              "line": 63,
+              "column": 1
+            }
+          },
+          {
+            "name": "module.name",
+            "nodeType": "template_literal",
+            "text": "rds",
+            "start": {
+              "line": 60,
+              "column": 8
+            },
+            "end": {
+              "line": 60,
+              "column": 11
+            }
+          },
+          {
+            "name": "module.source",
+            "nodeType": "expression",
+            "text": "\"registry.terraform.io/terraform-aws-modules/rds/aws//modules/db_instance\"",
+            "start": {
+              "line": 61,
+              "column": 12
+            },
+            "end": {
+              "line": 61,
+              "column": 86
+            }
+          },
+          {
+            "name": "module.version",
+            "nodeType": "expression",
+            "text": "\"6.10.0\"",
+            "start": {
+              "line": 62,
+              "column": 12
+            },
+            "end": {
+              "line": 62,
+              "column": 20
+            }
+          },
+          {
+            "name": "module.block",
+            "nodeType": "block",
+            "text": "module \"network\" {\n  source = \"git::https://example.com/network.git?ref=v1.2.0\"\n}",
+            "start": {
+              "line": 65,
+              "column": 0
+            },
+            "end": {
+              "line": 67,
+              "column": 1
+            }
+          },
+          {
+            "name": "module.name",
+            "nodeType": "template_literal",
+            "text": "network",
+            "start": {
+              "line": 65,
+              "column": 8
+            },
+            "end": {
+              "line": 65,
+              "column": 15
+            }
+          },
+          {
+            "name": "module.source",
+            "nodeType": "expression",
+            "text": "\"git::https://example.com/network.git?ref=v1.2.0\"",
+            "start": {
+              "line": 66,
+              "column": 11
+            },
+            "end": {
+              "line": 66,
+              "column": 60
+            }
+          }
+        ],
+        "providers": [
+          {
+            "name": "provider.block",
+            "nodeType": "block",
+            "text": "provider \"aws\" {\n  region = var.region\n}",
+            "start": {
+              "line": 22,
+              "column": 0
+            },
+            "end": {
+              "line": 24,
+              "column": 1
+            }
+          },
+          {
+            "name": "provider.name",
+            "nodeType": "template_literal",
+            "text": "aws",
+            "start": {
+              "line": 22,
+              "column": 10
+            },
+            "end": {
+              "line": 22,
+              "column": 13
+            }
+          },
+          {
+            "name": "provider.block",
+            "nodeType": "block",
+            "text": "provider \"aws\" {\n  alias  = \"west\"\n  region = \"us-west-2\"\n}",
+            "start": {
+              "line": 26,
+              "column": 0
+            },
+            "end": {
+              "line": 29,
+              "column": 1
+            }
+          },
+          {
+            "name": "provider.name",
+            "nodeType": "template_literal",
+            "text": "aws",
+            "start": {
+              "line": 26,
+              "column": 10
+            },
+            "end": {
+              "line": 26,
+              "column": 13
+            }
+          },
+          {
+            "name": "provider.alias",
+            "nodeType": "expression",
+            "text": "\"west\"",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 17
+            }
+          }
+        ],
+        "terraform": [
+          {
+            "name": "terraform.block",
+            "nodeType": "block",
+            "text": "terraform {\n  required_version = \">= 1.6\"\n\n  required_providers {\n    aws = {\n      source  = \"hashicorp/aws\"\n      version = \">= 5.40\"\n    }\n    google = {\n      source  = \"hashicorp/google\"\n      version = \"~> 6.0\"\n    }\n    random = \">= 3.1\"\n  }\n\n  backend \"s3\" {\n    bucket = \"orders-state\"\n    key    = \"prod/terraform.tfstate\"\n  }\n}",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 20,
+              "column": 1
+            }
+          },
+          {
+            "name": "requirement",
+            "nodeType": "attribute",
+            "text": "aws = {\n      source  = \"hashicorp/aws\"\n      version = \">= 5.40\"\n    }",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 5
+            }
+          },
+          {
+            "name": "requirement.name",
+            "nodeType": "identifier",
+            "text": "aws",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 5,
+              "column": 7
+            }
+          },
+          {
+            "name": "requirement.source",
+            "nodeType": "expression",
+            "text": "\"hashicorp/aws\"",
+            "start": {
+              "line": 6,
+              "column": 16
+            },
+            "end": {
+              "line": 6,
+              "column": 31
+            }
+          },
+          {
+            "name": "requirement.version",
+            "nodeType": "expression",
+            "text": "\">= 5.40\"",
+            "start": {
+              "line": 7,
+              "column": 16
+            },
+            "end": {
+              "line": 7,
+              "column": 25
+            }
+          },
+          {
+            "name": "requirement",
+            "nodeType": "attribute",
+            "text": "google = {\n      source  = \"hashicorp/google\"\n      version = \"~> 6.0\"\n    }",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 12,
+              "column": 5
+            }
+          },
+          {
+            "name": "requirement.name",
+            "nodeType": "identifier",
+            "text": "google",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 9,
+              "column": 10
+            }
+          },
+          {
+            "name": "requirement.source",
+            "nodeType": "expression",
+            "text": "\"hashicorp/google\"",
+            "start": {
+              "line": 10,
+              "column": 16
+            },
+            "end": {
+              "line": 10,
+              "column": 34
+            }
+          },
+          {
+            "name": "requirement.version",
+            "nodeType": "expression",
+            "text": "\"~> 6.0\"",
+            "start": {
+              "line": 11,
+              "column": 16
+            },
+            "end": {
+              "line": 11,
+              "column": 24
+            }
+          },
+          {
+            "name": "requirement",
+            "nodeType": "attribute",
+            "text": "random = \">= 3.1\"",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 21
+            }
+          },
+          {
+            "name": "requirement.name",
+            "nodeType": "identifier",
+            "text": "random",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 10
+            }
+          },
+          {
+            "name": "requirement.version",
+            "nodeType": "literal_value",
+            "text": "\">= 3.1\"",
+            "start": {
+              "line": 13,
+              "column": 13
+            },
+            "end": {
+              "line": 13,
+              "column": 21
+            }
+          },
+          {
+            "name": "backend.block",
+            "nodeType": "block",
+            "text": "backend \"s3\" {\n    bucket = \"orders-state\"\n    key    = \"prod/terraform.tfstate\"\n  }",
+            "start": {
+              "line": 16,
+              "column": 2
+            },
+            "end": {
+              "line": 19,
+              "column": 3
+            }
+          },
+          {
+            "name": "backend.type",
+            "nodeType": "template_literal",
+            "text": "s3",
+            "start": {
+              "line": 16,
+              "column": 11
+            },
+            "end": {
+              "line": 16,
+              "column": 13
+            }
+          }
+        ],
+        "declarations": [
+          {
+            "name": "variable.block",
+            "nodeType": "block",
+            "text": "variable \"region\" {\n  type    = string\n  default = \"us-east-1\"\n}",
+            "start": {
+              "line": 31,
+              "column": 0
+            },
+            "end": {
+              "line": 34,
+              "column": 1
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "template_literal",
+            "text": "region",
+            "start": {
+              "line": 31,
+              "column": 10
+            },
+            "end": {
+              "line": 31,
+              "column": 16
+            }
+          },
+          {
+            "name": "variable.block",
+            "nodeType": "block",
+            "text": "variable \"engine_version\" {\n  type = string\n}",
+            "start": {
+              "line": 36,
+              "column": 0
+            },
+            "end": {
+              "line": 38,
+              "column": 1
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "template_literal",
+            "text": "engine_version",
+            "start": {
+              "line": 36,
+              "column": 10
+            },
+            "end": {
+              "line": 36,
+              "column": 24
+            }
+          },
+          {
+            "name": "locals.block",
+            "nodeType": "block",
+            "text": "locals {\n  name = \"orders-${var.region}\"\n  tags = { service = local.name }\n}",
+            "start": {
+              "line": 40,
+              "column": 0
+            },
+            "end": {
+              "line": 43,
+              "column": 1
+            }
+          },
+          {
+            "name": "local",
+            "nodeType": "attribute",
+            "text": "name = \"orders-${var.region}\"",
+            "start": {
+              "line": 41,
+              "column": 2
+            },
+            "end": {
+              "line": 41,
+              "column": 31
+            }
+          },
+          {
+            "name": "local.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 41,
+              "column": 2
+            },
+            "end": {
+              "line": 41,
+              "column": 6
+            }
+          },
+          {
+            "name": "local",
+            "nodeType": "attribute",
+            "text": "tags = { service = local.name }",
+            "start": {
+              "line": 42,
+              "column": 2
+            },
+            "end": {
+              "line": 42,
+              "column": 33
+            }
+          },
+          {
+            "name": "local.name",
+            "nodeType": "identifier",
+            "text": "tags",
+            "start": {
+              "line": 42,
+              "column": 2
+            },
+            "end": {
+              "line": 42,
+              "column": 6
+            }
+          },
+          {
+            "name": "output.block",
+            "nodeType": "block",
+            "text": "output \"db_endpoint\" {\n  value = aws_db_instance.orders.endpoint\n}",
+            "start": {
+              "line": 109,
+              "column": 0
+            },
+            "end": {
+              "line": 111,
+              "column": 1
+            }
+          },
+          {
+            "name": "output.name",
+            "nodeType": "template_literal",
+            "text": "db_endpoint",
+            "start": {
+              "line": 109,
+              "column": 8
+            },
+            "end": {
+              "line": 109,
+              "column": 19
+            }
+          },
+          {
+            "name": "output.block",
+            "nodeType": "block",
+            "text": "output \"db_module\" {\n  value = module.db.id\n}",
+            "start": {
+              "line": 113,
+              "column": 0
+            },
+            "end": {
+              "line": 115,
+              "column": 1
+            }
+          },
+          {
+            "name": "output.name",
+            "nodeType": "template_literal",
+            "text": "db_module",
+            "start": {
+              "line": 113,
+              "column": 8
+            },
+            "end": {
+              "line": 113,
+              "column": 17
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "required_version = \">= 1.6\"",
+            "start": {
+              "line": 2,
+              "column": 2
+            },
+            "end": {
+              "line": 2,
+              "column": 29
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "required_version",
+            "start": {
+              "line": 2,
+              "column": 2
+            },
+            "end": {
+              "line": 2,
+              "column": 18
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\">= 1.6\"",
+            "start": {
+              "line": 2,
+              "column": 21
+            },
+            "end": {
+              "line": 2,
+              "column": 29
+            }
+          },
+          {
+            "name": "nested",
+            "nodeType": "block",
+            "text": "required_providers {\n    aws = {\n      source  = \"hashicorp/aws\"\n      version = \">= 5.40\"\n    }\n    google = {\n      source  = \"hashicorp/google\"\n      version = \"~> 6.0\"\n    }\n    random = \">= 3.1\"\n  }",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 14,
+              "column": 3
+            }
+          },
+          {
+            "name": "nested.type",
+            "nodeType": "identifier",
+            "text": "required_providers",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 4,
+              "column": 20
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "aws = {\n      source  = \"hashicorp/aws\"\n      version = \">= 5.40\"\n    }",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 8,
+              "column": 5
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "aws",
+            "start": {
+              "line": 5,
+              "column": 4
+            },
+            "end": {
+              "line": 5,
+              "column": 7
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "{\n      source  = \"hashicorp/aws\"\n      version = \">= 5.40\"\n    }",
+            "start": {
+              "line": 5,
+              "column": 10
+            },
+            "end": {
+              "line": 8,
+              "column": 5
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "google = {\n      source  = \"hashicorp/google\"\n      version = \"~> 6.0\"\n    }",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 12,
+              "column": 5
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "google",
+            "start": {
+              "line": 9,
+              "column": 4
+            },
+            "end": {
+              "line": 9,
+              "column": 10
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "{\n      source  = \"hashicorp/google\"\n      version = \"~> 6.0\"\n    }",
+            "start": {
+              "line": 9,
+              "column": 13
+            },
+            "end": {
+              "line": 12,
+              "column": 5
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "random = \">= 3.1\"",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "random",
+            "start": {
+              "line": 13,
+              "column": 4
+            },
+            "end": {
+              "line": 13,
+              "column": 10
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\">= 3.1\"",
+            "start": {
+              "line": 13,
+              "column": 13
+            },
+            "end": {
+              "line": 13,
+              "column": 21
+            }
+          },
+          {
+            "name": "nested",
+            "nodeType": "block",
+            "text": "backend \"s3\" {\n    bucket = \"orders-state\"\n    key    = \"prod/terraform.tfstate\"\n  }",
+            "start": {
+              "line": 16,
+              "column": 2
+            },
+            "end": {
+              "line": 19,
+              "column": 3
+            }
+          },
+          {
+            "name": "nested.type",
+            "nodeType": "identifier",
+            "text": "backend",
+            "start": {
+              "line": 16,
+              "column": 2
+            },
+            "end": {
+              "line": 16,
+              "column": 9
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "bucket = \"orders-state\"",
+            "start": {
+              "line": 17,
+              "column": 4
+            },
+            "end": {
+              "line": 17,
+              "column": 27
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "bucket",
+            "start": {
+              "line": 17,
+              "column": 4
+            },
+            "end": {
+              "line": 17,
+              "column": 10
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders-state\"",
+            "start": {
+              "line": 17,
+              "column": 13
+            },
+            "end": {
+              "line": 17,
+              "column": 27
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "key    = \"prod/terraform.tfstate\"",
+            "start": {
+              "line": 18,
+              "column": 4
+            },
+            "end": {
+              "line": 18,
+              "column": 37
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "key",
+            "start": {
+              "line": 18,
+              "column": 4
+            },
+            "end": {
+              "line": 18,
+              "column": 7
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"prod/terraform.tfstate\"",
+            "start": {
+              "line": 18,
+              "column": 13
+            },
+            "end": {
+              "line": 18,
+              "column": 37
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "region = var.region",
+            "start": {
+              "line": 23,
+              "column": 2
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "region",
+            "start": {
+              "line": 23,
+              "column": 2
+            },
+            "end": {
+              "line": 23,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "var.region",
+            "start": {
+              "line": 23,
+              "column": 11
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "alias  = \"west\"",
+            "start": {
+              "line": 27,
+              "column": 2
+            },
+            "end": {
+              "line": 27,
+              "column": 17
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "alias",
+            "start": {
+              "line": 27,
+              "column": 2
+            },
+            "end": {
+              "line": 27,
+              "column": 7
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"west\"",
+            "start": {
+              "line": 27,
+              "column": 11
+            },
+            "end": {
+              "line": 27,
+              "column": 17
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "region = \"us-west-2\"",
+            "start": {
+              "line": 28,
+              "column": 2
+            },
+            "end": {
+              "line": 28,
+              "column": 22
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "region",
+            "start": {
+              "line": 28,
+              "column": 2
+            },
+            "end": {
+              "line": 28,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"us-west-2\"",
+            "start": {
+              "line": 28,
+              "column": 11
+            },
+            "end": {
+              "line": 28,
+              "column": 22
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "type    = string",
+            "start": {
+              "line": 32,
+              "column": 2
+            },
+            "end": {
+              "line": 32,
+              "column": 18
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "type",
+            "start": {
+              "line": 32,
+              "column": 2
+            },
+            "end": {
+              "line": 32,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "string",
+            "start": {
+              "line": 32,
+              "column": 12
+            },
+            "end": {
+              "line": 32,
+              "column": 18
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "default = \"us-east-1\"",
+            "start": {
+              "line": 33,
+              "column": 2
+            },
+            "end": {
+              "line": 33,
+              "column": 23
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "default",
+            "start": {
+              "line": 33,
+              "column": 2
+            },
+            "end": {
+              "line": 33,
+              "column": 9
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"us-east-1\"",
+            "start": {
+              "line": 33,
+              "column": 12
+            },
+            "end": {
+              "line": 33,
+              "column": 23
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "type = string",
+            "start": {
+              "line": 37,
+              "column": 2
+            },
+            "end": {
+              "line": 37,
+              "column": 15
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "type",
+            "start": {
+              "line": 37,
+              "column": 2
+            },
+            "end": {
+              "line": 37,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "string",
+            "start": {
+              "line": 37,
+              "column": 9
+            },
+            "end": {
+              "line": 37,
+              "column": 15
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name = \"orders-${var.region}\"",
+            "start": {
+              "line": 41,
+              "column": 2
+            },
+            "end": {
+              "line": 41,
+              "column": 31
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 41,
+              "column": 2
+            },
+            "end": {
+              "line": 41,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders-${var.region}\"",
+            "start": {
+              "line": 41,
+              "column": 9
+            },
+            "end": {
+              "line": 41,
+              "column": 31
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "tags = { service = local.name }",
+            "start": {
+              "line": 42,
+              "column": 2
+            },
+            "end": {
+              "line": 42,
+              "column": 33
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "tags",
+            "start": {
+              "line": 42,
+              "column": 2
+            },
+            "end": {
+              "line": 42,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "{ service = local.name }",
+            "start": {
+              "line": 42,
+              "column": 9
+            },
+            "end": {
+              "line": 42,
+              "column": 33
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "default = true",
+            "start": {
+              "line": 46,
+              "column": 2
+            },
+            "end": {
+              "line": 46,
+              "column": 16
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "default",
+            "start": {
+              "line": 46,
+              "column": 2
+            },
+            "end": {
+              "line": 46,
+              "column": 9
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "true",
+            "start": {
+              "line": 46,
+              "column": 12
+            },
+            "end": {
+              "line": 46,
+              "column": 16
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "source = \"./modules/db\"",
+            "start": {
+              "line": 50,
+              "column": 2
+            },
+            "end": {
+              "line": 50,
+              "column": 25
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "source",
+            "start": {
+              "line": 50,
+              "column": 2
+            },
+            "end": {
+              "line": 50,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"./modules/db\"",
+            "start": {
+              "line": 50,
+              "column": 11
+            },
+            "end": {
+              "line": 50,
+              "column": 25
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name   = local.name",
+            "start": {
+              "line": 51,
+              "column": 2
+            },
+            "end": {
+              "line": 51,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 51,
+              "column": 2
+            },
+            "end": {
+              "line": 51,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "local.name",
+            "start": {
+              "line": 51,
+              "column": 11
+            },
+            "end": {
+              "line": 51,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "vpc_id = data.aws_vpc.default.id",
+            "start": {
+              "line": 52,
+              "column": 2
+            },
+            "end": {
+              "line": 52,
+              "column": 34
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "vpc_id",
+            "start": {
+              "line": 52,
+              "column": 2
+            },
+            "end": {
+              "line": 52,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "data.aws_vpc.default.id",
+            "start": {
+              "line": 52,
+              "column": 11
+            },
+            "end": {
+              "line": 52,
+              "column": 34
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "source  = \"terraform-aws-modules/vpc/aws\"",
+            "start": {
+              "line": 56,
+              "column": 2
+            },
+            "end": {
+              "line": 56,
+              "column": 43
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "source",
+            "start": {
+              "line": 56,
+              "column": 2
+            },
+            "end": {
+              "line": 56,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"terraform-aws-modules/vpc/aws\"",
+            "start": {
+              "line": 56,
+              "column": 12
+            },
+            "end": {
+              "line": 56,
+              "column": 43
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "version = \"~> 5.8\"",
+            "start": {
+              "line": 57,
+              "column": 2
+            },
+            "end": {
+              "line": 57,
+              "column": 20
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "version",
+            "start": {
+              "line": 57,
+              "column": 2
+            },
+            "end": {
+              "line": 57,
+              "column": 9
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"~> 5.8\"",
+            "start": {
+              "line": 57,
+              "column": 12
+            },
+            "end": {
+              "line": 57,
+              "column": 20
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "source  = \"registry.terraform.io/terraform-aws-modules/rds/aws//modules/db_instance\"",
+            "start": {
+              "line": 61,
+              "column": 2
+            },
+            "end": {
+              "line": 61,
+              "column": 86
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "source",
+            "start": {
+              "line": 61,
+              "column": 2
+            },
+            "end": {
+              "line": 61,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"registry.terraform.io/terraform-aws-modules/rds/aws//modules/db_instance\"",
+            "start": {
+              "line": 61,
+              "column": 12
+            },
+            "end": {
+              "line": 61,
+              "column": 86
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "version = \"6.10.0\"",
+            "start": {
+              "line": 62,
+              "column": 2
+            },
+            "end": {
+              "line": 62,
+              "column": 20
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "version",
+            "start": {
+              "line": 62,
+              "column": 2
+            },
+            "end": {
+              "line": 62,
+              "column": 9
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"6.10.0\"",
+            "start": {
+              "line": 62,
+              "column": 12
+            },
+            "end": {
+              "line": 62,
+              "column": 20
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "source = \"git::https://example.com/network.git?ref=v1.2.0\"",
+            "start": {
+              "line": 66,
+              "column": 2
+            },
+            "end": {
+              "line": 66,
+              "column": 60
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "source",
+            "start": {
+              "line": 66,
+              "column": 2
+            },
+            "end": {
+              "line": 66,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"git::https://example.com/network.git?ref=v1.2.0\"",
+            "start": {
+              "line": 66,
+              "column": 11
+            },
+            "end": {
+              "line": 66,
+              "column": 60
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name       = local.name",
+            "start": {
+              "line": 70,
+              "column": 2
+            },
+            "end": {
+              "line": 70,
+              "column": 25
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 70,
+              "column": 2
+            },
+            "end": {
+              "line": 70,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "local.name",
+            "start": {
+              "line": 70,
+              "column": 15
+            },
+            "end": {
+              "line": 70,
+              "column": 25
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "subnet_ids = module.vpc.private_subnets",
+            "start": {
+              "line": 71,
+              "column": 2
+            },
+            "end": {
+              "line": 71,
+              "column": 41
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "subnet_ids",
+            "start": {
+              "line": 71,
+              "column": 2
+            },
+            "end": {
+              "line": 71,
+              "column": 12
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "module.vpc.private_subnets",
+            "start": {
+              "line": 71,
+              "column": 15
+            },
+            "end": {
+              "line": 71,
+              "column": 41
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "identifier           = local.name",
+            "start": {
+              "line": 75,
+              "column": 2
+            },
+            "end": {
+              "line": 75,
+              "column": 35
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "identifier",
+            "start": {
+              "line": 75,
+              "column": 2
+            },
+            "end": {
+              "line": 75,
+              "column": 12
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "local.name",
+            "start": {
+              "line": 75,
+              "column": 25
+            },
+            "end": {
+              "line": 75,
+              "column": 35
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "engine               = \"postgres\"",
+            "start": {
+              "line": 76,
+              "column": 2
+            },
+            "end": {
+              "line": 76,
+              "column": 35
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "engine",
+            "start": {
+              "line": 76,
+              "column": 2
+            },
+            "end": {
+              "line": 76,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"postgres\"",
+            "start": {
+              "line": 76,
+              "column": 25
+            },
+            "end": {
+              "line": 76,
+              "column": 35
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "engine_version       = var.engine_version",
+            "start": {
+              "line": 77,
+              "column": 2
+            },
+            "end": {
+              "line": 77,
+              "column": 43
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "engine_version",
+            "start": {
+              "line": 77,
+              "column": 2
+            },
+            "end": {
+              "line": 77,
+              "column": 16
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "var.engine_version",
+            "start": {
+              "line": 77,
+              "column": 25
+            },
+            "end": {
+              "line": 77,
+              "column": 43
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "db_subnet_group_name = aws_db_subnet_group.main.name",
+            "start": {
+              "line": 78,
+              "column": 2
+            },
+            "end": {
+              "line": 78,
+              "column": 54
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "db_subnet_group_name",
+            "start": {
+              "line": 78,
+              "column": 2
+            },
+            "end": {
+              "line": 78,
+              "column": 22
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "aws_db_subnet_group.main.name",
+            "start": {
+              "line": 78,
+              "column": 25
+            },
+            "end": {
+              "line": 78,
+              "column": 54
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "tags                 = local.tags",
+            "start": {
+              "line": 79,
+              "column": 2
+            },
+            "end": {
+              "line": 79,
+              "column": 35
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "tags",
+            "start": {
+              "line": 79,
+              "column": 2
+            },
+            "end": {
+              "line": 79,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "local.tags",
+            "start": {
+              "line": 79,
+              "column": 25
+            },
+            "end": {
+              "line": 79,
+              "column": 35
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "provider      = aws.west",
+            "start": {
+              "line": 83,
+              "column": 2
+            },
+            "end": {
+              "line": 83,
+              "column": 26
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "provider",
+            "start": {
+              "line": 83,
+              "column": 2
+            },
+            "end": {
+              "line": 83,
+              "column": 10
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "aws.west",
+            "start": {
+              "line": 83,
+              "column": 18
+            },
+            "end": {
+              "line": 83,
+              "column": 26
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "function_name = \"orders-worker\"",
+            "start": {
+              "line": 84,
+              "column": 2
+            },
+            "end": {
+              "line": 84,
+              "column": 33
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "function_name",
+            "start": {
+              "line": 84,
+              "column": 2
+            },
+            "end": {
+              "line": 84,
+              "column": 15
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders-worker\"",
+            "start": {
+              "line": 84,
+              "column": 18
+            },
+            "end": {
+              "line": 84,
+              "column": 33
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "runtime       = \"python3.12\"",
+            "start": {
+              "line": 85,
+              "column": 2
+            },
+            "end": {
+              "line": 85,
+              "column": 30
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "runtime",
+            "start": {
+              "line": 85,
+              "column": 2
+            },
+            "end": {
+              "line": 85,
+              "column": 9
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"python3.12\"",
+            "start": {
+              "line": 85,
+              "column": 18
+            },
+            "end": {
+              "line": 85,
+              "column": 30
+            }
+          },
+          {
+            "name": "nested",
+            "nodeType": "block",
+            "text": "environment {\n    variables = {\n      DB_HOST = aws_db_instance.orders.address\n      QUEUE   = \"${aws_sqs_queue.jobs.url}\"\n    }\n  }",
+            "start": {
+              "line": 86,
+              "column": 2
+            },
+            "end": {
+              "line": 91,
+              "column": 3
+            }
+          },
+          {
+            "name": "nested.type",
+            "nodeType": "identifier",
+            "text": "environment",
+            "start": {
+              "line": 86,
+              "column": 2
+            },
+            "end": {
+              "line": 86,
+              "column": 13
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "variables = {\n      DB_HOST = aws_db_instance.orders.address\n      QUEUE   = \"${aws_sqs_queue.jobs.url}\"\n    }",
+            "start": {
+              "line": 87,
+              "column": 4
+            },
+            "end": {
+              "line": 90,
+              "column": 5
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "variables",
+            "start": {
+              "line": 87,
+              "column": 4
+            },
+            "end": {
+              "line": 87,
+              "column": 13
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "{\n      DB_HOST = aws_db_instance.orders.address\n      QUEUE   = \"${aws_sqs_queue.jobs.url}\"\n    }",
+            "start": {
+              "line": 87,
+              "column": 16
+            },
+            "end": {
+              "line": 90,
+              "column": 5
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "count = 1",
+            "start": {
+              "line": 95,
+              "column": 2
+            },
+            "end": {
+              "line": 95,
+              "column": 11
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "count",
+            "start": {
+              "line": 95,
+              "column": 2
+            },
+            "end": {
+              "line": 95,
+              "column": 7
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "1",
+            "start": {
+              "line": 95,
+              "column": 10
+            },
+            "end": {
+              "line": 95,
+              "column": 11
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name  = \"orders-jobs\"",
+            "start": {
+              "line": 96,
+              "column": 2
+            },
+            "end": {
+              "line": 96,
+              "column": 23
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 96,
+              "column": 2
+            },
+            "end": {
+              "line": 96,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders-jobs\"",
+            "start": {
+              "line": 96,
+              "column": 10
+            },
+            "end": {
+              "line": 96,
+              "column": 23
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name     = \"orders\"",
+            "start": {
+              "line": 100,
+              "column": 2
+            },
+            "end": {
+              "line": 100,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 100,
+              "column": 2
+            },
+            "end": {
+              "line": 100,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders\"",
+            "start": {
+              "line": 100,
+              "column": 13
+            },
+            "end": {
+              "line": 100,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "version  = \"1.30\"",
+            "start": {
+              "line": 101,
+              "column": 2
+            },
+            "end": {
+              "line": 101,
+              "column": 19
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "version",
+            "start": {
+              "line": 101,
+              "column": 2
+            },
+            "end": {
+              "line": 101,
+              "column": 9
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"1.30\"",
+            "start": {
+              "line": 101,
+              "column": 13
+            },
+            "end": {
+              "line": 101,
+              "column": 19
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "role_arn = aws_iam_role.cluster.arn",
+            "start": {
+              "line": 102,
+              "column": 2
+            },
+            "end": {
+              "line": 102,
+              "column": 37
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "role_arn",
+            "start": {
+              "line": 102,
+              "column": 2
+            },
+            "end": {
+              "line": 102,
+              "column": 10
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "aws_iam_role.cluster.arn",
+            "start": {
+              "line": 102,
+              "column": 13
+            },
+            "end": {
+              "line": 102,
+              "column": 37
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name = \"orders-eks\"",
+            "start": {
+              "line": 106,
+              "column": 2
+            },
+            "end": {
+              "line": 106,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 106,
+              "column": 2
+            },
+            "end": {
+              "line": 106,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"orders-eks\"",
+            "start": {
+              "line": 106,
+              "column": 9
+            },
+            "end": {
+              "line": 106,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "value = aws_db_instance.orders.endpoint",
+            "start": {
+              "line": 110,
+              "column": 2
+            },
+            "end": {
+              "line": 110,
+              "column": 41
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "value",
+            "start": {
+              "line": 110,
+              "column": 2
+            },
+            "end": {
+              "line": 110,
+              "column": 7
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "aws_db_instance.orders.endpoint",
+            "start": {
+              "line": 110,
+              "column": 10
+            },
+            "end": {
+              "line": 110,
+              "column": 41
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "value = module.db.id",
+            "start": {
+              "line": 114,
+              "column": 2
+            },
+            "end": {
+              "line": 114,
+              "column": 22
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "value",
+            "start": {
+              "line": 114,
+              "column": 2
+            },
+            "end": {
+              "line": 114,
+              "column": 7
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "module.db.id",
+            "start": {
+              "line": 114,
+              "column": 10
+            },
+            "end": {
+              "line": 114,
+              "column": 22
+            }
+          }
+        ],
+        "references": [
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "var.region",
+            "start": {
+              "line": 23,
+              "column": 11
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "var",
+            "start": {
+              "line": 23,
+              "column": 11
+            },
+            "end": {
+              "line": 23,
+              "column": 14
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "region",
+            "start": {
+              "line": 23,
+              "column": 15
+            },
+            "end": {
+              "line": 23,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "var.region",
+            "start": {
+              "line": 41,
+              "column": 19
+            },
+            "end": {
+              "line": 41,
+              "column": 29
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "var",
+            "start": {
+              "line": 41,
+              "column": 19
+            },
+            "end": {
+              "line": 41,
+              "column": 22
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "region",
+            "start": {
+              "line": 41,
+              "column": 23
+            },
+            "end": {
+              "line": 41,
+              "column": 29
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "local.name",
+            "start": {
+              "line": 42,
+              "column": 21
+            },
+            "end": {
+              "line": 42,
+              "column": 31
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "local",
+            "start": {
+              "line": 42,
+              "column": 21
+            },
+            "end": {
+              "line": 42,
+              "column": 26
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 42,
+              "column": 27
+            },
+            "end": {
+              "line": 42,
+              "column": 31
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "local.name",
+            "start": {
+              "line": 51,
+              "column": 11
+            },
+            "end": {
+              "line": 51,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "local",
+            "start": {
+              "line": 51,
+              "column": 11
+            },
+            "end": {
+              "line": 51,
+              "column": 16
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 51,
+              "column": 17
+            },
+            "end": {
+              "line": 51,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "data.aws_vpc.default.id",
+            "start": {
+              "line": 52,
+              "column": 11
+            },
+            "end": {
+              "line": 52,
+              "column": 34
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "data",
+            "start": {
+              "line": 52,
+              "column": 11
+            },
+            "end": {
+              "line": 52,
+              "column": 15
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "aws_vpc",
+            "start": {
+              "line": 52,
+              "column": 16
+            },
+            "end": {
+              "line": 52,
+              "column": 23
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "local.name",
+            "start": {
+              "line": 70,
+              "column": 15
+            },
+            "end": {
+              "line": 70,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "local",
+            "start": {
+              "line": 70,
+              "column": 15
+            },
+            "end": {
+              "line": 70,
+              "column": 20
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 70,
+              "column": 21
+            },
+            "end": {
+              "line": 70,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "module.vpc.private_subnets",
+            "start": {
+              "line": 71,
+              "column": 15
+            },
+            "end": {
+              "line": 71,
+              "column": 41
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "module",
+            "start": {
+              "line": 71,
+              "column": 15
+            },
+            "end": {
+              "line": 71,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "vpc",
+            "start": {
+              "line": 71,
+              "column": 22
+            },
+            "end": {
+              "line": 71,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "local.name",
+            "start": {
+              "line": 75,
+              "column": 25
+            },
+            "end": {
+              "line": 75,
+              "column": 35
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "local",
+            "start": {
+              "line": 75,
+              "column": 25
+            },
+            "end": {
+              "line": 75,
+              "column": 30
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 75,
+              "column": 31
+            },
+            "end": {
+              "line": 75,
+              "column": 35
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "var.engine_version",
+            "start": {
+              "line": 77,
+              "column": 25
+            },
+            "end": {
+              "line": 77,
+              "column": 43
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "var",
+            "start": {
+              "line": 77,
+              "column": 25
+            },
+            "end": {
+              "line": 77,
+              "column": 28
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "engine_version",
+            "start": {
+              "line": 77,
+              "column": 29
+            },
+            "end": {
+              "line": 77,
+              "column": 43
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "aws_db_subnet_group.main.name",
+            "start": {
+              "line": 78,
+              "column": 25
+            },
+            "end": {
+              "line": 78,
+              "column": 54
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "aws_db_subnet_group",
+            "start": {
+              "line": 78,
+              "column": 25
+            },
+            "end": {
+              "line": 78,
+              "column": 44
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "main",
+            "start": {
+              "line": 78,
+              "column": 45
+            },
+            "end": {
+              "line": 78,
+              "column": 49
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "local.tags",
+            "start": {
+              "line": 79,
+              "column": 25
+            },
+            "end": {
+              "line": 79,
+              "column": 35
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "local",
+            "start": {
+              "line": 79,
+              "column": 25
+            },
+            "end": {
+              "line": 79,
+              "column": 30
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "tags",
+            "start": {
+              "line": 79,
+              "column": 31
+            },
+            "end": {
+              "line": 79,
+              "column": 35
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "aws.west",
+            "start": {
+              "line": 83,
+              "column": 18
+            },
+            "end": {
+              "line": 83,
+              "column": 26
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "aws",
+            "start": {
+              "line": 83,
+              "column": 18
+            },
+            "end": {
+              "line": 83,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "west",
+            "start": {
+              "line": 83,
+              "column": 22
+            },
+            "end": {
+              "line": 83,
+              "column": 26
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "aws_db_instance.orders.address",
+            "start": {
+              "line": 88,
+              "column": 16
+            },
+            "end": {
+              "line": 88,
+              "column": 46
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "aws_db_instance",
+            "start": {
+              "line": 88,
+              "column": 16
+            },
+            "end": {
+              "line": 88,
+              "column": 31
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "orders",
+            "start": {
+              "line": 88,
+              "column": 32
+            },
+            "end": {
+              "line": 88,
+              "column": 38
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "aws_sqs_queue.jobs.url",
+            "start": {
+              "line": 89,
+              "column": 19
+            },
+            "end": {
+              "line": 89,
+              "column": 41
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "aws_sqs_queue",
+            "start": {
+              "line": 89,
+              "column": 19
+            },
+            "end": {
+              "line": 89,
+              "column": 32
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "jobs",
+            "start": {
+              "line": 89,
+              "column": 33
+            },
+            "end": {
+              "line": 89,
+              "column": 37
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "aws_iam_role.cluster.arn",
+            "start": {
+              "line": 102,
+              "column": 13
+            },
+            "end": {
+              "line": 102,
+              "column": 37
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "aws_iam_role",
+            "start": {
+              "line": 102,
+              "column": 13
+            },
+            "end": {
+              "line": 102,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "cluster",
+            "start": {
+              "line": 102,
+              "column": 26
+            },
+            "end": {
+              "line": 102,
+              "column": 33
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "aws_db_instance.orders.endpoint",
+            "start": {
+              "line": 110,
+              "column": 10
+            },
+            "end": {
+              "line": 110,
+              "column": 41
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "aws_db_instance",
+            "start": {
+              "line": 110,
+              "column": 10
+            },
+            "end": {
+              "line": 110,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "orders",
+            "start": {
+              "line": 110,
+              "column": 26
+            },
+            "end": {
+              "line": 110,
+              "column": 32
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "module.db.id",
+            "start": {
+              "line": 114,
+              "column": 10
+            },
+            "end": {
+              "line": 114,
+              "column": 22
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "module",
+            "start": {
+              "line": 114,
+              "column": 10
+            },
+            "end": {
+              "line": 114,
+              "column": 16
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "db",
+            "start": {
+              "line": 114,
+              "column": 17
+            },
+            "end": {
+              "line": 114,
+              "column": 19
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/modules/db/main.tf",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "resources": [
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"aws_security_group\" \"db\" {\n  name   = \"${var.name}-db\"\n  vpc_id = var.vpc_id\n}",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 13,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "aws_security_group",
+            "start": {
+              "line": 10,
+              "column": 10
+            },
+            "end": {
+              "line": 10,
+              "column": 28
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "db",
+            "start": {
+              "line": 10,
+              "column": 31
+            },
+            "end": {
+              "line": 10,
+              "column": 33
+            }
+          },
+          {
+            "name": "resource.block",
+            "nodeType": "block",
+            "text": "resource \"aws_rds_cluster\" \"this\" {\n  cluster_identifier     = var.name\n  engine                 = \"aurora-postgresql\"\n  engine_version         = \"16.2\"\n  vpc_security_group_ids = [aws_security_group.db.id]\n}",
+            "start": {
+              "line": 15,
+              "column": 0
+            },
+            "end": {
+              "line": 20,
+              "column": 1
+            }
+          },
+          {
+            "name": "resource.type",
+            "nodeType": "template_literal",
+            "text": "aws_rds_cluster",
+            "start": {
+              "line": 15,
+              "column": 10
+            },
+            "end": {
+              "line": 15,
+              "column": 25
+            }
+          },
+          {
+            "name": "resource.name",
+            "nodeType": "template_literal",
+            "text": "this",
+            "start": {
+              "line": 15,
+              "column": 28
+            },
+            "end": {
+              "line": 15,
+              "column": 32
+            }
+          }
+        ],
+        "modules": [],
+        "providers": [],
+        "terraform": [
+          {
+            "name": "terraform.block",
+            "nodeType": "block",
+            "text": "terraform {\n  required_providers {\n    aws = {\n      source  = \"hashicorp/aws\"\n      version = \">= 5.0\"\n    }\n  }\n}",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 1
+            }
+          },
+          {
+            "name": "requirement",
+            "nodeType": "attribute",
+            "text": "aws = {\n      source  = \"hashicorp/aws\"\n      version = \">= 5.0\"\n    }",
+            "start": {
+              "line": 3,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 5
+            }
+          },
+          {
+            "name": "requirement.name",
+            "nodeType": "identifier",
+            "text": "aws",
+            "start": {
+              "line": 3,
+              "column": 4
+            },
+            "end": {
+              "line": 3,
+              "column": 7
+            }
+          },
+          {
+            "name": "requirement.source",
+            "nodeType": "expression",
+            "text": "\"hashicorp/aws\"",
+            "start": {
+              "line": 4,
+              "column": 16
+            },
+            "end": {
+              "line": 4,
+              "column": 31
+            }
+          },
+          {
+            "name": "requirement.version",
+            "nodeType": "expression",
+            "text": "\">= 5.0\"",
+            "start": {
+              "line": 5,
+              "column": 16
+            },
+            "end": {
+              "line": 5,
+              "column": 24
+            }
+          }
+        ],
+        "declarations": [
+          {
+            "name": "output.block",
+            "nodeType": "block",
+            "text": "output \"id\" {\n  value = aws_rds_cluster.this.id\n}",
+            "start": {
+              "line": 22,
+              "column": 0
+            },
+            "end": {
+              "line": 24,
+              "column": 1
+            }
+          },
+          {
+            "name": "output.name",
+            "nodeType": "template_literal",
+            "text": "id",
+            "start": {
+              "line": 22,
+              "column": 8
+            },
+            "end": {
+              "line": 22,
+              "column": 10
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "name": "nested",
+            "nodeType": "block",
+            "text": "required_providers {\n    aws = {\n      source  = \"hashicorp/aws\"\n      version = \">= 5.0\"\n    }\n  }",
+            "start": {
+              "line": 2,
+              "column": 2
+            },
+            "end": {
+              "line": 7,
+              "column": 3
+            }
+          },
+          {
+            "name": "nested.type",
+            "nodeType": "identifier",
+            "text": "required_providers",
+            "start": {
+              "line": 2,
+              "column": 2
+            },
+            "end": {
+              "line": 2,
+              "column": 20
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "aws = {\n      source  = \"hashicorp/aws\"\n      version = \">= 5.0\"\n    }",
+            "start": {
+              "line": 3,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 5
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "aws",
+            "start": {
+              "line": 3,
+              "column": 4
+            },
+            "end": {
+              "line": 3,
+              "column": 7
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "{\n      source  = \"hashicorp/aws\"\n      version = \">= 5.0\"\n    }",
+            "start": {
+              "line": 3,
+              "column": 10
+            },
+            "end": {
+              "line": 6,
+              "column": 5
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "name   = \"${var.name}-db\"",
+            "start": {
+              "line": 11,
+              "column": 2
+            },
+            "end": {
+              "line": 11,
+              "column": 27
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 11,
+              "column": 2
+            },
+            "end": {
+              "line": 11,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"${var.name}-db\"",
+            "start": {
+              "line": 11,
+              "column": 11
+            },
+            "end": {
+              "line": 11,
+              "column": 27
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "vpc_id = var.vpc_id",
+            "start": {
+              "line": 12,
+              "column": 2
+            },
+            "end": {
+              "line": 12,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "vpc_id",
+            "start": {
+              "line": 12,
+              "column": 2
+            },
+            "end": {
+              "line": 12,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "var.vpc_id",
+            "start": {
+              "line": 12,
+              "column": 11
+            },
+            "end": {
+              "line": 12,
+              "column": 21
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "cluster_identifier     = var.name",
+            "start": {
+              "line": 16,
+              "column": 2
+            },
+            "end": {
+              "line": 16,
+              "column": 35
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "cluster_identifier",
+            "start": {
+              "line": 16,
+              "column": 2
+            },
+            "end": {
+              "line": 16,
+              "column": 20
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "var.name",
+            "start": {
+              "line": 16,
+              "column": 27
+            },
+            "end": {
+              "line": 16,
+              "column": 35
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "engine                 = \"aurora-postgresql\"",
+            "start": {
+              "line": 17,
+              "column": 2
+            },
+            "end": {
+              "line": 17,
+              "column": 46
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "engine",
+            "start": {
+              "line": 17,
+              "column": 2
+            },
+            "end": {
+              "line": 17,
+              "column": 8
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"aurora-postgresql\"",
+            "start": {
+              "line": 17,
+              "column": 27
+            },
+            "end": {
+              "line": 17,
+              "column": 46
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "engine_version         = \"16.2\"",
+            "start": {
+              "line": 18,
+              "column": 2
+            },
+            "end": {
+              "line": 18,
+              "column": 33
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "engine_version",
+            "start": {
+              "line": 18,
+              "column": 2
+            },
+            "end": {
+              "line": 18,
+              "column": 16
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "\"16.2\"",
+            "start": {
+              "line": 18,
+              "column": 27
+            },
+            "end": {
+              "line": 18,
+              "column": 33
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "vpc_security_group_ids = [aws_security_group.db.id]",
+            "start": {
+              "line": 19,
+              "column": 2
+            },
+            "end": {
+              "line": 19,
+              "column": 53
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "vpc_security_group_ids",
+            "start": {
+              "line": 19,
+              "column": 2
+            },
+            "end": {
+              "line": 19,
+              "column": 24
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "[aws_security_group.db.id]",
+            "start": {
+              "line": 19,
+              "column": 27
+            },
+            "end": {
+              "line": 19,
+              "column": 53
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "value = aws_rds_cluster.this.id",
+            "start": {
+              "line": 23,
+              "column": 2
+            },
+            "end": {
+              "line": 23,
+              "column": 33
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "value",
+            "start": {
+              "line": 23,
+              "column": 2
+            },
+            "end": {
+              "line": 23,
+              "column": 7
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "aws_rds_cluster.this.id",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 33
+            }
+          }
+        ],
+        "references": [
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "var.name",
+            "start": {
+              "line": 11,
+              "column": 14
+            },
+            "end": {
+              "line": 11,
+              "column": 22
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "var",
+            "start": {
+              "line": 11,
+              "column": 14
+            },
+            "end": {
+              "line": 11,
+              "column": 17
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 11,
+              "column": 18
+            },
+            "end": {
+              "line": 11,
+              "column": 22
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "var.vpc_id",
+            "start": {
+              "line": 12,
+              "column": 11
+            },
+            "end": {
+              "line": 12,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "var",
+            "start": {
+              "line": 12,
+              "column": 11
+            },
+            "end": {
+              "line": 12,
+              "column": 14
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "vpc_id",
+            "start": {
+              "line": 12,
+              "column": 15
+            },
+            "end": {
+              "line": 12,
+              "column": 21
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "var.name",
+            "start": {
+              "line": 16,
+              "column": 27
+            },
+            "end": {
+              "line": 16,
+              "column": 35
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "var",
+            "start": {
+              "line": 16,
+              "column": 27
+            },
+            "end": {
+              "line": 16,
+              "column": 30
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "name",
+            "start": {
+              "line": 16,
+              "column": 31
+            },
+            "end": {
+              "line": 16,
+              "column": 35
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "aws_security_group.db.id",
+            "start": {
+              "line": 19,
+              "column": 28
+            },
+            "end": {
+              "line": 19,
+              "column": 52
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "aws_security_group",
+            "start": {
+              "line": 19,
+              "column": 28
+            },
+            "end": {
+              "line": 19,
+              "column": 46
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "db",
+            "start": {
+              "line": 19,
+              "column": 47
+            },
+            "end": {
+              "line": 19,
+              "column": 49
+            }
+          },
+          {
+            "name": "reference",
+            "nodeType": "expression",
+            "text": "aws_rds_cluster.this.id",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 33
+            }
+          },
+          {
+            "name": "reference.root",
+            "nodeType": "identifier",
+            "text": "aws_rds_cluster",
+            "start": {
+              "line": 23,
+              "column": 10
+            },
+            "end": {
+              "line": 23,
+              "column": 25
+            }
+          },
+          {
+            "name": "reference.attribute",
+            "nodeType": "identifier",
+            "text": "this",
+            "start": {
+              "line": 23,
+              "column": 26
+            },
+            "end": {
+              "line": 23,
+              "column": 30
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/modules/db/variables.tf",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "resources": [],
+        "modules": [],
+        "providers": [],
+        "terraform": [],
+        "declarations": [
+          {
+            "name": "variable.block",
+            "nodeType": "block",
+            "text": "variable \"name\" {\n  type = string\n}",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 1
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "template_literal",
+            "text": "name",
+            "start": {
+              "line": 1,
+              "column": 10
+            },
+            "end": {
+              "line": 1,
+              "column": 14
+            }
+          },
+          {
+            "name": "variable.block",
+            "nodeType": "block",
+            "text": "variable \"vpc_id\" {\n  type = string\n}",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 1
+            }
+          },
+          {
+            "name": "variable.name",
+            "nodeType": "template_literal",
+            "text": "vpc_id",
+            "start": {
+              "line": 5,
+              "column": 10
+            },
+            "end": {
+              "line": 5,
+              "column": 16
+            }
+          }
+        ],
+        "arguments": [
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "type = string",
+            "start": {
+              "line": 2,
+              "column": 2
+            },
+            "end": {
+              "line": 2,
+              "column": 15
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "type",
+            "start": {
+              "line": 2,
+              "column": 2
+            },
+            "end": {
+              "line": 2,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "string",
+            "start": {
+              "line": 2,
+              "column": 9
+            },
+            "end": {
+              "line": 2,
+              "column": 15
+            }
+          },
+          {
+            "name": "argument",
+            "nodeType": "attribute",
+            "text": "type = string",
+            "start": {
+              "line": 6,
+              "column": 2
+            },
+            "end": {
+              "line": 6,
+              "column": 15
+            }
+          },
+          {
+            "name": "argument.name",
+            "nodeType": "identifier",
+            "text": "type",
+            "start": {
+              "line": 6,
+              "column": 2
+            },
+            "end": {
+              "line": 6,
+              "column": 6
+            }
+          },
+          {
+            "name": "argument.value",
+            "nodeType": "expression",
+            "text": "string",
+            "start": {
+              "line": 6,
+              "column": 9
+            },
+            "end": {
+              "line": 6,
+              "column": 15
+            }
+          }
+        ],
+        "references": []
+      }
+    }
+  ]
+}

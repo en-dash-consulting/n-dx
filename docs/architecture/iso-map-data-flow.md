@@ -179,6 +179,23 @@ the order it was written, so sorting would reorder the map's nodes relative to
 a fresh discovery. Byte-stability across runs comes from discovery being
 deterministic plus canonical key ordering, not from sorting.
 
+**Terraform model fields (optional).** When the opt-in Terraform pack
+(`@n-dx/lang-terraform`) loads, `analyzers/terraform-infrastructure.ts` runs
+it over the inventory's `.tf` files after discovery and adds four optional
+fields to each Terraform resource already listed, matched by declaring file and
+`infra:<type>.<name>`: `module` (the module call path, e.g. `module.db`; absent
+in a root module), `provider` (`{ name, version? }`, the version constraint from
+`required_providers`), `references` (ids of listed resources it references in
+the same module directory) and `attributes` (`engine`, `engineVersion`,
+`runtime`, `image`, `clusterVersion`). Values are as written in the Terraform,
+never normalised, and a field appears only when the model supplied a value. An
+attribute written as `var.x`, `local.x` or a null ternary in a reusable module
+is stored resolved only when every module call that instantiates the module
+resolves it to the same string; otherwise it stays as written. The
+step never adds or removes a resource, link or seam, and never changes a
+field. Without the pack the file is exactly what discovery wrote. The iso-map
+export reads none of these fields, so its bundle is unchanged.
+
 1. **Infrastructure-as-code.** `.tf` files are scanned for
    `resource "type" "name"` blocks; `.yaml`/`.yml` files are scanned for
    CloudFormation and SAM templates, recognised by a top-level `Resources:`

@@ -169,12 +169,12 @@ Go monorepos with many small packages (e.g., a microservices project with 50+ `c
 - Very large monorepos may hit the zone count cap (default: 30, scaled by file count), causing aggressive merging.
 - The linear dependency chains common in Go (`cmd → handler → service → repo`) can cause Louvain to merge adjacent layers when the total file count is small.
 
-### 5. Regex-based parsing limitations
+### 5. Import parsing limitations
 
-The Go import parser uses regex-based extraction rather than a full Go AST parser. Edge cases that may not be handled:
+Go imports come from the tree-sitter Go pack, or from the regex parser when the pack cannot run (see [Go integration](./go-integration.md#import-graph)). Edge cases neither handles:
 
 - Build-tag-gated imports (`//go:build linux`) — the parser extracts all imports regardless of build tags, which may include platform-specific packages that aren't relevant on the current OS.
-- Multi-line raw string literals containing `import`-like patterns — unlikely in practice but theoretically possible.
+- Multi-line raw string literals containing `import`-like patterns — the regex parser only; the pack parses them as strings.
 - CGo imports (`import "C"`) — treated as stdlib; the actual C dependencies are not tracked.
 
 ### 6. External dependency classification heuristic

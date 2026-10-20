@@ -995,8 +995,8 @@ const JS_EXTENSIONS = new Set([
  */
 const MAX_SOURCE_BYTES = 1_000_000;
 
-/** Roles whose call sites describe something other than what this repo calls. */
-const SKIP_ROLES = new Set(["test", "docs", "asset"]);
+/** Roles whose call sites describe something other than what this repo calls; pack calls from them are dropped too. */
+export const SKIP_ROLES: ReadonlySet<string> = new Set(["test", "docs", "asset"]);
 
 /**
  * Detect everything this repository reaches out to.

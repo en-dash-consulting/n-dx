@@ -1,0 +1,125 @@
+[
+  {
+    "module": "parent",
+    "dir": "",
+    "buildSystem": "maven",
+    "group": {
+      "resolved": true,
+      "value": "com.acme"
+    },
+    "version": {
+      "resolved": true,
+      "value": "2.1.0"
+    },
+    "dependencies": [
+      {
+        "group": "org.slf4j",
+        "artifact": "slf4j-api",
+        "version": {
+          "resolved": true,
+          "value": "2.0.13"
+        },
+        "scope": "compile"
+      }
+    ],
+    "javaVersion": {
+      "resolved": true,
+      "value": "17"
+    },
+    "notices": []
+  },
+  {
+    "module": "child",
+    "dir": "child",
+    "buildSystem": "maven",
+    "group": {
+      "resolved": true,
+      "value": "com.acme"
+    },
+    "version": {
+      "resolved": true,
+      "value": "2.1.0"
+    },
+    "dependencies": [
+      {
+        "group": "com.acme",
+        "artifact": "lib",
+        "version": {
+          "resolved": true,
+          "value": "2.1.0"
+        },
+        "scope": "compile"
+      },
+      {
+        "group": "com.fasterxml.jackson.core",
+        "artifact": "jackson-databind",
+        "version": {
+          "resolved": false,
+          "reason": "property jackson.missing is not defined in the repository"
+        },
+        "scope": "compile"
+      },
+      {
+        "group": "org.apache.commons",
+        "artifact": "commons-lang3",
+        "version": {
+          "resolved": false,
+          "reason": "no version declared and none managed in the repository"
+        },
+        "scope": "compile"
+      },
+      {
+        "group": "org.junit.jupiter",
+        "artifact": "junit-jupiter",
+        "version": {
+          "resolved": true,
+          "value": "5.11.0"
+        },
+        "scope": "test"
+      },
+      {
+        "group": "org.slf4j",
+        "artifact": "slf4j-api",
+        "version": {
+          "resolved": true,
+          "value": "2.0.13"
+        },
+        "scope": "compile"
+      }
+    ],
+    "javaVersion": {
+      "resolved": true,
+      "value": "21"
+    },
+    "notices": []
+  },
+  {
+    "module": "lib",
+    "dir": "lib",
+    "buildSystem": "maven",
+    "group": {
+      "resolved": true,
+      "value": "com.acme"
+    },
+    "version": {
+      "resolved": true,
+      "value": "2.1.0"
+    },
+    "dependencies": [
+      {
+        "group": "org.slf4j",
+        "artifact": "slf4j-api",
+        "version": {
+          "resolved": true,
+          "value": "2.0.13"
+        },
+        "scope": "compile"
+      }
+    ],
+    "javaVersion": {
+      "resolved": true,
+      "value": "17"
+    },
+    "notices": []
+  }
+]

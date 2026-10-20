@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -737,8 +738,17 @@ describe("n-dx ci", () => {
     let json;
 
     beforeAll(async () => {
-      // Break the inventory schema
+      // Break the inventory schema of an inventory made under the current
+      // rules. A real analyze first records the inventory fingerprint in
+      // .sourcevision/.cache, so ci's incremental analyze treats the broken
+      // file as its own cache rather than rebuilding it from scratch (which a
+      // missing or stale fingerprint would do, and validation would then pass).
       tmpDir = await freshProject();
+      const seed = runResultBase(["sv", "analyze", "--fast", "--quiet", tmpDir], { timeout: 30000 });
+      if (seed.code !== 0) throw new Error(`seed analyze failed (exit ${seed.code}): ${seed.stderr}`);
+      if (!existsSync(join(tmpDir, ".sourcevision", ".cache", "inventory-fingerprint.json"))) {
+        throw new Error("seed analyze wrote no inventory fingerprint");
+      }
       await writeFile(join(tmpDir, ".sourcevision", "inventory.json"), JSON.stringify({ invalid: true }));
       text = runResult([tmpDir]);
       json = runResult(["--format=json", "--quiet", tmpDir]);

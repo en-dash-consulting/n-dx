@@ -34,6 +34,9 @@ import {
   runZonesPhase,
   runComponentsPhase,
   runCallGraphPhase,
+  packFrameworkFacts,
+  suggestPack,
+  optionalPacksLine,
   PhasePrerequsiteError,
   PhaseError,
   MAX_ENRICHMENT_PASS,
@@ -42,9 +45,13 @@ import type { AnalyzeContext } from "./analyze-phases.js";
 import { generatePrMarkdownFile } from "./pr-markdown.js";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
 import { computeInfrastructure, toInfrastructureData } from "../../analyzers/infrastructure.js";
+import { enrichTerraformInfrastructure } from "../../analyzers/terraform-infrastructure.js";
+import { terraformConfig } from "@n-dx/lang-kit";
+import { loadInventoryConfig } from "../../language/detect.js";
 import { buildSdlcProfile, stripSdlcProfileForDisk } from "../../analyzers/sdlc-profile.js";
 import { computeReadinessScore } from "../../analyzers/readiness-score.js";
 import { detectOutbound } from "../../analyzers/outbound-detection.js";
+import { withPackOutbound } from "../../analyzers/pack-framework-facts.js";
 import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../analyzers/primer.js";
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
@@ -521,6 +528,12 @@ export async function cmdAnalyze(targetDir: string, extraArgs: string[]): Promis
       // Non-critical — don't fail the analysis
     }
 
+    const optionalPacks = optionalPacksLine(ctx);
+    if (optionalPacks !== undefined) {
+      info("");
+      info(optionalPacks);
+    }
+
     info("");
     info(green("Done."));
     completed = true;
@@ -735,17 +748,19 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // graph structurally cannot show. Discovered here rather than inside the
     // iso export so anything can read it, and written canonically so repeated
     // runs over an unchanged tree produce a byte-identical file.
-    writeFileSync(
-      join(ctx.svDir, DATA_FILES.infrastructure),
-      toCanonicalJSON(
-        toInfrastructureData(
-          computeInfrastructure(
-            ctx.absDir,
-            (inventory.files as Array<{ path: string }>).map((f) => f.path),
-          ),
-        ),
-      ),
+    // With the Terraform pack, Terraform resources gain the model's optional
+    // fields; without it the file is exactly what the scan found.
+    const inventoryPaths = (inventory.files as Array<{ path: string }>).map((f) => f.path);
+    const infrastructure = await enrichTerraformInfrastructure(
+      toInfrastructureData(computeInfrastructure(ctx.absDir, inventoryPaths)),
+      ctx.absDir,
+      inventoryPaths,
+      {
+        listed: ((await loadInventoryConfig(ctx.absDir)).packs ?? []).includes(terraformConfig.id),
+        suggest: (id) => suggestPack(ctx, id),
+      },
     );
+    writeFileSync(join(ctx.svDir, DATA_FILES.infrastructure), toCanonicalJSON(infrastructure));
 
     // SDLC readiness — commands, CI, deployment, quality gates and the rest,
     // each claim carrying the file that proves it. Its own bounded walk,
@@ -773,10 +788,10 @@ export async function generateOutputFiles(ctx: AnalyzeContext): Promise<void> {
     // HTTP picture, mirroring the server routes the components phase records.
     // Deterministic and LLM-free, so it runs on every analysis including
     // `--fast`, and is written canonically for the same reason as the file
-    // above it.
+    // above it. Language packs' outbound calls join the detectors' entries.
     writeFileSync(
       join(ctx.svDir, DATA_FILES.outbound),
-      toCanonicalJSON(await detectOutbound(ctx.absDir, inventory)),
+      toCanonicalJSON(withPackOutbound(await detectOutbound(ctx.absDir, inventory), inventory, await packFrameworkFacts(ctx, inventory))),
     );
 
     const llmsTxt = generateLlmsTxt(manifest, inventory, importsData, zonesData, componentsData, classData);
