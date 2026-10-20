@@ -38,6 +38,15 @@ describe("pack archive", () => {
     expect(readTarGz(writeTarGz(entries))).toEqual(entries);
   });
 
+  it("refuses an archive that inflates past the size limit before reading any entry", () => {
+    // 64 KiB of zeros gzips to well under 1 KiB; a valid entry header comes first,
+    // so a refusal can only come from the limit, not from parsing.
+    const bomb = gzipSync(Buffer.concat([gunzipSync(rawTar("a.txt", "0", "hi")), Buffer.alloc(64 * 1024)]));
+    expect(bomb.length).toBeLessThan(1024);
+    expect(() => readTarGz(bomb, 4096)).toThrow(/inflates past 4096 bytes/);
+    expect(readTarGz(bomb, 128 * 1024)).toEqual([file("a.txt", "hi")]);
+  });
+
   it("refuses data that is not gzip, and a tar with no end-of-archive marker", () => {
     expect(() => readTarGz(Buffer.from("plain"))).toThrow(/not gzip data/);
     const tar = gunzipSync(writeTarGz([file("a", "b")]));

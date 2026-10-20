@@ -25,7 +25,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import type { LanguagePackEntry } from "@n-dx/lang-kit";
 import { CLI_ERROR_CODES, spawnCli } from "@n-dx/llm-client";
-import { ArchiveError, collectTree, readTarGz, writeTarGz, type ArchiveEntry } from "./pack-archive.js";
+import { ArchiveError, MAX_BUNDLE_BYTES, collectTree, readTarGz, writeTarGz, type ArchiveEntry } from "./pack-archive.js";
 import { withPackLock } from "./pack-lock.js";
 import {
   defaultPackDir,
@@ -74,6 +74,8 @@ export interface PackCommandDeps {
   readonly tempRoot?: string;
   /** Whether a pack directory lock's holder still runs; defaults to `pidAlive` (`pack-lock.ts`). */
   readonly isAlive?: (pid: number) => boolean;
+  /** The most `add --from` lets a bundle inflate to; defaults to {@link MAX_BUNDLE_BYTES}. */
+  readonly maxBundleBytes?: number;
 }
 
 /** Runs npm through llm-client's spawn helper, which goes through cmd.exe on Windows for npm's `.cmd` shim. */
@@ -391,10 +393,10 @@ function readBundleFile(file: string): Buffer {
 }
 
 /** The bundle's manifest and entries, or an error naming what is wrong with it. */
-function readBundle(file: string, archive: Buffer, pack: InstallablePack, version: string): ArchiveEntry[] {
+function readBundle(file: string, archive: Buffer, pack: InstallablePack, version: string, maxBytes: number): ArchiveEntry[] {
   let entries: ArchiveEntry[];
   try {
-    entries = readTarGz(archive);
+    entries = readTarGz(archive, maxBytes);
   } catch (error) {
     if (!(error instanceof ArchiveError)) throw error;
     throw new CLIError(`${file} is not a usable pack bundle: ${error.message}.`, `Make it again with \`sv pack bundle ${pack.id}\`.`);
@@ -449,7 +451,7 @@ async function addFromBundle(
   const bundleFile = resolve(deps.cwd ?? process.cwd(), file);
   const archive = readBundleFile(bundleFile);
   verifyBundle(bundleFile, archive, expectedHash, write);
-  const entries = readBundle(bundleFile, archive, pack, version).filter(
+  const entries = readBundle(bundleFile, archive, pack, version, deps.maxBundleBytes ?? MAX_BUNDLE_BYTES).filter(
     // npm's hidden lockfile describes the bundle's own prefix, not this one.
     (e) => e.path.startsWith("node_modules/") && e.path !== "node_modules/.package-lock.json",
   );

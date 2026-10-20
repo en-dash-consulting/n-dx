@@ -483,6 +483,9 @@ describe("sv pack bundle and add --from", () => {
     await expect(cmdPack(["add", "java", "--from", write("cut.tgz", archive.subarray(0, archive.length / 2))], deps())).rejects.toThrow(
       /cut\.tgz is not a usable pack bundle/,
     );
+    await expect(
+      cmdPack(["add", "java", "--from", write("big.tgz", archive)], deps({ maxBundleBytes: 1024 })),
+    ).rejects.toThrow(/big\.tgz is not a usable pack bundle: it inflates past 1024 bytes/);
     const bare = writeTarGz([{ type: "file", path: "node_modules/x/package.json", mode: 0o644, data: Buffer.from("{}") }]);
     await expect(cmdPack(["add", "java", "--from", write("bare.tgz", bare)], deps())).rejects.toThrow(
       "bare.tgz is not a pack bundle: it has no n-dx-pack-bundle.json.",

@@ -154,12 +154,26 @@ function safePath(path: string): string {
   return trimmed;
 }
 
-/** The entries of a gzipped tar. Throws {@link ArchiveError} for anything a bundle cannot hold. */
-export function readTarGz(archive: Buffer): ArchiveEntry[] {
+/**
+ * The most a bundle may inflate to. A pack and its dependencies are tens of
+ * MB; the limit stops a small archive that inflates to gigabytes from
+ * exhausting memory before any check runs.
+ */
+export const MAX_BUNDLE_BYTES = 512 * 1024 * 1024;
+
+/**
+ * The entries of a gzipped tar. Throws {@link ArchiveError} for anything a
+ * bundle cannot hold, including an archive that inflates past `maxBytes`,
+ * which is refused before any entry is parsed.
+ */
+export function readTarGz(archive: Buffer, maxBytes: number = MAX_BUNDLE_BYTES): ArchiveEntry[] {
   let tar: Buffer;
   try {
-    tar = gunzipSync(archive);
+    tar = gunzipSync(archive, { maxOutputLength: maxBytes });
   } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ERR_BUFFER_TOO_LARGE") {
+      throw new ArchiveError(`it inflates past ${maxBytes} bytes, more than any pack bundle holds`);
+    }
     throw new ArchiveError(`not gzip data (${error instanceof Error ? error.message : String(error)})`);
   }
   const entries: ArchiveEntry[] = [];

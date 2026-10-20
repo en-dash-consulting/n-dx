@@ -116,8 +116,9 @@ Offline, for a machine with no registry access:
   `<bundle>.sha256` beside the bundle) before parsing, extracting or importing
   anything; with no hash to check it prints the bundle's and says it was not
   verified. It then reads the manifest and refuses a bundle of another pack or
-  version, or an archive that will not read (a manifest that is not a JSON
-  object is "not a pack bundle"). It extracts into `.sv-pack-stage-*` beside
+  version, or an archive that will not read, including one that inflates past
+  512 MiB (`MAX_BUNDLE_BYTES`), refused before any entry is parsed (a manifest
+  that is not a JSON object is "not a pack bundle"). It extracts into `.sv-pack-stage-*` beside
   the pack directory and loads the pack from there; only then does it rename
   the pack's dependency closure (`dependencyClosure`: the pack and what its
   `package.json` files name in `dependencies`, `optionalDependencies` and
