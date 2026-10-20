@@ -446,7 +446,12 @@ export function webValue(node: Capture): WebValue {
  * {@link joinWebPath}.
  */
 export function joinPrefix(prefix: string, path: string): string {
-  return path === "" ? prefix : prefix === "" ? path : `${prefix.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  if (path === "") return prefix;
+  if (prefix === "") return path;
+  // Trimmed by a loop: `/\/+$/` is quadratic on many `/` followed by another character.
+  let end = prefix.length;
+  while (end > 0 && prefix.charCodeAt(end - 1) === 0x2f) end--;
+  return `${prefix.slice(0, end)}/${path.replace(/^\/+/, "")}`;
 }
 
 /**

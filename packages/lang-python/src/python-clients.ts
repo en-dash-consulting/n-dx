@@ -134,6 +134,22 @@ export function topLevelIndex(text: string, char: string): number {
 /** True when `text` closes every bracket it opens and never closes one it did not. */
 const balanced = (text: string): boolean => topLevelIndex(`${text}\u0000`, "\u0000") === text.length;
 
+/** A dotted name, whitespace allowed around the dots: what an env lookup subscripts or calls. */
+const APPLIED_NAME = /^[A-Za-z_][\w.\s]*$/;
+
+/**
+ * `name[inner]` or `name(inner)`, split at the first `open`, the name without
+ * trailing whitespace; undefined unless `text` ends with the matching close and
+ * the name is a dotted name. Found by index, not by one regex, which backtracks
+ * quadratically on a name followed by many spaces.
+ */
+export function applied(text: string, open: "[" | "("): { name: string; inner: string } | undefined {
+  const at = text.indexOf(open);
+  if (at === -1 || !text.endsWith(open === "[" ? "]" : ")")) return undefined;
+  const name = text.slice(0, at).trimEnd();
+  return APPLIED_NAME.test(name) ? { name, inner: text.slice(at + 1, -1) } : undefined;
+}
+
 /** The text inside parentheses that wrap the whole of `text`; undefined otherwise. */
 function unwrapped(text: string): string | undefined {
   if (!text.startsWith("(") || !text.endsWith(")")) return undefined;
@@ -158,14 +174,14 @@ class TargetReader {
 
   /** The key of `os.environ["X"]`, `os.environ.get("X")` or `os.getenv("X")`: `X`, `""` when not a literal; undefined for anything else. */
   envKey(text: string): string | undefined {
-    const subscript = /^([A-Za-z_][\w.\s]*?)\s*\[([\s\S]*)\]$/.exec(text);
-    if (subscript && balanced(subscript[2]!) && this.qualify(subscript[1]!) === "os.environ") return literalValue(subscript[2]!) ?? "";
-    const call = /^([A-Za-z_][\w.\s]*?)\s*\(([\s\S]*)\)$/.exec(text);
-    if (!call || !balanced(call[2]!)) return undefined;
-    const name = this.qualify(call[1]!);
+    const subscript = applied(text, "[");
+    if (subscript && balanced(subscript.inner) && this.qualify(subscript.name) === "os.environ") return literalValue(subscript.inner) ?? "";
+    const call = applied(text, "(");
+    if (!call || !balanced(call.inner)) return undefined;
+    const name = this.qualify(call.name);
     if (name !== "os.getenv" && name !== "os.environ.get") return undefined;
-    const comma = topLevelIndex(call[2]!, ",");
-    return literalValue(comma === -1 ? call[2]! : call[2]!.slice(0, comma)) ?? "";
+    const comma = topLevelIndex(call.inner, ",");
+    return literalValue(comma === -1 ? call.inner : call.inner.slice(0, comma)) ?? "";
   }
 
   private evaluate(written: string, depth: number): Target {
