@@ -36,7 +36,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Escape the runner paths fully in the CI grammar-steps test](./escape-the-runner-paths-fully-in-the.md) | pending |
 | [Keep the sv pack add command out of the docs build's HTML parser](./keep-the-sv-pack-add-command-out-of.md) | completed |
 | [Make the Python env-key and route-prefix helpers linear on any input](./make-the-python-env-key-and-route.md) | pending |
-| [Make the Spring Boot name and route-path helpers linear on any input](./make-the-spring-boot-name-and-route.md) | pending |
+| [Make the Spring Boot name and route-path helpers linear on any input](./make-the-spring-boot-name-and-route.md) | in_progress |
 | [Normalise path separators before the Terraform model test filters caches](./normalise-path-separators-before-the.md) | completed |
 | [Pin the Maven and Gradle build goldens to LF so Windows checkouts match](./pin-the-maven-and-gradle-build-goldens.md) | completed |
 | [Say that sv pack add --from runs the bundle's entry module while validating it](./say-that-sv-pack-add-from-runs-the.md) | completed |

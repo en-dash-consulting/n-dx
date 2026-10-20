@@ -74,11 +74,20 @@ const PROVENANCE: Readonly<Record<string, RuleProvenance>> = {
 
 const COMMENTS: ReadonlySet<string> = new Set(["line_comment", "block_comment"]);
 
-/** Last segment of a possibly qualified, possibly generic type or annotation name. */
-const simpleName = (text: string): string => {
-  const bare = text.replace(/<[\s\S]*>/, "").replace(/\[\s*\]/g, "").replace(/\s+/g, "");
+/**
+ * Last segment of a possibly qualified, possibly generic type or annotation name.
+ *
+ * Capture text is repository input, so this stays linear: the type arguments
+ * are cut by index from the first `<` to the last `>` after it, which is what
+ * a greedy `/<[\s\S]*>/` removes without its retry from every unclosed `<`.
+ */
+export function simpleName(text: string): string {
+  const open = text.indexOf("<");
+  const close = text.lastIndexOf(">");
+  const erased = open >= 0 && close > open ? text.slice(0, open) + text.slice(close + 1) : text;
+  const bare = erased.replace(/\[\s*\]/g, "").replace(/\s+/g, "");
   return bare.slice(bare.lastIndexOf(".") + 1);
-};
+}
 
 const before = (a: SourcePosition, b: SourcePosition): boolean => a.line < b.line || (a.line === b.line && a.column < b.column);
 
@@ -232,9 +241,17 @@ export interface SpringSkip {
 const literal = (node: Capture): string | undefined =>
   node.nodeType === "string_literal" ? javaStringValue(node.text).text : undefined;
 
-/** Join a prefix and a path with exactly one slash; the result starts with one. */
+const SLASH = 0x2f;
+
+/**
+ * Join a prefix and a path with exactly one slash; the result starts with one.
+ * The prefix's trailing slashes are trimmed by a loop: `/\/+$/` retries from
+ * every slash of a run that ends in another character, quadratic on repository input.
+ */
 export function joinRoutePath(prefix: string, path: string): string {
-  const head = prefix.replace(/\/+$/, "");
+  let end = prefix.length;
+  while (end > 0 && prefix.charCodeAt(end - 1) === SLASH) end--;
+  const head = prefix.slice(0, end);
   const tail = path.replace(/^\/+/, "");
   const joined = tail === "" ? head : `${head}/${tail}`;
   return joined.startsWith("/") ? joined : `/${joined}`;
