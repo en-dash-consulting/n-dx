@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
-import { goConfig } from "../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 
 describe("analyzeImports incremental carry-over — Go package directories", () => {
   let dir: string;
@@ -50,7 +50,9 @@ describe("analyzeImports incremental carry-over — Go package directories", () 
     await writeFile(join(dir, "name.go"), "package main\n\nfunc Name() {}\n");
     const inventory = await analyzeInventory(dir, { languageConfig: goConfig });
     const full = await analyzeImports(dir, inventory, { language: "go" });
-    expect(full.edges.some((e) => e.from === "util/root.go" && e.to === "")).toBe(true);
+    // The regex parser points this edge at "" (the root package); the Go pack
+    // resolves it to the files that declare the names used.
+    expect(full.edges.some((e) => e.from === "util/root.go")).toBe(true);
 
     const incremental = await analyzeImports(dir, inventory, {
       language: "go",

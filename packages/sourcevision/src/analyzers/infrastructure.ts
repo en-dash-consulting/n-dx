@@ -27,8 +27,11 @@
  * ## Two constraints on what this module may import
  *
  * It bundles into the standalone iso-map skill script, which must run in any
- * repository with no dependencies, so **only `node:` builtins and type-only
- * imports** may appear here. That is also why serialization is not done here:
+ * repository with no dependencies, so only these imports may appear here:
+ * `node:` builtins, type-only imports, and `IAC_KINDS` from `@n-dx/lang-kit`.
+ * `scripts/build-iso-skill.mjs` aliases `@n-dx/lang-kit` to
+ * `packages/lang-kit/src/iac-kinds.ts` alone, so any other lang-kit import
+ * fails the bundle build. That is also why serialization is not done here:
  * canonical JSON comes from `util/sort.ts`, which re-exports it from
  * `@n-dx/llm-client`, and importing that would pull a package into the
  * bundle. The analyze pipeline writes the file; this module only computes the
@@ -39,6 +42,7 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative, extname, sep } from "node:path";
+import { IAC_KINDS } from "@n-dx/lang-kit";
 import { DATA_FILES } from "../schema/data-files.js";
 import type { InfraLink, InfraResource, InfrastructureData } from "../schema/v1.js";
 
@@ -48,9 +52,10 @@ import type { InfraLink, InfraResource, InfrastructureData } from "../schema/v1.
  * The `.ndx/` container for a project root, or `null` on the legacy layout.
  *
  * Hand-written twin of `resolveLayout(root).container`. This module bundles
- * into the standalone skill script and may import nothing but `node:`
- * builtins, so it cannot reach the resolver in `@n-dx/llm-client` — the same
- * constraint that gives `packages/core/layout.js` its own copy.
+ * into the standalone skill script and may import only what the header
+ * above allows (no `@n-dx/llm-client`), so it cannot reach that package's
+ * resolver — the same constraint that gives `packages/core/layout.js` its
+ * own copy.
  * `tests/integration/layout-resolver-contract.test.js` pins what is built on
  * it to the canonical implementation, because a third copy of a rule drifts
  * just as silently as a second one.
@@ -161,33 +166,6 @@ export function readDeclaredConfig(root: string): {
 }
 
 // ── Infrastructure-as-code discovery ────────────────────────────────────────
-
-/**
- * Resource type → coarse kind, for every IaC dialect.
- *
- * Matched as substrings against the resource type so this stays useful across
- * AWS, GCP and Azure without enumerating every provider's naming.
- *
- * One table, not one per parser: the patterns are written in Terraform's
- * underscore form and `classifyResource` normalizes the other dialects into it
- * (`AWS::SQS::Queue` → `aws_sqs_queue`). Two tables would disagree within a
- * release — which is how the skill script and the package came to disagree
- * about zone colours.
- */
-const IAC_KINDS: Array<[RegExp, string]> = [
-  [/bucket|blob_container|storage_account/, "bucket"],
-  [/sqs|_queue|servicebus_queue|pubsub_subscription/, "queue"],
-  [/sns|pubsub_topic|eventgrid|event_bus|eventbridge/, "topic"],
-  [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
-  [/elasticache|redis|memcache/, "cache"],
-  [/kinesis|kafka|msk|firehose/, "stream"],
-  [/cloudwatch_event_rule|events_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
-  [/secret|kms|vault|parameter/, "secrets"],
-  [
-    /lambda_function|serverless_function|cloud_run|cloudfunctions|container_app/,
-    "compute",
-  ],
-];
 
 /**
  * Classify a resource type from any dialect.
@@ -483,6 +461,25 @@ export function linkInfrastructure(
 // ── Assembly ────────────────────────────────────────────────────────────────
 
 /**
+ * Terraform files declare infrastructure; they are never code that uses it.
+ * Linking reads files for resource names, and a resource's own `.tf` file
+ * names it, so a Terraform file would be linked as a user of the resource it
+ * declares (and, in a workspace, become the crossing endpoint instead of the
+ * code that calls it). Decides by the rules of `isTerraformFile` in
+ * the terraform module of `@n-dx/lang-kit`: `.tf` and `.tfvars` by lowercased
+ * extension, `terragrunt.hcl` and `*.tftest.hcl` by exact, case-sensitive name.
+ * Kept as a local copy because the bundle's lang-kit alias reaches only
+ * `iac-kinds.ts`, so no other lang-kit export is available here;
+ * `terraform-config.test.ts` fails if the two disagree.
+ */
+export function isTerraformPath(path: string): boolean {
+  const ext = extname(path).toLowerCase();
+  if (ext === ".tf" || ext === ".tfvars") return true;
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return name === "terragrunt.hcl" || name.endsWith(".tftest.hcl");
+}
+
+/**
  * Discover everything the import graph does not show, from scratch.
  *
  * The compute path. `export/iso-declared.ts` prefers the persisted
@@ -490,7 +487,9 @@ export function linkInfrastructure(
  * scanned with no analysis, or an analysis made before the file existed.
  *
  * `readFile` lets the scanner reuse contents it already has; when omitted,
- * files are read on demand and only if there is IaC to link.
+ * files are read on demand and only if there is IaC to link. Terraform files
+ * in `filePaths` are never link candidates (see {@link isTerraformPath}), so
+ * every caller can pass the whole inventory.
  */
 export function computeInfrastructure(
   root: string,
@@ -514,7 +513,7 @@ export function computeInfrastructure(
 
   const infrastructure = linkInfrastructure(
     [...config.infrastructure, ...iac.infrastructure],
-    filePaths,
+    filePaths.filter((path) => !isTerraformPath(path)),
     read,
   );
 

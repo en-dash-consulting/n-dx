@@ -39,6 +39,11 @@ const REQUIRED_ARTIFACTS = [
   ["packages/hench/dist/cli/index.js", "hench", "packages/hench/src", "packages/hench/dist"],
   ["packages/web/dist/server/start.js", "@n-dx/web", "packages/web/src", "packages/web/dist"],
   ["packages/llm-client/dist/public.js", "@n-dx/llm-client", "packages/llm-client/src", "packages/llm-client/dist"],
+  ["packages/lang-kit/dist/index.js", "@n-dx/lang-kit", "packages/lang-kit/src", "packages/lang-kit/dist"],
+  // sourcevision loads these packs from the workspace when the CLI analyzes.
+  ["packages/lang-runtime/dist/index.js", "@n-dx/lang-runtime", "packages/lang-runtime/src", "packages/lang-runtime/dist"],
+  ["packages/lang-java/dist/index.js", "@n-dx/lang-java", "packages/lang-java/src", "packages/lang-java/dist"],
+  ["packages/lang-go/dist/index.js", "@n-dx/lang-go", "packages/lang-go/src", "packages/lang-go/dist"],
 ];
 
 export function setup() {

@@ -11,8 +11,8 @@
  * Returns false if prerequisites are missing, true on success, throws on error.
  */
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   DATA_FILES,
   toCanonicalJSON,
@@ -55,6 +55,17 @@ import type {
 import { info } from "../output.js";
 import { bold, cyan, dim, yellow, green, red, loadProjectOverrides } from "@n-dx/llm-client";
 import { buildProjectProfile, stripProjectProfileForDisk } from "../../analyzers/project-profile.js";
+import { readImportsPackFrameworkFacts } from "../../analyzers/imports.js";
+import { inventoryFingerprint, withPackAnalysedLanguages } from "../../analyzers/inventory.js";
+import { SV_CACHE_DIRNAME } from "../../paths.js";
+import { KNOWN_PACKS } from "../../language/pack-loader.js";
+
+/**
+ * Machine-local record of the {@link inventoryFingerprint} the last inventory
+ * was made under. Kept out of inventory.json so its bytes depend on content alone.
+ */
+const INVENTORY_FINGERPRINT_FILE = "inventory-fingerprint.json";
+import type { PackFrameworkFacts } from "../../analyzers/pack-framework-facts.js";
 
 // ── Shared context passed between phases ─────────────────────────────
 
@@ -79,6 +90,37 @@ export interface AnalyzeContext {
   tokenUsage: AnalyzeTokenUsage;
   /** Result from phase 1 (inventory), used by later phases for incremental hints. */
   inventoryResult: InventoryResult | null;
+  /**
+   * Language packs' routes and outbound calls, collected by the imports phase
+   * in the call that reads imports; read on demand when it did not run.
+   */
+  packFacts?: PackFrameworkFacts;
+  /**
+   * Ids of opt-in packs that would help this repo but are neither listed nor
+   * installed. Phases only record them; analyze names them in one line at the end.
+   */
+  suggestedPacks?: Set<string>;
+}
+
+/** Record `packId` as an optional pack for this run's end-of-run line. */
+export function suggestPack(ctx: AnalyzeContext, packId: string): void {
+  (ctx.suggestedPacks ??= new Set()).add(packId);
+}
+
+/** The one line naming the run's suggested packs, in analysis order; undefined when there are none. */
+export function optionalPacksLine(ctx: AnalyzeContext): string | undefined {
+  const ids = KNOWN_PACKS.map((p) => p.id).filter((id) => ctx.suggestedPacks?.has(id));
+  return ids.length === 0 ? undefined : `Optional packs for this repo: ${ids.join(", ")} — ndx sv pack add <id>`;
+}
+
+/**
+ * The packs' routes and outbound-call facts for this run: the imports
+ * phase's, or, when it did not run (`--phase`, `sv narrate`), one pack call
+ * for those kinds alone, kept for the rest of the run.
+ */
+export async function packFrameworkFacts(ctx: AnalyzeContext, inventory: Inventory): Promise<PackFrameworkFacts> {
+  ctx.packFacts ??= await readImportsPackFrameworkFacts(ctx.absDir, inventory);
+  return ctx.packFacts;
 }
 
 /** Safely load a JSON file, returning undefined if missing or corrupted. */
@@ -113,16 +155,21 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
   updateManifestModule(ctx.absDir, "inventory", "running");
 
   try {
-    const previousInventory = loadPreviousData(join(ctx.svDir, DATA_FILES.inventory));
-
     // Detect all languages and merge into a unified config for skip dirs, etc.
     const langConfigs = await detectLanguages(ctx.absDir);
     const mergedConfig = mergeLanguageConfigs(langConfigs);
 
+    // Cached entries are reused only when the rules that made them still hold.
+    const fingerprintPath = join(ctx.svDir, SV_CACHE_DIRNAME, INVENTORY_FINGERPRINT_FILE);
+    const fingerprint = inventoryFingerprint(mergedConfig);
+    const previousInventory = !ctx.fullMode && loadPreviousData(fingerprintPath)?.fingerprint === fingerprint
+      ? loadPreviousData(join(ctx.svDir, DATA_FILES.inventory))
+      : undefined;
+
     ctx.inventoryResult = await analyzeInventory(
       ctx.absDir,
       {
-        ...((!ctx.fullMode && previousInventory) ? { previousInventory } : {}),
+        ...(previousInventory ? { previousInventory } : {}),
         languageConfig: mergedConfig,
       },
     );
@@ -133,6 +180,8 @@ export async function runInventoryPhase(ctx: AnalyzeContext): Promise<void> {
       files: ctx.inventoryResult.files,
       summary: ctx.inventoryResult.summary,
     }));
+    mkdirSync(dirname(fingerprintPath), { recursive: true });
+    writeFileSync(fingerprintPath, JSON.stringify({ fingerprint }) + "\n");
     updateManifestModule(ctx.absDir, "inventory", "complete");
 
     // Record resolved language(s) in manifest for downstream consumers
@@ -174,13 +223,31 @@ export async function runImportsPhase(ctx: AnalyzeContext): Promise<void> {
     const stats = ctx.inventoryResult?.stats;
     const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
 
-    const imports = await analyzeImports(ctx.absDir, inventory, !ctx.fullMode && previousImports ? {
-      previousImports,
-      changedFiles: ctx.inventoryResult?.changedFiles,
-      fileSetChanged,
-    } : undefined);
+    const packFacts: Array<PackFrameworkFacts[number]> = [];
+    const analysedPacks: string[] = [];
+    const imports = await analyzeImports(ctx.absDir, inventory, {
+      ...(!ctx.fullMode && previousImports ? {
+        previousImports,
+        changedFiles: ctx.inventoryResult?.changedFiles,
+        fileSetChanged,
+      } : {}),
+      packs: {
+        framework: (facts) => packFacts.push(...facts.map(({ path, routes, outboundCalls }) => ({ path, routes, outboundCalls }))),
+        analysed: (id) => analysedPacks.push(id),
+        suggest: (id) => suggestPack(ctx, id),
+      },
+    });
+    ctx.packFacts = packFacts;
     const outPath = join(ctx.svDir, DATA_FILES.imports);
     writeFileSync(outPath, toCanonicalJSON(imports));
+
+    // A pack-only language (Java, Python) is analysed only when its pack ran, which
+    // the inventory phase could not know; without such a pack inventory.json is untouched.
+    const summary = withPackAnalysedLanguages(inventory.summary, analysedPacks);
+    if (summary !== inventory.summary) {
+      writeFileSync(inventoryPath, toCanonicalJSON({ ...inventory, summary }));
+      if (ctx.inventoryResult) ctx.inventoryResult.summary = summary;
+    }
     updateManifestModule(ctx.absDir, "imports", "complete");
     info(`  ${bold(String(imports.summary.totalEdges))} edges, ${bold(String(imports.summary.totalExternal))} external → ${dim(outPath)}`);
   } catch (err) {
@@ -558,11 +625,14 @@ export async function runComponentsPhase(ctx: AnalyzeContext): Promise<void> {
     const stats = ctx.inventoryResult?.stats;
     const fileSetChanged = stats ? (stats.added > 0 || stats.deleted > 0) : true;
 
-    const components = await analyzeComponents(ctx.absDir, inventory, importsData, !ctx.fullMode && previousComponents ? {
-      previousComponents,
-      changedFiles: ctx.inventoryResult?.changedFiles,
-      fileSetChanged,
-    } : undefined);
+    const components = await analyzeComponents(ctx.absDir, inventory, importsData, {
+      ...(!ctx.fullMode && previousComponents ? {
+        previousComponents,
+        changedFiles: ctx.inventoryResult?.changedFiles,
+        fileSetChanged,
+      } : {}),
+      packFacts: await packFrameworkFacts(ctx, inventory),
+    });
     const outPath = join(ctx.svDir, DATA_FILES.components);
     writeFileSync(outPath, toCanonicalJSON(components));
     updateManifestModule(ctx.absDir, "components", "complete");

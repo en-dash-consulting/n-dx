@@ -1,0 +1,163 @@
+{
+  "facts": [
+    {
+      "path": "shop/__init__.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/",
+          "handler": "index",
+          "position": {
+            "line": 16,
+            "column": 5
+          }
+        }
+      ]
+    },
+    {
+      "path": "shop/admin.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/admin/",
+          "handler": "dashboard",
+          "position": {
+            "line": 8,
+            "column": 1
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/admin/reports/daily",
+          "handler": "daily",
+          "position": {
+            "line": 13,
+            "column": 1
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/admin/reports/daily",
+          "handler": "daily",
+          "position": {
+            "line": 13,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "path": "shop/api.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/v2/status",
+          "handler": "status",
+          "position": {
+            "line": 6,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "path": "shop/views.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/about",
+          "handler": "about",
+          "position": {
+            "line": 7,
+            "column": 1
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/login",
+          "handler": "login",
+          "position": {
+            "line": 12,
+            "column": 1
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/login",
+          "handler": "login",
+          "position": {
+            "line": 12,
+            "column": 1
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/feed",
+          "handler": "feed",
+          "position": {
+            "line": 17,
+            "column": 1
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/items/<int:id>",
+          "handler": "item",
+          "position": {
+            "line": 22,
+            "column": 1
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/items",
+          "handler": "add_item",
+          "position": {
+            "line": 27,
+            "column": 1
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/items/<int:id>",
+          "handler": "put_item",
+          "position": {
+            "line": 32,
+            "column": 1
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/items/<int:id>",
+          "handler": "delete_item",
+          "position": {
+            "line": 37,
+            "column": 1
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/items/<int:id>",
+          "handler": "patch_item",
+          "position": {
+            "line": 42,
+            "column": 1
+          }
+        },
+        {
+          "method": "GET",
+          "path": "${PREFIX + \"/redirect\"}",
+          "handler": "old_redirect",
+          "position": {
+            "line": 47,
+            "column": 1
+          }
+        }
+      ]
+    }
+  ],
+  "notices": [
+    "Flask: 1 route path or prefix is not a literal and is kept as written in ${…} form: shop/views.py:47 (path PREFIX + \"/redirect\").",
+    "Flask: 1 mount names no application or router the rules can follow and was not followed: shop/__init__.py:14 (register_blueprint missing_bp)."
+  ]
+}
