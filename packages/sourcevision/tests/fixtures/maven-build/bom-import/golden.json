@@ -1,0 +1,74 @@
+[
+  {
+    "module": "platform",
+    "dir": "",
+    "buildSystem": "maven",
+    "group": {
+      "resolved": true,
+      "value": "com.acme"
+    },
+    "version": {
+      "resolved": true,
+      "value": "3.0.0"
+    },
+    "dependencies": [],
+    "notices": []
+  },
+  {
+    "module": "acme-bom",
+    "dir": "bom",
+    "buildSystem": "maven",
+    "group": {
+      "resolved": true,
+      "value": "com.acme"
+    },
+    "version": {
+      "resolved": true,
+      "value": "3.0.0"
+    },
+    "dependencies": [],
+    "notices": []
+  },
+  {
+    "module": "app",
+    "dir": "app",
+    "buildSystem": "maven",
+    "group": {
+      "resolved": true,
+      "value": "com.acme"
+    },
+    "version": {
+      "resolved": true,
+      "value": "3.0.0"
+    },
+    "dependencies": [
+      {
+        "group": "com.google.guava",
+        "artifact": "guava",
+        "version": {
+          "resolved": true,
+          "value": "33.2.1"
+        },
+        "scope": "compile"
+      },
+      {
+        "group": "org.springframework",
+        "artifact": "spring-core",
+        "version": {
+          "resolved": false,
+          "reason": "managed outside the repository by org.springframework.boot:spring-boot-dependencies:3.2.5"
+        },
+        "scope": "compile"
+      }
+    ],
+    "javaVersion": {
+      "resolved": true,
+      "value": "11"
+    },
+    "springBootVersion": {
+      "resolved": true,
+      "value": "3.2.5"
+    },
+    "notices": []
+  }
+]

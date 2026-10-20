@@ -14,19 +14,21 @@ n-dx's analysis pipeline was originally built for TypeScript/JavaScript. Rather 
 
 The registry is the backbone of multi-language support. Every downstream subsystem — inventory, imports, archetypes, test detection, guard configuration — reads from the same `LanguageConfig` interface rather than hardcoding language-specific constants.
 
-**Location:** `packages/sourcevision/src/language/`
+**Location:** `packages/lang-kit/src/` (`@n-dx/lang-kit`, foundation tier)
 
 ```
-language/
+lang-kit/src/
   registry.ts      # LanguageConfig interface definition
-  go.ts            # Go configuration
-  swift.ts         # Swift configuration
-  python.ts        # Python configuration (inventory only, no import parser)
-  csharp.ts        # C# and ASP.NET WebForms markup configuration
+  go.ts            # Go configuration (also java.ts, python.ts, swift.ts, terraform.ts, csharp.ts)
   typescript.ts    # TypeScript/JavaScript configuration (backward-compatible defaults)
   detect.ts        # Auto-detection, multi-language detection, config merging
   index.ts         # Barrel exports
 ```
+
+lang-kit reads no config. `packages/sourcevision/src/language/detect.ts` is the
+layer that reads the project config's `language` override and walks the tree
+for Terraform files, then calls lang-kit's `detectLanguage` / `detectLanguages`
+with both.
 
 ### LanguageConfig Interface
 
@@ -177,7 +179,7 @@ To add support for a new language (e.g., Python, Rust):
 
 ### 1. Create language config
 
-Add `packages/sourcevision/src/language/python.ts`:
+Add `packages/lang-kit/src/python.ts` and export it from `src/index.ts`:
 
 ```typescript
 export const pythonConfig: LanguageConfig = {
@@ -196,7 +198,7 @@ export const pythonConfig: LanguageConfig = {
 
 ### 2. Register in detection chain
 
-Update `detect.ts`:
+Update `packages/lang-kit/src/detect.ts`:
 - Add `pyproject.toml` / `setup.py` as project markers
 - Add file-count tiebreak for `.py` extensions
 

@@ -7,6 +7,7 @@ const rexRoot = resolve(import.meta.dirname, "../rex");
 const svRoot = resolve(import.meta.dirname, "../sourcevision");
 const claudeClientRoot = resolve(import.meta.dirname, "../claude-client");
 const llmClientRoot = resolve(import.meta.dirname, "../llm-client");
+const packagesRoot = resolve(import.meta.dirname, "..");
 const sandboxBlocksNetwork = process.env["CODEX_SANDBOX_NETWORK_DISABLED"] === "1";
 
 export default defineConfig({
@@ -23,6 +24,9 @@ export default defineConfig({
       { find: /^@n-dx\/sourcevision\/dist\/(.+)\.js$/, replacement: `${svRoot}/src/$1.ts` },
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/llm-client$/, replacement: `${llmClientRoot}/src/public.ts` },
+      // Map @n-dx/lang-kit and the @n-dx/lang-* packs sourcevision loads to their
+      // source barrels: their dist would hit the local .js → .ts rewrite below
+      { find: /^@n-dx\/(lang-[a-z]+)$/, replacement: `${packagesRoot}/$1/src/index.ts` },
       // Map @n-dx/claude-client to source public.ts for vitest (transitive dep of rex)
       { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/public.ts` },
       // Map local .js imports to .ts files (only relative paths)
@@ -43,6 +47,7 @@ export default defineConfig({
       "tests/setup/preact-frame-leak-guard.ts",
       "../../tests/setup-color-env.js",
       "../../tests/setup-session-env.js",
+      "../../tests/setup-ndx-home.js",
     ],
     exclude: sandboxBlocksNetwork
       ? [
