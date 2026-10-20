@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
-import { goConfig } from "../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 
 describe("analyzeImports incremental carry-over — Go package directories", () => {
   let dir: string;
