@@ -24,7 +24,7 @@ import {
   walkProject,
   WALK_BOUNDS,
 } from "../../../src/analyzers/sdlc-profile.js";
-import { loadIgnoreFilter } from "../../../src/analyzers/inventory.js";
+import { loadIgnoreFilter } from "../../../src/util/project-walk.js";
 import { SdlcProfileSchema, validate } from "../../../src/schema/validate.js";
 
 const roots: string[] = [];

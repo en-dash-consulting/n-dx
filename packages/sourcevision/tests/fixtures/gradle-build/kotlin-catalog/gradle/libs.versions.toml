@@ -1,0 +1,23 @@
+# Version catalog: read exactly.
+[versions]
+spring-boot = "3.3.4"
+java = "21"
+jackson = { strictly = "2.17.2" }
+junit = "5.11.0"
+
+[libraries]
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-bom = { group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "spring-boot" }
+jackson-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
+junit-api = "org.junit.jupiter:junit-jupiter-api:5.11.0"
+junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version = { ref = "junit" } }
+broken-ref = { module = "com.example:broken", version.ref = "nowhere" }
+
+[bundles]
+testing = [
+  "junit-api",
+  "junit-engine",
+]
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

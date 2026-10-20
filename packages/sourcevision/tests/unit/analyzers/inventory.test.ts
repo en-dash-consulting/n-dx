@@ -8,9 +8,8 @@ import {
   deriveCategory,
   isBinary,
   analyzeInventory,
-  IgnoreFilter,
-  loadIgnoreFilter,
 } from "../../../src/analyzers/inventory.js";
+import { IgnoreFilter, loadIgnoreFilter } from "../../../src/util/project-walk.js";
 import type { InventoryResult } from "../../../src/analyzers/inventory.js";
 
 // ── detectLanguage ────────────────────────────────────────────────────────────
@@ -421,6 +420,53 @@ describe("analyzeInventory", () => {
 
     expect(paths).toContain("app.py");
     expect(paths.some((p) => p.includes("site-packages"))).toBe(false);
+  });
+
+  it("inventories Python packages named env, build or dist, and still skips virtualenvs and build output", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-pkg-env-"));
+    await writeFile(join(tmpDir, "pyproject.toml"), "[project]\nname='x'\n");
+    const files: Record<string, string> = {
+      // Packages: each directory holds __init__.py.
+      "src/app/utils/env/__init__.py": "",
+      "src/app/utils/env/base.py": "x = 1\n",
+      "src/app/build/__init__.py": "",
+      "src/app/dist/__init__.pyi": "",
+      // A virtualenv and build output at the root.
+      "env/pyvenv.cfg": "home = /usr/bin\n",
+      "env/lib/python3.13/site-packages/dep/__init__.py": "",
+      "build/lib/app/__init__.py": "",
+      "dist/app-1.0.tar.gz": "",
+    };
+    for (const [path, text] of Object.entries(files)) {
+      await mkdir(join(tmpDir, path, ".."), { recursive: true });
+      await writeFile(join(tmpDir, path), text);
+    }
+    // A file named like a skip directory is still skipped.
+    await writeFile(join(tmpDir, "src", "app", "env"), "");
+
+    const inv = await analyzeInventory(tmpDir, { codeOnly: false });
+    const paths = inv.files.map((f) => f.path).sort();
+
+    expect(paths).toEqual([
+      "pyproject.toml",
+      "src/app/build/__init__.py",
+      "src/app/dist/__init__.pyi",
+      "src/app/utils/env/__init__.py",
+      "src/app/utils/env/base.py",
+    ]);
+  });
+
+  it("still skips build and dist unconditionally in a TypeScript project", async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "sv-inv-ts-build-"));
+    await writeFile(join(tmpDir, "package.json"), '{ "name": "test" }\n');
+    await mkdir(join(tmpDir, "src"), { recursive: true });
+    await writeFile(join(tmpDir, "src", "app.ts"), "export {};\n");
+    await mkdir(join(tmpDir, "dist"), { recursive: true });
+    await writeFile(join(tmpDir, "dist", "__init__.py"), "");
+    await writeFile(join(tmpDir, "dist", "app.js"), "");
+
+    const inv = await analyzeInventory(tmpDir);
+    expect(inv.files.map((f) => f.path)).toEqual(["src/app.ts"]);
   });
 
   it("excludes vendor artifact directories from the inventory", async () => {

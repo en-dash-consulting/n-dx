@@ -40,7 +40,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { WEBFORMS_EXTENSIONS } from "../language/csharp.js";
+import { WEBFORMS_EXTENSIONS } from "@n-dx/lang-kit";
 import type { ImportEdge, ExternalImport } from "../schema/index.js";
 
 export interface CSharpImportResult {

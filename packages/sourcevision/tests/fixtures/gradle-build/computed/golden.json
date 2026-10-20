@@ -1,0 +1,40 @@
+[
+  {
+    "module": ":",
+    "dir": "",
+    "buildSystem": "gradle",
+    "dependencies": [
+      {
+        "group": "com.fasterxml.jackson.core",
+        "artifact": "jackson-databind",
+        "version": {
+          "resolved": false,
+          "reason": "computed in the build script: ${jacksonVersion}"
+        },
+        "scope": "implementation"
+      },
+      {
+        "group": "org.apache.commons",
+        "artifact": "commons-lang3",
+        "version": {
+          "resolved": true,
+          "value": "3.+",
+          "bestEffort": true
+        },
+        "scope": "implementation"
+      }
+    ],
+    "javaVersion": {
+      "resolved": false,
+      "reason": "computed in the build script: javaVer"
+    },
+    "springBootVersion": {
+      "resolved": false,
+      "reason": "computed in the build script: \"$springBootVersion\""
+    },
+    "notices": [
+      "build.gradle: dependency \"implementation dynamicDependency\" is computed in the build script",
+      "build.gradle: dependency \"implementation \"com.example:$artifactName:1.0\"\" has a computed group or name"
+    ]
+  }
+]

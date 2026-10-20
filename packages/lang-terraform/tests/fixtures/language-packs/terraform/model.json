@@ -1,0 +1,1044 @@
+{
+  "model": {
+    "resources": [
+      {
+        "file": "src/gcp.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 1,
+            "column": 0
+          },
+          "end": {
+            "line": 7,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "google_sql_database_instance",
+        "name": "orders",
+        "address": "google_sql_database_instance.orders",
+        "provider": {
+          "name": "google",
+          "version": "~> 6.0"
+        },
+        "attributes": {
+          "engineVersion": "POSTGRES_15"
+        },
+        "references": []
+      },
+      {
+        "file": "src/gcp.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 9,
+            "column": 0
+          },
+          "end": {
+            "line": 15,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "google_cloudfunctions2_function",
+        "name": "export",
+        "address": "google_cloudfunctions2_function.export",
+        "provider": {
+          "name": "google",
+          "version": "~> 6.0"
+        },
+        "attributes": {
+          "runtime": "nodejs20"
+        },
+        "references": []
+      },
+      {
+        "file": "src/gcp.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 17,
+            "column": 0
+          },
+          "end": {
+            "line": 20,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "google_container_cluster",
+        "name": "primary",
+        "address": "google_container_cluster.primary",
+        "provider": {
+          "name": "google",
+          "version": "~> 6.0"
+        },
+        "attributes": {
+          "clusterVersion": "1.29"
+        },
+        "references": []
+      },
+      {
+        "file": "src/gcp.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 22,
+            "column": 0
+          },
+          "end": {
+            "line": 29,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "google_cloud_run_v2_service",
+        "name": "api",
+        "address": "google_cloud_run_v2_service.api",
+        "provider": {
+          "name": "google",
+          "version": "~> 6.0"
+        },
+        "attributes": {
+          "image": "gcr.io/orders/api:1.4.2"
+        },
+        "references": []
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 69,
+            "column": 0
+          },
+          "end": {
+            "line": 72,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "aws_db_subnet_group",
+        "name": "main",
+        "address": "aws_db_subnet_group.main",
+        "provider": {
+          "name": "aws",
+          "version": ">= 5.40"
+        },
+        "attributes": {},
+        "references": []
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 74,
+            "column": 0
+          },
+          "end": {
+            "line": 80,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "aws_db_instance",
+        "name": "orders",
+        "address": "aws_db_instance.orders",
+        "provider": {
+          "name": "aws",
+          "version": ">= 5.40"
+        },
+        "attributes": {
+          "engine": "postgres",
+          "engineVersion": "var.engine_version"
+        },
+        "expressions": {
+          "engineVersion": "var.engine_version"
+        },
+        "references": [
+          "aws_db_subnet_group.main"
+        ]
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 82,
+            "column": 0
+          },
+          "end": {
+            "line": 92,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "aws_lambda_function",
+        "name": "worker",
+        "address": "aws_lambda_function.worker",
+        "provider": {
+          "name": "aws",
+          "alias": "west",
+          "version": ">= 5.40"
+        },
+        "attributes": {
+          "runtime": "python3.12"
+        },
+        "references": [
+          "aws_db_instance.orders",
+          "aws_sqs_queue.jobs"
+        ]
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 94,
+            "column": 0
+          },
+          "end": {
+            "line": 97,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "aws_sqs_queue",
+        "name": "jobs",
+        "address": "aws_sqs_queue.jobs",
+        "provider": {
+          "name": "aws",
+          "version": ">= 5.40"
+        },
+        "attributes": {},
+        "references": []
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 99,
+            "column": 0
+          },
+          "end": {
+            "line": 103,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "aws_eks_cluster",
+        "name": "main",
+        "address": "aws_eks_cluster.main",
+        "provider": {
+          "name": "aws",
+          "version": ">= 5.40"
+        },
+        "attributes": {
+          "clusterVersion": "1.30"
+        },
+        "references": [
+          "aws_iam_role.cluster"
+        ]
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 105,
+            "column": 0
+          },
+          "end": {
+            "line": 107,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "aws_iam_role",
+        "name": "cluster",
+        "address": "aws_iam_role.cluster",
+        "provider": {
+          "name": "aws",
+          "version": ">= 5.40"
+        },
+        "attributes": {},
+        "references": []
+      },
+      {
+        "file": "src/modules/db/main.tf",
+        "directory": "src/modules/db",
+        "span": {
+          "start": {
+            "line": 10,
+            "column": 0
+          },
+          "end": {
+            "line": 13,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "aws_security_group",
+        "name": "db",
+        "address": "aws_security_group.db",
+        "provider": {
+          "name": "aws",
+          "version": ">= 5.0"
+        },
+        "attributes": {},
+        "references": []
+      },
+      {
+        "file": "src/modules/db/main.tf",
+        "directory": "src/modules/db",
+        "span": {
+          "start": {
+            "line": 15,
+            "column": 0
+          },
+          "end": {
+            "line": 20,
+            "column": 1
+          }
+        },
+        "mode": "managed",
+        "type": "aws_rds_cluster",
+        "name": "this",
+        "address": "aws_rds_cluster.this",
+        "provider": {
+          "name": "aws",
+          "version": ">= 5.0"
+        },
+        "attributes": {
+          "engine": "aurora-postgresql",
+          "engineVersion": "16.2"
+        },
+        "references": [
+          "aws_security_group.db"
+        ]
+      }
+    ],
+    "dataSources": [
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 45,
+            "column": 0
+          },
+          "end": {
+            "line": 47,
+            "column": 1
+          }
+        },
+        "mode": "data",
+        "type": "aws_vpc",
+        "name": "default",
+        "address": "data.aws_vpc.default",
+        "provider": {
+          "name": "aws",
+          "version": ">= 5.40"
+        },
+        "attributes": {},
+        "references": []
+      }
+    ],
+    "modules": [
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 49,
+            "column": 0
+          },
+          "end": {
+            "line": 53,
+            "column": 1
+          }
+        },
+        "name": "db",
+        "address": "module.db",
+        "source": "./modules/db",
+        "arguments": {
+          "name": {
+            "expression": "local.name",
+            "line": 51
+          },
+          "vpc_id": {
+            "expression": "data.aws_vpc.default.id",
+            "line": 52
+          }
+        },
+        "sourceKind": "local",
+        "target": "src/modules/db",
+        "followed": true
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 55,
+            "column": 0
+          },
+          "end": {
+            "line": 58,
+            "column": 1
+          }
+        },
+        "name": "vpc",
+        "address": "module.vpc",
+        "source": "terraform-aws-modules/vpc/aws",
+        "version": "~> 5.8",
+        "sourceKind": "registry",
+        "registry": {
+          "namespace": "terraform-aws-modules",
+          "name": "vpc",
+          "provider": "aws"
+        }
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 60,
+            "column": 0
+          },
+          "end": {
+            "line": 63,
+            "column": 1
+          }
+        },
+        "name": "rds",
+        "address": "module.rds",
+        "source": "registry.terraform.io/terraform-aws-modules/rds/aws//modules/db_instance",
+        "version": "6.10.0",
+        "sourceKind": "registry",
+        "registry": {
+          "hostname": "registry.terraform.io",
+          "namespace": "terraform-aws-modules",
+          "name": "rds",
+          "provider": "aws",
+          "subdirectory": "modules/db_instance"
+        },
+        "declares": [
+          "aws_db_instance"
+        ]
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 65,
+            "column": 0
+          },
+          "end": {
+            "line": 67,
+            "column": 1
+          }
+        },
+        "name": "network",
+        "address": "module.network",
+        "source": "git::https://example.com/network.git?ref=v1.2.0",
+        "sourceKind": "other"
+      }
+    ],
+    "providers": [
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 22,
+            "column": 0
+          },
+          "end": {
+            "line": 24,
+            "column": 1
+          }
+        },
+        "name": "aws"
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 26,
+            "column": 0
+          },
+          "end": {
+            "line": 29,
+            "column": 1
+          }
+        },
+        "name": "aws",
+        "alias": "west"
+      }
+    ],
+    "requirements": [
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 5,
+            "column": 4
+          },
+          "end": {
+            "line": 8,
+            "column": 5
+          }
+        },
+        "name": "aws",
+        "source": "hashicorp/aws",
+        "version": ">= 5.40"
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 9,
+            "column": 4
+          },
+          "end": {
+            "line": 12,
+            "column": 5
+          }
+        },
+        "name": "google",
+        "source": "hashicorp/google",
+        "version": "~> 6.0"
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 13,
+            "column": 4
+          },
+          "end": {
+            "line": 13,
+            "column": 21
+          }
+        },
+        "name": "random",
+        "version": ">= 3.1"
+      },
+      {
+        "file": "src/modules/db/main.tf",
+        "directory": "src/modules/db",
+        "span": {
+          "start": {
+            "line": 3,
+            "column": 4
+          },
+          "end": {
+            "line": 6,
+            "column": 5
+          }
+        },
+        "name": "aws",
+        "source": "hashicorp/aws",
+        "version": ">= 5.0"
+      }
+    ],
+    "backends": [
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 16,
+            "column": 2
+          },
+          "end": {
+            "line": 19,
+            "column": 3
+          }
+        },
+        "type": "s3"
+      }
+    ],
+    "variables": [
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 31,
+            "column": 0
+          },
+          "end": {
+            "line": 34,
+            "column": 1
+          }
+        },
+        "name": "region",
+        "default": {
+          "expression": "\"us-east-1\"",
+          "line": 33
+        }
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 36,
+            "column": 0
+          },
+          "end": {
+            "line": 38,
+            "column": 1
+          }
+        },
+        "name": "engine_version"
+      },
+      {
+        "file": "src/modules/db/variables.tf",
+        "directory": "src/modules/db",
+        "span": {
+          "start": {
+            "line": 1,
+            "column": 0
+          },
+          "end": {
+            "line": 3,
+            "column": 1
+          }
+        },
+        "name": "name"
+      },
+      {
+        "file": "src/modules/db/variables.tf",
+        "directory": "src/modules/db",
+        "span": {
+          "start": {
+            "line": 5,
+            "column": 0
+          },
+          "end": {
+            "line": 7,
+            "column": 1
+          }
+        },
+        "name": "vpc_id"
+      }
+    ],
+    "outputs": [
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 109,
+            "column": 0
+          },
+          "end": {
+            "line": 111,
+            "column": 1
+          }
+        },
+        "name": "db_endpoint"
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 113,
+            "column": 0
+          },
+          "end": {
+            "line": 115,
+            "column": 1
+          }
+        },
+        "name": "db_module"
+      },
+      {
+        "file": "src/modules/db/main.tf",
+        "directory": "src/modules/db",
+        "span": {
+          "start": {
+            "line": 22,
+            "column": 0
+          },
+          "end": {
+            "line": 24,
+            "column": 1
+          }
+        },
+        "name": "id"
+      }
+    ],
+    "locals": [
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 41,
+            "column": 2
+          },
+          "end": {
+            "line": 41,
+            "column": 31
+          }
+        },
+        "name": "name",
+        "value": {
+          "expression": "\"orders-${var.region}\"",
+          "line": 41
+        }
+      },
+      {
+        "file": "src/main.tf",
+        "directory": "src",
+        "span": {
+          "start": {
+            "line": 42,
+            "column": 2
+          },
+          "end": {
+            "line": 42,
+            "column": 33
+          }
+        },
+        "name": "tags",
+        "value": {
+          "expression": "{ service = local.name }",
+          "line": 42
+        }
+      }
+    ],
+    "references": [
+      {
+        "directory": "src",
+        "from": "aws_db_instance.orders",
+        "to": "aws_db_subnet_group.main"
+      },
+      {
+        "directory": "src",
+        "from": "aws_db_instance.orders",
+        "to": "local.name"
+      },
+      {
+        "directory": "src",
+        "from": "aws_db_instance.orders",
+        "to": "local.tags"
+      },
+      {
+        "directory": "src",
+        "from": "aws_db_instance.orders",
+        "to": "var.engine_version"
+      },
+      {
+        "directory": "src",
+        "from": "aws_db_subnet_group.main",
+        "to": "local.name"
+      },
+      {
+        "directory": "src",
+        "from": "aws_db_subnet_group.main",
+        "to": "module.vpc"
+      },
+      {
+        "directory": "src",
+        "from": "aws_eks_cluster.main",
+        "to": "aws_iam_role.cluster"
+      },
+      {
+        "directory": "src",
+        "from": "aws_lambda_function.worker",
+        "to": "aws_db_instance.orders"
+      },
+      {
+        "directory": "src",
+        "from": "aws_lambda_function.worker",
+        "to": "aws_sqs_queue.jobs"
+      },
+      {
+        "directory": "src",
+        "from": "local.name",
+        "to": "var.region"
+      },
+      {
+        "directory": "src",
+        "from": "local.tags",
+        "to": "local.name"
+      },
+      {
+        "directory": "src",
+        "from": "module.db",
+        "to": "data.aws_vpc.default"
+      },
+      {
+        "directory": "src",
+        "from": "module.db",
+        "to": "local.name"
+      },
+      {
+        "directory": "src",
+        "from": "output.db_endpoint",
+        "to": "aws_db_instance.orders"
+      },
+      {
+        "directory": "src",
+        "from": "output.db_module",
+        "to": "module.db"
+      },
+      {
+        "directory": "src/modules/db",
+        "from": "aws_rds_cluster.this",
+        "to": "aws_security_group.db"
+      },
+      {
+        "directory": "src/modules/db",
+        "from": "aws_rds_cluster.this",
+        "to": "var.name"
+      },
+      {
+        "directory": "src/modules/db",
+        "from": "aws_security_group.db",
+        "to": "var.name"
+      },
+      {
+        "directory": "src/modules/db",
+        "from": "aws_security_group.db",
+        "to": "var.vpc_id"
+      },
+      {
+        "directory": "src/modules/db",
+        "from": "output.id",
+        "to": "aws_rds_cluster.this"
+      }
+    ],
+    "modulePaths": {
+      "src/modules/db": "module.db"
+    },
+    "instances": [
+      {
+        "directory": "src"
+      },
+      {
+        "directory": "src/modules/db",
+        "module": "module.db",
+        "parent": 0,
+        "call": 0
+      }
+    ]
+  },
+  "facts": {
+    "src/gcp.tf": {
+      "resources": [
+        {
+          "type": "google_sql_database_instance",
+          "name": "orders",
+          "position": {
+            "line": 1,
+            "column": 0
+          },
+          "provider": {
+            "name": "google",
+            "version": "~> 6.0"
+          },
+          "attributes": {
+            "engineVersion": "POSTGRES_15"
+          }
+        },
+        {
+          "type": "google_cloudfunctions2_function",
+          "name": "export",
+          "position": {
+            "line": 9,
+            "column": 0
+          },
+          "provider": {
+            "name": "google",
+            "version": "~> 6.0"
+          },
+          "attributes": {
+            "runtime": "nodejs20"
+          }
+        },
+        {
+          "type": "google_container_cluster",
+          "name": "primary",
+          "position": {
+            "line": 17,
+            "column": 0
+          },
+          "provider": {
+            "name": "google",
+            "version": "~> 6.0"
+          },
+          "attributes": {
+            "clusterVersion": "1.29"
+          }
+        },
+        {
+          "type": "google_cloud_run_v2_service",
+          "name": "api",
+          "position": {
+            "line": 22,
+            "column": 0
+          },
+          "provider": {
+            "name": "google",
+            "version": "~> 6.0"
+          },
+          "attributes": {
+            "image": "gcr.io/orders/api:1.4.2"
+          }
+        }
+      ]
+    },
+    "src/main.tf": {
+      "resources": [
+        {
+          "type": "aws_db_subnet_group",
+          "name": "main",
+          "position": {
+            "line": 69,
+            "column": 0
+          },
+          "provider": {
+            "name": "aws",
+            "version": ">= 5.40"
+          }
+        },
+        {
+          "type": "aws_db_instance",
+          "name": "orders",
+          "position": {
+            "line": 74,
+            "column": 0
+          },
+          "provider": {
+            "name": "aws",
+            "version": ">= 5.40"
+          },
+          "references": [
+            "aws_db_subnet_group.main"
+          ],
+          "attributes": {
+            "engine": "postgres",
+            "engineVersion": "var.engine_version"
+          }
+        },
+        {
+          "type": "aws_lambda_function",
+          "name": "worker",
+          "position": {
+            "line": 82,
+            "column": 0
+          },
+          "provider": {
+            "name": "aws",
+            "version": ">= 5.40"
+          },
+          "references": [
+            "aws_db_instance.orders",
+            "aws_sqs_queue.jobs"
+          ],
+          "attributes": {
+            "runtime": "python3.12"
+          }
+        },
+        {
+          "type": "aws_sqs_queue",
+          "name": "jobs",
+          "position": {
+            "line": 94,
+            "column": 0
+          },
+          "provider": {
+            "name": "aws",
+            "version": ">= 5.40"
+          }
+        },
+        {
+          "type": "aws_eks_cluster",
+          "name": "main",
+          "position": {
+            "line": 99,
+            "column": 0
+          },
+          "provider": {
+            "name": "aws",
+            "version": ">= 5.40"
+          },
+          "references": [
+            "aws_iam_role.cluster"
+          ],
+          "attributes": {
+            "clusterVersion": "1.30"
+          }
+        },
+        {
+          "type": "aws_iam_role",
+          "name": "cluster",
+          "position": {
+            "line": 105,
+            "column": 0
+          },
+          "provider": {
+            "name": "aws",
+            "version": ">= 5.40"
+          }
+        }
+      ]
+    },
+    "src/modules/db/main.tf": {
+      "resources": [
+        {
+          "type": "aws_security_group",
+          "name": "db",
+          "position": {
+            "line": 10,
+            "column": 0
+          },
+          "module": "module.db",
+          "provider": {
+            "name": "aws",
+            "version": ">= 5.0"
+          }
+        },
+        {
+          "type": "aws_rds_cluster",
+          "name": "this",
+          "position": {
+            "line": 15,
+            "column": 0
+          },
+          "module": "module.db",
+          "provider": {
+            "name": "aws",
+            "version": ">= 5.0"
+          },
+          "references": [
+            "aws_security_group.db"
+          ],
+          "attributes": {
+            "engine": "aurora-postgresql",
+            "engineVersion": "16.2"
+          }
+        }
+      ]
+    },
+    "src/modules/db/variables.tf": {
+      "resources": []
+    }
+  }
+}
