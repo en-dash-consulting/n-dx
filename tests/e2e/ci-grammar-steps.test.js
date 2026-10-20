@@ -23,6 +23,7 @@ const DECIDER = "scripts/grammar-suites.mjs";
 const indentOf = (line) => line.length - line.trimStart().length;
 const meaningful = (line) => line.trim() !== "" && !line.trimStart().startsWith("#");
 const unquote = (value) => value.trim().replace(/^(['"])(.*)\1$/, "$2");
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** `{ name: lines }` for each job under the top-level `jobs:`. */
 function parseJobs(text) {
@@ -160,7 +161,7 @@ function substitute(text, combo, where) {
 
 /** Comma-separated suite labels a run-all-tests step runs for `combo`. */
 function suitesRun(step, combo, where) {
-  const match = new RegExp(`${RUNNER.replace(/[.]/g, "\\.")}[ \\t]+(\\S+)`).exec(substitute(step.run, combo, where));
+  const match = new RegExp(`${escapeRegExp(RUNNER)}[ \\t]+(\\S+)`).exec(substitute(step.run, combo, where));
   return match ? match[1] : "all";
 }
 
@@ -185,7 +186,7 @@ function stepRuns(step, steps, combo, where) {
   const decider = steps.find((s) => s.id === id);
   if (!decider) throw new Error(`${where}: "${step.name}" reads steps.${id}, but no step has id ${id}`);
   if (decider.index > step.index) throw new Error(`${where}: step ${id} runs after "${step.name}", which reads its output`);
-  const call = new RegExp(`${name}=\\$\\(node ${DECIDER.replace(/[.]/g, "\\.")} ([^\\s)]+)\\)`).exec(substitute(decider.run, combo, where));
+  const call = new RegExp(`${name}=\\$\\(node ${escapeRegExp(DECIDER)} ([^\\s)]+)\\)`).exec(substitute(decider.run, combo, where));
   if (!call || !decider.run.includes("GITHUB_OUTPUT")) {
     throw new Error(`${where}: step ${id} must write ${name}=$(node ${DECIDER} <suites>) to $GITHUB_OUTPUT`);
   }
