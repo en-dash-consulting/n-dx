@@ -11,8 +11,16 @@
  *        ↓
  *   Domain          rex · sourcevision            (independent, never import each other)
  *        ↓
- *   Foundation      @n-dx/llm-client              (shared types, API client)
+ *   Foundation      @n-dx/llm-client · @n-dx/lang-kit  (shared types, API client · language facts)
+ *
+ *   Packs (beside domain; loaded at run time, never imported)
+ *                   @n-dx/lang-runtime · @n-dx/lang-java · lang-go · lang-sql · lang-terraform · lang-python
  * ```
+ *
+ * sourcevision reaches a pack only through a dynamic `import()` in its pack
+ * loader; architecture-policy.test.js ("packs are loaded, never imported")
+ * holds every other package to that, and to web-tree-sitter living in
+ * @n-dx/lang-runtime alone.
  *
  * ## Policies enforced
  *
@@ -22,6 +30,8 @@
  * 3. **Gateway enforcement** — cross-package runtime imports in hench and web
  *    must flow through designated gateway modules, not scattered leaf files.
  *    `import type` is excluded (erased at compile time, zero runtime coupling).
+ * 4. **Pack tier** — sourcevision imports nothing from @n-dx/lang-runtime, a
+ *    pack or web-tree-sitter, not even a type.
  *
  * @see CLAUDE.md — Architecture section
  * @see PACKAGE_GUIDELINES.md — Gateway pattern reference
@@ -214,10 +224,11 @@ describe("gateway-rules.json validation", () => {
  * Domain-tier isolation policy.
  *
  * Rex and sourcevision sit at the domain layer and may import only from
- * @n-dx/llm-client (foundation). They are not listed in gateway-rules.json
- * because they have no cross-package runtime imports that require a gateway.
- * Foundation-tier imports are intentionally ungated — @n-dx/llm-client is the
- * shared bottom of the hierarchy, designed for direct use by all tiers.
+ * @n-dx/llm-client and @n-dx/lang-kit (foundation). They are not listed in
+ * gateway-rules.json because they have no cross-package runtime imports that
+ * require a gateway. Foundation-tier imports are intentionally ungated — the
+ * foundation packages are the shared bottom of the hierarchy, designed for
+ * direct use by all tiers.
  *
  * The tests below enforce domain isolation more strictly than the gateway
  * pattern: they block all imports from sibling domain or upper-layer packages,
@@ -247,7 +258,7 @@ describe("architecture policy: domain layer isolation", () => {
       expect.fail(
         [
           "Rex must not import from sibling domain or upper-layer packages.",
-          "Rex sits at the domain layer and may only import from @n-dx/llm-client (foundation).",
+          "Rex sits at the domain layer and may only import from @n-dx/llm-client and @n-dx/lang-kit (foundation).",
           "",
           "Violations:",
           ...violations.map((v) => `  - ${v}`),
@@ -261,8 +272,11 @@ describe("architecture policy: domain layer isolation", () => {
     }
   });
 
-  it("sourcevision must not import from rex, hench, or @n-dx/web", () => {
+  it("sourcevision must not import from rex, hench, @n-dx/web or the pack tier", () => {
     const forbidden = ["@n-dx/rex", "@n-dx/hench", "@n-dx/web"];
+    // Pack tier: loaded at run time by src/language/pack-loader.ts, never
+    // imported — not even `import type`, so no parser type reaches sourcevision.
+    const packTier = /from\s+["'](@n-dx\/lang-(?!kit["'])[a-z-]+|web-tree-sitter)["']/;
     const svSrc = walk(join(ROOT, "packages/sourcevision/src"));
     const violations = [];
 
@@ -275,13 +289,16 @@ describe("architecture policy: domain layer isolation", () => {
           violations.push(`${rel} imports from "${pkg}"`);
         }
       }
+      const pack = content.match(packTier);
+      if (pack) violations.push(`${rel} imports from "${pack[1]}"`);
     }
 
     if (violations.length > 0) {
       expect.fail(
         [
-          "Sourcevision must not import from sibling domain or upper-layer packages.",
-          "Sourcevision sits at the domain layer and may only import from @n-dx/llm-client (foundation).",
+          "Sourcevision must not import from sibling domain or upper-layer packages, or from the pack tier.",
+          "Sourcevision sits at the domain layer and may only import from @n-dx/llm-client and @n-dx/lang-kit (foundation);",
+          "it loads @n-dx/lang-* packs at run time (src/language/pack-loader.ts) and never imports @n-dx/lang-runtime.",
           "",
           "Violations:",
           ...violations.map((v) => `  - ${v}`),
@@ -309,7 +326,7 @@ describe("architecture policy: domain layer isolation", () => {
       { name: "@n-dx/rex", dir: "rex" },
       { name: "@n-dx/sourcevision", dir: "sourcevision" },
     ];
-    const SIBLING_DIRS = ["web", "hench", "rex", "sourcevision", "llm-client"];
+    const SIBLING_DIRS = ["web", "hench", "rex", "sourcevision", "llm-client", "lang-kit"];
     const violations = [];
 
     for (const pkg of DOMAIN_PKGS) {
@@ -749,6 +766,7 @@ describe("architecture policy: gateway enforcement", () => {
       ...walk(join(ROOT, "packages/hench/src")),
       ...walk(join(ROOT, "packages/web/src")),
       ...walk(join(ROOT, "packages/llm-client/src")),
+      ...walk(join(ROOT, "packages/lang-kit/src")),
       ...walk(join(ROOT, "packages/graview/src")),
     ];
 

@@ -1,7 +1,8 @@
 /**
  * Deterministic import graph analyzer.
- * Uses the TypeScript compiler API for JS/TS AST parsing and the Go import
- * parser for .go files — no Claude invocation.
+ * Uses the TypeScript compiler API for JS/TS AST parsing and language packs
+ * (loaded at run time) for Java and Go, with the Go regex import parser as
+ * Go's fallback when its pack is missing or degrades — no Claude invocation.
  */
 
 import { readFile } from "node:fs/promises";
@@ -20,10 +21,11 @@ import { toPosix } from "../util/paths.js";
 import { extractGoImports, readGoModulePath } from "./go-imports.js";
 import { buildSwiftImportGraph } from "./swift-imports.js";
 import { buildCSharpImportGraph } from "./csharp-imports.js";
+import { buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts, type PackImportsOptions } from "./pack-imports.js";
 import { readManifest } from "./manifest.js";
-import { getLanguageConfig, detectLanguages, mergeLanguageConfigs } from "../language/detect.js";
-import type { LanguageConfig } from "../language/registry.js";
-import { csharpConfig } from "../language/csharp.js";
+import { detectLanguages, loadInventoryConfig } from "../language/detect.js";
+import { type FileFacts, type LanguageConfig, csharpConfig, getLanguageConfig, goConfig, languageConfigsFromIds, mergeLanguageConfigs, terraformConfig } from "@n-dx/lang-kit";
+import { isTerraformSource } from "./terraform-infrastructure.js";
 
 // ── Parseable extensions ─────────────────────────────────────────────────────
 
@@ -31,6 +33,9 @@ const JS_TS_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"])
 const GO_EXTENSION = ".go";
 const SWIFT_EXTENSION = ".swift";
 const PROBE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
+
+/** Packs whose language falls back to another parser here when the pack degrades. */
+const PACK_FALLBACKS: ReadonlyMap<string, string> = new Map([[goConfig.id, "the regex import parser"]]);
 
 // ── AST extraction ───────────────────────────────────────────────────────────
 
@@ -341,6 +346,8 @@ export interface ImportsOptions {
   fileSetChanged?: boolean;
   /** Primary language id (e.g. "go", "typescript"). Reads manifest.language / detectLanguage when omitted. */
   language?: string;
+  /** Which language packs (Java, Go) to load, where to find them, and the notice sink. */
+  packs?: PackImportsOptions;
 }
 
 // ── analyzeImports helpers ───────────────────────────────────────────────────
@@ -352,9 +359,7 @@ async function resolveLanguageConfig(
   options?: ImportsOptions,
 ): Promise<LanguageConfig> {
   if (manifest.languages && manifest.languages.length > 0) {
-    const configs = manifest.languages
-      .map((id) => getLanguageConfig(id))
-      .filter((c): c is NonNullable<typeof c> => c != null);
+    const configs = languageConfigsFromIds(manifest.languages);
     if (configs.length > 0) return mergeLanguageConfigs(configs);
   }
   if (options?.language) {
@@ -368,6 +373,32 @@ async function resolveLanguageConfig(
   return mergeLanguageConfigs(await detectLanguages(targetDir));
 }
 
+/**
+ * Extensions the imports phase parses: JS/TS always, for backward
+ * compatibility, and C#, whose resolver has no per-language setup to gate;
+ * plus the resolved languages' extensions.
+ */
+async function parseableExtensionsFor(targetDir: string, options?: Pick<ImportsOptions, "language">): Promise<Set<string>> {
+  const langConfig = await resolveLanguageConfig(targetDir, readManifest(targetDir), options);
+  return new Set<string>([...JS_TS_EXTENSIONS, ...csharpConfig.parseableExtensions, ...langConfig.parseableExtensions]);
+}
+
+/**
+ * The routes and outbound-call facts of the files {@link analyzeImports}
+ * hands to packs, read for a phase that runs without the imports phase. The
+ * same packs and files are asked, so such a run records what a full analysis
+ * records.
+ */
+export async function readImportsPackFrameworkFacts(
+  targetDir: string,
+  inventory: Inventory,
+  options?: Pick<ImportsOptions, "language" | "packs">,
+): Promise<FileFacts[]> {
+  const packs = packsFor(await parseableExtensionsFor(targetDir, options), options?.packs?.packs);
+  const packFiles = inventory.files.filter((f) => isPackFile(f.path, packs));
+  return readPackFrameworkFacts(packFiles, targetDir, { ...options?.packs, packs });
+}
+
 interface IncrementalState {
   edgeMap: Map<string, ImportEdge>;
   externalMap: Map<string, ExternalImport>;
@@ -379,7 +410,9 @@ interface IncrementalState {
  * the entries for unchanged files. Files in changedFiles are excluded so they
  * can be re-parsed fresh. Only files still in `fileSet` count as unchanged: a
  * file pruned from the inventory in an earlier run is absent from it without
- * showing up as deleted (#744).
+ * showing up as deleted (#744). An edge target must still exist: an inventoried
+ * file, or a directory holding one, since Go edges point at the imported
+ * package's directory.
  */
 function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet: Set<string>): IncrementalState {
   const edgeMap = new Map<string, ImportEdge>();
@@ -387,9 +420,13 @@ function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet
   const unchangedExternalFiles = new Set<string>();
 
   const unchanged = (f: string) => !changedFiles.has(f) && fileSet.has(f);
+  // "" is the project root: a Go import of the module path itself.
+  const dirSet = new Set<string>();
+  for (const f of fileSet) dirSet.add(f.slice(0, Math.max(f.lastIndexOf("/"), 0)));
+  const targetExists = (to: string) => fileSet.has(to) || dirSet.has(to);
 
   for (const edge of prev.edges) {
-    if (unchanged(edge.from) && fileSet.has(edge.to)) {
+    if (unchanged(edge.from) && targetExists(edge.to)) {
       edgeMap.set(`${edge.from}\0${edge.to}\0${edge.type}`, edge);
     }
   }
@@ -574,53 +611,30 @@ async function processGoFiles(
       continue;
     }
 
-    const goResult = extractGoImports(sourceText, file.path, goModulePath);
-
-    for (const edge of goResult.edges) {
-      const key = `${edge.from}\0${edge.to}\0${edge.type}`;
-      const existing = edgeMap.get(key);
-      if (existing) {
-        edgeMap.set(key, { ...existing, symbols: Array.from(new Set([...existing.symbols, ...edge.symbols])) });
-      } else {
-        edgeMap.set(key, edge);
-      }
-    }
-
-    for (const goExt of goResult.external) {
-      const existing = externalMap.get(goExt.package);
-      if (existing) {
-        externalMap.set(goExt.package, {
-          package: goExt.package,
-          importedBy: Array.from(new Set([...existing.importedBy, ...goExt.importedBy])),
-          symbols: Array.from(new Set([...existing.symbols, ...goExt.symbols])),
-        });
-      } else {
-        externalMap.set(goExt.package, { ...goExt });
-      }
-    }
+    mergeGraph(extractGoImports(sourceText, file.path, goModulePath), edgeMap, externalMap);
   }
 }
 
-/** Merge a symbol-based resolver's edges and externals into the shared maps. */
-function mergeResolverResult(
-  result: { edges: ImportEdge[]; external: ExternalImport[] },
+/**
+ * Add edges and external packages to the maps, unioning symbols (and
+ * importers) with entries already there.
+ */
+function mergeGraph(
+  graph: { readonly edges: readonly ImportEdge[]; readonly external: readonly ExternalImport[] },
   edgeMap: Map<string, ImportEdge>,
   externalMap: Map<string, ExternalImport>,
 ): void {
-  for (const edge of result.edges) {
+  for (const edge of graph.edges) {
     const key = `${edge.from}\0${edge.to}\0${edge.type}`;
     const existing = edgeMap.get(key);
     if (existing) {
-      edgeMap.set(key, {
-        ...existing,
-        symbols: Array.from(new Set([...existing.symbols, ...edge.symbols])),
-      });
+      edgeMap.set(key, { ...existing, symbols: Array.from(new Set([...existing.symbols, ...edge.symbols])) });
     } else {
       edgeMap.set(key, edge);
     }
   }
 
-  for (const ext of result.external) {
+  for (const ext of graph.external) {
     const existing = externalMap.get(ext.package);
     if (existing) {
       externalMap.set(ext.package, {
@@ -650,7 +664,7 @@ async function processCSharpFiles(
   if (files.length === 0) return;
   const allCSharp = inventory.files.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
   const result = await buildCSharpImportGraph(allCSharp, targetDir, new Set(files.map((f) => f.path)));
-  mergeResolverResult(result, edgeMap, externalMap);
+  mergeGraph(result, edgeMap, externalMap);
 }
 
 /**
@@ -667,7 +681,7 @@ async function processSwiftFiles(
   externalMap: Map<string, ExternalImport>,
 ): Promise<void> {
   if (files.length === 0) return;
-  mergeResolverResult(await buildSwiftImportGraph(files, targetDir), edgeMap, externalMap);
+  mergeGraph(await buildSwiftImportGraph(files, targetDir), edgeMap, externalMap);
 }
 
 /** Compute ImportsSummary statistics from collected edges and external packages. */
@@ -712,20 +726,22 @@ export async function analyzeImports(
   const tsconfigPaths = await readTsconfigPaths(targetDir);
   const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
 
-  const manifest = readManifest(targetDir);
-  const langConfig = await resolveLanguageConfig(targetDir, manifest, options);
-
-  // Always include JS/TS for backward compatibility, and C#, whose resolver has
-  // no per-language setup to gate; add resolved language extensions.
-  const parseableExts = new Set<string>([...JS_TS_EXTENSIONS, ...csharpConfig.parseableExtensions]);
-  for (const ext of langConfig.parseableExtensions) parseableExts.add(ext);
+  const parseableExts = await parseableExtensionsFor(targetDir, options);
 
   // Read go.mod once if any Go files exist in the inventory.
   const hasGoFiles = inventory.files.some((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
   const goModulePath = hasGoFiles ? await readGoModulePath(targetDir) : null;
 
+  // Pack languages resolve against a whole-project index, so their files are
+  // re-parsed on every run: the incremental path treats them as changed.
+  const packs = packsFor(parseableExts, options?.packs?.packs);
+  const packFiles = inventory.files.filter((f) => isPackFile(f.path, packs));
+
   const prev = options?.previousImports;
-  const changedFiles = options?.changedFiles;
+  const changedFiles =
+    options?.changedFiles && packFiles.length > 0
+      ? new Set([...options.changedFiles, ...packFiles.map((f) => f.path)])
+      : options?.changedFiles;
   const fileSetChanged = options?.fileSetChanged ?? true;
   // Opt-in guard (NDX_SV_SAFE_INCREMENTAL=1): fall back to a full re-analysis when a
   // legacy/partial imports.json has non-array edges/external, instead of throwing
@@ -754,9 +770,10 @@ export async function analyzeImports(
     return true;
   });
 
-  // Partition into JS/TS, Go, Swift and C# to prevent cross-language contamination
+  // Partition into JS/TS, Go, Swift, C# and pack languages to prevent cross-language contamination
   const jsTsFiles = parseable.filter((f) => JS_TS_EXTENSIONS.has(extname(f.path).toLowerCase()));
-  const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION);
+  // Go goes through its pack when one is selected; the regex parser covers the rest.
+  const goParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === GO_EXTENSION && !isPackFile(f.path, packs));
   const swiftParseableFiles = parseable.filter((f) => extname(f.path).toLowerCase() === SWIFT_EXTENSION);
   const csharpParseableFiles = parseable.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
 
@@ -764,6 +781,27 @@ export async function analyzeImports(
   await processGoFiles(goParseableFiles, targetDir, goModulePath, edgeMap, externalMap);
   await processSwiftFiles(swiftParseableFiles, targetDir, edgeMap, externalMap);
   await processCSharpFiles(csharpParseableFiles, inventory, targetDir, edgeMap, externalMap);
+  const listedPacks = (await loadInventoryConfig(targetDir)).packs;
+  if (listedPacks?.length) {
+    const withFiles = new Set(packs.filter((p) => packFiles.some((f) => isPackFile(f.path, [p]))).map((p) => p.id));
+    // Terraform produces no imports; with `.tf` files, the infrastructure step reports its pack.
+    if (inventory.files.some((f) => isTerraformSource(f.path))) withFiles.add(terraformConfig.id);
+    await noticeListedPacks(listedPacks, withFiles, { loader: options?.packs?.loader, warn: options?.packs?.warn });
+  }
+  if (packFiles.length > 0) {
+    const graph = await buildPackImportGraph(packFiles, targetDir, { ...options?.packs, packs, fallbacks: PACK_FALLBACKS, listed: listedPacks ?? [] });
+    mergeGraph(graph, edgeMap, externalMap);
+    // Go must never drop to inventory-only: a degraded Go pack hands every Go
+    // file (all of them are in the changed set) to the regex parser, and a
+    // pack that ran hands it the files it could not parse (generated files
+    // over the runner's size limit), so their imports are kept.
+    const goDegraded = graph.degraded.includes(goConfig.id);
+    const unparsed = new Set(graph.unparsed);
+    const goFiles = packFiles.filter(
+      (f) => extname(f.path).toLowerCase() === GO_EXTENSION && (goDegraded || unparsed.has(f.path)),
+    );
+    await processGoFiles(goFiles, targetDir, goModulePath, edgeMap, externalMap);
+  }
 
   // Incremental cleanup: remove packages whose importers were all changed
   if (canIncremental) {

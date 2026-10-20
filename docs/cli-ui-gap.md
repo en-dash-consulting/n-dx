@@ -166,6 +166,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `sourcevision reset` | n/a | — | Destructive; intentionally terminal-only |
 | `sourcevision git-credential-helper` | n/a | — | Interactive terminal flow |
 | `sourcevision mcp` | n/a | — | Server plumbing |
+| `sourcevision pack` | none | low | Installs per-user language packs with npm or from an offline bundle; terminal-only for now |
 
 ## hench package CLI
 

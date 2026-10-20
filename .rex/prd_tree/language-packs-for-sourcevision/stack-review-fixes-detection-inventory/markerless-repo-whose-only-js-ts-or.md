@@ -1,0 +1,25 @@
+---
+id: "4f696905-1c08-4ec6-bce1-ec7ae351701a"
+level: "task"
+title: "Markerless repo whose only JS/TS or Ruby-style source sits deeper than three levels, or only in skipped dirs, still loses the TS fallback to Terraform"
+status: "completed"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "lang-kit"
+  - "pr-17"
+source: "ndx-adversarial-review"
+startedAt: "2026-10-17T02:14:57.119Z"
+completedAt: "2026-10-17T02:23:56.693Z"
+endedAt: "2026-10-17T02:23:56.693Z"
+resolutionType: "code-change"
+resolutionDetail: "Seam widened to searchProjectFiles: sourcevision's inventory walk counts Terraform and fallback-source files; markerless repo is Terraform alone only when Terraform files outnumber fallback source (tie → TS). Corpus unchanged."
+acceptanceCriteria:
+  - "A markerless repo with only `apps/web/src/components/X.tsx` and `infra/main.tf` detects `[typescript, terraform]` with TypeScript primary (test fails today)"
+  - "A markerless repo with `.tf` files and JS only under a gitignored directory detects `[terraform]` alone"
+  - "terraform-aws-rds and cloud-foundation-fabric still detect `[terraform]`"
+description: "Verdict: should-fix (medium), from the adversarial review of 033b28e3 (commit bcf3cfe51).\n\nFailure: lang-kit's `hasFallbackSource` (packages/lang-kit/src/detect.ts) uses the tiebreak's `walkBounded`, which goes three levels deep, reads at most 2000 directories, skips bin/vendor/dist/build/node_modules and ignores .gitignore. The Terraform search (sourcevision `hasTerraformMarker`) walks the whole tree with the inventory's skip set. So the two disagree:\n- A markerless repo whose only source is deeper, e.g. `apps/web/src/components/X.tsx` with nothing shallower, plus `infra/main.tf`, detects as `[terraform]`. The inventory then lists the .tsx files with Terraform's config, which has no TS skip dirs and no test or generated patterns. That is the original #767 regression on a narrower set of repos.\n- The reverse: a pure-Terraform repo with JS only in a gitignored directory (within three levels) detects as `[typescript, terraform]`, although the inventory never lists that JS.\n\nReachable through `sv analyze` and `ndx analyze` on any markerless repo with a `.tf` file. It is rare, because most repos have some source within three levels, which is why it is not must-fix.\n\nOptions:\n1. (Recommended) Widen the `TerraformSearch` seam so the caller's single inventory walk reports both \"has Terraform file\" and \"has fallback source\". Exact agreement with the inventory and one walk. Cost: a seam signature change in lang-kit and sourcevision, plus test updates.\n2. Raise the depth bound for this probe only. Cheap, but it still disagrees with the inventory's skip and ignore rules."
+lastModified: "2026-10-17T02:23:58.364Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

@@ -13,6 +13,7 @@ n-dx is organized as a pnpm monorepo with a strict four-tier dependency hierarch
   Domain          rex · sourcevision            (independent, never import each other)
        ↓
   Foundation      @n-dx/llm-client              (shared types, API client)
+                  @n-dx/lang-kit                (language facts, pack contract)
 ```
 
 **Rules:**
@@ -40,6 +41,7 @@ packages/
   rex/             # PRD + task tracker
   hench/           # autonomous agent
   llm-client/      # vendor-neutral LLM foundation
+  lang-kit/        # language facts + pack contract (foundation, no deps)
   web/             # dashboard + MCP HTTP server
 ```
 
@@ -78,5 +80,6 @@ Single writer per file. Hench and web read `.rex/` files but modify PRD state by
 | `start` + `plan` | Warning | Plan writes `.rex/prd.json`; restart server after |
 | `ci` + `work` | No | Both write `.sourcevision/` and `.rex/prd.json` |
 | `plan` + `work` | No | Both write `.rex/prd.json` |
+| `sv pack add\|remove` + another `sv pack add\|remove` | No | Both write the per-user pack directory, shared by every worktree and project on one ndx home; the second fails naming the holder's PID |
 
 **General rule:** Commands that write to `.rex/prd.json`, `.sourcevision/`, or `.hench/config.json` must not run concurrently.

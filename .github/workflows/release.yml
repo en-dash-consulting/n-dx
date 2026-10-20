@@ -81,7 +81,7 @@ jobs:
         env:
           REGISTRY: https://registry.npmjs.org
           # Space-separated list of package names (without @n-dx/ prefix)
-          PACKAGES: "core rex sourcevision hench llm-client web"
+          PACKAGES: "core rex lang-kit lang-runtime lang-java lang-go lang-sql lang-terraform lang-python sourcevision hench llm-client web"
         run: |
           set -uo pipefail
           AUDIENCE="npm:registry.npmjs.org"
@@ -182,6 +182,28 @@ jobs:
         if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm build
 
+      # Each language pack (@n-dx/lang-*) ships its own build/grammars/*.wasm
+      # (package.json "files"); sourcevision ships none. Grammars are never
+      # committed, so they must be built here or a published pack degrades its
+      # language to inventory-only. SV_REQUIRE_GRAMMARS=1 makes the tests
+      # below — including sourcevision's tests/e2e/packed-tarball.test.ts,
+      # which packs each pack and loads it from a pack directory — fail rather
+      # than skip when a grammar is missing. Same cache as ci.yml.
+      - name: Cache grammar build downloads
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packages/lang-runtime/build/cache
+          key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
+
+      - name: Build tree-sitter grammars
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: pnpm -r --workspace-concurrency=1 run build:grammars
+
+      - name: Require built grammars in tests
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: echo "SV_REQUIRE_GRAMMARS=1" >> "$GITHUB_ENV"
+
       - name: Run unit tests
         if: github.event_name == 'push' || inputs.mode == 'publish'
         run: pnpm -r run test
@@ -238,5 +260,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISHED: ${{ steps.changesets.outputs.published }}
-          PACKAGES: "core rex sourcevision hench llm-client web"
+          PACKAGES: "core rex lang-kit lang-runtime lang-java lang-go lang-sql lang-terraform lang-python sourcevision hench llm-client web"
         run: node scripts/verify-release-sync.mjs
