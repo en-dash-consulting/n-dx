@@ -1,9 +1,12 @@
-/** The Node-only tar of an offline pack bundle: round trips, long paths, and what reading refuses. */
+/** The Node-only tar of an offline pack bundle: round trips, long paths, what reading refuses and the links collecting skips. */
 
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { readTarGz, writeTarGz, type ArchiveEntry } from "../../../src/cli/commands/pack-archive.js";
+import { collectTree, readTarGz, writeTarGz, type ArchiveEntry } from "../../../src/cli/commands/pack-archive.js";
 
 const file = (path: string, text: string, mode = 0o644): ArchiveEntry => ({ type: "file", path, mode, data: Buffer.from(text) });
 
@@ -70,5 +73,46 @@ describe("pack archive", () => {
   it("skips the root directory entry that `tar -C dir .` writes", () => {
     expect(readTarGz(rawTar("./", "5"))).toEqual([]);
     expect(readTarGz(rawTar("./a.txt", "0", "hi"))).toEqual([file("a.txt", "hi")]);
+  });
+});
+
+describe("collectTree", () => {
+  let work: string;
+  let root: string;
+
+  beforeEach(() => {
+    work = mkdtempSync(join(tmpdir(), "sv-pack-tree-"));
+    root = join(work, "prefix");
+    mkdirSync(join(root, "node_modules", ".bin"), { recursive: true });
+    mkdirSync(join(root, "node_modules", "x"));
+    writeFileSync(join(root, "node_modules", "x", "package.json"), "{}");
+    writeFileSync(join(root, "node_modules", ".bin", "x"), "#!/bin/sh\n");
+  });
+  afterEach(() => rmSync(work, { recursive: true, force: true }));
+
+  const plainTree: ArchiveEntry[] = [
+    { type: "directory", path: "node_modules" },
+    { type: "directory", path: "node_modules/x" },
+    file("node_modules/x/package.json", "{}"),
+  ];
+
+  it("collects an npm-shaped prefix with no links as every file and directory, leaving out .bin", () => {
+    expect(collectTree(root)).toEqual({ entries: plainTree, skippedLinks: [] });
+  });
+
+  // "junction" makes a directory link on Windows without symlink privilege; elsewhere it is ignored.
+  it("terminates on a link loop, skipping the link and naming it", () => {
+    symlinkSync(root, join(root, "node_modules", "x", "loop"), "junction");
+    expect(collectTree(root)).toEqual({ entries: plainTree, skippedLinks: ["node_modules/x/loop"] });
+  });
+
+  it("never copies the target of a link out of the tree into the entries", () => {
+    const outside = join(work, "outside");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "secret.txt"), "not for the bundle");
+    symlinkSync(outside, join(root, "node_modules", "escape"), "junction");
+    const { entries, skippedLinks } = collectTree(root);
+    expect(entries).toEqual(plainTree);
+    expect(skippedLinks).toEqual(["node_modules/escape"]);
   });
 });

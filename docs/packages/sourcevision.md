@@ -140,7 +140,8 @@ failed move never deletes a copy another writer put in place.
 
 The archive is written and read in Node (`src/cli/commands/pack-archive.ts`),
 not by a `tar` process: regular files and directories only, with pax long
-paths; reading refuses links, bad checksums, truncation and any path that is
+paths. `bundle` never follows a symbolic link in the installed prefix; it
+leaves each one out and names it. Reading refuses links, bad checksums, truncation and any path that is
 absolute or contains `..`.
 
 ## Output Files

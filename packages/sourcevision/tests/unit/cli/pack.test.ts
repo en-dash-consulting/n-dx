@@ -4,7 +4,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -375,6 +375,22 @@ describe("sv pack bundle and add --from", () => {
     expect(readFileSync(`${out}.sha256`, "utf-8")).toBe(`${hash}  java.tgz\n`);
     expect(lines[1]).toBe(`SHA-256 ${hash}, written to ${out}.sha256.`);
     expect(lines[2]).toBe(`Install it with no network: ndx sv pack add java --from "${out}" --sha256 ${hash}`);
+  });
+
+  it("leaves a symbolic link in the prefix out of the bundle and says so", async () => {
+    const outside = join(work, "outside");
+    mkdirSync(outside);
+    writeFileSync(join(outside, "secret.txt"), "not for the bundle");
+    const npm = fakeNpm((args) => {
+      const prefix = args[args.indexOf("--prefix") + 1]!;
+      installPrefix(prefix, "@n-dx/lang-java");
+      // "junction" makes a directory link on Windows without symlink privilege; elsewhere it is ignored.
+      symlinkSync(outside, join(prefix, "node_modules", "escape"), "junction");
+    });
+    const out = join(work, "java.tgz");
+    await cmdPack(["bundle", "java", "--out", out], deps({ npm, tempRoot, cwd: work }));
+    expect(readTarGz(readFileSync(out)).some((e) => e.path.startsWith("node_modules/escape"))).toBe(false);
+    expect(lines[1]).toBe("Left out 1 symbolic link(s), which a bundle never follows: node_modules/escape.");
   });
 
   it("names the bundle n-dx-lang-<lang>-<version>.tgz in the working directory by default", async () => {

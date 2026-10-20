@@ -3,8 +3,8 @@
  * alone: no `tar` process, so no shell quoting, no GNU-vs-bsdtar differences
  * on Windows and no new dependency.
  *
- * It writes and reads only what a bundle holds: regular files and directories,
- * with a pax `path` record for a path longer than ustar's 100 bytes. Reading
+ * It writes and reads only what a bundle holds: regular files and directories
+ * (collecting a tree skips symbolic links rather than following them), with a pax `path` record for a path longer than ustar's 100 bytes. Reading
  * refuses anything else (links, devices), a header whose checksum is wrong, a
  * truncated archive and any path that is absolute or climbs out with `..`, so
  * extracting an entry can only write inside the target directory.
@@ -12,7 +12,7 @@
  * @module sourcevision/cli/commands/pack-archive
  */
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 
@@ -29,21 +29,35 @@ const FILE_MODE = 0o644;
 const EXEC_MODE = 0o755;
 const DIR_MODE = 0o755;
 
+/** What {@link collectTree} found under a root. */
+export interface CollectedTree {
+  readonly entries: ArchiveEntry[];
+  /** Symbolic links left out of `entries`: `/`-separated paths relative to the root, in walk order. */
+  readonly skippedLinks: string[];
+}
+
 /**
  * Every file and directory under `root`, sorted, with paths relative to it.
- * Symbolic links are followed. A `.bin` directory directly inside a
- * `node_modules` is left out: it holds only npm's command links, which a pack
- * never needs and which do not survive every platform.
+ * Symbolic links (and Windows junctions) are never followed: each is left out
+ * of `entries` and named in `skippedLinks`, so a link loop cannot recurse and
+ * a link out of the tree cannot copy its target into a bundle. An
+ * `npm install --prefix` tree holds no links outside `.bin`. A `.bin`
+ * directory directly inside a `node_modules` is left out without a mention:
+ * it holds only npm's command links, which a pack never needs and which do
+ * not survive every platform.
  */
-export function collectTree(root: string): ArchiveEntry[] {
+export function collectTree(root: string): CollectedTree {
   const entries: ArchiveEntry[] = [];
+  const skippedLinks: string[] = [];
   const walk = (dir: string, rel: string): void => {
     for (const name of readdirSync(dir).sort()) {
       if (name === ".bin" && rel.split("/").pop() === "node_modules") continue;
       const full = join(dir, name);
       const path = rel ? `${rel}/${name}` : name;
-      const stat = statSync(full);
-      if (stat.isDirectory()) {
+      const stat = lstatSync(full);
+      if (stat.isSymbolicLink()) {
+        skippedLinks.push(path);
+      } else if (stat.isDirectory()) {
         entries.push({ type: "directory", path });
         walk(full, path);
       } else if (stat.isFile()) {
@@ -52,7 +66,7 @@ export function collectTree(root: string): ArchiveEntry[] {
     }
   };
   walk(root, "");
-  return entries;
+  return { entries, skippedLinks };
 }
 
 function writeString(header: Buffer, offset: number, length: number, value: string): void {

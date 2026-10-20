@@ -324,7 +324,7 @@ async function bundle(pack: InstallablePack, version: string, deps: PackCommandD
       platform: "any",
     };
     writeFileSync(join(prefix, BUNDLE_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
-    const entries = collectTree(prefix);
+    const { entries, skippedLinks } = collectTree(prefix);
     const archive = writeTarGz(entries);
     const hash = sha256Hex(archive);
     mkdirSync(dirname(file), { recursive: true });
@@ -332,6 +332,9 @@ async function bundle(pack: InstallablePack, version: string, deps: PackCommandD
     writeFileSync(checksumFileOf(file), `${hash}  ${basename(file)}\n`);
     const files = entries.filter((e) => e.type === "file").length;
     write(`Bundled ${pack.packageName}@${version} and its dependencies (${files} files) into ${file}.`);
+    if (skippedLinks.length > 0) {
+      write(`Left out ${skippedLinks.length} symbolic link(s), which a bundle never follows: ${skippedLinks.join(", ")}.`);
+    }
     write(`SHA-256 ${hash}, written to ${checksumFileOf(file)}.`);
     write(`Install it with no network: ndx sv pack add ${pack.id} --from ${quoted(file)} --sha256 ${hash}`);
   } finally {
