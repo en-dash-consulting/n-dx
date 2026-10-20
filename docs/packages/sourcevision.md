@@ -61,8 +61,10 @@ SHA-256 is `<hex>`, before reading it; then it refuses a bundle of another pack
 or version, replaces the installed copies of the pack and its dependencies and
 loads the pack, with no npm call.
 
-**A bundle is trusted like any npm tarball.** Its JavaScript runs as soon as
-`add --from` loads the pack, and its manifest is written by whoever made it, so
+**A bundle is trusted like any npm tarball.** No npm call is not no code: to
+validate a bundle, `add --from` imports its entry module from a staging
+directory, running its top level before anything is installed, so only add
+bundles from a trusted source. Its manifest is written by whoever made it, so
 reading the manifest is not verification: the hash is. Send the hash that
 `bundle` printed by a channel separate from the bundle, and pass it as
 `--sha256`. Without `--sha256`, `add --from` checks `<file>.sha256` when it

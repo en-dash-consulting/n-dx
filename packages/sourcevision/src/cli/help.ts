@@ -324,8 +324,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "                  corrupt one, is refused. Without --sha256 it checks\n" +
       "                  <bundle>.sha256 if present, else says it did not verify\n" +
       "\n" +
-      "A bundle is trusted like any npm tarball: its code runs when the pack\n" +
-      "loads. Take the hash from whoever made the bundle, not from beside it.\n" +
+      "A bundle is trusted like any npm tarball: validating it runs its entry\n" +
+      "module before anything is installed, so only add bundles from a trusted\n" +
+      "source. Take the hash from whoever made the bundle, not from beside it.\n" +
       "\n" +
       "add and remove hold <pack dir>.lock while they run: a second one fails\n" +
       "naming the holder's PID. Run one pack writer at a time.",

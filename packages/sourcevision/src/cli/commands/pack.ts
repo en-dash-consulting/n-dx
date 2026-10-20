@@ -14,7 +14,9 @@
  * process), printing its SHA-256 and writing it to `<bundle>.sha256`;
  * `add --from <bundle> [--sha256 <hex>]` checks that hash before reading the
  * archive, then installs the pack and its dependency closure with no npm call.
- * A bundle is trusted like any npm tarball: its code runs when it loads.
+ * No npm call is not no code: to validate the bundle, `add` imports its entry
+ * module from the staging directory, running its top level before anything is
+ * installed, so only add bundles from a trusted source.
  *
  * @module sourcevision/cli/commands/pack
  */
