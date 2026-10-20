@@ -104,18 +104,64 @@ function insideAny(c: Capture, outer: readonly Capture[]): boolean {
 
 const startsWithCapital = (segment: string): boolean => /^[A-Z]/.test(segment);
 
-/** `java.util.Map<K, V>.Entry` → `["java", "util", "Map", "Entry"]`; whitespace, comments and annotations dropped. */
-function dottedSegments(text: string): string[] {
-  let stripped = text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
-  for (let prev = ""; prev !== stripped; ) {
-    prev = stripped;
-    stripped = stripped.replace(/<[^<>]*>/g, "");
-  }
-  return stripped
+/**
+ * `java.util.Map<K, V>.Entry` → `["java", "util", "Map", "Entry"]`; whitespace, comments and annotations dropped.
+ * Linear on any text, because capture text comes from the repository under analysis.
+ */
+export function dottedSegments(text: string): string[] {
+  return eraseGenerics(stripComments(text))
     .replace(/@[\w$.]+/g, "")
     .replace(/\s+/g, "")
     .split(".")
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Drop block and line comments in one left-to-right scan. An unterminated block
+ * opener stays as text; once one search for a closer fails, no later one can succeed.
+ */
+function stripComments(text: string): string {
+  let out = "";
+  let from = 0;
+  let closerAhead = true;
+  for (let i = 0; i < text.length - 1; i++) {
+    if (text[i] !== "/") continue;
+    let end = -1;
+    if (text[i + 1] === "*") {
+      if (closerAhead) {
+        const close = text.indexOf("*/", i + 2);
+        if (close < 0) closerAhead = false;
+        else end = close + 2;
+      }
+    } else if (text[i + 1] === "/") {
+      const newline = text.indexOf("\n", i + 2);
+      end = newline < 0 ? text.length : newline;
+    }
+    if (end < 0) continue;
+    out += text.slice(from, i);
+    from = end;
+    i = end - 1;
+  }
+  return out + text.slice(from);
+}
+
+/**
+ * Drop every character inside balanced `<…>`, nesting included, in one pass;
+ * unbalanced brackets stay. Each `>` closes the nearest open `<`, as repeatedly
+ * removing innermost `<[^<>]*>` pairs does.
+ */
+function eraseGenerics(text: string): string {
+  const out: string[] = [];
+  const open: number[] = [];
+  for (const ch of text) {
+    if (ch === ">" && open.length > 0) {
+      out.length = open.pop()!;
+      continue;
+    }
+    if (ch === "<") open.push(out.length);
+    out.push(ch);
+  }
+  return out.join("");
 }
 
 function readFacts(file: PackSourceFile): JavaFileFacts {
