@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
 import { analyzeZones } from "../../src/analyzers/zones.js";
-import { goConfig } from "../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 import { validate, ZonesSchema } from "../../src/schema/validate.js";
 
 const validateZones = (data: unknown) => validate(ZonesSchema, data);

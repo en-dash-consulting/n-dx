@@ -284,3 +284,10 @@ export function fixtureRex(
     }),
   };
 }
+
+/** Set to `1` to rewrite build-model goldens instead of comparing; the packs' golden tests read the same variable. */
+export const UPDATE_ENV = "SV_UPDATE_PACK_GOLDENS";
+
+export function updateRequested(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[UPDATE_ENV] === "1";
+}

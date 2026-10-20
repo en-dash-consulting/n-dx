@@ -1,5 +1,160 @@
 # @n-dx/llm-client
 
+## 0.9.1
+
+### Patch Changes
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`02aa8af`](https://github.com/en-dash-consulting/n-dx/commit/02aa8afe08842e6d56b65f52d3364007485b72c2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 agent brief is built from the change and the product nodes it affects. `buildChangeBrief` renders the work, the change's intent and amendments (proposed text included), each amended or touched capability with its own and inherited capability criteria, requirements, health and whether its spec was reviewed, the constraints that bind them, depends-on neighbours one hop out, where the capabilities live in code, the last three changes to those nodes, and the project's commands, workflow and log.
+  
+  One measured 4,000-token budget covers the whole brief. Sections are admitted capabilities-and-constraints first; a list that does not fit is trimmed in place — falling back to a compact form that still names every capability — rather than dropped, and every trim says what it left out. Nothing takes a vendor or model, and the sectioned and flat renders are byte-identical, so a CLI run and an API run send the same brief.
+  
+  `@n-dx/llm-client` exports `estimateTokens` and `CHARS_PER_TOKEN`, the model-independent half of `budgetPreflight`, so a caller sizing text against its own budget needs no model id.
+  
+  The two sections the budget never trims, `task` and `change`, bound every free-text field and every list they render — description, failure reason, done-when criteria, tags, blockers, an amendment's summary, proposed text and criteria, and the touched-without-amending list. An unbounded one would not have made the brief long, it would have made the brief exceed its budget and drop the capabilities section the budget exists to protect.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`0fa0251`](https://github.com/en-dash-consulting/n-dx/commit/0fa0251bb16de71d69aabbe9243a86bf2325dadb) Thanks [@endash-shal](https://github.com/endash-shal)! - Bitbucket and Atlassian credentials are redacted in full, not up to their
+  first `-`, `_`, `+` or `/`.
+  
+  The four Atlassian patterns in `redact.ts` were written from memory with no
+  network access, and their body character classes were too narrow. A body
+  character outside the class ends the match, so the prefix was replaced and
+  everything after that character stayed in the run record in plain text — the
+  worst shape a redaction bug can take, because the output looks redacted.
+  
+  Each class is now taken from a published detector ruleset, cited in the code:
+  
+  - `ATBB` (Bitbucket Cloud app password) — trufflehog's
+    `bitbucketapppassword` detector, whose own fixture `ATBBa9iO-tyg7u_op`
+    carries both `-` and `_`. The length floor also came down: real app
+    passwords are far shorter than the previous 20-character body minimum, so
+    one was not matched at all.
+  - `ATATT` / `ATCTT` — gitleaks' `atlassian-api-token` and trufflehog's
+    `atlassian/v2`. Both show `+` and `/` in the body; neither was in the class.
+  - `BBDC-` (Bitbucket Data Center, prefixed since Data Center 8) — the body is
+    plain base64, so `+`, `/` and `=` belong in it.
+  
+  The unit-test fixtures were runs of a single repeated letter built to clear
+  each regex's own floor, so they could only ever confirm the regex against
+  itself. They now carry the documented body characters, and a new test checks
+  the *suffix* after each one rather than the whole token — the old assertion
+  (`not.toContain(secret)`) passed even when half the credential survived.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`1923d4d`](https://github.com/en-dash-consulting/n-dx/commit/1923d4d06a947f1d6b296acbf7418e694c304cad) Thanks [@endash-shal](https://github.com/endash-shal)! - Claude Code CLI runs now honour `llm.effort`, passing it as `--effort <level>`.
+  
+  The Messages API paths have sent `llm.effort` as `output_config.effort` since
+  the effort work landed, but CLI runs dropped it: the llm-client CLI provider
+  ignored `CompletionRequest.effort` and hench's CLI agent loop passed no
+  `--effort` at all. A project that set `llm.effort` got it on API runs and
+  silently not on CLI runs.
+  
+  Both now resolve through `resolveClaudeCliEffort`, which shares the API path's
+  validation — an unknown level or a model that does not accept effort is
+  dropped with the same warning — and stops before its per-model default.
+  `CLAUDE_DEFAULT_EFFORT` exists to hold the API's heavy tier at the depth it
+  had before Opus 5.5 lowered its own API default; Claude Code picks its own
+  default per model, so sending ours unasked would override that choice on every
+  run nobody configured. With no rule matched the flag is omitted and the CLI
+  decides.
+  
+  `agent/lifecycle/api-effort.ts` is now `agent-effort.ts`, since it serves both
+  of hench's loops.
+
+- [#809](https://github.com/en-dash-consulting/n-dx/pull/809) [`cb236e9`](https://github.com/en-dash-consulting/n-dx/commit/cb236e93e169b0f10301f47ffa26e0bf681c9259) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Update `@anthropic-ai/sdk` to 0.133 (hench, llm-client) and `zod` to 4.6.7 (hench, rex, sourcevision, web). Both are additive releases with no change to n-dx behaviour.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dev dependencies bumped, including vitest 5. No runtime change: the published packages ship the same code, and the one test that vitest 5 rejected (a `vi.mock` written inside a test body) now declares its mock at module scope.
+
+- [#787](https://github.com/en-dash-consulting/n-dx/pull/787) [`d7c49c3`](https://github.com/en-dash-consulting/n-dx/commit/d7c49c3927f08f5743f43274034dee29f6843ecb) Thanks [@endash-shal](https://github.com/endash-shal)! - Fail-forward mode: a settings toggle that commits work as it happens instead of letting it pile up uncommitted.
+  
+  With it on, an autonomous loop that finds work left in the tree after an iteration commits it and carries on, rather than refusing to continue — so an interrupted loop still leaves each finished iteration committed. Settings changes commit too, including ones made from the pre-run menu, which writes the same file through the same handler as the settings page. `--allow-dirty` suppresses it: the operator asked for their tree to be left alone.
+  
+  Every commit it makes is scoped to the paths that step touched and uses a constant message for its kind. Work that belongs to the operator is refused outright rather than committed: anything already staged (including a `git add -p` hunk selection), and anything at all while a merge, rebase, cherry-pick or revert is in progress — `git add` on a conflicted path marks it resolved, and mid-rebase the commit then succeeds with the conflict markers in it. A failed commit unstages whatever it had staged, so it leaves the index as it found it. It also refuses to commit a config that carries a credential. Commits carry the usual `N-DX` trailers. Nothing is ever pushed. Off by default, and with it off behaviour is unchanged.
+  
+  The toggle is read through `isFailForwardEnabled` in `@n-dx/llm-client` rather than from the dashboard's feature registry, because `ndx work` and the hench run loop are separate processes that never reach the web server — two readers of one toggle would have drifted. The value is re-read at each decision point, so turning it off mid-run is obeyed at the next boundary rather than after a restart.
+  
+  The toggle also carries an info control on the settings page explaining what is committed and when; `FeatureDefinition` gains an optional `details` field for toggles whose effects reach outside the dashboard.
+
+- [#647](https://github.com/en-dash-consulting/n-dx/pull/647) [`2cd2e40`](https://github.com/en-dash-consulting/n-dx/commit/2cd2e40b5927eb23a9633aaddc37bbce559c3101) Thanks [@dnaniel](https://github.com/dnaniel)! - New package `@n-dx/graview`: a read-only projection of an n-dx project into [Graview](https://graview.dev). `ndx graview emit .` writes a `graview-document` declaration (the kinds area, capability, constraint, change, task, release, zone, component, run and commit, with every stored and derived rex relation as a typed edge, five titled lenses and two rules) and a `{nodes, edges}` seed snapshot built from the rex PRD model, sourcevision's zones and components, and hench's run records. `ndx graview check|describe|serve|mcp .` re-emit and spawn the `graview` CLI on the files, so the graph is never older than the tree on disk; `serve` is the store's HTTP and live WebSocket wire that a Graview face connects to, and `mcp` is read-only.
+  
+  No n-dx package depends on `@graview/*`: the binary is a peer tool resolved from `graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, the installed product face's own `graview`, then `npx -y graview@0.1.20`. Output lands under the layout's new `graviewDir` (`.ndx/graview` or `.graview`), which `ndx init` now gitignores; nothing is written under the rex, sourcevision or hench directories, and the N-DX-Item trailer cache `computeRealizedBy` keeps goes under the graview dir too. File nodes are opt-in (`--files`).
+  
+  Commits and releases come from git for every tree, v1 included: each commit on main whose `N-DX-Item` trailer names a change or task is a `commit` node (subject, author, date) that `landedFor` it, and a finished change with no stamped `shippedIn` ships with the first release tag containing its landing, so each `release` is dated by its tag and counts what it shipped. The caches go under the graview dir.
+  
+  A v1 tree projects the product layer rex's migration plan proposes (the plan's rules stage, pure and deterministic): an epic is an area, a feature with completed work a capability with a template statement, a constraint-shaped feature a constraint, the work under them changes placed on them, the rest in the Inbox. Every product node from the plan says `proposed`, and `graview.proposeProductLayer: false` projects the tree as changes only.
+
+- [#623](https://github.com/en-dash-consulting/n-dx/pull/623) [`090e111`](https://github.com/en-dash-consulting/n-dx/commit/090e111efc45edac8a0bcdf420fd55b2baabc117) Thanks [@mikemikimike](https://github.com/mikemikimike)! - Filter credential-shaped environment variables before launching vendor CLIs,
+  including retries and cross-vendor reviewers, while retaining the active
+  vendor's authentication, including Claude's active Bedrock and Vertex modes.
+  An explicit `hench.guard.env.allow` entry permits the matching variables to
+  reach hench runs and the cross-vendor reviewer; projects that need additional
+  credentials for tests or MCP servers must opt in there. One-shot completions
+  from rex, sourcevision and the dashboard always use the default filter.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`0562de4`](https://github.com/en-dash-consulting/n-dx/commit/0562de42cb52dda567b9b1358d987e380519b51a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `POST /api/llm/config/preview` resolves unsaved edits without writing them. It
+  takes `PUT /api/llm/config`'s body, plus an optional `provider` (the field the
+  page saves through `/api/hench/config`), and returns `effective`,
+  `effectiveProblems`, `tiers`, `failover` and `review` for the saved config with
+  those edits applied in memory. Refused edits come back in `editProblems`
+  instead of failing the request. `GET` and the preview now share one resolver;
+  `@n-dx/llm-client` exports `parseLLMConfig`, the in-memory half of
+  `loadLLMConfig`.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`65731af`](https://github.com/en-dash-consulting/n-dx/commit/65731afcf429ea011d2bb1ee4e5f537a6739b0e4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan can have Jev review it. Review runs when `rex.placement.models` is `jev` or `both`, or the `jevReview` option is set, and needs a TypeSafe key. Without a key the pass is skipped with one warning. Each item gets one Jev request (task class `prd.migrate.judge`) that batches its questions: a held item's kind and placement, whether an area's title names a job a user does, whether each criterion states product behaviour, and whether each linked test exercises its criterion. Each judged entry records its lowest confidence. The plan summary gains a review queue (held items first, then entries by ascending confidence) and counts of what Jev flagged and dropped. A test link Jev judges irrelevant is dropped only under `autoAccept: confident`. Otherwise it is flagged. A different kind or a process criterion is flagged, never applied. After Jev drops a link, review is re-checked against the approved spec hash, as after any redraft. Migrations may define `summarize`, which rebuilds the summary after every pass.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177) Thanks [@dependabot](https://github.com/apps/dependabot)! - Production dependencies bumped: zod 4, ink 8, react 19.3, @anthropic-ai/sdk 0.131, @modelcontextprotocol/sdk 1.32.1 and pdfkit 0.20. TypeScript stays on 6.x because sourcevision parses source with its compiler API, which TypeScript 7 does not ship, and preact stays on 10.x until its web test and leave-guard changes are worked through. Schemas move to zod 4's two-argument `z.record`; reserved and loosely-typed state keys are declared optional, since zod 4 no longer treats a missing `z.unknown()` key as optional; and the SDLC evidence list keeps its at-least-one rule as a tuple so it still infers the non-empty type.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`8228a7e`](https://github.com/en-dash-consulting/n-dx/commit/8228a7eb48c34ea6eb394a1b56d2736c7e759553) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: each package's vitest config splits its files into a shared-worker project and an isolated one for files that mock modules or globals, through `tests/vitest-isolation.mjs`. Same tests, less per-file worker and module-graph cost. No production code changed.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`173f13e`](https://github.com/en-dash-consulting/n-dx/commit/173f13e17743c32f839c1619fc221e7d8c584148) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: vitest keeps console output for failing tests and drops it for passing ones (`silent: "passed-only"`). A green run of the monorepo no longer prints thousands of lines of task briefs, init summaries and fixture warnings. No production code changed.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`7a6eeab`](https://github.com/en-dash-consulting/n-dx/commit/7a6eeabfe2a97d511ebbc980f0e1155134e88d48) Thanks [@endash-shal](https://github.com/endash-shal)! - Count each assistant message's tokens once, and price a task's runs in the dashboard.
+  
+  Claude's `--output-format stream-json` emits one `assistant` line per *content block*, not per message, and every line repeats the finished message in full — `usage` included. A turn that writes a sentence and calls three tools arrives as four lines carrying one turn's tokens four times. Claude Code's session transcripts have the same shape. Both of hench's live ingestion paths summed line by line, so every run's totals were multiplied by the turn's average block count: on a measured session, 234 usage-bearing lines carrying 57 distinct messages, a 4.27x over-count that recorded 23.5M cache-read tokens against the 5.5M actually read.
+  
+  `UsageMessageFilter` in `@n-dx/llm-client` holds the identity rule — the first sighting of a `message.id` counts, later ones do not. It is applied in `cli-loop`'s token extraction (both the event-pipeline and legacy paths) and in the transcript reader behind `hench record`. Repeats are flagged rather than dropped in the transcript, because cursors and marks address positions by the per-line uuid; removing lines would move every boundary and invalidate every cursor file on disk. Usage carrying no message id is still counted — a vendor that stamps none would otherwise lose its tokens entirely.
+  
+  The dashboard then had a second problem: it led with a single token total that counted cache reads alongside everything else. Cache reads bill at roughly a tenth of the input rate and outnumber the other three classes by an order of magnitude, so the figure read as tens of millions for work that cost a few dollars. The per-task aggregator now keeps the four billed classes apart instead of collapsing them to one number, and prices each run at the model that run recorded — one task's Haiku and Opus runs are no longer billed at a single blended rate. Cost rolls up through the PRD tree alongside tokens, and the tree's usage column leads with it; the token accounting moves to the cell tooltip, which reports newly-processed tokens and cache reads separately so the price and the token count can be reconciled.
+  
+  Two errors in the price table itself turned up on the way. `claude-sonnet-5` was priced at $3/$15 — the rates of the Sonnet 4.6 it replaced — overstating every Sonnet 5 figure by 50%; it is the toolkit's standard tier *and* the fallback every unrecognised model is priced at, so the error reached far more surfaces than the runs that named it. And `claude-fable-5-1` was absent, so a Fable 5.1 run silently priced at the Sonnet fallback; its cache-read rate is $0.25/MTok rather than the 0.1x the other Claude rows follow.
+  
+  Runs already recorded keep the totals they were written with — the run files do not retain message ids, so the over-count cannot be undone after the fact. Runs recorded from here on are correct.
+
+- [#625](https://github.com/en-dash-consulting/n-dx/pull/625) [`e41d31f`](https://github.com/en-dash-consulting/n-dx/commit/e41d31fff91f9599ffc1e85d38cf1fad8da9e162) Thanks [@endash-shal](https://github.com/endash-shal)! - Repository trust now covers `guard.env.allow`. A tracked `.hench/config.json`
+  (or a `.n-dx.json` hench override) that passes credential-shaped environment
+  variables through to the agent's processes changes the trust digest and raises
+  an `env-allow-added` warning in the trust review, instead of taking effect
+  unseen on an already-trusted checkout. `guard.env.deny` is not collected — it
+  can only remove variables, so it never widens what the agent can read.
+  
+  A repository that ships no `guard.env.allow` keeps the digest it already had,
+  so the upgrade does not re-open trust on checkouts the user has approved.
+
+- [#658](https://github.com/en-dash-consulting/n-dx/pull/658) [`c357d36`](https://github.com/en-dash-consulting/n-dx/commit/c357d364ff0609368c12f8a797e468960fed53f6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Follow-ups to the vendor CLI credential filter:
+  
+  - Claude on Bedrock keeps its role and container credentials: the IRSA names
+    (`AWS_WEB_IDENTITY_TOKEN_FILE`, `AWS_ROLE_ARN`, `AWS_ROLE_SESSION_NAME`), the
+    ECS/Fargate `AWS_CONTAINER_*` names and `AWS_CA_BUNDLE` reach the CLI when
+    `CLAUDE_CODE_USE_BEDROCK` is on, and are stripped when it is off. When Bedrock
+    or Vertex mode is on and none of its credential variables are set, `ndx work`
+    says so once, by name only.
+  - The cross-vendor reviewer falls back to the shell test command when its
+    environment cannot be resolved (for example, an unreadable config), instead of
+    failing the review.
+  - The reviewer's shell test command no longer inherits the raw environment. It
+    gets the project's `hench.guard.env` policy, without the reviewer vendor's
+    authentication variables. If that policy cannot be loaded, the default filter
+    applies and the review banner says so.
+  - `ndx start --open` on Windows opens the dashboard without `cmd.exe`, so a
+    `%NAME%`-shaped sequence in the URL's token or project id is no longer
+    expanded.
+
+- [#790](https://github.com/en-dash-consulting/n-dx/pull/790) [`6f9db39`](https://github.com/en-dash-consulting/n-dx/commit/6f9db391476e7a2afff41389cb7f6d6dd85f6fa1) Thanks [@endash-shal](https://github.com/endash-shal)! - The Windows CLI spawn now refuses a command line that `cmd.exe` would rewrite before running it.
+  
+  `quoteWindowsToken` neutralises every `cmd.exe` metacharacter except one, and said so in its own comment: `%VAR%` is expanded *inside* double quotes, and the substituted text is then parsed as part of the command line. An expanded value holding a double quote therefore ends the argument early, and an `&` after it starts a second command. `cmd.exe` offers no escape for `%` outside a batch file, so quoting cannot close this — the limitation was written down as a caller contract instead, with nothing enforcing it.
+  
+  `spawnCli`, and the `spawnCli`/`execFileSyncCli` twins in `@n-dx/core`, now check the tokens against the environment they are about to pass and throw rather than spawn. The check is deliberately narrow: `cmd.exe` expands only a name it can resolve and leaves anything else literal, so a path that merely contains a percent sign (`C:\Users\100%cool\bin`) still spawns, and so does one naming a variable that is not set. Only a token that would actually be rewritten is refused, and no CLI the toolkit spawns passes one. Matching is case-insensitive, as Windows environment lookup is.
+  
+  POSIX spawns are unaffected — they never go through `cmd.exe`.
+
 ## 0.9.0
 
 ### Patch Changes

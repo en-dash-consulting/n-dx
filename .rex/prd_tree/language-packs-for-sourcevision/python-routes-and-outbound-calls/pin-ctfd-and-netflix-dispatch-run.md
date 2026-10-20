@@ -1,0 +1,25 @@
+---
+id: "4118bd59-2324-4c90-a3ae-4d0105b196a8"
+level: "task"
+title: "Pin CTFd and Netflix/dispatch, run python-routes-report and the PR 16 byte-identity checks"
+status: "completed"
+priority: "medium"
+tags:
+  - "language-packs"
+  - "lang-python"
+  - "frameworks"
+  - "pr-16"
+  - "operator"
+startedAt: "2026-10-16T00:48:24.804Z"
+completedAt: "2026-10-16T00:48:24.804Z"
+endedAt: "2026-10-16T00:48:24.804Z"
+resolutionType: "code-change"
+resolutionDetail: "Done in session: CTFd and Netflix/dispatch pinned in f0220159e and cloned; python-routes-report run and hand-checked; byte-identity and added-only checks against a PR 15b build all pass (logged on e589b220)."
+acceptanceCriteria:
+  - "python-corpus.json lists CTFd and Netflix/dispatch at real pinned SHAs and both clone"
+  - "python-routes-report output for every corpus repository is logged with a hand-checked 15-route sample"
+  - "The byte-identity comparisons against PR 15b are logged and pass, or each difference is captured as its own task"
+description: "Operator task (needs the network and ~/.cache/ndx-python-corpus, neither available to the agent run that built the route rules, e589b220).\n\n1. Add CTFd/CTFd (Flask, shape \"Flask application, blueprints across files\") and Netflix/dispatch (FastAPI, shape \"FastAPI backend, routers included across files\") to packages/sourcevision/scripts/python-corpus.json, each pinned to a commit SHA from `git ls-remote <url> HEAD`. No SHA was invented in e589b220.\n2. `node packages/sourcevision/scripts/python-corpus-clone.mjs`.\n3. `pnpm --filter @n-dx/lang-runtime build && pnpm --filter @n-dx/lang-python build`, then `node packages/sourcevision/scripts/python-routes-report.mjs` and log per repository: routes by framework and method, placeholder paths, notices, the 15-route sample checked by hand against the source (file:line). Expect dispatch's `app.mount(\"/api/v1\", app=api)` to put its routes under /api/v1 (mount of a FastAPI app is followed).\n4. Persisted bar: `sv analyze --fast` byte-identical to PR 15b for every repo without Python and for Python repos with the pack refused; with the pack, components.json differs only by added serverRoutes groups for Python files and summary.totalServerRoutes, outbound.json unchanged. Also time home-assistant-core with routes wanted: the Django query captures every list and tuple."
+lastModified: "2026-10-16T00:48:25.127Z"
+lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+---

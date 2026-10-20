@@ -246,3 +246,21 @@ describe("a project with no infrastructure at all", () => {
     rmSync(bare, { recursive: true, force: true });
   });
 });
+
+describe("Terraform files are never link candidates", () => {
+  it("ignores .tf, .tfvars, terragrunt.hcl and .tftest.hcl paths whoever passes them", () => {
+    const withTerraform = [
+      ...SOURCE_FILES,
+      "infra/main.tf",
+      "infra/prod.tfvars",
+      "live/terragrunt.hcl",
+      "infra/queue.tftest.hcl",
+    ];
+    const render = (paths: string[]): string =>
+      toCanonicalJSON(toInfrastructureData(computeInfrastructure(root, paths)));
+
+    expect(render(withTerraform)).toBe(render(SOURCE_FILES));
+    const targets = toInfrastructureData(computeInfrastructure(root, withTerraform)).links.map((l) => l.target);
+    expect(targets.some((t) => /\.tf$|\.tfvars$|\.hcl$/.test(t))).toBe(false);
+  });
+});

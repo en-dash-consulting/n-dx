@@ -1,0 +1,202 @@
+{
+  "facts": [
+    {
+      "path": "app/__init__.py",
+      "routes": []
+    },
+    {
+      "path": "app/api/__init__.py",
+      "routes": []
+    },
+    {
+      "path": "app/api/main.py",
+      "routes": []
+    },
+    {
+      "path": "app/api/routes/__init__.py",
+      "routes": []
+    },
+    {
+      "path": "app/api/routes/admin.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "${settings.API_V1_STR}/admin/tools/stats",
+          "handler": "stats",
+          "position": {
+            "line": 6,
+            "column": 1
+          }
+        },
+        {
+          "method": "GET",
+          "path": "${settings.API_V1_STR}/staff/tools/stats",
+          "handler": "stats",
+          "position": {
+            "line": 6,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "path": "app/api/routes/items.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "${settings.API_V1_STR}/items/",
+          "handler": "read_items",
+          "position": {
+            "line": 8,
+            "column": 1
+          }
+        },
+        {
+          "method": "POST",
+          "path": "${settings.API_V1_STR}/items/",
+          "handler": "create_item",
+          "position": {
+            "line": 13,
+            "column": 1
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "${settings.API_V1_STR}/items/{id}",
+          "handler": "update_item",
+          "position": {
+            "line": 18,
+            "column": 1
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "${settings.API_V1_STR}/items/{id}",
+          "handler": "delete_item",
+          "position": {
+            "line": 23,
+            "column": 1
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "${settings.API_V1_STR}/items/{id}",
+          "handler": "patch_item",
+          "position": {
+            "line": 28,
+            "column": 1
+          }
+        },
+        {
+          "method": "OPTIONS",
+          "path": "${settings.API_V1_STR}/items/",
+          "handler": "item_options",
+          "position": {
+            "line": 33,
+            "column": 1
+          }
+        },
+        {
+          "method": "HEAD",
+          "path": "${settings.API_V1_STR}/items/",
+          "handler": "item_head",
+          "position": {
+            "line": 38,
+            "column": 1
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "${settings.API_V1_STR}/items/bulk",
+          "handler": "bulk",
+          "position": {
+            "line": 43,
+            "column": 1
+          }
+        },
+        {
+          "method": "POST",
+          "path": "${settings.API_V1_STR}/items/bulk",
+          "handler": "bulk",
+          "position": {
+            "line": 43,
+            "column": 1
+          }
+        },
+        {
+          "method": "GET",
+          "path": "${settings.API_V1_STR}/items/any",
+          "handler": "any_item",
+          "position": {
+            "line": 48,
+            "column": 1
+          }
+        },
+        {
+          "method": "GET",
+          "path": "${settings.API_V1_STR}/items/${VERSION}/latest",
+          "handler": "latest",
+          "position": {
+            "line": 58,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "path": "app/api/routes/users.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "${settings.API_V1_STR}/people/me",
+          "handler": "me",
+          "position": {
+            "line": 7,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "path": "app/core/__init__.py",
+      "routes": []
+    },
+    {
+      "path": "app/core/config.py",
+      "routes": []
+    },
+    {
+      "path": "app/legacy.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/legacy/ping",
+          "handler": "ping",
+          "position": {
+            "line": 6,
+            "column": 1
+          }
+        }
+      ]
+    },
+    {
+      "path": "app/main.py",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/health",
+          "handler": "health",
+          "position": {
+            "line": 15,
+            "column": 1
+          }
+        }
+      ]
+    }
+  ],
+  "notices": [
+    "FastAPI: 2 route paths or prefixes are not literals and are kept as written in ${…} form: app/api/routes/items.py:58 (path f\"/{VERSION}/latest\"), app/main.py:9 (prefix settings.API_V1_STR).",
+    "FastAPI: 1 route method is not a literal and was skipped: app/api/routes/items.py:53 (methods ALLOWED).",
+    "FastAPI: 1 mount names no application or router the rules can follow and was not followed: app/main.py:10 (include_router make_router())."
+  ]
+}
