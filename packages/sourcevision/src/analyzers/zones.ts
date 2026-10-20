@@ -2830,17 +2830,30 @@ const NON_IMPORTABLE_EXTENSIONS = new Set([
 
 // ── Helper: prepare scope and edges ──────────────────────────────────────────
 
-/** Filter sub-analyzed files from edges/inventory and build the test file set. */
+/**
+ * Filter sub-analyzed files from edges/inventory and build the test file set.
+ *
+ * `zonedInventory` is the inventory zone detection sees: Terraform is
+ * inventoried but never zoned, so adding it leaves a repo's zones, their
+ * descriptions, file counts and input fingerprint unchanged (task 43a98ad8).
+ * Keyed on the inventory's language, not `.hcl`, so other HCL files are zoned
+ * as before. Its `summary` is the full inventory's; zone detection never reads it.
+ */
 function prepareScopeAndEdges(
-  inventory: Inventory,
+  fullInventory: Inventory,
   imports: Imports,
   subAnalyses: SubAnalysis[],
 ): {
+  zonedInventory: Inventory;
   filteredEdges: ImportEdge[];
   scopeFiles: string[];
   testFiles: Set<string>;
   subAnalyzedPrefixes: string[];
 } {
+  const inventory: Inventory = {
+    ...fullInventory,
+    files: fullInventory.files.filter((f) => f.language !== "Terraform"),
+  };
   const subAnalyzedPrefixes = getSubAnalyzedPrefixes(subAnalyses);
   const filteredEdges = subAnalyzedPrefixes.length > 0
     ? imports.edges.filter(
@@ -2860,7 +2873,7 @@ function prepareScopeAndEdges(
     if (f.role === "test") testFiles.add(f.path);
   }
 
-  return { filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes };
+  return { zonedInventory: inventory, filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes };
 }
 
 // ── Helper: promote sub-analyses ─────────────────────────────────────────────
@@ -3136,7 +3149,7 @@ function buildAnalyzeZonesResult(opts: {
 // ── Main entry point ────────────────────────────────────────────────────────
 
 export async function analyzeZones(
-  inventory: Inventory,
+  fullInventory: Inventory,
   imports: Imports,
   options?: {
     enrich?: boolean;
@@ -3197,9 +3210,9 @@ export async function analyzeZones(
   const previousZones = options?.previousZones;
   const subAnalyses = options?.subAnalyses ?? [];
 
-  // ── Prepare scope ──
-  const { filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes } =
-    prepareScopeAndEdges(inventory, imports, subAnalyses);
+  // ── Prepare scope ── everything below sees only the zoned inventory.
+  const { zonedInventory: inventory, filteredEdges, scopeFiles, testFiles, subAnalyzedPrefixes } =
+    prepareScopeAndEdges(fullInventory, imports, subAnalyses);
 
   let expandedZones: Zone[];
   let unzoned: string[];

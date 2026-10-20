@@ -1,0 +1,53 @@
+[
+  {
+    "module": "web-app",
+    "dir": "",
+    "buildSystem": "maven",
+    "group": {
+      "resolved": true,
+      "value": "com.acme"
+    },
+    "version": {
+      "resolved": true,
+      "value": "1.0.0"
+    },
+    "dependencies": [
+      {
+        "group": "com.acme",
+        "artifact": "pinned",
+        "version": {
+          "resolved": false,
+          "reason": "property spring-retry.version is not defined in the repository; may be defined by org.springframework.boot:spring-boot-starter-parent:3.3.4"
+        },
+        "scope": "compile"
+      },
+      {
+        "group": "org.springframework.boot",
+        "artifact": "spring-boot-starter-test",
+        "version": {
+          "resolved": false,
+          "reason": "managed outside the repository by org.springframework.boot:spring-boot-starter-parent:3.3.4"
+        },
+        "scope": "test"
+      },
+      {
+        "group": "org.springframework.boot",
+        "artifact": "spring-boot-starter-web",
+        "version": {
+          "resolved": false,
+          "reason": "managed outside the repository by org.springframework.boot:spring-boot-starter-parent:3.3.4"
+        },
+        "scope": "compile"
+      }
+    ],
+    "javaVersion": {
+      "resolved": true,
+      "value": "21"
+    },
+    "springBootVersion": {
+      "resolved": true,
+      "value": "3.3.4"
+    },
+    "notices": []
+  }
+]
