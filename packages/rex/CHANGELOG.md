@@ -1,5 +1,454 @@
 # @n-dx/rex
 
+## 0.9.1
+
+### Patch Changes
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`02aa8af`](https://github.com/en-dash-consulting/n-dx/commit/02aa8afe08842e6d56b65f52d3364007485b72c2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 agent brief is built from the change and the product nodes it affects. `buildChangeBrief` renders the work, the change's intent and amendments (proposed text included), each amended or touched capability with its own and inherited capability criteria, requirements, health and whether its spec was reviewed, the constraints that bind them, depends-on neighbours one hop out, where the capabilities live in code, the last three changes to those nodes, and the project's commands, workflow and log.
+  
+  One measured 4,000-token budget covers the whole brief. Sections are admitted capabilities-and-constraints first; a list that does not fit is trimmed in place — falling back to a compact form that still names every capability — rather than dropped, and every trim says what it left out. Nothing takes a vendor or model, and the sectioned and flat renders are byte-identical, so a CLI run and an API run send the same brief.
+  
+  `@n-dx/llm-client` exports `estimateTokens` and `CHARS_PER_TOKEN`, the model-independent half of `budgetPreflight`, so a caller sizing text against its own budget needs no model id.
+  
+  The two sections the budget never trims, `task` and `change`, bound every free-text field and every list they render — description, failure reason, done-when criteria, tags, blockers, an amendment's summary, proposed text and criteria, and the touched-without-amending list. An unbounded one would not have made the brief long, it would have made the brief exceed its budget and drop the capabilities section the budget exists to protect.
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`550c099`](https://github.com/en-dash-consulting/n-dx/commit/550c099f0e81cb18b20d3fecd619d549bf4d2f61) Thanks [@endash-shal](https://github.com/endash-shal)! - The base workflow now tells an agent when to use the two v2 tools its run is
+  granted, and a task-less change is covered end to end as a unit of work.
+  
+  `get_capability` and `place_change` are in the rex MCP tools a run may call,
+  but no prompt asked for either, and the rule behind that list is that a tool
+  no prompt asks for does not belong in it. The base workflow
+  (`.rex/n-dx_workflow.md`, rewritten by `ndx init`) now says: on a v2 PRD, read
+  a capability with `get_capability` when the brief's trimmed entry cannot tell
+  you whether the change is finished (step 2); and place a follow-up captured
+  with `add_item` using `place_change`, because an untargeted change lands in
+  the Inbox carrying `needsPlacement` and is never selected autonomously from
+  there (step 9). The autonomous adversarial-review pass says the same of the
+  findings it captures. A test now checks that every granted tool is named in
+  the base workflow, and that `apply_change` — the one PRD write the completion
+  hold cannot withdraw — stays operator-only; the allowlist's own comment
+  carries that rationale.
+  
+  A hench integration test runs a task-less change through a real v2 tree: the
+  store `resolveStore` returns is the change layer, selection picks the change
+  itself and claims it, picks a task over its change where one exists, refuses
+  rather than falling back to the v1 selector when v2's rules leave nothing to
+  run, and a completion held on the claim is written to the change's
+  `state.yaml` once the test gate passes.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`3049ac5`](https://github.com/en-dash-consulting/n-dx/commit/3049ac5ae0199c06b262d0bec554d0c6931db497) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex change apply`, `add_item` and `place_change` now refuse a criteria delta on a constraint, or a replace/remove on a new capability, with "has no capability criteria" instead of a bare "criteria".
+
+- [#787](https://github.com/en-dash-consulting/n-dx/pull/787) [`26d68a9`](https://github.com/en-dash-consulting/n-dx/commit/26d68a9c6bdbe1de498b43a777d517e75e1caecf) Thanks [@endash-shal](https://github.com/endash-shal)! - `assignee` can now be written, not only read. The field has been on the item schema and honoured by task selection for some time — `matchesAssignee` inherits it down the parent chain and `ndx work --mine` filters on it — but nothing exposed a way to set it, so hand-editing frontmatter was the only route.
+  
+  `rex update <id> --assignee="<name>"` sets it and `--assignee=` removes it, matching how `--source` behaves. MCP `edit_item` and `add_item` both take an `assignee` parameter, and on `edit_item` an empty string removes it so an item can be unassigned without touching files by hand. The value is trimmed on the way in, because selection matches it exactly.
+  
+  The v2 layout is covered too: `addChangeNode` carries `assignee` onto changes, tasks and subtasks, so a v2 PRD is not left with the same read-only field the v1 one had.
+  
+  No storage change was needed — the folder-tree serializer already round-tripped the field as an unknown extra, and v2 already routed it into `state.yaml` from `ItemStateSchema`.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`f0ca395`](https://github.com/en-dash-consulting/n-dx/commit/f0ca3954254f56bd20611e14459f607dc6181ff9) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex health` now says a capability "has no capability criteria" instead of a bare "criteria".
+
+- [#747](https://github.com/en-dash-consulting/n-dx/pull/747) [`02eed9a`](https://github.com/en-dash-consulting/n-dx/commit/02eed9a6fa283936ae81862c213be3d4ee323b0a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The capability page's edit form is now reachable from the dashboard.
+  
+  [#729](https://github.com/en-dash-consulting/n-dx/issues/729) built the form, but nothing mounted it and no route ran rex's
+  `handleProductEdit`. `POST /api/rex/product/edit` now applies an edit to a
+  capability's statement and its own criteria's text inside rex's v2 transaction,
+  and the capability page passes `onEdit` so a save posts to it and refetches.
+  The editorial checkbox keeps its meaning: checked records a History line and
+  keeps the capability met; unchecked marks it revised and drafts a change in the
+  Inbox to build the difference. On a v1 tree the route answers 409 and the
+  capability page stays read-only. `@n-dx/rex` now exports `handleProductEdit` and
+  `ProductEditError`.
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`1abeb88`](https://github.com/en-dash-consulting/n-dx/commit/1abeb885cd14a6a61222aa5073e2700fa78ae260) Thanks [@endash-shal](https://github.com/endash-shal)! - Quick Add and batch import work on a v2 PRD. A v2 tree has no levels, so
+  `rex add` previews one change per description — `{ preview: true, changes }` —
+  rather than the epic/feature/task proposals a v1 tree returns. The dashboard
+  read only `proposals`, so the preview came back empty and there was no way to
+  add a change from the dashboard at all.
+  
+  The preview routes now forward `changes`, and the panel renders each change
+  with the placement the rules suggest and whether it lands in the Inbox.
+  Accepting posts to the new `POST /api/rex/smart-add-accept`, which re-runs the
+  same `rex add` with `--accept`: a v2 add is deterministic — a change's title is
+  its description's first line, with no LLM round-trip — so what is written is
+  what the preview named. The v1 accept path, which writes epics, features and
+  tasks, is not reached.
+  
+  Batch import's accept path was dropping its log line and its `rex:prd-changed`
+  broadcast on a v2 tree, because it looked for an `added` count in output that
+  is a list of change rows. It now counts the rows.
+  
+  `rex add --format=json` carries each placement candidate's title and display id
+  alongside its `target` id, as the text report already resolves them. Without it
+  a JSON consumer has no tree to resolve the id against, and the dashboard could
+  only have shown a bare id.
+
+- [#809](https://github.com/en-dash-consulting/n-dx/pull/809) [`cb236e9`](https://github.com/en-dash-consulting/n-dx/commit/cb236e93e169b0f10301f47ffa26e0bf681c9259) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Update `@anthropic-ai/sdk` to 0.133 (hench, llm-client) and `zod` to 4.6.7 (hench, rex, sourcevision, web). Both are additive releases with no change to n-dx behaviour.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dev dependencies bumped, including vitest 5. No runtime change: the published packages ship the same code, and the one test that vitest 5 rejected (a `vi.mock` written inside a test body) now declares its mock at module scope.
+
+- [#741](https://github.com/en-dash-consulting/n-dx/pull/741) [`0a08ba6`](https://github.com/en-dash-consulting/n-dx/commit/0a08ba6ac46544418a8666bcd971de1c9450374f) Thanks [@endash-shal](https://github.com/endash-shal)! - `rex recommend` and `rex analyze` tag the changes they create from a sourcevision finding with `code-health`. Placement stopped reading `source: "sourcevision"` and now recognises a finding-derived change by that tag alone, so without this the changes both commands produce lost their architecture-constraint routing and their forced `touches` relation.
+  
+  Everything `recommend` emits — the run's epic, its zone+category features and their tasks — exists because the analysis reported a finding, so the whole hierarchy carries the tag. In `analyze` only the repairs do: actionable zone findings, circular-dependency tasks and legacy inline zone findings. The zone features and inventory-category epics it proposes as new work stay untagged, because they describe what the codebase has rather than what is wrong with it.
+  
+  The marker joins `finding:<hash>` and `finding-category:<category>` as a tag that never names a proposal's epic, so grouping and epic titles are unchanged.
+
+- [#647](https://github.com/en-dash-consulting/n-dx/pull/647) [`a4af06e`](https://github.com/en-dash-consulting/n-dx/commit/a4af06ec00bfd0fd8ed37bed21cf04885a99dc62) Thanks [@dnaniel](https://github.com/dnaniel)! - The v1-to-v2 migration plan marks a capability or constraint `met` when its v1 item completed, and the plan's data stage stamps `metAt` with the drafted spec's hash, as `appliedAt` already stamps a completed change: without it every migrated capability read proposed forever. `specHash` and `nodeSpec` join rex's public API. The Graview projection's proposed product layer stamps the same, so a completed feature's capability reads met, one with an open amending change reads changing, and the capability declaration drops its `metAt` datetime (rex's `metAt` is a spec hash, said through `intentStatus`).
+  
+  A run record's commits carry how each was tied to the run (`attribution`: `start-head` on the live path), and `hench backfill-commits [dir]` fills `commits` on every record written without `startHead`, from the main branch's history: a subject naming the run id, then an `N-DX-Item` trailer naming the run's task, then the run's time window when no other run's holds the commit (the window proper before the `--pad`, and never a window longer than `--max-window`, so a run an audit ended weeks later claims nothing). Merge and `chore(prd)` commits are never attributed; a record that has commits is left alone, so the command is idempotent; `--dry-run` reports without writing. On n-dx's own history it ties 638 commits to 569 of 673 runs.
+  
+  The projection reads that evidence: every commit a run record names is a `commit` node that `landedFor` the run's task, carrying the record's `attribution` (a trailer commit says `trailer`), with author and date from git. A capability is `realizedIn` the zones of the files changed by every commit that landed for a change placed on it, `amends` or `touches`, or for the work under that change, from trailers and run records alike; `loadCommitFiles` joins rex's public API for the file scan. The face's capability page, zone page and coverage picture fill in accordingly.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`5ef4660`](https://github.com/en-dash-consulting/n-dx/commit/5ef4660a3d53c49946aa396c54c2dee20af7d920) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex health` on a v2 tree runs the v2 tree rules and reads `rex.structureHealth.maxCriteriaPerCapability` as the capability-criteria threshold. v1 trees report as before.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`17257ac`](https://github.com/en-dash-consulting/n-dx/commit/17257acdcd976fae362ee09488bc2ddebebe2992) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 tree, `rex health` exits 1 when a tree rule reports an error or the reader skipped a node; warnings alone exit 0. `ndx ci`'s structure-health step gates on that exit code and shows error, warning and skipped-node counts instead of "score: undefined". v1 is unchanged.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`4aae21c`](https://github.com/en-dash-consulting/n-dx/commit/4aae21c613d532b56a3b62fce0f362075110e4fa) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex health` on a v2 tree now prints the reader's warnings under "Reader warnings:" and adds a `warnings` array beside `treeRules` in `--format=json`, so skipped nodes and folders without `index.md` no longer read as "no findings".
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`ffe0774`](https://github.com/en-dash-consulting/n-dx/commit/ffe0774afe9ca7e2344624d9516a4cdb70536899) Thanks [@endash-shal](https://github.com/endash-shal)! - The Inbox is a reserved folder in a v2 tree, not a flag at the change-layer root. An unplaced change is written to `changes/inbox/<slug>/index.md` with `needsPlacement: true` in that folder's own `state.yaml`, and placement moves it out to the change-layer root keeping its id and its slug. The reader reads `changes/inbox/` as a folder rather than a change, so its children are top-level changes and every count, selection and bundle sees the tree as before. A tree written by the earlier layout, with the flag on a change at the changes root, still reads and moves into the folder on the next write.
+
+- [#653](https://github.com/en-dash-consulting/n-dx/pull/653) [`06082f8`](https://github.com/en-dash-consulting/n-dx/commit/06082f8eb52ff8efcd03fa00f95aa098028a5a62) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tightens a v2 rule under the soft freeze: `layer-nesting` now reports a task at the changes root, a subtask directly under a change, and a task under a task.
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`ec4cd53`](https://github.com/en-dash-consulting/n-dx/commit/ec4cd5313e430f27b93b38ca5ad643577d3852bc) Thanks [@endash-shal](https://github.com/endash-shal)! - Edit the product map directly, and set the two PRD settings from the dashboard.
+  
+  **Direct edit, with an editorial checkbox.** The capability page can now edit a
+  node's spec in place. The checkbox is the point: checked, it says the wording
+  moved and nothing was asked for, so the node stays met and the edit is recorded
+  as history; unchecked, the spec has moved ahead of the build and a change is
+  drafted to build the difference. Only the author can tell those apart, so the
+  form asks rather than guessing — and names which of the two is about to happen
+  before the edit is submitted. The checkbox is disabled, with the reason beside
+  it, on a node rex would refuse it for: one already revised (re-stamping would
+  mark the unbuilt revision met) or one never met (there is no met spec to
+  re-stamp). Inherited criteria are not editable here, because they belong to the
+  capability they come from. The page submits the edit and renders the capability
+  it is handed back; what an edit does to a node's status stays rex's to decide.
+  
+  **Workflow settings.** `rex.applyOn` (when a completed change's amendments
+  reach the product layer) and `rex.placement.autoAccept` (when a placement is
+  taken without a person) are now on the Workflow page, saved to the same
+  `.n-dx.json` the CLI reads. What counts as valid is rex's to say, not the
+  dashboard's: `APPLY_ON`, `PLACEMENT_AUTO_ACCEPT`, both defaults and both
+  parsers now come through the web→rex gateway, so the chooser offers exactly the
+  values the parser accepts and `PUT /api/rex/settings` refuses anything else. A
+  chooser with its own list would write a setting the CLI silently falls back
+  from, which reads as a save that did nothing. For the same reason the page
+  surfaces rex's own warnings about values already in the file that it had to
+  fall back from.
+  
+  **Bitbucket remotes.** The dashboard's repository name is read through the
+  shared remote-URL parser rather than a local regex, so Bitbucket Cloud and Data
+  Center remotes — including the `/scm/` clone prefix and the ssh-on-7999 form —
+  resolve as the analysis manifest and the iso export already resolve them. The
+  local copy answered correctly for the common forms; what it could not do was
+  guarantee it answered the *same* thing, which is the whole reason the parser is
+  shared. Covered by tests over every form the route can be given, and over a
+  real Data Center remote read from a git checkout.
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`3e6c353`](https://github.com/en-dash-consulting/n-dx/commit/3e6c353d31a11130b1bef37419b45c6458080e76) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx migrate --plan` writes the v1 → v2 migration plan out for review.
+  
+  The classification, data and model passes already existed and were wired to
+  nothing. `rex migrate-plan` (which `ndx migrate --plan` spawns) now reads the
+  PRD under the store lock, runs the pipeline over it, and writes two files to an
+  operator-chosen path: the JSON plan keyed by v1 item id, which the apply step
+  will read, and a Markdown summary listing every v1 item with its target, the
+  proposed areas with their notes, the proposed constraints, the dissolved
+  release epics and the review queue.
+  
+  Nothing is written to the PRD — planning is a pure read. Both output paths are
+  refused anywhere inside the rex directory, under the same rule `rex export`
+  applies: a JSON document at `.rex/prd.json` would be read *as* the PRD on a
+  checkout without the tree.
+  
+  Re-planning reads the plan already at `--out` and reuses every model answer
+  whose item, question and model still match, and reuses its cut time unless
+  `--cut-at` overrides it — so an unchanged tree re-plans into a byte-identical
+  file without asking anything. That is also the retry path after a seam error:
+  the pass is recorded incomplete, the answers already paid for are kept, and the
+  next run continues from them.
+  
+  `--rules-only` runs the rules alone, free and fully deterministic. Otherwise
+  `rex.placement.models` chooses the placement tiers (text by default) and Jev
+  reviews the plan unless `--no-jev-review`. A text-only placement suggests
+  rather than places: under `autoAccept: agree` a held change stays held with the
+  suggestion recorded for a reviewer.
+
+- [#759](https://github.com/en-dash-consulting/n-dx/pull/759) [`ee868a7`](https://github.com/en-dash-consulting/n-dx/commit/ee868a76f8d4b3f84183267b56d2c32fe959c66e) Thanks [@endash-shal](https://github.com/endash-shal)! - `rex migrate-slugs` now describes the slug rule it actually implements. Its
+  `rex --help` summary and the JSDoc beside it still named the unconditional
+  `-{id6}` rule that slug rule 2 replaced, so the command read as a whole-tree
+  migration to a different convention. Both are now derived from one
+  `SLUG_RULE_SUMMARY` constant that lives beside `SLUG_RULE_VERSION`, and
+  `rex migrate-slugs --help` has a dedicated page saying it re-serialises at the
+  current rule and encodes no rule of its own — so it reads as the right tool for
+  a single drifted path as well as for a whole tree.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`dc0ba79`](https://github.com/en-dash-consulting/n-dx/commit/dc0ba79f4e48dae6b7d803d201bdcb69602f2023) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan now holds every cancelled or deleted item as an unapplied change that needs placement, unless its v1 parent already names its capability or constraint: fix- or work-shaped features, tasks under an area, PR-named epics and root-level items. Before, rules could place them on a capability.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`7964dc2`](https://github.com/en-dash-consulting/n-dx/commit/7964dc2f3c762f6f4aa77fc548f94bef3653ed3d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan now holds a cancelled or deleted child of a release epic as an unapplied change that needs placement, as it already does under areas. Before, rules could place it on a capability as an ordinary change.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`00ba308`](https://github.com/en-dash-consulting/n-dx/commit/00ba308ecb4ae783cdf4837686f3f8338ede1c0e) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `draftCapabilitySpecs`, the spec step of the v2 migration plan. For each planned capability it drafts a present-tense statement and EARS-style criteria from the feature and its applied history. A criterion whose words match test file names becomes an automated requirement; a wide tie links nothing. Code evidence from sourcevision is passed in by the caller. A draft leaves `reviewedHash` unset unless the capability is listed as reviewed with that draft's spec hash. A listed capability whose draft changed since approval stays unreviewed, with a note naming both hashes, and joins the review queue. Not wired to a command yet.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`3b4978e`](https://github.com/en-dash-consulting/n-dx/commit/3b4978ec0d50d08b56b93996a565f7cc148efd43) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `classifyV1Tree`, the first step of the v2 migration plan. It reads a v1 item tree and gives every item one entry with a v2 target, writing nothing. An epic naming a PR or issue becomes one change. An epic naming only a release dissolves into `plannedRelease`, and each of its children becomes a change. A release-named epic never becomes an area. Other epics become areas. Under an area, features become capabilities, constraints or changes from their titles, and each change is placed on a capability or constraint only when the placement rules find a clear leader. Otherwise it is held with `needsPlacement`. The plan also proposes the area list, flagging titles that are not job-shaped and areas with no product node, and the constraints. Not wired to a command yet.
+
+- [#741](https://github.com/en-dash-consulting/n-dx/pull/741) [`df54b01`](https://github.com/en-dash-consulting/n-dx/commit/df54b0162a38250827499fd1f545dd4689dc2505) Thanks [@endash-shal](https://github.com/endash-shal)! - `rex migrate-plan` fills each capability's code evidence from the sourcevision analysis. The spec drafter has always taken a capability-to-code-files map and no caller supplied one, so every capability in a migration plan reported "no code or test evidence" and the spec-drafting prompt was handed an empty list.
+  
+  `readCapabilityCodeFiles` reads the analysis off disk — rex reads the files, as `analyze/scanners.ts` already does, and never imports sourcevision. Two signals are unioned per item: the non-test files of the zone whose id or name best matches the item's **title**, and the files imported by the tests the item's criteria link to, matched by the drafter's own `linkedTests` so the two agree. Only the title decides a zone, because criteria words describe behaviour and reach zones the capability has nothing to do with. A tie across more than two zones contributes nothing, and the union is ranked by how much of the item each path names and capped at twenty files, since `codeFiles` is quoted verbatim into the drafting prompt.
+  
+  The map stays plan input: capabilities carry no `codeFiles` field, so the soft-frozen v2 schema is unchanged. With no analysis directory the reader returns an empty map and the plan is byte-identical to one planned before the reader existed.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`5032a7c`](https://github.com/en-dash-consulting/n-dx/commit/5032a7c9ff4346c62fc8898a32d7183d8cdc3f6d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - A release epic the v2 migration plan dissolves no longer becomes an alias of its first child, which sent a lookup of the old id to an arbitrary change. The plan summary lists each dissolved release (`dissolvedReleases`: old id, title, `plannedRelease`) so a lookup of the old id can say what it was.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`5292bdb`](https://github.com/en-dash-consulting/n-dx/commit/5292bdb577c696e8ed05a9a2de2cf42b9d3b13fb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan reads the caller's `productNames` in a feature title, so another repository's "Acme 2.1 search" feature is a change with `plannedRelease` 2.1 rather than a capability.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`65731af`](https://github.com/en-dash-consulting/n-dx/commit/65731afcf429ea011d2bb1ee4e5f537a6739b0e4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan can have Jev review it. Review runs when `rex.placement.models` is `jev` or `both`, or the `jevReview` option is set, and needs a TypeSafe key. Without a key the pass is skipped with one warning. Each item gets one Jev request (task class `prd.migrate.judge`) that batches its questions: a held item's kind and placement, whether an area's title names a job a user does, whether each criterion states product behaviour, and whether each linked test exercises its criterion. Each judged entry records its lowest confidence. The plan summary gains a review queue (held items first, then entries by ascending confidence) and counts of what Jev flagged and dropped. A test link Jev judges irrelevant is dropped only under `autoAccept: confident`. Otherwise it is flagged. A different kind or a process criterion is flagged, never applied. After Jev drops a link, review is re-checked against the approved spec hash, as after any redraft. Migrations may define `summarize`, which rebuilds the summary after every pass.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`8c6112e`](https://github.com/en-dash-consulting/n-dx/commit/8c6112e3182b7d624b8fc2ee6dbb84b411e203f7) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan can place the changes its rules hold with a model. A text pass (task class `prd.place`, on by default) and a Jev pass (when `rex.placement.models` is `jev` or `both` and a TypeSafe key is present) ask about each held change and decide through `decidePlacement`, so `rex.placement.autoAccept` applies as it does elsewhere. A proposed new capability or constraint is never accepted without a person. The plan file records every raw model answer, so a re-plan with a different accept rule does not ask again. With no model available, or `rulesOnly`, the plan is the rules-only plan. Migration passes now receive the plan context, and `merge` may be async. A placement question carries only the rules shortlist's capabilities, so renaming any other capability keeps the recorded answer, and a replay decides as the recording did. Not wired to a command yet.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`e5b9066`](https://github.com/en-dash-consulting/n-dx/commit/e5b90660d44136bc568935a636703065933c7b04) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan redrafts capability specs with a text model (task class `prd.spec`, on by default through `planSeams`, which replaces `placementSeams`). The model sees only the capability's item, its applied history, its code files and its linked tests. Every criterion cites the item it came from; one citing no source, or an item outside the capability, is rejected and the template criteria are kept with a note. The plan records the answers, so an unchanged re-run does not ask again. The template draft stays as the fallback and is fixed: no "The product provides …" statement (a note asks for one), grammatical EARS for verb-led criteria ("removes dead exports" becomes "The system shall remove dead exports"), process criteria (tests pass, docs updated, changeset added) left out, tests linked only within the packages of the capability's code files, and no `specReviewed` field.
+  
+  Specs are drafted once placement settles. The plan places held changes with the text model, then with Jev, then drafts the specs, then has the text model redraft them and Jev review them. So an applied change that the text or Jev pass places on a capability is among its sources, and a model criterion citing that change is accepted. Migrations may define ordered `stages`: model stages and deterministic `derive` stages. A model's stages share one recorded-answers map, and an unchanged question still reuses its recorded answer.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`91d20ad`](https://github.com/en-dash-consulting/n-dx/commit/91d20ad509f252d9d17f8128f1f2e5b8f3543609) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The migration plan's Jev review raises a note or flag only for answers at or above a confidence of 0.4 (`jevFlagMinConfidence` in the migration options changes it); weaker answers stay recorded on the entry. The review queue ranks held items first, then entries by number of confident flags, then by confidence, so an undecided answer no longer outranks a confident flag. The summary's flagged counts use the same threshold.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`1ffe0ca`](https://github.com/en-dash-consulting/n-dx/commit/1ffe0cae40b67858122ab14d26cdcb8b934afb22) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Give migrations their own home in `src/migrations/`, so a schema migration can be deleted as a unit. A migration plans from a source adapter rather than a tree type, through a pipeline of rules, then an optional text pass, then an optional Jev pass, each calling an injected seam. It writes a JSON plan file: a header (migration id, source digest, `cutAt`, passes and their models), entries keyed by source item id, and recorded model answers keyed by item id and content hash, so re-planning reuses the answer for an unchanged item. The v1-to-v2 plan modules moved into `migrations/v1-to-v2/` and are registered as the `v1-to-v2` migration. Not wired to a command yet.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`fa4d7e9`](https://github.com/en-dash-consulting/n-dx/commit/fa4d7e903e9a59a3549f98678483b49dceeb6c45) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex reshape --accept` on a v2 tree no longer fails when one product-layer proposal would make the drafted change unappliable, such as a move under an area that another proposal removes. That proposal is reported as not drafted, with apply's reason. The other proposals are still drafted, and the change-layer pass still runs.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177) Thanks [@dependabot](https://github.com/apps/dependabot)! - Production dependencies bumped: zod 4, ink 8, react 19.3, @anthropic-ai/sdk 0.131, @modelcontextprotocol/sdk 1.32.1 and pdfkit 0.20. TypeScript stays on 6.x because sourcevision parses source with its compiler API, which TypeScript 7 does not ship, and preact stays on 10.x until its web test and leave-guard changes are worked through. Schemas move to zod 4's two-argument `z.record`; reserved and loosely-typed state keys are declared optional, since zod 4 no longer treats a missing `z.unknown()` key as optional; and the SDLC evidence list keeps its at-least-one rule as a tuple so it still infers the non-empty type.
+
+- [#741](https://github.com/en-dash-consulting/n-dx/pull/741) [`70f49fa`](https://github.com/en-dash-consulting/n-dx/commit/70f49fa920586f70243c1089d33c5394e33f9f6e) Thanks [@endash-shal](https://github.com/endash-shal)! - `rex recommend --accept` and `rex analyze --accept` now serve a v2 PRD, creating a change per proposal instead of refusing. A v2 tree has no container above a change, so the proposal hierarchy does not cross: only the deepest node that names work becomes a change — a feature's tasks, or the feature when it proposed none, or the epic when it proposed no features. The run's epic and its zone+category features are not created.
+  
+  Each change goes through the same `rex add` door, so it lands in the Inbox needing placement and the rules rank the capability or constraint it amends or touches, printed with the `rex change place` line that records it. That is sourcevision's one door into the product map.
+  
+  The baseline a v1 accept writes — the items a scanner marks completed because the code already does them — is not written on v2. That is the product layer, which `rex migrate-plan` establishes and a change amends; `analyze` reports how many proposals it skipped for that reason rather than opening them as pending work nobody will do.
+  
+  Sourcevision's pull-request markdown no longer parses `.rex/prd.md` or `.rex/prd.json` directly. The epic resolver read them itself and fell back from one to the other; both are legacy formats a folder-tree or v2 project does not have, and the read was wrapped in a `catch` returning "no PRD". No user saw an empty Completed Work section from this: the only code path reaching it, `resolveWorkedEpicTitlesForRange`, has no caller. This removes the legacy parse from that helper — part of retiring the direct reads — so a future caller does not inherit the bug. It now goes through the same `rex tree --format=json` spawn the branch work collector uses.
+
+- [#653](https://github.com/en-dash-consulting/n-dx/pull/653) [`085b63d`](https://github.com/en-dash-consulting/n-dx/commit/085b63d208f9622328efd5ac6f2af18ca07c2846) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Tightens a v2 rule under the soft freeze: `ref-resolves` now reports a change that touches or modifies an area; touches and `modified` amendments must name a capability or constraint (`removed` and added-`under` may still name an area).
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`32e9aea`](https://github.com/en-dash-consulting/n-dx/commit/32e9aea4d296c7c799e880adfccfeaf055a97d2d) Thanks [@endash-shal](https://github.com/endash-shal)! - `hench show <run> --repoint` now resolves a commit whose object is gone, and
+  `get_token_usage` reports what a task actually cost.
+  
+  **Re-pointing from recorded facts.** A run record stores each commit's subject
+  and author date so a rewritten SHA can be matched to its twin. Those facts were
+  never read: rex answers "not in this repository" before any twin rule runs, and
+  its twin key is author *email* + author date + subject, which the record did
+  not carry. So the feature failed in precisely the case it was built for — a
+  pruned branch, a fresh clone, `git gc` after a squash merge. Run records now
+  carry `authorEmail`, and `repointCommits` takes an optional per-SHA `facts` map
+  it falls back on when git cannot resolve the SHA. The author-date-subject and
+  trailer-subject rules run from those facts; patch-id cannot, because it needs
+  the object itself. An unmatched SHA is still reported, never dropped.
+  
+  **Cost in the rollup.** `costUsd` was `0` on every tuple and nothing ever set
+  it, so `get_token_usage` reported zero cost for every PRD item. Each run is now
+  priced at the model it recorded, before the rollup sums — a task's Haiku and
+  Opus runs bill an order of magnitude apart, so one blended rate over the total
+  would be wrong for every item that mixed them. A run with no model, or one the
+  pricing table does not know, prices at the fallback rate, the same rate
+  `rex usage` quotes for it.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`039ee0c`](https://github.com/en-dash-consulting/n-dx/commit/039ee0c79a06fb4786790f233b79a1a53628ef4b) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex reshape` on a v2 tree now drafts a move or split of a product node whose body holds only the History section `rex change apply` writes; the copy's History names the original's id. Notes outside History still stop the move, with the reason.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`9b5f740`](https://github.com/en-dash-consulting/n-dx/commit/9b5f7404da93f402fb75bae6b0da0556909e63a5) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex reshape` on the product layer no longer drafts a merge that would lose data: a merged node with tags, notes outside History, requirements, dependsOn or appliesTo, or one another live node names, is skipped with the reason.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`f0a4b80`](https://github.com/en-dash-consulting/n-dx/commit/f0a4b802eb0e435afea4466de0e5af56cf7b73c3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex reshape`, `rex reorganize` and `rex prune` (consolidation and `--smart`) skip, with the reason, a merge that would fold away an applied change and a split, delete or collapse that would remove a change prune keeps; the rest of the batch still applies. The change-layer store refuses any write that removes a change prune keeps, so a retired product node keeps its status row.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`6e87f37`](https://github.com/en-dash-consulting/n-dx/commit/6e87f37a3943094dcf596e268b28c553be04cf1a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The migration plan treats a completed feature as a fix change, not a capability, when an adversarial review filed it (source, `severity:*` or review tag, or an area with that source) or its title states a defect ("silently", "does not", "never", "cannot", "can … instead of").
+
+- [#747](https://github.com/en-dash-consulting/n-dx/pull/747) [`4ffc297`](https://github.com/en-dash-consulting/n-dx/commit/4ffc29701453ef5e59ffa7d81d42c8be744b37f6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Four rex correctness fixes:
+  
+  - `rex usage` and the token budget preflight apply `rex.budget` from `.n-dx.json` (and from `.ndx/config.json` on the `.ndx/` layout). Before, `token-store` read the wrong directory and key, so the overrides were ignored.
+  - `computeLanding` takes the change rather than bare item ids, and an open change never reports as landed. `trailerIds`, exported from `public.ts`, now accepts any node with `id`, `aliases` and `children` (`Pick<RuleNode, "id" | "aliases" | "children">`). The widening is backward compatible.
+  - The v2 bundle export refusal names a child file the reader skipped as invalid, with its warning, instead of telling the operator to add a child back. The bundle format is unchanged.
+  - `FileStore` and `FolderTreeStore` save reports are project-relative on the `.ndx/` layout (`.ndx/rex/prd_tree/...`), so hench's completion commit stages the task's PRD edits instead of dropping them.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`b05a659`](https://github.com/en-dash-consulting/n-dx/commit/b05a6599554b5d7893b6735f16c01636c573f04d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex health` on a v2 tree now passes the project's releases (package.json version, every `plannedRelease` and `shippedIn`) to the tree rules, so `title-release-token` flags a change titled with one of them. A dependency version that is not a project release is still not flagged.
+
+- [#653](https://github.com/en-dash-consulting/n-dx/pull/653) [`5dbf308`](https://github.com/en-dash-consulting/n-dx/commit/5dbf3086350e1530202ba7ea565400a5f5384290) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex --help` now lists the `restore` and `codeowners` commands.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`4670da7`](https://github.com/en-dash-consulting/n-dx/commit/4670da73c3a43fb2616b0ed5f5d477373fff81e6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex reshape`, `rex reorganize` and `rex prune` are layer-aware on a v2 PRD. The change layer is restructured as on a v1 PRD; nothing under `product/` is written. On the product layer, reshape drafts accepted proposals as one change with removed and added amendments (a move or split that would drop a node's tags, body, requirements or dependsOn, or orphan a reference to it, is reported and not drafted), reorganize only reports, and prune does not apply. v1 trees behave as before.
+
+- [#800](https://github.com/en-dash-consulting/n-dx/pull/800) [`61954d9`](https://github.com/en-dash-consulting/n-dx/commit/61954d9dcdbf09d5d9f1899e4059ef22e0f657f1) Thanks [@endash-shal](https://github.com/endash-shal)! - Close the rex log follow-ups: `[dir]`, `--item`, `--format=json`, rotation race
+  
+  `ndx log <event> <dir>` refused when the current directory was not a project,
+  although the help documents the trailing `[dir]` and `rex log` has always read
+  it. The orchestrator checked `process.cwd()` for `.rex` before delegating, so
+  the documented form failed exactly where it was needed — a run from outside
+  the project. It now resolves the directory from the second positional, which
+  is where `rex log` reads it too.
+  
+  `ndx log --help` lists `--format=json`, which the command already forwarded.
+  
+  The workflow step and the `ndx-work` skill now show
+  `ndx log <event> --item=<task-id> --detail="..."`; without `--item` an entry
+  written through the CLI route is not tied to the task.
+  
+  Execution-log rotation took a stat and then a rename with nothing in between.
+  Every `rex log` / `ndx log` call is its own short-lived process, so two that
+  both saw an over-size log would both rename it: the first moved a megabyte of
+  history to `.1` and appended, then the second's rename overwrote that `.1`
+  with the single line the first had just written. The size is now re-read under
+  a lock, so the second writer sees the rotated file and does nothing. Appends
+  stay outside the lock, and a lock that cannot be taken appends without
+  rotating rather than failing.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`0316a48`](https://github.com/en-dash-consulting/n-dx/commit/0316a48dc8cead39507ed79811a0a0fcba6a2775) Thanks [@ryrykeith](https://github.com/ryrykeith)! - New `rex product show|edit` and `rex change place|apply` for a v2 PRD. On a v2 tree `rex add` (and `ndx add`) creates a change, or a task or subtask under `--parent`, and prints it with its suggested placement; a description becomes one change. `--criterion` stays a work item's acceptance criteria; a capability's capability criteria use `--capability-criterion`. v1 trees behave as before.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`23cb6f3`](https://github.com/en-dash-consulting/n-dx/commit/23cb6f36f4c3dcd33713c4201e58a8d5daa15291) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex prune` on a v2 tree keeps applied changes that carry removed or added amendments, so a retired product node keeps its status row. It reports what it kept and why.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`4448fe4`](https://github.com/en-dash-consulting/n-dx/commit/4448fe4bfd8822e722e4548f66e947a3fb91d306) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Add `rex release stamp <version>`: stamps `shippedIn` on every finished change that has landed on main since the last release tag, reading git only (tags, ancestry, `N-DX-Item` trailers), so any CI can run it. Under `rex.applyOn: release` it first applies completed changes to the product layer. A stamped change is never restamped. On a v1 tree it prints that there is nothing to stamp and exits 0. n-dx's Version Packages step now runs it and continues with a warning if it fails.
+
+- [#647](https://github.com/en-dash-consulting/n-dx/pull/647) [`0c0c861`](https://github.com/en-dash-consulting/n-dx/commit/0c0c861564998e76cc0b51a602cd95956a6fb4db) Thanks [@dnaniel](https://github.com/dnaniel)! - `@n-dx/rex` exports the v2 PRD model and what is derived from it: `loadPrdModel` and `prdLayout` (one reader for both layouts; a v1 tree reads as changes only), the v2 node and tree types, `indexTree`, `computeEdges`, `computeProductStatus`, `computeRealizedBy`, `deriveChangeKind`, and the product, capability and status report builders. Until now every one of these was internal, so a consumer of the product layer — the dashboard's Product, Changes and Capability views, or a projection of the graph into another tool — could reach them only through a `dist/*` import the package guidelines forbid. Zod schemas stay off the public surface.
+  
+  Also public: `loadTrailerCommits` (every `N-DX-Item` commit on main, now with its `subject`), `computeLandings`, and the release tags read once (`listReleaseTags`, one per version in creation order, a changesets monorepo's `<package>@X.Y.Z` tags folded to one) with the release each of many commits first shipped in (`releasesContaining`, the `resolveShippedIn` answer in one walk). The trailer, landing and commit-files caches rebuild once under the new format version.
+  
+  The v1-to-v2 plan's rules stage is public too: `classifyV1Tree` (where each v1 item lands in v2) and `draftCapabilitySpecs` (the template capability specs), with their types. Both are pure; nothing here writes.
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`e0ba4ae`](https://github.com/en-dash-consulting/n-dx/commit/e0ba4aeac84bb4ac6f6ec33334f469ba50c85c5b) Thanks [@endash-shal](https://github.com/endash-shal)! - Selection and completion run through the v2 rules.
+  
+  - On a v2 tree, `get_next_task` and `rex next` select through the change-layer rules (`findNextWork`): placed changes and their tasks, a change with no tasks as its own unit, never an Inbox change awaiting placement, and nothing another worktree has claimed. A claim on a change covers everything inside it at any depth, including the task a claimed task-less change splits into when `add_item` gives it its first task: selection skips that work, and `update_task_status` (to `in_progress`) and `claim_task` refuse it, naming the claimed change. A change that holds another change is a container, never a unit of work: selection descends into the nested change, `resolveWorkById` returns `null` for the container, and `claim_task` refuses it, naming the nested work to claim instead. The enclosing change's gates (placement, status, blockers) apply to everything inside it. v1 selection is unchanged.
+  - On a v2 tree, `update_task_status` and `rex update --status=completed` complete work through the change-layer rules, sharing one implementation in one PRD transaction. When the last live task of a pending change completes, the change completes too, and under `rex.applyOn: complete` (the default) its amendments apply to the product layer in the same write. Under `review` or `release` the change stays completed but unapplied. An `in_progress` change is never completed by its tasks ([#368](https://github.com/en-dash-consulting/n-dx/issues/368)). A change that needs placement is held open. A subtask completes its pending task when it is the last one. A change completes directly when its id is passed. A change holding an open nested change refuses to complete and writes nothing; completing the last open nested change completes each pending enclosing change in the same write and applies them innermost first. A task-less change that gains its first task still splits as before. v1 trees keep today's cascade.
+  - `get_prd_status` on a v2 tree counts capabilities and open changes under a nested area toward the top-level area's row.
+  - `ChangeLayerStore` keeps a save report on v2 trees, as `FileStore` does on v1: `takeSaveFileReport` returns the project-relative files under `product/` and `changes/` that its writes created, rewrote or deleted since the last take (a removed folder is listed by its files), then `null` until the next write. `completeV2Work` writes through the store's new `withModelTransaction`, so a completion and the product files its apply touched are in the report too. Hench can then commit just those files instead of all of `product/` and `changes/`. `writePrdModel`'s result gains `deletedFiles`.
+  - `enclosingChangeIds` is exported from the public entry, so a consumer that claims a task directly can refuse one inside a change another worktree holds.
+  - `@n-dx/rex`'s public entry exports the v2 runtime for hench and the dashboard: `prdLayout`, `loadPrdModel`, `withPrdModelTransaction`, `findNextWork`, `findActionableWork`, `resolveWorkById`, `findNextWorkTask`, `completedWorkIds`, `changeWorkShape`, `completeTask`, `completeChange`, `completeWork`, `completeV2Work`, `loadApplyOn`, `buildChangeBrief`, `renderChangeBrief`, `ChangeLayerStore` and their types. `ChangeCompletionResult` gains `applies`.
+  
+  MCP fields added on a v2 tree (optional, absent on v1; MCP tool shapes are soft-frozen since 0.9.0):
+  
+  - `get_next_task`: `item.type`, `item.displayId` and the item's other v2 fields (`slug`, `touches`, …), as stored.
+  - `get_next_task`: `parentChain[].type`.
+  - `get_next_task`: `changeId`, the change the selected unit belongs to.
+  - `update_task_status` (status `completed`): `changeId`, the change the item belongs to (itself when it is a change).
+  - `update_task_status` (status `completed`): `changeCompleted`, whether that change is now completed.
+  - `update_task_status` (status `completed`): `applied`, whether its amendments were applied in this write.
+  - `update_task_status` (status `completed`): `reason`, why the change was held open or left unapplied.
+  - `update_task_status` (status `completed`): `warnings`, `rex.applyOn` config warnings.
+  - `update_task_status` (status `completed`): on a v2 tree `autoCompleted` lists each change completed by the cascade as `{ id, title, level }`; the projected v2 item fields that `autoCompleted` entries carry (see the store-resolution note) apply to the other statuses.
+  
+  CLI JSON fields added on a v2 tree: `rex next --format=json` gains `changeId`; `rex update --format=json` (status `completed`) gains `changeId`, `changeCompleted`, `applied` and `reason`.
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`27babd6`](https://github.com/en-dash-consulting/n-dx/commit/27babd637fe4677309053a15db9efc7b16743bce) Thanks [@endash-shal](https://github.com/endash-shal)! - Every PRD tool opens a v2 tree, and none can split it.
+  
+  - Store resolution is layout-aware. On a v2 PRD (`product/` present) `resolveStore` returns the change-layer store, so commands that open the PRD through it read and write the change layer instead of failing with "Rex directory not found". The new `resolveV1Store` keeps `migrate-slugs` v1-only. The v1 store refuses to read or write a v2 tree, with an error naming the v2 layout. The "Run 'n-dx init'" hint appears only when the project has no PRD in either layout.
+  - Nothing splits a v2 tree: `rex init` no longer scaffolds `prd_tree/` beside `product/`, and `rex migrate-to-folder-tree`, `migrate-to-md` and `migrate-folder-tree-filenames` refuse on a v2 tree, writing nothing. A stray `.rex/prd.json` beside a v2 tree is no longer migrated into `prd_tree/` (the migration reports `reason: "v2-layout"`), and a stray `prd_tree/` no longer overrides the change layer in `status`, `tree`, `next` and `validate`.
+  - The rex MCP tools serve a v2 PRD: `edit_item`, `move_item`, `merge_items`, `claim_task`, `release_task`, `verify_criteria`, `facets`, `health`, `reorganize` and `get_token_usage`. On a v2 tree `move_item` follows node types (a task moves between changes; a change never goes under a task), `merge_items` merges sibling changes only (carrying their `touches`, and refusing to absorb a change that carries amendments), `edit_item` refuses `level`, and `claim_task` claims a task or a change with no tasks.
+  - The rex CLI serves a v2 tree: `status`, `tree`, `update`, `move`, `remove`, `ready`, `verify`, `fix`, `validate` and `report`. `rex move` and MCP `move_item` can nest a change under another change. `rex analyze`, `rex recommend --accept` and `rex restore` refuse on a v2 tree with a sentence naming what to use instead. `ndx status` and `ndx ci` pass on a v2 project. On a v2 tree `rex validate` skips the v1 hierarchy-placement and empty-container checks, so a change nested under a change passes, and `rex reorganize` and MCP `reorganize` no longer propose v1 orphaned-feature or single-child collapses.
+  - `restoreFromBackup` and `getAvailableBackups` refuse on a v2 tree by throwing `V2RestoreRefusedError` (exported from `public.ts`), so the dashboard's restore route can no longer swap a v1 snapshot in beside `product/`. `rex restore` prints the same sentence as before.
+  - `mergeChanges` and `validateChangesMerge` (exported from `public.ts`) are the merge for a v2 change layer: they validate, carry the absorbed changes' `touches` and ids onto the target, then merge. `merge_items` and an accepted `rex reorganize` / MCP `reorganize` merge both use them, so a reorganize merge on a v2 tree no longer drops the absorbed change's `touches` and aliases, and never absorbs a change that carries amendments (that proposal fails with `Skipped:`).
+  - An accepted `rex reshape` merge (and the `add` reshape phase) on a v2 tree goes through `mergeChanges` too: the absorbed change's `touches`, id, display id and aliases carry to the survivor. A merge of tasks, of non-siblings, or one that would absorb a change carrying amendments is skipped with a proposal error and writes nothing, as `merge_items` refuses it.
+  - v1 trees behave as before.
+  
+  MCP fields added on a v2 tree (optional, absent on v1; MCP tool shapes are soft-frozen since 0.9.0):
+  
+  - `merge_items`: on a v2 tree the absorbed changes' ids and display ids (and their former aliases) are recorded as `aliases` on the target (the target item's `aliases` field, optional, absent on v1), so `get_item` and `N-DX-Item` trailers naming an absorbed change still resolve to the target.
+  - `edit_item`: `item.type`, `item.displayId` and the item's other v2 fields (`slug`, `touches`, `amends`, …), as stored.
+  - `move_item`: `type`.
+  - `claim_task`: `type`.
+  - `update_task_status`: items listed in `autoCompleted` carry the projected item's v2 fields (`type`, `slug`, `displayId`, `body`, `amends`, …), as stored.
+  
+  MCP values changed on a v2 tree (the field is unchanged and v1 answers as before):
+  
+  - `get_capabilities`: `adapter` reads `"v2-change-layer"` and `supportsWatch` reads `false`, the change-layer store's values.
+  
+  `rex validate` on a v2 tree no longer runs the `tree identity`, `tree slug convention` and `tree slug rule marker` checks against a stray `.rex/prd_tree/`.
+  
+  `rex report` on a v2 tree no longer raises `hierarchy placement` or `empty containers` for a change nested under a change or a change with no task, so `--fail-on-error` exits 0.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`57b79b5`](https://github.com/en-dash-consulting/n-dx/commit/57b79b5facab35ec2d0529b3f5a598d8321d086d) Thanks [@endash-shal](https://github.com/endash-shal)! - Run records keep each commit's author date, and `hench show <run> --repoint`
+  finds where a run's commits went after a rebase.
+  
+  A run record names commits — `startHead`, everything the run committed, and
+  the reviewer's `repairCommit` — and a stack rebase or squash merge rewrites
+  all of them at once. On 2026-10-07 every commit cited in the PR 27/8 and
+  [#548](https://github.com/en-dash-consulting/n-dx/issues/548)/[#549](https://github.com/en-dash-consulting/n-dx/issues/549) run records stopped being on main, and the record had nothing left
+  to find them by.
+  
+  Each commit a run produces now stores its author date beside its SHA and
+  subject, and the baseline gets the same treatment in a new `startHeadCommit`.
+  A rebase preserves author email, author date and subject, so those three are
+  what identify the twin.
+  
+  `hench show <run-id> --repoint` reports what moved, what was already on the
+  ref, and what could not be matched and why; `--write` applies it. The matching
+  rules come from rex's `repointCommits`, now part of its public API — a
+  hench-local copy would be a second definition of commit identity across a
+  rewrite, free to disagree with rex's about the same pair of SHAs. An
+  unmatched SHA is always reported and never dropped from the record.
+  
+  Records written before this change are still readable, and still re-point: the
+  rules read the old SHA's facts from git, so the stored copy is an aid rather
+  than a requirement.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`c8c81b2`](https://github.com/en-dash-consulting/n-dx/commit/c8c81b2d3741448f67bafb995134c2706dbd6aab) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Spec drafts name the actor and the behaviour: the prompt forbids opening a criterion with "The system shall ensure that" and leaves out decisions, documentation edits and process steps, and a merged "The system shall ensure that the system keeps …" is stored as "The system shall keep …".
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`a23735c`](https://github.com/en-dash-consulting/n-dx/commit/a23735ccadf4deade1eb3280be4da2c9aa8f58e3) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The migration plan keeps a model's own subject in a capability criterion. "The inventory lists every prompt surface" is stored as "The inventory shall list every prompt surface", and a sentence whose verb cannot be converted is stored as written, instead of being wrapped in "The system shall ensure that". The spec-draft prompt now asks for "shall" in every criterion.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`e605e9f`](https://github.com/en-dash-consulting/n-dx/commit/e605e9f3bf02b0d724ea72b7818d2f4533b195bb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The migration plan's present-tense statement check accepts a statement that names "the task", "the change", "the item" or "the PR", or opens with a code span such as "`ndx self-heal` persists …". Those are product vocabulary in a PRD tool; only "this feature/task/change/…" still marks work. Capabilities whose model statement was rejected no longer fall back to the template statement.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`2f124e3`](https://github.com/en-dash-consulting/n-dx/commit/2f124e378f0e63471d5d44e1cd5f241e25698dfe) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The run block gains reviewMode and reviewVendor; add_item and edit_item accept them. A task can now be pair-reviewed by a chosen vendor whatever the project default is. `ndx work` takes `--review-mode=<off|self|pair>` and `--reviewer=<claude|codex>`, and applies them as flag, then the task's `run`, then `hench.review.*`, then the default. A saved value the run cannot honour (a reviewer equal to the executor, or pair on an executor with no CLI counterpart) is skipped with a warning and never stops a loop. `ndx work --resolve` reports `reviewMode` and `reviewVendor` under `resolved`, each with its source, and `review` now holds only `rounds`.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`d0398e5`](https://github.com/en-dash-consulting/n-dx/commit/d0398e50aa2749b6384d3e5e9f4b5a602b80d73d) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: fixture git repositories take their identity, line-ending and signing config from one gitconfig that the shared vitest setup writes and points `GIT_CONFIG_GLOBAL` at, instead of two to five `git config` spawns per repository. hench's `initGitFixtureRepo` is now a bare `git init`. No production code changed.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`7be556b`](https://github.com/en-dash-consulting/n-dx/commit/7be556b29f11a83557c1a704240f6e2838a8072e) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: the slowest e2e and integration files build their fixture once and copy it per test, or run the CLI once per fixture state and assert many times, instead of spawning the CLI or git per test. Same tests, a third to a half of the wall time. No production code changed.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`8228a7e`](https://github.com/en-dash-consulting/n-dx/commit/8228a7eb48c34ea6eb394a1b56d2736c7e759553) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: each package's vitest config splits its files into a shared-worker project and an isolated one for files that mock modules or globals, through `tests/vitest-isolation.mjs`. Same tests, less per-file worker and module-graph cost. No production code changed.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`173f13e`](https://github.com/en-dash-consulting/n-dx/commit/173f13e17743c32f839c1619fc221e7d8c584148) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: vitest keeps console output for failing tests and drops it for passing ones (`silent: "passed-only"`). A green run of the monorepo no longer prints thousands of lines of task briefs, init summaries and fixture warnings. No production code changed.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`bf98c36`](https://github.com/en-dash-consulting/n-dx/commit/bf98c36b8d80364c2a745ff3d2594349be9fa7ae) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 rule `title-release-token` is now a warning. `rex health` still prints a title that names a project release or a PR, but it no longer counts as a tree rule error, so it cannot fail the command or `ndx ci`. `rex add`, `rex change place` and MCP `add_item` / `place_change` refuse only on errors, so they now also accept a title naming a PR (such as "PR 12 follow-up"), which they refused before. Titles naming a release were already accepted there.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`7a6eeab`](https://github.com/en-dash-consulting/n-dx/commit/7a6eeabfe2a97d511ebbc980f0e1155134e88d48) Thanks [@endash-shal](https://github.com/endash-shal)! - Count each assistant message's tokens once, and price a task's runs in the dashboard.
+  
+  Claude's `--output-format stream-json` emits one `assistant` line per *content block*, not per message, and every line repeats the finished message in full — `usage` included. A turn that writes a sentence and calls three tools arrives as four lines carrying one turn's tokens four times. Claude Code's session transcripts have the same shape. Both of hench's live ingestion paths summed line by line, so every run's totals were multiplied by the turn's average block count: on a measured session, 234 usage-bearing lines carrying 57 distinct messages, a 4.27x over-count that recorded 23.5M cache-read tokens against the 5.5M actually read.
+  
+  `UsageMessageFilter` in `@n-dx/llm-client` holds the identity rule — the first sighting of a `message.id` counts, later ones do not. It is applied in `cli-loop`'s token extraction (both the event-pipeline and legacy paths) and in the transcript reader behind `hench record`. Repeats are flagged rather than dropped in the transcript, because cursors and marks address positions by the per-line uuid; removing lines would move every boundary and invalidate every cursor file on disk. Usage carrying no message id is still counted — a vendor that stamps none would otherwise lose its tokens entirely.
+  
+  The dashboard then had a second problem: it led with a single token total that counted cache reads alongside everything else. Cache reads bill at roughly a tenth of the input rate and outnumber the other three classes by an order of magnitude, so the figure read as tens of millions for work that cost a few dollars. The per-task aggregator now keeps the four billed classes apart instead of collapsing them to one number, and prices each run at the model that run recorded — one task's Haiku and Opus runs are no longer billed at a single blended rate. Cost rolls up through the PRD tree alongside tokens, and the tree's usage column leads with it; the token accounting moves to the cell tooltip, which reports newly-processed tokens and cache reads separately so the price and the token count can be reconciled.
+  
+  Two errors in the price table itself turned up on the way. `claude-sonnet-5` was priced at $3/$15 — the rates of the Sonnet 4.6 it replaced — overstating every Sonnet 5 figure by 50%; it is the toolkit's standard tier *and* the fallback every unrecognised model is priced at, so the error reached far more surfaces than the runs that named it. And `claude-fable-5-1` was absent, so a Fable 5.1 run silently priced at the Sonnet fallback; its cache-read rate is $0.25/MTok rather than the 0.1x the other Claude rows follow.
+  
+  Runs already recorded keep the totals they were written with — the run files do not retain message ids, so the over-count cannot be undone after the fact. Runs recorded from here on are correct.
+
+- [#799](https://github.com/en-dash-consulting/n-dx/pull/799) [`c4a1a61`](https://github.com/en-dash-consulting/n-dx/commit/c4a1a614884022d74c477dc3d792550f7e7735cc) Thanks [@endash-shal](https://github.com/endash-shal)! - Attribute commits whose `N-DX-Item` sits above the closing `Co-Authored-By`
+  
+  Git reads trailers only from a commit message's final paragraph, so an
+  `N-DX-Item` separated from the closing `Co-Authored-By` by a blank line was
+  invisible to attribution. On this repository that hid 57 commits — about 7% of
+  all history carrying the trailer — from `ndx migrate --plan` and the product
+  layer's code evidence. Fixing the writers only helps new commits, so those
+  would never have been attributable.
+  
+  The reader now recovers an item from the trailing run of trailer-shaped
+  paragraphs, stopping at the first prose paragraph, and never from a merge
+  commit, whose body quotes the messages it brings in. A trailer quoted
+  mid-message is still ignored. The trailer-commit cache version is bumped, so
+  the first read after upgrading rescans.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`844b636`](https://github.com/en-dash-consulting/n-dx/commit/844b63698f9ccda4f81b83362257b16dfcb065c2) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex tree-diff` reports the product map delta on a v2 tree: capabilities and constraints added, modified (title, statement or capability criteria) and retired, beside the change list (`map` in `--json`). `--format=markdown` renders the report as a host-neutral pull-request comment, and `--out=<file>` writes it to a file (refused inside `.rex/`). v1 diffs are unchanged.
+
+- [#747](https://github.com/en-dash-consulting/n-dx/pull/747) [`af89c92`](https://github.com/en-dash-consulting/n-dx/commit/af89c92e0b643d37b1380bd4eb4c383a32168c67) Thanks [@ryrykeith](https://github.com/ryrykeith)! - v2 completion and selection hold up.
+  
+  - A v2 change can no longer get stuck after being applied while in progress. `rex change apply` and MCP `apply_change` now refuse a change whose live tasks or nested changes are not all completed, naming them, and write nothing. Completing a change that was already applied (`rex update --status=completed`, `update_task_status`) closes it with `completedAt` and does not apply its amendments again.
+  - `ndx work --task=<change>` on a v2 tree no longer runs a change that still has open tasks. It runs and claims the change's next actionable task, skipping tasks another worktree has claimed, and never claims the change itself; `--resolve` reports that task. If every open task is claimed elsewhere, blocked or not actionable, the run is refused and names each task with the reason. A change with no tasks still runs as one unit. rex: `resolveWorkById` resolves such a change to its next runnable task (new `excludeIds` option), and `openChangeTasks` lists a change's open tasks.
+  - A kept v2 completion's run error no longer puts files that were already dirty before the run into its `git add` / `git commit` commands. It lists them apart, as dirty before the run and not part of the task.
+  - hench's `task-lookup.ts` imports rex through `src/prd/rex-gateway.ts`, and the domain-isolation policy now also fails on a dynamic `import("@n-dx/rex")` in hench outside the gateway.
+
+- [#747](https://github.com/en-dash-consulting/n-dx/pull/747) [`20c1d2b`](https://github.com/en-dash-consulting/n-dx/commit/20c1d2be598d61a4cb1b055d8abd28b8127618a8) Thanks [@ryrykeith](https://github.com/ryrykeith)! - v2 MCP tools take display ids and report v2 health.
+  
+  - On a v2 tree, the MCP tools `update_task_status`, `edit_item`, `move_item` (the item and the new parent), `merge_items`, `claim_task` and `release_task`, and the `rex update` command, accept a change's display id (`CH-1`) or alias as `get_item` does, instead of refusing it as "not found". The tools' inputs are wider; no output changes.
+  - On a v2 tree, the MCP `health` tool adds a `v2` field to its response: the tree rules, reader warnings and landing check that `rex health` shows. Every existing field is unchanged, and v1 responses are identical. A v2 project with no `.rex/config.json` gets its score and the v2 report on default thresholds.
+  - `rex health` and MCP `health` on a v2 tree no longer fail when `package.json` is not valid JSON; the title release-token rule skips and the rest of the report is returned.
+  - hench: `ndx work --resolve` reports a subtask or a container change with the run's own message ("is a subtask … Run the task instead", "holds other changes") rather than `task-not-found`.
+
+- [#789](https://github.com/en-dash-consulting/n-dx/pull/789) [`0766fc9`](https://github.com/en-dash-consulting/n-dx/commit/0766fc96d9e266814c57c5bb29d3ae1b41ad99e7) Thanks [@endash-shal](https://github.com/endash-shal)! - `verify --run-tests` now quotes the test paths it appends to the configured test command.
+  
+  The test command is a shell string by contract, so the discovered paths appended to it were parsed by that shell as well. Those paths are filenames found by walking the repository, and `&` separates commands in both `sh` and `cmd.exe` — so a file whose *name* carried a command ran it on the machine of whoever invoked verify. That reaches further than it first appears: MCP `verify_criteria` defaults `runTests` to true, and the dashboard's requirements view calls the same path, so merely opening a repository and checking coverage was enough. A filename also passes review far more easily than an edit to the configured test command.
+  
+  Paths are now quoted for the platform's shell — single quotes on POSIX, double quotes under `cmd.exe`. The selected files are unchanged and still passed to the runner; only their quoting differs. A path that quoting cannot make safe is dropped instead of run: `cmd.exe` expands `%VAR%` even inside double quotes, which no quoting closes, and no legitimate test file needs a `%` in its name.
+- Updated dependencies [[`02aa8af`](https://github.com/en-dash-consulting/n-dx/commit/02aa8afe08842e6d56b65f52d3364007485b72c2), [`0fa0251`](https://github.com/en-dash-consulting/n-dx/commit/0fa0251bb16de71d69aabbe9243a86bf2325dadb), [`1923d4d`](https://github.com/en-dash-consulting/n-dx/commit/1923d4d06a947f1d6b296acbf7418e694c304cad), [`cb236e9`](https://github.com/en-dash-consulting/n-dx/commit/cb236e93e169b0f10301f47ffa26e0bf681c9259), [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1), [`d7c49c3`](https://github.com/en-dash-consulting/n-dx/commit/d7c49c3927f08f5743f43274034dee29f6843ecb), [`2cd2e40`](https://github.com/en-dash-consulting/n-dx/commit/2cd2e40b5927eb23a9633aaddc37bbce559c3101), [`090e111`](https://github.com/en-dash-consulting/n-dx/commit/090e111efc45edac8a0bcdf420fd55b2baabc117), [`0562de4`](https://github.com/en-dash-consulting/n-dx/commit/0562de42cb52dda567b9b1358d987e380519b51a), [`65731af`](https://github.com/en-dash-consulting/n-dx/commit/65731afcf429ea011d2bb1ee4e5f537a6739b0e4), [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177), [`8228a7e`](https://github.com/en-dash-consulting/n-dx/commit/8228a7eb48c34ea6eb394a1b56d2736c7e759553), [`173f13e`](https://github.com/en-dash-consulting/n-dx/commit/173f13e17743c32f839c1619fc221e7d8c584148), [`7a6eeab`](https://github.com/en-dash-consulting/n-dx/commit/7a6eeabfe2a97d511ebbc980f0e1155134e88d48), [`e41d31f`](https://github.com/en-dash-consulting/n-dx/commit/e41d31fff91f9599ffc1e85d38cf1fad8da9e162), [`c357d36`](https://github.com/en-dash-consulting/n-dx/commit/c357d364ff0609368c12f8a797e468960fed53f6), [`6f9db39`](https://github.com/en-dash-consulting/n-dx/commit/6f9db391476e7a2afff41389cb7f6d6dd85f6fa1)]:
+  - @n-dx/llm-client@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes

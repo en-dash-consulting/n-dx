@@ -3,53 +3,17 @@
  * Replaces the Claude-based phase 1 with pure TypeScript.
  */
 
-import { readFile, readdir, stat } from "node:fs/promises";
-import {join, relative, extname, basename} from "node:path";import { createHash } from "node:crypto";
-import { PROJECT_DIRS, isVerbose, verbose } from "@n-dx/llm-client";
+import { readFile, stat } from "node:fs/promises";
+import { join, extname, basename } from "node:path";
+import { createHash } from "node:crypto";
+import { isVerbose, verbose } from "@n-dx/llm-client";
 import type { FileEntry, FileRole, Inventory } from "../schema/index.js";
 import { sortInventory, toCanonicalJSON } from "../util/sort.js";
 import { computeInventorySummary } from "../util/merge.js";
-import { toPosix } from "../util/paths.js";
+import { loadIgnoreFilter, projectSkip, walkProjectFiles } from "../util/project-walk.js";
 import { detectLanguage as detectProjectLanguage, loadInventoryConfig } from "../language/detect.js";
-import { typescriptConfig } from "../language/typescript.js";
-import { csharpConfig } from "../language/csharp.js";
-import type { LanguageConfig } from "../language/registry.js";
-
-// ── Skip patterns ────────────────────────────────────────────────────────────
-
-/** Always-skipped directories regardless of language config. */
-const BASE_SKIP_DIRS: ReadonlySet<string> = new Set([
-  ".git",
-  // n-dx tooling state, not user source — exclude from the inventory entirely
-  // so generated PRD markdown / logs don't skew the Overview language stats.
-  PROJECT_DIRS.SOURCEVISION,
-  PROJECT_DIRS.REX,
-  PROJECT_DIRS.HENCH,
-]);
-
-/**
- * Vendored third-party dependency directories, excluded from the inventory in
- * every project regardless of detected language. These hold code the project
- * did not author (like `node_modules`), so scanning them inflates language
- * stats and pollutes source-logic analysis. Per-language configs still add
- * their own vendored dirs (e.g. Go's `vendor/`, Python's virtualenvs); this
- * universal set covers cross-language conventions and the JS ecosystem's own
- * vendored dirs, which a non-Go/Python project would otherwise never skip.
- * Matched by exact directory name at any depth, so a plural `vendors/` dir or
- * a `vendor-utils.ts` source file is unaffected.
- */
-const VENDOR_SKIP_DIRS: ReadonlySet<string> = new Set([
-  "vendor",
-  "vendored",
-  "third_party",
-  "third-party",
-  "thirdparty",
-  "bower_components",
-  "jspm_packages",
-  "web_modules",
-  "Godeps",
-  ".yarn",
-]);
+import { sourcevisionVersion } from "../language/package-paths.js";
+import { csharpConfig, javaConfig, pythonConfig, typescriptConfig, terraformConfig, isTerraformFile, type LanguageConfig } from "@n-dx/lang-kit";
 
 // ── Language detection ───────────────────────────────────────────────────────
 
@@ -133,6 +97,47 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   ".astro": "Astro",
 };
 
+/** Inventory language names of `extensions`. */
+function languageNames(extensions: Iterable<string>): Set<string> {
+  const names = new Set<string>();
+  for (const ext of extensions) {
+    const lang = EXT_TO_LANGUAGE[ext];
+    if (lang) names.add(lang);
+  }
+  return names;
+}
+
+/**
+ * Languages parsed only through an opt-in pack with no fallback parser
+ * (Java: `@n-dx/lang-java`; Python: `@n-dx/lang-python`). `javaSecondaryConfig`
+ * shares `javaConfig`'s id and extensions, so a Java secondary is covered too.
+ * The inventory phase runs before anything loads the pack, so it leaves them
+ * out of `analysedLanguages`; listing them would claim analysis the pack may
+ * not do. The imports phase sets them with {@link withPackAnalysedLanguages}
+ * from the packs that ran.
+ */
+const PACK_ONLY_CONFIGS: readonly LanguageConfig[] = [javaConfig, pythonConfig];
+
+const packOnlyLanguages = (configs: readonly LanguageConfig[]): Set<string> =>
+  languageNames(configs.flatMap((c) => [...c.parseableExtensions]));
+
+/**
+ * `summary` with its pack-only languages in `analysedLanguages` set to those
+ * whose pack is in `packIds` (the packs that ran) and that have files here:
+ * one whose pack ran is added, one whose pack did not is removed, as on an
+ * imports-only re-run after the pack is gone. `summary` itself when that
+ * changes nothing.
+ */
+export function withPackAnalysedLanguages(summary: Inventory["summary"], packIds: readonly string[]): Inventory["summary"] {
+  const packOnly = packOnlyLanguages(PACK_ONLY_CONFIGS);
+  const ran = packOnlyLanguages(PACK_ONLY_CONFIGS.filter((c) => packIds.includes(c.id)));
+  const listed = summary.analysedLanguages ?? [];
+  const kept = listed.filter((lang) => !packOnly.has(lang) || ran.has(lang));
+  const added = Object.keys(summary.byLanguage).filter((lang) => ran.has(lang) && !listed.includes(lang));
+  if (added.length === 0 && kept.length === listed.length) return summary;
+  return { ...summary, analysedLanguages: [...kept, ...added].sort() };
+}
+
 export function detectLanguage(filePath: string): string {
   const name = basename(filePath);
   const ext = extname(filePath).toLowerCase();
@@ -141,6 +146,7 @@ export function detectLanguage(filePath: string): string {
   if (name === "Makefile" || name === "GNUmakefile") return "Makefile";
   if (name === "Dockerfile" || name.startsWith("Dockerfile.")) return "Dockerfile";
   if (name === "Vagrantfile") return "Ruby";
+  if (isTerraformFile(name)) return "Terraform";
   if (name === "Rakefile" || name === "Gemfile") return "Ruby";
   if (name === "Justfile") return "Just";
   if (name === "CMakeLists.txt" || ext === ".cmake") return "CMake";
@@ -154,7 +160,7 @@ export function detectLanguage(filePath: string): string {
 // ── Role classification ──────────────────────────────────────────────────────
 
 // CONFIG_FILENAMES — now sourced from languageConfig.configFilenames.
-// See packages/sourcevision/src/language/ for per-language config sets.
+// See packages/lang-kit/src/ for per-language config sets.
 
 /**
  * Convention for build/tooling config artifacts named `<tool>.config.<ext>`
@@ -236,20 +242,61 @@ const PROGRAMMING_LANGUAGES = new Set([
   "Perl",
   "Shell",
   "SQL",
+  "Terraform",
   "Vue",
   "Svelte",
   "Astro",
 ]);
 
-export function classifyRole(filePath: string, language: string, langConfig?: LanguageConfig): FileRole {
+/** Bytes of a file's start the generated-header rules look at. */
+const GENERATED_HEADER_BYTES = 8192;
+
+/** Leading text of `buf`, or undefined when no header rule applies to this file's extension. */
+function readHeaderText(filePath: string, buf: Buffer, config: LanguageConfig): string | undefined {
+  const ext = extname(filePath).toLowerCase();
+  if (!config.generatedHeaders?.some((rule) => rule.extensions.has(ext))) return undefined;
+  return buf.subarray(0, GENERATED_HEADER_BYTES).toString("utf-8");
+}
+
+/** True when `head` carries a generated-file header a rule for this file's extension recognises. */
+function hasGeneratedHeader(filePath: string, head: string, config: LanguageConfig): boolean {
+  const ext = extname(filePath).toLowerCase();
+  return (config.generatedHeaders ?? []).some((rule) => {
+    if (!rule.extensions.has(ext)) return false;
+    const end = rule.endOfHeader ? head.search(rule.endOfHeader) : -1;
+    return rule.pattern.test(end === -1 ? head : head.slice(0, end));
+  });
+}
+
+/**
+ * @param head leading text of the file; lets language header rules
+ *   (`LanguageConfig.generatedHeaders`) mark generated files path patterns miss.
+ */
+export function classifyRole(filePath: string, language: string, langConfig?: LanguageConfig, head?: string): FileRole {
   const name = basename(filePath);
   const lower = filePath.toLowerCase();
   const ext = extname(filePath).toLowerCase();
 
   const config = langConfig ?? typescriptConfig;
 
-  // 1. Test — language-specific patterns (e.g. _test.go for Go, .test./.spec. for TS)
-  if (config.testFilePatterns.some((pat) => pat.test(filePath))) {
+  // 1. Test — language-specific patterns (e.g. _test.go for Go, .test./.spec. for TS).
+  //    Terraform's own patterns (.tftest.hcl, tests/ and test/ directories) never
+  //    decide a non-Terraform file.
+  const terraformPattern = (pat: RegExp): boolean => terraformConfig.testFilePatterns.includes(pat);
+  // 1a. Terraform (.tf, .tfvars, terragrunt.hcl, .tftest.hcl) is config unless a
+  //     test pattern matches it. Another language's pattern always counts
+  //     (tests/fixtures/infra/main.tf in a TS repo stays in test quarantine);
+  //     Terraform's own patterns count only in a Terraform-first repo, so a
+  //     Terraform file under tests/ keeps the test role there (decision 8) and
+  //     repos led by another language keep their roles.
+  if (language === "Terraform") {
+    const terraformFirst = config.id === terraformConfig.id;
+    const isTest = config.testFilePatterns.some(
+      (pat) => (terraformFirst || !terraformPattern(pat)) && pat.test(filePath),
+    );
+    return isTest ? "test" : "config";
+  }
+  if (config.testFilePatterns.some((pat) => !terraformPattern(pat) && pat.test(filePath))) {
     return "test";
   }
 
@@ -257,7 +304,8 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
   if (
     LOCKFILE_NAMES.has(name) ||
     lower.includes("generated") ||
-    config.generatedFilePatterns.some((pat) => pat.test(filePath))
+    config.generatedFilePatterns.some((pat) => pat.test(filePath)) ||
+    (head !== undefined && hasGeneratedHeader(filePath, head, config))
   ) {
     return "generated";
   }
@@ -265,6 +313,7 @@ export function classifyRole(filePath: string, language: string, langConfig?: La
   // 3. Config — language-specific filenames + universal heuristics
   if (
     config.configFilenames.has(name) ||
+    config.configFilePatterns?.some((pat) => pat.test(filePath)) ||
     CONFIG_CONVENTION_PATTERN.test(name) ||
     name.startsWith("tsconfig") ||
     name === ".env" ||
@@ -361,170 +410,13 @@ export function isBinary(buf: Buffer): boolean {
   return check.includes(0);
 }
 
-// ── Ignore filter ────────────────────────────────────────────────────────────
-
-interface IgnoreRule {
-  regex: RegExp;
-  negated: boolean;
-  dirOnly: boolean;
-}
-
-function compilePattern(pattern: string): IgnoreRule {
-  let negated = false;
-  let dirOnly = false;
-
-  // Leading ! means negation
-  if (pattern.startsWith("!")) {
-    negated = true;
-    pattern = pattern.slice(1);
-  }
-
-  // Trailing / means directory-only
-  if (pattern.endsWith("/")) {
-    dirOnly = true;
-    pattern = pattern.slice(0, -1);
-  }
-
-  // Leading / means anchored to root; otherwise matches at any depth
-  const anchored = pattern.startsWith("/");
-  if (anchored) {
-    pattern = pattern.slice(1);
-  }
-
-  // Convert gitignore glob to regex
-  let regex = "";
-  let i = 0;
-  while (i < pattern.length) {
-    const ch = pattern[i];
-    if (ch === "*") {
-      if (pattern[i + 1] === "*") {
-        if (pattern[i + 2] === "/") {
-          // **/ matches zero or more directories
-          regex += "(?:.*/)?";
-          i += 3;
-          continue;
-        }
-        // ** at end or mid-pattern matches everything
-        regex += ".*";
-        i += 2;
-        continue;
-      }
-      regex += "[^/]*";
-      i++;
-    } else if (ch === "?") {
-      regex += "[^/]";
-      i++;
-    } else if (ch === "[") {
-      // Pass through character classes
-      const close = pattern.indexOf("]", i + 1);
-      if (close === -1) {
-        regex += "\\[";
-        i++;
-      } else {
-        regex += pattern.slice(i, close + 1);
-        i = close + 1;
-      }
-    } else if (".+^${}()|\\".includes(ch)) {
-      regex += "\\" + ch;
-      i++;
-    } else {
-      regex += ch;
-      i++;
-    }
-  }
-
-  // If pattern contains a slash, it's always anchored
-  const hasSlash = pattern.includes("/");
-  if (anchored || hasSlash) {
-    regex = "^" + regex;
-  } else {
-    // Matches at any depth: can appear after a /
-    regex = "(?:^|/)" + regex;
-  }
-
-  regex += "$";
-
-  return { regex: new RegExp(regex), negated, dirOnly };
-}
-
-export class IgnoreFilter {
-  private rules: IgnoreRule[] = [];
-
-  add(content: string): void {
-    for (const raw of content.split("\n")) {
-      const line = raw.trim();
-      if (!line || line.startsWith("#")) continue;
-      this.rules.push(compilePattern(line));
-    }
-  }
-
-  ignores(path: string): boolean {
-    const isDir = path.endsWith("/");
-    const testPath = isDir ? path.slice(0, -1) : path;
-
-    let ignored = false;
-    for (const rule of this.rules) {
-      if (rule.dirOnly && !isDir) continue;
-      if (rule.regex.test(testPath)) {
-        ignored = !rule.negated;
-      }
-    }
-    return ignored;
-  }
-}
-
-export async function loadIgnoreFilter(rootDir: string): Promise<IgnoreFilter> {
-  const filter = new IgnoreFilter();
-
-  for (const name of [".gitignore", ".sourcevisionignore"]) {
-    try {
-      const content = await readFile(join(rootDir, name), "utf-8");
-      filter.add(content);
-    } catch {
-      // File doesn't exist — skip
-    }
-  }
-
-  return filter;
-}
-
-// ── File discovery ───────────────────────────────────────────────────────────
-
-async function walkDir(
-  dir: string,
-  rootDir: string,
-  ig: IgnoreFilter,
-  skipDirs: ReadonlySet<string>,
-  acceptFile?: (relPath: string) => boolean,
-): Promise<string[]> {
-  const files: string[] = [];
-  const entries = await readdir(dir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    if (skipDirs.has(entry.name)) continue;
-    if (entry.name === ".gitkeep") continue;
-
-    const fullPath = join(dir, entry.name);
-    const relPath = toPosix(relative(rootDir, fullPath));
-
-    if (entry.isDirectory()) {
-      if (ig.ignores(relPath + "/")) continue;
-      const sub = await walkDir(fullPath, rootDir, ig, skipDirs, acceptFile);
-      files.push(...sub);
-    } else if (entry.isFile()) {
-      if (ig.ignores(relPath)) continue;
-      // Code-only filter — skip non-code files before they are stat'd/read.
-      if (acceptFile && !acceptFile(relPath)) continue;
-      files.push(relPath);
-    }
-  }
-
-  return files;
-}
-
 // ── Incremental types ────────────────────────────────────────────────────────
 
 export interface InventoryOptions {
+  /**
+   * Entries reused as they are for files whose mtime and size match. Pass one
+   * only when it was made under the same {@link inventoryFingerprint}.
+   */
   previousInventory?: Inventory;
   /** Pre-resolved language config. When omitted, detectLanguage() auto-detects. */
   languageConfig?: LanguageConfig;
@@ -577,7 +469,7 @@ export async function analyzeInventory(
   const extraSkipDirs = options?.extraSkipDirs ?? inventoryConfig.extraSkipDirs ?? [];
 
   // Build skip set: always-skipped dirs + vendored deps + language-specific dirs + user extras
-  const skipDirs = new Set([...BASE_SKIP_DIRS, ...VENDOR_SKIP_DIRS, ...langConfig.skipDirectories, ...extraSkipDirs]);
+  const skip = projectSkip(langConfig, extraSkipDirs);
 
   // Extensions rejected by the code-only filter below, tallied by extension —
   // surfaced on the summary as `skippedExtensions` so a project whose files
@@ -598,7 +490,11 @@ export async function analyzeInventory(
   };
 
   const ig = await loadIgnoreFilter(absDir);
-  const filePaths = await walkDir(absDir, absDir, ig, skipDirs, acceptFile);
+  // Code-only filter applied before files are stat'd/read.
+  const filePaths: string[] = [];
+  for await (const relPath of walkProjectFiles(absDir, absDir, ig, skip)) {
+    if (acceptFile(relPath)) filePaths.push(relPath);
+  }
 
   const prev = options?.previousInventory;
   const prevMap = new Map<string, FileEntry>();
@@ -641,7 +537,7 @@ export async function analyzeInventory(
     const buf = await readFile(fullPath);
     const hash = createHash("sha256").update(buf).digest("hex");
     const language = detectLanguage(relPath);
-    const role = classifyRole(relPath, language, langConfig);
+    const role = classifyRole(relPath, language, langConfig, readHeaderText(relPath, buf, langConfig));
     const category = deriveCategory(relPath);
 
     let lineCount = 0;
@@ -704,16 +600,13 @@ export async function analyzeInventory(
   // detected primary language's own parser handles. Mirrors the extension set
   // analyzeImports() builds in imports.ts. Intersected with byLanguage so the
   // list only names languages actually present in this inventory.
-  const analysedExtensions = new Set<string>([
-    ...typescriptConfig.parseableExtensions,
-    ...csharpConfig.parseableExtensions,
-    ...langConfig.parseableExtensions,
-  ]);
-  const analysedLanguageNames = new Set<string>();
-  for (const ext of analysedExtensions) {
-    const lang = EXT_TO_LANGUAGE[ext];
-    if (lang) analysedLanguageNames.add(lang);
-  }
+  // Pack-only languages are left out; see PACK_ONLY_CONFIGS.
+  const packOnlyExtensions = new Set(PACK_ONLY_CONFIGS.flatMap((c) => [...c.parseableExtensions]));
+  const analysedLanguageNames = languageNames(
+    [...typescriptConfig.parseableExtensions, ...csharpConfig.parseableExtensions, ...langConfig.parseableExtensions].filter(
+      (ext) => !packOnlyExtensions.has(ext),
+    ),
+  );
   summary.analysedLanguages = Object.keys(summary.byLanguage)
     .filter((lang) => analysedLanguageNames.has(lang))
     .sort();
@@ -726,6 +619,32 @@ export async function analyzeInventory(
   }
 
   return result;
+}
+
+/** JSON replacer that writes a language config's sets, maps and patterns in a stable form. */
+function canonicalConfigValue(_key: string, value: unknown): unknown {
+  if (value instanceof RegExp) return `/${value.source}/${value.flags}`;
+  if (value instanceof Set) return [...value].map(String).sort();
+  if (value instanceof Map) return [...value.entries()].sort(([a], [b]) => String(a).localeCompare(String(b)));
+  if (typeof value === "function") return undefined;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(obj).sort().map((k) => [k, obj[k]]));
+  }
+  return value;
+}
+
+/**
+ * Fingerprint of everything that decides a cached {@link FileEntry}: the
+ * sourcevision version (the classifier's code) and the language config's
+ * rules (test, generated, config and entry patterns, header rules, skip
+ * rules). A previous inventory is reusable only under the same fingerprint;
+ * the caller stores it outside inventory.json.
+ */
+export function inventoryFingerprint(langConfig: LanguageConfig, version: string = sourcevisionVersion()): string {
+  return createHash("sha256")
+    .update(JSON.stringify({ version, config: langConfig }, canonicalConfigValue))
+    .digest("hex");
 }
 
 export { toCanonicalJSON };

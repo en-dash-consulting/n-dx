@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// sourceCompatibility = '8' is commented out and must not be read
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation "com.google.guava:guava:33.2.1-jre" /* pinned */
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.14.0'
+    implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2023.0.1"))
+    implementation project(':lib')
+    runtimeOnly "com.example:generated:$generatedVersion"
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2', {
+        exclude group: 'org.hamcrest'
+    }
+}

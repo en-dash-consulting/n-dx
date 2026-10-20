@@ -160,12 +160,15 @@ export function detectHandlerName(sourceText: string): string | null {
 
 // ── Main detection ──────────────────────────────────────────────────────────
 
+/** Roles whose files are never scanned for server routes; pack routes from them are dropped too. */
+export const ROUTE_SKIP_ROLES: ReadonlySet<string> = new Set(["test", "config", "docs"]);
+
 /**
  * Heuristic: should we scan this file for server routes?
  * Checks filename patterns and file content indicators.
  */
 function isLikelyRouteFile(filePath: string, role: string, archetypeMap?: Map<string, string | null>): boolean {
-  if (role === "test" || role === "config" || role === "docs") return false;
+  if (ROUTE_SKIP_ROLES.has(role)) return false;
   // Check archetype classification first
   if (archetypeMap?.size) {
     const archetype = archetypeMap.get(filePath);
