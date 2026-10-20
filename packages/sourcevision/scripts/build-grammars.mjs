@@ -165,12 +165,15 @@ export function extractTarGz(gz, dest) {
   }
 }
 
-async function buildGrammar(cli, name, { repo, version, sha256: expected }) {
-  const archive = await fetchVerified(
+function fetchSource(name, { repo, version, sha256: expected }) {
+  return fetchVerified(
     `https://github.com/${repo}/archive/refs/tags/v${version}.tar.gz`,
     expected,
     `${name}-${version}.tar.gz`,
   );
+}
+
+function buildGrammar(cli, name, { version }, archive) {
   const source = join(BUILD_ROOT, "src", `${name}-${version}`);
   rmSync(source, { recursive: true, force: true });
   extractTarGz(archive, source);
@@ -185,14 +188,19 @@ async function buildGrammar(cli, name, { repo, version, sha256: expected }) {
 
 async function main() {
   const cli = await installCli();
-  for (const [name, grammar] of Object.entries(GRAMMARS)) {
-    await buildGrammar(cli, name, grammar);
-  }
+  // Every download happens before the first build. A build blocks the event
+  // loop for minutes (the CLI fetches and unpacks wasi-sdk on a cold cache),
+  // and on Windows the next fetch after it fails ("fetch failed"), so a second
+  // grammar never got its source.
+  const archives = new Map();
+  for (const [name, grammar] of Object.entries(GRAMMARS)) archives.set(name, await fetchSource(name, grammar));
+  for (const [name, grammar] of Object.entries(GRAMMARS)) buildGrammar(cli, name, grammar, archives.get(name));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : error);
+    if (error instanceof Error && error.cause) console.error("  cause:", error.cause);
     process.exit(1);
   });
 }
