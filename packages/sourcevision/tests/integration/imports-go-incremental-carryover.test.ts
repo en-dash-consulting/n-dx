@@ -50,7 +50,9 @@ describe("analyzeImports incremental carry-over — Go package directories", () 
     await writeFile(join(dir, "name.go"), "package main\n\nfunc Name() {}\n");
     const inventory = await analyzeInventory(dir, { languageConfig: goConfig });
     const full = await analyzeImports(dir, inventory, { language: "go" });
-    expect(full.edges.some((e) => e.from === "util/root.go" && e.to === "")).toBe(true);
+    // The regex parser points this edge at "" (the root package); the Go pack
+    // resolves it to the files that declare the names used.
+    expect(full.edges.some((e) => e.from === "util/root.go")).toBe(true);
 
     const incremental = await analyzeImports(dir, inventory, {
       language: "go",
