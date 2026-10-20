@@ -37,4 +37,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Normalise path separators before the Terraform model test filters caches](./normalise-path-separators-before-the.md) | completed |
 | [Pin the Maven and Gradle build goldens to LF so Windows checkouts match](./pin-the-maven-and-gradle-build-goldens.md) | completed |
 | [Say that sv pack add --from runs the bundle's entry module while validating it](./say-that-sv-pack-add-from-runs-the.md) | pending |
-| [Stop collectTree following symlinks when it bundles a pack](./stop-collecttree-following-symlinks.md) | pending |
+| [Stop collectTree following symlinks when it bundles a pack](./stop-collecttree-following-symlinks.md) | completed |
