@@ -42,6 +42,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Web Dashboard Accessibility (a11y)](./web-dashboard-accessibility-a11y/index.md) | completed |
 | [Changes view: time-ordered default with recency desaturation](./changes-view-time-ordered-default-with.md) | deferred |
 | [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
+| [Condense the Workflow settings page into a responsive grid of fields](./condense-the-workflow-settings-page.md) | pending |
 | [Dashboard action icons render at a readable size from one shared SVG icon set](./dashboard-action-icons-render-at-a.md) | completed |
 | [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | completed |
 | [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |
@@ -57,4 +58,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Re-snapshot surviving run files before the no-change short-circuit](./re-snapshot-surviving-run-files-before.md) | completed |
 | [Reconcile the null-hash contract in both run-file change detectors](./reconcile-the-null-hash-contract-in.md) | completed |
 | [Standardize Rex Analysis and Hench Optimization pages to shared dashboard UI styles](./standardize-rex-analysis-and-hench.md) | completed |
-| [Condense the Workflow settings page into a responsive grid of fields](./condense-the-workflow-settings-page.md) | pending |
+| [Stack the dashboard's floating notices and status pills like toasts instead of overlapping](./stack-the-dashboard-s-floating-notices.md) | pending |
