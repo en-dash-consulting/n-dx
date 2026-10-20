@@ -2,12 +2,11 @@
 id: "9af1c83c-cf4d-4f8f-b343-6857cb6b66a6"
 level: "epic"
 title: "CLI & Developer Tools"
-status: "completed"
+status: "pending"
 startedAt: "2026-04-02T17:55:36.327Z"
-completedAt: "2026-10-16T06:09:44.057Z"
 endedAt: "2026-10-16T06:09:44.057Z"
 description: "Command-line interface: error handling, validation, formatting, help navigation, command aliases, configuration management, and CI pipeline."
-lastModified: "2026-10-16T06:09:44.648Z"
+lastModified: "2026-10-16T23:10:42.449Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -62,7 +61,9 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Let a project opt in to restricted-import rules in ndx ci](./let-a-project-opt-in-to-restricted.md) | completed |
 | [`ndx ci` architecture-policy step always fails: ci.js child_process allowlist has drifted from the e2e test's](./ndx-ci-architecture-policy-step-always.md) | completed |
 | [`ndx ci` fails any user project that imports child_process: its allowlist only names n-dx's own files and cannot be configured](./ndx-ci-fails-any-user-project-that.md) | completed |
+| [ndx ci gateway-imports step scans only .ts files, so a .js or .mjs file that bypasses a gateway passes](./ndx-ci-gateway-imports-step-scans-only.md) | pending |
 | [`ndx ci` reports restricted imports as "skipped" when .n-dx.json is not valid JSON, so configured rules silently stop applying](./ndx-ci-reports-restricted-imports-as.md) | completed |
+| [`ndx ci` restricted-import scan silently skips an unreadable directory outside git, so an enforced rule passes unread](./ndx-ci-restricted-import-scan-silently.md) | pending |
 | [`ndx ci` restricted-import scan walks gitignored build output and agent worktrees, reporting false violations](./ndx-ci-restricted-import-scan-walks.md) | completed |
 | [`ndx move <id> [dir]` checks the current directory for .rex instead of the directory it names](./ndx-move-id-dir-checks-the-current.md) | completed |
 | [`node packages/core/ci.js .` is a silent no-op, yet `pnpm verify` and CONTRIBUTING.md run the CI gate that way](./node-packages-core-ci-js-is-a-silent.md) | completed |
