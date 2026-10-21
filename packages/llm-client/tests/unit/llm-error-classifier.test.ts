@@ -208,7 +208,7 @@ describe("classifyLLMError", () => {
   // The sentinel sits at the end of the message, so this path reads the whole
   // message rather than a bounded window, and has to stay linear on its own.
   describe("sentinel extraction on pathological input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
-    it("is linear on a long run of spaces before the sentinel", async () => {
+    it("stays within the hang budget on a long run of spaces before the sentinel", async () => {
       const err = new Error(`Invalid JSON in LLM response${" ".repeat(20_000)}[ndx-debug:x]`);
       const r = await callWithinBudget<typeof classifyLLMError>(CLASSIFIER, "classifyLLMError", err);
       expect(r.category).toBe("parse");
@@ -217,7 +217,7 @@ describe("classifyLLMError", () => {
       expect(r.message).not.toContain("[ndx-debug:");
     });
 
-    it("is linear on a long run of spaces with no sentinel", async () => {
+    it("stays within the hang budget on a long run of spaces with no sentinel", async () => {
       const err = new Error(`Invalid JSON in LLM response${" ".repeat(20_000)}[ndx-debug:x`);
       const r = await callWithinBudget<typeof classifyLLMError>(CLASSIFIER, "classifyLLMError", err);
       expect(r.category).toBe("parse");
@@ -517,18 +517,22 @@ describe("isAuthError", () => {
   // where vitest's per-test timeout never fires, and the helper fails the
   // test by name instead. Each expected value is what the signature gave
   // before the gaps were bounded.
+  // Only the 'invalid api ' case fails on revert: the old pattern was cubic and
+  // took about 20 s here. The quadratic ones ran in under 200 ms before the
+  // rewrite, so their budget cases are hang guardrails, not proofs of linearity;
+  // the bounded-gap tables above are what pin the new patterns.
   describe("on pathological input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
-    it("is linear on 'invalid api ' repeated with no 'key'", async () => {
+    it("finishes within budget, where the old cubic pattern took 20 s, on 'invalid api ' repeated with no 'key'", async () => {
       const text = "invalid api ".repeat(2000);
       await expect(callWithinBudget<typeof isAuthError>(CLASSIFIER, "isAuthError", text)).resolves.toBe(false);
     });
 
-    it("is linear on 'authentication' repeated with no outcome word", async () => {
+    it("stays within the hang budget on 'authentication' repeated with no outcome word", async () => {
       const text = "authentication".repeat(2000);
       await expect(callWithinBudget<typeof isAuthError>(CLASSIFIER, "isAuthError", text)).resolves.toBe(false);
     });
 
-    it("is linear on 'key' repeated with no 'expired' or 'invalid'", async () => {
+    it("stays within the hang budget on 'key' repeated with no 'expired' or 'invalid'", async () => {
       const text = "key".repeat(10000);
       await expect(callWithinBudget<typeof isAuthError>(CLASSIFIER, "isAuthError", text)).resolves.toBe(false);
     });
@@ -681,22 +685,22 @@ describe("parseAuthPayload", () => {
   // ── linearity (see the isAuthError block for why these run in a worker) ──
 
   describe("on pathological input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
-    it("is linear on 'invalid api ' repeated with no 'key'", async () => {
+    it("finishes within budget, where the old cubic pattern took 20 s, on 'invalid api ' repeated with no 'key'", async () => {
       const text = "invalid api ".repeat(2000);
       await expect(callWithinBudget<typeof parseAuthPayload>(CLASSIFIER, "parseAuthPayload", text, "claude")).resolves.toBeNull();
     });
 
-    it("is linear on 'authentication' repeated with no outcome word", async () => {
+    it("stays within the hang budget on 'authentication' repeated with no outcome word", async () => {
       const text = "authentication".repeat(2000);
       await expect(callWithinBudget<typeof parseAuthPayload>(CLASSIFIER, "parseAuthPayload", text, "claude")).resolves.toBeNull();
     });
 
-    it("is linear on 'key' repeated with no 'expired'", async () => {
+    it("stays within the hang budget on 'key' repeated with no 'expired'", async () => {
       const text = "key".repeat(10000);
       await expect(callWithinBudget<typeof parseAuthPayload>(CLASSIFIER, "parseAuthPayload", text, "claude")).resolves.toBeNull();
     });
 
-    it("is linear on 'unauthorized ' repeated with no object word", async () => {
+    it("stays within the hang budget on 'unauthorized ' repeated with no object word", async () => {
       const text = "unauthorized ".repeat(2000);
       await expect(callWithinBudget<typeof parseAuthPayload>(CLASSIFIER, "parseAuthPayload", text, "claude")).resolves.toBeNull();
     });
