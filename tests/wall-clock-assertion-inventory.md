@@ -150,6 +150,9 @@ than scaling it" — and every one of these is named for a complexity claim.
 | `packages/hench/tests/unit/cli/commands/run-loop.test.ts:85,99` | `expect(elapsed).toBeLessThan(50 or 200 * BUDGET_MULTIPLIER)` |
 | `packages/web/tests/unit/server/routes-search.test.ts:288` | `expect(roundTripMs).toBeLessThan(500 * BUDGET_MULTIPLIER)` |
 | `packages/web/tests/unit/server/search-index.test.ts:550` | `expect(searchElapsed).toBeLessThan(200 * BUDGET_MULTIPLIER)` |
+| `tests/unit/file-permissions.test.js:89` | `expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER)` — bounds a hang in the `icacls` ACE regex on a 200k-repeat `:(` line. Technique 1 does not apply: the cost is the regex engine's backtracking, which nothing in the call can count, and a ratio on sub-millisecond work is unreliable (TESTING.md, rule 2). Measured: 19,888 ms with `[^)]` (the regression it guards), 0.8 ms with `[^()]`, against a 5 s default budget. |
+| `tests/unit/web-hub-mode.test.js:66` | `expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER)` — bounds a hang in `slugifyProjectId`'s trailing trim on a 100k-repeat interior `-.` run. Same reasoning as the row above. Measured: 25,333 ms with `[-.]+$`, 0.7 ms with the lookbehind, against a 5 s default budget. |
+| `packages/web/tests/unit/hub/new-project.test.ts:143` | `expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER)` — twin of the `web-hub-mode` row for the hub's copy of `slugifyProjectId`; same input, same measurements. |
 
 ---
 

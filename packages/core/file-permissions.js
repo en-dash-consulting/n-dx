@@ -53,7 +53,10 @@ export function parseIcaclsOutput(output, path) {
     // ("NT AUTHORITY\SYSTEM"), so match the flag groups from the right. A flag
     // group never contains "(" either; excluding it keeps the match linear on
     // a line of alternating ":(" (quadratic with `[^)]`, since every "(" could
-    // then start a group that swallows the rest of the line).
+    // then start a group that swallows the rest of the line). Same result on
+    // every icacls line; the strings the two forms disagree on — a "(" inside
+    // a flag group, or ":(" inside an identity — are ones icacls never prints,
+    // and they now parse as no ACE rather than as a malformed one.
     const match = line.match(/^(.*?):((?:\([^()]*\))+)$/);
     if (!match) continue;
 

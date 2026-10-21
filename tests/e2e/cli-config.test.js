@@ -469,20 +469,25 @@ describe("n-dx config", () => {
     // segment assigned on every object in the CLI process before this guard;
     // the hench variant landed `constructor: { prototype: … }` in
     // .hench/config.json. Both project-section and package-config paths are
-    // covered, and the files are compared byte for byte because a refused set
-    // must not even re-serialize them.
+    // covered, plus the llm flat-map branch of `splitSettingPath`, and the
+    // files are compared byte for byte because a refused set must not even
+    // re-serialize them. The routes row carries a valid tier, `light`: with
+    // `x` the tier validator refused it first (naming the key and so the
+    // segment), and the row held with the guard removed; with `light` the
+    // unguarded path created `routes`, assigned the no-op `__proto__`,
+    // rewrote .n-dx.json and exited 0.
     it.each([
-      ["llm.__proto__.polluted", "__proto__"],
-      ["llm.routes.__proto__", "__proto__"],
-      ["hench.constructor.prototype.polluted", "constructor"],
-    ])("refuses %s rather than walking onto Object.prototype, and writes nothing", async (key, segment) => {
+      ["llm.__proto__.polluted", "x", "__proto__"],
+      ["llm.routes.__proto__", "light", "__proto__"],
+      ["hench.constructor.prototype.polluted", "x", "constructor"],
+    ])("refuses %s rather than walking onto Object.prototype, and writes nothing", async (key, value, segment) => {
       const sharedPath = join(tmpDir, ".n-dx.json");
       const henchPath = join(tmpDir, ".hench", "config.json");
       await writeFile(sharedPath, JSON.stringify({ llm: { vendor: "claude" } }, null, 2) + "\n");
       const sharedBefore = await readFile(sharedPath);
       const henchBefore = await readFile(henchPath);
 
-      const stderr = runFail([key, "x", tmpDir]);
+      const stderr = runFail([key, value, tmpDir]);
 
       expect(stderr).toContain(segment);
       expect(stderr).toContain(key.slice(key.indexOf(".") + 1));

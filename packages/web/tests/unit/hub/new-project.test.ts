@@ -19,6 +19,9 @@ import {
   defaultParentDir,
 } from "../../../src/hub/new-project.js";
 
+/** TESTING.md, Family 2: every absolute time budget is scaled through this. */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
 describe("validateProjectName", () => {
   it("accepts an ordinary folder name", () => {
     expect(validateProjectName("my-project")).toBeNull();
@@ -126,15 +129,18 @@ describe("project ids", () => {
     expect(slugifyProjectId("...")).toBe("project");
   });
 
-  // Twin of the core assertion: the trailing trim is pinned to the start of a
-  // `-.` run, so an interior run is scanned once rather than from every
-  // position, and the slug is unchanged.
-  it("keeps an interior -. run and trims the edges without quadratic backtracking", () => {
+  // Twin of the core assertion in tests/unit/web-hub-mode.test.js: the
+  // trailing trim is pinned to the start of a `-.` run, so an interior run is
+  // scanned once rather than from every position, and the slug is unchanged.
+  // A hang guardrail on a complexity claim, scaled per TESTING.md Family 2.
+  // Measured at this length: 25,333 ms with `[-.]+$`, 0.7 ms with the
+  // lookbehind, against 250 ms × 20 = 5 s by default.
+  it("keeps an interior -. run and trims the edges within the scaled linear budget", () => {
     expect(slugifyProjectId("-.-.app-.-.")).toBe("app");
-    const interior = `a${"-.".repeat(25_000)}b`;
+    const interior = `a${"-.".repeat(100_000)}b`;
     const start = performance.now();
     expect(slugifyProjectId(interior)).toBe(interior);
-    expect(performance.now() - start).toBeLessThan(250);
+    expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER);
   });
 
   it("uses the bare slug when nothing holds it", () => {
