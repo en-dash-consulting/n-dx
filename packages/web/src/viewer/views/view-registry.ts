@@ -28,6 +28,7 @@ import {
   MapPanel,
   LanguagesPanel,
   NextStepsPanel,
+  DeliveryPanel,
   Graph,
   IsoMapView,
   ZonesView,
@@ -156,6 +157,7 @@ function renderPanel(panel: StagePanelId, opened: boolean, grid: TileGridApi, ct
       : h(CodebaseStats, { data: ctx.data });
     case "next-steps": return h(NextStepsPanel, { embedded: true });
     case "languages": return h(LanguagesPanel, { data: ctx.data, opened });
+    case "delivery": return h(DeliveryPanel, { analyzedAt: ctx.data.manifest?.analyzedAt ?? null, opened });
   }
 }
 

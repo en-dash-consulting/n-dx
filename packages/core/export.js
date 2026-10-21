@@ -513,7 +513,11 @@ export async function runExport(args) {
 
   // ── Step 1: Copy sourcevision data files ───────────────────────────────
   console.log("[export] copying sourcevision data...");
-  const svDataFiles = ["manifest.json", "inventory.json", "imports.json", "zones.json", "components.json", "callgraph.json"];
+  const svDataFiles = [
+    "manifest.json", "inventory.json", "imports.json", "zones.json", "components.json", "callgraph.json",
+    // The Analyze dashboard's Delivery & infrastructure tile reads these two.
+    "readiness.json", "infrastructure.json",
+  ];
   const copiedFiles = [];
   for (const file of svDataFiles) {
     if (copyIfExists(join(svDir, file), join(outDir, "data", file))) {
