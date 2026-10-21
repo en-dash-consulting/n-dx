@@ -175,8 +175,13 @@ function boundForClassification(message: string): string {
  * "invalid api " repeated to 48 kB took 59 s to fail to match. A bounded gap
  * is tried at most 80 ways per start position, so the match is linear in the
  * window.
+ *
+ * `api_key_invalid` is Google's `google.rpc.ErrorInfo.reason` for a rejected
+ * key. It arrives in a 400 whose message says "API key not valid" (no
+ * "invalid"), pretty-printed with the reason on its own line, so neither
+ * word-order alternative reaches it.
  */
-const INVALID_API_KEY = /invalid[^\n]{0,80}?api[^\n]{0,80}?key|invalid_api_key/i;
+const INVALID_API_KEY = /invalid[^\n]{0,80}?api[^\n]{0,80}?key|invalid_api_key|api_key_invalid/i;
 
 /**
  * Detect whether an error message signals an authentication or session-loss

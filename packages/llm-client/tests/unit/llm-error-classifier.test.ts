@@ -464,6 +464,7 @@ describe("isAuthError", () => {
       ["authentication failed", "authentication failed"],
       ["Authentication error: token invalid", "authentication invalid"],
       ["unauthorized", "bare unauthorized"],
+      ["\"reason\": \"API_KEY_INVALID\"", "Google's ErrorInfo reason for a rejected key"],
     ])("returns true for '%s' (%s)", (input) => {
       expect(isAuthError(input)).toBe(true);
     });
@@ -619,6 +620,29 @@ describe("parseAuthPayload", () => {
 
   it("returns null for empty input", () => {
     expect(parseAuthPayload("", "claude")).toBeNull();
+  });
+
+  // Google answers a wrong API key with a 400 whose message says "API key not
+  // valid" (no "invalid") and whose API_KEY_INVALID reason sits on its own
+  // line of a pretty-printed body — no status code and no word-order signature
+  // reaches it, so the reason token is a signature of its own.
+  it("detects Google's pretty-printed 400 API_KEY_INVALID body and extracts its message", () => {
+    const body = JSON.stringify({
+      error: {
+        code: 400,
+        message: "API key not valid. Please pass a valid API key.",
+        status: "INVALID_ARGUMENT",
+        details: [{
+          "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+          reason: "API_KEY_INVALID",
+          domain: "googleapis.com",
+        }],
+      },
+    }, null, 2);
+    const r = parseAuthPayload(`Gemini API error 400: ${body}`, "google");
+    expect(r).not.toBeNull();
+    expect(r?.httpStatus).toBeNull();
+    expect(r?.authReason).toBe("INVALID_ARGUMENT: API key not valid. Please pass a valid API key.");
   });
 
   // ── reason extraction from JSON payloads ──────────────────────────

@@ -5,8 +5,58 @@ import {
   parseGeminiTokenUsage,
   validateGeminiModelId,
 } from "../../src/google-api-provider.js";
-import { ClaudeClientError } from "../../src/types.js";
+import { AuthFailureError, ClaudeClientError } from "../../src/types.js";
 import type { LLMProvider } from "../../src/provider-interface.js";
+
+/**
+ * The body Google sends for a wrong API key: HTTP 400, not 401, with the
+ * `API_KEY_INVALID` reason in `details[]` and a message that never says
+ * "invalid". Pretty-printed as the real service prints it, so the status and
+ * the reason sit on different lines.
+ */
+const GOOGLE_API_KEY_INVALID_BODY = JSON.stringify(
+  {
+    error: {
+      code: 400,
+      message: "API key not valid. Please pass a valid API key.",
+      status: "INVALID_ARGUMENT",
+      details: [
+        {
+          "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+          reason: "API_KEY_INVALID",
+          domain: "googleapis.com",
+          metadata: { service: "generativelanguage.googleapis.com" },
+        },
+      ],
+    },
+  },
+  null,
+  2,
+);
+
+/** A 400 that is not about the key: Google's shape for a malformed request. */
+const GOOGLE_BAD_REQUEST_BODY = JSON.stringify(
+  {
+    error: {
+      code: 400,
+      message: "Invalid JSON payload received. Unknown name \"contents\" at 'generation_config'.",
+      status: "INVALID_ARGUMENT",
+      details: [{ "@type": "type.googleapis.com/google.rpc.BadRequest", fieldViolations: [] }],
+    },
+  },
+  null,
+  2,
+);
+
+/** Mock fetch with a response whose `text()` is exactly `bodyText`. */
+function mockFetchRaw(bodyText: string, status: number): void {
+  globalThis.fetch = vi.fn().mockResolvedValue({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => JSON.parse(bodyText),
+    text: async () => bodyText,
+  });
+}
 
 // ── resolveGoogleApiKey ───────────────────────────────────────────────────
 
@@ -383,19 +433,62 @@ describe("createGoogleApiProvider — complete()", () => {
     expect(result.tokenUsage).toBeUndefined();
   });
 
-  it("throws ClaudeClientError with reason 'auth' on 401", async () => {
-    mockFetchResponse({ error: { code: 401, message: "API_KEY_INVALID" } }, 401);
+  // Google rejects a wrong key with a 400, not a 401 — see
+  // GOOGLE_API_KEY_INVALID_BODY. The user must still get the re-auth guidance.
+  it("throws AuthFailureError with re-auth guidance on Google's 400 API_KEY_INVALID", async () => {
+    mockFetchRaw(GOOGLE_API_KEY_INVALID_BODY, 400);
 
     const provider = createGoogleApiProvider({
       googleConfig: { api_key: "AIza-bad" },
     });
 
-    try {
-      await provider.complete({ prompt: "Hi", model: "gemini-2.5-pro" });
-    } catch (err) {
-      expect((err as ClaudeClientError).reason).toBe("auth");
-      expect((err as ClaudeClientError).retryable).toBe(false);
-    }
+    const err = await provider.complete({ prompt: "Hi", model: "gemini-2.5-pro" })
+      .then(() => { throw new Error("expected complete() to reject"); }, (e: unknown) => e);
+    expect(err).toBeInstanceOf(AuthFailureError);
+    const auth = err as AuthFailureError;
+    expect(auth.reason).toBe("auth");
+    expect(auth.retryable).toBe(false);
+    expect(auth.provider).toBe("google");
+    expect(auth.authReason).toContain("API key not valid");
+    expect(auth.message).toContain("Authentication failed for Google");
+    expect(auth.message).not.toContain("{");
+    // A bad key is never transient: one request, no retry.
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a 400 that does not name the key as a non-auth failure", async () => {
+    mockFetchRaw(GOOGLE_BAD_REQUEST_BODY, 400);
+
+    const provider = createGoogleApiProvider({
+      googleConfig: { api_key: "AIza-test" },
+    });
+
+    const err = await provider.complete({ prompt: "Hi", model: "gemini-2.5-pro" })
+      .then(() => { throw new Error("expected complete() to reject"); }, (e: unknown) => e);
+    expect(err).toBeInstanceOf(ClaudeClientError);
+    expect(err).not.toBeInstanceOf(AuthFailureError);
+    expect((err as ClaudeClientError).reason).toBe("unknown");
+  });
+
+  // A 401 comes back for a rejected OAuth token rather than an API key.
+  it("throws AuthFailureError on 401 UNAUTHENTICATED", async () => {
+    mockFetchResponse({
+      error: {
+        code: 401,
+        message: "Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential.",
+        status: "UNAUTHENTICATED",
+      },
+    }, 401);
+
+    const provider = createGoogleApiProvider({
+      googleConfig: { api_key: "AIza-bad" },
+    });
+
+    const err = await provider.complete({ prompt: "Hi", model: "gemini-2.5-pro" })
+      .then(() => { throw new Error("expected complete() to reject"); }, (e: unknown) => e);
+    expect(err).toBeInstanceOf(AuthFailureError);
+    expect((err as AuthFailureError).httpStatus).toBe(401);
+    expect((err as AuthFailureError).retryable).toBe(false);
   });
 
   it("throws ClaudeClientError with reason 'auth' on 403", async () => {
@@ -538,6 +631,20 @@ describe("createGoogleApiProvider — stream()", () => {
     });
   }
 
+  it("throws AuthFailureError on Google's 400 API_KEY_INVALID before reading the stream", async () => {
+    mockFetchRaw(GOOGLE_API_KEY_INVALID_BODY, 400);
+
+    const provider = createGoogleApiProvider({ googleConfig: { api_key: "AIza-bad" } });
+    const err = await (async () => {
+      for await (const _chunk of provider.stream({ prompt: "Hi", model: "gemini-2.5-pro" })) {
+        // drain
+      }
+    })().then(() => { throw new Error("expected stream() to reject"); }, (e: unknown) => e);
+    expect(err).toBeInstanceOf(AuthFailureError);
+    expect((err as AuthFailureError).provider).toBe("google");
+    expect((err as AuthFailureError).authReason).toContain("API key not valid");
+  });
+
   it("happy path — emits text chunks from SSE stream", async () => {
     mockStreamResponse([
       buildSsePayload("Hello "),
@@ -678,6 +785,24 @@ describe("createGoogleApiProvider — validateAuth()", () => {
       googleConfig: { api_key: "AIza-bad" },
     });
     expect(await provider.validateAuth!()).toBe(false);
+  });
+
+  it("returns false on Google's 400 API_KEY_INVALID (a wrong key, not a bad request)", async () => {
+    mockFetchRaw(GOOGLE_API_KEY_INVALID_BODY, 400);
+
+    const provider = createGoogleApiProvider({
+      googleConfig: { api_key: "AIza-bad" },
+    });
+    expect(await provider.validateAuth!()).toBe(false);
+  });
+
+  it("throws on a 400 that does not name the key", async () => {
+    mockFetchRaw(GOOGLE_BAD_REQUEST_BODY, 400);
+
+    const provider = createGoogleApiProvider({
+      googleConfig: { api_key: "AIza-test" },
+    });
+    await expect(provider.validateAuth!()).rejects.toThrow(ClaudeClientError);
   });
 
   it("throws ClaudeClientError on unexpected status codes", async () => {
@@ -884,6 +1009,25 @@ describe("createGoogleApiProvider — generateContentWithTools()", () => {
       expect((err as ClaudeClientError).reason).toBe("auth");
       expect((err as ClaudeClientError).retryable).toBe(false);
     }
+  });
+
+  it("throws AuthFailureError on Google's 400 API_KEY_INVALID without retrying", async () => {
+    mockFetchRaw(GOOGLE_API_KEY_INVALID_BODY, 400);
+
+    const provider = createGoogleApiProvider({
+      googleConfig: { api_key: "AIza-bad" },
+      maxRetries: 2,
+      baseDelayMs: 1,
+    });
+    const err = await provider.generateContentWithTools({
+      contents: [{ role: "user", parts: [{ text: "hi" }] }],
+      tools: TOOLS,
+    }).then(() => { throw new Error("expected generateContentWithTools() to reject"); }, (e: unknown) => e);
+    expect(err).toBeInstanceOf(AuthFailureError);
+    expect((err as AuthFailureError).reason).toBe("auth");
+    expect((err as AuthFailureError).retryable).toBe(false);
+    expect((err as AuthFailureError).authReason).toContain("API key not valid");
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("retries on 429 then throws rate-limit after exhaustion", async () => {
