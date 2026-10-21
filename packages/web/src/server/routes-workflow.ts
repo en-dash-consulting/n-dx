@@ -16,7 +16,13 @@ import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
-import { completeConfigGroups, validateConfigConstraints } from "./hench-config-fields.js";
+import {
+  FORBIDDEN_CONFIG_SEGMENTS,
+  completeConfigGroups,
+  getConfigValue,
+  setConfigValue,
+  validateConfigConstraints,
+} from "./hench-config-fields.js";
 import { contextWriteFloor, contextWriteFloorFromCompletedRun, hasCacheWrites, highConsumptionThreshold, runBudgetedTokens } from "./token-cost.js";
 
 const WORKFLOW_PREFIX = "/api/hench/workflow/";
@@ -487,20 +493,18 @@ export const APPLYABLE_SUGGESTION_KEYS: Record<string, "number"> = {
   "retry.maxRetries": "number",
 };
 
-/** Path segments that would poison the prototype chain if used as an object key. */
-const FORBIDDEN_PATH_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
-
 /**
  * Validate a `changes` map against {@link APPLYABLE_SUGGESTION_KEYS}.
  * Returns an error message for the first offending entry, or null if every
  * entry is an allowlisted key with a value of the required type. Called before
  * any write (and before preview), so a rejected request leaves the config file
- * byte-for-byte unchanged.
+ * byte-for-byte unchanged. The forbidden-segment check is the same set
+ * `setConfigValue` refuses, so the message here and the no-op there agree.
  */
 function validateSuggestionChanges(changes: Record<string, unknown>): string | null {
   for (const [key, value] of Object.entries(changes)) {
     const segments = key.split(".");
-    if (segments.some((seg) => FORBIDDEN_PATH_SEGMENTS.has(seg))) {
+    if (segments.some((seg) => FORBIDDEN_CONFIG_SEGMENTS.has(seg))) {
       return `Key "${key}" contains a forbidden path segment.`;
     }
     // Own keys only: a plain lookup finds Object.prototype's members too, so a
@@ -516,31 +520,6 @@ function validateSuggestionChanges(changes: Record<string, unknown>): string | n
     }
   }
   return null;
-}
-
-function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split(".");
-  // Defense in depth: refuse prototype-poisoning segments even though
-  // validateSuggestionChanges already rejects them upstream.
-  if (parts.some((part) => FORBIDDEN_PATH_SEGMENTS.has(part))) return;
-  let current = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (!(parts[i] in current) || typeof current[parts[i]] !== "object" || current[parts[i]] === null) {
-      current[parts[i]] = {};
-    }
-    current = current[parts[i]] as Record<string, unknown>;
-  }
-  current[parts[parts.length - 1]] = value;
-}
-
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current === null || current === undefined || typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
 }
 
 // ── Route handler ────────────────────────────────────────────────────
@@ -713,7 +692,7 @@ async function handleApplySuggestion(
   // Build the preview diff
   const diff: Array<{ path: string; oldValue: unknown; newValue: unknown }> = [];
   for (const [key, newValue] of Object.entries(changes)) {
-    const oldValue = getNestedValue(config, key);
+    const oldValue = getConfigValue(config, key);
     diff.push({ path: key, oldValue, newValue });
   }
 
@@ -724,7 +703,7 @@ async function handleApplySuggestion(
 
   // Apply changes
   for (const [key, value] of Object.entries(changes)) {
-    setNestedValue(config, key, value);
+    setConfigValue(config, key, value);
   }
   // Writing retry.maxRetries into a config with no retry block creates a
   // one-member group hench's schema refuses — complete it before serializing.
