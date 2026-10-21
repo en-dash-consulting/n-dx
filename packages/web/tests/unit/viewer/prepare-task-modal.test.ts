@@ -106,6 +106,14 @@ describe("PrepareTaskModal", () => {
     }
   });
 
+  // The Work page opens it from the "Up next" card, a z-index: 1 stacking
+  // context: rendered there, the panels beside the card painted over it.
+  it("renders under <body>, outside the page content that opened it", async () => {
+    await open();
+    expect(root!.querySelector(".prep-backdrop")).toBeNull();
+    expect($(".prep-backdrop").parentElement!.parentElement).toBe(document.body);
+  });
+
   it("states the task in the header", async () => {
     await open();
     const header = $(".prep-header").textContent!;

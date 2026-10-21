@@ -34,6 +34,7 @@ import { ActionIcon } from "./action-icon.js";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
 import { useFocusTrap } from "../hooks/index.js";
+import { BodyPortal } from "./body-portal.js";
 import { QueuedNotice } from "./queued-notice.js";
 import { RUN_OPTION_SPECS } from "../external.js";
 import type { RunOptionKey } from "../external.js";
@@ -400,16 +401,20 @@ function PrepareTaskModalBody({ taskId, workspace, onClose, onOpenLive, liveHref
     });
   }
 
-  return h("div", { class: "prep-backdrop", onClick: onBackdrop },
-    h("div", {
-      ref: dialogRef,
-      class: "prep-modal",
-      role: "dialog",
-      "aria-modal": "true",
-      "aria-labelledby": TITLE_ID,
-    },
-      h(Header, { prep, taskId, onClose }),
-      body,
+  // Opened from inside page content (the Work page's "Up next" card), so it
+  // has to leave that content's stacking context to stay on top.
+  return h(BodyPortal, null,
+    h("div", { class: "prep-backdrop", onClick: onBackdrop },
+      h("div", {
+        ref: dialogRef,
+        class: "prep-modal",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": TITLE_ID,
+      },
+        h(Header, { prep, taskId, onClose }),
+        body,
+      ),
     ),
   );
 }
