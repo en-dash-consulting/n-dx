@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -51,11 +51,25 @@ describe("setup-exit-trace", () => {
     expect(text).toMatch(/ uncaught uncaughtException\nError: process\.exit unexpectedly called/);
   }, 60_000);
 
-  it("writes nothing when tracing is off", () => {
-    const base = mkdtempSync(join(tmpdir(), "exit-trace-off-"));
+  // vitest prints the stack of the process.exit error it raises. With tracing
+  // on, that stack passes through the tracer's wrapper; off, the wrapper must
+  // not be installed at all, so no frame names the tracer.
+  // vitest prints frames as "❯ process.exit <path>:<line>:<col>".
+  const WRAPPER_FRAME = /process\.exit \S*setup-exit-trace\.js:\d+/;
+
+  it("installs its hooks when tracing is on", () => {
+    const base = mkdtempSync(join(tmpdir(), "exit-trace-on-"));
     dirs.push(base);
-    runFixture(undefined);
-    expect(existsSync(join(base, "trace"))).toBe(false);
-    expect(readdirSync(base)).toEqual([]);
+    const run = runFixture(join(base, "trace"));
+    expect(`${run.stdout}${run.stderr}`).toMatch(WRAPPER_FRAME);
+  }, 60_000);
+
+  it("installs nothing when tracing is off", () => {
+    const run = runFixture(undefined);
+    const output = `${run.stdout}${run.stderr}`;
+    // The fixture did run and die the way the on case does…
+    expect(output).toMatch(/process\.exit unexpectedly called/);
+    // …but process.exit was vitest's own, not the tracer's.
+    expect(output).not.toMatch(WRAPPER_FRAME);
   }, 60_000);
 });
