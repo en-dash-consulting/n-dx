@@ -55,6 +55,7 @@ describe("rex public API contract", () => {
     { name: "collectCompletedIds", type: "function" },
     // Timestamps & auto-completion
     { name: "computeTimestampUpdates", type: "function" },
+    { name: "allChildrenSuccessful", type: "function" },
     { name: "findAutoCompletions", type: "function" },
     { name: "reconcileAutoCompletions", type: "function" },
     // Merge
@@ -247,6 +248,7 @@ describe("hench → rex gateway contract", () => {
     "openClaimsStore",
     "resolveClaimHolder",
     "computeTimestampUpdates",
+    "allChildrenSuccessful",
     "findAutoCompletions",
     "findParentResets",
     "collectRequirements",
@@ -824,7 +826,7 @@ describe("gateway export auto-detection", () => {
         "isAppliedChange", "indexTree", "enclosingChangeIds", "awaitsPlacement", "loadPrdModel",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates",
-        "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",
+        "allChildrenSuccessful", "findAutoCompletions", "reconcileAutoCompletions", "findParentResets",
         "collectRequirements", "validateAutomatedRequirements",
         "formatRequirementsValidation", "isRootLevel", "isWorkItem",
         "loadAcknowledged", "saveAcknowledged", "acknowledgeFinding", "resolveActor",

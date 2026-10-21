@@ -2649,6 +2649,7 @@ async function commitPrdTreeIfStaged(
   producer: string,
   report?: SaveFileReport | null,
   itemId?: string,
+  status?: { from: string; to: string },
 ): Promise<PrdTreeCommitResult> {
   const rootPaths = await prdPathsToStage(projectDir);
 
@@ -2703,6 +2704,7 @@ async function commitPrdTreeIfStaged(
     // which ends the block and leaves anything after it as body text git will
     // not parse as a trailer.
     const trailers = [
+      ...(itemId && status ? [`N-DX-Status: ${itemId} ${status.from} → ${status.to}`] : []),
       `N-DX: ${producer}`,
       ...(itemId ? [`N-DX-Item: ${itemId}`] : []),
       buildCoAuthoredByTrailerLine(),
@@ -2731,6 +2733,7 @@ async function commitCompletionMetadata(
   taskId: string,
   origin?: RunGitOrigin,
   report?: SaveFileReport | null,
+  status?: { from: string; to: string },
 ): Promise<PrdTreeCommitResult> {
   // #360's guard, kept ahead of the staging helper so a moved checkout leaves
   // the tree exactly as it was. Reported, never thrown — the metadata staying
@@ -2752,7 +2755,7 @@ async function commitCompletionMetadata(
   // staging the whole `.rex/prd_tree/`, which under the no-concurrent-PRD-
   // writers contract is just this run's metadata, and a v2 tree stages nothing. The message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (task completion)", report, taskId);
+  const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (task completion)", report, taskId, status);
   if (result.error) {
     detail(`Warning: could not commit PRD tree changes: ${result.error.message}`);
   } else if (result.staged > 0) {
@@ -3167,6 +3170,7 @@ export async function performCommitPromptIfNeeded(
   taskId?: string,
   commitWatcher?: CommitMsgWatcher,
   baselineDirty?: string[],
+  priorStatus?: string,
 ): Promise<CommitPromptOutcome> {
   if (autoCommit || run.status !== "completed") return "not-applicable";
 
@@ -3325,8 +3329,12 @@ export async function performCommitPromptIfNeeded(
   //   when the dashboard moved. `itemIdFromTrailer` in rex's
   //   `core/change-commits.ts` unwraps a legacy permalink to the same id.
   // - Co-Authored-By: GitHub co-authorship attribution.
+  // finalizeRun writes "completed" before this prompt runs, so the item
+  // already reads completed above; the status it had before that write is
+  // what this commit records.
+  const statusFrom = priorStatus ?? oldStatus;
   const trailers = buildRunTrailers(run, taskId, {
-    status: oldStatus && newStatus && oldStatus !== newStatus ? { from: oldStatus, to: newStatus } : undefined,
+    status: statusFrom && newStatus && statusFrom !== newStatus ? { from: statusFrom, to: newStatus } : undefined,
   });
   try {
     const { writeFileSync } = await import("node:fs");
@@ -4553,10 +4561,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Update PRD status to "completed" immediately after test gate passes.
   // This ensures status is persisted to disk before the next iteration's
   // task selection, preventing re-selection of just-completed tasks.
+  // The status the item had before this write, for the N-DX-Status trailer of
+  // whichever commit lands it. Set only when this run makes the transition.
+  let completionTransition: { from: string; to: string } | undefined;
   if (opts.store && run.taskId && run.status === "completed") {
     const held = completionHold?.outcome === "not-applied" ? completionHold : undefined;
+    const priorStatus = (await opts.store.getItem(run.taskId))?.status;
     const updated = await updateCompletedTaskStatus(opts.store, run.taskId, run, held);
     if (updated) {
+      if (priorStatus && priorStatus !== "completed") {
+        completionTransition = { from: priorStatus, to: "completed" };
+      }
       if (held) held.outcome = "applied";
       detail(
         held
@@ -4596,6 +4611,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.taskId,
     opts.commitWatcher,
     opts.baselineDirty,
+    completionTransition?.from,
   );
 
   // Review repairs: only the autoCommit path needs them swept here. The
@@ -4653,6 +4669,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         run.taskId,
         run,
         opts.store ? takeSaveFileReport(opts.store) : null,
+        // A prompt that committed carried the transition already; what is
+        // left for this commit is the attribution write.
+        commitPrompt === "committed" ? undefined : completionTransition,
       );
       if (completionMetadata.error) {
         // The task's own work already succeeded and validated — only the

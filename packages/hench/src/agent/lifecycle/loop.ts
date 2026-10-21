@@ -9,6 +9,7 @@ import { saveRun } from "../../store/runs.js";
 import { recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, detail, info, withHeartbeat } from "../../types/output.js";
 import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import {
@@ -125,6 +126,7 @@ async function rejectUnvalidatedCompletion(args: {
     startingHead: args.startingHead,
     selfHeal: args.selfHeal,
     baselineUntracked: args.baselineUntracked,
+    finalizeReadyParent: await isFinalizeReadyParent(store, taskId),
   });
   if (validation.valid) return;
 
