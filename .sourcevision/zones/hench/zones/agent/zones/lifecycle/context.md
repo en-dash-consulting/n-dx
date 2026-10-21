@@ -8,7 +8,7 @@ Zone: Hench (`hench/agent/lifecycle`)
 Files: 24, Cohesion: 0.74, Coupling: 0.26
 Description: 24 files, primarily TypeScript
 Entry points: packages/hench/src/agent/analysis/adversarial-review.ts, packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/index.ts, packages/hench/src/agent/lifecycle/agent-effort.ts, packages/hench/src/agent/lifecycle/background-wait.ts, packages/hench/src/agent/lifecycle/batch-divider.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts, packages/hench/src/agent/lifecycle/event-accumulator.ts, packages/hench/src/agent/lifecycle/orientation.ts, packages/hench/src/agent/lifecycle/pair-review-rounds.ts, packages/hench/src/agent/lifecycle/primer.ts, packages/hench/src/agent/lifecycle/prior-attempt-work.ts, packages/hench/src/agent/lifecycle/read-only-refusal.ts, packages/hench/src/agent/lifecycle/session-cache.ts, packages/hench/src/agent/lifecycle/spawn-budget.ts, packages/hench/src/agent/lifecycle/token-usage.ts, packages/hench/src/agent/lifecycle/vendor-adapter.ts, packages/hench/src/cli/commands/cache.ts, packages/hench/src/cli/help.ts, packages/hench/src/prd/llm-gateway.ts, packages/hench/src/quota/token-validation.ts, packages/hench/src/store/project-config.ts
-Lines: 11331
+Lines: 11336
 
 </zone>
 
@@ -21,7 +21,7 @@ packages/hench/src/agent/lifecycle/adapters/index.ts (TypeScript, 53 lines, sour
 packages/hench/src/agent/lifecycle/agent-effort.ts (TypeScript, 61 lines, source)
 packages/hench/src/agent/lifecycle/background-wait.ts (TypeScript, 102 lines, source)
 packages/hench/src/agent/lifecycle/batch-divider.ts (TypeScript, 58 lines, source)
-packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 3219 lines, source)
+packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 3224 lines, source)
 packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts (TypeScript, 110 lines, source)
 packages/hench/src/agent/lifecycle/event-accumulator.ts (TypeScript, 806 lines, source)
 packages/hench/src/agent/lifecycle/orientation.ts (TypeScript, 304 lines, source)

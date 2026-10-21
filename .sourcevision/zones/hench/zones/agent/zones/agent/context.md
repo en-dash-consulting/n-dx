@@ -8,7 +8,7 @@ Zone: Agent (`hench/agent/agent`)
 Files: 7, Cohesion: 0.42, Coupling: 0.58
 Description: 7 files, primarily TypeScript
 Entry points: packages/hench/src/agent/analysis/livelock.ts, packages/hench/src/agent/analysis/plan-only-detection.ts, packages/hench/src/agent/analysis/spin.ts, packages/hench/src/agent/lifecycle/context-prune.ts, packages/hench/src/agent/lifecycle/heartbeat.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/store/runs.ts
-Lines: 3550
+Lines: 3552
 
 </zone>
 
@@ -19,7 +19,7 @@ packages/hench/src/agent/analysis/plan-only-detection.ts (TypeScript, 87 lines, 
 packages/hench/src/agent/analysis/spin.ts (TypeScript, 41 lines, source)
 packages/hench/src/agent/lifecycle/context-prune.ts (TypeScript, 687 lines, source)
 packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 121 lines, source)
-packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 2202 lines, source)
+packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 2204 lines, source)
 packages/hench/src/store/runs.ts (TypeScript, 106 lines, source)
 
 </files>

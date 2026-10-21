@@ -1,6 +1,6 @@
 {
   "id": "llm-client",
-  "name": "Unified LLM Client",
+  "name": "Llm Client",
   "description": "58 files, mostly utilities and services; entry points api-provider.ts, auth-guidance.ts, auth-token.ts; imports Tests; imported by Packages and Packages.",
   "files": [
     "packages/llm-client/src/api-provider.ts",
@@ -119,7 +119,7 @@
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 58,
-  "lineCount": 16838,
+  "lineCount": 16883,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

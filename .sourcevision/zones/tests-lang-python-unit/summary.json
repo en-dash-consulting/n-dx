@@ -1,0 +1,25 @@
+{
+  "id": "tests-lang-python-unit",
+  "name": "Tests Lang Python Unit",
+  "description": "Non-source files in packages: index.test.ts, python-clients.test.ts, python-grammar-pin.test.ts (+3 more)",
+  "files": [
+    "packages/lang-python/tests/unit/index.test.ts",
+    "packages/lang-python/tests/unit/python-clients.test.ts",
+    "packages/lang-python/tests/unit/python-grammar-pin.test.ts",
+    "packages/lang-python/tests/unit/python-helpers-linear.test.ts",
+    "packages/lang-python/tests/unit/python-notices.test.ts",
+    "packages/lang-python/tests/unit/python-web.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 278,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -8,7 +8,7 @@ Zone: Core 5 (`core/core-5`)
 Files: 10, Cohesion: 0.41, Coupling: 0.59
 Description: 10 files, primarily JavaScript
 Entry points: packages/core/gitattributes-pins.js, packages/core/layout.js, packages/core/migrate-layout.js, packages/core/narration-status.js, packages/core/readme-generator.js, packages/core/refresh-artifacts.js, packages/core/refresh-validate.js, packages/core/run-summary.js, packages/core/stale-check.js, scripts/build-cli-ui-gap.mjs
-Lines: 2275
+Lines: 2277
 
 </zone>
 
@@ -23,7 +23,7 @@ packages/core/refresh-artifacts.js (JavaScript, 56 lines, source)
 packages/core/refresh-validate.js (JavaScript, 179 lines, source)
 packages/core/run-summary.js (JavaScript, 299 lines, source)
 packages/core/stale-check.js (JavaScript, 87 lines, source)
-scripts/build-cli-ui-gap.mjs (JavaScript, 145 lines, build)
+scripts/build-cli-ui-gap.mjs (JavaScript, 147 lines, build)
 
 </files>
 

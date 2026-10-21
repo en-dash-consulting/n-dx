@@ -5,157 +5,46 @@
 <zone>
 
 Zone: Core (`rex/core`)
-Files: 26, Cohesion: 0.60, Coupling: 0.40
-Description: 26 files, primarily TypeScript
-Entry points: packages/rex/src/cli/commands/add-change.ts, packages/rex/src/cli/commands/merge-state.ts, packages/rex/src/cli/mcp-tools/get-capability.ts, packages/rex/src/cli/v2-completion.ts, packages/rex/src/core/apply-amendments.ts, packages/rex/src/core/apply-policy.ts, packages/rex/src/core/change-add.ts, packages/rex/src/core/change-brief.ts, packages/rex/src/core/change-completion.ts, packages/rex/src/core/change-next-task.ts, packages/rex/src/core/change-place.ts, packages/rex/src/core/change-selection.ts, packages/rex/src/core/folder-per-task-migration.ts, packages/rex/src/core/product-edges.ts, packages/rex/src/core/product-edit.ts, packages/rex/src/core/product-report.ts, packages/rex/src/core/product-reshape.ts, packages/rex/src/core/product-status.ts, packages/rex/src/schema/v2-rules.ts, packages/rex/src/schema/v2.ts, packages/rex/src/store/folder-tree-parser.ts, packages/rex/src/store/prd-model-reader.ts, packages/rex/src/store/prd-model-transaction.ts, packages/rex/src/store/prd-model-writer.ts, packages/rex/src/store/state-merge.ts, packages/rex/src/store/state-writer.ts
-Lines: 10016
+Files: 11, Cohesion: 0.87, Coupling: 0.13
+Description: 11 files, primarily TypeScript
+Entry points: packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/remove.ts, packages/rex/src/core/delete.ts, packages/rex/src/core/parent-completion.ts, packages/rex/src/core/remove-epic.ts, packages/rex/src/core/remove-feature.ts, packages/rex/src/core/remove-task.ts, packages/rex/src/core/timestamps.ts, packages/rex/src/fix/index.ts, packages/rex/src/fix/tree.ts, packages/rex/src/fix/types.ts
+Lines: 1940
 
 </zone>
 
 <files>
 
-packages/rex/src/cli/commands/add-change.ts (TypeScript, 220 lines, source)
-packages/rex/src/cli/commands/merge-state.ts (TypeScript, 59 lines, source)
-packages/rex/src/cli/mcp-tools/get-capability.ts (TypeScript, 40 lines, source)
-packages/rex/src/cli/v2-completion.ts (TypeScript, 104 lines, source)
-packages/rex/src/core/apply-amendments.ts (TypeScript, 654 lines, source)
-packages/rex/src/core/apply-policy.ts (TypeScript, 119 lines, source)
-packages/rex/src/core/change-add.ts (TypeScript, 185 lines, source)
-packages/rex/src/core/change-brief.ts (TypeScript, 898 lines, source)
-packages/rex/src/core/change-completion.ts (TypeScript, 338 lines, source)
-packages/rex/src/core/change-next-task.ts (TypeScript, 113 lines, source)
-packages/rex/src/core/change-place.ts (TypeScript, 221 lines, source)
-packages/rex/src/core/change-selection.ts (TypeScript, 285 lines, source)
-packages/rex/src/core/folder-per-task-migration.ts (TypeScript, 598 lines, source)
-packages/rex/src/core/product-edges.ts (TypeScript, 234 lines, source)
-packages/rex/src/core/product-edit.ts (TypeScript, 253 lines, source)
-packages/rex/src/core/product-report.ts (TypeScript, 409 lines, source)
-packages/rex/src/core/product-reshape.ts (TypeScript, 374 lines, source)
-packages/rex/src/core/product-status.ts (TypeScript, 119 lines, source)
-packages/rex/src/schema/v2-rules.ts (TypeScript, 909 lines, source)
-packages/rex/src/schema/v2.ts (TypeScript, 658 lines, source)
-packages/rex/src/store/folder-tree-parser.ts (TypeScript, 1413 lines, source)
-packages/rex/src/store/prd-model-reader.ts (TypeScript, 503 lines, source)
-packages/rex/src/store/prd-model-transaction.ts (TypeScript, 78 lines, source)
-packages/rex/src/store/prd-model-writer.ts (TypeScript, 620 lines, source)
-packages/rex/src/store/state-merge.ts (TypeScript, 291 lines, source)
-packages/rex/src/store/state-writer.ts (TypeScript, 321 lines, source)
+packages/rex/src/cli/commands/fix.ts (TypeScript, 147 lines, source)
+packages/rex/src/cli/commands/remove.ts (TypeScript, 263 lines, source)
+packages/rex/src/core/delete.ts (TypeScript, 42 lines, source)
+packages/rex/src/core/parent-completion.ts (TypeScript, 302 lines, source)
+packages/rex/src/core/remove-epic.ts (TypeScript, 75 lines, source)
+packages/rex/src/core/remove-feature.ts (TypeScript, 286 lines, source)
+packages/rex/src/core/remove-task.ts (TypeScript, 140 lines, source)
+packages/rex/src/core/timestamps.ts (TypeScript, 121 lines, source)
+packages/rex/src/fix/index.ts (TypeScript, 462 lines, source)
+packages/rex/src/fix/tree.ts (TypeScript, 44 lines, source)
+packages/rex/src/fix/types.ts (TypeScript, 58 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/core/change-add.ts {addChangeNode}
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/core/change-add.ts {AddChangeNodeInput}
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/core/change-place.ts {suggestPlacement}
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/core/change-place.ts {PlacementSuggestion}
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/schema/v2-rules.ts {indexTree}
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/schema/v2.ts {ChangeNodeType}
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/store/prd-model-reader.ts {loadPrdModel}
-  packages/rex/src/cli/commands/add-change.ts → packages/rex/src/store/prd-model-transaction.ts {withPrdModelTransaction}
-  packages/rex/src/cli/commands/merge-state.ts → packages/rex/src/store/state-merge.ts {mergeStateYaml, readFolderSpecs}
-  packages/rex/src/cli/mcp-tools/get-capability.ts → packages/rex/src/core/product-report.ts {capabilityReport, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, ProductReportError, RECENT_APPLIED}
-  packages/rex/src/cli/mcp-tools/get-capability.ts → packages/rex/src/core/product-report.ts {ChangePageOptions}
-  packages/rex/src/cli/mcp-tools/get-capability.ts → packages/rex/src/store/prd-model-reader.ts {loadPrdModel, prdLayout}
-  packages/rex/src/cli/v2-completion.ts → packages/rex/src/core/apply-policy.ts {loadApplyOn}
-  packages/rex/src/cli/v2-completion.ts → packages/rex/src/core/change-completion.ts {completeWork}
-  packages/rex/src/cli/v2-completion.ts → packages/rex/src/core/change-completion.ts {CompleteWorkResult}
-  packages/rex/src/core/apply-amendments.ts → packages/rex/src/schema/v2-rules.ts {checkV2Rules, isAppliedChange, isOpenChange, specHash}
-  packages/rex/src/core/apply-amendments.ts → packages/rex/src/schema/v2-rules.ts {RuleFinding, RuleNode, V2Tree}
-  packages/rex/src/core/apply-amendments.ts → packages/rex/src/schema/v2.ts {isDisplayId}
-  packages/rex/src/core/apply-amendments.ts → packages/rex/src/schema/v2.ts {Amendment, ChangeNode, CriteriaDelta, Criterion}
-  packages/rex/src/core/apply-policy.ts → packages/rex/src/core/apply-amendments.ts {applyAmendments, resolve}
-  packages/rex/src/core/apply-policy.ts → packages/rex/src/core/apply-amendments.ts {ApplyAmendmentsOptions, ApplyAmendmentsResult}
-  packages/rex/src/core/apply-policy.ts → packages/rex/src/schema/v2-rules.ts {isOpenChange}
-  packages/rex/src/core/apply-policy.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/change-add.ts → packages/rex/src/core/apply-amendments.ts {applyAmendmentsProblems, freeSlug, NO_PROBLEMS, pendingWarnings}
-  packages/rex/src/core/change-add.ts → packages/rex/src/core/change-completion.ts {addTask, closedState, ClosedChangeError}
-  packages/rex/src/core/change-add.ts → packages/rex/src/core/change-completion.ts {ChangeSplit}
-  packages/rex/src/core/change-add.ts → packages/rex/src/schema/v2-rules.ts {checkV2Rules, indexTree}
-  packages/rex/src/core/change-add.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/change-add.ts → packages/rex/src/schema/v2.ts {Amendment, ChangeNodeType, DiscoveredFrom, SavedRunSettings}
-  packages/rex/src/core/change-brief.ts → packages/rex/src/core/change-selection.ts {WorkUnit}
-  packages/rex/src/core/change-brief.ts → packages/rex/src/core/product-edges.ts {computeEdges, deriveChangeKind, productIndex}
-  packages/rex/src/core/change-brief.ts → packages/rex/src/core/product-edges.ts {Realization}
-  packages/rex/src/core/change-brief.ts → packages/rex/src/core/product-status.ts {computeProductStatus}
-  packages/rex/src/core/change-brief.ts → packages/rex/src/core/product-status.ts {ProductStatus}
-  packages/rex/src/core/change-brief.ts → packages/rex/src/schema/v2-rules.ts {indexTree, nodeSpec, specHash}
-  packages/rex/src/core/change-brief.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, TreeIndex, V2Tree}
-  packages/rex/src/core/change-brief.ts → packages/rex/src/schema/v2.ts {Amendment, ChangeNode, CapabilityNode, ConstraintNode, Criterion}
-  packages/rex/src/core/change-completion.ts → packages/rex/src/core/apply-amendments.ts {ApplyAmendmentsError, describeWork, unfinishedWork}
-  packages/rex/src/core/change-completion.ts → packages/rex/src/core/apply-policy.ts {applyOnTrigger}
-  packages/rex/src/core/change-completion.ts → packages/rex/src/core/apply-policy.ts {ApplyOnTriggerOptions, ApplyOnTriggerResult}
-  packages/rex/src/core/change-completion.ts → packages/rex/src/schema/v2-rules.ts {awaitsPlacement, indexTree, isAppliedChange, isOpenChange}
-  packages/rex/src/core/change-completion.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/change-next-task.ts → packages/rex/src/core/change-selection.ts {findActionableWork}
-  packages/rex/src/core/change-next-task.ts → packages/rex/src/core/change-selection.ts {WorkUnit}
-  packages/rex/src/core/change-next-task.ts → packages/rex/src/schema/v2-rules.ts {indexTree}
-  packages/rex/src/core/change-next-task.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/change-place.ts → packages/rex/src/core/apply-amendments.ts {applyAmendmentsProblems, NOTHING_TO_MODIFY, pendingWarnings}
-  packages/rex/src/core/change-place.ts → packages/rex/src/schema/v2-rules.ts {checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash}
-  packages/rex/src/core/change-place.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/change-place.ts → packages/rex/src/schema/v2.ts {Amendment, ChangeNode, CriteriaDelta}
-  packages/rex/src/core/change-selection.ts → packages/rex/src/schema/v2-rules.ts {awaitsPlacement, indexTree, isOpenChange}
-  packages/rex/src/core/change-selection.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/change-selection.ts → packages/rex/src/schema/v2.ts {ChangeNode, TaskNode}
-  packages/rex/src/core/folder-per-task-migration.ts → packages/rex/src/store/folder-tree-parser.ts {parseFrontmatter}
-  packages/rex/src/core/folder-per-task-migration.ts → packages/rex/src/store/folder-tree-parser.ts {ParseWarning}
-  packages/rex/src/core/product-edges.ts → packages/rex/src/schema/v2-rules.ts {indexTree}
-  packages/rex/src/core/product-edges.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, TreeIndex, V2Tree}
-  packages/rex/src/core/product-edges.ts → packages/rex/src/schema/v2.ts {Amendment, ChangeNode, ConstraintNode}
-  packages/rex/src/core/product-edit.ts → packages/rex/src/core/apply-amendments.ts {appendHistory, freeSlug, nodeSpecHash, resolve, stampMet}
-  packages/rex/src/core/product-edit.ts → packages/rex/src/schema/v2-rules.ts {isOpenChange, specHash}
-  packages/rex/src/core/product-edit.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/product-edit.ts → packages/rex/src/schema/v2.ts {Amendment, ChangeNode, Criterion}
-  packages/rex/src/core/product-report.ts → packages/rex/src/core/change-selection.ts {compareReleases}
-  packages/rex/src/core/product-report.ts → packages/rex/src/core/product-edges.ts {computeEdges, productIndex}
-  packages/rex/src/core/product-report.ts → packages/rex/src/core/product-edges.ts {CoChange}
-  packages/rex/src/core/product-report.ts → packages/rex/src/core/product-status.ts {computeProductStatus}
-  packages/rex/src/core/product-report.ts → packages/rex/src/core/product-status.ts {Health, IntentStatus, ProductStatus}
-  packages/rex/src/core/product-report.ts → packages/rex/src/schema/v2-rules.ts {indexTree, isAppliedChange, isOpenChange}
-  packages/rex/src/core/product-report.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/product-report.ts → packages/rex/src/schema/v2.ts {ChangeNode}
-  packages/rex/src/core/product-reshape.ts → packages/rex/src/core/apply-amendments.ts {bodyNotes, nodeSpecHash, resolve, upsertCriteriaDelta}
-  packages/rex/src/core/product-reshape.ts → packages/rex/src/core/change-add.ts {addChangeNode, AddChangeNodeError}
-  packages/rex/src/core/product-reshape.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/product-reshape.ts → packages/rex/src/schema/v2.ts {Amendment, CriteriaDelta, Criterion}
-  packages/rex/src/core/product-status.ts → packages/rex/src/core/product-edges.ts {productIndex}
-  packages/rex/src/core/product-status.ts → packages/rex/src/schema/v2-rules.ts {changingNodes, isAppliedChange, isOpenChange, nodeSpec, specHash}
-  packages/rex/src/core/product-status.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/core/product-status.ts → packages/rex/src/schema/v2.ts {ChangeNode, CheckResult}
-  packages/rex/src/schema/v2-rules.ts → packages/rex/src/schema/v2.ts {layerOf, RETIRED_STATE_FIELDS}
-  packages/rex/src/schema/v2-rules.ts → packages/rex/src/schema/v2.ts {AddedNodeType, Amendment, Criterion, Layer, NodeType, V2Node}
-  packages/rex/src/store/prd-model-reader.ts → packages/rex/src/schema/v2-rules.ts {RuleNode, V2Tree}
-  packages/rex/src/store/prd-model-reader.ts → packages/rex/src/schema/v2.ts {ItemStateSchema, NodeIntentSchema, RootHeaderSchema, SCHEMA_VERSION_V2, isV2Schema}
-  packages/rex/src/store/prd-model-reader.ts → packages/rex/src/schema/v2.ts {ItemState, Layer, NodeType, StateFile}
-  packages/rex/src/store/prd-model-reader.ts → packages/rex/src/store/folder-tree-parser.ts {parseFolderTree, parseFrontmatter}
-  packages/rex/src/store/prd-model-reader.ts → packages/rex/src/store/folder-tree-parser.ts {ParseWarning}
-  packages/rex/src/store/prd-model-reader.ts → packages/rex/src/store/state-writer.ts {STATE_FILE_NAME, extraTopLevelKeys, loadStateFile}
-  packages/rex/src/store/prd-model-transaction.ts → packages/rex/src/schema/v2-rules.ts {V2Tree}
-  packages/rex/src/store/prd-model-transaction.ts → packages/rex/src/store/prd-model-reader.ts {CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel}
-  packages/rex/src/store/prd-model-transaction.ts → packages/rex/src/store/prd-model-reader.ts {PrdModel}
-  packages/rex/src/store/prd-model-transaction.ts → packages/rex/src/store/prd-model-writer.ts {writePrdModel}
-  packages/rex/src/store/prd-model-transaction.ts → packages/rex/src/store/prd-model-writer.ts {WritePrdModelResult}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/schema/v2-rules.ts {RuleNode}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/schema/v2.ts {AreaIntentSchema, CapabilityIntentSchema, ChangeIntentSchema, ConstraintIntentSchema, ItemStateSchema, NodeIntentSchema, SCHEMA_VERSION_V2, SubtaskIntentSchema, TaskIntentSchema, isV2Schema}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/schema/v2.ts {ItemState, Layer, NodeType, StateFile}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/store/folder-tree-parser.ts {parseFrontmatter}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/store/folder-tree-parser.ts {ParseWarning}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/store/prd-model-reader.ts {CHANGES_DIRNAME, INBOX_DIRNAME, PRODUCT_DIRNAME, assertPrdModelWritable, assertV2TreeWritable}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/store/prd-model-reader.ts {FolderStateKeys, PrdModel}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/store/state-writer.ts {STATE_FILE_NAME, emptyStateFile, extraTopLevelKeys, loadStateFile, sameTextOnDisk, saveStateFile}
-  packages/rex/src/store/prd-model-writer.ts → packages/rex/src/store/state-writer.ts {ProductSpec}
-  packages/rex/src/store/state-merge.ts → packages/rex/src/schema/v2-rules.ts {specHash}
-  packages/rex/src/store/state-merge.ts → packages/rex/src/schema/v2.ts {NodeIntentSchema}
-  packages/rex/src/store/state-merge.ts → packages/rex/src/schema/v2.ts {ItemState, StateFile}
-  packages/rex/src/store/state-merge.ts → packages/rex/src/store/folder-tree-parser.ts {parseFrontmatter}
-  packages/rex/src/store/state-merge.ts → packages/rex/src/store/folder-tree-parser.ts {ParseWarning}
-  packages/rex/src/store/state-merge.ts → packages/rex/src/store/state-writer.ts {canonicalJson, emptyStateFile, parseStateYaml, serializeStateYaml}
-  packages/rex/src/store/state-merge.ts → packages/rex/src/store/state-writer.ts {ProductSpec}
-  packages/rex/src/store/state-writer.ts → packages/rex/src/schema/v2-rules.ts {specHash}
-  packages/rex/src/store/state-writer.ts → packages/rex/src/schema/v2.ts {ItemStateSchema, SCHEMA_VERSION_V2, StateFileSchema}
-  packages/rex/src/store/state-writer.ts → packages/rex/src/schema/v2.ts {Criterion, StateFile}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/fix/index.ts {detectIssues, applyFixes}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/fix/index.ts {FixAction, FixKind}
+  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/remove-epic.ts {removeEpic}
+  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/remove-feature.ts {preCheckFeatureDeletion, removeFeature}
+  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/remove-task.ts {removeTask}
+  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/timestamps.ts {computeTimestampUpdates}
+  packages/rex/src/core/remove-epic.ts → packages/rex/src/core/delete.ts {deleteItem, cleanBlockedByRefs}
+  packages/rex/src/core/remove-feature.ts → packages/rex/src/core/delete.ts {deleteItem}
+  packages/rex/src/core/remove-task.ts → packages/rex/src/core/delete.ts {deleteItem, cleanBlockedByRefs}
+  packages/rex/src/core/remove-task.ts → packages/rex/src/core/parent-completion.ts {allChildrenSuccessful, AUTO_COMPLETABLE_STATUSES}
+  packages/rex/src/fix/index.ts → packages/rex/src/core/parent-completion.ts {AUTO_COMPLETABLE_STATUSES, SUCCESSFUL_CHILD_STATUSES, allChildrenSuccessful}
+  packages/rex/src/fix/index.ts → packages/rex/src/core/parent-completion.ts {ParentStatusNode}
+  packages/rex/src/fix/index.ts → packages/rex/src/fix/tree.ts {collectFixItemIds, collectFixTreePostOrder, walkFixTree}
+  packages/rex/src/fix/index.ts → packages/rex/src/fix/types.ts {FixAction, FixItem, FixItemStatus, FixKind, FixResult}
+  packages/rex/src/fix/tree.ts → packages/rex/src/fix/types.ts {FixItem}
 
 </imports>

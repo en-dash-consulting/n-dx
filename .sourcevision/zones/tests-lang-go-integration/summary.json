@@ -1,0 +1,25 @@
+{
+  "id": "tests-lang-go-integration",
+  "name": "Tests Lang Go Integration",
+  "description": "Non-source files in packages: embedded-sql.test.ts, go-pack-queries.test.ts, go-resolver.test.ts (+3 more)",
+  "files": [
+    "packages/lang-go/tests/integration/embedded-sql.test.ts",
+    "packages/lang-go/tests/integration/go-pack-queries.test.ts",
+    "packages/lang-go/tests/integration/go-resolver.test.ts",
+    "packages/lang-go/tests/integration/pack-facts.test.ts",
+    "packages/lang-go/tests/integration/pack-golden.test.ts",
+    "packages/lang-go/tests/integration/tree-sitter-go-grammar.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 759,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

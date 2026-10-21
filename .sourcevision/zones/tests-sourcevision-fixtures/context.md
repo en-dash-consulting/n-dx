@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Tests Sourcevision Fixtures (`tests-sourcevision-fixtures`)
-Files: 46, Cohesion: 1.00, Coupling: 0.00
+Files: 68, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Non-source files in packages: main.go, router.go, setup.go (+43 more)
-Lines: 472
+Lines: 1101
 
 </zone>
 
@@ -28,6 +28,21 @@ packages/sourcevision/tests/fixtures/go-project/internal/repository/user.go (Go,
 packages/sourcevision/tests/fixtures/go-project/internal/repository/user_test.go (Go, 14 lines, test)
 packages/sourcevision/tests/fixtures/go-project/pkg/response/json.go (Go, 18 lines, test)
 packages/sourcevision/tests/fixtures/go-project/pkg/response/json_test.go (Go, 30 lines, test)
+packages/sourcevision/tests/fixtures/gradle-build/kotlin-catalog/build.gradle.kts (Kotlin, 25 lines, test)
+packages/sourcevision/tests/fixtures/gradle-build/kotlin-catalog/settings.gradle.kts (Kotlin, 1 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/ClinicApplication.java (Java, 11 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/controller/OwnerController.java (Java, 27 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/controller/VisitController.java (Java, 27 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/entity/Owner.java (Java, 27 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/entity/Pet.java (Java, 24 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/entity/PetType.java (Java, 7 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/entity/Visit.java (Java, 30 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/repository/OwnerRepository.java (Java, 9 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/repository/PetRepository.java (Java, 10 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/repository/VisitRepository.java (Java, 9 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/service/OwnerService.java (Java, 34 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/main/java/com/example/clinic/service/VisitService.java (Java, 29 lines, test)
+packages/sourcevision/tests/fixtures/java-spring-project/src/test/java/com/example/clinic/service/VisitServiceTest.java (Java, 15 lines, test)
 packages/sourcevision/tests/fixtures/mixed-go-ts/cmd/server/main.go (Go, 14 lines, test)
 packages/sourcevision/tests/fixtures/mixed-go-ts/internal/api/router.go (Go, 15 lines, test)
 packages/sourcevision/tests/fixtures/mixed-go-ts/internal/api/router_test.go (Go, 10 lines, test)
@@ -51,6 +66,13 @@ packages/sourcevision/tests/fixtures/small-ts-project/src/services/email-service
 packages/sourcevision/tests/fixtures/small-ts-project/src/services/user-service.ts (TypeScript, 18 lines, test)
 packages/sourcevision/tests/fixtures/small-ts-project/src/utils/format.ts (TypeScript, 7 lines, test)
 packages/sourcevision/tests/fixtures/small-ts-project/src/utils/validate.ts (TypeScript, 5 lines, test)
+packages/sourcevision/tests/fixtures/spring-petclinic-sql/src/main/resources/db/h2/data.sql (SQL, 53 lines, test)
+packages/sourcevision/tests/fixtures/spring-petclinic-sql/src/main/resources/db/h2/schema.sql (SQL, 65 lines, test)
+packages/sourcevision/tests/fixtures/spring-petclinic-sql/src/main/resources/db/mysql/data.sql (SQL, 53 lines, test)
+packages/sourcevision/tests/fixtures/spring-petclinic-sql/src/main/resources/db/mysql/schema.sql (SQL, 56 lines, test)
+packages/sourcevision/tests/fixtures/spring-petclinic-sql/src/main/resources/db/mysql/user.sql (SQL, 11 lines, test)
+packages/sourcevision/tests/fixtures/spring-petclinic-sql/src/main/resources/db/postgres/data.sql (SQL, 53 lines, test)
+packages/sourcevision/tests/fixtures/spring-petclinic-sql/src/main/resources/db/postgres/schema.sql (SQL, 53 lines, test)
 packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/client.ts (TypeScript, 13 lines, test)
 packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/index.ts (TypeScript, 2 lines, test)
 packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/worker.ts (TypeScript, 9 lines, test)
@@ -87,14 +109,14 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[suggestion] [info] Zone "tests-sourcevision-fixtures" has files across 25 directories — consider consolidating under a dedicated directory
+[suggestion] [info] Zone "tests-sourcevision-fixtures" has files across 35 directories — consider consolidating under a dedicated directory
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Zone "tests-sourcevision-fixtures" has files across 25 directories — consider consolidating under a dedicated directory
+- Zone "tests-sourcevision-fixtures" has files across 35 directories — consider consolidating under a dedicated directory
 - [call graph] 6 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

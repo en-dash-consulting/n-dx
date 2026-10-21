@@ -102,8 +102,8 @@
     "packages/hench/src/tools/shell.ts",
     "packages/hench/src/types/output.ts"
   ],
-  "cohesion": 0.59,
-  "coupling": 0.41,
+  "cohesion": 0.58,
+  "coupling": 0.42,
   "fileCount": 51,
-  "lineCount": 18182
+  "lineCount": 18189
 }

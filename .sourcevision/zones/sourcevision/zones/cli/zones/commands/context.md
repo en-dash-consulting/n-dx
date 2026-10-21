@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Commands (`sourcevision/cli/commands`)
-Files: 5, Cohesion: 0.50, Coupling: 0.50
+Files: 5, Cohesion: 0.47, Coupling: 0.53
 Description: 5 files, primarily TypeScript
 Entry points: packages/sourcevision/src/analyzers/analyze-progress.ts, packages/sourcevision/src/analyzers/run-ledger.ts, packages/sourcevision/src/cli/commands/analyze-phases.ts, packages/sourcevision/src/cli/commands/analyze.ts, packages/sourcevision/src/cli/commands/narrate.ts
-Lines: 2779
+Lines: 2864
 
 </zone>
 
@@ -16,8 +16,8 @@ Lines: 2779
 
 packages/sourcevision/src/analyzers/analyze-progress.ts (TypeScript, 563 lines, source)
 packages/sourcevision/src/analyzers/run-ledger.ts (TypeScript, 239 lines, source)
-packages/sourcevision/src/cli/commands/analyze-phases.ts (TypeScript, 732 lines, source)
-packages/sourcevision/src/cli/commands/analyze.ts (TypeScript, 864 lines, source)
+packages/sourcevision/src/cli/commands/analyze-phases.ts (TypeScript, 802 lines, source)
+packages/sourcevision/src/cli/commands/analyze.ts (TypeScript, 879 lines, source)
 packages/sourcevision/src/cli/commands/narrate.ts (TypeScript, 381 lines, source)
 
 </files>
@@ -28,7 +28,7 @@ Internal:
   packages/sourcevision/src/analyzers/analyze-progress.ts → packages/sourcevision/src/analyzers/run-ledger.ts {setRunLedgerListener, snapshotRunLedger}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/analyze-progress.ts {isAnalyzeProgressActive, startAnalyzeProgress, finishAnalyzeProgress, markPhaseStarted, markPhaseEnded, markScope, noteAnalyzeError, openRootPhase}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/run-ledger.ts {startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache}
-  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/analyze-phases.ts {runInventoryPhase, runImportsPhase, runClassificationsPhase, runZonesPhase, runComponentsPhase, runCallGraphPhase, PhasePrerequsiteError, PhaseError, MAX_ENRICHMENT_PASS}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/analyze-phases.ts {runInventoryPhase, runImportsPhase, runClassificationsPhase, runZonesPhase, runComponentsPhase, runCallGraphPhase, packFrameworkFacts, suggestPack, optionalPacksLine, PhasePrerequsiteError, PhaseError, MAX_ENRICHMENT_PASS}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/analyze-phases.ts {AnalyzeContext}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/narrate.ts {carryNarration, cmdNarrate, narrationLogPath, takeOverNarration}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/narrate.ts {NarrateDeps}

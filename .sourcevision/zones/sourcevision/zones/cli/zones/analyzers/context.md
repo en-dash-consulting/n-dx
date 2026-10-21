@@ -5,41 +5,32 @@
 <zone>
 
 Zone: Analyzers (`sourcevision/cli/analyzers`)
-Files: 7, Cohesion: 0.59, Coupling: 0.41
-Description: 7 files, primarily TypeScript
-Entry points: packages/sourcevision/src/analyzers/analysis-outcome.ts, packages/sourcevision/src/analyzers/workspace-aggregate.ts, packages/sourcevision/src/analyzers/workspace-crossings.ts, packages/sourcevision/src/analyzers/workspace.ts, packages/sourcevision/src/paths.ts, packages/sourcevision/src/schema/data-files.ts, packages/sourcevision/src/util/paths.ts
-Lines: 2113
+Files: 4, Cohesion: 0.56, Coupling: 0.44
+Description: 4 files, primarily TypeScript
+Entry points: packages/sourcevision/src/analyzers/imports.ts, packages/sourcevision/src/analyzers/pack-imports.ts, packages/sourcevision/src/analyzers/terraform-infrastructure.ts, packages/sourcevision/src/language/pack-loader.ts
+Lines: 1494
 
 </zone>
 
 <files>
 
-packages/sourcevision/src/analyzers/analysis-outcome.ts (TypeScript, 103 lines, source)
-packages/sourcevision/src/analyzers/workspace-aggregate.ts (TypeScript, 543 lines, source)
-packages/sourcevision/src/analyzers/workspace-crossings.ts (TypeScript, 957 lines, source)
-packages/sourcevision/src/analyzers/workspace.ts (TypeScript, 415 lines, source)
-packages/sourcevision/src/paths.ts (TypeScript, 73 lines, source)
-packages/sourcevision/src/schema/data-files.ts (TypeScript, 18 lines, source)
-packages/sourcevision/src/util/paths.ts (TypeScript, 4 lines, source)
+packages/sourcevision/src/analyzers/imports.ts (TypeScript, 816 lines, source)
+packages/sourcevision/src/analyzers/pack-imports.ts (TypeScript, 260 lines, source)
+packages/sourcevision/src/analyzers/terraform-infrastructure.ts (TypeScript, 173 lines, source)
+packages/sourcevision/src/language/pack-loader.ts (TypeScript, 245 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/sourcevision/src/analyzers/analysis-outcome.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace-crossings.ts {buildPackageMap, computeCrossRepoEdges, countCrossingsBySource}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace-crossings.ts {WithheldCrossing}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace.ts {promoteZones, promoteCrossings, buildSubAnalysisRefs, detectSubAnalyses, loadMemberArtifacts}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace.ts {SubAnalysis}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/paths.ts {resolveSourcevisionPaths}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES, SUPPLEMENTARY_FILES}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/util/paths.ts {toPosix}
-  packages/sourcevision/src/analyzers/workspace-crossings.ts → packages/sourcevision/src/analyzers/workspace.ts {SubAnalysis}
-  packages/sourcevision/src/analyzers/workspace-crossings.ts → packages/sourcevision/src/util/paths.ts {toPosix}
-  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/paths.ts {resolveSourcevisionPaths}
-  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES}
-  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/util/paths.ts {toPosix}
-  packages/sourcevision/src/paths.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES}
+  packages/sourcevision/src/analyzers/imports.ts → packages/sourcevision/src/analyzers/pack-imports.ts {buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts}
+  packages/sourcevision/src/analyzers/imports.ts → packages/sourcevision/src/analyzers/pack-imports.ts {PackImportsOptions}
+  packages/sourcevision/src/analyzers/imports.ts → packages/sourcevision/src/analyzers/terraform-infrastructure.ts {isTerraformSource}
+  packages/sourcevision/src/analyzers/pack-imports.ts → packages/sourcevision/src/language/pack-loader.ts {INSTALLABLE_PACKS, KNOWN_PACKS, isSuggestedPack, loadPack, packInstallCommand}
+  packages/sourcevision/src/analyzers/pack-imports.ts → packages/sourcevision/src/language/pack-loader.ts {InstallablePack, KnownPack, PackLoaderOptions}
+  packages/sourcevision/src/analyzers/terraform-infrastructure.ts → packages/sourcevision/src/analyzers/pack-imports.ts {noticeListedPacks}
+  packages/sourcevision/src/analyzers/terraform-infrastructure.ts → packages/sourcevision/src/language/pack-loader.ts {KNOWN_PACKS, isSuggestedPack, loadPack, packInstallCommand}
+  packages/sourcevision/src/analyzers/terraform-infrastructure.ts → packages/sourcevision/src/language/pack-loader.ts {KnownPack, PackLoaderOptions}
 
 </imports>

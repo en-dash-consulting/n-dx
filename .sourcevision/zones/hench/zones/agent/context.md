@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Agent (`hench/agent`)
-Files: 51, Cohesion: 0.59, Coupling: 0.41
+Files: 51, Cohesion: 0.58, Coupling: 0.42
 Description: 51 files, primarily TypeScript
 Entry points: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/adversarial-review.ts, packages/hench/src/agent/analysis/livelock.ts, packages/hench/src/agent/analysis/plan-only-detection.ts, packages/hench/src/agent/analysis/spin.ts, packages/hench/src/agent/analysis/workflow.ts, packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts, packages/hench/src/agent/lifecycle/agent-effort.ts, packages/hench/src/agent/lifecycle/background-wait.ts, packages/hench/src/agent/lifecycle/batch-divider.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts, packages/hench/src/agent/lifecycle/context-prune.ts, packages/hench/src/agent/lifecycle/event-accumulator.ts, packages/hench/src/agent/lifecycle/heartbeat.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/lifecycle/orientation.ts, packages/hench/src/agent/lifecycle/pair-review-rounds.ts, packages/hench/src/agent/lifecycle/plan-mode-prompt.ts, packages/hench/src/agent/lifecycle/primer.ts, packages/hench/src/agent/lifecycle/prior-attempt-work.ts, packages/hench/src/agent/lifecycle/prompt-diagnostics.ts, packages/hench/src/agent/lifecycle/read-only-refusal.ts, packages/hench/src/agent/lifecycle/session-cache.ts, packages/hench/src/agent/lifecycle/spawn-budget.ts, packages/hench/src/agent/lifecycle/task-display.ts, packages/hench/src/agent/lifecycle/token-budget.ts, packages/hench/src/agent/lifecycle/token-usage.ts, packages/hench/src/agent/lifecycle/vendor-adapter.ts, packages/hench/src/agent/token-cost.ts, packages/hench/src/cli/commands/cache.ts, packages/hench/src/cli/commands/validate-tokens.ts, packages/hench/src/cli/help.ts, packages/hench/src/prd/llm-gateway.ts, packages/hench/src/quota/token-validation-hook.ts, packages/hench/src/quota/token-validation.ts, packages/hench/src/store/project-config.ts, packages/hench/src/store/runs.ts, packages/hench/src/tools/contracts.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/files.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/shell.ts, packages/hench/src/types/output.ts
-Lines: 18182
+Lines: 18189
 
 </zone>
 
@@ -28,12 +28,12 @@ packages/hench/src/agent/lifecycle/adapters/index.ts (TypeScript, 53 lines, sour
 packages/hench/src/agent/lifecycle/agent-effort.ts (TypeScript, 61 lines, source)
 packages/hench/src/agent/lifecycle/background-wait.ts (TypeScript, 102 lines, source)
 packages/hench/src/agent/lifecycle/batch-divider.ts (TypeScript, 58 lines, source)
-packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 3219 lines, source)
+packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 3224 lines, source)
 packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts (TypeScript, 110 lines, source)
 packages/hench/src/agent/lifecycle/context-prune.ts (TypeScript, 687 lines, source)
 packages/hench/src/agent/lifecycle/event-accumulator.ts (TypeScript, 806 lines, source)
 packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 121 lines, source)
-packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 2202 lines, source)
+packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 2204 lines, source)
 packages/hench/src/agent/lifecycle/orientation.ts (TypeScript, 304 lines, source)
 packages/hench/src/agent/lifecycle/pair-review-rounds.ts (TypeScript, 154 lines, source)
 packages/hench/src/agent/lifecycle/plan-mode-prompt.ts (TypeScript, 130 lines, source)

@@ -1,0 +1,35 @@
+{
+  "id": "java-language-pack",
+  "name": "Java Language Pack",
+  "description": "Focused language analyzer for Java with Maven/Gradle support, Spring Boot integration, and SQL detection.",
+  "files": [
+    "packages/lang-java/src/index.ts",
+    "packages/lang-java/src/java-pack.ts",
+    "packages/lang-java/src/java-resolver.ts",
+    "packages/lang-java/src/java-sql.ts",
+    "packages/lang-java/src/java-test-artifacts.ts",
+    "packages/lang-java/src/pack.ts",
+    "packages/lang-java/src/package-paths.ts",
+    "packages/lang-java/src/spring-boot.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-java/src/index.ts",
+    "packages/lang-java/src/java-pack.ts",
+    "packages/lang-java/src/java-resolver.ts",
+    "packages/lang-java/src/java-sql.ts",
+    "packages/lang-java/src/pack.ts",
+    "packages/lang-java/src/package-paths.ts",
+    "packages/lang-java/src/spring-boot.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 1637,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

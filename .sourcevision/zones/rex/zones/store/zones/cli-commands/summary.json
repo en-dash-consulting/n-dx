@@ -1,0 +1,31 @@
+{
+  "id": "rex/store/cli-commands",
+  "name": "Cli Commands",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/folder-tree-sync.ts",
+    "packages/rex/src/cli/commands/migrate-to-folder-tree.ts",
+    "packages/rex/src/cli/commands/validate.ts",
+    "packages/rex/src/cli/help.ts",
+    "packages/rex/src/core/post-merge-validate.ts",
+    "packages/rex/src/store/branch-naming.ts",
+    "packages/rex/src/store/index.ts",
+    "packages/rex/src/store/prd-discovery.ts",
+    "packages/rex/src/store/prd-migration.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/folder-tree-sync.ts",
+    "packages/rex/src/cli/commands/migrate-to-folder-tree.ts",
+    "packages/rex/src/cli/commands/validate.ts",
+    "packages/rex/src/cli/help.ts",
+    "packages/rex/src/core/post-merge-validate.ts",
+    "packages/rex/src/store/branch-naming.ts",
+    "packages/rex/src/store/index.ts",
+    "packages/rex/src/store/prd-discovery.ts",
+    "packages/rex/src/store/prd-migration.ts"
+  ],
+  "cohesion": 0.63,
+  "coupling": 0.37,
+  "fileCount": 9,
+  "lineCount": 3240
+}

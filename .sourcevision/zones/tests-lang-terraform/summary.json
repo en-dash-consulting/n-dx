@@ -1,0 +1,25 @@
+{
+  "id": "tests-lang-terraform",
+  "name": "Tests Lang Terraform",
+  "description": "Non-source files in packages: pack-fixtures.ts, grammar.test.ts, module-instances.test.ts (+3 more)",
+  "files": [
+    "packages/lang-terraform/tests/helpers/pack-fixtures.ts",
+    "packages/lang-terraform/tests/integration/grammar.test.ts",
+    "packages/lang-terraform/tests/integration/module-instances.test.ts",
+    "packages/lang-terraform/tests/integration/pack-golden.test.ts",
+    "packages/lang-terraform/tests/unit/index.test.ts",
+    "packages/lang-terraform/tests/unit/terraform-model.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 584,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

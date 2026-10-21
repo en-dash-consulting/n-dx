@@ -12,6 +12,7 @@
     "tests/hidden-child-process.js",
     "tests/setup-color-env.js",
     "tests/setup-judgment-env.js",
+    "tests/setup-ndx-home.js",
     "tests/setup-session-env.js",
     "tests/vitest-isolation.d.mts",
     "tests/vitest-isolation.mjs"
@@ -23,8 +24,8 @@
   ],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 12,
-  "lineCount": 1067,
+  "fileCount": 13,
+  "lineCount": 1101,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

@@ -6,14 +6,16 @@
     "packages/sourcevision/tests/e2e/cli-analyze.test.ts",
     "packages/sourcevision/tests/e2e/cli-hints.test.ts",
     "packages/sourcevision/tests/e2e/cli-iso.test.ts",
+    "packages/sourcevision/tests/e2e/cli-pack.test.ts",
     "packages/sourcevision/tests/e2e/cli-serve.test.ts",
+    "packages/sourcevision/tests/e2e/packed-tarball.test.ts",
     "packages/sourcevision/tests/e2e/prd-epic-resolver-contract.test.ts"
   ],
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 5,
-  "lineCount": 1180,
+  "fileCount": 7,
+  "lineCount": 1463,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

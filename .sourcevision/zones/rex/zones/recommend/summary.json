@@ -1,29 +1,36 @@
 {
   "id": "rex/recommend",
-  "name": "Recommendation Engine",
-  "description": "8 files, primarily TypeScript",
+  "name": "Recommend",
+  "description": "12 files, primarily TypeScript",
   "files": [
     "packages/rex/src/analyze/acknowledge.ts",
+    "packages/rex/src/analyze/dedupe.ts",
+    "packages/rex/src/analyze/reconcile.ts",
     "packages/rex/src/cli/commands/recommend.ts",
+    "packages/rex/src/cli/commands/reshape-detect-duplicates.ts",
+    "packages/rex/src/cli/commands/validate-interactive.ts",
+    "packages/rex/src/core/epic-correlation.ts",
     "packages/rex/src/recommend/conflict-detection.ts",
     "packages/rex/src/recommend/create-from-recommendations.ts",
     "packages/rex/src/recommend/similarity.ts",
     "packages/rex/src/recommend/text-similarity-shared.ts",
-    "packages/rex/src/recommend/tree.ts",
     "packages/rex/src/recommend/types.ts"
   ],
   "entryPoints": [
     "packages/rex/src/analyze/acknowledge.ts",
+    "packages/rex/src/analyze/dedupe.ts",
+    "packages/rex/src/analyze/reconcile.ts",
     "packages/rex/src/cli/commands/recommend.ts",
+    "packages/rex/src/cli/commands/reshape-detect-duplicates.ts",
+    "packages/rex/src/cli/commands/validate-interactive.ts",
+    "packages/rex/src/core/epic-correlation.ts",
     "packages/rex/src/recommend/conflict-detection.ts",
     "packages/rex/src/recommend/create-from-recommendations.ts",
     "packages/rex/src/recommend/similarity.ts",
-    "packages/rex/src/recommend/text-similarity-shared.ts",
-    "packages/rex/src/recommend/tree.ts",
     "packages/rex/src/recommend/types.ts"
   ],
-  "cohesion": 0.65,
-  "coupling": 0.35,
-  "fileCount": 8,
-  "lineCount": 2292
+  "cohesion": 0.82,
+  "coupling": 0.18,
+  "fileCount": 12,
+  "lineCount": 3434
 }

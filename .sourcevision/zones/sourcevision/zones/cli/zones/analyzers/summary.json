@@ -1,27 +1,21 @@
 {
   "id": "sourcevision/cli/analyzers",
   "name": "Analyzers",
-  "description": "7 files, primarily TypeScript",
+  "description": "4 files, primarily TypeScript",
   "files": [
-    "packages/sourcevision/src/analyzers/analysis-outcome.ts",
-    "packages/sourcevision/src/analyzers/workspace-aggregate.ts",
-    "packages/sourcevision/src/analyzers/workspace-crossings.ts",
-    "packages/sourcevision/src/analyzers/workspace.ts",
-    "packages/sourcevision/src/paths.ts",
-    "packages/sourcevision/src/schema/data-files.ts",
-    "packages/sourcevision/src/util/paths.ts"
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "packages/sourcevision/src/analyzers/pack-imports.ts",
+    "packages/sourcevision/src/analyzers/terraform-infrastructure.ts",
+    "packages/sourcevision/src/language/pack-loader.ts"
   ],
   "entryPoints": [
-    "packages/sourcevision/src/analyzers/analysis-outcome.ts",
-    "packages/sourcevision/src/analyzers/workspace-aggregate.ts",
-    "packages/sourcevision/src/analyzers/workspace-crossings.ts",
-    "packages/sourcevision/src/analyzers/workspace.ts",
-    "packages/sourcevision/src/paths.ts",
-    "packages/sourcevision/src/schema/data-files.ts",
-    "packages/sourcevision/src/util/paths.ts"
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "packages/sourcevision/src/analyzers/pack-imports.ts",
+    "packages/sourcevision/src/analyzers/terraform-infrastructure.ts",
+    "packages/sourcevision/src/language/pack-loader.ts"
   ],
-  "cohesion": 0.59,
-  "coupling": 0.41,
-  "fileCount": 7,
-  "lineCount": 2113
+  "cohesion": 0.56,
+  "coupling": 0.44,
+  "fileCount": 4,
+  "lineCount": 1494
 }

@@ -5,85 +5,32 @@
 <zone>
 
 Zone: Cli (`rex/cli`)
-Files: 24, Cohesion: 0.47, Coupling: 0.53
-Description: 24 files, primarily TypeScript
-Entry points: packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/codeowners.ts, packages/rex/src/cli/commands/init.ts, packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts, packages/rex/src/cli/commands/migrate-slugs.ts, packages/rex/src/cli/commands/migrate-to-md.ts, packages/rex/src/cli/commands/next.ts, packages/rex/src/cli/commands/parse-md.ts, packages/rex/src/cli/commands/release.ts, packages/rex/src/cli/commands/remove.ts, packages/rex/src/cli/commands/reshape-product.ts, packages/rex/src/cli/commands/restore.ts, packages/rex/src/cli/commands/update.ts, packages/rex/src/cli/commands/verify.ts, packages/rex/src/cli/completion-hold.ts, packages/rex/src/cli/errors.ts, packages/rex/src/cli/output.ts, packages/rex/src/cli/snapshot-guard.ts, packages/rex/src/cli/validate-input.ts, packages/rex/src/codeowners/plan.ts, packages/rex/src/core/backup-snapshots.ts, packages/rex/src/core/timestamps.ts, packages/rex/src/store/title-to-filename.ts, packages/rex/src/workflow/default.ts
-Lines: 3915
+Files: 5, Cohesion: 1.00, Coupling: 0.00
+Description: 5 files, primarily TypeScript
+Entry points: packages/rex/src/analyze/batch-types.ts, packages/rex/src/cli/commands/chunked-review-state.ts, packages/rex/src/cli/commands/chunked-review-types.ts, packages/rex/src/cli/commands/chunked-review.ts
+Lines: 1184
 
 </zone>
 
 <files>
 
-packages/rex/src/cli/commands/add.ts (TypeScript, 256 lines, source)
-packages/rex/src/cli/commands/codeowners.ts (TypeScript, 90 lines, source)
-packages/rex/src/cli/commands/init.ts (TypeScript, 172 lines, source)
-packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts (TypeScript, 330 lines, source)
-packages/rex/src/cli/commands/migrate-slugs.ts (TypeScript, 212 lines, source)
-packages/rex/src/cli/commands/migrate-to-md.ts (TypeScript, 55 lines, source)
-packages/rex/src/cli/commands/next.ts (TypeScript, 151 lines, source)
-packages/rex/src/cli/commands/parse-md.ts (TypeScript, 48 lines, source)
-packages/rex/src/cli/commands/release.ts (TypeScript, 103 lines, source)
-packages/rex/src/cli/commands/remove.ts (TypeScript, 263 lines, source)
-packages/rex/src/cli/commands/reshape-product.ts (TypeScript, 104 lines, source)
-packages/rex/src/cli/commands/restore.ts (TypeScript, 143 lines, source)
-packages/rex/src/cli/commands/update.ts (TypeScript, 322 lines, source)
-packages/rex/src/cli/commands/verify.ts (TypeScript, 111 lines, source)
-packages/rex/src/cli/completion-hold.ts (TypeScript, 62 lines, source)
-packages/rex/src/cli/errors.ts (TypeScript, 225 lines, source)
-packages/rex/src/cli/output.ts (TypeScript, 130 lines, source)
-packages/rex/src/cli/snapshot-guard.ts (TypeScript, 95 lines, source)
-packages/rex/src/cli/validate-input.ts (TypeScript, 146 lines, source)
-packages/rex/src/codeowners/plan.ts (TypeScript, 133 lines, source)
-packages/rex/src/core/backup-snapshots.ts (TypeScript, 475 lines, source)
-packages/rex/src/core/timestamps.ts (TypeScript, 121 lines, source)
-packages/rex/src/store/title-to-filename.ts (TypeScript, 98 lines, source)
-packages/rex/src/workflow/default.ts (TypeScript, 70 lines, source)
+packages/rex/src/analyze/batch-types.ts (TypeScript, 50 lines, source)
+packages/rex/src/cli/commands/chunked-review-state.ts (TypeScript, 832 lines, source)
+packages/rex/src/cli/commands/chunked-review-types.ts (TypeScript, 45 lines, source)
+packages/rex/src/cli/commands/chunked-review.ts (TypeScript, 212 lines, source)
+packages/rex/src/cli/commands/modification-intent.ts (TypeScript, 45 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/rex/src/cli/commands/add.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/add.ts → packages/rex/src/cli/output.ts {info, result, warn}
-  packages/rex/src/cli/commands/add.ts → packages/rex/src/cli/snapshot-guard.ts {ensureSnapshot, formatRecoveryHint}
-  packages/rex/src/cli/commands/codeowners.ts → packages/rex/src/cli/errors.ts {CLIError, requireRexDir}
-  packages/rex/src/cli/commands/codeowners.ts → packages/rex/src/cli/output.ts {info, result, warn}
-  packages/rex/src/cli/commands/codeowners.ts → packages/rex/src/codeowners/plan.ts {planCodeOwners}
-  packages/rex/src/cli/commands/init.ts → packages/rex/src/cli/output.ts {info}
-  packages/rex/src/cli/commands/init.ts → packages/rex/src/workflow/default.ts {NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE}
-  packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts → packages/rex/src/cli/output.ts {info}
-  packages/rex/src/cli/commands/migrate-folder-tree-filenames.ts → packages/rex/src/store/title-to-filename.ts {appendFilenameSuffix, titleToFilename}
-  packages/rex/src/cli/commands/migrate-slugs.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/migrate-slugs.ts → packages/rex/src/cli/output.ts {info, result}
-  packages/rex/src/cli/commands/migrate-slugs.ts → packages/rex/src/cli/snapshot-guard.ts {ensureSnapshot}
-  packages/rex/src/cli/commands/migrate-to-md.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/migrate-to-md.ts → packages/rex/src/cli/output.ts {info}
-  packages/rex/src/cli/commands/next.ts → packages/rex/src/cli/output.ts {info, result}
-  packages/rex/src/cli/commands/parse-md.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/parse-md.ts → packages/rex/src/cli/output.ts {result}
-  packages/rex/src/cli/commands/release.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/release.ts → packages/rex/src/cli/output.ts {result, warn}
-  packages/rex/src/cli/commands/remove.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/remove.ts → packages/rex/src/cli/output.ts {info, warn, result}
-  packages/rex/src/cli/commands/remove.ts → packages/rex/src/cli/snapshot-guard.ts {ensureSnapshot}
-  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/timestamps.ts {computeTimestampUpdates}
-  packages/rex/src/cli/commands/reshape-product.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/reshape-product.ts → packages/rex/src/cli/output.ts {info, startSpinner}
-  packages/rex/src/cli/commands/restore.ts → packages/rex/src/cli/errors.ts {CLIError, requireRexDir}
-  packages/rex/src/cli/commands/restore.ts → packages/rex/src/cli/output.ts {info, result, warn}
-  packages/rex/src/cli/commands/restore.ts → packages/rex/src/core/backup-snapshots.ts {getAvailableBackups, restoreFromBackup, V2_RESTORE_REFUSAL}
-  packages/rex/src/cli/commands/update.ts → packages/rex/src/cli/completion-hold.ts {holdCompletionForRun, describeHeldCompletion}
-  packages/rex/src/cli/commands/update.ts → packages/rex/src/cli/errors.ts {CLIError, requireRexDir}
-  packages/rex/src/cli/commands/update.ts → packages/rex/src/cli/output.ts {info, result, warn}
-  packages/rex/src/cli/commands/update.ts → packages/rex/src/core/timestamps.ts {computeTimestampUpdates}
-  packages/rex/src/cli/commands/verify.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/commands/verify.ts → packages/rex/src/cli/output.ts {info, result}
-  packages/rex/src/cli/snapshot-guard.ts → packages/rex/src/cli/errors.ts {CLIError}
-  packages/rex/src/cli/snapshot-guard.ts → packages/rex/src/cli/output.ts {warn}
-  packages/rex/src/cli/snapshot-guard.ts → packages/rex/src/core/backup-snapshots.ts {snapshotPRDTree, pruneBackups}
-  packages/rex/src/cli/snapshot-guard.ts → packages/rex/src/core/backup-snapshots.ts {BackupSnapshot}
-  packages/rex/src/cli/validate-input.ts → packages/rex/src/cli/errors.ts {CLIError}
+  packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/analyze/batch-types.ts {GranularityAdjustmentRecord, BatchAcceptanceRecord}
+  packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/cli/commands/chunked-review-types.ts {Proposal}
+  packages/rex/src/cli/commands/chunked-review-state.ts → packages/rex/src/cli/commands/modification-intent.ts {classifyModificationRequest}
+  packages/rex/src/cli/commands/chunked-review.ts → packages/rex/src/cli/commands/chunked-review-state.ts {GranularityAdjustmentRecord, ChunkReviewState, ChunkAction, GranularityRequest, BatchAcceptanceRecord, GranularityHandler, AssessmentHandler, ModificationHandler, ProposalAssessment, createReviewState, getCurrentChunk, formatPaginationHeader, formatChunk, formatActionMenu, buildPrompt, parseChunkInput, applyAction, replaceProposals, getAcceptedProposals, getRemainingProposals, buildBatchRecord, formatBatchSummary}
+  packages/rex/src/cli/commands/chunked-review.ts → packages/rex/src/cli/commands/chunked-review-state.ts {createReviewState, formatPaginationHeader, formatChunk, formatActionMenu, buildPrompt, parseChunkInput, applyAction, replaceProposals, getAcceptedProposals, getRemainingProposals, buildBatchRecord, formatBatchSummary}
+  packages/rex/src/cli/commands/chunked-review.ts → packages/rex/src/cli/commands/chunked-review-state.ts {GranularityHandler, AssessmentHandler, ModificationHandler, BatchAcceptanceRecord}
+  packages/rex/src/cli/commands/chunked-review.ts → packages/rex/src/cli/commands/chunked-review-types.ts {Proposal}
 
 </imports>

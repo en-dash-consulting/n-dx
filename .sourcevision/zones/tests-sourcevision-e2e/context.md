@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Tests Sourcevision E2e (`tests-sourcevision-e2e`)
-Files: 5, Cohesion: 1.00, Coupling: 0.00
+Files: 7, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.test.ts (+2 more)
-Lines: 1180
+Lines: 1463
 
 </zone>
 
@@ -17,7 +17,9 @@ Lines: 1180
 packages/sourcevision/tests/e2e/cli-analyze.test.ts (TypeScript, 409 lines, test)
 packages/sourcevision/tests/e2e/cli-hints.test.ts (TypeScript, 161 lines, test)
 packages/sourcevision/tests/e2e/cli-iso.test.ts (TypeScript, 198 lines, test)
+packages/sourcevision/tests/e2e/cli-pack.test.ts (TypeScript, 72 lines, test)
 packages/sourcevision/tests/e2e/cli-serve.test.ts (TypeScript, 143 lines, test)
+packages/sourcevision/tests/e2e/packed-tarball.test.ts (TypeScript, 211 lines, test)
 packages/sourcevision/tests/e2e/prd-epic-resolver-contract.test.ts (TypeScript, 269 lines, test)
 
 </files>
@@ -26,7 +28,8 @@ packages/sourcevision/tests/e2e/prd-epic-resolver-contract.test.ts (TypeScript, 
 
 
 Outgoing (this zone → other zones):
-  → sourcevision: packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/analyzers/analyze-progress.ts; packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/analyzers/readiness-score.ts; packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/tests/e2e/prd-epic-resolver-contract.test.ts → packages/sourcevision/src/cli/commands/prd-epic-resolver.ts
+  → sourcevision: packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/analyzers/analyze-progress.ts; packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/analyzers/readiness-score.ts; packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/schema/data-files.ts; packages/sourcevision/tests/e2e/cli-analyze.test.ts → packages/sourcevision/src/schema/validate.ts; packages/sourcevision/tests/e2e/packed-tarball.test.ts → packages/sourcevision/src/language/pack-loader.ts; packages/sourcevision/tests/e2e/prd-epic-resolver-contract.test.ts → packages/sourcevision/src/cli/commands/prd-epic-resolver.ts
+  → tests-packages: packages/sourcevision/tests/e2e/packed-tarball.test.ts → packages/sourcevision/tests/helpers/workspace-pack.ts
 
 </imports>
 
@@ -39,6 +42,6 @@ Outgoing (this zone → other zones):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 93 internal calls, 27 outgoing, 0 incoming (cohesion: 0.78, coupling: 0.23)
+- [call graph] 110 internal calls, 27 outgoing, 0 incoming (cohesion: 0.8, coupling: 0.2)
 
 </insights>

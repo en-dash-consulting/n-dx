@@ -5,66 +5,324 @@
 <zone>
 
 Zone: Analyzers (`sourcevision/analyzers`)
-Files: 18, Cohesion: 0.39, Coupling: 0.61
-Description: 18 files, primarily TypeScript
-Entry points: packages/sourcevision/src/analyzers/archetypes.ts, packages/sourcevision/src/analyzers/callgraph-findings.ts, packages/sourcevision/src/analyzers/callgraph.ts, packages/sourcevision/src/analyzers/components.ts, packages/sourcevision/src/analyzers/context.ts, packages/sourcevision/src/analyzers/llms-txt.ts, packages/sourcevision/src/analyzers/next-steps.ts, packages/sourcevision/src/analyzers/outbound-detection.ts, packages/sourcevision/src/analyzers/route-detection.ts, packages/sourcevision/src/analyzers/server-route-detection.ts, packages/sourcevision/src/analyzers/swift-imports.ts, packages/sourcevision/src/analyzers/zone-output.ts, packages/sourcevision/src/export/pdf-report.ts, packages/sourcevision/src/schema/index.ts, packages/sourcevision/src/util/merge.ts
-Lines: 6902
+Files: 58, Cohesion: 0.77, Coupling: 0.23
+Description: 58 files, primarily TypeScript
+Entry points: packages/sourcevision/src/analyzers/analysis-outcome.ts, packages/sourcevision/src/analyzers/archetypes.ts, packages/sourcevision/src/analyzers/area-naming.ts, packages/sourcevision/src/analyzers/callgraph-findings.ts, packages/sourcevision/src/analyzers/callgraph.ts, packages/sourcevision/src/analyzers/classify.ts, packages/sourcevision/src/analyzers/claude-client.ts, packages/sourcevision/src/analyzers/components.ts, packages/sourcevision/src/analyzers/context.ts, packages/sourcevision/src/analyzers/csharp-imports.ts, packages/sourcevision/src/analyzers/declared-rules.ts, packages/sourcevision/src/analyzers/enrich-batch.ts, packages/sourcevision/src/analyzers/enrich-cascade.ts, packages/sourcevision/src/analyzers/enrich-config.ts, packages/sourcevision/src/analyzers/enrich-judge.ts, packages/sourcevision/src/analyzers/enrich-multiplex.ts, packages/sourcevision/src/analyzers/enrich-parsing.ts, packages/sourcevision/src/analyzers/enrich-per-zone.ts, packages/sourcevision/src/analyzers/enrich.ts, packages/sourcevision/src/analyzers/file-headers.ts, packages/sourcevision/src/analyzers/go-imports.ts, packages/sourcevision/src/analyzers/go-outbound-detection.ts, packages/sourcevision/src/analyzers/go-route-detection.ts, packages/sourcevision/src/analyzers/llms-txt.ts, packages/sourcevision/src/analyzers/louvain.ts, packages/sourcevision/src/analyzers/move-recommendations.ts, packages/sourcevision/src/analyzers/next-steps.ts, packages/sourcevision/src/analyzers/outbound-detection.ts, packages/sourcevision/src/analyzers/pack-framework-facts.ts, packages/sourcevision/src/analyzers/partition-review.ts, packages/sourcevision/src/analyzers/primer.ts, packages/sourcevision/src/analyzers/prompt-envelope.ts, packages/sourcevision/src/analyzers/rerun-judge.ts, packages/sourcevision/src/analyzers/route-convention.ts, packages/sourcevision/src/analyzers/route-detection.ts, packages/sourcevision/src/analyzers/server-route-detection.ts, packages/sourcevision/src/analyzers/subzone-naming.ts, packages/sourcevision/src/analyzers/swift-imports.ts, packages/sourcevision/src/analyzers/token-usage.ts, packages/sourcevision/src/analyzers/typed-findings.ts, packages/sourcevision/src/analyzers/workspace-aggregate.ts, packages/sourcevision/src/analyzers/workspace-crossings.ts, packages/sourcevision/src/analyzers/workspace.ts, packages/sourcevision/src/analyzers/zone-areas.ts, packages/sourcevision/src/analyzers/zone-identity.ts, packages/sourcevision/src/analyzers/zone-naming.ts, packages/sourcevision/src/analyzers/zone-output.ts, packages/sourcevision/src/analyzers/zone-symbols.ts, packages/sourcevision/src/analyzers/zones.ts, packages/sourcevision/src/export/pdf-report.ts, packages/sourcevision/src/paths.ts, packages/sourcevision/src/schema/data-files.ts, packages/sourcevision/src/schema/index.ts, packages/sourcevision/src/util/merge.ts, packages/sourcevision/src/util/paths.ts
+Lines: 25130
 
 </zone>
 
 <files>
 
+packages/sourcevision/src/analyzers/analysis-outcome.ts (TypeScript, 103 lines, source)
 packages/sourcevision/src/analyzers/archetypes.ts (TypeScript, 288 lines, source)
+packages/sourcevision/src/analyzers/area-naming.ts (TypeScript, 99 lines, source)
 packages/sourcevision/src/analyzers/callgraph-findings.ts (TypeScript, 662 lines, source)
 packages/sourcevision/src/analyzers/callgraph.ts (TypeScript, 813 lines, source)
-packages/sourcevision/src/analyzers/components.ts (TypeScript, 838 lines, source)
+packages/sourcevision/src/analyzers/classify.ts (TypeScript, 798 lines, source)
+packages/sourcevision/src/analyzers/claude-client.ts (TypeScript, 238 lines, source)
+packages/sourcevision/src/analyzers/components.ts (TypeScript, 841 lines, source)
 packages/sourcevision/src/analyzers/context.ts (TypeScript, 272 lines, source)
-packages/sourcevision/src/analyzers/index.ts (TypeScript, 31 lines, source)
+packages/sourcevision/src/analyzers/csharp-imports.ts (TypeScript, 517 lines, source)
+packages/sourcevision/src/analyzers/declared-rules.ts (TypeScript, 396 lines, source)
+packages/sourcevision/src/analyzers/enrich-batch.ts (TypeScript, 678 lines, source)
+packages/sourcevision/src/analyzers/enrich-cascade.ts (TypeScript, 405 lines, source)
+packages/sourcevision/src/analyzers/enrich-config.ts (TypeScript, 279 lines, source)
+packages/sourcevision/src/analyzers/enrich-judge.ts (TypeScript, 914 lines, source)
+packages/sourcevision/src/analyzers/enrich-multiplex.ts (TypeScript, 245 lines, source)
+packages/sourcevision/src/analyzers/enrich-parsing.ts (TypeScript, 591 lines, source)
+packages/sourcevision/src/analyzers/enrich-per-zone.ts (TypeScript, 485 lines, source)
+packages/sourcevision/src/analyzers/enrich.ts (TypeScript, 434 lines, source)
+packages/sourcevision/src/analyzers/file-headers.ts (TypeScript, 87 lines, source)
+packages/sourcevision/src/analyzers/go-imports.ts (TypeScript, 249 lines, source)
+packages/sourcevision/src/analyzers/go-outbound-detection.ts (TypeScript, 728 lines, source)
+packages/sourcevision/src/analyzers/go-route-detection.ts (TypeScript, 320 lines, source)
 packages/sourcevision/src/analyzers/llms-txt.ts (TypeScript, 350 lines, source)
+packages/sourcevision/src/analyzers/louvain.ts (TypeScript, 903 lines, source)
+packages/sourcevision/src/analyzers/move-recommendations.ts (TypeScript, 221 lines, source)
 packages/sourcevision/src/analyzers/next-steps.ts (TypeScript, 295 lines, source)
 packages/sourcevision/src/analyzers/outbound-detection.ts (TypeScript, 1043 lines, source)
+packages/sourcevision/src/analyzers/pack-framework-facts.ts (TypeScript, 122 lines, source)
+packages/sourcevision/src/analyzers/partition-review.ts (TypeScript, 262 lines, source)
+packages/sourcevision/src/analyzers/primer.ts (TypeScript, 265 lines, source)
+packages/sourcevision/src/analyzers/prompt-envelope.ts (TypeScript, 205 lines, source)
+packages/sourcevision/src/analyzers/rerun-judge.ts (TypeScript, 461 lines, source)
+packages/sourcevision/src/analyzers/route-convention.ts (TypeScript, 271 lines, source)
 packages/sourcevision/src/analyzers/route-detection.ts (TypeScript, 377 lines, source)
-packages/sourcevision/src/analyzers/server-route-detection.ts (TypeScript, 336 lines, source)
+packages/sourcevision/src/analyzers/server-route-detection.ts (TypeScript, 339 lines, source)
+packages/sourcevision/src/analyzers/subzone-naming.ts (TypeScript, 178 lines, source)
 packages/sourcevision/src/analyzers/swift-imports.ts (TypeScript, 299 lines, source)
+packages/sourcevision/src/analyzers/token-usage.ts (TypeScript, 50 lines, source)
+packages/sourcevision/src/analyzers/typed-findings.ts (TypeScript, 495 lines, source)
+packages/sourcevision/src/analyzers/workspace-aggregate.ts (TypeScript, 543 lines, source)
+packages/sourcevision/src/analyzers/workspace-crossings.ts (TypeScript, 957 lines, source)
+packages/sourcevision/src/analyzers/workspace.ts (TypeScript, 415 lines, source)
+packages/sourcevision/src/analyzers/zone-areas.ts (TypeScript, 333 lines, source)
+packages/sourcevision/src/analyzers/zone-hash.ts (TypeScript, 26 lines, source)
+packages/sourcevision/src/analyzers/zone-identity.ts (TypeScript, 269 lines, source)
+packages/sourcevision/src/analyzers/zone-naming.ts (TypeScript, 702 lines, source)
 packages/sourcevision/src/analyzers/zone-output.ts (TypeScript, 330 lines, source)
+packages/sourcevision/src/analyzers/zone-symbols.ts (TypeScript, 281 lines, source)
+packages/sourcevision/src/analyzers/zones.ts (TypeScript, 3633 lines, source)
 packages/sourcevision/src/export/pdf-report.ts (TypeScript, 566 lines, source)
+packages/sourcevision/src/paths.ts (TypeScript, 73 lines, source)
+packages/sourcevision/src/schema/data-files.ts (TypeScript, 18 lines, source)
 packages/sourcevision/src/schema/index.ts (TypeScript, 17 lines, source)
 packages/sourcevision/src/util/debug-stopwatch.ts (TypeScript, 93 lines, source)
 packages/sourcevision/src/util/debug-timing.ts (TypeScript, 106 lines, source)
 packages/sourcevision/src/util/merge.ts (TypeScript, 186 lines, source)
+packages/sourcevision/src/util/paths.ts (TypeScript, 4 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
+  packages/sourcevision/src/analyzers/analysis-outcome.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES}
+  packages/sourcevision/src/analyzers/analysis-outcome.ts → packages/sourcevision/src/schema/index.ts {AnalysisOutcome, Finding}
   packages/sourcevision/src/analyzers/archetypes.ts → packages/sourcevision/src/schema/index.ts {ArchetypeDefinition}
+  packages/sourcevision/src/analyzers/area-naming.ts → packages/sourcevision/src/analyzers/claude-client.ts {getJudgmentRoute}
+  packages/sourcevision/src/analyzers/area-naming.ts → packages/sourcevision/src/analyzers/route-convention.ts {RouteLayout}
+  packages/sourcevision/src/analyzers/area-naming.ts → packages/sourcevision/src/analyzers/zone-areas.ts {areaAsZone}
+  packages/sourcevision/src/analyzers/area-naming.ts → packages/sourcevision/src/analyzers/zone-identity.ts {idFromName}
+  packages/sourcevision/src/analyzers/area-naming.ts → packages/sourcevision/src/analyzers/zone-naming.ts {nameZonesBySelection}
+  packages/sourcevision/src/analyzers/area-naming.ts → packages/sourcevision/src/schema/index.ts {Zone, ZoneArea}
   packages/sourcevision/src/analyzers/callgraph-findings.ts → packages/sourcevision/src/analyzers/archetypes.ts {BUILTIN_ARCHETYPES}
+  packages/sourcevision/src/analyzers/callgraph-findings.ts → packages/sourcevision/src/analyzers/classify.ts {buildClassificationMap}
   packages/sourcevision/src/analyzers/callgraph-findings.ts → packages/sourcevision/src/schema/index.ts {CallGraph, CallEdge, FunctionNode, Finding, Inventory, ImportEdge, Classifications}
   packages/sourcevision/src/analyzers/callgraph.ts → packages/sourcevision/src/schema/index.ts {FunctionNode, CallEdge, CallType, CallGraph, CallGraphSummary, Inventory, Imports, ImportEdge}
+  packages/sourcevision/src/analyzers/classify.ts → packages/sourcevision/src/analyzers/archetypes.ts {BUILTIN_ARCHETYPES}
+  packages/sourcevision/src/analyzers/classify.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/classify.ts → packages/sourcevision/src/analyzers/file-headers.ts {collectFileHeaders}
+  packages/sourcevision/src/analyzers/classify.ts → packages/sourcevision/src/analyzers/prompt-envelope.ts {section, svPromptEnvelope, svPrompt}
+  packages/sourcevision/src/analyzers/classify.ts → packages/sourcevision/src/analyzers/token-usage.ts {emptyAnalyzeTokenUsage, accumulateTokenUsage}
+  packages/sourcevision/src/analyzers/classify.ts → packages/sourcevision/src/schema/index.ts {Inventory, Imports, ImportEdge, ArchetypeDefinition, ArchetypeSignal, FileClassification, ClassificationEvidence, Classifications, ClassificationsSummary, AnalyzeTokenUsage}
+  packages/sourcevision/src/analyzers/claude-client.ts → packages/sourcevision/src/schema/index.ts {TokenUsage}
+  packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/analyzers/pack-framework-facts.ts {withPackRouteGroups}
+  packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/analyzers/pack-framework-facts.ts {PackFrameworkFacts}
   packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/analyzers/route-detection.ts {ROUTE_EXPORT_NAMES, parseFileRoutePattern, buildRouteTree, findRoutesConfig, parseRoutesConfig, findRoutesDir}
   packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/analyzers/server-route-detection.ts {detectServerRoutes}
   packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/schema/index.ts {ComponentKind, ComponentDefinition, ComponentUsageEdge, RouteExportKind, RouteModule, RouteTreeNode, ServerRouteGroup, Components, ComponentsSummary, Inventory, Imports}
   packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/util/debug-timing.ts {debugTimed, debugTimedAsync, checkpoint}
+  packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/util/paths.ts {toPosix}
+  packages/sourcevision/src/analyzers/context.ts → packages/sourcevision/src/analyzers/classify.ts {buildClassificationMap}
   packages/sourcevision/src/analyzers/context.ts → packages/sourcevision/src/analyzers/next-steps.ts {deriveNextSteps}
   packages/sourcevision/src/analyzers/context.ts → packages/sourcevision/src/schema/index.ts {Manifest, Inventory, Imports, Classifications, Zones, Components}
-  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/callgraph-findings.ts {generateCallGraphFindings}
-  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/callgraph-findings.ts {CallGraphFindingsOptions}
-  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/callgraph.ts {analyzeCallGraph, extractFunctions, extractCalls, computeZoneCallStats}
-  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/callgraph.ts {ZoneCallStats, CrossZoneCallPattern}
-  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/components.ts {analyzeComponents, extractComponentDefinitions, extractJsxUsages, extractConventionExports}
-  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/route-detection.ts {parseFileRoutePattern, buildRouteTree, findRoutesConfig, parseRoutesConfig, findRoutesDir}
+  packages/sourcevision/src/analyzers/csharp-imports.ts → packages/sourcevision/src/schema/index.ts {ImportEdge, ExternalImport}
+  packages/sourcevision/src/analyzers/declared-rules.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/declared-rules.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {tryParseJSON}
+  packages/sourcevision/src/analyzers/declared-rules.ts → packages/sourcevision/src/paths.ts {SV_CACHE_DIRNAME}
+  packages/sourcevision/src/analyzers/declared-rules.ts → packages/sourcevision/src/schema/index.ts {Finding, TokenUsage, Zone, ZoneCrossing}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/analyzers/enrich-config.ts {computeAttemptConfigs, buildMetaPrompt}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/analyzers/enrich-config.ts {PassConfig}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/analyzers/enrich-judge.ts {judgeFindings}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {tryParseJSON, extractFindings, formatFileLabel}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/analyzers/file-headers.ts {extractFileHeader}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/analyzers/prompt-envelope.ts {section, svPromptEnvelope, svPrompt, logSvPromptSections, JSON_OBJECT_ONLY, ONLY_NEW_INSIGHTS, findingsContract, stripJudgedFields, outputLines, findingTypesHint, withHint}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/analyzers/token-usage.ts {emptyAnalyzeTokenUsage, accumulateTokenUsage}
+  packages/sourcevision/src/analyzers/enrich-batch.ts → packages/sourcevision/src/schema/index.ts {Zone, ZoneCrossing, Zones, Finding, AnalyzeTokenUsage, ProjectProfile}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/enrich-judge.ts {assessZoneFragility, fragilityFindings}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/enrich-multiplex.ts {narrateZones}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {EnrichResult}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/enrich.ts {isStructuralZone, applyStructuralTemplate}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/rerun-judge.ts {computeZoneDeltas, computeZoneHeaderHash, emptyRerunOutcome, findingKey, judgeRerun, judgedPreviousFindings}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/rerun-judge.ts {RerunOutcome}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/route-convention.ts {routeLayoutFor}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/token-usage.ts {emptyAnalyzeTokenUsage}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/zone-identity.ts {dedupeZoneNames}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/zone-identity.ts {dedupeZoneNames, isAlgorithmicName, zoneIdsOf}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/analyzers/zone-naming.ts {nameZonesBySelection, describeZoneFromFacts, algorithmicZoneName}
+  packages/sourcevision/src/analyzers/enrich-cascade.ts → packages/sourcevision/src/schema/index.ts {Finding, Imports, Inventory, ProjectProfile, Zone, ZoneCrossing, Zones, AnalyzeTokenUsage}
+  packages/sourcevision/src/analyzers/enrich-config.ts → packages/sourcevision/src/analyzers/prompt-envelope.ts {section, svPromptEnvelope, svPrompt, findingsContract, stripJudgedFields, outputLines, JSON_OBJECT_ONLY}
+  packages/sourcevision/src/analyzers/enrich-config.ts → packages/sourcevision/src/schema/index.ts {Zone, ZoneCrossing, Finding, FindingType}
+  packages/sourcevision/src/analyzers/enrich-judge.ts → packages/sourcevision/src/analyzers/claude-client.ts {ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/enrich-judge.ts → packages/sourcevision/src/analyzers/file-headers.ts {collectFileHeaders}
+  packages/sourcevision/src/analyzers/enrich-judge.ts → packages/sourcevision/src/analyzers/zone-symbols.ts {collectZoneSymbols, emptyZoneSymbols, isEmptyZoneSymbols}
+  packages/sourcevision/src/analyzers/enrich-judge.ts → packages/sourcevision/src/analyzers/zone-symbols.ts {ZoneSymbolOptions}
+  packages/sourcevision/src/analyzers/enrich-judge.ts → packages/sourcevision/src/schema/index.ts {Finding, FindingCategory, FindingType, Imports, MoveFileFinding, TokenUsage, Zone, ZoneCrossing}
+  packages/sourcevision/src/analyzers/enrich-multiplex.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/enrich-multiplex.ts → packages/sourcevision/src/analyzers/enrich-config.ts {getPassConfig}
+  packages/sourcevision/src/analyzers/enrich-multiplex.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {tryParseJSON, extractFindings, extractZoneInsights, formatFileLabel}
+  packages/sourcevision/src/analyzers/enrich-multiplex.ts → packages/sourcevision/src/analyzers/enrich-per-zone.ts {computeZoneStructureHash}
+  packages/sourcevision/src/analyzers/enrich-multiplex.ts → packages/sourcevision/src/analyzers/file-headers.ts {collectFileHeaders}
+  packages/sourcevision/src/analyzers/enrich-multiplex.ts → packages/sourcevision/src/analyzers/prompt-envelope.ts {section, svPromptEnvelope, svPrompt, logSvPromptSections, JSON_OBJECT_ONLY, ONLY_NEW_INSIGHTS, findingsContract, stripJudgedFields, outputLines, findingTypesHint}
+  packages/sourcevision/src/analyzers/enrich-multiplex.ts → packages/sourcevision/src/schema/index.ts {Finding, ProjectProfile, TokenUsage, Zone, ZoneCrossing}
+  packages/sourcevision/src/analyzers/enrich-parsing.ts → packages/sourcevision/src/schema/index.ts {Zone, Finding, FindingType, FindingCategory, AnalyzeTokenUsage}
+  packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/analyzers/enrich-config.ts {MAX_CONCURRENT_ZONES, PER_ZONE_MAX_FILES, PER_ZONE_MAX_CROSSINGS, getPassConfig, computePerZoneAttemptConfigs}
+  packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/analyzers/enrich-config.ts {PassConfig}
+  packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {tryParseJSON, extractFindings, deduplicateZoneIds, formatFileLabel, extractZoneInsights, findPrevZone}
+  packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/analyzers/prompt-envelope.ts {section, svPromptEnvelope, svPrompt, logSvPromptSections, JSON_OBJECT_ONLY, ONLY_NEW_INSIGHTS, findingsContract, stripJudgedFields, outputLines, findingTypesHint}
+  packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/analyzers/token-usage.ts {emptyAnalyzeTokenUsage}
+  packages/sourcevision/src/analyzers/enrich-per-zone.ts → packages/sourcevision/src/schema/index.ts {Inventory, Imports, Zone, ZoneCrossing, Zones, Finding, ZoneTokenUsage, AnalyzeTokenUsage}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, callLLM, setClaudeConfig, setLLMConfig, setClaudeClient, setLLMClient, getAuthMode, getLLMVendor, ClaudeClientError, DEFAULT_MODEL, DEFAULT_CODEX_MODEL}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/claude-client.ts {getJudgmentRoute}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/claude-client.ts {CallClaudeResult}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-batch.ts {enrichBatch, runMetaEvaluation, aggregateBatchResults}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-batch.ts {BatchResult}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-config.ts {PASS_CONFIGS, getPassConfig, buildMetaPrompt, computeAttemptConfigs, computePerZoneAttemptConfigs, MAX_CONCURRENT_ZONES, PER_ZONE_MAX_FILES, PER_ZONE_MAX_CROSSINGS}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-config.ts {ZONES_PER_BATCH, getPassConfig}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-config.ts {PassConfig}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {tryParseJSON, extractFindings, mergeZonesByName, deduplicateFindings, classifyFinding}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {extractFindings, mergeZonesByName, deduplicateZoneIds, findPrevZone, extractZoneInsights}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {EnrichResult}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-per-zone.ts {enrichZonesPerZone, computeZoneStructureHash}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/enrich-per-zone.ts {PerZoneEnrichResult}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/token-usage.ts {emptyAnalyzeTokenUsage, accumulateTokenUsage, formatTokenUsage}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/analyzers/zone-hash.ts {computeGlobalContentHash}
+  packages/sourcevision/src/analyzers/enrich.ts → packages/sourcevision/src/schema/index.ts {Inventory, Imports, Zone, ZoneCrossing, Zones, FindingType, ProjectProfile}
+  packages/sourcevision/src/analyzers/go-imports.ts → packages/sourcevision/src/schema/index.ts {ImportEdge, ImportType, ExternalImport}
+  packages/sourcevision/src/analyzers/go-imports.ts → packages/sourcevision/src/util/paths.ts {toPosix}
+  packages/sourcevision/src/analyzers/go-outbound-detection.ts → packages/sourcevision/src/analyzers/go-imports.ts {extractGoImports}
+  packages/sourcevision/src/analyzers/go-outbound-detection.ts → packages/sourcevision/src/analyzers/go-route-detection.ts {stripGoComments}
+  packages/sourcevision/src/analyzers/go-outbound-detection.ts → packages/sourcevision/src/schema/index.ts {OutboundDependency}
+  packages/sourcevision/src/analyzers/go-route-detection.ts → packages/sourcevision/src/schema/index.ts {HttpMethod, ServerRoute, ServerRouteGroup}
+  packages/sourcevision/src/analyzers/llms-txt.ts → packages/sourcevision/src/analyzers/classify.ts {buildClassificationMap}
   packages/sourcevision/src/analyzers/llms-txt.ts → packages/sourcevision/src/analyzers/next-steps.ts {deriveNextSteps}
   packages/sourcevision/src/analyzers/llms-txt.ts → packages/sourcevision/src/schema/index.ts {Manifest, Inventory, Imports, Classifications, Zones, Components}
+  packages/sourcevision/src/analyzers/louvain.ts → packages/sourcevision/src/schema/index.ts {ImportEdge}
+  packages/sourcevision/src/analyzers/move-recommendations.ts → packages/sourcevision/src/schema/index.ts {Zone, ImportEdge, ZoneCrossing, MoveFileFinding}
   packages/sourcevision/src/analyzers/next-steps.ts → packages/sourcevision/src/schema/index.ts {Zones, Zone, Finding, NextStep}
+  packages/sourcevision/src/analyzers/outbound-detection.ts → packages/sourcevision/src/analyzers/go-outbound-detection.ts {detectGoOutboundCalls}
   packages/sourcevision/src/analyzers/outbound-detection.ts → packages/sourcevision/src/schema/index.ts {Confidence, DeclaredContract, Inventory, OutboundData, OutboundDependency}
+  packages/sourcevision/src/analyzers/pack-framework-facts.ts → packages/sourcevision/src/analyzers/go-route-detection.ts {inferPrefix}
+  packages/sourcevision/src/analyzers/pack-framework-facts.ts → packages/sourcevision/src/analyzers/outbound-detection.ts {SKIP_ROLES}
+  packages/sourcevision/src/analyzers/pack-framework-facts.ts → packages/sourcevision/src/analyzers/server-route-detection.ts {ROUTE_SKIP_ROLES}
+  packages/sourcevision/src/analyzers/pack-framework-facts.ts → packages/sourcevision/src/schema/index.ts {HttpMethod, Inventory, OutboundData, OutboundDependency, ServerRoute, ServerRouteGroup}
+  packages/sourcevision/src/analyzers/partition-review.ts → packages/sourcevision/src/analyzers/claude-client.ts {ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/partition-review.ts → packages/sourcevision/src/schema/index.ts {PartitionHealth, PartitionReview, Zone, ZoneCrossing}
+  packages/sourcevision/src/analyzers/primer.ts → packages/sourcevision/src/analyzers/prompt-envelope.ts {section, svPromptEnvelope, svPrompt}
+  packages/sourcevision/src/analyzers/primer.ts → packages/sourcevision/src/schema/index.ts {Manifest}
+  packages/sourcevision/src/analyzers/prompt-envelope.ts → packages/sourcevision/src/analyzers/claude-client.ts {DEFAULT_MODEL}
+  packages/sourcevision/src/analyzers/rerun-judge.ts → packages/sourcevision/src/analyzers/claude-client.ts {ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/rerun-judge.ts → packages/sourcevision/src/analyzers/file-headers.ts {collectFileHeaders, extractFileHeader}
+  packages/sourcevision/src/analyzers/rerun-judge.ts → packages/sourcevision/src/schema/index.ts {Finding, RerunSummary, Zone, ZoneCrossing, Zones}
   packages/sourcevision/src/analyzers/route-detection.ts → packages/sourcevision/src/schema/index.ts {RouteExportKind, RouteModule, RouteTreeNode}
+  packages/sourcevision/src/analyzers/route-detection.ts → packages/sourcevision/src/util/paths.ts {toPosix}
+  packages/sourcevision/src/analyzers/server-route-detection.ts → packages/sourcevision/src/analyzers/classify.ts {buildClassificationMap}
+  packages/sourcevision/src/analyzers/server-route-detection.ts → packages/sourcevision/src/analyzers/go-route-detection.ts {detectGoServerRoutes}
   packages/sourcevision/src/analyzers/server-route-detection.ts → packages/sourcevision/src/schema/index.ts {HttpMethod, ServerRoute, ServerRouteGroup, Inventory, Classifications}
   packages/sourcevision/src/analyzers/server-route-detection.ts → packages/sourcevision/src/util/debug-timing.ts {debugTimed, debugTimedAsync, checkpoint}
+  packages/sourcevision/src/analyzers/subzone-naming.ts → packages/sourcevision/src/analyzers/claude-client.ts {getJudgmentRoute}
+  packages/sourcevision/src/analyzers/subzone-naming.ts → packages/sourcevision/src/analyzers/route-convention.ts {RouteLayout}
+  packages/sourcevision/src/analyzers/subzone-naming.ts → packages/sourcevision/src/analyzers/zone-identity.ts {idFromName, isAlgorithmicName, reprefixSubZones, sharedPrefixSegments, zoneIdsOf}
+  packages/sourcevision/src/analyzers/subzone-naming.ts → packages/sourcevision/src/analyzers/zone-naming.ts {nameZonesBySelection}
+  packages/sourcevision/src/analyzers/subzone-naming.ts → packages/sourcevision/src/schema/index.ts {Zone}
   packages/sourcevision/src/analyzers/swift-imports.ts → packages/sourcevision/src/schema/index.ts {ImportEdge, ImportType, ExternalImport}
+  packages/sourcevision/src/analyzers/token-usage.ts → packages/sourcevision/src/schema/index.ts {TokenUsage, AnalyzeTokenUsage}
+  packages/sourcevision/src/analyzers/typed-findings.ts → packages/sourcevision/src/analyzers/claude-client.ts {ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/typed-findings.ts → packages/sourcevision/src/analyzers/enrich-judge.ts {buildZoneEvidence}
+  packages/sourcevision/src/analyzers/typed-findings.ts → packages/sourcevision/src/analyzers/enrich-judge.ts {FindingEvidence}
+  packages/sourcevision/src/analyzers/typed-findings.ts → packages/sourcevision/src/analyzers/zone-symbols.ts {extractTopLevelDeclarations, isTestPath}
+  packages/sourcevision/src/analyzers/typed-findings.ts → packages/sourcevision/src/schema/index.ts {Finding, FindingAnchor, Imports, TokenUsage, Zone, ZoneCrossing}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/context.ts {generateContext}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/llms-txt.ts {generateLlmsTxt}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace-crossings.ts {buildPackageMap, computeCrossRepoEdges, countCrossingsBySource}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace-crossings.ts {WithheldCrossing}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace.ts {promoteZones, promoteCrossings, buildSubAnalysisRefs, detectSubAnalyses, loadMemberArtifacts}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace.ts {SubAnalysis}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/paths.ts {resolveSourcevisionPaths}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES, SUPPLEMENTARY_FILES}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/schema/index.ts {WorkspaceConfig, WorkspaceMember, Manifest, Inventory, FileEntry, InventorySummary, Imports, ImportEdge, ExternalImport, ImportsSummary, Zones, Zone, ZoneCrossing}
+  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/util/paths.ts {toPosix}
+  packages/sourcevision/src/analyzers/workspace-crossings.ts → packages/sourcevision/src/analyzers/workspace.ts {SubAnalysis}
+  packages/sourcevision/src/analyzers/workspace-crossings.ts → packages/sourcevision/src/schema/index.ts {Confidence, CrossingSource, InfraLink, InfraResource, OutboundDependency, Zone, ZoneCrossing}
+  packages/sourcevision/src/analyzers/workspace-crossings.ts → packages/sourcevision/src/util/paths.ts {toPosix}
+  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/paths.ts {resolveSourcevisionPaths}
+  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES}
+  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/schema/index.ts {Manifest, Inventory, Imports, Zones, Zone, ZoneCrossing, SubAnalysisRef, Components, OutboundData, InfrastructureData}
+  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/util/paths.ts {toPosix}
+  packages/sourcevision/src/analyzers/zone-areas.ts → packages/sourcevision/src/analyzers/route-convention.ts {routeFeatureOf, routePathOf}
+  packages/sourcevision/src/analyzers/zone-areas.ts → packages/sourcevision/src/analyzers/route-convention.ts {RouteLayout}
+  packages/sourcevision/src/analyzers/zone-areas.ts → packages/sourcevision/src/analyzers/zone-identity.ts {idFromName}
+  packages/sourcevision/src/analyzers/zone-areas.ts → packages/sourcevision/src/schema/index.ts {Zone, ZoneArea, ZoneCrossing}
+  packages/sourcevision/src/analyzers/zone-identity.ts → packages/sourcevision/src/schema/index.ts {Finding, Zone, ZoneCrossing}
+  packages/sourcevision/src/analyzers/zone-naming.ts → packages/sourcevision/src/analyzers/claude-client.ts {callClaude, ClaudeClientError, getJudgmentRoute}
+  packages/sourcevision/src/analyzers/zone-naming.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {tryParseJSON, mergeZonesByName}
+  packages/sourcevision/src/analyzers/zone-naming.ts → packages/sourcevision/src/analyzers/route-convention.ts {dominantRouteFeature, routePathOf}
+  packages/sourcevision/src/analyzers/zone-naming.ts → packages/sourcevision/src/analyzers/route-convention.ts {RouteLayout}
+  packages/sourcevision/src/analyzers/zone-naming.ts → packages/sourcevision/src/analyzers/zone-symbols.ts {collectZoneSymbols, dominantSymbolNoun}
+  packages/sourcevision/src/analyzers/zone-naming.ts → packages/sourcevision/src/schema/index.ts {Finding, Imports, Zone, ZoneCrossing, TokenUsage}
   packages/sourcevision/src/analyzers/zone-output.ts → packages/sourcevision/src/schema/index.ts {Inventory, Imports, Zones, Zone, ZoneCrossing, Finding, ZoneSummary, ZoneRiskMetrics}
+  packages/sourcevision/src/analyzers/zone-symbols.ts → packages/sourcevision/src/schema/index.ts {Imports, Zone}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/area-naming.ts {nameAreas}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/claude-client.ts {getJudgmentRoute}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/declared-rules.ts {checkDeclaredRules}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/enrich-cascade.ts {cascadeEnrichment}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/enrich-judge.ts {judgeFindings, judgeZoneFragility, judgeHeuristicFindings, judgeMoves}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/enrich-parsing.ts {deduplicateFindings, enforceSeverityRules}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/enrich.ts {enrichZonesWithAI, enrichZonesPerZone}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/louvain.ts {buildUndirectedGraph, addDirectoryProximityEdges, louvainPhase1, mergeBidirectionalCoupling, mergeSmallCommunities, mergeSatelliteCommunities, capZoneCount, splitLargeCommunities, splitByFirstDifferingDirectory}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/louvain.ts {MergeLogEntry}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/move-recommendations.ts {detectPinDivergence, detectImportNeighborMoves}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/move-recommendations.ts {MoveContext}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/partition-review.ts {assessPartitionHealth, formatPartitionLine, reviewPreviousPartition}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/rerun-judge.ts {applyFindingVerdict, findingKey}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/rerun-judge.ts {RerunOutcome}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/route-convention.ts {addRouteFeatureEdges, buildRouteLayout, detectRouteConventions, routeFeatureZoneId}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/route-convention.ts {RouteLayout}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/subzone-naming.ts {nameSubZones}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/token-usage.ts {emptyAnalyzeTokenUsage}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/typed-findings.ts {computeTypedFindings, judgeTypedFindings, noulAgreement, probabilitiesByZone}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/workspace-crossings.ts {buildPackageMap, computeCrossRepoCrossings}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/workspace.ts {promoteZones, promoteCrossings, getSubAnalyzedPrefixes, isSubAnalyzedFile}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/workspace.ts {SubAnalysis}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/zone-areas.ts {computeAreas}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/zone-hash.ts {computeGlobalContentHash}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/zone-hash.ts {computeGlobalContentHash}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/analyzers/zone-identity.ts {dedupeZoneNames, deepestDistinguishingSegment, idFromStems, idsFollowNames, isAlgorithmicName, renameZoneRefs, reprefixSubZones, zoneIdsOf}
+  packages/sourcevision/src/analyzers/zones.ts → packages/sourcevision/src/schema/index.ts {Inventory, Imports, ImportEdge, Zone, ZoneCrossing, Zones, ZoneStability, Finding, AnalyzeTokenUsage, SubAnalysisRef, ProjectProfile, PartitionReview, ZoneArea}
   packages/sourcevision/src/export/pdf-report.ts → packages/sourcevision/src/schema/index.ts {Manifest, Inventory, Imports, Zones, Zone, Finding, Components, ImportType}
+  packages/sourcevision/src/paths.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES}
   packages/sourcevision/src/util/debug-timing.ts → packages/sourcevision/src/util/debug-stopwatch.ts {startStopwatch, stopStopwatch}
   packages/sourcevision/src/util/merge.ts → packages/sourcevision/src/schema/index.ts {FileEntry, Inventory, InventorySummary, ImportEdge, ExternalImport, Imports, FileRole}
 
 </imports>
+
+<sub-crossings>
+
+Cross-dependencies between sub-zones:
+  sourcevision/analyzers/analyzers → sourcevision/analyzers/sourcevision: 6
+  sourcevision/analyzers/analyzers-2 → sourcevision/analyzers/analyzers: 1
+  sourcevision/analyzers/analyzers-2 → sourcevision/analyzers/enrich: 7
+  sourcevision/analyzers/analyzers-2 → sourcevision/analyzers/enrich-cascade-file-headers: 3
+  sourcevision/analyzers/analyzers-2 → sourcevision/analyzers/sourcevision: 10
+  sourcevision/analyzers/analyzers-2 → sourcevision/analyzers/zone: 2
+  sourcevision/analyzers/detection → sourcevision/analyzers/analyzers: 3
+  sourcevision/analyzers/detection → sourcevision/analyzers/analyzers-2: 1
+  sourcevision/analyzers/detection → sourcevision/analyzers/sourcevision: 8
+  sourcevision/analyzers/enrich → sourcevision/analyzers/analyzers-2: 10
+  sourcevision/analyzers/enrich → sourcevision/analyzers/enrich-cascade-file-headers: 1
+  sourcevision/analyzers/enrich → sourcevision/analyzers/sourcevision: 6
+  sourcevision/analyzers/enrich → sourcevision/analyzers/zone: 1
+  sourcevision/analyzers/enrich-cascade-file-headers → sourcevision/analyzers/analyzers-2: 4
+  sourcevision/analyzers/enrich-cascade-file-headers → sourcevision/analyzers/enrich: 3
+  sourcevision/analyzers/enrich-cascade-file-headers → sourcevision/analyzers/sourcevision: 2
+  sourcevision/analyzers/enrich-cascade-file-headers → sourcevision/analyzers/zone: 3
+  sourcevision/analyzers/sourcevision → sourcevision/analyzers/analyzers-2: 5
+  sourcevision/analyzers/sourcevision → sourcevision/analyzers/detection: 1
+  sourcevision/analyzers/sourcevision → sourcevision/analyzers/zone: 3
+  sourcevision/analyzers/zone → sourcevision/analyzers/analyzers: 3
+  sourcevision/analyzers/zone → sourcevision/analyzers/analyzers-2: 8
+  sourcevision/analyzers/zone → sourcevision/analyzers/enrich: 2
+  sourcevision/analyzers/zone → sourcevision/analyzers/enrich-cascade-file-headers: 3
+  sourcevision/analyzers/zone → sourcevision/analyzers/sourcevision: 8
+
+</sub-crossings>
+
+<sub-zones>
+
+This zone has 7 sub-zone(s):
+
+- **Analyzers** (`sourcevision/analyzers/analyzers`): 7 files, cohesion 0.67, coupling 0.33
+- **Analyzers 2** (`sourcevision/analyzers/analyzers-2`): 9 files, cohesion 0.36, coupling 0.64
+- **Detection** (`sourcevision/analyzers/detection`): 9 files, cohesion 0.63, coupling 0.37
+- **Enrich** (`sourcevision/analyzers/enrich`): 7 files, cohesion 0.48, coupling 0.52
+- **Enrich Cascade File Headers** (`sourcevision/analyzers/enrich-cascade-file-headers`): 3 files, cohesion 0.19, coupling 0.81
+- **Sourcevision** (`sourcevision/analyzers/sourcevision`): 14 files, cohesion 0.4, coupling 0.6
+- **Zone** (`sourcevision/analyzers/zone`): 9 files, cohesion 0.45, coupling 0.55
+
+Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
+
+</sub-zones>

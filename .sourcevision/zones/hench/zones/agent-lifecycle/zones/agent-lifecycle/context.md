@@ -8,7 +8,7 @@ Zone: Hench (`hench/agent-lifecycle/agent-lifecycle`)
 Files: 9, Cohesion: 0.46, Coupling: 0.54
 Description: 9 files, primarily TypeScript
 Entry points: packages/hench/src/agent/analysis/git-changed-files.ts, packages/hench/src/agent/lifecycle/commit-subject.ts, packages/hench/src/agent/lifecycle/gate-only-retry.ts, packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts, packages/hench/src/agent/lifecycle/shared.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/process/actor-identity.ts, packages/hench/src/store/run-events.ts, packages/hench/src/store/run-log.ts
-Lines: 6648
+Lines: 6667
 
 </zone>
 
@@ -18,7 +18,7 @@ packages/hench/src/agent/analysis/git-changed-files.ts (TypeScript, 170 lines, s
 packages/hench/src/agent/lifecycle/commit-subject.ts (TypeScript, 76 lines, source)
 packages/hench/src/agent/lifecycle/gate-only-retry.ts (TypeScript, 250 lines, source)
 packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts (TypeScript, 164 lines, source)
-packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 4846 lines, source)
+packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 4865 lines, source)
 packages/hench/src/agent/planning/prompt.ts (TypeScript, 288 lines, source)
 packages/hench/src/process/actor-identity.ts (TypeScript, 96 lines, source)
 packages/hench/src/store/run-events.ts (TypeScript, 486 lines, source)

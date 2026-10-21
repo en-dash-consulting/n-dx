@@ -5,33 +5,34 @@
 <zone>
 
 Zone: Tests (`tests-e2e`)
-Files: 107, Cohesion: 1.00, Coupling: 0.00
+Files: 109, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+104 more)
 Entry points: tests/e2e/e2e-helpers.js
-Lines: 29143
+Lines: 29892
 
 </zone>
 
 <files>
 
 tests/e2e/agents-md-size-budget.test.js (JavaScript, 159 lines, test)
-tests/e2e/architecture-policy.test.js (JavaScript, 2253 lines, test)
+tests/e2e/architecture-policy.test.js (JavaScript, 2452 lines, test)
 tests/e2e/assistant-body-drift.test.js (JavaScript, 114 lines, test)
 tests/e2e/assistant-integration.test.js (JavaScript, 679 lines, test)
 tests/e2e/assistant-parity-smoke.test.js (JavaScript, 348 lines, test)
 tests/e2e/build-stamp-unpublished.test.js (JavaScript, 57 lines, test)
 tests/e2e/catalog-runtime-contract.test.js (JavaScript, 70 lines, test)
 tests/e2e/ci-draft-pr-gate.test.js (JavaScript, 190 lines, test)
+tests/e2e/ci-grammar-steps.test.js (JavaScript, 349 lines, test)
 tests/e2e/ci-merge-queue-trigger.test.js (JavaScript, 51 lines, test)
 tests/e2e/cli-add.test.js (JavaScript, 118 lines, test)
-tests/e2e/cli-agent-run-env.test.js (JavaScript, 120 lines, test)
-tests/e2e/cli-arg-contracts.test.js (JavaScript, 423 lines, test)
+tests/e2e/cli-agent-run-env.test.js (JavaScript, 173 lines, test)
+tests/e2e/cli-arg-contracts.test.js (JavaScript, 424 lines, test)
 tests/e2e/cli-auth.test.js (JavaScript, 135 lines, test)
 tests/e2e/cli-brand.test.js (JavaScript, 101 lines, test)
 tests/e2e/cli-child-cleanup.test.js (JavaScript, 162 lines, test)
 tests/e2e/cli-ci-child-cleanup.test.js (JavaScript, 537 lines, test)
-tests/e2e/cli-ci.test.js (JavaScript, 772 lines, test)
+tests/e2e/cli-ci.test.js (JavaScript, 782 lines, test)
 tests/e2e/cli-config.test.js (JavaScript, 2029 lines, test)
 tests/e2e/cli-contract.test.js (JavaScript, 103 lines, test)
 tests/e2e/cli-delegation.test.js (JavaScript, 67 lines, test)
@@ -48,7 +49,7 @@ tests/e2e/cli-legacy-notice-once.test.js (JavaScript, 66 lines, test)
 tests/e2e/cli-mcp-shim.test.js (JavaScript, 311 lines, test)
 tests/e2e/cli-migrate-apply.test.js (JavaScript, 147 lines, test)
 tests/e2e/cli-migrate-layout.test.js (JavaScript, 110 lines, test)
-tests/e2e/cli-migrate-plan.test.js (JavaScript, 171 lines, test)
+tests/e2e/cli-migrate-plan.test.js (JavaScript, 192 lines, test)
 tests/e2e/cli-orchestration.test.js (JavaScript, 429 lines, test)
 tests/e2e/cli-orphan-cleanup.test.js (JavaScript, 189 lines, test)
 tests/e2e/cli-output-contracts.test.js (JavaScript, 84 lines, test)
@@ -81,8 +82,9 @@ tests/e2e/codex-mcp-contract.test.js (JavaScript, 443 lines, test)
 tests/e2e/command-docs-parity.test.js (JavaScript, 116 lines, test)
 tests/e2e/docs-command-refs.test.js (JavaScript, 224 lines, test)
 tests/e2e/docs-skill-refs.test.js (JavaScript, 88 lines, test)
-tests/e2e/domain-isolation.test.js (JavaScript, 1182 lines, test)
+tests/e2e/domain-isolation.test.js (JavaScript, 1200 lines, test)
 tests/e2e/e2e-helpers.js (JavaScript, 421 lines, test)
+tests/e2e/fixed-group-versions.test.js (JavaScript, 87 lines, test)
 tests/e2e/hench-config-gate-contract.test.js (JavaScript, 521 lines, test)
 tests/e2e/instruction-alignment.test.js (JavaScript, 606 lines, test)
 tests/e2e/integration-coverage-policy.test.js (JavaScript, 159 lines, test)
@@ -92,10 +94,10 @@ tests/e2e/mcp-json-tracked.test.js (JavaScript, 134 lines, test)
 tests/e2e/mcp-registration-scope.test.js (JavaScript, 201 lines, test)
 tests/e2e/mcp-registration.test.js (JavaScript, 407 lines, test)
 tests/e2e/mcp-transport-hub.test.js (JavaScript, 253 lines, test)
-tests/e2e/mcp-transport.test.js (JavaScript, 263 lines, test)
+tests/e2e/mcp-transport.test.js (JavaScript, 265 lines, test)
 tests/e2e/obfuscated-code-policy.test.js (JavaScript, 110 lines, test)
 tests/e2e/pair-programming-timeout-tree-kill.test.js (JavaScript, 213 lines, test)
-tests/e2e/prd-line-endings.test.js (JavaScript, 300 lines, test)
+tests/e2e/prd-line-endings.test.js (JavaScript, 304 lines, test)
 tests/e2e/prd-slug-conformance.test.js (JavaScript, 169 lines, test)
 tests/e2e/prompt-census.test.js (JavaScript, 671 lines, test)
 tests/e2e/prompt-section-parity.test.js (JavaScript, 339 lines, test)
@@ -117,7 +119,7 @@ tests/e2e/source-nul-bytes.test.js (JavaScript, 80 lines, test)
 tests/e2e/stop-orphan-children.test.js (JavaScript, 318 lines, test)
 tests/e2e/sv-pr-markdown-folder-tree.test.js (JavaScript, 334 lines, test)
 tests/e2e/token-cost-parity.test.js (JavaScript, 125 lines, test)
-tests/e2e/verify-build.js (JavaScript, 79 lines, test)
+tests/e2e/verify-build.js (JavaScript, 84 lines, test)
 tests/e2e/verify-script-ci-step.test.js (JavaScript, 69 lines, test)
 tests/e2e/vitest-hidden-spawn-policy.test.js (JavaScript, 49 lines, test)
 tests/e2e/vitest-timeout-failure.test.js (JavaScript, 127 lines, test)
@@ -181,7 +183,7 @@ Internal:
 Outgoing (this zone → other zones):
   → core: tests/e2e/agents-md-size-budget.test.js → packages/core/assistant-assets.js; tests/e2e/architecture-policy.test.js → packages/core/ci.js; tests/e2e/assistant-body-drift.test.js → packages/core/assistant-assets.js; tests/e2e/assistant-integration.test.js → packages/core/assistant-assets.js; tests/e2e/assistant-integration.test.js → packages/core/assistant-integration.js; tests/e2e/assistant-integration.test.js → packages/core/claude-integration.js; tests/e2e/assistant-integration.test.js → packages/core/codex-integration.js; tests/e2e/build-stamp-unpublished.test.js → packages/core/win-spawn.js; tests/e2e/catalog-runtime-contract.test.js → packages/core/llm-model-catalog.js; tests/e2e/cli-brand.test.js → packages/core/cli-brand.js; tests/e2e/cli-start-two-projects.test.js → packages/core/child-lifecycle.js; tests/e2e/cli-ui-gap-drift.test.js → packages/core/help.js; tests/e2e/cli-ui-gap-drift.test.js → scripts/build-cli-ui-gap.mjs; tests/e2e/codex-artifact-validation.test.js → packages/core/assistant-assets.js; tests/e2e/codex-artifact-validation.test.js → packages/core/codex-integration.js; tests/e2e/codex-integration.test.js → packages/core/assistant-assets.js; tests/e2e/codex-integration.test.js → packages/core/codex-integration.js; tests/e2e/codex-mcp-contract.test.js → packages/core/assistant-assets.js; tests/e2e/codex-mcp-contract.test.js → packages/core/codex-integration.js; tests/e2e/command-docs-parity.test.js → packages/core/help.js; tests/e2e/docs-command-refs.test.js → packages/core/assistant-assets.js; tests/e2e/docs-command-refs.test.js → packages/core/help.js; tests/e2e/docs-skill-refs.test.js → packages/core/assistant-assets.js; tests/e2e/instruction-alignment.test.js → packages/core/assistant-assets.js; tests/e2e/instruction-alignment.test.js → packages/core/assistant-integration.js; tests/e2e/mcp-json-tracked.test.js → packages/core/assistant-assets.js; tests/e2e/mcp-json-tracked.test.js → packages/core/claude-integration.js; tests/e2e/mcp-registration.test.js → packages/core/assistant-assets.js; tests/e2e/mcp-registration.test.js → packages/core/claude-integration.js; tests/e2e/pair-programming-timeout-tree-kill.test.js → packages/core/pair-programming.js; tests/e2e/prd-line-endings.test.js → packages/core/gitattributes-pins.js; tests/e2e/prd-line-endings.test.js → packages/core/layout.js; tests/e2e/prompt-section-parity.test.js → packages/core/assistant-assets.js; tests/e2e/published-assets-bundled.test.js → packages/core/win-spawn.js; tests/e2e/published-package-loadability.test.js → packages/core/win-spawn.js; tests/e2e/skill-commit-isolation.test.js → packages/core/assistant-assets.js; tests/e2e/skill-commit-isolation.test.js → packages/core/commit-trailers.js; tests/e2e/skill-item-fields.test.js → packages/core/assistant-assets.js; tests/e2e/skill-prd-layout.test.js → packages/core/assistant-assets.js; tests/e2e/skill-run-recording.test.js → packages/core/assistant-assets.js; tests/e2e/skill-sync.test.js → packages/core/assistant-assets.js; tests/e2e/skill-tracking-parity.test.js → packages/core/assistant-assets.js; tests/e2e/skill-tracking-parity.test.js → packages/core/assistant-integration.js; tests/e2e/stop-orphan-children.test.js → packages/core/child-lifecycle.js; tests/e2e/verify-build.js → scripts/lib/stale-dist.mjs
   → rex-cli: tests/e2e/prd-slug-conformance.test.js → packages/rex/src/store/folder-tree-parser.ts; tests/e2e/prd-slug-conformance.test.js → packages/rex/src/store/folder-tree-serializer.ts; tests/e2e/prd-slug-conformance.test.js → packages/rex/src/store/slug-rule-guard.ts
-  → scripts: tests/e2e/iso-skill-drift.test.js → scripts/build-iso-skill.mjs; tests/e2e/obfuscated-code-policy.test.js → scripts/check-obfuscated-code.mjs; tests/e2e/prompt-census.test.js → scripts/prompt-census.mjs
+  → scripts: tests/e2e/ci-grammar-steps.test.js → scripts/grammar-suites.mjs; tests/e2e/iso-skill-drift.test.js → scripts/build-iso-skill.mjs; tests/e2e/obfuscated-code-policy.test.js → scripts/check-obfuscated-code.mjs; tests/e2e/prompt-census.test.js → scripts/prompt-census.mjs
   → tests-helpers: tests/e2e/cli-which.test.js → tests/helpers/symlink-support.js; tests/e2e/prd-slug-conformance.test.js → tests/helpers/slug-drift-message.js; tests/e2e/skill-portability.test.js → tests/helpers/all-skills.js; tests/e2e/skill-termination.test.js → tests/helpers/all-skills.js; tests/e2e/stop-orphan-children.test.js → tests/helpers/posix-shell.js
 
 Incoming (other zones → this zone):
@@ -199,6 +201,6 @@ Incoming (other zones → this zone):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 1928 internal calls, 303 outgoing, 21 incoming (cohesion: 0.86, coupling: 0.14)
+- [call graph] 2006 internal calls, 306 outgoing, 21 incoming (cohesion: 0.87, coupling: 0.13)
 
 </insights>

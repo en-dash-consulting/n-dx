@@ -5,67 +5,34 @@
 <zone>
 
 Zone: Cli Commands (`rex/cli-commands`)
-Files: 16, Cohesion: 0.40, Coupling: 0.60
-Description: 16 files, primarily TypeScript
-Entry points: packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/commands/migrate-plan.ts, packages/rex/src/cli/legacy-layout-notice.ts, packages/rex/src/cli/mcp-tools/tool.ts, packages/rex/src/cli/mcp-workspace.ts, packages/rex/src/cli/mcp.ts, packages/rex/src/cli/resolve-dir.ts, packages/rex/src/core/merge-driver.ts, packages/rex/src/migrations/registry.ts, packages/rex/src/migrations/v1-to-v2/index.ts, packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts, packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts, packages/rex/src/migrations/v1-to-v2/migration-plan.ts, packages/rex/src/migrations/v1-to-v2/plan-summary.ts
-Lines: 3794
+Files: 5, Cohesion: 0.93, Coupling: 0.07
+Description: 5 files, primarily TypeScript
+Entry points: packages/rex/src/cli/commands/token-format.ts, packages/rex/src/cli/commands/usage.ts, packages/rex/src/core/token-store.ts, packages/rex/src/core/token-usage.ts
+Lines: 1661
 
 </zone>
 
 <files>
 
-packages/rex/src/cli/commands/constants.ts (TypeScript, 68 lines, source)
-packages/rex/src/cli/commands/merge-driver.ts (TypeScript, 55 lines, source)
-packages/rex/src/cli/commands/migrate-plan.ts (TypeScript, 351 lines, source)
-packages/rex/src/cli/index.ts (TypeScript, 736 lines, source)
-packages/rex/src/cli/legacy-layout-notice.ts (TypeScript, 56 lines, source)
-packages/rex/src/cli/mcp-tools/tool.ts (TypeScript, 51 lines, source)
-packages/rex/src/cli/mcp-workspace.ts (TypeScript, 209 lines, source)
-packages/rex/src/cli/mcp.ts (TypeScript, 152 lines, source)
-packages/rex/src/cli/resolve-dir.ts (TypeScript, 30 lines, source)
-packages/rex/src/core/merge-driver.ts (TypeScript, 310 lines, source)
-packages/rex/src/migrations/registry.ts (TypeScript, 16 lines, source)
-packages/rex/src/migrations/v1-to-v2/index.ts (TypeScript, 198 lines, source)
-packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts (TypeScript, 494 lines, source)
-packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts (TypeScript, 372 lines, source)
-packages/rex/src/migrations/v1-to-v2/migration-plan.ts (TypeScript, 463 lines, source)
-packages/rex/src/migrations/v1-to-v2/plan-summary.ts (TypeScript, 233 lines, source)
+packages/rex/src/cli/commands/token-errors.ts (TypeScript, 14 lines, source)
+packages/rex/src/cli/commands/token-format.ts (TypeScript, 131 lines, source)
+packages/rex/src/cli/commands/usage.ts (TypeScript, 316 lines, source)
+packages/rex/src/core/token-store.ts (TypeScript, 47 lines, source)
+packages/rex/src/core/token-usage.ts (TypeScript, 1153 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/rex/src/cli/commands/merge-driver.ts → packages/rex/src/core/merge-driver.ts {mergePrdMarkdown}
-  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/registry.ts {findMigration, MIGRATIONS}
-  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/index.ts {contentHash, sourceDigest, v1TreeSource, V1_TREE_SOURCE_KIND}
-  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/index.ts {V1ToV2Options}
-  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts {MIGRATION_JUDGE_TASK_CLASS}
-  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/plan-summary.ts {renderPlanSummary}
-  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/plan-summary.ts {V1ToV2Plan}
-  packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/constants.ts {usage}
-  packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/merge-driver.ts {cmdMergeDriver}
-  packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/migrate-plan.ts {cmdMigratePlan}
-  packages/rex/src/cli/index.ts → packages/rex/src/cli/legacy-layout-notice.ts {noteLegacyLayout}
-  packages/rex/src/cli/index.ts → packages/rex/src/cli/mcp.ts {startMcpServer}
-  packages/rex/src/cli/index.ts → packages/rex/src/cli/resolve-dir.ts {resolveDir}
-  packages/rex/src/cli/mcp-tools/tool.ts → packages/rex/src/cli/mcp-workspace.ts {RexWorkspace}
-  packages/rex/src/cli/mcp.ts → packages/rex/src/cli/commands/constants.ts {TOOL_VERSION}
-  packages/rex/src/cli/mcp.ts → packages/rex/src/cli/mcp-tools/tool.ts {Access}
-  packages/rex/src/cli/mcp.ts → packages/rex/src/cli/mcp-workspace.ts {openRexWorkspace, WorkspaceBinding}
-  packages/rex/src/cli/mcp.ts → packages/rex/src/cli/mcp-workspace.ts {RexWorkspace}
-  packages/rex/src/migrations/registry.ts → packages/rex/src/migrations/v1-to-v2/index.ts {v1ToV2}
-  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts {jevHeldPass, flagThresholdOf, jevReviewPass, jevReviewSummary, reviewQueue, withJevArea}
-  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts {JevReviewFields, JevReviewOptions, JevReviewSummary, ReviewQueueItem}
-  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts {buildPlanData, stampReview}
-  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts {ItemPlanData, PlanData, PlanDataOptions}
-  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {classifyV1Tree}
-  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {ClassifyOptions, MigrationPlan, PlanEntry}
-  packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts → packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts {stampReview}
-  packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts → packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts {ItemPlanData}
-  packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {PlanEntry, ProposedArea}
-  packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {MigrationPlan, PlanEntry}
-  packages/rex/src/migrations/v1-to-v2/plan-summary.ts → packages/rex/src/migrations/v1-to-v2/index.ts {V1ToV2Entry, V1ToV2Summary}
-  packages/rex/src/migrations/v1-to-v2/plan-summary.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {PlanTargetType}
+  packages/rex/src/cli/commands/token-format.ts → packages/rex/src/core/token-store.ts {loadTokenUsageConfig, readTokenUsageLog}
+  packages/rex/src/cli/commands/token-format.ts → packages/rex/src/core/token-usage.ts {aggregateTokenUsage, checkBudget, totalTokens}
+  packages/rex/src/cli/commands/token-format.ts → packages/rex/src/core/token-usage.ts {AggregateTokenUsage, BudgetCheckResult}
+  packages/rex/src/cli/commands/usage.ts → packages/rex/src/cli/commands/token-errors.ts {BudgetExceededError}
+  packages/rex/src/cli/commands/usage.ts → packages/rex/src/cli/commands/token-format.ts {formatAggregateTokenUsage, formatBudgetWarnings}
+  packages/rex/src/cli/commands/usage.ts → packages/rex/src/core/token-store.ts {loadTokenUsageConfig, readTokenUsageLog}
+  packages/rex/src/cli/commands/usage.ts → packages/rex/src/core/token-usage.ts {aggregateTokenUsage, estimateCost, collectTokenEvents, groupByCommand, groupByTimePeriod, checkBudget, totalTokens}
+  packages/rex/src/cli/commands/usage.ts → packages/rex/src/core/token-usage.ts {AggregateTokenUsage, TokenUsageFilter, CommandTokenUsage, CostEstimate, TimePeriod, PeriodBucket}
+  packages/rex/src/core/token-store.ts → packages/rex/src/core/token-usage.ts {BudgetConfig, TokenUsageLogEntry}
 
 </imports>

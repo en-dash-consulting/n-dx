@@ -1,0 +1,43 @@
+{
+  "id": "tests-lang-java-fixtures",
+  "name": "Tests Lang Java Fixtures",
+  "description": "Non-source files in packages: Default.java, Cart.java, Checkout.java (+21 more)",
+  "files": [
+    "packages/lang-java/tests/fixtures/language-packs/java/src/Default.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/app/Cart.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/app/Checkout.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/app/Clock.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/app/FooApplication.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/app/Receipt.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/app/Status.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/app/Tax.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/model/Customer.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/shop/OrderService.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/shop/Types.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/time/Clock.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/tool/Launcher.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/util/Cart.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/util/Constants.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/util/Numbers.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/util/Strings.java",
+    "packages/lang-java/tests/fixtures/language-packs/java/src/com/example/util/Unused.java",
+    "packages/lang-java/tests/fixtures/spring-boot/src/com/example/client/HttpClients.java",
+    "packages/lang-java/tests/fixtures/spring-boot/src/com/example/client/InventoryClient.java",
+    "packages/lang-java/tests/fixtures/spring-boot/src/com/example/messaging/Messaging.java",
+    "packages/lang-java/tests/fixtures/spring-boot/src/com/example/web/OwnerController.java",
+    "packages/lang-java/tests/fixtures/spring-boot/src/com/example/web/PetController.java",
+    "packages/lang-java/tests/fixtures/spring-boot/src/com/example/web/ReportService.java"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 24,
+  "lineCount": 429,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

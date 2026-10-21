@@ -5,30 +5,27 @@
 <zone>
 
 Zone: Cli (`sourcevision/cli/cli`)
-Files: 7, Cohesion: 0.29, Coupling: 0.71
-Description: 7 files, primarily TypeScript
-Entry points: packages/sourcevision/src/analyzers/convergence.ts, packages/sourcevision/src/cli/commands/export-pdf.ts, packages/sourcevision/src/cli/commands/pr-markdown.ts, packages/sourcevision/src/cli/commands/validate.ts, packages/sourcevision/src/cli/mcp.ts, packages/sourcevision/src/cli/sourcevision-core.ts
-Lines: 1589
+Files: 6, Cohesion: 0.31, Coupling: 0.69
+Description: 6 files, primarily TypeScript
+Entry points: packages/sourcevision/src/analyzers/convergence.ts, packages/sourcevision/src/cli/commands/pr-markdown.ts, packages/sourcevision/src/cli/commands/validate.ts, packages/sourcevision/src/cli/mcp.ts, packages/sourcevision/src/cli/sourcevision-core.ts
+Lines: 1461
 
 </zone>
 
 <files>
 
 packages/sourcevision/src/analyzers/convergence.ts (TypeScript, 226 lines, source)
-packages/sourcevision/src/cli/commands/export-pdf.ts (TypeScript, 129 lines, source)
 packages/sourcevision/src/cli/commands/pr-markdown.ts (TypeScript, 180 lines, source)
 packages/sourcevision/src/cli/commands/validate.ts (TypeScript, 72 lines, source)
 packages/sourcevision/src/cli/mcp-workspace.ts (TypeScript, 147 lines, source)
 packages/sourcevision/src/cli/mcp.ts (TypeScript, 754 lines, source)
-packages/sourcevision/src/cli/sourcevision-core.ts (TypeScript, 81 lines, source)
+packages/sourcevision/src/cli/sourcevision-core.ts (TypeScript, 82 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/sourcevision/src/cli/commands/export-pdf.ts → packages/sourcevision/src/cli/sourcevision-core.ts {DATA_FILES}
-  packages/sourcevision/src/cli/commands/export-pdf.ts → packages/sourcevision/src/cli/sourcevision-core.ts {Manifest, Inventory, Imports, Zones, Components}
   packages/sourcevision/src/cli/commands/pr-markdown.ts → packages/sourcevision/src/cli/sourcevision-core.ts {collectBranchWork, classifyItems, renderPRMarkdownFromRecord}
   packages/sourcevision/src/cli/commands/pr-markdown.ts → packages/sourcevision/src/cli/sourcevision-core.ts {BranchWorkRecord, BranchWorkRecordItem, BranchWorkEpicSummary, BranchWorkResult, RexBridge}
   packages/sourcevision/src/cli/commands/validate.ts → packages/sourcevision/src/cli/sourcevision-core.ts {validate, ManifestSchema, InventorySchema, ImportsSchema, ZonesSchema, ComponentsSchema, DATA_FILES}

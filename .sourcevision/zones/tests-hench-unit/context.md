@@ -8,7 +8,7 @@ Zone: Tests Hench Unit (`tests-hench-unit`)
 Files: 201, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Non-source files in packages: adaptive.test.ts, adversarial-review.test.ts, change-magnitude.test.ts (+198 more)
-Lines: 59525
+Lines: 59532
 
 </zone>
 
@@ -146,7 +146,7 @@ packages/hench/tests/unit/helpers/cleanup-project-dir.test.ts (TypeScript, 87 li
 packages/hench/tests/unit/helpers/git-fixture-repo.test.ts (TypeScript, 125 lines, test)
 packages/hench/tests/unit/helpers/scripted-claude-cli.test.ts (TypeScript, 27 lines, test)
 packages/hench/tests/unit/no-bare-require.test.ts (TypeScript, 48 lines, test)
-packages/hench/tests/unit/prd/rex-gateway.test.ts (TypeScript, 163 lines, test)
+packages/hench/tests/unit/prd/rex-gateway.test.ts (TypeScript, 164 lines, test)
 packages/hench/tests/unit/prd/self-heal-task-selector.test.ts (TypeScript, 173 lines, test)
 packages/hench/tests/unit/process/actor-identity.test.ts (TypeScript, 146 lines, test)
 packages/hench/tests/unit/process/agent-mcp-config.test.ts (TypeScript, 322 lines, test)
@@ -201,7 +201,7 @@ packages/hench/tests/unit/store/suggestions.test.ts (TypeScript, 119 lines, test
 packages/hench/tests/unit/store/templates.test.ts (TypeScript, 422 lines, test)
 packages/hench/tests/unit/store/trust.test.ts (TypeScript, 84 lines, test)
 packages/hench/tests/unit/tools/cleanup-transformations.test.ts (TypeScript, 348 lines, test)
-packages/hench/tests/unit/tools/completion-validation.test.ts (TypeScript, 294 lines, test)
+packages/hench/tests/unit/tools/completion-validation.test.ts (TypeScript, 300 lines, test)
 packages/hench/tests/unit/tools/dead-code-analyzer.test.ts (TypeScript, 514 lines, test)
 packages/hench/tests/unit/tools/dependency-audit.test.ts (TypeScript, 244 lines, test)
 packages/hench/tests/unit/tools/dispatch-memory.test.ts (TypeScript, 173 lines, test)

@@ -1,0 +1,39 @@
+{
+  "id": "web-hub",
+  "name": "Web Hub",
+  "description": "Multi-project hub registry, admission control, project lifecycle management, and central orchestration for the development platform.",
+  "files": [
+    "packages/web/src/hub/admission.ts",
+    "packages/web/src/hub/children.ts",
+    "packages/web/src/hub/exec-gateway.ts",
+    "packages/web/src/hub/home.ts",
+    "packages/web/src/hub/hub.ts",
+    "packages/web/src/hub/index.ts",
+    "packages/web/src/hub/new-project.ts",
+    "packages/web/src/hub/overview.ts",
+    "packages/web/src/hub/proxy.ts",
+    "packages/web/src/hub/registry.ts",
+    "packages/web/src/hub/routes.ts"
+  ],
+  "entryPoints": [
+    "packages/web/src/hub/admission.ts",
+    "packages/web/src/hub/home.ts",
+    "packages/web/src/hub/hub.ts",
+    "packages/web/src/hub/index.ts",
+    "packages/web/src/hub/new-project.ts",
+    "packages/web/src/hub/overview.ts",
+    "packages/web/src/hub/registry.ts",
+    "packages/web/src/hub/routes.ts"
+  ],
+  "cohesion": 0.89,
+  "coupling": 0.11,
+  "fileCount": 11,
+  "lineCount": 3902,
+  "riskMetrics": {
+    "cohesion": 0.89,
+    "coupling": 0.11,
+    "riskScore": 0.10999999999999999,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

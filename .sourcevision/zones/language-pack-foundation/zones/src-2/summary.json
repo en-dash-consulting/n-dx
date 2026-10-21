@@ -1,0 +1,33 @@
+{
+  "id": "lang-kit/src-2",
+  "name": "Src 2",
+  "description": "11 files, primarily TypeScript",
+  "files": [
+    "packages/lang-kit/src/csharp.ts",
+    "packages/lang-kit/src/detect.ts",
+    "packages/lang-kit/src/go.ts",
+    "packages/lang-kit/src/java.ts",
+    "packages/lang-kit/src/python.ts",
+    "packages/lang-kit/src/registry.ts",
+    "packages/lang-kit/src/swift.ts",
+    "packages/lang-kit/src/terraform.ts",
+    "packages/lang-kit/src/typescript.ts",
+    "packages/lang-kit/vitest.config.ts",
+    "packages/lang-python/vitest.config.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-kit/src/csharp.ts",
+    "packages/lang-kit/src/detect.ts",
+    "packages/lang-kit/src/go.ts",
+    "packages/lang-kit/src/java.ts",
+    "packages/lang-kit/src/python.ts",
+    "packages/lang-kit/src/registry.ts",
+    "packages/lang-kit/src/swift.ts",
+    "packages/lang-kit/src/terraform.ts",
+    "packages/lang-kit/src/typescript.ts"
+  ],
+  "cohesion": 0.7,
+  "coupling": 0.3,
+  "fileCount": 11,
+  "lineCount": 1363
+}

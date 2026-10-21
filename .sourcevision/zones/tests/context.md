@@ -5,10 +5,11 @@
 <zone>
 
 Zone: Tests (`tests`)
-Files: 3, Cohesion: 1.00, Coupling: 0.00
+Files: 4, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts
-Lines: 386
+Entry points: packages/sourcevision/tests/setup-ndx-home.ts
+Lines: 414
 
 </zone>
 
@@ -17,6 +18,7 @@ Lines: 386
 packages/graview-face/tests/door.test.ts (TypeScript, 59 lines, test)
 packages/graview-face/tests/places.test.ts (TypeScript, 76 lines, test)
 packages/graview-face/tests/sync.test.ts (TypeScript, 251 lines, test)
+packages/sourcevision/tests/setup-ndx-home.ts (TypeScript, 28 lines, test)
 
 </files>
 
@@ -25,6 +27,9 @@ packages/graview-face/tests/sync.test.ts (TypeScript, 251 lines, test)
 
 Outgoing (this zone → other zones):
   → graview-face: packages/graview-face/tests/door.test.ts → packages/graview-face/dev/ndx-door.ts; packages/graview-face/tests/places.test.ts → packages/graview-face/src/app.ts; packages/graview-face/tests/places.test.ts → packages/graview-face/src/model/spend.ts; packages/graview-face/tests/places.test.ts → packages/graview-face/src/model/work.ts; packages/graview-face/tests/places.test.ts → packages/graview-face/src/ui/pages.tsx; packages/graview-face/tests/places.test.ts → packages/graview-face/src/ui/views.tsx; packages/graview-face/tests/sync.test.ts → packages/graview-face/src/sync/engine.ts; packages/graview-face/tests/sync.test.ts → packages/graview-face/src/sync/mapping.ts; packages/graview-face/tests/sync.test.ts → packages/graview-face/src/sync/ndx-system.ts
+
+Incoming (other zones → this zone):
+  ← tests-sourcevision-unit: packages/sourcevision/tests/unit/language/pack-loader.test.ts → packages/sourcevision/tests/setup-ndx-home.ts
 
 </imports>
 

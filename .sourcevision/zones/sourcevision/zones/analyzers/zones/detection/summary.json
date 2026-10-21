@@ -1,0 +1,29 @@
+{
+  "id": "sourcevision/analyzers/detection",
+  "name": "Detection",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/components.ts",
+    "packages/sourcevision/src/analyzers/go-imports.ts",
+    "packages/sourcevision/src/analyzers/go-outbound-detection.ts",
+    "packages/sourcevision/src/analyzers/go-route-detection.ts",
+    "packages/sourcevision/src/analyzers/pack-framework-facts.ts",
+    "packages/sourcevision/src/analyzers/route-detection.ts",
+    "packages/sourcevision/src/analyzers/server-route-detection.ts",
+    "packages/sourcevision/src/util/debug-stopwatch.ts",
+    "packages/sourcevision/src/util/debug-timing.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/components.ts",
+    "packages/sourcevision/src/analyzers/go-imports.ts",
+    "packages/sourcevision/src/analyzers/go-outbound-detection.ts",
+    "packages/sourcevision/src/analyzers/go-route-detection.ts",
+    "packages/sourcevision/src/analyzers/pack-framework-facts.ts",
+    "packages/sourcevision/src/analyzers/route-detection.ts",
+    "packages/sourcevision/src/analyzers/server-route-detection.ts"
+  ],
+  "cohesion": 0.63,
+  "coupling": 0.37,
+  "fileCount": 9,
+  "lineCount": 3175
+}

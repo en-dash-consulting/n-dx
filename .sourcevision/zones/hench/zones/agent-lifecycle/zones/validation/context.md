@@ -8,7 +8,7 @@ Zone: Completion Validation (`hench/agent-lifecycle/validation`)
 Files: 3, Cohesion: 0.40, Coupling: 0.60
 Description: 3 files, primarily TypeScript
 Entry points: packages/hench/src/agent/completion.ts, packages/hench/src/validation/changed-files.ts, packages/hench/src/validation/completion.ts
-Lines: 446
+Lines: 461
 
 </zone>
 
@@ -16,7 +16,7 @@ Lines: 446
 
 packages/hench/src/agent/completion.ts (TypeScript, 15 lines, source)
 packages/hench/src/validation/changed-files.ts (TypeScript, 238 lines, source)
-packages/hench/src/validation/completion.ts (TypeScript, 193 lines, source)
+packages/hench/src/validation/completion.ts (TypeScript, 208 lines, source)
 
 </files>
 

@@ -1,0 +1,30 @@
+{
+  "id": "lang-sql",
+  "name": "Lang Sql",
+  "description": "Extracts SQL schemas and database facts from migrations and configuration to enable dependency introspection and schema-based analysis.",
+  "files": [
+    "packages/lang-sql/src/index.ts",
+    "packages/lang-sql/src/pack.ts",
+    "packages/lang-sql/src/package-paths.ts",
+    "packages/lang-sql/src/sql-facts.ts",
+    "packages/lang-sql/src/sql-pack.ts",
+    "packages/lang-sql/src/sql-schema.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-sql/src/index.ts",
+    "packages/lang-sql/src/sql-facts.ts",
+    "packages/lang-sql/src/sql-pack.ts",
+    "packages/lang-sql/src/sql-schema.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 218,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

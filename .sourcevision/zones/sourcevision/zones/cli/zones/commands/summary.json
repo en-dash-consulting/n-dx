@@ -16,8 +16,8 @@
     "packages/sourcevision/src/cli/commands/analyze.ts",
     "packages/sourcevision/src/cli/commands/narrate.ts"
   ],
-  "cohesion": 0.5,
-  "coupling": 0.5,
+  "cohesion": 0.47,
+  "coupling": 0.53,
   "fileCount": 5,
-  "lineCount": 2779
+  "lineCount": 2864
 }

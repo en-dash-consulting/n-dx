@@ -9,7 +9,7 @@ Files: 52, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: 52 files, mostly utilities and entry points; entry points assistant-assets.js, assistant-integration.js, child-lifecycle.js; imported by Tests and Tests.
 Entry points: packages/core/assistant-assets.js, packages/core/assistant-integration.js, packages/core/child-lifecycle.js, packages/core/ci.js, packages/core/claude-integration.js, packages/core/cli-brand.js, packages/core/cli-identity.js, packages/core/cli-log.js, packages/core/cli-timeout.js, packages/core/codex-integration.js, packages/core/command-effects.js, packages/core/commit-trailers.js, packages/core/config.js, packages/core/export.js, packages/core/file-permissions.js, packages/core/git-preflight.js, packages/core/gitattributes-pins.js, packages/core/help.js, packages/core/init-llm.js, packages/core/init-summary.js, packages/core/install-identity.js, packages/core/layout.js, packages/core/llm-model-catalog.js, packages/core/mcp-shim.js, packages/core/migrate-chain.js, packages/core/migrate-layout.js, packages/core/narration-status.js, packages/core/pair-programming.js, packages/core/refresh-artifacts.js, packages/core/refresh-plan.js, packages/core/refresh-validate.js, packages/core/resolve-existing-dir.js, packages/core/run-summary.js, packages/core/self-heal-confirm.js, packages/core/stale-check.js, packages/core/update-check.js, packages/core/web.js, packages/core/win-spawn.js, scripts/build-cli-ui-gap.mjs, scripts/lib/select-suites.mjs, scripts/lib/stale-dist.mjs
-Lines: 26568
+Lines: 26670
 
 </zone>
 
@@ -28,24 +28,24 @@ packages/core/cli-identity.js (JavaScript, 114 lines, source)
 packages/core/cli-ink.js (JavaScript, 446 lines, source)
 packages/core/cli-log.js (JavaScript, 187 lines, source)
 packages/core/cli-timeout.js (JavaScript, 151 lines, source)
-packages/core/cli.js (JavaScript, 3648 lines, source)
+packages/core/cli.js (JavaScript, 3665 lines, source)
 packages/core/codex-integration.js (JavaScript, 134 lines, source)
-packages/core/command-effects.js (JavaScript, 918 lines, source)
+packages/core/command-effects.js (JavaScript, 943 lines, source)
 packages/core/commit-trailers.js (JavaScript, 108 lines, source)
 packages/core/config.js (JavaScript, 3438 lines, source)
-packages/core/export.js (JavaScript, 870 lines, source)
+packages/core/export.js (JavaScript, 874 lines, source)
 packages/core/file-permissions.js (JavaScript, 273 lines, source)
 packages/core/git-preflight.js (JavaScript, 294 lines, source)
 packages/core/gitattributes-pins.js (JavaScript, 178 lines, source)
 packages/core/gitignore.js (JavaScript, 69 lines, source)
-packages/core/help.js (JavaScript, 2025 lines, source)
+packages/core/help.js (JavaScript, 2028 lines, source)
 packages/core/init-llm.js (JavaScript, 630 lines, source)
 packages/core/init-summary.js (JavaScript, 51 lines, source)
 packages/core/install-identity.js (JavaScript, 298 lines, source)
 packages/core/layout.js (JavaScript, 247 lines, source)
 packages/core/llm-model-catalog.js (JavaScript, 77 lines, source)
 packages/core/mcp-shim.js (JavaScript, 570 lines, source)
-packages/core/migrate-chain.js (JavaScript, 198 lines, source)
+packages/core/migrate-chain.js (JavaScript, 205 lines, source)
 packages/core/migrate-layout.js (JavaScript, 556 lines, source)
 packages/core/narration-status.js (JavaScript, 96 lines, source)
 packages/core/pair-programming.js (JavaScript, 1127 lines, source)
@@ -60,8 +60,8 @@ packages/core/self-heal-confirm.js (JavaScript, 202 lines, source)
 packages/core/stale-check.js (JavaScript, 87 lines, source)
 packages/core/update-check.js (JavaScript, 211 lines, source)
 packages/core/web.js (JavaScript, 1961 lines, source)
-packages/core/win-spawn.js (JavaScript, 138 lines, source)
-scripts/build-cli-ui-gap.mjs (JavaScript, 145 lines, build)
+packages/core/win-spawn.js (JavaScript, 182 lines, source)
+scripts/build-cli-ui-gap.mjs (JavaScript, 147 lines, build)
 scripts/lib/select-suites.mjs (JavaScript, 428 lines, build)
 scripts/lib/stale-dist.mjs (JavaScript, 117 lines, build)
 scripts/run-all-tests.mjs (JavaScript, 319 lines, build)
@@ -101,7 +101,7 @@ Internal:
   packages/core/cli.js → packages/core/cli-identity.js {recordCliName}
   packages/core/cli.js → packages/core/cli-ink.js {renderInit}
   packages/core/cli.js → packages/core/cli-timeout.js {resolveCommandTimeout, withCommandTimeout}
-  packages/core/cli.js → packages/core/command-effects.js {COMMAND_EFFECTS, LAYOUT_TOKENS, localizeEffects, resolveCommandEffects, shouldShowPreflight, formatPreflightBanner}
+  packages/core/cli.js → packages/core/command-effects.js {COMMAND_EFFECTS, LAYOUT_TOKENS, prdTokenPaths, localizeEffects, resolveCommandEffects, shouldShowPreflight, formatPreflightBanner}
   packages/core/cli.js → packages/core/config.js {runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings}
   packages/core/cli.js → packages/core/export.js {runExport}
   packages/core/cli.js → packages/core/git-preflight.js {runGitPreflight, formatGitWarningLines, commitInitBaseline, formatGitInitCommitLines}
@@ -113,7 +113,7 @@ Internal:
   packages/core/cli.js → packages/core/install-identity.js {collectInstallIdentity, formatInstallIdentity, formatWorkIdentityLine, readGitIdentity, shouldPrintWorkIdentity}
   packages/core/cli.js → packages/core/layout.js {relativeToRoot, resolveLayout}
   packages/core/cli.js → packages/core/mcp-shim.js {runMcpShim}
-  packages/core/cli.js → packages/core/migrate-chain.js {DEFAULT_MIGRATION_PLAN_OUT, isLegacyV1Project, runMigrateChain}
+  packages/core/cli.js → packages/core/migrate-chain.js {DEFAULT_MIGRATION_PLAN_OUT, hasV2Tree, isLegacyV1Project, runMigrateChain}
   packages/core/cli.js → packages/core/migrate-layout.js {runMigrateLayout}
   packages/core/cli.js → packages/core/narration-status.js {formatNarrationStatus, readNarrationState}
   packages/core/cli.js → packages/core/pair-programming.js {readRexTestCommand, resolveReviewerVendor, runCrossVendorReview, runReviewRounds, formatReviewBanner, assembleNdxContext, writeNdxContextFile, buildRemediationContext}
@@ -197,6 +197,8 @@ Incoming (other zones → this zone):
 
 [observation] [info] 41 entry points — wide API surface, consider consolidating exports
 [observation] [info] High cohesion (1) — files are tightly interconnected
+[anti-pattern] [info] Assistant-integration modules (assistant-assets.js, assistant-integration.js, claude-integration.js) sit flat beside the orchestration scripts in packages/core. Generating AGENTS.md, CLAUDE.md and .codex/config.toml is its own subsystem, enforced by instruction-alignment.test.js. Grouping these files under a subdirectory such as packages/core/assistant/ would make that boundary visible and shrink the 41-entry-point surface of the flat directory.
+[suggestion] [info] Report the bin/ launchers separately from the orchestration modules in core's entry-point count, for example by tagging bin/*.js with an entrypoint archetype that the 'wide API surface' heuristic ignores. Otherwise the consolidation advice targets per-binary shims that must stay separate because package.json bin entries need them.
 
 </findings>
 
@@ -204,7 +206,13 @@ Incoming (other zones → this zone):
 
 - High cohesion (1) — files are tightly interconnected
 - 41 entry points — wide API surface, consider consolidating exports
-- [call graph] 1903 internal calls, 0 outgoing, 1392 incoming (cohesion: 1, coupling: 0)
+- High cohesion (1) — files are tightly interconnected
+- 41 entry points — wide API surface, consider consolidating exports
+- The core zone mixes two concerns with different reasons to change: assistant-instruction generation (assistant-assets.js, assistant-integration.js, claude-integration.js) and CLI orchestration and process lifecycle (ci.js, child-lifecycle.js, bin/*.js shims). Its perfect cohesion comes from a shared CLI entry, not from one shared responsibility.
+- Assistant-integration modules (assistant-assets.js, assistant-integration.js, claude-integration.js) sit flat beside the orchestration scripts in packages/core. Generating AGENTS.md, CLAUDE.md and .codex/config.toml is its own subsystem, enforced by instruction-alignment.test.js. Grouping these files under a subdirectory such as packages/core/assistant/ would make that boundary visible and shrink the 41-entry-point surface of the flat directory.
+- The core zone mixes the bin shims (packages/core/bin/hench.js and its siblings) with the orchestration scripts (assistant-assets.js, assistant-integration.js). Each bin shim counts as its own entry point, so many of the 41 entry points are thin per-tool launchers rather than API surface.
+- Report the bin/ launchers separately from the orchestration modules in core's entry-point count, for example by tagging bin/*.js with an entrypoint archetype that the 'wide API surface' heuristic ignores. Otherwise the consolidation advice targets per-binary shims that must stay separate because package.json bin entries need them.
+- [call graph] 1911 internal calls, 0 outgoing, 1407 incoming (cohesion: 1, coupling: 0)
 
 </insights>
 
@@ -240,8 +248,8 @@ This zone has 7 sub-zone(s):
 - **Assistant Integration** (`core/core`): 5 files, cohesion 0.64, coupling 0.36
 - **Core 2** (`core/core-2`): 8 files, cohesion 0.4, coupling 0.6
 - **Core 3** (`core/core-3`): 6 files, cohesion 0.38, coupling 0.62
+- **Core 4** (`core/core-4`): 14 files, cohesion 0.47, coupling 0.53
 - **Core 5** (`core/core-5`): 10 files, cohesion 0.41, coupling 0.59
-- **Orchestration Entry Points** (`core/orchestration-entry-points`): 14 files, cohesion 0.47, coupling 0.53
 - **Scripts** (`core/scripts`): 4 files, cohesion 0.86, coupling 0.14
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
