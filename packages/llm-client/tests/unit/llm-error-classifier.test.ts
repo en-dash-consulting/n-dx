@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../lang-kit/tests/helpers/call-within-budget.js";
 import {
   classifyLLMError,
   extractProviderDetail,
@@ -17,6 +18,8 @@ import {
   type LLMErrorContext,
 } from "../../src/llm-error-classifier.js";
 import { AuthFailureError, ClaudeClientError } from "../../src/types.js";
+
+const CLASSIFIER = new URL("../../src/llm-error-classifier.ts", import.meta.url);
 
 describe("classifyLLMError", () => {
   // ── auth category ─────────────────────────────────────────────────
@@ -197,6 +200,29 @@ describe("classifyLLMError", () => {
     expect(r.message).not.toContain("Raw response saved to");
     expect(r.message).not.toContain("Underlying error:");
     expect(r.suggestion).not.toContain("Inspect the captured response");
+  });
+
+  // The sentinel's producer (rex's throwParseFailure) writes `<message> [ndx-debug:<path>]`
+  // with exactly one space, so the extractor takes at most one; the trailing
+  // trim() keeps the cleaned message the same whatever whitespace preceded it.
+  // The sentinel sits at the end of the message, so this path reads the whole
+  // message rather than a bounded window, and has to stay linear on its own.
+  describe("sentinel extraction on pathological input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+    it("is linear on a long run of spaces before the sentinel", async () => {
+      const err = new Error(`Invalid JSON in LLM response${" ".repeat(20_000)}[ndx-debug:x]`);
+      const r = await callWithinBudget<typeof classifyLLMError>(CLASSIFIER, "classifyLLMError", err);
+      expect(r.category).toBe("parse");
+      expect(r.message).toContain("Raw response saved to x.");
+      expect(r.message).toContain("Underlying error: Invalid JSON in LLM response.");
+      expect(r.message).not.toContain("[ndx-debug:");
+    });
+
+    it("is linear on a long run of spaces with no sentinel", async () => {
+      const err = new Error(`Invalid JSON in LLM response${" ".repeat(20_000)}[ndx-debug:x`);
+      const r = await callWithinBudget<typeof classifyLLMError>(CLASSIFIER, "classifyLLMError", err);
+      expect(r.category).toBe("parse");
+      expect(r.message).not.toContain("Raw response saved to");
+    });
   });
 
   // ── network category ──────────────────────────────────────────────
@@ -456,6 +482,62 @@ describe("isAuthError", () => {
       expect(isAuthError(input)).toBe(false);
     });
   });
+
+  // The gaps in these signatures are bounded (`[^\n]{0,80}?`): the words of
+  // one provider sentence sit within a line of each other, never 80 characters
+  // apart, so a credential phrase that straddles lines or a long run of other
+  // text is not one. The cases pin that reading.
+  describe("bounded gaps between the words of a signature", () => {
+    it.each([
+      ["invalid x-api-key", "hyphenated key header"],
+      ["Invalid API key provided", "spaced phrase"],
+      ["invalid_api_key", "snake_case code"],
+      ["invalid: the configured API key was rejected", "words between invalid and key"],
+      ["authentication_error", "snake_case type"],
+      ["Authentication failed", "two words"],
+      ["Authentication error: token invalid", "error then invalid"],
+      ["Authentication to the upstream service is required", "required at a distance"],
+    ])("returns true for '%s' (%s)", (input) => {
+      expect(isAuthError(input)).toBe(true);
+    });
+
+    it.each([
+      [`invalid ${"x".repeat(100)} api key`, "100 characters between invalid and api"],
+      ["invalid\napi key", "newline between invalid and api"],
+      [`authentication ${"x".repeat(100)} failed`, "100 characters between authentication and failed"],
+    ])("returns false for '%s' (%s)", (input) => {
+      expect(isAuthError(input)).toBe(false);
+    });
+  });
+
+  // Provider bodies reach the classifier whole (`response.text()` interpolated
+  // into Error.message, or a CLI's stderr accumulated unbounded), so each
+  // signature must stay linear in the message. The calls run under lang-kit's
+  // callWithinBudget: a regressed pattern blocks the thread it matches on,
+  // where vitest's per-test timeout never fires, and the helper fails the
+  // test by name instead. Each expected value is what the signature gave
+  // before the gaps were bounded.
+  describe("on pathological input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+    it("is linear on 'invalid api ' repeated with no 'key'", async () => {
+      const text = "invalid api ".repeat(2000);
+      await expect(callWithinBudget<typeof isAuthError>(CLASSIFIER, "isAuthError", text)).resolves.toBe(false);
+    });
+
+    it("is linear on 'authentication' repeated with no outcome word", async () => {
+      const text = "authentication".repeat(2000);
+      await expect(callWithinBudget<typeof isAuthError>(CLASSIFIER, "isAuthError", text)).resolves.toBe(false);
+    });
+
+    it("is linear on 'key' repeated with no 'expired' or 'invalid'", async () => {
+      const text = "key".repeat(10000);
+      await expect(callWithinBudget<typeof isAuthError>(CLASSIFIER, "isAuthError", text)).resolves.toBe(false);
+    });
+
+    it("still finds a signature at the head of a long body", async () => {
+      const text = `401 Unauthorized: ${"x".repeat(100_000)}`;
+      await expect(callWithinBudget<typeof isAuthError>(CLASSIFIER, "isAuthError", text)).resolves.toBe(true);
+    });
+  });
 });
 describe("parseAuthPayload", () => {
   // ── detection ─────────────────────────────────────────────────────
@@ -547,6 +629,77 @@ describe("parseAuthPayload", () => {
     const r = parseAuthPayload(`There was an error: ${body}`, "claude");
     expect(r).not.toBeNull();
     expect(r?.authReason).toContain("invalid x-api-key");
+  });
+
+  // The detection patterns read a bounded window of the message; the JSON
+  // extractors read all of it. A provider body puts its status and error type
+  // at the head and may carry kilobytes of detail behind them, and the
+  // error.message inside that detail is still the reason worth showing.
+  it("extracts error.message from a JSON body longer than the detection window", () => {
+    const body = JSON.stringify({
+      error: {
+        type: "authentication_error",
+        message: "invalid x-api-key",
+        request_log: "x".repeat(10_000),
+      },
+    });
+    const r = parseAuthPayload(`OpenAI API error 401: ${body}`, "codex");
+    expect(r).not.toBeNull();
+    expect(r?.httpStatus).toBe(401);
+    expect(r?.authReason).toBe("invalid x-api-key");
+  });
+
+  // ── bounded gaps ──────────────────────────────────────────────────
+
+  // A plain-text message is its own reason (extractProviderDetail echoes a
+  // body with no JSON in it), so the assertion is on the word that detected it.
+  it.each([
+    ["invalid x-api-key", /invalid/i],
+    ["Invalid API key provided", /invalid/i],
+    ["invalid_api_key", /invalid/i],
+    ["Your API key has expired", /expired/i],
+    ["Token expired — please refresh credentials", /expired/i],
+    ["The expired key was rejected", /expired/i],
+    ["Unauthorized request", /unauthorized/i],
+    ["unauthorized: access denied", /unauthorized/i],
+    ["authentication_error: bad credentials", /authentication/i],
+    ["Authentication failed", /authentication/i],
+  ])("detects '%s' (reason matches %s)", (input, reason) => {
+    const r = parseAuthPayload(input, "claude");
+    expect(r).not.toBeNull();
+    expect(r?.authReason).toMatch(reason);
+  });
+
+  it.each([
+    [`invalid ${"x".repeat(100)} api key`, "100 characters between invalid and api"],
+    [`expired ${"x".repeat(100)} token`, "100 characters between expired and token"],
+    [`unauthorized ${"x".repeat(100)} request`, "100 characters between unauthorized and request"],
+  ])("returns null for '%s' (%s)", (input) => {
+    expect(parseAuthPayload(input, "claude")).toBeNull();
+  });
+
+  // ── linearity (see the isAuthError block for why these run in a worker) ──
+
+  describe("on pathological input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+    it("is linear on 'invalid api ' repeated with no 'key'", async () => {
+      const text = "invalid api ".repeat(2000);
+      await expect(callWithinBudget<typeof parseAuthPayload>(CLASSIFIER, "parseAuthPayload", text, "claude")).resolves.toBeNull();
+    });
+
+    it("is linear on 'authentication' repeated with no outcome word", async () => {
+      const text = "authentication".repeat(2000);
+      await expect(callWithinBudget<typeof parseAuthPayload>(CLASSIFIER, "parseAuthPayload", text, "claude")).resolves.toBeNull();
+    });
+
+    it("is linear on 'key' repeated with no 'expired'", async () => {
+      const text = "key".repeat(10000);
+      await expect(callWithinBudget<typeof parseAuthPayload>(CLASSIFIER, "parseAuthPayload", text, "claude")).resolves.toBeNull();
+    });
+
+    it("is linear on 'unauthorized ' repeated with no object word", async () => {
+      const text = "unauthorized ".repeat(2000);
+      await expect(callWithinBudget<typeof parseAuthPayload>(CLASSIFIER, "parseAuthPayload", text, "claude")).resolves.toBeNull();
+    });
   });
 });
 

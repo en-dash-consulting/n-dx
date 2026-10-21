@@ -38,6 +38,7 @@ import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { LocalConfig } from "./llm-types.js";
 import { parseOpenAiTokenUsage } from "./openai-api-provider.js";
+import { CLASSIFY_WINDOW } from "./llm-error-classifier.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 const DEFAULT_MAX_RETRIES = 3;
@@ -157,7 +158,11 @@ export function parseLmStudioError(status: number, rawBody: string): string {
     // Not JSON — fall through to raw body
   }
 
-  const msg = innerMessage ?? rawBody;
+  // The body is the whole `response.text()`, and the signatures below are
+  // tested before the 300-character truncation at the end, so they read a
+  // bounded head of it. What they look for sits at the start of an LM Studio
+  // message; nothing kilobytes in distinguishes one error from another.
+  const msg = (innerMessage ?? rawBody).slice(0, CLASSIFY_WINDOW);
 
   // ── Known patterns → actionable messages ────────────────────────────────
 
@@ -175,8 +180,10 @@ export function parseLmStudioError(status: number, rawBody: string): string {
     );
   }
 
-  // No model loaded
-  if (/no model (is )?loaded|model not found|model.*not.*available/i.test(msg)) {
+  // No model loaded. The words of "model … not … available" sit within one
+  // sentence, so the gaps are bounded: with `.*` the pattern backtracked
+  // cubically, and a 50 kB body of "model not " took 100 s to fail to match.
+  if (/no model (is )?loaded|model not found|model[^\n]{0,200}?not[^\n]{0,200}?available/i.test(msg)) {
     return `No model loaded in LM Studio — open LM Studio and load a model before running ndx work.`;
   }
 

@@ -149,9 +149,41 @@ function formatErrorSuffix(
 }
 
 /**
+ * How much of an error message the auth signatures below read.
+ *
+ * A provider error reaches the classifier whole: the fetch-based providers
+ * interpolate the entire `response.text()` body into `Error.message`, and
+ * hench hands over a vendor CLI's accumulated stderr. The status code and the
+ * error type sit at the head of either, and nothing behind the first few
+ * kilobytes tells auth from anything else, so the signatures read a window and
+ * their cost stops growing with the body. The JSON extractors
+ * (`extractProviderDetail`, `extractJsonErrorMessage`) keep reading the whole
+ * message, because the `error.message` worth showing can sit deep in a long
+ * body.
+ */
+export const CLASSIFY_WINDOW = 4096;
+
+/** The head of `message` that the auth signatures read; see {@link CLASSIFY_WINDOW}. */
+function boundForClassification(message: string): string {
+  return message.length > CLASSIFY_WINDOW ? message.slice(0, CLASSIFY_WINDOW) : message;
+}
+
+/**
+ * The words of one signature sit within a sentence of each other, never 80
+ * characters apart, so the gaps are bounded runs of non-newline characters
+ * rather than `.*`. With `.*` the three-word signature backtracked cubically:
+ * "invalid api " repeated to 48 kB took 59 s to fail to match. A bounded gap
+ * is tried at most 80 ways per start position, so the match is linear in the
+ * window.
+ */
+const INVALID_API_KEY = /invalid[^\n]{0,80}?api[^\n]{0,80}?key|invalid_api_key/i;
+
+/**
  * Detect whether an error message signals an authentication or session-loss
  * problem — a credential that was never valid, or a CLI session that expired
  * or was revoked mid-run.
+ *
+ * Reads the first {@link CLASSIFY_WINDOW} characters of the message.
  *
  * Covers two families of signatures:
  *
@@ -168,13 +200,14 @@ function formatErrorSuffix(
  * to collide with adjacent categories — e.g. `token limit exceeded` (budget)
  * and `truncated at N tokens` (parse) are not matched.
  */
-export function isAuthError(message: string): boolean {
-  if (!message) return false;
+export function isAuthError(rawMessage: string): boolean {
+  if (!rawMessage) return false;
+  const message = boundForClassification(rawMessage);
   return (
     /\b401\b/.test(message) ||
     /\b403\b/.test(message) ||
-    /invalid.*api.*key/i.test(message) ||
-    /authentication.*(fail|error|invalid|expired|required)/i.test(message) ||
+    INVALID_API_KEY.test(message) ||
+    /authentication[^\n]{0,80}?(?:fail|error|invalid|expired|required)/i.test(message) ||
     /\bunauthorized\b/i.test(message) ||
     /not logged ?in/i.test(message) ||
     /please (log ?in|sign in|run [^.\n]*login)/i.test(message) ||
@@ -213,8 +246,13 @@ export function classifyLLMError(
   // Upstream parsers (e.g. parseProposalResponse) may embed a
   // `[ndx-debug:<path>]` sentinel in the thrown error message, pointing at a
   // file containing the raw LLM response. Extract it so the parse branch can
-  // surface the path and underlying error detail back to the user.
-  const debugMatch = /\s*\[ndx-debug:([^\]]+)\]/.exec(err.message);
+  // surface the path and underlying error detail back to the user. The only
+  // producer (rex's throwParseFailure) writes exactly one space before the
+  // sentinel, so the pattern takes at most one: `\s*` was quadratic in a run
+  // of whitespace, and the trim() below makes the cleaned message the same
+  // either way. The sentinel sits at the end of the message, so this reads
+  // the whole message, not the CLASSIFY_WINDOW the auth signatures read.
+  const debugMatch = / ?\[ndx-debug:([^\]]+)\]/.exec(err.message);
   const debugPath = debugMatch ? debugMatch[1] : null;
   const cleanedMessage = debugMatch
     ? err.message.replace(debugMatch[0], "").trim()
@@ -462,29 +500,34 @@ function extractJsonErrorMessage(text: string): string {
  * provider payloads are scanned for 401/403 HTTP status codes,
  * `authentication_error` type, and `invalid_api_key` / expired-token
  * patterns before falling back to plain message matching.
+ *
+ * Detection reads the first {@link CLASSIFY_WINDOW} characters; the reason is
+ * extracted from the whole message.
  */
 export function parseAuthPayload(
   rawMessage: string,
   _vendor: LLMVendor,
 ): { httpStatus: number | null; authReason: string } | null {
   if (!rawMessage) return null;
+  const message = boundForClassification(rawMessage);
 
   // Expired-token pattern covers both orders: "token expired" and "expired token".
+  // Bounded gaps, as in INVALID_API_KEY.
   const isExpiredCredential =
-    /expired.*(token|key)|(token|key).*expired|api.key.*expired/i.test(rawMessage);
+    /expired[^\n]{0,80}?(?:token|key)|(?:token|key)[^\n]{0,80}?expired|api.key[^\n]{0,80}?expired/i.test(message);
 
   const isAuth =
-    /\b(401|403)\b/.test(rawMessage) ||
-    /invalid.*api.*key|invalid_api_key/i.test(rawMessage) ||
-    /authentication.*(fail|error|invalid|expired)/i.test(rawMessage) ||
-    /authentication_error/i.test(rawMessage) ||
-    /unauthorized.*(request|access|error)/i.test(rawMessage) ||
+    /\b(401|403)\b/.test(message) ||
+    INVALID_API_KEY.test(message) ||
+    /authentication[^\n]{0,80}?(?:fail|error|invalid|expired)/i.test(message) ||
+    /authentication_error/i.test(message) ||
+    /unauthorized[^\n]{0,80}?(?:request|access|error)/i.test(message) ||
     isExpiredCredential ||
-    /not logged in|login required/i.test(rawMessage);
+    /not logged in|login required/i.test(message);
 
   if (!isAuth) return null;
 
-  const statusMatch = /\b(401|403)\b/.exec(rawMessage);
+  const statusMatch = /\b(401|403)\b/.exec(message);
   const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : null;
 
   // Try the vendor-prefix-aware extractor first (handles "Gemini API error 401: {...}").
@@ -500,11 +543,11 @@ export function parseAuthPayload(
 
   let authReason = jsonReason;
   if (!authReason) {
-    if (/invalid.*api.*key|invalid_api_key/i.test(rawMessage)) {
+    if (INVALID_API_KEY.test(message)) {
       authReason = "invalid API key";
     } else if (isExpiredCredential) {
       authReason = "token expired";
-    } else if (/not logged in|login required/i.test(rawMessage)) {
+    } else if (/not logged in|login required/i.test(message)) {
       authReason = "not logged in";
     } else if (httpStatus === 401) {
       authReason = "401 Unauthorized";
