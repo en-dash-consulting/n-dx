@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { renderHomePage, renderCard, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel } from "../../../src/hub/home.js";
+import { renderHomePage, renderCard, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel, readinessLabel, infrastructureLabel } from "../../../src/hub/home.js";
 import type { HubOverview, ProjectCard } from "../../../src/hub/overview.js";
 
 /**
@@ -33,6 +33,8 @@ function card(overrides: Partial<ProjectCard> = {}): ProjectCard {
     analyzedAt: "2026-09-16T09:00:00.000Z",
     repoName: "acme-api",
     remoteHost: "github.com",
+    readiness: null,
+    infrastructure: null,
     ...overrides,
   };
 }
@@ -76,6 +78,25 @@ describe("card labels", () => {
   it("leads with what the project is doing, then its state", () => {
     expect(cardFacts(card({ activeRuns: 2, branch: "feature/x", dirtyFiles: 3 })))
       .toEqual(["2 running", "feature/x", "3 uncommitted", "42% complete"]);
+  });
+
+  it("adds readiness and infrastructure after progress, when the child reports them", () => {
+    expect(cardFacts(card({ readiness: 88, infrastructure: 3 })))
+      .toEqual(["main", "clean", "42% complete", "readiness 88", "3 infra resources"]);
+    expect(readinessLabel(card({ readiness: 0 }))).toBe("readiness 0");
+    expect(readinessLabel(card({ readiness: null }))).toBeNull();
+    expect(infrastructureLabel(card({ infrastructure: 1 }))).toBe("1 infra resource");
+    // Zero and unknown both leave the fact off: an older child build reports
+    // neither field, and a project with no IaC has nothing worth a badge.
+    expect(infrastructureLabel(card({ infrastructure: 0 }))).toBeNull();
+    expect(infrastructureLabel(card({ infrastructure: null }))).toBeNull();
+  });
+
+  it("renders the readiness and infrastructure facts on the card", () => {
+    const doc = renderToDocument(renderCard(card({ readiness: 88, infrastructure: 2 })));
+    const facts = Array.from(doc.querySelectorAll(".fact")).map((el) => el.textContent);
+    expect(facts).toContain("readiness 88");
+    expect(facts).toContain("2 infra resources");
   });
 
   it("says only that an unreachable project is not answering, and why", () => {

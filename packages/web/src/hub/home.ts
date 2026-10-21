@@ -60,6 +60,21 @@ export function runningLabel(card: ProjectCard): string | null {
   return card.activeRuns ? `${card.activeRuns} running` : null;
 }
 
+/** "readiness 88", or null when the project has no readiness score. */
+export function readinessLabel(card: ProjectCard): string | null {
+  return card.readiness === null ? null : `readiness ${card.readiness}`;
+}
+
+/**
+ * "3 infra resources", or null when there are none to count. Zero is left off
+ * like an unknown count: every project with no infrastructure-as-code would
+ * otherwise carry a fact that says nothing.
+ */
+export function infrastructureLabel(card: ProjectCard): string | null {
+  if (!card.infrastructure) return null;
+  return `${card.infrastructure} infra resource${card.infrastructure === 1 ? "" : "s"}`;
+}
+
 /**
  * "acme-api · github.com", the repository the card's project is a checkout of.
  *
@@ -90,6 +105,10 @@ export function cardFacts(card: ProjectCard): string[] {
   if (dirty) facts.push(dirty);
   const progress = progressLabel(card);
   if (progress) facts.push(progress);
+  const readiness = readinessLabel(card);
+  if (readiness) facts.push(readiness);
+  const infrastructure = infrastructureLabel(card);
+  if (infrastructure) facts.push(infrastructure);
   return facts;
 }
 

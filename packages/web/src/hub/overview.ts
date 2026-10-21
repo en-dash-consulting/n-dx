@@ -57,6 +57,17 @@ export interface ProjectCard {
   repoName: string | null;
   /** Host serving the git remote (`github.com`), or null when there is none. */
   remoteHost: string | null;
+  /**
+   * The SDLC readiness score, 0-100, from the child's `readiness.json`. Null
+   * when the project has no readiness artifact, or the child is a build that
+   * does not report one.
+   */
+  readiness: number | null;
+  /**
+   * Infrastructure resources the child's analysis discovered. Null when the
+   * child is a build that does not report the count; zero when it found none.
+   */
+  infrastructure: number | null;
 }
 
 export interface HubOverview {
@@ -82,6 +93,8 @@ export interface ChildSnapshot {
       analyzedAt?: string | null;
       /** Repo identity from the child's manifest — see {@link ProjectCard.repoName}. */
       repo?: { name?: string | null; remoteHost?: string | null } | null;
+      readiness?: { overall?: number } | null;
+      infrastructure?: number;
     };
   } | null;
   git: { branch?: string | null; files?: unknown[] } | null;
@@ -147,6 +160,8 @@ export function toProjectCard(project: ProjectView, snapshot: ChildSnapshot | nu
     // either, and `?? null` alone would let "" through to an empty label.
     repoName: repo?.name || null,
     remoteHost: repo?.remoteHost || null,
+    readiness: typeof status?.sv?.readiness?.overall === "number" ? status.sv.readiness.overall : null,
+    infrastructure: typeof status?.sv?.infrastructure === "number" ? status.sv.infrastructure : null,
   };
 }
 
