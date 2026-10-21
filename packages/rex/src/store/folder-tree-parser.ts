@@ -1362,14 +1362,31 @@ function stripTrailingNewlines(content: string): string {
   return content.slice(0, end);
 }
 
-/** The escapes decoded in a double-quoted scalar that is not valid JSON. */
+/**
+ * The escapes decoded in a double-quoted scalar that is not valid JSON: the
+ * single-character ones JSON defines. `\uXXXX` is handled in the decoder.
+ */
 const QUOTED_ESCAPES: Record<string, string> = {
   n: "\n",
   t: "\t",
   r: "\r",
+  b: "\b",
+  f: "\f",
+  "/": "/",
   '"': '"',
   "\\": "\\",
 };
+
+/**
+ * The escapes of a double-quoted scalar JSON.parse refused, decoded in one
+ * left-to-right pass like JSON would: `\n \t \r \b \f \/ \" \\` and `\uXXXX`
+ * with exactly four hex digits. Any other `\c`, a `\u` short of four digits
+ * among them, stays as written.
+ */
+function decodeQuotedFallback(body: string): string {
+  return body.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (match, c: string) =>
+    c.length === 5 ? String.fromCharCode(parseInt(c.slice(1), 16)) : (QUOTED_ESCAPES[c] ?? match));
+}
 
 function parseScalar(s: string): unknown {
   s = s.trim();
@@ -1388,16 +1405,16 @@ function parseScalar(s: string): unknown {
     // Both writers quote with JSON.stringify, so JSON.parse decodes every
     // escape, `\uXXXX` included. Only a hand- or agent-written scalar with an
     // escape JSON lacks, e.g. `\x`, reaches the fallback, which decodes the
-    // escapes JSON shares in one left-to-right pass and keeps any other `\c`
+    // escapes JSON defines in one left-to-right pass and keeps any other `\c`
     // as written. One pass matters: a chain of replaces re-read its own
     // output, turning the `\\n` of `C:\\new` into `\n` and then into a line
     // feed, and every save after that compounded the change.
     try {
       return JSON.parse(s) as string;
     } catch {
-      // Not valid JSON — decode the common escapes below.
+      // Not valid JSON — decode the JSON escapes below.
     }
-    return s.slice(1, -1).replace(/\\(.)/g, (match, c: string) => QUOTED_ESCAPES[c] ?? match);
+    return decodeQuotedFallback(s.slice(1, -1));
   }
   if (s.startsWith("'") && s.endsWith("'") && s.length >= 2) {
     return s.slice(1, -1).replace(/''/g, "'");

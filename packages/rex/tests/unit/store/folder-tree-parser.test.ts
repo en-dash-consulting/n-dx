@@ -1162,6 +1162,26 @@ describe("parseFrontmatter: double-quoted escapes", () => {
     const fm = parseFrontmatter('---\ntitle: "\\x \\"q\\" tab\\t cr\\r lf\\n bs\\\\ end"\n---\n', "index.md", []);
     expect(fm).toEqual({ title: '\\x "q" tab\t cr\r lf\n bs\\ end' });
   });
+
+  it("decodes \\b, \\f, \\/ and \\uXXXX in the fallback like JSON", () => {
+    // The same scalar with the `\x` removed is valid JSON, and JSON.parse
+    // gives the same value: the fallback must not read it differently.
+    const body = 'bs\\b ff\\f sl\\/ u\\u00e9\\u00C9\\u0041 end';
+    const fm = parseFrontmatter(`---\ntitle: "\\x ${body}"\n---\n`, "index.md", []);
+    expect(fm).toEqual({ title: `\\x ${JSON.parse(`"${body}"`) as string}` });
+    expect(fm).toEqual({ title: "\\x bs\b ff\f sl/ u\u00e9\u00c9A end" });
+  });
+
+  it("keeps a \\u escape short of four hex digits literal in the fallback", () => {
+    const fm = parseFrontmatter('---\ntitle: "\\x \\u12 \\u12G4 \\u00e tail \\u"\n---\n', "index.md", []);
+    expect(fm).toEqual({ title: "\\x \\u12 \\u12G4 \\u00e tail \\u" });
+  });
+
+  it("decodes a \\uXXXX escape once, never re-reading its own output", () => {
+    // `\u005c` is a backslash; decoded, it must not then escape the `n`.
+    const fm = parseFrontmatter('---\ntitle: "\\x \\u005cn"\n---\n', "index.md", []);
+    expect(fm).toEqual({ title: "\\x \\n" });
+  });
 });
 
 describe("parseFrontmatter: block scalars with many blank lines", () => {

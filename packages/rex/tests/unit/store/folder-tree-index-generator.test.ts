@@ -301,6 +301,26 @@ describe("generateIndexMd", () => {
     );
   });
 
+  it("escapes a commit author for its table cell exactly like the message", () => {
+    // A `|` in a git author name split the row; the author cell went out bare.
+    const item: PRDItem = {
+      id: "t-1",
+      level: "task",
+      title: "Task with a commit",
+      status: "completed",
+      commits: [{
+        hash: "0123456789abcdef0123456789abcdef01234567",
+        author: "Dev | Ops \\ Team\nLtd",
+        authorEmail: "dev@example.com",
+        timestamp: "2026-04-20T10:00:00Z",
+        message: "plain",
+      }],
+    };
+
+    const output = generateIndexMd(item, [], []);
+    expect(output).toContain("| Dev \\| Ops \\\\ Team Ltd | `0123456` | plain | 2026-04-20T10:00:00Z |");
+  });
+
   it("generates Changes section from execution log", () => {
     const item: PRDItem = {
       id: "t-1",
