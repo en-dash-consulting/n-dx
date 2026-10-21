@@ -59,7 +59,7 @@ export async function createUninitializedFixtureProject(): Promise<string> {
 }
 
 /**
- * Create a fully-initialized project (folder-tree PRD backend, local LLM
+ * Create a fully-initialized project (v1 folder-tree PRD, local LLM
  * vendor) with one pending epic and one pending task under it, ready for
  * PRD and Hench Runs workflow tests.
  *
@@ -75,7 +75,8 @@ export async function createFixtureProject(): Promise<FixtureProject> {
   execFileSync(
     "node",
     [CORE_CLI, "init", "--provider=local", "--no-claude", "--no-codex", dir],
-    { stdio: "pipe" },
+    // The fixture is a v1 epic and task; init alone gives a new project v2.
+    { stdio: "pipe", env: { ...process.env, NDX_INIT_LAYOUT: "v1" } },
   );
 
   const epicOut = execFileSync(

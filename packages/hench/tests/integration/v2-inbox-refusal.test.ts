@@ -1,7 +1,8 @@
 /**
  * `ndx work --task=<id>` on a v2 tree refuses an Inbox change (`needsPlacement`)
  * and a task inside one, naming placement. Rex would refuse to close it, so a
- * run would end completed with the item still open.
+ * run would end completed with the item still open. On a product layer with
+ * no capability or constraint rex closes it, so the run proceeds.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -60,5 +61,11 @@ describe("explicit --task on a v2 tree", () => {
         expect(err.suggestion).toContain("place_change");
       },
     );
+
+    it("runs it when the product layer has no capability or constraint to place it on", async () => {
+      await rm(join(rexDir, "product/checkout"), { recursive: true, force: true, ...RM_RETRY });
+      expect((await select(CHANGE_ID)).item.id).toBe(TASK_ID);
+      expect((await select(TASK_ID)).item.id).toBe(TASK_ID);
+    });
   });
 });

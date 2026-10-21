@@ -11,6 +11,7 @@ import { isItemLevel } from "../schema/index.js";
 import { join } from "node:path";
 import { resolveDir } from "./resolve-dir.js";
 import { resolveRexPaths } from "../store/index.js";
+import { noteLegacyLayout } from "./legacy-layout-notice.js";
 
 suppressKnownDeprecations();
 
@@ -381,6 +382,18 @@ async function dispatchRemove(
       : process.cwd();
   requireRexDir(removeDir);
 
+  if (await isV2Project(removeDir)) {
+    if (removeLevel) {
+      throw new CLIError(
+        `This PRD uses the v2 layout, where items have a type, not a level ("${removeLevel}").`,
+        "Usage: rex remove <id> (a change, task or subtask).",
+      );
+    }
+    const { cmdRemoveChange } = await import("./commands/remove-change.js");
+    await cmdRemoveChange(removeDir, removeId, flags);
+    return;
+  }
+
   const { cmdRemove } = await import("./commands/remove.js");
   await cmdRemove(removeDir, removeId, removeLevel, flags);
 }
@@ -611,6 +624,11 @@ async function dispatchCommand(
       await cmdMigratePlan(resolveDir(positional), flags);
       break;
     }
+    case "migrate-apply": {
+      const { cmdMigrateApply } = await import("./commands/migrate-apply.js");
+      await cmdMigrateApply(resolveDir(positional), flags);
+      break;
+    }
     case "migrate-to-md": {
       const { cmdMigrateToMd } = await import("./commands/migrate-to-md.js");
       await cmdMigrateToMd(resolveDir(positional), flags);
@@ -675,7 +693,7 @@ async function dispatchCommand(
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
         "release", "reorganize", "health", "product", "change", "mcp",
-        "migrate-plan", "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
+        "migrate-plan", "migrate-apply", "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
         "backfill-commit-attribution",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
@@ -708,6 +726,7 @@ async function main(): Promise<void> {
   setDebug(flags.debug === "true");
 
   try {
+    noteLegacyLayout(command, positional);
     await dispatchCommand(command, positional, flags, multiFlags);
   } catch (err) {
     handleCLIError(err, flags.debug === "true");

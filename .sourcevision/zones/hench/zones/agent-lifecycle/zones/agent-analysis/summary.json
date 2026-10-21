@@ -1,0 +1,19 @@
+{
+  "id": "hench/agent-lifecycle/agent-analysis",
+  "name": "Analysis & Recovery",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/analysis/review-repairs.ts",
+    "packages/hench/src/agent/lifecycle/fail-forward.ts",
+    "packages/hench/src/process/git-mutation.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/analysis/review-repairs.ts",
+    "packages/hench/src/agent/lifecycle/fail-forward.ts",
+    "packages/hench/src/process/git-mutation.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 3,
+  "lineCount": 482
+}

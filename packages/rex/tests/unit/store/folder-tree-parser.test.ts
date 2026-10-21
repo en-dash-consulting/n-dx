@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parseFolderTree, parseFrontmatter, type ParseWarning } from "../../../src/store/folder-tree-parser.js";
@@ -294,6 +294,24 @@ describe("parseFolderTree: folder-tree fixtures", () => {
         message: "No item markdown file found (expected index.md or title-named .md file)",
       }),
     ]);
+    // The folder holds only a .gitkeep: nothing was dropped with it.
+    expect(result.warnings[0]!.skipped).toBeUndefined();
+  });
+
+  it("a folder with no item file but subfolders is marked skipped: its subtree is dropped", async () => {
+    const root = await mkdtemp(join(tmpdir(), "rex-parser-skipped-"));
+    try {
+      await mkdir(join(root, "lost-epic", "lost-feature"), { recursive: true });
+      await writeFile(
+        join(root, "lost-epic", "lost-feature", "index.md"),
+        '---\nid: "f1"\nlevel: "feature"\ntitle: "Lost"\nstatus: "pending"\n---\n',
+      );
+      const result = await parseFolderTree(root);
+      expect(result.items).toEqual([]);
+      expect(result.warnings).toEqual([expect.objectContaining({ path: join(root, "lost-epic"), skipped: true })]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("malformed frontmatter → partial load with warning", async () => {
@@ -305,6 +323,7 @@ describe("parseFolderTree: folder-tree fixtures", () => {
         // join() builds the warning path, so the separator is "\" on Windows.
         path: expect.stringContaining(join("broken-epic-bbbbbbbb", "index.md")),
         message: "Unclosed frontmatter block (missing closing ---)",
+        skipped: true,
       }),
     ]);
   });

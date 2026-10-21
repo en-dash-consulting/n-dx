@@ -1,0 +1,18 @@
+{
+  "id": "sourcevision/cli/help-serve",
+  "name": "Help Serve",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/cli/help.ts",
+    "packages/sourcevision/src/cli/index.ts",
+    "packages/sourcevision/src/cli/serve.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/cli/help.ts",
+    "packages/sourcevision/src/cli/serve.ts"
+  ],
+  "cohesion": 0.22,
+  "coupling": 0.78,
+  "fileCount": 3,
+  "lineCount": 615
+}

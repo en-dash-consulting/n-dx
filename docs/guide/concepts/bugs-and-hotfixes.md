@@ -1,7 +1,7 @@
 # Bugs and hotfixes
 
 ::: warning The v2 model
-This page describes the v2 model, which ships from 0.9.0 for v2 projects. `ndx init` creates v1 projects until the storage migration ships (see [v1 projects](../prd-storage#v1-projects)).
+This page describes the v2 model, which ships from 0.9.0 for v2 projects. `ndx init` creates v2 projects; a v1 project is one that has not yet run `ndx migrate` (see [v1 projects](../prd-storage#v1-projects)).
 :::
 
 A bug is the build drifting from an unchanged spec. So a **fix** is a change that *touches* a capability without amending it. Engineers own fixes; stewards are pulled in only when a fix needs the spec to say something new.

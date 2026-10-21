@@ -171,6 +171,7 @@ export {
   resolveTaskModel,
   DEFAULT_ROUTES,
   resolveJudgmentRoute,
+  routesToTier,
   DEFAULT_JUDGMENT_ROUTES,
   JUDGMENT_ROUTE_TYPESAFE,
   TYPESAFE_API_KEY_ENV,

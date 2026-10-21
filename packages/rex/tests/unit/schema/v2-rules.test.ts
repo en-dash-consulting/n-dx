@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   checkV2Rules,
+  CUT_CHANGE_BODY_PREFIX,
+  CUT_CHANGE_TITLE,
+  CUT_HELD_AFTER_CUT_HEADING,
   indexTree,
   isAppliedChange,
   isOpenChange,
@@ -80,20 +83,23 @@ describe("change-has-target", () => {
 });
 
 describe("change-placed-at-close", () => {
+  /** Runs the rule on a product layer a change can be placed on. */
+  const placeable = (changes: RuleNode[]) => check("change-placed-at-close", { product: [cap()], changes });
+
   it("passes an open Inbox change and a completed placed change", () => {
     const changes = [
       node("change", { needsPlacement: true, status: "in_progress" }),
       node("change", { status: "completed", touches: ["a"] }),
       node("change", { status: "completed", needsPlacement: false, touches: ["a"] }),
     ];
-    expect(check("change-placed-at-close", { changes })).toEqual([]);
+    expect(placeable(changes)).toEqual([]);
   });
 
   it("fails a completed change still needing placement, and says when it also has no target", () => {
     const placedTargets = node("change", { status: "completed", needsPlacement: true, touches: ["a"] });
     const spike = node("change", { status: "completed", needsPlacement: true, spike: true });
     const untargeted = node("change", { status: "completed", needsPlacement: true });
-    const findings = check("change-placed-at-close", { changes: [placedTargets, spike, untargeted] });
+    const findings = placeable([placedTargets, spike, untargeted]);
     expect(ids(findings)).toEqual([placedTargets.id, spike.id, untargeted.id]);
     expect(findings[0].severity).toBe("error");
     expect(findings[0].message).not.toContain("must also amend or touch");
@@ -103,7 +109,7 @@ describe("change-placed-at-close", () => {
 
   it("fails an applied change still needing placement, whatever its status", () => {
     const applied = node("change", { status: "in_progress", appliedAt: "2026-10-05T00:00:00.000Z", needsPlacement: true, touches: ["a"] });
-    const findings = check("change-placed-at-close", { changes: [applied] });
+    const findings = placeable([applied]);
     expect(ids(findings)).toEqual([applied.id]);
     expect(findings[0].message).toContain("is applied but still needs placement");
   });
@@ -113,6 +119,68 @@ describe("change-placed-at-close", () => {
     const tree: V2Tree = { product: [], changes: [bare] };
     const findings = checkV2Rules(tree, { now: NOW }, ["change-has-target", "change-placed-at-close"]);
     expect(findings.map((f) => [f.rule, f.nodeId])).toEqual([["change-has-target", bare.id]]);
+  });
+
+  it("passes a closed Inbox change while the product layer has no capability or constraint, and fails it once one exists", () => {
+    const completed = node("change", { status: "completed", needsPlacement: true });
+    const applied = node("change", { appliedAt: "2026-10-05T00:00:00.000Z", needsPlacement: true });
+    const changes = [completed, applied];
+    expect(check("change-placed-at-close", { changes })).toEqual([]);
+    expect(check("change-placed-at-close", { product: [node("area")], changes })).toEqual([]);
+    expect(ids(check("change-placed-at-close", { product: [node("constraint", { statement: "s" })], changes }))).toEqual([completed.id, applied.id]);
+  });
+
+  describe("on a migrated tree (S2-Q2)", () => {
+    const CUT = "2026-10-10T00:00:00.000Z";
+    const cut = () =>
+      node("change", {
+        title: CUT_CHANGE_TITLE,
+        body: `${CUT_CHANGE_BODY_PREFIX}, by plan 0123456789ab cut at ${CUT}.`,
+        status: "completed",
+        completedAt: CUT,
+        appliedAt: CUT,
+        touches: ["a"],
+      });
+    const held = (fields: Record<string, unknown>) => node("change", { needsPlacement: true, touches: ["a"], ...fields });
+
+    it("warns, not errors, on a held change the migration closed at or before the cut", () => {
+      const before = held({ status: "completed", completedAt: "2026-09-01T00:00:00.000Z", appliedAt: "2026-09-01T00:00:00.000Z" });
+      // A v1 item with no completedAt is applied at the cut.
+      const atCut = held({ status: "completed", appliedAt: CUT });
+      // So is one whose completedAt does not parse.
+      const badDate = held({ status: "completed", completedAt: "last week", appliedAt: CUT });
+      const findings = placeable([cut(), before, atCut, badDate]);
+      expect(ids(findings)).toEqual([before.id, atCut.id, badDate.id]);
+      expect(findings.map((f) => f.severity)).toEqual(["warning", "warning", "warning"]);
+      expect(findings[0].message).toContain("closed before the migration cut");
+    });
+
+    it("reports nothing for a held change that is still open", () => {
+      expect(placeable([cut(), held({ status: "pending" }), held({ status: "in_progress" })])).toEqual([]);
+    });
+
+    it("still errors on a held change completed after the cut", () => {
+      const after = held({ status: "completed", completedAt: "2026-10-11T00:00:00.000Z", appliedAt: "2026-10-11T00:00:00.000Z" });
+      const findings = placeable([cut(), after]);
+      expect(ids(findings)).toEqual([after.id]);
+      expect(findings[0].severity).toBe("error");
+    });
+
+    it("warns on a held change completed after the cut that the cut lists as v1 work apply held, and errors on one it does not list", () => {
+      const listed = held({ status: "completed", completedAt: "2026-10-11T00:00:00.000Z" });
+      const unlisted = held({ status: "completed", completedAt: "2026-10-11T00:00:00.000Z" });
+      const withList = cut();
+      withList.body += `\n\n${CUT_HELD_AFTER_CUT_HEADING}\n\n- ${listed.title} (${listed.id})\n\nNext section:`;
+      const findings = placeable([withList, listed, unlisted]);
+      expect(findings.map((f) => [f.nodeId, f.severity])).toEqual([[listed.id, "warning"], [unlisted.id, "error"]]);
+    });
+
+    it("still errors when no migration cut is in the tree, even on a change titled like the cut", () => {
+      const before = held({ status: "completed", completedAt: "2026-09-01T00:00:00.000Z" });
+      const lookalike = node("change", { title: CUT_CHANGE_TITLE, body: "Ours.", status: "completed", appliedAt: CUT, touches: ["a"] });
+      expect(placeable([before]).map((f) => f.severity)).toEqual(["error"]);
+      expect(placeable([lookalike, before]).map((f) => f.severity)).toEqual(["error"]);
+    });
   });
 });
 

@@ -5,21 +5,23 @@
 <zone>
 
 Zone: Tests Web Helpers (`tests-web-helpers`)
-Files: 6, Cohesion: 1.00, Coupling: 0.00
+Files: 8, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: built-server-guard.ts, crash-detector-test-support.ts, temp-dir.ts (+3 more)
-Entry points: packages/web/tests/helpers/built-server-guard.ts, packages/web/tests/helpers/crash-detector-test-support.ts, packages/web/tests/helpers/preact-test-support.ts, packages/web/tests/helpers/server-route-test-support.ts, packages/web/tests/helpers/temp-dir.ts, packages/web/tests/helpers/tree-work-count.ts, packages/web/tests/helpers/viewer-boot.ts, packages/web/tests/helpers/visibility-test-support.ts
-Lines: 552
+Description: Non-source files in packages: built-server-guard.ts, crash-detector-test-support.ts, job-tray.ts (+5 more)
+Entry points: packages/web/tests/helpers/built-server-guard.ts, packages/web/tests/helpers/crash-detector-test-support.ts, packages/web/tests/helpers/job-tray.ts, packages/web/tests/helpers/preact-test-support.ts, packages/web/tests/helpers/prep-fixture.ts, packages/web/tests/helpers/server-route-test-support.ts, packages/web/tests/helpers/temp-dir.ts, packages/web/tests/helpers/tree-work-count.ts, packages/web/tests/helpers/viewer-boot.ts, packages/web/tests/helpers/visibility-test-support.ts
+Lines: 615
 
 </zone>
 
 <files>
 
-packages/web/tests/helpers/built-server-guard.ts (TypeScript, 115 lines, test)
+packages/web/tests/helpers/built-server-guard.ts (TypeScript, 81 lines, test)
 packages/web/tests/helpers/crash-detector-test-support.ts (TypeScript, 20 lines, test)
+packages/web/tests/helpers/job-tray.ts (TypeScript, 45 lines, test)
+packages/web/tests/helpers/prep-fixture.ts (TypeScript, 40 lines, test)
 packages/web/tests/helpers/temp-dir.ts (TypeScript, 54 lines, test)
 packages/web/tests/helpers/tree-work-count.ts (TypeScript, 153 lines, test)
-packages/web/tests/helpers/viewer-boot.ts (TypeScript, 154 lines, test)
+packages/web/tests/helpers/viewer-boot.ts (TypeScript, 166 lines, test)
 packages/web/tests/helpers/visibility-test-support.ts (TypeScript, 56 lines, test)
 
 </files>
@@ -28,17 +30,19 @@ packages/web/tests/helpers/visibility-test-support.ts (TypeScript, 56 lines, tes
 
 
 Outgoing (this zone → other zones):
-  → web-viewer: packages/web/tests/helpers/tree-work-count.ts → packages/web/src/viewer/components/prd-tree/types.ts; packages/web/tests/helpers/viewer-boot.ts → packages/web/src/viewer/main.ts
+  → core: packages/web/tests/helpers/built-server-guard.ts → scripts/lib/stale-dist.mjs
+  → web-viewer: packages/web/tests/helpers/job-tray.ts → packages/web/src/viewer/hooks/use-active-operations.ts; packages/web/tests/helpers/prep-fixture.ts → packages/web/src/viewer/components/prepare-task-model.ts; packages/web/tests/helpers/tree-work-count.ts → packages/web/src/viewer/components/prd-tree/types.ts; packages/web/tests/helpers/viewer-boot.ts → packages/web/src/viewer/main.ts
 
 Incoming (other zones → this zone):
-  ← tests-web-integration: packages/web/tests/integration/hub-daemon.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/hub-proxy.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/merge-history-pipeline.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/port-zero-reporting.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/port-zero-reporting.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/pr-markdown-tab-parity.test.ts → packages/web/tests/helpers/viewer-boot.ts; packages/web/tests/integration/scoped-route-dispatch.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/scoped-route-dispatch.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/token-usage-route-regression.test.ts → packages/web/tests/helpers/viewer-boot.ts; packages/web/tests/integration/workspace-scoped-prd-writes.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/workspace-slot-dispatch.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/workspace-two-worktrees.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/worktrees-route.test.ts → packages/web/tests/helpers/temp-dir.ts
-  ← tests-web-unit: packages/web/tests/unit/helpers/built-server-guard.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/unit/viewer/crash-detector.test.ts → packages/web/tests/helpers/crash-detector-test-support.ts; packages/web/tests/unit/viewer/dom-update-gate.test.ts → packages/web/tests/helpers/visibility-test-support.ts; packages/web/tests/unit/viewer/large-tree-performance.test.ts → packages/web/tests/helpers/tree-work-count.ts; packages/web/tests/unit/viewer/prd-tree-live-tick-perf.test.ts → packages/web/tests/helpers/tree-work-count.ts; packages/web/tests/unit/viewer/status-indicators-polling.test.ts → packages/web/tests/helpers/visibility-test-support.ts
+  ← tests-web-integration: packages/web/tests/integration/feature-gate-enforcement.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/feature-gate-enforcement.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/hub-auth-token.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/hub-daemon.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/hub-proxy.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/live-analyze-route.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/live-route.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/merge-history-pipeline.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/port-zero-reporting.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/port-zero-reporting.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/pr-markdown-refresh.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/pr-markdown-tab-parity.test.ts → packages/web/tests/helpers/viewer-boot.ts; packages/web/tests/integration/run-liveness-worktrees.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/run-reconcile-worktrees.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/scoped-route-dispatch.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/scoped-route-dispatch.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/smart-add-dispatch.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/smart-add-v2-changes.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/start-first-prd-read.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/start-first-prd-read.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/start-v2-stray-legacy-prd.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/start-v2-stray-legacy-prd.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/token-usage-route-regression.test.ts → packages/web/tests/helpers/viewer-boot.ts; packages/web/tests/integration/workspace-scoped-prd-writes.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/workspace-slot-dispatch.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/integration/workspace-two-worktrees.test.ts → packages/web/tests/helpers/temp-dir.ts; packages/web/tests/integration/worktrees-route.test.ts → packages/web/tests/helpers/temp-dir.ts
+  ← tests-web-unit: packages/web/tests/unit/helpers/built-server-guard.test.ts → packages/web/tests/helpers/built-server-guard.ts; packages/web/tests/unit/viewer/active-operations-tray.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/ask-refinements.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/ask-view-a11y.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/ask-view.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/axe-audit.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/crash-detector.test.ts → packages/web/tests/helpers/crash-detector-test-support.ts; packages/web/tests/unit/viewer/dom-update-gate.test.ts → packages/web/tests/helpers/visibility-test-support.ts; packages/web/tests/unit/viewer/enrichment-gate-hook-order.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/explain-finding.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/iso-map-view.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/large-tree-performance.test.ts → packages/web/tests/helpers/tree-work-count.ts; packages/web/tests/unit/viewer/live-task-route.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/prd-tree-live-tick-perf.test.ts → packages/web/tests/helpers/tree-work-count.ts; packages/web/tests/unit/viewer/prepare-task-follows-open.test.ts → packages/web/tests/helpers/prep-fixture.ts; packages/web/tests/unit/viewer/prepare-task-modal.test.ts → packages/web/tests/helpers/prep-fixture.ts; packages/web/tests/unit/viewer/prepare-task-model.test.ts → packages/web/tests/helpers/prep-fixture.ts; packages/web/tests/unit/viewer/refresh-panel.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/restored-views.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/self-heal-live.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/start-task-workspace-live.test.ts → packages/web/tests/helpers/prep-fixture.ts; packages/web/tests/unit/viewer/status-indicators-polling.test.ts → packages/web/tests/helpers/visibility-test-support.ts; packages/web/tests/unit/viewer/suggestions-view.test.ts → packages/web/tests/helpers/job-tray.ts; packages/web/tests/unit/viewer/sv-analyze-controls.test.ts → packages/web/tests/helpers/job-tray.ts
   ← web-server: packages/web/tests/integration/seam-register-scheduler.test.ts → packages/web/tests/helpers/temp-dir.ts
 
 </imports>
 
 <findings>
 
+[observation] [info] 10 entry points — wide API surface, consider consolidating exports
 [observation] [info] High cohesion (1) — files are tightly interconnected
 
 </findings>
@@ -46,6 +50,7 @@ Incoming (other zones → this zone):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 11 internal calls, 0 outgoing, 165 incoming (cohesion: 1, coupling: 0)
+- 10 entry points — wide API surface, consider consolidating exports
+- [call graph] 8 internal calls, 1 outgoing, 327 incoming (cohesion: 0.89, coupling: 0.11)
 
 </insights>

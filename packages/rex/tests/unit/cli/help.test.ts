@@ -106,6 +106,17 @@ describe("rex CLI help", () => {
       expect(output).toContain("--file");
     });
 
+    it("init help names the PRD tree it creates, not prd.json", () => {
+      showCommandHelp("init");
+      const output = logSpy.mock.calls[0][0] as string;
+      expect(output).not.toContain("prd.json");
+      expect(output).toContain("config.json");
+      expect(output).toContain("workflow.md");
+      expect(output).toContain("empty v2 tree");
+      expect(output).toContain("product/index.md");
+      expect(output).toContain("keeps its layout");
+    });
+
     it("log help names event, item and detail and says it is the non-MCP route to append_log", () => {
       showCommandHelp("log");
       const output = logSpy.mock.calls[0][0] as string;

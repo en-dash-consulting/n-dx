@@ -1,0 +1,19 @@
+{
+  "id": "hench/agent-lifecycle/validation",
+  "name": "Completion Validation",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/completion.ts",
+    "packages/hench/src/validation/changed-files.ts",
+    "packages/hench/src/validation/completion.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/completion.ts",
+    "packages/hench/src/validation/changed-files.ts",
+    "packages/hench/src/validation/completion.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 3,
+  "lineCount": 446
+}

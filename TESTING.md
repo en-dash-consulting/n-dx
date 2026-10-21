@@ -614,6 +614,11 @@ an agent running the suite inside Claude Code — ever saw the failure.
   To check whether a failure is a leak, run with `NDX_TEST_ISOLATE_ALL=1`, which
   puts every file back in its own worker: a failure that disappears is a leak
   in the shared project, one that stays is the test's own.
+- **`rex init` gives fixtures a v1 tree.** A new project gets an empty v2 PRD,
+  but most fixtures init and then `rex add epic`, so `tests/setup-session-env.js`
+  sets `NDX_INIT_LAYOUT=v1`. A test of what users get deletes it from its spawn
+  env (`packages/rex/tests/e2e/cli-init.test.ts`). Playwright loads no vitest
+  setup, so its fixture passes it explicitly.
 - **Fixture repos get their git config from one file, not from `git config`.**
   `tests/setup-session-env.js` writes a gitconfig (identity `Test
   <test@test.com>`, `core.autocrlf=false`, `core.eol=lf`, `commit.gpgsign=false`,

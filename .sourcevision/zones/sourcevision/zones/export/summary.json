@@ -1,44 +1,32 @@
 {
   "id": "sourcevision/export",
   "name": "Export",
-  "description": "16 files, primarily TypeScript",
+  "description": "10 files, primarily TypeScript",
   "files": [
-    "packages/sourcevision/src/analyzers/branch-work-classifier.ts",
-    "packages/sourcevision/src/analyzers/branch-work-filter.ts",
-    "packages/sourcevision/src/analyzers/branch-work-store.ts",
-    "packages/sourcevision/src/analyzers/project-profile.ts",
-    "packages/sourcevision/src/analyzers/risk-scoring.ts",
-    "packages/sourcevision/src/export/iso-declared.ts",
+    "packages/sourcevision/src/analyzers/manifest.ts",
+    "packages/sourcevision/src/constants.ts",
     "packages/sourcevision/src/export/iso-map.ts",
     "packages/sourcevision/src/export/iso-model.ts",
     "packages/sourcevision/src/export/iso-scan.ts",
     "packages/sourcevision/src/export/iso-sources.ts",
     "packages/sourcevision/src/export/iso-standalone.ts",
-    "packages/sourcevision/src/generators/pr-markdown-template.ts",
     "packages/sourcevision/src/public.ts",
-    "packages/sourcevision/src/schema/v1.ts",
-    "packages/sourcevision/src/schema/validate.ts",
-    "packages/sourcevision/src/util/archetype-overrides.ts"
+    "packages/sourcevision/src/util/archetype-overrides.ts",
+    "packages/sourcevision/src/util/git-remote.ts"
   ],
   "entryPoints": [
-    "packages/sourcevision/src/analyzers/branch-work-classifier.ts",
-    "packages/sourcevision/src/analyzers/branch-work-filter.ts",
-    "packages/sourcevision/src/analyzers/branch-work-store.ts",
-    "packages/sourcevision/src/analyzers/project-profile.ts",
-    "packages/sourcevision/src/analyzers/risk-scoring.ts",
-    "packages/sourcevision/src/export/iso-declared.ts",
+    "packages/sourcevision/src/analyzers/manifest.ts",
+    "packages/sourcevision/src/constants.ts",
     "packages/sourcevision/src/export/iso-map.ts",
     "packages/sourcevision/src/export/iso-model.ts",
     "packages/sourcevision/src/export/iso-scan.ts",
     "packages/sourcevision/src/export/iso-sources.ts",
-    "packages/sourcevision/src/generators/pr-markdown-template.ts",
     "packages/sourcevision/src/public.ts",
-    "packages/sourcevision/src/schema/v1.ts",
-    "packages/sourcevision/src/schema/validate.ts",
-    "packages/sourcevision/src/util/archetype-overrides.ts"
+    "packages/sourcevision/src/util/archetype-overrides.ts",
+    "packages/sourcevision/src/util/git-remote.ts"
   ],
-  "cohesion": 0.66,
-  "coupling": 0.34,
-  "fileCount": 16,
-  "lineCount": 7882
+  "cohesion": 0.57,
+  "coupling": 0.43,
+  "fileCount": 10,
+  "lineCount": 4652
 }

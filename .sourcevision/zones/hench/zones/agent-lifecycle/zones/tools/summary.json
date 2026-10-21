@@ -1,0 +1,19 @@
+{
+  "id": "hench/agent-lifecycle/tools",
+  "name": "Test Infrastructure",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/tools/test-command-resolver.ts",
+    "packages/hench/src/tools/test-gate-template.ts",
+    "packages/hench/src/tools/test-runner.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/tools/test-command-resolver.ts",
+    "packages/hench/src/tools/test-gate-template.ts",
+    "packages/hench/src/tools/test-runner.ts"
+  ],
+  "cohesion": 0.57,
+  "coupling": 0.43,
+  "fileCount": 3,
+  "lineCount": 2079
+}

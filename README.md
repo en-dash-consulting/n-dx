@@ -241,7 +241,9 @@ ndx config llm.codex.cli_path codex .
 |---------|-------------|
 | `ndx plan [dir]` | Analyze codebase and generate PRD proposals (`--guided`, `--accept`) |
 | `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` (`--dry-run`, `--no-commit`) |
+| `ndx migrate [dir]` | Run every migration step the project still needs: the layout move into `.ndx/`, the `prd.md` / `prd.json` conversion, then the v1 → v2 plan (to `./migration-plan.json`) and apply. Steps already done are skipped (`--dry-run`, `--no-commit`, `--rules-only`) |
 | `ndx migrate --plan [dir]` | Plan the PRD's v1 → v2 migration and write it out for review; writes nothing to the PRD (`--out`, `--rules-only`) |
+| `ndx migrate --apply [dir]` | Apply the reviewed plan: write the v2 tree and remove the v1 tree (`--plan=<path>`, default `./migration-plan.json`; `--dry-run` writes nothing) |
 | `ndx status [dir]` | Show PRD status (`--format=json`, `--since`, `--until`) |
 | `ndx readiness [dir]` | Score SDLC readiness for autonomous agent work — tests, CI, CD, rollback, migrations, quality gates, observability, agent safety (`--json`). Heuristic: detects whether a practice exists, not whether it is good |
 | `ndx refresh [dir]` | Refresh dashboard artifacts (`--ui-only`, `--data-only`, `--no-build`) |

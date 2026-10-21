@@ -29,7 +29,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { resolveLayout } from "./layout.js";
 
@@ -40,6 +40,7 @@ import { resolveLayout } from "./layout.js";
  * @property {number} inputTokens
  * @property {number} outputTokens
  * @property {number|null} costUsd - `null` when no tool recorded a cost.
+ * @property {boolean} [usageUntracked] - The command made model calls it records nowhere this module reads; `calls` is then not a count of them.
  * @property {boolean} narrationPending - This run queued a detached narrator that has not finished; its spend is not in the numbers above.
  * @property {string} next - The command to run next.
  */
@@ -213,7 +214,7 @@ export function collectRunSummary(dir, effects, startedAt) {
 
   const filesWritten = [];
   for (const write of effects.writes) {
-    if (newestMtimeMs(join(dir, write.path)) >= threshold) filesWritten.push(write.path);
+    if (newestMtimeMs(resolve(dir, write.path)) >= threshold) filesWritten.push(write.path);
   }
 
   // Both are consulted because `ndx plan` drives sourcevision and rex in turn
@@ -238,6 +239,7 @@ export function collectRunSummary(dir, effects, startedAt) {
     outputTokens,
     costUsd,
     narrationPending: narrationIsPending(manifest, threshold),
+    usageUntracked: effects.usage === "untracked" && effects.llm.length > 0,
     next: effects.next,
   };
 }
@@ -271,7 +273,10 @@ export function formatRunSummary(summary, style = {}) {
     lines.push(`  ${bold("wrote")}    ${summary.filesWritten.map((p) => cyan(p)).join(", ")}`);
   }
 
-  if (summary.calls === 0) {
+  if (summary.usageUntracked) {
+    // Any counted calls would be a fragment of the real number, so none are printed.
+    lines.push(`  ${bold("llm")}      model calls may have been made${dim(" — this command does not count them")}`);
+  } else if (summary.calls === 0) {
     lines.push(`  ${bold("llm")}      no model calls${dim(" — nothing spent")}`);
   } else {
     const tokens = (summary.inputTokens + summary.outputTokens).toLocaleString();

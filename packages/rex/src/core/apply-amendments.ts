@@ -48,7 +48,9 @@
  *
  * Any problem refuses the whole apply with {@link ApplyAmendmentsError},
  * listing every problem found. Last, the v2 rules run on the result: an error
- * finding the input tree did not have refuses the apply too, with the findings.
+ * finding the input tree did not have refuses the apply too, with the findings,
+ * except `change-placed-at-close` on another change: that appears only when
+ * this apply makes placement possible.
  *
  * @module rex/core/apply-amendments
  */
@@ -153,7 +155,12 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   change.appliedAmendsHash = amendsHash(amends);
   delete change.needsPlacement;
 
-  const introduced = newErrors(tree, next, options.now);
+  // Apply edits no other change, so another change's new change-placed-at-close
+  // only means this apply gave the product layer its first capability or
+  // constraint: a change that closed unplaced before is now placeable. Rules
+  // report it; it is not this change's breakage, and refusing would leave the
+  // product layer with nothing to place on forever.
+  const introduced = newErrors(tree, next, options.now).filter((f) => f.rule !== "change-placed-at-close" || f.nodeId === change.id);
   if (introduced.length > 0) {
     throw new ApplyAmendmentsError(label, introduced.map((f) => `the result breaks ${f.rule}: ${f.message}`), introduced);
   }

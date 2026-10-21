@@ -15,7 +15,12 @@ import { eolPatternsFor, gitattributesMergeRules } from "../../packages/core/git
 import { resolveLayout } from "../../packages/core/layout.js";
 
 const REPO_ROOT = process.cwd();
-const PRD_ROOT = join(REPO_ROOT, ".rex", "prd_tree");
+// The repository's PRD in whichever layout it is in: v1 is one prd_tree/, v2
+// (after `ndx migrate --apply`) is product/ and changes/.
+const PRD_DIRS = ["prd_tree", "product", "changes"]
+  .map((name) => join(".rex", name))
+  .filter((rel) => existsSync(join(REPO_ROOT, rel)));
+const PRD_PATHSPECS = PRD_DIRS.map((rel) => `${rel.split("\\").join("/")}/`);
 
 /** Collect up to `limit` serialized markdown files under the PRD tree. */
 function collectPrdMarkdown(dir, acc = [], limit = 20) {
@@ -34,7 +39,7 @@ function gitPath(absPath) {
 }
 
 describe("PRD serialized files are pinned to LF (issue #283)", () => {
-  const samples = collectPrdMarkdown(PRD_ROOT);
+  const samples = PRD_DIRS.flatMap((rel) => collectPrdMarkdown(join(REPO_ROOT, rel)));
 
   it("finds PRD markdown to validate", () => {
     expect(samples.length).toBeGreaterThan(0);
@@ -62,7 +67,7 @@ describe("PRD serialized files are pinned to LF (issue #283)", () => {
     // in_progress. The assertion below cannot tell content churn from
     // line-ending churn, so it is only meaningful on an already-clean file.
     const dirty = new Set(
-      execFileSync("git", ["status", "--porcelain", "--", ".rex/prd_tree/"], {
+      execFileSync("git", ["status", "--porcelain", "--", ...PRD_PATHSPECS], {
         encoding: "utf8",
         cwd: REPO_ROOT,
       })
@@ -79,7 +84,7 @@ describe("PRD serialized files are pinned to LF (issue #283)", () => {
     // and such a path used to blow this test up with ENOENT rather than
     // testing anything. The dirty set catches most of those, but the guard is
     // cheap and does not depend on parsing porcelain output correctly.
-    const tracked = execFileSync("git", ["ls-files", "--", ".rex/prd_tree/"], {
+    const tracked = execFileSync("git", ["ls-files", "--", ...PRD_PATHSPECS], {
       encoding: "utf8",
       cwd: REPO_ROOT,
     })
