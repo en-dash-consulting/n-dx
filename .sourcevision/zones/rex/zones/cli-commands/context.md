@@ -5,87 +5,67 @@
 <zone>
 
 Zone: Cli Commands (`rex/cli-commands`)
-Files: 20, Cohesion: 0.42, Coupling: 0.58
-Description: 20 files, primarily TypeScript
-Entry points: packages/rex/src/cli/commands/claim.ts, packages/rex/src/cli/commands/folder-tree-sync.ts, packages/rex/src/cli/commands/migrate-slugs.ts, packages/rex/src/cli/commands/migrate-to-folder-tree.ts, packages/rex/src/cli/commands/validate.ts, packages/rex/src/cli/completion-hold.ts, packages/rex/src/cli/folder-tree-path.ts, packages/rex/src/cli/help.ts, packages/rex/src/cli/migration-notification.ts, packages/rex/src/core/post-merge-validate.ts, packages/rex/src/core/slug-migration.ts, packages/rex/src/schema/validate.ts, packages/rex/src/store/claims.ts, packages/rex/src/store/ensure-legacy-prd-migrated.ts, packages/rex/src/store/file-adapter.ts, packages/rex/src/store/file-lock.ts, packages/rex/src/store/index.ts, packages/rex/src/store/notion-client.ts, packages/rex/src/store/paths.ts, packages/rex/src/store/prd-md-migration.ts
-Lines: 5975
+Files: 16, Cohesion: 0.40, Coupling: 0.60
+Description: 16 files, primarily TypeScript
+Entry points: packages/rex/src/cli/commands/constants.ts, packages/rex/src/cli/commands/migrate-plan.ts, packages/rex/src/cli/legacy-layout-notice.ts, packages/rex/src/cli/mcp-tools/tool.ts, packages/rex/src/cli/mcp-workspace.ts, packages/rex/src/cli/mcp.ts, packages/rex/src/cli/resolve-dir.ts, packages/rex/src/core/merge-driver.ts, packages/rex/src/migrations/registry.ts, packages/rex/src/migrations/v1-to-v2/index.ts, packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts, packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts, packages/rex/src/migrations/v1-to-v2/migration-plan.ts, packages/rex/src/migrations/v1-to-v2/plan-summary.ts
+Lines: 3794
 
 </zone>
 
 <files>
 
-packages/rex/src/cli/commands/claim.ts (TypeScript, 300 lines, source)
-packages/rex/src/cli/commands/folder-tree-sync.ts (TypeScript, 140 lines, source)
-packages/rex/src/cli/commands/migrate-slugs.ts (TypeScript, 199 lines, source)
-packages/rex/src/cli/commands/migrate-to-folder-tree.ts (TypeScript, 253 lines, source)
-packages/rex/src/cli/commands/validate.ts (TypeScript, 509 lines, source)
-packages/rex/src/cli/completion-hold.ts (TypeScript, 62 lines, source)
-packages/rex/src/cli/folder-tree-path.ts (TypeScript, 39 lines, source)
-packages/rex/src/cli/help.ts (TypeScript, 743 lines, source)
-packages/rex/src/cli/migration-notification.ts (TypeScript, 161 lines, source)
-packages/rex/src/core/post-merge-validate.ts (TypeScript, 659 lines, source)
-packages/rex/src/core/slug-migration.ts (TypeScript, 0 lines, source)
-packages/rex/src/schema/validate.ts (TypeScript, 217 lines, source)
-packages/rex/src/store/claims.ts (TypeScript, 556 lines, source)
-packages/rex/src/store/ensure-legacy-prd-migrated.ts (TypeScript, 274 lines, source)
-packages/rex/src/store/file-adapter.ts (TypeScript, 820 lines, source)
-packages/rex/src/store/file-lock.ts (TypeScript, 397 lines, source)
-packages/rex/src/store/index.ts (TypeScript, 284 lines, source)
-packages/rex/src/store/notion-client.ts (TypeScript, 161 lines, source)
-packages/rex/src/store/paths.ts (TypeScript, 42 lines, source)
-packages/rex/src/store/prd-md-migration.ts (TypeScript, 159 lines, source)
+packages/rex/src/cli/commands/constants.ts (TypeScript, 68 lines, source)
+packages/rex/src/cli/commands/merge-driver.ts (TypeScript, 55 lines, source)
+packages/rex/src/cli/commands/migrate-plan.ts (TypeScript, 351 lines, source)
+packages/rex/src/cli/index.ts (TypeScript, 736 lines, source)
+packages/rex/src/cli/legacy-layout-notice.ts (TypeScript, 56 lines, source)
+packages/rex/src/cli/mcp-tools/tool.ts (TypeScript, 51 lines, source)
+packages/rex/src/cli/mcp-workspace.ts (TypeScript, 209 lines, source)
+packages/rex/src/cli/mcp.ts (TypeScript, 152 lines, source)
+packages/rex/src/cli/resolve-dir.ts (TypeScript, 30 lines, source)
+packages/rex/src/core/merge-driver.ts (TypeScript, 310 lines, source)
+packages/rex/src/migrations/registry.ts (TypeScript, 16 lines, source)
+packages/rex/src/migrations/v1-to-v2/index.ts (TypeScript, 198 lines, source)
+packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts (TypeScript, 494 lines, source)
+packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts (TypeScript, 372 lines, source)
+packages/rex/src/migrations/v1-to-v2/migration-plan.ts (TypeScript, 463 lines, source)
+packages/rex/src/migrations/v1-to-v2/plan-summary.ts (TypeScript, 233 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/rex/src/cli/commands/claim.ts → packages/rex/src/store/claims.ts {openClaimsStore, resolveClaimHolder, defaultIsPidAlive}
-  packages/rex/src/cli/commands/claim.ts → packages/rex/src/store/claims.ts {TaskClaim}
-  packages/rex/src/cli/commands/claim.ts → packages/rex/src/store/index.ts {resolveStore}
-  packages/rex/src/cli/commands/folder-tree-sync.ts → packages/rex/src/store/index.ts {serializeFolderTree, parseFolderTree, PRD_TREE_DIRNAME, prdLockPath, withLock, assertSlugRuleWritable}
-  packages/rex/src/cli/commands/folder-tree-sync.ts → packages/rex/src/store/index.ts {PRDStore}
-  packages/rex/src/cli/commands/migrate-slugs.ts → packages/rex/src/core/slug-migration.ts {findUnresolvableSiblingCollisions, fingerprintTree, diffFingerprints, isLossless}
-  packages/rex/src/cli/commands/migrate-slugs.ts → packages/rex/src/store/index.ts {resolveStore, PRD_TREE_DIRNAME, SLUG_RULE_VERSION, readSlugRuleMarker}
-  packages/rex/src/cli/commands/migrate-to-folder-tree.ts → packages/rex/src/cli/commands/folder-tree-sync.ts {FOLDER_TREE_SUBDIR}
-  packages/rex/src/cli/commands/migrate-to-folder-tree.ts → packages/rex/src/schema/validate.ts {validateDocument}
-  packages/rex/src/cli/commands/migrate-to-folder-tree.ts → packages/rex/src/store/index.ts {serializeFolderTree, parseFolderTree, TREE_META_FILENAME}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/cli/commands/folder-tree-sync.ts {loadItemsPreferFolderTree}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/cli/migration-notification.ts {emitMigrationNotification}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/core/post-merge-validate.ts {detectPostMergeIssues, repairPostMergeIssues}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/schema/validate.ts {validateDocument, validateConfig}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/store/index.ts {resolveStore, ensureLegacyPrdMigrated, LegacyPrdMigrationError, findNonConformingSlugs, findTreeIdentityFaults, readSlugRuleMarker, parseFolderTree, PRD_TREE_DIRNAME, SLUG_RULE_VERSION, SLUG_RULE_MARKER_MISSING}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/store/index.ts {PRDStore}
-  packages/rex/src/cli/completion-hold.ts → packages/rex/src/store/index.ts {ClaimsStore, TaskClaim}
-  packages/rex/src/cli/folder-tree-path.ts → packages/rex/src/store/index.ts {resolveSiblingSlugs, PRD_TREE_DIRNAME}
-  packages/rex/src/cli/help.ts → packages/rex/src/store/index.ts {PRD_TREE_DIRNAME}
-  packages/rex/src/cli/migration-notification.ts → packages/rex/src/store/ensure-legacy-prd-migrated.ts {LegacyPrdMigrationResult}
-  packages/rex/src/cli/migration-notification.ts → packages/rex/src/store/index.ts {PRD_TREE_DIRNAME}
-  packages/rex/src/store/claims.ts → packages/rex/src/store/file-lock.ts {withLock}
-  packages/rex/src/store/claims.ts → packages/rex/src/store/file-lock.ts {LockOptions}
-  packages/rex/src/store/ensure-legacy-prd-migrated.ts → packages/rex/src/schema/validate.ts {validateDocument, PRDDocumentSchema}
-  packages/rex/src/store/ensure-legacy-prd-migrated.ts → packages/rex/src/store/file-lock.ts {withLock}
-  packages/rex/src/store/ensure-legacy-prd-migrated.ts → packages/rex/src/store/index.ts {serializeFolderTree}
-  packages/rex/src/store/ensure-legacy-prd-migrated.ts → packages/rex/src/store/paths.ts {PRD_TREE_DIRNAME, TREE_META_FILENAME}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/schema/validate.ts {validateDocument, validateConfig, validateLogEntry}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/file-lock.ts {withLock}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/paths.ts {PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/prd-md-migration.ts {PRD_MARKDOWN_FILENAME, toMarkdownSourcePath}
-  packages/rex/src/store/index.ts → packages/rex/src/store/claims.ts {openClaimsStore, claimsStorePath, resolveClaimHolder}
-  packages/rex/src/store/index.ts → packages/rex/src/store/claims.ts {ClaimsStore, ClaimHolder, TaskClaim, PendingCompletion}
-  packages/rex/src/store/index.ts → packages/rex/src/store/ensure-legacy-prd-migrated.ts {ensureLegacyPrdMigrated, LegacyPrdMigrationError}
-  packages/rex/src/store/index.ts → packages/rex/src/store/ensure-legacy-prd-migrated.ts {LegacyPrdMigrationResult}
-  packages/rex/src/store/index.ts → packages/rex/src/store/file-adapter.ts {FileStore, ensureRexDir, PRD_FILENAME}
-  packages/rex/src/store/index.ts → packages/rex/src/store/file-adapter.ts {FileStore, PRD_FILENAME}
-  packages/rex/src/store/index.ts → packages/rex/src/store/file-lock.ts {withLock, acquireLock}
-  packages/rex/src/store/index.ts → packages/rex/src/store/notion-client.ts {LiveNotionClient}
-  packages/rex/src/store/index.ts → packages/rex/src/store/notion-client.ts {LiveNotionClient}
-  packages/rex/src/store/index.ts → packages/rex/src/store/notion-client.ts {NotionClient, NotionAdapterConfig}
-  packages/rex/src/store/index.ts → packages/rex/src/store/paths.ts {PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath}
-  packages/rex/src/store/index.ts → packages/rex/src/store/prd-md-migration.ts {migrateJsonPrdToMarkdown, PRD_MARKDOWN_FILENAME, PRDMarkdownMigrationError, jsonToMarkdownFilename, toMarkdownSourcePath}
-  packages/rex/src/store/index.ts → packages/rex/src/store/prd-md-migration.ts {PRD_MARKDOWN_FILENAME}
-  packages/rex/src/store/index.ts → packages/rex/src/store/prd-md-migration.ts {MarkdownMigrationResult}
-  packages/rex/src/store/prd-md-migration.ts → packages/rex/src/schema/validate.ts {validateDocument}
-  packages/rex/src/store/prd-md-migration.ts → packages/rex/src/store/file-adapter.ts {PRD_FILENAME}
+  packages/rex/src/cli/commands/merge-driver.ts → packages/rex/src/core/merge-driver.ts {mergePrdMarkdown}
+  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/registry.ts {findMigration, MIGRATIONS}
+  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/index.ts {contentHash, sourceDigest, v1TreeSource, V1_TREE_SOURCE_KIND}
+  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/index.ts {V1ToV2Options}
+  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts {MIGRATION_JUDGE_TASK_CLASS}
+  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/plan-summary.ts {renderPlanSummary}
+  packages/rex/src/cli/commands/migrate-plan.ts → packages/rex/src/migrations/v1-to-v2/plan-summary.ts {V1ToV2Plan}
+  packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/constants.ts {usage}
+  packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/merge-driver.ts {cmdMergeDriver}
+  packages/rex/src/cli/index.ts → packages/rex/src/cli/commands/migrate-plan.ts {cmdMigratePlan}
+  packages/rex/src/cli/index.ts → packages/rex/src/cli/legacy-layout-notice.ts {noteLegacyLayout}
+  packages/rex/src/cli/index.ts → packages/rex/src/cli/mcp.ts {startMcpServer}
+  packages/rex/src/cli/index.ts → packages/rex/src/cli/resolve-dir.ts {resolveDir}
+  packages/rex/src/cli/mcp-tools/tool.ts → packages/rex/src/cli/mcp-workspace.ts {RexWorkspace}
+  packages/rex/src/cli/mcp.ts → packages/rex/src/cli/commands/constants.ts {TOOL_VERSION}
+  packages/rex/src/cli/mcp.ts → packages/rex/src/cli/mcp-tools/tool.ts {Access}
+  packages/rex/src/cli/mcp.ts → packages/rex/src/cli/mcp-workspace.ts {openRexWorkspace, WorkspaceBinding}
+  packages/rex/src/cli/mcp.ts → packages/rex/src/cli/mcp-workspace.ts {RexWorkspace}
+  packages/rex/src/migrations/registry.ts → packages/rex/src/migrations/v1-to-v2/index.ts {v1ToV2}
+  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts {jevHeldPass, flagThresholdOf, jevReviewPass, jevReviewSummary, reviewQueue, withJevArea}
+  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts {JevReviewFields, JevReviewOptions, JevReviewSummary, ReviewQueueItem}
+  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts {buildPlanData, stampReview}
+  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts {ItemPlanData, PlanData, PlanDataOptions}
+  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {classifyV1Tree}
+  packages/rex/src/migrations/v1-to-v2/index.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {ClassifyOptions, MigrationPlan, PlanEntry}
+  packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts → packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts {stampReview}
+  packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts → packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts {ItemPlanData}
+  packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {PlanEntry, ProposedArea}
+  packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {MigrationPlan, PlanEntry}
+  packages/rex/src/migrations/v1-to-v2/plan-summary.ts → packages/rex/src/migrations/v1-to-v2/index.ts {V1ToV2Entry, V1ToV2Summary}
+  packages/rex/src/migrations/v1-to-v2/plan-summary.ts → packages/rex/src/migrations/v1-to-v2/migration-plan.ts {PlanTargetType}
 
 </imports>

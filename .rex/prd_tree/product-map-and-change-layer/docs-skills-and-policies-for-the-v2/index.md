@@ -25,6 +25,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [command-effects declares {rex}/prd_tree/ as the PRD read/write for every command on a v2 project](./command-effects-declares-rex-prd-tree.md) | completed |
 | [docs/guide/skills.md says the PRD skills' v2 versions have not shipped and lists ndx-reshape as v1-only](./docs-guide-skills-md-says-the-prd.md) | completed |
 | [Layout-literal wall lets a hardcoded .ndx/rex, .ndx/hench or .ndx/sourcevision path through](./layout-literal-wall-lets-a-hardcoded.md) | completed |
 | [/ndx-reshape's manifest description offers "change levels", which a v2 tree refuses](./ndx-reshape-s-manifest-description.md) | completed |

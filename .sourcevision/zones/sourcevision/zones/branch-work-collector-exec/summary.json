@@ -1,0 +1,19 @@
+{
+  "id": "sourcevision/branch-work-collector-exec",
+  "name": "Branch Work Collector Exec",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/branch-work-collector.ts",
+    "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+    "packages/sourcevision/src/util/exec-cli.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/branch-work-collector.ts",
+    "packages/sourcevision/src/cli/commands/prd-epic-resolver.ts",
+    "packages/sourcevision/src/util/exec-cli.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 3,
+  "lineCount": 912
+}

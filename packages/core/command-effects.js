@@ -18,7 +18,7 @@
  * COMMAND_REGISTRY); `tests/unit/command-effects.test.js` fails on a registry
  * command without a declaration and on a declaration without a command.
  *
- * Paths the layout owns are written as tokens — `{rex}/prd_tree/`, `{config}` —
+ * Paths the layout owns are written as tokens — `{rex}/`, `{config}`, `{prd}` —
  * never as `.rex/` or `.n-dx.json`, because where those live depends on whether
  * the project is on the legacy or the `.ndx/` layout, and `layout.js` owns that
  * decision. {@link localizeEffects} expands the tokens against a project's
@@ -44,6 +44,12 @@
  * @property {boolean} [conditional] - Only written under the condition named in `when`.
  * @property {string} [when] - The condition, phrased to follow "only": "with --accept",
  *   "without --dry-run", "on import", "when autoCommit is on".
+ * @property {string} [followsFlag] - A value flag that names this path (`--out`);
+ *   {@link resolveCommandEffects} replaces `path` with the flag's value, or
+ *   {@link WriteEffect.defaultPath} when it is absent.
+ * @property {string} [defaultPath] - The path when `followsFlag` is not passed.
+ * @property {string} [derivedFrom] - A second flag whose value, with `.json`
+ *   swapped for `.md`, is the default when `followsFlag` is not passed.
  */
 
 /**
@@ -72,6 +78,9 @@
  *   *this* command. Per command because the CLIs disagree: sourcevision honours
  *   `--fast` and drops `--no-llm`, while `ndx plan` honours `--no-llm` and rex
  *   ignores `--fast`.
+ * @property {"untracked"} [usage] - Set when the command's model calls are
+ *   recorded nowhere the run summary reads, so it must say they are not counted
+ *   rather than report none.
  * @property {string} [delegates] - For a passthrough, the tool whose subcommand
  *   decides the real effects.
  * @property {string} duration - Rough wall-clock, for expectation-setting only.
@@ -89,8 +98,10 @@ const BANNER_SUPPRESSING_FLAGS = new Set([
 // Frozen so a consumer that mutates one entry cannot silently edit another.
 
 const LLM_PROVIDER = Object.freeze({ to: "llm-provider", what: "the configured LLM vendor" });
-const PRD_TREE = "{rex}/prd_tree/";
-const PRD_READ = "{rex}/prd_tree/";
+// `{prd}` / `{prdRead}` expand per project (see PRD_TOKENS): a v1 project keeps
+// its PRD in prd_tree/, a v2 one in changes/ and product/.
+const PRD_TREE = "{prd}";
+const PRD_READ = "{prdRead}";
 const SV_ANALYSIS_WRITE = Object.freeze({
   path: "{sourcevision}/",
   what: "inventory, import graph, zones, CONTEXT.md, llms.txt",
@@ -222,11 +233,20 @@ export const COMMAND_EFFECTS = {
 
   migrate: {
     command: "migrate",
-    summary: "Plan the PRD's v1 → v2 migration and write it out for review.",
-    reads: ["{rex}/prd_tree/ (under the PRD lock)", "the plan already at --out, for the answers it recorded", "test files under the project, to link criteria"],
+    summary: "Run every migration step the project still needs (layout, folder tree, v1 → v2 plan and apply), or plan for review, or apply the reviewed plan.",
+    reads: [
+      "{rex}/prd_tree/ (under the PRD lock)",
+      "the plan already at --out, for the answers it recorded",
+      "test files under the project, to link criteria",
+      "with --apply, or without --plan or --apply: the plan at --plan (default ./migration-plan.json)",
+      "git status, when the layout step runs",
+    ],
     writes: [
-      { path: "--out (default ./migration-plan.json)", what: "the plan, keyed by v1 item id" },
-      { path: "--summary (default: --out with .md)", what: "the Markdown summary for review" },
+      { path: ".ndx/", what: "the moved tool directories and config, committed unless --no-commit (as migrate-layout)", conditional: true, when: "without --plan or --apply, on a legacy layout and without --dry-run" },
+      { path: "{rex}/prd_tree/", what: "the folder tree converted from prd.md / prd.json", conditional: true, when: "without --plan or --apply, on a flat-file PRD and without --dry-run" },
+      { path: "--out (default ./migration-plan.json)", followsFlag: "--out", defaultPath: "./migration-plan.json", what: "the plan, keyed by v1 item id", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
+      { path: "--summary (default: --out with .md)", followsFlag: "--summary", defaultPath: "./migration-plan.md", derivedFrom: "--out", what: "the Markdown summary for review", conditional: true, when: "with --plan, or without --plan or --apply on a v1 tree" },
+      { path: "{rex}/", what: "the v2 product and change layers, replacing prd_tree/ and tree-meta.json", conditional: true, when: "with --apply, or without --plan or --apply on a v1 tree, and without --dry-run" },
     ],
     llm: [
       { phase: "placement", purpose: "place a change the rules held", calls: "0-N, none with --rules-only" },
@@ -235,6 +255,7 @@ export const COMMAND_EFFECTS = {
     ],
     network: [{ ...LLM_PROVIDER, when: "without --rules-only" }],
     noLlmFlags: ["--rules-only"],
+    usage: "untracked",
     duration: "seconds with --rules-only; up to an hour over a large PRD with the model passes",
     next: "ndx status",
   },
@@ -283,7 +304,8 @@ export const COMMAND_EFFECTS = {
     summary: "Group SourceVision findings into recommendations you can accept.",
     reads: [
       "{sourcevision}/ (findings from the last analysis)",
-      "{rex}/prd_tree/ and {rex}/acknowledged-findings.json",
+      PRD_READ,
+      "{rex}/acknowledged-findings.json",
     ],
     writes: [
       { path: "{rex}/acknowledged-findings.json", what: "acknowledgements", conditional: true, when: "with --acknowledge" },
@@ -303,7 +325,7 @@ export const COMMAND_EFFECTS = {
     reads: [
       "every tracked source file under the project",
       "{sourcevision}/ (refreshed first)",
-      "{rex}/prd_tree/ (to avoid proposing what already exists)",
+      `${PRD_READ} (to avoid proposing what already exists)`,
     ],
     writes: [
       SV_ANALYSIS_WRITE,
@@ -408,11 +430,11 @@ export const COMMAND_EFFECTS = {
 
   "install-sample": {
     command: "install-sample",
-    summary: "Add a small sample app and four PRD tasks to try the loop on.",
+    summary: "Add a small sample app and a sample change with two tasks to try the loop on.",
     reads: [],
     writes: [
       { path: "sample-app/", what: "index.html, style.css, app.js" },
-      { path: "{rex}/prd_tree/sample-app-improvements/", what: "four sample tasks" },
+      { path: "{rex}/changes/", what: "a sample change with two tasks (v1 project: {rex}/prd_tree/sample-app-improvements/)" },
     ],
     llm: [],
     network: [],
@@ -422,11 +444,11 @@ export const COMMAND_EFFECTS = {
 
   "destroy-sample": {
     command: "destroy-sample",
-    summary: "Delete the sample app and its PRD tasks.",
+    summary: "Delete the sample app and its PRD items.",
     reads: [PRD_READ],
     writes: [
       { path: "sample-app/", what: "deleted" },
-      { path: PRD_TREE, what: "the sample tasks, deleted" },
+      { path: "{rex}/changes/", what: "the sample change and its tasks, deleted (v1 project: the sample items under {rex}/prd_tree/)" },
     ],
     llm: [],
     network: [],
@@ -735,6 +757,28 @@ export const LAYOUT_TOKENS = Object.freeze({
   webPort: "webPortFile",
 });
 
+/**
+ * Tokens that depend on the project's PRD storage version, not on the layout:
+ * `{prd}` is where a command writes the PRD, `{prdRead}` what it reads.
+ * {@link prdTokenPaths} answers them; the dashboard's twin in
+ * `routes-commands.ts` must agree (`command-effects-manifest-contract.test.js`).
+ */
+export const PRD_TOKENS = Object.freeze(["prd", "prdRead"]);
+
+/**
+ * The {@link PRD_TOKENS} for a project whose rex directory is `rexPath`.
+ * `v2` is whether `<rexPath>/product/` exists, the test rex itself uses.
+ *
+ * @param {string} rexPath - Project-relative rex directory.
+ * @param {boolean} v2
+ * @returns {{prd: string, prdRead: string}}
+ */
+export function prdTokenPaths(rexPath, v2) {
+  return v2
+    ? { prd: `${rexPath}/changes/`, prdRead: `${rexPath}/product/ and ${rexPath}/changes/` }
+    : { prd: `${rexPath}/prd_tree/`, prdRead: `${rexPath}/prd_tree/` };
+}
+
 const TOKEN_PATTERN = /\{(\w+)\}/g;
 
 /**
@@ -787,11 +831,34 @@ export function getCommandEffects(command) {
  * @returns {CommandEffects|null}
  */
 export function resolveCommandEffects(command, flags = []) {
-  const base = getCommandEffects(command);
-  if (!base) return null;
+  const declared = getCommandEffects(command);
+  if (!declared) return null;
+  const base = declared.writes.some((w) => w.followsFlag)
+    ? { ...declared, writes: declared.writes.map((w) => followFlag(w, flags)) }
+    : declared;
   const silencers = base.noLlmFlags ?? [];
   if (!flags.some((f) => silencers.includes(f))) return base;
   return { ...base, llm: [], network: base.network.filter((n) => n.to !== "llm-provider") };
+}
+
+/** The value of `--name=value` in `flags`, or undefined (a bare `--name` has none). */
+function flagValue(flags, name) {
+  const hit = flags.find((f) => f.startsWith(`${name}=`));
+  return hit === undefined ? undefined : hit.slice(name.length + 1);
+}
+
+/** `plan.json` → `plan.md`; anything else gets `.md` appended (rex's `summaryPathFor`). */
+function markdownSibling(path) {
+  return path.endsWith(".json") ? `${path.slice(0, -".json".length)}.md` : `${path}.md`;
+}
+
+/** A write that names itself by a flag, resolved for this invocation. */
+function followFlag(write, flags) {
+  if (!write.followsFlag) return write;
+  const given = flagValue(flags, write.followsFlag);
+  const from = write.derivedFrom ? flagValue(flags, write.derivedFrom) : undefined;
+  const path = given ?? (from !== undefined ? markdownSibling(from) : write.defaultPath);
+  return { ...write, path };
 }
 
 /**

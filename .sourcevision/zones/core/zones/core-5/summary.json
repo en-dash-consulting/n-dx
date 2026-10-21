@@ -1,0 +1,33 @@
+{
+  "id": "core/core-5",
+  "name": "Core 5",
+  "description": "10 files, primarily JavaScript",
+  "files": [
+    "packages/core/gitattributes-pins.js",
+    "packages/core/layout.js",
+    "packages/core/migrate-layout.js",
+    "packages/core/narration-status.js",
+    "packages/core/readme-generator.js",
+    "packages/core/refresh-artifacts.js",
+    "packages/core/refresh-validate.js",
+    "packages/core/run-summary.js",
+    "packages/core/stale-check.js",
+    "scripts/build-cli-ui-gap.mjs"
+  ],
+  "entryPoints": [
+    "packages/core/gitattributes-pins.js",
+    "packages/core/layout.js",
+    "packages/core/migrate-layout.js",
+    "packages/core/narration-status.js",
+    "packages/core/readme-generator.js",
+    "packages/core/refresh-artifacts.js",
+    "packages/core/refresh-validate.js",
+    "packages/core/run-summary.js",
+    "packages/core/stale-check.js",
+    "scripts/build-cli-ui-gap.mjs"
+  ],
+  "cohesion": 0.41,
+  "coupling": 0.59,
+  "fileCount": 10,
+  "lineCount": 2275
+}

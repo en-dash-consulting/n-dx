@@ -3,12 +3,22 @@ import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { DEFAULT_CONFIG } from "../../schema/index.js";
 import { toCanonicalJSON } from "../../core/canonical.js";
 import { relativeToRoot, resolveLayout } from "@n-dx/llm-client";
-import { PRD_CACHE_DIRNAME, ensureRexDir, resolveRexPaths } from "../../store/index.js";
-import { prdLayout } from "../../store/prd-model-reader.js";
+import { PRD_CACHE_DIRNAME, discoverPRDFiles, ensureRexDir, prdLockPath, resolveRexPaths, withLock } from "../../store/index.js";
+import { prdLayout, rexDirHoldsPrd } from "../../store/prd-model-reader.js";
+import { writePrdModel } from "../../store/prd-model-writer.js";
+import { SCHEMA_VERSION_V2 } from "../../schema/v2.js";
 import { NDX_WORKFLOW, USER_WORKFLOW_TEMPLATE } from "../../workflow/default.js";
 
 import { FOLDER_TREE_SUBDIR } from "./folder-tree-sync.js";
 import { info } from "../output.js";
+
+/**
+ * Set to `v1` to give a project with no PRD the v1 folder tree instead of an
+ * empty v2 tree. A test hook, not a user option: the shared vitest setup
+ * (tests/setup-session-env.js) sets it so fixtures built on `rex add epic` keep
+ * a v1 tree, and the tests of the v2 default clear it. Kept out of help.
+ */
+export const INIT_LAYOUT_ENV = "NDX_INIT_LAYOUT";
 
 export async function cmdInit(
   dir: string,
@@ -60,13 +70,28 @@ export async function cmdInit(
     info("Created workflow.md (edit to add project-specific rules)");
   }
 
-  // The folder-tree scaffold (created once; not overwritten). Never beside a
-  // v2 tree: an empty prd_tree/ next to product/ is a split tree that v1
-  // tools would read as an empty PRD.
+  // A project with no PRD gets an empty v2 tree. One that has a PRD keeps its
+  // layout: moving a v1 PRD is `ndx migrate`'s job. Never a v1 scaffold beside
+  // product/: an empty prd_tree/ there is a split tree that v1 tools would read
+  // as an empty PRD.
+  let v2: boolean;
   if ((await prdLayout(rexDir)) === "v2") {
-    info("PRD is in the v2 layout (product/), skipping the v1 folder tree");
-  } else {
+    info("PRD is in the v2 layout (product/), skipping");
+    v2 = true;
+  } else if (
+    rexDirHoldsPrd(rexDir)
+    // Branch-scoped legacy files are a v1 source too: a v2 tree beside them hides them.
+    || (await discoverPRDFiles(rexDir)).length > 0
+    || process.env[INIT_LAYOUT_ENV] === "v1"
+  ) {
     await scaffoldFolderTree(join(rexDir, FOLDER_TREE_SUBDIR), project);
+    v2 = false;
+  } else {
+    await withLock(prdLockPath(rexDir), () =>
+      writePrdModel(rexDir, { layout: "v2", schema: SCHEMA_VERSION_V2, title: project, tree: { product: [], changes: [] }, warnings: [] }),
+    );
+    info("Created product/index.md (v2 layout)");
+    v2 = true;
   }
 
   // NOTE: init deliberately does *not* write `tree-meta.json`, even though
@@ -103,7 +128,9 @@ export async function cmdInit(
 
   info(`\nInitialized ${rexDirName}/ in ${dir}`);
   info("Next steps:");
-  info("  rex add epic --title=\"Your first epic\" " + dir);
+  info(v2
+    ? "  rex add --title=\"Your first change\" " + dir
+    : "  rex add epic --title=\"Your first epic\" " + dir);
   info("  rex status " + dir);
 }
 

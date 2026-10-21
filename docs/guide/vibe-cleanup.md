@@ -96,7 +96,7 @@ This reads the SourceVision findings and proposes actionable PRD items, organize
 Cleanup work changes the code without changing what the product must do. In the PRD's terms (see [The PRD](./concepts/)), each cleanup is a **change** that *touches* a constraint such as architecture integrity rather than amending a capability. It reads as a refactor, writes nothing to the product layer, and needs no steward.
 
 ::: info v1 projects
-Until the storage migration ships, `ndx init` creates v1 projects, and on a v1 project the proposals are grouped into epics with tasks under them, as in the output below.
+`ndx init` creates v2 projects. On a v1 project, one that has not yet run `ndx migrate`, the proposals are grouped into epics with tasks under them, as in the output below.
 :::
 
 The output on a v1 project looks like:

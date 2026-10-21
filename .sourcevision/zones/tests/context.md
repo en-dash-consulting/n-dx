@@ -5,40 +5,26 @@
 <zone>
 
 Zone: Tests (`tests`)
-Files: 8, Cohesion: 1.00, Coupling: 0.00
+Files: 3, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in tests: evals.test.js, record-goldens.js, score.js (+5 more)
-Entry points: tests/helpers/all-skills.js, tests/helpers/posix-shell.js, tests/helpers/real-process-tree.js, tests/helpers/symlink-support.js
-Lines: 971
+Description: Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts
+Lines: 386
 
 </zone>
 
 <files>
 
-tests/gauntlet/sourcevision-evals/evals.test.js (JavaScript, 111 lines, test)
-tests/gauntlet/sourcevision-evals/record-goldens.js (JavaScript, 80 lines, test)
-tests/gauntlet/sourcevision-evals/score.js (JavaScript, 91 lines, test)
-tests/gauntlet/sourcevision-evals/score.test.js (JavaScript, 225 lines, test)
-tests/helpers/all-skills.js (JavaScript, 85 lines, test)
-tests/helpers/posix-shell.js (JavaScript, 103 lines, test)
-tests/helpers/real-process-tree.js (JavaScript, 235 lines, test)
-tests/helpers/symlink-support.js (JavaScript, 41 lines, test)
+packages/graview-face/tests/door.test.ts (TypeScript, 59 lines, test)
+packages/graview-face/tests/places.test.ts (TypeScript, 76 lines, test)
+packages/graview-face/tests/sync.test.ts (TypeScript, 251 lines, test)
 
 </files>
 
 <imports>
 
-Internal:
-  tests/gauntlet/sourcevision-evals/evals.test.js → tests/gauntlet/sourcevision-evals/score.js {archetypeAccuracy, zonePartitionSimilarity, projectForScoring}
-  tests/gauntlet/sourcevision-evals/score.test.js → tests/gauntlet/sourcevision-evals/score.js {archetypeAccuracy, zonePartitionSimilarity, projectForScoring}
 
 Outgoing (this zone → other zones):
-  → core: tests/helpers/all-skills.js → packages/core/assistant-assets.js; tests/helpers/real-process-tree.js → packages/core/child-lifecycle.js
-
-Incoming (other zones → this zone):
-  ← tests-e2e: tests/e2e/cli-which.test.js → tests/helpers/symlink-support.js; tests/e2e/skill-portability.test.js → tests/helpers/all-skills.js; tests/e2e/skill-termination.test.js → tests/helpers/all-skills.js; tests/e2e/stop-orphan-children.test.js → tests/helpers/posix-shell.js
-  ← tests-integration: tests/integration/exec-interrupt-forwarding.test.js → tests/helpers/posix-shell.js; tests/integration/late-arrival-child-cleanup.test.js → tests/helpers/real-process-tree.js; tests/integration/terminate-tree-liveness.test.js → tests/helpers/real-process-tree.js
-  ← tests-unit: tests/unit/web-port-occupant.test.js → tests/helpers/symlink-support.js
+  → graview-face: packages/graview-face/tests/door.test.ts → packages/graview-face/dev/ndx-door.ts; packages/graview-face/tests/places.test.ts → packages/graview-face/src/app.ts; packages/graview-face/tests/places.test.ts → packages/graview-face/src/model/spend.ts; packages/graview-face/tests/places.test.ts → packages/graview-face/src/model/work.ts; packages/graview-face/tests/places.test.ts → packages/graview-face/src/ui/pages.tsx; packages/graview-face/tests/places.test.ts → packages/graview-face/src/ui/views.tsx; packages/graview-face/tests/sync.test.ts → packages/graview-face/src/sync/engine.ts; packages/graview-face/tests/sync.test.ts → packages/graview-face/src/sync/mapping.ts; packages/graview-face/tests/sync.test.ts → packages/graview-face/src/sync/ndx-system.ts
 
 </imports>
 
@@ -51,6 +37,6 @@ Incoming (other zones → this zone):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 47 internal calls, 5 outgoing, 37 incoming (cohesion: 0.9, coupling: 0.1)
+- [call graph] 14 internal calls, 25 outgoing, 0 incoming (cohesion: 0.36, coupling: 0.64)
 
 </insights>

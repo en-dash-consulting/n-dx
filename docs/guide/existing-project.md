@@ -156,7 +156,7 @@ ndx plan .
 
 **Do not pass `--accept` here.** The blank-project Quickstart uses `--accept` because there's no existing context to filter against; on an existing repo it's a recipe for a noisy backlog. The default flow is interactive — review each proposal and accept only what fits your roadmap. Anything you don't review is cached in `.rex/pending-proposals.json` and you can revisit it later with `rex analyze --accept`.
 
-The accepted items land in the PRD's folder tree. `ndx init` creates v1 projects until the storage migration ships, so today that is `.rex/prd_tree/`: a slug-named folder per item with children, a `<slug>.md` file per item without. A v2 PRD keeps requirements and changes apart, in `.ndx/rex/product/` and `.ndx/rex/changes/`; see [PRD Storage Layout](./prd-storage).
+The accepted items land in the PRD's folder tree. `ndx init` creates a v2 PRD, which keeps requirements and changes apart, in `product/` and `changes/` (`.ndx/rex/` or `.rex/`); see [PRD Storage Layout](./prd-storage). On a v1 project, one that has not yet run `ndx migrate`, they land in `.rex/prd_tree/` instead: a slug-named folder per item with children, a `<slug>.md` file per item without.
 
 ## 8. Validate and commit the PRD baseline
 

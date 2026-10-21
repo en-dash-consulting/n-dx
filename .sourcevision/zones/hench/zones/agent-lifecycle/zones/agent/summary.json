@@ -1,0 +1,21 @@
+{
+  "id": "hench/agent-lifecycle/agent",
+  "name": "Agent",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/analysis/change-magnitude.ts",
+    "packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts",
+    "packages/hench/src/store/artifacts.ts",
+    "packages/hench/src/store/paths.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/analysis/change-magnitude.ts",
+    "packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts",
+    "packages/hench/src/store/artifacts.ts",
+    "packages/hench/src/store/paths.ts"
+  ],
+  "cohesion": 0.38,
+  "coupling": 0.62,
+  "fileCount": 4,
+  "lineCount": 1470
+}

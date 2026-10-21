@@ -1,0 +1,19 @@
+{
+  "id": "core/scripts",
+  "name": "Scripts",
+  "description": "4 files, primarily JavaScript",
+  "files": [
+    "scripts/lib/select-suites.mjs",
+    "scripts/lib/stale-dist.mjs",
+    "scripts/run-all-tests.mjs",
+    "scripts/write-build-stamp.mjs"
+  ],
+  "entryPoints": [
+    "scripts/lib/select-suites.mjs",
+    "scripts/lib/stale-dist.mjs"
+  ],
+  "cohesion": 0.86,
+  "coupling": 0.14,
+  "fileCount": 4,
+  "lineCount": 874
+}

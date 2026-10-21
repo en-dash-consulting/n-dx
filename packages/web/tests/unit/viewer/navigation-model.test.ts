@@ -376,7 +376,7 @@ describe("rendered surfaces take their labels from the model", () => {
       act(() => { (root.querySelector(".guide-btn") as HTMLButtonElement).click(); });
       await settle();
 
-      const heading = root.querySelector(".guide-header h2")?.textContent ?? "";
+      const heading = document.querySelector(".guide-header h2")?.textContent ?? "";
       // A view without its own guide falls back to the Overview prose, and is
       // titled to match the text it shows rather than the page it was opened
       // from — a title that named the page would be labelling someone else's

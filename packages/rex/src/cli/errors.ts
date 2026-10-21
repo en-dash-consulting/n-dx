@@ -211,6 +211,20 @@ export function handleCLIError(err: unknown, debug = false): never {
 }
 
 /**
+ * Refuse a command that rewrites the repository's PRD layout when it runs
+ * inside an `ndx work` agent run (`NDX_AGENT_RUN` set). An operator migrates
+ * from their own shell; an agent working in the repository must not.
+ */
+export function refuseInsideAgentRun(command: string): void {
+  if (process.env.NDX_AGENT_RUN) {
+    throw new CLIError(
+      `${command} refuses inside an agent run (NDX_AGENT_RUN is set).`,
+      "An operator runs the migration from their own shell.",
+    );
+  }
+}
+
+/**
  * Check that .rex/ exists in the given directory.
  * Throws a CLIError with an init suggestion if missing.
  */

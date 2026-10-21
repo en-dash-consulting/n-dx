@@ -5,20 +5,28 @@
 <zone>
 
 Zone: Tests Packages (`tests-packages`)
-Files: 6, Cohesion: 1.00, Coupling: 0.00
+Files: 14, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: folder-tree-index-generator.test.ts, index.ts, rex-dir-test-support.ts (+3 more)
-Entry points: packages/rex/tests/helpers/index.ts, packages/rex/tests/helpers/rex-dir-test-support.ts, packages/web/tests/setup/preact-frame-leak-guard.ts
-Lines: 1746
+Description: Non-source files in packages: project.ts, emit.test.ts, fake-cli.ts (+11 more)
+Entry points: packages/graview/tests/helpers/project.ts, packages/llm-client/tests/helpers/fake-cli.ts, packages/llm-client/tests/helpers/fake-spawn.ts, packages/llm-client/tests/helpers/posix-shell.ts, packages/rex/tests/helpers/index.ts, packages/rex/tests/helpers/jev-judge.ts, packages/rex/tests/helpers/rex-dir-test-support.ts, packages/rex/tests/helpers/v2-fixture.ts, packages/sourcevision/tests/helpers/index.ts, packages/web/tests/fixtures/v2-product-map.ts, packages/web/tests/setup/preact-frame-leak-guard.ts
+Lines: 2699
 
 </zone>
 
 <files>
 
+packages/graview/tests/helpers/project.ts (TypeScript, 104 lines, test)
+packages/graview/tests/integration/emit.test.ts (TypeScript, 91 lines, test)
+packages/llm-client/tests/helpers/fake-cli.ts (TypeScript, 69 lines, test)
+packages/llm-client/tests/helpers/fake-spawn.ts (TypeScript, 101 lines, test)
+packages/llm-client/tests/helpers/posix-shell.ts (TypeScript, 76 lines, test)
 packages/rex/src/store/tests/folder-tree-index-generator.test.ts (TypeScript, 609 lines, test)
 packages/rex/tests/helpers/index.ts (TypeScript, 208 lines, test)
+packages/rex/tests/helpers/jev-judge.ts (TypeScript, 34 lines, test)
 packages/rex/tests/helpers/rex-dir-test-support.ts (TypeScript, 550 lines, test)
-packages/sourcevision/tests/helpers/index.ts (TypeScript, 226 lines, test)
+packages/rex/tests/helpers/v2-fixture.ts (TypeScript, 47 lines, test)
+packages/sourcevision/tests/helpers/index.ts (TypeScript, 286 lines, test)
+packages/web/tests/fixtures/v2-product-map.ts (TypeScript, 371 lines, test)
 packages/web/tests/setup/local-storage.ts (TypeScript, 62 lines, test)
 packages/web/tests/setup/preact-frame-leak-guard.ts (TypeScript, 91 lines, test)
 
@@ -26,27 +34,43 @@ packages/web/tests/setup/preact-frame-leak-guard.ts (TypeScript, 91 lines, test)
 
 <imports>
 
+Internal:
+  packages/graview/tests/integration/emit.test.ts → packages/graview/tests/helpers/project.ts {makeProject}
 
 Outgoing (this zone → other zones):
-  → rex-cli: packages/rex/src/store/tests/folder-tree-index-generator.test.ts → packages/rex/src/schema/index.ts; packages/rex/src/store/tests/folder-tree-index-generator.test.ts → packages/rex/src/store/folder-tree-index-generator.ts; packages/rex/tests/helpers/rex-dir-test-support.ts → packages/rex/src/schema/index.ts; packages/rex/tests/helpers/rex-dir-test-support.ts → packages/rex/src/store/index.ts; packages/rex/tests/helpers/rex-dir-test-support.ts → packages/rex/src/store/markdown-parser.ts; packages/rex/tests/helpers/rex-dir-test-support.ts → packages/rex/src/store/title-to-filename.ts
+  → graview: packages/graview/tests/helpers/project.ts → packages/graview/src/llm-gateway.ts; packages/graview/tests/integration/emit.test.ts → packages/graview/src/emit.ts; packages/graview/tests/integration/emit.test.ts → packages/graview/src/llm-gateway.ts
+  → llm-client: packages/llm-client/tests/helpers/posix-shell.ts → packages/llm-client/src/exec.ts
+  → rex-cli: packages/rex/src/store/tests/folder-tree-index-generator.test.ts → packages/rex/src/schema/index.ts; packages/rex/src/store/tests/folder-tree-index-generator.test.ts → packages/rex/src/store/folder-tree-index-generator.ts; packages/rex/tests/helpers/jev-judge.ts → packages/rex/src/core/placement-policy.ts; packages/rex/tests/helpers/rex-dir-test-support.ts → packages/rex/src/schema/index.ts; packages/rex/tests/helpers/rex-dir-test-support.ts → packages/rex/src/store/index.ts; packages/rex/tests/helpers/rex-dir-test-support.ts → packages/rex/src/store/markdown-parser.ts; packages/rex/tests/helpers/rex-dir-test-support.ts → packages/rex/src/store/title-to-filename.ts
+  → web-viewer: packages/web/tests/fixtures/v2-product-map.ts → packages/web/src/viewer/views/product-model.ts
 
 Incoming (other zones → this zone):
-  ← tests-rex-e2e: packages/rex/tests/e2e/cli-analyze.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-fix.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-import.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-recommend.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-smart-add.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts
-  ← tests-rex-integration: packages/rex/tests/integration/import-bundle-transaction.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts
-  ← tests-rex-unit: packages/rex/tests/unit/cli/commands/add.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/fix.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/move.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/recommend.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/remove.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/status-sections.test.ts → packages/rex/tests/helpers/index.ts; packages/rex/tests/unit/cli/commands/sync.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/update.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/usage.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/validate-epicless.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/validate.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/mcp.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/core/canonical.test.ts → packages/rex/tests/helpers/index.ts; packages/rex/tests/unit/core/parent-completion.test.ts → packages/rex/tests/helpers/index.ts; packages/rex/tests/unit/recommend/create-from-recommendations.invalid-dag.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/recommend/create-from-recommendations.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts
-  ← tests-web-unit: packages/web/tests/unit/setup/preact-frame-leak-guard.test.ts → packages/web/tests/setup/preact-frame-leak-guard.ts
+  ← tests-graview-unit: packages/graview/tests/unit/snapshot.test.ts → packages/graview/tests/helpers/project.ts
+  ← tests-llm-client-integration: packages/llm-client/tests/integration/exec-timeout-tree-kill.test.ts → packages/llm-client/tests/helpers/posix-shell.ts
+  ← tests-llm-client-unit: packages/llm-client/tests/unit/auth.test.ts → packages/llm-client/tests/helpers/fake-spawn.ts; packages/llm-client/tests/unit/cli-provider.test.ts → packages/llm-client/tests/helpers/fake-cli.ts; packages/llm-client/tests/unit/codex-cli-provider.test.ts → packages/llm-client/tests/helpers/fake-cli.ts; packages/llm-client/tests/unit/exec.test.ts → packages/llm-client/tests/helpers/fake-spawn.ts
+  ← tests-rex-e2e: packages/rex/tests/e2e/cli-analyze.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-fix.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-import.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-migrate-plan.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-prd-bundle-v2.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-recommend.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-smart-add.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-v2-change-verbs.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/e2e/cli-v2-serve.test.ts → packages/rex/tests/helpers/v2-fixture.ts
+  ← tests-rex-integration: packages/rex/tests/integration/branch-guard.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/integration/import-bundle-transaction.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/integration/layer-aware-restructure.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/public-prd-model.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/public-v2-runtime.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/release-stamp.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/tree-diff-sources.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/integration/tree-diff-sources.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/v2-backup-refusal.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/v2-mcp-add-item.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/v2-mcp-lock-clock.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/v2-mcp-place-apply.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/v2-mcp-tools.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/integration/v2-stray-legacy-prd.test.ts → packages/rex/tests/helpers/v2-fixture.ts
+  ← tests-rex-unit: packages/rex/tests/unit/cli/commands/add.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/change-place-pending.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/cli/commands/fix.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/health-v2.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/cli/commands/move.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/next-v2.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/cli/commands/product-change-v2.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/cli/commands/recommend.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/remove.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/status-sections.test.ts → packages/rex/tests/helpers/index.ts; packages/rex/tests/unit/cli/commands/update-assignee-selection.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/update-v2.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/cli/commands/update.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/usage.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/validate-epicless.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/commands/validate.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/mcp-product-tools.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/cli/mcp.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/cli/migrate-plan-jev.test.ts → packages/rex/tests/helpers/jev-judge.ts; packages/rex/tests/unit/cli/v2-layout-guards.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/core/apply-amendments.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/core/canonical.test.ts → packages/rex/tests/helpers/index.ts; packages/rex/tests/unit/core/parent-completion.test.ts → packages/rex/tests/helpers/index.ts; packages/rex/tests/unit/core/product-status.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/migrations/v1-to-v2/jev-review-pass.test.ts → packages/rex/tests/helpers/jev-judge.ts; packages/rex/tests/unit/migrations/v1-to-v2/placement-pass.test.ts → packages/rex/tests/helpers/jev-judge.ts; packages/rex/tests/unit/migrations/v1-to-v2/spec-pass.test.ts → packages/rex/tests/helpers/jev-judge.ts; packages/rex/tests/unit/recommend/create-from-recommendations.invalid-dag.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/recommend/create-from-recommendations.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/unit/store/change-layer-save-report.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/store/prd-bundle-v2.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/store/prd-model-reader.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/store/prd-model-reader.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/store/prd-model-transaction.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/store/prd-model-writer.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/store/prd-model-writer.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/unit/store/v2-store-resolution.test.ts → packages/rex/tests/helpers/v2-fixture.ts
+  ← tests-sourcevision-integration: packages/sourcevision/tests/integration/pr-markdown-reviewer-output.test.ts → packages/sourcevision/tests/helpers/index.ts
+  ← tests-sourcevision-unit: packages/sourcevision/tests/unit/cli/pr-markdown.test.ts → packages/sourcevision/tests/helpers/index.ts
+  ← tests-web-unit: packages/web/tests/unit/setup/preact-frame-leak-guard.test.ts → packages/web/tests/setup/preact-frame-leak-guard.ts; packages/web/tests/unit/viewer/capability-page.test.ts → packages/web/tests/fixtures/v2-product-map.ts; packages/web/tests/unit/viewer/changes-view.test.ts → packages/web/tests/fixtures/v2-product-map.ts; packages/web/tests/unit/viewer/product-pages.test.ts → packages/web/tests/fixtures/v2-product-map.ts; packages/web/tests/unit/viewer/product-view.test.ts → packages/web/tests/fixtures/v2-product-map.ts
 
 </imports>
 
 <findings>
 
+[observation] [info] 11 entry points — wide API surface, consider consolidating exports
 [observation] [info] High cohesion (1) — files are tightly interconnected
+[suggestion] [info] Zone "tests-packages" has files across 8 directories — consider consolidating under a dedicated directory
+[anti-pattern] [info] "packages/rex/tests/helpers/v2-fixture.ts" is imported from 3 zones (tests-rex-e2e, tests-rex-integration, tests-rex-unit) — a cross-cutting dependency every one of them is coupled to
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 58 internal calls, 31 outgoing, 413 incoming (cohesion: 0.65, coupling: 0.35)
+- 11 entry points — wide API surface, consider consolidating exports
+- Zone "tests-packages" has files across 8 directories — consider consolidating under a dedicated directory
+- "packages/rex/tests/helpers/v2-fixture.ts" is imported from 3 zones (tests-rex-e2e, tests-rex-integration, tests-rex-unit) — a cross-cutting dependency every one of them is coupled to
+- [call graph] 89 internal calls, 39 outgoing, 634 incoming (cohesion: 0.7, coupling: 0.3)
 
 </insights>

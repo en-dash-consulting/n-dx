@@ -10,10 +10,11 @@ review work without custom tooling, and people, assistants, MCP clients and
 the dashboard all read and write the same files.
 
 ::: info v1 projects
-Until the storage migration ships, `ndx init` creates **v1** projects. A v1
-PRD is one tree of items in `.rex/prd_tree/` with no product layer; it is
-described under [v1 projects](#v1-projects) below. Rex reads the layout from
-disk: `.ndx/rex/product/` present means v2, otherwise v1. The product-layer
+`ndx init` gives a new project an empty v2 tree (`product/index.md`). A v1
+PRD is the older layout: one tree of items in `.rex/prd_tree/` with no
+product layer. An existing v1 PRD keeps its layout until `ndx migrate` moves
+it; the layout is described under [v1 projects](#v1-projects) below. Rex
+reads the layout from disk: `product/` present means v2, otherwise v1. The product-layer
 commands (`rex product`, `rex change`) and MCP tools (`get_product`,
 `get_capability`, `place_change`, `apply_change`) refuse a v1 PRD with a
 message naming the layout.
