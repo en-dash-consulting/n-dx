@@ -2786,7 +2786,8 @@ var IAC_SKIP = /* @__PURE__ */ new Set([
   "vendor",
   "coverage"
 ]);
-var IAC_TEST_DIRS = /* @__PURE__ */ new Set(["tests", "__tests__", "fixtures", "__fixtures__", "testdata", "__mocks__"]);
+var FIXTURE_DIRS = /* @__PURE__ */ new Set(["fixtures", "__fixtures__", "testdata", "__mocks__"]);
+var IAC_TEST_DIRS = /* @__PURE__ */ new Set(["tests", "__tests__", ...FIXTURE_DIRS]);
 function findIaCFiles(root, limit = 400) {
   const terraform = [];
   const yaml = [];

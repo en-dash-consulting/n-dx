@@ -186,12 +186,19 @@ const IAC_SKIP = new Set([
 ]);
 
 /**
- * Test and fixture trees, matched case-insensitively (.NET writes `Tests/`
- * and `Fixtures/`): a `.tf` there describes nothing deployed, and reporting it
- * would draw fake infrastructure. `test` is deliberately absent, because it is
- * a common environment name (`environments/test/main.tf`).
+ * Directories that hold test inputs, lower-cased. Whatever is inside one
+ * (a `.tf`, a `package.json`, a `go.mod`) describes a fixture project, not
+ * this one. Shared by infrastructure discovery and the SDLC profile's walk,
+ * and matched case-insensitively (.NET writes `Fixtures/`).
  */
-const IAC_TEST_DIRS = new Set(["tests", "__tests__", "fixtures", "__fixtures__", "testdata", "__mocks__"]);
+export const FIXTURE_DIRS: ReadonlySet<string> = new Set(["fixtures", "__fixtures__", "testdata", "__mocks__"]);
+
+/**
+ * Discovery also skips the test trees themselves: a `.tf` there describes
+ * nothing deployed. `test` is deliberately absent, because it is a common
+ * environment name (`environments/test/main.tf`).
+ */
+const IAC_TEST_DIRS: ReadonlySet<string> = new Set(["tests", "__tests__", ...FIXTURE_DIRS]);
 
 /**
  * Find IaC candidate files in one pass over the tree.
