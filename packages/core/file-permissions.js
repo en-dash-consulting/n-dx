@@ -50,14 +50,17 @@ export function parseIcaclsOutput(output, path) {
     if (!line) continue;
 
     // identity:(FLAG)(FLAG)... — identities contain spaces and backslashes
-    // ("NT AUTHORITY\SYSTEM"), so match the flag groups from the right.
-    const match = line.match(/^(.*?):((?:\([^)]*\))+)$/);
+    // ("NT AUTHORITY\SYSTEM"), so match the flag groups from the right. A flag
+    // group never contains "(" either; excluding it keeps the match linear on
+    // a line of alternating ":(" (quadratic with `[^)]`, since every "(" could
+    // then start a group that swallows the rest of the line).
+    const match = line.match(/^(.*?):((?:\([^()]*\))+)$/);
     if (!match) continue;
 
     const identity = match[1].trim();
     if (!identity) continue;
 
-    const flags = [...match[2].matchAll(/\(([^)]*)\)/g)].map((m) => m[1]);
+    const flags = [...match[2].matchAll(/\(([^()]*)\)/g)].map((m) => m[1]);
     aces.push({ identity, flags });
   }
 

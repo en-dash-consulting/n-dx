@@ -663,14 +663,34 @@ export function getConfigValue(config: HenchConfig, path: string): unknown {
   return current;
 }
 
-/** Set a nested value in config using dot-path notation. Returns a new config object. */
+/**
+ * Path segments that walk `setConfigValue` off its clone and onto
+ * `Object.prototype`: `"__proto__" in current` is true for every plain object,
+ * so `__proto__.polluted` assigned on every object in the process. Both
+ * callers allowlist the path against `CONFIG_FIELDS` first; this is the guard
+ * behind the allowlist, inlined because hench shares no config helper with
+ * web's `hench-config-fields`.
+ */
+const FORBIDDEN_CONFIG_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Set a nested value in config using dot-path notation. Returns a new config
+ * object. Throws `CLIError` on a path segment in {@link FORBIDDEN_CONFIG_SEGMENTS}.
+ */
 export function setConfigValue(
   config: HenchConfig,
   path: string,
   value: unknown,
 ): HenchConfig {
-  const clone = JSON.parse(JSON.stringify(config)) as HenchConfig;
   const parts = path.split(".");
+  const reserved = parts.find((part) => FORBIDDEN_CONFIG_SEGMENTS.has(part));
+  if (reserved !== undefined) {
+    throw new CLIError(
+      `Invalid config key "${path}": "${reserved}" is a reserved object property, not a setting.`,
+      `Valid keys: ${CONFIG_FIELDS.map((f) => f.path).join(", ")}`,
+    );
+  }
+  const clone = JSON.parse(JSON.stringify(config)) as HenchConfig;
   let current: Record<string, unknown> = clone as unknown as Record<string, unknown>;
   for (let i = 0; i < parts.length - 1; i++) {
     if (!(parts[i] in current) || typeof current[parts[i]] !== "object") {

@@ -474,24 +474,47 @@ function isMachineLocalKey(keyArg) {
 const LLM_FLAT_MAP_SECTIONS = ["routes.", "effort."];
 
 /**
+ * Path segments that walk off the config object and onto `Object.prototype`.
+ * `ndx config llm.__proto__.polluted x` followed `configs.llm["__proto__"]`
+ * and assigned on every object in the process; the write is not persisted
+ * (JSON.stringify skips the prototype), but nothing in this file should be
+ * able to reach it. Inlined rather than imported from hench or web: config.js
+ * is orchestration-tier and imports from no package.
+ */
+const FORBIDDEN_SETTING_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
  * Split a section-relative setting path into object keys.
  *
  * Identical to `path.split(".")` except inside the flat-map sections above,
  * where everything after the section name is one literal key.
+ *
+ * Throws on a segment in {@link FORBIDDEN_SETTING_SEGMENTS}, so both
+ * `getByPath` and `setByPath` refuse before touching the object.
  *
  * @param {string} settingPath Path within the section (no package prefix).
  * @param {string} [pkg] Owning section, when known.
  * @returns {string[]}
  */
 function splitSettingPath(settingPath, pkg) {
+  let parts;
   if (pkg === "llm") {
     for (const prefix of LLM_FLAT_MAP_SECTIONS) {
       if (settingPath.startsWith(prefix) && settingPath.length > prefix.length) {
-        return [prefix.slice(0, -1), settingPath.slice(prefix.length)];
+        parts = [prefix.slice(0, -1), settingPath.slice(prefix.length)];
+        break;
       }
     }
   }
-  return settingPath.split(".");
+  parts ??= settingPath.split(".");
+  for (const part of parts) {
+    if (FORBIDDEN_SETTING_SEGMENTS.has(part)) {
+      throw new Error(
+        `Invalid key "${settingPath}": "${part}" is a reserved object property, not a setting.`,
+      );
+    }
+  }
+  return parts;
 }
 
 function getByPath(obj, path, pkg) {

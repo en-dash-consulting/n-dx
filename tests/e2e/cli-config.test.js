@@ -464,6 +464,31 @@ describe("n-dx config", () => {
       const stderr = runFail(["unknown.key", "val", tmpDir]);
       expect(stderr).toContain("Unknown package");
     });
+
+    // `configs.llm["__proto__"]` is Object.prototype, so a key with that
+    // segment assigned on every object in the CLI process before this guard;
+    // the hench variant landed `constructor: { prototype: … }` in
+    // .hench/config.json. Both project-section and package-config paths are
+    // covered, and the files are compared byte for byte because a refused set
+    // must not even re-serialize them.
+    it.each([
+      ["llm.__proto__.polluted", "__proto__"],
+      ["llm.routes.__proto__", "__proto__"],
+      ["hench.constructor.prototype.polluted", "constructor"],
+    ])("refuses %s rather than walking onto Object.prototype, and writes nothing", async (key, segment) => {
+      const sharedPath = join(tmpDir, ".n-dx.json");
+      const henchPath = join(tmpDir, ".hench", "config.json");
+      await writeFile(sharedPath, JSON.stringify({ llm: { vendor: "claude" } }, null, 2) + "\n");
+      const sharedBefore = await readFile(sharedPath);
+      const henchBefore = await readFile(henchPath);
+
+      const stderr = runFail([key, "x", tmpDir]);
+
+      expect(stderr).toContain(segment);
+      expect(stderr).toContain(key.slice(key.indexOf(".") + 1));
+      expect(Buffer.compare(await readFile(sharedPath), sharedBefore)).toBe(0);
+      expect(Buffer.compare(await readFile(henchPath), henchBefore)).toBe(0);
+    });
   });
 
   // ── Help ───────────────────────────────────────────────────────────────────

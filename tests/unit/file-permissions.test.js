@@ -72,6 +72,16 @@ Se han procesado correctamente 1 archivos`;
     expect(parseIcaclsOutput("", WIN_PATH)).toEqual([]);
     expect(parseIcaclsOutput("Access is denied.", WIN_PATH)).toEqual([]);
   });
+
+  // A flag group excludes "(" as well as ")": same ACEs on every real icacls
+  // line, and a line of alternating ":(" is rejected in one pass instead of
+  // retrying a group from every "(" (about 750 ms at this length before).
+  it("rejects a line of alternating ':(' without quadratic backtracking", () => {
+    const hostile = `${WIN_PATH} ${":(".repeat(25_000)}`;
+    const start = performance.now();
+    expect(parseIcaclsOutput(hostile, WIN_PATH)).toEqual([]);
+    expect(performance.now() - start).toBeLessThan(250);
+  });
 });
 
 describe("restrictFileToOwner — POSIX", () => {

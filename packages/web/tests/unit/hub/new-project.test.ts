@@ -126,6 +126,17 @@ describe("project ids", () => {
     expect(slugifyProjectId("...")).toBe("project");
   });
 
+  // Twin of the core assertion: the trailing trim is pinned to the start of a
+  // `-.` run, so an interior run is scanned once rather than from every
+  // position, and the slug is unchanged.
+  it("keeps an interior -. run and trims the edges without quadratic backtracking", () => {
+    expect(slugifyProjectId("-.-.app-.-.")).toBe("app");
+    const interior = `a${"-.".repeat(25_000)}b`;
+    const start = performance.now();
+    expect(slugifyProjectId(interior)).toBe(interior);
+    expect(performance.now() - start).toBeLessThan(250);
+  });
+
   it("uses the bare slug when nothing holds it", () => {
     expect(deriveProjectId(join("/repos", "alpha"), new Map())).toBe("alpha");
   });

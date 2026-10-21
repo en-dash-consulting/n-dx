@@ -48,6 +48,17 @@ describe("slugifyProjectId", () => {
     expect(slugifyProjectId("---")).toBe("project");
     expect(slugifyProjectId(undefined)).toBe("project");
   });
+
+  // The trailing trim is pinned to the start of a `-.` run, so an interior run
+  // (which `-{2,}` does not collapse) is scanned once instead of from every
+  // position — about 1.5 s at this length before — and the slug is unchanged.
+  it("keeps an interior -. run and trims the edges without quadratic backtracking", () => {
+    expect(slugifyProjectId("-.-.app-.-.")).toBe("app");
+    const interior = `a${"-.".repeat(25_000)}b`;
+    const start = performance.now();
+    expect(slugifyProjectId(interior)).toBe(interior);
+    expect(performance.now() - start).toBeLessThan(250);
+  });
 });
 
 describe("deriveProjectId", () => {
