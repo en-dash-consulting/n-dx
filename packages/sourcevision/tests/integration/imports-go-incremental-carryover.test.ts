@@ -81,6 +81,28 @@ describe("analyzeImports incremental carry-over — Go package directories", () 
     expect(incremental.edges.some((e) => e.to === "util")).toBe(false);
   });
 
+  // A directory is a package only when it holds a Go file. With codeOnly off
+  // the inventory also lists util/data.json, which must not keep the edge
+  // alive once util's Go files are pruned, on either path.
+  it("does not count a directory holding only non-Go inventoried files as a package", async () => {
+    await writeFile(join(dir, "util", "data.json"), "{}\n");
+    const inventory = await analyzeInventory(dir, { languageConfig: goConfig, codeOnly: false });
+    expect(inventory.files.some((f) => f.path === "util/data.json")).toBe(true);
+    const full = await analyzeImports(dir, inventory, { language: "go" });
+    const pruned = { ...inventory, files: inventory.files.filter((f) => !f.path.endsWith(".go") || !f.path.startsWith("util/")) };
+
+    const regex = await analyzeImports(dir, pruned, { language: "go", packs: { packs: [] } });
+    expect(regex.edges.some((e) => e.to === "util")).toBe(false);
+
+    const incremental = await analyzeImports(dir, pruned, {
+      language: "go",
+      previousImports: full,
+      changedFiles: new Set(),
+      fileSetChanged: false,
+    });
+    expect(incremental.edges.some((e) => e.to === "util")).toBe(false);
+  });
+
   // The regex parser runs for every Go file when the pack is degraded (its
   // grammar not built, the default for a local checkout), so this suite must
   // hold on that path whether or not the grammar is built here: `packs: []`

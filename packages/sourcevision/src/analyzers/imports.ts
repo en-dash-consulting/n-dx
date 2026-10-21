@@ -416,15 +416,20 @@ interface IncrementalState {
  */
 /**
  * Whether an edge target names something in the inventory: a file, or a
- * directory holding one, since Go edges point at the imported package's
- * directory ("" is the project root: a Go import of the module path itself).
- * Shared by the incremental carry-over and the regex Go parser, so neither
- * keeps an edge to a package the other would drop (#744).
+ * directory holding an inventoried Go file, since Go edges, and only Go
+ * edges, point at the imported package's directory ("" is the project root:
+ * a Go import of the module path itself). A Go file, not any file: with
+ * `codeOnly` off, or in a mixed repository, a directory can hold inventoried
+ * files and still be no Go package, and the Go pack links only directories
+ * that hold one. Shared by the incremental carry-over and the regex Go
+ * parser, so neither keeps an edge to a package the other would drop (#744).
  */
 function inventoriedTarget(fileSet: ReadonlySet<string>): (to: string) => boolean {
-  const dirSet = new Set<string>();
-  for (const f of fileSet) dirSet.add(f.slice(0, Math.max(f.lastIndexOf("/"), 0)));
-  return (to) => fileSet.has(to) || dirSet.has(to);
+  const goDirs = new Set<string>();
+  for (const f of fileSet) {
+    if (extname(f).toLowerCase() === GO_EXTENSION) goDirs.add(f.slice(0, Math.max(f.lastIndexOf("/"), 0)));
+  }
+  return (to) => fileSet.has(to) || goDirs.has(to);
 }
 
 function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet: Set<string>): IncrementalState {
