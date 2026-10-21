@@ -440,7 +440,7 @@ describe("isolation", () => {
     // dual-read loader, tree writer, store transaction, apply engine, apply
     // policy, product-edit handler, computed edges, product status, change
     // landing, placement and its policy, change selection, change completion,
-    // agent brief, migration plan and its specs, code owners and `rex codeowners`,
+    // agent brief, migration plan and its specs, migration apply, code owners and `rex codeowners`,
     // release stamp and `rex release`) may import each other; nothing else may
     // import them until the v2 store
     // wires them in. The exceptions are the `rex merge-state` git driver,
@@ -455,14 +455,18 @@ describe("isolation", () => {
     // v2 tree rules on a v2 tree (cli/commands/health.ts, core/health.ts), and
     // the v2 CLI verbs: `rex product`, `rex change`, and `rex add` on a v2 tree
     // (cli/commands/product.ts, change.ts, add-change.ts and their v2-cli.ts),
+    // and `rex remove` on a v2 tree, which removes a change or task inside the
+    // PRD transaction (cli/commands/remove-change.ts),
     // and the layer-aware restructuring behind `rex reshape`, `rex reorganize`
     // and `rex prune`: the change-layer store, the layer projection, and the
     // product-layer reshape draft (cli/commands/reshape-product.ts), and
     // `rex tree-diff`, which loads either layout (core/tree-source.ts) and
     // diffs the product layer (core/map-diff.ts), and the layout-aware store
     // resolution: the v1 store's refusal of a v2 tree (store/file-adapter.ts),
-    // `rex init`, which never scaffolds prd_tree/ beside product/
-    // (cli/commands/init.ts), and the CLI error hints, which never send a
+    // `rex migrate-slugs`, which reads only the layout so it can refuse a v2
+    // tree, where slugs are frozen (cli/commands/migrate-slugs.ts),
+    // `rex init`, which writes an empty v2 tree for a new project and never
+    // scaffolds prd_tree/ beside product/ (cli/commands/init.ts), and the CLI error hints, which never send a
     // project with a PRD in either layout to `n-dx init` (cli/errors.ts), and
     // the MCP tools that follow the change-layer types on a v2 tree: edit_item,
     // move_item, merge_items and claim_task, with the type-based parent rule
@@ -474,7 +478,8 @@ describe("isolation", () => {
     // get_next_task and `rex next`, in get_next_task's v1 shape
     // (core/change-next-task.ts), and v2 completion and apply-on-complete
     // behind update_task_status and `rex update --status`
-    // (cli/v2-completion.ts).
+    // (cli/v2-completion.ts), and the v1 deprecation notice, which reads the
+    // product folder name (cli/legacy-layout-notice.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -518,6 +523,7 @@ describe("isolation", () => {
         "cli/commands/product.ts",
         "cli/commands/change.ts",
         "cli/commands/add-change.ts",
+        "cli/commands/remove-change.ts",
         "cli/commands/v2-cli.ts",
         "store/change-layer-store.ts",
         "core/layer-projection.ts",
@@ -531,8 +537,10 @@ describe("isolation", () => {
         "migrations/v1-to-v2/capability-spec.ts",
         "migrations/v1-to-v2/migration-plan-data.ts",
         "migrations/v1-to-v2/spec-pass.ts",
+        "migrations/v1-to-v2/apply.ts",
         "store/file-adapter.ts",
         "cli/commands/init.ts",
+        "cli/commands/migrate-slugs.ts",
         "cli/errors.ts",
         "cli/mcp-tools/edit-item.ts",
         "cli/mcp-tools/move-item.ts",
@@ -545,6 +553,7 @@ describe("isolation", () => {
         "core/backup-snapshots.ts",
         "core/change-next-task.ts",
         "cli/v2-completion.ts",
+        "cli/legacy-layout-notice.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

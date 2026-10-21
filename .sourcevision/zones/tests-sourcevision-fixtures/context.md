@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Tests Sourcevision Fixtures (`tests-sourcevision-fixtures`)
-Files: 35, Cohesion: 1.00, Coupling: 0.00
+Files: 46, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: main.go, router.go, setup.go (+32 more)
-Lines: 407
+Description: Non-source files in packages: main.go, router.go, setup.go (+43 more)
+Lines: 472
 
 </zone>
 
@@ -39,6 +39,11 @@ packages/sourcevision/tests/fixtures/remix-app/app/routes/_auth.login.tsx (TypeS
 packages/sourcevision/tests/fixtures/remix-app/app/routes/_auth.tsx (TypeScript, 3 lines, test)
 packages/sourcevision/tests/fixtures/remix-app/app/routes/_index.tsx (TypeScript, 11 lines, test)
 packages/sourcevision/tests/fixtures/remix-app/app/routes/users.$id.tsx (TypeScript, 11 lines, test)
+packages/sourcevision/tests/fixtures/sdlc/go-gitlab-no-tests/main.go (Go, 3 lines, test)
+packages/sourcevision/tests/fixtures/sdlc/node-helm-prisma-launchdarkly/prisma/migrations/0001_init/migration.sql (SQL, 1 lines, test)
+packages/sourcevision/tests/fixtures/sdlc/node-helm-prisma-launchdarkly/src/cart.test.ts (TypeScript, 2 lines, test)
+packages/sourcevision/tests/fixtures/sdlc/node-helm-prisma-launchdarkly/src/cart.ts (TypeScript, 1 lines, test)
+packages/sourcevision/tests/fixtures/sdlc/node-helm-prisma-launchdarkly/tests/e2e/checkout.e2e.test.ts (TypeScript, 1 lines, test)
 packages/sourcevision/tests/fixtures/small-ts-project/src/config.ts (TypeScript, 4 lines, test)
 packages/sourcevision/tests/fixtures/small-ts-project/src/index.ts (TypeScript, 8 lines, test)
 packages/sourcevision/tests/fixtures/small-ts-project/src/models/user.ts (TypeScript, 9 lines, test)
@@ -46,6 +51,12 @@ packages/sourcevision/tests/fixtures/small-ts-project/src/services/email-service
 packages/sourcevision/tests/fixtures/small-ts-project/src/services/user-service.ts (TypeScript, 18 lines, test)
 packages/sourcevision/tests/fixtures/small-ts-project/src/utils/format.ts (TypeScript, 7 lines, test)
 packages/sourcevision/tests/fixtures/small-ts-project/src/utils/validate.ts (TypeScript, 5 lines, test)
+packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/client.ts (TypeScript, 13 lines, test)
+packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/index.ts (TypeScript, 2 lines, test)
+packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/worker.ts (TypeScript, 9 lines, test)
+packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/index.ts (TypeScript, 7 lines, test)
+packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/queue.ts (TypeScript, 9 lines, test)
+packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/routes.ts (TypeScript, 17 lines, test)
 packages/sourcevision/tests/fixtures/zig-mixed/native/lib.zig (Zig, 5 lines, test)
 packages/sourcevision/tests/fixtures/zig-mixed/src/app.js (JavaScript, 3 lines, test)
 packages/sourcevision/tests/fixtures/zig-mixed/src/index.ts (TypeScript, 3 lines, test)
@@ -65,20 +76,25 @@ Internal:
   packages/sourcevision/tests/fixtures/small-ts-project/src/services/user-service.ts → packages/sourcevision/tests/fixtures/small-ts-project/src/utils/format.ts {formatName}
   packages/sourcevision/tests/fixtures/small-ts-project/src/services/user-service.ts → packages/sourcevision/tests/fixtures/small-ts-project/src/utils/validate.ts {validateName}
   packages/sourcevision/tests/fixtures/small-ts-project/src/utils/validate.ts → packages/sourcevision/tests/fixtures/small-ts-project/src/utils/format.ts {formatName}
+  packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/index.ts → packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/client.ts {loadOrders, loadOrder}
+  packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/index.ts → packages/sourcevision/tests/fixtures/workspace-crossings/checkout-web/src/worker.ts {drainOrderEvents}
+  packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/index.ts → packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/queue.ts {publishOrderEvent}
+  packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/index.ts → packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/routes.ts {registerRoutes}
+  packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/routes.ts → packages/sourcevision/tests/fixtures/workspace-crossings/orders-api/src/index.ts {OrderSummary}
 
 </imports>
 
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[suggestion] [info] Zone "tests-sourcevision-fixtures" has files across 19 directories — consider consolidating under a dedicated directory
+[suggestion] [info] Zone "tests-sourcevision-fixtures" has files across 25 directories — consider consolidating under a dedicated directory
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Zone "tests-sourcevision-fixtures" has files across 19 directories — consider consolidating under a dedicated directory
+- Zone "tests-sourcevision-fixtures" has files across 25 directories — consider consolidating under a dedicated directory
 - [call graph] 6 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

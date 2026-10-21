@@ -1,7 +1,7 @@
 {
   "id": "viewer-message-pipeline",
-  "name": "Viewer Message Pipeline",
-  "description": "Declared zone anchor (7 files).",
+  "name": "Message Optimization Pipeline",
+  "description": "7 files, mostly utilities and services; entry points call-rate-limiter.ts, fetch-pipeline.ts, index.ts; imported by Packages and Packages.",
   "files": [
     "packages/web/src/viewer/messaging/call-rate-limiter.ts",
     "packages/web/src/viewer/messaging/fetch-pipeline.ts",

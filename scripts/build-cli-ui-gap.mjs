@@ -40,10 +40,12 @@ function cell(text) {
 function tokenLegend() {
   const legacy = resolveLayout(ROOT, { mode: "legacy" });
   const ndx = resolveLayout(ROOT, { mode: "ndx" });
-  return Object.entries(LAYOUT_TOKENS)
+  const layoutLegend = Object.entries(LAYOUT_TOKENS)
     .map(([token, field]) =>
       `\`{${token}}\` = \`${relativeToRoot(legacy, legacy[field])}\` (\`${relativeToRoot(ndx, ndx[field])}\` on the .ndx layout)`)
     .join(", ");
+  // The PRD tokens follow the storage version, not the layout.
+  return `${layoutLegend}, \`{prd}\` = \`{rex}/changes/\` (\`{rex}/prd_tree/\` on a v1 project), \`{prdRead}\` = \`{rex}/product/ and {rex}/changes/\` (\`{rex}/prd_tree/\` on a v1 project)`;
 }
 
 /** A real path gets code formatting; a description ("source files", "git commits") does not. */

@@ -4,6 +4,7 @@ import {
   resolveVendorModel,
   resolveModel,
   resolveJudgmentRoute,
+  routesToTier,
   DEFAULT_ROUTES,
   DEFAULT_JUDGMENT_ROUTES,
   TIER_MODELS,
@@ -264,5 +265,21 @@ describe("resolveJudgmentRoute", () => {
     const r = resolveTaskModel("code.classify", config);
     expect(r.tier).toBe(DEFAULT_ROUTES["code.classify"]);
     expect(r.model).toBe(resolveVendorModel("claude", config, DEFAULT_ROUTES["code.classify"]));
+  });
+});
+
+describe("routesToTier", () => {
+  it("is false with no routes, and for a typesafe route", () => {
+    expect(routesToTier("prd.migrate.judge", undefined)).toBe(false);
+    expect(routesToTier("prd.migrate.judge", {})).toBe(false);
+    expect(routesToTier("prd.migrate.judge", { routes: { "prd.migrate.judge": "typesafe" } })).toBe(false);
+  });
+
+  it("is true for an exact or glob tier route, exact winning over a glob", () => {
+    expect(routesToTier("prd.migrate.judge", { routes: { "prd.migrate.judge": "light" } })).toBe(true);
+    expect(routesToTier("prd.migrate.judge", { routes: { "*": "standard" } })).toBe(true);
+    expect(routesToTier("prd.migrate.judge", { routes: { "prd.*": "light" } })).toBe(true);
+    expect(routesToTier("prd.migrate.judge", { routes: { "*": "standard", "prd.migrate.judge": "typesafe" } })).toBe(false);
+    expect(routesToTier("prd.migrate.judge", { routes: { "code.*": "light" } })).toBe(false);
   });
 });

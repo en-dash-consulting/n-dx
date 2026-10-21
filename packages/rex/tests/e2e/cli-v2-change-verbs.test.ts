@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -71,6 +72,24 @@ describe("on a v2 tree", () => {
     const out = run(["product", "edit", "A1.1", "--capability-criterion", "c9: A refund reaches the card", "--capability-criterion=c1: Charged once"], tmp);
     expect(out).toMatch(/it now reads revised/);
     expect(run(["product", "show", "A1.1"], tmp)).toMatch(/c1: Charged once[\s\S]*c9: A refund reaches the card/);
+  });
+
+  it("rex remove takes a change id and deletes the change with its task", () => {
+    const out = run(["remove", FIXTURE_CHANGE, "--yes", tmp], tmp);
+    expect(out).toMatch(/Removed change: Add Apple Pay \(2 items\)/);
+    expect(existsSync(join(tmp, ".rex", "changes", "add-apple-pay"))).toBe(false);
+    expect(run(["remove", FIXTURE_CHANGE, "--yes", tmp], tmp, true)).toMatch(/not found/);
+  });
+
+  it("rex remove refuses a product node and a level", () => {
+    expect(run(["remove", "A1.1", "--yes", tmp], tmp, true)).toMatch(/product layer/);
+    expect(run(["remove", "task", FIXTURE_TASK, tmp], tmp, true)).toMatch(/type, not a level/);
+  });
+
+  it("rex remove fails naming the holder while the PRD lock is held", async () => {
+    await writeFile(join(tmp, ".rex", "prd.lock"), JSON.stringify({ pid: process.pid, token: "t", timestamp: new Date().toISOString() }));
+    expect(run(["remove", FIXTURE_CHANGE, "--yes", tmp], tmp, true)).toContain(`Held by PID ${process.pid}`);
+    expect(existsSync(join(tmp, ".rex", "changes", "add-apple-pay"))).toBe(true);
   });
 
   it("help names each verb", () => {

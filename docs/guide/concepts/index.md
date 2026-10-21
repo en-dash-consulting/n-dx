@@ -1,7 +1,7 @@
 # The PRD: product layer and change layer
 
 ::: warning The v2 model
-This section describes the v2 model. Its schema, `rex product`, `rex change` and the v2 MCP tools ship from 0.9.0, but until the storage migration ships, `ndx init` creates **v1** projects: one tree of items in `.rex/prd_tree/`, with no product layer (see [PRD Storage Layout](../prd-storage#v1-projects)). Pages here say so where a v1 project behaves differently.
+This section describes the v2 model. Its schema, `rex product`, `rex change` and the v2 MCP tools ship from 0.9.0, and `ndx init` creates v2 projects. A **v1** project, one that has not yet run `ndx migrate`, is one tree of items in `.rex/prd_tree/`, with no product layer (see [PRD Storage Layout](../prd-storage#v1-projects)). Pages here say so where a v1 project behaves differently.
 :::
 
 In the v2 model the **PRD is the product's requirements plus the changes being made to them**. It has two layers, and a third kind of record sits beside them.

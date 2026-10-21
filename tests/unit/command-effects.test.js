@@ -19,6 +19,7 @@ import {
   localizeEffects,
   expandLayoutTokens,
   LAYOUT_TOKENS,
+  prdTokenPaths,
 } from "../../packages/core/command-effects.js";
 import { getOrchestratorCommands } from "../../packages/core/help.js";
 
@@ -37,6 +38,12 @@ describe("command effects declarations", () => {
     const registry = new Set(getOrchestratorCommands());
     const stray = Object.keys(COMMAND_EFFECTS).filter((name) => !registry.has(name));
     expect(stray, "declarations for commands the CLI does not have").toEqual([]);
+  });
+
+  it("declares the sample commands' v2 PRD writes, not only the v1 tree", () => {
+    for (const name of ["install-sample", "destroy-sample"]) {
+      expect(getCommandEffects(name).writes.map((w) => w.path), name).toContain("{rex}/changes/");
+    }
   });
 
   it("returns null for a name that is not a command", () => {
@@ -186,8 +193,9 @@ describe("shouldShowPreflight", () => {
 });
 
 describe("localizeEffects", () => {
-  const LEGACY = { rex: ".rex", hench: ".hench", sourcevision: ".sourcevision", config: ".n-dx.json" };
-  const NDX = { rex: ".ndx/rex", hench: ".ndx/hench", sourcevision: ".ndx/sourcevision", config: ".ndx/config.json" };
+  const LEGACY = { rex: ".rex", hench: ".hench", sourcevision: ".sourcevision", config: ".n-dx.json", ...prdTokenPaths(".rex", false) };
+  const NDX = { rex: ".ndx/rex", hench: ".ndx/hench", sourcevision: ".ndx/sourcevision", config: ".ndx/config.json", ...prdTokenPaths(".ndx/rex", false) };
+  const NDX_V2 = { ...NDX, ...prdTokenPaths(".ndx/rex", true) };
 
   it("names no layout-owned path literally — every one is a token", () => {
     // A literal `.rex/` is wrong on a `.ndx/` project, silently: the banner
@@ -202,10 +210,22 @@ describe("localizeEffects", () => {
     expect(localizeEffects(COMMAND_EFFECTS.analyze, NDX).writes[0].path).toBe(".ndx/sourcevision/");
   });
 
+  it("names changes/ and product/, not prd_tree/, for the PRD on a v2 project", () => {
+    const add = localizeEffects(resolveCommandEffects("add"), NDX_V2);
+    expect(add.writes.map((w) => w.path)).toContain(".ndx/rex/changes/");
+    expect(add.reads).toContain(".ndx/rex/product/ and .ndx/rex/changes/");
+    expect(JSON.stringify(add)).not.toContain("prd_tree");
+    for (const name of ["plan", "recommend"]) {
+      expect(localizeEffects(COMMAND_EFFECTS[name], NDX_V2).reads.join("\n"), name).not.toContain("prd_tree");
+    }
+    // The same declaration on a v1 project still names the tree.
+    expect(localizeEffects(resolveCommandEffects("add"), NDX).writes.map((w) => w.path)).toContain(".ndx/rex/prd_tree/");
+  });
+
   it("leaves an unknown token as written and does not touch the declaration", () => {
     expect(expandLayoutTokens("{nope}/x", LEGACY)).toBe("{nope}/x");
     localizeEffects(COMMAND_EFFECTS.plan, LEGACY);
-    expect(COMMAND_EFFECTS.plan.writes.map((w) => w.path)).toContain("{rex}/prd_tree/");
+    expect(COMMAND_EFFECTS.plan.writes.map((w) => w.path)).toContain("{prd}");
   });
 
   it("declares a resolveLayout field for every token", () => {
@@ -254,5 +274,23 @@ describe("formatPreflightBanner", () => {
       bold: (t) => `<b>${t}</b>`,
     }).join("\n");
     expect(text).toContain("<b>ndx analyze</b>");
+  });
+});
+
+describe("migrate effects follow --out", () => {
+  const paths = (flags) => resolveCommandEffects("migrate", flags).writes.map((w) => w.path);
+
+  it("names the default plan and summary without flags", () => {
+    expect(paths([])).toEqual(expect.arrayContaining(["./migration-plan.json", "./migration-plan.md"]));
+  });
+
+  it("names --out and the .md beside it, or --summary when given", () => {
+    expect(paths(["--out=/tmp/p.json"])).toEqual(expect.arrayContaining(["/tmp/p.json", "/tmp/p.md"]));
+    expect(paths(["--out=/tmp/p", "--summary=/tmp/s.md"])).toEqual(expect.arrayContaining(["/tmp/p", "/tmp/s.md"]));
+  });
+
+  it("declares model usage untracked, and --rules-only drops the model phases", () => {
+    expect(resolveCommandEffects("migrate", []).usage).toBe("untracked");
+    expect(resolveCommandEffects("migrate", ["--rules-only"]).llm).toEqual([]);
   });
 });

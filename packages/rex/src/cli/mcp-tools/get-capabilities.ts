@@ -22,7 +22,7 @@ export async function handleGetCapabilities(store: PRDStore, workspace?: Workspa
       JSON.stringify(
         {
           ...(workspace ? { workspace } : {}),
-          schemaVersion: SCHEMA_VERSION,
+          schemaVersion: caps.schemaVersion ?? SCHEMA_VERSION,
           toolVersion: TOOL_VERSION,
           adapter: caps.adapter,
           supportsTransactions: caps.supportsTransactions,

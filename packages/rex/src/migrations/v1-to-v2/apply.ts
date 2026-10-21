@@ -1,0 +1,1105 @@
+/**
+ * Migration v1 → v2, apply: a reviewed plan and the v1 tree to the v2 tree.
+ *
+ * {@link buildV2Tree} is pure. It reads the v1 tree as it is now, not as it
+ * was planned, and takes each item's place from the plan entry with its id:
+ *
+ * - **Placed and held changes.** A change the plan placed amends or touches
+ *   its capability or constraint. A held change lands in the Inbox
+ *   (`needsPlacement`); a model's pick that was not accepted is noted in its
+ *   body as a suggestion, never applied.
+ * - **Items newer than the plan.** An item with no entry goes under its v1
+ *   parent when that parent is change-layer work (a task, or a subtask under
+ *   a task), and otherwise lands in the Inbox as its own change.
+ * - **Moved items.** An item whose planned parent is gone, or can no longer
+ *   hold its type, is re-fitted: change-layer work becomes a task or subtask
+ *   of its new parent, and anything else lands in the Inbox as a change.
+ * - **Delivery containers.** A dissolved release epic is no node: its children
+ *   are placed or held like any change, its release is stamped as their
+ *   `plannedRelease`, and the cut change lists every container by id, with
+ *   its description and acceptance criteria under its line.
+ * - **Product nodes.** Areas keep their v1 epic names. A capability ships its
+ *   drafted spec, unreviewed unless the plan recorded an approval of that
+ *   exact draft. A capability or constraint starts met (`metAt` is the hash of
+ *   the spec written; the plan's `metAt` tracks it, restamped by every pass
+ *   that redrafts the spec) when its v1
+ *   item was completed or an applied change sits on it, and proposed
+ *   otherwise: never revised.
+ * - **blockedBy.** A dissolved container's own refs move onto its open
+ *   children. A ref to a dissolved container names the nodes it split
+ *   into; a ref to a product node names that node's open changes, and a
+ *   product node's own refs move onto its open changes. A dependency already
+ *   met is dropped. Every rewrite is in `blockers` and the cut change's body.
+ * - **The cut.** The first change, "Product map and change layer", is applied
+ *   at the plan's `cutAt` and adds every capability and constraint, so the
+ *   product layer's history starts with the migration. It lists the held v1
+ *   work that closed after `cutAt` (completed between plan and apply), which
+ *   the cut time alone would read as closed in v2.
+ *
+ * Every v1 id ends up as a node or a listed container: checked by count and
+ * id ({@link everyV1Id}, through `fingerprintTree` and `isLossless`) before
+ * anything is written and again on the tree read back. The v2 rules run on
+ * the tree read back and are counted by rule ({@link RuleCount}), not refused.
+ *
+ * {@link applyV1ToV2} writes under one hold of the PRD lock. The v2 tree is
+ * written to a staging folder inside the rex directory and read back; then
+ * `changes/` and `product/` are renamed into place, and `prd_tree/` and
+ * `tree-meta.json` are removed. The rename of `product/` is the switch: the
+ * reader takes a rex directory with `product/` as v2. A crash before it
+ * leaves the v1 tree; after it, the v2 tree, and the next apply removes the
+ * v1 files the crash left ({@link leftoverV1}): only when they are the tree
+ * the plan was made from or, with no plan, every id they hold is in the v2
+ * tree. A removal that fails after the switch is reported as such, naming the
+ * leftovers and the manual step to clear them ({@link removeV1Leftovers}).
+ * Any other `prd_tree/` beside the v2 tree is refused and kept. Apply on
+ * a v2 tree changes nothing else.
+ *
+ * @module migrations/v1-to-v2/apply
+ */
+
+import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rename, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { amendsHash, freeSlug } from "../../core/apply-amendments.js";
+import { checkV2TreeHealth } from "../../core/health.js";
+import { diffFingerprints, fingerprintTree, isLossless, type FingerprintDiff } from "../../core/slug-migration.js";
+import type { StructureHealthThresholds } from "../../schema/index.js";
+import type { PRDItem } from "../../schema/v1.js";
+import { SCHEMA_VERSION_V2, type Amendment, type NodeType } from "../../schema/v2.js";
+import {
+  CUT_CHANGE_BODY_PREFIX,
+  CUT_CHANGE_TITLE,
+  CUT_HELD_AFTER_CUT_HEADING,
+  isOpenChange,
+  nodeSpec,
+  specHash,
+  type RuleFinding,
+  type RuleNode,
+  type V2RuleId,
+  type V2Tree,
+} from "../../schema/v2-rules.js";
+import { withLock, type LockOptions } from "../../store/file-lock.js";
+import { parseFolderTree } from "../../store/folder-tree-parser.js";
+import { discoverPRDFiles } from "../../store/prd-discovery.js";
+import { PRD_TREE_DIRNAME, TREE_META_FILENAME, prdLockPath } from "../../store/paths.js";
+import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from "../../store/prd-model-reader.js";
+import { writePrdModel } from "../../store/prd-model-writer.js";
+import type { PlanFile } from "../plan-file.js";
+import { sourceDigest } from "../pipeline.js";
+import { V1_TREE_SOURCE_KIND, v1TreeSource, type V1ToV2Entry, type V1ToV2Summary } from "./index.js";
+import { describeSkippedV1Items, skippedV1Items } from "./v1-tree-read.js";
+import { countCorrupt, dropCorrupt, legacyLoeBucket, legacyLoeRationale, v2Slugs, type SlugEntry } from "./migration-plan-data.js";
+
+export type V1ToV2Plan = PlanFile<V1ToV2Entry, V1ToV2Summary>;
+
+export { CUT_CHANGE_TITLE };
+/** The staging folder inside the rex directory; removed when apply ends. */
+export const STAGING_DIRNAME = ".migrate-v2";
+
+/** v1 keys stored in `state.yaml`, not frontmatter, though v2 no longer declares them. */
+const RETIRED_STATE_KEYS = ["commits"] as const;
+
+// ── Build ────────────────────────────────────────────────────────
+
+/** A v1 epic that became no node; its children were placed or held. */
+export interface DeliveryContainer {
+  id: string;
+  title: string;
+  /** The release its changes carry as `plannedRelease`; absent when the plan recorded none. */
+  plannedRelease?: string;
+  /** Kept in the cut change's body, under the container's line. */
+  description?: string;
+  /** Kept in the cut change's body, under the container's line. */
+  acceptanceCriteria?: string[];
+  /** Moved onto the container's open children ({@link repointDissolvedBlockers}). */
+  blockedBy?: string[];
+}
+
+/**
+ * A v1 `blockedBy` ref v2 cannot hold as written: it names a dissolved
+ * container (`container`), or a product node (`requirement`), and blockedBy
+ * names change-layer work only.
+ */
+export interface BlockerRewrite {
+  kind: "container" | "requirement";
+  /** The node whose blockedBy held the ref. */
+  node: string;
+  /** The v1 ref. */
+  from: string;
+  /** The refs that replace it; empty when the dependency is met and the ref is dropped. */
+  to: string[];
+  /**
+   * Set when `node` holds no blockedBy in v2 (a product node or a dissolved
+   * container): the open work `to` moved onto; empty when it has none and the ref is dropped.
+   */
+  onto?: string[];
+}
+
+export interface BuiltV2Tree {
+  tree: V2Tree;
+  /** Id of the cut change. */
+  cut: string;
+  containers: DeliveryContainer[];
+  /** Every `blockedBy` ref apply rewrote or dropped, in the order it did so. */
+  blockers: BlockerRewrite[];
+  /** v1 ids with no plan entry: items made after the plan. */
+  late: string[];
+  /** v1 ids whose planned place no longer fits, re-fitted. */
+  refitted: string[];
+  /** Plan entries whose item is no longer in the tree. */
+  gone: string[];
+  /** Changes in the Inbox. */
+  inbox: number;
+  /** Undeclared keys stored in `state.yaml`, by node id (`WritePrdModelOptions.stateKeys`). */
+  stateKeys: Map<string, Set<string>>;
+}
+
+type WorkType = "change" | "task" | "subtask";
+
+interface Placed {
+  item: PRDItem;
+  entry?: V1ToV2Entry;
+  type: NodeType;
+  parent?: string;
+  /** Lands in the Inbox. */
+  held: boolean;
+}
+
+const PRODUCT_TYPES: ReadonlySet<string> = new Set(["area", "capability", "constraint"]);
+const WORK_TYPES: ReadonlySet<string> = new Set(["change", "task", "subtask"]);
+
+/** The type `type` takes under a parent of `parentType` (whose own parent is `grandType`), or undefined when it cannot sit there. */
+function fit(type: NodeType, parentType: NodeType, grandType: NodeType | undefined): NodeType | undefined {
+  if (WORK_TYPES.has(type)) {
+    if (parentType === "change") return "task";
+    if (parentType === "task" || parentType === "subtask") return "subtask";
+    return undefined;
+  }
+  if (type === "capability") return parentType === "area" || (parentType === "capability" && grandType !== "capability") ? type : undefined;
+  if (type === "constraint") return PRODUCT_TYPES.has(parentType) ? type : undefined;
+  return undefined;
+}
+
+function flatten(items: readonly PRDItem[], parent: PRDItem | undefined, out: Array<{ item: PRDItem; parent?: PRDItem }>): typeof out {
+  for (const item of items) {
+    out.push({ item, ...(parent ? { parent } : {}) });
+    flatten(item.children ?? [], item, out);
+  }
+  return out;
+}
+
+/** The v2 tree for `items`, the v1 tree as it is now, by `plan`. Pure. */
+export function buildV2Tree(items: readonly PRDItem[], plan: V1ToV2Plan): BuiltV2Tree {
+  const { entries } = plan;
+  const cutAt = plan.header.cutAt;
+  const flat = flatten(items, undefined, []);
+  const present = new Set(flat.map(({ item }) => item.id));
+  const entryOf = (id: string): V1ToV2Entry | undefined => (Object.hasOwn(entries, id) ? entries[id] : undefined);
+
+  // 1. Where each item would sit: its plan entry, or for a newer item, its v1 parent's work.
+  const containers: DeliveryContainer[] = [];
+  const initial = new Map<string, Placed>();
+  const late: string[] = [];
+  for (const { item, parent } of flat) {
+    const entry = entryOf(item.id);
+    if (entry?.target === "release") {
+      containers.push({
+        id: item.id,
+        title: item.title,
+        ...(entry.plannedRelease !== undefined ? { plannedRelease: entry.plannedRelease } : {}),
+        ...(item.description ? { description: item.description } : {}),
+        ...(item.acceptanceCriteria?.length ? { acceptanceCriteria: item.acceptanceCriteria } : {}),
+        ...(item.blockedBy?.length ? { blockedBy: item.blockedBy } : {}),
+      });
+      continue;
+    }
+    if (entry) {
+      initial.set(item.id, { item, entry, type: entry.target, ...(entry.parent !== undefined ? { parent: entry.parent } : {}), held: false });
+      continue;
+    }
+    late.push(item.id);
+    const above = parent ? initial.get(parent.id) : undefined;
+    initial.set(
+      item.id,
+      above && WORK_TYPES.has(above.type)
+        ? { item, type: "task", parent: parent!.id, held: false }
+        : { item, type: "change", held: true },
+    );
+  }
+
+  // 2. Re-fit against the parents as they land: a gone or unfit parent sends the item to the Inbox.
+  const placed = new Map<string, Placed>();
+  const refitted: string[] = [];
+  const resolving = new Set<string>();
+  const settle = (id: string): Placed => {
+    const done = placed.get(id);
+    if (done) return done;
+    const start = initial.get(id)!;
+    resolving.add(id);
+    let result: Placed;
+    const parentId = start.parent;
+    const parent = parentId !== undefined && initial.has(parentId) && !resolving.has(parentId) ? settle(parentId) : undefined;
+    if (parentId === undefined) {
+      result = start.type === "area" || start.type === "change" ? start : inboxOf(start);
+    } else if (!parent) {
+      result = inboxOf(start);
+    } else {
+      const grand = parent.parent !== undefined ? placed.get(parent.parent)?.type : undefined;
+      const type = fit(start.type, parent.type, grand);
+      result = type === undefined ? inboxOf(start) : { ...start, type };
+    }
+    if (result.type !== start.type || result.parent !== start.parent) {
+      if (start.entry) refitted.push(id);
+    }
+    resolving.delete(id);
+    placed.set(id, result);
+    return result;
+  };
+  for (const id of initial.keys()) settle(id);
+
+  // 3. Slugs, from the siblings each item now has.
+  const slugEntries: SlugEntry[] = [...placed.values()].map((p) => ({
+    id: p.item.id,
+    title: p.item.title,
+    target: p.type,
+    ...(p.parent !== undefined ? { parent: p.parent } : {}),
+  }));
+  const slugs = v2Slugs(items, slugEntries);
+
+  // 4. Nodes.
+  const stateKeys = new Map<string, Set<string>>();
+  const nodes = new Map<string, RuleNode>();
+  for (const p of placed.values()) {
+    const node = toNode(p, slugs.get(p.item.id) ?? p.item.id, cutAt);
+    const retired = RETIRED_STATE_KEYS.filter((k) => node[k] !== undefined);
+    if (retired.length > 0) stateKeys.set(node.id, new Set(retired));
+    nodes.set(node.id, node);
+  }
+  const blockers: BlockerRewrite[] = [];
+  repointDissolvedBlockers(nodes, containers, flat, blockers);
+  const releaseOf = new Map(containers.filter((c) => c.plannedRelease !== undefined).map((c) => [c.id, c.plannedRelease!]));
+  const parentById = new Map(flat.map(({ item, parent }) => [item.id, parent?.id]));
+  const tree: V2Tree = { product: [], changes: [] };
+  for (const p of placed.values()) {
+    const node = nodes.get(p.item.id)!;
+    if (p.type === "change") {
+      const release = p.entry?.plannedRelease ?? releaseOf.get(parentById.get(p.item.id) ?? "");
+      if (release !== undefined) node.plannedRelease = release;
+      target(node, p, nodes);
+    }
+    if (p.parent === undefined) {
+      tree[PRODUCT_TYPES.has(p.type) ? "product" : "changes"].push(node);
+    } else {
+      (nodes.get(p.parent)!.children ??= []).push(node);
+    }
+  }
+
+  // A held change has no target; for blockers only, it is open on the product node its v1 parent became.
+  const heldOn = new Map<string, string>();
+  for (const node of nodes.values()) {
+    const v1Parent = node.needsPlacement === true ? parentById.get(node.id) : undefined;
+    if (v1Parent !== undefined && PRODUCT_TYPES.has(nodes.get(v1Parent)?.type ?? "")) heldOn.set(node.id, v1Parent);
+  }
+  rewriteRequirementBlockers(tree, nodes, heldOn, blockers);
+  stampMet(tree, nodes);
+
+  const cut = cutChange(tree, containers, blockers, heldAfterCut(nodes, cutAt), plan);
+  tree.changes.push(cut);
+
+  return {
+    tree,
+    cut: cut.id,
+    containers,
+    blockers,
+    late,
+    refitted,
+    gone: Object.keys(entries).filter((id) => !present.has(id)),
+    inbox: tree.changes.filter((n) => n.needsPlacement === true).length,
+    stateKeys,
+  };
+}
+
+/**
+ * A `blockedBy` ref to a dissolved container names no node, and selection reads an
+ * unresolved ref as an open blocker. Replace it with the nodes the container split
+ * into (its v1 children, through any nested container), so the ordering survives and
+ * resolves; a node never blocks itself. A container completed in v1 already satisfied
+ * the dependency, so its ref is dropped; a cancelled or deleted child never completes,
+ * so it is never a blocker. Each rewrite is recorded in `out`.
+ *
+ * A container's own blockedBy first moves onto its open children, so work in a
+ * release still waits for what the release waited for; a ref to another
+ * container is then repointed like any other.
+ */
+function repointDissolvedBlockers(
+  nodes: ReadonlyMap<string, RuleNode>,
+  containers: readonly DeliveryContainer[],
+  flat: ReadonlyArray<{ item: PRDItem; parent?: PRDItem }>,
+  out: BlockerRewrite[],
+): void {
+  if (containers.length === 0) return;
+  const dissolved = new Set(containers.map((c) => c.id));
+  const statusOf = new Map(flat.map(({ item }) => [item.id, item.status]));
+  const childrenOf = new Map<string, string[]>();
+  for (const { item, parent } of flat) {
+    if (parent && dissolved.has(parent.id)) childrenOf.set(parent.id, [...(childrenOf.get(parent.id) ?? []), item.id]);
+  }
+  const expand = (id: string, seen: Set<string>): string[] => {
+    const status = statusOf.get(id);
+    if (status === "cancelled" || status === "deleted") return [];
+    if (nodes.has(id)) return [id];
+    if (!dissolved.has(id) || seen.has(id) || status === "completed") return [];
+    seen.add(id);
+    return (childrenOf.get(id) ?? []).flatMap((child) => expand(child, seen));
+  };
+  for (const c of containers) {
+    if (!c.blockedBy) continue;
+    const onto = expand(c.id, new Set()).filter((id) => nodes.get(id)!.status !== "completed");
+    for (const ref of c.blockedBy) {
+      out.push({ kind: "container", node: c.id, from: ref, to: [ref], onto });
+      for (const id of onto) {
+        if (id === ref) continue;
+        const node = nodes.get(id)!;
+        setBlockedBy(node, [...(node.blockedBy ?? []), ref]);
+      }
+    }
+  }
+  for (const node of nodes.values()) {
+    if (!node.blockedBy?.some((ref) => dissolved.has(ref))) continue;
+    const refs = node.blockedBy.flatMap((ref) => {
+      if (!dissolved.has(ref)) return [ref];
+      const to = expand(ref, new Set()).filter((id) => id !== node.id);
+      out.push({ kind: "container", node: node.id, from: ref, to });
+      return to;
+    });
+    setBlockedBy(node, refs);
+  }
+}
+
+/** `refs`, without repeats, as the node's blockedBy; none removes the field. */
+function setBlockedBy(node: RuleNode, refs: readonly string[]): void {
+  const unique = [...new Set(refs)];
+  if (unique.length > 0) node.blockedBy = unique;
+  else delete node.blockedBy;
+}
+
+/**
+ * blockedBy names change-layer work, and selection waits for a ref to complete,
+ * which nothing sets on a product node; nor does it read a product node's own
+ * blockedBy. So, by decision S2-Q1:
+ *
+ * - A work node's ref to a product node becomes refs to that node's open
+ *   changes: those placed on it or on a product node beneath it, which is what
+ *   an area has. A held change (`heldOn`) counts as on the product node its v1
+ *   parent became, so work held in the Inbox still orders what waited on it;
+ *   placement never reads this. With none open the dependency is met, and the
+ *   ref is dropped.
+ * - A product node's own blockedBy moves onto each of its open changes,
+ *   rewritten the same way, and the product node keeps none. With no open
+ *   change to carry it, it is dropped.
+ *
+ * No node is left blocked by itself, a change it sits inside or work it holds.
+ * Each rewrite is recorded in `out`. Runs after placement, which sets `touches` and `amends`.
+ */
+function rewriteRequirementBlockers(
+  tree: V2Tree,
+  nodes: ReadonlyMap<string, RuleNode>,
+  heldOn: ReadonlyMap<string, string>,
+  out: BlockerRewrite[],
+): void {
+  const parentOf = new Map<string, RuleNode>();
+  const index = (node: RuleNode): void => {
+    for (const child of node.children ?? []) {
+      parentOf.set(child.id, node);
+      index(child);
+    }
+  };
+  [...tree.product, ...tree.changes].forEach(index);
+  const isProduct = (id: string): boolean => PRODUCT_TYPES.has(nodes.get(id)?.type ?? "");
+  const above = (id: string): Set<string> => {
+    const ids = new Set([id]);
+    for (let at = parentOf.get(id); at; at = parentOf.get(at.id)) ids.add(at.id);
+    return ids;
+  };
+  /** The node, what holds it and what it holds: a blocker among them never clears. */
+  const own = (id: string): Set<string> => {
+    const ids = above(id);
+    const below = (node: RuleNode): void => node.children?.forEach((child) => (ids.add(child.id), below(child)));
+    below(nodes.get(id)!);
+    return ids;
+  };
+
+  const openOn = new Map<string, string[]>();
+  for (const node of nodes.values()) {
+    if (node.type !== "change" || !isOpenChange(node)) continue;
+    const held = heldOn.get(node.id);
+    const on = new Set([...(node.touches ?? []), ...(node.amends ?? []).map((a) => a.target), ...(held !== undefined ? [held] : [])].filter(isProduct));
+    for (const id of [...on].flatMap((t) => [...above(t)])) {
+      if (isProduct(id) && !openOn.get(id)?.includes(node.id)) openOn.set(id, [...(openOn.get(id) ?? []), node.id]);
+    }
+  }
+  const rewrite = (ref: string, holder: string): string[] => {
+    const mine = own(holder);
+    return (isProduct(ref) ? (openOn.get(ref) ?? []) : [ref]).filter((id) => !mine.has(id));
+  };
+
+  // Work nodes first, so what a product node moves onto its changes is already rewritten.
+  const products: RuleNode[] = [];
+  for (const node of nodes.values()) {
+    if (!node.blockedBy) continue;
+    if (PRODUCT_TYPES.has(node.type)) {
+      products.push(node);
+      continue;
+    }
+    if (!node.blockedBy.some(isProduct)) continue;
+    setBlockedBy(
+      node,
+      node.blockedBy.flatMap((ref) => {
+        const to = rewrite(ref, node.id);
+        if (isProduct(ref)) out.push({ kind: "requirement", node: node.id, from: ref, to });
+        return to;
+      }),
+    );
+  }
+  for (const node of products) {
+    const onto = openOn.get(node.id) ?? [];
+    for (const ref of node.blockedBy!) {
+      out.push({ kind: "requirement", node: node.id, from: ref, to: isProduct(ref) ? (openOn.get(ref) ?? []) : [ref], onto });
+      for (const id of onto) {
+        const change = nodes.get(id)!;
+        setBlockedBy(change, [...(change.blockedBy ?? []), ...rewrite(ref, id)]);
+      }
+    }
+    delete node.blockedBy;
+  }
+}
+
+/** One rewrite as `<node>: blockedBy <from> → <to>`, for the dry run and the cut change. */
+export function describeBlockerRewrite(r: BlockerRewrite): string {
+  const to = r.to.length > 0 ? r.to.join(", ") : r.kind === "container" ? "dropped (container completed or no open child)" : "dropped (no open change: met)";
+  if (r.onto === undefined) return `${r.node}: blockedBy ${r.from} → ${to}`;
+  const [holder, work] = r.kind === "container" ? ["container", "child"] : ["product node", "change"];
+  if (r.onto.length === 0) return `${r.node}: blockedBy ${r.from} → dropped (${holder} with no open ${work} to carry it)`;
+  return `${r.node}: blockedBy ${r.from} → ${to}, moved onto its open ${r.kind === "container" ? "children" : "changes"} ${r.onto.join(", ")}`;
+}
+
+/** The Inbox change an item becomes when its planned place no longer exists. */
+function inboxOf(p: Placed): Placed {
+  return { item: p.item, ...(p.entry ? { entry: p.entry } : {}), type: "change", held: true };
+}
+
+/** The v1 item's fields as a v2 node of `p.type`: intent and state together, as the reader loads them. */
+function toNode(p: Placed, slug: string, cutAt: string): RuleNode {
+  const { item, entry, type } = p;
+  const {
+    children: _children,
+    level: _level,
+    description,
+    acceptanceCriteria,
+    loe,
+    loeRationale,
+    recommendationMeta,
+    log,
+    ...rest
+  } = item;
+  const node: Record<string, unknown> = { ...rest, id: item.id, type, title: item.title, slug };
+
+  const meta = recommendationMeta === undefined ? undefined : dropCorrupt(recommendationMeta);
+  if (meta !== undefined) node.recommendationMeta = meta;
+  const cleanLog = log === undefined ? undefined : dropCorrupt(log);
+  if (cleanLog !== undefined) node.log = cleanLog;
+
+  const bucket = legacyLoeBucket(item);
+  if (bucket !== undefined) node.loeRationale = legacyLoeRationale(bucket, loeRationale);
+  else {
+    if (loe !== undefined) node.loe = loe;
+    if (loeRationale !== undefined) node.loeRationale = loeRationale;
+  }
+
+  const criteria = acceptanceCriteria?.length ? acceptanceCriteria : undefined;
+  switch (type) {
+    case "area":
+      if (description !== undefined) node.summary = description;
+      if (criteria) node.acceptanceCriteria = criteria;
+      break;
+    case "capability": {
+      // The spec is the draft (plan data never holds a second list); the v1 text stays in the body.
+      const spec = entry?.spec;
+      if (spec?.statement !== undefined) node.statement = spec.statement;
+      if (spec?.criteria.length) node.criteria = spec.criteria.map((c) => ({ id: c.id, text: c.text }));
+      if (spec?.requirements.length) node.requirements = spec.requirements;
+      if (description !== undefined) node.body = description;
+      const reviewed = entry?.data?.reviewedHash;
+      if (reviewed !== undefined && reviewed === specHash(nodeSpec(node as RuleNode))) node.reviewedHash = reviewed;
+      break;
+    }
+    case "constraint":
+      if (description !== undefined) node.statement = description;
+      if (criteria) node.acceptanceCriteria = criteria;
+      break;
+    case "change":
+      if (description !== undefined) node.intent = description;
+      if (criteria) node.acceptanceCriteria = criteria;
+      if (item.status === "completed") {
+        const done = item.completedAt;
+        node.appliedAt = entry?.data?.appliedAt ?? (done !== undefined && !Number.isNaN(Date.parse(done)) ? done : cutAt);
+      }
+      if (entry?.data?.shippedIn) node.shippedIn = entry.data.shippedIn.version;
+      break;
+    default:
+      if (description !== undefined) node.description = description;
+      if (criteria) node.acceptanceCriteria = criteria;
+  }
+  return node as RuleNode;
+}
+
+/** A change's target: its plan placement while that node landed, else the Inbox. */
+function target(node: RuleNode, p: Placed, nodes: ReadonlyMap<string, RuleNode>): void {
+  const placement = p.held ? undefined : p.entry?.placement;
+  const on = placement === undefined ? undefined : nodes.get(placement);
+  if (!on || (on.type !== "capability" && on.type !== "constraint")) {
+    node.needsPlacement = true;
+    const suggestion = suggestionOf(p.entry, nodes);
+    if (suggestion) node.body = node.body ? `${node.body}\n\n${suggestion}` : suggestion;
+    return;
+  }
+  if (p.entry?.relation === "amends") {
+    const amendment: Amendment = { target: on.id, delta: "modified", summary: node.title, base: specHash(nodeSpec(on)) };
+    node.amends = [amendment];
+  } else {
+    node.touches = [on.id];
+  }
+}
+
+/** A model's pick that was not accepted, as a note for whoever places the change. */
+function suggestionOf(entry: V1ToV2Entry | undefined, nodes: ReadonlyMap<string, RuleNode>): string | undefined {
+  const mp = entry?.modelPlacement;
+  const pick = mp?.text?.pick ?? mp?.jev?.pick;
+  if (!mp || pick == null) return undefined;
+  const node = nodes.get(pick);
+  const by = Object.entries(mp.models).map(([pass, model]) => `${pass} ${model}`).join(", ");
+  return `Migration suggestion (${by}, not accepted): place on ${node ? `"${node.title}" (${pick})` : pick}.`;
+}
+
+/** Met when the v1 item was completed or an applied change sits on the node; otherwise proposed. */
+function stampMet(tree: V2Tree, nodes: ReadonlyMap<string, RuleNode>): void {
+  const builtOn = new Set<string>();
+  const visit = (node: RuleNode): void => {
+    if (node.type === "change" && node.appliedAt !== undefined) {
+      for (const ref of [...(node.touches ?? []), ...(node.amends ?? []).map((a) => a.target)]) builtOn.add(ref);
+    }
+    node.children?.forEach(visit);
+  };
+  tree.changes.forEach(visit);
+  for (const node of nodes.values()) {
+    if (node.type !== "capability" && node.type !== "constraint") continue;
+    if (node.status === "completed" || builtOn.has(node.id)) node.metAt = specHash(nodeSpec(node));
+  }
+}
+
+/** A UUID-shaped id from the plan, so applying one plan to one tree gives one tree. */
+function cutId(plan: V1ToV2Plan): string {
+  const hex = createHash("sha256").update(`cut ${plan.header.source.digest} ${plan.header.cutAt}`).digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex[16]!, 16) & 3) | 8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** Heads the cut change's list of delivery containers, one `- <title> (<id>)` line each. */
+const CONTAINERS_HEADING = "Delivery containers that became no node (their changes were placed or held):";
+/** Heads the cut change's list of blockedBy refs v2 could not hold as written ({@link BlockerRewrite}). */
+const BLOCKERS_HEADING = "blockedBy refs rewritten or dropped (v2 blockedBy names change-layer work only):";
+const CONTAINER_LINE = /^- .* \(([^()\s]+)\)(?:: plannedRelease .*)?$/;
+
+/** Ids of the delivery containers the cut change in `tree` lists: v1 ids that became no node. */
+export function cutContainerIds(tree: V2Tree): string[] {
+  const ids: string[] = [];
+  for (const node of tree.changes) {
+    if (node.title !== CUT_CHANGE_TITLE || typeof node.body !== "string") continue;
+    const lines = node.body.split("\n");
+    const start = lines.indexOf(CONTAINERS_HEADING);
+    if (start < 0) continue;
+    for (const line of lines.slice(start + 1)) {
+      const id = CONTAINER_LINE.exec(line)?.[1];
+      if (id !== undefined) ids.push(id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Held changes that closed after the plan's `cutAt`: v1 work completed between
+ * plan and apply. The cut lists them, so `change-placed-at-close` reads them as
+ * migrated work rather than as changes closed in v2.
+ */
+function heldAfterCut(nodes: ReadonlyMap<string, RuleNode>, cutAt: string): RuleNode[] {
+  const cut = Date.parse(cutAt);
+  return [...nodes.values()].filter((node) => {
+    if (node.needsPlacement !== true || (node.status !== "completed" && node.appliedAt === undefined)) return false;
+    // As the rule reads it: an unparseable completedAt falls back to appliedAt.
+    const completedAt = Date.parse(node.completedAt ?? "");
+    return (Number.isNaN(completedAt) ? Date.parse(node.appliedAt ?? "") : completedAt) > cut;
+  });
+}
+
+/** The cut: an applied change that adds every capability and constraint, and names the containers that became no node. */
+function cutChange(
+  tree: V2Tree,
+  containers: readonly DeliveryContainer[],
+  blockers: readonly BlockerRewrite[],
+  held: readonly RuleNode[],
+  plan: V1ToV2Plan,
+): RuleNode {
+  const id = cutId(plan);
+  const at = plan.header.cutAt;
+  const amends: Amendment[] = [];
+  const visit = (node: RuleNode, under: RuleNode | undefined): void => {
+    if (node.type === "capability" || node.type === "constraint") {
+      // Keys in AmendmentSchema order, the order the reader returns them, so a re-save rewrites nothing.
+      amends.push({
+        target: node.id,
+        delta: "added",
+        summary: "Defined at the migration cut",
+        ...(under ? { under: under.id } : {}),
+        title: node.title,
+        ...(node.type === "constraint" ? { type: "constraint" as const } : {}),
+      });
+    }
+    node.children?.forEach((child) => visit(child, node));
+  };
+  tree.product.forEach((node) => visit(node, undefined));
+
+  const lines = [
+    `${CUT_CHANGE_BODY_PREFIX}, by plan ${plan.header.source.digest.slice(0, 12)} cut at ${at}.`,
+  ];
+  // Before the containers, whose list `cutContainerIds` reads to the end of the body.
+  if (blockers.length > 0) {
+    lines.push("", BLOCKERS_HEADING, "");
+    for (const r of blockers) lines.push(`- ${describeBlockerRewrite(r)}`);
+  }
+  if (held.length > 0) {
+    lines.push("", CUT_HELD_AFTER_CUT_HEADING, "");
+    for (const node of held) lines.push(`- ${node.title} (${node.id})`);
+  }
+  if (containers.length > 0) {
+    lines.push("", CONTAINERS_HEADING, "");
+    for (const c of containers) {
+      lines.push(`- ${c.title} (${c.id})${c.plannedRelease !== undefined ? `: plannedRelease ${c.plannedRelease}` : ""}`);
+      // Indented, so no line of it reads as a container line.
+      const under = [...(c.description?.split("\n") ?? []), ...(c.acceptanceCriteria ? ["Acceptance criteria:", ...c.acceptanceCriteria.map((ac) => `- ${ac}`)] : [])];
+      for (const line of under) lines.push(line.trim() === "" ? "" : `  ${line}`);
+    }
+  }
+  return {
+    id,
+    type: "change",
+    title: CUT_CHANGE_TITLE,
+    slug: freeSlug(CUT_CHANGE_TITLE, id, tree.changes),
+    intent: "Define the product capabilities: the product layer starts here, as built at the cut.",
+    ...(amends.length > 0 ? { amends } : { spike: true }),
+    body: lines.join("\n"),
+    status: "completed",
+    startedAt: at,
+    completedAt: at,
+    appliedAt: at,
+    ...(amends.length > 0 ? { appliedAmendsHash: amendsHash(amends) } : {}),
+  } as RuleNode;
+}
+
+// ── Check ────────────────────────────────────────────────────────
+
+function idsOf(nodes: readonly RuleNode[], out: Set<string>): Set<string> {
+  for (const node of nodes) {
+    out.add(node.id);
+    idsOf(node.children ?? [], out);
+  }
+  return out;
+}
+
+/**
+ * Every v1 id in `tree` as a node, or in `containers`: a diff of the two id
+ * sets through `fingerprintTree` and `diffFingerprints`. The cut is the only
+ * node with no v1 id; `isLossless` holds when nothing is lost or gained.
+ */
+export function everyV1Id(items: readonly PRDItem[], tree: V2Tree, containers: readonly DeliveryContainer[], cut: string): FingerprintDiff {
+  const ids = (list: Iterable<string>): Map<string, string> => new Map([...list].map((id) => [id, id]));
+  const before = ids(fingerprintTree([...items]).keys());
+  const landed = idsOf([...tree.product, ...tree.changes], new Set());
+  landed.delete(cut);
+  for (const c of containers) landed.add(c.id);
+  return diffFingerprints(before, ids(landed));
+}
+
+/**
+ * Refuse a v1 tree that holds an id more than once. The id check compares id
+ * sets, and the tree is built by id, so a repeated id would lose an item
+ * without either noticing.
+ */
+export function assertUniqueV1Ids(items: readonly PRDItem[]): void {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const { item } of flatten(items, undefined, [])) {
+    if (seen.has(item.id)) repeated.add(item.id);
+    seen.add(item.id);
+  }
+  if (repeated.size === 0) return;
+  const ids = [...repeated];
+  throw new MigrationApplyError(
+    `The v1 tree holds ${ids.length} id${ids.length === 1 ? "" : "s"} more than once (${ids.slice(0, 5).join(", ")}${ids.length > 5 ? ", …" : ""}): ` +
+      "give each item its own id, then apply again. Nothing was written.",
+  );
+}
+
+/** The errors and warnings one v2 rule reports on the migrated tree. */
+export interface RuleCount {
+  rule: V2RuleId;
+  errors: number;
+  warnings: number;
+}
+
+/** Findings per rule, most errors first, then most warnings, then by rule id. */
+export function countRuleFindings(findings: readonly RuleFinding[]): RuleCount[] {
+  const counts = new Map<V2RuleId, RuleCount>();
+  for (const f of findings) {
+    const count = counts.get(f.rule) ?? { rule: f.rule, errors: 0, warnings: 0 };
+    if (f.severity === "error") count.errors++;
+    else count.warnings++;
+    counts.set(f.rule, count);
+  }
+  return [...counts.values()].sort((a, b) => b.errors - a.errors || b.warnings - a.warnings || a.rule.localeCompare(b.rule));
+}
+
+/** What `rex health` reads besides the tree, so the counts apply reports are the ones it gates on. */
+export interface RuleCheckOptions {
+  structureHealth?: StructureHealthThresholds;
+  packageVersion?: string;
+}
+
+function assertEveryV1Id(diff: FingerprintDiff, v1Count: number, where: string): void {
+  if (isLossless(diff)) return;
+  const parts = [
+    diff.lost.length > 0 ? `missing ${diff.lost.length} (${diff.lost.slice(0, 5).join(", ")}${diff.lost.length > 5 ? ", …" : ""})` : "",
+    diff.gained.length > 0 ? `unexpected ${diff.gained.length} (${diff.gained.slice(0, 5).join(", ")}${diff.gained.length > 5 ? ", …" : ""})` : "",
+  ].filter(Boolean);
+  throw new MigrationApplyError(`Not every v1 id is in the ${where}, of ${v1Count} items: ${parts.join("; ")}. Nothing was written.`);
+}
+
+// ── Apply ────────────────────────────────────────────────────────
+
+export class MigrationApplyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MigrationApplyError";
+  }
+}
+
+/** Refuse a plan this apply must not write: another migration's, or one whose model pass stopped. */
+export function assertApplicable(plan: PlanFile): asserts plan is V1ToV2Plan {
+  if (plan.header.migration !== "v1-to-v2") {
+    throw new MigrationApplyError(`The plan is for migration ${plan.header.migration}, not v1-to-v2.`);
+  }
+  const stopped = plan.header.passes.filter((p) => p.incomplete);
+  if (stopped.length > 0) {
+    throw new MigrationApplyError(
+      `The plan is incomplete: ${stopped.map((p) => `the ${p.name} pass stopped (${p.incomplete!.error})`).join("; ")}. Plan again before applying. Nothing was written.`,
+    );
+  }
+}
+
+/**
+ * Legacy PRD sources beside the tree: `prd.md`, `prd.json` and branch-scoped
+ * `prd_<branch>_<date>.json` — the files `FileAdapter.loadLegacyDocument`
+ * reads once the tree is gone, and a v1 save then turns into a new
+ * `prd_tree/` beside the v2 tree. A `prd.json.migrated` marker does not make
+ * `prd.json` safe: that read ignores it. So apply refuses while any is present.
+ */
+async function legacySources(rexDir: string): Promise<string[]> {
+  const found = [join(rexDir, "prd.md"), join(rexDir, "prd.json")];
+  found.push(...(await discoverPRDFiles(rexDir)).map((name) => join(rexDir, name)));
+  return found.filter((path) => existsSync(path));
+}
+
+async function assertNoLegacySources(rexDir: string): Promise<void> {
+  const found = await legacySources(rexDir);
+  if (found.length === 0) return;
+  const them = found.length > 1 ? "them" : "it";
+  throw new MigrationApplyError(
+    `Legacy PRD source${found.length > 1 ? "s" : ""} beside the tree: ${found.join(", ")}. Applying would leave ${them} to be migrated back into a new prd_tree/ next to the v2 tree. Move or delete ${them}, after checking nothing is missing from the tree, then apply again. Nothing was written.`,
+  );
+}
+
+export interface ApplyV1ToV2Options {
+  /** Reads the v1 tree; called under the PRD lock. */
+  load: () => Promise<{ title: string; items: PRDItem[] }>;
+  lock?: LockOptions;
+  /** For the v2 rules run on the tree read back; reported, never refused. */
+  rules?: RuleCheckOptions;
+}
+
+/** What the written tree read back as: files written, nodes read, and the v2 rule findings on it by rule. */
+interface Verified {
+  files: number;
+  nodes: number;
+  rules: RuleCount[];
+}
+
+export type ApplyV1ToV2Result =
+  | { status: "already-v2"; removed: string[]; proof?: LeftoverProof }
+  | ({ status: "applied"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; v1Items: number } & Verified);
+
+interface Prepared {
+  v1: { title: string; items: PRDItem[] };
+  built: BuiltV2Tree;
+  v1Items: number;
+}
+
+/** The refusals, the build and the id check shared by apply and its rehearsal; writes nothing. */
+async function prepare(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load">): Promise<Prepared> {
+  if (!plan) throw new MigrationApplyError("No migration plan to apply.");
+  assertApplicable(plan);
+  // `load` drops the parser's warnings, so an item it skipped would pass the id checks below unseen.
+  const skipped = await skippedV1Items(rexDir);
+  if (skipped.length > 0) throw new MigrationApplyError(`${describeSkippedV1Items(skipped)} Nothing was written.`);
+  const v1 = await options.load();
+  assertUniqueV1Ids(v1.items);
+  const built = buildV2Tree(v1.items, plan);
+  const v1Items = fingerprintTree(v1.items).size;
+  assertEveryV1Id(everyV1Id(v1.items, built.tree, built.containers, built.cut), v1Items, "v2 tree");
+  return { v1, built, v1Items };
+}
+
+/**
+ * Write the built model into `dir` and read it back, refusing what apply refuses:
+ * a writer error, a skipped warning on read-back, or a v1 id the read-back lost.
+ * The v2 rules run on the tree read back, as `rex health` runs them, and are
+ * counted, not refused: which findings should stop a migration is undecided.
+ * `dir` must exist; the caller owns it and cleans up.
+ */
+async function writeAndVerify(dir: string, prepared: Prepared, lock: LockOptions | undefined, rules: RuleCheckOptions | undefined): Promise<Verified> {
+  const { v1, built, v1Items } = prepared;
+  const model: PrdModel = { layout: "v2", schema: SCHEMA_VERSION_V2, title: v1.title, tree: built.tree, warnings: [] };
+  const written = await withLock(prdLockPath(dir), () => writePrdModel(dir, model, { stateKeys: built.stateKeys }), lock);
+  const back = await loadPrdModel(dir, { ignoreSchemaSkew: false });
+  const skipped = back.warnings.filter((w) => w.skipped);
+  if (skipped.length > 0) {
+    throw new MigrationApplyError(`The written v2 tree does not read back: ${skipped.map((w) => `${w.path}: ${w.message}`).join("; ")}. Nothing was written.`);
+  }
+  assertEveryV1Id(everyV1Id(v1.items, back.tree, built.containers, built.cut), v1Items, "v2 tree read back");
+  return {
+    files: written.written.length,
+    nodes: idsOf([...back.tree.product, ...back.tree.changes], new Set()).size,
+    rules: countRuleFindings(checkV2TreeHealth(back.tree, rules?.structureHealth, new Date(), rules?.packageVersion)),
+  };
+}
+
+// ── Leftover v1 files ────────────────────────────────────────────
+
+/**
+ * Why v1 files beside the v2 tree are what an interrupted apply left: they
+ * are the tree the plan was made from (`plan`), no plan was given and every
+ * id they hold is in the v2 tree (`ids`), or they hold no item (`empty`).
+ */
+export type LeftoverProof = "plan" | "ids" | "empty";
+
+/** The one safe way to clear v1 leftovers the apply cannot (or may not) remove itself. */
+const manualStep = (paths: readonly string[]): string => {
+  const them = paths.length === 1 ? "it" : "them";
+  return `To clear ${them}, check that the v2 tree holds everything in ${them}, then delete ${paths.join(" and ")} by hand.`;
+};
+
+/**
+ * Remove the v1 files beside a v2 tree. A failure here (a handle the dashboard's
+ * watcher or antivirus holds on Windows) leaves the v2 tree in place, so it is
+ * reported as such, naming what is left and the error. It does not promise a
+ * re-run finishes the job: a partly removed prd_tree/ is refused by
+ * {@link leftoverV1}, so the step it gives is the manual one.
+ */
+async function removeV1Leftovers(paths: readonly string[]): Promise<void> {
+  const failures: string[] = [];
+  for (const path of paths) {
+    try {
+      await rm(path, { recursive: true, force: true });
+    } catch (err) {
+      failures.push(`${path}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  if (failures.length === 0) return;
+  const left = paths.filter((path) => existsSync(path));
+  throw new MigrationApplyError(
+    `The v2 tree is in place, but removing the v1 leftovers failed (${failures.join("; ")}). ` +
+      `Left: ${left.join(", ")}. ${manualStep(left)}`,
+  );
+}
+
+/**
+ * The v1 files beside the v2 tree under `rexDir` that apply may remove, and
+ * why. Throws, naming the ids the v2 tree lacks, when they are not provably
+ * what an interrupted apply left: a v1 branch merged after the cut, or a v1
+ * write beside the v2 tree, is the operator's to re-capture, not to delete.
+ */
+async function leftoverV1(rexDir: string, plan: PlanFile | undefined): Promise<{ removed: string[]; proof?: LeftoverProof }> {
+  const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
+  const removed = [treeRoot, join(rexDir, TREE_META_FILENAME)].filter((path) => existsSync(path));
+  if (removed.length === 0) return { removed };
+  const kept = `Kept ${removed.join(" and ")}.`;
+  const { items, warnings } = existsSync(treeRoot) ? await parseFolderTree(treeRoot) : { items: [], warnings: [] };
+  if (warnings.length > 0) {
+    throw new MigrationApplyError(
+      `${treeRoot} beside the v2 tree does not read cleanly (${warnings.map((w) => `${w.path}: ${w.message}`).join("; ")}), ` +
+        `so it cannot be shown to be what an interrupted apply left. ${kept} ${manualStep(removed)}`,
+    );
+  }
+  if (items.length === 0) return { removed, proof: "empty" };
+  if (plan && sourceDigest(V1_TREE_SOURCE_KIND, (await v1TreeSource(items).read()).items) === plan.header.source.digest) {
+    return { removed, proof: "plan" };
+  }
+
+  const v2 = await loadPrdModel(rexDir);
+  const landed = idsOf([...v2.tree.product, ...v2.tree.changes], new Set(cutContainerIds(v2.tree)));
+  const missing = [...fingerprintTree(items).keys()].filter((id) => !landed.has(id));
+  if (!plan && missing.length === 0) return { removed, proof: "ids" };
+  const remedy = `${kept} Re-capture in the v2 tree anything it holds that is missing. ${manualStep(removed)}`;
+  if (missing.length > 0) {
+    throw new MigrationApplyError(
+      `${treeRoot} beside the v2 tree holds ${missing.length} item${missing.length === 1 ? "" : "s"} the v2 tree does not ` +
+        `(${missing.slice(0, 10).join(", ")}${missing.length > 10 ? ", …" : ""}): it is not what an interrupted apply left. ${remedy}`,
+    );
+  }
+  throw new MigrationApplyError(
+    `${treeRoot} beside the v2 tree differs from the tree the plan was made from: every id it holds is in the v2 tree, ` +
+      `but an edit made after the plan may not be. ${remedy}`,
+  );
+}
+
+// ── Rehearsal ────────────────────────────────────────────────────
+
+export type V1Kind = "epic" | "feature" | "task" | "subtask";
+export const V1_KINDS: readonly V1Kind[] = ["epic", "feature", "task", "subtask"];
+
+/** What the v1 items of one kind become. The `become` counts add up to `total`. */
+export interface KindTally {
+  total: number;
+  /** By v2 type; `release` is a delivery container that becomes no node. */
+  become: Record<NodeType | "release", number>;
+  /** Changes held for the Inbox (also counted under `change`). */
+  held: number;
+  /** Metadata values dropped: corrupt `[object Object]` strings in `recommendationMeta`. */
+  droppedMeta: number;
+  /** Log values dropped, likewise. */
+  droppedLog: number;
+}
+
+const emptyTally = (): KindTally => ({
+  total: 0,
+  become: { area: 0, capability: 0, constraint: 0, change: 0, task: 0, subtask: 0, release: 0 },
+  held: 0,
+  droppedMeta: 0,
+  droppedLog: 0,
+});
+
+/** Per v1 kind, what its items become in `built`. Pure; the cut change has no v1 item and is not counted. */
+export function tallyV1ToV2(items: readonly PRDItem[], built: Pick<BuiltV2Tree, "tree" | "containers">): Record<V1Kind, KindTally> {
+  const nodes = new Map<string, RuleNode>();
+  const index = (list: readonly RuleNode[]): void => {
+    for (const node of list) {
+      nodes.set(node.id, node);
+      index(node.children ?? []);
+    }
+  };
+  index([...built.tree.product, ...built.tree.changes]);
+  const containers = new Set(built.containers.map((c) => c.id));
+
+  const out = Object.fromEntries(V1_KINDS.map((k) => [k, emptyTally()])) as Record<V1Kind, KindTally>;
+  for (const { item } of flatten(items, undefined, [])) {
+    const tally = out[item.level as V1Kind];
+    tally.total++;
+    tally.droppedMeta += countCorrupt(item.recommendationMeta);
+    tally.droppedLog += countCorrupt(item.log);
+    if (containers.has(item.id)) {
+      tally.become.release++;
+      continue;
+    }
+    const node = nodes.get(item.id)!;
+    tally.become[node.type]++;
+    if (node.needsPlacement === true) tally.held++;
+  }
+  return out;
+}
+
+export type RehearseV1ToV2Result =
+  | { status: "already-v2"; removed: string[]; proof?: LeftoverProof }
+  | ({ status: "rehearsed"; built: Omit<BuiltV2Tree, "tree" | "stateKeys">; kinds: Record<V1Kind, KindTally>; v1Items: number } & Verified);
+
+/**
+ * {@link applyV1ToV2} without the swap: the same refusals, id check, write and
+ * read-back, the write going to an OS temp directory that is removed afterwards.
+ * Writes nothing under `rexDir` and does not take its PRD lock.
+ * On a v2 tree, `removed` lists the v1 files apply would remove, and a
+ * leftover apply would refuse is refused here too.
+ */
+export async function rehearseV1ToV2(rexDir: string, plan: PlanFile | undefined, options: Pick<ApplyV1ToV2Options, "load" | "rules">): Promise<RehearseV1ToV2Result> {
+  if (existsSync(join(rexDir, PRODUCT_DIRNAME))) return { status: "already-v2", ...(await leftoverV1(rexDir, plan)) };
+  if (!existsSync(join(rexDir, PRD_TREE_DIRNAME))) throw new MigrationApplyError(`No PRD folder tree at ${join(rexDir, PRD_TREE_DIRNAME)}: nothing to apply.`);
+  await assertNoLegacySources(rexDir);
+  const prepared = await prepare(rexDir, plan, options);
+  const { v1, built, v1Items } = prepared;
+  const scratch = await mkdtemp(join(tmpdir(), "rex-migrate-rehearsal-"));
+  let verified: Verified;
+  try {
+    verified = await writeAndVerify(scratch, prepared, undefined, options.rules);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+  const { tree: _tree, stateKeys: _keys, ...summary } = built;
+  return { status: "rehearsed", built: summary, kinds: tallyV1ToV2(v1.items, built), ...verified, v1Items };
+}
+
+/**
+ * Apply `plan` to the v1 tree under `rexDir`, holding the PRD lock throughout.
+ * A tree already v2 is left as is, apart from v1 files an interrupted apply
+ * provably left beside it ({@link leftoverV1}).
+ */
+export async function applyV1ToV2(rexDir: string, plan: PlanFile | undefined, options: ApplyV1ToV2Options): Promise<ApplyV1ToV2Result> {
+  const staging = join(rexDir, STAGING_DIRNAME);
+  const productDir = join(rexDir, PRODUCT_DIRNAME);
+  const changesDir = join(rexDir, CHANGES_DIRNAME);
+  const v1Files = [join(rexDir, PRD_TREE_DIRNAME), join(rexDir, TREE_META_FILENAME)];
+
+  return withLock(
+    prdLockPath(rexDir),
+    async () => {
+      await rm(staging, { recursive: true, force: true });
+      if (existsSync(productDir)) {
+        const leftover = await leftoverV1(rexDir, plan);
+        await removeV1Leftovers(leftover.removed);
+        return { status: "already-v2", ...leftover };
+      }
+      if (!existsSync(v1Files[0]!)) throw new MigrationApplyError(`No PRD folder tree at ${v1Files[0]}: nothing to apply.`);
+      await assertNoLegacySources(rexDir);
+      if (!plan) throw new MigrationApplyError("No migration plan to apply.");
+      assertApplicable(plan);
+      // Without product/ the tree reads as v1, so a changes/ here is what an interrupted apply moved in.
+      await rm(changesDir, { recursive: true, force: true });
+
+      const prepared = await prepare(rexDir, plan, options);
+      const { built, v1Items } = prepared;
+
+      let verified: Verified;
+      try {
+        await mkdir(staging, { recursive: true });
+        verified = await writeAndVerify(staging, prepared, options.lock, options.rules);
+        if (existsSync(join(staging, CHANGES_DIRNAME))) await rename(join(staging, CHANGES_DIRNAME), changesDir);
+        await rename(join(staging, PRODUCT_DIRNAME), productDir);
+      } catch (err) {
+        await rm(changesDir, { recursive: true, force: true });
+        await rm(staging, { recursive: true, force: true });
+        throw err;
+      }
+      await removeV1Leftovers([...v1Files, staging]);
+
+      const { tree: _tree, stateKeys: _keys, ...summary } = built;
+      return { status: "applied", built: summary, v1Items, ...verified };
+    },
+    options.lock,
+  );
+}

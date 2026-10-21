@@ -51,7 +51,7 @@ async function getV2Item(rexDir: string, ref: string): Promise<McpResult> {
 
 export const getItemTool = defineTool({
   name: "get_item",
-  description: "Get full details of a PRD item including parent chain. Use to understand task context before starting work.",
+  description: "Get full details of a PRD item including parent chain. Use to understand task context before starting work. On a v2 tree, `type` (change, task or subtask) is authoritative; `level` is the v1 projection, kept for compatibility until v1 is refused.",
   schema: {
     id: z.string().describe("Item ID"),
   },

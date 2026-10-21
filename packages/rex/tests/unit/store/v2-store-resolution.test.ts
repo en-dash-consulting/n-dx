@@ -16,6 +16,7 @@ import { toCanonicalJSON } from "../../../src/core/canonical.js";
 import { FileStore, PRD_TREE_DIRNAME, resolveStore, resolveV1Store } from "../../../src/store/index.js";
 import { ChangeLayerStore, resolveLayerStore } from "../../../src/store/change-layer-store.js";
 import { V1StoreOnV2TreeError } from "../../../src/store/file-adapter.js";
+import { handleGetCapabilities } from "../../../src/cli/mcp-tools/get-capabilities.js";
 import { copyV2Fixture } from "../../helpers/v2-fixture.js";
 
 describe("store resolution on a v2 tree", () => {
@@ -44,6 +45,13 @@ describe("store resolution on a v2 tree", () => {
     expect((await store.loadConfig()).project).toBe("t");
     await store.appendLog({ timestamp: new Date().toISOString(), event: "test" });
     expect(await store.readLog()).toHaveLength(1);
+  });
+
+  it("get_capabilities reports rex/v2 for the resolved store", async () => {
+    const store = await resolveStore(rexDir);
+    expect(store.capabilities().schemaVersion).toBe("rex/v2");
+    const result = await handleGetCapabilities(store);
+    expect(JSON.parse(result.content[0].text).schemaVersion).toBe("rex/v2");
   });
 
   it("resolveLayerStore does not wrap the resolved store twice", async () => {

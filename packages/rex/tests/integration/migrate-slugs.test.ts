@@ -130,6 +130,19 @@ describe("rex migrate-slugs", () => {
     expect(flatten(doc.items)).toEqual(flatten(before.items));
   });
 
+  it("refuses a v2 tree: slugs are frozen, and the v1 migrate command is not named", async () => {
+    await mkdir(join(rexDir, "product"), { recursive: true });
+
+    const err = await cmdMigrateSlugs(projectDir, {}).then(
+      () => undefined,
+      (e: unknown) => e as { message: string; suggestion?: string },
+    );
+
+    expect(err).toBeDefined();
+    expect(err!.message).toMatch(/frozen on a v2 tree/);
+    expect(`${err!.message} ${err!.suggestion ?? ""}`).not.toContain("migrate-to-folder-tree");
+  });
+
   it("is idempotent — a second run changes nothing", async () => {
     await cmdMigrateSlugs(projectDir, {});
     const first = await listTree(treeRoot);

@@ -5,22 +5,26 @@
 <zone>
 
 Zone: Web Landing (`web-landing`)
-Files: 1, Cohesion: 1.00, Coupling: 0.00
-Risk: healthy (score: 0.00)
-Description: 1 file, mostly pages; entry points landing.ts; imported by Packages.
+Files: 2, Cohesion: 0.00, Coupling: 0.00
+Risk: at-risk (score: 0.50)
+Description: 2 files, mostly pages; entry points landing.ts; imports Tests; imported by Packages.
 Entry points: packages/web/src/landing/landing.ts
-Lines: 531
+Lines: 684
 
 </zone>
 
 <files>
 
-packages/web/src/landing/landing.ts (TypeScript, 531 lines, source)
+packages/web/src/landing/landing.ts (TypeScript, 614 lines, source)
+packages/web/vitest.config.ts (TypeScript, 70 lines, config)
 
 </files>
 
 <imports>
 
+
+Outgoing (this zone → other zones):
+  → tests-2: packages/web/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/web/vitest.config.ts → tests/vitest-isolation.mjs
 
 Incoming (other zones → this zone):
   ← tests-web-unit: packages/web/tests/unit/landing/landing.test.ts → packages/web/src/landing/landing.ts
@@ -29,13 +33,16 @@ Incoming (other zones → this zone):
 
 <findings>
 
-[observation] [info] High cohesion (1) — files are tightly interconnected
+[observation] [info] Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
+[move-file] [warning] File "packages/web/src/landing/landing.ts" is pinned to zone "Web Landing" but lives in packages/web/src/landing/ — consider moving to packages/web/ to align physical location with architectural zone
+[suggestion] [info] Zone "Web Landing" has an unreliable risk reading: only 2 files tracked (minimum 5 needed for reliable metrics) — cohesion: 0.00, coupling: 0.00 (risk score: 0.50)
 
 </findings>
 
 <insights>
 
-- High cohesion (1) — files are tightly interconnected
-- [call graph] 32 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
+- File "packages/web/src/landing/landing.ts" is pinned to zone "Web Landing" but lives in packages/web/src/landing/ — consider moving to packages/web/ to align physical location with architectural zone
+- [call graph] 37 internal calls, 1 outgoing, 0 incoming (cohesion: 0.97, coupling: 0.03)
 
 </insights>

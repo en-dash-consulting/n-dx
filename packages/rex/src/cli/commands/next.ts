@@ -63,7 +63,7 @@ async function nextV2Work(dir: string, store: ChangeLayerStore, flags: Record<st
   const skippedClaimed = skipped.filter((c) => !completed.has(c.taskId));
   const next = findNextWorkTask(tree, { excludeIds });
   if (!next) return printNoneLeft(skippedClaimed, flags);
-  printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id });
+  printNext(next.item, next.parents, next.explanation, skippedClaimed, flags, { changeId: next.unit.change.id }, true);
 }
 
 /**
@@ -95,6 +95,7 @@ function printNext(
   skippedClaimed: SkippedClaim[],
   flags: Record<string, string>,
   v2Fields: { changeId?: string } = {},
+  v2 = false,
 ): void {
   if (flags.format === "json") {
     result(JSON.stringify({ item, parents, explanation, ...v2Fields, skippedClaimed }, null, 2));
@@ -106,7 +107,9 @@ function printNext(
     info(dim(breadcrumb + " →"));
   }
 
-  result(`\n[${item.level}] ${bold(item.title)}`);
+  // A v2 tree has types, not levels: label by type. JSON keeps the v1 fields
+  // until v1 is refused (the next release), when every v2 payload drops level.
+  result(`\n[${v2 ? item.type : item.level}] ${bold(item.title)}`);
   result(`  ID:     ${dim(item.id)}`);
   info(`  Status: ${colorStatus(item.status)}`);
   if (item.priority) info(`  Priority: ${colorPriority(item.priority)}`);

@@ -1,0 +1,27 @@
+{
+  "id": "hench/agent/hench",
+  "name": "Hench",
+  "description": "8 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/lifecycle/plan-mode-prompt.ts",
+    "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
+    "packages/hench/src/agent/lifecycle/task-display.ts",
+    "packages/hench/src/cli/commands/validate-tokens.ts",
+    "packages/hench/src/quota/token-validation-hook.ts",
+    "packages/hench/src/types/index.ts",
+    "packages/hench/src/types/output.ts",
+    "packages/hench/vitest.config.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/lifecycle/plan-mode-prompt.ts",
+    "packages/hench/src/agent/lifecycle/prompt-diagnostics.ts",
+    "packages/hench/src/agent/lifecycle/task-display.ts",
+    "packages/hench/src/cli/commands/validate-tokens.ts",
+    "packages/hench/src/quota/token-validation-hook.ts",
+    "packages/hench/src/types/output.ts"
+  ],
+  "cohesion": 0.46,
+  "coupling": 0.54,
+  "fileCount": 8,
+  "lineCount": 1069
+}

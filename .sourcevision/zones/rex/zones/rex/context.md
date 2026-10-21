@@ -5,78 +5,90 @@
 <zone>
 
 Zone: Rex (`rex/rex`)
-Files: 15, Cohesion: 0.47, Coupling: 0.53
-Description: 15 files, primarily TypeScript
-Entry points: packages/rex/src/cli/commands/status-sections.ts, packages/rex/src/cli/commands/status-work-cycle.ts, packages/rex/src/cli/commands/status.ts, packages/rex/src/cli/commands/tree.ts, packages/rex/src/core/durations.ts, packages/rex/src/core/item-duration-rollup.ts, packages/rex/src/core/item-token-rollup.ts, packages/rex/src/core/keywords.ts, packages/rex/src/core/stats.ts, packages/rex/src/core/verify.ts, packages/rex/src/public.ts, packages/rex/src/schema/levels.ts, packages/rex/src/schema/v1.ts
-Lines: 3720
+Files: 22, Cohesion: 0.40, Coupling: 0.60
+Description: 22 files, primarily TypeScript
+Entry points: packages/rex/src/cli/commands/claim.ts, packages/rex/src/cli/commands/log.ts, packages/rex/src/cli/commands/validate-interactive.ts, packages/rex/src/cli/commands/validate.ts, packages/rex/src/core/durations.ts, packages/rex/src/core/execution-log.ts, packages/rex/src/core/identity.ts, packages/rex/src/core/item-duration-rollup.ts, packages/rex/src/core/post-merge-validate.ts, packages/rex/src/core/remove-feature.ts, packages/rex/src/core/sync.ts, packages/rex/src/public.ts, packages/rex/src/store/change-layer-store.ts, packages/rex/src/store/claims.ts, packages/rex/src/store/contracts.ts, packages/rex/src/store/file-adapter.ts, packages/rex/src/store/file-lock.ts, packages/rex/src/store/folder-tree-store.ts, packages/rex/src/store/prd-md-migration.ts, packages/rex/src/store/self-heal-tag.ts
+Lines: 7135
 
 </zone>
 
 <files>
 
-packages/rex/src/cli/commands/status-sections.ts (TypeScript, 467 lines, source)
-packages/rex/src/cli/commands/status-shared.ts (TypeScript, 273 lines, source)
-packages/rex/src/cli/commands/status-work-cycle.ts (TypeScript, 186 lines, source)
-packages/rex/src/cli/commands/status.ts (TypeScript, 248 lines, source)
-packages/rex/src/cli/commands/tree.ts (TypeScript, 151 lines, source)
+packages/rex/src/cli/commands/claim.ts (TypeScript, 300 lines, source)
+packages/rex/src/cli/commands/log.ts (TypeScript, 80 lines, source)
+packages/rex/src/cli/commands/validate-interactive.ts (TypeScript, 344 lines, source)
+packages/rex/src/cli/commands/validate.ts (TypeScript, 524 lines, source)
 packages/rex/src/core/code-coverage.ts (TypeScript, 123 lines, source)
 packages/rex/src/core/durations.ts (TypeScript, 81 lines, source)
+packages/rex/src/core/execution-log.ts (TypeScript, 56 lines, source)
+packages/rex/src/core/identity.ts (TypeScript, 79 lines, source)
 packages/rex/src/core/item-duration-rollup.ts (TypeScript, 155 lines, source)
-packages/rex/src/core/item-token-rollup.ts (TypeScript, 265 lines, source)
-packages/rex/src/core/keywords.ts (TypeScript, 50 lines, source)
-packages/rex/src/core/stats.ts (TypeScript, 64 lines, source)
-packages/rex/src/core/verify.ts (TypeScript, 344 lines, source)
-packages/rex/src/public.ts (TypeScript, 549 lines, source)
-packages/rex/src/schema/levels.ts (TypeScript, 182 lines, source)
-packages/rex/src/schema/v1.ts (TypeScript, 582 lines, source)
+packages/rex/src/core/post-merge-validate.ts (TypeScript, 659 lines, source)
+packages/rex/src/core/remove-feature.ts (TypeScript, 286 lines, source)
+packages/rex/src/core/scope-creep.ts (TypeScript, 72 lines, source)
+packages/rex/src/core/sync.ts (TypeScript, 545 lines, source)
+packages/rex/src/public.ts (TypeScript, 699 lines, source)
+packages/rex/src/store/change-layer-store.ts (TypeScript, 227 lines, source)
+packages/rex/src/store/claims.ts (TypeScript, 556 lines, source)
+packages/rex/src/store/contracts.ts (TypeScript, 326 lines, source)
+packages/rex/src/store/file-adapter.ts (TypeScript, 961 lines, source)
+packages/rex/src/store/file-lock.ts (TypeScript, 416 lines, source)
+packages/rex/src/store/folder-tree-store.ts (TypeScript, 410 lines, source)
+packages/rex/src/store/prd-md-migration.ts (TypeScript, 189 lines, source)
+packages/rex/src/store/self-heal-tag.ts (TypeScript, 47 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/cli/commands/status-shared.ts {STATUS_ICONS, renderTree, filterCompleted, filterDeleted, formatStats, formatTimestamp}
-  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/cli/commands/status-shared.ts {CoverageMap}
-  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/stats.ts {computeStats}
-  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/stats.ts {TreeStats}
-  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/verify.ts {VerifyResult}
-  packages/rex/src/cli/commands/status-shared.ts → packages/rex/src/core/stats.ts {computeStats}
-  packages/rex/src/cli/commands/status-shared.ts → packages/rex/src/core/stats.ts {TreeStats}
-  packages/rex/src/cli/commands/status-work-cycle.ts → packages/rex/src/cli/commands/status-shared.ts {formatTimestamp}
-  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-sections.ts {buildCoverageMap, renderJsonOutput, renderStaleReport, renderTreeView, renderCoverageSummary, renderTokenUsageSection, renderAutoCompletableHints, renderStaleWarnings, buildPerPRDSections, renderShowIndividualJson, renderShowIndividualHuman, renderWhatNextHints}
-  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-shared.ts {STATUS_ICONS, renderProgressBar, formatTimestamp, filterCompleted, filterDeleted, renderTree, formatStats}
-  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-shared.ts {filterDeleted}
-  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-shared.ts {CoverageMap}
-  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-work-cycle.ts {renderWorkCycleSection}
-  packages/rex/src/cli/commands/status.ts → packages/rex/src/core/stats.ts {computeStats}
-  packages/rex/src/cli/commands/status.ts → packages/rex/src/core/verify.ts {verify}
-  packages/rex/src/cli/commands/status.ts → packages/rex/src/core/verify.ts {VerifyResult}
-  packages/rex/src/cli/commands/tree.ts → packages/rex/src/cli/commands/status-shared.ts {STATUS_ICONS, renderProgressBar, timestampSuffix, blockedBySuffix, coverageSuffix, overrideSuffix, filterDeleted}
-  packages/rex/src/cli/commands/tree.ts → packages/rex/src/cli/commands/status-shared.ts {CoverageMap}
-  packages/rex/src/cli/commands/tree.ts → packages/rex/src/core/stats.ts {computeStats}
-  packages/rex/src/core/durations.ts → packages/rex/src/schema/v1.ts {PRDItem}
+  packages/rex/src/cli/commands/claim.ts → packages/rex/src/store/claims.ts {openClaimsStore, resolveClaimHolder, defaultIsPidAlive}
+  packages/rex/src/cli/commands/claim.ts → packages/rex/src/store/claims.ts {TaskClaim}
+  packages/rex/src/cli/commands/log.ts → packages/rex/src/core/execution-log.ts {appendExecutionLogEntry}
+  packages/rex/src/cli/commands/validate-interactive.ts → packages/rex/src/core/remove-feature.ts {preCheckFeatureDeletion, removeFeature}
+  packages/rex/src/cli/commands/validate.ts → packages/rex/src/cli/commands/validate-interactive.ts {resolveEpiclessFeatures, applyEpiclessResolutions}
+  packages/rex/src/cli/commands/validate.ts → packages/rex/src/cli/commands/validate-interactive.ts {PromptFn}
+  packages/rex/src/cli/commands/validate.ts → packages/rex/src/core/post-merge-validate.ts {detectPostMergeIssues, repairPostMergeIssues}
+  packages/rex/src/core/execution-log.ts → packages/rex/src/store/contracts.ts {PRDStore}
   packages/rex/src/core/item-duration-rollup.ts → packages/rex/src/core/durations.ts {getTaskDuration}
-  packages/rex/src/core/item-duration-rollup.ts → packages/rex/src/schema/v1.ts {PRDItem}
-  packages/rex/src/core/item-token-rollup.ts → packages/rex/src/schema/v1.ts {PRDItem}
-  packages/rex/src/core/verify.ts → packages/rex/src/core/keywords.ts {extractKeywords, scoreMatch}
+  packages/rex/src/core/remove-feature.ts → packages/rex/src/core/sync.ts {extractSyncMeta}
+  packages/rex/src/core/sync.ts → packages/rex/src/core/identity.ts {resolveActor}
   packages/rex/src/public.ts → packages/rex/src/core/code-coverage.ts {crossReferenceChanges}
   packages/rex/src/public.ts → packages/rex/src/core/code-coverage.ts {AffectedTask, UncoveredChange, CrossReferenceResult}
   packages/rex/src/public.ts → packages/rex/src/core/durations.ts {getTaskDuration}
   packages/rex/src/public.ts → packages/rex/src/core/durations.ts {TaskDuration}
+  packages/rex/src/public.ts → packages/rex/src/core/execution-log.ts {appendExecutionLogEntry}
+  packages/rex/src/public.ts → packages/rex/src/core/execution-log.ts {AppendLogArgs}
+  packages/rex/src/public.ts → packages/rex/src/core/identity.ts {resolveActor}
   packages/rex/src/public.ts → packages/rex/src/core/item-duration-rollup.ts {aggregateItemDurations}
   packages/rex/src/public.ts → packages/rex/src/core/item-duration-rollup.ts {ItemDurationTotals, ItemDurationAggregation}
-  packages/rex/src/public.ts → packages/rex/src/core/item-token-rollup.ts {aggregateItemTokenUsage, readRunTokensFromHench}
-  packages/rex/src/public.ts → packages/rex/src/core/item-token-rollup.ts {ItemTokenTuple, ItemRunTokens, ItemTokenTotals, ItemTokenAggregation}
-  packages/rex/src/public.ts → packages/rex/src/core/keywords.ts {extractKeywords, scoreMatch}
-  packages/rex/src/public.ts → packages/rex/src/core/stats.ts {computeStats}
-  packages/rex/src/public.ts → packages/rex/src/core/stats.ts {TreeStats}
-  packages/rex/src/public.ts → packages/rex/src/core/verify.ts {verify, findTestFiles, mapCriteriaToTests, collectVerifiableTasks}
-  packages/rex/src/public.ts → packages/rex/src/core/verify.ts {CriterionResult, TaskVerification, TestRunResult, VerifyResult, VerifyOptions}
-  packages/rex/src/public.ts → packages/rex/src/schema/levels.ts {isRootLevel, isWorkItem, isContainerLevel, isLeafLevel, isValidLevel, getLevelLabel, getLevelPlural, getLevelEmoji, getLevelDisplayMap, getChildLevel, getParentLevels, getAllLevels, getWorkItemLevels, getContainerLevels, formatLevelSummary, setLevelDisplay, resetLevelDisplay}
-  packages/rex/src/public.ts → packages/rex/src/schema/levels.ts {LevelDisplay}
-  packages/rex/src/public.ts → packages/rex/src/schema/v1.ts {SCHEMA_VERSION, isCompatibleSchema, assertSchemaVersion, PRIORITY_ORDER, LEVEL_HIERARCHY, VALID_LEVELS, VALID_STATUSES, VALID_PRIORITIES, VALID_REQUIREMENT_CATEGORIES, VALID_VALIDATION_TYPES, CHILD_LEVEL, LOE_DEFAULTS, isPriority, isItemLevel, isItemStatus, isRequirementCategory, isValidationType, DEFAULT_CONFIG}
-  packages/rex/src/public.ts → packages/rex/src/schema/v1.ts {PRDItem, PRDDocument, ItemLevel, ItemStatus, Priority, ResolutionType, RexConfig, RequirementCategory, RequirementValidationType, Requirement, FacetDefinition, LoEConfig, ActiveInterval}
-  packages/rex/src/schema/levels.ts → packages/rex/src/schema/v1.ts {LEVEL_HIERARCHY, CHILD_LEVEL}
-  packages/rex/src/schema/levels.ts → packages/rex/src/schema/v1.ts {ItemLevel}
+  packages/rex/src/public.ts → packages/rex/src/core/remove-feature.ts {preCheckFeatureDeletion, removeFeature}
+  packages/rex/src/public.ts → packages/rex/src/core/remove-feature.ts {DeletionPreCheck, RemoveFeatureResult, ExternalDependent, SyncedItem}
+  packages/rex/src/public.ts → packages/rex/src/core/scope-creep.ts {detectScopeCreep, setInitialChildCount}
+  packages/rex/src/public.ts → packages/rex/src/core/scope-creep.ts {ScopeCreepResult}
+  packages/rex/src/public.ts → packages/rex/src/store/change-layer-store.ts {ChangeLayerStore, isChangeLayerStore}
+  packages/rex/src/public.ts → packages/rex/src/store/claims.ts {openClaimsStore, claimsStorePath, resolveClaimHolder, defaultIsPidAlive, NOOP_CLAIMS_STORE, DEFAULT_CLAIM_TTL_MS, CLAIMS_DIRNAME, CLAIMS_FILENAME}
+  packages/rex/src/public.ts → packages/rex/src/store/claims.ts {ClaimsStore, ClaimsStoreOptions, ClaimOptions, ClaimResult, ClaimHolder, ClaimOwner, TaskClaim, ClaimHoldReason, PendingCompletion, ReleaseOptions}
+  packages/rex/src/public.ts → packages/rex/src/store/contracts.ts {takeSaveFileReport}
+  packages/rex/src/public.ts → packages/rex/src/store/contracts.ts {PRDStore, SaveFileReport}
+  packages/rex/src/public.ts → packages/rex/src/store/prd-md-migration.ts {migrateJsonPrdToMarkdown, PRD_MARKDOWN_FILENAME, PRDMarkdownMigrationError}
+  packages/rex/src/public.ts → packages/rex/src/store/prd-md-migration.ts {MarkdownMigrationResult}
+  packages/rex/src/store/change-layer-store.ts → packages/rex/src/store/contracts.ts {buildSaveFileReport, mergeSaveFileReports}
+  packages/rex/src/store/change-layer-store.ts → packages/rex/src/store/contracts.ts {PRDStore, SaveFileReport, StoreCapabilities}
+  packages/rex/src/store/claims.ts → packages/rex/src/store/file-lock.ts {withLock}
+  packages/rex/src/store/claims.ts → packages/rex/src/store/file-lock.ts {LockOptions}
+  packages/rex/src/store/file-adapter.ts → packages/rex/src/core/identity.ts {resolveActor}
+  packages/rex/src/store/file-adapter.ts → packages/rex/src/core/sync.ts {stampModified, stampModifiedFields, stampUpdatedFields, stampActor, snapshotItemContent, stampChangedItems}
+  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/contracts.ts {buildSaveFileReport, mergeSaveFileReports}
+  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/contracts.ts {PRDStore, StoreCapabilities, WriteOptions, SaveFileReport}
+  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/file-lock.ts {withLock}
+  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/prd-md-migration.ts {PRD_MARKDOWN_FILENAME, LEGACY_SOURCE_FILE_PREFIX, toMarkdownSourcePath}
+  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/self-heal-tag.ts {withSelfHealTag}
+  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/core/identity.ts {resolveActor}
+  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/core/sync.ts {stampModified, stampUpdatedItem, stampActor, stampModifiedFields, snapshotItemContent, stampChangedItems}
+  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/store/contracts.ts {buildSaveFileReport, mergeSaveFileReports}
+  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/store/contracts.ts {PRDStore, StoreCapabilities, WriteOptions, SaveFileReport}
+  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/store/file-lock.ts {withLock}
+  packages/rex/src/store/prd-md-migration.ts → packages/rex/src/store/file-adapter.ts {PRD_FILENAME}
 
 </imports>

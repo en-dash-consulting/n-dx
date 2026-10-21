@@ -147,7 +147,8 @@ describe("the reserved Inbox folder over MCP", () => {
 
     await call("place_change", { id, target: "A1.1", relation: "touches" });
 
-    expect(await treePaths("refunds-by-card")).toEqual(["changes/refunds-by-card/index.md"]);
+    // state.yaml keeps the change's lastModified / lastModifiedBy, not needsPlacement.
+    expect(await treePaths("refunds-by-card")).toEqual(["changes/refunds-by-card/index.md", "changes/refunds-by-card/state.yaml"]);
     expect(await treePaths("inbox")).toEqual([]);
     const item = await call("get_item", { id });
     expect(item.item).toMatchObject({ id, slug: "refunds-by-card" });

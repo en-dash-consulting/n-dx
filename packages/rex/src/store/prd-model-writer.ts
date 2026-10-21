@@ -47,7 +47,8 @@
  * @module rex/store/prd-model-writer
  */
 
-import { mkdir, readFile, readdir, rm, rmdir } from "node:fs/promises";
+import type { Dirent } from "node:fs";
+import { mkdir, readFile, readdir, rename, rm, rmdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import {
   AreaIntentSchema,
@@ -167,7 +168,7 @@ export async function writePrdModel(
   // The model's own stamp is not enough: the tree may have been restamped since it was read.
   await assertV2TreeWritable(rexDir);
   const stamp = model.layout === "v2" && isV2Schema(model.schema) ? model.schema : SCHEMA_VERSION_V2;
-  const plan: Plan = { files: new Map(), states: [], dirs: new Set(), stale: [] };
+  const plan: Plan = { files: new Map(), states: [], dirs: new Set(), stale: [], carried: [] };
 
   const productDir = join(rexDir, PRODUCT_DIRNAME);
   const changesDir = join(rexDir, CHANGES_DIRNAME);
@@ -202,6 +203,7 @@ export async function writePrdModel(
       result.written.push(rel(path));
     }
   }
+  for (const { from, to } of plan.carried) await rename(from, to);
   for (const { path, isDir } of plan.stale) {
     const { removed, files } = await removeStale(path, isDir);
     result.removed.push(...removed.map(rel));
@@ -219,6 +221,8 @@ interface Plan {
   states: Array<{ dir: string; file: StateFile | null; specs: Map<string, ProductSpec> }>;
   dirs: Set<string>;
   stale: Array<{ path: string; isDir: boolean }>;
+  /** Non-tree files of a folder that moved, renamed into its new folder before stale removal. */
+  carried: Array<{ from: string; to: string }>;
 }
 
 /**
@@ -230,6 +234,8 @@ interface LoadedState {
   files: Map<string, StateFile>;
   /** Every row, by node id, whichever folder holds it; the first found wins. */
   rows: Map<string, ItemState>;
+  /** The folder each folder node's own `index.md` is in, by node id: where a moved node's state.yaml still is. */
+  folderOf: Map<string, string>;
   /** {@link WritePrdModelOptions.stateKeys}. */
   stateKeys: ReadonlyMap<string, ReadonlySet<string>>;
   /** {@link WritePrdModelOptions.folderState}. */
@@ -241,12 +247,15 @@ async function loadAllStateFiles(
   stateKeys: ReadonlyMap<string, ReadonlySet<string>>,
   folderState: FolderStateKeys,
 ): Promise<LoadedState> {
-  const loaded: LoadedState = { files: new Map(), rows: new Map(), stateKeys, folderState };
+  const loaded: LoadedState = { files: new Map(), rows: new Map(), folderOf: new Map(), stateKeys, folderState };
   const walk = async (dir: string): Promise<void> => {
     for (const entry of (await listDir(dir)) ?? []) {
       if (entry.name.startsWith(".")) continue;
       if (entry.isDirectory()) {
         await walk(join(dir, entry.name));
+      } else if (entry.isFile() && entry.name === INDEX_FILE) {
+        const fm = parseFrontmatter((await readIfExists(join(dir, INDEX_FILE))) ?? "", dir, []);
+        if (typeof fm?.id === "string") loaded.folderOf.set(fm.id, dir);
       } else if (entry.isFile() && entry.name === STATE_FILE_NAME) {
         const file = await loadStateFile(dir);
         loaded.files.set(dir, file);
@@ -278,6 +287,14 @@ async function planFolder(
   const entries = (await listDir(dir)) ?? [];
   const existing = loaded.files.get(dir) ?? { ...emptyStateFile(), schema: stamp };
   const { layers, nodes: byOwner } = loaded.folderState;
+  if (typeof owner !== "string") {
+    // A node that moved here left its top-level keys in the folder it came from.
+    const oldDir = loaded.folderOf.get(owner.id);
+    const old = oldDir !== undefined && oldDir !== dir ? loaded.files.get(oldDir) : undefined;
+    for (const [key, value] of Object.entries((old && extraTopLevelKeys(old)) ?? {})) {
+      if (!Object.hasOwn(existing, key)) Object.assign(existing, { [key]: value });
+    }
+  }
   Object.assign(existing, typeof owner !== "string" ? byOwner.get(owner.id) : owner === INBOX_DIRNAME ? undefined : layers[owner]);
   const rows: Record<string, ItemState> = {};
   const specs = new Map<string, ProductSpec>();
@@ -336,6 +353,7 @@ async function planFolder(
       expectedDirs.add(node.slug);
       await planFolder(join(dir, node.slug), node.children ?? [], node, stamp, loaded, plan);
     } else {
+      assertNoStrandedState(loaded.folderOf.get(node.id) ?? join(dir, node.slug), node, loaded);
       const intent: Record<string, unknown> = {};
       keep(node, intent);
       const file = `${node.slug}.md`;
@@ -344,6 +362,8 @@ async function planFolder(
       plan.files.set(join(dir, file), renderNode(node, intent));
     }
   }
+
+  if (typeof owner !== "string") await planCarried(owner, dir, expectedDirs, loaded, plan, entries);
 
   // An empty Inbox is not kept: the folder goes stale with the last change placed out of it.
   if (reserved.length > 0) {
@@ -364,6 +384,53 @@ async function planFolder(
     if (entry.isDirectory() ? expectedDirs.has(entry.name) : !entry.name.endsWith(".md") || expectedFiles.has(entry.name)) continue;
     plan.stale.push({ path: join(dir, entry.name), isDir: entry.isDirectory() });
   }
+}
+
+/**
+ * A folder node that moved takes its non-tree files (anything but `.md` and
+ * `state.yaml`) along, so they stay with their change. Refuses, before anything
+ * is written, when the new folder already holds an entry of that name or a
+ * child folder will take it.
+ */
+async function planCarried(
+  owner: RuleNode,
+  dir: string,
+  expectedDirs: ReadonlySet<string>,
+  loaded: LoadedState,
+  plan: Plan,
+  entries: readonly Dirent[],
+): Promise<void> {
+  const oldDir = loaded.folderOf.get(owner.id);
+  if (oldDir === undefined || oldDir === dir) return;
+  const present = new Set(entries.map((e) => e.name.toLowerCase()));
+  const taken = new Set([...expectedDirs].map((d) => d.toLowerCase()));
+  for (const entry of (await listDir(oldDir)) ?? []) {
+    if (entry.name.startsWith(".") || !entry.isFile()) continue;
+    if (entry.name.endsWith(".md") || entry.name === STATE_FILE_NAME) continue;
+    const key = entry.name.toLowerCase();
+    if (present.has(key) || taken.has(key)) {
+      throw new Error(
+        `Node ${owner.id} moves from ${oldDir} to ${dir}, and ${entry.name} cannot go with it: ${dir} already has an entry of that name. ` +
+          `Nothing was written. Rename or move one of the two files by hand.`,
+      );
+    }
+    plan.carried.push({ from: join(oldDir, entry.name), to: join(dir, entry.name) });
+  }
+}
+
+/**
+ * A node that lost its last child becomes a leaf file, and its old folder (with
+ * its `state.yaml`) is removed. Top-level keys a newer build wrote there have
+ * no home in a leaf, so refuse rather than drop them silently.
+ */
+function assertNoStrandedState(oldFolder: string, node: RuleNode, loaded: LoadedState): void {
+  const file = loaded.files.get(oldFolder);
+  const extra = file && extraTopLevelKeys(file);
+  if (!extra) return;
+  throw new Error(
+    `Node ${node.id} would become a leaf, but its folder ${oldFolder} keeps state.yaml keys this build cannot place: ` +
+      `${Object.keys(extra).join(", ")}. Nothing was written. Keep a child in the folder, or remove those keys by hand if they are not needed.`,
+  );
 }
 
 /**

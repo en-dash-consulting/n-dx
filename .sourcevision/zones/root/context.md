@@ -7,8 +7,8 @@
 Zone: Root (`root`)
 Files: 4, Cohesion: 0.00, Coupling: 0.00
 Risk: healthy (score: 0.50)
-Description: 4 files.
-Lines: 350
+Description: 4 files; imports Tests.
+Lines: 357
 
 </zone>
 
@@ -17,14 +17,23 @@ Lines: 350
 pr-check.js (JavaScript, 212 lines, source)
 scan_transcripts.py (Python, 69 lines, source)
 test-token-format.js (JavaScript, 47 lines, source)
-vitest.config.js (JavaScript, 22 lines, config)
+vitest.config.js (JavaScript, 29 lines, config)
 
 </files>
+
+<imports>
+
+
+Outgoing (this zone → other zones):
+  → tests-2: vitest.config.js → tests/hidden-child-process-alias.mjs
+
+</imports>
 
 <findings>
 
 [observation] [info] Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0)
 [observation] [info] Files in zone "Root" appear to serve unrelated purposes; a maintainer would expect them in separate modules.
+[anti-pattern] [warning] "pr-check.js" exports 1 declaration(s) (runPRCheck) that no file in the project imports
 
 </findings>
 
@@ -32,6 +41,7 @@ vitest.config.js (JavaScript, 22 lines, config)
 
 - Isolated files — no import edges between 4 files, cohesion is unmeasurable (reported as 0)
 - Files in zone "Root" appear to serve unrelated purposes; a maintainer would expect them in separate modules.
+- "pr-check.js" exports 1 declaration(s) (runPRCheck) that no file in the project imports
 - [call graph] 30 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>
