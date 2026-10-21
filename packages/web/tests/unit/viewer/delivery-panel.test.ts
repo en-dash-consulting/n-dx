@@ -147,13 +147,13 @@ describe("DeliveryPanel", () => {
     ]);
   });
 
-  it("points at ndx analyze when neither artifact exists", async () => {
+  it("points at `<cli> analyze` under the project's CLI name when neither artifact exists", async () => {
     serve({});
     render(h(DeliveryPanel, { stamp: "" }), root);
     await waitFor(() => expect(root.querySelectorAll(".delivery-empty")).toHaveLength(2));
     const text = root.textContent ?? "";
-    expect(text).toContain("No readiness score yet. Run ndx analyze to produce it.");
-    expect(text).toContain("No infrastructure scan yet. Run ndx analyze to produce it.");
+    expect(text).toContain("No readiness score yet. Run n-dx analyze to produce it.");
+    expect(text).toContain("No infrastructure scan yet. Run n-dx analyze to produce it.");
     expect(root.querySelector(".delivery-note")).toBeNull();
   });
 

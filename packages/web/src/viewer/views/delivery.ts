@@ -12,6 +12,7 @@
 import { h } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { ComponentChild } from "preact";
+import { useCliName } from "../hooks/index.js";
 
 // ── Shapes ─────────────────────────────────────────────────────
 
@@ -203,9 +204,9 @@ function useDeliveryData(stamp: string): DeliveryData | null {
 const HEURISTIC_NOTE =
   "Readiness is a heuristic: it detects whether each practice exists and is wired up, not whether it is good.";
 
-function missing(what: string): ComponentChild {
+function missing(what: string, cliName: string): ComponentChild {
   return h("p", { class: "delivery-empty" },
-    `No ${what} yet. Run `, h("code", null, "ndx analyze"), " to produce it.");
+    `No ${what} yet. Run `, h("code", null, `${cliName} analyze`), " to produce it.");
 }
 
 function ScoreMeter({ score }: { score: number }): ComponentChild {
@@ -296,20 +297,21 @@ function InfrastructureDetail({ infra }: { infra: Infrastructure }): ComponentCh
  */
 export function DeliveryPanel({ stamp, opened = false }: { stamp: string; opened?: boolean }): ComponentChild {
   const data = useDeliveryData(stamp);
+  const cliName = useCliName();
   const note = useMemo(() => h("p", { class: "delivery-note" }, HEURISTIC_NOTE), []);
   if (!data) return h("p", { class: "stage-tile-empty" }, "Loading…");
   const { readiness, infrastructure } = data;
 
   if (!opened) {
     return h("div", { class: "delivery-panel" },
-      readiness ? h(ReadinessSummary, { readiness }) : missing("readiness score"),
-      infrastructure ? h(InfrastructureSummary, { infra: infrastructure }) : missing("infrastructure scan"),
+      readiness ? h(ReadinessSummary, { readiness }) : missing("readiness score", cliName),
+      infrastructure ? h(InfrastructureSummary, { infra: infrastructure }) : missing("infrastructure scan", cliName),
       readiness ? note : null,
     );
   }
   return h("div", { class: "delivery-panel delivery-panel--opened" },
     readiness ? note : null,
-    readiness ? h(ReadinessDetail, { readiness }) : missing("readiness score"),
-    infrastructure ? h(InfrastructureDetail, { infra: infrastructure }) : missing("infrastructure scan"),
+    readiness ? h(ReadinessDetail, { readiness }) : missing("readiness score", cliName),
+    infrastructure ? h(InfrastructureDetail, { infra: infrastructure }) : missing("infrastructure scan", cliName),
   );
 }
