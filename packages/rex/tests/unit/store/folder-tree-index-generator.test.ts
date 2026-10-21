@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import type { PRDItem, LogEntry } from "../../../src/schema/index.js";
 import { generateIndexMd } from "../../../src/store/folder-tree-index-generator.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../../lang-kit/tests/helpers/call-within-budget.js";
 
 describe("generateIndexMd", () => {
   it("generates deterministic output for epic with description", () => {
@@ -271,6 +272,33 @@ describe("generateIndexMd", () => {
 
     const output = generateIndexMd(item, [], []);
     // Currently empty since extractCommits is a placeholder
+  });
+
+  it("escapes a commit message for its table cell: backslashes, pipes, and folded newlines", () => {
+    // A `|` would end the cell early, a `\` left bare would turn the escaped
+    // pipe's own backslash into text, and a newline would end the row.
+    const item: PRDItem = {
+      id: "t-1",
+      level: "task",
+      title: "Task with a commit",
+      status: "completed",
+      description: "",
+      acceptanceCriteria: [],
+      children: [],
+      commits: [{
+        hash: "0123456789abcdef0123456789abcdef01234567",
+        author: "Dev",
+        authorEmail: "dev@example.com",
+        timestamp: "2026-04-20T10:00:00Z",
+        message: "fix(a): keep C:\\path | and `x`\r\n\nbody line",
+      }],
+    };
+
+    const output = generateIndexMd(item, [], []);
+    expect(output).toContain("## Commits");
+    expect(output).toContain(
+      "| Dev | `0123456` | fix(a): keep C:\\\\path \\| and `x` body line | 2026-04-20T10:00:00Z |",
+    );
   });
 
   it("generates Changes section from execution log", () => {
@@ -638,5 +666,23 @@ describe("generateIndexMd: loe fields and object encoding", () => {
     );
     expect(out).not.toContain("[object Object]");
     expect(out).toContain('meta: {"a":1}');
+  });
+});
+
+describe("generateIndexMd: on adversarial repository input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+  const GENERATOR = new URL("../../../src/store/folder-tree-index-generator.ts", import.meta.url);
+
+  it("escapes a 100k-character commit message of pipes and backslashes in one pass", async () => {
+    const message = "|\\".repeat(50_000);
+    const item: PRDItem = {
+      id: "t-1",
+      level: "task",
+      title: "T",
+      status: "completed",
+      commits: [{ hash: "0123456789abcdef0123456789abcdef01234567", author: "Dev", authorEmail: "d@e", timestamp: "", message }],
+    };
+    await expect(
+      callWithinBudget<typeof generateIndexMd>(GENERATOR, "generateIndexMd", item, [], []),
+    ).resolves.toContain(`| Dev | \`0123456\` | ${"\\|\\\\".repeat(50_000)} |  |`);
   });
 });

@@ -643,8 +643,12 @@ export function extractRequirementSentences(text: string): string[] {
   return sentences
     .filter((s) => isRequirementSentence(s))
     .map((s) => {
-      // Trim trailing period/semicolon for cleaner task titles
-      let cleaned = s.replace(/[.;]+$/, "").trim();
+      // Trim trailing period/semicolon for cleaner task titles. The lookbehind
+      // pins the match to the start of a run, so a run of periods that does not
+      // end the sentence is tried once, not once per period: the plain
+      // `/[.;]+$/` took 7.5 s on 100k of them, and this text is a README from
+      // whatever repository is being analysed.
+      let cleaned = s.replace(/(?<![.;])[.;]+$/, "").trim();
       // Cap length — very long sentences are descriptions, not tasks
       if (cleaned.length > 150) return "";
       return cleaned;

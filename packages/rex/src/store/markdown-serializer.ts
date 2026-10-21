@@ -361,7 +361,13 @@ function shouldUseBlockScalar(s: string): boolean {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_TS_RE = /^\d{4}-\d{2}-\d{2}T/;
 const YAML_BOOL_NULL_RE = /^(null|true|false|yes|no|on|off|~)$/i;
-const LOOKS_LIKE_NUMBER_RE = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+// Every string scalar is tested against this. The integer part and the fraction
+// are two groups with a mandatory `.` between them, so a run of digits has one
+// parse; the earlier `\d+\.?\d*` let the `.` be absent and split the digits
+// between its two runs in every way before failing, 4.5 s on 50k digits. The
+// language is unchanged: an optional sign, digits with an optional fraction or
+// a bare fraction, an optional exponent.
+const LOOKS_LIKE_NUMBER_RE = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/;
 const YAML_INDICATOR_START_RE = /^[:{}&*#[\]|>%@`!?,]/;
 
 function mustQuoteYamlString(s: string): boolean {

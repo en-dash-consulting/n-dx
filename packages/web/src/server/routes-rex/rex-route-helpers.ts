@@ -8,7 +8,7 @@
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "../types.js";
-import { loadPRDSync, savePRDSync } from "../prd-io.js";
+import { loadPRDSync } from "../prd-io.js";
 
 import {
   type PRDItem,

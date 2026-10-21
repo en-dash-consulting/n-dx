@@ -84,7 +84,12 @@ export function generateIndexMd(
         const shortHash = commit.hash.slice(0, 7);
         const fullHash = commit.hash;
         const author = commit.author || "unknown";
-        const message = (commit.message || "").replace(/\|/g, "\\|");
+        // One pass over `\` and `|` together: escaping `|` alone left a `\`
+        // before it in the message to swallow the added backslash, and a
+        // newline would end the table row.
+        const message = (commit.message || "")
+          .replace(/[\\|]/g, (c) => `\\${c}`)
+          .replace(/[\r\n]+/g, " ");
         const timestamp = commit.timestamp || "";
         lines.push(`| ${author} | \`${shortHash}\` | ${message} | ${timestamp} |`);
       }
