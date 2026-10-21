@@ -73,3 +73,5 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | completed |
 | [Wire migrate apply onto #715's migrate-plan and #716's Inbox writer](./wire-migrate-apply-onto-715-s-migrate.md) | completed |
 | [Wire the migrate chain and the once-per-command v1 notice onto main's ndx migrate](./wire-the-migrate-chain-and-the-once.md) | completed |
+| [The --out state-directory guard sees through Windows short-name aliases](./the-out-state-directory-guard-sees.md) | completed |
+| [migrate-apply's leftover prd_tree/ tests restore the v1 files on Windows](./migrate-apply-s-leftover-prd-tree.md) | completed |
