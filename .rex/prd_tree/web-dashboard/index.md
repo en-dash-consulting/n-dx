@@ -43,7 +43,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Web Dashboard Accessibility (a11y)](./web-dashboard-accessibility-a11y/index.md) | completed |
 | [A worktree workspace's first PRD read answers 404 until its lazily written cache lands](./a-worktree-workspace-s-first-prd-read.md) | pending |
 | [Changes view: time-ordered default with recency desaturation](./changes-view-time-ordered-default-with.md) | deferred |
-| [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
+| [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | completed |
 | [Dashboard action icons render at a readable size from one shared SVG icon set](./dashboard-action-icons-render-at-a.md) | completed |
 | [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | completed |
 | [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |

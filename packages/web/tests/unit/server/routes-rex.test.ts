@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
-import { parseDocument, serializeDocument, resolveStore } from "@n-dx/rex";
+import { parseDocument, serializeDocument, resolveStore, findNextTask, collectCompletedIds } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 function readPRDFromMd(rexDir: string) {
@@ -197,6 +197,55 @@ describe("Rex API routes", () => {
     const task1 = await after.json();
     expect(task1.status).toBe("completed");
     expect(task1.completedAt).toBeDefined();
+  });
+
+  /**
+   * Closing a parent's last open task completes the parent, as `rex update`
+   * and MCP `update_task_status` do. Without it the epic stayed pending with
+   * every child done, selection picked the empty epic as the next task, and
+   * `ndx loop` handed a run nothing to do.
+   */
+  describe("closing the last open task completes its ancestors", () => {
+    const patch = (id: string, body: unknown) =>
+      fetch(`http://127.0.0.1:${port}/api/rex/items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    it("persists the epic's completion, read back from the store", async () => {
+      expect((await patch("task-1", { status: "completed" })).status).toBe(200);
+      expect((await readPRDFromStore(rexDir)).items[0]!.status).toBe("pending");
+
+      const res = await patch("task-2", { status: "completed" });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ ok: true, autoCompleted: [{ id: "epic-1", level: "epic" }] });
+
+      // A fresh store, not the response or the in-process cache.
+      const epic = (await readPRDFromStore(rexDir)).items[0]!;
+      expect(epic.status).toBe("completed");
+      expect(epic.completedAt).toBeDefined();
+
+      // What `ndx loop` selects next: nothing, rather than the emptied epic.
+      const doc = await readPRDFromStore(rexDir);
+      expect(findNextTask(doc.items, collectCompletedIds(doc.items))).toBeNull();
+    });
+
+    it("does not complete a parent that still has open work", async () => {
+      const res = await patch("task-1", { status: "completed" });
+      expect(await res.json()).toEqual({ ok: true });
+      expect((await readPRDFromStore(rexDir)).items[0]!.status).toBe("pending");
+    });
+
+    it("does the same for the bulk route", async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/items/bulk`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: ["task-1", "task-2"], updates: { status: "completed" } }),
+      });
+      expect(res.status).toBe(200);
+      expect((await readPRDFromStore(rexDir)).items[0]!.status).toBe("completed");
+    });
   });
 
   it("PATCH /api/rex/items/:id returns 404 for unknown item", async () => {
