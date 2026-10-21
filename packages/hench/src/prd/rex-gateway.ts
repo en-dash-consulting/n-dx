@@ -214,7 +214,7 @@ export { resolveActor } from "@n-dx/rex";
 export { computeTimestampUpdates } from "@n-dx/rex";
 
 // ---- Parent auto-completion -------------------------------------------------
-export { findAutoCompletions, reconcileAutoCompletions } from "@n-dx/rex";
+export { allChildrenSuccessful, findAutoCompletions, reconcileAutoCompletions } from "@n-dx/rex";
 
 // ---- Parent reset -----------------------------------------------------------
 // The pure computation only. `cascadeParentReset` is deliberately not
