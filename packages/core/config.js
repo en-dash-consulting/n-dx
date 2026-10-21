@@ -226,10 +226,20 @@ async function saveProjectJSON(path, data) {
 /**
  * Deep merge source into target. Source values take precedence.
  * Arrays are replaced (not concatenated). Objects are recursively merged.
+ *
+ * Keys in {@link FORBIDDEN_SETTING_SEGMENTS} are dropped from both sides.
+ * `JSON.parse` makes a literal `"__proto__"` key in `.n-dx.json` an own
+ * property, and assigning it on a fresh object sets the result's prototype
+ * instead of a key — so a config file could hand every later reader a
+ * `polluted` field it never wrote. None of the three names is a setting.
  */
 function deepMerge(target, source) {
-  const result = { ...target };
+  const result = {};
+  for (const key of Object.keys(target)) {
+    if (!FORBIDDEN_SETTING_SEGMENTS.has(key)) result[key] = target[key];
+  }
   for (const key of Object.keys(source)) {
+    if (FORBIDDEN_SETTING_SEGMENTS.has(key)) continue;
     const srcVal = source[key];
     const tgtVal = result[key];
     if (

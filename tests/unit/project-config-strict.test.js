@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadProjectConfigStrict } from "../../packages/core/config.js";
+import { loadProjectConfig, loadProjectConfigStrict } from "../../packages/core/config.js";
 
 describe("loadProjectConfigStrict", () => {
   let dir;
@@ -23,6 +23,35 @@ describe("loadProjectConfigStrict", () => {
     await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ ci: { a: 1, b: 1 } }));
     await writeFile(join(dir, ".n-dx.local.json"), JSON.stringify({ ci: { b: 2 } }));
     expect(await loadProjectConfigStrict(dir)).toEqual({ config: { ci: { a: 1, b: 2 } }, errors: [] });
+  });
+
+  // JSON.parse makes a literal "__proto__" key an own property, and the merge
+  // used to assign it — which on a fresh `{ ...target }` sets the result's
+  // prototype rather than a key. Both load paths must skip the three
+  // prototype-chain names and still merge the ordinary keys beside them.
+  it("skips __proto__, constructor and prototype keys from either file", async () => {
+    await writeFile(
+      join(dir, ".n-dx.json"),
+      '{"__proto__":{"polluted":1},"constructor":{"prototype":{"polluted":1}},"ci":{"a":1,"b":1}}',
+    );
+    await writeFile(join(dir, ".n-dx.local.json"), '{"__proto__":{"polluted":2},"ci":{"b":2}}');
+
+    const { config, errors } = await loadProjectConfigStrict(dir);
+    expect(errors).toEqual([]);
+    expect(Object.getPrototypeOf(config)).toBe(Object.prototype);
+    expect(Object.hasOwn(config, "__proto__")).toBe(false);
+    expect(Object.hasOwn(config, "constructor")).toBe(false);
+    expect("polluted" in config).toBe(false);
+    expect(config.ci).toEqual({ a: 1, b: 2 });
+
+    const merged = await loadProjectConfig(dir);
+    expect(Object.getPrototypeOf(merged)).toBe(Object.prototype);
+    expect(Object.hasOwn(merged, "__proto__")).toBe(false);
+    expect("polluted" in merged).toBe(false);
+    expect(merged.ci).toEqual({ a: 1, b: 2 });
+
+    expect({}.polluted).toBeUndefined();
+    expect(Object.hasOwn(Object.prototype, "polluted")).toBe(false);
   });
 
   it("names a local file that does not parse", async () => {
