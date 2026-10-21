@@ -39,13 +39,12 @@ import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } fro
 import type { LocalConfig } from "./llm-types.js";
 import { parseOpenAiTokenUsage } from "./openai-api-provider.js";
 import { CLASSIFY_WINDOW } from "./llm-error-classifier.js";
+import { DEFAULT_LOCAL_HOST, DEFAULT_LOCAL_PORT, describeLocalEndpointProblem } from "./local-endpoint.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_TOKENS = 8192;
-const DEFAULT_HOST = "localhost";
-const DEFAULT_PORT = 1234;
 // Local inference can be slow; use a long timeout. Streaming is unaffected
 // because the connection stays open as chunks arrive.
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -125,10 +124,30 @@ function describeTimeout(timeoutMs: number): string {
   return `${timeoutMs / 1000}s`;
 }
 
-/** Build the base URL from host and port config. */
+/**
+ * Build the base URL from host and port config.
+ *
+ * The saved values are spliced straight into the URL, so a hand-edited
+ * `.n-dx.json` whose host carries a path or credentials, or whose port is a
+ * string, is refused here — the same rule the dashboard and `ndx config`
+ * apply — rather than reaching `fetch` as a request to somewhere else. An
+ * absent or cleared key (undefined, null, or an empty host) takes the default;
+ * a present value is judged as written, so a port saved as `"1234"` is an
+ * error and not a silent 1234.
+ */
 function resolveBaseUrl(localConfig?: LocalConfig): string {
-  const host = localConfig?.host ?? DEFAULT_HOST;
-  const port = localConfig?.port ?? DEFAULT_PORT;
+  const savedHost: unknown = localConfig?.host;
+  const savedPort: unknown = localConfig?.port;
+  const host = savedHost == null || savedHost === "" ? DEFAULT_LOCAL_HOST : savedHost;
+  const port = savedPort == null ? DEFAULT_LOCAL_PORT : savedPort;
+  const problem = describeLocalEndpointProblem(host, port);
+  if (problem) {
+    throw new ClaudeClientError(
+      `${problem} Fix llm.local.host / llm.local.port in .n-dx.json (ndx config llm.local.host <host>).`,
+      "unknown",
+      false,
+    );
+  }
   return `http://${host}:${port}/v1`;
 }
 

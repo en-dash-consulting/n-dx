@@ -143,6 +143,19 @@ describe("POST /api/llm/local-test", () => {
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toContain("Invalid LLM host");
   });
+
+  // A port saved as a string used to read as absent and be replaced by 1234,
+  // so the smoke test hit a server the saved config never named while
+  // inference used the string as written.
+  it("refuses a saved string-typed port instead of testing port 1234", async () => {
+    await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { local: { host: "127.0.0.1", port: String(llmPort) } } }));
+    const res = await post("/api/llm/local-test", {});
+    expect(res.status).toBe(400);
+    const error = await errorOf(res);
+    expect(error).toContain("Invalid LLM port");
+    expect(error).toContain(`"${llmPort}"`);
+    expect(llmRequests).toBe(0);
+  });
 });
 
 describe("POST /api/llm/local-profiles", () => {
@@ -181,6 +194,21 @@ describe("GET /api/llm/local-status", () => {
     await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { local: { host: "127.0.0.1", port: llmPort } } }));
     const res = await fetch(`${dashboardUrl}/api/llm/local-status`);
     expect(await res.json()).toMatchObject({ ok: true, models: ["a", "b", "c"] });
+  });
+
+  it.each<[string | number, string]>([
+    [String(1234), "a string-typed port"],
+    [70000, "a port above TCP's range"],
+    [1.5, "a fractional port"],
+  ])("reports a saved port that fails the shape check (%s) instead of probing 1234", async (port) => {
+    await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { local: { host: "127.0.0.1", port } } }));
+    const res = await fetch(`${dashboardUrl}/api/llm/local-status`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ ok: false, url: "", models: [] });
+    expect(body.error).toContain("Invalid LLM port");
+    expect(body.error).toContain(JSON.stringify(port));
+    expect(llmRequests).toBe(0);
   });
 });
 

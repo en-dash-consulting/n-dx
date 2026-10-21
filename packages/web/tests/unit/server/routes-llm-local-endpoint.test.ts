@@ -4,12 +4,18 @@
  * read as anything other than a hostname — a path, a query, credentials,
  * a second port — must be refused before a request is built from it.
  *
+ * The rule is `@n-dx/llm-client`'s (`local-endpoint.ts`): inference builds
+ * the same URL, so the dashboard imports it rather than keeping a copy. This
+ * file holds the dashboard's expectations of that rule — the hosts a LAN
+ * setup needs accepted and the shapes the probes must never fetch — so a
+ * change to the shared rule that would break the dashboard fails here.
+ *
  * This is a shape check, not an allowlist: a LAN GPU box is a supported
  * configuration, so any resolvable-looking hostname passes.
  */
 
 import { describe, it, expect } from "vitest";
-import { isPlausibleLlmHost, isValidPort } from "../../../src/server/routes-llm.js";
+import { isPlausibleLlmHost, isValidPort } from "@n-dx/llm-client";
 
 describe("isPlausibleLlmHost", () => {
   it.each(["localhost", "127.0.0.1", "[::1]", "gpu-box.invalid", "10.0.0.5", "GPU-Box.invalid", "my_host", "a.b.c.example", "127.1", "[0:0:0:0:0:0:0:1]", "b\u00fccher.lan"])(

@@ -32,6 +32,11 @@ import {
   parseLLMConfig,
   resolveLayout,
   getNextFailoverAttempt,
+  DEFAULT_LOCAL_HOST,
+  DEFAULT_LOCAL_PORT,
+  isPlausibleLlmHost,
+  isValidPort,
+  describeLocalEndpointProblem,
 } from "@n-dx/llm-client";
 import type { LLMConfig, LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
 import {
@@ -748,8 +753,6 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
 // Local server health probe
 // ---------------------------------------------------------------------------
 
-const DEFAULT_LOCAL_HOST = "localhost";
-const DEFAULT_LOCAL_PORT = 1234;
 const LOCAL_HEALTH_TIMEOUT_MS = 3_000;
 
 interface LocalStatusResponse {
@@ -759,67 +762,31 @@ interface LocalStatusResponse {
   error?: string;
 }
 
-/** RFC 1035's ceiling on a DNS name; longer than this cannot resolve. */
-const MAX_HOST_LENGTH = 253;
+// The host and port shape rule — `isPlausibleLlmHost`, `isValidPort` and the
+// message `describeLocalEndpointProblem` writes — is `@n-dx/llm-client`'s:
+// inference builds the same `http://${host}:${port}/v1` URL the probes do,
+// so the dashboard imports the rule rather than carrying a copy of it.
 
 /**
- * Whether `host` is something `http://${host}:${port}/v1/…` can only ever
- * address as a host. The probes and the smoke test splice the configured
- * host straight into a URL, so a value carrying `/`, `?`, `#`, `@`, `\` or
- * whitespace would rewrite the path, the query or the authority of the
- * request instead — `127.0.0.1/x?` fetches `/x?:1234/v1/models`, and
- * `u@127.0.0.1` sends credentials. The round trip through `URL` proves the
- * whole string is consumed as the hostname: no username, no path, nothing
- * swallowed by the parser.
- *
- * This is a shape check, not an allowlist. A LAN GPU box is a supported
- * configuration and `local-api-provider.ts` builds the same URL for real
- * inference, so loopback-only would break a working setup; the endpoints
- * that use this are already behind the token and Origin gate.
+ * The host and port saved under `llm.local`, or the defaults where a key is
+ * absent (unset, null, or a cleared host). Both pass the shape check in the
+ * first shape; in the second a saved value that fails it — written by hand or
+ * by an older dashboard — is carried as written with the message that names
+ * it, so the caller reports it and never probes a URL built from it. A port
+ * saved as the string `"1234"` is therefore an error here, as it is for
+ * inference, and not a silent 1234.
  */
-export function isPlausibleLlmHost(host: unknown): host is string {
-  if (typeof host !== "string" || host.length === 0 || host.length > MAX_HOST_LENGTH) return false;
-  if (/[\s/?#@\\]/.test(host)) return false;
-  let url: URL;
-  try {
-    url = new URL(`http://${host}:1/`);
-  } catch {
-    return false;
-  }
-  // The whole input must have become the authority and nothing else. Compare
-  // the round-tripped URL, not the hostname text: WHATWG normalises `127.1`,
-  // an expanded IPv6 literal or an IDN name, and inference accepts all three.
-  return url.href === `http://${url.hostname}:1/`;
-}
+type SavedLocalEndpoint =
+  | { host: string; port: number; error: null }
+  | { host: unknown; port: unknown; error: string };
 
-/** Whether `port` is a TCP port: an integer from 1 to 65535. */
-export function isValidPort(port: unknown): port is number {
-  return typeof port === "number" && Number.isInteger(port) && port >= 1 && port <= 65535;
-}
-
-/** The message PUT and the probe routes answer with for a refused host or port. */
-function invalidLocalEndpointMessage(host: unknown, port: unknown): string | null {
-  if (!isPlausibleLlmHost(host)) {
-    return `Invalid LLM host ${JSON.stringify(host)}: expected a hostname, an IPv4 address or a bracketed IPv6 address with no port, path, credentials or whitespace.`;
-  }
-  if (!isValidPort(port)) {
-    return `Invalid LLM port ${JSON.stringify(port)}: expected an integer from 1 to 65535.`;
-  }
-  return null;
-}
-
-/**
- * The host and port saved under `llm.local` when both pass the shape check,
- * or the defaults when a key is absent. A saved value that fails the check
- * — written by hand or by an older dashboard — is reported, not fetched,
- * so a probe never builds a URL from it.
- */
-function savedLocalEndpoint(
-  llmLocal: Record<string, unknown>,
-): { host: string; port: number; error: string | null } {
-  const host = typeof llmLocal["host"] === "string" && llmLocal["host"] ? llmLocal["host"] : DEFAULT_LOCAL_HOST;
-  const port = typeof llmLocal["port"] === "number" ? llmLocal["port"] : DEFAULT_LOCAL_PORT;
-  return { host, port, error: invalidLocalEndpointMessage(host, port) };
+function savedLocalEndpoint(llmLocal: Record<string, unknown>): SavedLocalEndpoint {
+  const savedHost = llmLocal["host"];
+  const savedPort = llmLocal["port"];
+  const host: unknown = savedHost == null || savedHost === "" ? DEFAULT_LOCAL_HOST : savedHost;
+  const port: unknown = savedPort == null ? DEFAULT_LOCAL_PORT : savedPort;
+  if (isPlausibleLlmHost(host) && isValidPort(port)) return { host, port, error: null };
+  return { host, port, error: describeLocalEndpointProblem(host, port) ?? "Invalid LLM host or port" };
 }
 
 /** The error-object shape `probeLocalServer` answers with, for an endpoint that was never fetched. */
@@ -1131,7 +1098,7 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
   const local = savedLocalEndpoint(llmLocal);
-  const localStatus = local.error ? unprobeableStatus(local.error) : await probeLocalServer(local.host, local.port);
+  const localStatus = local.error !== null ? unprobeableStatus(local.error) : await probeLocalServer(local.host, local.port);
 
   return {
     claude: cliEntry(
@@ -1216,7 +1183,7 @@ function validateLlmChange(
       const n = Number(value);
       const isPort = PORT_PATHS.has(path);
       const valid = isPort
-        ? Number.isInteger(n) && n >= 1 && n <= 65535
+        ? isValidPort(n)
         : Number.isInteger(n) && n >= 0;
       if (!valid) {
         const expected = isPort ? "a valid port number (1–65535)" : "a non-negative integer";
@@ -1358,7 +1325,7 @@ export async function handleLlmRoute(
       const host: unknown = typeof data.host === "string" && data.host ? data.host : DEFAULT_LOCAL_HOST;
       const port: unknown = data.port === undefined ? DEFAULT_LOCAL_PORT : data.port;
       if (!isPlausibleLlmHost(host) || !isValidPort(port)) {
-        errorResponse(res, 400, invalidLocalEndpointMessage(host, port) ?? "Invalid LLM host or port");
+        errorResponse(res, 400, describeLocalEndpointProblem(host, port) ?? "Invalid LLM host or port");
         return true;
       }
       const profile: LocalProfile = {
@@ -1420,7 +1387,7 @@ export async function handleLlmRoute(
     // or credentials, or a port outside TCP's range, is refused before any
     // request goes out — whichever of the body or the saved config it came from.
     if (!isPlausibleLlmHost(host) || !isValidPort(port)) {
-      errorResponse(res, 400, invalidLocalEndpointMessage(host, port) ?? "Invalid LLM host or port");
+      errorResponse(res, 400, describeLocalEndpointProblem(host, port) ?? "Invalid LLM host or port");
       return true;
     }
     // The model count comes from the same host and port, so it describes the
@@ -1437,7 +1404,7 @@ export async function handleLlmRoute(
     const llm = (config["llm"] ?? {}) as Record<string, unknown>;
     const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
     const local = savedLocalEndpoint(llmLocal);
-    const result = local.error ? unprobeableStatus(local.error) : await probeLocalServer(local.host, local.port);
+    const result = local.error !== null ? unprobeableStatus(local.error) : await probeLocalServer(local.host, local.port);
     jsonResponse(res, 200, result);
     return true;
   }
