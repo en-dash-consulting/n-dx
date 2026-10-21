@@ -36,20 +36,27 @@ export interface CrossReferenceResult {
 
 /**
  * Extract file path references from a text string.
- * Matches common file path patterns (e.g. src/foo/bar.ts, ./lib/util.js).
+ * Matches common file path patterns (e.g. src/foo/bar.ts, ./lib/util.js,
+ * .github/x.yml) and returns them relative: a leading `/`, `./` or `../` is
+ * stripped, so `../lib/x.ts` gives `lib/x.ts`, the tail the old pattern gave,
+ * and the suffix match in crossReferenceChanges still finds it.
+ *
+ * @internal Exported for its unit test only; not part of rex's public API.
  */
-function extractFilePaths(text: string): string[] {
-  // Match paths like src/foo.ts, ./lib/bar.js, /abs/x.md, packages/x/y.ts.
+export function extractFilePaths(text: string): string[] {
   // A match starts only at a token boundary: the lookbehind refuses a start
   // right after a path character, so a pattern that fails on a long run of
   // `-` or `a/` fails once rather than once per position (quadratic: PRD text
-  // of 50k such characters took 0.9 s). It also stops a match beginning in the
-  // middle of a token — `foo.bar/baz.ts`, a URL, `v1.2/foo.ts` — which used to
-  // leak tails like `bar/baz.ts`. Because of the lookbehind the leading `/` of
-  // an absolute path is consumed here, and normalizePath strips it.
-  const pattern = /(?<![\w@.\/-])\/?(?:\.\/)?(?:[\w@-]+\/)+[\w.-]+\.\w+/g;
+  // of 50k such characters took 0.9 s; 256 KiB takes under 10 ms now). It also
+  // stops a match beginning in the middle of a token — `foo.bar/baz.ts`, a
+  // URL, `v1.2/foo.ts` — which used to leak tails like `bar/baz.ts`. Because
+  // `.` is in the lookbehind class, `./` and `../` prefixes and a `.`-led
+  // segment (`.github/`, `src/.hidden/`) are matched explicitly, whole, where
+  // the old pattern skipped to the segment after them.
+  const pattern = /(?<![\w@.\/-])\/?(?:\.\.?\/)*(?:\.?[\w@-]+\/)+[\w.-]+\.\w+/g;
   const matches = text.match(pattern);
-  return matches ? [...new Set(matches)] : [];
+  if (!matches) return [];
+  return [...new Set(matches.map((path) => path.replace(/^\/?(?:\.\.?\/)*/, "")))];
 }
 
 /**
@@ -72,10 +79,12 @@ function collectItemFilePaths(item: PRDItem): string[] {
 }
 
 /**
- * Normalize a file path for matching (strip a leading ./ or /, and trailing whitespace).
+ * Normalize a file path for matching (strip leading ./ and trailing whitespace).
+ * Applied to the caller's changed files too, so it leaves an absolute or UNC
+ * path as given: the result is reported back in matchedFiles/uncoveredChanges.
  */
 function normalizePath(path: string): string {
-  return path.replace(/^\.?\//, "").trim();
+  return path.replace(/^\.\//, "").trim();
 }
 
 /**
