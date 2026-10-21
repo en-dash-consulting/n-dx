@@ -1152,7 +1152,21 @@ const MIN_FILES_FOR_COHESION_GATE = 5;
  * Each entry must explain why the zone cannot meet the threshold and
  * what structural condition would allow removing the exemption.
  */
-const COHESION_EXCEPTIONS = new Map([]);
+const COHESION_EXCEPTIONS = new Map([
+  [
+    "rex",
+    // The 2026-10-21 generative baseline (700b789db) was the first analysis
+    // after #814 landed packages/rex/src/migrations/ (10 files). Louvain put
+    // them in rex's residual zone next to the chunked-review, fix and
+    // recommend files, and the mix reads 0.45 where the 15-file zone read
+    // 0.74 on main. `.n-dx.json` now declares a `rex-migrations` anchor; a
+    // zones-only --fast re-run confirmed it carves the directory into its own
+    // zone, but --fast also replaces every generative zone description, so the
+    // baseline was not regenerated here. Remove this entry with the next
+    // generative `ndx analyze .`, which emits rex without the migrations files.
+    "rex residual zone absorbed src/migrations; rex-migrations anchor declared, awaiting the next generative analysis",
+  ],
+]);
 
 describe("architecture policy: zone cohesion gate", () => {
   it(`all production zones meet minimum cohesion threshold (${COHESION_THRESHOLD})`, (ctx) => {
