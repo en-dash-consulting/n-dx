@@ -844,7 +844,11 @@ function deployToGitHubPages(outDir, projectDir, cname) {
       } else {
         const timestamp = new Date().toISOString();
         const message = buildCommitMessage(`Deploy dashboard (${timestamp})`, "export/dashboard");
-        execFileSyncCli("git", ["commit", "-m", message], { cwd: tmpWorktree, stdio: "pipe" });
+        // The message goes through stdin, not `-m`: on Windows this runs through
+        // cmd.exe, which reads a command line only up to the first line break,
+        // so a `-m` body and its trailers were dropped there, and the wrapper
+        // now refuses a multi-line argument outright.
+        execFileSyncCli("git", ["commit", "-F", "-"], { cwd: tmpWorktree, stdio: "pipe", input: message });
         execFileSyncCli("git", ["push", "--force", "origin", branch], { cwd: tmpWorktree, stdio: "inherit" });
         console.log(`[export] pushed to ${branch}`);
       }
