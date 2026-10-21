@@ -61,3 +61,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [Optional 3D isometric architecture map generator](./optional-3d-isometric-architecture-map.md) | completed |
 | [sv analyze removes its stop handlers before the progress file stops saying running](./sv-analyze-removes-its-stop-handlers.md) | completed |
 | [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | completed |
+| [SDLC readiness evidence cites test fixture files](./sdlc-readiness-evidence-cites-test.md) | pending |
