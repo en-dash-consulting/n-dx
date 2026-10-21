@@ -21,6 +21,19 @@ export interface GoRawImport {
   kind: "stdlib" | "third-party" | "internal";
 }
 
+export interface GoImportOptions {
+  /**
+   * Whether an internal import's target, the package directory relative to
+   * the project root ("" for the module root), holds an inventoried file.
+   * An import of a directory that holds none, pruned by `.sourcevisionignore`
+   * or never inventoried, is kept as an external package rather than an edge
+   * to a node that does not exist, as the Go pack does. Unset, every internal
+   * import is an edge, which is the parser's historical behaviour and what
+   * the pack-parity test compares against.
+   */
+  targetExists?: (to: string) => boolean;
+}
+
 export interface GoImportResult {
   /** Internal import edges (file → file) */
   edges: ImportEdge[];
@@ -123,6 +136,7 @@ export function extractGoImports(
   sourceText: string,
   filePath: string,
   modulePath: string | null,
+  options: GoImportOptions = {},
 ): { raw: GoRawImport[]; edges: ImportEdge[]; external: ExternalImport[] } {
   const raw: GoRawImport[] = [];
   const lines = sourceText.split("\n");
@@ -200,13 +214,12 @@ export function extractGoImports(
   const externalMap = new Map<string, ExternalImport>();
 
   for (const imp of raw) {
-    if (imp.kind === "internal" && modulePath) {
-      // Resolve internal import to relative directory path from project root
-      const internalPath = imp.path.slice(modulePath.length + 1); // strip "module/" prefix
-
+    // Resolve internal import to relative directory path from project root
+    const internalTarget = imp.kind === "internal" && modulePath ? toPosix(imp.path.slice(modulePath.length + 1)) : null;
+    if (internalTarget !== null && (!options.targetExists || options.targetExists(internalTarget))) {
       edges.push({
         from: filePath,
-        to: toPosix(internalPath),
+        to: internalTarget,
         type: "static" as ImportType,
         symbols: imp.alias && imp.alias !== "_" && imp.alias !== "." ? [imp.alias] : ["*"],
       });

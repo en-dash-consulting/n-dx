@@ -414,16 +414,26 @@ interface IncrementalState {
  * file, or a directory holding one, since Go edges point at the imported
  * package's directory.
  */
+/**
+ * Whether an edge target names something in the inventory: a file, or a
+ * directory holding one, since Go edges point at the imported package's
+ * directory ("" is the project root: a Go import of the module path itself).
+ * Shared by the incremental carry-over and the regex Go parser, so neither
+ * keeps an edge to a package the other would drop (#744).
+ */
+function inventoriedTarget(fileSet: ReadonlySet<string>): (to: string) => boolean {
+  const dirSet = new Set<string>();
+  for (const f of fileSet) dirSet.add(f.slice(0, Math.max(f.lastIndexOf("/"), 0)));
+  return (to) => fileSet.has(to) || dirSet.has(to);
+}
+
 function buildIncrementalState(prev: Imports, changedFiles: Set<string>, fileSet: Set<string>): IncrementalState {
   const edgeMap = new Map<string, ImportEdge>();
   const externalMap = new Map<string, ExternalImport>();
   const unchangedExternalFiles = new Set<string>();
 
   const unchanged = (f: string) => !changedFiles.has(f) && fileSet.has(f);
-  // "" is the project root: a Go import of the module path itself.
-  const dirSet = new Set<string>();
-  for (const f of fileSet) dirSet.add(f.slice(0, Math.max(f.lastIndexOf("/"), 0)));
-  const targetExists = (to: string) => fileSet.has(to) || dirSet.has(to);
+  const targetExists = inventoriedTarget(fileSet);
 
   for (const edge of prev.edges) {
     if (unchanged(edge.from) && targetExists(edge.to)) {
@@ -600,6 +610,7 @@ async function processGoFiles(
   files: Inventory["files"],
   targetDir: string,
   goModulePath: string | null,
+  targetExists: (to: string) => boolean,
   edgeMap: Map<string, ImportEdge>,
   externalMap: Map<string, ExternalImport>,
 ): Promise<void> {
@@ -611,7 +622,7 @@ async function processGoFiles(
       continue;
     }
 
-    mergeGraph(extractGoImports(sourceText, file.path, goModulePath), edgeMap, externalMap);
+    mergeGraph(extractGoImports(sourceText, file.path, goModulePath, { targetExists }), edgeMap, externalMap);
   }
 }
 
@@ -723,6 +734,7 @@ export async function analyzeImports(
   options?: ImportsOptions
 ): Promise<Imports> {
   const fileSet = new Set(inventory.files.map((f) => f.path));
+  const targetExists = inventoriedTarget(fileSet);
   const tsconfigPaths = await readTsconfigPaths(targetDir);
   const resolver = createResolver(fileSet, targetDir, tsconfigPaths);
 
@@ -778,7 +790,7 @@ export async function analyzeImports(
   const csharpParseableFiles = parseable.filter((f) => csharpConfig.parseableExtensions.has(extname(f.path).toLowerCase()));
 
   await processJsTsFiles(jsTsFiles, targetDir, resolver, edgeMap, externalMap);
-  await processGoFiles(goParseableFiles, targetDir, goModulePath, edgeMap, externalMap);
+  await processGoFiles(goParseableFiles, targetDir, goModulePath, targetExists, edgeMap, externalMap);
   await processSwiftFiles(swiftParseableFiles, targetDir, edgeMap, externalMap);
   await processCSharpFiles(csharpParseableFiles, inventory, targetDir, edgeMap, externalMap);
   const listedPacks = (await loadInventoryConfig(targetDir)).packs;
@@ -800,7 +812,7 @@ export async function analyzeImports(
     const goFiles = packFiles.filter(
       (f) => extname(f.path).toLowerCase() === GO_EXTENSION && (goDegraded || unparsed.has(f.path)),
     );
-    await processGoFiles(goFiles, targetDir, goModulePath, edgeMap, externalMap);
+    await processGoFiles(goFiles, targetDir, goModulePath, targetExists, edgeMap, externalMap);
   }
 
   // Incremental cleanup: remove packages whose importers were all changed

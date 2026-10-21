@@ -80,4 +80,17 @@ describe("analyzeImports incremental carry-over — Go package directories", () 
 
     expect(incremental.edges.some((e) => e.to === "util")).toBe(false);
   });
+
+  // The regex parser runs for every Go file when the pack is degraded (its
+  // grammar not built, the default for a local checkout), so this suite must
+  // hold on that path whether or not the grammar is built here: `packs: []`
+  // selects it explicitly.
+  it("drops the edge on a full run through the regex parser too, keeping the import as an external", async () => {
+    const inventory = await analyzeInventory(dir, { languageConfig: goConfig });
+    const pruned = { ...inventory, files: inventory.files.filter((f) => !f.path.startsWith("util/")) };
+    const full = await analyzeImports(dir, pruned, { language: "go", packs: { packs: [] } });
+
+    expect(full.edges.some((e) => e.to === "util")).toBe(false);
+    expect(full.external.map((e) => e.package)).toContain("example.com/app/util");
+  });
 });
