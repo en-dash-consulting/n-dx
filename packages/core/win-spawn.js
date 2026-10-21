@@ -83,8 +83,33 @@ export function buildWindowsCliCommandLine(binary, args) {
   return [head, ...args.map(quoteWindowsToken)].join(" ");
 }
 
-/** A cmd.exe variable reference. Names cannot contain `%`, `=`, or a newline. */
-const WINDOWS_VAR_REF = /%([^%=\r\n]+)%/g;
+/**
+ * A cmd.exe variable reference: `%NAME%`, or `%NAME:~start,len%` and
+ * `%NAME:old=new%` with a modifier after the first `:`. The name is what
+ * precedes that colon; a modifier never changes which variable is read.
+ * TWIN: same as WINDOWS_VAR_REF in packages/llm-client/src/exec.ts.
+ */
+const WINDOWS_VAR_REF = /%([^%\r\n]+)%/g;
+
+/**
+ * Names cmd.exe computes on the spot rather than reads from the environment,
+ * so no `env` lists them and an environment lookup alone never refuses them.
+ * Lower-case here; the lookup is case-insensitive, as cmd.exe's is.
+ * `%CMDCMDLINE%` is the dangerous one: its last character is the closing
+ * quote of the command line cmd.exe is running, so `%CMDCMDLINE:~-1%`
+ * smuggles a `"` past quoting and ends the argument.
+ * TWIN: same as CMD_DYNAMIC_VARIABLES in packages/llm-client/src/exec.ts.
+ */
+const CMD_DYNAMIC_VARIABLES = new Set([
+  "cd",
+  "date",
+  "time",
+  "random",
+  "errorlevel",
+  "cmdextversion",
+  "cmdcmdline",
+  "highestnumanodenumber",
+]);
 
 /** Windows environment names are case-insensitive; `process.env` is not. */
 function envHasName(env, name) {
@@ -96,28 +121,53 @@ function envHasName(env, name) {
 }
 
 /**
+ * True when cmd.exe would rewrite the `%…%` reference whose inside is
+ * `reference`; false when it would leave it literal. The name is read up to
+ * the first `:`, so a modifier cannot hide it. A name starting with `=` is one
+ * of cmd.exe's hidden per-drive (`%=C:%`) or exit-code (`%=ExitCode%`)
+ * variables, resolvable without being in `env`.
+ * TWIN: same as cmdWouldExpand in packages/llm-client/src/exec.ts.
+ *
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} reference
+ */
+function cmdWouldExpand(env, reference) {
+  const name = reference.split(":")[0];
+  if (name === "") return false;
+  return name.startsWith("=") || CMD_DYNAMIC_VARIABLES.has(name.toLowerCase()) || envHasName(env, name);
+}
+
+/**
  * Refuse a command line whose tokens cmd.exe would rewrite before running it.
  *
  * TWIN: same logic as assertNoWindowsEnvExpansion in
  * packages/llm-client/src/exec.ts — see that copy for the full rationale.
+ * Exported for the cross-package parity test.
  *
  * Quoting neutralises every cmd.exe metacharacter except `%VAR%`, which is
  * expanded *inside* double quotes; a value holding a quote then ends the
  * argument and an `&` after it starts a second command. cmd.exe has no escape
  * for `%` outside a batch file, so the only sound answer is to refuse. The
  * check is narrow: cmd.exe expands only a name it can resolve, so a path that
- * merely contains `%` still spawns.
+ * merely contains `%` still spawns. A line break is refused too: cmd.exe reads
+ * a command line only up to the first one and silently drops the rest.
  *
  * @param {readonly string[]} tokens
  * @param {NodeJS.ProcessEnv} env
  */
 export function assertNoWindowsEnvExpansion(tokens, env) {
   for (const token of tokens) {
-    for (const match of token.matchAll(WINDOWS_VAR_REF)) {
-      const name = match[1];
-      if (!envHasName(env, name)) continue;
+    if (/[\r\n]/.test(token)) {
       throw new Error(
-        `Refusing to spawn: ${JSON.stringify(token)} contains %${name}%, which cmd.exe would expand ` +
+        `Refusing to spawn: ${JSON.stringify(token)} contains a line break. cmd.exe reads a command line ` +
+          `only up to the first line break, so the rest of this command would be silently dropped.`,
+      );
+    }
+    for (const match of token.matchAll(WINDOWS_VAR_REF)) {
+      const reference = match[1];
+      if (!cmdWouldExpand(env, reference)) continue;
+      throw new Error(
+        `Refusing to spawn: ${JSON.stringify(token)} contains %${reference}%, which cmd.exe would expand ` +
           `into the command line before running it. An expanded value containing a quote can end the ` +
           `argument and start another command, and quoting cannot prevent it.`,
       );
@@ -144,7 +194,7 @@ export function execFileSyncCli(binary, args, options) {
     logCliInvocation({ binary, args, cwd: options?.cwd, via: "execFileSyncCli", commandLine: cmdLine });
     // Outer quote pair: cmd.exe /s strips only the outermost quotes, keeping
     // per-token inner quotes (spaced paths) intact.
-    return execFileSync("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
+    return execFileSync("cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
       windowsHide: true,
       ...options,
       windowsVerbatimArguments: true,
@@ -171,7 +221,7 @@ export function spawnCli(binary, args, options = {}) {
     assertNoWindowsEnvExpansion([binary, ...args], options.env ?? process.env);
     const cmdLine = buildWindowsCliCommandLine(binary, args);
     logCliInvocation({ binary, args, cwd: options.cwd, via: "spawnCli", commandLine: cmdLine });
-    return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
+    return spawn("cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
       windowsHide: true,
       ...options,
       windowsVerbatimArguments: true,

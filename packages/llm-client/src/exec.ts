@@ -31,7 +31,7 @@
  */
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import type { ChildProcess, StdioOptions } from "node:child_process";
+import type { ChildProcess, ExecFileSyncOptions, StdioOptions } from "node:child_process";
 import { existsSync, realpathSync, openSync, closeSync } from "node:fs";
 // Aliased: `resolve` is the conventional name for a Promise executor argument
 // throughout this file, and the import would be shadowed inside every one.
@@ -619,7 +619,7 @@ export function buildShellInvocation(
   posixShellAvailable: boolean,
 ): ShellInvocation {
   if (resolveShellKind(platform, posixShellAvailable) === "cmd") {
-    return { cmd: "cmd.exe", args: ["/d", "/s", "/c", `"${command}"`], kind: "cmd" };
+    return { cmd: "cmd.exe", args: ["/d", "/v:off", "/s", "/c", `"${command}"`], kind: "cmd" };
   }
   return { cmd: "sh", args: ["-c", command], kind: "posix" };
 }
@@ -1687,8 +1687,33 @@ export function buildWindowsCliCommandLine(binary: string, args: string[]): stri
   return [head, ...args.map(quoteWindowsToken)].join(" ");
 }
 
-/** A cmd.exe variable reference. Names cannot contain `%`, `=`, or a newline. */
-const WINDOWS_VAR_REF = /%([^%=\r\n]+)%/g;
+/**
+ * A cmd.exe variable reference: `%NAME%`, or `%NAME:~start,len%` and
+ * `%NAME:old=new%` with a modifier after the first `:`. The name is what
+ * precedes that colon; a modifier never changes which variable is read.
+ * TWIN: packages/core/win-spawn.js.
+ */
+const WINDOWS_VAR_REF = /%([^%\r\n]+)%/g;
+
+/**
+ * Names cmd.exe computes on the spot rather than reads from the environment,
+ * so no `env` lists them and an environment lookup alone never refuses them.
+ * Lower-case here; the lookup is case-insensitive, as cmd.exe's is.
+ * `%CMDCMDLINE%` is the dangerous one: its last character is the closing
+ * quote of the command line cmd.exe is running, so `%CMDCMDLINE:~-1%`
+ * smuggles a `"` past quoting and ends the argument.
+ * TWIN: packages/core/win-spawn.js.
+ */
+const CMD_DYNAMIC_VARIABLES = new Set([
+  "cd",
+  "date",
+  "time",
+  "random",
+  "errorlevel",
+  "cmdextversion",
+  "cmdcmdline",
+  "highestnumanodenumber",
+]);
 
 /** Windows environment names are case-insensitive; `process.env` is not. */
 function envHasName(env: NodeJS.ProcessEnv, name: string): boolean {
@@ -1697,6 +1722,20 @@ function envHasName(env: NodeJS.ProcessEnv, name: string): boolean {
     if (key.toLowerCase() === wanted) return env[key] !== undefined;
   }
   return false;
+}
+
+/**
+ * True when cmd.exe would rewrite the `%…%` reference whose inside is
+ * `reference`; false when it would leave it literal. The name is read up to
+ * the first `:`, so a modifier cannot hide it. A name starting with `=` is one
+ * of cmd.exe's hidden per-drive (`%=C:%`) or exit-code (`%=ExitCode%`)
+ * variables, resolvable without being in `env`.
+ * TWIN: packages/core/win-spawn.js.
+ */
+function cmdWouldExpand(env: NodeJS.ProcessEnv, reference: string): boolean {
+  const name = reference.split(":")[0]!;
+  if (name === "") return false;
+  return name.startsWith("=") || CMD_DYNAMIC_VARIABLES.has(name.toLowerCase()) || envHasName(env, name);
 }
 
 /**
@@ -1714,21 +1753,68 @@ function envHasName(env: NodeJS.ProcessEnv, name: string): boolean {
  * Enforcing the contract here is what turns it from a comment into a guarantee.
  * The check is deliberately narrow — cmd.exe only expands a name it can
  * resolve, leaving anything else literal, so a path that merely contains `%`
- * (`C:\100%cool\bin`) still spawns. Only a token that would actually be
- * rewritten is refused, and no CLI this spawns passes one.
+ * (`C:\100%cool\bin`) still spawns. Resolvable means: in `env`, one of cmd.exe's
+ * own dynamic variables, or a hidden `=`-prefixed one — and the name is read
+ * up to the first `:`, because `%CMDCMDLINE:~-1%` is still CMDCMDLINE. A line
+ * break is refused as well: cmd.exe reads a command line only up to the first
+ * one and silently drops the rest, so the child would run a different command
+ * from the one asked for.
+ *
+ * TWIN: packages/core/win-spawn.js (the orchestration tier must not import this
+ * package); `tests/unit/windows-quoting-parity.test.js` holds the two equal.
  */
-function assertNoWindowsEnvExpansion(tokens: readonly string[], env: NodeJS.ProcessEnv): void {
+export function assertNoWindowsEnvExpansion(tokens: readonly string[], env: NodeJS.ProcessEnv): void {
   for (const token of tokens) {
-    for (const match of token.matchAll(WINDOWS_VAR_REF)) {
-      const name = match[1]!;
-      if (!envHasName(env, name)) continue;
+    if (/[\r\n]/.test(token)) {
       throw new Error(
-        `Refusing to spawn: ${JSON.stringify(token)} contains %${name}%, which cmd.exe would expand ` +
+        `Refusing to spawn: ${JSON.stringify(token)} contains a line break. cmd.exe reads a command line ` +
+          `only up to the first line break, so the rest of this command would be silently dropped.`,
+      );
+    }
+    for (const match of token.matchAll(WINDOWS_VAR_REF)) {
+      const reference = match[1]!;
+      if (!cmdWouldExpand(env, reference)) continue;
+      throw new Error(
+        `Refusing to spawn: ${JSON.stringify(token)} contains %${reference}%, which cmd.exe would expand ` +
           `into the command line before running it. An expanded value containing a quote can end the ` +
           `argument and start another command, and quoting cannot prevent it.`,
       );
     }
   }
+}
+
+/**
+ * Synchronous twin of {@link spawnCli}: run a CLI and return its stdout, with
+ * the same Windows recipe and the same refusal. For callers that need the
+ * output before they can continue — sourcevision reads `rex tree` this way.
+ * Options are `execFileSync`'s; `windowsHide` defaults on, as everywhere else.
+ *
+ * TWIN: packages/core/win-spawn.js execFileSyncCli.
+ */
+export function execFileSyncCli(
+  binary: string,
+  args: string[],
+  options: ExecFileSyncOptions = {},
+  _platform: NodeJS.Platform = process.platform,
+): string | Buffer {
+  const cwd = typeof options.cwd === "string" ? options.cwd : undefined;
+  if (_platform === "win32") {
+    assertNoWindowsEnvExpansion([binary, ...args], options.env ?? process.env);
+    const cmdLine = buildWindowsCliCommandLine(binary, args);
+    logCliInvocation({ binary, args, cwd, via: "execFileSyncCli", platform: _platform, commandLine: cmdLine });
+    // `/v:off`: delayed `!VAR!` expansion is a registry setting `/d` does not
+    // reach; off, a `!` in a token stays a `!`. `/s` strips only the outer
+    // quote pair, keeping each token's own quotes.
+    // Node's ExecFileSyncOptions type omits windowsVerbatimArguments, though
+    // execFileSync honours it (it is a spawn option underneath); hence the cast.
+    return execFileSync("cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
+      windowsHide: true,
+      ...options,
+      windowsVerbatimArguments: true,
+    } as ExecFileSyncOptions);
+  }
+  logCliInvocation({ binary, args, cwd, via: "execFileSyncCli", platform: _platform });
+  return execFileSync(binary, args, { windowsHide: true, ...options });
 }
 
 /**
@@ -1766,7 +1852,7 @@ export function spawnCli(
     // strips only the outermost quote pair, leaving the inner per-token quotes
     // (e.g. around a path containing spaces) intact. Without this wrapper, /s
     // would strip the binary path's own quotes and break spaced paths (#68).
-    return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
+    return spawn("cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
       ...baseOpts,
       windowsHide,
       windowsVerbatimArguments: true,

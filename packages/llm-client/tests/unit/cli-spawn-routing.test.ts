@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createCliClient } from "../../src/cli-provider.js";
-import { buildWindowsCliCommandLine, spawnCli } from "../../src/exec.js";
+import { buildWindowsCliCommandLine, execFileSyncCli, spawnCli } from "../../src/exec.js";
 
 const isWindows = process.platform === "win32";
 
@@ -89,6 +89,70 @@ describe("spawnCli refuses what cmd.exe would expand", () => {
     expect(() =>
       spawnCli("claude", ["%inject%"], { ...win, env: { INJECT: "anything" } }),
     ).toThrow(/Refusing to spawn/);
+  });
+
+  /**
+   * cmd.exe computes some variables itself, so they are never in `env` and an
+   * environment lookup alone lets them through. `%CMDCMDLINE%` is cmd.exe's
+   * own command line, whose last character is the closing quote of the string
+   * after `/c` — so `%CMDCMDLINE:~-1%` expands to a bare `"`, ends the
+   * argument, and the `&` after it begins a second command. Reproduced with an
+   * echo-only token of exactly this shape before the guard learned the names.
+   */
+  it.each([
+    ["the last character of cmd.exe's own command line", "claude-opus-5%CMDCMDLINE:~-1% & echo INJECTED & echo "],
+    ["the current directory", "x%CD%y"],
+    ["a random number", "seed-%RANDOM%"],
+    ["the exit code", "%ERRORLEVEL%"],
+    ["a hidden per-drive variable", "%=C:%"],
+    ["a hidden exit-code variable", "%=ExitCode%"],
+  ])("refuses a token that reads %s, which no environment lists", (_label, token) => {
+    expect(() => spawnCli("claude", ["--model", token], { ...win, env: { PATH: "" } })).toThrow(
+      /Refusing to spawn.*would expand/s,
+    );
+  });
+
+  /**
+   * A modifier after the name (`:~start,len` substring, `:old=new`
+   * substitution) does not change which variable is read, so the lookup must
+   * see the name before the colon. The old pattern captured `OS:~0,3` whole,
+   * which matched nothing, and excluded `=` so `%X:a=b%` was never seen at all.
+   */
+  it.each([
+    ["a substring modifier", "x%OS:~0,3%y"],
+    ["a substitution modifier", 'x%OS:W=" & whoami & echo %y'],
+    ["a case-folded name behind a modifier", "%os:~1%"],
+  ])("refuses a defined variable behind %s", (_label, token) => {
+    expect(() => spawnCli("claude", [token], { ...win, env: { OS: "Windows_NT" } })).toThrow(
+      /Refusing to spawn.*%OS/is,
+    );
+  });
+
+  /**
+   * cmd.exe reads a command line only up to the first line break and silently
+   * drops the rest, so a token holding one changes which command runs rather
+   * than failing. Refused outright, before anything is spawned.
+   */
+  it.each([
+    ["a line feed", "a\necho SECOND"],
+    ["a carriage return and line feed", "a\r\necho SECOND"],
+  ])("refuses a token holding %s", (_label, token) => {
+    expect(() => spawnCli("claude", [token], { ...win, env: {} })).toThrow(/Refusing to spawn.*line break/s);
+  });
+
+  it("refuses through the synchronous twin as well", () => {
+    expect(() =>
+      execFileSyncCli("claude", ["--model", "m%CMDCMDLINE:~-1%"], { env: { PATH: "" } }, "win32"),
+    ).toThrow(/Refusing to spawn.*%CMDCMDLINE/s);
+  });
+
+  it("still spawns a token naming an undefined variable behind a modifier", () => {
+    let child: ReturnType<typeof spawnCli> | undefined;
+    expect(() => {
+      child = spawnCli("claude", ["%undefined_var:~1%"], { ...win, env: { PATH: "" } });
+    }).not.toThrow();
+    child?.on("error", () => {});
+    if (child?.pid !== undefined) child.kill();
   });
 
   /**

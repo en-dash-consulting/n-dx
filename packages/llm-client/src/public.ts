@@ -337,6 +337,7 @@ export {
   quoteWindowsToken,
   buildWindowsCliCommandLine,
   spawnCli,
+  execFileSyncCli,
   diagnoseCliInvocation,
   isCliNotFoundError,
   diagnoseCliNotFound,

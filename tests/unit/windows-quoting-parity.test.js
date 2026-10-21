@@ -58,8 +58,14 @@
  * table: see the exhaustive enumeration below.
  */
 import { describe, it, expect } from "vitest";
-import { buildWindowsCliCommandLine as buildLlm } from "../../packages/llm-client/src/exec.ts";
-import { buildWindowsCliCommandLine as buildWinSpawn } from "../../packages/core/win-spawn.js";
+import {
+  buildWindowsCliCommandLine as buildLlm,
+  assertNoWindowsEnvExpansion as assertLlm,
+} from "../../packages/llm-client/src/exec.ts";
+import {
+  buildWindowsCliCommandLine as buildWinSpawn,
+  assertNoWindowsEnvExpansion as assertWinSpawn,
+} from "../../packages/core/win-spawn.js";
 import { buildWindowsCliCommandLine as buildConfig } from "../../packages/core/config.js";
 
 /** Edge-case tokens exercised through both builders as args. */
@@ -153,6 +159,60 @@ describe("config.js re-exports win-spawn.js (backward compat)", () => {
     for (const token of EDGE_TOKENS) {
       const args = ["--flag", token, "tail"];
       expect(buildConfig(binary, args)).toBe(buildWinSpawn(binary, args));
+    }
+  });
+});
+
+/**
+ * The `%VAR%` refusal is part of the twin too, and the half that was unpinned
+ * when #790 added it. A guard that one copy tightens and the other does not is
+ * a spawn that one package refuses and the other runs. Each token is tried
+ * against an environment that defines OS and nothing else; the twins must agree
+ * on whether to refuse and on the message.
+ */
+describe("Windows guard parity: exec.ts twin === win-spawn.js twin", () => {
+  const ENV = { OS: "Windows_NT", Path: "C:\\Windows" };
+  const GUARD_TOKENS = [
+    ...EDGE_TOKENS,
+    "model%INJECT%",
+    "x%OS%y",
+    "x%os%y",
+    "x%OS:~0,3%y",
+    'x%OS:W=" & whoami & echo %y',
+    "x%Path%y",
+    "m%CMDCMDLINE:~-1%",
+    "x%CD%y",
+    "%RANDOM%",
+    "%ERRORLEVEL%",
+    "%=C:%",
+    "%=ExitCode%",
+    "a\necho SECOND",
+    "a\r\necho SECOND",
+    "C:\\Users\\100%cool\\claude.cmd",
+    "50%undefined_var%x",
+    "%undefined_var:~1%",
+    "%%",
+    "%",
+    "%:~1%",
+  ];
+
+  function outcome(assertFn, token) {
+    try {
+      assertFn(["claude", token], ENV);
+      return "spawns";
+    } catch (err) {
+      return `refuses: ${err.message}`;
+    }
+  }
+
+  it("agrees on every guard token", () => {
+    const divergent = GUARD_TOKENS.filter((token) => outcome(assertWinSpawn, token) !== outcome(assertLlm, token));
+    expect(divergent).toEqual([]);
+  });
+
+  it("refuses the tokens the proof of concept used", () => {
+    for (const token of ["m%CMDCMDLINE:~-1%", "x%OS:~0,3%y", "a\necho SECOND"]) {
+      expect(outcome(assertLlm, token), token).toMatch(/^refuses/);
     }
   });
 });
