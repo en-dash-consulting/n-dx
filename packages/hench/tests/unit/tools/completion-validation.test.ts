@@ -105,6 +105,8 @@ describe("toolRexUpdateStatus with completion validation", () => {
     );
 
     expect(mockValidate).toHaveBeenCalledWith("/project", {
+      // makeStore holds no tree, so the task is never a finalize-ready parent.
+      finalizeReadyParent: false,
       testCommand: "npm test",
     });
   });
@@ -187,6 +189,8 @@ describe("toolRexUpdateStatus with completion validation", () => {
     );
 
     expect(mockValidate).toHaveBeenCalledWith("/project", {
+      // makeStore holds no tree, so the task is never a finalize-ready parent.
+      finalizeReadyParent: false,
       startingHead: "abc123",
     });
   });
@@ -209,6 +213,8 @@ describe("toolRexUpdateStatus with completion validation", () => {
     );
 
     expect(mockValidate).toHaveBeenCalledWith("/project", {
+      // makeStore holds no tree, so the task is never a finalize-ready parent.
+      finalizeReadyParent: false,
       testCommand: "pnpm test",
       startingHead: "abc123",
     });

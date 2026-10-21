@@ -24,6 +24,7 @@
 
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type {PermissionMode, RetryConfig, RunRecord, ToolCallRecord, TurnTokenUsage} from "../../schema/index.js";import { validateCompletion, formatValidationResult } from "../../validation/completion.js";
+import { isFinalizeReadyParent } from "../../validation/finalize-ready.js";
 import { toolRexAppendLog } from "../../tools/rex.js";
 import {checkTokenBudget, formatBudgetExceeded} from "./token-budget.js";import { mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage } from "./token-usage.js";
 import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
@@ -2046,12 +2047,15 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
     return "break";
   }
 
-  // Validate completion: require meaningful changes
+  // Validate completion: require meaningful changes — except on a parent whose
+  // children are all completed, where closing it is the whole task.
+  const finalizeReadyParent = await isFinalizeReadyParent(store, taskId);
   const validation = await validateCompletion(projectDir, {
     testCommand: ctx.testCommand,
     startingHead: ctx.startingHead,
     selfHeal: ctx.selfHeal,
     baselineUntracked: ctx.baselineUntracked,
+    finalizeReadyParent,
   });
 
   syncRunFromAccumulated(run, accumulated, attempt);
@@ -2090,6 +2094,7 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
             startingHead: ctx.startingHead,
             selfHeal: ctx.selfHeal,
             baselineUntracked: ctx.baselineUntracked,
+            finalizeReadyParent,
           }),
       });
     }

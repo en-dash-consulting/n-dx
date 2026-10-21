@@ -426,6 +426,84 @@ describe("commitCompletionMetadata — autoCommit path (Bug A)", () => {
     expect(log.trim().split("\n").length).toBeLessThanOrEqual(3);
     expect(await getRexDirtyLines(projectDir)).toHaveLength(0);
   });
+
+  /**
+   * A store whose item reads back the status last written, as a real one does.
+   * The mocks above always answer in_progress, which hides the case that
+   * matters here: finalizeRun writes "completed" before the commit prompt
+   * runs, so a prompt that asks the store for the old status gets "completed".
+   */
+  function statefulStore() {
+    let status = "in_progress";
+    return {
+      getItem: vi.fn(async (id: string) =>
+        id === taskId ? { id: taskId, status, title: "Test task", level: "task" } : null,
+      ),
+      updateItem: vi.fn(async (id: string, updates: Record<string, unknown>) => {
+        if (id === taskId && updates.status === "completed") {
+          status = "completed";
+          const current = readFileSync(taskIndexPath, "utf-8").replace(/\r\n/g, "\n");
+          await writeFile(taskIndexPath, current.replace("status: in_progress", "status: completed"), "utf-8");
+        }
+      }),
+      appendLog: vi.fn(async () => {}),
+      loadDocument: vi.fn(async () => ({ items: [] })),
+    };
+  }
+
+  it("records the status transition on the completion commit", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(taskId),
+      henchDir,
+      projectDir,
+      autoCommit: false,
+      skipFullTestGate: true,
+      store: statefulStore(),
+    });
+
+    expect(await headTrailer(projectDir, "N-DX-Status")).toBe(`${taskId} in_progress → completed`);
+    expect(await headTrailer(projectDir, "N-DX-Item")).toBe(taskId);
+    expect(await getRexDirtyLines(projectDir)).toHaveLength(0);
+  });
+
+  it("records the status transition on the prompt's commit, which carries the completion", async () => {
+    const { finalizeRun } = await import("../../src/agent/lifecycle/shared.js");
+
+    await writeFile(join(projectDir, "feature.ts"), "export const x = 1;\n", "utf-8");
+    await execAsync("git add feature.ts", { cwd: projectDir });
+    await writeFile(join(projectDir, ".hench-commit-msg.txt"), "feat: add x\n", "utf-8");
+
+    await (finalizeRun as Function)({
+      run: buildCompletedRun(taskId),
+      henchDir,
+      projectDir,
+      autoCommit: false,
+      yes: true,
+      autonomous: true,
+      skipFullTestGate: true,
+      store: statefulStore(),
+    });
+
+    const { stdout } = await execFileAsync(
+      "git",
+      ["log", "--format=%s%x09%(trailers:key=N-DX-Status,valueonly,separator=;)"],
+      { cwd: projectDir },
+    );
+    const bySubject = new Map(
+      stdout
+        .split("\n")
+        .filter((line) => line.includes("\t"))
+        .map((line) => line.split("\t") as [string, string]),
+    );
+    // The commit that lands the completed status says so…
+    expect(bySubject.get("feat: add x")?.trim()).toBe(`${taskId} in_progress → completed`);
+    // …and no follow-up commit claims the same transition a second time.
+    const claims = [...bySubject.values()].filter((v) => v.trim() !== "");
+    expect(claims).toHaveLength(1);
+    expect(await getRexDirtyLines(projectDir)).toHaveLength(0);
+  });
 });
 
 /**
