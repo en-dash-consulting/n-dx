@@ -75,6 +75,7 @@ const EXPECTED_EXPORTS = [
   // Timestamps
   "computeTimestampUpdates",
   // Parent auto-completion
+  "allChildrenSuccessful",
   "findAutoCompletions",
   "reconcileAutoCompletions",
   // Parent reset
