@@ -134,11 +134,11 @@ describe("extractRequirementSentences", () => {
 describe("extractRequirementSentences: on adversarial repository input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
   const EXTRACT = new URL("../../../src/analyze/extract.ts", import.meta.url);
 
-  it("is linear on a sentence with 100k periods that do not end it", async () => {
+  it("is linear on a sentence with 300k periods that do not end it", async () => {
     // The README of an analysed repository is unbounded input. `/[.;]+$/`
-    // backtracked from every period in the run, 7.5 s at this size; the
+    // backtracked from every period in the run, about 67 s at this size, well over the 5 s budget; the
     // sentence is then far over the title cap, so the result is empty.
-    const text = `The system must handle it${".".repeat(100_000)}x`;
+    const text = `The system must handle it${".".repeat(300_000)}x`;
     await expect(
       callWithinBudget<typeof extractRequirementSentences>(EXTRACT, "extractRequirementSentences", text),
     ).resolves.toEqual([]);

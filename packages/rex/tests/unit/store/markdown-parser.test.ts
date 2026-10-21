@@ -192,9 +192,9 @@ describe("parseDocument: block scalars with many blank lines", () => {
 describe("parseDocument: on adversarial repository input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
   const PARSER = new URL("../../../src/store/markdown-parser.ts", import.meta.url);
 
-  it("chomping is linear on a block scalar with 100k blank lines", async () => {
-    // `/\n*$/` backtracked from every newline in the run, 6 s at this size.
-    const blanks = 100_000;
+  it("chomping is linear on a block scalar with 300k blank lines", async () => {
+    // `/\n*$/` backtracked from every newline in the run, about 55 s at this size, eleven times the 5 s budget on any machine.
+    const blanks = 300_000;
     const doc = blockScalarDoc("|-", ["a", ...Array<string>(blanks).fill(""), "b"]);
     await expect(callWithinBudget<typeof parseDocument>(PARSER, "parseDocument", doc)).resolves.toMatchObject({
       ok: true,

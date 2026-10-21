@@ -1185,9 +1185,9 @@ describe("parseFrontmatter: block scalars with many blank lines", () => {
 describe("parseFrontmatter: on adversarial repository input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
   const PARSER = new URL("../../../src/store/folder-tree-parser.ts", import.meta.url);
 
-  it("chomping is linear on a block scalar with 100k blank lines", async () => {
-    // `/\n*$/` backtracked from every newline in the run, 6 s at this size.
-    const blanks = 100_000;
+  it("chomping is linear on a block scalar with 300k blank lines", async () => {
+    // `/\n*$/` backtracked from every newline in the run, about 55 s at this size, eleven times the 5 s budget on any machine.
+    const blanks = 300_000;
     const raw = `---\ndescription: |-\n  a\n${"\n".repeat(blanks)}  b\n---\n`;
     await expect(
       callWithinBudget<typeof parseFrontmatter>(PARSER, "parseFrontmatter", raw, "index.md", []),
