@@ -198,6 +198,28 @@ describe("PUT /api/llm/config — prototype-chain paths", () => {
     }
   }
 
+  it("refuses a path named after an Object.prototype member as unknown, not as deprecated", async () => {
+    await writeFile(join(projectDir, ".n-dx.json"), seed, "utf-8");
+    const { res } = await send("PUT", "/api/llm/config", { toString: "x" });
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).not.toContain("deprecated");
+    expect(text).toContain("Unknown LLM config path");
+  });
+
+  it("previews a vendor named after an Object.prototype member without throwing", async () => {
+    await writeFile(join(projectDir, ".n-dx.json"), seed, "utf-8");
+    const res = await fetch(`${baseUrl}/api/llm/config/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { "llm.vendor": "toString" }, provider: "cli" }),
+    });
+    // A refused vendor is an edit problem the preview reports, never a 500.
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { editProblems?: Array<{ path?: string }> };
+    expect(body.editProblems?.some((p) => p.path === "llm.vendor")).toBe(true);
+  });
+
   it("refuses a delete through __proto__ and leaves Object.prototype alone", async () => {
     const configPath = join(projectDir, ".n-dx.json");
     for (const value of [null, ""]) {

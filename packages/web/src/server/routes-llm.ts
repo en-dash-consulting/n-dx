@@ -1125,7 +1125,9 @@ function validateLlmChange(
   // replacement named beats the generic "unknown path" below, which would
   // leave a caller guessing that the key it can still *read* is not one
   // it may set.
-  const replacement = DEPRECATED_WRITE_PATHS[path];
+  // Own keys only: a path named after an Object.prototype member (`toString`)
+  // must fall through to the unknown-path refusal, not read the inherited function.
+  const replacement = Object.hasOwn(DEPRECATED_WRITE_PATHS, path) ? DEPRECATED_WRITE_PATHS[path] : undefined;
   if (replacement) {
     return `"${path}" is a deprecated key and is no longer written. Set "${replacement}" instead — ` +
       `the legacy value is still read until 1.0.0 and is left untouched.`;

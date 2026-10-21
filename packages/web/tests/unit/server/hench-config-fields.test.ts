@@ -167,6 +167,11 @@ describe("validateConfigKeyValue", () => {
 });
 
 describe("validateProviderForVendor", () => {
+  it("treats a vendor named after an Object.prototype member as unrecognized, not as a provider list", () => {
+    expect(validateProviderForVendor("cli", "toString")).toBeNull();
+    expect(validateProviderForVendor("api", "constructor")).toBeNull();
+  });
+
   it("accepts cli or api for claude", () => {
     expect(validateProviderForVendor("cli", "claude")).toBeNull();
     expect(validateProviderForVendor("api", "claude")).toBeNull();
