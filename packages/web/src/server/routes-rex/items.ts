@@ -7,7 +7,7 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
   findItemById, updateInTree,
@@ -185,7 +185,7 @@ async function cascadeV1Completion(
     // The status write has already committed. Failing the request here would
     // tell the dashboard the close did not happen when it did (a writer holding
     // the PRD lock past its timeout is enough), so report what was not closed.
-    return { completed, error: err instanceof Error ? err.message : String(err) };
+    return { completed, error: errorMessage(err) };
   }
   return { completed };
 }
@@ -217,7 +217,7 @@ async function handleItemPatch(
   try {
     updates = JSON.parse(await readBody(req, res)) as Record<string, unknown>;
   } catch (err) {
-    errorResponse(res, 400, `Invalid JSON body: ${String(err)}`);
+    errorResponse(res, 400, `Invalid JSON body: ${errorMessage(err)}`);
     return true;
   }
   const problem = validateItemPatch(updates);
@@ -252,7 +252,7 @@ async function handleItemPatch(
         if (!completing) throw err;
         // The completion is already on disk: publish it, and say the fields were not saved.
         await publishItemUpdate(ctx, store, itemId, { status: "completed" }, broadcast);
-        const message = err instanceof Error ? err.message : String(err);
+        const message = errorMessage(err);
         throw new Error(`Completed "${itemId}", but its other fields were not saved: ${message}`);
       }
     }
@@ -272,7 +272,7 @@ async function handleItemPatch(
       ...(cascade.error ? { autoCompleteError: cascade.error } : {}),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     if (err instanceof ItemNotFoundError) {
       errorResponse(res, 404, message);
     } else if (message.startsWith("No live ")) {
@@ -309,7 +309,7 @@ async function handleItemDelete(
   try {
     await store.removeItem(itemId);
   } catch (err) {
-    errorResponse(res, 404, `Item "${itemId}" could not be removed: ${String(err)}`);
+    errorResponse(res, 404, `Item "${itemId}" could not be removed: ${errorMessage(err)}`);
     return true;
   }
 
@@ -507,7 +507,7 @@ async function handleItemAdd(
     // `level` rides along for a client still reading the v1 spelling.
     jsonResponse(res, 201, { ok: true, id, type, level, title: item.title });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -611,7 +611,7 @@ async function handleBulkUpdate(
               result.reason = completion.reason;
             }
           } catch (err) {
-            result.error = err instanceof Error ? err.message : String(err);
+            result.error = errorMessage(err);
             refused.push(result);
           }
         }
@@ -639,7 +639,7 @@ async function handleBulkUpdate(
         } catch (err) {
           // The completions are on disk; report them and fall through to the
           // cache refresh and broadcast below.
-          const message = err instanceof Error ? err.message : String(err);
+          const message = errorMessage(err);
           for (const result of results) {
             if (!result.ok) continue;
             result.ok = false;
@@ -682,7 +682,7 @@ async function handleBulkUpdate(
 
     jsonResponse(res, 200, { ok: true, results, ...(autoCompleteError ? { autoCompleteError } : {}) });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -779,7 +779,7 @@ async function handleItemMerge(
 
     jsonResponse(res, 200, { ok: true, ...result });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }

@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { completeConfigGroups, validateConfigConstraints } from "./hench-config-fields.js";
 import { contextWriteFloor, contextWriteFloorFromCompletedRun, hasCacheWrites, highConsumptionThreshold, runBudgetedTokens } from "./token-cost.js";
 
@@ -661,7 +661,7 @@ async function handleSuggestionDecision(
   try {
     saveSuggestionHistory(ctx.projectDir, history);
   } catch (err) {
-    errorResponse(res, 500, `Failed to save decision: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to save decision: ${errorMessage(err)}`);
     return true;
   }
 
@@ -740,7 +740,7 @@ async function handleApplySuggestion(
   try {
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
   } catch (err) {
-    errorResponse(res, 500, `Failed to write config: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to write config: ${errorMessage(err)}`);
     return true;
   }
 

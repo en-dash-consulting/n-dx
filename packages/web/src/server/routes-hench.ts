@@ -72,7 +72,7 @@ import {
 } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import {
   CONFIG_FIELD_META,
   validateFieldValue,
@@ -1089,7 +1089,7 @@ async function handleConfigUpdate(
   try {
     writeFileSync(configPath, JSON.stringify(current, null, 2) + "\n", "utf-8");
   } catch (err) {
-    errorResponse(res, 500, `Failed to write config: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to write config: ${errorMessage(err)}`);
     return true;
   }
 
@@ -1370,7 +1370,7 @@ async function handleTemplateCreate(
   try {
     await writeFile(filePath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
   } catch (err) {
-    errorResponse(res, 500, `Failed to save template: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to save template: ${errorMessage(err)}`);
     return true;
   }
 
@@ -1420,7 +1420,7 @@ async function handleTemplateApply(
   try {
     writeFileSync(configPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
   } catch (err) {
-    errorResponse(res, 500, `Failed to write config: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to write config: ${errorMessage(err)}`);
     return true;
   }
 
@@ -1458,7 +1458,7 @@ async function handleTemplateDelete(
   try {
     await writeFile(filePath, JSON.stringify(filtered, null, 2) + "\n", "utf-8");
   } catch (err) {
-    errorResponse(res, 500, `Failed to delete template: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to delete template: ${errorMessage(err)}`);
     return true;
   }
 
@@ -2327,7 +2327,7 @@ async function startExecution(
       if (entry) {
         entry.state.status = "failed";
         entry.state.finishedAt = new Date().toISOString();
-        entry.state.error = err instanceof Error ? err.message : String(err);
+        entry.state.error = errorMessage(err);
         broadcastExecState(broadcast, { ...entry.state });
         appendLog(ctx, {
           timestamp: entry.state.finishedAt,
@@ -2556,7 +2556,7 @@ function handleMarkStuck(
   try {
     writeRunFileAtomic(runsDir, runId, ended);
   } catch (err) {
-    errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to update run: ${errorMessage(err)}`);
     return true;
   }
 
@@ -2728,7 +2728,7 @@ function endIfStillEndable(
     writeRunFileAtomic(target.runsDir, id, endedRunRecord(fresh, verdict.reason, now));
     outcome.ended = true;
   } catch (err) {
-    outcome.error = err instanceof Error ? err.message : String(err);
+    outcome.error = errorMessage(err);
   }
 }
 
@@ -3691,7 +3691,7 @@ async function handleTerminate(
           try {
             writeFileSync(runPath, JSON.stringify(run, null, 2) + "\n", "utf-8");
           } catch (err) {
-            errorResponse(res, 500, `Failed to update run: ${err instanceof Error ? err.message : String(err)}`);
+            errorResponse(res, 500, `Failed to update run: ${errorMessage(err)}`);
             return true;
           }
         }

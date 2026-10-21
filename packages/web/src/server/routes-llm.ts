@@ -21,7 +21,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
 import {
   LLM_VENDOR,
@@ -871,7 +871,7 @@ async function probeLocalServer(
       .filter(Boolean);
     return { ok: true, url, models };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errorMessage(err);
     const friendly = msg.includes("abort") || msg.includes("Cancel")
       ? "Timed out — is LM Studio running?"
       : isConnectionRefused(err)
@@ -948,7 +948,7 @@ async function runSmokeTest(
     return { ok: true, latencyMs, tokensPerSecond, outputTokens, reply, url };
   } catch (err) {
     const latencyMs = Date.now() - t0;
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errorMessage(err);
     const friendly = msg.includes("abort") || msg.includes("Cancel")
       ? `Timed out after ${SMOKE_TEST_TIMEOUT_MS / 1000}s — model may still be loading`
       : isConnectionRefused(err)

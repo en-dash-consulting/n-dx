@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { henchDirIn } from "./paths.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { safeDecodeSegment } from "../shared/index.js";
 import {
   validateConfigKeyValue,
@@ -702,7 +702,7 @@ async function handleUpdateSettings(
   try {
     saveAdaptiveState(ctx.projectDir, state);
   } catch (err) {
-    errorResponse(res, 500, `Failed to save settings: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to save settings: ${errorMessage(err)}`);
     return true;
   }
 
@@ -769,7 +769,7 @@ async function handleApplyAdjustment(
   try {
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
   } catch (err) {
-    errorResponse(res, 500, `Failed to write config: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to write config: ${errorMessage(err)}`);
     return true;
   }
 
@@ -835,7 +835,7 @@ async function handleDismissAdjustment(
   try {
     saveAdaptiveState(ctx.projectDir, state);
   } catch (err) {
-    errorResponse(res, 500, `Failed to save: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to save: ${errorMessage(err)}`);
     return true;
   }
 
@@ -914,7 +914,7 @@ async function handleSetOverride(
   try {
     saveAdaptiveState(ctx.projectDir, state);
   } catch (err) {
-    errorResponse(res, 500, `Failed to save: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to save: ${errorMessage(err)}`);
     return true;
   }
 
