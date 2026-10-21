@@ -39,8 +39,15 @@ export interface CrossReferenceResult {
  * Matches common file path patterns (e.g. src/foo/bar.ts, ./lib/util.js).
  */
 function extractFilePaths(text: string): string[] {
-  // Match paths like src/foo.ts, ./lib/bar.js, packages/x/y.ts
-  const pattern = /(?:\.\/)?(?:[\w@-]+\/)+[\w.-]+\.\w+/g;
+  // Match paths like src/foo.ts, ./lib/bar.js, /abs/x.md, packages/x/y.ts.
+  // A match starts only at a token boundary: the lookbehind refuses a start
+  // right after a path character, so a pattern that fails on a long run of
+  // `-` or `a/` fails once rather than once per position (quadratic: PRD text
+  // of 50k such characters took 0.9 s). It also stops a match beginning in the
+  // middle of a token — `foo.bar/baz.ts`, a URL, `v1.2/foo.ts` — which used to
+  // leak tails like `bar/baz.ts`. Because of the lookbehind the leading `/` of
+  // an absolute path is consumed here, and normalizePath strips it.
+  const pattern = /(?<![\w@.\/-])\/?(?:\.\/)?(?:[\w@-]+\/)+[\w.-]+\.\w+/g;
   const matches = text.match(pattern);
   return matches ? [...new Set(matches)] : [];
 }
@@ -65,10 +72,10 @@ function collectItemFilePaths(item: PRDItem): string[] {
 }
 
 /**
- * Normalize a file path for matching (strip leading ./ and trailing whitespace).
+ * Normalize a file path for matching (strip a leading ./ or /, and trailing whitespace).
  */
 function normalizePath(path: string): string {
-  return path.replace(/^\.\//, "").trim();
+  return path.replace(/^\.?\//, "").trim();
 }
 
 /**
