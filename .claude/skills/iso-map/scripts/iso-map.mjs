@@ -2784,7 +2784,16 @@ var IAC_SKIP = /* @__PURE__ */ new Set([
   "dist",
   "build",
   "vendor",
-  "coverage"
+  "coverage",
+  // Test and fixture trees: a `.tf` there describes nothing deployed, and
+  // reporting it would draw fake infrastructure. `test` is deliberately absent,
+  // because it is a common environment name (`environments/test/main.tf`).
+  "tests",
+  "__tests__",
+  "fixtures",
+  "__fixtures__",
+  "testdata",
+  "__mocks__"
 ]);
 function findIaCFiles(root, limit = 400) {
   const terraform = [];

@@ -183,6 +183,10 @@ function classifyResource(type: string): string | null {
 
 const IAC_SKIP = new Set([
   "node_modules", ".git", ".terraform", "dist", "build", "vendor", "coverage",
+  // Test and fixture trees: a `.tf` there describes nothing deployed, and
+  // reporting it would draw fake infrastructure. `test` is deliberately absent,
+  // because it is a common environment name (`environments/test/main.tf`).
+  "tests", "__tests__", "fixtures", "__fixtures__", "testdata", "__mocks__",
 ]);
 
 /**

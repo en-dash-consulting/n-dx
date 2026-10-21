@@ -19,5 +19,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [Hub project cards show readiness and infrastructure counts](./hub-project-cards-show-readiness-and.md) | pending |
+| [Infrastructure discovery skips test fixtures](./infrastructure-discovery-skips-test.md) | completed |
 | [Overview section for SDLC readiness and discovered infrastructure](./overview-section-for-sdlc-readiness.md) | pending |
-| [Infrastructure discovery skips test fixtures](./infrastructure-discovery-skips-test.md) | pending |
