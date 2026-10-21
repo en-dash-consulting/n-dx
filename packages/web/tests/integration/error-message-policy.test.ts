@@ -16,22 +16,36 @@
  * Two rules, both over the source text of every file under `src/server/`:
  *
  *  1. No `errorResponse(`/`jsonResponse(` argument stringifies the caught
- *     value (`String(err)`, `String(e)`, `String(error)`) or hand-rolls the
- *     `x instanceof Error ? x.message : String(x)` ternary.
- *  2. That ternary appears nowhere in the directory, because it also feeds
- *     the status objects (self-heal, init, refresh, task execution) that a
- *     later GET serves verbatim, where rule 1 cannot see it.
+ *     value — `String(err)`, `String(e as Error)`, a template `${err}`,
+ *     `err.toString()` — or hand-rolls the `x instanceof Error ? x.message
+ *     : String(x)` ternary. "The caught value" is any identifier spelled
+ *     like one (`e`, `err`, `error`, `cause`, `exc`, anything ending in
+ *     `err`/`Error` such as `parseErr`) plus every name the file's own
+ *     `catch (name)` clauses bind, so `String(count)` in a response body
+ *     stays ordinary formatting.
+ *  2. That ternary appears nowhere in the directory, on one line or wrapped
+ *     over several, because it also feeds the status objects (self-heal,
+ *     init, refresh, task execution) that a later GET serves verbatim,
+ *     where rule 1 cannot see it.
  *
  * A ternary with a literal fallback (`err instanceof Error ? err.message :
  * "Invalid request body"`) is left alone: it already reads `.message` by
  * name and never stringifies the value.
  *
+ * The detector self-tests plant each forbidden spelling in a probe file
+ * under a temporary directory, assert the same scan the real tree gets
+ * names it, and remove the directory again — so a spelling the policy
+ * forbids is one the detector is known to see (stack #855's reviews found
+ * `String(e as Error)`, `${err}` and the wrapped ternary slipping past).
+ *
  * @see packages/web/tests/integration/boundary-check.test.ts — the same
  *   walk over `src/`, for import boundaries
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 
 const SERVER_SRC = join(import.meta.dirname!, "..", "..", "src", "server");
@@ -50,11 +64,53 @@ function collectTsFiles(dir: string): string[] {
   return files;
 }
 
-/** `String(err)` and its common spellings. */
-const STRINGIFIED_CATCH = /\bString\((?:err|e|error)\)/;
+/** An identifier, as `String(`, `${` or `.toString()` would receive it. */
+const IDENT = String.raw`[A-Za-z_$][\w$]*`;
 
-/** The hand-rolled ternary `errorMessage()` replaces. */
-const MESSAGE_TERNARY = /instanceof Error\s*\?\s*\w+\.message\s*:\s*String\(/;
+/** `String(x)` and `String(x as Error)`; the identifier is group 1. */
+const STRINGIFIED = new RegExp(String.raw`(?<![\w$.])String\(\s*(${IDENT})\s*(?:as\b[^()]*)?\)`, "g");
+
+/** A template literal's `${x}` or `${x as Error}`; the identifier is group 1. */
+const INTERPOLATED = new RegExp(String.raw`\$\{\s*(${IDENT})\s*(?:as\b[^{}]*)?\}`, "g");
+
+/** `x.toString()`; the identifier is group 1. `a.x.toString()` reads a field, not the caught value. */
+const TO_STRING = new RegExp(String.raw`(?<![\w$.])(${IDENT})\.toString\(\)`, "g");
+
+/**
+ * The hand-rolled ternary `errorMessage()` replaces, with `\s*` at every
+ * seam so a copy wrapped over several lines reads the same as one line.
+ * The fallback may be `String(x)` or `x.toString()`; the subject may be
+ * cast, `(e as Error).message`.
+ */
+const MESSAGE_TERNARY = new RegExp(
+  String.raw`\binstanceof\s+Error\s*\?\s*(?:${IDENT}|\(\s*${IDENT}\s+as\s+Error\s*\))\.message\s*:\s*(?:String\(|${IDENT}\.toString\()`,
+  "g",
+);
+
+/**
+ * Whether `name` is spelled like a caught value: the three conventional
+ * names, `cause` and `exc`, or anything ending in `err`/`Err`/`error`/`Error`
+ * (`parseErr`, `fetchError`). `count`, `taskId` or `value` is not, so a
+ * response body that formats one of those is left alone.
+ */
+export function isCaughtValueName(name: string): boolean {
+  return /^(?:e|err|error|cause|exc|\w*[Ee]rr(?:or)?)$/.test(name);
+}
+
+/** Every name the file's `catch (name)` clauses bind, however it is spelled. */
+export function catchBoundNames(source: string): Set<string> {
+  const names = new Set<string>();
+  for (const match of source.matchAll(new RegExp(String.raw`\bcatch\s*\(\s*(${IDENT})`, "g"))) names.add(match[1]);
+  return names;
+}
+
+/** The identifiers `text` stringifies, by any of the three spellings. */
+export function stringifiedNames(text: string): string[] {
+  return [STRINGIFIED, INTERPOLATED, TO_STRING].flatMap((re) => [...text.matchAll(re)].map((match) => match[1]));
+}
+
+/** The 1-based line of `source` that offset `index` falls on. */
+const lineAt = (source: string, index: number): number => source.slice(0, index).split("\n").length;
 
 /**
  * The argument text of every `errorResponse(` / `jsonResponse(` call in
@@ -77,7 +133,7 @@ export function responseCallArguments(source: string): Array<{ line: number; arg
       else if (source[i] === ")") depth--;
     }
     calls.push({
-      line: source.slice(0, match.index).split("\n").length,
+      line: lineAt(source, match.index),
       args: source.slice(start, depth === 0 ? i - 1 : i),
     });
   }
@@ -86,44 +142,50 @@ export function responseCallArguments(source: string): Array<{ line: number; arg
 
 /** `file:line` for every response call in `source` whose argument fails rule 1. */
 export function offendingResponseCalls(file: string, source: string): string[] {
+  const bound = catchBoundNames(source);
+  const isCaught = (name: string): boolean => isCaughtValueName(name) || bound.has(name);
   return responseCallArguments(source)
-    .filter(({ args }) => STRINGIFIED_CATCH.test(args) || MESSAGE_TERNARY.test(args))
+    .filter(({ args }) => stringifiedNames(args).some(isCaught) || [...args.matchAll(MESSAGE_TERNARY)].length > 0)
     .map(({ line }) => `${file}:${line}`);
 }
 
-/** `file:line` for every line of `source` that carries the ternary (rule 2). */
+/** `file:line` for every ternary in `source` (rule 2), on the line it starts. */
 export function offendingTernaries(file: string, source: string): string[] {
-  return source
-    .split("\n")
-    .map((text, index) => (MESSAGE_TERNARY.test(text) ? `${file}:${index + 1}` : null))
-    .filter((hit): hit is string => hit !== null);
+  return [...source.matchAll(MESSAGE_TERNARY)].map((match) => `${file}:${lineAt(source, match.index)}`);
+}
+
+/** Both rules over every `.ts` file under `dir`, paths relative to it. */
+export function scanTree(dir: string): { files: string[]; responseCalls: string[]; ternaries: string[] } {
+  const files = collectTsFiles(dir).map((full) => ({
+    rel: relative(dir, full).split(sep).join("/"),
+    source: readFileSync(full, "utf-8"),
+  }));
+  return {
+    files: files.map((f) => f.rel),
+    responseCalls: files.flatMap(({ rel, source }) => offendingResponseCalls(rel, source)),
+    ternaries: files.flatMap(({ rel, source }) => offendingTernaries(rel, source)),
+  };
 }
 
 describe("error-message policy (src/server)", () => {
-  const files = collectTsFiles(SERVER_SRC).map((full) => ({
-    rel: relative(SERVER_SRC, full).split(sep).join("/"),
-    source: readFileSync(full, "utf-8"),
-  }));
+  const tree = scanTree(SERVER_SRC);
 
   it("scans the route files", () => {
-    const names = files.map((f) => f.rel);
-    expect(names).toContain("response-utils.ts");
-    expect(names).toContain("routes-commands.ts");
-    expect(names).toContain("routes-rex/items.ts");
+    expect(tree.files).toContain("response-utils.ts");
+    expect(tree.files).toContain("routes-commands.ts");
+    expect(tree.files).toContain("routes-rex/items.ts");
   });
 
   it("no errorResponse/jsonResponse argument stringifies the caught value", () => {
-    const offenders = files.flatMap(({ rel, source }) => offendingResponseCalls(rel, source));
     expect(
-      offenders,
+      tree.responseCalls,
       "pass the caught value through errorMessage() from response-utils.ts",
     ).toEqual([]);
   });
 
   it("no file hand-rolls the `instanceof Error ? .message : String()` ternary", () => {
-    const offenders = files.flatMap(({ rel, source }) => offendingTernaries(rel, source));
     expect(
-      offenders,
+      tree.ternaries,
       "errorMessage() from response-utils.ts is that ternary; use it so a served status field reads the same",
     ).toEqual([]);
   });
@@ -132,8 +194,8 @@ describe("error-message policy (src/server)", () => {
 describe("error-message policy detector", () => {
   it("flags the stringified value and the ternary, on one line or several", () => {
     const source = [
-      'errorResponse(res, 500, String(err));',
-      'errorResponse(res, 500, `Failed: ${err instanceof Error ? err.message : String(err)}`);',
+      "errorResponse(res, 500, String(err));",
+      "errorResponse(res, 500, `Failed: ${err instanceof Error ? err.message : String(err)}`);",
       "errorResponse(",
       "  res,",
       "  500,",
@@ -147,12 +209,23 @@ describe("error-message policy detector", () => {
   it("accepts errorMessage(), a literal, and a ternary with a literal fallback", () => {
     const source = [
       "errorResponse(res, 500, errorMessage(err));",
-      'errorResponse(res, 500, `Failed to save: ${errorMessage(err)}`);',
+      "errorResponse(res, 500, `Failed to save: ${errorMessage(err)}`);",
       'errorResponse(res, 400, err instanceof Error ? err.message : "Invalid request body");',
       'jsonResponse(res, 200, { error: "Self-heal is already running" });',
+      "errorResponse(res, 500, err.message);",
     ].join("\n");
     expect(offendingResponseCalls("x.ts", source)).toEqual([]);
     expect(offendingTernaries("x.ts", source)).toEqual([]);
+  });
+
+  it("leaves a response that formats a value other than the caught one alone", () => {
+    const source = [
+      "jsonResponse(res, 200, { total: String(count), label: `${items.length} items`, id: taskId.toString() });",
+      "errorResponse(res, 404, `No task ${id}`);",
+      "jsonResponse(res, 200, { ok: true, port: String(port), elapsed: `${elapsedMs}ms`, mode: value.toString() });",
+      "errorResponse(res, 400, `Unknown field ${String(field)}`);",
+    ].join("\n");
+    expect(offendingResponseCalls("x.ts", source)).toEqual([]);
   });
 
   it("finds the ternary on a status field no response call wraps", () => {
@@ -161,5 +234,132 @@ describe("error-message policy detector", () => {
       "slot.state.error = err instanceof Error ? err.message : String(err);",
     ].join("\n");
     expect(offendingTernaries("x.ts", source)).toEqual(["x.ts:2"]);
+  });
+
+  it("knows a caught value by its name", () => {
+    for (const name of ["e", "err", "error", "cause", "exc", "parseErr", "fetchError", "Err", "innerError"]) {
+      expect(isCaughtValueName(name), name).toBe(true);
+    }
+    for (const name of ["count", "taskId", "value", "errorCount", "errors", "field", "elapsedMs", "port"]) {
+      expect(isCaughtValueName(name), name).toBe(false);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Probe files: each forbidden spelling, planted on disk and scanned the way
+// the real tree is, then removed. The expected line is where the response
+// call or the ternary starts.
+// ---------------------------------------------------------------------------
+
+/** [label, probe lines, 1-based line the offender is reported on]. */
+type Planted = [label: string, lines: string[], line: number];
+
+const RULE_1_SPELLINGS: Planted[] = [
+  ["String(err)", ["errorResponse(res, 500, String(err));"], 1],
+  ["String(e as Error)", ["errorResponse(res, 500, String(e as Error));"], 1],
+  ["String(error as unknown as string)", ["errorResponse(res, 500, String(error as unknown as string));"], 1],
+  ["a template `${err}`", ["errorResponse(res, 500, `Failed: ${err}`);"], 1],
+  ["a template `${e}`", ["errorResponse(res, 500, `Build failed: ${e}`);"], 1],
+  ["a template `${error}`", ["jsonResponse(res, 200, { ok: false, error: `${error}` });"], 1],
+  ["a template `${e as Error}`", ["errorResponse(res, 500, `${e as Error}`);"], 1],
+  ["err.toString()", ["errorResponse(res, 500, err.toString());"], 1],
+  ["e.toString() inside a body object", ["jsonResponse(res, 200, { error: e.toString() });"], 1],
+  ["String(cause)", ["errorResponse(res, 500, String(cause));"], 1],
+  ["String(exc)", ["errorResponse(res, 500, String(exc));"], 1],
+  ["a template `${cause}`", ["errorResponse(res, 500, `Refused: ${cause}`);"], 1],
+  ["exc.toString()", ["errorResponse(res, 500, exc.toString());"], 1],
+  ["String(parseErr) — a name ending in Err", ["errorResponse(res, 400, String(parseErr));"], 1],
+  ["String(fetchError) — a name ending in Error", ["errorResponse(res, 502, String(fetchError));"], 1],
+  ["a template `${innerError}`", ["errorResponse(res, 500, `Inner: ${innerError}`);"], 1],
+  [
+    "a catch variable of any spelling the file binds",
+    ["try {", "  run();", "} catch (oops) {", "  errorResponse(res, 500, String(oops));", "}"],
+    4,
+  ],
+  [
+    "a bound catch variable interpolated in a body object",
+    ["try {", "  run();", "} catch (problem) {", "  jsonResponse(res, 500, { error: `${problem}` });", "}"],
+    4,
+  ],
+  [
+    "the ternary wrapped across lines inside the call",
+    [
+      "errorResponse(",
+      "  res,",
+      "  500,",
+      "  err instanceof Error",
+      "    ? err.message",
+      "    : String(err),",
+      ");",
+    ],
+    1,
+  ],
+  [
+    "the ternary with a .toString() fallback",
+    ["errorResponse(res, 500, err instanceof Error ? err.message : err.toString());"],
+    1,
+  ],
+];
+
+const RULE_2_SPELLINGS: Planted[] = [
+  ["the ternary on one line", ["slot.state.error = err instanceof Error ? err.message : String(err);"], 1],
+  [
+    "the ternary wrapped across lines",
+    ["const status = {", "  error: err instanceof Error", "    ? err.message", "    : String(err),", "};"],
+    2,
+  ],
+  [
+    "the ternary wrapped before the colon",
+    ["state.error = e instanceof Error ? e.message", "  : String(e);"],
+    1,
+  ],
+  ["the ternary with a .toString() fallback", ["state.error = cause instanceof Error ? cause.message : cause.toString();"], 1],
+  ["the ternary over a cast subject", ["state.error = e instanceof Error ? (e as Error).message : String(e);"], 1],
+  ["the ternary with `instanceof` and `Error` split by a line break", ["state.error = err instanceof", "  Error ? err.message : String(err);"], 1],
+];
+
+describe("error-message policy detector — planted probe files", () => {
+  let probeDir: string;
+
+  beforeEach(async () => {
+    probeDir = await mkdtemp(join(tmpdir(), "ndx-error-message-policy-"));
+  });
+
+  afterEach(async () => {
+    await rm(probeDir, { recursive: true, force: true });
+  });
+
+  async function plant(name: string, lines: string[]): Promise<void> {
+    await writeFile(join(probeDir, name), `${lines.join("\n")}\n`, "utf-8");
+  }
+
+  it.each(RULE_1_SPELLINGS)("rule 1 fails a probe file carrying %s", async (_label, lines, line) => {
+    await plant("probe.ts", lines);
+    expect(scanTree(probeDir).responseCalls).toEqual([`probe.ts:${line}`]);
+  });
+
+  it.each(RULE_2_SPELLINGS)("rule 2 fails a probe file carrying %s", async (_label, lines, line) => {
+    await plant("probe.ts", lines);
+    expect(scanTree(probeDir).ternaries).toEqual([`probe.ts:${line}`]);
+  });
+
+  it("reports a probe in a nested directory by its relative path, like the real tree", async () => {
+    await mkdir(join(probeDir, "routes-rex"));
+    await plant(join("routes-rex", "items.ts"), ["errorResponse(res, 500, `${err}`);"]);
+    expect(scanTree(probeDir).responseCalls).toEqual(["routes-rex/items.ts:1"]);
+  });
+
+  it("passes a probe file that answers through errorMessage() and formats its own values", async () => {
+    await plant("clean.ts", [
+      "try {",
+      "  run();",
+      "} catch (err) {",
+      "  errorResponse(res, 500, `Failed to run: ${errorMessage(err)}`);",
+      "}",
+      "jsonResponse(res, 200, { total: String(count), label: `${items.length} items`, id: taskId.toString() });",
+      'errorResponse(res, 400, err instanceof Error ? err.message : "Invalid request body");',
+    ]);
+    expect(scanTree(probeDir)).toMatchObject({ files: ["clean.ts"], responseCalls: [], ternaries: [] });
   });
 });

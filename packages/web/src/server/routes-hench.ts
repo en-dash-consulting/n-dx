@@ -1079,9 +1079,11 @@ async function handleConfigUpdate(
   // Sibling constraints are only decidable on the finished config, so they run
   // after completion: a lone `prune.triggerPairs` edit is filled out from the
   // defaults first, and the pair it produces has to be one hench will load.
-  const constraintError = validateConfigConstraints(current);
-  if (constraintError) {
-    errorResponse(res, 400, `Validation errors: ${constraintError}`);
+  // Named for what it is — a validation message, not a caught value — so the
+  // error-message policy's caught-value scan does not read `${…Error}` as one.
+  const constraintViolation = validateConfigConstraints(current);
+  if (constraintViolation) {
+    errorResponse(res, 400, `Validation errors: ${constraintViolation}`);
     return true;
   }
 
