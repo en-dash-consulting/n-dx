@@ -51,15 +51,29 @@ export interface LLMErrorClassification {
  * vendors. Returns "" when there is nothing useful to add.
  */
 export function extractProviderDetail(rawMessage: string): string {
-  if (!rawMessage) return "";
+  return parseProviderDetail(rawMessage).detail;
+}
+
+/**
+ * {@link extractProviderDetail} with the provenance of what it returns.
+ *
+ * `fromJson` is true when the body parsed as a `{ error: {…} }` object and
+ * `detail` was built from its fields; false when `detail` is the body itself,
+ * echoed back because it was plain text (or JSON with nothing to show). A
+ * caller that wants a reason the provider stated, rather than a copy of the
+ * message it already holds, reads the flag.
+ */
+function parseProviderDetail(rawMessage: string): { detail: string; fromJson: boolean } {
+  if (!rawMessage) return { detail: "", fromJson: false };
 
   // Strip a leading "<Vendor> API error <NNN>: " / "... stream error <NNN>: "
   // prefix produced by the fetch-based providers, leaving the raw body.
   const prefix = /^[A-Za-z][\w.-]* API(?: stream)? error \d+:\s*/;
   const body = rawMessage.replace(prefix, "").trim();
-  if (!body) return "";
+  if (!body) return { detail: "", fromJson: false };
 
   let detail = body;
+  let fromJson = false;
 
   // Google and OpenAI both return { error: { message, status?, code? } }.
   if (body.startsWith("{")) {
@@ -90,7 +104,11 @@ export function extractProviderDetail(rawMessage: string): string {
           if (typeof d.retryDelay === "string") extras.push(`retry in ${d.retryDelay}`);
         }
         const head = label && message ? `${label}: ${message}` : label || message;
-        detail = [head, ...extras].filter(Boolean).join(" — ") || body;
+        const built = [head, ...extras].filter(Boolean).join(" — ");
+        if (built) {
+          detail = built;
+          fromJson = true;
+        }
       }
     } catch {
       // Not JSON after all — fall back to the raw body.
@@ -100,7 +118,7 @@ export function extractProviderDetail(rawMessage: string): string {
   // Collapse whitespace and truncate so multi-line bodies don't flood the terminal.
   detail = detail.replace(/\s+/g, " ").trim();
   if (detail.length > 300) detail = `${detail.slice(0, 297)}…`;
-  return detail;
+  return { detail, fromJson };
 }
 
 /**
@@ -533,6 +551,13 @@ function extractJsonErrorMessage(text: string): string {
  *
  * Detection reads the first {@link CLASSIFY_WINDOW} characters; the reason is
  * extracted from the whole message.
+ *
+ * `authReason` is the provider's own `error.message` (with its status label,
+ * when the body carries one) whenever the message holds a JSON error body.
+ * A plain-text message states no reason of its own, so it is normalized to
+ * one of a fixed vocabulary instead of being echoed: "invalid API key",
+ * "token expired", "not logged in", "401 Unauthorized", "403 Forbidden",
+ * "unauthorized" or "authentication failed".
  */
 export function parseAuthPayload(
   rawMessage: string,
@@ -561,16 +586,17 @@ export function parseAuthPayload(
   const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : null;
 
   // Try the vendor-prefix-aware extractor first (handles "Gemini API error 401: {...}").
-  // Only trust the result when it actually parsed JSON (no raw braces remaining).
-  const providerDetail = extractProviderDetail(rawMessage);
-  const cleanProviderDetail = providerDetail && !providerDetail.includes("{")
-    ? providerDetail
-    : "";
+  // Its detail is a reason only when it was built from the JSON body: a
+  // plain-text body comes back as the detail verbatim, and taking that as the
+  // reason would echo the message instead of normalizing it below.
+  const provider = parseProviderDetail(rawMessage);
+  const providerReason = provider.fromJson ? provider.detail : "";
 
   // Fall back to a generic JSON scan for messages without the vendor prefix
   // (e.g. Claude CLI stdout envelopes, plain SDK error strings).
-  const jsonReason = cleanProviderDetail || extractJsonErrorMessage(rawMessage);
+  const jsonReason = providerReason || extractJsonErrorMessage(rawMessage);
 
+  // No JSON reason anywhere: the message is plain text, so normalize it.
   let authReason = jsonReason;
   if (!authReason) {
     if (INVALID_API_KEY.test(message)) {
@@ -583,6 +609,8 @@ export function parseAuthPayload(
       authReason = "401 Unauthorized";
     } else if (httpStatus === 403) {
       authReason = "403 Forbidden";
+    } else if (/unauthorized/i.test(message)) {
+      authReason = "unauthorized";
     } else {
       authReason = "authentication failed";
     }

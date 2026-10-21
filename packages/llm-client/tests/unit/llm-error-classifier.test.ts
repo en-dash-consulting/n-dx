@@ -696,23 +696,46 @@ describe("parseAuthPayload", () => {
 
   // ── bounded gaps ──────────────────────────────────────────────────
 
-  // A plain-text message is its own reason (extractProviderDetail echoes a
-  // body with no JSON in it), so the assertion is on the word that detected it.
+  // A plain-text message states no reason of its own, so the reason is
+  // normalized to a fixed vocabulary rather than echoing the message. The
+  // provider detail is trusted only when it was built from a JSON body; a
+  // body that merely echoes back (plain text, or braces that do not parse)
+  // falls through to the normalized reasons. Before this, every one of these
+  // came back as the input verbatim and the normalized branch was unreachable.
   it.each([
-    ["invalid x-api-key", /invalid/i],
-    ["Invalid API key provided", /invalid/i],
-    ["invalid_api_key", /invalid/i],
-    ["Your API key has expired", /expired/i],
-    ["Token expired — please refresh credentials", /expired/i],
-    ["The expired key was rejected", /expired/i],
-    ["Unauthorized request", /unauthorized/i],
-    ["unauthorized: access denied", /unauthorized/i],
-    ["authentication_error: bad credentials", /authentication/i],
-    ["Authentication failed", /authentication/i],
-  ])("detects '%s' (reason matches %s)", (input, reason) => {
+    ["invalid x-api-key", "invalid API key"],
+    ["Invalid API key provided", "invalid API key"],
+    ["invalid_api_key", "invalid API key"],
+    ["Your API key has expired", "token expired"],
+    ["Token expired — please refresh credentials", "token expired"],
+    ["The expired key was rejected", "token expired"],
+    ["Not logged in. Please run claude login.", "not logged in"],
+    ["401 Unauthorized", "401 Unauthorized"],
+    ["403 Forbidden", "403 Forbidden"],
+    ["Gemini API error 401: Unauthorized", "401 Unauthorized"],
+    ["Gemini API error 401: {not a json body", "401 Unauthorized"],
+    ["Unauthorized request", "unauthorized"],
+    ["unauthorized: access denied", "unauthorized"],
+    ["authentication_error: bad credentials", "authentication failed"],
+    ["Authentication failed", "authentication failed"],
+  ])("normalizes plain-text '%s' to '%s'", (input, reason) => {
     const r = parseAuthPayload(input, "claude");
     expect(r).not.toBeNull();
-    expect(r?.authReason).toMatch(reason);
+    expect(r?.authReason).toBe(reason);
+  });
+
+  it("keeps the provider's extracted error.message as the reason for a JSON body", () => {
+    const google = JSON.stringify({
+      error: { code: 401, message: "API key not valid. Please pass a valid API key.", status: "UNAUTHENTICATED" },
+    });
+    expect(parseAuthPayload(`Gemini API error 401: ${google}`, "google")?.authReason).toBe(
+      "UNAUTHENTICATED: API key not valid. Please pass a valid API key.",
+    );
+    const anthropic = JSON.stringify({
+      type: "error",
+      error: { type: "authentication_error", message: "invalid x-api-key" },
+    });
+    expect(parseAuthPayload(`401 ${anthropic}`, "claude")?.authReason).toBe("invalid x-api-key");
   });
 
   it.each([
