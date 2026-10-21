@@ -29,7 +29,7 @@ export default defineConfig({
     // shell cannot change test verdicts. See tests/setup-color-env.js.
     setupFiles: [
       "../../tests/setup-color-env.js",
-      "../../tests/setup-session-env.js",
+      "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
       // Clears TYPESAFE_API_KEY so no test resolves a live judgment route.
       "../../tests/setup-judgment-env.js",
       // Keeps a pack installed in the developer's ndx home out of the tests.

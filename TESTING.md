@@ -443,6 +443,56 @@ signal exit code against the expected one, which reads as a product failure.
   scaled that cap by `BUDGET_MULTIPLIER` instead of raising it to a new fixed
   number.
 
+#### A worker exits with every test passing
+
+**Symptom:** a suite fails with `Worker exited unexpectedly with exit code 1`,
+or its log stops mid-output with no vitest summary, while every test in the
+run passed. The file it names passes standalone and on a re-run.
+
+**What is known** (vitest 5.0.4, investigated for `7db88b02` after five such
+failures in one session on 2026-10-14):
+
+- **It is not a test calling `process.exit`.** Vitest 5 replaces
+  `process.exit` inside a worker with an error naming the test file, so a
+  direct call fails that file with "process.exit unexpectedly called" rather
+  than killing the worker. `tests/unit/setup-exit-trace.test.js` pins this.
+  A bare exit code 1 therefore comes from outside the test's own call stack.
+- **The five sightings were not one mechanism.** Two were a temp-directory
+  removal racing a child that had not exited: `codex-mcp-contract` resolved
+  its MCP exchange on the answer and killed the server without waiting for
+  it, and `afterAll` removed the server's cwd. That is fixed by awaiting the
+  child's exit, not by a longer retry window. One was a Family 3 spawn
+  guardrail: `cli-init-git-preflight` killed a full `ndx init` at a fixed 25s;
+  that is scaled by `BUDGET_MULTIPLIER` now. The two rex worker exits (one
+  reported, one a truncated log) are unexplained, and the affected-gate
+  failure on `ed9a4a88` left no run record on the machine that saw it, so it
+  can be neither reproduced nor attributed.
+- **Reproduction under load:** five consecutive `pnpm validate` passes on
+  Windows 11 (2026-10-21, vitest 5.0.4; three stopping at the first failing
+  package, two with `--no-bail` so `web` ran too), with the exit tracer on,
+  produced no worker exit, no EPERM or EBUSY at teardown, and no traced
+  `process.exit` or uncaught error in any worker log. The worker exits did not
+  reproduce. Each pass did fail one sourcevision test, and deterministically:
+  `imports-go-incremental-carryover` fails on any checkout without the Go
+  grammar built, because the regex fallback keeps edges to a pruned package
+  directory. CI builds the grammar and never sees it. That is a product
+  defect, not a load effect; it is tracked on its own.
+
+**Rules:**
+
+- Do not raise retries or timeouts for a worker exit. There is no assertion to
+  retry; a retry turns a crash into a slower green run and throws away the
+  only evidence.
+- Run the failing selection again with `NDX_TEST_EXIT_TRACE=<dir>` set
+  (`tests/setup-exit-trace.js`, loaded by every package's vitest config). Each
+  worker appends to `<dir>/worker-<pid>.log`: the test files it started, the
+  stack of any `process.exit` call, any uncaught error, and its heap use and
+  active-handle count when it exits. The last `file` line in the log of the
+  worker that died is the file to investigate, whatever vitest named.
+- A test that kills a child must await the child's `exit` before removing
+  anything the child holds (its cwd, its open files). Waiting on the event
+  takes exactly as long as the machine needs; a retry window is a guess.
+
 ### Family 2 — Wall-clock and render-order assumptions
 
 **Symptom:** a timing ratio or `waitFor` that passes on an idle machine and
