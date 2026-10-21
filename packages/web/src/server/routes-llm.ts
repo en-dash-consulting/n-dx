@@ -786,7 +786,10 @@ export function isPlausibleLlmHost(host: unknown): host is string {
   } catch {
     return false;
   }
-  return url.hostname === host.toLowerCase() && url.username === "" && url.pathname === "/";
+  // The whole input must have become the authority and nothing else. Compare
+  // the round-tripped URL, not the hostname text: WHATWG normalises `127.1`,
+  // an expanded IPv6 literal or an IDN name, and inference accepts all three.
+  return url.href === `http://${url.hostname}:1/`;
 }
 
 /** Whether `port` is a TCP port: an integer from 1 to 65535. */

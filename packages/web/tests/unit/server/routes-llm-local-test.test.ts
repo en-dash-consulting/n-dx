@@ -14,6 +14,8 @@ import { handleLlmRoute } from "../../../src/server/routes-llm.js";
 let projectDir: string;
 let dashboard: Server;
 let fakeLlm: Server;
+/** Requests the fake LLM server has answered since the test began. */
+let llmRequests = 0;
 let dashboardUrl: string;
 let llmPort: number;
 let modelsStatus = 200;
@@ -30,7 +32,9 @@ function listen(server: Server): Promise<void> {
 beforeEach(async () => {
   modelsStatus = 200;
   projectDir = await mkdtemp(join(tmpdir(), "ndx-llm-local-test-"));
+  llmRequests = 0;
   fakeLlm = createServer((req, res) => {
+    llmRequests++;
     res.setHeader("Content-Type", "application/json");
     if (req.url === "/v1/models") {
       res.writeHead(modelsStatus);
@@ -110,6 +114,7 @@ describe("POST /api/llm/local-test", () => {
     const res = await post("/api/llm/local-test", { host, port: llmPort });
     expect(res.status).toBe(400);
     expect(await errorOf(res)).toContain("Invalid LLM host");
+    expect(llmRequests).toBe(0);
   });
 
   it.each([70000, 1.5, 0, -1, "1234"])("answers 400 for port %j", async (port) => {
@@ -118,11 +123,13 @@ describe("POST /api/llm/local-test", () => {
     expect(await errorOf(res)).toContain("Invalid LLM port");
   });
 
-  it.each(["localhost", "127.0.0.1", "[::1]", "gpu-box.lan"])(
+  it.each(["localhost", "127.0.0.1", "[::1]", "gpu-box.invalid"])(
     "accepts host %j and runs the test against it",
     async (host) => {
       // Only 127.0.0.1 has a server behind it here; the others may fail to
       // connect or resolve, which is a 200 with ok:false, never a refusal.
+      // `.invalid` (RFC 2606) can never resolve, so no resolver that answers
+      // NXDOMAIN with a record can point this test at a stranger's server.
       const res = await post("/api/llm/local-test", { host, port: llmPort });
       expect(res.status).toBe(200);
       const body = (await res.json()) as { ok: boolean };

@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import { isPlausibleLlmHost, isValidPort } from "../../../src/server/routes-llm.js";
 
 describe("isPlausibleLlmHost", () => {
-  it.each(["localhost", "127.0.0.1", "[::1]", "gpu-box.lan", "10.0.0.5", "GPU-Box.lan", "my_host", "a.b.c.example"])(
+  it.each(["localhost", "127.0.0.1", "[::1]", "gpu-box.invalid", "10.0.0.5", "GPU-Box.invalid", "my_host", "a.b.c.example", "127.1", "[0:0:0:0:0:0:0:1]", "b\u00fccher.lan"])(
     "accepts %j",
     (host) => {
       expect(isPlausibleLlmHost(host)).toBe(true);
