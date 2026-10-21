@@ -1155,7 +1155,9 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       defaultModel: defaultModel(LLM_VENDOR.LOCAL),
       reachable: localStatus.ok,
       ...(localStatus.ok ? {} : { reason: localStatus.error ?? "Local server unreachable" }),
-      readiness: localReadiness(localStatus.ok, `${local.host}:${local.port}`),
+      // A saved endpoint that failed the shape check was never fetched: the
+      // card needs setup, with the shape error as its line, not "unreachable".
+      readiness: localReadiness(localStatus.ok, `${local.host}:${local.port}`, local.error),
     },
   };
 }
