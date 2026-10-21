@@ -97,7 +97,8 @@ const WINDOWS_VAR_REF = /%([^%\r\n]+)%/g;
  * Lower-case here; the lookup is case-insensitive, as cmd.exe's is.
  * `%CMDCMDLINE%` is the dangerous one: its last character is the closing
  * quote of the command line cmd.exe is running, so `%CMDCMDLINE:~-1%`
- * smuggles a `"` past quoting and ends the argument.
+ * smuggles a `"` past quoting and ends the argument. `%__APPDIR__%` and
+ * `%__CD__%` end in a backslash, which escapes the closing quote instead.
  * TWIN: same as CMD_DYNAMIC_VARIABLES in packages/llm-client/src/exec.ts.
  */
 const CMD_DYNAMIC_VARIABLES = new Set([
@@ -109,6 +110,10 @@ const CMD_DYNAMIC_VARIABLES = new Set([
   "cmdextversion",
   "cmdcmdline",
   "highestnumanodenumber",
+  // Undocumented pseudo-variables: the cmd.exe binary's directory and the
+  // current directory with a trailing backslash. Neither is listed by `set`.
+  "__appdir__",
+  "__cd__",
 ]);
 
 /** Windows environment names are case-insensitive; `process.env` is not. */

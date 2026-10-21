@@ -186,6 +186,8 @@ describe("Windows guard parity: exec.ts twin === win-spawn.js twin", () => {
     "%ERRORLEVEL%",
     "%=C:%",
     "%=ExitCode%",
+    "m%__APPDIR__%",
+    "m%__CD__:~-1%",
     "a\necho SECOND",
     "a\r\necho SECOND",
     "C:\\Users\\100%cool\\claude.cmd",
@@ -211,7 +213,7 @@ describe("Windows guard parity: exec.ts twin === win-spawn.js twin", () => {
   });
 
   it("refuses the tokens the proof of concept used", () => {
-    for (const token of ["m%CMDCMDLINE:~-1%", "x%OS:~0,3%y", "a\necho SECOND"]) {
+    for (const token of ["m%CMDCMDLINE:~-1%", "x%OS:~0,3%y", "m%__APPDIR__%", "a\necho SECOND"]) {
       expect(outcome(assertLlm, token), token).toMatch(/^refuses/);
     }
   });

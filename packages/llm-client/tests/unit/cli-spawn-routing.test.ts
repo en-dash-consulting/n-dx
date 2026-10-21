@@ -106,6 +106,8 @@ describe("spawnCli refuses what cmd.exe would expand", () => {
     ["the exit code", "%ERRORLEVEL%"],
     ["a hidden per-drive variable", "%=C:%"],
     ["a hidden exit-code variable", "%=ExitCode%"],
+    ["the cmd.exe binary's directory, a pseudo-variable `set` never lists", "m%__APPDIR__%"],
+    ["the current directory with a trailing backslash", "m%__CD__:~-1%"],
   ])("refuses a token that reads %s, which no environment lists", (_label, token) => {
     expect(() => spawnCli("claude", ["--model", token], { ...win, env: { PATH: "" } })).toThrow(
       /Refusing to spawn.*would expand/s,

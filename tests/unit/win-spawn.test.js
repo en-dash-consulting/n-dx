@@ -185,7 +185,7 @@ describe("assertNoWindowsEnvExpansion (core twin)", () => {
   });
 
   it("refuses cmd.exe's own dynamic variables, which no environment lists", () => {
-    for (const token of ["m%CMDCMDLINE:~-1%", "x%CD%y", "%RANDOM%", "%ERRORLEVEL%", "%=C:%", "%=ExitCode%"]) {
+    for (const token of ["m%CMDCMDLINE:~-1%", "x%CD%y", "%RANDOM%", "%ERRORLEVEL%", "%=C:%", "%=ExitCode%", "m%__APPDIR__%", "m%__CD__:~-1%"]) {
       expect(() => assertNoWindowsEnvExpansion([token], {}), token).toThrow(/would expand/);
     }
   });
