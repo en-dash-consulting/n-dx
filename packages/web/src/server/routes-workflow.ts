@@ -503,7 +503,9 @@ function validateSuggestionChanges(changes: Record<string, unknown>): string | n
     if (segments.some((seg) => FORBIDDEN_PATH_SEGMENTS.has(seg))) {
       return `Key "${key}" contains a forbidden path segment.`;
     }
-    const expected = APPLYABLE_SUGGESTION_KEYS[key];
+    // Own keys only: a plain lookup finds Object.prototype's members too, so a
+    // body keyed `toString` read back a truthy function and passed.
+    const expected = Object.hasOwn(APPLYABLE_SUGGESTION_KEYS, key) ? APPLYABLE_SUGGESTION_KEYS[key] : undefined;
     if (!expected) {
       return `Key "${key}" is not an applyable suggestion setting. Allowed: ${Object.keys(APPLYABLE_SUGGESTION_KEYS).join(", ")}.`;
     }

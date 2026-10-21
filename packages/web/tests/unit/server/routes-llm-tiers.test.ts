@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
@@ -157,5 +157,97 @@ describe("task class labels", () => {
   it("has no label for a class DEFAULT_ROUTES no longer routes", () => {
     const stale = Object.keys(TASK_CLASS_LABELS).filter((k) => !(k in DEFAULT_ROUTES));
     expect(stale).toEqual([]);
+  });
+});
+
+/**
+ * `isWritablePath` accepts any `llm.tiers.*` suffix, and a delete used to skip
+ * the `<vendor>.<tier>` shape check, so `llm.tiers.__proto__.toString: null`
+ * walked `deleteByPath` through `config.llm.tiers["__proto__"]` — which is
+ * Object.prototype — and removed its `toString` from the server process.
+ *
+ * Every request here is sent through `send`, which restores the original
+ * method before any assertion runs, so a regression surfaces as a failed
+ * expectation rather than a test process with no `toString`.
+ */
+describe("PUT /api/llm/config — prototype-chain paths", () => {
+  const seed = JSON.stringify({ llm: { vendor: "claude", tiers: { claude: { light: "haiku" } } } });
+  const originalToString = Object.prototype.toString;
+
+  async function send(
+    method: "PUT" | "POST",
+    path: string,
+    changes: Record<string, unknown>,
+  ): Promise<{ res: Response; prototypeIntact: boolean }> {
+    try {
+      const res = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes }),
+      });
+      return { res, prototypeIntact: Object.prototype.hasOwnProperty("toString") };
+    } finally {
+      if (!Object.prototype.hasOwnProperty("toString")) {
+        Object.defineProperty(Object.prototype, "toString", {
+          value: originalToString,
+          writable: true,
+          configurable: true,
+          enumerable: false,
+        });
+      }
+    }
+  }
+
+  it("refuses a delete through __proto__ and leaves Object.prototype alone", async () => {
+    const configPath = join(projectDir, ".n-dx.json");
+    for (const value of [null, ""]) {
+      await writeFile(configPath, seed, "utf-8");
+      const { res, prototypeIntact } = await send("PUT", "/api/llm/config", {
+        "llm.tiers.__proto__.toString": value,
+      });
+      const label = `value ${JSON.stringify(value)}`;
+      expect(prototypeIntact, label).toBe(true);
+      expect(res.status, label).toBe(400);
+      expect(await res.text(), label).toContain("__proto__");
+      expect(await readFile(configPath, "utf-8"), label).toBe(seed);
+    }
+  });
+
+  it("refuses llm.routes.__proto__ rather than answering 200 for a silent no-op", async () => {
+    const configPath = join(projectDir, ".n-dx.json");
+    await writeFile(configPath, seed, "utf-8");
+    const { res } = await send("PUT", "/api/llm/config", { "llm.routes.__proto__": "light" });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("__proto__");
+    expect(await readFile(configPath, "utf-8")).toBe(seed);
+  });
+
+  it("reports the same paths as edit problems in the preview and applies neither", async () => {
+    await writeFile(join(projectDir, ".n-dx.json"), seed, "utf-8");
+    const { res, prototypeIntact } = await send("POST", "/api/llm/config/preview", {
+      "llm.tiers.__proto__.toString": null,
+      "llm.routes.__proto__": "light",
+    });
+    expect(prototypeIntact).toBe(true);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.editProblems.map((p: { path: string }) => p.path).sort()).toEqual([
+      "llm.routes.__proto__",
+      "llm.tiers.__proto__.toString",
+    ]);
+  });
+
+  it("holds a delete to the llm.tiers.<vendor>.<tier> shape, and still clears a tier", async () => {
+    const configPath = join(projectDir, ".n-dx.json");
+    await writeFile(configPath, seed, "utf-8");
+    const whole = await send("PUT", "/api/llm/config", { "llm.tiers.claude": null });
+    expect(whole.res.status).toBe(400);
+    expect(await whole.res.text()).toContain("llm.tiers.<vendor>.<tier>");
+    expect(await readFile(configPath, "utf-8")).toBe(seed);
+
+    const one = await send("PUT", "/api/llm/config", { "llm.tiers.claude.light": null });
+    expect(one.res.status).toBe(200);
+    const after = JSON.parse(await readFile(configPath, "utf-8"));
+    expect(after.llm.tiers.claude.light).toBeUndefined();
   });
 });

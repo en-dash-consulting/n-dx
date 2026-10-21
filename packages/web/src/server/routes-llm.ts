@@ -34,7 +34,12 @@ import {
   getNextFailoverAttempt,
 } from "@n-dx/llm-client";
 import type { LLMConfig, LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
-import { VENDOR_PROVIDERS, validateConfigKeyValue, validateProviderForVendor } from "./hench-config-fields.js";
+import {
+  FORBIDDEN_CONFIG_SEGMENTS,
+  VENDOR_PROVIDERS,
+  validateConfigKeyValue,
+  validateProviderForVendor,
+} from "./hench-config-fields.js";
 import {
   readConfigSnapshot,
   readEffectiveNdxConfig,
@@ -319,8 +324,12 @@ function splitConfigPath(path: string): string[] {
 /**
  * Reject a parameterized path or value the resolver could not honor.
  * Returns an error message, or null when the change is acceptable.
+ *
+ * A delete (`deleting`) is held to the same path shape as a set — a tier is
+ * `llm.tiers.<vendor>.<tier>` whether it is being written or cleared — but
+ * not to the value rules, since there is no value.
  */
-function validateRoutingChange(path: string, value: unknown): string | null {
+function validateRoutingChange(path: string, value: unknown, deleting = false): string | null {
   if (path.startsWith("llm.tiers.")) {
     const rest = path.slice("llm.tiers.".length);
     const segments = rest.split(".");
@@ -335,11 +344,15 @@ function validateRoutingChange(path: string, value: unknown): string | null {
       return `Unknown tier "${tier}" in "${path}". Expected one of: ${[...TASK_TIERS].join(", ")}.`;
     }
     // Model ID validation is performed by validateModelForVendor, called after this path check
-    if (typeof value !== "string") {
+    if (!deleting && typeof value !== "string") {
       return `Value for "${path}" must be a model ID string.`;
     }
     return null;
   }
+
+  // Routes and effort are flat maps keyed by task class, so the path has no
+  // shape to hold a delete to; only a set has a value to check.
+  if (deleting) return null;
 
   if (path.startsWith("llm.routes.")) {
     if (typeof value !== "string" || !TASK_TIERS.has(value)) {
@@ -427,9 +440,17 @@ function getNumber(obj: Record<string, unknown>, key: string): number | null {
   return typeof v === "number" ? v : null;
 }
 
-/** Set a nested value by dot-separated path, creating intermediate objects. */
+/**
+ * Set a nested value by dot-separated path, creating intermediate objects.
+ *
+ * A `__proto__` / `constructor` / `prototype` segment is a no-op: walking
+ * through one lands on Object.prototype, and a write there reaches every
+ * object in the process. validateLlmChange refuses such a path first; this is
+ * the second line for a caller that bypasses it.
+ */
 function setByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = splitConfigPath(path);
+  if (parts.some((part) => FORBIDDEN_CONFIG_SEGMENTS.has(part))) return;
   let current: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
@@ -441,9 +462,14 @@ function setByPath(obj: Record<string, unknown>, path: string, value: unknown): 
   current[parts[parts.length - 1]] = value;
 }
 
-/** Delete a nested key by dot-separated path. */
+/**
+ * Delete a nested key by dot-separated path. Same prototype-chain guard as
+ * setByPath: `llm.tiers.__proto__.toString` once deleted Object.prototype's
+ * toString from the server process.
+ */
 function deleteByPath(obj: Record<string, unknown>, path: string): void {
   const parts = splitConfigPath(path);
+  if (parts.some((part) => FORBIDDEN_CONFIG_SEGMENTS.has(part))) return;
   let current: unknown = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     if (current == null || typeof current !== "object") return;
@@ -1087,6 +1113,14 @@ function validateLlmChange(
   value: string | boolean | number | null,
   vendorAfterChanges: string | null,
 ): string | null {
+  // Refused before any other rule, so the answer names the segment rather
+  // than a shape or vendor. Checked on the raw dotted path, not the
+  // flat-map-aware split: `llm.routes.__proto__` is a harmless own key once
+  // split, but nothing legitimate is ever named this way.
+  const poison = path.split(".").find((segment) => FORBIDDEN_CONFIG_SEGMENTS.has(segment));
+  if (poison) {
+    return `Invalid path "${path}": "${poison}" is not an allowed config key segment.`;
+  }
   // Legacy keys are read until 1.0.0 but never written. Refusing with the
   // replacement named beats the generic "unknown path" below, which would
   // leave a caller guessing that the key it can still *read* is not one
@@ -1125,12 +1159,11 @@ function validateLlmChange(
   if (path === "llm.vendor" && value !== null && !VALID_VENDORS.has(value.toString())) {
     return `llm.vendor must be one of: ${[...VALID_VENDORS].join(", ")}; got "${value}"`;
   }
-  // Routing paths carry their own shape and enum rules. Skipped for a
-  // null/"" value, which is a delete rather than a set.
-  if (value !== null && value !== "") {
-    const routingError = validateRoutingChange(path, value);
-    if (routingError) return routingError;
-  }
+  // Routing paths carry their own shape and enum rules. A null/"" value is a
+  // delete rather than a set: the path shape still applies, the value rules
+  // do not.
+  const routingError = validateRoutingChange(path, value, value === null || value === "");
+  if (routingError) return routingError;
   return validateModelForVendor(path, value) ?? validateReviewChange(path, value, vendorAfterChanges);
 }
 
