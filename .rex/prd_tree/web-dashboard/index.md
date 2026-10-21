@@ -65,3 +65,4 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Overview's isometric hero never shows its Options button because the page does not pass onOpenOptions](./overview-s-isometric-hero-never-shows.md) | pending |
 | [Stopping web serve on Windows leaves the ndx work and sv analyze children it spawned running](./stopping-web-serve-on-windows-leaves.md) | pending |
 | [Windows: exec() and spawnCli have no windowsHide, so children of console-less parents open visible console windows and sv narrate's claude window never closes](./windows-exec-and-spawncli-have-no.md) | pending |
+| [Start now on the Live page stays on /live instead of opening the task page it is given navigateTo for](./start-now-on-the-live-page-stays-on.md) | pending |

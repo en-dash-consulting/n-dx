@@ -40,6 +40,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone](./n-dx-rex-fails-intermittently-under/index.md) | completed |
 | [Narrow jsonResponse utility scope](./narrow-jsonresponse-utility-scope/index.md) | completed |
 | [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-audit/index.md) | completed |
+| [Playwright browser suites: hardening from the adversarial review of the manual and happy-click suites](./playwright-browser-suites-hardening/index.md) | pending |
 | [Project-aware Navigation and Context](./project-aware-navigation-and-context/index.md) | completed |
 | [Refactor high-risk architectural zones](./refactor-high-risk-architectural-zones/index.md) | completed |
 | [Skills Reference and .gitignore Guidance in ndx Documentation](./skills-reference-and-gitignore/index.md) | completed |
