@@ -47,6 +47,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Docs say ndx init creates v1 projects; it now creates v2](./docs-say-ndx-init-creates-v1-projects.md) | completed |
 | [Drop level from every v2 payload when v1 is refused](./drop-level-from-every-v2-payload-when.md) | pending |
 | [migrate --apply drops a blockedBy ref to an unbuilt capability as "met" when its pending work is held in the Inbox](./migrate-apply-drops-a-blockedby-ref-to.md) | completed |
+| [migrate-apply's leftover prd_tree/ tests restore the v1 files on Windows](./migrate-apply-s-leftover-prd-tree.md) | completed |
 | [Migrated product nodes read met when their v1 item completed](./migrated-product-nodes-read-met-when.md) | completed |
 | [Migration plan, dry run and apply refuse when the v1 parser skipped an item file](./migration-plan-dry-run-and-apply.md) | completed |
 | [ndx commands that spawn rex several times print the v1 deprecation notice once per spawn](./ndx-commands-that-spawn-rex-several.md) | completed |
@@ -69,9 +70,8 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [The bare ndx migrate chain shows the preflight banner and its --dry-run runs no model unless asked](./the-bare-ndx-migrate-chain-shows-the.md) | completed |
 | [The interrupted-apply test compares normalised snapshot paths, so Windows CLI smoke passes](./the-interrupted-apply-test-compares.md) | completed |
 | [The migration plan's --out and --summary guard compares real paths and refuses n-dx state directories](./the-migration-plan-s-out-and-summary.md) | completed |
+| [The --out state-directory guard sees through Windows short-name aliases](./the-out-state-directory-guard-sees.md) | completed |
 | [The v1 notice tests strip NDX_LEGACY_NOTICE from the environment they spawn with](./the-v1-notice-tests-strip-ndx-legacy.md) | completed |
 | [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | completed |
 | [Wire migrate apply onto #715's migrate-plan and #716's Inbox writer](./wire-migrate-apply-onto-715-s-migrate.md) | completed |
 | [Wire the migrate chain and the once-per-command v1 notice onto main's ndx migrate](./wire-the-migrate-chain-and-the-once.md) | completed |
-| [The --out state-directory guard sees through Windows short-name aliases](./the-out-state-directory-guard-sees.md) | completed |
-| [migrate-apply's leftover prd_tree/ tests restore the v1 files on Windows](./migrate-apply-s-leftover-prd-tree.md) | completed |

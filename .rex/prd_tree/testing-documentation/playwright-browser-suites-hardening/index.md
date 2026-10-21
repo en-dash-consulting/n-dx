@@ -21,10 +21,10 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | Title | Status |
 |-------|--------|
 | [A failed manual flow leaves the agent process tree running: afterAll stops only the dashboard](./a-failed-manual-flow-leaves-the-agent.md) | pending |
+| [A manual spec whose dashboard fails to start leaks its fixture directory](./a-manual-spec-whose-dashboard-fails-to.md) | pending |
 | [Flow 2 navigates away right after clicking Full analysis, racing the POST that starts it](./flow-2-navigates-away-right-after.md) | pending |
 | [hasCli uses shell: true with an args array and trips Node's DEP0190 on every manual run](./hascli-uses-shell-true-with-an-args.md) | pending |
 | [openLiveTask falls back to the newest run of any status and can open a previous leg's completed task](./openlivetask-falls-back-to-the-newest.md) | pending |
 | [settings.spec's feature-toggle API check asserts the response contains the key, which it always does](./settings-spec-s-feature-toggle-api.md) | pending |
 | [The happy-click sweep can press status-picker options: the listbox is never dismissed and option names are not denied](./the-happy-click-sweep-can-press-status.md) | pending |
 | [The manual flows' headSha assertion is vacuous: the baseline is taken before the spec's own commitAll](./the-manual-flows-headsha-assertion-is.md) | pending |
-| [A manual spec whose dashboard fails to start leaks its fixture directory](./a-manual-spec-whose-dashboard-fails-to.md) | pending |
