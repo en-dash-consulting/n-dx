@@ -146,6 +146,7 @@ describe("test fixtures are not infrastructure", () => {
       "src/__fixtures__/stack.tf": tf("aws_sns_topic", "fixture_topic"),
       "tests/setup/main.tf": tf("aws_lambda_function", "helper"),
       "internal/testdata/main.tf": tf("aws_dynamodb_table", "golden"),
+      "Api/Tests/Fixtures/main.tf": tf("aws_sns_topic", "dotnet_fixture"),
       "tests/fixtures/stack.yaml":
         "Resources:\n  Fake:\n    Type: AWS::SQS::Queue\n",
     };

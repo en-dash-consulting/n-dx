@@ -11,6 +11,7 @@ import { h, render } from "preact";
 import {
   DeliveryPanel,
   asInfrastructure,
+  deliveryAnalysisStamp,
   asReadiness,
   dimensionRows,
   groupInfrastructure,
@@ -69,6 +70,20 @@ describe("delivery model", () => {
     expect(rows.map((r) => r.label)).toEqual(["Testing", "CI", "CD", "newPractice"]);
   });
 
+  it("skips a dimension that is not an object instead of throwing", () => {
+    const rows = dimensionRows(asReadiness({ overall: 50, dimensions: { ci: dim(100), cd: null, testing: 7 } })!);
+    expect(rows.map((r) => r.id)).toEqual(["ci"]);
+  });
+
+  it("stamps an analysis by its run as well as its last phase", () => {
+    // analyze advances analyzedAt per phase but writes the two artifacts after
+    // the last one; only lastAnalysis moves when that output step is done.
+    const midRun = deliveryAnalysisStamp({ analyzedAt: "t2", lastAnalysis: { at: "r1" } });
+    const done = deliveryAnalysisStamp({ analyzedAt: "t2", lastAnalysis: { at: "r2" } });
+    expect(midRun).not.toBe(done);
+    expect(deliveryAnalysisStamp(null)).toBe("|");
+  });
+
   it("groups resources by kind, both alphabetical", () => {
     const groups = groupInfrastructure(asInfrastructure(INFRA)!);
     expect(groups.map((g) => [g.kind, g.resources.map((r) => r.name)])).toEqual([
@@ -109,7 +124,7 @@ describe("DeliveryPanel", () => {
 
   it("shows the score, each practice and resource counts in the tile", async () => {
     serve({ "readiness.json": READINESS, "infrastructure.json": INFRA });
-    render(h(DeliveryPanel, { analyzedAt: "t1" }), root);
+    render(h(DeliveryPanel, { stamp: "t1" }), root);
     await waitFor(() => expect(root.querySelector(".delivery-overall-score")?.textContent).toBe("72"));
     const practices = Array.from(root.querySelectorAll(".delivery-dimension-label")).map((e) => e.textContent);
     expect(practices).toEqual(["Testing", "CI", "CD"]);
@@ -119,7 +134,7 @@ describe("DeliveryPanel", () => {
 
   it("opened, lists evidence, gaps and every resource with its origin", async () => {
     serve({ "readiness.json": READINESS, "infrastructure.json": INFRA });
-    render(h(DeliveryPanel, { analyzedAt: "t1", opened: true }), root);
+    render(h(DeliveryPanel, { stamp: "t1", opened: true }), root);
     await waitFor(() => expect(root.querySelector(".delivery-evidence")).not.toBeNull());
     expect(root.querySelector(".delivery-evidence code")?.textContent).toBe(".github/workflows/ci.yml:12");
     expect(root.querySelector(".delivery-gaps")?.textContent).toBe("No deploy job — a workflow that deploys on merge");
@@ -134,7 +149,7 @@ describe("DeliveryPanel", () => {
 
   it("points at ndx analyze when neither artifact exists", async () => {
     serve({});
-    render(h(DeliveryPanel, { analyzedAt: null }), root);
+    render(h(DeliveryPanel, { stamp: "" }), root);
     await waitFor(() => expect(root.querySelectorAll(".delivery-empty")).toHaveLength(2));
     const text = root.textContent ?? "";
     expect(text).toContain("No readiness score yet. Run ndx analyze to produce it.");
@@ -144,16 +159,16 @@ describe("DeliveryPanel", () => {
 
   it("says plainly when the scan found no infrastructure", async () => {
     serve({ "readiness.json": READINESS, "infrastructure.json": { resources: [], seams: [], links: [], sawIaC: false } });
-    render(h(DeliveryPanel, { analyzedAt: "t1" }), root);
+    render(h(DeliveryPanel, { stamp: "t1" }), root);
     await waitFor(() => expect(root.textContent).toContain("No infrastructure found"));
   });
 
   it("refetches when the analysis changes", async () => {
     serve({ "readiness.json": READINESS, "infrastructure.json": INFRA });
-    render(h(DeliveryPanel, { analyzedAt: "t1" }), root);
+    render(h(DeliveryPanel, { stamp: "t1" }), root);
     await waitFor(() => expect(root.querySelector(".delivery-overall-score")).not.toBeNull());
     serve({ "readiness.json": { ...READINESS, overall: 95 }, "infrastructure.json": INFRA });
-    render(h(DeliveryPanel, { analyzedAt: "t2" }), root);
+    render(h(DeliveryPanel, { stamp: "t2" }), root);
     await waitFor(() => expect(root.querySelector(".delivery-overall-score")?.textContent).toBe("95"));
   });
 });

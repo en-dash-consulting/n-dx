@@ -2784,17 +2784,9 @@ var IAC_SKIP = /* @__PURE__ */ new Set([
   "dist",
   "build",
   "vendor",
-  "coverage",
-  // Test and fixture trees: a `.tf` there describes nothing deployed, and
-  // reporting it would draw fake infrastructure. `test` is deliberately absent,
-  // because it is a common environment name (`environments/test/main.tf`).
-  "tests",
-  "__tests__",
-  "fixtures",
-  "__fixtures__",
-  "testdata",
-  "__mocks__"
+  "coverage"
 ]);
+var IAC_TEST_DIRS = /* @__PURE__ */ new Set(["tests", "__tests__", "fixtures", "__fixtures__", "testdata", "__mocks__"]);
 function findIaCFiles(root, limit = 400) {
   const terraform = [];
   const yaml = [];
@@ -2810,7 +2802,7 @@ function findIaCFiles(root, limit = 400) {
     for (const entry of entries) {
       const full = join2(dir, entry.name);
       if (entry.isDirectory()) {
-        if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
+        if (IAC_SKIP.has(entry.name) || IAC_TEST_DIRS.has(entry.name.toLowerCase()) || entry.name.startsWith(".")) continue;
         walk(full, depth + 1);
         continue;
       }

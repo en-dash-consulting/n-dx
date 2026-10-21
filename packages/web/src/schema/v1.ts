@@ -31,8 +31,12 @@ export interface Manifest {
   children?: SubAnalysisRef[];
   /** Background `sv narrate` state — zone names and insights still landing while `pending`. */
   narration?: NarrationState;
-  /** The most recent analyze run; `mode` says how zones were enriched. */
-  lastAnalysis?: { mode?: string };
+  /**
+   * The most recent analyze run; `mode` says how zones were enriched, `at`
+   * when the run started. Written after the run's output files, unlike
+   * `analyzedAt`, which stops advancing when the last phase completes.
+   */
+  lastAnalysis?: { mode?: string; at?: string };
 }
 
 /** Mirrors sourcevision's `NarrationState`. */

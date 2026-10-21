@@ -183,11 +183,15 @@ function classifyResource(type: string): string | null {
 
 const IAC_SKIP = new Set([
   "node_modules", ".git", ".terraform", "dist", "build", "vendor", "coverage",
-  // Test and fixture trees: a `.tf` there describes nothing deployed, and
-  // reporting it would draw fake infrastructure. `test` is deliberately absent,
-  // because it is a common environment name (`environments/test/main.tf`).
-  "tests", "__tests__", "fixtures", "__fixtures__", "testdata", "__mocks__",
 ]);
+
+/**
+ * Test and fixture trees, matched case-insensitively (.NET writes `Tests/`
+ * and `Fixtures/`): a `.tf` there describes nothing deployed, and reporting it
+ * would draw fake infrastructure. `test` is deliberately absent, because it is
+ * a common environment name (`environments/test/main.tf`).
+ */
+const IAC_TEST_DIRS = new Set(["tests", "__tests__", "fixtures", "__fixtures__", "testdata", "__mocks__"]);
 
 /**
  * Find IaC candidate files in one pass over the tree.
@@ -211,7 +215,7 @@ function findIaCFiles(root: string, limit = 400): { terraform: string[]; yaml: s
     for (const entry of entries) {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
+        if (IAC_SKIP.has(entry.name) || IAC_TEST_DIRS.has(entry.name.toLowerCase()) || entry.name.startsWith(".")) continue;
         walk(full, depth + 1);
         continue;
       }

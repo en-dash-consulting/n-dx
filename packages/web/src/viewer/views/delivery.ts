@@ -97,10 +97,18 @@ export function asInfrastructure(raw: unknown): Infrastructure | null {
   return { resources: d.resources, sawIaC: d.sawIaC === true };
 }
 
-/** One row per dimension: known ones in report order, then any newer ones. */
+/**
+ * One row per dimension: known ones in report order, then any newer ones.
+ * An entry that is not an object (a hand-edited file) is left out rather than
+ * taking the panel down.
+ */
 export function dimensionRows(readiness: Readiness): DimensionRow[] {
-  const known = Object.keys(DIMENSION_LABELS).filter((id) => id in readiness.dimensions);
-  const extra = Object.keys(readiness.dimensions).filter((id) => !(id in DIMENSION_LABELS));
+  const present = (id: string) => {
+    const d: unknown = readiness.dimensions[id];
+    return typeof d === "object" && d !== null;
+  };
+  const known = Object.keys(DIMENSION_LABELS).filter((id) => id in readiness.dimensions && present(id));
+  const extra = Object.keys(readiness.dimensions).filter((id) => !(id in DIMENSION_LABELS) && present(id));
   return [...known, ...extra].map((id) => {
     const d = readiness.dimensions[id]!;
     return {
@@ -160,8 +168,24 @@ interface DeliveryData {
   infrastructure: Infrastructure | null;
 }
 
+/**
+ * Changes whenever an analysis finishes writing the two artifacts.
+ *
+ * `analyzedAt` alone is not enough: analyze advances it as each phase
+ * completes, then writes `readiness.json` and `infrastructure.json` in its
+ * output step after the last phase. Keyed on `analyzedAt`, a dashboard open
+ * during the run refetched while the old files were still on disk and never
+ * again. `lastAnalysis` is written after the outputs, so including it makes
+ * the final manifest write trigger the refetch.
+ */
+export function deliveryAnalysisStamp(
+  manifest: { analyzedAt?: string; lastAnalysis?: { at?: string } } | null | undefined,
+): string {
+  return `${manifest?.analyzedAt ?? ""}|${manifest?.lastAnalysis?.at ?? ""}`;
+}
+
 /** Both artifacts, refetched whenever the analysis they belong to changes. */
-function useDeliveryData(analyzedAt: string | null): DeliveryData | null {
+function useDeliveryData(stamp: string): DeliveryData | null {
   const [data, setData] = useState<DeliveryData | null>(null);
   useEffect(() => {
     let live = true;
@@ -170,7 +194,7 @@ function useDeliveryData(analyzedAt: string | null): DeliveryData | null {
         if (live) setData({ readiness: asReadiness(readiness), infrastructure: asInfrastructure(infrastructure) });
       });
     return () => { live = false; };
-  }, [analyzedAt]);
+  }, [stamp]);
   return data;
 }
 
@@ -270,8 +294,8 @@ function InfrastructureDetail({ infra }: { infra: Infrastructure }): ComponentCh
  * by kind; opened, every practice's evidence and gaps and every resource with
  * the file that declares it.
  */
-export function DeliveryPanel({ analyzedAt, opened = false }: { analyzedAt: string | null; opened?: boolean }): ComponentChild {
-  const data = useDeliveryData(analyzedAt);
+export function DeliveryPanel({ stamp, opened = false }: { stamp: string; opened?: boolean }): ComponentChild {
+  const data = useDeliveryData(stamp);
   const note = useMemo(() => h("p", { class: "delivery-note" }, HEURISTIC_NOTE), []);
   if (!data) return h("p", { class: "stage-tile-empty" }, "Loading…");
   const { readiness, infrastructure } = data;

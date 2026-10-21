@@ -11,7 +11,7 @@ import { basename } from "../utils.js";
 import { formatSince } from "../utils/format.js";
 import { narrationNotice } from "./narration-notice.js";
 import { IsoMapHero } from "./iso-map.js";
-import { DeliveryPanel } from "./delivery.js";
+import { DeliveryPanel, deliveryAnalysisStamp } from "./delivery.js";
 import { isoMapAnalysisStamp } from "./iso-map-url.js";
 import { ActionIcon, AnalyzeControls, BrandedHeader, InfoTip } from "../components/index.js";
 import type { JobTray } from "../hooks/index.js";
@@ -433,7 +433,7 @@ export function Overview({ data, navigateTo, onSelect, jobs, variant = "full" }:
     // SDLC readiness and discovered infrastructure, with their evidence.
     lead ? null : h("div", { class: "overview-section" },
       h("h3", null, "Delivery & infrastructure"),
-      h(DeliveryPanel, { analyzedAt: manifest?.analyzedAt ?? null, opened: true }),
+      h(DeliveryPanel, { stamp: deliveryAnalysisStamp(manifest), opened: true }),
     ),
 
     // Two-column layout: Languages + Zone summary
