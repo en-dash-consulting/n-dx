@@ -92,6 +92,20 @@ describe("crossReferenceChanges", () => {
     expect(matched("src/foo/bar.ts", ["zzz/foo/bar.ts"])).toEqual([]);
   });
 
+  // The shorter path is the whole longer one or follows a `/` in it. A bare
+  // endsWith matched `lib/util.ts` to `mylib/util.ts` and to every
+  // `**/lib/util.ts` alike.
+  it("matches a tail only at a path separator, in both directions", () => {
+    expect(matched("lib/util.ts", ["mylib/util.ts"])).toEqual([]);
+    expect(matched("mylib/util.ts", ["lib/util.ts"])).toEqual([]);
+    expect(matched("src/lib/util.ts", ["lib/util.ts"])).toEqual(["lib/util.ts"]);
+    expect(matched("lib/util.ts", ["src/lib/util.ts"])).toEqual(["src/lib/util.ts"]);
+    expect(matched("lib/util.ts", ["lib/util.ts"])).toEqual(["lib/util.ts"]);
+    expect(matched("lib/util.ts", ["mylib/util.ts", "src/lib/util.ts", "lib/util.ts"])).toEqual([
+      "src/lib/util.ts", "lib/util.ts",
+    ]);
+  });
+
   it("reports a changed file as given, apart from a leading ./", () => {
     const task = makeTask({ description: "Touches src/a.ts and lib/b.ts." });
     const { affectedTasks, uncoveredChanges } = crossReferenceChanges([task], [

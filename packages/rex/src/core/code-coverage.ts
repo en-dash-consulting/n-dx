@@ -88,6 +88,17 @@ function normalizePath(path: string): string {
 }
 
 /**
+ * Whether `tail` is the whole of `path` or ends it after a `/`. A bare
+ * endsWith matched `lib/util.ts` to `mylib/util.ts`, and to every
+ * `**\/lib/util.ts` alike.
+ */
+function endsAtSeparator(path: string, tail: string): boolean {
+  if (path === tail) return true;
+  if (tail.length === 0 || path.length <= tail.length || !path.endsWith(tail)) return false;
+  return path.charCodeAt(path.length - tail.length - 1) === 47; // "/"
+}
+
+/**
  * Cross-reference changed files with PRD items.
  *
  * @param items - PRD item tree
@@ -110,8 +121,8 @@ export function crossReferenceChanges(
     for (const changed of normalizedChanges) {
       for (const itemPath of itemPaths) {
         // Match if the changed file ends with the item's referenced path
-        // or if the item's path ends with the changed file
-        if (changed.endsWith(itemPath) || itemPath.endsWith(changed) || changed === itemPath) {
+        // or the item's path ends with the changed file, at a `/` boundary.
+        if (endsAtSeparator(changed, itemPath) || endsAtSeparator(itemPath, changed)) {
           matchedFiles.push(changed);
           coveredFiles.add(changed);
           break;
