@@ -179,7 +179,8 @@ export function assertOutsideRexDir(outPath: string, dir: string, noun: string, 
  * `path` with symlinks resolved through its nearest existing ancestor (the
  * path itself may not exist yet), case-folded where filesystems usually are.
  * Plain `path.relative` misses a symlink to a guarded directory, a `/tmp`
- * versus `/private/tmp` alias, and `.REX` on a case-insensitive volume.
+ * versus `/private/tmp` alias, a Windows 8.3 short name (`RUNNER~1`) and `.REX`
+ * on a case-insensitive volume. Only `realpathSync.native` expands short names.
  */
 function canonicalPath(path: string): string {
   let existing = resolve(path);
@@ -190,7 +191,7 @@ function canonicalPath(path: string): string {
     tail.unshift(basename(existing));
     existing = parent;
   }
-  const real = join(existsSync(existing) ? realpathSync(existing) : existing, ...tail);
+  const real = join(existsSync(existing) ? realpathSync.native(existing) : existing, ...tail);
   return process.platform === "darwin" || process.platform === "win32" ? real.toLowerCase() : real;
 }
 
