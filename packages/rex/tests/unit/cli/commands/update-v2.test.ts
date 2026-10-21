@@ -42,7 +42,8 @@ async function outcome(dir: string) {
       applied: node.appliedAt !== undefined,
       resolutionType: node.resolutionType,
     })),
-    product: JSON.stringify(tree.product, (k, v) => (/At$/.test(k) ? undefined : v)),
+    // Timestamps differ between the two runs; lastModified is one.
+    product: JSON.stringify(tree.product, (k, v) => (/At$|^lastModified$/.test(k) ? undefined : v)),
   };
 }
 

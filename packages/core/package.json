@@ -87,6 +87,7 @@
     "layout.js",
     "init-summary.js",
     "migrate-layout.js",
+    "migrate-chain.js",
     "run-summary.js"
   ],
   "scripts": {

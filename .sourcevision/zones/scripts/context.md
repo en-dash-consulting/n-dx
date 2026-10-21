@@ -5,27 +5,31 @@
 <zone>
 
 Zone: Build & CI Scripts (`scripts`)
-Files: 11, Cohesion: 0.00, Coupling: 0.00
+Files: 15, Cohesion: 0.00, Coupling: 0.00
 Risk: healthy (score: 0.50)
-Description: Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+8 more)
-Entry points: scripts/build-iso-skill.mjs, scripts/check-dependency-drift.mjs, scripts/check-obfuscated-code.mjs, scripts/cli-smoke-parity.mjs, scripts/prompt-census.mjs
-Lines: 5008
+Description: Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+12 more)
+Entry points: scripts/build-iso-skill.mjs, scripts/check-dependency-drift.mjs, scripts/check-lockfile-integrity.mjs, scripts/check-obfuscated-code.mjs, scripts/cli-smoke-parity.mjs, scripts/prompt-census.mjs, scripts/verify-release-sync.mjs
+Lines: 5700
 
 </zone>
 
 <files>
 
 scripts/backfill-release-tags.mjs (JavaScript, 194 lines, build)
-scripts/build-iso-skill.mjs (JavaScript, 135 lines, build)
+scripts/build-iso-skill.mjs (JavaScript, 148 lines, build)
 scripts/check-dependency-drift.mjs (JavaScript, 208 lines, build)
+scripts/check-lockfile-integrity.mjs (JavaScript, 259 lines, build)
 scripts/check-obfuscated-code.mjs (JavaScript, 652 lines, build)
 scripts/cli-smoke-parity.mjs (JavaScript, 782 lines, build)
+scripts/export-preview-demo.mjs (JavaScript, 214 lines, build)
 scripts/hench-callgraph-analysis.mjs (JavaScript, 214 lines, build)
+scripts/lib/stale-dist.d.mts (TypeScript, 45 lines, build)
 scripts/preflight.mjs (JavaScript, 158 lines, build)
 scripts/profile-prd-tree-write.mjs (JavaScript, 219 lines, build)
 scripts/profile-store-write.mjs (JavaScript, 423 lines, build)
-scripts/prompt-census.mjs (JavaScript, 1940 lines, build)
-scripts/run-vitest-bind-aware.mjs (JavaScript, 83 lines, build)
+scripts/prompt-census.mjs (JavaScript, 1952 lines, build)
+scripts/run-vitest-bind-aware.mjs (JavaScript, 89 lines, build)
+scripts/verify-release-sync.mjs (JavaScript, 143 lines, build)
 
 </files>
 
@@ -37,19 +41,21 @@ Outgoing (this zone → other zones):
 
 Incoming (other zones → this zone):
   ← tests-e2e: tests/e2e/iso-skill-drift.test.js → scripts/build-iso-skill.mjs; tests/e2e/obfuscated-code-policy.test.js → scripts/check-obfuscated-code.mjs; tests/e2e/prompt-census.test.js → scripts/prompt-census.mjs
-  ← tests-unit: tests/unit/check-dependency-drift.test.js → scripts/check-dependency-drift.mjs; tests/unit/cli-smoke-parity.test.js → scripts/cli-smoke-parity.mjs
+  ← tests-unit: tests/unit/check-dependency-drift.test.js → scripts/check-dependency-drift.mjs; tests/unit/check-lockfile-integrity.test.js → scripts/check-lockfile-integrity.mjs; tests/unit/cli-smoke-parity.test.js → scripts/cli-smoke-parity.mjs; tests/unit/verify-release-sync.test.js → scripts/verify-release-sync.mjs
 
 </imports>
 
 <findings>
 
-[observation] [info] Isolated files — no import edges between 11 files, cohesion is unmeasurable (reported as 0)
+[observation] [info] Isolated files — no import edges between 15 files, cohesion is unmeasurable (reported as 0)
+[anti-pattern] [warning] "Build & CI Scripts" imports "Tests" on 1 edge(s) while the 3 edge(s) between them run the other way — the minority direction looks like a layering violation
 
 </findings>
 
 <insights>
 
-- Isolated files — no import edges between 11 files, cohesion is unmeasurable (reported as 0)
-- [call graph] 341 internal calls, 1 outgoing, 100 incoming (cohesion: 1, coupling: 0)
+- Isolated files — no import edges between 15 files, cohesion is unmeasurable (reported as 0)
+- "Build & CI Scripts" imports "Tests" on 1 edge(s) while the 3 edge(s) between them run the other way — the minority direction looks like a layering violation
+- [call graph] 370 internal calls, 1 outgoing, 121 incoming (cohesion: 1, coupling: 0)
 
 </insights>

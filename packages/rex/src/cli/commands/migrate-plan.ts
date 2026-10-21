@@ -18,8 +18,8 @@
  * The plan at `--out`, when one is already there, is read back as the earlier
  * plan. A model answer recorded in it is reused while the item's content, the
  * question and the model all still match, so re-planning an unchanged tree
- * asks nothing and costs nothing. Its `cutAt` is reused too unless `--cut-at`
- * overrides it, which is what makes the re-run byte-identical rather than
+ * asks nothing and costs nothing. Its `cutAt` is reused too when the PRD and
+ * the code evidence are the ones it was made from, unless `--cut-at` overrides it, which is what makes the re-run byte-identical rather than
  * merely equivalent — the cut is a property of the plan, not of the clock the
  * re-run happened to see.
  *
@@ -41,19 +41,22 @@
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { TYPESAFE_API_KEY_ENV, askJev, exec, resolveLayout, relativeToRoot } from "@n-dx/llm-client";
+import { TYPESAFE_API_KEY_ENV, askJev, exec, resolveLayout, relativeToRoot, routesToTier } from "@n-dx/llm-client";
+import type { LLMConfig } from "../../store/project-config.js";
+import { MIGRATION_JUDGE_TASK_CLASS } from "../../migrations/v1-to-v2/jev-review-pass.js";
 import { prdLockPath, resolveRexPaths, resolveStore, withLock } from "../../store/index.js";
 import { hasV2Tree } from "../../store/prd-bundle-v2.js";
 import { loadPlacementSettings } from "../../core/placement-policy.js";
 import { findTestFiles } from "../../core/verify.js";
 import { findMigration, MIGRATIONS } from "../../migrations/registry.js";
 import { formatPlanFile, readPlanFile, writePlanFile, type PlanFile } from "../../migrations/plan-file.js";
-import { v1TreeSource, type V1ToV2Options } from "../../migrations/v1-to-v2/index.js";
+import { contentHash, sourceDigest, v1TreeSource, V1_TREE_SOURCE_KIND, type V1ToV2Options } from "../../migrations/v1-to-v2/index.js";
 import { readCodeEvidence, readCodeEvidenceProvenance } from "../../migrations/v1-to-v2/code-files.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
+import { describeSkippedV1Items, skippedV1Items } from "../../migrations/v1-to-v2/v1-tree-read.js";
 import { renderPlanSummary, type V1ToV2Plan } from "../../migrations/v1-to-v2/plan-summary.js";
 import { atomicWrite } from "../../store/atomic-write.js";
-import { CLIError } from "../errors.js";
+import { CLIError, refuseInsideAgentRun } from "../errors.js";
 import { assertOutsideRexDir } from "./export.js";
 import { info, result, warn } from "../output.js";
 
@@ -90,13 +93,45 @@ async function readPrevious(path: string): Promise<PlanFile | undefined> {
   }
 }
 
-/** Resolve the cut time: the flag, else the earlier plan's (so a re-run reproduces it), else now. */
-function resolveCutAt(flag: string | undefined, previous: PlanFile | undefined): string {
-  if (flag !== undefined && flag !== "true") {
-    if (Number.isNaN(Date.parse(flag))) throw new CLIError(`--cut-at=${flag} is not an ISO time.`, "Example: --cut-at=2026-10-09T00:00:00.000Z");
-    return flag;
+/** The `--cut-at` flag as an ISO time; undefined when absent. Validated before anything is read. */
+function parseCutAtFlag(flag: string | undefined): string | undefined {
+  if (flag === undefined || flag === "true") return undefined;
+  if (Number.isNaN(Date.parse(flag))) throw new CLIError(`--cut-at=${flag} is not an ISO time.`, "Example: --cut-at=2026-10-09T00:00:00.000Z");
+  return flag;
+}
+
+/**
+ * Resolve the cut time: the flag, else the earlier plan's when it was made from
+ * this very source, else now.
+ *
+ * "This source" is the PRD items (`source.digest`) and the code evidence the
+ * plan read (`evidenceDigest`; a plan from before it existed lacks it and so
+ * matches only an empty analysis). Reusing the cut across a changed source
+ * would carry an old date into `appliedAt` fallbacks and the cut change's id.
+ * `reset` is set when an earlier plan was there and its cut was not reused.
+ */
+function resolveCutAt(
+  flag: string | undefined,
+  previous: PlanFile | undefined,
+  current: { digest: string; evidenceDigest: string },
+): { cutAt: string; reset: boolean } {
+  if (flag !== undefined) return { cutAt: flag, reset: false };
+  if (!previous) return { cutAt: new Date().toISOString(), reset: false };
+  const evidence = (previous.summary as V1ToV2Plan["summary"]).evidenceDigest ?? contentHash({});
+  if (previous.header.source.digest === current.digest && evidence === current.evidenceDigest) {
+    return { cutAt: previous.header.cutAt, reset: false };
   }
-  return previous?.header.cutAt ?? new Date().toISOString();
+  return { cutAt: new Date().toISOString(), reset: true };
+}
+
+/**
+ * Whether the plan asks Jev to review it (with a key; see `planSeams`).
+ *
+ * Off under `--no-jev-review`, and when `llm.routes` sends the judge class to a
+ * tier (exact or glob) — the project-level opt-out every judge class honours.
+ */
+export function wantsJevReview(flags: Record<string, string>, llmConfig: LLMConfig): boolean {
+  return flags["no-jev-review"] !== "true" && !routesToTier(MIGRATION_JUDGE_TASK_CLASS, llmConfig);
 }
 
 /**
@@ -112,7 +147,8 @@ async function buildSeams(dir: string, rexDir: string, flags: Record<string, str
 
   const { setLLMConfig, setClaudeConfig, setProjectDir } = await import("../../analyze/reason.js");
   const { loadLLMConfig, loadClaudeConfig } = await import("../../store/project-config.js");
-  setLLMConfig(await loadLLMConfig(rexDir));
+  const llmConfig = await loadLLMConfig(rexDir);
+  setLLMConfig(llmConfig);
   setClaudeConfig(await loadClaudeConfig(rexDir));
   setProjectDir(dir);
 
@@ -130,7 +166,7 @@ async function buildSeams(dir: string, rexDir: string, flags: Record<string, str
       spec: createTextSpecModel(model),
       jev: { model: JEV_PLAN_MODEL, judge: askJev },
       jevAvailable: Boolean(process.env[TYPESAFE_API_KEY_ENV]),
-      jevReview: flags["no-jev-review"] !== "true",
+      jevReview: wantsJevReview(flags, llmConfig),
       warn,
     });
   } catch (err) {
@@ -165,6 +201,7 @@ async function isAncestorOfHead(dir: string, sha: string): Promise<boolean> {
 }
 
 export async function cmdMigratePlan(dir: string, flags: Record<string, string>): Promise<void> {
+  refuseInsideAgentRun("rex migrate-plan");
   // The whole argument shape settles before anything is read, so a malformed
   // command fails on the command rather than part-way through a paid run.
   const id = flags.migration === undefined || flags.migration === "true" ? DEFAULT_MIGRATION : flags.migration;
@@ -203,7 +240,7 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   }
 
   const previous = await readPrevious(outPath);
-  const cutAt = resolveCutAt(flags["cut-at"], previous);
+  const cutAtFlag = parseCutAtFlag(flags["cut-at"]);
 
   const store = await resolveStore(rexDir);
   // Read-only span under the PRD lock, the same guarantee `rex export` takes:
@@ -211,7 +248,13 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   // classify a mixed state. Never withTransaction — that would write the tree
   // back out, and this command writes nothing to it.
   await mkdir(rexDir, { recursive: true });
-  const doc = await withLock(prdLockPath(rexDir), () => store.loadDocument());
+  const doc = await withLock(prdLockPath(rexDir), async () => {
+    // The store's load drops the parser's warnings: an item it skipped would
+    // be planned as absent, and apply would then remove its file.
+    const skipped = await skippedV1Items(rexDir);
+    if (skipped.length > 0) throw new CLIError(describeSkippedV1Items(skipped), "No plan was written.");
+    return store.loadDocument();
+  });
 
   const seams = await buildSeams(dir, rexDir, flags);
   // Both outside facts the rules read are gathered here: the migration itself
@@ -256,12 +299,22 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   }
   const options: V1ToV2Options = { testFiles, codeFiles };
 
+  const evidenceDigest = contentHash(codeFiles);
+  const { cutAt, reset } = resolveCutAt(cutAtFlag, previous, {
+    digest: sourceDigest(V1_TREE_SOURCE_KIND, (await v1TreeSource(doc.items).read()).items),
+    evidenceDigest,
+  });
+  if (reset) {
+    info(`The earlier plan at ${outPath} was made from a different PRD or code analysis; the cut time was reset to ${cutAt}.`);
+  }
+
   info(`Planning ${migration.id} over ${doc.items.length} top-level items (cut at ${cutAt})…`);
   const plan = (await migration.plan(v1TreeSource(doc.items), { cutAt, seams, previous, options })) as V1ToV2Plan;
 
   // Recorded on the plan, not just printed: the cut-day apply and anyone
   // reviewing migration-plan.json later need to know how old the evidence is.
   if (evidenceSummary) plan.summary.codeEvidence = evidenceSummary;
+  plan.summary.evidenceDigest = evidenceDigest;
 
   await mkdir(dirname(outPath), { recursive: true });
   await writePlanFile(outPath, plan);

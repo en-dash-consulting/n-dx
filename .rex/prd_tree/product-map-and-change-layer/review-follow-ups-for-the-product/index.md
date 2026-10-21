@@ -19,7 +19,10 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [A cascaded close on a v2 tree stamps the auto-completed change with the current actor as its author](./a-cascaded-close-on-a-v2-tree-stamps.md) | pending |
 | [A change's touches and amends name a capability or constraint](./a-change-s-touches-and-amends-name-a.md) | completed |
+| [A re-run of migrate --apply refuses a genuine leftover prd_tree/ that the plan cannot vouch for](./a-re-run-of-migrate-apply-refuses-a.md) | completed |
+| [A v2 folder node that becomes a leaf strands its non-tree files in an index-less folder](./a-v2-folder-node-that-becomes-a-leaf.md) | pending |
 | [An open fix: true change that adds a capability marks the new capability defective while its kind is feature](./an-open-fix-true-change-that-adds-a.md) | completed |
 | [Apply refuses removing one member of a pre-existing dependsOn knot that stays cyclic](./apply-refuses-removing-one-member-of-a.md) | pending |
 | [Bitbucket token patterns in redact.ts are tested only against samples built from the patterns themselves](./bitbucket-token-patterns-in-redact-ts.md) | completed |
@@ -27,24 +30,33 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [change-management guide says rex remove archives items and rex restore <item-id> recovers them; neither is true](./change-management-guide-says-rex.md) | completed |
 | [Codex drops most of packages/web/AGENTS.md: root plus nested AGENTS.md exceeds its 32 KiB combined project-doc budget](./codex-drops-most-of-packages-web.md) | completed |
 | [Codex never sees the per-package governance or the path-scoped rules, because they live only in Claude-loaded files](./codex-never-sees-the-per-package.md) | cancelled |
+| [Dashboard error messages from spawned rex commands start with the v1 deprecation notice](./dashboard-error-messages-from-spawned.md) | completed |
 | [Decide whether rex's trailer reader recovers a split-off N-DX-Item line](./decide-whether-rex-s-trailer-reader.md) | completed |
 | [Defer the PRD timeline view and re-scope it to the Changes view](./defer-the-prd-timeline-view-and-re.md) | completed |
 | [Derive area links and propose dependsOn from shared tests](./derive-area-links-and-propose.md) | pending |
 | [Diff two migration plans in words](./diff-two-migration-plans-in-words.md) | pending |
 | [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
+| [get_capabilities reports schemaVersion rex/v1 on a v2 tree](./get-capabilities-reports-schemaversion.md) | completed |
+| [get_product on a large v2 tree exceeds what an MCP client accepts](./get-product-on-a-large-v2-tree-exceeds.md) | completed |
 | [Install the sv analyze stop handlers before the progress file says running](./install-the-sv-analyze-stop-handlers.md) | completed |
+| [MCP writes on a v2 tree do not stamp lastModified / lastModifiedBy](./mcp-writes-on-a-v2-tree-do-not-stamp.md) | completed |
 | [`ndx ci` crashes with a stack trace, and no report, when a scanned source file cannot be read](./ndx-ci-crashes-with-a-stack-trace-and.md) | pending |
 | [ndx ci gateway-imports step misses dynamic import() that domain-isolation now flags](./ndx-ci-gateway-imports-step-misses.md) | pending |
 | [ndx work --task=<change> --resolve refuses a change whose open tasks --reset-deferred would reopen](./ndx-work-task-change-resolve-refuses-a.md) | pending |
 | [No test pins the Ask route passing the v2 merge rule to parseAnswerRefinements](./no-test-pins-the-ask-route-passing-the.md) | pending |
 | [Nothing stops AGENTS.md growing past Codex's 32 KiB project-doc limit, where Codex silently drops the tail](./nothing-stops-agents-md-growing-past.md) | completed |
+| [Placing an Inbox change strands non-tree files in changes/inbox/<slug>/ and leaves a skipped-folder warning](./placing-an-inbox-change-strands-non.md) | completed |
 | [Record review decisions as calibration records on the run record](./record-review-decisions-as-calibration.md) | pending |
 | [ref-resolves errors on an added amendment placed under a node another open change adds](./ref-resolves-errors-on-an-added.md) | deferred |
+| [rex migrate-slugs on a v2 tree tells you to run rex migrate-to-folder-tree, a v1 command](./rex-migrate-slugs-on-a-v2-tree-tells.md) | completed |
+| [rex migrate-to-folder-tree drops the PRD title: it never writes tree-meta.json, so the tree reads back as "PRD"](./rex-migrate-to-folder-tree-drops-the.md) | completed |
 | [rex release stamp applies a container change before the changes nested in it](./rex-release-stamp-applies-a-container.md) | pending |
 | [Stop the timed-out test gate test racing its fake gate startup](./stop-the-timed-out-test-gate-test.md) | completed |
 | [The merge-state git test's LF pin is unguarded off Windows: removing it still passes on macOS and Linux](./the-merge-state-git-test-s-lf-pin-is.md) | completed |
-| [The v2 writer silently drops a folder's top-level state.yaml keys when the folder loses its last child](./the-v2-writer-silently-drops-a-folder.md) | pending |
+| [The migration plan's metAt hashes the rules-stage spec draft and goes stale once a later pass redrafts the spec](./the-migration-plan-s-metat-hashes-the.md) | completed |
+| [The v2 writer drops a moved folder node's top-level state.yaml keys](./the-v2-writer-drops-a-moved-folder.md) | completed |
+| [v2 changes still carry a v1 level (epic) in MCP and CLI output](./v2-changes-still-carry-a-v1-level-epic.md) | completed |
 | [v2 isolation test misses imports of the core v2 modules and dynamic import() of any v2 module](./v2-isolation-test-misses-imports-of.md) | pending |
 | [v2 layer-nesting accepts a change under a change and a task at the changes root](./v2-layer-nesting-accepts-a-change.md) | completed |
 | [VALIDATED_DOC_PAGES is hand-maintained: a root test that starts reading a new docs page selects nothing until someone adds a group](./validated-doc-pages-is-hand-maintained.md) | pending |

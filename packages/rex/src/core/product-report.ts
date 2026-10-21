@@ -1,8 +1,11 @@
 /**
  * Read-only reports over a v2 tree, the shapes the rex MCP read tools return:
  *
- * - {@link productReport}: the product layer as areas → capabilities and
- *   constraints, each with its computed status and health (`get_product`).
+ * - {@link productSummary}: one row of counts per area (`get_product`'s
+ *   default); {@link productAreaReport}: one area's capabilities and
+ *   constraints (`get_product` with `area`); {@link productReport}: the whole
+ *   product layer as areas → capabilities and constraints, each with its
+ *   computed status and health (`get_product` with `full`).
  * - {@link capabilityReport}: one capability or constraint with its parent
  *   chain, status, and the changes and constraints related to it
  *   (`get_capability`).
@@ -17,7 +20,7 @@
 
 import type { ItemStatus } from "../schema/v1.js";
 import type { ChangeNode } from "../schema/v2.js";
-import { indexTree, isAppliedChange, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { indexTree, isAppliedChange, isOpenChange, type RuleNode, type TreeIndex, type V2Tree } from "../schema/v2-rules.js";
 import { compareReleases } from "./change-selection.js";
 import { computeEdges, productIndex, type CoChange } from "./product-edges.js";
 import { computeProductStatus, type Health, type IntentStatus, type ProductStatus } from "./product-status.js";
@@ -41,7 +44,39 @@ export interface ProductReportNode {
 
 /** The live product layer, areas first as stored, with each capability's and constraint's status and health. */
 export function productReport(tree: V2Tree): ProductReportNode[] {
-  const status = computeProductStatus(tree);
+  return tree.product.flatMap(reportVisitor(computeProductStatus(tree)));
+}
+
+/** An area in the product summary: its counts, without the capabilities and constraints themselves. */
+export interface ProductSummaryArea extends AreaStatus {
+  summary?: string;
+}
+
+/**
+ * The product layer in brief: one row per top-level area with its counts.
+ * Its size grows with the number of areas, not capabilities, so it stays
+ * within what an MCP client accepts on a large tree (`get_product`'s default).
+ */
+export function productSummary(tree: V2Tree): ProductSummaryArea[] {
+  const live = new Map(tree.product.map((n) => [n.id, n]));
+  return areaStatuses(tree, computeProductStatus(tree), indexTree(tree)).map((row) => {
+    const summary = live.get(row.id)?.summary;
+    return typeof summary === "string" && summary ? { ...row, summary } : row;
+  });
+}
+
+/** One area (id, display id or alias; a nested area too) with every live capability and constraint under it. */
+export function productAreaReport(tree: V2Tree, ref: string): ProductReportNode {
+  const node = indexTree(tree).resolve(ref);
+  if (!node || node.type !== "area") {
+    const what = node ? `is ${article(node.type)} ${node.type}, not an area` : "names no area";
+    const plain = `"${ref}" ${what}.`;
+    throw new ProductReportError(`${plain} Use get_product without area for the list of areas.`, "not-an-area", plain);
+  }
+  return reportVisitor(computeProductStatus(tree))(node)[0];
+}
+
+function reportVisitor(status: Record<string, ProductStatus>): (node: RuleNode) => ProductReportNode[] {
   const visit = (node: RuleNode): ProductReportNode[] => {
     if (node.status === "deleted") return [];
     if (node.type !== "area" && node.type !== "capability" && node.type !== "constraint") return [];
@@ -58,13 +93,13 @@ export function productReport(tree: V2Tree): ProductReportNode[] {
       ...(children.length ? { children } : {}),
     }];
   };
-  return tree.product.flatMap(visit);
+  return visit;
 }
 
 // ── get_capability ───────────────────────────────────────────────
 
 /** Why a report was refused. Each surface words its own hint by kind; the message is the MCP wording. */
-export type ProductReportErrorKind = "not-a-capability" | "no-status" | "bad-cursor";
+export type ProductReportErrorKind = "not-a-capability" | "not-an-area" | "no-status" | "bad-cursor";
 
 export class ProductReportError extends Error {
   /**
@@ -326,10 +361,40 @@ export const RECENT_RELEASES = 5;
 
 /** Product status per area and change counts per release. */
 export function prdStatusReport(tree: V2Tree, options: { allReleases?: boolean } = {}): PrdStatusReport {
-  const status = computeProductStatus(tree);
   const index = indexTree(tree);
-  // Every live change, nested ones included: add_item takes a change as a change's parent.
-  const changes = index.entries.filter((e) => e.root === "changes" && e.node.type === "change").map((e) => e.node);
+  const changes = liveChanges(index);
+  const areas = areaStatuses(tree, computeProductStatus(tree), index);
+
+  const byRelease = new Map<string | null, RuleNode[]>();
+  for (const change of changes) {
+    const c = change as ChangeNode;
+    const release = c.shippedIn ?? c.plannedRelease ?? null;
+    byRelease.set(release, [...(byRelease.get(release) ?? []), change]);
+  }
+  const everyRelease = [...byRelease]
+    .sort(([a], [b]) => compareReleases(a ?? undefined, b ?? undefined))
+    .map(([release, list]): ReleaseStatus => ({ release, changes: countChanges(list) }));
+  const closed = everyRelease.filter((r) => r.release !== null && r.changes.open === 0);
+  const dropped = new Set(options.allReleases ? [] : closed.slice(0, Math.max(closed.length - RECENT_RELEASES, 0)));
+  const releases = everyRelease.filter((r) => !dropped.has(r));
+
+  return {
+    changes: countChanges(changes),
+    inbox: changes.filter((c) => isOpenChange(c) && c.needsPlacement).length,
+    areas,
+    releases,
+    releasesOmitted: dropped.size,
+  };
+}
+
+/** Every live change, nested ones included: add_item takes a change as a change's parent. */
+function liveChanges(index: TreeIndex): RuleNode[] {
+  return index.entries.filter((e) => e.root === "changes" && e.node.type === "change").map((e) => e.node);
+}
+
+/** One row per live top-level area: its capabilities and constraints by status, and its open changes. */
+function areaStatuses(tree: V2Tree, status: Record<string, ProductStatus>, index: TreeIndex): AreaStatus[] {
+  const changes = liveChanges(index);
 
   // Each node maps to its top-level area: an area nested in an area rolls up into its ancestor's row.
   const areaOf = new Map<string, RuleNode>();
@@ -352,7 +417,7 @@ export function prdStatusReport(tree: V2Tree, options: { allReleases?: boolean }
     }
   }
 
-  const areas = tree.product.filter((n) => n.type === "area" && n.status !== "deleted").map((area): AreaStatus => {
+  return tree.product.filter((n) => n.type === "area" && n.status !== "deleted").map((area): AreaStatus => {
     const row: AreaStatus = { ...brief(area), capabilities: 0, constraints: 0, status: {}, defective: 0, openChanges: openByArea.get(area.id)?.size ?? 0 };
     for (const { node } of index.entries) {
       if (areaOf.get(node.id) !== area || (node.type !== "capability" && node.type !== "constraint")) continue;
@@ -364,27 +429,6 @@ export function prdStatusReport(tree: V2Tree, options: { allReleases?: boolean }
     }
     return row;
   });
-
-  const byRelease = new Map<string | null, RuleNode[]>();
-  for (const change of changes) {
-    const c = change as ChangeNode;
-    const release = c.shippedIn ?? c.plannedRelease ?? null;
-    byRelease.set(release, [...(byRelease.get(release) ?? []), change]);
-  }
-  const everyRelease = [...byRelease]
-    .sort(([a], [b]) => compareReleases(a ?? undefined, b ?? undefined))
-    .map(([release, list]): ReleaseStatus => ({ release, changes: countChanges(list) }));
-  const closed = everyRelease.filter((r) => r.release !== null && r.changes.open === 0);
-  const dropped = new Set(options.allReleases ? [] : closed.slice(0, Math.max(closed.length - RECENT_RELEASES, 0)));
-  const releases = everyRelease.filter((r) => !dropped.has(r));
-
-  return {
-    changes: countChanges(changes),
-    inbox: changes.filter((c) => isOpenChange(c) && c.needsPlacement).length,
-    areas,
-    releases,
-    releasesOmitted: dropped.size,
-  };
 }
 
 function countChanges(changes: readonly RuleNode[]): ChangeCounts {

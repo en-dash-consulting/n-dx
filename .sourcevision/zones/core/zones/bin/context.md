@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Bin (`core/bin`)
-Files: 5, Cohesion: 0.62, Coupling: 0.38
+Files: 5, Cohesion: 0.53, Coupling: 0.47
 Description: 5 files, primarily JavaScript
 Entry points: packages/core/child-lifecycle.js, packages/core/pair-programming.js
-Lines: 1873
+Lines: 2005
 
 </zone>
 
@@ -18,7 +18,7 @@ packages/core/bin/hench.js (JavaScript, 45 lines, source)
 packages/core/bin/rex.js (JavaScript, 35 lines, source)
 packages/core/bin/sourcevision.js (JavaScript, 35 lines, source)
 packages/core/child-lifecycle.js (JavaScript, 763 lines, source)
-packages/core/pair-programming.js (JavaScript, 995 lines, source)
+packages/core/pair-programming.js (JavaScript, 1127 lines, source)
 
 </files>
 

@@ -5,7 +5,7 @@
 ## Features
 
 - **SourceVision zone maps** — interactive visualization of architectural zones
-- **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage. Both pages are built and land in the navigation with the v2 store. Until then, and on the v1 projects `ndx init` creates until the storage migration ships, the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
+- **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage. Both pages are built and land in the navigation with the v2 store. Until then, and on a v1 project (one that has not yet run `ndx migrate`), the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
 - **Unified MCP server** — single HTTP endpoint serving both Rex and SourceVision MCP tools
 - **Live reload** — updates automatically when data changes (via `ndx refresh`)
 

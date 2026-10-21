@@ -5,32 +5,37 @@
 <zone>
 
 Zone: Tests Rex E2e (`tests-rex-e2e`)
-Files: 18, Cohesion: 1.00, Coupling: 0.00
+Files: 23, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: add-stdin-hang.test.ts, cli-adapter.test.ts, cli-add-path-regression.test.ts (+15 more)
-Lines: 5423
+Description: Non-source files in packages: add-stdin-hang.test.ts, cli-add-path-regression.test.ts, cli-analyze.test.ts (+20 more)
+Lines: 6403
 
 </zone>
 
 <files>
 
 packages/rex/tests/e2e/add-stdin-hang.test.ts (TypeScript, 174 lines, test)
-packages/rex/tests/e2e/cli-adapter.test.ts (TypeScript, 333 lines, test)
 packages/rex/tests/e2e/cli-add-path-regression.test.ts (TypeScript, 295 lines, test)
 packages/rex/tests/e2e/cli-analyze.test.ts (TypeScript, 762 lines, test)
-packages/rex/tests/e2e/cli-fix.test.ts (TypeScript, 168 lines, test)
-packages/rex/tests/e2e/cli-folder-tree.test.ts (TypeScript, 430 lines, test)
+packages/rex/tests/e2e/cli-fix.test.ts (TypeScript, 183 lines, test)
+packages/rex/tests/e2e/cli-folder-tree.test.ts (TypeScript, 460 lines, test)
 packages/rex/tests/e2e/cli-hints.test.ts (TypeScript, 114 lines, test)
 packages/rex/tests/e2e/cli-import.test.ts (TypeScript, 122 lines, test)
-packages/rex/tests/e2e/cli-init.test.ts (TypeScript, 256 lines, test)
+packages/rex/tests/e2e/cli-init.test.ts (TypeScript, 341 lines, test)
+packages/rex/tests/e2e/cli-legacy-layout-notice.test.ts (TypeScript, 89 lines, test)
+packages/rex/tests/e2e/cli-migrate-plan.test.ts (TypeScript, 298 lines, test)
 packages/rex/tests/e2e/cli-migrate-to-md.test.ts (TypeScript, 76 lines, test)
 packages/rex/tests/e2e/cli-no-json-writes.test.ts (TypeScript, 155 lines, test)
-packages/rex/tests/e2e/cli-prd-bundle.test.ts (TypeScript, 1024 lines, test)
-packages/rex/tests/e2e/cli-prune.test.ts (TypeScript, 241 lines, test)
+packages/rex/tests/e2e/cli-prd-bundle-v2.test.ts (TypeScript, 195 lines, test)
+packages/rex/tests/e2e/cli-prd-bundle.test.ts (TypeScript, 1057 lines, test)
+packages/rex/tests/e2e/cli-prune.test.ts (TypeScript, 260 lines, test)
 packages/rex/tests/e2e/cli-quiet.test.ts (TypeScript, 103 lines, test)
+packages/rex/tests/e2e/cli-ready-item-flag.test.ts (TypeScript, 72 lines, test)
 packages/rex/tests/e2e/cli-recommend.test.ts (TypeScript, 137 lines, test)
-packages/rex/tests/e2e/cli-smart-add.test.ts (TypeScript, 745 lines, test)
-packages/rex/tests/e2e/cli-sync.test.ts (TypeScript, 66 lines, test)
+packages/rex/tests/e2e/cli-release.test.ts (TypeScript, 56 lines, test)
+packages/rex/tests/e2e/cli-smart-add.test.ts (TypeScript, 778 lines, test)
+packages/rex/tests/e2e/cli-v2-change-verbs.test.ts (TypeScript, 116 lines, test)
+packages/rex/tests/e2e/cli-v2-serve.test.ts (TypeScript, 338 lines, test)
 packages/rex/tests/e2e/cli-workflow.test.ts (TypeScript, 222 lines, test)
 
 </files>
@@ -39,8 +44,8 @@ packages/rex/tests/e2e/cli-workflow.test.ts (TypeScript, 222 lines, test)
 
 
 Outgoing (this zone → other zones):
-  → rex-cli: packages/rex/tests/e2e/cli-add-path-regression.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-analyze.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-fix.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-fix.test.ts → packages/rex/src/store/markdown-serializer.ts; packages/rex/tests/e2e/cli-folder-tree.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/v1.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/validate.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-migrate-to-md.test.ts → packages/rex/src/core/canonical.ts; packages/rex/tests/e2e/cli-migrate-to-md.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-migrate-to-md.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-migrate-to-md.test.ts → packages/rex/src/store/markdown-parser.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-workflow.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-workflow.test.ts → packages/rex/src/store/folder-tree-parser.ts; packages/rex/tests/e2e/cli-workflow.test.ts → packages/rex/src/store/index.ts
-  → tests-packages: packages/rex/tests/e2e/cli-analyze.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-fix.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-import.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-recommend.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-smart-add.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts
+  → rex-cli: packages/rex/tests/e2e/cli-add-path-regression.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-analyze.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-fix.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-folder-tree.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/cli/commands/init.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/cli/legacy-layout-notice.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/v1.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/v2.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/schema/validate.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-init.test.ts → packages/rex/src/store/prd-model-reader.ts; packages/rex/tests/e2e/cli-legacy-layout-notice.test.ts → packages/rex/src/cli/legacy-layout-notice.ts; packages/rex/tests/e2e/cli-migrate-plan.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-migrate-plan.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-migrate-plan.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-migrate-to-md.test.ts → packages/rex/src/core/canonical.ts; packages/rex/tests/e2e/cli-migrate-to-md.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-migrate-to-md.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-migrate-to-md.test.ts → packages/rex/src/store/markdown-parser.ts; packages/rex/tests/e2e/cli-prd-bundle-v2.test.ts → packages/rex/src/core/prd-bundle.ts; packages/rex/tests/e2e/cli-prd-bundle-v2.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-v2-serve.test.ts → packages/rex/src/core/canonical.ts; packages/rex/tests/e2e/cli-v2-serve.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-v2-serve.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-v2-serve.test.ts → packages/rex/src/store/index.ts; packages/rex/tests/e2e/cli-workflow.test.ts → packages/rex/src/schema/index.ts; packages/rex/tests/e2e/cli-workflow.test.ts → packages/rex/src/store/folder-tree-parser.ts; packages/rex/tests/e2e/cli-workflow.test.ts → packages/rex/src/store/index.ts
+  → tests-packages: packages/rex/tests/e2e/cli-analyze.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-fix.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-import.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-migrate-plan.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-prd-bundle-v2.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/e2e/cli-prd-bundle.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-recommend.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-smart-add.test.ts → packages/rex/tests/helpers/rex-dir-test-support.ts; packages/rex/tests/e2e/cli-v2-change-verbs.test.ts → packages/rex/tests/helpers/v2-fixture.ts; packages/rex/tests/e2e/cli-v2-serve.test.ts → packages/rex/tests/helpers/v2-fixture.ts
 
 </imports>
 
@@ -53,6 +58,6 @@ Outgoing (this zone → other zones):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 644 internal calls, 41 outgoing, 0 incoming (cohesion: 0.94, coupling: 0.06)
+- [call graph] 831 internal calls, 58 outgoing, 0 incoming (cohesion: 0.93, coupling: 0.07)
 
 </insights>

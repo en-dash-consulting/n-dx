@@ -5,36 +5,45 @@
 <zone>
 
 Zone: Tests Integration (`tests-integration`)
-Files: 22, Cohesion: 1.00, Coupling: 0.00
+Files: 31, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in tests: assistant-integration.test.js, claude-config-validation.test.js, codex-config-validation.test.js (+19 more)
-Lines: 7075
+Description: Non-source files in tests: assistant-integration.test.js, ci-structure-health.test.js, claude-config-validation.test.js (+28 more)
+Lines: 9624
 
 </zone>
 
 <files>
 
 tests/integration/assistant-integration.test.js (JavaScript, 145 lines, test)
+tests/integration/ci-structure-health.test.js (JavaScript, 85 lines, test)
 tests/integration/claude-config-validation.test.js (JavaScript, 521 lines, test)
 tests/integration/codex-config-validation.test.js (JavaScript, 625 lines, test)
-tests/integration/cross-package-contracts.test.js (JavaScript, 1286 lines, test)
+tests/integration/command-effects-manifest-contract.test.js (JavaScript, 116 lines, test)
+tests/integration/cross-package-contracts.test.js (JavaScript, 1574 lines, test)
+tests/integration/effective-agent-config-contract.test.js (JavaScript, 473 lines, test)
 tests/integration/exec-interrupt-forwarding.test.js (JavaScript, 235 lines, test)
 tests/integration/gateway-pipeline.test.js (JavaScript, 197 lines, test)
 tests/integration/google-config-validation.test.js (JavaScript, 377 lines, test)
 tests/integration/hench-rex-gateway-pipeline.test.js (JavaScript, 296 lines, test)
 tests/integration/late-arrival-child-cleanup.test.js (JavaScript, 76 lines, test)
+tests/integration/layout-resolver-contract.test.js (JavaScript, 532 lines, test)
 tests/integration/light-tier-routes.test.js (JavaScript, 85 lines, test)
 tests/integration/llm-client-adapter.test.js (JavaScript, 60 lines, test)
 tests/integration/llm-routing-config-roundtrip.test.js (JavaScript, 129 lines, test)
 tests/integration/mcp-shim-bridge.test.js (JavaScript, 273 lines, test)
-tests/integration/pair-programming.test.js (JavaScript, 1168 lines, test)
+tests/integration/pair-programming-env-failure.test.js (JavaScript, 97 lines, test)
+tests/integration/pair-programming-shell-test-env.test.js (JavaScript, 123 lines, test)
+tests/integration/pair-programming.test.js (JavaScript, 1349 lines, test)
+tests/integration/prd-delta-cli-agreement.test.js (JavaScript, 154 lines, test)
 tests/integration/primer-fingerprint-contract.test.js (JavaScript, 248 lines, test)
-tests/integration/scheduler-startup.test.js (JavaScript, 428 lines, test)
+tests/integration/run-all-tests-selection.test.js (JavaScript, 212 lines, test)
+tests/integration/scheduler-startup.test.js (JavaScript, 426 lines, test)
 tests/integration/self-heal-capture-only.test.js (JavaScript, 137 lines, test)
-tests/integration/skill-commit-behavior.test.js (JavaScript, 326 lines, test)
+tests/integration/skill-commit-behavior.test.js (JavaScript, 554 lines, test)
 tests/integration/task-class-registry.test.js (JavaScript, 125 lines, test)
 tests/integration/task-class-sync.test.js (JavaScript, 81 lines, test)
 tests/integration/terminate-tree-liveness.test.js (JavaScript, 145 lines, test)
+tests/integration/vendor-cli-env-trust.test.js (JavaScript, 62 lines, test)
 tests/integration/web-server-viewer-boundary.test.js (JavaScript, 112 lines, test)
 
 </files>
@@ -43,9 +52,9 @@ tests/integration/web-server-viewer-boundary.test.js (JavaScript, 112 lines, tes
 
 
 Outgoing (this zone → other zones):
-  → core: tests/integration/assistant-integration.test.js → packages/core/assistant-integration.js; tests/integration/claude-config-validation.test.js → packages/core/assistant-assets.js; tests/integration/claude-config-validation.test.js → packages/core/claude-integration.js; tests/integration/codex-config-validation.test.js → packages/core/assistant-assets.js; tests/integration/codex-config-validation.test.js → packages/core/codex-integration.js; tests/integration/google-config-validation.test.js → packages/core/config.js; tests/integration/late-arrival-child-cleanup.test.js → packages/core/child-lifecycle.js; tests/integration/mcp-shim-bridge.test.js → packages/core/mcp-shim.js; tests/integration/pair-programming.test.js → packages/core/pair-programming.js; tests/integration/primer-fingerprint-contract.test.js → packages/core/pair-programming.js; tests/integration/task-class-sync.test.js → packages/core/config.js; tests/integration/terminate-tree-liveness.test.js → packages/core/child-lifecycle.js
-  → tests: tests/integration/exec-interrupt-forwarding.test.js → tests/helpers/posix-shell.js; tests/integration/late-arrival-child-cleanup.test.js → tests/helpers/real-process-tree.js; tests/integration/terminate-tree-liveness.test.js → tests/helpers/real-process-tree.js
+  → core: tests/integration/assistant-integration.test.js → packages/core/assistant-integration.js; tests/integration/ci-structure-health.test.js → packages/core/ci.js; tests/integration/claude-config-validation.test.js → packages/core/assistant-assets.js; tests/integration/claude-config-validation.test.js → packages/core/claude-integration.js; tests/integration/codex-config-validation.test.js → packages/core/assistant-assets.js; tests/integration/codex-config-validation.test.js → packages/core/codex-integration.js; tests/integration/command-effects-manifest-contract.test.js → packages/core/command-effects.js; tests/integration/command-effects-manifest-contract.test.js → packages/core/layout.js; tests/integration/google-config-validation.test.js → packages/core/config.js; tests/integration/late-arrival-child-cleanup.test.js → packages/core/child-lifecycle.js; tests/integration/layout-resolver-contract.test.js → packages/core/layout.js; tests/integration/mcp-shim-bridge.test.js → packages/core/mcp-shim.js; tests/integration/pair-programming-env-failure.test.js → packages/core/pair-programming.js; tests/integration/pair-programming-shell-test-env.test.js → packages/core/pair-programming.js; tests/integration/pair-programming.test.js → packages/core/config.js; tests/integration/pair-programming.test.js → packages/core/pair-programming.js; tests/integration/primer-fingerprint-contract.test.js → packages/core/pair-programming.js; tests/integration/task-class-sync.test.js → packages/core/config.js; tests/integration/terminate-tree-liveness.test.js → packages/core/child-lifecycle.js; tests/integration/vendor-cli-env-trust.test.js → packages/core/config.js
   → tests-e2e: tests/integration/self-heal-capture-only.test.js → tests/e2e/e2e-helpers.js
+  → tests-helpers: tests/integration/exec-interrupt-forwarding.test.js → tests/helpers/posix-shell.js; tests/integration/late-arrival-child-cleanup.test.js → tests/helpers/real-process-tree.js; tests/integration/terminate-tree-liveness.test.js → tests/helpers/real-process-tree.js
 
 </imports>
 
@@ -58,6 +67,6 @@ Outgoing (this zone → other zones):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 169 internal calls, 209 outgoing, 0 incoming (cohesion: 0.45, coupling: 0.55)
+- [call graph] 319 internal calls, 242 outgoing, 0 incoming (cohesion: 0.57, coupling: 0.43)
 
 </insights>

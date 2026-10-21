@@ -13,8 +13,8 @@
     "packages/core/child-lifecycle.js",
     "packages/core/pair-programming.js"
   ],
-  "cohesion": 0.62,
-  "coupling": 0.38,
+  "cohesion": 0.53,
+  "coupling": 0.47,
   "fileCount": 5,
-  "lineCount": 1873
+  "lineCount": 2005
 }

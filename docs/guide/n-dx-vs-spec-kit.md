@@ -28,7 +28,7 @@ If the last six months were vibe-coded, use the [vibe-cleanup guide](./vibe-clea
 
 **AWS Kiro** is an agentic IDE, not a CLI you add to an existing editor. A prompt becomes requirements, design, and tasks, then its agents implement. Typical files: `requirements.md`, `design.md`, `tasks.md`. Commercial AWS product. Formal requirement checks and Agent Hooks are on the public pitch. The workflow lives in Kiro.
 
-**n-dx** is a CLI-first toolkit from En Dash. Install `@n-dx/core`, then `ndx analyze`, `ndx recommend`, `ndx work`, and `ndx start`. Built for Claude Code and Codex. PRD in `.ndx/rex/` (`.rex/prd_tree/` on the v1 projects `ndx init` creates until the storage migration ships). Rex and SourceVision expose MCP. License is Elastic 2.0 (source-available, not OSI). Hosted-service limits differ from MIT. GitHub listed 16 stars on 21 Aug 2026.
+**n-dx** is a CLI-first toolkit from En Dash. Install `@n-dx/core`, then `ndx analyze`, `ndx recommend`, `ndx work`, and `ndx start`. Built for Claude Code and Codex. PRD in `.ndx/rex/` (`.rex/prd_tree/` on a v1 project that has not yet run `ndx migrate`). Rex and SourceVision expose MCP. License is Elastic 2.0 (source-available, not OSI). Hosted-service limits differ from MIT. GitHub listed 16 stars on 21 Aug 2026.
 
 ## Comparison
 

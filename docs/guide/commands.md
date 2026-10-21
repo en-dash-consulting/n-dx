@@ -8,7 +8,9 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 |---------|-------------|
 | `ndx init [dir]` | Initialize a project for n-dx |
 | `ndx migrate-layout [dir]` | Move an existing project's state into `.ndx/` |
+| `ndx migrate [dir]` | Run every migration step the project still needs: the layout move into `.ndx/`, the `prd.md` / `prd.json` conversion, then the v1 → v2 plan and apply. Steps already done are skipped (`--dry-run`, `--rules-only`) |
 | `ndx migrate --plan [dir]` | Plan the PRD's v1 → v2 migration and write it out for review |
+| `ndx migrate --apply [dir]` | Apply the reviewed migration plan (`--plan=<path>`, `--dry-run`) |
 | `ndx config [key] [value]` | View or edit settings |
 | `ndx which` | Show which n-dx is running: version, path, install kind, git |
 | `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config this checkout ships |
@@ -120,7 +122,7 @@ ndx init --git .                 # also create a git repository (answers the pre
 ndx init --no-git .              # never create one
 ```
 
-Initializes the project: creates analysis metadata (`.sourcevision/`), PRD storage (`.rex/`, holding a v1 PRD until the storage migration ships), agent configuration (`.hench/`), and assistant-specific artifacts. By default both Claude and Codex surfaces are provisioned.
+Initializes the project: creates analysis metadata (`.sourcevision/`), PRD storage (`.rex/`, holding an empty v2 PRD; an existing v1 PRD keeps its layout until `ndx migrate`), agent configuration (`.hench/`), and assistant-specific artifacts. By default both Claude and Codex surfaces are provisioned.
 
 When the directory is not inside a git repository, init offers to create one — n-dx records autonomous work as commits, so without a repository auto-commit, pair programming, and the hench run loop stay disabled. That prompt needs a TTY: scripted runs and the dashboard's setup wizard answer it with `--git` or `--no-git` instead. A repository created this way also gets a `chore: n-dx init` baseline commit, so the working tree is clean straight out of init.
 
@@ -166,7 +168,7 @@ ndx add --file=ideas.txt .            # import from file
 Each description becomes one change in the Inbox, with no LLM call. The output names the change and the rules' suggested placement, which `rex change place` records. `--criterion="…"` (repeatable) sets the change's acceptance criteria, its "done when"; a capability's capability criteria are edited with `rex product edit`, never here.
 
 ::: info v1 projects
-On a v1 PRD (`.rex/prd_tree/`, which `ndx init` creates until the storage migration ships), `ndx add` uses an LLM to decompose the descriptions into a proposal of epics, features and tasks, detects duplicates, and offers merge, cancel or proceed.
+On a v1 PRD (`.rex/prd_tree/`, a project that has not yet run `ndx migrate`), `ndx add` uses an LLM to decompose the descriptions into a proposal of epics, features and tasks, detects duplicates, and offers merge, cancel or proceed.
 :::
 
 ### plan

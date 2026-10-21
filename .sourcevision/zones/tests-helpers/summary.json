@@ -1,0 +1,30 @@
+{
+  "id": "tests-helpers",
+  "name": "Tests Helpers",
+  "description": "Non-source files in tests: all-skills.js, posix-shell.js, real-process-tree.js (+2 more)",
+  "files": [
+    "tests/helpers/all-skills.js",
+    "tests/helpers/posix-shell.js",
+    "tests/helpers/real-process-tree.js",
+    "tests/helpers/slug-drift-message.js",
+    "tests/helpers/symlink-support.js"
+  ],
+  "entryPoints": [
+    "tests/helpers/all-skills.js",
+    "tests/helpers/posix-shell.js",
+    "tests/helpers/real-process-tree.js",
+    "tests/helpers/slug-drift-message.js",
+    "tests/helpers/symlink-support.js"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 5,
+  "lineCount": 526,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

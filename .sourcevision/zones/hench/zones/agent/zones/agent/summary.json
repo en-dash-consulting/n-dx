@@ -1,0 +1,27 @@
+{
+  "id": "hench/agent/agent",
+  "name": "Agent",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/analysis/livelock.ts",
+    "packages/hench/src/agent/analysis/plan-only-detection.ts",
+    "packages/hench/src/agent/analysis/spin.ts",
+    "packages/hench/src/agent/lifecycle/context-prune.ts",
+    "packages/hench/src/agent/lifecycle/heartbeat.ts",
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/store/runs.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/analysis/livelock.ts",
+    "packages/hench/src/agent/analysis/plan-only-detection.ts",
+    "packages/hench/src/agent/analysis/spin.ts",
+    "packages/hench/src/agent/lifecycle/context-prune.ts",
+    "packages/hench/src/agent/lifecycle/heartbeat.ts",
+    "packages/hench/src/agent/lifecycle/loop.ts",
+    "packages/hench/src/store/runs.ts"
+  ],
+  "cohesion": 0.42,
+  "coupling": 0.58,
+  "fileCount": 7,
+  "lineCount": 3550
+}

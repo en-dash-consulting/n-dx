@@ -113,6 +113,12 @@ export interface StoreCapabilities {
    * When `true`, consumers may subscribe to live updates.
    */
   supportsWatch: boolean;
+
+  /**
+   * Schema version of the tree this store reads and writes (`rex/v1` or
+   * `rex/v2`). Absent means `rex/v1`.
+   */
+  schemaVersion?: string;
 }
 
 /**

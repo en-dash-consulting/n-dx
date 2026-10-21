@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Tests Unit (`tests-unit`)
-Files: 40, Cohesion: 1.00, Coupling: 0.00
+Files: 58, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, child-lifecycle.test.js (+37 more)
-Lines: 10145
+Description: Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+55 more)
+Lines: 13809
 
 </zone>
 
@@ -16,6 +16,7 @@ Lines: 10145
 
 tests/unit/architecture-gate-reporting.test.js (JavaScript, 119 lines, test)
 tests/unit/check-dependency-drift.test.js (JavaScript, 149 lines, test)
+tests/unit/check-lockfile-integrity.test.js (JavaScript, 180 lines, test)
 tests/unit/child-lifecycle.test.js (JavaScript, 667 lines, test)
 tests/unit/claude-discovery.test.js (JavaScript, 253 lines, test)
 tests/unit/claude-mcp-pinned-registration.test.js (JavaScript, 169 lines, test)
@@ -26,31 +27,48 @@ tests/unit/cli-smoke-parity.test.js (JavaScript, 1044 lines, test)
 tests/unit/cli-timeout-schema.test.js (JavaScript, 38 lines, test)
 tests/unit/cli-timeout.test.js (JavaScript, 178 lines, test)
 tests/unit/color-env-neutralized.test.js (JavaScript, 97 lines, test)
+tests/unit/command-effects.test.js (JavaScript, 282 lines, test)
+tests/unit/commit-trailers.test.js (JavaScript, 203 lines, test)
 tests/unit/config-repair.test.js (JavaScript, 91 lines, test)
+tests/unit/core-layout-routing.test.js (JavaScript, 252 lines, test)
 tests/unit/experimental-flags.test.js (JavaScript, 52 lines, test)
 tests/unit/export-sanitize.test.js (JavaScript, 415 lines, test)
 tests/unit/file-permissions.test.js (JavaScript, 334 lines, test)
-tests/unit/git-preflight.test.js (JavaScript, 224 lines, test)
-tests/unit/help.test.js (JavaScript, 253 lines, test)
-tests/unit/init-llm.test.js (JavaScript, 1395 lines, test)
+tests/unit/git-preflight.test.js (JavaScript, 245 lines, test)
+tests/unit/help.test.js (JavaScript, 271 lines, test)
+tests/unit/hidden-child-process.test.js (JavaScript, 82 lines, test)
+tests/unit/init-dir-labels.test.js (JavaScript, 68 lines, test)
+tests/unit/init-llm.test.js (JavaScript, 1413 lines, test)
 tests/unit/install-identity.test.js (JavaScript, 399 lines, test)
-tests/unit/narration-status.test.js (JavaScript, 62 lines, test)
-tests/unit/ndx-gitignore-template.test.js (JavaScript, 92 lines, test)
+tests/unit/mcp-shim-roots.test.js (JavaScript, 288 lines, test)
+tests/unit/migrate-chain.test.js (JavaScript, 140 lines, test)
+tests/unit/migrate-layout.test.js (JavaScript, 423 lines, test)
+tests/unit/narration-status.test.js (JavaScript, 96 lines, test)
+tests/unit/ndx-gitignore-template.test.js (JavaScript, 122 lines, test)
 tests/unit/primer-preference.test.js (JavaScript, 201 lines, test)
+tests/unit/project-config-strict.test.js (JavaScript, 44 lines, test)
 tests/unit/refresh-artifacts.test.js (JavaScript, 32 lines, test)
 tests/unit/refresh-plan.test.js (JavaScript, 108 lines, test)
 tests/unit/refresh-validate.test.js (JavaScript, 335 lines, test)
+tests/unit/release-version-script.test.js (JavaScript, 78 lines, test)
 tests/unit/resolve-existing-dir.test.js (JavaScript, 119 lines, test)
+tests/unit/run-summary.test.js (JavaScript, 315 lines, test)
+tests/unit/select-suites.test.js (JavaScript, 434 lines, test)
 tests/unit/self-heal-confirm.test.js (JavaScript, 505 lines, test)
-tests/unit/stale-check.test.js (JavaScript, 128 lines, test)
+tests/unit/setup-session-env.test.js (JavaScript, 25 lines, test)
+tests/unit/slug-drift-message.test.js (JavaScript, 96 lines, test)
+tests/unit/stale-check.test.js (JavaScript, 150 lines, test)
+tests/unit/stale-dist-declaration.test.js (JavaScript, 78 lines, test)
+tests/unit/stale-dist.test.js (JavaScript, 127 lines, test)
 tests/unit/terminate-by-pid-result-unused.test.js (JavaScript, 85 lines, test)
 tests/unit/token-pricing-parity.test.js (JavaScript, 118 lines, test)
 tests/unit/tree-kill-parity.test.js (JavaScript, 69 lines, test)
 tests/unit/update-check.test.js (JavaScript, 271 lines, test)
+tests/unit/verify-release-sync.test.js (JavaScript, 92 lines, test)
 tests/unit/vitest-timeout-policy.test.js (JavaScript, 160 lines, test)
-tests/unit/web-hub-mode.test.js (JavaScript, 127 lines, test)
+tests/unit/web-hub-mode.test.js (JavaScript, 251 lines, test)
 tests/unit/web-hub-status.test.js (JavaScript, 190 lines, test)
-tests/unit/web-port-occupant.test.js (JavaScript, 754 lines, test)
+tests/unit/web-port-occupant.test.js (JavaScript, 944 lines, test)
 tests/unit/win-spawn.test.js (JavaScript, 168 lines, test)
 tests/unit/windows-quoting-parity.test.js (JavaScript, 158 lines, test)
 tests/unit/windows-spawn-compat.test.js (JavaScript, 85 lines, test)
@@ -61,11 +79,12 @@ tests/unit/windows-spawn-compat.test.js (JavaScript, 85 lines, test)
 
 
 Outgoing (this zone → other zones):
-  → core: tests/unit/child-lifecycle.test.js → packages/core/child-lifecycle.js; tests/unit/claude-discovery.test.js → packages/core/claude-integration.js; tests/unit/claude-discovery.test.js → packages/core/win-spawn.js; tests/unit/claude-mcp-pinned-registration.test.js → packages/core/assistant-assets.js; tests/unit/claude-mcp-pinned-registration.test.js → packages/core/assistant-integration.js; tests/unit/claude-mcp-pinned-registration.test.js → packages/core/claude-integration.js; tests/unit/claude-mcp-pinned-registration.test.js → packages/core/win-spawn.js; tests/unit/claude-mcp-scope-flag.test.js → packages/core/assistant-assets.js; tests/unit/claude-mcp-scope-flag.test.js → packages/core/claude-integration.js; tests/unit/claude-mcp-scope-flag.test.js → packages/core/win-spawn.js; tests/unit/cli-identity.test.js → packages/core/cli-identity.js; tests/unit/cli-log.test.js → packages/core/cli-log.js; tests/unit/cli-timeout-schema.test.js → packages/core/config.js; tests/unit/cli-timeout.test.js → packages/core/cli-timeout.js; tests/unit/config-repair.test.js → packages/core/config.js; tests/unit/experimental-flags.test.js → packages/core/config.js; tests/unit/export-sanitize.test.js → packages/core/export.js; tests/unit/file-permissions.test.js → packages/core/file-permissions.js; tests/unit/git-preflight.test.js → packages/core/git-preflight.js; tests/unit/help.test.js → packages/core/help.js; tests/unit/init-llm.test.js → packages/core/init-llm.js; tests/unit/install-identity.test.js → packages/core/install-identity.js; tests/unit/narration-status.test.js → packages/core/narration-status.js; tests/unit/primer-preference.test.js → packages/core/pair-programming.js; tests/unit/refresh-artifacts.test.js → packages/core/refresh-artifacts.js; tests/unit/refresh-plan.test.js → packages/core/refresh-plan.js; tests/unit/refresh-validate.test.js → packages/core/refresh-validate.js; tests/unit/resolve-existing-dir.test.js → packages/core/resolve-existing-dir.js; tests/unit/self-heal-confirm.test.js → packages/core/self-heal-confirm.js; tests/unit/stale-check.test.js → packages/core/stale-check.js; tests/unit/tree-kill-parity.test.js → packages/core/child-lifecycle.js; tests/unit/update-check.test.js → packages/core/update-check.js; tests/unit/web-hub-mode.test.js → packages/core/web.js; tests/unit/web-hub-status.test.js → packages/core/web.js; tests/unit/web-port-occupant.test.js → packages/core/web.js; tests/unit/win-spawn.test.js → packages/core/win-spawn.js; tests/unit/windows-quoting-parity.test.js → packages/core/config.js; tests/unit/windows-quoting-parity.test.js → packages/core/win-spawn.js
+  → core: tests/unit/child-lifecycle.test.js → packages/core/child-lifecycle.js; tests/unit/claude-discovery.test.js → packages/core/claude-integration.js; tests/unit/claude-discovery.test.js → packages/core/win-spawn.js; tests/unit/claude-mcp-pinned-registration.test.js → packages/core/assistant-assets.js; tests/unit/claude-mcp-pinned-registration.test.js → packages/core/assistant-integration.js; tests/unit/claude-mcp-pinned-registration.test.js → packages/core/claude-integration.js; tests/unit/claude-mcp-pinned-registration.test.js → packages/core/win-spawn.js; tests/unit/claude-mcp-scope-flag.test.js → packages/core/assistant-assets.js; tests/unit/claude-mcp-scope-flag.test.js → packages/core/claude-integration.js; tests/unit/claude-mcp-scope-flag.test.js → packages/core/win-spawn.js; tests/unit/cli-identity.test.js → packages/core/cli-identity.js; tests/unit/cli-log.test.js → packages/core/cli-log.js; tests/unit/cli-timeout-schema.test.js → packages/core/config.js; tests/unit/cli-timeout.test.js → packages/core/cli-timeout.js; tests/unit/command-effects.test.js → packages/core/command-effects.js; tests/unit/command-effects.test.js → packages/core/help.js; tests/unit/commit-trailers.test.js → packages/core/commit-trailers.js; tests/unit/config-repair.test.js → packages/core/config.js; tests/unit/core-layout-routing.test.js → packages/core/assistant-assets.js; tests/unit/core-layout-routing.test.js → packages/core/export.js; tests/unit/core-layout-routing.test.js → packages/core/pair-programming.js; tests/unit/core-layout-routing.test.js → packages/core/refresh-artifacts.js; tests/unit/core-layout-routing.test.js → packages/core/refresh-validate.js; tests/unit/core-layout-routing.test.js → packages/core/self-heal-confirm.js; tests/unit/core-layout-routing.test.js → packages/core/web.js; tests/unit/experimental-flags.test.js → packages/core/config.js; tests/unit/export-sanitize.test.js → packages/core/export.js; tests/unit/file-permissions.test.js → packages/core/file-permissions.js; tests/unit/git-preflight.test.js → packages/core/git-preflight.js; tests/unit/help.test.js → packages/core/help.js; tests/unit/init-dir-labels.test.js → packages/core/init-summary.js; tests/unit/init-dir-labels.test.js → packages/core/layout.js; tests/unit/init-llm.test.js → packages/core/init-llm.js; tests/unit/install-identity.test.js → packages/core/install-identity.js; tests/unit/mcp-shim-roots.test.js → packages/core/mcp-shim.js; tests/unit/migrate-chain.test.js → packages/core/migrate-chain.js; tests/unit/migrate-layout.test.js → packages/core/layout.js; tests/unit/migrate-layout.test.js → packages/core/migrate-layout.js; tests/unit/narration-status.test.js → packages/core/narration-status.js; tests/unit/primer-preference.test.js → packages/core/pair-programming.js; tests/unit/project-config-strict.test.js → packages/core/config.js; tests/unit/refresh-artifacts.test.js → packages/core/refresh-artifacts.js; tests/unit/refresh-plan.test.js → packages/core/refresh-plan.js; tests/unit/refresh-validate.test.js → packages/core/refresh-validate.js; tests/unit/resolve-existing-dir.test.js → packages/core/resolve-existing-dir.js; tests/unit/run-summary.test.js → packages/core/run-summary.js; tests/unit/select-suites.test.js → scripts/lib/select-suites.mjs; tests/unit/self-heal-confirm.test.js → packages/core/self-heal-confirm.js; tests/unit/stale-check.test.js → packages/core/stale-check.js; tests/unit/stale-dist.test.js → scripts/lib/stale-dist.mjs; tests/unit/tree-kill-parity.test.js → packages/core/child-lifecycle.js; tests/unit/update-check.test.js → packages/core/update-check.js; tests/unit/web-hub-mode.test.js → packages/core/web.js; tests/unit/web-hub-status.test.js → packages/core/web.js; tests/unit/web-port-occupant.test.js → packages/core/web.js; tests/unit/win-spawn.test.js → packages/core/win-spawn.js; tests/unit/windows-quoting-parity.test.js → packages/core/config.js; tests/unit/windows-quoting-parity.test.js → packages/core/win-spawn.js
   → hench: tests/unit/ndx-gitignore-template.test.js → packages/hench/src/store/artifacts.ts
   → llm-client: tests/unit/cli-log.test.js → packages/llm-client/src/cli-log.ts; tests/unit/tree-kill-parity.test.js → packages/llm-client/src/process-tree.ts; tests/unit/windows-quoting-parity.test.js → packages/llm-client/src/exec.ts
-  → scripts: tests/unit/check-dependency-drift.test.js → scripts/check-dependency-drift.mjs; tests/unit/cli-smoke-parity.test.js → scripts/cli-smoke-parity.mjs
-  → tests: tests/unit/web-port-occupant.test.js → tests/helpers/symlink-support.js
+  → scripts: tests/unit/check-dependency-drift.test.js → scripts/check-dependency-drift.mjs; tests/unit/check-lockfile-integrity.test.js → scripts/check-lockfile-integrity.mjs; tests/unit/cli-smoke-parity.test.js → scripts/cli-smoke-parity.mjs; tests/unit/verify-release-sync.test.js → scripts/verify-release-sync.mjs
+  → tests-2: tests/unit/hidden-child-process.test.js → tests/hidden-child-process.js
+  → tests-helpers: tests/unit/release-version-script.test.js → tests/helpers/posix-shell.js; tests/unit/slug-drift-message.test.js → tests/helpers/slug-drift-message.js; tests/unit/web-port-occupant.test.js → tests/helpers/symlink-support.js
 
 </imports>
 
@@ -78,6 +97,6 @@ Outgoing (this zone → other zones):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 282 internal calls, 773 outgoing, 0 incoming (cohesion: 0.27, coupling: 0.73)
+- [call graph] 548 internal calls, 1050 outgoing, 0 incoming (cohesion: 0.34, coupling: 0.66)
 
 </insights>

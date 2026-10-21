@@ -86,6 +86,16 @@ describe("v1-to-v2 spec text pass", () => {
     expect(spec.requirements.map((r) => r.id)).toEqual(["f1:c1"]);
   });
 
+  it("keeps a met capability's metAt equal to the hash of the final redrafted spec", async () => {
+    const template = await v1ToV2.plan(v1TreeSource(tree()), { cutAt: CUT, options: { testFiles: TEST_FILES } });
+    expect(template.entries.f1!.met).toBe(true);
+    const p = await plan(drafter(GOOD));
+    const final = p.entries.f1!;
+    expect(final.spec!.statement).not.toBe(template.entries.f1!.spec!.statement);
+    expect(final.data!.metAt).toBe(specHash(final.spec!));
+    expect(final.data!.metAt).not.toBe(template.entries.f1!.data!.metAt);
+  });
+
   it("stores a drafted \"The system shall ensure that the system keeps …\" as \"The system shall keep …\"", async () => {
     const p = await plan(
       drafter({

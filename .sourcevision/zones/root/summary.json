@@ -1,7 +1,7 @@
 {
   "id": "root",
   "name": "Root",
-  "description": "4 files.",
+  "description": "4 files; imports Tests.",
   "files": [
     "pr-check.js",
     "scan_transcripts.py",
@@ -12,7 +12,7 @@
   "cohesion": 0,
   "coupling": 0,
   "fileCount": 4,
-  "lineCount": 350,
+  "lineCount": 357,
   "riskMetrics": {
     "cohesion": 0,
     "coupling": 0,

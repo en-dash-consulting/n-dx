@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir, homedir } from "node:os";
 import { DEFAULT_TIMEOUT, withSandboxedClaudeConfig } from "./e2e-helpers.js";
@@ -733,6 +733,9 @@ describe("init establishes the folder layout", () => {
       env: {
         ...pathEnvWith(binDir),
         CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
+        // The suites' v1 init default (tests/setup-session-env.js) is off here:
+        // these runs are what a user gets.
+        NDX_INIT_LAYOUT: undefined,
       },
     });
   }
@@ -791,6 +794,11 @@ describe("init establishes the folder layout", () => {
       // `.mcp.json` is the documented exception — the vendor CLIs read it at
       // the repository root, so it stays there on both layouts.
       expect(existsSync(join(projectDir, ".mcp.json"))).toBe(true);
+
+      // The PRD starts as an empty v2 tree, so no command prints the v1 notice.
+      expect(readFileSync(join(projectDir, ".ndx", "rex", "product", "index.md"), "utf-8")).toContain('schema: "rex/v2"');
+      expect(existsSync(join(projectDir, ".ndx", "rex", "prd_tree"))).toBe(false);
+      expect(output).not.toContain("v1 layout (prd_tree/)");
     } finally {
       await removeDirs(binDir, projectDir);
     }

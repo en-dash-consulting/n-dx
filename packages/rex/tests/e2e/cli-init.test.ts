@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, access, rename } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, readFile, readdir, access, rename, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -11,6 +11,10 @@ import {
   TREE_META_FILENAME,
   SLUG_RULE_VERSION,
 } from "../../src/store/index.js";
+import { SCHEMA_VERSION_V2 } from "../../src/schema/v2.js";
+import { loadPrdModel } from "../../src/store/prd-model-reader.js";
+import { INIT_LAYOUT_ENV } from "../../src/cli/commands/init.js";
+import { LEGACY_LAYOUT_NOTICE, LEGACY_NOTICE_ENV } from "../../src/cli/legacy-layout-notice.js";
 
 const cliPath = join(
   fileURLToPath(import.meta.url),
@@ -252,5 +256,86 @@ describe("rex init", () => {
     // config still passes schema validation
     const configResult = RexConfigSchema.safeParse(JSON.parse(configRaw2));
     expect(configResult.success).toBe(true);
+  });
+});
+
+// The suites default `rex init` to v1 (tests/setup-session-env.js); these runs
+// clear that opt-in to see what a user gets.
+describe("rex init on a new project (v2 default)", () => {
+  let tmpDir: string;
+
+  const userEnv = (): NodeJS.ProcessEnv => {
+    const env = { ...process.env };
+    delete env[INIT_LAYOUT_ENV];
+    delete env[LEGACY_NOTICE_ENV];
+    return env;
+  };
+  const rex = (args: string[]) => {
+    const out = spawnSync("node", [cliPath, ...args], { encoding: "utf-8", timeout: 20000, env: userEnv() });
+    if (out.status !== 0) throw new Error(`rex ${args.join(" ")} exited ${out.status}:\n${out.stdout}${out.stderr}`);
+    return out;
+  };
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), "rex-e2e-init-v2-"));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("writes product/index.md stamped rex/v2, no prd_tree/, and v2 next steps", async () => {
+    const { stdout } = rex(["init", tmpDir]);
+    const rexDir = join(tmpDir, ".rex");
+    expect(await readdir(join(rexDir, "product"))).toEqual(["index.md"]);
+    expect(await readFile(join(rexDir, "product", "index.md"), "utf-8")).toContain(`schema: "${SCHEMA_VERSION_V2}"`);
+    await expect(access(join(rexDir, PRD_TREE_DIRNAME))).rejects.toThrow();
+    expect(stdout).toContain('rex add --title="Your first change"');
+    expect(stdout).not.toContain("rex add epic");
+
+    // Re-running keeps it, and still names v2 verbs.
+    const again = rex(["init", tmpDir]).stdout;
+    expect(again).toContain('rex add --title="Your first change"');
+    await expect(access(join(rexDir, PRD_TREE_DIRNAME))).rejects.toThrow();
+  });
+
+  it("prints no v1 deprecation notice", () => {
+    rex(["init", tmpDir]);
+    expect(rex(["status", tmpDir]).stderr).not.toContain(LEGACY_LAYOUT_NOTICE);
+  });
+
+  it("leaves a v1 project on v1", async () => {
+    spawnSync("node", [cliPath, "init", tmpDir], { encoding: "utf-8", env: { ...userEnv(), [INIT_LAYOUT_ENV]: "v1" } });
+    rex(["add", "epic", "--title=Billing", tmpDir]);
+
+    const { stdout } = rex(["init", tmpDir]);
+    expect(stdout).toContain("rex add epic");
+    await expect(access(join(tmpDir, ".rex", "product"))).rejects.toThrow();
+    expect(rex(["status", tmpDir]).stdout).toContain("Billing");
+  });
+
+  // A branch-scoped legacy file is a v1 PRD source too (FileStore reads it,
+  // migrate --apply refuses beside it); a v2 tree written next to it hides it.
+  it("leaves a project whose only PRD is a branch-scoped legacy file on v1", async () => {
+    const rexDir = join(tmpDir, ".rex");
+    await mkdir(rexDir);
+    await writeFile(join(rexDir, "prd_main_2026-01-01.json"), JSON.stringify({ schema: "rex/v1", title: "Old", items: [] }));
+
+    expect(rex(["init", tmpDir]).stdout).toContain("rex add epic");
+    await expect(access(join(rexDir, "product"))).rejects.toThrow();
+  });
+
+  it("lets rex next and rex update work a task", async () => {
+    rex(["init", tmpDir]);
+    rex(["add", "--title=Ship the first page", tmpDir]);
+    const rexDir = join(tmpDir, ".rex");
+    const quiet = { env: {}, warn: () => {} };
+    const change = (await loadPrdModel(rexDir, quiet)).tree.changes[0];
+    rex(["add", "task", "--title=Write the page", `--parent=${change.id}`, tmpDir]);
+    const task = (await loadPrdModel(rexDir, quiet)).tree.changes[0].children![0];
+
+    expect(JSON.parse(rex(["next", "--format=json", tmpDir]).stdout).item.id).toBe(task.id);
+    rex(["update", task.id, "--status=completed", tmpDir]);
+    expect((await loadPrdModel(rexDir, quiet)).tree.changes[0].status).toBe("completed");
   });
 });

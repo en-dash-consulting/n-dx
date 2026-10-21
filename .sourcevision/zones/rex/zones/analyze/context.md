@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Analyze (`rex/analyze`)
-Files: 16, Cohesion: 0.78, Coupling: 0.22
-Description: 16 files, primarily TypeScript
-Entry points: packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/escalate.ts, packages/rex/src/analyze/extract.ts, packages/rex/src/analyze/file-validation.ts, packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/llm-bridge.ts, packages/rex/src/analyze/modify-reason.ts, packages/rex/src/analyze/prompt-envelope.ts, packages/rex/src/analyze/propose-group-renames.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/rename-resolve.ts, packages/rex/src/analyze/scanners.ts, packages/rex/src/analyze/validate-modification.ts
-Lines: 8549
+Files: 26, Cohesion: 0.69, Coupling: 0.31
+Description: 26 files, primarily TypeScript
+Entry points: packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/escalate.ts, packages/rex/src/analyze/extract.ts, packages/rex/src/analyze/file-validation.ts, packages/rex/src/analyze/guided.ts, packages/rex/src/analyze/llm-bridge.ts, packages/rex/src/analyze/modify-reason.ts, packages/rex/src/analyze/place-reason.ts, packages/rex/src/analyze/prompt-envelope.ts, packages/rex/src/analyze/propose-group-renames.ts, packages/rex/src/analyze/propose.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/rename-resolve.ts, packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/analyze/scanners.ts, packages/rex/src/analyze/spec-draft-reason.ts, packages/rex/src/analyze/validate-modification.ts, packages/rex/src/cli/commands/status-sections.ts, packages/rex/src/cli/commands/status-work-cycle.ts, packages/rex/src/cli/commands/status.ts, packages/rex/src/cli/commands/tree.ts, packages/rex/src/core/stats.ts, packages/rex/src/core/verify.ts
+Lines: 11137
 
 </zone>
 
@@ -21,15 +21,25 @@ packages/rex/src/analyze/escalate.ts (TypeScript, 219 lines, source)
 packages/rex/src/analyze/extract.ts (TypeScript, 1687 lines, source)
 packages/rex/src/analyze/file-validation.ts (TypeScript, 587 lines, source)
 packages/rex/src/analyze/guided.ts (TypeScript, 274 lines, source)
-packages/rex/src/analyze/llm-bridge.ts (TypeScript, 205 lines, source)
+packages/rex/src/analyze/llm-bridge.ts (TypeScript, 217 lines, source)
 packages/rex/src/analyze/modify-reason.ts (TypeScript, 269 lines, source)
+packages/rex/src/analyze/place-reason.ts (TypeScript, 82 lines, source)
 packages/rex/src/analyze/prompt-envelope.ts (TypeScript, 168 lines, source)
 packages/rex/src/analyze/propose-group-renames.ts (TypeScript, 244 lines, source)
-packages/rex/src/analyze/propose.ts (TypeScript, 398 lines, source)
+packages/rex/src/analyze/propose.ts (TypeScript, 421 lines, source)
 packages/rex/src/analyze/reason.ts (TypeScript, 1895 lines, source)
 packages/rex/src/analyze/rename-resolve.ts (TypeScript, 175 lines, source)
-packages/rex/src/analyze/scanners.ts (TypeScript, 1125 lines, source)
+packages/rex/src/analyze/reshape-reason.ts (TypeScript, 565 lines, source)
+packages/rex/src/analyze/scanners.ts (TypeScript, 1160 lines, source)
+packages/rex/src/analyze/spec-draft-reason.ts (TypeScript, 86 lines, source)
 packages/rex/src/analyze/validate-modification.ts (TypeScript, 218 lines, source)
+packages/rex/src/cli/commands/status-sections.ts (TypeScript, 467 lines, source)
+packages/rex/src/cli/commands/status-shared.ts (TypeScript, 273 lines, source)
+packages/rex/src/cli/commands/status-work-cycle.ts (TypeScript, 186 lines, source)
+packages/rex/src/cli/commands/status.ts (TypeScript, 248 lines, source)
+packages/rex/src/cli/commands/tree.ts (TypeScript, 165 lines, source)
+packages/rex/src/core/stats.ts (TypeScript, 64 lines, source)
+packages/rex/src/core/verify.ts (TypeScript, 382 lines, source)
 
 </files>
 
@@ -62,6 +72,9 @@ Internal:
   packages/rex/src/analyze/modify-reason.ts → packages/rex/src/analyze/reason.ts {spawnClaude, parseProposalResponse, emptyAnalyzeTokenUsage, accumulateTokenUsage, readProjectContext, validateProposalQuality, PRD_SCHEMA, FEW_SHOT_EXAMPLE, TASK_QUALITY_RULES, ANTI_PATTERNS, OUTPUT_INSTRUCTION, MAX_RETRIES}
   packages/rex/src/analyze/modify-reason.ts → packages/rex/src/analyze/reason.ts {ReasonResult}
   packages/rex/src/analyze/modify-reason.ts → packages/rex/src/analyze/validate-modification.ts {validateModificationRequest}
+  packages/rex/src/analyze/place-reason.ts → packages/rex/src/analyze/analyze-shared.ts {extractJson}
+  packages/rex/src/analyze/place-reason.ts → packages/rex/src/analyze/llm-bridge.ts {resolveConfiguredModel, spawnClaude}
+  packages/rex/src/analyze/place-reason.ts → packages/rex/src/analyze/prompt-envelope.ts {rexPrompt, rexPromptEnvelope, section}
   packages/rex/src/analyze/prompt-envelope.ts → packages/rex/src/analyze/analyze-shared.ts {DEFAULT_MODEL}
   packages/rex/src/analyze/propose-group-renames.ts → packages/rex/src/analyze/prompt-envelope.ts {section, rexPromptEnvelope, rexPrompt}
   packages/rex/src/analyze/propose-group-renames.ts → packages/rex/src/analyze/reason.ts {spawnClaude, resolveConfiguredModel, extractJson}
@@ -78,7 +91,32 @@ Internal:
   packages/rex/src/analyze/rename-resolve.ts → packages/rex/src/analyze/escalate.ts {withEscalation}
   packages/rex/src/analyze/rename-resolve.ts → packages/rex/src/analyze/prompt-envelope.ts {section, rexPromptEnvelope, rexPrompt}
   packages/rex/src/analyze/rename-resolve.ts → packages/rex/src/analyze/reason.ts {spawnClaude, resolveConfiguredModel, extractJson}
+  packages/rex/src/analyze/reshape-reason.ts → packages/rex/src/analyze/escalate.ts {withEscalation}
+  packages/rex/src/analyze/reshape-reason.ts → packages/rex/src/analyze/prompt-envelope.ts {section, rexPromptEnvelope, rexPrompt, logRexPromptSections}
+  packages/rex/src/analyze/reshape-reason.ts → packages/rex/src/analyze/reason.ts {spawnClaude, extractJson, repairTruncatedJson, readProjectContext, emptyAnalyzeTokenUsage, accumulateTokenUsage}
   packages/rex/src/analyze/scanners.ts → packages/rex/src/analyze/analyze-shared.ts {cleanHeading, extractJsonItems, extractYamlItems}
+  packages/rex/src/analyze/spec-draft-reason.ts → packages/rex/src/analyze/analyze-shared.ts {extractJson}
+  packages/rex/src/analyze/spec-draft-reason.ts → packages/rex/src/analyze/llm-bridge.ts {resolveConfiguredModel, spawnClaude}
+  packages/rex/src/analyze/spec-draft-reason.ts → packages/rex/src/analyze/prompt-envelope.ts {rexPrompt, rexPromptEnvelope, section}
   packages/rex/src/analyze/validate-modification.ts → packages/rex/src/analyze/propose.ts {Proposal}
+  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/cli/commands/status-shared.ts {STATUS_ICONS, renderTree, filterCompleted, filterDeleted, formatStats, formatTimestamp}
+  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/cli/commands/status-shared.ts {CoverageMap}
+  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/stats.ts {computeStats}
+  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/stats.ts {TreeStats}
+  packages/rex/src/cli/commands/status-sections.ts → packages/rex/src/core/verify.ts {VerifyResult}
+  packages/rex/src/cli/commands/status-shared.ts → packages/rex/src/core/stats.ts {computeStats}
+  packages/rex/src/cli/commands/status-shared.ts → packages/rex/src/core/stats.ts {TreeStats}
+  packages/rex/src/cli/commands/status-work-cycle.ts → packages/rex/src/cli/commands/status-shared.ts {formatTimestamp}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-sections.ts {buildCoverageMap, renderJsonOutput, renderStaleReport, renderTreeView, renderCoverageSummary, renderTokenUsageSection, renderAutoCompletableHints, renderStaleWarnings, buildPerPRDSections, renderShowIndividualJson, renderShowIndividualHuman, renderWhatNextHints}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-shared.ts {STATUS_ICONS, renderProgressBar, formatTimestamp, filterCompleted, filterDeleted, renderTree, formatStats}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-shared.ts {filterDeleted}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-shared.ts {CoverageMap}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/cli/commands/status-work-cycle.ts {renderWorkCycleSection}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/core/stats.ts {computeStats}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/core/verify.ts {verify}
+  packages/rex/src/cli/commands/status.ts → packages/rex/src/core/verify.ts {VerifyResult}
+  packages/rex/src/cli/commands/tree.ts → packages/rex/src/cli/commands/status-shared.ts {STATUS_ICONS, renderProgressBar, timestampSuffix, blockedBySuffix, coverageSuffix, overrideSuffix, filterDeleted}
+  packages/rex/src/cli/commands/tree.ts → packages/rex/src/cli/commands/status-shared.ts {CoverageMap}
+  packages/rex/src/cli/commands/tree.ts → packages/rex/src/core/stats.ts {computeStats}
 
 </imports>

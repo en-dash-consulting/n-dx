@@ -5,28 +5,30 @@
 <zone>
 
 Zone: .Claude Scripts (`.claude`)
-Files: 1, Cohesion: 1.00, Coupling: 0.00
-Risk: healthy (score: 0.00)
-Description: Build, packaging, and CI scripts: iso-map.mjs
-Lines: 3268
+Files: 2, Cohesion: 0.00, Coupling: 0.00
+Risk: at-risk (score: 0.50)
+Description: Build, packaging, and CI scripts: iso-map.mjs, config.ts
+Lines: 3722
 
 </zone>
 
 <files>
 
-.claude/skills/iso-map/scripts/iso-map.mjs (JavaScript, 3268 lines, build)
+.claude/skills/iso-map/scripts/iso-map.mjs (JavaScript, 3539 lines, build)
+docs/.vitepress/config.ts (TypeScript, 183 lines, docs)
 
 </files>
 
 <findings>
 
-[observation] [info] High cohesion (1) — files are tightly interconnected
+[observation] [info] Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
+[suggestion] [info] Zone ".Claude Scripts" has an unreliable risk reading: only 2 files tracked (minimum 5 needed for reliable metrics) — cohesion: 0.00, coupling: 0.00 (risk score: 0.50)
 
 </findings>
 
 <insights>
 
-- High cohesion (1) — files are tightly interconnected
-- [call graph] 164 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
+- [call graph] 178 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

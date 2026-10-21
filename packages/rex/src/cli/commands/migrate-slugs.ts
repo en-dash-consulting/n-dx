@@ -27,6 +27,7 @@ import {
   PRD_TREE_DIRNAME,
   SLUG_RULE_VERSION,
   readSlugRuleMarker, resolveRexPaths } from "../../store/index.js";
+import { prdLayout } from "../../store/prd-model-reader.js";
 import {
   findUnresolvableSiblingCollisions,
   fingerprintTree,
@@ -63,6 +64,12 @@ export async function cmdMigrateSlugs(
   const rexDir = resolveRexPaths(dir).rexDir;
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   // Slugs are a v1 folder-tree property; a v2 tree's slugs are frozen.
+  if ((await prdLayout(rexDir)) === "v2") {
+    throw new CLIError(
+      "Slugs are frozen on a v2 tree — nothing to migrate.",
+      "'rex migrate-slugs' applies to v1 folder trees only.",
+    );
+  }
   const store = await resolveV1Store(rexDir);
 
   const before = await listTree(treeRoot);

@@ -92,7 +92,7 @@ function noneLeft(skippedClaimed: SkippedClaim[]): McpResult {
 
 export const getNextTaskTool = defineTool({
   name: "get_next_task",
-  description: "Get the next actionable task based on priority and dependencies, with explanation of why it was selected. Use when the user asks what to work on next.",
+  description: "Get the next actionable task based on priority and dependencies, with explanation of why it was selected. Use when the user asks what to work on next. On a v2 tree, `type` (change, task or subtask) is authoritative; `level` is the v1 projection, kept for compatibility until v1 is refused.",
   schema: {
     tags: z.array(z.string()).optional().describe("Only return tasks that have at least one of these tags. Omit to return any task regardless of tags."),
   },

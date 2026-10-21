@@ -16,10 +16,12 @@
  *
  * A unit is a candidate when it is `pending`, `in_progress` or `failing`, its
  * `blockedBy` refs all name completed nodes, and its change is open
- * (`isOpenChange`), itself in one of those statuses, unblocked and placed. A
- * change with `needsPlacement` is in the Inbox: neither it nor its tasks are
- * selected autonomously, but {@link resolveWorkById} still returns them, so
- * `ndx work --task` runs them.
+ * (`isOpenChange`), itself in one of those statuses, unblocked and not held
+ * for placement. A change with `needsPlacement` is in the Inbox; while the
+ * product layer has a capability or constraint to place it on
+ * (`awaitsPlacement`), neither it nor its tasks are selected autonomously,
+ * but {@link resolveWorkById} still returns them. On a product layer with
+ * neither, an Inbox change is selected like a placed one.
  *
  * ## Explicit refs
  *
@@ -42,7 +44,7 @@
  * @module rex/core/change-selection
  */
 
-import { indexTree, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { awaitsPlacement, indexTree, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { PRIORITY_ORDER, type ItemStatus } from "../schema/v1.js";
 import type { ChangeNode, TaskNode } from "../schema/v2.js";
 import { SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
@@ -100,7 +102,7 @@ export function findActionableWork(tree: V2Tree, options: WorkSelectionOptions =
   const workable = new Map<RuleNode, boolean>();
   const changeWorkable = (node: RuleNode): boolean => {
     const parent = parentOf.get(node);
-    const ok = isOpenChange(node) && !node.needsPlacement && runnable(node) && (parent?.type !== "change" || workable.get(parent) === true);
+    const ok = isOpenChange(node) && !awaitsPlacement(index, node) && runnable(node) && (parent?.type !== "change" || workable.get(parent) === true);
     workable.set(node, ok);
     return ok;
   };

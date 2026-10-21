@@ -1955,12 +1955,17 @@ const EFFECTS_LAYOUT_TOKENS = {
 
 /** This project's path for each layout token, relative to its root with forward slashes. */
 function effectsLayoutPaths(layout: ReturnType<typeof resolveLayout>, projectDir: string): Record<string, string> {
-  return Object.fromEntries(
+  const paths = Object.fromEntries(
     Object.entries(EFFECTS_LAYOUT_TOKENS).map(([token, field]) => [
       token,
       relative(projectDir, layout[field]).split(sep).join("/"),
     ]),
   );
+  // Twin of core's `prdTokenPaths`: a v2 project (`product/` present) keeps its PRD in changes/ and product/.
+  const rex = paths.rex;
+  return existsSync(join(layout.rexDir, "product"))
+    ? { ...paths, prd: `${rex}/changes/`, prdRead: `${rex}/product/ and ${rex}/changes/` }
+    : { ...paths, prd: `${rex}/prd_tree/`, prdRead: `${rex}/prd_tree/` };
 }
 
 /** Drop loaded declarations (tests, and a CLI swapped under a running server). */
