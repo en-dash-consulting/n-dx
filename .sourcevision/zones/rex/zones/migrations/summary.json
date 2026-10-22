@@ -1,0 +1,39 @@
+{
+  "id": "rex/migrations",
+  "name": "Migrations",
+  "description": "13 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/migrate-plan.ts",
+    "packages/rex/src/core/keywords.ts",
+    "packages/rex/src/core/placement-policy.ts",
+    "packages/rex/src/core/placement.ts",
+    "packages/rex/src/migrations/migration.ts",
+    "packages/rex/src/migrations/pipeline.ts",
+    "packages/rex/src/migrations/plan-file.ts",
+    "packages/rex/src/migrations/v1-to-v2/capability-spec.ts",
+    "packages/rex/src/migrations/v1-to-v2/code-files.ts",
+    "packages/rex/src/migrations/v1-to-v2/placement-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/seams.ts",
+    "packages/rex/src/migrations/v1-to-v2/spec-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/v1-tree-read.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/migrate-plan.ts",
+    "packages/rex/src/core/keywords.ts",
+    "packages/rex/src/core/placement-policy.ts",
+    "packages/rex/src/core/placement.ts",
+    "packages/rex/src/migrations/migration.ts",
+    "packages/rex/src/migrations/pipeline.ts",
+    "packages/rex/src/migrations/plan-file.ts",
+    "packages/rex/src/migrations/v1-to-v2/capability-spec.ts",
+    "packages/rex/src/migrations/v1-to-v2/code-files.ts",
+    "packages/rex/src/migrations/v1-to-v2/placement-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/seams.ts",
+    "packages/rex/src/migrations/v1-to-v2/spec-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/v1-tree-read.ts"
+  ],
+  "cohesion": 0.83,
+  "coupling": 0.17,
+  "fileCount": 13,
+  "lineCount": 2879
+}

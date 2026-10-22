@@ -29,6 +29,7 @@
     "packages/hench/tests/integration/dry-run-fresh-keeps-session-cache.test.ts",
     "packages/hench/tests/integration/dry-run-reset-deferred.test.ts",
     "packages/hench/tests/integration/failover-loop.test.ts",
+    "packages/hench/tests/integration/finalize-ready-completion.test.ts",
     "packages/hench/tests/integration/fork-lift-wiring.test.ts",
     "packages/hench/tests/integration/full-test-gate-blocking.test.ts",
     "packages/hench/tests/integration/gate-changed-files.test.ts",
@@ -106,8 +107,8 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 99,
-  "lineCount": 26772,
+  "fileCount": 100,
+  "lineCount": 26934,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

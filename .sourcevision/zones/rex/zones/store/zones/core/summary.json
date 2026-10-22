@@ -1,0 +1,23 @@
+{
+  "id": "rex/store/core",
+  "name": "Core",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/v2-completion.ts",
+    "packages/rex/src/core/execution-log.ts",
+    "packages/rex/src/core/parent-reset.ts",
+    "packages/rex/src/store/change-layer-store.ts",
+    "packages/rex/src/store/contracts.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/v2-completion.ts",
+    "packages/rex/src/core/execution-log.ts",
+    "packages/rex/src/core/parent-reset.ts",
+    "packages/rex/src/store/change-layer-store.ts",
+    "packages/rex/src/store/contracts.ts"
+  ],
+  "cohesion": 0.73,
+  "coupling": 0.27,
+  "fileCount": 5,
+  "lineCount": 844
+}

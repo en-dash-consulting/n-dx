@@ -66,6 +66,7 @@
     "packages/rex/tests/integration/v2-backup-refusal.test.ts",
     "packages/rex/tests/integration/v2-mcp-add-item.test.ts",
     "packages/rex/tests/integration/v2-mcp-lock-clock.test.ts",
+    "packages/rex/tests/integration/v2-mcp-modified-stamps.test.ts",
     "packages/rex/tests/integration/v2-mcp-place-apply.test.ts",
     "packages/rex/tests/integration/v2-mcp-tools.test.ts",
     "packages/rex/tests/integration/v2-stray-legacy-prd.test.ts",
@@ -76,8 +77,8 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 69,
-  "lineCount": 18357,
+  "fileCount": 70,
+  "lineCount": 18584,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

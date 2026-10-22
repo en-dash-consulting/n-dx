@@ -5,90 +5,35 @@
 <zone>
 
 Zone: Rex (`rex/rex`)
-Files: 22, Cohesion: 0.40, Coupling: 0.60
-Description: 22 files, primarily TypeScript
-Entry points: packages/rex/src/cli/commands/claim.ts, packages/rex/src/cli/commands/log.ts, packages/rex/src/cli/commands/validate-interactive.ts, packages/rex/src/cli/commands/validate.ts, packages/rex/src/core/durations.ts, packages/rex/src/core/execution-log.ts, packages/rex/src/core/identity.ts, packages/rex/src/core/item-duration-rollup.ts, packages/rex/src/core/post-merge-validate.ts, packages/rex/src/core/remove-feature.ts, packages/rex/src/core/sync.ts, packages/rex/src/public.ts, packages/rex/src/store/change-layer-store.ts, packages/rex/src/store/claims.ts, packages/rex/src/store/contracts.ts, packages/rex/src/store/file-adapter.ts, packages/rex/src/store/file-lock.ts, packages/rex/src/store/folder-tree-store.ts, packages/rex/src/store/prd-md-migration.ts, packages/rex/src/store/self-heal-tag.ts
-Lines: 7135
+Files: 5, Cohesion: 0.88, Coupling: 0.13
+Description: 5 files, primarily TypeScript
+Entry points: packages/rex/src/cli/commands/tree-diff.ts, packages/rex/src/core/map-diff.ts, packages/rex/src/core/tree-diff-markdown.ts, packages/rex/src/core/tree-diff.ts, packages/rex/src/core/tree-source.ts
+Lines: 1196
 
 </zone>
 
 <files>
 
-packages/rex/src/cli/commands/claim.ts (TypeScript, 300 lines, source)
-packages/rex/src/cli/commands/log.ts (TypeScript, 80 lines, source)
-packages/rex/src/cli/commands/validate-interactive.ts (TypeScript, 344 lines, source)
-packages/rex/src/cli/commands/validate.ts (TypeScript, 524 lines, source)
-packages/rex/src/core/code-coverage.ts (TypeScript, 123 lines, source)
-packages/rex/src/core/durations.ts (TypeScript, 81 lines, source)
-packages/rex/src/core/execution-log.ts (TypeScript, 56 lines, source)
-packages/rex/src/core/identity.ts (TypeScript, 79 lines, source)
-packages/rex/src/core/item-duration-rollup.ts (TypeScript, 155 lines, source)
-packages/rex/src/core/post-merge-validate.ts (TypeScript, 659 lines, source)
-packages/rex/src/core/remove-feature.ts (TypeScript, 286 lines, source)
-packages/rex/src/core/scope-creep.ts (TypeScript, 72 lines, source)
-packages/rex/src/core/sync.ts (TypeScript, 545 lines, source)
-packages/rex/src/public.ts (TypeScript, 699 lines, source)
-packages/rex/src/store/change-layer-store.ts (TypeScript, 227 lines, source)
-packages/rex/src/store/claims.ts (TypeScript, 556 lines, source)
-packages/rex/src/store/contracts.ts (TypeScript, 326 lines, source)
-packages/rex/src/store/file-adapter.ts (TypeScript, 961 lines, source)
-packages/rex/src/store/file-lock.ts (TypeScript, 416 lines, source)
-packages/rex/src/store/folder-tree-store.ts (TypeScript, 410 lines, source)
-packages/rex/src/store/prd-md-migration.ts (TypeScript, 189 lines, source)
-packages/rex/src/store/self-heal-tag.ts (TypeScript, 47 lines, source)
+packages/rex/src/cli/commands/tree-diff.ts (TypeScript, 337 lines, source)
+packages/rex/src/core/map-diff.ts (TypeScript, 162 lines, source)
+packages/rex/src/core/tree-diff-markdown.ts (TypeScript, 120 lines, source)
+packages/rex/src/core/tree-diff.ts (TypeScript, 266 lines, source)
+packages/rex/src/core/tree-source.ts (TypeScript, 311 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/rex/src/cli/commands/claim.ts → packages/rex/src/store/claims.ts {openClaimsStore, resolveClaimHolder, defaultIsPidAlive}
-  packages/rex/src/cli/commands/claim.ts → packages/rex/src/store/claims.ts {TaskClaim}
-  packages/rex/src/cli/commands/log.ts → packages/rex/src/core/execution-log.ts {appendExecutionLogEntry}
-  packages/rex/src/cli/commands/validate-interactive.ts → packages/rex/src/core/remove-feature.ts {preCheckFeatureDeletion, removeFeature}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/cli/commands/validate-interactive.ts {resolveEpiclessFeatures, applyEpiclessResolutions}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/cli/commands/validate-interactive.ts {PromptFn}
-  packages/rex/src/cli/commands/validate.ts → packages/rex/src/core/post-merge-validate.ts {detectPostMergeIssues, repairPostMergeIssues}
-  packages/rex/src/core/execution-log.ts → packages/rex/src/store/contracts.ts {PRDStore}
-  packages/rex/src/core/item-duration-rollup.ts → packages/rex/src/core/durations.ts {getTaskDuration}
-  packages/rex/src/core/remove-feature.ts → packages/rex/src/core/sync.ts {extractSyncMeta}
-  packages/rex/src/core/sync.ts → packages/rex/src/core/identity.ts {resolveActor}
-  packages/rex/src/public.ts → packages/rex/src/core/code-coverage.ts {crossReferenceChanges}
-  packages/rex/src/public.ts → packages/rex/src/core/code-coverage.ts {AffectedTask, UncoveredChange, CrossReferenceResult}
-  packages/rex/src/public.ts → packages/rex/src/core/durations.ts {getTaskDuration}
-  packages/rex/src/public.ts → packages/rex/src/core/durations.ts {TaskDuration}
-  packages/rex/src/public.ts → packages/rex/src/core/execution-log.ts {appendExecutionLogEntry}
-  packages/rex/src/public.ts → packages/rex/src/core/execution-log.ts {AppendLogArgs}
-  packages/rex/src/public.ts → packages/rex/src/core/identity.ts {resolveActor}
-  packages/rex/src/public.ts → packages/rex/src/core/item-duration-rollup.ts {aggregateItemDurations}
-  packages/rex/src/public.ts → packages/rex/src/core/item-duration-rollup.ts {ItemDurationTotals, ItemDurationAggregation}
-  packages/rex/src/public.ts → packages/rex/src/core/remove-feature.ts {preCheckFeatureDeletion, removeFeature}
-  packages/rex/src/public.ts → packages/rex/src/core/remove-feature.ts {DeletionPreCheck, RemoveFeatureResult, ExternalDependent, SyncedItem}
-  packages/rex/src/public.ts → packages/rex/src/core/scope-creep.ts {detectScopeCreep, setInitialChildCount}
-  packages/rex/src/public.ts → packages/rex/src/core/scope-creep.ts {ScopeCreepResult}
-  packages/rex/src/public.ts → packages/rex/src/store/change-layer-store.ts {ChangeLayerStore, isChangeLayerStore}
-  packages/rex/src/public.ts → packages/rex/src/store/claims.ts {openClaimsStore, claimsStorePath, resolveClaimHolder, defaultIsPidAlive, NOOP_CLAIMS_STORE, DEFAULT_CLAIM_TTL_MS, CLAIMS_DIRNAME, CLAIMS_FILENAME}
-  packages/rex/src/public.ts → packages/rex/src/store/claims.ts {ClaimsStore, ClaimsStoreOptions, ClaimOptions, ClaimResult, ClaimHolder, ClaimOwner, TaskClaim, ClaimHoldReason, PendingCompletion, ReleaseOptions}
-  packages/rex/src/public.ts → packages/rex/src/store/contracts.ts {takeSaveFileReport}
-  packages/rex/src/public.ts → packages/rex/src/store/contracts.ts {PRDStore, SaveFileReport}
-  packages/rex/src/public.ts → packages/rex/src/store/prd-md-migration.ts {migrateJsonPrdToMarkdown, PRD_MARKDOWN_FILENAME, PRDMarkdownMigrationError}
-  packages/rex/src/public.ts → packages/rex/src/store/prd-md-migration.ts {MarkdownMigrationResult}
-  packages/rex/src/store/change-layer-store.ts → packages/rex/src/store/contracts.ts {buildSaveFileReport, mergeSaveFileReports}
-  packages/rex/src/store/change-layer-store.ts → packages/rex/src/store/contracts.ts {PRDStore, SaveFileReport, StoreCapabilities}
-  packages/rex/src/store/claims.ts → packages/rex/src/store/file-lock.ts {withLock}
-  packages/rex/src/store/claims.ts → packages/rex/src/store/file-lock.ts {LockOptions}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/core/identity.ts {resolveActor}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/core/sync.ts {stampModified, stampModifiedFields, stampUpdatedFields, stampActor, snapshotItemContent, stampChangedItems}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/contracts.ts {buildSaveFileReport, mergeSaveFileReports}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/contracts.ts {PRDStore, StoreCapabilities, WriteOptions, SaveFileReport}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/file-lock.ts {withLock}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/prd-md-migration.ts {PRD_MARKDOWN_FILENAME, LEGACY_SOURCE_FILE_PREFIX, toMarkdownSourcePath}
-  packages/rex/src/store/file-adapter.ts → packages/rex/src/store/self-heal-tag.ts {withSelfHealTag}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/core/identity.ts {resolveActor}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/core/sync.ts {stampModified, stampUpdatedItem, stampActor, stampModifiedFields, snapshotItemContent, stampChangedItems}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/store/contracts.ts {buildSaveFileReport, mergeSaveFileReports}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/store/contracts.ts {PRDStore, StoreCapabilities, WriteOptions, SaveFileReport}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/store/file-lock.ts {withLock}
-  packages/rex/src/store/prd-md-migration.ts → packages/rex/src/store/file-adapter.ts {PRD_FILENAME}
+  packages/rex/src/cli/commands/tree-diff.ts → packages/rex/src/core/map-diff.ts {diffProductLayer}
+  packages/rex/src/cli/commands/tree-diff.ts → packages/rex/src/core/map-diff.ts {MapDiff, MapEntry}
+  packages/rex/src/cli/commands/tree-diff.ts → packages/rex/src/core/tree-diff-markdown.ts {renderTreeDiffMarkdown}
+  packages/rex/src/cli/commands/tree-diff.ts → packages/rex/src/core/tree-diff.ts {diffTrees}
+  packages/rex/src/cli/commands/tree-diff.ts → packages/rex/src/core/tree-diff.ts {TreeDiff, DiffEntry, DiffItemRef}
+  packages/rex/src/cli/commands/tree-diff.ts → packages/rex/src/core/tree-source.ts {loadTreeAtRef, loadTreeFromDir, resolveAnchorRef, TreeSourceError}
+  packages/rex/src/cli/commands/tree-diff.ts → packages/rex/src/core/tree-source.ts {ResolvedTree}
+  packages/rex/src/core/map-diff.ts → packages/rex/src/core/tree-diff.ts {DiffFieldChange}
+  packages/rex/src/core/tree-diff-markdown.ts → packages/rex/src/core/map-diff.ts {MapDiff, MapEntry}
+  packages/rex/src/core/tree-diff-markdown.ts → packages/rex/src/core/tree-diff.ts {DiffEntry, DiffItemRef, TreeDiff}
 
 </imports>

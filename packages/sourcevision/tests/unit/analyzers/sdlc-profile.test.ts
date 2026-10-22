@@ -88,6 +88,23 @@ describe("walkProject bounds", () => {
     expect(paths.some((p) => p.startsWith("third_party/"))).toBe(false);
   });
 
+  it("skips fixture trees in any case but keeps the tests beside them", async () => {
+    const root = project("fixtures", {
+      "tests/unit/a.test.ts": "it('a', () => {});\n",
+      "tests/fixtures/go-project/go.mod": "module example.com/fake\n\ngo 1.23\n",
+      "tests/fixtures/node/package.json": JSON.stringify({ scripts: { test: "vitest" } }),
+      "src/__fixtures__/Dockerfile": "FROM node\n",
+      "internal/testdata/Makefile": "test:\n\techo hi\n",
+      "Api.Tests/Fixtures/package.json": "{}",
+    });
+    const paths = walkProject(root, await loadIgnoreFilter(root)).files.map((f) => f.path);
+    expect(paths).toEqual(["tests/unit/a.test.ts"]);
+
+    // The on-disk shape: the in-memory one carries the temp root as projectDir.
+    const profile = stripSdlcProfileForDisk(await buildSdlcProfile(root));
+    expect(JSON.stringify(profile)).not.toMatch(/fixtures|testdata/i);
+  });
+
   it("respects .gitignore and .sourcevisionignore", async () => {
     const root = project("ignore", {
       ".gitignore": "secret/\n",

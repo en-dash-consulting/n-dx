@@ -77,7 +77,7 @@ export interface StageSection {
  * renders through the registry (`renderPanel`). Overview's Next steps and
  * Languages, split out so they can sit in tiles of their own.
  */
-export type StagePanelId = "map" | "health" | "next-steps" | "languages";
+export type StagePanelId = "map" | "health" | "next-steps" | "languages" | "delivery";
 
 /** Columns a tile spans on the 12-column dashboard grid. */
 export type TileCols = 4 | 6 | 8 | 12;
@@ -154,6 +154,7 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
       { view: "iso-map", panel: "map", title: "Codebase map", cols: 8, rows: 3, chromeless: true, hiddenWhenDeployed: true },
       { view: "overview", panel: "health", title: "Codebase health" },
       { view: "suggestions", panel: "next-steps", title: "Next steps", rows: 2 },
+      { view: "overview", panel: "delivery", title: "Delivery & infrastructure", rows: 2 },
       { view: "problems" },
       { view: "suggestions" },
       { view: "zones" },

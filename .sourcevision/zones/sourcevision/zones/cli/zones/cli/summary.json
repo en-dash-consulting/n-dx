@@ -1,10 +1,9 @@
 {
   "id": "sourcevision/cli/cli",
   "name": "Cli",
-  "description": "7 files, primarily TypeScript",
+  "description": "6 files, primarily TypeScript",
   "files": [
     "packages/sourcevision/src/analyzers/convergence.ts",
-    "packages/sourcevision/src/cli/commands/export-pdf.ts",
     "packages/sourcevision/src/cli/commands/pr-markdown.ts",
     "packages/sourcevision/src/cli/commands/validate.ts",
     "packages/sourcevision/src/cli/mcp-workspace.ts",
@@ -13,14 +12,13 @@
   ],
   "entryPoints": [
     "packages/sourcevision/src/analyzers/convergence.ts",
-    "packages/sourcevision/src/cli/commands/export-pdf.ts",
     "packages/sourcevision/src/cli/commands/pr-markdown.ts",
     "packages/sourcevision/src/cli/commands/validate.ts",
     "packages/sourcevision/src/cli/mcp.ts",
     "packages/sourcevision/src/cli/sourcevision-core.ts"
   ],
-  "cohesion": 0.29,
-  "coupling": 0.71,
-  "fileCount": 7,
-  "lineCount": 1589
+  "cohesion": 0.31,
+  "coupling": 0.69,
+  "fileCount": 6,
+  "lineCount": 1461
 }

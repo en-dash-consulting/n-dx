@@ -329,7 +329,7 @@ describe("StagePage", () => {
     await mount(page("analyze"));
     expect(sectionViews()).toEqual(["overview"]);
     const tiles = Array.from(root.querySelectorAll<HTMLElement>(".stage-tile")).map((el) => el.dataset.tile);
-    expect(tiles).toEqual(["map", "health", "next-steps", "problems", "suggestions", "zones", "architecture", "files", "languages"]);
+    expect(tiles).toEqual(["map", "health", "next-steps", "delivery", "problems", "suggestions", "zones", "architecture", "files", "languages"]);
     expect(root.querySelector('.stage-tile[data-tile="map"]')?.className).toContain("stage-tile--c8 stage-tile--r3");
   });
 

@@ -1,0 +1,24 @@
+{
+  "id": "tests-lang-java-unit",
+  "name": "Tests Lang Java Unit",
+  "description": "Non-source files in packages: dotted-segments.test.ts, index.test.ts, java-grammar-pin.test.ts (+2 more)",
+  "files": [
+    "packages/lang-java/tests/unit/dotted-segments.test.ts",
+    "packages/lang-java/tests/unit/index.test.ts",
+    "packages/lang-java/tests/unit/java-grammar-pin.test.ts",
+    "packages/lang-java/tests/unit/java-resolver-scale.test.ts",
+    "packages/lang-java/tests/unit/spring-boot-names.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 5,
+  "lineCount": 244,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

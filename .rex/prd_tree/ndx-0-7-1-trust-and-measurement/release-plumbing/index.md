@@ -2,12 +2,15 @@
 id: "dbea1b0f-a865-48dd-adc0-e4c31dde781c"
 level: "feature"
 title: "Release plumbing"
-status: "pending"
+status: "completed"
 priority: "high"
 tags:
   - "0.7.1"
   - "release-plumbing"
 source: "caos work management: feature ndx 0.7.1 - Release plumbing"
+startedAt: "2026-10-21T04:22:38.203Z"
+completedAt: "2026-10-21T04:22:38.203Z"
+endedAt: "2026-10-21T04:22:38.203Z"
 acceptanceCriteria:
   - "Publishing 0.7.1 creates one tag per package and a GitHub release without manual steps."
   - "Tags exist for every 0.5.x and 0.6.0 version at the commit that published it."
@@ -15,7 +18,7 @@ acceptanceCriteria:
   - "The migration design document is committed on main."
 description: "The release workflow has published 0.5.x and 0.6.0 to npm without creating git tags or GitHub releases; the last tag is 0.4.6 from July 2026, so the repository alone cannot show what shipped. Restore per-package tagging and GitHub releases in the workflow, backfill tags for 0.5.x and 0.6.0 at their Version Packages commits and re-create missing changelog entries, and clear the housekeeping left by the last wave: close issues #362, #363, #364, #365 and #368 (already fixed by #370), triage #375 (rex fix inverts timestamps it cannot repair) and #367 (Windows port relocation), and commit the PRD storage migration design document that is currently untracked.\n\nGoal: Anyone can read the release history from the repository, and the open issue list is a real work list."
 assignee: "Ryan Keith <ryan.k@endash.us>"
-lastModified: "2026-10-13T19:52:32.830Z"
+lastModified: "2026-10-21T04:22:38.206Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 

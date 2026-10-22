@@ -1,0 +1,27 @@
+{
+  "id": "tests-lang-runtime-unit",
+  "name": "Tests Lang Runtime Unit",
+  "description": "Non-source files in packages: build-grammars.test.ts, index.test.ts, pack-calls.test.ts (+5 more)",
+  "files": [
+    "packages/lang-runtime/tests/unit/build-grammars.test.ts",
+    "packages/lang-runtime/tests/unit/index.test.ts",
+    "packages/lang-runtime/tests/unit/pack-calls.test.ts",
+    "packages/lang-runtime/tests/unit/pack-entry.test.ts",
+    "packages/lang-runtime/tests/unit/pack.test.ts",
+    "packages/lang-runtime/tests/unit/runner.test.ts",
+    "packages/lang-runtime/tests/unit/testing/grammar.test.ts",
+    "packages/lang-runtime/tests/unit/testing/pack-golden.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 901,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

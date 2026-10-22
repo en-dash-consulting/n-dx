@@ -22,6 +22,7 @@ import type {
   RequirementValidationType,
 } from "../schema/index.js";
 import { findItem, walkTree } from "./tree.js";
+import type { TreeEntry } from "./tree.js";
 
 // ── Collection ────────────────────────────────────────────────────
 
@@ -56,7 +57,17 @@ export function collectRequirements(
 ): TracedRequirement[] {
   const entry = findItem(items, itemId);
   if (!entry) return [];
+  return traceRequirements(entry);
+}
 
+/**
+ * The requirements that apply to an entry the caller already holds: its own,
+ * then each ancestor's from the immediate parent up to the root. Takes the
+ * entry rather than an id so a caller that is already walking the tree does
+ * not pay for a second walk per item — scoring every item through
+ * `collectRequirements` made next-task selection quadratic in PRD size.
+ */
+export function traceRequirements(entry: TreeEntry): TracedRequirement[] {
   const traced: TracedRequirement[] = [];
 
   // Own requirements first

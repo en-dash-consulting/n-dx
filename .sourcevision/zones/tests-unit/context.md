@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Tests Unit (`tests-unit`)
-Files: 58, Cohesion: 1.00, Coupling: 0.00
+Files: 59, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+55 more)
-Lines: 13809
+Lines: 13861
 
 </zone>
 
@@ -27,7 +27,7 @@ tests/unit/cli-smoke-parity.test.js (JavaScript, 1044 lines, test)
 tests/unit/cli-timeout-schema.test.js (JavaScript, 38 lines, test)
 tests/unit/cli-timeout.test.js (JavaScript, 178 lines, test)
 tests/unit/color-env-neutralized.test.js (JavaScript, 97 lines, test)
-tests/unit/command-effects.test.js (JavaScript, 282 lines, test)
+tests/unit/command-effects.test.js (JavaScript, 296 lines, test)
 tests/unit/commit-trailers.test.js (JavaScript, 203 lines, test)
 tests/unit/config-repair.test.js (JavaScript, 91 lines, test)
 tests/unit/core-layout-routing.test.js (JavaScript, 252 lines, test)
@@ -41,10 +41,11 @@ tests/unit/init-dir-labels.test.js (JavaScript, 68 lines, test)
 tests/unit/init-llm.test.js (JavaScript, 1413 lines, test)
 tests/unit/install-identity.test.js (JavaScript, 399 lines, test)
 tests/unit/mcp-shim-roots.test.js (JavaScript, 288 lines, test)
-tests/unit/migrate-chain.test.js (JavaScript, 140 lines, test)
+tests/unit/migrate-chain.test.js (JavaScript, 159 lines, test)
 tests/unit/migrate-layout.test.js (JavaScript, 423 lines, test)
 tests/unit/narration-status.test.js (JavaScript, 96 lines, test)
 tests/unit/ndx-gitignore-template.test.js (JavaScript, 122 lines, test)
+tests/unit/ndx-home-isolated.test.js (JavaScript, 19 lines, test)
 tests/unit/primer-preference.test.js (JavaScript, 201 lines, test)
 tests/unit/project-config-strict.test.js (JavaScript, 44 lines, test)
 tests/unit/refresh-artifacts.test.js (JavaScript, 32 lines, test)
@@ -97,6 +98,6 @@ Outgoing (this zone → other zones):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 548 internal calls, 1050 outgoing, 0 incoming (cohesion: 0.34, coupling: 0.66)
+- [call graph] 550 internal calls, 1060 outgoing, 0 incoming (cohesion: 0.34, coupling: 0.66)
 
 </insights>

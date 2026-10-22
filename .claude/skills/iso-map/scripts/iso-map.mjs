@@ -2786,6 +2786,8 @@ var IAC_SKIP = /* @__PURE__ */ new Set([
   "vendor",
   "coverage"
 ]);
+var FIXTURE_DIRS = /* @__PURE__ */ new Set(["fixtures", "__fixtures__", "testdata", "__mocks__"]);
+var IAC_TEST_DIRS = /* @__PURE__ */ new Set(["tests", "__tests__", ...FIXTURE_DIRS]);
 function findIaCFiles(root, limit = 400) {
   const terraform = [];
   const yaml = [];
@@ -2801,7 +2803,7 @@ function findIaCFiles(root, limit = 400) {
     for (const entry of entries) {
       const full = join2(dir, entry.name);
       if (entry.isDirectory()) {
-        if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
+        if (IAC_SKIP.has(entry.name) || IAC_TEST_DIRS.has(entry.name.toLowerCase()) || entry.name.startsWith(".")) continue;
         walk(full, depth + 1);
         continue;
       }

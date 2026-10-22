@@ -5,36 +5,42 @@
 <zone>
 
 Zone: Src 4 (`llm-client/src-4`)
-Files: 7, Cohesion: 0.24, Coupling: 0.76
-Description: 7 files, primarily TypeScript
-Entry points: packages/llm-client/src/json.ts, packages/llm-client/src/progress-reporter.ts, packages/llm-client/src/public.ts, packages/llm-client/src/suggest.ts, packages/llm-client/src/tool-schema.ts
-Lines: 1239
+Files: 9, Cohesion: 0.24, Coupling: 0.76
+Description: 9 files, primarily TypeScript
+Entry points: packages/llm-client/src/git-remote-url.ts, packages/llm-client/src/progress-reporter.ts, packages/llm-client/src/public.ts, packages/llm-client/src/redact.ts, packages/llm-client/src/suggest.ts, packages/llm-client/src/system-memory.ts, packages/llm-client/src/tool-schema.ts, packages/llm-client/src/usage-dedup.ts
+Lines: 2263
 
 </zone>
 
 <files>
 
-packages/llm-client/src/json.ts (TypeScript, 18 lines, source)
+packages/llm-client/src/git-remote-url.ts (TypeScript, 187 lines, source)
 packages/llm-client/src/progress-reporter.ts (TypeScript, 123 lines, source)
-packages/llm-client/src/project-dirs.ts (TypeScript, 36 lines, source)
-packages/llm-client/src/public.ts (TypeScript, 537 lines, source)
+packages/llm-client/src/public.ts (TypeScript, 730 lines, source)
+packages/llm-client/src/redact.ts (TypeScript, 333 lines, source)
 packages/llm-client/src/suggest.ts (TypeScript, 75 lines, source)
 packages/llm-client/src/suppress-deprecations.ts (TypeScript, 105 lines, source)
+packages/llm-client/src/system-memory.ts (TypeScript, 249 lines, source)
 packages/llm-client/src/tool-schema.ts (TypeScript, 345 lines, source)
+packages/llm-client/src/usage-dedup.ts (TypeScript, 116 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/llm-client/src/public.ts → packages/llm-client/src/json.ts {toCanonicalJSON}
+  packages/llm-client/src/public.ts → packages/llm-client/src/git-remote-url.ts {parseGitRemoteUrl, remoteToWebUrl, stripRemoteCredentials}
+  packages/llm-client/src/public.ts → packages/llm-client/src/git-remote-url.ts {ParsedGitRemote, RemoteHostKind}
   packages/llm-client/src/public.ts → packages/llm-client/src/progress-reporter.ts {createProgressReporter, formatRetryLine, printRetryLine, setActiveProgressReporter, getActiveProgressReporter}
   packages/llm-client/src/public.ts → packages/llm-client/src/progress-reporter.ts {ProgressReporter}
-  packages/llm-client/src/public.ts → packages/llm-client/src/project-dirs.ts {PROJECT_DIRS}
-  packages/llm-client/src/public.ts → packages/llm-client/src/project-dirs.ts {ProjectDir}
+  packages/llm-client/src/public.ts → packages/llm-client/src/redact.ts {REDACTED_TOKEN, REDACTED_VALUE, REDACTED_KEY_BLOCK, REDACTED_PASSWORD, redactSecrets, redactSecretsDetailed, redactDeep, createLineRedactor}
+  packages/llm-client/src/public.ts → packages/llm-client/src/redact.ts {RedactionResult, LineRedactor}
   packages/llm-client/src/public.ts → packages/llm-client/src/suggest.ts {editDistance, suggestCommands, formatTypoSuggestion}
   packages/llm-client/src/public.ts → packages/llm-client/src/suppress-deprecations.ts {suppressKnownDeprecations}
+  packages/llm-client/src/public.ts → packages/llm-client/src/system-memory.ts {readAvailableMemory, getAvailableMemory, createAvailableMemoryReader, parseVmStatAvailableBytes, parseDarwinPressureLevel, derivePressure, MEMORY_READING_TTL_MS, MEMORY_EXEC_TIMEOUT_MS, PRESSURE_CRITICAL_USED_PERCENT, PRESSURE_WARN_USED_PERCENT}
+  packages/llm-client/src/public.ts → packages/llm-client/src/system-memory.ts {AvailableMemoryReading, MemoryPressure, ExecRunner, SystemMemoryDeps, AvailableMemoryReader}
   packages/llm-client/src/public.ts → packages/llm-client/src/tool-schema.ts {toAnthropicToolDef, toAnthropicToolDefs, toOpenAiToolDef, toOpenAiToolDefs, toGeminiFunctionDeclaration, toGeminiFunctionDeclarations}
   packages/llm-client/src/public.ts → packages/llm-client/src/tool-schema.ts {JsonSchemaType, ToolPropertySchema, ToolInputSchema, ToolDefinition, AnthropicToolDef, OpenAiToolDef, GeminiFunctionDeclaration, GeminiSchema}
+  packages/llm-client/src/public.ts → packages/llm-client/src/usage-dedup.ts {usageMessageId, UsageMessageFilter}
 
 </imports>

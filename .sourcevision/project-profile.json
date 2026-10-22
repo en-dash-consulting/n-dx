@@ -4,10 +4,13 @@
   "languages": [
     "typescript",
     "javascript",
+    "python",
+    "java",
     "go",
     "sql",
-    "zig",
-    "python"
+    "terraform",
+    "kotlin",
+    "zig"
   ],
   "frameworks": [
     "vitest"

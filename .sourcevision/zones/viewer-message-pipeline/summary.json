@@ -1,6 +1,6 @@
 {
   "id": "viewer-message-pipeline",
-  "name": "Message Optimization Pipeline",
+  "name": "Viewer Message Pipeline",
   "description": "7 files, mostly utilities and services; entry points call-rate-limiter.ts, fetch-pipeline.ts, index.ts; imported by Packages and Packages.",
   "files": [
     "packages/web/src/viewer/messaging/call-rate-limiter.ts",

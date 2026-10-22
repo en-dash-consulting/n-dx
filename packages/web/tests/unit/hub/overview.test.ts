@@ -107,6 +107,38 @@ describe("toProjectCard", () => {
     });
   });
 
+  /** Same shape of guarantee as repo identity: every child state gives a card. */
+  describe("readiness and infrastructure", () => {
+    const withSv = (sv: NonNullable<NonNullable<ChildSnapshot["status"]>["sv"]>): ChildSnapshot => ({
+      ...HEALTHY,
+      status: { ...HEALTHY.status, sv },
+    });
+
+    it("carries the readiness score and the infrastructure count", () => {
+      const card = toProjectCard(project("a"), withSv({ readiness: { overall: 88 }, infrastructure: 3 }));
+      expect(card.readiness).toBe(88);
+      expect(card.infrastructure).toBe(3);
+    });
+
+    it("keeps a zero count apart from an unknown one", () => {
+      const card = toProjectCard(project("a"), withSv({ readiness: null, infrastructure: 0 }));
+      expect(card.readiness).toBeNull();
+      expect(card.infrastructure).toBe(0);
+    });
+
+    it("is null for a child whose build predates both fields", () => {
+      const card = toProjectCard(project("a"), HEALTHY);
+      expect(card.readiness).toBeNull();
+      expect(card.infrastructure).toBeNull();
+    });
+
+    it("is null for an unreachable child", () => {
+      const card = toProjectCard(project("a"), { status: null, git: null, error: "ECONNREFUSED" });
+      expect(card.readiness).toBeNull();
+      expect(card.infrastructure).toBeNull();
+    });
+  });
+
   it("renders a card for an unreachable child from the registry alone", () => {
     const card = toProjectCard(
       project("beta", { status: { state: "unreachable", pid: null, port: null, attached: false, respawns: 1, lastHealthAt: null, lastError: null } as never }),

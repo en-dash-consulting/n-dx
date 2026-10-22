@@ -23,6 +23,9 @@ packages/web/playwright.config.ts (TypeScript, 25 lines, config)
 <findings>
 
 [observation] [info] Isolated files — no import edges between 3 files, cohesion is unmeasurable (reported as 0)
+[observation] [info] vitest.config.ts is grouped with Playwright config but serves test orchestration (not end-to-end testing)—consolidate all build/test config files into single location for consistency
+[anti-pattern] [info] playwright.config.ts sits in the build-config zone ('web') rather than with the tests-web-e2e-ui suite it drives. The e2e runner's config and its specs therefore appear as unrelated zones.
+[suggestion] [info] Re-classify packages/web/build.js and packages/web/dev.js as entrypoint (set_file_archetype), so entry-point and dead-export analysis treats them as roots and does not flag their exports.
 [suggestion] [info] Zone "Web" has an unreliable risk reading: only 3 files tracked (minimum 5 needed for reliable metrics) — cohesion: 0.00, coupling: 0.00 (risk score: 0.50)
 
 </findings>
@@ -30,6 +33,15 @@ packages/web/playwright.config.ts (TypeScript, 25 lines, config)
 <insights>
 
 - Isolated files — no import edges between 3 files, cohesion is unmeasurable (reported as 0)
+- Isolated files — no import edges between 3 files, cohesion is unmeasurable (reported as 0)
+- Zero cohesion/coupling is expected and correct for isolated infrastructure files
+- Vitest config is miscategorized here—should be co-located with build.js and dev.js in shared build configuration, not grouped with Playwright config
+- Separation from application logic (viewer, server) is correct; build infrastructure should not import from runtime code
+- vitest.config.ts is grouped with Playwright config but serves test orchestration (not end-to-end testing)—consolidate all build/test config files into single location for consistency
+- playwright.config.ts is zoned apart from tests-web-e2e-ui, the 9-file Playwright suite it configures
+- playwright.config.ts sits in the build-config zone ('web') rather than with the tests-web-e2e-ui suite it drives. The e2e runner's config and its specs therefore appear as unrelated zones.
+- build.js and dev.js are classified as config, but they are executable build and dev-server entry scripts. The 'config' archetype hides that they are the web package's build entrypoints.
+- Re-classify packages/web/build.js and packages/web/dev.js as entrypoint (set_file_archetype), so entry-point and dead-export analysis treats them as roots and does not flag their exports.
 - [call graph] 26 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

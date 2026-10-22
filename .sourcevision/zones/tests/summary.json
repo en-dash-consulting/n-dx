@@ -5,13 +5,16 @@
   "files": [
     "packages/graview-face/tests/door.test.ts",
     "packages/graview-face/tests/places.test.ts",
-    "packages/graview-face/tests/sync.test.ts"
+    "packages/graview-face/tests/sync.test.ts",
+    "packages/sourcevision/tests/setup-ndx-home.ts"
   ],
-  "entryPoints": [],
+  "entryPoints": [
+    "packages/sourcevision/tests/setup-ndx-home.ts"
+  ],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 3,
-  "lineCount": 386,
+  "fileCount": 4,
+  "lineCount": 414,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

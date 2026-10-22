@@ -1,0 +1,25 @@
+{
+  "id": "lang-kit/lang-kit",
+  "name": "Lang Kit",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/lang-kit/src/build-model.ts",
+    "packages/lang-kit/src/go-build.ts",
+    "packages/lang-kit/src/gradle-catalog.ts",
+    "packages/lang-kit/src/gradle-script.ts",
+    "packages/lang-kit/src/java-gradle-build.ts",
+    "packages/lang-kit/src/toml-lite.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-kit/src/build-model.ts",
+    "packages/lang-kit/src/go-build.ts",
+    "packages/lang-kit/src/gradle-catalog.ts",
+    "packages/lang-kit/src/gradle-script.ts",
+    "packages/lang-kit/src/java-gradle-build.ts",
+    "packages/lang-kit/src/toml-lite.ts"
+  ],
+  "cohesion": 0.5,
+  "coupling": 0.5,
+  "fileCount": 6,
+  "lineCount": 1713
+}

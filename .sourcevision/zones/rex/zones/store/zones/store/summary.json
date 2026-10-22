@@ -1,0 +1,23 @@
+{
+  "id": "rex/store/store",
+  "name": "Store",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/core/identity.ts",
+    "packages/rex/src/core/sync.ts",
+    "packages/rex/src/store/ensure-legacy-prd-migrated.ts",
+    "packages/rex/src/store/folder-tree-store.ts",
+    "packages/rex/src/store/paths.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/core/identity.ts",
+    "packages/rex/src/core/sync.ts",
+    "packages/rex/src/store/ensure-legacy-prd-migrated.ts",
+    "packages/rex/src/store/folder-tree-store.ts",
+    "packages/rex/src/store/paths.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 5,
+  "lineCount": 1440
+}

@@ -8,13 +8,13 @@ Zone: .Claude Scripts (`.claude`)
 Files: 2, Cohesion: 0.00, Coupling: 0.00
 Risk: at-risk (score: 0.50)
 Description: Build, packaging, and CI scripts: iso-map.mjs, config.ts
-Lines: 3722
+Lines: 3732
 
 </zone>
 
 <files>
 
-.claude/skills/iso-map/scripts/iso-map.mjs (JavaScript, 3539 lines, build)
+.claude/skills/iso-map/scripts/iso-map.mjs (JavaScript, 3549 lines, build)
 docs/.vitepress/config.ts (TypeScript, 183 lines, docs)
 
 </files>
@@ -29,6 +29,6 @@ docs/.vitepress/config.ts (TypeScript, 183 lines, docs)
 <insights>
 
 - Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
-- [call graph] 178 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- [call graph] 179 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

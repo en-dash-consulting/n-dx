@@ -1,43 +1,22 @@
 {
   "id": "rex/cli-commands",
   "name": "Cli Commands",
-  "description": "16 files, primarily TypeScript",
+  "description": "5 files, primarily TypeScript",
   "files": [
-    "packages/rex/src/cli/commands/constants.ts",
-    "packages/rex/src/cli/commands/merge-driver.ts",
-    "packages/rex/src/cli/commands/migrate-plan.ts",
-    "packages/rex/src/cli/index.ts",
-    "packages/rex/src/cli/legacy-layout-notice.ts",
-    "packages/rex/src/cli/mcp-tools/tool.ts",
-    "packages/rex/src/cli/mcp-workspace.ts",
-    "packages/rex/src/cli/mcp.ts",
-    "packages/rex/src/cli/resolve-dir.ts",
-    "packages/rex/src/core/merge-driver.ts",
-    "packages/rex/src/migrations/registry.ts",
-    "packages/rex/src/migrations/v1-to-v2/index.ts",
-    "packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts",
-    "packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts",
-    "packages/rex/src/migrations/v1-to-v2/migration-plan.ts",
-    "packages/rex/src/migrations/v1-to-v2/plan-summary.ts"
+    "packages/rex/src/cli/commands/token-errors.ts",
+    "packages/rex/src/cli/commands/token-format.ts",
+    "packages/rex/src/cli/commands/usage.ts",
+    "packages/rex/src/core/token-store.ts",
+    "packages/rex/src/core/token-usage.ts"
   ],
   "entryPoints": [
-    "packages/rex/src/cli/commands/constants.ts",
-    "packages/rex/src/cli/commands/migrate-plan.ts",
-    "packages/rex/src/cli/legacy-layout-notice.ts",
-    "packages/rex/src/cli/mcp-tools/tool.ts",
-    "packages/rex/src/cli/mcp-workspace.ts",
-    "packages/rex/src/cli/mcp.ts",
-    "packages/rex/src/cli/resolve-dir.ts",
-    "packages/rex/src/core/merge-driver.ts",
-    "packages/rex/src/migrations/registry.ts",
-    "packages/rex/src/migrations/v1-to-v2/index.ts",
-    "packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts",
-    "packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts",
-    "packages/rex/src/migrations/v1-to-v2/migration-plan.ts",
-    "packages/rex/src/migrations/v1-to-v2/plan-summary.ts"
+    "packages/rex/src/cli/commands/token-format.ts",
+    "packages/rex/src/cli/commands/usage.ts",
+    "packages/rex/src/core/token-store.ts",
+    "packages/rex/src/core/token-usage.ts"
   ],
-  "cohesion": 0.4,
-  "coupling": 0.6,
-  "fileCount": 16,
-  "lineCount": 3794
+  "cohesion": 0.93,
+  "coupling": 0.07,
+  "fileCount": 5,
+  "lineCount": 1661
 }

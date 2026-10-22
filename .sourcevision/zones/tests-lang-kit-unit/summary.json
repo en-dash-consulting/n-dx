@@ -1,0 +1,37 @@
+{
+  "id": "tests-lang-kit-unit",
+  "name": "Tests Lang Kit Unit",
+  "description": "Non-source files in packages: call-within-budget.test.ts, detect.test.ts, go-build.test.ts (+15 more)",
+  "files": [
+    "packages/lang-kit/tests/unit/call-within-budget.test.ts",
+    "packages/lang-kit/tests/unit/detect.test.ts",
+    "packages/lang-kit/tests/unit/go-build.test.ts",
+    "packages/lang-kit/tests/unit/iac-kinds.test.ts",
+    "packages/lang-kit/tests/unit/index.test.ts",
+    "packages/lang-kit/tests/unit/ini-lite.test.ts",
+    "packages/lang-kit/tests/unit/java-maven-build.test.ts",
+    "packages/lang-kit/tests/unit/java-modules.test.ts",
+    "packages/lang-kit/tests/unit/language-registry.test.ts",
+    "packages/lang-kit/tests/unit/maven-properties.test.ts",
+    "packages/lang-kit/tests/unit/pack-contract.test.ts",
+    "packages/lang-kit/tests/unit/pack-entry.test.ts",
+    "packages/lang-kit/tests/unit/python-build.test.ts",
+    "packages/lang-kit/tests/unit/python-requirements.test.ts",
+    "packages/lang-kit/tests/unit/python-setup-py.test.ts",
+    "packages/lang-kit/tests/unit/sql-references.test.ts",
+    "packages/lang-kit/tests/unit/toml-lite.test.ts",
+    "packages/lang-kit/tests/unit/yaml-subset.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 18,
+  "lineCount": 2116,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

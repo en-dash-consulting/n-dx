@@ -402,7 +402,7 @@ describe("the Analysis stage is a tile dashboard", () => {
   it("leads with Overview and lays every SourceVision view out as tiles", () => {
     expect(STAGES.analyze.sections.map((s) => s.view)).toEqual(["overview"]);
     expect(tiles.map((t) => t.panel ?? t.view)).toEqual([
-      "map", "health", "next-steps", "problems", "suggestions", "zones",
+      "map", "health", "next-steps", "delivery", "problems", "suggestions", "zones",
       "architecture", "files", "languages", "pr-markdown", "ask",
     ]);
     expect(placed).toEqual([

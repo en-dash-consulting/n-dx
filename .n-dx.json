@@ -12,6 +12,13 @@
       "mergeThreshold": 5,
       "anchors": [
         {
+          "id": "rex-migrations",
+          "name": "Rex Migrations",
+          "include": [
+            "packages/rex/src/migrations/**"
+          ]
+        },
+        {
           "id": "web-server",
           "name": "Web Server",
           "include": [

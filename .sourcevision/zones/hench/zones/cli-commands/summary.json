@@ -1,7 +1,7 @@
 {
   "id": "hench/cli-commands",
   "name": "Cli Commands",
-  "description": "25 files, primarily TypeScript",
+  "description": "26 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/planning/brief.ts",
     "packages/hench/src/agent/planning/cli-identity.ts",
@@ -27,7 +27,8 @@
     "packages/hench/src/queue/priority-scheduler.ts",
     "packages/hench/src/store/repoint-runs.ts",
     "packages/hench/src/store/trust.ts",
-    "packages/hench/src/tools/rex.ts"
+    "packages/hench/src/tools/rex.ts",
+    "packages/hench/src/validation/finalize-ready.ts"
   ],
   "entryPoints": [
     "packages/hench/src/agent/planning/brief.ts",
@@ -53,10 +54,11 @@
     "packages/hench/src/queue/priority-scheduler.ts",
     "packages/hench/src/store/repoint-runs.ts",
     "packages/hench/src/store/trust.ts",
-    "packages/hench/src/tools/rex.ts"
+    "packages/hench/src/tools/rex.ts",
+    "packages/hench/src/validation/finalize-ready.ts"
   ],
   "cohesion": 0.49,
   "coupling": 0.51,
-  "fileCount": 25,
-  "lineCount": 9922
+  "fileCount": 26,
+  "lineCount": 9957
 }

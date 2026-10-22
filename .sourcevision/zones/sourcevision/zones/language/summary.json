@@ -1,37 +1,19 @@
 {
   "id": "sourcevision/language",
-  "name": "Language Support",
-  "description": "13 files, primarily TypeScript",
+  "name": "Language",
+  "description": "3 files, primarily TypeScript",
   "files": [
-    "packages/sourcevision/src/analyzers/csharp-imports.ts",
-    "packages/sourcevision/src/analyzers/go-imports.ts",
-    "packages/sourcevision/src/analyzers/go-outbound-detection.ts",
-    "packages/sourcevision/src/analyzers/go-route-detection.ts",
-    "packages/sourcevision/src/analyzers/imports.ts",
-    "packages/sourcevision/src/analyzers/inventory.ts",
-    "packages/sourcevision/src/language/csharp.ts",
-    "packages/sourcevision/src/language/detect.ts",
-    "packages/sourcevision/src/language/go.ts",
-    "packages/sourcevision/src/language/python.ts",
-    "packages/sourcevision/src/language/registry.ts",
-    "packages/sourcevision/src/language/swift.ts",
-    "packages/sourcevision/src/language/typescript.ts"
+    "packages/sourcevision/src/language/database-engines.ts",
+    "packages/sourcevision/src/language/sql-dialects.ts",
+    "packages/sourcevision/src/language/sql-migrations.ts"
   ],
   "entryPoints": [
-    "packages/sourcevision/src/analyzers/csharp-imports.ts",
-    "packages/sourcevision/src/analyzers/go-imports.ts",
-    "packages/sourcevision/src/analyzers/go-outbound-detection.ts",
-    "packages/sourcevision/src/analyzers/go-route-detection.ts",
-    "packages/sourcevision/src/analyzers/imports.ts",
-    "packages/sourcevision/src/analyzers/inventory.ts",
-    "packages/sourcevision/src/language/csharp.ts",
-    "packages/sourcevision/src/language/detect.ts",
-    "packages/sourcevision/src/language/go.ts",
-    "packages/sourcevision/src/language/registry.ts",
-    "packages/sourcevision/src/language/typescript.ts"
+    "packages/sourcevision/src/language/database-engines.ts",
+    "packages/sourcevision/src/language/sql-dialects.ts",
+    "packages/sourcevision/src/language/sql-migrations.ts"
   ],
-  "cohesion": 0.66,
-  "coupling": 0.34,
-  "fileCount": 13,
-  "lineCount": 4261
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 3,
+  "lineCount": 1245
 }

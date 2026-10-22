@@ -8,7 +8,7 @@ Zone: Tests Integration (`tests-integration`)
 Files: 31, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Non-source files in tests: assistant-integration.test.js, ci-structure-health.test.js, claude-config-validation.test.js (+28 more)
-Lines: 9624
+Lines: 9642
 
 </zone>
 
@@ -18,8 +18,8 @@ tests/integration/assistant-integration.test.js (JavaScript, 145 lines, test)
 tests/integration/ci-structure-health.test.js (JavaScript, 85 lines, test)
 tests/integration/claude-config-validation.test.js (JavaScript, 521 lines, test)
 tests/integration/codex-config-validation.test.js (JavaScript, 625 lines, test)
-tests/integration/command-effects-manifest-contract.test.js (JavaScript, 116 lines, test)
-tests/integration/cross-package-contracts.test.js (JavaScript, 1574 lines, test)
+tests/integration/command-effects-manifest-contract.test.js (JavaScript, 132 lines, test)
+tests/integration/cross-package-contracts.test.js (JavaScript, 1576 lines, test)
 tests/integration/effective-agent-config-contract.test.js (JavaScript, 473 lines, test)
 tests/integration/exec-interrupt-forwarding.test.js (JavaScript, 235 lines, test)
 tests/integration/gateway-pipeline.test.js (JavaScript, 197 lines, test)
@@ -67,6 +67,6 @@ Outgoing (this zone → other zones):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 319 internal calls, 242 outgoing, 0 incoming (cohesion: 0.57, coupling: 0.43)
+- [call graph] 319 internal calls, 247 outgoing, 0 incoming (cohesion: 0.56, coupling: 0.44)
 
 </insights>

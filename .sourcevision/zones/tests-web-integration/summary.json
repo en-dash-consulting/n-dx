@@ -37,6 +37,7 @@
     "packages/web/tests/integration/start-cache-lifecycle.test.ts",
     "packages/web/tests/integration/start-cache-v2.test.ts",
     "packages/web/tests/integration/start-first-prd-read.test.ts",
+    "packages/web/tests/integration/start-legacy-notice-env.test.ts",
     "packages/web/tests/integration/start-rex-watcher-v2.test.ts",
     "packages/web/tests/integration/start-v2-stray-legacy-prd.test.ts",
     "packages/web/tests/integration/token-usage-route-regression.test.ts",
@@ -49,8 +50,8 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 42,
-  "lineCount": 13436,
+  "fileCount": 43,
+  "lineCount": 13507,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

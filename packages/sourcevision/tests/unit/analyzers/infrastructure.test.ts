@@ -131,6 +131,42 @@ describe("discovery", () => {
   });
 });
 
+describe("test fixtures are not infrastructure", () => {
+  const tf = (type: string, name: string): string => `resource "${type}" "${name}" {}\n`;
+  let fixtureRoot: string;
+
+  beforeAll(() => {
+    fixtureRoot = join(tmpdir(), "sv-infrastructure-fixtures-test");
+    rmSync(fixtureRoot, { recursive: true, force: true });
+    const files: Record<string, string> = {
+      "infra/main.tf": tf("aws_sqs_queue", "real"),
+      // An environment named `test` is real infrastructure, not a test.
+      "infra/environments/test/main.tf": tf("aws_s3_bucket", "test_env"),
+      "packages/a/tests/fixtures/checkout/infra/main.tf": tf("aws_sqs_queue", "order_events"),
+      "src/__fixtures__/stack.tf": tf("aws_sns_topic", "fixture_topic"),
+      "tests/setup/main.tf": tf("aws_lambda_function", "helper"),
+      "internal/testdata/main.tf": tf("aws_dynamodb_table", "golden"),
+      "Api/Tests/Fixtures/main.tf": tf("aws_sns_topic", "dotnet_fixture"),
+      "tests/fixtures/stack.yaml":
+        "Resources:\n  Fake:\n    Type: AWS::SQS::Queue\n",
+    };
+    for (const [path, content] of Object.entries(files)) {
+      const full = join(fixtureRoot, path);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(full, content, "utf-8");
+    }
+  });
+
+  afterAll(() => {
+    if (fixtureRoot) rmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it("reports IaC outside test and fixture directories only", () => {
+    const ids = computeInfrastructure(fixtureRoot, []).infrastructure.map((i) => i.id).sort();
+    expect(ids).toEqual(["infra:aws_s3_bucket.test_env", "infra:aws_sqs_queue.real"]);
+  });
+});
+
 describe("the persisted shape round-trips exactly", () => {
   it("reading the file back gives the architecture discovery produced", () => {
     const computed = computeInfrastructure(root, SOURCE_FILES);

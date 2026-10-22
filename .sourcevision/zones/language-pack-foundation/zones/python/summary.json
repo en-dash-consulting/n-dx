@@ -1,0 +1,22 @@
+{
+  "id": "lang-kit/python",
+  "name": "Python",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/lang-kit/src/dir-glob.ts",
+    "packages/lang-kit/src/ini-lite.ts",
+    "packages/lang-kit/src/python-build.ts",
+    "packages/lang-kit/src/python-requirements.ts",
+    "packages/lang-kit/src/python-setup-py.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-kit/src/ini-lite.ts",
+    "packages/lang-kit/src/python-build.ts",
+    "packages/lang-kit/src/python-requirements.ts",
+    "packages/lang-kit/src/python-setup-py.ts"
+  ],
+  "cohesion": 0.57,
+  "coupling": 0.43,
+  "fileCount": 5,
+  "lineCount": 1413
+}

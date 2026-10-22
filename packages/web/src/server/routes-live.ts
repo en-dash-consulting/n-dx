@@ -341,6 +341,13 @@ interface PrdIndex {
   criteria: Map<string, number>;
   doc: PRDDocument | null;
   completedIds: Set<string>;
+  /**
+   * Next-task rankings already computed for this parse, keyed by the sorted
+   * excluded ids. The ranking depends only on the document and that set, and
+   * the monitor asks every two seconds, so each distinct set is ranked once
+   * per parse rather than once per tick.
+   */
+  nextByExcluded: Map<string, LiveNextTask[]>;
 }
 
 const prdIndexes = new Map<string, PrdIndex>();
@@ -395,7 +402,7 @@ function prdIndexFor(rexDir: string): PrdIndex {
   const cached = prdIndexes.get(rexDir);
   if (cached && cached.signature === signature) return cached;
   const doc = signature === "absent" ? null : loadPRDSync(rexDir);
-  const index: PrdIndex = { signature, chains: new Map(), titles: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set() };
+  const index: PrdIndex = { signature, chains: new Map(), titles: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set(), nextByExcluded: new Map() };
   if (doc) {
     for (const { item, parents } of walkTree(doc.items)) {
       index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })));
@@ -415,10 +422,19 @@ function prdIndexFor(rexDir: string): PrdIndex {
  */
 function nextTasks(index: PrdIndex, excluded: ReadonlySet<string>): LiveNextTask[] {
   if (!index.doc) return [];
+  const key = [...excluded].sort().join("\n");
+  const memo = index.nextByExcluded.get(key);
+  if (memo) return memo;
+  const next = rankNextTasks(index, index.doc, excluded);
+  index.nextByExcluded.set(key, next);
+  return next;
+}
+
+function rankNextTasks(index: PrdIndex, doc: PRDDocument, excluded: ReadonlySet<string>): LiveNextTask[] {
   const excludeIds = new Set(excluded);
   const next: LiveNextTask[] = [];
   while (next.length < NEXT_TASK_LIMIT) {
-    const entry = findNextTask(index.doc.items, index.completedIds, { excludeIds });
+    const entry = findNextTask(doc.items, index.completedIds, { excludeIds });
     if (!entry) break;
     excludeIds.add(entry.item.id);
     next.push({

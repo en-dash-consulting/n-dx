@@ -164,6 +164,7 @@
     "packages/hench/src/types/output.ts",
     "packages/hench/src/validation/changed-files.ts",
     "packages/hench/src/validation/completion.ts",
+    "packages/hench/src/validation/finalize-ready.ts",
     "packages/hench/tests/unit/tools/go-test-runner.test.ts",
     "packages/hench/tests/unit/tools/test-command-resolver.test.ts",
     "packages/hench/tests/unit/tools/test-runner.test.ts",
@@ -313,12 +314,13 @@
     "packages/hench/src/tools/test-runner.ts",
     "packages/hench/src/types/output.ts",
     "packages/hench/src/validation/changed-files.ts",
-    "packages/hench/src/validation/completion.ts"
+    "packages/hench/src/validation/completion.ts",
+    "packages/hench/src/validation/finalize-ready.ts"
   ],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 165,
-  "lineCount": 59447,
+  "fileCount": 166,
+  "lineCount": 59523,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

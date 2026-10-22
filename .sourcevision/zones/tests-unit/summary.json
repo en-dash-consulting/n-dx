@@ -34,6 +34,7 @@
     "tests/unit/migrate-layout.test.js",
     "tests/unit/narration-status.test.js",
     "tests/unit/ndx-gitignore-template.test.js",
+    "tests/unit/ndx-home-isolated.test.js",
     "tests/unit/primer-preference.test.js",
     "tests/unit/project-config-strict.test.js",
     "tests/unit/refresh-artifacts.test.js",
@@ -65,8 +66,8 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 58,
-  "lineCount": 13809,
+  "fileCount": 59,
+  "lineCount": 13861,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

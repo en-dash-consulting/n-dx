@@ -37,6 +37,7 @@ import { basename, join, relative, sep } from "node:path";
 
 import { loadIgnoreFilter, type IgnoreFilter } from "../util/project-walk.js";
 import { discoverFromIaC } from "../export/iso-declared.js";
+import { FIXTURE_DIRS } from "./infrastructure.js";
 import { cmp } from "../util/sort.js";
 import {
   isMap,
@@ -212,6 +213,9 @@ export function walkProject(root: string, ignore: IgnoreFilter): WalkResult {
 
       if (entry.isDirectory()) {
         if (SKIP_DIRS.has(entry.name)) continue;
+        // A fixture's manifests and workflows belong to the project it fakes,
+        // and would otherwise be cited as this repository's evidence.
+        if (FIXTURE_DIRS.has(entry.name.toLowerCase())) continue;
         if (ignore.ignores(rel + "/")) continue;
         descend(full, depth + 1);
         if (truncated) return;

@@ -31,5 +31,5 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Hench commit hygiene](./hench-commit-hygiene/index.md) | completed |
 | [PRD write guards](./prd-write-guards/index.md) | completed |
 | [Prompt cache, prune and budget configuration](./prompt-cache-prune-and-budget/index.md) | completed |
-| [Release plumbing](./release-plumbing/index.md) | pending |
+| [Release plumbing](./release-plumbing/index.md) | completed |
 | [Trust copy](./trust-copy/index.md) | completed |

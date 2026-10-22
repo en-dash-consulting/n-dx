@@ -1,0 +1,19 @@
+{
+  "id": "lang-kit/maven",
+  "name": "Maven",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/lang-kit/src/java-maven-build.ts",
+    "packages/lang-kit/src/maven-properties.ts",
+    "packages/lang-kit/src/xml-lite.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-kit/src/java-maven-build.ts",
+    "packages/lang-kit/src/maven-properties.ts",
+    "packages/lang-kit/src/xml-lite.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 3,
+  "lineCount": 662
+}

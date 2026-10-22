@@ -30,6 +30,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [ndx Dashboard Refresh Orchestration](./ndx-dashboard-refresh-orchestration/index.md) | completed |
 | [PRD Merge Context Graph View](./prd-merge-context-graph-view/index.md) | completed |
 | [Process Lifecycle Management and Graceful Shutdown](./process-lifecycle-management-and/index.md) | completed |
+| [Readiness and infrastructure visible in the dashboard](./readiness-and-infrastructure-visible/index.md) | completed |
 | [Rex Context Graph Flowchart Restructure with Shape-Encoded Node Types and Clickable Detail](./rex-context-graph-flowchart/index.md) | completed |
 | [Runtime Process and Thread Lifecycle Enforcement](./runtime-process-and-thread-lifecycle/index.md) | completed |
 | [Settings Page Completeness and Command-Based Reorganization](./settings-page-completeness-and-command/index.md) | completed |

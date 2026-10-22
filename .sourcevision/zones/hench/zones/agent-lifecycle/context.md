@@ -8,7 +8,7 @@ Zone: Agent Lifecycle (`hench/agent-lifecycle`)
 Files: 32, Cohesion: 0.57, Coupling: 0.43
 Description: 32 files, primarily TypeScript
 Entry points: packages/hench/src/agent/analysis/change-magnitude.ts, packages/hench/src/agent/analysis/git-changed-files.ts, packages/hench/src/agent/analysis/review-repairs.ts, packages/hench/src/agent/analysis/review.ts, packages/hench/src/agent/completion.ts, packages/hench/src/agent/lifecycle/commit-msg-watcher.ts, packages/hench/src/agent/lifecycle/commit-subject.ts, packages/hench/src/agent/lifecycle/fail-forward.ts, packages/hench/src/agent/lifecycle/gate-only-retry.ts, packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts, packages/hench/src/agent/lifecycle/shared.ts, packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/process/actor-identity.ts, packages/hench/src/process/exec.ts, packages/hench/src/process/git-ancestry.ts, packages/hench/src/process/git-mutation.ts, packages/hench/src/process/git-origin.ts, packages/hench/src/store/artifacts.ts, packages/hench/src/store/paths.ts, packages/hench/src/store/run-events.ts, packages/hench/src/store/run-log.ts, packages/hench/src/tools/cleanup-transformations.ts, packages/hench/src/tools/dead-code-analyzer.ts, packages/hench/src/tools/exec-shell.ts, packages/hench/src/tools/test-command-resolver.ts, packages/hench/src/tools/test-gate-template.ts, packages/hench/src/tools/test-runner.ts, packages/hench/src/validation/changed-files.ts, packages/hench/src/validation/completion.ts
-Lines: 14095
+Lines: 14129
 
 </zone>
 
@@ -25,7 +25,7 @@ packages/hench/src/agent/lifecycle/commit-trailers.ts (TypeScript, 63 lines, sou
 packages/hench/src/agent/lifecycle/fail-forward.ts (TypeScript, 268 lines, source)
 packages/hench/src/agent/lifecycle/gate-only-retry.ts (TypeScript, 250 lines, source)
 packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts (TypeScript, 164 lines, source)
-packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 4846 lines, source)
+packages/hench/src/agent/lifecycle/shared.ts (TypeScript, 4865 lines, source)
 packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts (TypeScript, 845 lines, source)
 packages/hench/src/agent/planning/prompt.ts (TypeScript, 288 lines, source)
 packages/hench/src/process/actor-identity.ts (TypeScript, 96 lines, source)
@@ -45,7 +45,7 @@ packages/hench/src/tools/test-command-resolver.ts (TypeScript, 392 lines, source
 packages/hench/src/tools/test-gate-template.ts (TypeScript, 110 lines, source)
 packages/hench/src/tools/test-runner.ts (TypeScript, 1577 lines, source)
 packages/hench/src/validation/changed-files.ts (TypeScript, 238 lines, source)
-packages/hench/src/validation/completion.ts (TypeScript, 193 lines, source)
+packages/hench/src/validation/completion.ts (TypeScript, 208 lines, source)
 
 </files>
 

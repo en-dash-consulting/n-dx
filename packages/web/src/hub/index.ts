@@ -62,4 +62,4 @@ export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyReq
 export type { ProxyDecision } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";
 export type { HubOverview, ProjectCard, ChildSnapshot } from "./overview.js";
-export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel } from "./home.js";
+export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel, readinessLabel, infrastructureLabel } from "./home.js";

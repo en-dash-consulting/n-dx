@@ -8,7 +8,7 @@ Zone: Tests Llm Client Unit (`tests-llm-client-unit`)
 Files: 61, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Non-source files in packages: ansi-reset-regression.test.ts, api-provider.test.ts, auth-guidance.test.ts (+58 more)
-Lines: 17505
+Lines: 17558
 
 </zone>
 
@@ -26,7 +26,7 @@ packages/llm-client/tests/unit/claude-legacy-fields.test.ts (TypeScript, 160 lin
 packages/llm-client/tests/unit/cli-provider-cwd.test.ts (TypeScript, 81 lines, test)
 packages/llm-client/tests/unit/cli-provider-effort.test.ts (TypeScript, 126 lines, test)
 packages/llm-client/tests/unit/cli-provider.test.ts (TypeScript, 247 lines, test)
-packages/llm-client/tests/unit/cli-spawn-routing.test.ts (TypeScript, 62 lines, test)
+packages/llm-client/tests/unit/cli-spawn-routing.test.ts (TypeScript, 115 lines, test)
 packages/llm-client/tests/unit/codex-cli-provider.test.ts (TypeScript, 277 lines, test)
 packages/llm-client/tests/unit/codex-output-validation.test.ts (TypeScript, 144 lines, test)
 packages/llm-client/tests/unit/codex-stdin-guard.test.ts (TypeScript, 60 lines, test)
@@ -96,6 +96,6 @@ Outgoing (this zone → other zones):
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 405 internal calls, 1611 outgoing, 0 incoming (cohesion: 0.2, coupling: 0.8)
+- [call graph] 405 internal calls, 1615 outgoing, 0 incoming (cohesion: 0.2, coupling: 0.8)
 
 </insights>

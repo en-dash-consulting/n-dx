@@ -94,6 +94,7 @@
     "packages/rex/tests/unit/cli/edit-item.test.ts",
     "packages/rex/tests/unit/cli/errors.test.ts",
     "packages/rex/tests/unit/cli/export-item-ref.test.ts",
+    "packages/rex/tests/unit/cli/get-capabilities-schema-version.test.ts",
     "packages/rex/tests/unit/cli/help.test.ts",
     "packages/rex/tests/unit/cli/llm-error-classifier.test.ts",
     "packages/rex/tests/unit/cli/mcp-product-tools.test.ts",
@@ -265,8 +266,8 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 258,
-  "lineCount": 86412,
+  "fileCount": 259,
+  "lineCount": 86979,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

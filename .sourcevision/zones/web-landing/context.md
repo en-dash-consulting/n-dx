@@ -9,14 +9,14 @@ Files: 2, Cohesion: 0.00, Coupling: 0.00
 Risk: at-risk (score: 0.50)
 Description: 2 files, mostly pages; entry points landing.ts; imports Tests; imported by Packages.
 Entry points: packages/web/src/landing/landing.ts
-Lines: 684
+Lines: 689
 
 </zone>
 
 <files>
 
 packages/web/src/landing/landing.ts (TypeScript, 614 lines, source)
-packages/web/vitest.config.ts (TypeScript, 70 lines, config)
+packages/web/vitest.config.ts (TypeScript, 75 lines, config)
 
 </files>
 
@@ -34,6 +34,7 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
+[observation] [info] vitest.config.ts grouped with landing.ts lacks logical relationship—rationalize with other build configuration files in web build config zone
 [move-file] [warning] File "packages/web/src/landing/landing.ts" is pinned to zone "Web Landing" but lives in packages/web/src/landing/ — consider moving to packages/web/ to align physical location with architectural zone
 [suggestion] [info] Zone "Web Landing" has an unreliable risk reading: only 2 files tracked (minimum 5 needed for reliable metrics) — cohesion: 0.00, coupling: 0.00 (risk score: 0.50)
 
@@ -42,6 +43,11 @@ Incoming (other zones → this zone):
 <insights>
 
 - Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
+- Isolated files — no import edges between 2 files, cohesion is unmeasurable (reported as 0)
+- Very small zone (2 files) with zero metrics is expected for minimal static content—no structural issues
+- vitest.config.ts is incidental here—should be co-located with build.js/dev.js in shared build configuration, not with landing page logic
+- Proper separation from hub and viewer prevents public-facing code from bloating application zones
+- vitest.config.ts grouped with landing.ts lacks logical relationship—rationalize with other build configuration files in web build config zone
 - File "packages/web/src/landing/landing.ts" is pinned to zone "Web Landing" but lives in packages/web/src/landing/ — consider moving to packages/web/ to align physical location with architectural zone
 - [call graph] 37 internal calls, 1 outgoing, 0 incoming (cohesion: 0.97, coupling: 0.03)
 

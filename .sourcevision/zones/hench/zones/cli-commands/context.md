@@ -5,10 +5,10 @@
 <zone>
 
 Zone: Cli Commands (`hench/cli-commands`)
-Files: 25, Cohesion: 0.49, Coupling: 0.51
-Description: 25 files, primarily TypeScript
-Entry points: packages/hench/src/agent/planning/brief.ts, packages/hench/src/agent/planning/cli-identity.ts, packages/hench/src/agent/planning/context-caps.ts, packages/hench/src/agent/planning/work-selection.ts, packages/hench/src/cli/commands/agent-model.ts, packages/hench/src/cli/commands/consecutive-failures.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/commands/provider-support.ts, packages/hench/src/cli/commands/review.ts, packages/hench/src/cli/commands/run-resolve.ts, packages/hench/src/cli/commands/run-settings.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/slug-migration-offer.ts, packages/hench/src/prd/rex-gateway.ts, packages/hench/src/process/agent-mcp-config.ts, packages/hench/src/process/claude-mcp-registration.ts, packages/hench/src/process/task-claims.ts, packages/hench/src/queue/execution-queue.ts, packages/hench/src/queue/format.ts, packages/hench/src/queue/priority-scheduler.ts, packages/hench/src/store/repoint-runs.ts, packages/hench/src/store/trust.ts, packages/hench/src/tools/rex.ts
-Lines: 9922
+Files: 26, Cohesion: 0.49, Coupling: 0.51
+Description: 26 files, primarily TypeScript
+Entry points: packages/hench/src/agent/planning/brief.ts, packages/hench/src/agent/planning/cli-identity.ts, packages/hench/src/agent/planning/context-caps.ts, packages/hench/src/agent/planning/work-selection.ts, packages/hench/src/cli/commands/agent-model.ts, packages/hench/src/cli/commands/consecutive-failures.ts, packages/hench/src/cli/commands/constants.ts, packages/hench/src/cli/commands/provider-support.ts, packages/hench/src/cli/commands/review.ts, packages/hench/src/cli/commands/run-resolve.ts, packages/hench/src/cli/commands/run-settings.ts, packages/hench/src/cli/commands/run.ts, packages/hench/src/cli/errors.ts, packages/hench/src/cli/slug-migration-offer.ts, packages/hench/src/prd/rex-gateway.ts, packages/hench/src/process/agent-mcp-config.ts, packages/hench/src/process/claude-mcp-registration.ts, packages/hench/src/process/task-claims.ts, packages/hench/src/queue/execution-queue.ts, packages/hench/src/queue/format.ts, packages/hench/src/queue/priority-scheduler.ts, packages/hench/src/store/repoint-runs.ts, packages/hench/src/store/trust.ts, packages/hench/src/tools/rex.ts, packages/hench/src/validation/finalize-ready.ts
+Lines: 9957
 
 </zone>
 
@@ -38,7 +38,8 @@ packages/hench/src/queue/format.ts (TypeScript, 59 lines, source)
 packages/hench/src/queue/priority-scheduler.ts (TypeScript, 152 lines, source)
 packages/hench/src/store/repoint-runs.ts (TypeScript, 231 lines, source)
 packages/hench/src/store/trust.ts (TypeScript, 95 lines, source)
-packages/hench/src/tools/rex.ts (TypeScript, 377 lines, source)
+packages/hench/src/tools/rex.ts (TypeScript, 379 lines, source)
+packages/hench/src/validation/finalize-ready.ts (TypeScript, 33 lines, source)
 
 </files>
 
@@ -114,5 +115,8 @@ Internal:
   packages/hench/src/store/repoint-runs.ts → packages/hench/src/prd/rex-gateway.ts {RecordedCommitFacts, RepointMatch, RepointMiss}
   packages/hench/src/tools/rex.ts → packages/hench/src/prd/rex-gateway.ts {completeV2Work, computeTimestampUpdates, isChangeLayerStore, reconcileAutoCompletions, validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder}
   packages/hench/src/tools/rex.ts → packages/hench/src/prd/rex-gateway.ts {PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor}
+  packages/hench/src/tools/rex.ts → packages/hench/src/validation/finalize-ready.ts {isFinalizeReadyParent}
+  packages/hench/src/validation/finalize-ready.ts → packages/hench/src/prd/rex-gateway.ts {allChildrenSuccessful, findItem, isChangeLayerStore}
+  packages/hench/src/validation/finalize-ready.ts → packages/hench/src/prd/rex-gateway.ts {PRDStore}
 
 </imports>

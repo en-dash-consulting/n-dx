@@ -1,0 +1,24 @@
+{
+  "id": "sourcevision/cli/cli-commands",
+  "name": "Cli Commands",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/cli/commands/pack-archive.ts",
+    "packages/sourcevision/src/cli/commands/pack.ts",
+    "packages/sourcevision/src/cli/help.ts",
+    "packages/sourcevision/src/cli/index.ts",
+    "packages/sourcevision/src/cli/serve.ts",
+    "packages/sourcevision/src/language/package-paths.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/cli/commands/pack-archive.ts",
+    "packages/sourcevision/src/cli/commands/pack.ts",
+    "packages/sourcevision/src/cli/help.ts",
+    "packages/sourcevision/src/cli/serve.ts",
+    "packages/sourcevision/src/language/package-paths.ts"
+  ],
+  "cohesion": 0.32,
+  "coupling": 0.68,
+  "fileCount": 6,
+  "lineCount": 1653
+}

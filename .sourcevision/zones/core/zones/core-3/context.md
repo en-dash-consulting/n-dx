@@ -8,7 +8,7 @@ Zone: Core 3 (`core/core-3`)
 Files: 6, Cohesion: 0.38, Coupling: 0.62
 Description: 6 files, primarily JavaScript
 Entry points: packages/core/cli-log.js, packages/core/commit-trailers.js, packages/core/export.js, packages/core/gitignore.js, packages/core/win-spawn.js
-Lines: 1619
+Lines: 1667
 
 </zone>
 
@@ -16,9 +16,9 @@ Lines: 1619
 
 packages/core/cli-log.js (JavaScript, 187 lines, source)
 packages/core/commit-trailers.js (JavaScript, 108 lines, source)
-packages/core/export.js (JavaScript, 870 lines, source)
+packages/core/export.js (JavaScript, 874 lines, source)
 packages/core/gitignore.js (JavaScript, 69 lines, source)
-packages/core/win-spawn.js (JavaScript, 138 lines, source)
+packages/core/win-spawn.js (JavaScript, 182 lines, source)
 scripts/soak-under-build-load.mjs (JavaScript, 247 lines, build)
 
 </files>
