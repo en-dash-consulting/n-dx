@@ -480,7 +480,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "rex verify [options] [dir]",
     description:
       "Maps acceptance criteria to test files and optionally executes tests\n" +
-      "to validate task completion.",
+      "to validate task completion. The repository's test command runs only\n" +
+      "once you have accepted its execution config with 'ndx trust accept .'.",
     options: [
       { flag: "--task=<id>", description: "Verify a specific task only" },
       { flag: "--dry-run", description: "Map criteria to tests without running them" },

@@ -343,6 +343,7 @@ describe("hench → llm-client gateway contract", () => {
     "recordRepoTrust",
     "clearRepoTrust",
     "formatRepoTrustReport",
+    "escapeTerminalControls",
     "redactDeep",
     "redactSecrets",
     "createLineRedactor",
@@ -862,7 +863,7 @@ describe("gateway export auto-detection", () => {
         // Repository trust: the guard baseline and the per-user trust store
         // are one evaluation shared by hench, the dashboard and ndx init.
         "guardBaselineForLanguage", "clampGuardToBaseline", "evaluateRepoTrust",
-        "recordRepoTrust", "clearRepoTrust", "formatRepoTrustReport",
+        "recordRepoTrust", "clearRepoTrust", "formatRepoTrustReport", "escapeTerminalControls",
         "redactDeep", "redactSecrets", "createLineRedactor",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
