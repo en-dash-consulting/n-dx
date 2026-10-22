@@ -17,12 +17,16 @@
  *
  *  1. No `errorResponse(`/`jsonResponse(` argument stringifies the caught
  *     value — `String(err)`, `String(e as Error)`, a template `${err}`,
- *     `err.toString()` — or hand-rolls the `x instanceof Error ? x.message
- *     : String(x)` ternary. "The caught value" is any identifier spelled
- *     like one (`e`, `err`, `error`, `cause`, `exc`, anything ending in
- *     `err`/`Error` such as `parseErr`) plus every name the file's own
- *     `catch (name)` clauses bind, so `String(count)` in a response body
- *     stays ordinary formatting.
+ *     `err.toString()`, with or without a `?? "fallback"`, `|| ""` or
+ *     `as Error` tail and a parenthesised `(err as Error)` subject —
+ *     reads its `.stack` (`${err.stack}`, `err.stack ?? ""`), or
+ *     hand-rolls the `x instanceof Error ? x.message : String(x)`
+ *     ternary. "The caught value" is any identifier spelled like one
+ *     (`e`, `err`, `error`, `cause`, `exc`, anything ending in
+ *     `err`/`Error` such as `parseErr` — but not `stderr`, `isError`,
+ *     `hasError` or `lastError`, which name something else) plus every
+ *     name the file's own `catch (name)` clauses bind, so `String(count)`
+ *     or `${stderr}` in a response body stays ordinary formatting.
  *  2. That ternary appears nowhere in the directory, on one line or wrapped
  *     over several, because it also feeds the status objects (self-heal,
  *     init, refresh, task execution) that a later GET serves verbatim,
@@ -67,14 +71,37 @@ function collectTsFiles(dir: string): string[] {
 /** An identifier, as `String(`, `${` or `.toString()` would receive it. */
 const IDENT = String.raw`[A-Za-z_$][\w$]*`;
 
-/** `String(x)` and `String(x as Error)`; the identifier is group 1. */
-const STRINGIFIED = new RegExp(String.raw`(?<![\w$.])String\(\s*(${IDENT})\s*(?:as\b[^()]*)?\)`, "g");
+/**
+ * What may follow the identifier before the closer: nothing, or a
+ * `?? "unknown"`, `|| ""` or `as Error` tail that wraps the value without
+ * changing what reaches the response. The tail stops at any bracket, so a
+ * nested call or template is not read through.
+ */
+const TAIL = String.raw`(?:\s*(?:\?\?|\|\||as\b)[^(){}]*)?`;
 
-/** A template literal's `${x}` or `${x as Error}`; the identifier is group 1. */
-const INTERPOLATED = new RegExp(String.raw`\$\{\s*(${IDENT})\s*(?:as\b[^{}]*)?\}`, "g");
+/**
+ * The value a spelling receives: a bare identifier with an optional tail
+ * (`err`, `err ?? "x"`, `e as Error`) or the same in parentheses
+ * (`(err as Error)`). The identifier is group 1 (parenthesised) or group 2
+ * (bare); `stringifiedNames` takes whichever matched.
+ */
+const SUBJECT = String.raw`(?:\(\s*(${IDENT})${TAIL}\s*\)|(${IDENT})${TAIL})`;
 
-/** `x.toString()`; the identifier is group 1. `a.x.toString()` reads a field, not the caught value. */
-const TO_STRING = new RegExp(String.raw`(?<![\w$.])(${IDENT})\.toString\(\)`, "g");
+/** `String(x)`, `String(x as Error)`, `String(x ?? "")`, `String((x as Error))`. */
+const STRINGIFIED = new RegExp(String.raw`(?<![\w$.])String\(\s*${SUBJECT}\s*\)`, "g");
+
+/** A template literal's `${x}`, `${x as Error}`, `${x ?? "unknown"}`, `${(x as Error)}`. */
+const INTERPOLATED = new RegExp(String.raw`\$\{\s*${SUBJECT}\s*\}`, "g");
+
+/** `x.toString()` and `(x as Error).toString()`. `a.x.toString()` reads a field, not the caught value. */
+const TO_STRING = new RegExp(String.raw`(?<![\w$.])${SUBJECT}\.toString\(\)`, "g");
+
+/**
+ * `x.stack` and `(x as Error).stack` — the one read that is the exposure
+ * itself, not a stand-in for it. `a.x.stack` reads a field, not the caught
+ * value.
+ */
+const STACK_READ = new RegExp(String.raw`(?<![\w$.])${SUBJECT}\.stack\b`, "g");
 
 /**
  * The hand-rolled ternary `errorMessage()` replaces, with `\s*` at every
@@ -91,10 +118,12 @@ const MESSAGE_TERNARY = new RegExp(
  * Whether `name` is spelled like a caught value: the three conventional
  * names, `cause` and `exc`, or anything ending in `err`/`Err`/`error`/`Error`
  * (`parseErr`, `fetchError`). `count`, `taskId` or `value` is not, so a
- * response body that formats one of those is left alone.
+ * response body that formats one of those is left alone — nor are the
+ * names that end that way but hold something else: a process's `stderr`,
+ * an `isError`/`hasError` flag, a `lastError` slot.
  */
 export function isCaughtValueName(name: string): boolean {
-  return /^(?:e|err|error|cause|exc|\w*[Ee]rr(?:or)?)$/.test(name);
+  return /^(?!(?:stderr|stdErr|isError|hasError|lastError)$)(?:e|err|error|cause|exc|\w*[Ee]rr(?:or)?)$/.test(name);
 }
 
 /** Every name the file's `catch (name)` clauses bind, however it is spelled. */
@@ -104,9 +133,11 @@ export function catchBoundNames(source: string): Set<string> {
   return names;
 }
 
-/** The identifiers `text` stringifies, by any of the three spellings. */
+/** The identifiers `text` stringifies, by any of the three spellings, or whose `.stack` it reads. */
 export function stringifiedNames(text: string): string[] {
-  return [STRINGIFIED, INTERPOLATED, TO_STRING].flatMap((re) => [...text.matchAll(re)].map((match) => match[1]));
+  return [STRINGIFIED, INTERPOLATED, TO_STRING, STACK_READ].flatMap((re) =>
+    [...text.matchAll(re)].map((match) => match[1] ?? match[2]),
+  );
 }
 
 /** The 1-based line of `source` that offset `index` falls on. */
@@ -117,8 +148,11 @@ const lineAt = (source: string, index: number): number => source.slice(0, index)
  * `source`, with the 1-based line the call starts on.
  *
  * Parentheses are balanced by hand so a call split over several lines is
- * read whole; a paren inside a string literal would widen the slice, which
- * can only make the check stricter.
+ * read whole. String literals are not understood: a `)` inside one closes
+ * the slice early and hides whatever follows it in the call, and an
+ * unbalanced `(` runs the slice on past the call. Neither occurs in the
+ * tree today; the probe rows plant the spellings this must see, so a
+ * message that grows a bracket would show up there before it hid anything.
  */
 export function responseCallArguments(source: string): Array<{ line: number; args: string }> {
   const calls: Array<{ line: number; args: string }> = [];
@@ -224,8 +258,27 @@ describe("error-message policy detector", () => {
       "errorResponse(res, 404, `No task ${id}`);",
       "jsonResponse(res, 200, { ok: true, port: String(port), elapsed: `${elapsedMs}ms`, mode: value.toString() });",
       "errorResponse(res, 400, `Unknown field ${String(field)}`);",
+      'jsonResponse(res, 200, { ok: false, stderr: `${stderr}`, retries: `${count ?? 0}`, note: String(label ?? "") });',
+      "jsonResponse(res, 200, { frames: trace.stack, failed: `${hasError}` });",
     ].join("\n");
     expect(offendingResponseCalls("x.ts", source)).toEqual([]);
+  });
+
+  it("sees the caught value through a fallback, a cast in parentheses, and a .stack read", () => {
+    const source = [
+      'errorResponse(res, 500, `${err ?? "unknown"}`);',
+      'errorResponse(res, 500, String(err ?? ""));',
+      "errorResponse(res, 500, `${(err as Error)}`);",
+      "errorResponse(res, 500, `${err.stack}`);",
+      'errorResponse(res, 500, err.stack ?? "");',
+      "jsonResponse(res, 500, { error: (e as Error).toString() });",
+    ].join("\n");
+    expect(offendingResponseCalls("x.ts", source)).toEqual(["x.ts:1", "x.ts:2", "x.ts:3", "x.ts:4", "x.ts:5", "x.ts:6"]);
+  });
+
+  it("names the stringified value whichever way the spelling wraps it", () => {
+    expect(stringifiedNames('`${err ?? "unknown"}` String(e || "") ${(cause as Error)} err.stack (exc as Error).toString()'))
+      .toEqual(["e", "err", "cause", "exc", "err"]);
   });
 
   it("finds the ternary on a status field no response call wraps", () => {
@@ -240,9 +293,16 @@ describe("error-message policy detector", () => {
     for (const name of ["e", "err", "error", "cause", "exc", "parseErr", "fetchError", "Err", "innerError"]) {
       expect(isCaughtValueName(name), name).toBe(true);
     }
-    for (const name of ["count", "taskId", "value", "errorCount", "errors", "field", "elapsedMs", "port"]) {
+    for (const name of [
+      "count", "taskId", "value", "errorCount", "errors", "field", "elapsedMs", "port",
+      "stderr", "stdErr", "isError", "hasError", "lastError",
+    ]) {
       expect(isCaughtValueName(name), name).toBe(false);
     }
+    // The same name rule decides a response argument: `${stderr}` is a
+    // process's output, `${err}` is the caught value.
+    expect(offendingResponseCalls("x.ts", "jsonResponse(res, 500, { output: `${stderr}` });")).toEqual([]);
+    expect(offendingResponseCalls("x.ts", "jsonResponse(res, 500, { output: `${err}` });")).toEqual(["x.ts:1"]);
   });
 });
 
@@ -272,6 +332,19 @@ const RULE_1_SPELLINGS: Planted[] = [
   ["String(parseErr) — a name ending in Err", ["errorResponse(res, 400, String(parseErr));"], 1],
   ["String(fetchError) — a name ending in Error", ["errorResponse(res, 502, String(fetchError));"], 1],
   ["a template `${innerError}`", ["errorResponse(res, 500, `Inner: ${innerError}`);"], 1],
+  ["a template `${err.stack}`", ["errorResponse(res, 500, `${err.stack}`);"], 1],
+  ['err.stack ?? ""', ['errorResponse(res, 500, err.stack ?? "");'], 1],
+  ["(e as Error).stack inside a body object", ["jsonResponse(res, 500, { error: (e as Error).stack });"], 1],
+  ['a template `${err ?? "unknown"}`', ['errorResponse(res, 500, `${err ?? "unknown"}`);'], 1],
+  ['String(err ?? "")', ['errorResponse(res, 500, String(err ?? ""));'], 1],
+  ['String(e || "failed")', ['errorResponse(res, 500, String(e || "failed"));'], 1],
+  ["a template `${(err as Error)}`", ["errorResponse(res, 500, `${(err as Error)}`);"], 1],
+  ["(err as Error).toString()", ["errorResponse(res, 500, (err as Error).toString());"], 1],
+  [
+    "a fallback inside a wrapped body object",
+    ["jsonResponse(res, 500, {", "  ok: false,", '  error: `${error ?? "unknown"}`,', "});"],
+    1,
+  ],
   [
     "a catch variable of any spelling the file binds",
     ["try {", "  run();", "} catch (oops) {", "  errorResponse(res, 500, String(oops));", "}"],
@@ -359,6 +432,16 @@ describe("error-message policy detector — planted probe files", () => {
       "}",
       "jsonResponse(res, 200, { total: String(count), label: `${items.length} items`, id: taskId.toString() });",
       'errorResponse(res, 400, err instanceof Error ? err.message : "Invalid request body");',
+    ]);
+    expect(scanTree(probeDir)).toMatchObject({ files: ["clean.ts"], responseCalls: [], ternaries: [] });
+  });
+
+  it("passes a probe file whose fallbacks and err-ish names are not the caught value", async () => {
+    await plant("clean.ts", [
+      "const { stdout, stderr } = await run();",
+      "jsonResponse(res, 200, { ok: true, stdout: `${stdout}`, stderr: `${stderr}`, retries: `${count ?? 0}` });",
+      'jsonResponse(res, 200, { label: String(name ?? ""), failed: `${hasError}`, last: `${lastError ?? "none"}` });',
+      "jsonResponse(res, 200, { frames: trace.stack });",
     ]);
     expect(scanTree(probeDir)).toMatchObject({ files: ["clean.ts"], responseCalls: [], ternaries: [] });
   });
