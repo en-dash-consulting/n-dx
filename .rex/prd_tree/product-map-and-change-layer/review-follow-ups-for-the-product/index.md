@@ -35,7 +35,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Defer the PRD timeline view and re-scope it to the Changes view](./defer-the-prd-timeline-view-and-re.md) | completed |
 | [Derive area links and propose dependsOn from shared tests](./derive-area-links-and-propose.md) | pending |
 | [Diff two migration plans in words](./diff-two-migration-plans-in-words.md) | pending |
-| [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | pending |
+| [docs/guide/skills.md skill table descriptions can drift from manifest.json with no test to catch it](./docs-guide-skills-md-skill-table.md) | completed |
 | [Frontmatter parser turns a literal backslash-n in a quoted string into a newline](./frontmatter-parser-turns-a-literal.md) | completed |
 | [get_capabilities reports schemaVersion rex/v1 on a v2 tree](./get-capabilities-reports-schemaversion.md) | completed |
 | [get_product on a large v2 tree exceeds what an MCP client accepts](./get-product-on-a-large-v2-tree-exceeds.md) | completed |
