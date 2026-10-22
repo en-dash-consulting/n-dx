@@ -368,6 +368,7 @@ export function getChangedFiles(dir) {
   const runGit = (args) => {
     try {
       return execFileSync("git", args, {
+        windowsHide: true,
         cwd: dir,
         encoding: "utf-8",
         timeout: 10_000,
@@ -893,6 +894,9 @@ function spawnShellTestCommand(testCommand, dir, timeout, registerChild, env) {
       env,
       stdio: ["ignore", "pipe", "pipe"],
       shell: true,
+      // The shell is a console app; without this a console-less ndx (one the
+      // dashboard spawned) gives it a visible window for the whole test run.
+      windowsHide: true,
       // Load-bearing here more than anywhere else in this file: with `shell: true`
       // the child IS the shell, so the test command is already a generation below it
       // and only a group signal reaches it on POSIX.

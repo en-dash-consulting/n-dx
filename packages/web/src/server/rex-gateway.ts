@@ -28,7 +28,7 @@ export { ensureLegacyPrdMigrated } from "@n-dx/rex";
 export type { LegacyPrdMigrationResult } from "@n-dx/rex";
 
 // ---- Rex folder-tree storage path -------------------------------------------
-export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset } from "@n-dx/rex";
+export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset, cascadeParentCompletion } from "@n-dx/rex";
 
 // ---- Rex storage layout -----------------------------------------------------
 // On a v2 tree the dashboard's PRD cache is the change-layer projection

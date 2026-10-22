@@ -40,6 +40,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [`@n-dx/rex` fails intermittently under `pnpm test` but passes standalone](./n-dx-rex-fails-intermittently-under/index.md) | completed |
 | [Narrow jsonResponse utility scope](./narrow-jsonresponse-utility-scope/index.md) | completed |
 | [Open Source Scope Documentation Audit and Cross-Reference](./open-source-scope-documentation-audit/index.md) | completed |
+| [Playwright browser suites: hardening from the adversarial review of the manual and happy-click suites](./playwright-browser-suites-hardening/index.md) | pending |
 | [Project-aware Navigation and Context](./project-aware-navigation-and-context/index.md) | completed |
 | [Refactor high-risk architectural zones](./refactor-high-risk-architectural-zones/index.md) | completed |
 | [Skills Reference and .gitignore Guidance in ndx Documentation](./skills-reference-and-gitignore/index.md) | completed |
@@ -53,7 +54,7 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Auto Re-Init Detection for Stale Projects](./auto-re-init-detection-for-stale.md) | completed |
 | [Auto-Update Detection from npm Registry](./auto-update-detection-from-npm-registry.md) | completed |
 | [docs/packages/overview.md says n-dx is six packages; it publishes fifteen](./docs-packages-overview-md-says-n-dx-is.md) | pending |
-| [Five unrelated suites failed under load in one session and passed on re-run: investigate the pattern, not each flake](./five-unrelated-suites-failed-under.md) | pending |
+| [Five unrelated suites failed under load in one session and passed on re-run: investigate the pattern, not each flake](./five-unrelated-suites-failed-under.md) | completed |
 | [Four source files hold a NUL byte, so git shows them as binary and their diffs cannot be reviewed](./four-source-files-hold-a-nul-byte-so.md) | completed |
 | [ndx init e2e test overwrites the developer's real MCP registration](./ndx-init-e2e-test-overwrites-the.md) | completed |
 | [routes-commands ndx-ladder tests leak the ambient NDX_CLI_PATH env var](./routes-commands-ndx-ladder-tests-leak.md) | completed |

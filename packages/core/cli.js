@@ -84,6 +84,7 @@ import {
 } from "./help.js";
 import { setupAssistantIntegrations, formatInitReport, checkSkillTracking, formatSkillTrackingHints } from "./assistant-integration.js";
 import { ensureGitattributesRules, MERGE_DRIVERS } from "./gitattributes-pins.js";
+import { CLI_LOG_FILENAME } from "./cli-log.js";
 import { recordCliName } from "./cli-identity.js";
 import { generateTargetReadme } from "./readme-generator.js";
 import {
@@ -1651,6 +1652,10 @@ async function handleInit(rest) {
   // it produces carries PRD data and run summaries, so it must not be
   // committable by accident.
   ensureGitignoreEntry(dir, "ndx-export/");
+  // Every vendor-CLI invocation appends to claude_commands.log in the project
+  // (cli-log.js); left untracked it shows in every git status, and hench's
+  // uncommitted-work gate refuses to complete a task over it.
+  ensureGitignoreEntry(dir, `${CLI_LOG_FILENAME}*`);
   // The Graview projection is derived from the PRD, the analysis and the runs
   // and rebuilt by every `ndx graview` command, so it is never committed.
   ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);

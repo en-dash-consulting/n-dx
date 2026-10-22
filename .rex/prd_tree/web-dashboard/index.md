@@ -43,7 +43,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Web Dashboard Accessibility (a11y)](./web-dashboard-accessibility-a11y/index.md) | completed |
 | [A worktree workspace's first PRD read answers 404 until its lazily written cache lands](./a-worktree-workspace-s-first-prd-read.md) | pending |
 | [Changes view: time-ordered default with recency desaturation](./changes-view-time-ordered-default-with.md) | deferred |
-| [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | pending |
+| [Closing a ticket from the dashboard does not save the PRD item, and ndx loop then fails](./closing-a-ticket-from-the-dashboard.md) | completed |
 | [Dashboard action icons render at a readable size from one shared SVG icon set](./dashboard-action-icons-render-at-a.md) | completed |
 | [Detected run and build commands as a dashboard control](./detected-run-and-build-commands-as-a.md) | completed |
 | [Fail-forward mode: commit automatically at the end of every run, loop and settings change](./fail-forward-mode-commit-automatically.md) | pending |
@@ -62,3 +62,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 | [Work page content paints over the prepare-task modal](./work-page-content-paints-over-the.md) | completed |
 | [Condense the Workflow settings page into a responsive grid of fields](./condense-the-workflow-settings-page.md) | pending |
 | [Stack the dashboard's floating notices and status pills like toasts instead of overlapping](./stack-the-dashboard-s-floating-notices.md) | pending |
+| [Overview's isometric hero never shows its Options button because the page does not pass onOpenOptions](./overview-s-isometric-hero-never-shows.md) | pending |
+| [Stopping web serve on Windows leaves the ndx work and sv analyze children it spawned running](./stopping-web-serve-on-windows-leaves.md) | pending |
+| [Windows: exec() and spawnCli have no windowsHide, so children of console-less parents open visible console windows and sv narrate's claude window never closes](./windows-exec-and-spawncli-have-no.md) | pending |
+| [Start now on the Live page stays on /live instead of opening the task page it is given navigateTo for](./start-now-on-the-live-page-stays-on.md) | pending |

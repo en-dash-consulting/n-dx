@@ -195,7 +195,7 @@ describe("getCurrentHead", () => {
       ["rev-parse", "HEAD"],
       // stderr is captured, not inherited: probing a directory that may not be
       // a repository must not print `fatal: not a git repository` to the user.
-      { cwd: "/project", encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+      { cwd: "/project", windowsHide: true, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
     );
   });
 

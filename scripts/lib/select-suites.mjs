@@ -46,6 +46,9 @@ export const ROOT_POLICY_TEST_FILES = [
   // Reads the gateway paths out of hench/src and web/src, so renaming a gateway
   // breaks it from a package-source change alone. 0.2 s.
   "tests/e2e/integration-coverage-policy.test.js",
+  // Scans every production spawn for windowsHide; a new spawn in any package
+  // source is exactly what breaks it. 0.1 s.
+  "tests/e2e/windows-hide-policy.test.js",
 ];
 
 /**

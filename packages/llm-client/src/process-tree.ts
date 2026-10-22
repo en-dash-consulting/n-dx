@@ -35,7 +35,7 @@
  * @module @n-dx/llm-client/process-tree
  */
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 
 /** Grace period before escalating a tree kill, and the bound on each wait. */
@@ -84,6 +84,66 @@ export function treeKillSpawnOptions(
  */
 export function treeKillCommand(pid: number): { command: string; args: string[] } {
   return { command: "taskkill", args: ["/PID", String(pid), "/T", "/F"] };
+}
+
+/** Injectable seams for {@link terminateTreeByPidSync}. Defaults are the real thing. */
+export interface TerminateByPidOptions {
+  platform?: NodeJS.Platform;
+  /** Injectable for the Windows path, so both branches are testable on any host. */
+  execFileSyncImpl?: typeof execFileSync;
+  /** Injectable signaller for the POSIX path and for the single-process fallback. */
+  killImpl?: (pid: number, signal: NodeJS.Signals) => void;
+  /** Bound on the Windows taskkill, so a wedged one cannot block the caller. */
+  timeoutMs?: number;
+}
+
+/**
+ * Terminate a process and its descendants, given only a PID — synchronously.
+ *
+ * {@link terminateProcessTree} is the richer, asynchronous form, but it needs
+ * the live `ChildProcess` to watch for exit. A caller that recorded a PID and
+ * then lost the handle — a detached child whose pid went to a manifest, read
+ * back by a later process — has only this. The hazard it exists for is
+ * Windows: `process.kill(pid)` is `TerminateProcess` on that one process, so a
+ * vendor CLI beneath the recorded process keeps running, and keeps whatever
+ * console window it opened.
+ *
+ * Order: the platform's tree primitive first (`taskkill /T /F`, or a POSIX
+ * group signal for a child spawned with {@link treeKillSpawnOptions}), then a
+ * plain kill of the process itself. Never throws — every target here is
+ * something the caller already believes is finished or unwanted.
+ */
+export function terminateTreeByPidSync(pid: number, opts: TerminateByPidOptions = {}): void {
+  const {
+    platform = process.platform,
+    execFileSyncImpl = execFileSync,
+    killImpl = (p, signal) => process.kill(p, signal),
+    timeoutMs = 10_000,
+  } = opts;
+
+  if (supportsProcessGroups(platform)) {
+    try {
+      // Negative pid: the group the detached child leads.
+      killImpl(-pid, "SIGTERM");
+      return;
+    } catch {
+      // Not a group leader, or already gone — fall through.
+    }
+  } else {
+    try {
+      const { command, args } = treeKillCommand(pid);
+      execFileSyncImpl(command, args, { stdio: "ignore", windowsHide: true, timeout: timeoutMs });
+      return;
+    } catch {
+      // taskkill is missing, or the tree is already gone — fall through.
+    }
+  }
+
+  try {
+    killImpl(pid, "SIGTERM");
+  } catch {
+    // Already gone.
+  }
 }
 
 /** Injectable seams. Defaults are the real thing; tests replace them. */

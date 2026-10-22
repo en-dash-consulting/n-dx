@@ -40,16 +40,26 @@ async function writeFakeBinary(filePath, { stdout = "", exitCode = 0 } = {}) {
   return filePath;
 }
 
+// TESTING.md Family 3. `ndx init` spawns rex and sourcevision in turn, which
+// takes a few seconds idle and more than the old fixed 25s under a loaded
+// affected gate, where this file was killed mid-init on 2026-10-14 and then
+// passed 6/6 standalone. The spawn guardrail scales with the same multiplier as
+// every other budget, and the test timeout stays above it so a real hang is
+// reported as the spawn timing out rather than as an opaque test timeout.
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+const SPAWN_TIMEOUT = 25_000 * BUDGET_MULTIPLIER;
+const TEST_TIMEOUT = SPAWN_TIMEOUT + 30_000;
+
 function run(args, opts = {}) {
   return execFileSync("node", [CLI_PATH, ...args], {
     encoding: "utf-8",
-    timeout: 25000,
+    timeout: SPAWN_TIMEOUT,
     stdio: "pipe",
     ...opts,
   });
 }
 
-describe("ndx init: git preflight", () => {
+describe("ndx init: git preflight", { timeout: TEST_TIMEOUT }, () => {
   let tmpDir;
   let binDir;
   let initEnv;

@@ -31,9 +31,10 @@
  * - an import inside a project module whose directory holds no inventoried
  *   .go file (parsed, or passed as unparsed: oversized, unreadable), such as
  *   a local replace into a `third_party/`, `build/` or gitignored directory
- *   the inventory skips, is an external package attributed to its `require`,
- *   where the regex parser emits an edge to a node that does not exist (or an
- *   external for a replaced module);
+ *   the inventory skips, is an external package attributed to its `require`.
+ *   The regex parser keeps it as an external too when sourcevision hands it
+ *   the inventory (`targetExists`), but attributes it to no module (or, for a
+ *   replaced module, emits an external by the replace alone);
  * - the module's root package (directory "") targets its non-test files,
  *   because an edge to "" matches no file downstream.
  *

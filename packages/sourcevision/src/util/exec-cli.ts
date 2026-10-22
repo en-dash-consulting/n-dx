@@ -24,12 +24,15 @@ export function execFileSyncCli(
   args: string[],
   options: Parameters<typeof execFileSync>[2],
 ): ReturnType<typeof execFileSync> {
+  // windowsHide: a console-less parent (the dashboard's hidden children, a
+  // detached narrate) would otherwise give every cmd.exe its own window.
   if (process.platform === "win32") {
     const cmdLine = buildWindowsCliCommandLine(binary, args);
     return execFileSync("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
       ...options,
       windowsVerbatimArguments: true,
+      windowsHide: true,
     } as Parameters<typeof execFileSync>[2]);
   }
-  return execFileSync(binary, args, options);
+  return execFileSync(binary, args, { ...options, windowsHide: true } as Parameters<typeof execFileSync>[2]);
 }

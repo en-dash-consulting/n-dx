@@ -62,3 +62,4 @@ lastModifiedBy: "Nick Daniel <nick@endash.us>"
 | [SDLC readiness evidence cites test fixture files](./sdlc-readiness-evidence-cites-test.md) | completed |
 | [sv analyze removes its stop handlers before the progress file stops saying running](./sv-analyze-removes-its-stop-handlers.md) | completed |
 | [sv analyze: skip git worktree checkouts in sub-analysis discovery](./sv-analyze-skip-git-worktree-checkouts.md) | completed |
+| [Go regex fallback keeps edges to a package directory the inventory no longer holds](./go-regex-fallback-keeps-edges-to-a.md) | completed |

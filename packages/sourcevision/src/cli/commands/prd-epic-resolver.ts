@@ -75,6 +75,7 @@ interface IndexedNode {
 function runGit(projectDir: string, args: string[]): string | null {
   try {
     return execFileSync("git", args, {
+      windowsHide: true,
       cwd: projectDir,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],

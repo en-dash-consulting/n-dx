@@ -402,7 +402,7 @@ describe("hench → llm-client gateway contract", () => {
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
   const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"];
-  const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME"];
+  const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME", "CLI_LOG_FILENAME"];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -528,6 +528,7 @@ describe("web → rex gateway contract", () => {
     "resolveStore",
     "prdLayout",
     "cascadeParentReset",
+    "cascadeParentCompletion",
     "getAvailableBackups",
     "restoreFromBackup",
     "isValidSnapshotId",
@@ -920,7 +921,10 @@ describe("gateway export auto-detection", () => {
         "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
         "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS",
         "isFailForwardEnabled",
-        "NDX_CONTAINER_DIRNAME"],
+        "NDX_CONTAINER_DIRNAME",
+        // The vendor-CLI invocation log's file name: the uncommitted-work gate
+        // discounts n-dx's own output by the name the writer uses.
+        "CLI_LOG_FILENAME"],
       ...["DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"],
     ]);
 
@@ -962,7 +966,7 @@ describe("gateway export auto-detection", () => {
         "isRequirementCategory", "isValidationType",
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
-        "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "cascadeParentReset",
+        "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "cascadeParentReset", "cascadeParentCompletion",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
         "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",

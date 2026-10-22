@@ -28,7 +28,7 @@ export default defineConfig({
     ],
   },
   test: {
-    setupFiles: ["../../tests/setup-color-env.js", "../../tests/setup-session-env.js"],
+    setupFiles: ["../../tests/setup-color-env.js", "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js"],
     include: ["tests/**/*.test.ts"],
     testTimeout: 30_000,
     hookTimeout: 30_000,

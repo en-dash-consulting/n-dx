@@ -236,6 +236,24 @@ describe("n-dx init provider selection", () => {
     });
   });
 
+  it("ignores the vendor-CLI invocation log in the project's .gitignore", async () => {
+    // Every claude/codex spawn appends to claude_commands.log in the project;
+    // left untracked, hench's uncommitted-work gate refused to complete a task
+    // over it in a project init had not ignored it for.
+    const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-clilog-"));
+    try {
+      await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
+
+      run(["init", "--provider=claude", tmpDir], { env: pathEnvWith(binDir) });
+
+      const lines = (await readFile(join(tmpDir, ".gitignore"), "utf-8")).split("\n").map((l) => l.trim());
+      expect(lines).toContain("claude_commands.log*");
+    } finally {
+      await removeDirs(binDir, tmpDir);
+    }
+  });
+
   it("persists selected provider to project settings", async () => {
     const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
     const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-persist-"));

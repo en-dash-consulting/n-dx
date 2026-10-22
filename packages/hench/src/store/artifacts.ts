@@ -43,6 +43,7 @@
 import { relative as relativePath } from "node:path";
 import { realpath } from "node:fs/promises";
 import { execStdout } from "../process/exec.js";
+import { CLI_LOG_FILENAME } from "../prd/llm-gateway.js";
 import {
   AGENT_MCP_DIRNAME,
   LOCKS_DIRNAME,
@@ -81,7 +82,17 @@ const RUNTIME_ENTRIES_IN_HENCH_DIR: readonly string[] = [
  * refuses to complete over a directory it created itself: the `.hench/mcp/`
  * story above, again.
  */
-const RUNTIME_ENTRIES_AT_ROOT: readonly string[] = [".hench-commit-msg.txt", ".ndx-commit-msg.txt", ".run-logs/"];
+const RUNTIME_ENTRIES_AT_ROOT: readonly string[] = [
+  ".hench-commit-msg.txt",
+  ".ndx-commit-msg.txt",
+  ".run-logs/",
+  // The vendor-CLI invocation log llm-client appends to on every spawn, and
+  // the name it rotates to. n-dx's own output: a run that probed credentials
+  // or started an agent has written it, and the gate refused to complete over
+  // it in every project `ndx init` had not ignored it for.
+  CLI_LOG_FILENAME,
+  `${CLI_LOG_FILENAME}.1`,
+];
 
 /**
  * `.gitignore` lines `hench init` writes for a project, named for the layout it
