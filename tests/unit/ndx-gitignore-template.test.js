@@ -68,6 +68,17 @@ describe("ndx init ignore template", () => {
     expect(entries).toContain("ndx-export/");
   });
 
+  it("ignores the vendor-CLI invocation log, here and in the template", () => {
+    // llm-client appends to claude_commands.log on every claude/codex spawn and
+    // rotates it to `.1`; hench's uncommitted-work gate refused to complete a
+    // task over it in projects that had not ignored it. `ndx init` writes the
+    // entry (cli.js); the template is what the docs tell a reader to paste.
+    for (const file of [TEMPLATE, REPO_IGNORE]) {
+      const lines = readFileSync(file, "utf-8").split("\n").map((l) => l.trim());
+      expect(lines, `claude_commands.log* missing from ${file}`).toContain("claude_commands.log*");
+    }
+  });
+
   it("ignores the skills' commit-message scratch file, here and in the template", () => {
     // `git commit -F .ndx-commit-msg.txt` can fail (hook, nothing staged,
     // interrupted session) before the skill deletes the file; unignored, the

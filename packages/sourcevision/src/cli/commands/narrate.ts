@@ -14,6 +14,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { terminateTreeByPidSync } from "@n-dx/llm-client";
 import type { Finding, Manifest, NarrationState, Zone, Zones } from "../../schema/index.js";
 import { DATA_FILES, readManifest, writeManifest, toCanonicalJSON, deduplicateFindings, enforceSeverityRules } from "../sourcevision-core.js";
 import { narrateZones } from "../../analyzers/enrich-multiplex.js";
@@ -146,6 +147,21 @@ function pidAlive(pid: number): boolean {
 }
 
 /**
+ * Stop a narrator and the vendor CLI it is driving.
+ *
+ * `process.kill(pid)` reaches only the narrator: on Windows it is
+ * TerminateProcess on that one process, and the `cmd.exe` → `claude` beneath
+ * it kept running — and kept the console window it had opened, which is the
+ * window operators found still up long after the analysis. The narrator is
+ * spawned detached and only its pid is recorded (in the manifest), so the kill
+ * has to work from a pid alone: {@link terminateTreeByPidSync} signals the
+ * process group on POSIX and runs `taskkill /T` on Windows.
+ */
+export function killNarrationTree(pid: number, platform: NodeJS.Platform = process.platform): void {
+  terminateTreeByPidSync(pid, { platform });
+}
+
+/**
  * Called at the start of `analyze`: take over whatever the previous narrator
  * left unfinished. A live narrator is stopped — it would otherwise race this
  * analysis for zones.json and then discard its own result as superseded — and
@@ -161,7 +177,7 @@ export function takeOverNarration(
   const n = manifest.narration;
   if (!n || n.status === "done") return { zones: [], names: [] };
   const isAlive = deps.isAlive ?? pidAlive;
-  const kill = deps.kill ?? ((pid: number) => { try { process.kill(pid, "SIGTERM"); } catch { /* gone already */ } });
+  const kill = deps.kill ?? killNarrationTree;
 
   let stopped: number | undefined;
   if (n.status === "pending") {

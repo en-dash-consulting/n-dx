@@ -22,7 +22,7 @@ export default defineConfig({
     // Pin color and session env so ambient shell state cannot change verdicts.
     setupFiles: [
       "../../tests/setup-color-env.js",
-      "../../tests/setup-session-env.js",
+      "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
     ],
     include: ["tests/**/*.test.ts"],
     projects: isolationProjects({ root: import.meta.dirname, name: "lang-java" }),

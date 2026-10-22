@@ -197,8 +197,10 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "live-analyze": ({ navigateTo }) =>
     h(LiveAnalyzeView, { navigateTo }),
 
-  "overview": ({ data, jobs }) =>
-    h(Overview, { data, jobs }),
+  // navigateTo is what lets the iso hero offer "Options" (→ the map's form);
+  // without it the Overview hero had Rebuild and Expand but no way there.
+  "overview": ({ data, jobs, navigateTo }) =>
+    h(Overview, { data, jobs, navigateTo }),
 
   "graph": ({ data, setDetail, selectedFile, selectedZone, navigateTo }) =>
     h(Graph, { data, onSelect: setDetail, selectedFile, selectedZone, navigateTo }),

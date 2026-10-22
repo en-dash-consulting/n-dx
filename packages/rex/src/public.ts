@@ -376,7 +376,7 @@ export type { TaskDuration } from "./core/durations.js";
 
 // ---- Core: parent auto-completion -------------------------------------------
 
-export { allChildrenSuccessful, findAutoCompletions, reconcileAutoCompletions } from "./core/parent-completion.js";
+export { allChildrenSuccessful, findAutoCompletions, reconcileAutoCompletions, cascadeParentCompletion } from "./core/parent-completion.js";
 
 // ---- Core: parent status reset ----------------------------------------------
 

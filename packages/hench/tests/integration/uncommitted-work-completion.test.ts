@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
-import { exec as execCb } from "node:child_process";
+import { exec as execCb, execFile as execFileCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
@@ -13,6 +13,7 @@ import { TaskClaims } from "../../src/process/task-claims.js";
 import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
+const execFileAsync = promisify(execFileCb);
 
 /**
  * The uncommitted-work gate, end to end through finalizeRun (#363).
@@ -524,31 +525,33 @@ describe("finalizeRun — uncommitted-work gate", () => {
         expect(run.status).toBe("completed");
         expect(statuses).toEqual(["completed"]);
 
-        // Three commits, in the order they are made: the executor's own, the
-        // repair commit, then the PRD completion record. The record used to be
-        // skipped entirely on this path — the executor committed for itself and
-        // wrote no message file, so nothing owned the completion write and it
-        // sat in the tree with the task marked done.
+        // Two commits, in the order they are made: the executor's own, then the
+        // repair commit — which also carries the completion, folded in once the
+        // task was marked completed, so no `chore(prd)` record follows. The
+        // completion used to be skipped entirely on this path — the executor
+        // committed for itself and wrote no message file, so nothing owned the
+        // completion write and it sat in the tree with the task marked done.
         const subjects = await subjectsSince(startHead);
-        expect(subjects).toHaveLength(3);
-        expect(subjects[0]).toBe("feat: executor committed itself");
-        expect(subjects[1]).toBe(
+        expect(subjects).toEqual([
+          "feat: executor committed itself",
           `fix(review): apply adversarial-review repairs (run ${run.id})`,
-        );
-        expect(subjects[2]).toContain("chore(prd):");
+        ]);
 
-        // The repair is in the repair commit, not merely somewhere in the
-        // range — asked of that commit by sha, since HEAD is now the record.
-        expect(run.review?.repairCommit).toMatch(/^[0-9a-f]{40}$/);
+        // The recorded repair commit is the one on the branch, re-pointed past
+        // the fold, and holds the repair and the completion write.
+        expect(run.review?.repairCommit).toBe(await head());
         const { stdout: repairFiles } = await execAsync(
           `git show --name-only --format= ${run.review!.repairCommit}`,
           { cwd: projectDir },
         );
-        expect(repairFiles.split("\n").filter(Boolean)).toEqual(["lib.ts"]);
+        const files = repairFiles.split("\n").filter(Boolean);
+        expect(files).toContain("lib.ts");
+        expect(files.some((f) => f.includes("prd_tree"))).toBe(true);
         expect(await porcelain()).not.toContain("lib.ts");
+        expect(await porcelain()).not.toContain("prd_tree");
       });
 
-      it("commits the PRD record even with no repairs to carry it", async () => {
+      it("folds the completion into the executor's commit even with no repairs to carry it", async () => {
         // The reported failure, with nothing else going on: the executor
         // committed its own work, wrote no message file, and the run had no
         // review repairs. Nothing downstream touched the tree, so the
@@ -566,9 +569,16 @@ describe("finalizeRun — uncommitted-work gate", () => {
 
         expect(run.status).toBe("completed");
 
+        // One commit: the work, then the completion folded into it, with the
+        // status transition and the item named in its trailer block.
         const subjects = await subjectsSince(startHead);
-        expect(subjects).toHaveLength(2);
-        expect(subjects[1]).toContain("chore(prd):");
+        expect(subjects).toEqual(["feat: executor committed itself"]);
+        const { stdout: files } = await execAsync("git show --name-only --format= HEAD", { cwd: projectDir });
+        expect(files).toContain("src.ts");
+        expect(files).toContain("prd_tree");
+        const { stdout: trailers } = await execFileAsync("git", ["log", "-1", "--format=%(trailers)", "HEAD"], { cwd: projectDir });
+        expect(trailers).toMatch(/N-DX-Status: \S+ \S+ → completed/);
+        expect(trailers).toMatch(/N-DX-Item: \S+/);
 
         // What the next run actually depends on.
         expect(await porcelain()).not.toContain("prd_tree");

@@ -5,9 +5,9 @@
  * inventory-only. As for Java, every .go file goes to the pack on an
  * incremental run, because resolution needs the whole project.
  *
- * The fixture tells the two parsers apart: `docs` holds no .go file, so the
- * pack records `main.go`'s import of it as external while the regex parser
- * keeps an edge to the directory.
+ * `docs` holds no .go file. Both parsers keep `main.go`'s import of it as an
+ * external package rather than an edge to a node that does not exist, so the
+ * graph is the same whichever parsed it; the notice is what tells them apart.
  */
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -30,8 +30,11 @@ const OTHER = 'package main\n\nimport "example.com/app/util"\n\nfunc other() { u
 
 const edgeKeys = (imports: Imports): string[] => imports.edges.map((e) => `${e.from} -> ${e.to} [${e.symbols.join(",")}]`).sort();
 
-const PACK_EDGES = ["main.go -> util [*]", "other.go -> util [*]"];
-const REGEX_EDGES = ["main.go -> docs [*]", "main.go -> util [*]", "other.go -> util [*]"];
+const EDGES = ["main.go -> util [*]", "other.go -> util [*]"];
+const EXTERNAL = [
+  { package: "example.com/app/docs", importedBy: ["main.go"], symbols: ["*"] },
+  { package: "stdlib:fmt", importedBy: ["main.go"], symbols: ["*"] },
+];
 
 /** The Go pack as if it were not installed. */
 const MISSING_GO: KnownPack = {
@@ -93,11 +96,8 @@ describe("Go pack in the imports phase", () => {
     await skipUnlessPackRuns(ctx, "go");
     const { imports, messages } = await analyze();
     expect(messages).toEqual([]);
-    expect(edgeKeys(imports)).toEqual(PACK_EDGES);
-    expect(imports.external).toEqual([
-      { package: "example.com/app/docs", importedBy: ["main.go"], symbols: ["*"] },
-      { package: "stdlib:fmt", importedBy: ["main.go"], symbols: ["*"] },
-    ]);
+    expect(edgeKeys(imports)).toEqual(EDGES);
+    expect(imports.external).toEqual(EXTERNAL);
   });
 
   it("keeps the imports of a Go file over the pack's size limit through the regex parser", async (ctx) => {
@@ -112,7 +112,7 @@ describe("Go pack in the imports phase", () => {
     await writeFile(join(dir, "other", "other.go"), "package other\n");
     const { imports, messages } = await analyze();
     expect(messages).toEqual([]);
-    expect(edgeKeys(imports)).toEqual([...PACK_EDGES, "util/zz_generated.go -> other [*]"]);
+    expect(edgeKeys(imports)).toEqual([...EDGES, "util/zz_generated.go -> other [*]"]);
     expect(imports.external.find((e) => e.package === "stdlib:strings")).toEqual({
       package: "stdlib:strings",
       importedBy: ["util/zz_generated.go"],
@@ -123,7 +123,8 @@ describe("Go pack in the imports phase", () => {
   describe("falls back to the regex parser", () => {
     it("when the pack is not installed, with one notice naming the install command", async () => {
       const { imports, messages } = await analyze({ packs: { packs: [MISSING_GO] } });
-      expect(edgeKeys(imports)).toEqual(REGEX_EDGES);
+      expect(edgeKeys(imports)).toEqual(EDGES);
+      expect(imports.external).toEqual(EXTERNAL);
       expect(messages).toHaveLength(1);
       expect(messages[0]).toContain("Go imports come from the regex import parser");
       expect(messages[0]).toContain("`ndx sv pack add go`");
@@ -131,7 +132,8 @@ describe("Go pack in the imports phase", () => {
 
     it("when the pack reports it cannot run", async () => {
       const { imports, messages } = await analyze({ packs: { packs: [DEGRADED_GO] } });
-      expect(edgeKeys(imports)).toEqual(REGEX_EDGES);
+      expect(edgeKeys(imports)).toEqual(EDGES);
+      expect(imports.external).toEqual(EXTERNAL);
       expect(messages).toEqual(["Go: go.work unreadable; Go imports come from the regex import parser."]);
     });
   });

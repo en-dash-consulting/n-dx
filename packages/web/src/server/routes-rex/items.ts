@@ -14,7 +14,7 @@ import {
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
-import { resolveStore, isChangeLayerStore, completeV2Work } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -166,6 +166,31 @@ function validateItemPatch(body: unknown): string | null {
 class ItemNotFoundError extends Error {}
 
 /**
+ * Complete the ancestors a v1 status write finished, as `rex update` does.
+ *
+ * Without it, closing a feature's last task here left the feature and its epic
+ * pending with every child done; selection then picked the empty feature as
+ * the next task and `ndx loop` handed a run nothing to do. v2 completion
+ * cascades inside rex's own `completeV2Work`, so this is the v1 path only.
+ */
+async function cascadeV1Completion(
+  ctx: ServerContext,
+  store: Awaited<ReturnType<typeof resolveStore>>,
+  ids: readonly string[],
+): Promise<{ completed: Array<{ id: string; title: string; level: string }>; error?: string }> {
+  const completed: Array<{ id: string; title: string; level: string }> = [];
+  try {
+    for (const id of ids) completed.push(...await cascadeParentCompletion(store, id, { projectDir: ctx.projectDir }));
+  } catch (err) {
+    // The status write has already committed. Failing the request here would
+    // tell the dashboard the close did not happen when it did (a writer holding
+    // the PRD lock past its timeout is enough), so report what was not closed.
+    return { completed, error: err instanceof Error ? err.message : String(err) };
+  }
+  return { completed };
+}
+
+/**
  * Refresh the in-process cache (so the next read sees the write before the
  * folder-tree watcher fires) and tell connected clients what changed.
  */
@@ -231,9 +256,21 @@ async function handleItemPatch(
         throw new Error(`Completed "${itemId}", but its other fields were not saved: ${message}`);
       }
     }
+    const cascade = !completing && updates.status === "completed"
+      ? await cascadeV1Completion(ctx, store, [itemId])
+      : { completed: [] };
+    const autoCompleted = cascade.completed;
     await publishItemUpdate(ctx, store, itemId, updates, broadcast);
+    // The item event names one item; the ancestors that closed with it need a
+    // whole-tree refresh in every open viewer.
+    if (autoCompleted.length > 0) broadcast?.({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
     // Say why a change was held open or left unapplied (rex.applyOn), so the dashboard can.
-    jsonResponse(res, 200, completion?.reason ? { ok: true, applied: completion.applied, reason: completion.reason } : { ok: true });
+    jsonResponse(res, 200, {
+      ok: true,
+      ...(completion?.reason ? { applied: completion.applied, reason: completion.reason } : {}),
+      ...(autoCompleted.length > 0 ? { autoCompleted } : {}),
+      ...(cascade.error ? { autoCompleteError: cascade.error } : {}),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (err instanceof ItemNotFoundError) {
@@ -553,6 +590,7 @@ async function handleBulkUpdate(
     if (completing) delete fieldUpdates.status;
     const writeFields = !completing || Object.keys(fieldUpdates).length > 0;
     let updatedDoc: Awaited<ReturnType<typeof store.loadDocument>>;
+    let autoCompleteError: string | undefined;
     if (completing) {
       // Completion runs first and fields are written only for the ids it
       // completed, so a refused completion writes nothing of its own. A change
@@ -617,6 +655,10 @@ async function handleBulkUpdate(
         }
         return doc;
       });
+      if (input.updates.status === "completed") {
+        autoCompleteError = (await cascadeV1Completion(ctx, store, results.filter((r) => r.ok).map((r) => r.id))).error;
+        updatedDoc = await store.loadDocument();
+      }
     }
     for (const result of results) {
       if (!result.ok && !result.error) result.error = "not found";
@@ -638,7 +680,7 @@ async function handleBulkUpdate(
       });
     }
 
-    jsonResponse(res, 200, { ok: true, results });
+    jsonResponse(res, 200, { ok: true, results, ...(autoCompleteError ? { autoCompleteError } : {}) });
   } catch (err) {
     errorResponse(res, 400, String(err));
   }

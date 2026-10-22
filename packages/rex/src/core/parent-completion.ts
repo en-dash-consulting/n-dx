@@ -41,7 +41,9 @@
  */
 
 import type { PRDItem, ItemStatus } from "../schema/index.js";
+import type { PRDStore, WriteOptions } from "../store/contracts.js";
 import { findItem } from "./tree.js";
+import { computeTimestampUpdates } from "./timestamps.js";
 
 export interface AutoCompletionResult {
   /** IDs of items that should be auto-completed, ordered bottom-up (child → ancestor). */
@@ -299,4 +301,47 @@ export function findAutoCompletions(
   }
 
   return result;
+}
+
+/**
+ * After an item's status change, complete the ancestors it finished.
+ *
+ * The write half of {@link findAutoCompletions}, shared by every writer that
+ * changes a status (`rex update`, MCP `update_task_status`, the dashboard's
+ * PATCH routes) so none of them closes a last task and leaves its feature
+ * open. A parent left `pending` with every child done is selected as the next
+ * task, and a run handed it has nothing to do.
+ *
+ * Each ancestor is completed through `updateItem` with `preserveModifiedBy`:
+ * a cascaded close is not a deliberate edit of that ancestor, so its
+ * authorship stays with whoever last touched it on purpose (#368).
+ *
+ * @returns The ancestors completed, bottom-up. Empty when the item is not
+ *   `completed` or no ancestor became complete.
+ */
+export async function cascadeParentCompletion(
+  store: PRDStore,
+  itemId: string,
+  options?: Omit<WriteOptions, "preserveModifiedBy">,
+): Promise<AutoCompletionResult["completedItems"]> {
+  const doc = await store.loadDocument();
+  const { completedItems } = findAutoCompletions(doc.items, itemId);
+  const completed: AutoCompletionResult["completedItems"] = [];
+
+  for (const item of completedItems) {
+    const parent = await store.getItem(item.id);
+    if (!parent) continue;
+    await store.updateItem(item.id, {
+      status: "completed" as ItemStatus,
+      ...computeTimestampUpdates(parent.status, "completed", parent),
+    }, { ...options, preserveModifiedBy: true });
+    await store.appendLog({
+      timestamp: new Date().toISOString(),
+      event: "auto_completed",
+      itemId: item.id,
+      detail: `Auto-completed ${item.level}: ${item.title} (all children done)`,
+    });
+    completed.push(item);
+  }
+  return completed;
 }

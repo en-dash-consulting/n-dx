@@ -2,7 +2,7 @@ import { z } from "zod";
 import { deleteItem, cleanBlockedByRefs } from "../../core/delete.js";
 import { validateTransition } from "../../core/transitions.js";
 import { computeTimestampUpdates } from "../../core/timestamps.js";
-import { findAutoCompletions } from "../../core/parent-completion.js";
+import { cascadeParentCompletion } from "../../core/parent-completion.js";
 import { holdCompletionForRun, describeHeldCompletion } from "../completion-hold.js";
 import { completeV2Work } from "../v2-completion.js";
 import type { PRDItem, ItemStatus, ResolutionType } from "../../schema/index.js";
@@ -166,32 +166,7 @@ export async function handleUpdateTaskStatus(
     // here is harmless and keeps this in sync with add-item's trigger.
     const autoCompleted: Array<{ id: string; title: string; level: string }> = [];
     if (status === "completed" || status === "deferred") {
-      const doc = await store.loadDocument();
-      const { completedItems } = findAutoCompletions(doc.items, id);
-
-      for (const item of completedItems) {
-        const parentItem = await store.getItem(item.id);
-        if (!parentItem) continue;
-
-        const parentTsUpdates = computeTimestampUpdates(
-          parentItem.status,
-          "completed",
-          parentItem,
-        );
-        await store.updateItem(item.id, {
-          status: "completed" as ItemStatus,
-          ...parentTsUpdates,
-          // Cascaded close, not a deliberate edit of this ancestor — leave its
-          // authorship with whoever last touched it on purpose (#368).
-        }, { applyAttribution: true, preserveModifiedBy: true, projectDir });
-        await store.appendLog({
-          timestamp: new Date().toISOString(),
-          event: "auto_completed",
-          itemId: item.id,
-          detail: `Auto-completed ${item.level}: ${item.title} (all children done)`,
-        });
-        autoCompleted.push(item);
-      }
+      autoCompleted.push(...await cascadeParentCompletion(store, id, { applyAttribution: true, projectDir }));
     }
 
     return textResult(

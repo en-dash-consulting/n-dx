@@ -4,10 +4,10 @@ level: "epic"
 title: "Hench"
 status: "completed"
 startedAt: "2026-03-26T15:22:13.999Z"
-completedAt: "2026-10-13T19:50:57.708Z"
-endedAt: "2026-10-13T19:50:57.708Z"
+completedAt: "2026-10-20T21:55:09.177Z"
+endedAt: "2026-10-20T21:55:09.177Z"
 description: "Autonomous agent: picks rex tasks, builds briefs with codebase context, runs an LLM tool-use loop to implement them, records runs. Supports sequential execution, concurrency management, and resource monitoring."
-lastModified: "2026-10-13T19:50:59.191Z"
+lastModified: "2026-10-20T21:55:09.868Z"
 lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 ---
 
@@ -43,11 +43,13 @@ lastModifiedBy: "Sterling H <sterling.h@endash.us>"
 | [Strict Self-Heal Tag Scoping Enforcement](./strict-self-heal-tag-scoping-enforcement/index.md) | completed |
 | [Task Repetition Detection and Completion Enforcement in Hench Run Loop](./task-repetition-detection-and/index.md) | completed |
 | [Web UI: Reorganize around SourceVision / Rex / Hench sections](./web-ui-reorganize-around-sourcevision/index.md) | completed |
+| [A completed task lands as one commit: work, then its completion](./a-completed-task-lands-as-one-commit.md) | completed |
 | [Commit review repairs when the executor committed for itself and left no commit message](./commit-review-repairs-when-the.md) | completed |
 | [Count project content under .rex/ and .ndx/ as changes in the completion check](./count-project-content-under-rex-and.md) | completed |
 | [Fix hench parent auto-completion cascade silently skipped + add reconciliation sweep (#293)](./fix-hench-parent-auto-completion.md) | completed |
 | [Fix hench task-completion commit gap + fullTestCommand schema drop (#302)](./fix-hench-task-completion-commit-gap.md) | completed |
 | [Hench task display branches on rex prose, so a reworded selection summary silently blanks the finalize label](./hench-task-display-branches-on-rex.md) | completed |
+| [ndx init does not gitignore claude_commands.log, so hench's commit gate refuses completion over n-dx's own CLI log in a fresh project](./ndx-init-does-not-gitignore-claude.md) | pending |
 | [Pre-run commit gate: verify uncommitted changes before starting a work loop](./pre-run-commit-gate-verify-uncommitted.md) | completed |
 | [Run records carry the commits a run made, backfilled for the hench era](./run-records-carry-the-commits-a-run.md) | completed |
 | [Run records keep each commit's author date and subject, and re-point rewritten SHAs](./run-records-keep-each-commit-s-author.md) | completed |

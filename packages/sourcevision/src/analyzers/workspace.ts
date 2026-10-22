@@ -160,6 +160,7 @@ function listNestedWorktrees(rootDir: string): ReadonlySet<string> {
   let stdout: unknown;
   try {
     stdout = execFileSync("git", ["worktree", "list", "--porcelain"], {
+      windowsHide: true,
       cwd: rootDir,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],

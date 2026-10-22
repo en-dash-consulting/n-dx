@@ -220,7 +220,7 @@ describe("6eacca42: the agent completes and commits, then the gate fails", () =>
 });
 
 describe("the gate passes", () => {
-  it("completes the task in hench's record commit, with the agent's resolution", async () => {
+  it("completes the task in the work commit, with the agent's resolution", async () => {
     await agentCompletesThroughMcp("Fixed config parsing");
     await agentCommitsEverything();
     const workCommit = git(projectDir, "rev-parse", "HEAD").trim();
@@ -239,10 +239,13 @@ describe("the gate passes", () => {
     expect(item?.resolutionDetail).toBe("Fixed config parsing");
     expect(run.completionHold?.outcome).toBe("applied");
 
-    // The work commit never said completed; the record commit after it does.
-    expect(git(projectDir, "show", "--stat", workCommit)).not.toContain("completed)");
-    const subjects = git(projectDir, "log", "--format=%s", `${workCommit}..HEAD`);
-    expect(subjects).toMatch(/chore\(prd\).*task-c2 completed/);
+    // The agent's commit was made before the gate, so it did not say completed;
+    // once the gate passed, the completion was folded into it. One commit, no
+    // `chore(prd)` record after it.
+    const subjects = git(projectDir, "log", "--format=%s", `${baseline}..HEAD`).trim().split("\n");
+    expect(subjects).toEqual([git(projectDir, "log", "-1", "--format=%s", workCommit).trim()]);
+    expect(git(projectDir, "show", "--name-only", "--format=", "HEAD")).toContain(".rex/prd_tree");
+    expect(git(projectDir, "log", "-1", "--format=%(trailers)", "HEAD")).toMatch(/N-DX-Status: task-c2 \S+ → completed/);
     expect(git(projectDir, "status", "--porcelain", "--", ".rex/prd_tree").trim()).toBe("");
   });
 
