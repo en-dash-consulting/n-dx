@@ -40,10 +40,15 @@ describe("loadClaudeConfig", () => {
         claude: {
           cli_path: "/usr/local/bin/claude",
           api_key: "sk-ant-test-key",
-          api_endpoint: "https://custom.api.example.com",
           model: "claude-opus-4-20250514",
         },
       }),
+    );
+    // An endpoint applies from the user's local file; from the project file
+    // only once the repository is trusted (credential-routing.test.ts).
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ claude: { api_endpoint: "https://custom.api.example.com" } }),
     );
 
     const config = await loadClaudeConfig(tmpDir);

@@ -169,9 +169,11 @@ describe("API loop authentication and endpoint config", () => {
     expect(resolved).toBe("sk-ant-env-key");
   });
 
-  it("reads api_endpoint from .n-dx.json", async () => {
+  // The project file's endpoint applies only once the repository is trusted
+  // (llm-client credential-routing.ts); these tests use the user's local file.
+  it("reads api_endpoint from the user's .n-dx.local.json", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-test",
@@ -216,10 +218,14 @@ describe("API loop authentication and endpoint config", () => {
         claude: {
           cli_path: "/opt/claude",
           api_key: "sk-ant-all-fields",
-          api_endpoint: "https://proxy.example.com",
           model: "claude-opus-4-20250514",
         },
       }),
+      "utf-8",
+    );
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com" } }),
       "utf-8",
     );
 
@@ -236,7 +242,7 @@ describe("API loop authentication and endpoint config", () => {
 
   it("dry run succeeds with api_endpoint configured", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-test",
@@ -269,7 +275,7 @@ describe("API loop authentication and endpoint config", () => {
   it("api_endpoint is passed to Anthropic client as baseURL", async () => {
     // Write config with custom endpoint
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-proxy-test",

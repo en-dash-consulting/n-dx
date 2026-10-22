@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
 import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
@@ -1191,19 +1192,126 @@ describe("n-dx config", () => {
       expect(output).toContain("Testing CLI path...");
       expect(output).toContain("0.0.1-legacy");
     });
+
+    describe("api_endpoint is credential routing", () => {
+      // Where the key is sent is the user's choice: a shared `.n-dx.json`
+      // endpoint applies only once the repository is trusted. A preloaded
+      // fetch stub records each request's host and whether it carried the
+      // sentinel key, so no request leaves the machine and the key is never
+      // printed.
+      const SENTINEL_KEY = "sk-ant-sentinel-test-connection";
+      const ATTACKER = "https://attacker.invalid";
+      const USER_PROXY = "https://user-proxy.invalid";
+      let ndxHome;
+      let requestsPath;
+      let stubPath;
+
+      beforeEach(async () => {
+        ndxHome = join(tmpDir, "ndx-home");
+        requestsPath = join(tmpDir, "requests.jsonl");
+        stubPath = join(tmpDir, "fetch-stub.mjs");
+        await writeFile(
+          stubPath,
+          [
+            'import { appendFileSync } from "node:fs";',
+            "globalThis.fetch = async (url, init = {}) => {",
+            "  const carriesKey = init.headers?.['x-api-key'] === process.env.SENTINEL_KEY;",
+            "  appendFileSync(process.env.REQUESTS_PATH, JSON.stringify({ host: new URL(String(url)).host, carriesKey }) + '\\n');",
+            "  return new Response('{}', { status: 200 });",
+            "};",
+          ].join("\n") + "\n",
+        );
+      });
+
+      function testConnection() {
+        return run(["--test-connection", tmpDir], {
+          env: {
+            ...process.env,
+            NDX_HOME: ndxHome,
+            NODE_OPTIONS: `--import=${pathToFileURL(stubPath).href}`,
+            REQUESTS_PATH: requestsPath,
+            SENTINEL_KEY,
+          },
+        });
+      }
+
+      async function requests() {
+        const raw = await readFile(requestsPath, "utf-8").catch((err) => {
+          if (err.code === "ENOENT") return "";
+          throw err;
+        });
+        return raw.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      }
+
+      async function writeConfigs(shared, local) {
+        await writeFile(SHARED_CONFIG_PATH(tmpDir), JSON.stringify(shared, null, 2) + "\n");
+        await writeFile(LOCAL_CONFIG_PATH(tmpDir), JSON.stringify(local, null, 2) + "\n");
+      }
+
+      it.each([
+        ["llm.claude.api_endpoint", { llm: { claude: { api_endpoint: ATTACKER } } }],
+        ["legacy claude.api_endpoint", { claude: { api_endpoint: ATTACKER } }],
+      ])("sends no request to an untrusted repository's %s", async (_label, shared) => {
+        await writeConfigs(shared, { llm: { claude: { api_key: SENTINEL_KEY } } });
+
+        testConnection();
+
+        const sent = await requests();
+        expect(sent).toEqual([{ host: "api.anthropic.com", carriesKey: true }]);
+      });
+
+      it("uses an api_endpoint from .n-dx.local.json", async () => {
+        await writeConfigs(
+          { llm: { claude: { api_endpoint: ATTACKER } } },
+          { llm: { claude: { api_key: SENTINEL_KEY, api_endpoint: USER_PROXY } } },
+        );
+
+        const output = testConnection();
+
+        expect(await requests()).toEqual([{ host: "user-proxy.invalid", carriesKey: true }]);
+        expect(output).toContain(`endpoint: ${USER_PROXY}`);
+      });
+    });
   });
 
   // ── API endpoint and model configuration ────────────────────────────────
 
   describe("claude.api_endpoint", () => {
-    it("sets claude.api_endpoint in .n-dx.json", async () => {
+    // Credential routing: the loaders honour the shared file's value only once
+    // the repository is trusted, so the user's own choice goes to the local file.
+    /** The shared `.n-dx.json`, or `{}` when nothing was written to it. */
+    async function readShared() {
+      const raw = await readFile(join(tmpDir, ".n-dx.json"), "utf-8").catch((err) => {
+        if (err.code === "ENOENT") return "{}";
+        throw err;
+      });
+      return JSON.parse(raw);
+    }
+
+    it("sets claude.api_endpoint in .n-dx.local.json, not the shared .n-dx.json", async () => {
       const output = run(["claude.api_endpoint", "https://proxy.example.com", tmpDir]);
       expect(output).toContain("claude.api_endpoint = https://proxy.example.com");
 
-      const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+      const local = JSON.parse(
+        await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"),
       );
-      expect(ndxConfig.llm.claude.api_endpoint).toBe("https://proxy.example.com");
+      expect(local.llm.claude.api_endpoint).toBe("https://proxy.example.com");
+      const shared = await readShared();
+      expect(shared.llm?.claude?.api_endpoint).toBeUndefined();
+    });
+
+    it("sets every vendor's api_endpoint and llm.google.apiKeyEnv in .n-dx.local.json", async () => {
+      run(["llm.codex.api_endpoint", "https://codex.example.com", tmpDir]);
+      run(["llm.google.api_endpoint", "https://gemini.example.com", tmpDir]);
+      run(["llm.google.apiKeyEnv", "MY_GOOGLE_KEY", tmpDir]);
+
+      const local = JSON.parse(await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"));
+      expect(local.llm.codex.api_endpoint).toBe("https://codex.example.com");
+      expect(local.llm.google.api_endpoint).toBe("https://gemini.example.com");
+      expect(local.llm.google.apiKeyEnv).toBe("MY_GOOGLE_KEY");
+      const shared = await readShared();
+      expect(shared.llm?.codex?.api_endpoint).toBeUndefined();
+      expect(shared.llm?.google).toBeUndefined();
     });
 
     it("gets claude.api_endpoint after setting it", () => {

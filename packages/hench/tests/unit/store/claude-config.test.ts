@@ -72,9 +72,10 @@ describe("Claude config inheritance (hench)", () => {
       expect(config.api_key).toBe("sk-ant-123");
     });
 
-    it("loads api_endpoint from .n-dx.json claude section", async () => {
+    // From the project file only once the repository is trusted (llm-client credential-routing.ts).
+    it("loads api_endpoint from the user's .n-dx.local.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx.local.json"),
         JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com" } }),
       );
       const config = await loadClaudeConfig(henchDir);
@@ -97,10 +98,13 @@ describe("Claude config inheritance (hench)", () => {
           claude: {
             cli_path: "/opt/claude",
             api_key: "sk-ant-123",
-            api_endpoint: "https://proxy.example.com",
             model: "claude-opus-4-20250514",
           },
         }),
+      );
+      await writeFile(
+        join(tmpDir, ".n-dx.local.json"),
+        JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com" } }),
       );
       const config = await loadClaudeConfig(henchDir);
       expect(config.cli_path).toBe("/opt/claude");

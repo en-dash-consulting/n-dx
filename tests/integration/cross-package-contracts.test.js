@@ -332,6 +332,7 @@ describe("hench → llm-client gateway contract", () => {
     "sanitizeChildEnv",
     "strippedEnvNames",
     "resolveVendorCliEnv",
+    "repoCommandEnv",
     "resolveApiKey",
     "resolveCliPath",
     "loadProjectOverrides",
@@ -858,7 +859,7 @@ describe("gateway export auto-detection", () => {
 
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
-        "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv",
+        "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv", "repoCommandEnv",
         "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
         // Repository trust: the guard baseline and the per-user trust store
         // are one evaluation shared by hench, the dashboard and ndx init.

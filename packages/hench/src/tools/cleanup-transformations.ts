@@ -17,6 +17,7 @@
 
 import {readFile, writeFile, stat} from "node:fs/promises";import { join, relative, resolve } from "node:path";
 import { execShellCmd } from "../process/exec.js";
+import { repoCommandEnv } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -176,6 +177,7 @@ async function runTypecheck(
   const { exitCode, stderr, launched, error } = await execShellCmd("pnpm typecheck", {
     cwd: projectDir,
     timeout,
+    env: repoCommandEnv(projectDir),
     maxBuffer: 5 * 1024 * 1024,
   });
 
