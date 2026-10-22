@@ -1,7 +1,7 @@
 {
   "id": "tests-hench-integration",
   "name": "Tests Hench Integration",
-  "description": "Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+96 more)",
+  "description": "Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+97 more)",
   "files": [
     "packages/hench/tests/integration/agent-commit-item-trailer-cli-loop.test.ts",
     "packages/hench/tests/integration/agent-commit-item-trailer.test.ts",

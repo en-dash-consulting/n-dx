@@ -1,7 +1,7 @@
 {
   "id": "go-language-pack",
-  "name": "Go Language Pack",
-  "description": "Focused language analyzer for Go providing resolver, SQL detection, and go.mod/go.sum parsing.",
+  "name": "Lang Go",
+  "description": "8 files, mostly utilities and entry points; entry points go-pack.ts, go-resolver.ts, go-sql.ts; imports Tests; imported by Packages and Packages.",
   "files": [
     "packages/lang-go/src/go-pack.ts",
     "packages/lang-go/src/go-resolver.ts",

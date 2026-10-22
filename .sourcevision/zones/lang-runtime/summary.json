@@ -1,7 +1,7 @@
 {
   "id": "lang-runtime",
-  "name": "Lang Runtime",
-  "description": "Provides the language pack contract, grammar build infrastructure, and golden-test utilities for tree-sitter-based language analysis.",
+  "name": "Language Pack Runtime",
+  "description": "13 files, mostly utilities and entry points; entry points build-grammars.mjs, index.ts, pack-calls.ts; imports Tests; imported by Packages and Packages.",
   "files": [
     "packages/lang-runtime/scripts/build-grammars.mjs",
     "packages/lang-runtime/scripts/update-pack-goldens.mjs",

@@ -7,7 +7,7 @@
 Zone: Tests Sourcevision E2e (`tests-sourcevision-e2e`)
 Files: 7, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.test.ts (+2 more)
+Description: Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.test.ts (+4 more)
 Lines: 1463
 
 </zone>

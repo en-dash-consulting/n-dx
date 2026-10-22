@@ -1,7 +1,7 @@
 {
   "id": "lang-sql",
   "name": "Lang Sql",
-  "description": "Extracts SQL schemas and database facts from migrations and configuration to enable dependency introspection and schema-based analysis.",
+  "description": "6 files, mostly utilities and entry points; entry points index.ts, sql-facts.ts, sql-pack.ts; imported by Packages.",
   "files": [
     "packages/lang-sql/src/index.ts",
     "packages/lang-sql/src/pack.ts",

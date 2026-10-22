@@ -1,7 +1,7 @@
 {
   "id": "tests-rex-integration",
   "name": "Tests Rex Integration",
-  "description": "Non-source files in packages: accept-keeps-loe.test.ts, add-auto-reshape.test.ts, add-collision-routing.test.ts (+66 more)",
+  "description": "Non-source files in packages: accept-keeps-loe.test.ts, add-auto-reshape.test.ts, add-collision-routing.test.ts (+67 more)",
   "files": [
     "packages/rex/tests/integration/accept-keeps-loe.test.ts",
     "packages/rex/tests/integration/add-auto-reshape.test.ts",

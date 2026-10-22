@@ -1,7 +1,7 @@
 {
   "id": "tests-unit",
   "name": "Tests Unit",
-  "description": "Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+55 more)",
+  "description": "Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+56 more)",
   "files": [
     "tests/unit/architecture-gate-reporting.test.js",
     "tests/unit/check-dependency-drift.test.js",

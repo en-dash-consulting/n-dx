@@ -1,0 +1,29 @@
+{
+  "id": "core/project-initialization",
+  "name": "Project Bootstrap Pipeline",
+  "description": "8 files, primarily JavaScript",
+  "files": [
+    "packages/core/ci.js",
+    "packages/core/cli-brand.js",
+    "packages/core/cli-ink.js",
+    "packages/core/config.js",
+    "packages/core/file-permissions.js",
+    "packages/core/git-preflight.js",
+    "packages/core/init-summary.js",
+    "packages/core/sample-app.js"
+  ],
+  "entryPoints": [
+    "packages/core/ci.js",
+    "packages/core/cli-brand.js",
+    "packages/core/cli-ink.js",
+    "packages/core/config.js",
+    "packages/core/file-permissions.js",
+    "packages/core/git-preflight.js",
+    "packages/core/init-summary.js",
+    "packages/core/sample-app.js"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 8,
+  "lineCount": 6844
+}

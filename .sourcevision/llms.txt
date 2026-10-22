@@ -5,14 +5,14 @@
 
 ## Project Overview
 
-- **Files**: 3136
-- **Lines of code**: 839,224
-- **Languages**: TypeScript (2675), JavaScript (334), Python (41), Java (37), Go (32)
+- **Files**: 3137
+- **Lines of code**: 839,371
+- **Languages**: TypeScript (2676), JavaScript (334), Python (41), Java (37), Go (32)
 - **Zones**: 62 (62 with descriptions)
-- **Avg cohesion**: 0.98, **avg coupling**: 0.01 (weighted by file count, 55 zones with ≥5 files)
+- **Avg cohesion**: 0.99, **avg coupling**: 0.00 (weighted by file count, 55 zones with ≥5 files)
 - **Small zones**: 7 excluded from averages (<5 files)
-- **Git**: chore/prd-readiness-infra-dashboard @ 472f3a5
-- **Analyzed**: 2026-10-21T17:47:04.220Z
+- **Git**: chore/100-migrate-this-repository @ 77aa2d7
+- **Analyzed**: 2026-10-22T19:02:44.483Z
 
 ## Architecture Zones
 
@@ -24,7 +24,7 @@ Build, packaging, and CI scripts: iso-map.mjs, config.ts
 - Cohesion: 0.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/.claude/context.md`
 
-### Core (`core`)
+### CLI Orchestration Hub (`core`)
 
 52 files, mostly utilities and entry points; entry points assistant-assets.js, assistant-integration.js, child-lifecycle.js; imported by Tests and Tests.
 
@@ -33,9 +33,9 @@ Build, packaging, and CI scripts: iso-map.mjs, config.ts
 - Entry points: packages/core/assistant-assets.js, packages/core/assistant-integration.js, packages/core/child-lifecycle.js, packages/core/ci.js, packages/core/claude-integration.js (+36 more)
 - Detail: `.sourcevision/zones/core/context.md`
 
-### Go Language Pack (`go-language-pack`)
+### Lang Go (`go-language-pack`)
 
-Focused language analyzer for Go providing resolver, SQL detection, and go.mod/go.sum parsing.
+8 files, mostly utilities and entry points; entry points go-pack.ts, go-resolver.ts, go-sql.ts; imports Tests; imported by Packages and Packages.
 
 - Files: 8
 - Cohesion: 1.00, Coupling: 0.00
@@ -62,34 +62,34 @@ Focused language analyzer for Go providing resolver, SQL detection, and go.mod/g
 
 ### Hench (`hench`)
 
-165 files, mostly utilities and cli commands; entry points adaptive.ts, adversarial-review.ts, change-magnitude.ts; imports Packages and Tests; imported by Packages and Packages.
+166 files, mostly utilities and cli commands; entry points adaptive.ts, adversarial-review.ts, change-magnitude.ts; imports Packages and Tests; imported by Packages and Packages.
 
 - Files: 166
 - Cohesion: 1.00, Coupling: 0.00
 - Entry points: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/adversarial-review.ts, packages/hench/src/agent/analysis/change-magnitude.ts, packages/hench/src/agent/analysis/git-changed-files.ts, packages/hench/src/agent/analysis/livelock.ts (+140 more)
 - Detail: `.sourcevision/zones/hench/context.md`
 
-### Java Language Pack (`java-language-pack`)
+### Lang Java (`java-language-pack`)
 
-Focused language analyzer for Java with Maven/Gradle support, Spring Boot integration, and SQL detection.
+8 files, mostly utilities and entry points; entry points index.ts, java-pack.ts, java-resolver.ts; imported by Packages and Packages.
 
 - Files: 8
 - Cohesion: 1.00, Coupling: 0.00
 - Entry points: packages/lang-java/src/index.ts, packages/lang-java/src/java-pack.ts, packages/lang-java/src/java-resolver.ts, packages/lang-java/src/java-sql.ts, packages/lang-java/src/pack.ts (+2 more)
 - Detail: `.sourcevision/zones/java-language-pack/context.md`
 
-### Lang Python (`lang-python`)
+### Python Language Pack (`lang-python`)
 
-Analyzes Python web frameworks (Django, FastAPI, Flask) and client libraries to extract HTTP routes and outbound calls.
+15 files, mostly utilities and entry points; entry points django.ts, fastapi.ts, flask.ts; imported by Packages and Packages.
 
 - Files: 15
 - Cohesion: 1.00, Coupling: 0.00
 - Entry points: packages/lang-python/src/django.ts, packages/lang-python/src/fastapi.ts, packages/lang-python/src/flask.ts, packages/lang-python/src/index.ts, packages/lang-python/src/pack.ts (+8 more)
 - Detail: `.sourcevision/zones/lang-python/context.md`
 
-### Lang Runtime (`lang-runtime`)
+### Language Pack Runtime (`lang-runtime`)
 
-Provides the language pack contract, grammar build infrastructure, and golden-test utilities for tree-sitter-based language analysis.
+13 files, mostly utilities and entry points; entry points build-grammars.mjs, index.ts, pack-calls.ts; imports Tests; imported by Packages and Packages.
 
 - Files: 13
 - Cohesion: 1.00, Coupling: 0.00
@@ -98,7 +98,7 @@ Provides the language pack contract, grammar build infrastructure, and golden-te
 
 ### Lang Sql (`lang-sql`)
 
-Extracts SQL schemas and database facts from migrations and configuration to enable dependency introspection and schema-based analysis.
+6 files, mostly utilities and entry points; entry points index.ts, sql-facts.ts, sql-pack.ts; imported by Packages.
 
 - Files: 6
 - Cohesion: 1.00, Coupling: 0.00
@@ -107,16 +107,16 @@ Extracts SQL schemas and database facts from migrations and configuration to ena
 
 ### Lang Terraform (`lang-terraform`)
 
-Analyzes Terraform HCL configurations to extract resources, modules, variables, and infrastructure dependencies for IaC analysis.
+9 files, mostly utilities and entry points; entry points index.ts; imports Tests; imported by Packages.
 
 - Files: 9
 - Cohesion: 1.00, Coupling: 0.00
 - Entry points: packages/lang-terraform/src/index.ts
 - Detail: `.sourcevision/zones/lang-terraform/context.md`
 
-### Language Pack Foundation (`language-pack-foundation`)
+### Lang Kit (`language-pack-foundation`)
 
-Foundation contract and detection system providing build-file models, pack registry, and shared language abstractions.
+33 files, mostly utilities and configuration; entry points build-file.ts, detect.ts, go-build.ts; imports Tests; imported by Packages.
 
 - Files: 33
 - Cohesion: 1.00, Coupling: 0.00
@@ -132,27 +132,36 @@ Foundation contract and detection system providing build-file models, pack regis
 - Entry points: packages/llm-client/src/api-provider.ts, packages/llm-client/src/auth-guidance.ts, packages/llm-client/src/auth-token.ts, packages/llm-client/src/auth.ts, packages/llm-client/src/budget-preflight.ts (+47 more)
 - Detail: `.sourcevision/zones/llm-client/context.md`
 
-### Rex (`rex`)
+### Rex (`rex-cli`)
 
-Domain layer providing PRD analysis algorithms, schema validation, tree operations, and storage contracts for folder-tree backend persistence.
+261 files, mostly utilities and cli commands; entry points acknowledge.ts, analyze-shared.ts, consolidation-guard.ts; imports Rex Migrations; imported by Packages and Packages.
 
-- Files: 24
-- Cohesion: 0.45, Coupling: 0.55
-- Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/batch-types.ts, packages/rex/src/analyze/dedupe.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/cli/commands/chunked-review-state.ts (+76 more)
-- Detail: `.sourcevision/zones/rex/context.md`
-
-### Rex CLI (`rex-cli`)
-
-259 files, mostly utilities and cli commands; entry points acknowledge.ts, analyze-shared.ts, consolidation-guard.ts; imports Rex and Rex Fix; imported by Packages and Packages.
-
-- Files: 255
-- Cohesion: 0.97, Coupling: 0.03
-- Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/dedupe.ts (+200 more)
+- Files: 261
+- Cohesion: 0.99, Coupling: 0.01
+- Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/dedupe.ts (+208 more)
 - Detail: `.sourcevision/zones/rex-cli/context.md`
 
-### Root (`root`)
+### Rex Core (`rex-core`)
 
-4 files; imports Tests.
+1 file, mostly entry points; entry points backfill-commit-attribution.ts, export.ts, health-warning.ts; imports Rex and Rex Migrations; imported by Packages and Packages.
+
+- Files: 1
+- Cohesion: 0.47, Coupling: 0.53
+- Entry points: packages/rex/src/cli/commands/backfill-commit-attribution.ts, packages/rex/src/cli/commands/export.ts, packages/rex/src/cli/commands/health-warning.ts, packages/rex/src/cli/commands/health.ts, packages/rex/src/cli/commands/import-bundle.ts (+52 more)
+- Detail: `.sourcevision/zones/rex-core/context.md`
+
+### Rex Migrations (`rex-migrations`)
+
+16 files, mostly services and models; entry points migration.ts, pipeline.ts, plan-file.ts; imports Rex; imported by Packages and Rex.
+
+- Files: 16
+- Cohesion: 0.56, Coupling: 0.44
+- Entry points: packages/rex/src/migrations/migration.ts, packages/rex/src/migrations/pipeline.ts, packages/rex/src/migrations/plan-file.ts, packages/rex/src/migrations/registry.ts, packages/rex/src/migrations/v1-to-v2/apply.ts (+10 more)
+- Detail: `.sourcevision/zones/rex-migrations/context.md`
+
+### Test Helpers (`root`)
+
+4 files, mostly test helpers; imports Tests.
 
 - Files: 4
 - Cohesion: 0.00, Coupling: 0.00
@@ -160,7 +169,7 @@ Domain layer providing PRD analysis algorithms, schema validation, tree operatio
 
 ### Build & CI Scripts (`scripts`)
 
-Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+12 more)
+Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+13 more)
 
 - Files: 16
 - Cohesion: 0.00, Coupling: 0.00
@@ -169,7 +178,7 @@ Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs
 
 ### Sourcevision (`sourcevision`)
 
-121 files, mostly utilities and services; entry points analysis-outcome.ts, analyze-progress.ts, archetypes.ts; imports Tests; imported by Packages and Packages.
+149 files, mostly utilities and services; entry points java-scip.mjs, workspace-pack.mjs, analysis-outcome.ts; imports Tests; imported by Packages and Packages.
 
 - Files: 149
 - Cohesion: 1.00, Coupling: 0.00
@@ -178,7 +187,7 @@ Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs
 
 ### Tests (`tests`)
 
-Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts
+Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts (+1 more)
 
 - Files: 4
 - Cohesion: 1.00, Coupling: 0.00
@@ -187,7 +196,7 @@ Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts
 
 ### Tests 2 (`tests-2`)
 
-Non-source files in tests: evals.test.js, record-goldens.js, score.js (+9 more)
+Non-source files in tests: evals.test.js, record-goldens.js, score.js (+10 more)
 
 - Files: 13
 - Cohesion: 1.00, Coupling: 0.00
@@ -196,7 +205,7 @@ Non-source files in tests: evals.test.js, record-goldens.js, score.js (+9 more)
 
 ### Tests (`tests-e2e`)
 
-Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+104 more)
+Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+106 more)
 
 - Files: 109
 - Cohesion: 1.00, Coupling: 0.00
@@ -239,7 +248,7 @@ Non-source files in packages: cli-hints.test.ts, cli-init.test.ts, cross-vendor-
 
 ### Tests Hench Integration (`tests-hench-integration`)
 
-Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+96 more)
+Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+97 more)
 
 - Files: 100
 - Cohesion: 1.00, Coupling: 0.00
@@ -367,7 +376,7 @@ Non-source files in packages: ansi-reset-regression.test.ts, api-provider.test.t
 
 ### Tests Packages (`tests-packages`)
 
-Non-source files in packages: project.ts, emit.test.ts, fake-cli.ts (+11 more)
+Non-source files in packages: project.ts, emit.test.ts, pack-fixtures.ts (+23 more)
 
 - Files: 26
 - Cohesion: 1.00, Coupling: 0.00
@@ -384,7 +393,7 @@ Non-source files in packages: add-stdin-hang.test.ts, cli-add-path-regression.te
 
 ### Tests Rex Integration (`tests-rex-integration`)
 
-Non-source files in packages: accept-keeps-loe.test.ts, add-auto-reshape.test.ts, add-collision-routing.test.ts (+66 more)
+Non-source files in packages: accept-keeps-loe.test.ts, add-auto-reshape.test.ts, add-collision-routing.test.ts (+67 more)
 
 - Files: 70
 - Cohesion: 1.00, Coupling: 0.00
@@ -392,15 +401,15 @@ Non-source files in packages: accept-keeps-loe.test.ts, add-auto-reshape.test.ts
 
 ### Tests Rex Unit (`tests-rex-unit`)
 
-Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+255 more)
+Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+257 more)
 
-- Files: 259
+- Files: 260
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-rex-unit/context.md`
 
 ### Tests Sourcevision E2e (`tests-sourcevision-e2e`)
 
-Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.test.ts (+2 more)
+Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.test.ts (+4 more)
 
 - Files: 7
 - Cohesion: 1.00, Coupling: 0.00
@@ -408,7 +417,7 @@ Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.te
 
 ### Tests Sourcevision Fixtures (`tests-sourcevision-fixtures`)
 
-Non-source files in packages: main.go, router.go, setup.go (+43 more)
+Non-source files in packages: main.go, router.go, setup.go (+65 more)
 
 - Files: 68
 - Cohesion: 1.00, Coupling: 0.00
@@ -424,7 +433,7 @@ Non-source files in packages: analyze-model-resolution.test.ts, claude-config.te
 
 ### Tests Sourcevision Unit (`tests-sourcevision-unit`)
 
-Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+123 more)
+Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+138 more)
 
 - Files: 141
 - Cohesion: 1.00, Coupling: 0.00
@@ -432,7 +441,7 @@ Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts
 
 ### Tests Unit (`tests-unit`)
 
-Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+55 more)
+Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+56 more)
 
 - Files: 59
 - Cohesion: 1.00, Coupling: 0.00
@@ -457,7 +466,7 @@ Non-source files in packages: built-server-guard.ts, crash-detector-test-support
 
 ### Tests Web Integration (`tests-web-integration`)
 
-Non-source files in packages: background-suspension-recovery.test.ts, boundary-check.test.ts, build-output-contract.test.ts (+39 more)
+Non-source files in packages: background-suspension-recovery.test.ts, boundary-check.test.ts, build-output-contract.test.ts (+40 more)
 
 - Files: 43
 - Cohesion: 1.00, Coupling: 0.00
@@ -465,13 +474,13 @@ Non-source files in packages: background-suspension-recovery.test.ts, boundary-c
 
 ### Packages (`tests-web-unit`)
 
-Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+343 more)
+Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+349 more)
 
 - Files: 352
 - Cohesion: 1.00, Coupling: 0.00
 - Detail: `.sourcevision/zones/tests-web-unit/context.md`
 
-### Viewer Message Pipeline (`viewer-message-pipeline`)
+### Message Pipeline (`viewer-message-pipeline`)
 
 7 files, mostly utilities and services; entry points call-rate-limiter.ts, fetch-pipeline.ts, index.ts; imported by Packages and Packages.
 
@@ -490,7 +499,7 @@ Project configuration and manifest files: vitest.bench.config.ts, vitest.config.
 
 ### Web (`web`)
 
-3 files.
+3 files, mostly configuration and entry points.
 
 - Files: 3
 - Cohesion: 0.00, Coupling: 0.00
@@ -498,14 +507,14 @@ Project configuration and manifest files: vitest.bench.config.ts, vitest.config.
 
 ### Web Hub (`web-hub`)
 
-Multi-project hub registry, admission control, project lifecycle management, and central orchestration for the development platform.
+11 files, mostly services and pages; entry points admission.ts, home.ts, hub.ts; imports Web Server; imported by Packages and Packages.
 
 - Files: 11
 - Cohesion: 0.89, Coupling: 0.11
 - Entry points: packages/web/src/hub/admission.ts, packages/web/src/hub/home.ts, packages/web/src/hub/hub.ts, packages/web/src/hub/index.ts, packages/web/src/hub/new-project.ts (+3 more)
 - Detail: `.sourcevision/zones/web-hub/context.md`
 
-### Web Landing (`web-landing`)
+### Landing Page (`web-landing`)
 
 2 files, mostly pages; entry points landing.ts; imports Tests; imported by Packages.
 
@@ -514,32 +523,23 @@ Multi-project hub registry, admission control, project lifecycle management, and
 - Entry points: packages/web/src/landing/landing.ts
 - Detail: `.sourcevision/zones/web-landing/context.md`
 
-### Web Server (`web-server`)
+### Dashboard API (`web-server`)
 
-HTTP server composition root wiring Express routes, gateway modules, MCP handlers, and connecting application domains.
+117 files, mostly route handlers and utilities; entry points request-guard.ts, aggregation-cache.ts, analysis-changes.ts; imports Web Hub and Packages; imported by Packages and Packages.
 
-- Files: 105
-- Cohesion: 0.93, Coupling: 0.07
-- Entry points: packages/web/src/server/aggregation-cache.ts, packages/web/src/server/analysis-changes.ts, packages/web/src/server/analyze-progress-watcher.ts, packages/web/src/server/cli-name.ts, packages/web/src/server/dashboard-usage.ts (+72 more)
+- Files: 117
+- Cohesion: 1.00, Coupling: 0.00
+- Entry points: packages/web/src/hub/request-guard.ts, packages/web/src/server/aggregation-cache.ts, packages/web/src/server/analysis-changes.ts, packages/web/src/server/analyze-progress-watcher.ts, packages/web/src/server/cli-name.ts (+79 more)
 - Detail: `.sourcevision/zones/web-server/context.md`
 
-### Web Viewer (`web-viewer`)
+### Dashboard Viewer (`web-viewer`)
 
-280 files, mostly components and pages; entry points v1.ts, base-path.ts, active-operations-tray.ts; imports Viewer Message Pipeline and Web Server; imported by Packages and Packages.
+284 files, mostly components and pages; entry points v1.ts, base-path.ts, active-operations-tray.ts; imports Web Server and Viewer Message Pipeline; imported by Packages and Packages.
 
-- Files: 295
+- Files: 284
 - Cohesion: 0.99, Coupling: 0.01
-- Entry points: packages/web/src/hub/request-guard.ts, packages/web/src/shared/auth.ts, packages/web/src/shared/index.ts, packages/web/src/shared/item-type.ts, packages/web/src/shared/origin.ts (+202 more)
+- Entry points: packages/web/src/schema/v1.ts, packages/web/src/viewer/base-path.ts, packages/web/src/viewer/components/active-operations-tray.ts, packages/web/src/viewer/components/active-tasks-panel.ts, packages/web/src/viewer/components/analyze-controls.ts (+197 more)
 - Detail: `.sourcevision/zones/web-viewer/context.md`
-
-### Web Viewer 2 (`web-viewer-2`)
-
-Preact UI components, hooks, views, performance utilities, and polling infrastructure for the dashboard interface.
-
-- Files: 1
-- Cohesion: 0.67, Coupling: 0.33
-- Entry points: packages/web/src/schema/v1.ts, packages/web/src/viewer/components/body-portal.ts, packages/web/src/viewer/components/bottom-bar.ts, packages/web/src/viewer/components/config-footer.ts, packages/web/src/viewer/components/crash-recovery-banner.ts (+127 more)
-- Detail: `.sourcevision/zones/web-viewer-2/context.md`
 
 ## Key Dependencies
 
@@ -551,14 +551,14 @@ Preact UI components, hooks, views, performance utilities, and polling infrastru
 - `packages/rex/src/schema/index.ts` (92 imports)
 - `packages/hench/src/store/config.ts` (85 imports)
 - `packages/web/tests/helpers/server-route-test-support.ts` (81 imports)
-- `packages/rex/src/core/tree.ts` (65 imports)
+- `packages/rex/src/core/tree.ts` (66 imports)
 - `packages/hench/src/agent/lifecycle/shared.ts` (57 imports)
 - `packages/web/src/viewer/hooks/index.ts` (56 imports)
 - `packages/rex/src/cli/output.ts` (54 imports)
 
 ### External Packages
 
-- `vitest` (used by 1618 files)
+- `vitest` (used by 1619 files)
 - `preact` (used by 337 files)
 - `@n-dx/llm-client` (used by 261 files)
 - `@n-dx/lang-kit` (used by 96 files)
@@ -916,30 +916,27 @@ Most used:
 
 - Zone pin for "packages/hench/src/store/json.ts" → "hench" skipped: the file is not present in any detected zone (out of scope or unzoned). [info]
 - Zone pin target "rex-prd-engine" did not form this analysis run — 12 pin(s) skipped and those files fell back to their Louvain zone. Single-target consolidations to "rex-prd-engine" are non-deterministic until it is a stable anchor. Skipped: packages/rex/src/analyze/batch-types.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/core/keywords.ts, packages/rex/src/core/tree.ts, packages/rex/src/core/verify.ts, packages/rex/src/schema/index.ts, packages/rex/src/schema/levels.ts, packages/rex/src/schema/v1.ts, +4 more. [warning]
-- Fixture directories (tests/fixtures/**, packages/*/tests/fixtures/**) and .claude/ are analysed as real zones, which skews the language detection, the zone-size statistics and the cycle counts. Exclude them, or give them an infrastructure/fixture zone type that is left out of the structural metrics. [info]
-- Gateway-archetype files exist outside the documented gateway inventory (web hub/exec-gateway.ts). Add a policy assertion that every file sourcevision classifies as a gateway appears in docs/architecture/gateways.md, so undocumented gateways fail CI instead of drifting silently. [warning]
-- Pack golden maintenance is duplicated (lang-runtime/scripts and sourcevision/scripts each have an update-pack-goldens.mjs), and the sourcevision copy is placed in the lang-terraform zone. Pack maintenance tooling has no clear owner. Consolidate it into lang-runtime, which already owns the build-grammars tooling for packs. [warning]
-- The production-imported-only-by-tests detector does not model the 'loaded, never imported' packs tier. Every runtime-loaded language pack entry will be reported as dead or missing a caller, which erodes trust in that finding class. Pack entries resolved through src/language/pack-loader.ts should count as having a runtime caller. [warning]
-- Zone pins and guidance target ids that this run no longer emits (web-shared, rex-prd-engine, hench-token-usage, rex-unit, web-sv-view-tests). Re-point the pins at the ids the analyser emits now, or add a pin validation that fails when a target zone never forms, so the documented zones and the analysed ones do not drift silently. [warning]
-- tests-2 is a second overflow zone with a numeric suffix (13 files), alongside web-viewer-2. Pin it to a named test zone so its id stays the same between analyses. [info]
 - God function: Graph in packages/web/src/viewer/views/graph.ts calls 245 unique functions — consider decomposing into smaller, focused functions [critical]
 - God function: cliLoop in packages/hench/src/agent/lifecycle/cli-loop.ts calls 88 unique functions — consider decomposing into smaller, focused functions [warning]
-- ... and 47 more
+- God function: buildZoneIsoModel in .claude/skills/iso-map/scripts/iso-map.mjs calls 73 unique functions — consider decomposing into smaller, focused functions [warning]
+- "packages/graview/src/cli/index.ts" exports 2 declaration(s) (findProductFace, main) that no file in the project imports [warning] (graview)
+- "packages/hench/src/store/suggestions.ts" is production code imported only by tests (2 importer(s), all test files) — either it is dead or its real caller is missing [warning] (graview)
+- "Hench" imports "Tests Hench" on 3 edge(s) while the 15 edge(s) between them run the other way — the minority direction looks like a layering violation [info] (hench)
+- "packages/hench/src/agent/completion.ts" is production code imported only by tests (2 importer(s), all test files) — either it is dead or its real caller is missing [warning] (hench)
+- "packages/hench/src/prd/llm-gateway.ts" is imported from 3 zones (tests-hench, tests-hench-integration, tests-hench-unit) — a cross-cutting dependency every one of them is coupled to [warning] (hench)
+- ... and 21 more
 
 ### Patterns
 
-- Gateway/barrel files that are supposed to be re-export-only (viewer/api.ts) participate in import cycles; a policy assertion that gateway modules import only their declared sources (types.ts, route-state.ts for api.ts) would catch this class of regression. [warning]
-- CLI command handlers (cli/commands/chunked-review.ts, chunked-review-state.ts, fix.ts, modification-intent.ts) share a zone with domain modules (analyze/batch-types.ts, fix/tree.ts), contradicting the rex-satellite 'CLI-only content' policy; domain logic co-clustered with these handlers should move behind src/core/ or src/fix/ and be imported, not co-located. [warning] (rex)
-- Pin packages/web/src/shared/*, packages/web/src/hub/request-guard.ts and packages/web/src/cli/index.ts out of web-viewer (to web-shared, web-hub and web respectively) so zone metrics reflect the documented web layering. [warning] (web-viewer)
-- Pin packages/web/src/schema/v1.ts to web-shared (or a named web-schema zone) in .n-dx.json; as a single-file overflow zone it hides that both web-server and web-viewer depend on it as a shared contract. [info] (web-viewer-2)
+- warning: analyze/spec-draft-reason.ts imports types from migrations/v1-to-v2/spec-pass.ts, so the general analyze layer depends on a single migration's internals. Move the SpecModel seam types into schema/ or a neutral migrations/types.ts so that migrations depends on analyze and never the reverse. [warning] (rex-cli)
+- info: public.ts is the package's only '.' export and the target of the hench and web gateways. Treat it as the contract boundary. The 'dead code' insight is a resolution artifact: teach the analyzer to map workspace package names to their exports entry instead of acting on it. [warning] (rex-core)
+- info: web-server → tests-web-helpers (1 edge) means production code imports a test helper. Find that import and invert it so the helper depends on the server, not the reverse. [warning] (web-server)
+- warning: pin packages/web/src/cli/** to an orchestration or web-cli zone. As placed, it creates the only real web-viewer → web-server and web-viewer → web-hub import edges, which misstates the browser/server split. [warning] (web-viewer)
+- info: schema/v1.ts is also placed here, but the shared contract types used by both sides belong with web-shared. Moving it would make external.ts the viewer's only outbound import surface, as documented. [warning] (web-viewer)
 
 ### Relationships
 
-- Test zones import production source across package boundaries (tests-web-unit → rex schema/v1.ts) without passing through the consuming package's gateway; domain-isolation.test.js gateway enforcement covers src/ only, leaving test-side cross-package coupling unaudited. [warning]
 - Tightly coupled modules: packages/hench/src/agent/lifecycle/shared.ts and packages/hench/src/types/output.ts — 141 cross-file calls (unidirectional). Consider extracting shared interface or merging [info]
-- packages/rex/src/schema/v1.ts is imported by tests-web-unit — web-package tests reach directly into rex source rather than through packages/web/src/server/rex-gateway.ts, so a rex schema change can break web tests without touching the gateway surface the policy suites audit. [warning] (rex-cli)
-- hooks/index.ts barrel is the common node in the 4-, 6- and 7-file cycles (use-prd-actions → task-detail → task-start-control → start-task-button → prepare-task-modal/queued-notice → hooks/index.ts). Components importing the hooks barrel instead of the specific hook leaf re-enter use-prd-actions; importing leaf hooks in those components breaks all three cycles. [critical] (web-viewer)
-- packages/web/src/viewer/api.ts — documented as a re-export-only inbound contract over types.ts and route-state.ts — participates in cycles through components/index.ts (top-nav→guide, bottom-bar, page-title, project-context). The gateway imports the components barrel, so any component consuming api.ts closes a loop; api.ts should not depend on components/. [critical] (web-viewer)
 
 ### Observations
 
@@ -947,27 +944,27 @@ Most used:
 - 41 entry points — wide API surface, consider consolidating exports [info] (core)
 - High cohesion (1) — files are tightly interconnected [info] (core)
 - 27 circular dependency chains detected — see imports.json for details [warning]
-- Bidirectional coupling: "rex" ↔ "rex-cli" (62+42 crossings) — consider extracting shared interface [warning]
-- Hub: packages/rex/src/schema/index.ts is imported by 5 zones — cross-cutting dependency [info]
+- Bidirectional coupling: "rex-cli" ↔ "rex-migrations" (16+48 crossings) — consider extracting shared interface [warning]
+- Hub: packages/rex/src/schema/index.ts is imported by 6 zones — cross-cutting dependency [info]
 - Hub: tests/hidden-child-process-alias.mjs is imported by 12 zones — cross-cutting dependency [info]
 - Hub: tests/vitest-isolation.mjs is imported by 9 zones — cross-cutting dependency [info]
 - Size imbalance: largest zone has 352 files vs smallest with 1 — uneven decomposition [info]
 - Fan-in hotspot: packages/web/src/viewer/hooks/index.ts receives calls from 54 files — high-impact module, changes may have wide ripple effects [warning]
-- ... and 81 more
+- ... and 80 more
 
 ### Suggestions
 
 - packages/web/tests/helpers/ contains files from 3 zones (tests-web-helpers, web-server, web-viewer) — consider grouping into subdirectories to clarify architectural boundaries [info]
-- Add a convention to PACKAGE_GUIDELINES.md, enforced in architecture-policy.test.js: a module never sits beside a same-named directory (x.ts next to x/). Once a module grows into a directory, its siblings with the same prefix move into it. [info]
-- Add language-pack zone pins to .n-dx.json that map packages/lang-<x>/** to 'lang-<x>' and packages/lang-kit/** to 'lang-kit'. Then add a pin-coverage assertion that every packages/* directory resolves to a zone id derived from its package name. This keeps pack zone ids the same between analyses. [info]
-- Pack-tier zone ids follow three schemes (lang-*, *-language-pack, language-pack-foundation). Adopt the package directory name as the zone id convention for every packages/lang-* zone, and record it in the lang-kit AGENTS.md next to the pack contract. [info]
-- Rename or re-pin the 255-file 'rex-cli' zone. It holds the PRD engine as well as the CLI commands, and the rex→rex-cli majority edge reads as the domain tier depending on CLI code. Pinning packages/rex/src/core/** and src/schema/** to a stable engine id would make the satellite-zone rule ('domain logic belongs in src/core/') checkable from zone edges. [warning]
-- Split packages/web/tests/unit into server/ and viewer/ subdirectories (or pin them to separate test zones) so the test zones mirror the runtime server/viewer boundary. One 352-file test zone importing both sides hides test-side imports that cross the boundary. [info]
-- Teach the import-graph resolver to map workspace package specifiers through each package.json exports field, and to follow barrel re-exports (export * from / export { x } from), before running the imported-only-by-tests detector. Before: public.ts, index.ts and folder-tree-store.ts are flagged as dead. After: only files with no production path through gateways or barrels are flagged. [warning]
 - Hub function: resolveRexPaths in packages/rex/src/store/index.ts is called from 46 files (high fan-in expected for this module type) — changes here have wide impact, consider if responsibilities can be narrowed [info]
 - 5 potentially unused exports in packages/core/assistant-assets.js have no incoming calls: getRegistry, getAllSkillBodies, getMcpServer, renderClaudeSkill, renderAllClaudeSkills [warning]
 - 5 potentially unused exports in packages/web/src/viewer/components/prd-tree/index-md-sections.ts have no incoming calls: ProgressTable, ChangesList, InfoSection, SummarySection, SubtasksList [warning]
-- ... and 57 more
+- 5 potentially unused exports in packages/web/src/viewer/hooks/use-live.ts have no incoming calls: isAnalysisJob, isDeadRun, countsAsLive, livenessBadge, asLiveSnapshot [warning]
+- 4 potentially unused exports in packages/lang-kit/src/detect.ts have no incoming calls: languageConfigsFromIds, isFallbackSourceFile, detectLanguage, detectLanguages [info]
+- 3 potentially unused exports in packages/lang-runtime/src/testing/pack-golden.ts have no incoming calls: fixtureDirFor, goldenPathFor, runPackOverFixture [info]
+- 3 potentially unused exports in packages/rex/src/store/folder-tree-mutations.ts have no incoming calls: writeItemDirectory, updateAncestorIndices, batchCreateDirectories [info]
+- 2 potentially unused exports in packages/graview-face/src/model/code.ts have no incoming calls: topZones, coverage [info]
+- 2 potentially unused exports in packages/lang-kit/src/go-build.ts have no incoming calls: findGoModuleDirs, readGoVendorModules [info]
+- ... and 25 more
 
 ## Next Steps
 
@@ -975,24 +972,21 @@ Prioritized work items derived from analysis:
 
 ### High Priority
 
-1. **7 related findings: Zone pin target "rex-prd-engine" did not form this analysis…**
+1. **3 related findings: Zone pin target "rex-prd-engine" did not form this analysis…**
 
-1. **2 related findings: "packages/rex/src/core/override-escalation.ts" is productio…**
-   Files: `packages/rex/src/analyze/acknowledge.ts`, `packages/rex/src/analyze/analyze-shared.ts`, `packages/rex/src/analyze/consolidation-guard.ts`
+1. **3 related findings: "Rex CLI" imports "Rex Migrations" on 16 edge(s) while the …**
+   Files: `packages/rex/src/analyze/acknowledge.ts`, `packages/rex/src/analyze/analyze-shared.ts`, `packages/rex/src/analyze/batch-types.ts`
 
-1. **6 related findings: "Web Viewer" imports "Web Hub Infrastructure" on 1 edge(s) …**
-   Files: `packages/web/src/cli/index.ts`, `packages/web/src/hub/request-guard.ts`, `packages/web/src/shared/auth.ts`
+1. **2 related findings: "Web Server" imports "Web Hub" on 1 edge(s) while the 5 edg…**
+   Files: `packages/web/src/hub/request-guard.ts`, `packages/web/src/public.ts`, `packages/web/src/server/aggregation-cache.ts`
 
 1. **Fan-in hotspot: packages/web/src/viewer/hooks/index.ts receives calls from 54 f…**
 
 1. **Graph in packages/web/src/viewer/views/graph.ts calls 245 unique functions**
 
-1. **2 related findings: hooks/index.ts barrel is the common node in the 4-, 6- and …**
-   Files: `packages/web/src/cli/index.ts`, `packages/web/src/hub/request-guard.ts`, `packages/web/src/shared/auth.ts`
-
 ### Medium Priority
 
-1. **3 related findings: "Hench" imports "Tests Hench" on 3 edge(s) while the 15 edg…**
+1. **2 related findings: "packages/hench/src/agent/completion.ts" is production code…**
    Files: `packages/hench/src/agent/analysis/adaptive.ts`, `packages/hench/src/agent/analysis/adversarial-review.ts`, `packages/hench/src/agent/analysis/change-magnitude.ts`
 
 1. **"packages/hench/tests/helpers/index.ts" is imported from 3 zones (hench, tests-…**
@@ -1007,27 +1001,23 @@ Prioritized work items derived from analysis:
 1. **File "packages/web/src/landing/landing.ts" is pinned to zone "Web Landing" but …**
    Files: `packages/web/src/landing/landing.ts`, `packages/web/vitest.config.ts`
 
-1. **File "packages/web/src/server/routes-rex/index-markdown.ts" is pinned to zone "…**
-   Files: `packages/web/src/public.ts`, `packages/web/src/server/aggregation-cache.ts`, `packages/web/src/server/analysis-changes.ts`
+1. **"packages/rex/src/public.ts" is production code imported only by tests (8 impor…**
+   Files: `packages/rex/src/public.ts`
 
-1. **CLI command handlers (cli/commands/chunked-review.ts, chunked-review-state.ts, …**
-   Files: `packages/rex/src/analyze/batch-types.ts`, `packages/rex/src/cli/commands/chunked-review-state.ts`, `packages/rex/src/cli/commands/chunked-review-types.ts`
-
-1. **rex meets the dual-fragility threshold (cohesion 0.45 < 0.5, coupling 0.55 > 0.…**
-   Files: `packages/rex/src/analyze/batch-types.ts`, `packages/rex/src/cli/commands/chunked-review-state.ts`, `packages/rex/src/cli/commands/chunked-review-types.ts`
+1. **info: public.ts is the package's only '.' export and the target of the hench an…**
+   Files: `packages/rex/src/public.ts`
 
 1. **File "packages/web/src/viewer/hooks/use-gateway.ts" is pinned to zone "Web View…**
-   Files: `packages/web/src/cli/index.ts`, `packages/web/src/hub/request-guard.ts`, `packages/web/src/shared/auth.ts`
+   Files: `packages/web/src/cli/index.ts`, `packages/web/src/schema/v1.ts`, `packages/web/src/viewer/api.ts`
 
 1. **"pr-check.js" exports 1 declaration(s) (runPRCheck) that no file in the project…**
    Files: `pr-check.js`, `scan_transcripts.py`, `test-token-format.js`
 
+1. **5 potentially unused exports in packages/core/assistant-assets.js have no incom…**
+
 ### Low Priority
 
 1. **ResolveRexPaths in packages/rex/src/store/index.ts is called from 46 files (hig…**
-
-1. **Zone "rex" has files across 6 directories**
-   Files: `packages/rex/src/analyze/batch-types.ts`, `packages/rex/src/cli/commands/chunked-review-state.ts`, `packages/rex/src/cli/commands/chunked-review-types.ts`
 
 1. **4 potentially unused exports in packages/lang-kit/src/detect.ts have no incomin…**
 
@@ -1043,8 +1033,11 @@ Prioritized work items derived from analysis:
 
 1. **2 potentially unused exports in packages/web/src/viewer/hooks/use-hub-queue.ts …**
 
-1. **Give every vitest config file (root vitest.config.js, packages/web/vitest.confi…**
-   Files: `pr-check.js`, `scan_transcripts.py`, `test-token-format.js`
+1. **Zone "Landing Page" has an unreliable risk reading: only 2 files tracked (minim…**
+   Files: `packages/web/src/landing/landing.ts`, `packages/web/vitest.config.ts`
+
+1. **Zone ".Claude Scripts" has an unreliable risk reading: only 2 files tracked (mi…**
+   Files: `.claude/skills/iso-map/scripts/iso-map.mjs`, `docs/.vitepress/config.ts`
 
 ## File Inventory
 
@@ -1099,7 +1092,7 @@ Prioritized work items derived from analysis:
 | `packages/core/web.js` | source | utility | core |
 | `packages/core/win-spawn.js` | source | utility | core |
 | `packages/graview-face/bin/serve.js` | source | entrypoint | graview-face |
-| `packages/graview-face/dev/ndx-door.ts` | source | utility | graview-face |
+| `packages/graview-face/dev/ndx-door.ts` | source |  | graview-face |
 | `packages/graview-face/scripts/a11y.mjs` | build |  | graview-face |
 | `packages/graview-face/scripts/graview.mjs` | build |  | graview-face |
 | `packages/graview-face/scripts/make-fixture.mjs` | build |  | graview-face |
@@ -1114,7 +1107,7 @@ Prioritized work items derived from analysis:
 | `packages/graview-face/src/model/types.ts` | source | types | graview-face |
 | `packages/graview-face/src/model/work.ts` | source | model | graview-face |
 | `packages/graview-face/src/sync/engine.ts` | source | service | graview-face |
-| `packages/graview-face/src/sync/mapping.ts` | source | utility | graview-face |
+| `packages/graview-face/src/sync/mapping.ts` | source | model | graview-face |
 | `packages/graview-face/src/sync/ndx-system.ts` | source | service | graview-face |
 | `packages/graview-face/src/ui/css.ts` | source | component | graview-face |
 | `packages/graview-face/src/ui/declared.tsx` | source | component | graview-face |
@@ -1136,18 +1129,18 @@ Prioritized work items derived from analysis:
 | `packages/graview-face/tests/sync.test.ts` | test |  | tests |
 | `packages/graview-face/vite.config.ts` | config |  | graview-face |
 | `packages/graview-face/vitest.config.ts` | config |  | graview-face |
-| `packages/graview/src/canonical.ts` | source | schema | graview |
+| `packages/graview/src/canonical.ts` | source | utility | graview |
 | `packages/graview/src/cli/index.ts` | source | entrypoint | graview |
-| `packages/graview/src/document.ts` | source | schema | graview |
+| `packages/graview/src/document.ts` | source | model | graview |
 | `packages/graview/src/emit.ts` | source | service | graview |
 | `packages/graview/src/graview-bin.ts` | source | entrypoint | graview |
 | `packages/graview/src/hench-gateway.ts` | source | gateway | graview |
-| `packages/graview/src/hub.ts` | source | service | graview |
+| `packages/graview/src/hub.ts` | source | config | graview |
 | `packages/graview/src/llm-gateway.ts` | source | gateway | graview |
 | `packages/graview/src/public.ts` | source | entrypoint | graview |
 | `packages/graview/src/rex-gateway.ts` | source | gateway | graview |
 | `packages/graview/src/snapshot-file.ts` | source | utility | graview |
-| `packages/graview/src/snapshot.ts` | source | schema | graview |
+| `packages/graview/src/snapshot.ts` | source | utility | graview |
 | `packages/graview/src/sources/code.ts` | source | service | graview |
 | `packages/graview/src/sources/proposed.ts` | source | service | graview |
 | `packages/graview/src/sources/requirements.ts` | source | service | graview |
@@ -1165,59 +1158,59 @@ Prioritized work items derived from analysis:
 | `packages/graview/vitest.config.ts` | config |  | graview |
 | `packages/hench/src/agent/analysis/adaptive.ts` | source | service | hench |
 | `packages/hench/src/agent/analysis/adversarial-review.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/change-magnitude.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/git-changed-files.ts` | source | service | hench |
+| `packages/hench/src/agent/analysis/change-magnitude.ts` | source | utility | hench |
+| `packages/hench/src/agent/analysis/git-changed-files.ts` | source | utility | hench |
 | `packages/hench/src/agent/analysis/index.ts` | source | entrypoint | hench |
-| `packages/hench/src/agent/analysis/livelock.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/plan-only-detection.ts` | source | service | hench |
+| `packages/hench/src/agent/analysis/livelock.ts` | source | utility | hench |
+| `packages/hench/src/agent/analysis/plan-only-detection.ts` | source | utility | hench |
 | `packages/hench/src/agent/analysis/review-repairs.ts` | source | service | hench |
 | `packages/hench/src/agent/analysis/review.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/spin.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/stuck.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/summary.ts` | source | service | hench |
-| `packages/hench/src/agent/analysis/workflow.ts` | source | service | hench |
-| `packages/hench/src/agent/completion.ts` | source | service | hench |
+| `packages/hench/src/agent/analysis/spin.ts` | source | utility | hench |
+| `packages/hench/src/agent/analysis/stuck.ts` | source |  | hench |
+| `packages/hench/src/agent/analysis/summary.ts` | source | utility | hench |
+| `packages/hench/src/agent/analysis/workflow.ts` | source | utility | hench |
+| `packages/hench/src/agent/completion.ts` | source | utility | hench |
 | `packages/hench/src/agent/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts` | source | service | hench |
 | `packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts` | source | service | hench |
 | `packages/hench/src/agent/lifecycle/adapters/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/agent/lifecycle/agent-effort.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/background-wait.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/background-wait.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/batch-divider.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/cli-loop.ts` | source | entrypoint | hench |
 | `packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/commit-msg-watcher.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/commit-msg-watcher.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/commit-subject.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/commit-trailers.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/context-prune.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/context-prune.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/event-accumulator.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/fail-forward.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/fail-forward.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/gate-only-retry.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/heartbeat.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/loop.ts` | source | service | hench |
 | `packages/hench/src/agent/lifecycle/orientation.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/pair-review-rounds.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/plan-mode-prompt.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/pair-review-rounds.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/plan-mode-prompt.ts` | source | service | hench |
 | `packages/hench/src/agent/lifecycle/pre-run-commit-subject.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/primer.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/prior-attempt-work.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/prior-attempt-work.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/prompt-cache.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/prompt-diagnostics.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/read-only-refusal.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/read-only-refusal.ts` | source | service | hench |
 | `packages/hench/src/agent/lifecycle/session-cache.ts` | source | utility | hench |
 | `packages/hench/src/agent/lifecycle/shared.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/spawn-budget.ts` | source | service | hench |
-| `packages/hench/src/agent/lifecycle/task-completion-gate.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/task-display.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/spawn-budget.ts` | source | utility | hench |
+| `packages/hench/src/agent/lifecycle/task-completion-gate.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/task-display.ts` | source |  | hench |
 | `packages/hench/src/agent/lifecycle/token-budget.ts` | source | service | hench |
 | `packages/hench/src/agent/lifecycle/token-usage.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts` | source | utility | hench |
-| `packages/hench/src/agent/lifecycle/vendor-adapter.ts` | source | service | hench |
+| `packages/hench/src/agent/lifecycle/uncommitted-work-gate.ts` | source |  | hench |
+| `packages/hench/src/agent/lifecycle/vendor-adapter.ts` | source | types | hench |
 | `packages/hench/src/agent/planning/brief.ts` | source | service | hench |
-| `packages/hench/src/agent/planning/cli-identity.ts` | source | types | hench |
+| `packages/hench/src/agent/planning/cli-identity.ts` | source | utility | hench |
 | `packages/hench/src/agent/planning/context-caps.ts` | source | service | hench |
-| `packages/hench/src/agent/planning/prompt.ts` | source | service | hench |
-| `packages/hench/src/agent/planning/work-selection.ts` | source | service | hench |
+| `packages/hench/src/agent/planning/prompt.ts` | source | utility | hench |
+| `packages/hench/src/agent/planning/work-selection.ts` | source |  | hench |
 | `packages/hench/src/agent/token-cost.ts` | source | utility | hench |
 | `packages/hench/src/cli/commands/agent-model.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/backfill-commits.ts` | source | cli-command | hench |
@@ -1241,22 +1234,22 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/cli/commands/usage.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/commands/validate-tokens.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/errors.ts` | source | utility | hench |
-| `packages/hench/src/cli/help.ts` | source | utility | hench |
+| `packages/hench/src/cli/help.ts` | source | cli-command | hench |
 | `packages/hench/src/cli/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/cli/output.ts` | source | utility | hench |
-| `packages/hench/src/cli/session-report.ts` | source | utility | hench |
-| `packages/hench/src/cli/slug-migration-offer.ts` | source | utility | hench |
-| `packages/hench/src/cli/token-logging.ts` | source | utility | hench |
-| `packages/hench/src/guard/commands.ts` | source | utility | hench |
-| `packages/hench/src/guard/contracts.ts` | source | schema | hench |
-| `packages/hench/src/guard/env.ts` | source | utility | hench |
+| `packages/hench/src/cli/session-report.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/slug-migration-offer.ts` | source | cli-command | hench |
+| `packages/hench/src/cli/token-logging.ts` | source | cli-command | hench |
+| `packages/hench/src/guard/commands.ts` | source | service | hench |
+| `packages/hench/src/guard/contracts.ts` | source | types | hench |
+| `packages/hench/src/guard/env.ts` | source | config | hench |
 | `packages/hench/src/guard/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/guard/paths.ts` | source | utility | hench |
-| `packages/hench/src/guard/policy.ts` | source | utility | hench |
+| `packages/hench/src/guard/policy.ts` | source | service | hench |
 | `packages/hench/src/prd/llm-gateway.ts` | source | gateway | hench |
 | `packages/hench/src/prd/rex-gateway.ts` | source | gateway | hench |
-| `packages/hench/src/process/actor-identity.ts` | source | types | hench |
-| `packages/hench/src/process/agent-mcp-config.ts` | source | types | hench |
+| `packages/hench/src/process/actor-identity.ts` | source | utility | hench |
+| `packages/hench/src/process/agent-mcp-config.ts` | source | config | hench |
 | `packages/hench/src/process/claude-mcp-registration.ts` | source | service | hench |
 | `packages/hench/src/process/concurrent-execution-metrics.ts` | source | utility | hench |
 | `packages/hench/src/process/exec-shell.ts` | source | utility | hench |
@@ -1264,19 +1257,19 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/process/git-ancestry.ts` | source | utility | hench |
 | `packages/hench/src/process/git-mutation.ts` | source | utility | hench |
 | `packages/hench/src/process/git-origin.ts` | source | utility | hench |
-| `packages/hench/src/process/lifecycle.ts` | source | service | hench |
+| `packages/hench/src/process/lifecycle.ts` | source | utility | hench |
 | `packages/hench/src/process/limiter.ts` | source | utility | hench |
 | `packages/hench/src/process/memory-monitor.ts` | source | utility | hench |
 | `packages/hench/src/process/memory-throttle.ts` | source | utility | hench |
 | `packages/hench/src/process/pool.ts` | source | utility | hench |
 | `packages/hench/src/process/process-memory-tracker.ts` | source | utility | hench |
 | `packages/hench/src/process/run-liveness.ts` | source | utility | hench |
-| `packages/hench/src/process/task-claims.ts` | source | service | hench |
+| `packages/hench/src/process/task-claims.ts` | source | utility | hench |
 | `packages/hench/src/process/toolchain-identity.ts` | source | utility | hench |
 | `packages/hench/src/public.ts` | source | entrypoint | hench |
 | `packages/hench/src/queue/execution-queue.ts` | source | utility | hench |
 | `packages/hench/src/queue/format.ts` | source | utility | hench |
-| `packages/hench/src/queue/priority-scheduler.ts` | source | service | hench |
+| `packages/hench/src/queue/priority-scheduler.ts` | source | utility | hench |
 | `packages/hench/src/quota/claude-quota.ts` | source | service | hench |
 | `packages/hench/src/quota/codex-quota.ts` | source | service | hench |
 | `packages/hench/src/quota/codex-token-retrieval.ts` | source | service | hench |
@@ -1310,22 +1303,22 @@ Prioritized work items derived from analysis:
 | `packages/hench/src/store/trust.ts` | source | store | hench |
 | `packages/hench/src/tools/cleanup-transformations.ts` | source | utility | hench |
 | `packages/hench/src/tools/contracts.ts` | source | types | hench |
-| `packages/hench/src/tools/dead-code-analyzer.ts` | source | service | hench |
-| `packages/hench/src/tools/dispatch.ts` | source | service | hench |
-| `packages/hench/src/tools/exec-shell.ts` | source | service | hench |
-| `packages/hench/src/tools/files.ts` | source | service | hench |
-| `packages/hench/src/tools/git.ts` | source | service | hench |
-| `packages/hench/src/tools/pr-status-trailers.ts` | source | service | hench |
-| `packages/hench/src/tools/rex.ts` | source | service | hench |
-| `packages/hench/src/tools/shell.ts` | source | service | hench |
+| `packages/hench/src/tools/dead-code-analyzer.ts` | source | utility | hench |
+| `packages/hench/src/tools/dispatch.ts` | source | utility | hench |
+| `packages/hench/src/tools/exec-shell.ts` | source | utility | hench |
+| `packages/hench/src/tools/files.ts` | source | utility | hench |
+| `packages/hench/src/tools/git.ts` | source | utility | hench |
+| `packages/hench/src/tools/pr-status-trailers.ts` | source | utility | hench |
+| `packages/hench/src/tools/rex.ts` | source | utility | hench |
+| `packages/hench/src/tools/shell.ts` | source | utility | hench |
 | `packages/hench/src/tools/test-command-resolver.ts` | source | utility | hench |
 | `packages/hench/src/tools/test-gate-template.ts` | source | utility | hench |
-| `packages/hench/src/tools/test-runner.ts` | source | service | hench |
+| `packages/hench/src/tools/test-runner.ts` | source | utility | hench |
 | `packages/hench/src/types/index.ts` | source | entrypoint | hench |
 | `packages/hench/src/types/output.ts` | source | utility | hench |
-| `packages/hench/src/validation/changed-files.ts` | source | service | hench |
-| `packages/hench/src/validation/completion.ts` | source | service | hench |
-| `packages/hench/src/validation/finalize-ready.ts` | source | service | hench |
+| `packages/hench/src/validation/changed-files.ts` | source | schema | hench |
+| `packages/hench/src/validation/completion.ts` | source | schema | hench |
+| `packages/hench/src/validation/finalize-ready.ts` | source | schema | hench |
 | `packages/hench/tests/e2e/cli-hints.test.ts` | test |  | tests-hench |
 | `packages/hench/tests/e2e/cli-init.test.ts` | test |  | tests-hench |
 | `packages/hench/tests/e2e/cross-vendor-run-record-smoke.test.ts` | test |  | tests-hench |
@@ -1451,4 +1444,4 @@ Prioritized work items derived from analysis:
 | `packages/hench/tests/unit/agent/codex-cli-adapter.test.ts` | test |  | tests-hench-unit |
 | `packages/hench/tests/unit/agent/codex-cli-token-parser.test.ts` | test |  | tests-hench-unit |
 
-_2736 of 3136 files not listed (table capped at 400 rows). Use the sourcevision `search_files` or `get_file_info` tools for the rest._
+_2737 of 3137 files not listed (table capped at 400 rows). Use the sourcevision `search_files` or `get_file_info` tools for the rest._

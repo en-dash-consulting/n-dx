@@ -1,7 +1,7 @@
 {
   "id": "web-hub",
   "name": "Web Hub",
-  "description": "Multi-project hub registry, admission control, project lifecycle management, and central orchestration for the development platform.",
+  "description": "11 files, mostly services and pages; entry points admission.ts, home.ts, hub.ts; imports Web Server; imported by Packages and Packages.",
   "files": [
     "packages/web/src/hub/admission.ts",
     "packages/web/src/hub/children.ts",

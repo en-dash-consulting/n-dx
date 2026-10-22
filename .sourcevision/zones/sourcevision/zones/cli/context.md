@@ -205,12 +205,12 @@ Cross-dependencies between sub-zones:
 
 This zone has 7 sub-zone(s):
 
-- **Analyzers** (`sourcevision/cli/analyzers`): 4 files, cohesion 0.56, coupling 0.44
-- **Cli** (`sourcevision/cli/cli`): 6 files, cohesion 0.31, coupling 0.69
-- **Cli Commands** (`sourcevision/cli/cli-commands`): 6 files, cohesion 0.32, coupling 0.68
-- **CLI Interface** (`sourcevision/cli/cli-interface`): 7 files, cohesion 0.34, coupling 0.66
-- **Commands** (`sourcevision/cli/commands`): 5 files, cohesion 0.47, coupling 0.53
-- **Commands 3** (`sourcevision/cli/commands-3`): 5 files, cohesion 0.33, coupling 0.67
+- **Import Graph Analysis** (`sourcevision/cli/analyzers`): 4 files, cohesion 0.56, coupling 0.44
+- **CLI & MCP Core** (`sourcevision/cli/cli`): 6 files, cohesion 0.31, coupling 0.69
+- **CLI Command Set** (`sourcevision/cli/cli-commands`): 6 files, cohesion 0.32, coupling 0.68
+- **Analysis Command Layer** (`sourcevision/cli/commands`): 5 files, cohesion 0.47, coupling 0.53
+- **Sourcevision** (`sourcevision/cli/commands-2`): 7 files, cohesion 0.34, coupling 0.66
+- **Export & Auxiliary** (`sourcevision/cli/export-and-auxiliary`): 5 files, cohesion 0.33, coupling 0.67
 - **Sourcevision** (`sourcevision/cli/sourcevision`): 4 files, cohesion 0.56, coupling 0.44
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`

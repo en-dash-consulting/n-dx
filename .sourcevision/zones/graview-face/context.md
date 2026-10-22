@@ -165,8 +165,6 @@ Incoming (other zones → this zone):
 [observation] [info] 9 entry points — wide API surface, consider consolidating exports
 [observation] [info] High cohesion (1) — files are tightly interconnected
 [suggestion] [info] Zone "graview-face" has files across 10 directories — consider consolidating under a dedicated directory
-[suggestion] [info] Give dev/** and scripts/** in graview-face an infrastructure zone type, or pin them to a 'graview-face-tooling' zone. The shipped surface (bin/serve.js plus src/) would then be measured on its own.
-[anti-pattern] [info] The zone treats build-time scripts (scripts/*.mjs, dev/ndx-door.ts) and runtime app code (src/app.ts, src/faces/pages.tsx) as one unit. Because graview-face is published on its own, mixing them hides which files ship. Pin scripts/ and dev/ to a tooling zone so the metrics describe only the shipped app.
 
 </findings>
 
@@ -174,13 +172,7 @@ Incoming (other zones → this zone):
 
 - High cohesion (1) — files are tightly interconnected
 - 9 entry points — wide API surface, consider consolidating exports
-- High cohesion (1) — files are tightly interconnected
-- 9 entry points — wide API surface, consider consolidating exports
 - Zone "graview-face" has files across 10 directories — consider consolidating under a dedicated directory
-- Build and dev tooling (scripts/a11y.mjs, scripts/graview.mjs, scripts/make-fixture.mjs, scripts/sync-data.mjs, dev/ndx-door.ts) shares the zone with the published React app source. Several of the zone's 9 entry points are tooling scripts, not app surface.
-- The zone treats build-time scripts (scripts/*.mjs, dev/ndx-door.ts) and runtime app code (src/app.ts, src/faces/pages.tsx) as one unit. Because graview-face is published on its own, mixing them hides which files ship. Pin scripts/ and dev/ to a tooling zone so the metrics describe only the shipped app.
-- The production zone contains development-only tooling: dev/ndx-door.ts and scripts/a11y.mjs are grouped with the shipped app sources. As a result, the 9 entry points include dev harnesses alongside the bin/serve.js runtime entry.
-- Give dev/** and scripts/** in graview-face an infrastructure zone type, or pin them to a 'graview-face-tooling' zone. The shipped surface (bin/serve.js plus src/) would then be measured on its own.
 - [call graph] 269 internal calls, 0 outgoing, 25 incoming (cohesion: 1, coupling: 0)
 
 </insights>

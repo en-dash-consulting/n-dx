@@ -1,6 +1,6 @@
 {
   "id": "hench/cli",
-  "name": "Cli",
+  "name": "Command Line Interface",
   "description": "22 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/analysis/stuck.ts",

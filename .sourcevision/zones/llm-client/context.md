@@ -352,7 +352,6 @@ Incoming (other zones → this zone):
 [observation] [info] 52 entry points — wide API surface, consider consolidating exports
 [observation] [info] High cohesion (1) — files are tightly interconnected
 [anti-pattern] [warning] "packages/llm-client/src/public.ts" is production code imported only by tests (5 importer(s), all test files) — either it is dead or its real caller is missing
-[suggestion] [info] Group by concern. Before: src/auth.ts, src/auth-token.ts, src/auth-guidance.ts, src/claude-effort.ts. After: src/auth/{index,token,guidance}.ts and src/vendors/claude/effort.ts. Keep public.ts as the only export surface, so the move does not change hench's llm-gateway.ts.
 
 </findings>
 
@@ -360,15 +359,7 @@ Incoming (other zones → this zone):
 
 - High cohesion (1) — files are tightly interconnected
 - 52 entry points — wide API surface, consider consolidating exports
-- High cohesion (1) — files are tightly interconnected
-- 52 entry points — wide API surface, consider consolidating exports
-- Maintains perfect cohesion (1.0) across 58 files through modular concern separation: auth, providers, token counting, error classification, rate limiting, and session management
-- Zero coupling (0.0) makes this the most isolated foundation module—no upward dependencies enable independent provider additions (Claude, OpenAI, Google, Codex, local, JEV)
-- Multi-vendor support is cleanly abstracted through provider interface (api-provider.ts, provider-interface.ts) without hard-coded vendor logic leaking into consumers
 - "packages/llm-client/src/public.ts" is production code imported only by tests (5 importer(s), all test files) — either it is dead or its real caller is missing
-- The vendor-neutral foundation has vendor-specific files at the top level of src/ (claude-effort.ts, and cli-brand.ts next to the generic auth and provider modules). That conflicts with the earlier claim that no vendor logic leaks outside the provider interface.
-- The auth concern is split into flat sibling files with a shared prefix (auth.ts, auth-token.ts, auth-guidance.ts) in a 58-file directory that has no subdirectories for concerns.
-- Group by concern. Before: src/auth.ts, src/auth-token.ts, src/auth-guidance.ts, src/claude-effort.ts. After: src/auth/{index,token,guidance}.ts and src/vendors/claude/effort.ts. Keep public.ts as the only export surface, so the move does not change hench's llm-gateway.ts.
 - [call graph] 658 internal calls, 1 outgoing, 1648 incoming (cohesion: 1, coupling: 0)
 
 </insights>
@@ -395,11 +386,11 @@ Cross-dependencies between sub-zones:
 
 This zone has 5 sub-zone(s):
 
+- **CLI Provider & Execution** (`llm-client/cli-provider-and`): 9 files, cohesion 0.39, coupling 0.61
+- **Client Utilities** (`llm-client/client-utilities`): 9 files, cohesion 0.24, coupling 0.76
 - **Project Configuration** (`llm-client/llm-client`): 8 files, cohesion 0.5, coupling 0.5
-- **Output Formatting System** (`llm-client/output-formatting-system`): 5 files, cohesion 0.53, coupling 0.47
 - **LLM Client Core** (`llm-client/src`): 27 files, cohesion 0.73, coupling 0.27
-- **Src 3** (`llm-client/src-3`): 9 files, cohesion 0.39, coupling 0.61
-- **Src 4** (`llm-client/src-4`): 9 files, cohesion 0.24, coupling 0.76
+- **Src 2** (`llm-client/src-2`): 5 files, cohesion 0.53, coupling 0.47
 
 Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
 

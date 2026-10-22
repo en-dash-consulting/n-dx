@@ -7,7 +7,7 @@
 Zone: Tests Sourcevision Unit (`tests-sourcevision-unit`)
 Files: 141, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+123 more)
+Description: Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+138 more)
 Lines: 45716
 
 </zone>

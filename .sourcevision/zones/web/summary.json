@@ -1,7 +1,7 @@
 {
   "id": "web",
   "name": "Web",
-  "description": "3 files.",
+  "description": "3 files, mostly configuration and entry points.",
   "files": [
     "packages/web/build.js",
     "packages/web/dev.js",

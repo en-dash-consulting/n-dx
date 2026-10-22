@@ -1,6 +1,6 @@
 {
   "id": "core",
-  "name": "Core",
+  "name": "CLI Orchestration Hub",
   "description": "52 files, mostly utilities and entry points; entry points assistant-assets.js, assistant-integration.js, child-lifecycle.js; imported by Tests and Tests.",
   "files": [
     "packages/core/assistant-assets.js",

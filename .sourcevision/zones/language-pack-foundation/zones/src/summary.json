@@ -1,6 +1,6 @@
 {
-  "id": "lang-kit/src",
-  "name": "Src",
+  "id": "language-pack-foundation/src",
+  "name": "Language Kit Foundation",
   "description": "8 files, primarily TypeScript",
   "files": [
     "packages/lang-kit/src/build-file.ts",

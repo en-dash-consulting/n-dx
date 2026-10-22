@@ -1,7 +1,7 @@
 {
   "id": "tests-sourcevision-unit",
   "name": "Tests Sourcevision Unit",
-  "description": "Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+123 more)",
+  "description": "Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+138 more)",
   "files": [
     "packages/sourcevision/tests/unit/analyzers/analysis-outcome.test.ts",
     "packages/sourcevision/tests/unit/analyzers/analyze-progress.test.ts",

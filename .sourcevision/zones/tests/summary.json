@@ -1,7 +1,7 @@
 {
   "id": "tests",
   "name": "Tests",
-  "description": "Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts",
+  "description": "Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts (+1 more)",
   "files": [
     "packages/graview-face/tests/door.test.ts",
     "packages/graview-face/tests/places.test.ts",

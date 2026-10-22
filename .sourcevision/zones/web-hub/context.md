@@ -7,7 +7,7 @@
 Zone: Web Hub (`web-hub`)
 Files: 11, Cohesion: 0.89, Coupling: 0.11
 Risk: healthy (score: 0.11)
-Description: Multi-project hub registry, admission control, project lifecycle management, and central orchestration for the development platform.
+Description: 11 files, mostly services and pages; entry points admission.ts, home.ts, hub.ts; imports Web Server; imported by Packages and Packages.
 Entry points: packages/web/src/hub/admission.ts, packages/web/src/hub/home.ts, packages/web/src/hub/hub.ts, packages/web/src/hub/index.ts, packages/web/src/hub/new-project.ts, packages/web/src/hub/overview.ts, packages/web/src/hub/registry.ts, packages/web/src/hub/routes.ts
 Lines: 3902
 
@@ -73,7 +73,7 @@ Internal:
   packages/web/src/hub/routes.ts → packages/web/src/hub/overview.ts {buildHubOverview, fetchChildSnapshot}
 
 Outgoing (this zone → other zones):
-  → web-viewer: packages/web/src/hub/admission.ts → packages/web/src/shared/index.ts; packages/web/src/hub/hub.ts → packages/web/src/hub/request-guard.ts; packages/web/src/hub/proxy.ts → packages/web/src/shared/index.ts; packages/web/src/hub/proxy.ts → packages/web/src/shared/index.ts; packages/web/src/hub/routes.ts → packages/web/src/shared/index.ts
+  → web-server: packages/web/src/hub/admission.ts → packages/web/src/shared/index.ts; packages/web/src/hub/hub.ts → packages/web/src/hub/request-guard.ts; packages/web/src/hub/proxy.ts → packages/web/src/shared/index.ts; packages/web/src/hub/proxy.ts → packages/web/src/shared/index.ts; packages/web/src/hub/routes.ts → packages/web/src/shared/index.ts
 
 Incoming (other zones → this zone):
   ← tests-web-integration: packages/web/tests/integration/hub-admission-auth.test.ts → packages/web/src/hub/admission.ts; packages/web/tests/integration/hub-admission-auth.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-admission-auth.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-admission.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-admission.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-auth-token.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-auth-token.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-cards.test.ts → packages/web/src/hub/home.ts; packages/web/tests/integration/hub-cards.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-cards.test.ts → packages/web/src/hub/overview.ts; packages/web/tests/integration/hub-daemon.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-daemon.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-proxy.test.ts → packages/web/src/hub/index.ts; packages/web/tests/integration/hub-proxy.test.ts → packages/web/src/hub/index.ts
@@ -86,28 +86,14 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] High cohesion (0.89) — files are tightly interconnected
-[observation] [info] Hub zone is properly isolated with excellent metrics (cohesion 0.89, coupling 0.11)—reinforces correct architectural separation of multi-project hub from single-project viewer
 [anti-pattern] [warning] 3 files import each other in a cycle: packages/web/src/hub/hub.ts → packages/web/src/hub/routes.ts → packages/web/src/hub/overview.ts → packages/web/src/hub/hub.ts
-[anti-pattern] [warning] hub/exec-gateway.ts is a gateway-archetype module that is missing from the documented web gateway inventory. Add it to docs/architecture/gateways.md and the web gateway table, or the re-export-only and ceiling checks will not be applied to it by convention.
-[anti-pattern] [warning] web-hub is absent from the documented web internal layering (web-server → web-viewer → viewer-message-pipeline → shared), yet it has measured bidirectional edges with web-viewer. Document the hub's tier and which direction of the edge is allowed so boundary-check.test.ts can enforce it.
-[suggestion] [warning] Document in packages/web/src/hub/AGENTS.md which request checks run in hub/request-guard.ts and which in server/request-security.ts. A direct child-server request skips the hub, so a check that lives only in the hub guard is not enforced on that path. Add a test that both paths reject the same unauthenticated or bad-Host request.
 
 </findings>
 
 <insights>
 
 - High cohesion (0.89) — files are tightly interconnected
-- High cohesion (0.89) — files are tightly interconnected
-- Excellent cohesion (0.89) and low coupling (0.11) indicate tight focus and proper isolation from viewer—hub concerns are well-encapsulated
-- Compact zone (11 files) with strong internal cohesion demonstrates mature architectural separation; maintain as independent zone to prevent viewer bloat
-- Clear module boundary: admission (auth), routes (routing), registry (project management) are tightly coupled to hub concerns, not viewer concerns
-- Hub zone is properly isolated with excellent metrics (cohesion 0.89, coupling 0.11)—reinforces correct architectural separation of multi-project hub from single-project viewer
 - 3 files import each other in a cycle: packages/web/src/hub/hub.ts → packages/web/src/hub/routes.ts → packages/web/src/hub/overview.ts → packages/web/src/hub/hub.ts
-- packages/web/src/hub/exec-gateway.ts is classified as a gateway, but the gateway table in the root CLAUDE.md lists only rex-gateway.ts, domain-gateway.ts, external.ts and api.ts for the web package
-- hub/exec-gateway.ts is a gateway-archetype module that is missing from the documented web gateway inventory. Add it to docs/architecture/gateways.md and the web gateway table, or the re-export-only and ceiling checks will not be applied to it by convention.
-- web-hub is absent from the documented web internal layering (web-server → web-viewer → viewer-message-pipeline → shared), yet it has measured bidirectional edges with web-viewer. Document the hub's tier and which direction of the edge is allowed so boundary-check.test.ts can enforce it.
-- The hub has its own request-guard.ts, and web-server has request-security.ts. The two zones guard requests in separate modules, and no documented contract says which checks each one owns (token admission, Host validation, origin checks).
-- Document in packages/web/src/hub/AGENTS.md which request checks run in hub/request-guard.ts and which in server/request-security.ts. A direct child-server request skips the hub, so a check that lives only in the hub guard is not enforced on that path. Add a test that both paths reject the same unauthenticated or bad-Host request.
 - [call graph] 170 internal calls, 20 outgoing, 248 incoming (cohesion: 0.89, coupling: 0.11)
 
 </insights>

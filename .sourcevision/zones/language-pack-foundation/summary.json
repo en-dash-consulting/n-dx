@@ -1,7 +1,7 @@
 {
   "id": "language-pack-foundation",
-  "name": "Language Pack Foundation",
-  "description": "Foundation contract and detection system providing build-file models, pack registry, and shared language abstractions.",
+  "name": "Lang Kit",
+  "description": "33 files, mostly utilities and configuration; entry points build-file.ts, detect.ts, go-build.ts; imports Tests; imported by Packages.",
   "files": [
     "packages/lang-kit/src/build-file.ts",
     "packages/lang-kit/src/build-model.ts",

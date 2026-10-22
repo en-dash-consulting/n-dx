@@ -1,7 +1,7 @@
 {
   "id": "tests-2",
   "name": "Tests 2",
-  "description": "Non-source files in tests: evals.test.js, record-goldens.js, score.js (+9 more)",
+  "description": "Non-source files in tests: evals.test.js, record-goldens.js, score.js (+10 more)",
   "files": [
     "tests/gauntlet/sourcevision-evals/evals.test.js",
     "tests/gauntlet/sourcevision-evals/record-goldens.js",

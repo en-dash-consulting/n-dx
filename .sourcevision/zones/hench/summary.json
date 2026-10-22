@@ -1,7 +1,7 @@
 {
   "id": "hench",
   "name": "Hench",
-  "description": "165 files, mostly utilities and cli commands; entry points adaptive.ts, adversarial-review.ts, change-magnitude.ts; imports Packages and Tests; imported by Packages and Packages.",
+  "description": "166 files, mostly utilities and cli commands; entry points adaptive.ts, adversarial-review.ts, change-magnitude.ts; imports Packages and Tests; imported by Packages and Packages.",
   "files": [
     "packages/hench/src/agent/analysis/adaptive.ts",
     "packages/hench/src/agent/analysis/adversarial-review.ts",

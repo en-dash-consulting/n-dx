@@ -1,7 +1,7 @@
 {
   "id": "tests-sourcevision-fixtures",
   "name": "Tests Sourcevision Fixtures",
-  "description": "Non-source files in packages: main.go, router.go, setup.go (+43 more)",
+  "description": "Non-source files in packages: main.go, router.go, setup.go (+65 more)",
   "files": [
     "packages/sourcevision/tests/fixtures/go-project/cmd/api/main.go",
     "packages/sourcevision/tests/fixtures/go-project/cmd/api/router.go",

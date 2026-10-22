@@ -1,0 +1,51 @@
+{
+  "id": "rex-migrations",
+  "name": "Rex Migrations",
+  "description": "16 files, mostly services and models; entry points migration.ts, pipeline.ts, plan-file.ts; imports Rex; imported by Packages and Rex.",
+  "files": [
+    "packages/rex/src/migrations/migration.ts",
+    "packages/rex/src/migrations/pipeline.ts",
+    "packages/rex/src/migrations/plan-file.ts",
+    "packages/rex/src/migrations/registry.ts",
+    "packages/rex/src/migrations/v1-to-v2/apply.ts",
+    "packages/rex/src/migrations/v1-to-v2/capability-spec.ts",
+    "packages/rex/src/migrations/v1-to-v2/code-files.ts",
+    "packages/rex/src/migrations/v1-to-v2/index.ts",
+    "packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts",
+    "packages/rex/src/migrations/v1-to-v2/migration-plan.ts",
+    "packages/rex/src/migrations/v1-to-v2/placement-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/plan-summary.ts",
+    "packages/rex/src/migrations/v1-to-v2/seams.ts",
+    "packages/rex/src/migrations/v1-to-v2/spec-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/v1-tree-read.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/migrations/migration.ts",
+    "packages/rex/src/migrations/pipeline.ts",
+    "packages/rex/src/migrations/plan-file.ts",
+    "packages/rex/src/migrations/registry.ts",
+    "packages/rex/src/migrations/v1-to-v2/apply.ts",
+    "packages/rex/src/migrations/v1-to-v2/capability-spec.ts",
+    "packages/rex/src/migrations/v1-to-v2/code-files.ts",
+    "packages/rex/src/migrations/v1-to-v2/index.ts",
+    "packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts",
+    "packages/rex/src/migrations/v1-to-v2/migration-plan.ts",
+    "packages/rex/src/migrations/v1-to-v2/plan-summary.ts",
+    "packages/rex/src/migrations/v1-to-v2/seams.ts",
+    "packages/rex/src/migrations/v1-to-v2/spec-pass.ts",
+    "packages/rex/src/migrations/v1-to-v2/v1-tree-read.ts"
+  ],
+  "cohesion": 0.56,
+  "coupling": 0.44,
+  "fileCount": 16,
+  "lineCount": 4797,
+  "riskMetrics": {
+    "cohesion": 0.56,
+    "coupling": 0.44,
+    "riskScore": 0.43999999999999995,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

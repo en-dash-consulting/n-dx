@@ -7,7 +7,7 @@
 Zone: Tests 2 (`tests-2`)
 Files: 13, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in tests: evals.test.js, record-goldens.js, score.js (+9 more)
+Description: Non-source files in tests: evals.test.js, record-goldens.js, score.js (+10 more)
 Entry points: tests/hidden-child-process-alias.mjs, tests/hidden-child-process.js, tests/vitest-isolation.mjs
 Lines: 1101
 

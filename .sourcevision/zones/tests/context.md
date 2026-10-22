@@ -7,7 +7,7 @@
 Zone: Tests (`tests`)
 Files: 4, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts
+Description: Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts (+1 more)
 Entry points: packages/sourcevision/tests/setup-ndx-home.ts
 Lines: 414
 

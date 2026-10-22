@@ -1,7 +1,7 @@
 {
   "id": "sourcevision",
   "name": "Sourcevision",
-  "description": "121 files, mostly utilities and services; entry points analysis-outcome.ts, analyze-progress.ts, archetypes.ts; imports Tests; imported by Packages and Packages.",
+  "description": "149 files, mostly utilities and services; entry points java-scip.mjs, workspace-pack.mjs, analysis-outcome.ts; imports Tests; imported by Packages and Packages.",
   "files": [
     "packages/sourcevision/scripts/bench-java-parse.mjs",
     "packages/sourcevision/scripts/corpus-sample.mjs",

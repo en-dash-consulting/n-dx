@@ -1,0 +1,19 @@
+{
+  "id": "rex-core/store",
+  "name": "PRD Storage Layer",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/store/branch-naming.ts",
+    "packages/rex/src/store/prd-discovery.ts",
+    "packages/rex/src/store/prd-migration.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/store/branch-naming.ts",
+    "packages/rex/src/store/prd-discovery.ts",
+    "packages/rex/src/store/prd-migration.ts"
+  ],
+  "cohesion": 0.55,
+  "coupling": 0.45,
+  "fileCount": 3,
+  "lineCount": 358
+}

@@ -1,6 +1,6 @@
 {
   "id": "hench/agent-lifecycle/agent",
-  "name": "Agent",
+  "name": "Agent State Management",
   "description": "4 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/analysis/change-magnitude.ts",

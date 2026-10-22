@@ -39419,7 +39419,7 @@
       "to": "packages/rex/src/core/requirements.ts",
       "type": "static",
       "symbols": [
-        "collectRequirements"
+        "traceRequirements"
       ],
       "weight": 1
     },
@@ -39431,7 +39431,7 @@
         "walkTree",
         "findItem"
       ],
-      "weight": 5
+      "weight": 6
     },
     {
       "from": "packages/rex/src/core/next-task.ts",
@@ -40352,6 +40352,15 @@
         "walkTree"
       ],
       "weight": 2
+    },
+    {
+      "from": "packages/rex/src/core/requirements.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "type",
+      "symbols": [
+        "TreeEntry"
+      ],
+      "weight": 1
     },
     {
       "from": "packages/rex/src/core/requirements.ts",
@@ -54609,6 +54618,43 @@
         "Requirement"
       ],
       "weight": 10
+    },
+    {
+      "from": "packages/rex/tests/unit/core/requirements-trace.test.ts",
+      "to": "packages/rex/src/core/next-task.ts",
+      "type": "static",
+      "symbols": [
+        "findNextTask"
+      ],
+      "weight": 2
+    },
+    {
+      "from": "packages/rex/tests/unit/core/requirements-trace.test.ts",
+      "to": "packages/rex/src/core/requirements.ts",
+      "type": "static",
+      "symbols": [
+        "collectRequirements",
+        "traceRequirements"
+      ],
+      "weight": 7
+    },
+    {
+      "from": "packages/rex/tests/unit/core/requirements-trace.test.ts",
+      "to": "packages/rex/src/core/tree.ts",
+      "type": "static",
+      "symbols": [
+        "walkTree"
+      ],
+      "weight": 2
+    },
+    {
+      "from": "packages/rex/tests/unit/core/requirements-trace.test.ts",
+      "to": "packages/rex/src/schema/index.ts",
+      "type": "type",
+      "symbols": [
+        "PRDItem"
+      ],
+      "weight": 8
     },
     {
       "from": "packages/rex/tests/unit/core/requirements.test.ts",
@@ -72130,7 +72176,7 @@
       "symbols": [
         "PRDDocument"
       ],
-      "weight": 1
+      "weight": 2
     },
     {
       "from": "packages/web/src/server/routes-live.ts",
@@ -95819,6 +95865,15 @@
     },
     {
       "from": "packages/web/tests/unit/viewer/use-app-data-unavailable.test.ts",
+      "to": "packages/web/src/viewer/loader/data-loader.ts",
+      "type": "static",
+      "symbols": [
+        "SERVER_PROBE_DELAYS_MS"
+      ],
+      "weight": 3
+    },
+    {
+      "from": "packages/web/tests/unit/viewer/use-app-data-unavailable.test.ts",
       "to": "packages/web/tests/helpers/preact-test-support.ts",
       "type": "static",
       "symbols": [
@@ -102425,6 +102480,7 @@
         "packages/rex/tests/unit/core/reorganize-executor.test.ts",
         "packages/rex/tests/unit/core/reorganize.test.ts",
         "packages/rex/tests/unit/core/requirements-prioritization.test.ts",
+        "packages/rex/tests/unit/core/requirements-trace.test.ts",
         "packages/rex/tests/unit/core/requirements.test.ts",
         "packages/rex/tests/unit/core/reshape-group-action.test.ts",
         "packages/rex/tests/unit/core/reshape-kept-changes.test.ts",
@@ -103403,7 +103459,7 @@
     }
   ],
   "summary": {
-    "totalEdges": 9808,
+    "totalEdges": 9814,
     "totalExternal": 52,
     "circularCount": 27,
     "circulars": [
@@ -103627,7 +103683,7 @@
       },
       {
         "path": "packages/rex/src/core/tree.ts",
-        "count": 65
+        "count": 66
       },
       {
         "path": "packages/hench/src/agent/lifecycle/shared.ts",
@@ -103682,6 +103738,6 @@
         "count": 40
       }
     ],
-    "avgImportsPerFile": 3.81
+    "avgImportsPerFile": 3.82
   }
 }

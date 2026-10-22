@@ -7,7 +7,7 @@
 Zone: Build & CI Scripts (`scripts`)
 Files: 16, Cohesion: 0.00, Coupling: 0.00
 Risk: healthy (score: 0.50)
-Description: Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+12 more)
+Description: Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+13 more)
 Entry points: scripts/build-iso-skill.mjs, scripts/check-dependency-drift.mjs, scripts/check-lockfile-integrity.mjs, scripts/check-obfuscated-code.mjs, scripts/cli-smoke-parity.mjs, scripts/grammar-suites.mjs, scripts/prompt-census.mjs, scripts/verify-release-sync.mjs
 Lines: 5762
 

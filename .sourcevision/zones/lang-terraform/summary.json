@@ -1,7 +1,7 @@
 {
   "id": "lang-terraform",
   "name": "Lang Terraform",
-  "description": "Analyzes Terraform HCL configurations to extract resources, modules, variables, and infrastructure dependencies for IaC analysis.",
+  "description": "9 files, mostly utilities and entry points; entry points index.ts; imports Tests; imported by Packages.",
   "files": [
     "packages/lang-terraform/src/index.ts",
     "packages/lang-terraform/src/pack.ts",
