@@ -1,7 +1,14 @@
 /* ── "Found run command" control ───────────────────────────────────────
- * Lives in the bottom bar beside the live indicators. The menu opens upward
- * because the bar is pinned to the bottom of the viewport.
+ * Lives in the top nav between the guide and search. The menu opens downward
+ * and right-aligned, since the control sits near the right edge of the bar.
  */
+
+.topnav-run {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.topnav-run + .topnav-search { margin-left: 0; }
 
 .runcmd {
   position: relative;
@@ -22,6 +29,11 @@
   font-size: 0.75rem;
   cursor: pointer;
   max-width: 16rem;
+}
+
+.runcmd-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .runcmd-btn--running {
@@ -77,8 +89,8 @@
 
 .runcmd-menu {
   position: absolute;
-  bottom: calc(100% + 0.4rem);
-  left: 0;
+  top: calc(100% + 0.4rem);
+  right: 0;
   z-index: var(--z-page-modal);
   width: min(26rem, calc(100vw - 2rem));
   max-height: 60vh;
@@ -185,4 +197,9 @@
   font-size: 0.68rem;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Narrow screens: the control keeps its glyph and drops its label, like search. */
+@media (max-width: 960px) {
+  .runcmd-label { display: none; }
 }
