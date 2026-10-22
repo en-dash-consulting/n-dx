@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
-import { exec as execCb } from "node:child_process";
+import { exec as execCb, execFile as execFileCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
@@ -13,6 +13,7 @@ import { TaskClaims } from "../../src/process/task-claims.js";
 import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
+const execFileAsync = promisify(execFileCb);
 
 /**
  * The uncommitted-work gate, end to end through finalizeRun (#363).
@@ -575,7 +576,7 @@ describe("finalizeRun — uncommitted-work gate", () => {
         const { stdout: files } = await execAsync("git show --name-only --format= HEAD", { cwd: projectDir });
         expect(files).toContain("src.ts");
         expect(files).toContain("prd_tree");
-        const { stdout: trailers } = await execAsync("git log -1 --format=%(trailers) HEAD", { cwd: projectDir });
+        const { stdout: trailers } = await execFileAsync("git", ["log", "-1", "--format=%(trailers)", "HEAD"], { cwd: projectDir });
         expect(trailers).toMatch(/N-DX-Status: \S+ \S+ → completed/);
         expect(trailers).toMatch(/N-DX-Item: \S+/);
 

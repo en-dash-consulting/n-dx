@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
-import { exec as execCb } from "node:child_process";
+import { exec as execCb, execFile as execFileCb } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { initConfig } from "../../src/store/config.js";
 import type { RunRecord } from "../../src/schema/index.js";
@@ -12,6 +12,7 @@ import { PRD_TREE_DIRNAME } from "../../src/prd/rex-gateway.js";
 import { initGitFixtureRepo, RM_RETRY } from "../helpers/index.js";
 
 const execAsync = promisify(execCb);
+const execFileAsync = promisify(execFileCb);
 
 /**
  * Integration tests for the commit-message approval gate.
@@ -750,8 +751,8 @@ status: in_progress
 
     const { stdout: subject } = await execAsync("git log -1 --format=%s", { cwd: projectDir });
     expect(subject.trim()).toBe("feat: update x");
-    const { stdout: item } = await execAsync(
-      "git log -1 --format=%(trailers:key=N-DX-Item,valueonly)",
+    const { stdout: item } = await execFileAsync(
+      "git", ["log", "-1", "--format=%(trailers:key=N-DX-Item,valueonly)"],
       { cwd: projectDir },
     );
     expect(item.trim()).toBe("task-1");
