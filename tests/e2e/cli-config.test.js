@@ -1355,6 +1355,19 @@ describe("n-dx config", () => {
       const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
       expect(ndxConfig.llm.local.port).toBe(11434);
     });
+
+    // A hand-edited `"port": "1234"` is what the dashboard and the provider
+    // now refuse, pointing at this command to fix it. Coercion used to keep
+    // the existing value's type, so the repair stored another string and was
+    // refused in turn; the only way out was another hand edit.
+    it("repairs a string-typed saved port to a number", async () => {
+      const sharedPath = join(tmpDir, ".n-dx.json");
+      await writeFile(sharedPath, JSON.stringify({ llm: { vendor: "local", local: { port: "1234" } } }, null, 2) + "\n");
+
+      run(["llm.local.port", "11434", tmpDir]);
+      const ndxConfig = JSON.parse(await readFile(sharedPath, "utf-8"));
+      expect(ndxConfig.llm.local.port).toBe(11434);
+    });
   });
 
   // ── Help — new claude settings ─────────────────────────────────────────

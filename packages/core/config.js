@@ -603,9 +603,27 @@ function coerceValue(newValue, existingValue) {
  */
 const STRING_SETTINGS = new Set(["llm.local.host", "llm.local.verifier.host"]);
 
-/** `coerceValue`, except that a known string setting is stored as typed. */
+/**
+ * Settings that are numbers whatever the file holds today. `coerceValue` keeps
+ * the existing value's type, so a hand-edited `"port": "1234"` would make every
+ * later `ndx config llm.local.port <n>` store another string, which the port
+ * rule then refuses; the one command the error message points at could never
+ * repair the file. A number setting is read as a number regardless.
+ */
+const NUMBER_SETTINGS = new Set(["llm.local.port", "llm.local.verifier.port"]);
+
+/**
+ * `coerceValue`, except that a known string setting is stored as typed and a
+ * known number setting is read as a number whatever the file holds today.
+ */
 function coerceSettingValue(pkg, settingPath, newValue, existingValue) {
-  if (STRING_SETTINGS.has(`${pkg}.${settingPath}`)) return newValue;
+  const key = `${pkg}.${settingPath}`;
+  if (STRING_SETTINGS.has(key)) return newValue;
+  if (NUMBER_SETTINGS.has(key)) {
+    // A value that is not a number stays as typed, so the refusal quotes it.
+    const n = newValue.trim() === "" ? NaN : Number(newValue);
+    return Number.isNaN(n) ? newValue : n;
+  }
   return coerceValue(newValue, existingValue);
 }
 
