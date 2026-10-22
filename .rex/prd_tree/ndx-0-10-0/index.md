@@ -2,13 +2,12 @@
 id: "5110a621-8bbc-43b4-b058-7f7d05c67b73"
 level: "epic"
 title: "ndx 0.10.0"
-status: "completed"
+status: "pending"
 priority: "high"
 startedAt: "2026-10-11T08:29:45.519Z"
-completedAt: "2026-10-11T08:29:45.519Z"
 endedAt: "2026-10-11T08:29:45.519Z"
 description: "Work targeted at the 0.10.0 release (soft freeze continues from 0.9.0)."
-lastModified: "2026-10-11T08:29:45.792Z"
+lastModified: "2026-10-22T17:14:02.770Z"
 lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 ---
 
@@ -16,6 +15,7 @@ lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
 
 | Title | Status |
 |-------|--------|
+| [Fresh v2 projects: dashboard add, progress and labels](./fresh-v2-projects-dashboard-add/index.md) | pending |
 | [Robot Wrangler stack 2/9 · Settings fixes the redesign stands on](./robot-wrangler-stack-2-9-settings/index.md) | completed |
 | [Robot Wrangler stack 3/9 · Review settings and a safe cross-vendor reviewer path](./robot-wrangler-stack-3-9-review/index.md) | completed |
 | [Robot Wrangler stack 4/9 · Robot Wrangler server: readiness, tiers, failover, review and preview](./robot-wrangler-stack-4-9-robot/index.md) | completed |
