@@ -223,6 +223,23 @@ describe("classifyLLMError", () => {
       expect(r.category).toBe("parse");
       expect(r.message).not.toContain("Raw response saved to");
     });
+
+    // CodeQL's witness for the unanchored regex this replaced: every opening
+    // without a closing `]` rescanned to the end. Quadratic: 3.6 s at 40 000
+    // openings on a dev machine, so ~30 s at this size, past the 5 s default
+    // budget; the scan takes milliseconds.
+    it("stays within the hang budget on many unclosed sentinel openings", async () => {
+      const err = new Error(`Invalid JSON in LLM response${"[ndx-debug:".repeat(120_000)}`);
+      const r = await callWithinBudget<typeof classifyLLMError>(CLASSIFIER, "classifyLLMError", err);
+      expect(r.category).toBe("parse");
+      expect(r.message).not.toContain("Raw response saved to");
+    });
+
+    it("takes the first sentinel with a path, past an empty one, as the regex did", () => {
+      const r = classifyLLMError(new Error("Invalid JSON in LLM response [ndx-debug:] [ndx-debug:a.txt] [ndx-debug:b.txt]"));
+      expect(r.message).toContain("Raw response saved to a.txt.");
+      expect(r.message).toContain("Underlying error: Invalid JSON in LLM response [ndx-debug:] [ndx-debug:b.txt].");
+    });
   });
 
   // ── network category ──────────────────────────────────────────────

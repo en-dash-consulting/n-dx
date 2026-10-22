@@ -223,6 +223,31 @@ export function isAuthError(rawMessage: string): boolean {
   );
 }
 
+const DEBUG_SENTINEL_OPEN = "[ndx-debug:";
+
+/**
+ * Find the first `[ndx-debug:<path>]` sentinel with a non-empty path, and the
+ * one space before it if there is one — what `/ ?\[ndx-debug:([^\]]+)\]/`
+ * matched. A scan, not that regex: unanchored, the regex rescanned to the end
+ * of the message from every `[ndx-debug:` that has no closing `]`, which is
+ * quadratic in a message built of them. Here, an opening with no `]` after it
+ * means no later opening has one either, so the scan stops.
+ */
+function findDebugSentinel(message: string): { path: string; start: number; end: number } | null {
+  let open = message.indexOf(DEBUG_SENTINEL_OPEN);
+  while (open !== -1) {
+    const pathStart = open + DEBUG_SENTINEL_OPEN.length;
+    const close = message.indexOf("]", pathStart);
+    if (close === -1) return null;
+    if (close > pathStart) {
+      const start = open > 0 && message[open - 1] === " " ? open - 1 : open;
+      return { path: message.slice(pathStart, close), start, end: close + 1 };
+    }
+    open = message.indexOf(DEBUG_SENTINEL_OPEN, pathStart);
+  }
+  return null;
+}
+
 /**
  * Classify an LLM error and return a user-friendly message, suggestion, and category.
  *
@@ -248,14 +273,14 @@ export function classifyLLMError(
   // file containing the raw LLM response. Extract it so the parse branch can
   // surface the path and underlying error detail back to the user. The only
   // producer (rex's throwParseFailure) writes exactly one space before the
-  // sentinel, so the pattern takes at most one: `\s*` was quadratic in a run
-  // of whitespace, and the trim() below makes the cleaned message the same
-  // either way. The sentinel sits at the end of the message, so this reads
-  // the whole message, not the CLASSIFY_WINDOW the auth signatures read.
-  const debugMatch = / ?\[ndx-debug:([^\]]+)\]/.exec(err.message);
-  const debugPath = debugMatch ? debugMatch[1] : null;
+  // sentinel, so the extractor takes at most one, and the trim() below makes
+  // the cleaned message the same whatever whitespace preceded it. The
+  // sentinel sits at the end of the message, so this reads the whole message,
+  // not the CLASSIFY_WINDOW the auth signatures read.
+  const debugMatch = findDebugSentinel(err.message);
+  const debugPath = debugMatch ? debugMatch.path : null;
   const cleanedMessage = debugMatch
-    ? err.message.replace(debugMatch[0], "").trim()
+    ? (err.message.slice(0, debugMatch.start) + err.message.slice(debugMatch.end)).trim()
     : err.message;
 
   // Concise provider reason (e.g. Gemini's RESOURCE_EXHAUSTED + quota metric),
