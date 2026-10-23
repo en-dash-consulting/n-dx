@@ -195,8 +195,11 @@ export const VENDOR_PROVIDERS: Readonly<Record<"claude" | "codex" | "google" | "
  */
 export function validateProviderForVendor(provider: string, vendor: string | null): string | null {
   if (!vendor) return null;
+  // An unrecognized vendor accepts any provider. Own keys only: a vendor named
+  // after an Object.prototype member would otherwise read the inherited
+  // function and throw on `.includes` below.
+  if (!Object.hasOwn(VENDOR_PROVIDERS, vendor)) return null;
   const allowed = VENDOR_PROVIDERS[vendor as keyof typeof VENDOR_PROVIDERS];
-  if (!allowed) return null;
   if (!allowed.includes(provider as "cli" | "api")) {
     return `Provider "${provider}" is not supported for vendor "${vendor}". Allowed: ${allowed.join(", ")}.`;
   }

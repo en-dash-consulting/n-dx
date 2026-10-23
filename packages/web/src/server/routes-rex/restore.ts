@@ -12,7 +12,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { appendLog } from "./rex-route-helpers.js";
 import { getAvailableBackups, restoreFromBackup, isValidSnapshotId, V2RestoreRefusedError } from "../rex-gateway.js";
@@ -157,7 +157,7 @@ async function handleRestore(
     jsonResponse(res, 200, { ok: true, restored: input.id, files: fileCount });
   } catch (err) {
     if (err instanceof V2RestoreRefusedError) return refuseV2Restore(res, err);
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }

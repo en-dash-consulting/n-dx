@@ -343,6 +343,20 @@ describe("Workflow Optimization API routes", () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
+  it("rejects a key the allowlist only has through Object.prototype", async () => {
+    // `APPLYABLE_SUGGESTION_KEYS["toString"]` is Object.prototype.toString: a
+    // truthy, non-"number" value that a plain lookup accepted, after which the
+    // body wrote an own `toString` into .hench/config.json.
+    const before = await readFile(join(henchDir, "config.json"), "utf-8");
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/workflow/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { toString: 5 } }),
+    });
+    expect(res.status).toBe(400);
+    expect(await readFile(join(henchDir, "config.json"), "utf-8")).toBe(before);
+  });
+
   it("rejects an allowlisted key with a wrong-typed value", async () => {
     const before = await readFile(join(henchDir, "config.json"), "utf-8");
     for (const bad of ["eighty", 12.5, -1, true, null] as unknown[]) {

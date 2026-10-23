@@ -200,12 +200,17 @@ function rewriteLines(content, mappings, pick) {
  *
  * @param {string[]} args
  * @param {string} cwd
+ * @param {string} [input]  Text for git's stdin. A commit message goes this way
+ *   (`commit -F -`), never as a `-m` argument: on Windows the wrapper runs git
+ *   through cmd.exe, which reads a command line only up to the first line
+ *   break, so a `-m` body and its trailers were silently dropped there, and
+ *   the wrapper now refuses such an argument outright.
  * @returns {{ok: boolean, stdout: string, error: string}}
  */
-function git(args, cwd) {
+function git(args, cwd, input) {
   try {
     const stdout = execFileSyncCli("git", args, {
-      cwd, encoding: "utf-8", stdio: "pipe", timeout: 30_000,
+      cwd, encoding: "utf-8", stdio: "pipe", timeout: 30_000, ...(input === undefined ? {} : { input }),
     });
     return { ok: true, stdout: stdout ?? "", error: "" };
   } catch (err) {
@@ -424,7 +429,7 @@ export async function runMigrateLayout(dir, flags = [], deps = {}) {
     return 0;
   }
 
-  const commit = git(["commit", "-m", buildCommitMessage(MIGRATE_COMMIT_SUBJECT, "migrate-layout")], root);
+  const commit = git(["commit", "-F", "-"], root, buildCommitMessage(MIGRATE_COMMIT_SUBJECT, "migrate-layout"));
   if (!commit.ok) {
     console.error(`\nError: the migration is staged but committing it failed.\nDetail: ${commit.error}`);
     return 1;

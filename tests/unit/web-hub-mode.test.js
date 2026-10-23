@@ -23,6 +23,9 @@ import {
   slugifyProjectId,
 } from "../../packages/core/web.js";
 
+/** TESTING.md, Family 2: every absolute time budget is scaled through this. */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
 function git(cwd, ...args) {
   return execFileSync(
     "git",
@@ -47,6 +50,20 @@ describe("slugifyProjectId", () => {
     expect(slugifyProjectId("v1.2.3_rc")).toBe("v1.2.3_rc");
     expect(slugifyProjectId("---")).toBe("project");
     expect(slugifyProjectId(undefined)).toBe("project");
+  });
+
+  // The trailing trim is pinned to the start of a `-.` run, so an interior run
+  // (which `-{2,}` does not collapse) is scanned once instead of from every
+  // position, and the slug is unchanged. A hang guardrail on a complexity
+  // claim the regex engine gives no counter for, so an absolute budget scaled
+  // per TESTING.md Family 2. Measured at this length: 25,333 ms with
+  // `[-.]+$`, 0.7 ms with the lookbehind, against 250 ms × 20 = 5 s by default.
+  it("keeps an interior -. run and trims the edges within the scaled linear budget", () => {
+    expect(slugifyProjectId("-.-.app-.-.")).toBe("app");
+    const interior = `a${"-.".repeat(100_000)}b`;
+    const start = performance.now();
+    expect(slugifyProjectId(interior)).toBe(interior);
+    expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER);
   });
 });
 

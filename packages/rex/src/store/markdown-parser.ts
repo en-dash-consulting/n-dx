@@ -545,11 +545,23 @@ function foldFoldedScalar(lines: string[]): string {
 }
 
 function applyChomping(content: string, chomping: "clip" | "strip" | "keep"): string {
-  if (chomping === "strip") return content.replace(/\n*$/, "");
+  if (chomping === "strip") return stripTrailingNewlines(content);
   if (chomping === "keep") return content + (content.endsWith("\n") ? "" : "\n");
   // clip: single trailing newline (or none if content is empty)
   if (content === "") return "";
-  return content.replace(/\n*$/, "") + "\n";
+  return stripTrailingNewlines(content) + "\n";
+}
+
+/**
+ * `content` without its trailing newlines. A loop, not `/\n*$/`: that regex
+ * tries every newline in the body as a start, runs to the end of each run and
+ * backtracks when `$` fails, so a block scalar with a long run of blank lines in
+ * its middle costs quadratic time (6 s at 100k) when a legacy `prd.md` is read.
+ */
+function stripTrailingNewlines(content: string): string {
+  let end = content.length;
+  while (end > 0 && content.charCodeAt(end - 1) === 10) end--;
+  return content.slice(0, end);
 }
 
 // ── Scalar parsing ─────────────────────────────────────────────────────────────

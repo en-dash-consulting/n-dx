@@ -60,6 +60,17 @@ describe("splitTokenQuery", () => {
     expect(splitTokenQuery("/prd?view=tree")).toEqual({ token: null, location: "/prd?view=tree" });
     expect(splitTokenQuery("/")).toEqual({ token: null, location: "/" });
   });
+
+  it("redirects to the root, not off-origin, for a request-target that is not a plain path", () => {
+    // Node leaves req.url unparsed, so each of these reaches splitTokenQuery
+    // verbatim; echoed into Location they would leave the dashboard's origin.
+    expect(splitTokenQuery(`//evil.com/?ndx_token=${T}`)).toEqual({ token: T, location: "/" });
+    expect(splitTokenQuery(`http://evil.com/x?ndx_token=${T}`)).toEqual({ token: T, location: "/" });
+    expect(splitTokenQuery(`/\\evil.com/?ndx_token=${T}`)).toEqual({ token: T, location: "/" });
+    // The other query parameters survive on the root, as they do on a real path.
+    expect(splitTokenQuery(`//evil.com/?x=1&ndx_token=${T}`)).toEqual({ token: T, location: "/?x=1" });
+    expect(splitTokenQuery(`/p/app/?ndx_token=${T}`)).toEqual({ token: T, location: "/p/app/" });
+  });
 });
 
 describe("authCookie and urlWithToken", () => {

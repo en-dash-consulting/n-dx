@@ -464,6 +464,36 @@ describe("n-dx config", () => {
       const stderr = runFail(["unknown.key", "val", tmpDir]);
       expect(stderr).toContain("Unknown package");
     });
+
+    // `configs.llm["__proto__"]` is Object.prototype, so a key with that
+    // segment assigned on every object in the CLI process before this guard;
+    // the hench variant landed `constructor: { prototype: … }` in
+    // .hench/config.json. Both project-section and package-config paths are
+    // covered, plus the llm flat-map branch of `splitSettingPath`, and the
+    // files are compared byte for byte because a refused set must not even
+    // re-serialize them. The routes row carries a valid tier, `light`: with
+    // `x` the tier validator refused it first (naming the key and so the
+    // segment), and the row held with the guard removed; with `light` the
+    // unguarded path created `routes`, assigned the no-op `__proto__`,
+    // rewrote .n-dx.json and exited 0.
+    it.each([
+      ["llm.__proto__.polluted", "x", "__proto__"],
+      ["llm.routes.__proto__", "light", "__proto__"],
+      ["hench.constructor.prototype.polluted", "x", "constructor"],
+    ])("refuses %s rather than walking onto Object.prototype, and writes nothing", async (key, value, segment) => {
+      const sharedPath = join(tmpDir, ".n-dx.json");
+      const henchPath = join(tmpDir, ".hench", "config.json");
+      await writeFile(sharedPath, JSON.stringify({ llm: { vendor: "claude" } }, null, 2) + "\n");
+      const sharedBefore = await readFile(sharedPath);
+      const henchBefore = await readFile(henchPath);
+
+      const stderr = runFail([key, value, tmpDir]);
+
+      expect(stderr).toContain(segment);
+      expect(stderr).toContain(key.slice(key.indexOf(".") + 1));
+      expect(Buffer.compare(await readFile(sharedPath), sharedBefore)).toBe(0);
+      expect(Buffer.compare(await readFile(henchPath), henchBefore)).toBe(0);
+    });
   });
 
   // ── Help ───────────────────────────────────────────────────────────────────
@@ -1266,6 +1296,77 @@ describe("n-dx config", () => {
       const output = run(["claude", "--json", tmpDir]);
       const parsed = JSON.parse(output);
       expect(parsed.model).toBe("claude-opus-4-20250514");
+    });
+  });
+
+  // The saved host and port are spliced into `http://${host}:${port}/v1/…`
+  // by the dashboard's probes and by inference, so the CLI write applies the
+  // same shape rule they do (packages/llm-client/src/local-endpoint.ts; core
+  // carries an inline twin pinned by tests/unit/local-endpoint-parity.test.js).
+  describe("llm.local.host and llm.local.port", () => {
+    it.each([
+      ["127.0.0.1/x?", "a path"],
+      ["u@127.0.0.1", "credentials"],
+      ["localhost:9999", "a second port"],
+      ["a b", "whitespace"],
+    ])("refuses the host %j (%s) with a non-zero exit and leaves .n-dx.json unchanged", async (host) => {
+      const sharedPath = join(tmpDir, ".n-dx.json");
+      await writeFile(sharedPath, JSON.stringify({ llm: { vendor: "local" } }, null, 2) + "\n");
+      const before = await readFile(sharedPath);
+
+      const result = spawnSync("node", [CLI_PATH, "config", "llm.local.host", host, tmpDir], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("local.host");
+      expect(result.stderr).toContain("Expected a hostname");
+      expect(Buffer.compare(await readFile(sharedPath), before)).toBe(0);
+    });
+
+    // `127.1` is numeric-shaped: a first-time set used to coerce it to the
+    // number 127.1, which every URL builder then refused.
+    it.each(["localhost", "127.1", "[::1]", "gpu-box.lan"])("accepts %s and stores it as a string", async (host) => {
+      const output = run(["llm.local.host", host, tmpDir]);
+      expect(output).toContain(`llm.local.host = ${host}`);
+
+      const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(ndxConfig.llm.local.host).toBe(host);
+    });
+
+    it("applies the same rule to llm.local.verifier.host", async () => {
+      const stderr = runFail(["llm.local.verifier.host", "127.0.0.1/x?", tmpDir]);
+      expect(stderr).toContain("local.verifier.host");
+
+      run(["llm.local.verifier.host", "127.1", tmpDir]);
+      const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(ndxConfig.llm.local.verifier.host).toBe("127.1");
+    });
+
+    it.each(["0", "70000", "1.5", "abc"])("refuses the port %s", (port) => {
+      const stderr = runFail(["llm.local.port", port, tmpDir]);
+      expect(stderr).toContain("local.port");
+      expect(stderr).toContain("between 1 and 65535");
+    });
+
+    it("stores an in-range port as a number", async () => {
+      run(["llm.local.port", "11434", tmpDir]);
+      const ndxConfig = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(ndxConfig.llm.local.port).toBe(11434);
+    });
+
+    // A hand-edited `"port": "1234"` is what the dashboard and the provider
+    // now refuse, pointing at this command to fix it. Coercion used to keep
+    // the existing value's type, so the repair stored another string and was
+    // refused in turn; the only way out was another hand edit.
+    it("repairs a string-typed saved port to a number", async () => {
+      const sharedPath = join(tmpDir, ".n-dx.json");
+      await writeFile(sharedPath, JSON.stringify({ llm: { vendor: "local", local: { port: "1234" } } }, null, 2) + "\n");
+
+      run(["llm.local.port", "11434", tmpDir]);
+      const ndxConfig = JSON.parse(await readFile(sharedPath, "utf-8"));
+      expect(ndxConfig.llm.local.port).toBe(11434);
     });
   });
 

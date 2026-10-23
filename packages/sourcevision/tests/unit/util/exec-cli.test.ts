@@ -8,6 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { execFileSyncCli } from "../../../src/util/exec-cli.js";
+import { execFileSyncCli as llmClientExecFileSyncCli } from "@n-dx/llm-client";
 
 describe("execFileSyncCli", () => {
   it("runs a real process and returns output", () => {
@@ -44,6 +45,28 @@ describe("execFileSyncCli", () => {
         stdio: "pipe",
       });
       expect(String(out)).toBe("win32-ok");
+    });
+  }
+});
+
+/**
+ * This module used to carry its own copy of the cmd.exe recipe, which missed
+ * the `%VAR%` refusal when llm-client and core gained it. It is a re-export
+ * now, so the identity check is the test that it cannot drift again.
+ */
+describe("exec-cli is llm-client's helper", () => {
+  it("re-exports the same function", () => {
+    expect(execFileSyncCli).toBe(llmClientExecFileSyncCli);
+  });
+
+  if (process.platform === "win32") {
+    it("on Windows: refuses a token cmd.exe would expand before anything spawns", () => {
+      expect(() =>
+        execFileSyncCli(process.execPath, ["-e", "process.exit(0)", "m%CMDCMDLINE:~-1%"], {
+          encoding: "utf-8",
+          stdio: "pipe",
+        }),
+      ).toThrow(/Refusing to spawn/);
     });
   }
 });

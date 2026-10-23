@@ -37,7 +37,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { exec, getWorktreeRoot, listWorktrees, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { errorResponse, jsonResponse, readBody } from "./response-utils.js";
+import { errorResponse, jsonResponse, readBody, errorMessage } from "./response-utils.js";
 import { resolveNdxBin } from "./routes-commands.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { buildLlmCatalog, resolveActiveVendor, validateCatalogModel } from "./routes-llm.js";
@@ -428,7 +428,7 @@ async function handleSave(
       return doc;
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     // The lock failure names the holder's PID, which is the most useful fact in
     // it — passed through rather than replaced with wording of our own.
     errorResponse(res, message.includes("Could not acquire PRD lock") ? 409 : 500, message);

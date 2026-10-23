@@ -1325,7 +1325,10 @@ function checkDataLayerContract(dir) {
   //   from "../../.hench/config.json"
   // Does NOT match filesystem reads (readFileSync, fs.readFile, etc.)
   const dataImportPatterns = dataDirs.map((d) => {
-    const escaped = d.replace(/\./g, "\\.");
+    // The names are layout constants (".rex", ".hench", …), but escape every
+    // metacharacter rather than only the dot so a renamed layout dir cannot
+    // silently become a regex operator.
+    const escaped = escapeRegExp(d);
     return new RegExp(
       `(?:from\\s+["'][^"']*\\/${escaped}\\/|from\\s+["']${escaped}\\/|require\\(["'][^"']*\\/${escaped}\\/|require\\(["']${escaped}\\/)`,
     );

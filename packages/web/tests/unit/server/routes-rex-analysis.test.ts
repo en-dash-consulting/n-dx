@@ -239,4 +239,18 @@ describe("POST /api/rex/analyze (background job)", () => {
     expect(status.error).toContain("boom");
     expect(status.report).toBeNull();
   });
+
+  it("answers a thrown spawn error with its message alone — no class prefix, no stack frame", async () => {
+    // Every route's catch used to answer `String(err)`; the sweep that
+    // finished commit 23a99bc06's work routes them all through errorMessage().
+    execMock.mockRejectedValue(new Error("rex add exploded"));
+
+    const res = await post("smart-add-preview", { text: "Support refunds when paying by card" });
+
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error: string };
+    expect(body).toEqual({ error: "rex add exploded" });
+    expect(body.error).not.toMatch(/^Error:/);
+    expect(body.error).not.toMatch(/\n\s+at /);
+  });
 });

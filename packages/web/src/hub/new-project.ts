@@ -167,13 +167,17 @@ export function planNewProject(input: NewProjectInput): NewProjectPlan {
   return { ...base, ok: true, problem: null };
 }
 
-/** URL- and path-safe project id. Twin of `slugifyProjectId` in packages/core/web.js. */
+/**
+ * URL- and path-safe project id. Twin of `slugifyProjectId` in
+ * packages/core/web.js, lookbehind included: it pins the trailing trim to the
+ * start of a `-.` run so an interior run is scanned once, not quadratically.
+ */
 export function slugifyProjectId(name: string): string {
   const slug = String(name ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/-{2,}/g, "-")
-    .replace(/^[-.]+|[-.]+$/g, "");
+    .replace(/^[-.]+|(?<![-.])[-.]+$/g, "");
   return slug || "project";
 }
 

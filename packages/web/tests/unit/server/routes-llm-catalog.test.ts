@@ -421,7 +421,33 @@ describe("GET /api/llm/catalog — readiness", () => {
 
   it("local is unreachable, naming the address, when nothing answers", async () => {
     await writeConfig({ llm: { local: { host: "127.0.0.1", port: 1 } } });
-    expect((await getCatalog()).local.readiness).toEqual({ state: "unreachable", summary: "Not reachable · 127.0.0.1:1" });
+    const body = await getCatalog();
+    expect(body.local.readiness).toEqual({ state: "unreachable", summary: "Not reachable · 127.0.0.1:1" });
+    expect(body.local).toMatchObject({ reachable: false, models: [] });
+  });
+
+  // A saved host or port that fails the shape check is never fetched, so the
+  // card must not claim a connection failure for a server nobody contacted:
+  // it needs setup, and its line is the shape error the detail already carried.
+  it.each([
+    ["host", { host: "127.0.0.1/x?", port: 1234 }, /^Invalid LLM host "127\.0\.0\.1\/x\?"/],
+    ["port", { host: "127.0.0.1", port: 70000 }, /^Invalid LLM port 70000/],
+  ])("local needs setup, carrying the shape error, when the saved %s cannot be probed", async (_what, local, shapeError) => {
+    const probeFetch = globalThis.fetch;
+    const probed: string[] = [];
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (!url.startsWith(baseUrl)) probed.push(url);
+      return probeFetch(input, init);
+    });
+    await writeConfig({ llm: { vendor: "local", local } });
+
+    const body = await getCatalog();
+
+    expect(body.local.readiness).toEqual({ state: "needs-setup", summary: expect.stringMatching(shapeError) });
+    expect(body.local.readiness.summary).not.toContain("Not reachable");
+    expect(body.local).toMatchObject({ reachable: false, models: [], reason: body.local.readiness.summary });
+    expect(probed, "the shape check refuses the endpoint before any request is built from it").toEqual([]);
   });
 
   it("never returns a key value", async () => {

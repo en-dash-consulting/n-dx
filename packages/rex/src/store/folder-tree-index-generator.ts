@@ -82,9 +82,10 @@ export function generateIndexMd(
       lines.push("|--------|------|---------|-----------|");
       for (const commit of commits) {
         const shortHash = commit.hash.slice(0, 7);
-        const fullHash = commit.hash;
-        const author = commit.author || "unknown";
-        const message = (commit.message || "").replace(/\|/g, "\\|");
+        // The author is escaped like the message: a `|` in a git author name
+        // split the row.
+        const author = escapeTableCell(commit.author || "unknown");
+        const message = escapeTableCell(commit.message || "");
         const timestamp = commit.timestamp || "";
         lines.push(`| ${author} | \`${shortHash}\` | ${message} | ${timestamp} |`);
       }
@@ -164,6 +165,19 @@ export function generateIndexMd(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Text for one cell of the Commits table. One pass over `\` and `|`
+ * together: escaping `|` alone left a `\` before it in the text to swallow
+ * the added backslash, and a line break would end the table row. The
+ * viewer's parseCommitsList (packages/web/src/viewer/utils/index-md-parser.ts)
+ * splits on unescaped pipes and undoes `\|` and `\\`.
+ */
+function escapeTableCell(text: string): string {
+  return text
+    .replace(/[\\|]/g, (c) => `\\${c}`)
+    .replace(/[\r\n]+/g, " ");
+}
 
 function renderItemDisplay(item: PRDItem): string {
   const title = `# ${item.title}`;

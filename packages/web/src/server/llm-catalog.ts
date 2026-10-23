@@ -184,8 +184,17 @@ export function googleReadiness(config: LLMConfig): VendorReadiness {
   return apiKeyReadiness(Boolean(resolveGoogleApiKey(config.google)));
 }
 
-/** The local server is ready when it answers; `address` is `host:port`. */
-export function localReadiness(reachable: boolean, address: string): VendorReadiness {
+/**
+ * The local server is ready when it answers; `address` is `host:port`.
+ *
+ * `shapeError` is the message the saved host or port failed the shape check
+ * with. That endpoint was never contacted, so it is a configuration to fix,
+ * not a connection that failed: the card says `needs-setup` and carries the
+ * shape error as its line, where `unreachable · host:port` would claim a
+ * server that was never probed.
+ */
+export function localReadiness(reachable: boolean, address: string, shapeError: string | null = null): VendorReadiness {
+  if (shapeError) return { state: "needs-setup", summary: shapeError };
   return reachable
     ? { state: "ready", summary: `Ready · ${address}` }
     : { state: "unreachable", summary: `Not reachable · ${address}` };
