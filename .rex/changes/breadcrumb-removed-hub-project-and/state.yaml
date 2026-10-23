@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "d7997bfb-31f0-40c7-a69c-c275f7a3f1c3":
+    status: "completed"
+    startedAt: "2026-10-15T04:52:47.665Z"
+    completedAt: "2026-10-15T05:02:12.220Z"
+    endedAt: "2026-10-15T05:02:12.220Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Breadcrumb removed; project context in the top bar"
+    appliedAt: "2026-10-15T05:02:12.220Z"
+    lastModified: "2026-10-15T05:02:12.537Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

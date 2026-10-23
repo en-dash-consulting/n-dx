@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "840160b0-0f30-4d66-bb9e-344fb430853d":
+    status: "completed"
+    startedAt: "2026-10-20T19:53:42.430Z"
+    completedAt: "2026-10-20T19:59:02.563Z"
+    endedAt: "2026-10-20T19:59:02.563Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Dialogs opened from page content or chrome render under body via BodyPortal (prepare-task modal, Guide, FAQ)"
+    appliedAt: "2026-10-20T19:59:02.563Z"
+    needsPlacement: true
+    lastModified: "2026-10-20T19:59:02.918Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

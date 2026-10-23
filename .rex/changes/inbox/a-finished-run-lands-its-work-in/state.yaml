@@ -1,0 +1,29 @@
+schema: "rex/v2"
+items:
+  "0c9623b6-57a4-47f9-a371-3865149cf866":
+    status: "completed"
+    startedAt: "2026-09-25T19:42:03.364Z"
+    completedAt: "2026-09-25T19:50:46.010Z"
+    endedAt: "2026-09-25T19:50:46.010Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Repairs are discounted by the completion gate only when autoCommit is on or a non-empty .hench-commit-msg.txt exists — the same condition as the staged index. Two regression tests reproduce run 2fb96507."
+    lastModified: "2026-09-25T19:50:46.359Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "475b386b-41c5-4f01-8ec3-168a994f0cde":
+    status: "completed"
+    startedAt: "2026-09-25T19:15:06.746Z"
+    completedAt: "2026-09-25T19:41:59.777Z"
+    endedAt: "2026-09-25T19:41:59.777Z"
+    resolutionType: "code-change"
+    resolutionDetail: "buildAllowedTools now appends AGENT_REX_MCP_TOOLS (update_task_status, append_log, add_item), derived from REX_MCP_SERVER_NAME in agent-mcp-config.ts. Reaches every Claude spawn because buildSpawnConfig is the sole producer of Claude CLI args. Tests pin the exact set, derive the server name from buildAgentMcpServers, and cover both the POSIX and Windows arg shapes."
+    lastModified: "2026-09-25T19:42:00.128Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6af0a1c8-3df5-4348-8ae3-1056b6a1e965":
+    status: "completed"
+    startedAt: "2026-09-25T19:50:47.384Z"
+    completedAt: "2026-09-25T19:50:47.384Z"
+    endedAt: "2026-09-25T19:50:47.384Z"
+    appliedAt: "2026-09-25T19:50:47.384Z"
+    needsPlacement: true
+    lastModified: "2026-09-25T19:50:47.749Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

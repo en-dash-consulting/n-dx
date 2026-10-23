@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "c9c56d87-d4d4-42dd-b04e-401b87c73159":
+    status: "completed"
+    startedAt: "2026-05-26T13:45:23.150Z"
+    completedAt: "2026-05-26T13:57:22.730Z"
+    endedAt: "2026-05-26T13:57:22.730Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented ConsecutiveFailureCounter class and wrote 23 regression tests covering: (1) counter initialization and increment, (2) 3-strike cancellation boundary, (3) success resets counter, (4) failure count and task ID in diagnostic message, (5) edge cases and loop simulation scenarios. All tests pass without live LLM dependencies."
+    appliedAt: "2026-05-26T13:57:22.730Z"

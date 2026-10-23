@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "c39af3ae-f049-4e93-8892-d4773cdc8501":
+    status: "completed"
+    startedAt: "2026-05-06T14:49:15.236Z"
+    completedAt: "2026-05-06T14:52:55.748Z"
+    endedAt: "2026-05-06T14:52:55.748Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented vendor-failover.ts with pure function getNextFailoverAttempt() that encodes ordered failover chains (Claude: sonnet→haiku→codex-std→codex-light; Codex: light→claude-std→claude-light). All model IDs resolved via resolveVendorModel(), chain terminates after 3 attempts. 17 unit tests cover all chains, exhaustion, and custom config. Public API exports added."
+    appliedAt: "2026-05-06T14:52:55.748Z"

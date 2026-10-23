@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "fa572435-b461-4086-b370-97cfb9edd2b6":
+    status: "completed"
+    startedAt: "2026-04-30T14:02:14.454Z"
+    completedAt: "2026-04-30T14:27:55.473Z"
+    endedAt: "2026-04-30T14:27:55.473Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented commit attribution surfacing with table rendering in detail panel and index.md summaries, comprehensive tests, and CSS styling."
+    appliedAt: "2026-04-30T14:27:55.473Z"

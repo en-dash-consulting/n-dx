@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "dbf09180-abc8-4226-addf-80b427fe3943":
+    status: "completed"
+    startedAt: "2026-06-01T15:12:35.342Z"
+    completedAt: "2026-06-01T15:19:50.900Z"
+    endedAt: "2026-06-01T15:19:50.900Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added readme-generator module, hooked into both static and Ink init paths. One target test green; remaining five belong to sibling proposed-file task."
+    appliedAt: "2026-06-01T15:19:50.900Z"

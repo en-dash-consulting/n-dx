@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "5a9dca6c-69a5-420f-ac5f-e02fc00274e0":
+    status: "completed"
+    startedAt: "2026-10-13T18:05:54.362Z"
+    completedAt: "2026-10-13T18:14:14.957Z"
+    endedAt: "2026-10-13T18:14:14.957Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run 6129d508 committed e9f5a7f22 and 26ab6a593; its gate failed only on the stale prompt-census baseline, re-recorded in 52c23af56, after which the recorded gate (affected since 9349d6846) passed."
+    appliedAt: "2026-10-13T18:14:14.957Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:14:15.299Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

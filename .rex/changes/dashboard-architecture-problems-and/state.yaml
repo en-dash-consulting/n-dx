@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "2737672a-06b8-41b5-9fe1-1678905a1b8a":
+    status: "completed"
+    startedAt: "2026-09-23T16:29:52.618Z"
+    completedAt: "2026-09-23T16:29:52.618Z"
+    endedAt: "2026-09-23T16:29:52.618Z"
+    resolutionType: "code-change"
+    resolutionDetail: "zones.enrichmentMode written by analyzeZones (carried on reuse); viewer/enrichment-pass.ts effectiveEnrichmentPass used by sidebar + three views; manifest fallback for older data; unit tests; live n-site2 zones.json shows enrichmentMode cascade."
+    appliedAt: "2026-09-23T16:29:52.618Z"
+    lastModified: "2026-09-23T16:29:52.994Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

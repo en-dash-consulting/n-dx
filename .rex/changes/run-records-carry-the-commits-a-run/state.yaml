@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "dd5bcb32-e250-472a-ba3f-4033e46b7dc5":
+    status: "completed"
+    startedAt: "2026-10-11T03:49:06.728Z"
+    completedAt: "2026-10-11T03:54:52.461Z"
+    endedAt: "2026-10-11T03:54:52.461Z"
+    resolutionType: "code-change"
+    resolutionDetail: "RunCommitRecord.attribution and hench backfill-commits; 638 commits tied to 569 of 673 runs on this machine"
+    appliedAt: "2026-10-11T03:54:52.461Z"
+    lastModified: "2026-10-11T03:54:52.738Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

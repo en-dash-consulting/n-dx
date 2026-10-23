@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8c18cb17-e9b6-496c-ae18-e442448a4a61":
+    status: "completed"
+    startedAt: "2026-10-08T00:27:32.361Z"
+    completedAt: "2026-10-08T00:33:29.645Z"
+    endedAt: "2026-10-08T00:33:29.645Z"
+    resolutionType: "code-change"
+    resolutionDetail: "New criteria-growth rule in v2-rules.ts; threshold via structureHealth.maxCriteriaPerCapability (default 15)"
+    appliedAt: "2026-10-08T00:33:29.645Z"
+    lastModified: "2026-10-08T00:33:29.899Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

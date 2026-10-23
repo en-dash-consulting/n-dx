@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "47e43846-b305-4b39-bd0f-274efd72b0dc":
+    status: "completed"
+    startedAt: "2026-10-08T00:48:37.625Z"
+    completedAt: "2026-10-08T01:04:26.916Z"
+    endedAt: "2026-10-08T01:04:26.916Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added rex core/repoint-commits.ts: repointCommits(shas, {repoDir, ref?, host?}) re-points recorded SHAs via on-main, author-date-subject, patch-id, trailer-subject, then optional CommitHost (host-pull-request); unmatched returned with reasons. llm-client exec gained `input` (stdin) for git patch-id/cat-file. Fixture tests cover rebase, cherry-pick, one- and two-commit squash, reworked commit, never-merged, missing SHA, host seam."
+    appliedAt: "2026-10-08T01:04:26.916Z"
+    lastModified: "2026-10-08T01:04:27.161Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

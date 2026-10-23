@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "19326fda-e8a5-4063-8baa-5feada660fe8":
+    status: "completed"
+    startedAt: "2026-10-12T20:18:53.402Z"
+    completedAt: "2026-10-12T20:30:28.048Z"
+    endedAt: "2026-10-12T20:30:28.048Z"
+    resolutionType: "code-change"
+    resolutionDetail: "core/merge.ts mergeChanges (validate, carry touches, carry aliases, mergeItems) + validateChangesMerge, exported from public.ts; merge_items and applyProposals({changeLayer}) use it from MCP and CLI reorganize. Commit f3c6f0a99."
+    appliedAt: "2026-10-12T20:30:28.048Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T20:30:28.317Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

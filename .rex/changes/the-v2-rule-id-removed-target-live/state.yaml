@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "e6444308-912e-48a0-a805-1fb96a822223":
+    status: "completed"
+    startedAt: "2026-10-08T01:17:06.574Z"
+    completedAt: "2026-10-08T01:21:02.538Z"
+    endedAt: "2026-10-08T01:21:02.538Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): renamed rule id removed-target-live to open-change-refs-live in v2-rules.ts, tests and two changesets. Commit 24b0fc500."
+    appliedAt: "2026-10-08T01:21:02.538Z"
+    lastModified: "2026-10-08T01:21:02.768Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "07154910-ff3f-4d1d-8432-ede8d3cb03d1":
+    status: "completed"
+    startedAt: "2026-10-09T03:57:07.141Z"
+    completedAt: "2026-10-09T04:10:04.836Z"
+    endedAt: "2026-10-09T04:10:04.836Z"
+    resolutionType: "code-change"
+    resolutionDetail: "add_item, place_change, apply_change read an injectable clock inside the withPrdModelTransaction callback; tests added"
+    appliedAt: "2026-10-09T04:10:04.836Z"
+    lastModified: "2026-10-09T04:10:05.109Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

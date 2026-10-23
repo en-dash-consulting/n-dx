@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "606ebb1c-ce77-4921-9b0e-b155ea84754e":
+    status: "completed"
+    startedAt: "2026-10-08T04:27:31.129Z"
+    completedAt: "2026-10-08T04:34:23.376Z"
+    endedAt: "2026-10-08T04:34:23.376Z"
+    resolutionType: "code-change"
+    resolutionDetail: "deriveChangeKind reads an added amendment's type; new fix-not-additive error rule"
+    appliedAt: "2026-10-08T04:34:23.376Z"
+    lastModified: "2026-10-08T04:34:23.636Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

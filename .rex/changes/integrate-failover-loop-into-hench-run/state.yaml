@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "a6c968d3-f0a8-490b-8b8c-f3a07c5ce4e5":
+    status: "completed"
+    startedAt: "2026-05-06T14:53:18.395Z"
+    completedAt: "2026-05-06T15:06:43.712Z"
+    endedAt: "2026-05-06T15:06:43.712Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented failover loop wrapper (callWithFailover) in hench agent loop. Integrates error classification and vendor/model failover chain when llm.autoFailover is enabled. On retryable errors: walks 3-attempt failover chain with log lines per switch. On non-retryable errors: bypasses failover. On exhaustion: restores original vendor/model and rethrows original error verbatim. 131 test files (2674 tests) passing including 13 new integration tests."
+    appliedAt: "2026-05-06T15:06:43.712Z"

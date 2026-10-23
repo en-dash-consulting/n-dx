@@ -1,0 +1,11 @@
+---
+id: "3f7f48c7-8681-4dd1-bd4c-59ab7647c87e"
+type: "capability"
+title: "Geometric Decorative Design System for ndx UI"
+slug: "geometric-decorative-design-system-for"
+statement: "The ndx web dashboard decorates its sections only with geometric and typographic CSS/SVG primitives (dot grids, concentric arcs, thin border circles, ruled lines and oversized background numerals), placed behind content on alternating section backgrounds that fade upward into view on scroll."
+criteria: [{"id":"c1","text":"The dashboard shall render adjacent top-level sections with alternating background tones drawn from the design-token palette."},{"id":"c2","text":"When a section header or major content block scrolls into view, the dashboard shall fade it in and translate it upward using IntersectionObserver."},{"id":"c3","text":"While the user's preference is prefers-reduced-motion: reduce, the dashboard shall render content in its final state with no transform or opacity animation."},{"id":"c4","text":"The dashboard shall place at least one geometric primitive (dot grid, arc, thin circle, ruled line or large numeral) in each section, behind the content and without obscuring its readability."},{"id":"c5","text":"The dashboard shall not render clip-path blob, gradient splash, organic shape, image or emoji decorations in its sections."},{"id":"c6","text":"The dashboard shall take the decoration stroke width, dash pattern, opacity and color from CSS custom properties defined in a single shared stylesheet."},{"id":"c7","text":"The web package shall export reusable SVG/CSS primitives for the dot grid, concentric arc set, thin border circle, ruled line and large numeral that any dashboard view can use."},{"id":"c8","text":"The dashboard shall not use raster image assets or emoji characters as decoration."}]
+source: "smart-add"
+---
+
+Establish a reusable design language for the ndx web dashboard built from purely geometric and typographic decoration — dot grids, concentric arcs, thin border circles, ruled lines, and oversized background numerals — rendered with CSS/SVG only. No raster images, emoji, gradient splashes, clip-path blobs, or organic shapes. The system should produce a clean, editorial visual rhythm across all dashboard sections.

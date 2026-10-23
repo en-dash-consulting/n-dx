@@ -1,0 +1,19 @@
+---
+id: "880d8c8e-f201-40a7-beb1-09261d88bc45"
+type: "change"
+title: "A claim on a task-less change covers the task it splits into"
+slug: "a-claim-on-a-task-less-change-covers"
+intent: "Review 2026-10-12, PR #690 should-fix 1 (CONFIRMED at unit level; the MCP path traced line by line).\n\nDefect: packages/rex/src/core/change-selection.ts:119 filters candidates with `!options.excludeIds?.has(u.node.id)`, so on v2 a claim excludes a unit only by its own id. The split rule (core/change-completion.ts:229, addTask) turns an in-flight task-less change's work into a new in_progress task, and the claim stays on the change.\n\nFailure scenario:\n1. Worktree A runs update_task_status {id: C, status: \"in_progress\"} on task-less change C, which takes the claim on C (acquireClaim).\n2. A's agent breaks the work down with add_item {type: \"task\", parentId: C}. addTask splits: the new task T becomes in_progress, and C goes back to pending.\n3. Worktree B calls get_next_task. excludeIds is {C}. T is not excluded, and because it is in_progress it ranks above pending work. B gets T, and update_task_status T in_progress grants B a fresh claim on T.\n4. Both worktrees now work the same unit, the double-pick claims exist to prevent (T4's criterion \"claims from other worktrees skipped\"). B's answer even lists C under skippedClaimed while handing out C's only work.\nReproduced: after addTask, findNextWork(tree, {excludeIds: new Set([\"C\"])}) returns task T in change C.\n\nFix (preferred): in findActionableWork, skip a unit when its change, or any change enclosing it, is in excludeIds. This also covers a claim on a container. (Alternative: move the claim from the change to the task on split, in the add_item v2 path when result.split is set.)"
+acceptanceCriteria:
+  - "Worktree A claims in_progress task-less change C; add_item splits C into task T; worktree B's get_next_task (and rex next) does not return T, and update_task_status T in_progress from B is refused as claimed (test with two worktrees' claims that fails on 1ea7984bfb)"
+  - "A unit whose enclosing change (at any depth) is claimed by another worktree is skipped by findActionableWork (test)"
+  - "v1 claim behaviour is unchanged; claims-skip-selection and change-selection tests pass unedited"
+touches:
+  - "b86f9199-bd84-45e8-95a8-bad39e42ebeb"
+priority: "high"
+tags:
+  - "pr-34"
+  - "review-2026-10-12"
+  - "lane-rex-domain"
+source: "review-2026-10-12"
+---

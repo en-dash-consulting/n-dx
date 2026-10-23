@@ -1,0 +1,18 @@
+---
+id: "2df3f7df-2deb-4bc5-8349-de7392416582"
+type: "task"
+title: "The exported computeLanding still reports an open change as landed, because it takes ids rather than the change"
+slug: "the-exported-computelanding-still"
+description: "Scenario: a caller passes an in_progress change's ids (change id plus task ids) to computeLanding, with task 1 merged and tagged v0.9.0 and task 2 unmerged. computeLanding returns { landed: true, ... }, so resolveShippedIn returns \"0.9.0\" for unfinished work. Task ae3c8475 put the open-change guard (\"change still open\") only in computeLandings, which can see the change's status. computeLanding takes `itemIds: Iterable<string>` and cannot.\n\nEvidence: packages/rex/src/core/change-landing.ts, computeLanding (a thin wrapper around landingFrom with no status check).\n\nReachable: computeLanding has no caller in src, and public.ts does not export it. Only the tests call it today. The first caller that uses it per change instead of computeLandings inherits the defect.\n\nVerdict: should-fix, low. It is a wrong answer only once a caller wires it in.\n\nOptions:\n(a) Make computeLanding take the ChangeNode (or Pick<ChangeNode, 'id'|'status'|'appliedAt'|'aliases'|'children'>), apply the same finished check, and derive the ids with trailerIds. This matches the task's literal wording and removes the trap. The ids-based tests move to a fixture node. Recommended.\n(b) Make computeLanding module-private and keep only computeLandings exported. This is cheapest, but it loses the single-change entry point.\n\nOperator note (overnight 2026-10-15): Take option (a). File: packages/rex/src/core/change-landing.ts and its tests. If the change alters what packages/rex/src/public.ts exports, say so plainly in your summary, because the layer changeset must name it. Do not edit these files, which other sessions own tonight: packages/rex/src/core/apply-amendments.ts, packages/rex/src/core/change-completion.ts, packages/rex/src/migrations/, packages/rex/src/store/prd-model-writer.ts, packages/rex/src/cli/index.ts, packages/rex/src/cli/help.ts, the rex MCP tool handlers (update_task_status, edit_item, move_item, merge_items, claim_task, health), packages/rex/tests/unit/schema/v2.test.ts, hench run and task-lookup source, packages/web, packages/sourcevision, packages/core/cli.js, help.js, command-effects.js, README.md, docs/guide/commands.md, tests/setup-session-env.js. If the fix needs one of them, stop and say so in your summary instead of editing it. The pinning test must fail on the code before your fix; say in your summary how you checked that. Run the six static root policy tests (tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy, obfuscated-code-policy) before committing. Do not add a changeset; the operator adds one per layer."
+acceptanceCriteria:
+  - "computeLanding on an in_progress change whose first task is merged and tagged returns { landed: false, reason: 'change still open' } (test)"
+  - "computeLanding on a completed change with the same history returns the merge commit as its landing (test)"
+  - "No exported landing function accepts bare ids without the change's status"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "rex"
+  - "pr-11"
+source: "ndx-adversarial-review"
+---

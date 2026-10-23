@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "23bf714b-1e57-472a-b13a-379961501ef7":
+    status: "completed"
+    startedAt: "2026-05-08T05:38:36.071Z"
+    completedAt: "2026-05-08T05:46:19.005Z"
+    endedAt: "2026-05-08T05:46:19.005Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Updated schema documentation to reflect dual-mode subtask serialization (leaf .md files vs. branch folders). Fixed type-consistency test to expect recursive subtask nesting. All phases (1-4) implementation verified and tests passing."
+    appliedAt: "2026-05-08T05:46:19.005Z"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "94d67abb-01f8-4f16-9e92-6fc66eb51d1b":
+    status: "completed"
+    startedAt: "2026-10-13T04:01:20.891Z"
+    completedAt: "2026-10-13T04:01:20.891Z"
+    endedAt: "2026-10-13T04:01:20.891Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): web and graview vitest configs alias @n-dx/lang-kit to packages/lang-kit/src/index.ts (3c443c3d9). It was the cause of run e70597e0's gate failure, not only a stale-dist risk."
+    appliedAt: "2026-10-13T04:01:20.891Z"
+    lastModified: "2026-10-13T04:01:22.037Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

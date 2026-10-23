@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "311a52a4-60bc-4265-a65b-2b94cd946d25":
+    status: "completed"
+    startedAt: "2026-10-15T04:22:25.783Z"
+    completedAt: "2026-10-15T04:28:32.331Z"
+    endedAt: "2026-10-15T04:28:32.331Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Full-screen tile leaves room for the open detail panel"
+    appliedAt: "2026-10-15T04:28:32.331Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T04:28:33.217Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

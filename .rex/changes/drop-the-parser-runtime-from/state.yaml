@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "1a548852-b37f-4c21-a987-dd3dc239e59d":
+    status: "completed"
+    startedAt: "2026-10-15T03:13:53.526Z"
+    completedAt: "2026-10-15T03:26:55.091Z"
+    endedAt: "2026-10-15T03:26:55.091Z"
+    resolutionType: "code-change"
+    resolutionDetail: "sourcevision drops web-tree-sitter (package.json only; operator must run pnpm install). Its tests reach packs through the loader (tests/helpers/workspace-pack.ts) with no static runtime/pack import. The grammar smoke tests moved to lang-java and lang-go. A new architecture-policy block, \"packs are loaded, never imported\", is registered in DOCUMENTED_POLICIES (now 24), and the domain-isolation sourcevision rule names the pack tier. packed-tarball checks that sourcevision's tarball has no wasm or queries and that every pack has its grammar and queries. Adds packages/sourcevision/AGENTS.md and CLAUDE.md."
+    appliedAt: "2026-10-15T03:26:55.091Z"
+    lastModified: "2026-10-15T03:26:55.363Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

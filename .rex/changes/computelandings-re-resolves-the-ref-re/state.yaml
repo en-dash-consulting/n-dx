@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "03866a98-34d9-4c3e-a876-d42d7d8edaff":
+    status: "completed"
+    completedAt: "2026-10-08T20:05:12.142Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed by task ae3c8475 (commit b2b021a43, merged in #584): computeLandings resolves the ref, checks shallowness and loads both caches once per call, not per change. ae3c8475's description names this capture; it was not marked at the time. Closed in the PR 11 cleanup, 2026-10-08."
+    appliedAt: "2026-10-08T20:05:12.142Z"
+    lastModified: "2026-10-08T20:05:12.991Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

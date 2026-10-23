@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "21c03cb4-f14d-4496-b4aa-649c2bb42672":
+    status: "completed"
+    startedAt: "2026-04-19T02:56:32.761Z"
+    completedAt: "2026-04-19T02:56:32.761Z"
+    appliedAt: "2026-04-19T02:56:32.761Z"
+    needsPlacement: true
+  "319b1c9b-775a-4891-9ae6-574996ea08e2":
+    status: "completed"
+    startedAt: "2026-04-19T02:55:33.551Z"
+    completedAt: "2026-04-19T02:56:32.724Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "theme-toggle zone no longer exists in current sourcevision analysis. Zone pin theme-toggle.ts → viewer-ui-hub already present in .n-dx.json (line 120) from a prior session. No current findings reference theme-toggle. Issue resolved."

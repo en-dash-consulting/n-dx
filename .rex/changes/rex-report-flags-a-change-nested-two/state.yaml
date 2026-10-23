@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "e2354ac9-99e4-4bf6-9eed-112ef6ff7951":
+    status: "completed"
+    startedAt: "2026-10-12T19:44:06.991Z"
+    completedAt: "2026-10-12T19:56:16.475Z"
+    endedAt: "2026-10-12T19:56:16.475Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex report skips the v1 placement and empty-container checks on a v2 tree (run a512fba6, 8b4382937 before the restack onto #716)."
+    appliedAt: "2026-10-12T19:56:16.475Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T19:56:16.825Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

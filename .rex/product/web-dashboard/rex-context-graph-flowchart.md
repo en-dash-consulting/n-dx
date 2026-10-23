@@ -1,0 +1,11 @@
+---
+id: "f4e984ba-0a05-47f4-8358-7f647d6f6828"
+type: "capability"
+title: "Rex Context Graph Flowchart Restructure with Shape-Encoded Node Types and Clickable Detail"
+slug: "rex-context-graph-flowchart"
+statement: "The Rex context graph shows PRD items as a flowchart, with each node's shape showing its structural role in the folder tree, and clicking or keyboard-activating a node opens the Rex task detail panel for that item."
+criteria: [{"id":"c1","text":"When a node contains an index.md and at least one other non-index.md file, the context graph shall render that node as a diamond."},{"id":"c2","text":"When a node has only non-index.md files and no subdirectory children, the context graph shall render that node as a square."},{"id":"c3","text":"When a node's children are exclusively subdirectories, the context graph shall render that node as a trapezoid."},{"id":"c4","text":"When a node is a leaf task with no children of any kind, the context graph shall render that node as a triangle."},{"id":"c5","text":"If a node matches none of the diamond, square, trapezoid or triangle rules, the context graph shall render that node as a circle."},{"id":"c6","text":"The context graph shall display a legend that labels each node shape with its structural meaning."},{"id":"c7","text":"When a user clicks a node in the context graph, the viewer shall open the Rex task detail panel with that item's data."},{"id":"c8","text":"The detail panel opened from the context graph shall display the same fields that the Rex tasks view shows for the same item."},{"id":"c9","text":"The context graph shall open the same detail panel component that the Rex tasks view uses."},{"id":"c10","text":"When the user clicks the active node a second time or presses Escape, the viewer shall close the detail panel."},{"id":"c11","text":"The context graph shall let the user reach nodes with Tab, open the detail panel with Enter and close it with Escape."},{"id":"c12","text":"When the detail panel opens, the context graph shall keep its zoom, pan and node positions unchanged."}]
+source: "smart-add"
+---
+
+Restructure the Rex context graph into a flowchart-style layout using distinct node shapes that encode the structural role of each PRD item in the folder tree, and make every node clickable to open the existing task detail panel.

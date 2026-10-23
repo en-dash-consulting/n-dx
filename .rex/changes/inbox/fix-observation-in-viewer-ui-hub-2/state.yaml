@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "6291b72e-8ea9-44b0-9028-9474ca8af4ea":
+    status: "completed"
+    startedAt: "2026-04-18T14:38:28.275Z"
+    completedAt: "2026-04-18T14:47:49.182Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed search-overlay.ts to import NavigateTo through api.ts gateway instead of directly from types.ts (leaf reach-in violation). Commit: 76116c37."
+  "d4b40fac-925e-4578-a37f-f3066399b768":
+    status: "completed"
+    startedAt: "2026-04-18T14:47:49.220Z"
+    completedAt: "2026-04-18T14:47:49.220Z"
+    appliedAt: "2026-04-18T14:47:49.220Z"
+    needsPlacement: true

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "4740f527-ac08-4a59-a20f-ce6854900296":
+    status: "completed"
+    startedAt: "2026-10-15T05:12:38.604Z"
+    completedAt: "2026-10-15T05:13:22.936Z"
+    endedAt: "2026-10-15T05:13:22.936Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Separate pinch and wheel zoom rates"
+    appliedAt: "2026-10-15T05:13:22.936Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T05:13:23.298Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

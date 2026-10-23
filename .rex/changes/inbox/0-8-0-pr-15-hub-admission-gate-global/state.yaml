@@ -1,0 +1,29 @@
+schema: "rex/v2"
+items:
+  "29de69ae-7a90-49b0-941a-7bd681a33856":
+    status: "completed"
+    startedAt: "2026-09-17T02:41:54.109Z"
+    completedAt: "2026-09-17T02:41:54.109Z"
+    endedAt: "2026-09-17T02:41:54.109Z"
+    appliedAt: "2026-09-17T02:41:54.109Z"
+    needsPlacement: true
+    lastModified: "2026-09-17T02:41:54.484Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "37458c57-6f30-4802-b5fd-8a41e35bfd0a":
+    status: "completed"
+    startedAt: "2026-09-17T02:25:29.880Z"
+    completedAt: "2026-09-17T02:36:32.227Z"
+    endedAt: "2026-09-17T02:36:32.227Z"
+    resolutionType: "code-change"
+    resolutionDetail: "hub/admission.ts gates execute requests on a machine-wide session cap and memory floor, queues FIFO with 202 + position, drains by poll; ~/.n-dx/config.json gains maxSessions and memoryFloorBytes with problems reported once at start; GET /api/hub/queue exposes the state. The viewer push is captured separately as ca54925b."
+    lastModified: "2026-09-17T02:36:32.608Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "ca54925b-bf8a-4507-af06-67a04ba96ad6":
+    status: "completed"
+    startedAt: "2026-09-17T02:37:49.435Z"
+    completedAt: "2026-09-17T02:41:52.732Z"
+    endedAt: "2026-09-17T02:41:52.732Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented the item's recommended option 3: the hub answers GET /api/hub/queue under a project prefix (scoped entries, machine-wide counts) and a new useHubQueue hook polls it. Push deferred with the onChange seam in place; all three acceptance criteria met without touching the proxy's upgrade path."
+    lastModified: "2026-09-17T02:41:53.153Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

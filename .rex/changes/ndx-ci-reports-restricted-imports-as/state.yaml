@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "0c8c7f53-b63f-4e9c-af2e-c75850d0044e":
+    status: "completed"
+    startedAt: "2026-10-15T07:02:37.785Z"
+    completedAt: "2026-10-15T07:08:51.723Z"
+    endedAt: "2026-10-15T07:08:51.723Z"
+    resolutionType: "code-change"
+    resolutionDetail: "config.js exports loadProjectConfigStrict (returns config + per-file parse errors); checkRestrictedImports fails the step on them. loadProjectConfig unchanged."
+    appliedAt: "2026-10-15T07:08:51.723Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T07:08:51.990Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,8 @@
+schema: "rex/v2"
+items:
+  "cd8060d7-e028-48f1-9843-deea23eabeed":
+    status: "completed"
+    startedAt: "2026-08-19T14:33:38.632Z"
+    completedAt: "2026-08-19T14:40:41.511Z"
+    endedAt: "2026-08-19T14:40:41.511Z"
+    appliedAt: "2026-08-19T14:40:41.511Z"

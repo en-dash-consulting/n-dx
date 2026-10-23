@@ -1,0 +1,33 @@
+schema: "rex/v2"
+items:
+  "2541cd58-4786-4fc5-b656-44b3b75319cd":
+    status: "completed"
+    startedAt: "2026-10-11T01:33:02.323Z"
+    completedAt: "2026-10-11T01:35:42.485Z"
+    endedAt: "2026-10-11T01:35:42.485Z"
+    lastModified: "2026-10-11T01:35:42.754Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "33f281fb-22ab-4f2f-bf3b-973f7dee61be":
+    status: "completed"
+    startedAt: "2026-10-11T01:14:11.380Z"
+    completedAt: "2026-10-11T01:38:32.978Z"
+    endedAt: "2026-10-11T01:38:32.978Z"
+    lastModified: "2026-10-11T01:38:33.254Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d2d48473-3e07-4ec5-b167-6ba0bd370be2":
+    status: "completed"
+    startedAt: "2026-10-11T00:35:00.100Z"
+    completedAt: "2026-10-11T00:47:32.351Z"
+    endedAt: "2026-10-11T00:47:32.351Z"
+    resolutionType: "code-change"
+    resolutionDetail: "review block added to hench schema, ndx config validators/help, dashboard fields, run-settings resolver (reviewMode/Vendor/Rounds, pair-unavailable warning, pair refusals) and a `review` block in --resolve."
+    lastModified: "2026-10-11T00:47:32.625Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f60294c0-b514-4a46-baed-b9f6b517cd98":
+    status: "completed"
+    startedAt: "2026-10-11T01:38:34.161Z"
+    completedAt: "2026-10-11T01:38:34.161Z"
+    endedAt: "2026-10-11T01:38:34.161Z"
+    appliedAt: "2026-10-11T01:38:34.161Z"
+    lastModified: "2026-10-11T01:38:34.445Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

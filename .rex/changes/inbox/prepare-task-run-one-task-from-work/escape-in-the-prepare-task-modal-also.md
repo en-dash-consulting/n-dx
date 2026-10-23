@@ -1,0 +1,18 @@
+---
+id: "6e90110f-b265-433a-a963-8ed8be0a00b5"
+type: "task"
+title: "Escape in the Prepare task modal also closes the PRD detail panel underneath"
+slug: "escape-in-the-prepare-task-modal-also"
+description: "Verdict: must-fix (introduced; the PRD panel is a main entry point and focus-return breaks).\n\nScenario: in the PRD task detail panel press Start, then Escape. The modal's document keydown listener (components/prepare-task-modal.ts:87-95) calls stopPropagation, which does not stop DetailPanel's own document listener (components/detail-panel.ts:20-27). Both close; the modal's focus-return target is gone.\n\nFix (recommended): register the modal's listener in the capture phase and call stopImmediatePropagation plus preventDefault; have DetailPanel ignore events with defaultPrevented.\n\n## Checks before committing (operator note)\n\nhench's test gate runs `npm run test` at the project root, which includes ROOT policy tests (tests/e2e/*, tests/integration/*) that no package suite runs: gateway export caps (architecture-policy), gateway contract lists (cross-package-contracts), the wall-clock assertion inventory, domain isolation and boundary checks. If you add a gateway export, a clock-bound test or a cross-package import, update those. Before committing run, from the project root: `npx vitest run tests/e2e tests/integration`, plus `npx vitest run` and `npx tsc --noEmit` from each package you touched. `pnpm` is not permitted in this sandbox. Add a patch changeset (scoped name) for each package you change."
+acceptanceCriteria:
+  - "Escape with the modal open over the PRD detail panel closes only the modal and returns focus to the Start control; a test covers it."
+  - "Escape with no modal still closes the detail panel."
+priority: "medium"
+tags:
+  - "0.8.0"
+  - "task-prep"
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "web-viewer"
+source: "ndx-adversarial-review"
+---

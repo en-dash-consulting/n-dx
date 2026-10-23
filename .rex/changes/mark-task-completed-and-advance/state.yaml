@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "24913e03-3f2d-458b-890b-9d71ca70d128":
+    status: "completed"
+    startedAt: "2026-05-12T14:18:21.235Z"
+    completedAt: "2026-05-12T14:39:07.947Z"
+    endedAt: "2026-05-12T14:39:07.947Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented early PRD status update in hench run loop. Created updateCompletedTaskStatus() function that marks tasks as completed immediately after test gate passes (before commit). Called early in finalizeRun() to ensure status is persisted before next iteration's task selection, preventing task re-selection. Updated performCommitPromptIfNeeded() to be idempotent. Added unit tests covering status transitions, idempotency, and error handling. Updated failing integration tests to expect new behavior."
+    appliedAt: "2026-05-12T14:39:07.947Z"

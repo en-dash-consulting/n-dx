@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "0bf2217f-85cb-4154-911b-71028142cbc9":
+    status: "completed"
+    startedAt: "2026-06-01T15:06:06.281Z"
+    completedAt: "2026-06-01T15:12:19.966Z"
+    endedAt: "2026-06-01T15:12:19.966Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added tests/e2e/cli-init-readme.test.js with 6 integration tests covering all 5 acceptance criteria. Tests run cross-platform against synthetic temp repos and are auto-wired into CI via the vitest glob (tests/**/*.test.js). They are intentionally red until the two sibling implementation tasks ship (TDD ordering)."
+    appliedAt: "2026-06-01T15:12:19.966Z"

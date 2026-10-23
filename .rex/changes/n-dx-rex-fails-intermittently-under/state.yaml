@@ -1,0 +1,21 @@
+schema: "rex/v2"
+items:
+  "56651b0f-9a11-4a77-9d8c-78ffb772729d":
+    status: "completed"
+    startedAt: "2026-09-11T11:24:56.987Z"
+    completedAt: "2026-09-11T11:35:20.837Z"
+    endedAt: "2026-09-11T11:35:20.837Z"
+    resolutionType: "code-change"
+    resolutionDetail: "run-all-tests.mjs now streams each suite's output to the terminal and to .test-logs/<suite>.log at once, naming the file on a failing suite's summary line. Switched from execFileSyncCli/inherit to spawnCli with piped streams so capture does not cost live output; spawn errors are now an explicit failure rather than a throw. Used .test-logs/ rather than hench's .run-logs/. Verified the green path, a non-zero suite exit, and a spawn ENOENT before trusting it, since CI depends on this script's exit code. It caught the rex flake on its first full run — fifth sighting, first surviving assertion — and that capture is recorded on the parent task."
+    lastModified: "2026-09-11T11:35:20.843Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "d3a995ca-7ea2-400a-b9a3-37f07acaa77f":
+    status: "completed"
+    startedAt: "2026-09-10T20:40:54.864Z"
+    completedAt: "2026-09-11T19:08:54.002Z"
+    endedAt: "2026-09-11T19:08:54.002Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Two root causes fixed: file-lock TOCTOU holes (mid-creation grace re-read, claim-by-rename stale cleanup) and the stale-save guard firing on same-writer leaf-to-folder promotions (guard is now id-aware — violations require a newer file whose item id is absent from the saved document). Verified with 20 consecutive green full-suite runs."
+    appliedAt: "2026-09-11T19:08:54.002Z"
+    lastModified: "2026-09-11T21:31:10.005Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

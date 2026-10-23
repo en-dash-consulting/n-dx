@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "d97ee3e3-3b06-4b76-aecf-1f7051440601":
+    status: "completed"
+    startedAt: "2026-10-15T07:10:50.687Z"
+    completedAt: "2026-10-15T07:16:13.946Z"
+    endedAt: "2026-10-15T07:16:13.946Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Tests pin product/ and changes/ watcher folders and the kept-completion rollback guard; commit 77cc1b30c."
+    appliedAt: "2026-10-15T07:16:13.946Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T07:16:14.236Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

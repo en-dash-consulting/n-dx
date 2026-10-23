@@ -1,0 +1,19 @@
+schema: "rex/v2"
+items:
+  "01d923cb-e8b0-49d1-bd33-9a57b1d4ec9e":
+    status: "completed"
+    startedAt: "2026-08-17T18:01:55.779Z"
+    completedAt: "2026-08-17T18:18:21.505Z"
+    endedAt: "2026-08-17T18:18:21.505Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Repointed the parity test at packages/llm-client/src/exec.ts (bc7d413a). Both negative checks verified: green with dist reverted to the old divergent builder, red when the source twins genuinely diverge. Also fixed two pre-existing failures per workflow step 5 — GNU tar drive-letter parsing in published-package-loadability (ba2d106c) and a CRLF-shebang collection failure in obfuscated-code-policy (worktree re-checkout, no commit) — plus an incremental-build false positive in my earlier dist-staleness check (3579538b)."
+  "0994732e-03c6-4de8-86ef-2f200a2cbe35":
+    status: "completed"
+    startedAt: "2026-08-19T03:38:50.189Z"
+    completedAt: "2026-08-19T03:38:50.189Z"
+    endedAt: "2026-08-19T03:38:50.189Z"
+  "f3f909c2-38a4-441b-aa36-962eff326a92":
+    status: "completed"
+    startedAt: "2026-08-19T03:33:35.644Z"
+    completedAt: "2026-08-19T03:38:36.543Z"
+    endedAt: "2026-08-19T03:38:36.543Z"

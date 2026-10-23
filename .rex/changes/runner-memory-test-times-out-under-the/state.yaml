@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "e93f3a9f-0405-40d0-a1ad-58eb2bce2202":
+    status: "completed"
+    startedAt: "2026-10-08T03:26:34.211Z"
+    completedAt: "2026-10-08T03:27:40.319Z"
+    endedAt: "2026-10-08T03:27:40.319Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Memory test uses a query-less pack and 220 parses; delete-count assertion kept; 0.57 s."
+    appliedAt: "2026-10-08T03:27:40.319Z"
+    lastModified: "2026-10-08T03:27:40.565Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "bce17e07-916b-4786-95ea-923ca81871bb":
+    status: "completed"
+    startedAt: "2026-10-15T05:33:33.873Z"
+    completedAt: "2026-10-15T05:41:22.296Z"
+    endedAt: "2026-10-15T05:41:22.296Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Opened health: clickable stats, attention zones, hubs, cycles"
+    appliedAt: "2026-10-15T05:41:22.296Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T05:41:22.952Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

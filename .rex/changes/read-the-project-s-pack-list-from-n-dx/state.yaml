@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "10c102ff-33f7-4c28-bc9f-fa2d07732d92":
+    status: "completed"
+    startedAt: "2026-10-15T05:02:40.979Z"
+    completedAt: "2026-10-15T05:31:43.396Z"
+    endedAt: "2026-10-15T05:31:43.396Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run e0063090 committed 355993342 + 70df5d0ae; its gate failure (setup NDX_HOME overriding the e2e tests' N_DX_HOME) fixed by the operator in abaafe9b5. Affected gate 14/14; output identical."
+    appliedAt: "2026-10-15T05:31:43.396Z"
+    lastModified: "2026-10-15T05:31:43.720Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

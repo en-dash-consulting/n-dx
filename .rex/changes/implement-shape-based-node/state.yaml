@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "b3ffbc17-9c74-4ca9-8583-c74941751291":
+    status: "completed"
+    startedAt: "2026-05-08T05:49:00.682Z"
+    completedAt: "2026-05-08T11:01:35.605Z"
+    endedAt: "2026-05-08T11:01:35.605Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented shape classification logic for PRD nodes based on folder structure inspection. Added SVG rendering for 5 distinct node shapes (diamond, square, trapezoid, triangle, circle) with comprehensive legend. All acceptance criteria met with 12 unit tests covering all shape categories."
+    appliedAt: "2026-05-08T11:01:35.605Z"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "45954c7d-9a7d-4c29-a050-32e2657a8414":
+    status: "completed"
+    startedAt: "2026-10-08T00:44:14.136Z"
+    completedAt: "2026-10-08T00:50:10.424Z"
+    endedAt: "2026-10-08T00:50:10.424Z"
+    resolutionType: "code-change"
+    resolutionDetail: "src/language/pack.ts: LanguagePack + RuleProvenance types, BUILTIN_PACKS (empty), loadLanguagePacks with per-pack grammar availability and inventory-only degradation; unit tests in tests/unit/language/pack.test.ts"
+    appliedAt: "2026-10-08T00:50:10.424Z"
+    lastModified: "2026-10-08T00:50:10.664Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ad4abaa9-cb9f-45c3-8882-6e49e334dc17":
+    status: "completed"
+    startedAt: "2026-10-08T21:45:46.186Z"
+    completedAt: "2026-10-08T21:47:41.118Z"
+    endedAt: "2026-10-08T21:47:41.118Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Widened v2Import regex in v2.test.ts to include prd-model-transaction (commit c60f6ac50)."
+    appliedAt: "2026-10-08T21:47:41.118Z"
+    lastModified: "2026-10-08T21:47:41.480Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

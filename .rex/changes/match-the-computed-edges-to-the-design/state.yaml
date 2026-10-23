@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "286661e3-a723-4331-ae03-49beb5b07e4d":
+    status: "completed"
+    startedAt: "2026-10-08T00:35:28.772Z"
+    completedAt: "2026-10-08T00:44:08.694Z"
+    endedAt: "2026-10-08T00:44:08.694Z"
+    resolutionType: "code-change"
+    resolutionDetail: "computeEdges: changedBy inverts amends+touches, cancelled changes add no edges, constraints bind descendant capabilities"
+    appliedAt: "2026-10-08T00:44:08.694Z"
+    lastModified: "2026-10-08T00:44:08.982Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

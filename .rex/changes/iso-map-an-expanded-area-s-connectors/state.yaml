@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "1cde82f3-e83a-43c1-b8df-ecfb17e4e25c":
+    status: "completed"
+    startedAt: "2026-09-23T13:54:21.297Z"
+    completedAt: "2026-09-23T13:54:21.297Z"
+    endedAt: "2026-09-23T13:54:21.297Z"
+    resolutionType: "code-change"
+    resolutionDetail: "crossAreaEdges on the areas model; compose() swaps expanded areas' connectors for zone-level arcs drawn above blocks; zone panel lists cross-area links; area selection highlights its zones' arcs. Verified with n-site2 screenshots and jsdom tests."
+    appliedAt: "2026-09-23T13:54:21.297Z"
+    lastModified: "2026-09-23T13:54:21.652Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

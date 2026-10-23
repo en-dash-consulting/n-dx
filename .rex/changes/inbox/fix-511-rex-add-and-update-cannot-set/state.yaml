@@ -1,0 +1,41 @@
+schema: "rex/v2"
+items:
+  "0fd8c9d9-40f7-4317-991b-cd5dd6f91166":
+    status: "completed"
+    startedAt: "2026-10-08T19:56:15.360Z"
+    completedAt: "2026-10-08T20:29:28.136Z"
+    endedAt: "2026-10-08T20:29:28.136Z"
+    appliedAt: "2026-10-08T20:29:28.136Z"
+    needsPlacement: true
+    lastModified: "2026-10-08T20:29:28.386Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "673e5666-7ad9-477f-a7e4-63dca792ef36":
+    status: "completed"
+    startedAt: "2026-10-08T18:31:02.752Z"
+    completedAt: "2026-10-08T18:39:25.620Z"
+    endedAt: "2026-10-08T18:39:25.620Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex add: repeatable --criterion, --source, smart-mode rejection, JSON output, help, tests"
+    lastModified: "2026-10-08T18:39:25.876Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "81535cd7-a0de-4c93-b9cc-5974b3312bba":
+    status: "completed"
+    startedAt: "2026-10-08T19:34:04.280Z"
+    completedAt: "2026-10-08T19:45:19.295Z"
+    endedAt: "2026-10-08T19:45:19.295Z"
+    lastModified: "2026-10-08T19:45:19.725Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9e540e68-f293-41b6-b2ab-945c61c85c6d":
+    status: "completed"
+    startedAt: "2026-10-08T19:48:56.106Z"
+    completedAt: "2026-10-08T19:56:13.096Z"
+    endedAt: "2026-10-08T19:56:13.096Z"
+    lastModified: "2026-10-08T19:56:13.635Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d1d9f3d3-76fa-4fe4-b9a6-e39f6addd443":
+    status: "completed"
+    startedAt: "2026-10-08T20:26:51.664Z"
+    completedAt: "2026-10-08T20:29:27.002Z"
+    endedAt: "2026-10-08T20:29:27.002Z"
+    lastModified: "2026-10-08T20:29:27.259Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

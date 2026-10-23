@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "82262cbb-0025-4880-8c12-cea479859f7b":
+    status: "completed"
+    startedAt: "2026-10-08T03:53:44.896Z"
+    completedAt: "2026-10-08T03:57:11.833Z"
+    endedAt: "2026-10-08T03:57:11.833Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added optional LanguageConfig.generatedHeaders (content rule with extensions, pattern, endOfHeader, source, verified); set for Go; inventory reads the first 8 KB only for matching extensions."
+    appliedAt: "2026-10-08T03:57:11.833Z"
+    lastModified: "2026-10-08T03:57:12.086Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

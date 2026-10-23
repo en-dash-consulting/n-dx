@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "4453363f-ee02-402f-b3bd-e668afe5b2dd":
+    status: "completed"
+    startedAt: "2026-10-13T19:50:20.736Z"
+    completedAt: "2026-10-13T19:50:20.736Z"
+    endedAt: "2026-10-13T19:50:20.736Z"
+    appliedAt: "2026-10-13T19:50:20.736Z"
+    lastModified: "2026-10-13T19:50:22.133Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

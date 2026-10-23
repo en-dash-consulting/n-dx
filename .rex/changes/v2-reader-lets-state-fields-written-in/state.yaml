@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "59847e62-38e0-48c2-a5ee-22d2163d410d":
+    status: "completed"
+    startedAt: "2026-10-07T19:02:51.305Z"
+    completedAt: "2026-10-07T19:07:26.521Z"
+    endedAt: "2026-10-07T19:07:26.521Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): readNode strips ItemStateSchema keys from frontmatter before intent parse, warning per key with item id and file. Commit 956da253c."
+    appliedAt: "2026-10-07T19:07:26.521Z"
+    lastModified: "2026-10-07T19:07:26.742Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

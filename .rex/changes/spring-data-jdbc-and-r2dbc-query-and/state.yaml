@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "aa82237e-ac2e-4749-94a8-f09d68fd6a5c":
+    status: "completed"
+    startedAt: "2026-10-11T01:48:35.950Z"
+    completedAt: "2026-10-11T01:52:12.889Z"
+    endedAt: "2026-10-11T01:52:12.889Z"
+    resolutionType: "code-change"
+    resolutionDetail: "java-sql.ts reads explicit imports: Spring Data JDBC/R2DBC Query is native; relational Table reads value/unnamed."
+    appliedAt: "2026-10-11T01:52:12.889Z"
+    lastModified: "2026-10-11T01:52:13.243Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

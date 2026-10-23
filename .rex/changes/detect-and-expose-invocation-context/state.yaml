@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "8f811dac-e4f2-4e47-84ea-8c425a1d6328":
+    status: "completed"
+    startedAt: "2026-04-20T18:27:53.277Z"
+    completedAt: "2026-04-20T18:37:20.851Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added invocationContext field to RunRecord to detect and expose whether hench is invoked via CLI (ndx work) or API (HTTP/MCP). The context is emitted via output stream and persisted in run metadata for both CLI and dashboard visibility."
+    appliedAt: "2026-04-20T18:37:20.851Z"

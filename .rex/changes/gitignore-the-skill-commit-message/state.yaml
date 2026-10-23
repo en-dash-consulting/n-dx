@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "92230d04-189e-4f54-a676-6c5144aef64f":
+    status: "completed"
+    startedAt: "2026-10-09T05:12:49.819Z"
+    completedAt: "2026-10-09T05:22:39.004Z"
+    endedAt: "2026-10-09T05:22:39.004Z"
+    resolutionType: "code-change"
+    resolutionDetail: ".ndx-commit-msg.txt added beside .hench-commit-msg.txt in .gitignore, ndx.gitignore, hench RUNTIME_ENTRIES_AT_ROOT (artifacts.ts), prior-attempt-work and completion bookkeeping excludes; tests added; hench rebuilt. Commit e1099be28."
+    appliedAt: "2026-10-09T05:22:39.004Z"
+    lastModified: "2026-10-09T05:22:39.341Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,26 @@
+---
+id: "718406b9-2826-4a8b-a6d7-94f76b846b00"
+type: "task"
+title: "Implement local gauntlet test runner script"
+slug: "implement-local-gauntlet-test-runner"
+description: "Add run-gauntlet-macos.sh (or extend run-gauntlet.sh with a --platform flag) to build and run the macOS container, streaming test output and returning meaningful exit codes. Validate the full flow: build → run → stream output → clean up. Runner should accept --no-build, --keep-container, and --verbose flags matching the existing Windows runner interface."
+acceptanceCriteria:
+  - "Shell script (e.g., run-gauntlet.sh) in .local_testing/ starts container and runs tests"
+  - "Test output is readable and includes progress indicators"
+  - "Exit codes reflect gauntlet pass/fail status"
+  - "Documentation includes command examples and troubleshooting"
+  - "Script handles container cleanup on completion"
+  - "Script builds the macOS Docker image and runs the gauntlet test suite inside it"
+  - "Script returns exit code 0 on test pass, non-zero on failure or Docker error"
+  - "--no-build, --keep-container, and --verbose flags work as documented"
+  - "Script can be run from the repo root on a macOS or Linux host"
+  - "Container is automatically removed after tests unless --keep-container is set"
+priority: "high"
+tags:
+  - "testing"
+  - "docker"
+  - "automation"
+  - "macos"
+  - "shell"
+source: "smart-add"
+---

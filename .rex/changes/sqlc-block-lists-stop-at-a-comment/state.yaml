@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "c5dc701b-6c05-4e41-a5a4-247ed7ffce30":
+    status: "completed"
+    startedAt: "2026-10-11T04:33:07.454Z"
+    completedAt: "2026-10-11T04:36:41.120Z"
+    endedAt: "2026-10-11T04:36:41.120Z"
+    resolutionType: "code-change"
+    resolutionDetail: "sqlcPaths block-list loop skips blank and #-comment lines instead of breaking; unit test covers both forms (b288db78a)"
+    appliedAt: "2026-10-11T04:36:41.120Z"
+    lastModified: "2026-10-11T04:36:41.395Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

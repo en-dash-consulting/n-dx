@@ -1,0 +1,23 @@
+---
+id: "a76e1030-7683-4d1c-97cb-a5b98b7cadc5"
+type: "change"
+title: "Wire click-through on context graph nodes to open the existing Rex task detail panel"
+slug: "wire-click-through-on-context-graph"
+intent: "Make each node in the Rex context graph clickable. On click, open the existing Rex task detail panel (already implemented in the tasks view) displaying the selected item's full information — title, description, status, acceptance criteria, tags, LoE, and branch/commit attribution. The panel must be the same component used in the tasks view, not a new implementation. Clicking the same node again or pressing Escape should close the panel."
+acceptanceCriteria:
+  - "Clicking any node in the context graph opens the Rex task detail panel with that item's data"
+  - "The panel displays the same fields shown for the same item in the Rex tasks view"
+  - "Clicking the active node a second time, or pressing Escape, dismisses the panel"
+  - "Keyboard navigation reaches nodes (Tab) and can open/close the panel (Enter / Escape)"
+  - "No new detail panel component is introduced — the existing tasks-view panel is reused"
+  - "Opening the detail panel does not alter graph zoom, pan, or node positions"
+touches:
+  - "f4e984ba-0a05-47f4-8358-7f647d6f6828"
+priority: "high"
+tags:
+  - "ui"
+  - "graph"
+  - "rex"
+  - "accessibility"
+source: "smart-add"
+---

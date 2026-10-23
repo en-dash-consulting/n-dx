@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "5f84e163-4e1a-4bf0-9379-d9926cdd57ae":
+    status: "completed"
+    startedAt: "2026-10-11T06:20:03.810Z"
+    completedAt: "2026-10-11T06:29:27.526Z"
+    endedAt: "2026-10-11T06:29:27.526Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: detection walks through the inventory's shared walk (util/project-walk.ts) with the same skip set, no depth cap, early exit. Commit 17db381b3."
+    appliedAt: "2026-10-11T06:29:27.526Z"
+    lastModified: "2026-10-11T06:29:27.802Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

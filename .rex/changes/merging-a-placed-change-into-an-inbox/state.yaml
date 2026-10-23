@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "cf0c6e49-226b-4876-8e78-062226933e54":
+    status: "completed"
+    startedAt: "2026-10-13T17:52:44.462Z"
+    completedAt: "2026-10-13T17:58:34.987Z"
+    endedAt: "2026-10-13T17:58:34.987Z"
+    resolutionType: "code-change"
+    resolutionDetail: "mergeChanges clears target needsPlacement when an absorbed change was placed (carryPlacement); tests added"
+    appliedAt: "2026-10-13T17:58:34.987Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T17:58:35.328Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

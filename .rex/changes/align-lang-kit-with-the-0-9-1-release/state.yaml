@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "d43d8663-14f2-4d50-b4cc-e30c9528a7b5":
+    status: "completed"
+    startedAt: "2026-10-17T01:26:35.251Z"
+    completedAt: "2026-10-17T01:33:50.605Z"
+    endedAt: "2026-10-17T01:33:50.605Z"
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit 0.9.1; tests/e2e/fixed-group-versions.test.js; backfill skips packages absent at a row's commit; verify-build checks lang-kit; overview.md lists lang-kit."
+    appliedAt: "2026-10-17T01:33:50.605Z"
+    lastModified: "2026-10-17T01:33:50.913Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

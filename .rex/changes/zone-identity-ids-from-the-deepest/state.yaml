@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "5d5aaed5-5b3b-4947-9320-3444ac727e1b":
+    status: "completed"
+    startedAt: "2026-09-23T02:43:52.605Z"
+    completedAt: "2026-09-23T02:48:29.586Z"
+    endedAt: "2026-09-23T02:48:29.586Z"
+    resolutionType: "code-change"
+    resolutionDetail: "zone-identity.ts: isAlgorithmicName (placeholders from any earlier numbered id), idsFollowNames with previousIds, reprefixSubZones, findZoneById, deepestDistinguishingSegment, stemWords/idFromStems, dedupeZoneNames moved here. Wired into reapplyCascadeLabels, cascade name inheritance, identity preservation, pins, MCP get_zone, stability. Live n-site2: no numbered ids, no duplicate names, sub-zone prefixes consistent."
+    appliedAt: "2026-09-23T02:48:29.586Z"
+    lastModified: "2026-09-23T02:48:29.919Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

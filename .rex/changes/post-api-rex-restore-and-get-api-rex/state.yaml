@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "13d09a74-ac02-490c-ace2-ba90d5b10774":
+    status: "completed"
+    startedAt: "2026-10-13T05:02:51.345Z"
+    completedAt: "2026-10-13T05:14:00.168Z"
+    endedAt: "2026-10-13T05:14:00.168Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Both restore routes catch rex's V2RestoreRefusedError (via rex-gateway) and answer 409 V2_RESTORE_REFUSED. Commit 292b541a3."
+    appliedAt: "2026-10-13T05:14:00.168Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T05:14:00.675Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "80ef4daf-9b80-4119-bb5b-6729b50fbdfd":
+    status: "completed"
+    startedAt: "2026-09-10T17:39:58.097Z"
+    completedAt: "2026-09-10T17:46:27.809Z"
+    endedAt: "2026-09-10T17:46:27.809Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Took neither option as written. The item assumed one consumer of `!isOriginal`; there were two, the second being the public `StartResult.isFallback`, equally wrong for port 0 and reaching programmatic callers. Added a derived `isFallback` to PortAllocationResult (set at all four return sites in findAvailablePort) and pointed both consumers at it. This gets option 2's benefit — every consumer fixed at once, including future ones — without option 2's cost, since `isOriginal` keeps its documented meaning and value everywhere, so the pinned port.test.ts assertion and public.ts consumers are untouched. All four acceptance criteria met, including criterion 4: new packages/web/tests/integration/port-zero-reporting.test.ts boots the real server in a subprocess and asserts at the reporting layer, verified red first against the literal message. Its occupied-port contrast case stops the suite passing if the notice were simply deleted. Typecheck, pnpm validate and the full root suite green; web 223 -> 224 test files."
+    appliedAt: "2026-09-10T17:46:27.809Z"
+    lastModified: "2026-09-10T17:46:27.815Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

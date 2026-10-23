@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8050220c-7add-4547-8806-0fc6765acb82":
+    status: "completed"
+    startedAt: "2026-10-01T05:28:31.828Z"
+    completedAt: "2026-10-01T05:46:01.708Z"
+    endedAt: "2026-10-01T05:46:01.708Z"
+    resolutionType: "code-change"
+    resolutionDetail: "views/live-task.ts + live-task-model.ts + hooks/use-live-task.ts (events tail via hench:run-appended frames, 1s poll without socket); GET /api/live/task/:taskId (server/routes-live-task.ts); readLogTailLines; terminate stops terminal-started runs by recorded pid (same host, fresh heartbeat). 25 new tests."
+    appliedAt: "2026-10-01T05:46:01.708Z"
+    lastModified: "2026-10-01T05:46:02.095Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

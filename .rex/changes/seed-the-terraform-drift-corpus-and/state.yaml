@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "97e2635b-6c92-4077-9d1a-ba63893af801":
+    status: "completed"
+    startedAt: "2026-10-08T07:57:53.797Z"
+    completedAt: "2026-10-08T08:04:22.546Z"
+    endedAt: "2026-10-08T08:04:22.546Z"
+    resolutionType: "code-change"
+    resolutionDetail: "tf-corpus scripts pinned to three SHAs; all .tf parse cleanly (944/944); policy audit skips grammar build dir"
+    appliedAt: "2026-10-08T08:04:22.546Z"
+    lastModified: "2026-10-08T08:04:22.796Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

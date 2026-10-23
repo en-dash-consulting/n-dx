@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "30bd6623-4c94-461d-a4f3-42614114db05":
+    status: "completed"
+    startedAt: "2026-04-29T19:03:10.292Z"
+    completedAt: "2026-04-29T19:17:11.656Z"
+    endedAt: "2026-04-29T19:17:11.656Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented N-DX authorship trailer that appends vendor, model, run ID, and optional weight to commit messages. Extended RunRecord schema, updated InitRunOptions, and added trailer generation in performCommitPromptIfNeeded. Added comprehensive integration tests verifying format, weight display, and git compatibility. All acceptance criteria met."
+    appliedAt: "2026-04-29T19:17:11.656Z"

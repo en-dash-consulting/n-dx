@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "cbb95845-6603-46a1-9e01-2dfe0035df40":
+    status: "completed"
+    startedAt: "2026-10-08T17:39:47.799Z"
+    completedAt: "2026-10-08T17:54:20.843Z"
+    endedAt: "2026-10-08T17:54:20.843Z"
+    resolutionType: "code-change"
+    resolutionDetail: "sv status reports repo identity, outbound/infrastructure counts and an explicit-null readiness; hub ChildSnapshot/ProjectCard carry repoName + remoteHost and home.ts renders them. Types re-exported through domain-gateway (cap raised 21→24 with justification). Tests in web unit/hub, unit/server/routes-status and a new tests/integration/hub-cards.test.ts."
+    appliedAt: "2026-10-08T17:54:20.843Z"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-08T17:54:21.149Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8ac55bc6-c995-479d-8043-935199d6b764":
+    status: "completed"
+    startedAt: "2026-10-07T22:05:17.683Z"
+    completedAt: "2026-10-07T22:16:30.831Z"
+    endedAt: "2026-10-07T22:16:30.831Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added core/placement.ts (rules ranking + injected text-model seam, agreement detection), registered prd.place, tests, changeset."
+    appliedAt: "2026-10-07T22:16:30.831Z"
+    lastModified: "2026-10-07T22:16:31.064Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "c1874b13-d3ac-402a-93ac-fe49c773c37b":
+    status: "completed"
+    startedAt: "2026-10-01T05:46:05.721Z"
+    completedAt: "2026-10-01T05:54:49.123Z"
+    endedAt: "2026-10-01T05:54:49.123Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Log tab: windowed raw log with follow, filters, search, jump to turn, download"
+    appliedAt: "2026-10-01T05:54:49.123Z"
+    lastModified: "2026-10-01T05:54:49.512Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

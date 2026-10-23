@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f7e0ceb7-df75-44dc-bf00-22abee078ca6":
+    status: "completed"
+    startedAt: "2026-10-09T14:41:10.011Z"
+    completedAt: "2026-10-09T14:56:05.898Z"
+    endedAt: "2026-10-09T14:56:05.898Z"
+    resolutionType: "code-change"
+    resolutionDetail: "applyAmendmentsProblems splits always/pending; add_item and place_change store pending ones with a warnings field."
+    appliedAt: "2026-10-09T14:56:05.898Z"
+    lastModified: "2026-10-09T14:56:06.134Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

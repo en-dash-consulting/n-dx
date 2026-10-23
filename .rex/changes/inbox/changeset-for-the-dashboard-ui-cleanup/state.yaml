@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "c1641f03-a904-4664-8764-5f0c60694528":
+    status: "completed"
+    startedAt: "2026-10-15T04:29:20.892Z"
+    completedAt: "2026-10-15T04:30:04.650Z"
+    endedAt: "2026-10-15T04:30:04.650Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Changeset + viewer architecture doc"
+    appliedAt: "2026-10-15T04:30:04.650Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T04:30:05.498Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "56d25253-371b-472e-b50e-b215f0a3ae44":
+    status: "completed"
+    startedAt: "2026-09-08T23:07:35.916Z"
+    completedAt: "2026-09-08T23:14:12.967Z"
+    endedAt: "2026-09-08T23:14:12.967Z"
+    resolutionType: "code-change"
+    resolutionDetail: "handleScopedRoute now takes `run: () => RouteResult` and invokes it only when the guard passes, so an already-invoked handler is a compile error (verified: TS2345). All 11 call sites migrated, including the ask route whose interim inline guard is folded back in. Removed resolveRouteResult, a no-op ternary with identical branches whose only caller was this helper. Two reachable routes (/api/notion/*, /api/merge-graph) covered by child-process tests, verified red before the change."
+    appliedAt: "2026-09-08T23:14:12.967Z"
+    lastModified: "2026-09-08T23:14:12.973Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

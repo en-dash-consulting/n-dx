@@ -1,0 +1,11 @@
+---
+id: "6ba40421-b660-40fb-9c7d-70651bb863e1"
+type: "capability"
+title: "CLI Hint Correctness, Test Coverage, and Documentation Sync"
+slug: "cli-hint-correctness-test-coverage-and"
+statement: "The ndx, rex, hench and sourcevision CLIs give hints, typo corrections and related-command suggestions that point to commands and flags that exist, and `ndx init` shows the canonical dinosaur on every run."
+criteria: [{"id":"c1","text":"The ndx, rex, hench and sourcevision CLIs shall reference only commands and flags that exist in the current CLI surface in every hint, suggestion and recommendation they print."},{"id":"c2","text":"The CLIs shall not print a hint that references a removed or renamed flag, an obsolete --mode value or a deprecated subcommand."},{"id":"c3","text":"When a user types a mistyped command name, the CLI shall suggest a corrected name that is a valid existing command."},{"id":"c4","text":"When a command fails with an error, the CLI shall show related-command hints that name commands which succeed when run."},{"id":"c5","text":"When a user invokes an unknown command in ndx, rex, hench or sourcevision, the CLI shall print a hint that names a valid command."},{"id":"c6","text":"When a user runs a command named in a hint, that command shall exit 0 or exit with the code the hint leads the user to expect."},{"id":"c7","text":"Every command listed in the documented Orchestration Commands and Direct Tool Access sections shall exist in the CLI and exit 0 when run with --help."},{"id":"c8","text":"The CLI --help output shall report the same flag names and default values as the project documentation."},{"id":"c9","text":"When ndx init runs in a project that is already initialized, ndx init shall show the same dinosaur as a first-time ndx init run."},{"id":"c10","text":"ndx init shall render the dinosaur exactly as the canonical art exported from cli-brand.js, in both the first-time and the already-initialized paths."}]
+source: "smart-add"
+---
+
+Audit the current state of CLI command hints and recommendations across all ndx/rex/hench/sourcevision commands, repair any stale or incorrect hint text, add tests that verify hints are surfaced and actionable, and synchronize all documentation (CLAUDE.md, README, commands.md, help text) with the current CLI command surface.

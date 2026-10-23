@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "271fedf9-4576-4f6b-a0d2-f9fccf6c3452":
+    status: "completed"
+    startedAt: "2026-10-13T19:24:15.626Z"
+    completedAt: "2026-10-13T19:26:38.671Z"
+    endedAt: "2026-10-13T19:26:38.671Z"
+    resolutionType: "code-change"
+    resolutionDetail: "product-pages.test.ts clears the project-metadata cache per case and awaits getProjectMetadata() under act() in the v1 empty-state cases. Test-only."
+    appliedAt: "2026-10-13T19:26:38.671Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T19:26:38.973Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,48 @@
+schema: "rex/v2"
+items:
+  "2211ed70-5738-4ae2-a57b-a8e0baa41950":
+    status: "deferred"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-09T14:52:34.967Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "38679536-98a9-4236-b92d-b4500e4b08f3":
+    status: "completed"
+    startedAt: "2026-10-02T17:23:15.941Z"
+    completedAt: "2026-10-02T17:55:38.777Z"
+    endedAt: "2026-10-02T17:55:38.777Z"
+    lastModified: "2026-10-02T17:55:39.183Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3c86657a-7fcb-4532-83e3-39655d19b52e":
+    status: "completed"
+    startedAt: "2026-09-29T14:58:04.536Z"
+    completedAt: "2026-09-29T15:16:13.619Z"
+    endedAt: "2026-09-29T15:16:13.619Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added packages/web/src/server/route-feature-gates.ts — a declarative inventory of which dashboard endpoint each feature toggle governs — and called enforceRouteFeatureGate at the top of handleApiRoutes in start.ts, so a disabled feature answers 403 naming the flag before dispatch. Closed the real gap: sourcevision.ask (the one toggle over a token-spending endpoint) previously left /api/rex/capture-ask and /api/rex/apply-refinements reachable; sourcevision.prMarkdown, rex.notionSync and rex.integrations were nav-only. The ask endpoint itself keeps its own gate (shaped kind:\"disabled\" body the panel renders) and is marked selfEnforced. Tests: tests/unit/server/route-feature-gates.test.ts (per-endpoint refuse/pass, flag named in body and prose, fail-closed on unreadable .n-dx.json, plus a completeness test that fails if a sidebar featureGate has no server entry) and tests/integration/feature-gate-enforcement.test.ts (real server via child driver, proving the chokepoint is on the dispatch path). Changeset .changeset/server-side-feature-gates.md, @n-dx/web patch. Committed as 9678068e."
+    lastModified: "2026-09-29T15:16:15.943Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "84e55e78-95c8-445f-aa85-e144ef097cef":
+    status: "completed"
+    startedAt: "2026-09-29T17:40:48.113Z"
+    completedAt: "2026-09-29T18:13:17.655Z"
+    endedAt: "2026-09-29T18:13:17.655Z"
+    resolutionType: "code-change"
+    resolutionDetail: "One shared job tray now tracks all seven async dashboard commands plus hench runs, each with phase, elapsed time and a working Stop; per-view pollers in Commands, Overview (analyze-controls) and Suggestions removed; finished runs show a result card linking to their output."
+    lastModified: "2026-09-29T18:13:18.639Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "95eb0e1e-8907-42de-9670-42db59857235":
+    status: "completed"
+    startedAt: "2026-09-28T19:23:21.893Z"
+    completedAt: "2026-09-29T14:57:34.268Z"
+    endedAt: "2026-09-29T14:57:34.268Z"
+    lastModified: "2026-09-29T14:57:36.349Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "eaa62be5-cd00-4968-b9bc-99c0ab8f8288":
+    status: "completed"
+    startedAt: "2026-10-13T19:50:43.528Z"
+    completedAt: "2026-10-13T19:50:43.528Z"
+    endedAt: "2026-10-13T19:50:43.528Z"
+    appliedAt: "2026-10-13T19:50:43.528Z"
+    needsPlacement: true
+    lastModified: "2026-10-13T19:50:44.894Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

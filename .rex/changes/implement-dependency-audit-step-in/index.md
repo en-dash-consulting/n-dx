@@ -1,0 +1,22 @@
+---
+id: "8af32cae-af63-4d0f-a1c7-2a6f9e34a3a5"
+type: "change"
+title: "Implement dependency audit step in self-heal pipeline"
+slug: "implement-dependency-audit-step-in"
+intent: "Add a pre-loop dependency audit that scans all monorepo workspace package.json files using depcheck (or equivalent) and pnpm audit. The step produces a structured report of unused, outdated, and vulnerable packages grouped by workspace package. This report feeds into the cleanup step and is stored in the run artifact for dashboard visibility. No files are modified during this step."
+acceptanceCriteria:
+  - "Runs before the analyze–recommend–execute loop begins"
+  - "Detects unused dependencies in each workspace package via depcheck or equivalent"
+  - "Detects outdated patch and minor versions via pnpm outdated"
+  - "Detects known vulnerabilities via pnpm audit"
+  - "Produces a structured JSON summary stored under a 'dependencyAudit' key in the run artifact"
+  - "Does not modify any files — audit only in this step"
+  - "Audit step is skippable via a --skip-deps flag on ndx self-heal"
+amends: [{"target":"c8582d6b-6088-49bb-8d94-cdf81bc4dc54","delta":"modified","summary":"Implement dependency audit step in self-heal pipeline","base":"69b65ba16fc38d135cc42cebd90cdfd4a9fe9f96ce479e755cd228a1aa64d29a"}]
+priority: "high"
+tags:
+  - "self-heal"
+  - "dependencies"
+  - "audit"
+source: "smart-add"
+---

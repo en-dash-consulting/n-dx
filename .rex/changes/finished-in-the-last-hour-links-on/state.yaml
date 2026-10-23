@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "0a0da654-6924-46dc-960a-9bd1e8105db6":
+    status: "completed"
+    startedAt: "2026-10-01T19:38:26.249Z"
+    completedAt: "2026-10-01T19:44:00.851Z"
+    endedAt: "2026-10-01T19:44:00.851Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Recent-run links on /live now use liveHref/isCurrentWorktree, so another worktree's run opens under /w/<key>/hench-runs/<id>. Commit db620f925."
+    appliedAt: "2026-10-01T19:44:00.851Z"
+    lastModified: "2026-10-01T19:44:01.358Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "ec23f1dd-c253-47da-a432-9a1674362b9b":
+    status: "completed"
+    startedAt: "2026-10-12T10:53:25.150Z"
+    completedAt: "2026-10-12T10:58:53.835Z"
+    endedAt: "2026-10-12T10:58:53.835Z"
+    resolutionType: "code-change"
+    resolutionDetail: "run-resolve.ts looks --task up with findV2Entry on a v2 tree (option a); claim check and claimed-elsewhere use entry.item.id. Commit e3c98fecf."
+    appliedAt: "2026-10-12T10:58:53.835Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T10:58:54.105Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "494ec070-30e1-4345-bcc6-520da88b7bdb":
+    status: "completed"
+    startedAt: "2026-10-08T00:51:56.659Z"
+    completedAt: "2026-10-08T01:01:40.187Z"
+    endedAt: "2026-10-08T01:01:40.187Z"
+    resolutionType: "code-change"
+    resolutionDetail: "ref-resolves checks that an unapplied change's same-change additions form a tree (reports a self-parent or cycle once, plus any addition placed under a cycle), and checks each reference field's destination kind. removed-target-live narrowed to retired targets so a change-layer target is reported once. Regression tests added."
+    appliedAt: "2026-10-08T01:01:40.187Z"
+    lastModified: "2026-10-08T01:01:41.133Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "169d6398-a8e6-43c3-82f8-4b77eb74774e":
+    status: "completed"
+    startedAt: "2026-10-01T05:58:11.556Z"
+    completedAt: "2026-10-01T06:09:12.563Z"
+    endedAt: "2026-10-01T06:09:12.563Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Review tab, stage strip, findings cards, side section; hench records reviewPlan and reviewSpend; web reads the report from disk with a local type."
+    appliedAt: "2026-10-01T06:09:12.563Z"
+    lastModified: "2026-10-01T06:09:12.948Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

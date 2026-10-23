@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "a0e35c39-9756-4877-bb92-e38b40d97996":
+    status: "completed"
+    startedAt: "2026-10-08T08:18:07.615Z"
+    completedAt: "2026-10-08T08:26:14.632Z"
+    endedAt: "2026-10-08T08:26:14.632Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added sql-dialects.ts with provenance-carrying rules and PetClinic goldens"
+    appliedAt: "2026-10-08T08:26:14.632Z"
+    lastModified: "2026-10-08T08:26:14.892Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

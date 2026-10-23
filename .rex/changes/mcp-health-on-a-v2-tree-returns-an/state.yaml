@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "d090cf0a-f41c-4cd5-90c1-d0b774c10e31":
+    status: "completed"
+    startedAt: "2026-10-15T06:39:59.398Z"
+    completedAt: "2026-10-15T06:46:34.184Z"
+    endedAt: "2026-10-15T06:46:34.184Z"
+    resolutionType: "code-change"
+    resolutionDetail: "readPackageVersion (cli/commands/health.ts) returns undefined on invalid JSON; MCP and CLI health no longer throw. Commit eb28a6720."
+    appliedAt: "2026-10-15T06:46:34.184Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T06:46:34.481Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "76bd115f-2f0e-4410-b6c2-d1e314e277af":
+    status: "completed"
+    startedAt: "2026-10-13T03:49:37.959Z"
+    completedAt: "2026-10-13T03:56:06.317Z"
+    endedAt: "2026-10-13T03:56:06.317Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Exported enclosingChangeIds from public.ts; public-surface test and gateways.md updated; patch changeset added."
+    appliedAt: "2026-10-13T03:56:06.317Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T03:56:06.605Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

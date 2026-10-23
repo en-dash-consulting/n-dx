@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "12988943-359c-4482-81f1-29237a3a19ae":
+    status: "completed"
+    startedAt: "2026-10-07T16:16:07.488Z"
+    completedAt: "2026-10-07T16:22:07.377Z"
+    endedAt: "2026-10-07T16:22:07.377Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 change and task intent declare a loose `run` (SavedRunSettingsSchema, keys from RUN_SETTING_KEYS, values unchecked, passthrough). New run-settings warning rule in v2-rules checks blocks with validateRunSettings."
+    appliedAt: "2026-10-07T16:22:07.377Z"
+    lastModified: "2026-10-07T16:22:07.600Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

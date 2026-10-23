@@ -1,0 +1,32 @@
+schema: "rex/v2"
+items:
+  "54bbe6b8-9d8a-4539-b185-3d30b352c921":
+    status: "completed"
+    startedAt: "2026-10-01T22:14:35.454Z"
+    completedAt: "2026-10-01T22:15:07.874Z"
+    endedAt: "2026-10-01T22:15:07.874Z"
+    lastModified: "2026-10-01T22:15:08.252Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "99c5c781-ad7e-41e4-9293-ea3f4d4894f5":
+    status: "completed"
+    startedAt: "2026-10-01T23:30:06.224Z"
+    completedAt: "2026-10-01T23:30:06.224Z"
+    endedAt: "2026-10-01T23:30:06.224Z"
+    lastModified: "2026-10-01T23:30:06.619Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a7f79d0d-4d63-42db-8e5e-e77c979990b8":
+    status: "completed"
+    startedAt: "2026-10-01T22:27:00.982Z"
+    completedAt: "2026-10-01T22:38:39.162Z"
+    endedAt: "2026-10-01T22:38:39.162Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Structural read-only-refusal detection (forked + no diff + zero file-edit calls) in processSuccessfulResult; one cold re-spawn per run with spawn reason read-only-retry, no retry-budget charge, session cache kept; run.readOnlyRefusal recorded and shown by hench show."
+    lastModified: "2026-10-01T22:38:39.550Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c2b544b2-65d0-4714-8cf2-02b797d11a74":
+    status: "completed"
+    startedAt: "2026-10-01T23:22:53.850Z"
+    completedAt: "2026-10-01T23:30:04.758Z"
+    endedAt: "2026-10-01T23:30:04.758Z"
+    lastModified: "2026-10-01T23:30:05.115Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

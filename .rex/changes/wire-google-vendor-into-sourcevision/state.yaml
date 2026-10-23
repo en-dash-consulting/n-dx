@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "6f950a55-accb-4437-a896-80da29fa986a":
+    status: "completed"
+    startedAt: "2026-06-05T14:00:50.695Z"
+    completedAt: "2026-06-05T14:14:39.347Z"
+    endedAt: "2026-06-05T14:14:39.347Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed getAuthMode() to fall through for Google (LLMProvider shape has no top-level .mode). Fixed classifyLLMError to emit Google-specific auth suggestion. Added tests in llm-client and sourcevision."
+    appliedAt: "2026-06-05T14:14:39.347Z"

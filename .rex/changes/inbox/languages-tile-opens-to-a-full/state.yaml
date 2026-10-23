@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "e1355780-c0e5-40a1-8b34-cd6abce2f884":
+    status: "completed"
+    startedAt: "2026-10-15T05:13:47.359Z"
+    completedAt: "2026-10-15T05:17:51.304Z"
+    endedAt: "2026-10-15T05:17:51.304Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Languages breakdown when opened; distinct colours"
+    appliedAt: "2026-10-15T05:17:51.304Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T05:17:51.602Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

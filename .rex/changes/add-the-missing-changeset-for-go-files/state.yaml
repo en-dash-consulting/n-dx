@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "dce5c939-6e58-47c2-b102-463a514a06f6":
+    status: "completed"
+    startedAt: "2026-10-17T01:23:11.503Z"
+    completedAt: "2026-10-17T01:26:14.889Z"
+    endedAt: "2026-10-17T01:26:14.889Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added .changeset/sv-go-generated-header.md (@n-dx/sourcevision patch)."
+    appliedAt: "2026-10-17T01:26:14.889Z"
+    lastModified: "2026-10-17T01:26:15.197Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

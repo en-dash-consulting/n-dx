@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "760d43c9-466a-4daf-95ff-8c6754c4857e":
+    status: "completed"
+    startedAt: "2026-05-14T14:02:16.048Z"
+    completedAt: "2026-05-14T14:14:08.845Z"
+    endedAt: "2026-05-14T14:14:08.845Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added detectHashSuffixDuplicatesInTree (exported) with HashSuffixDuplicateGroup return type; extended stripHashSuffix to cover bracketed UUID and dash-style tails; replaced private tree function in reshape.ts; 40 new unit tests all pass."
+    appliedAt: "2026-05-14T14:14:08.845Z"

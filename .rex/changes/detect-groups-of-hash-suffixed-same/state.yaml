@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "cd96c72a-8003-401f-83a1-2bb70012618a":
+    status: "completed"
+    startedAt: "2026-05-18T17:54:14.546Z"
+    completedAt: "2026-05-18T18:01:43.205Z"
+    endedAt: "2026-05-18T18:01:43.205Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added detectConsolidationGroups + ConsolidationGroup/ConsolidationMember types to add-reshape.ts; 20 unit tests cover all acceptance criteria cases."
+    appliedAt: "2026-05-18T18:01:43.205Z"

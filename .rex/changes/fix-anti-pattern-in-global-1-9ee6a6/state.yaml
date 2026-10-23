@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "9ee6a611-4094-4df5-8948-00f4cbdf65af":
+    status: "completed"
+    startedAt: "2026-04-17T15:22:09.583Z"
+    completedAt: "2026-04-17T15:22:09.583Z"
+    appliedAt: "2026-04-17T15:22:09.583Z"
+  "f653153b-52d7-4155-8773-51258364aeda":
+    status: "completed"
+    startedAt: "2026-04-17T15:11:24.224Z"
+    completedAt: "2026-04-17T15:22:09.410Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Decomposed handleInit into 8 focused helpers: parseInitFlagSet, buildInitArgs, repairInitConfig, resolveInitAssistants, selectInitLLMProvider, runSubInitPhase (lifted from nested), persistInitLLMConfig, printStaticInitSummary. Reduced from 290 lines/40 unique call sites to ~100 lines/~18 call sites."

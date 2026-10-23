@@ -1,0 +1,32 @@
+schema: "rex/v2"
+items:
+  "2f3726fb-a014-453c-8b34-0006dfa08d8a":
+    status: "completed"
+    startedAt: "2026-10-15T06:46:44.242Z"
+    completedAt: "2026-10-15T06:46:44.242Z"
+    endedAt: "2026-10-15T06:46:44.242Z"
+    appliedAt: "2026-10-15T06:46:44.242Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    needsPlacement: true
+    lastModified: "2026-10-15T06:46:44.534Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7b0b3d72-d77b-414c-9729-527c18edf8ef":
+    status: "completed"
+    startedAt: "2026-10-15T06:31:50.390Z"
+    completedAt: "2026-10-15T06:43:16.404Z"
+    endedAt: "2026-10-15T06:43:16.404Z"
+    resolutionType: "code-change"
+    resolutionDetail: "New root-docs subset (3 docs tests, <1 s) plus VALIDATED_DOC_PAGES group mapping; unit tests pin it; TESTING.md updated."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T06:43:17.335Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "df0fe7a7-1995-4f54-bd68-8abcbc0a8595":
+    status: "completed"
+    startedAt: "2026-10-15T06:44:51.969Z"
+    completedAt: "2026-10-15T06:46:43.117Z"
+    endedAt: "2026-10-15T06:46:43.117Z"
+    resolutionType: "code-change"
+    resolutionDetail: "docs/guide/mcp.md now registers HTTP MCP at /p/<id>/mcp/<server> with X-Ndx-Token; no 0.7.0 hub claims remain. Commit 3f9c98ef0."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T06:46:43.409Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

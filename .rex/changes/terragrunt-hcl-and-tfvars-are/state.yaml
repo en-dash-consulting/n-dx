@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b88d60d0-987d-4d12-b99a-d5cc5d9129dd":
+    status: "completed"
+    startedAt: "2026-10-11T05:02:59.994Z"
+    completedAt: "2026-10-11T05:07:35.162Z"
+    endedAt: "2026-10-11T05:07:35.162Z"
+    resolutionType: "code-change"
+    resolutionDetail: "hasTerraformMarker counts terragrunt.hcl, .tfvars and .tftest.hcl; Terragrunt-only test added."
+    appliedAt: "2026-10-11T05:07:35.162Z"
+    lastModified: "2026-10-11T05:07:37.034Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

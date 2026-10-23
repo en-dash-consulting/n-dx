@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "db1a04e4-553b-46c7-9635-9a03f1646d4a":
+    status: "completed"
+    startedAt: "2026-10-13T16:37:37.235Z"
+    completedAt: "2026-10-13T16:42:55.447Z"
+    endedAt: "2026-10-13T16:42:55.447Z"
+    resolutionType: "code-change"
+    resolutionDetail: "items.ts single and bulk PATCH complete first, write fields after; 4 route tests; changeset line. Commit bee8f9428."
+    appliedAt: "2026-10-13T16:42:55.447Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T16:42:55.733Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

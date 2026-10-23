@@ -1,0 +1,32 @@
+---
+id: "566ba657-0ea2-4f0e-88f9-b719c6a2ecfa"
+type: "change"
+title: "Fail-forward mode: commit automatically at the end of every run, loop and settings change"
+slug: "fail-forward-mode-commit-automatically"
+intent: "A single settings toggle, \"fail-forward mode\", that makes n-dx save work automatically instead of leaving it uncommitted. When it is on, the end of every command, run and loop adds and commits whatever that work changed, using a simple constant message per kind of change. Settings changes commit the same way, including the ones made through the pre-run menu.\n\nThe name states the intent: never stall or lose work because something was left dirty — keep moving forward and let the history record each step.\n\nScope:\n- **End of a run or loop.** When an autonomous run finishes — `ndx work --auto`, `--loop`, `--iterations`, `--epic-by-epic` — commit what it changed. In a loop this is per iteration, not once at the end, so an interrupted loop still leaves each completed iteration committed.\n- **Settings changes.** Writing `.n-dx.json`, `.rex/config.json` or `.hench/config.json` commits with a constant message naming what changed.\n- **The pre-run menu.** Settings edited from the prepare-task modal (`packages/web/src/viewer/components/prepare-task-modal.ts`) commit on the same path, not a separate one.\n- **Constant messages.** A fixed message per kind (settings, PRD, scan output, run result) rather than generated prose — predictable history, nothing to review before it lands.\n\nThe toggle itself:\n- A boolean key in `FEATURE_REGISTRY` (`packages/web/src/server/routes-features.ts:43`), which renders generically in `views/feature-toggles.ts` on the Project settings page. Default off.\n- Enforced server-side with `isFeatureEnabled` so it fails closed, and readable by the CLI/hench paths too — those do not go through the web server, so the toggle must live in project config that both sides read, not in web-only state.\n- **The toggle needs an info icon** opening a short explanation of what fail-forward mode commits, when, and that it is off by default. The settings sections currently render label plus description text with no per-toggle help affordance, so this is a small addition to the toggle component rather than a copy change.\n\nRelationship to the one-click labelled commit feature: that one delivers dirty-path classification and pathspec-scoped staging, which this feature needs. Build on it rather than adding a second commit path — and in particular do not route this through `POST /api/git/commit` while it still runs `git add -A` (`packages/web/src/server/routes-git.ts:229`), or an automatic commit will sweep in unrelated work.\n\nInteractions worth settling in design, because they are where this can do damage:\n- Hench's pre-run gate refuses to start against a dirty tree (`performPreRunCommitGateIfNeeded`, `packages/hench/src/agent/lifecycle/shared.ts`) and there is already an \"Allow dirty tree\" escape in the prepare-task modal. Fail-forward changes what that gate sees; the two must not fight.\n- An automatic commit must not stage a user's unrelated in-progress work. Scope every commit to the paths the step actually touched.\n- Attribution: these commits should carry the `N-DX:` trailer block like other n-dx-generated commits, and name an `N-DX-Item` where the work belongs to one.\n- Nothing should be pushed automatically. Committing is the whole promise."
+acceptanceCriteria:
+  - "A 'fail-forward mode' toggle exists in settings, defaults to off, and is read by both the dashboard and the CLI/hench run paths from shared project config rather than web-only state"
+  - "The toggle carries an info icon that opens a short explanation of what is committed, when, and that it is off by default"
+  - "With the mode on, a finished run commits the work it changed; in a loop each iteration commits as it completes, so an interrupted loop leaves completed iterations committed"
+  - "With the mode on, a settings change commits with a constant message naming what changed"
+  - "Settings changed through the pre-run menu commit by the same path as settings changed on the settings page"
+  - "Commit messages are fixed per kind of change rather than generated prose"
+  - "Every automatic commit stages only the paths that step touched, leaving unrelated in-progress work uncommitted and unstaged"
+  - "Automatic commits carry the N-DX trailer block, naming an N-DX-Item where the work belongs to one"
+  - "With the mode off, behaviour is unchanged and nothing is committed automatically"
+  - "Nothing is pushed automatically in either state"
+  - "The mode and hench's dirty-tree pre-run gate do not contradict each other"
+touches:
+  - "16015ed9-d730-417e-a5ca-22c073a934b6"
+priority: "medium"
+tags:
+  - "web"
+  - "git"
+  - "hench"
+  - "settings"
+  - "feature-toggle"
+  - "fail-forward"
+source: "ndx-capture"
+blockedBy:
+  - "fae4e9ca-fa04-4359-a482-8f703143ea47"
+---

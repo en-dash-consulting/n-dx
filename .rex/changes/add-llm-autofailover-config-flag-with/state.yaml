@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "8bf9ba99-1896-42de-b63e-7b14ed433a7f":
+    status: "completed"
+    startedAt: "2026-05-06T14:31:44.611Z"
+    completedAt: "2026-05-06T14:48:51.322Z"
+    endedAt: "2026-05-06T14:48:51.322Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added llm.autoFailover config field to schema (llm-types.ts), loader (llm-config.ts), CLI validator and help (config.js), web API (routes-llm.ts), web UI (llm-provider.ts with ToggleField), and unit tests (llm-config.test.ts, cli-config.test.js). Field defaults to false, persists through .n-dx.json, validates via ndx config CLI and web dashboard."
+    appliedAt: "2026-05-06T14:48:51.322Z"

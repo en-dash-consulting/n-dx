@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "1fc7b668-07cf-49cb-94d1-068877751514":
+    status: "completed"
+    startedAt: "2026-05-18T13:04:57.681Z"
+    completedAt: "2026-05-18T13:07:54.431Z"
+    endedAt: "2026-05-18T13:07:54.431Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added What to Focus On (3 avenues: self-heal items, help-wanted tags, doc gaps) and How To Contribute (branch/commit/PR flow, pre-commit gates, ndx ci health gate, N-DX-* trailer conventions, PRD-linked commits) to CONTRIBUTING.md. Sections positioned to match the required five-section order."
+    appliedAt: "2026-05-18T13:07:54.431Z"

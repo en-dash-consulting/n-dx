@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b6ca93d3-fcf8-4965-9418-5ead8f5a96df":
+    status: "completed"
+    startedAt: "2026-10-17T01:23:12.835Z"
+    completedAt: "2026-10-17T01:29:32.998Z"
+    endedAt: "2026-10-17T01:29:32.998Z"
+    resolutionType: "code-change"
+    resolutionDetail: "The test job builds grammars and sets SV_REQUIRE_GRAMMARS=1 on every OS leg that runs the sourcevision suite; the build job's copy is removed. A CI run still has to confirm it (operator push)."
+    appliedAt: "2026-10-17T01:29:32.998Z"
+    lastModified: "2026-10-17T01:29:33.347Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

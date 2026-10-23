@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "03fd3c35-f82f-4939-9b63-09e97ff86ecc":
+    status: "completed"
+    startedAt: "2026-07-16T14:25:07.397Z"
+    completedAt: "2026-07-17T15:09:39.925Z"
+    endedAt: "2026-07-17T15:09:39.925Z"
+    resolutionType: "code-change"
+    resolutionDetail: "SVG title tooltip on connecting file rows listing target zone names + call weights (weight-desc), resolved from rendered zones; 6 new unit tests"
+    appliedAt: "2026-07-17T15:09:39.925Z"

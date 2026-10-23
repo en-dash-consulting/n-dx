@@ -1,0 +1,19 @@
+schema: "rex/v2"
+items:
+  "99f752e7-487c-4447-b0e7-0636224705b2":
+    status: "completed"
+    startedAt: "2026-09-17T02:58:11.140Z"
+    completedAt: "2026-09-17T03:11:12.060Z"
+    endedAt: "2026-09-17T03:11:12.060Z"
+    resolutionType: "code-change"
+    resolutionDetail: "packages/core/mcp-shim.js bridges stdio JSON-RPC to /p/&lt;id&gt;/mcp/&lt;server&gt; with the worktree header when the hub is up and the repo registered, and spawns the sub-package's stdio server otherwise; hub port and project id come from the directory's start marker first."
+    lastModified: "2026-09-17T03:11:12.437Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "b5d8cf75-346b-40c5-ad1d-07e29a5a855b":
+    status: "completed"
+    startedAt: "2026-09-17T03:11:13.390Z"
+    completedAt: "2026-09-17T03:11:13.390Z"
+    endedAt: "2026-09-17T03:11:13.390Z"
+    appliedAt: "2026-09-17T03:11:13.390Z"
+    lastModified: "2026-09-17T03:11:13.773Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

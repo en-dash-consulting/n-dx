@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "180d3cb3-9373-4a36-8b90-2c1e9f5d375a":
+    status: "completed"
+    startedAt: "2026-10-08T01:54:25.640Z"
+    completedAt: "2026-10-08T01:59:46.799Z"
+    endedAt: "2026-10-08T01:59:46.799Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Pinned corpus, clone and report scripts added; G1 met at 99.93%"
+    appliedAt: "2026-10-08T01:59:46.799Z"
+    lastModified: "2026-10-08T01:59:47.023Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

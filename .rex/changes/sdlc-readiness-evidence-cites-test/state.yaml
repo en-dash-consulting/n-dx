@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "7a93a121-aa1c-45ee-86a9-e2f4a4e1a6a4":
+    status: "completed"
+    startedAt: "2026-10-21T13:41:52.432Z"
+    completedAt: "2026-10-21T13:43:47.435Z"
+    endedAt: "2026-10-21T13:43:47.435Z"
+    resolutionType: "code-change"
+    resolutionDetail: "SDLC walk skips the shared fixture directory list"
+    appliedAt: "2026-10-21T13:43:47.435Z"
+    lastModified: "2026-10-21T13:43:48.116Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

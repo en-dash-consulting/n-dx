@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8f4d555e-67a4-4ded-b67a-029211d5508b":
+    status: "completed"
+    startedAt: "2026-10-08T03:16:16.129Z"
+    completedAt: "2026-10-08T03:22:44.218Z"
+    endedAt: "2026-10-08T03:22:44.218Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added tree-sitter-go v0.25.0 pin + grammar integration test (commit 88c243a2d)"
+    appliedAt: "2026-10-08T03:22:44.218Z"
+    lastModified: "2026-10-08T03:22:44.586Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

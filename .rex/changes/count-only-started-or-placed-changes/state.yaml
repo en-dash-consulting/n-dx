@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "bd27f348-30ef-4e76-b29a-38401ecb10ad":
+    status: "completed"
+    startedAt: "2026-10-08T04:34:55.849Z"
+    completedAt: "2026-10-08T04:46:55.137Z"
+    endedAt: "2026-10-08T04:46:55.137Z"
+    resolutionType: "code-change"
+    resolutionDetail: "isBuildingChange + changingNodes in schema/v2-rules.ts shared by computeProductStatus and long-revised; sub-capabilities follow an amended parent; health reads current checks only (latest at per requirement); retired nodes always ok (2a940e6b)."
+    appliedAt: "2026-10-08T04:46:55.137Z"
+    lastModified: "2026-10-08T04:46:55.368Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

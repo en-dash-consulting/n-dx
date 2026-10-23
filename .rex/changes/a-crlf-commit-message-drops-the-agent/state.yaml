@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "67f17f2b-c930-4f62-8a78-40f056e64f4b":
+    status: "completed"
+    startedAt: "2026-10-09T04:01:19.169Z"
+    completedAt: "2026-10-09T04:07:25.711Z"
+    endedAt: "2026-10-09T04:07:25.711Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Normalise line endings in appendTrailerBlock; CRLF tests added"
+    appliedAt: "2026-10-09T04:07:25.711Z"
+    lastModified: "2026-10-09T04:07:26.432Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

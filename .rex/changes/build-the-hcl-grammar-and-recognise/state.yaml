@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "442fc751-4ea4-4a7f-855f-77a9e31f9a4a":
+    status: "completed"
+    startedAt: "2026-10-08T07:48:48.462Z"
+    completedAt: "2026-10-08T07:56:24.792Z"
+    endedAt: "2026-10-08T07:56:24.792Z"
+    resolutionType: "code-change"
+    resolutionDetail: "HCL grammar pinned; Terraform config, detection and inventory roles added; infrastructure.json unchanged by test."
+    appliedAt: "2026-10-08T07:56:24.792Z"
+    lastModified: "2026-10-08T07:56:25.055Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

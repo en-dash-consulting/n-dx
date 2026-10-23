@@ -1,0 +1,30 @@
+---
+id: "7acad3da-6e29-4e52-bed1-121ad63b4fd3"
+type: "change"
+title: "Add regression tests for single-child compaction across write path and reshape migration"
+slug: "add-regression-tests-for-single-child"
+intent: "Write regression tests covering both surfaces introduced by single-child compaction: (1) serializer unit tests asserting the new write-path behavior for single-child vs multi-child containers, and (2) integration tests for the reshape compaction pass using a fixture prd_tree containing known over-wrapped directories. Tests should verify idempotency, metadata preservation, and that no data is lost when a wrapper directory is collapsed."
+acceptanceCriteria:
+  - "Serializer unit test: single-child container produces a flat file, not a subdirectory + index.md"
+  - "Serializer unit test: two-child container still produces the existing subdirectory structure"
+  - "Reshape integration test: fixture tree with 3 over-wrapped directories is fully compacted in one reshape run"
+  - "Reshape integration test: re-running reshape on the compacted fixture produces no further changes"
+  - "Parser unit test: compacted tree round-trips back to the original PRD item tree with all titles, statuses, and metadata intact"
+  - "Serializer unit test: single-child folder fixture produces exactly one file with no index.md"
+  - "Serializer unit test: two-child folder fixture produces named files plus one index.md"
+  - "Parser unit test: legacy folder with index.md and one named file parses without duplicate fields"
+  - "Reshape integration test: single-child folder with index.md is reduced to named file only after reshape runs"
+  - "All four tests run in the existing rex test suite with no new test infrastructure required"
+touches:
+  - "84a54eee-5e54-43c0-8232-fa8929e64e33"
+priority: "high"
+tags:
+  - "rex"
+  - "testing"
+  - "folder-tree"
+  - "reshape"
+  - "prd-storage"
+  - "regression"
+  - "serializer"
+source: "smart-add"
+---

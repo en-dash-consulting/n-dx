@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "3e7f093b-4ca3-42cf-8dab-3c7803698480":
+    status: "completed"
+    startedAt: "2026-10-15T07:20:49.741Z"
+    completedAt: "2026-10-15T07:26:58.233Z"
+    endedAt: "2026-10-15T07:26:58.233Z"
+    resolutionType: "code-change"
+    resolutionDetail: "useProductRead keeps ready data on a failed refetch and sets refreshError; pages show a StaleNotice. parseAnswerRefinements takes {changeLayer}; the Ask route passes it. Commit 81bac3da4."
+    appliedAt: "2026-10-15T07:26:58.233Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T07:26:59.150Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "24d15e85-b4b7-49a4-852a-a9979ffb44b7":
+    status: "completed"
+    startedAt: "2026-10-13T17:26:01.631Z"
+    completedAt: "2026-10-13T17:30:09.958Z"
+    endedAt: "2026-10-13T17:30:09.958Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added TaskClaims.heldByEnclosingChange, used by selectTaskEntry and run-resolve; 3 new resolve tests."
+    appliedAt: "2026-10-13T17:30:09.958Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T17:30:10.267Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

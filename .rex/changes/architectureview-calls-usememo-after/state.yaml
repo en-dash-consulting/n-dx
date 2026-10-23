@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "cbb8a5de-d037-4353-acd9-a0f4b4d41168":
+    status: "completed"
+    startedAt: "2026-09-10T17:24:13.335Z"
+    completedAt: "2026-09-10T17:30:21.397Z"
+    endedAt: "2026-09-10T17:30:21.397Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Hoisted the zoneHealthData useMemo above the enrichment gate in architecture.ts (solution option 1). Went further than option 1 on the guard: instead of only appending architecture.ts to the hardcoded GATED_VIEWS list, added a completeness assertion that reads the views directory for `h(EnrichmentGate` and asserts the list equals it — closing the class that let this instance escape, which was option 2's goal at a fraction of its cost (no generalisation of the crude componentBody parser needed, since the list is still explicit; only its completeness is derived). All four acceptance criteria met: structural guard red before the fix with exactly one failure and green after, transition tests across the threshold in both directions and repeatedly, and a dedicated assertion that the zone-health chart renders above the threshold and not below. Build, typecheck, pnpm validate and the full root suite green; web 3549 -> 3555 tests."
+    appliedAt: "2026-09-10T17:30:21.397Z"
+    lastModified: "2026-09-10T17:30:21.403Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

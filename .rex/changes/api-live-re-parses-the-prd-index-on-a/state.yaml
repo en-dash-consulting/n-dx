@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "5e38e56b-d2bf-47b6-af0a-92a0c877bdf1":
+    status: "completed"
+    startedAt: "2026-10-01T18:28:17.040Z"
+    completedAt: "2026-10-01T18:33:55.362Z"
+    endedAt: "2026-10-01T18:33:55.362Z"
+    resolutionType: "code-change"
+    resolutionDetail: "prdIndexFor keyed on prd.json mtime:size; absent cache → empty index. Tests added."
+    appliedAt: "2026-10-01T18:33:55.362Z"
+    lastModified: "2026-10-01T18:33:55.698Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

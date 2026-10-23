@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "901a3775-37cc-42e1-bf80-c9d5e9cf5a6f":
+    status: "completed"
+    startedAt: "2026-10-12T11:23:29.967Z"
+    completedAt: "2026-10-13T17:20:25.216Z"
+    endedAt: "2026-10-13T17:20:25.216Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Commit baf820f3c. New GET /api/rex/product, /changes, /product/capability/<id> (routes-rex/product.ts) build the view shapes from loadPrdModel/productReport/capabilityReport via the gateway; v1 answers {layout:\"v1\"} and the pages show an empty state naming `<cli> migrate`. Product and Changes are Plan-stage views (requiresServer); capability page opens from a Product row."
+    appliedAt: "2026-10-13T17:20:25.216Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T17:20:25.511Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

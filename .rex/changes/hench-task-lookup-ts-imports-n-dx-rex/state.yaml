@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "b6564c07-4cae-4f11-903e-ada8957aa99c":
+    status: "completed"
+    startedAt: "2026-10-15T05:39:09.977Z"
+    completedAt: "2026-10-15T05:45:26.469Z"
+    endedAt: "2026-10-15T05:45:26.469Z"
+    resolutionType: "code-change"
+    resolutionDetail: "task-lookup.ts imports via rex-gateway; domain-isolation gateway rule now flags dynamic import() of the guarded package."
+    appliedAt: "2026-10-15T05:45:26.469Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T05:45:27.526Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

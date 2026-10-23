@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "e052cf8e-0feb-48e5-9b39-3f5fc3856f4c":
+    status: "completed"
+    startedAt: "2026-10-10T05:06:21.428Z"
+    completedAt: "2026-10-11T05:24:11.457Z"
+    endedAt: "2026-10-11T05:24:11.457Z"
+    resolutionType: "code-change"
+    resolutionDetail: "classifyRole: Terraform gets role test when a non-Terraform test pattern matches, else config. Commit 0be5294ed."
+    appliedAt: "2026-10-11T05:24:11.457Z"
+    lastModified: "2026-10-11T05:24:12.984Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

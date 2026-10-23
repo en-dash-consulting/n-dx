@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "383f9b5f-a72b-44ec-8a99-d37769c50866":
+    status: "completed"
+    startedAt: "2026-10-09T04:10:08.195Z"
+    completedAt: "2026-10-09T04:25:21.457Z"
+    endedAt: "2026-10-09T04:25:21.457Z"
+    resolutionType: "code-change"
+    resolutionDetail: "place_change takes optional proposed and criteria (AmendmentSchema criteria shape) with target + explicit relation amends and recordPlacement stores them on the modified amendment (base unchanged); apply_change's nothing-to-modify refusal names place_change's proposed and criteria; tests + snapshot updated"
+    appliedAt: "2026-10-09T04:25:21.457Z"
+    lastModified: "2026-10-09T04:25:21.749Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

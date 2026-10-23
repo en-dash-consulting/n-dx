@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b782c83c-46f4-4610-b000-a12864198aa5":
+    status: "completed"
+    startedAt: "2026-10-13T18:00:04.286Z"
+    completedAt: "2026-10-13T18:10:38.370Z"
+    endedAt: "2026-10-13T18:10:38.370Z"
+    resolutionType: "code-change"
+    resolutionDetail: "SQL and HCL grammars, queries, readers and tests moved into @n-dx/lang-sql and @n-dx/lang-terraform; sourcevision ships no grammar; corpus reports unchanged."
+    appliedAt: "2026-10-13T18:10:38.370Z"
+    lastModified: "2026-10-13T18:10:38.657Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

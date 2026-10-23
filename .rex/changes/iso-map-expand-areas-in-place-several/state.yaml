@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "e5f4bf9f-3a37-4c5c-a4f5-b6a9f7127c44":
+    status: "completed"
+    startedAt: "2026-09-23T13:35:51.505Z"
+    completedAt: "2026-09-23T13:35:51.505Z"
+    endedAt: "2026-09-23T13:35:51.505Z"
+    resolutionType: "code-change"
+    resolutionDetail: "compose() + build() in the iso runtime: expanded areas become frames carrying their scene's zones, grid rows/cols widen, connectors remapped with face-snapped endpoints; area nodes namespaced area:<id>; Expand/Collapse/Open on its own; 3 jsdom tests; verified with n-site2 screenshots."
+    appliedAt: "2026-09-23T13:35:51.505Z"
+    lastModified: "2026-09-23T13:35:51.891Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

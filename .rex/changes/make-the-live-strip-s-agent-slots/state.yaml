@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "94195450-f8a4-4798-857b-a63d71ec3482":
+    status: "completed"
+    startedAt: "2026-10-01T23:04:44.070Z"
+    completedAt: "2026-10-01T23:16:44.592Z"
+    endedAt: "2026-10-01T23:16:44.592Z"
+    resolutionType: "code-change"
+    resolutionDetail: "machine.slots: standalone counts live-verdict runs across all worktrees vs hench limit; behind the hub, proxy sends X-Ndx-Hub-Admission (running/maxSessions/queued) on GET /api/live and the route overlays it. Tile label names scope."
+    appliedAt: "2026-10-01T23:16:44.592Z"
+    lastModified: "2026-10-01T23:16:44.955Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

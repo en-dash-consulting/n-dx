@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "4cd36470-40d7-4bec-bd21-f3fe6ecb62c1":
+    status: "completed"
+    startedAt: "2026-10-02T05:23:26.659Z"
+    completedAt: "2026-10-02T05:36:02.527Z"
+    endedAt: "2026-10-02T05:36:02.527Z"
+    resolutionType: "code-change"
+    resolutionDetail: "MODEL_COSTS claude-sonnet-5 set to 2/10/2.50/0.20 (verified against pricing page 2026-10-02); header comment fixed; tests updated; changeset added."
+    appliedAt: "2026-10-02T05:36:02.527Z"
+    lastModified: "2026-10-02T05:36:02.927Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

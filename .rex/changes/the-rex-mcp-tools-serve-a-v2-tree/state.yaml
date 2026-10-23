@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "c026ba0d-b8bf-48e4-8f66-9d75cab27fb9":
+    status: "completed"
+    startedAt: "2026-10-12T07:34:57.545Z"
+    completedAt: "2026-10-12T07:50:02.377Z"
+    endedAt: "2026-10-12T07:50:02.377Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Commit 1aac865d9: v2 rules for move/merge/edit/claim on the change-layer store; tests/integration/v2-mcp-tools.test.ts covers all ten tools plus the workspace."
+    appliedAt: "2026-10-12T07:50:02.377Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T07:50:03.109Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "29d832fa-e3d5-45e1-91ef-58caba7f899c":
+    status: "completed"
+    startedAt: "2026-04-18T15:29:56.845Z"
+    completedAt: "2026-04-18T15:29:56.845Z"
+    appliedAt: "2026-04-18T15:29:56.845Z"
+  "6b4127ed-4c0b-4bf4-ae0a-43e6f7e65c8c":
+    status: "completed"
+    startedAt: "2026-04-18T15:26:24.624Z"
+    completedAt: "2026-04-18T15:29:56.808Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Added zone type overrides for .local-testing and local-docker-harness as infrastructure in .n-dx.json; added hints.md entry explaining the zone and why cohesion 0 is expected for gitignored infra scripts."

@@ -1,0 +1,15 @@
+schema: "rex/v2"
+items:
+  "0f4f26a4-be92-4cc5-ab4a-6c47a4aae4b6":
+    status: "deferred"
+    lastModified: "2026-10-09T19:08:05.594Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "738edb51-d79e-4e0e-a2fd-d661d03391d5":
+    status: "deferred"
+    needsPlacement: true
+    lastModified: "2026-10-09T19:08:04.426Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b2d8b4c9-e780-498e-9195-3ab07036fd42":
+    status: "deferred"
+    lastModified: "2026-10-09T19:08:05.021Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

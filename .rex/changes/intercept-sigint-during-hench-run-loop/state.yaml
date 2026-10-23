@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "f00023d2-c399-4bd2-beb8-481549a6ad37":
+    status: "completed"
+    startedAt: "2026-04-20T19:16:56.406Z"
+    completedAt: "2026-04-20T19:23:48.298Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented SIGINT handler in agent loop with cancellation flag, graceful exit at loop boundary, and proper handler cleanup. Added \"cancelled\" status to schema. All tests pass."
+    appliedAt: "2026-04-20T19:23:48.298Z"

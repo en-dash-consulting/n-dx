@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "4fc2aacd-651b-4499-8555-2a6f2c8007ba":
+    status: "completed"
+    startedAt: "2026-04-24T14:36:54.749Z"
+    completedAt: "2026-04-24T15:03:15.777Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added tags filter to PrioritizationOptions, findNextTask, findActionableTasks; threaded through hench run via --tags flag; ndx self-heal now passes --tags=self-heal"
+    appliedAt: "2026-04-24T15:03:15.777Z"

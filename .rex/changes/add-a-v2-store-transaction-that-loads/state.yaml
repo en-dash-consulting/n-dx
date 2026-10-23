@@ -1,0 +1,11 @@
+schema: "rex/v2"
+items:
+  "000328e7-4ac8-461d-a931-e286420db79f":
+    status: "completed"
+    startedAt: "2026-10-08T20:26:23.972Z"
+    completedAt: "2026-10-08T21:45:54.362Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Delivered by run d3e891fe (commits 034fecbb0, review repair 66426a641): withPrdModelTransaction in packages/rex/src/store/prd-model-transaction.ts with tests for the lock span, a waiting concurrent writer and the v1 refusal. That run failed only at the test gate (stale rex dist/ after the review repair; hench bug 7d3e9741). The isolation-test gap was closed by follow-up d3c20225 (run 0953a112, commit 6bc7a0708), whose gate passed. Completed by hand with Ryan's approval, 2026-10-08."
+    appliedAt: "2026-10-08T21:45:54.362Z"
+    lastModified: "2026-10-08T21:45:54.626Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

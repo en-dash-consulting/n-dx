@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "a6c4edd0-36a6-4bcf-860f-6d61b6c900a3":
+    status: "completed"
+    startedAt: "2026-10-15T22:45:43.261Z"
+    completedAt: "2026-10-15T22:45:43.261Z"
+    endedAt: "2026-10-15T22:45:43.261Z"
+    resolutionType: "code-change"
+    resolutionDetail: "escape() requires exactly 4/8 hex digits and rejects surrogates and code points above U+10FFFF with TomlSyntaxError; tests in toml-lite.test.ts and python-build.test.ts. Fixed within task 203cd7bb."
+    appliedAt: "2026-10-15T22:45:43.261Z"
+    lastModified: "2026-10-15T22:45:43.562Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

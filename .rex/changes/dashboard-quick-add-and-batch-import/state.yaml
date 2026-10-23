@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "812b0599-8d2a-41f9-9570-3060ce5d3a78":
+    status: "completed"
+    startedAt: "2026-10-12T02:10:34.757Z"
+    completedAt: "2026-10-12T02:28:48.309Z"
+    endedAt: "2026-10-12T02:28:48.309Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Quick Add and batch import forward a v2 tree's `changes` preview and render each change with its suggested placement. Accepting posts to the new POST /api/rex/smart-add-accept, which re-runs `rex add --accept`; the v1 accept path is not reached. Batch import's accept now counts the change rows it gets back, restoring its log line and refresh broadcast."
+    appliedAt: "2026-10-12T02:28:48.309Z"
+    lastModified: "2026-10-12T02:28:48.852Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

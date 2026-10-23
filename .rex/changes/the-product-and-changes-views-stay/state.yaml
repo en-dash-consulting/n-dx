@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "e0f4567a-1b58-41af-83aa-aecc65adcd95":
+    status: "completed"
+    startedAt: "2026-10-13T17:32:36.485Z"
+    completedAt: "2026-10-13T17:38:00.124Z"
+    endedAt: "2026-10-13T17:38:00.124Z"
+    resolutionType: "code-change"
+    resolutionDetail: "useProductRead refetches on rex:prd-changed via new usePrdChangedRefresh hook; commit 54cc1a166"
+    appliedAt: "2026-10-13T17:38:00.124Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T17:38:00.421Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

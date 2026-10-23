@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "dffc3dc6-6c96-4f44-8b07-0e6c15f85d30":
+    status: "completed"
+    startedAt: "2026-05-06T03:02:56.560Z"
+    completedAt: "2026-05-06T03:12:14.253Z"
+    endedAt: "2026-05-06T03:12:14.253Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Replaced all heuristics in stale-check.js with a single directory-existence probe. Deleted dead staleness-check.js. Updated cli.js and tests."
+    appliedAt: "2026-05-06T03:12:14.253Z"

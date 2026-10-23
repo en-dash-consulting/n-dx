@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "523668ec-59f0-4091-a891-9121f7077415":
+    status: "completed"
+    startedAt: "2026-09-22T12:45:17.912Z"
+    completedAt: "2026-09-22T12:48:57.560Z"
+    endedAt: "2026-09-22T12:48:57.560Z"
+    resolutionType: "code-change"
+    resolutionDetail: "No-change re-run on caos went from 277 s with 19 text-model calls to 1.0 s with zero LLM calls (161 cache hits): fallbacks skipped on unchanged files, escalated zones carried forward, judged state free of zone names, naming progress + concurrency"
+    appliedAt: "2026-09-22T12:48:57.560Z"
+    lastModified: "2026-09-22T12:48:57.571Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

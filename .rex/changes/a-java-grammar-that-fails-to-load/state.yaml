@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "7fc53a4a-418c-4dfe-bfc0-9f10f2a92181":
+    status: "completed"
+    startedAt: "2026-10-08T03:34:27.810Z"
+    completedAt: "2026-10-08T03:43:34.563Z"
+    endedAt: "2026-10-08T03:43:34.563Z"
+    resolutionType: "code-change"
+    resolutionDetail: "buildPackImportGraph loads each grammar up front; on failure it warns once (path + error) and skips that pack. Unit test uses a non-WASM file in a temp grammarDir."
+    appliedAt: "2026-10-08T03:43:34.563Z"
+    lastModified: "2026-10-08T03:43:35.339Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

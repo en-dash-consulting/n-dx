@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ac7a26e1-0f28-4e63-b481-4fa0fbf094e0":
+    status: "completed"
+    startedAt: "2026-10-15T04:49:24.445Z"
+    completedAt: "2026-10-15T05:00:11.223Z"
+    endedAt: "2026-10-15T05:00:11.223Z"
+    resolutionType: "code-change"
+    resolutionDetail: "sv pack bundle and sv pack add --from with a Node-only tar archive; tests with an injected npm; docs and help updated (aa1a348b1)"
+    appliedAt: "2026-10-15T05:00:11.223Z"
+    lastModified: "2026-10-15T05:00:11.518Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

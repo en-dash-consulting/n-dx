@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "e92dfe2f-762f-4a30-adb7-dde28e7c7ff9":
+    status: "completed"
+    startedAt: "2026-09-23T02:48:44.768Z"
+    completedAt: "2026-09-23T03:13:35.832Z"
+    endedAt: "2026-09-23T03:13:35.832Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Balanced subdivision (70% rule, resolution retry, first-differing-directory split, else none); capZoneCount relative-weight scoring with size guard; oversized-zone health signal; test communities per parent dir / nested suite with fold and unique ids; iso map tiles + dossier list; ZONE_ALGORITHM_VERSION 4; eval golden re-recorded. Live n-site2 largest zone 23.8% -> 11.6%, no sliver chains. Iso edges to individual tiles not built."
+    appliedAt: "2026-09-23T03:13:35.832Z"
+    lastModified: "2026-09-23T03:13:36.173Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "a6dd190a-9452-42b0-8931-490108d568ce":
+    status: "completed"
+    startedAt: "2026-09-22T18:52:18.223Z"
+    completedAt: "2026-09-22T18:52:18.223Z"
+    endedAt: "2026-09-22T18:52:18.223Z"
+    resolutionType: "code-change"
+    resolutionDetail: "takeOverNarration + carryNarration in sv narrate.ts wired into cmdAnalyze; names cleared after naming phase; core narration-status.js in ndx status; web overview notice; ndx plan --wait; unit tests in sv, core and web; live two-run takeover on n-site2 copy ended done with no names left."
+    appliedAt: "2026-09-22T18:52:18.223Z"
+    lastModified: "2026-09-22T18:52:18.556Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

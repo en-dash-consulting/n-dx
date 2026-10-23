@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "1c505fec-1e3c-4fa3-aecd-eb6d3e35dd7f":
+    status: "completed"
+    startedAt: "2026-05-08T17:27:07.100Z"
+    completedAt: "2026-05-08T18:01:25.238Z"
+    endedAt: "2026-05-08T18:01:25.238Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Replaced merge-history flattenPrdItems' homemade slugger and disk-walking shape classifier with rex's canonical resolveSiblingSlugs and a pure tree-derived classifier. Each PrdNode now carries a treePath slug-chain matching the .rex/prd_tree/ folder layout exactly; ordering, parentId and shape all flow from the parsed PRD tree, so the context graph mirrors the dashboard folder-tree view by construction. Click-through still keys on item id (unchanged). No new disk traversal: parseFolderTree (upstream of loadPRDSync) is the sole hierarchy source."
+    appliedAt: "2026-05-08T18:01:25.238Z"

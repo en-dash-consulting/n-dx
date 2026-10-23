@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "da9227aa-3b7a-449f-80af-a99f94975c1a":
+    status: "completed"
+    startedAt: "2026-10-01T06:23:50.798Z"
+    completedAt: "2026-10-01T06:36:38.750Z"
+    endedAt: "2026-10-01T06:36:38.750Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Live analysis page (/live/analyze) with server routes and sourcevision stop/error recording; full suite passes (6/6)."
+    appliedAt: "2026-10-01T06:36:38.750Z"
+    lastModified: "2026-10-01T06:36:39.136Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

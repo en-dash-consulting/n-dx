@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "efc173f4-fcbd-4da9-b152-9f3ca22ab4af":
+    status: "completed"
+    startedAt: "2026-10-12T19:21:28.229Z"
+    completedAt: "2026-10-12T19:26:29.721Z"
+    endedAt: "2026-10-12T19:26:29.721Z"
+    resolutionType: "code-change"
+    resolutionDetail: "codeql.yml and dependency-review.yml: explicit pull_request types, job-level draft gate, CodeQL concurrency group cancelling only PR runs."
+    appliedAt: "2026-10-12T19:26:29.721Z"
+    needsPlacement: true
+    lastModified: "2026-10-12T19:26:30.505Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

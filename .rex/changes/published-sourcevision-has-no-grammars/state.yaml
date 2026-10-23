@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "29205936-8871-4e01-bcf8-ff9f7773408b":
+    status: "completed"
+    startedAt: "2026-10-08T02:50:01.644Z"
+    completedAt: "2026-10-08T03:04:09.450Z"
+    endedAt: "2026-10-08T03:04:09.450Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Shipped built grammars (4a591e152, hench run aa4a7a62). The run's review never spawned; operator adversarial review (assisted run 511149ea) found nothing; SV_REQUIRE_GRAMMARS=1 tarball tests 8/8."
+    appliedAt: "2026-10-08T03:04:09.450Z"
+    lastModified: "2026-10-08T03:04:09.710Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "aa3c7e0f-a6fc-45d5-b2f4-56c67f07ccbf":
+    status: "completed"
+    startedAt: "2026-05-18T17:40:05.499Z"
+    completedAt: "2026-05-18T17:53:54.263Z"
+    endedAt: "2026-05-18T17:53:54.263Z"
+    resolutionType: "code-change"
+    resolutionDetail: "detectHashSuffixDuplicatesInTree now always emits GroupAction (alwaysGroup:true); applyGroup records GroupAuditRecord; archive.ts has GroupAuditEntry; cmdReshape writes group audit trail; 8 integration tests all pass"
+    appliedAt: "2026-05-18T17:53:54.263Z"

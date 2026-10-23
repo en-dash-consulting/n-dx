@@ -1,0 +1,8 @@
+schema: "rex/v2"
+items:
+  "0b75c98d-cbee-49d2-9cda-0fa3946e057f":
+    status: "completed"
+    startedAt: "2026-05-13T20:29:27.333Z"
+    completedAt: "2026-05-13T21:30:00.000Z"
+    resolutionType: "code-change"
+    appliedAt: "2026-05-13T21:30:00.000Z"

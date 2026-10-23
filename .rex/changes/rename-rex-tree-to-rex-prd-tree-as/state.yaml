@@ -1,0 +1,22 @@
+schema: "rex/v2"
+items:
+  "235b322d-5e4d-4160-b09b-f5a501cebc00":
+    status: "completed"
+    startedAt: "2026-05-06T02:56:06.092Z"
+    completedAt: "2026-05-06T03:02:33.473Z"
+    endedAt: "2026-05-06T03:02:33.473Z"
+    resolutionType: "code-change"
+    resolutionDetail: "All acceptance criteria already met in codebase; added missing integration tests."
+  "48ac9b6e-974d-4224-9256-a130eb8b7510":
+    status: "completed"
+    startedAt: "2026-05-06T13:23:32.163Z"
+    completedAt: "2026-05-06T13:26:47.975Z"
+    endedAt: "2026-05-06T13:26:47.975Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Verified that all documentation files (CLAUDE.md, AGENTS.md, package READMEs, prd-folder-tree-schema.md) already reference .rex/prd_tree exclusively. Confirmed no legacy .rex/tree documentation references remain. Validated that ndx init regeneration produces matching CLAUDE.md and AGENTS.md content by testing the renderClaudeMd() and renderAgentsMd() functions against the current files."
+  "c94d8eed-5685-48c6-8263-d796974538ed":
+    status: "completed"
+    startedAt: "2026-05-06T13:26:49.125Z"
+    completedAt: "2026-05-06T13:26:49.125Z"
+    endedAt: "2026-05-06T13:26:49.125Z"
+    appliedAt: "2026-05-06T13:26:49.125Z"

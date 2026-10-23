@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "9c28bdc7-1d37-447c-bfde-3e1a356fed85":
+    status: "completed"
+    startedAt: "2026-10-08T05:45:43.995Z"
+    completedAt: "2026-10-08T05:53:42.978Z"
+    endedAt: "2026-10-08T05:53:42.978Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Maven pom reader into in-memory ModuleBuildModel, with fixture goldens."
+    appliedAt: "2026-10-08T05:53:42.978Z"
+    lastModified: "2026-10-08T05:53:43.226Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

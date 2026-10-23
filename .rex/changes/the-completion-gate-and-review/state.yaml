@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "f0f2bab6-1130-4db4-bbce-54e4f8d8615d":
+    status: "completed"
+    startedAt: "2026-10-12T10:42:05.355Z"
+    completedAt: "2026-10-12T10:52:52.733Z"
+    endedAt: "2026-10-12T10:52:52.733Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Work in 1d6eb344a; this run updated claude-cli-adapter.test.ts to pin the five-tool allowlist (apply_change excluded). Full hench suite green, typecheck clean."
+    appliedAt: "2026-10-12T10:52:52.733Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T10:52:53.005Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

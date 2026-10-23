@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "9fb62d5e-4468-40b3-a269-ab689c996172":
+    status: "completed"
+    startedAt: "2026-10-13T02:43:06.990Z"
+    completedAt: "2026-10-13T03:10:28.064Z"
+    endedAt: "2026-10-13T03:10:28.064Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run 37b402d5 + review repairs e3c6f3359; operator finished lockfile, guidance and instruction regeneration in a61fa15de. All gates pass (affected gate 9/9 suites)."
+    appliedAt: "2026-10-13T03:10:28.064Z"
+    lastModified: "2026-10-13T03:10:28.390Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

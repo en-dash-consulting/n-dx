@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "12afe7fd-ec91-424d-9dc1-d932848044e4":
+    status: "completed"
+    startedAt: "2026-10-08T01:44:28.649Z"
+    completedAt: "2026-10-08T01:50:44.982Z"
+    endedAt: "2026-10-08T01:50:44.982Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Java pack with six query files, fixtures, golden, direct query tests, provenance."
+    appliedAt: "2026-10-08T01:50:44.982Z"
+    lastModified: "2026-10-08T01:50:45.252Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

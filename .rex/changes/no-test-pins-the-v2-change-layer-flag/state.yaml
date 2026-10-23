@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "3d1acefe-4738-4259-888d-6900b3a3bccc":
+    status: "completed"
+    startedAt: "2026-10-13T03:57:07.553Z"
+    completedAt: "2026-10-13T04:01:45.627Z"
+    endedAt: "2026-10-13T04:01:45.627Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Two v2 integration tests in layer-aware-restructure.test.ts pin changeLayer at reshape.ts and add-reshape.ts"
+    appliedAt: "2026-10-13T04:01:45.627Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T04:01:46.011Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

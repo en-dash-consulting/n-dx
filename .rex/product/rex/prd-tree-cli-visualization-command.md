@@ -1,0 +1,11 @@
+---
+id: "13d17a1e-7203-4afd-b082-64b32742dead"
+type: "capability"
+title: "PRD Tree CLI Visualization Command"
+slug: "prd-tree-cli-visualization-command"
+statement: "The `rex tree` command, also available as `ndx tree`, reads the `.rex/prd_tree/` folder tree and prints the PRD hierarchy as an indented, color-coded tree showing each item's title and status."
+criteria: [{"id":"c1","text":"When a valid `.rex/prd_tree/` directory exists, the `rex tree` command shall print the PRD hierarchy and exit successfully."},{"id":"c2","text":"When a valid `.rex/prd_tree/` directory exists, the `ndx tree` command shall print the PRD hierarchy and exit successfully."},{"id":"c3","text":"The tree command shall indent each line to show the item's place in the epic → feature → task hierarchy."},{"id":"c4","text":"The tree command shall show each item's title and its status string (completed, in_progress or pending) on that item's line."},{"id":"c5","text":"If `.rex/prd_tree/` is absent or unreadable, the tree command shall exit with a non-zero code and print a clear error message."},{"id":"c6","text":"The tree command shall read each item's title from the `title` field in its `index.md` frontmatter."},{"id":"c7","text":"If an item's `index.md` frontmatter has no `title`, the tree command shall show the item's slug directory name instead."},{"id":"c8","text":"When colour output is enabled, the tree command shall print the whole line of a completed item in purple ANSI colour."},{"id":"c9","text":"When colour output is enabled, the tree command shall print an in-progress item in yellow, with `**` before and after its title."},{"id":"c10","text":"The tree command shall print pending items without any ANSI codes."},{"id":"c11","text":"When `NO_COLOR` is set or stdout is not a TTY, the tree command shall print no ANSI sequences and shall still put `**` before and after in-progress titles."},{"id":"c12","text":"The tree command shall take its colours from the shared ANSI colour utility that the other CLI commands use."}]
+source: "smart-add"
+---
+
+A dedicated CLI command that renders the full PRD hierarchy as a color-coded tree, showing each item's title and completion status at a glance without opening the dashboard.

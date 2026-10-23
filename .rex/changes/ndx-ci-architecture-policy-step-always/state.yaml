@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "a96f0d51-dc84-4c5b-9ab8-ad3c508b6334":
+    status: "completed"
+    startedAt: "2026-10-07T03:45:02.602Z"
+    completedAt: "2026-10-07T03:58:11.658Z"
+    endedAt: "2026-10-07T03:58:11.658Z"
+    resolutionType: "code-change"
+    resolutionDetail: "ci.js and architecture-policy.test.js both read packages/core/child-process-allowlist.json; a parity test compares ci.js checkArchitecturePolicy against the test's scan."
+    appliedAt: "2026-10-07T03:58:11.658Z"
+    lastModified: "2026-10-07T03:58:11.874Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

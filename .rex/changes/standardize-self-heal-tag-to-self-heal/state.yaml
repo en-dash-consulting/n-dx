@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "75619751-480b-48cb-b543-7409f49387b0":
+    status: "completed"
+    startedAt: "2026-05-06T03:12:31.242Z"
+    completedAt: "2026-05-06T13:01:09.053Z"
+    endedAt: "2026-05-06T13:01:09.053Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Standardized SELF_HEAL_TAG constant from 'self-heal' to 'self-heal-items' across all creation and selection paths. Auto-applied tag filter in self-heal mode. All acceptance criteria met: single constant exports tag value; PRD items created in self-heal runs carry the tag; hench selector enforces tag filter automatically; no legacy migration needed."
+    appliedAt: "2026-05-06T13:01:09.053Z"

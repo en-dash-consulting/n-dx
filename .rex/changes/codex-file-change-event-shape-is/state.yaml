@@ -1,0 +1,11 @@
+schema: "rex/v2"
+items:
+  "cf511d6d-4ea7-4a5d-8dc8-79da893a68ef":
+    status: "completed"
+    startedAt: "2026-09-12T18:11:25.289Z"
+    completedAt: "2026-09-12T19:08:08.673Z"
+    endedAt: "2026-09-12T19:08:08.673Z"
+    failureReason: "Blocked: nested codex exec --ephemeral --json cannot initialize its app-server client in the managed sandbox, so the required real edit-plus-command JSONL fixture was not captured and no implementation was made."
+    appliedAt: "2026-09-12T19:08:08.673Z"
+    lastModified: "2026-09-12T19:08:08.978Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

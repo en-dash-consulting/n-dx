@@ -1,0 +1,20 @@
+---
+id: "f8121e9f-277e-4d6a-bbc2-68e9e2f62def"
+type: "change"
+title: "Robot Wrangler stack 2/9 · Settings fixes the redesign stands on"
+slug: "robot-wrangler-stack-2-9-settings"
+intent: "Two defects from #660 that every later Robot Wrangler change depends on. `robot-wrangler.css` references 19 custom properties that no stylesheet defines, so most of the page's colours and spacing fall back to nothing (the Automatic failover toggle renders as a lone white dot, and the header tile touches the title). Separately, the settings overlay renders nothing until the app's sourcevision data has loaded, although no settings page uses that data, so on a busy checkout a settings page can stay blank for 40+ seconds.\n\nThis is PR 2 of the 9-PR Robot Wrangler stack. It changes no layout: it makes the existing page render on real design tokens and makes settings pages independent of the analysis-data load.\n\nGoal: Settings pages render immediately and on the real design tokens."
+acceptanceCriteria:
+  - "No viewer stylesheet uses an undefined custom property without a fallback, and a test enforces it."
+  - "Every settings page renders while the analysis data is still loading."
+  - "Partly fixes #660 (items 1 and 3)."
+plannedRelease: "0.10.0"
+priority: "high"
+tags:
+  - "0.10.0"
+  - "robot-wrangler-redesign"
+  - "rw-stack-2"
+source: "claude-code: Robot Wrangler redesign session 2026-10-10 (PR stack)"
+---
+
+Migration suggestion (text claude-opus-5-5, not accepted): place on "Settings Page Completeness and Command-Based Reorganization" (dc5e6696-7575-4983-b8c5-a73711bc4d8f).

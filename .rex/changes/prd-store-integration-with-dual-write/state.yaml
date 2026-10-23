@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "1306e659-dcaf-4303-b890-a8fdd5b706c8":
+    status: "completed"
+    startedAt: "2026-04-24T16:20:10.156Z"
+    completedAt: "2026-04-24T16:20:10.156Z"
+    appliedAt: "2026-04-24T16:20:10.156Z"
+  "3b442642-e7e9-49a4-96fc-debd8da30fc1":
+    status: "completed"
+    startedAt: "2026-04-24T16:08:51.271Z"
+    completedAt: "2026-04-24T16:20:10.138Z"
+  "7143e2a0-7c77-45ed-b3e5-d588a11b3b27":
+    status: "completed"
+    startedAt: "2026-04-24T15:55:40.852Z"
+    completedAt: "2026-04-30T15:51:52.692Z"
+    endedAt: "2026-04-30T15:51:52.692Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed idempotency in migrate-to-folder-tree command by detecting when the PRD is loaded from an existing tree and returning early with 'already up to date' message. This makes the migration command properly idempotent when run multiple times. All three failing idempotency tests should now pass."
+  "97b24996-6ca7-46de-a2bf-1355ebc12e9f":
+    status: "completed"
+    startedAt: "2026-04-24T15:54:10.082Z"
+    completedAt: "2026-04-28T15:08:27.304Z"
+    endedAt: "2026-04-28T15:08:27.304Z"

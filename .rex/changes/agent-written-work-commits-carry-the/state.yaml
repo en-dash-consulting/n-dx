@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "80bf4e58-26ac-4903-8bcb-a5f41e8e7c61":
+    status: "completed"
+    startedAt: "2026-10-09T04:21:43.217Z"
+    completedAt: "2026-10-09T04:37:08.956Z"
+    endedAt: "2026-10-09T04:37:08.956Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Brief now carries the run's exact N-DX / N-DX-Item lines (briefForRun, after the run record exists) with a one-final-block instruction; system prompt unchanged. finalizeRun checks each commit since startHead via %(trailers:key=N-DX-Item,valueonly), records mismatches as run.commitsMissingItem, run summary prints them. No commit amended. Tests in tests/integration/agent-commit-item-trailer.test.ts; census re-recorded; hench rebuilt."
+    appliedAt: "2026-10-09T04:37:08.956Z"
+    lastModified: "2026-10-09T04:37:09.221Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
