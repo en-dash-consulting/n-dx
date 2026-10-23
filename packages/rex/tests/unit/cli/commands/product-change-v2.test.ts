@@ -287,6 +287,22 @@ describe("rex add on a v2 tree", () => {
     expect((await changes()).length).toBe(before + 1);
   });
 
+  it("previews a long description's cut title with the full text as its description", async () => {
+    const long = `${"Shoppers paying by card want refunds ".repeat(4).trim()}.\n\nSecond paragraph.`;
+    await cmdAddChangesFromDescriptions(tmp, [long], { format: "json" });
+    const [row] = JSON.parse(text()).changes;
+    expect(row.title).toBe(titleFrom(long));
+    expect(row.title.endsWith("…")).toBe(true);
+    expect(row.description).toBe(long);
+  });
+
+  it("previews a one-line description with no separate description", async () => {
+    await cmdAddChangesFromDescriptions(tmp, ["Dark mode"], { format: "json" });
+    const [row] = JSON.parse(text()).changes;
+    expect(row).toMatchObject({ title: "Dark mode" });
+    expect(row.description).toBeUndefined();
+  });
+
   it("titleFrom cuts a long first line at a word", () => {
     const long = "word ".repeat(30).trim();
     const title = titleFrom(long);

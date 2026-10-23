@@ -747,6 +747,52 @@ describe("SmartAddInput on a v2 PRD", () => {
     expect(onPrdChanged).toHaveBeenCalled();
   });
 
+  it("says the text becomes an Inbox change, not generated proposals", () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2" }));
+
+    expect(root.querySelector(".smart-add-title")!.textContent).toBe("Add to Inbox");
+    expect(root.textContent).toContain("becomes one change in the Inbox");
+    expect(root.textContent).not.toContain("Smart Add");
+    expect(root.textContent).not.toMatch(/proposal/i);
+    const button = root.querySelector<HTMLButtonElement>(".smart-add-btn-generate")!;
+    expect(button.textContent).toBe("Preview");
+    expect(button.getAttribute("aria-label")).not.toMatch(/proposal/i);
+  });
+
+  it("never shows the proposal-generating loading text", async () => {
+    fetchSpy.mockReturnValue(new Promise(() => {}));
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2" }));
+    await typeAndGenerate(root, "Support refunds when paying by card");
+    await flush();
+
+    expect(root.querySelector(".smart-add-loading")).toBeTruthy();
+    expect(root.textContent).not.toMatch(/proposal|Generating/i);
+  });
+
+  it("previews the cut title with the full text as its description, and names the next step", async () => {
+    const full = "Shoppers paying by card want refunds they can start themselves from the order page.\n\nRefunds go back to the same card.";
+    const title = "Shoppers paying by card want refunds they can start themselves from the order…";
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ...v2Preview, changes: [{ ...v2Preview.changes[0], title, description: full }] }),
+    });
+
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2" }));
+    await typeAndGenerate(root, full);
+    await vi.runAllTimersAsync();
+    await flush();
+
+    expect(root.querySelector(".smart-add-preview-title")!.textContent).toBe(title);
+    expect(root.querySelector(".smart-add-preview-full-text")!.textContent).toBe(full);
+    expect(root.querySelector(".smart-add-next-step")!.textContent).toMatch(/^Next: place it on the capability/);
+  });
+
+  it("keeps the v1 Smart Add wording when the layout is v1", () => {
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v1" }));
+    expect(root.querySelector(".smart-add-title")!.textContent).toBe("Smart Add");
+    expect(root.querySelector(".smart-add-btn-generate")!.textContent).toBe("Generate");
+  });
+
   it("surfaces an accept failure and keeps the preview on screen", async () => {
     fetchSpy.mockImplementation(async (url: string) =>
       url === "/api/rex/smart-add-accept"
