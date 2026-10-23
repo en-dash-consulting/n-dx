@@ -40,7 +40,7 @@ export interface TaskDetailProps {
   /** Called when PRD data may have changed (e.g. after execution completes). */
   onPrdChanged?: () => void;
   /** Called to add a child item under the current item. */
-  onAddChild?: (data: { title: string; parentId: string; type: ItemType; description?: string; priority?: string }) => Promise<void>;
+  onAddChild?: (data: AddChildData) => Promise<void>;
   /** Called to remove/delete the current item and all its descendants. */
   onRemove?: (id: string) => Promise<void>;
   /** Navigation callback for deep-linking to other views (e.g. hench-runs). */
@@ -554,6 +554,16 @@ function ChildrenSummary({
 
 // Child type inference comes from childTypeOf() in shared/item-type.ts.
 
+/** What the add-child form sends: the fields `POST /api/rex/items` takes for a child. */
+export interface AddChildData {
+  title: string;
+  parentId: string;
+  type: ItemType;
+  description?: string;
+  acceptanceCriteria?: string[];
+  priority?: string;
+}
+
 /** Inline form for adding a child item within the detail panel. */
 function AddChildForm({
   parentId,
@@ -563,11 +573,12 @@ function AddChildForm({
 }: {
   parentId: string;
   parentType: ItemType;
-  onSubmit: (data: { title: string; parentId: string; type: ItemType; description?: string; priority?: string }) => Promise<void>;
+  onSubmit: (data: AddChildData) => Promise<void>;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [criteria, setCriteria] = useState("");
   const [priority, setPriority] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -588,19 +599,22 @@ function AddChildForm({
     setSubmitting(true);
     setError(null);
 
+    // One criterion per line; blank lines are dropped.
+    const acceptanceCriteria = criteria.split("\n").map((line) => line.trim()).filter(Boolean);
     try {
       await onSubmit({
         title: trimmedTitle,
         parentId,
         type: childType,
         description: description.trim() || undefined,
+        ...(acceptanceCriteria.length ? { acceptanceCriteria } : {}),
         priority: priority || undefined,
       });
     } catch (err) {
       setError(String(err));
       setSubmitting(false);
     }
-  }, [title, description, priority, parentId, childType, onSubmit]);
+  }, [title, description, criteria, priority, parentId, childType, onSubmit]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -661,8 +675,8 @@ function AddChildForm({
         type: "button",
         class: `task-add-child-more${showExtra ? " active" : ""}`,
         onClick: () => setShowExtra(!showExtra),
-        title: showExtra ? "Hide extra fields" : "Show description & priority",
-        "aria-label": showExtra ? "Hide extra fields" : "Show description & priority",
+        title: showExtra ? "Hide extra fields" : "Show description, criteria & priority",
+        "aria-label": showExtra ? "Hide extra fields" : "Show description, criteria & priority",
         disabled: submitting,
       }, h(ActionIcon, { name: "more" })),
       h("button", {
@@ -689,6 +703,16 @@ function AddChildForm({
             value: description,
             placeholder: "Description (optional)",
             onInput: (e: Event) => setDescription((e.target as HTMLTextAreaElement).value),
+            onKeyDown: handleKeyDown,
+            rows: 2,
+            disabled: submitting,
+          }),
+          h("textarea", {
+            class: "task-add-child-criteria",
+            value: criteria,
+            placeholder: `${criteriaLabel(childType)}: one criterion per line (optional)`,
+            "aria-label": criteriaLabel(childType),
+            onInput: (e: Event) => setCriteria((e.target as HTMLTextAreaElement).value),
             onKeyDown: handleKeyDown,
             rows: 2,
             disabled: submitting,

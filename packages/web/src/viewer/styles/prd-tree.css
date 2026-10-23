@@ -1765,7 +1765,8 @@
   gap: var(--space-1-5);
 }
 
-.task-add-child-description {
+.task-add-child-description,
+.task-add-child-criteria {
   padding: var(--space-1-5) var(--space-2);
   background: var(--bg-main, var(--bg));
   border: 1px solid var(--border);
@@ -1776,7 +1777,8 @@
   resize: vertical;
 }
 
-.task-add-child-description:focus {
+.task-add-child-description:focus,
+.task-add-child-criteria:focus {
   border-color: var(--accent);
   outline: none;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
