@@ -541,6 +541,9 @@ async function addInboxChange(
 /** The child a v2 parent takes: a change takes tasks, a task subtasks. */
 const V2_CHILD_TYPE: Readonly<Record<string, "task" | "subtask">> = { change: "task", task: "subtask" };
 
+/** Rex's own refusals of an add, matched by name so no error class crosses the gateway. */
+const V2_ADD_REFUSALS: ReadonlySet<string> = new Set(["AddChangeNodeError", "ClosedChangeError", "ChangeLayerWriteError"]);
+
 /**
  * Add a task under a change (or a subtask under a task) on a v2 tree, through
  * rex's own add rule inside the change-layer store's transaction: a closed
@@ -598,8 +601,16 @@ async function addV2Child(
       return { tree: added.tree, result: added.node };
     }));
   } catch (err) {
-    // Rex's refusal (a closed change, a broken v2 rule) names its reason.
-    errorResponse(res, 400, err instanceof Error ? err.message : String(err));
+    // As PATCH: a held lock is 409 and names the holder's PID; rex's refusal (a
+    // closed change, a broken v2 rule) is 400 with its reason; anything else is 500.
+    const message = errorMessage(err);
+    if (message.includes("Could not acquire PRD lock")) {
+      errorResponse(res, 409, message);
+    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
+      errorResponse(res, 400, message);
+    } else {
+      errorResponse(res, 500, message);
+    }
     return true;
   }
 
