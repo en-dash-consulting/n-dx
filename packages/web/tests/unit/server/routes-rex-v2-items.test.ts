@@ -143,6 +143,39 @@ describe("Rex item routes on a v2 project", () => {
     expect(res.status).toBe(404);
   });
 
+  it("POST /items adds a subtask under a task", async () => {
+    const res = await send("POST", "items", { title: "Check the button", parentId: TASK_ID });
+    expect(res.status).toBe(201);
+    const created = await res.json();
+    expect(created).toMatchObject({ ok: true, type: "subtask", parentId: TASK_ID });
+
+    const task = (await (await resolveStore(rexDir)).getItem(TASK_ID))!;
+    expect(task.children?.find((c) => c.id === created.id)).toMatchObject({ type: "subtask", title: "Check the button" });
+  });
+
+  it("POST /items refuses a child under a subtask and writes nothing", async () => {
+    const subtask = await (await send("POST", "items", { title: "Leaf", parentId: TASK_ID })).json();
+    const before = JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items);
+    const res = await send("POST", "items", { title: "Too deep", parentId: subtask.id });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("takes no children");
+    expect(JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items)).toBe(before);
+  });
+
+  it("POST /items moves an in-progress change's criteria onto its first task", async () => {
+    const change = await (await send("POST", "items", { title: "Support gift cards", acceptanceCriteria: ["A balance shows"] })).json();
+    expect((await send("PATCH", `items/${change.id}`, { status: "in_progress" })).status).toBe(200);
+
+    const res = await send("POST", "items", { title: "Gift card balance check", parentId: change.id });
+    expect(res.status).toBe(201);
+    const created = await res.json();
+
+    const saved = (await (await resolveStore(rexDir)).getItem(change.id))!;
+    const task = saved.children?.find((c) => c.id === created.id);
+    expect(task).toMatchObject({ status: "in_progress", acceptanceCriteria: ["A balance shows"] });
+    expect(saved.acceptanceCriteria ?? []).toEqual([]);
+  });
+
   it("PATCH status in_progress goes through the change-layer store", async () => {
     const res = await send("PATCH", `items/${TASK_ID}`, { status: "in_progress" });
     expect(res.status).toBe(200);
