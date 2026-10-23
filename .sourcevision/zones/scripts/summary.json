@@ -1,7 +1,7 @@
 {
   "id": "scripts",
   "name": "Build & CI Scripts",
-  "description": "Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+12 more)",
+  "description": "Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+13 more)",
   "files": [
     "scripts/backfill-release-tags.mjs",
     "scripts/build-iso-skill.mjs",

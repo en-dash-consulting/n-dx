@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f2116b57-582f-4747-8b86-3f65fd5da1ac":
+    status: "completed"
+    startedAt: "2026-10-08T06:10:21.855Z"
+    completedAt: "2026-10-08T06:17:09.911Z"
+    endedAt: "2026-10-08T06:17:09.911Z"
+    resolutionType: "code-change"
+    resolutionDetail: "postExecute and countProjectExecutions send X-Ndx-Token (hub.token); refresh reload sends it too; new hub-admission-auth integration test."
+    appliedAt: "2026-10-08T06:17:09.911Z"
+    lastModified: "2026-10-08T06:17:10.168Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

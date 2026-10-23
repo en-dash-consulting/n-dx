@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "d355da37-c17c-4a29-a18b-96ad2e854555":
+    status: "completed"
+    startedAt: "2026-04-24T20:19:01.121Z"
+    completedAt: "2026-04-24T20:30:36.537Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added branch/sourceFile attribution to get_prd_status epics, /api/status item nodes, and PRDItemData viewer type"
+    appliedAt: "2026-04-24T20:30:36.537Z"

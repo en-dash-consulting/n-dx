@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "54b28dd7-df82-47e3-948f-2d76bfaeab90":
+    status: "completed"
+    startedAt: "2026-05-11T15:29:15.044Z"
+    completedAt: "2026-05-15T21:38:32.071Z"
+    endedAt: "2026-05-15T21:38:32.071Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added autoConfirmResolution definition in handleSelfHeal and regression test covering the recommendations→PRD tagged items→execution gate ordering."
+    appliedAt: "2026-05-15T21:38:32.071Z"

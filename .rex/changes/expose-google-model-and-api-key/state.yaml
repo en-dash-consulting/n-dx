@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "8087847b-48a3-4298-bb06-b4f492289a02":
+    status: "completed"
+    startedAt: "2026-06-05T12:49:42.602Z"
+    completedAt: "2026-06-05T13:13:29.979Z"
+    endedAt: "2026-06-05T13:13:29.979Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added llm.google.model validation (gemini- prefix check), llm.google.apiKeyEnv config field and validator, updated runGoogleApiPreflight to use configured apiKeyEnv, extended help text, and added 27 integration tests."
+    appliedAt: "2026-06-05T13:13:29.979Z"

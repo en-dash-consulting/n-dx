@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "aabf1250-55d6-474d-8bd2-205cabfa3ad9":
+    status: "completed"
+    startedAt: "2026-10-12T11:39:21.502Z"
+    completedAt: "2026-10-12T11:43:00.445Z"
+    endedAt: "2026-10-12T11:43:00.445Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Bulk PATCH completed on v2 routes through completeV2Work per id (option a)"
+    appliedAt: "2026-10-12T11:43:00.445Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T11:43:00.715Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

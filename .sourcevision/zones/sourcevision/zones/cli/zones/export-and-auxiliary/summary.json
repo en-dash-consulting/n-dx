@@ -1,0 +1,23 @@
+{
+  "id": "sourcevision/cli/export-and-auxiliary",
+  "name": "Export & Auxiliary",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/cli/commands/export-pdf.ts",
+    "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
+    "packages/sourcevision/src/cli/commands/iso.ts",
+    "packages/sourcevision/src/cli/commands/pack-lock.ts",
+    "packages/sourcevision/src/cli/errors.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/cli/commands/export-pdf.ts",
+    "packages/sourcevision/src/cli/commands/git-credential-helper.ts",
+    "packages/sourcevision/src/cli/commands/iso.ts",
+    "packages/sourcevision/src/cli/commands/pack-lock.ts",
+    "packages/sourcevision/src/cli/errors.ts"
+  ],
+  "cohesion": 0.33,
+  "coupling": 0.67,
+  "fileCount": 5,
+  "lineCount": 686
+}

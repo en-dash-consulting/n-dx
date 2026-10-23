@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "8b16401f-3532-4cd9-9d8b-90e128c1fa24":
+    status: "completed"
+    startedAt: "2026-08-19T18:56:41.723Z"
+    completedAt: "2026-08-19T19:00:30.835Z"
+    endedAt: "2026-08-19T19:00:30.835Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Verification task, no code change. First macOS root-suite run was 32190469600 (green); macOS green in 14 of 15 branch runs. The single failure (32283838405) was my own over-strict assertion about POSIX process reaping, triaged individually and fixed in f58c2cb5 rather than skipped — and notably none of the five macOS causes this task predicted was involved. No macOS-specific skips exist. Observed billed cost is 63 added minutes per run with macOS at 63%, against an estimate of ~38 at ~80%: total understated, macOS share overstated, because Windows is slower than assumed and macOS's root step is actually faster. Decision: KEEP macOS, on evidence rather than cost — on run 32283838405 ubuntu passed the identical suite that macOS failed, so macOS caught a POSIX defect ubuntu missed, refuting this task's own \"ubuntu already covers POSIX\" premise."
+    appliedAt: "2026-08-19T19:00:30.835Z"

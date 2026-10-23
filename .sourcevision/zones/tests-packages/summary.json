@@ -1,7 +1,7 @@
 {
   "id": "tests-packages",
   "name": "Tests Packages",
-  "description": "Non-source files in packages: project.ts, emit.test.ts, fake-cli.ts (+11 more)",
+  "description": "Non-source files in packages: project.ts, emit.test.ts, pack-fixtures.ts (+23 more)",
   "files": [
     "packages/graview/tests/helpers/project.ts",
     "packages/graview/tests/integration/emit.test.ts",

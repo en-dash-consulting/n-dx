@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "2cc07bf3-a431-4c1c-9f4b-b28acac745d1":
+    status: "completed"
+    startedAt: "2026-10-15T07:34:56.905Z"
+    completedAt: "2026-10-15T07:45:31.424Z"
+    endedAt: "2026-10-15T07:45:31.424Z"
+    resolutionType: "code-change"
+    resolutionDetail: "POST /api/rex/product/edit runs handleProductEdit in withPrdModelTransaction via rex-gateway; product-pages passes onEdit; v1 refuses 409."
+    appliedAt: "2026-10-15T07:45:31.424Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T07:45:31.715Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

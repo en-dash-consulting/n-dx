@@ -1,0 +1,32 @@
+schema: "rex/v2"
+items:
+  "25746a2d-4197-4369-be91-3ef099dcad2e":
+    status: "completed"
+    startedAt: "2026-10-02T14:59:24.996Z"
+    completedAt: "2026-10-02T14:59:24.996Z"
+    endedAt: "2026-10-02T14:59:24.996Z"
+    lastModified: "2026-10-02T14:59:25.409Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3266bfb4-aea5-4a97-b717-211bd55d55a6":
+    status: "completed"
+    startedAt: "2026-10-09T04:38:14.513Z"
+    completedAt: "2026-10-09T04:38:14.513Z"
+    endedAt: "2026-10-09T04:38:14.513Z"
+    lastModified: "2026-10-09T04:38:14.999Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "497212a6-b1ff-479d-88f1-443ad7aed717":
+    status: "completed"
+    startedAt: "2026-10-02T14:59:19.341Z"
+    completedAt: "2026-10-02T14:59:19.341Z"
+    endedAt: "2026-10-02T14:59:19.341Z"
+    lastModified: "2026-10-02T14:59:19.748Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "eb632a9e-d324-486a-a21c-5366b1732293":
+    status: "completed"
+    startedAt: "2026-10-09T04:38:17.072Z"
+    completedAt: "2026-10-09T04:38:17.072Z"
+    endedAt: "2026-10-09T04:38:17.072Z"
+    appliedAt: "2026-10-09T04:38:17.072Z"
+    needsPlacement: true
+    lastModified: "2026-10-09T04:38:17.547Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,7 +1,7 @@
 {
   "id": "root",
-  "name": "Root",
-  "description": "4 files; imports Tests.",
+  "name": "Test Helpers",
+  "description": "4 files, mostly test helpers; imports Tests.",
   "files": [
     "pr-check.js",
     "scan_transcripts.py",

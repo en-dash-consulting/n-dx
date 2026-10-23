@@ -1,0 +1,31 @@
+{
+  "id": "rex-core/rex",
+  "name": "Rex",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
+    "packages/rex/src/cli/commands/release.ts",
+    "packages/rex/src/core/backup-snapshots.ts",
+    "packages/rex/src/core/change-commits.ts",
+    "packages/rex/src/core/change-landing.ts",
+    "packages/rex/src/core/release-stamp.ts",
+    "packages/rex/src/core/repoint-commits.ts",
+    "packages/rex/src/core/trailer-coverage.ts",
+    "packages/rex/src/store/atomic-write.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/backfill-commit-attribution.ts",
+    "packages/rex/src/cli/commands/release.ts",
+    "packages/rex/src/core/backup-snapshots.ts",
+    "packages/rex/src/core/change-commits.ts",
+    "packages/rex/src/core/change-landing.ts",
+    "packages/rex/src/core/release-stamp.ts",
+    "packages/rex/src/core/repoint-commits.ts",
+    "packages/rex/src/core/trailer-coverage.ts",
+    "packages/rex/src/store/atomic-write.ts"
+  ],
+  "cohesion": 0.65,
+  "coupling": 0.35,
+  "fileCount": 9,
+  "lineCount": 2392
+}

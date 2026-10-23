@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "9d4329d2-74ce-445d-9e16-3cc206a6c201":
+    status: "completed"
+    startedAt: "2026-10-09T09:03:04.338Z"
+    completedAt: "2026-10-09T09:07:45.688Z"
+    endedAt: "2026-10-09T09:07:45.688Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Reworded three apply-amendments refusals and the doc comment to \"capability criteria\"; updated exact-string assertions in four test files; added patch changeset."
+    appliedAt: "2026-10-09T09:07:45.688Z"
+    lastModified: "2026-10-09T09:07:45.951Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

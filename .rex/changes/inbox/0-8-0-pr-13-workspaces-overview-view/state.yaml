@@ -1,0 +1,36 @@
+schema: "rex/v2"
+items:
+  "00669fc3-3e39-446c-826a-ae3c964e83f9":
+    status: "completed"
+    startedAt: "2026-09-16T19:45:16.857Z"
+    completedAt: "2026-09-16T20:20:05.532Z"
+    endedAt: "2026-09-16T20:20:05.532Z"
+    lastModified: "2026-09-16T20:20:05.936Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "6f00e7e9-34ce-4519-be4b-e2323d8a2476":
+    status: "completed"
+    startedAt: "2026-09-16T20:20:06.968Z"
+    completedAt: "2026-09-16T20:20:06.968Z"
+    endedAt: "2026-09-16T20:20:06.968Z"
+    appliedAt: "2026-09-16T20:20:06.968Z"
+    needsPlacement: true
+    lastModified: "2026-09-16T20:20:07.348Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8d5f3393-57cf-4d83-8324-108cc4388d24":
+    status: "completed"
+    startedAt: "2026-09-16T19:15:30.203Z"
+    completedAt: "2026-09-16T19:20:15.313Z"
+    endedAt: "2026-09-16T19:20:15.313Z"
+    resolutionType: "code-change"
+    resolutionDetail: "packages/web/src/server/prd-delta.ts + GET /api/workspaces/:key/prd-delta: id-based diff (onlyHere/onlyAnchor/changed/completedHere), counts + capped id lists, cached per pair and invalidated by either tree's rex watcher."
+    lastModified: "2026-09-16T19:20:15.689Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "d95cab0e-ab9e-4d61-a1c5-f76b0efbfe2e":
+    status: "completed"
+    startedAt: "2026-09-16T19:22:27.092Z"
+    completedAt: "2026-09-16T19:41:08.222Z"
+    endedAt: "2026-09-16T19:41:08.222Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added WorkspaceWriteStrip to the PRD view (non-anchor workspaces only), an integration test hashing both worktrees' trees around slot and slot-less writes, and per-workspace PRD lock docs in root + web CLAUDE.md."
+    lastModified: "2026-09-16T19:41:08.604Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

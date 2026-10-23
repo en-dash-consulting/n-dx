@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "0aea078f-1a1e-4264-9c48-82e0af192c4e":
+    status: "completed"
+    startedAt: "2026-09-10T20:05:06.387Z"
+    completedAt: "2026-09-10T20:15:05.141Z"
+    endedAt: "2026-09-10T20:15:05.141Z"
+    resolutionType: "code-change"
+    resolutionDetail: "parseBundle now rejects blockedBy cycles and illegal nesting (roots must be root-legal, children legal under their parent per LEVEL_HIERARCHY) before the store is opened; mergeBundle's graft additionally validates each added item against the level of the local parent it actually lands under, catching a same-id item a local reshape has re-levelled. Cycle detection was extracted from validateDAG as findDependencyCycles and shared — validateDAG's output is unchanged — because validateDAG also flags orphan blockedBy references, which are legitimate in a merge bundle and would have caused false rejections. 8 tests, 6 red first, including two over-rejection guards (edge pointing outside the bundle; task directly under an epic). Verified via the built CLI: specific message, exit 1, tree untouched, no snapshot consumed. Full suite clean, 6/6."
+    appliedAt: "2026-09-10T20:15:05.141Z"
+    lastModified: "2026-09-10T20:15:05.147Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

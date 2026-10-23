@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "82129f65-3d31-431c-983e-6c3257011463":
+    status: "completed"
+    startedAt: "2026-10-11T06:01:56.180Z"
+    completedAt: "2026-10-11T06:06:46.409Z"
+    endedAt: "2026-10-11T06:06:46.409Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Shared isTerraformFile in terraform.ts used by detect.ts and inventory.ts; agreement test added."
+    appliedAt: "2026-10-11T06:06:46.409Z"
+    lastModified: "2026-10-11T06:06:46.686Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

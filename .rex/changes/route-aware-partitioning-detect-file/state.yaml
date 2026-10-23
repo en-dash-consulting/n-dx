@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "84a91da2-f8b2-4970-8e4e-2d5826a75533":
+    status: "completed"
+    startedAt: "2026-09-23T02:33:38.079Z"
+    completedAt: "2026-09-23T02:43:39.232Z"
+    endedAt: "2026-09-23T02:43:39.232Z"
+    resolutionType: "code-change"
+    resolutionDetail: "route-convention.ts (React Router/Remix, Next, SvelteKit detection from inventory; containers; route features; feature ties weighted by each file's outside pull); route-generic segments skipped in id derivation and same-id merging; flat routes named from the route; route-path name candidate; profile records routeConventions; ZONE_ALGORITHM_VERSION 3 with algorithmVersion stored on zones.json so a version change neither reuses nor seeds and keeps new ids while carrying chosen names. Live n-site2: routes-N gone, 20 small zones -> 0."
+    appliedAt: "2026-09-23T02:43:39.232Z"
+    lastModified: "2026-09-23T02:43:39.584Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

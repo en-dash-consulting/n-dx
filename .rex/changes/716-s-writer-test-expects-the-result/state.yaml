@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "09a3ed3e-1afa-4da3-8383-31cbb4769e19":
+    status: "completed"
+    startedAt: "2026-10-13T16:09:32.311Z"
+    completedAt: "2026-10-13T16:11:26.209Z"
+    endedAt: "2026-10-13T16:11:26.209Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Inbox byte-identical rewrite test now expects { written: [], removed: [], deletedFiles: [] }; commit 2d03bcc15"
+    appliedAt: "2026-10-13T16:11:26.209Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T16:11:26.525Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

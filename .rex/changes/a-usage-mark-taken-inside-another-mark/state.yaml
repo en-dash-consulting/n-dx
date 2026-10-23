@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "18da2319-deb7-42fe-b5da-3dae8347be75":
+    status: "completed"
+    startedAt: "2026-10-12T03:30:51.398Z"
+    completedAt: "2026-10-12T03:44:52.602Z"
+    endedAt: "2026-10-12T03:44:52.602Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Records now charge the span they claim to the enclosing marks still outstanding; a mark's window is read less whatever was charged to it, so nested records sum to the outer window instead of overlapping."
+    appliedAt: "2026-10-12T03:44:52.602Z"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-12T03:44:53.086Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

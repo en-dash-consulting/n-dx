@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "21d748de-f42e-4cda-95f5-1e21f85b3713":
+    status: "completed"
+    startedAt: "2026-05-19T16:36:59.713Z"
+    completedAt: "2026-05-19T16:39:52.532Z"
+    endedAt: "2026-05-19T16:39:52.532Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added resolveItem to tree.ts with ID-first then title-fallback lookup; exported from public.ts; 6 unit tests added."
+    appliedAt: "2026-05-19T16:39:52.532Z"

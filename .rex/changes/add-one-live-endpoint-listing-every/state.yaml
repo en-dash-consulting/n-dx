@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ee6d1469-e731-4c4e-868b-ba2684c11c46":
+    status: "completed"
+    startedAt: "2026-10-01T04:14:58.722Z"
+    completedAt: "2026-10-01T04:38:58.984Z"
+    endedAt: "2026-10-01T04:38:58.984Z"
+    resolutionType: "code-change"
+    resolutionDetail: "GET /api/live + live:changed frames (routes-live.ts); shared staleness rule; loop position and hub-queued requests split to db56901f."
+    appliedAt: "2026-10-01T04:38:58.984Z"
+    lastModified: "2026-10-01T04:38:59.363Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

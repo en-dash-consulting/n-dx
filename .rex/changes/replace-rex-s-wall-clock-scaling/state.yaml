@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f987905c-6d6b-45cf-8a19-be3e58e5650b":
+    status: "completed"
+    startedAt: "2026-09-03T21:02:16.566Z"
+    completedAt: "2026-09-03T21:13:05.633Z"
+    endedAt: "2026-09-03T21:13:05.633Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Replaced the wall-clock ratio with an exact count of similarity() calls; verified against an injected quadratic regression (12 -> 288 comparisons). Root-repo `npm run test` now exits 0 (6/6 suites, was 5/6)."
+    appliedAt: "2026-09-03T21:13:05.633Z"
+    lastModified: "2026-09-03T21:13:05.660Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

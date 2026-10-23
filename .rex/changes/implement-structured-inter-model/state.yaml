@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "75c7df48-1438-4a03-8467-34bc0de734ae":
+    status: "completed"
+    startedAt: "2026-04-16T16:56:18.148Z"
+    completedAt: "2026-04-20T14:00:04.943Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added ReviewFeedback struct, parseReviewerOutput parser, buildRemediationContext builder, runReviewerLlmCapturing (tee to terminal + capture), wired feedback loop into handlePairProgramming with --skip-feedback flag"
+    appliedAt: "2026-04-20T14:00:04.943Z"

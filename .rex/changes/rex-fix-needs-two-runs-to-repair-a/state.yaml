@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "bd8aafde-9826-4b33-9230-fa7f10155f0c":
+    status: "completed"
+    startedAt: "2026-09-17T01:56:31.556Z"
+    completedAt: "2026-09-17T02:00:10.297Z"
+    endedAt: "2026-09-17T02:00:10.297Z"
+    resolutionType: "code-change"
+    resolutionDetail: "findMisalignedParents decides bottom-up with a reopening set, so every falsely-completed ancestor is found in one pass; detector, fixer and the stuck-parent willReopen set all still share that single function."
+    appliedAt: "2026-09-17T02:00:10.297Z"
+    lastModified: "2026-09-17T02:00:10.673Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

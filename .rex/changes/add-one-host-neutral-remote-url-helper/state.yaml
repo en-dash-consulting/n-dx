@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "3d7747f6-a22a-41e1-bd4f-491f29f54191":
+    status: "completed"
+    startedAt: "2026-10-08T20:51:45.850Z"
+    completedAt: "2026-10-08T21:14:09.128Z"
+    endedAt: "2026-10-08T21:14:09.128Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added packages/llm-client/src/git-remote-url.ts (parseGitRemoteUrl / remoteToWebUrl / stripRemoteCredentials) with 28 unit tests covering GitHub, Bitbucket Cloud and Bitbucket Data Center in https, ssh and scp-style forms. sourcevision's util/git-remote.ts and web's routes-project.ts now delegate to it; a new architecture-policy rule fails the build on a second parser."
+    appliedAt: "2026-10-08T21:14:09.128Z"
+    lastModified: "2026-10-08T21:14:09.417Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "472adfe6-f575-4b8a-9433-2182a612add7":
+    status: "completed"
+    startedAt: "2026-10-12T19:33:18.194Z"
+    completedAt: "2026-10-12T19:43:31.808Z"
+    endedAt: "2026-10-12T19:43:31.808Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex validate skips the prd_tree/ slug and identity checks on a v2 tree (run 10499c02, 29b713ef8 before the restack onto #716)."
+    appliedAt: "2026-10-12T19:43:31.808Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T19:43:32.059Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

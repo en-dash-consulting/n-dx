@@ -1,0 +1,20 @@
+schema: "rex/v2"
+items:
+  "3453f50c-a009-44e3-9f0f-6f280cf6b3b6":
+    status: "completed"
+    startedAt: "2026-10-06T04:16:33.143Z"
+    completedAt: "2026-10-06T04:16:33.143Z"
+    endedAt: "2026-10-06T04:16:33.143Z"
+    appliedAt: "2026-10-06T04:16:33.143Z"
+    needsPlacement: true
+    lastModified: "2026-10-06T04:16:34.618Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "84f00f7b-cbdc-4148-b695-8a9e917a6cb5":
+    status: "completed"
+    startedAt: "2026-10-06T04:16:33.143Z"
+    completedAt: "2026-10-06T04:16:33.143Z"
+    endedAt: "2026-10-06T04:16:33.143Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Captured by the planning PR."
+    lastModified: "2026-10-06T04:16:35.782Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

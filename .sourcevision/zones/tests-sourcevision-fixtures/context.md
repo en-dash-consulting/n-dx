@@ -7,7 +7,7 @@
 Zone: Tests Sourcevision Fixtures (`tests-sourcevision-fixtures`)
 Files: 68, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: main.go, router.go, setup.go (+43 more)
+Description: Non-source files in packages: main.go, router.go, setup.go (+65 more)
 Lines: 1101
 
 </zone>

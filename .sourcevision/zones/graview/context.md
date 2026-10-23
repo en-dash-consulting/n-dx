@@ -116,11 +116,8 @@ Incoming (other zones → this zone):
 [observation] [info] 12 entry points — wide API surface, consider consolidating exports
 [observation] [info] High cohesion (1) — files are tightly interconnected
 [suggestion] [info] Zone "graview" has files across 5 directories — consider consolidating under a dedicated directory
-[suggestion] [warning] graview-face reads the emitted graview-document from disk instead of importing it, so a schema change in graview/src/document.ts reaches graview-face without any type error. Add a contract test that emits a document with graview and compiles it with graview-face's loader. This would catch schema drift that the import graph cannot show.
 [anti-pattern] [warning] "packages/graview/src/cli/index.ts" exports 2 declaration(s) (findProductFace, main) that no file in the project imports
 [anti-pattern] [warning] "packages/hench/src/store/suggestions.ts" is production code imported only by tests (2 importer(s), all test files) — either it is dead or its real caller is missing
-[anti-pattern] [warning] The architecture diagram in CLAUDE.md lists Orchestration, Execution, Domain, Packs and Foundation, but leaves out graview, which imports from hench (Execution), rex and sourcevision (Domain) and llm-client (Foundation). Without a documented tier, architecture-policy.test.js has no declared layer to hold graview's imports to. A hench import of graview would not break any stated rule.
-[anti-pattern] [warning] packages/hench/src/store/suggestions.ts is assigned to the graview zone even though it is a hench store module and no production file in graview or hench imports it. The import graph is too thin to place it, and its location contradicts its zone. Either delete it as dead code or pin it to hench.
 
 </findings>
 
@@ -128,16 +125,9 @@ Incoming (other zones → this zone):
 
 - High cohesion (1) — files are tightly interconnected
 - 12 entry points — wide API surface, consider consolidating exports
-- High cohesion (1) — files are tightly interconnected
-- 12 entry points — wide API surface, consider consolidating exports
 - Zone "graview" has files across 5 directories — consider consolidating under a dedicated directory
 - "packages/hench/src/store/suggestions.ts" is production code imported only by tests (2 importer(s), all test files) — either it is dead or its real caller is missing
 - "packages/graview/src/cli/index.ts" exports 2 declaration(s) (findProductFace, main) that no file in the project imports
-- graview has gateways to hench (hench-gateway.ts re-exports normalizeRunTokens, RunRecord and RunTokens), rex, sourcevision and llm-client. That makes it a consumer above the Execution tier, but the four-tier diagram in CLAUDE.md does not place graview at all.
-- packages/hench/src/store/suggestions.ts is assigned to the graview zone even though it is a hench store module and no production file in graview or hench imports it. The import graph is too thin to place it, and its location contradicts its zone. Either delete it as dead code or pin it to hench.
-- The architecture diagram in CLAUDE.md lists Orchestration, Execution, Domain, Packs and Foundation, but leaves out graview, which imports from hench (Execution), rex and sourcevision (Domain) and llm-client (Foundation). Without a documented tier, architecture-policy.test.js has no declared layer to hold graview's imports to. A hench import of graview would not break any stated rule.
-- canonical.ts and document.ts are both classified as schema. They define the graview-document contract that graview-face compiles, so this zone owns a cross-package data contract that is not exposed as a typed import.
-- graview-face reads the emitted graview-document from disk instead of importing it, so a schema change in graview/src/document.ts reaches graview-face without any type error. Add a contract test that emits a document with graview and compiles it with graview-face's loader. This would catch schema drift that the import graph cannot show.
 - [call graph] 134 internal calls, 0 outgoing, 108 incoming (cohesion: 1, coupling: 0)
 
 </insights>

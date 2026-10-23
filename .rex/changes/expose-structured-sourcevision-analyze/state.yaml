@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "a8335123-473d-41cf-9be4-3bce15ee13be":
+    status: "completed"
+    startedAt: "2026-10-01T02:22:57.853Z"
+    completedAt: "2026-10-01T02:49:05.653Z"
+    endedAt: "2026-10-01T02:49:05.653Z"
+    resolutionType: "code-change"
+    resolutionDetail: "sv analyze writes .sourcevision/.cache/analyze-progress.json (phase, pass, batch, cache, LLM per class); readAnalyzeProgress judges pid and attaches previous same-mode timings; sv-analyze/status gains additive `progress`; 1s per-workspace poller pushes sv:analyze-progress frames. Commits dbe5f3bff + census baseline."
+    appliedAt: "2026-10-01T02:49:05.653Z"
+    lastModified: "2026-10-01T02:49:06.039Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

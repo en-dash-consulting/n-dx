@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "d0319f99-42f9-4648-a064-6e52b32bb18a":
+    status: "completed"
+    startedAt: "2026-05-18T12:56:32.210Z"
+    completedAt: "2026-05-18T13:04:31.211Z"
+    endedAt: "2026-05-18T13:04:31.211Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added skills reference links to all 16 guide pages. Added no-plan-mode to overnight.md skills table. Wrote docs-skill-refs.test.js regression test verifying every guide page links to ./skills and every skill reference matches the manifest."
+    appliedAt: "2026-05-18T13:04:31.211Z"

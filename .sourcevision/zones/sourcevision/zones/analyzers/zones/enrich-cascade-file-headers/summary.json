@@ -1,6 +1,6 @@
 {
   "id": "sourcevision/analyzers/enrich-cascade-file-headers",
-  "name": "Enrich Cascade File Headers",
+  "name": "Analysis Enrichment",
   "description": "3 files, primarily TypeScript",
   "files": [
     "packages/sourcevision/src/analyzers/enrich-cascade.ts",

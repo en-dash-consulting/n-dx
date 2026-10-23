@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "86536c82-eb93-4810-8610-f6960ff36736":
+    status: "completed"
+    startedAt: "2026-10-12T11:02:25.051Z"
+    completedAt: "2026-10-12T11:07:58.001Z"
+    endedAt: "2026-10-12T11:07:58.001Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: hench renders workflow.md outside rex's budget on v2 (shared workflowBlock with v1), placed before log/trimmed note."
+    appliedAt: "2026-10-12T11:07:58.001Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T11:07:58.272Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

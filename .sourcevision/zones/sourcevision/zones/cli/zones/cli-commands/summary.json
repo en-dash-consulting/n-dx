@@ -1,6 +1,6 @@
 {
   "id": "sourcevision/cli/cli-commands",
-  "name": "Cli Commands",
+  "name": "CLI Command Set",
   "description": "6 files, primarily TypeScript",
   "files": [
     "packages/sourcevision/src/cli/commands/pack-archive.ts",

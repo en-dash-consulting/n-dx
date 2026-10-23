@@ -6,14 +6,14 @@
 <architecture>
 
 Project: n-dx
-Git: chore/prd-readiness-infra-dashboard @ 472f3a5
-Files: 3136, Lines: 839224
-Languages: TypeScript(2675) JavaScript(334) Python(41) Java(37) Go(32)
+Git: chore/100-migrate-this-repository @ 77aa2d7
+Files: 3137, Lines: 839371
+Languages: TypeScript(2676) JavaScript(334) Python(41) Java(37) Go(32)
 Zones: 62, Described: 62
-Weighted avg cohesion: 0.98, coupling: 0.01 (55 zones with ≥5 files)
+Weighted avg cohesion: 0.99, coupling: 0.00 (55 zones with ≥5 files)
 Unweighted avg cohesion: 0.97, coupling: 0.01
 Small zones excluded from averages: 7 (<5 files, unreliable metrics)
-Import edges: 9808, External packages: 52
+Import edges: 9814, External packages: 52
 Circulars: 27
 
 </architecture>
@@ -23,65 +23,68 @@ Circulars: 27
 [.claude] .Claude Scripts (2 files, coh=0.00 coup=0.00)
   Build, packaging, and CI scripts: iso-map.mjs, config.ts
   files: .claude/skills/iso-map/scripts/iso-map.mjs, docs/.vitepress/config.ts
-[core] Core (52 files, coh=1.00 coup=0.00)
+[core] CLI Orchestration Hub (52 files, coh=1.00 coup=0.00)
   52 files, mostly utilities and entry points; entry points assistant-assets.js, assistant-integration.js, child-lifecycle.js; imported by Tests and Tests.
   files: packages/core/assistant-assets.js [utility], packages/core/assistant-integration.js [utility], packages/core/bin/hench.js [utility], packages/core/bin/rex.js [utility], packages/core/bin/sourcevision.js [utility], packages/core/child-lifecycle.js [utility], packages/core/ci.js [utility], packages/core/claude-integration.js [utility], packages/core/cli-brand.js [utility], packages/core/cli-identity.js [utility] +42
-[go-language-pack] Go Language Pack (8 files, coh=1.00 coup=0.00)
-  Focused language analyzer for Go providing resolver, SQL detection, and go.mod/go.sum parsing.
-  files: packages/lang-go/src/go-pack.ts [service], packages/lang-go/src/go-resolver.ts [service], packages/lang-go/src/go-sql.ts [service], packages/lang-go/src/index.ts [entrypoint], packages/lang-go/src/pack.ts [entrypoint], packages/lang-go/src/package-paths.ts [utility], packages/lang-go/vitest.config.ts, packages/lang-java/vitest.config.ts
+[go-language-pack] Lang Go (8 files, coh=1.00 coup=0.00)
+  8 files, mostly utilities and entry points; entry points go-pack.ts, go-resolver.ts, go-sql.ts; imports Tests; imported by Packages and Packages.
+  files: packages/lang-go/src/go-pack.ts [gateway], packages/lang-go/src/go-resolver.ts [utility], packages/lang-go/src/go-sql.ts [utility], packages/lang-go/src/index.ts [entrypoint], packages/lang-go/src/pack.ts [entrypoint], packages/lang-go/src/package-paths.ts [utility], packages/lang-go/vitest.config.ts, packages/lang-java/vitest.config.ts
 [graview] Graview (20 files, coh=1.00 coup=0.00)
   20 files, mostly services and gateways; entry points canonical.ts, document.ts, emit.ts; imports Tests; imported by Packages and Packages.
-  files: packages/graview/src/canonical.ts [schema], packages/graview/src/cli/index.ts [entrypoint], packages/graview/src/document.ts [schema], packages/graview/src/emit.ts [service], packages/graview/src/graview-bin.ts [entrypoint], packages/graview/src/hench-gateway.ts [gateway], packages/graview/src/hub.ts [service], packages/graview/src/llm-gateway.ts [gateway], packages/graview/src/public.ts [entrypoint], packages/graview/src/rex-gateway.ts [gateway] +10
+  files: packages/graview/src/canonical.ts [utility], packages/graview/src/cli/index.ts [entrypoint], packages/graview/src/document.ts [model], packages/graview/src/emit.ts [service], packages/graview/src/graview-bin.ts [entrypoint], packages/graview/src/hench-gateway.ts [gateway], packages/graview/src/hub.ts [config], packages/graview/src/llm-gateway.ts [gateway], packages/graview/src/public.ts [entrypoint], packages/graview/src/rex-gateway.ts [gateway] +10
 [graview-face] Graview Face (35 files, coh=1.00 coup=0.00)
   35 files, mostly components and models; entry points ndx-door.ts, app.ts, spend.ts; imports Tests; imported by Packages.
-  files: packages/graview-face/bin/serve.js [entrypoint], packages/graview-face/dev/ndx-door.ts [utility], packages/graview-face/scripts/a11y.mjs, packages/graview-face/scripts/graview.mjs, packages/graview-face/scripts/make-fixture.mjs, packages/graview-face/scripts/sync-data.mjs, packages/graview-face/src/app.ts [entrypoint], packages/graview-face/src/faces/pages.tsx [component], packages/graview-face/src/faces/scene.tsx [component], packages/graview-face/src/main.tsx [entrypoint] +25
+  files: packages/graview-face/bin/serve.js [entrypoint], packages/graview-face/dev/ndx-door.ts, packages/graview-face/scripts/a11y.mjs, packages/graview-face/scripts/graview.mjs, packages/graview-face/scripts/make-fixture.mjs, packages/graview-face/scripts/sync-data.mjs, packages/graview-face/src/app.ts [entrypoint], packages/graview-face/src/faces/pages.tsx [component], packages/graview-face/src/faces/scene.tsx [component], packages/graview-face/src/main.tsx [entrypoint] +25
 [hench] Hench (166 files, coh=1.00 coup=0.00)
-  165 files, mostly utilities and cli commands; entry points adaptive.ts, adversarial-review.ts, change-magnitude.ts; imports Packages and Tests; imported by Packages and Packages.
-  files: packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/adversarial-review.ts [service], packages/hench/src/agent/analysis/change-magnitude.ts [service], packages/hench/src/agent/analysis/git-changed-files.ts [service], packages/hench/src/agent/analysis/index.ts [entrypoint], packages/hench/src/agent/analysis/livelock.ts [service], packages/hench/src/agent/analysis/plan-only-detection.ts [service], packages/hench/src/agent/analysis/review-repairs.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/spin.ts [service] +156
-[java-language-pack] Java Language Pack (8 files, coh=1.00 coup=0.00)
-  Focused language analyzer for Java with Maven/Gradle support, Spring Boot integration, and SQL detection.
-  files: packages/lang-java/src/index.ts [entrypoint], packages/lang-java/src/java-pack.ts [service], packages/lang-java/src/java-resolver.ts [service], packages/lang-java/src/java-sql.ts [service], packages/lang-java/src/java-test-artifacts.ts [utility], packages/lang-java/src/pack.ts [entrypoint], packages/lang-java/src/package-paths.ts [utility], packages/lang-java/src/spring-boot.ts [service]
-[lang-python] Lang Python (15 files, coh=1.00 coup=0.00)
-  Analyzes Python web frameworks (Django, FastAPI, Flask) and client libraries to extract HTTP routes and outbound calls.
-  files: packages/lang-python/src/django.ts [service], packages/lang-python/src/fastapi.ts [service], packages/lang-python/src/flask.ts [service], packages/lang-python/src/index.ts [entrypoint], packages/lang-python/src/pack.ts [entrypoint], packages/lang-python/src/package-paths.ts [utility], packages/lang-python/src/python-clients.ts [service], packages/lang-python/src/python-imports.ts [service], packages/lang-python/src/python-notices.ts [utility], packages/lang-python/src/python-pack.ts [entrypoint] +5
-[lang-runtime] Lang Runtime (13 files, coh=1.00 coup=0.00)
-  Provides the language pack contract, grammar build infrastructure, and golden-test utilities for tree-sitter-based language analysis.
-  files: packages/lang-runtime/scripts/build-grammars.mjs, packages/lang-runtime/scripts/update-pack-goldens.mjs, packages/lang-runtime/src/index.ts [entrypoint], packages/lang-runtime/src/pack-calls.ts [utility], packages/lang-runtime/src/pack-entry.ts [entrypoint], packages/lang-runtime/src/pack-facts.ts [types], packages/lang-runtime/src/pack-package.ts [utility], packages/lang-runtime/src/pack.ts [entrypoint], packages/lang-runtime/src/runner.ts [service], packages/lang-runtime/src/testing/grammar.ts [test-helper] +3
+  166 files, mostly utilities and cli commands; entry points adaptive.ts, adversarial-review.ts, change-magnitude.ts; imports Packages and Tests; imported by Packages and Packages.
+  files: packages/hench/src/agent/analysis/adaptive.ts [service], packages/hench/src/agent/analysis/adversarial-review.ts [service], packages/hench/src/agent/analysis/change-magnitude.ts [utility], packages/hench/src/agent/analysis/git-changed-files.ts [utility], packages/hench/src/agent/analysis/index.ts [entrypoint], packages/hench/src/agent/analysis/livelock.ts [utility], packages/hench/src/agent/analysis/plan-only-detection.ts [utility], packages/hench/src/agent/analysis/review-repairs.ts [service], packages/hench/src/agent/analysis/review.ts [service], packages/hench/src/agent/analysis/spin.ts [utility] +156
+[java-language-pack] Lang Java (8 files, coh=1.00 coup=0.00)
+  8 files, mostly utilities and entry points; entry points index.ts, java-pack.ts, java-resolver.ts; imported by Packages and Packages.
+  files: packages/lang-java/src/index.ts [entrypoint], packages/lang-java/src/java-pack.ts [gateway], packages/lang-java/src/java-resolver.ts [utility], packages/lang-java/src/java-sql.ts [utility], packages/lang-java/src/java-test-artifacts.ts [utility], packages/lang-java/src/pack.ts [entrypoint], packages/lang-java/src/package-paths.ts [utility], packages/lang-java/src/spring-boot.ts [utility]
+[lang-python] Python Language Pack (15 files, coh=1.00 coup=0.00)
+  15 files, mostly utilities and entry points; entry points django.ts, fastapi.ts, flask.ts; imported by Packages and Packages.
+  files: packages/lang-python/src/django.ts, packages/lang-python/src/fastapi.ts, packages/lang-python/src/flask.ts, packages/lang-python/src/index.ts [entrypoint], packages/lang-python/src/pack.ts [entrypoint], packages/lang-python/src/package-paths.ts [utility], packages/lang-python/src/python-clients.ts [service], packages/lang-python/src/python-imports.ts [utility], packages/lang-python/src/python-notices.ts, packages/lang-python/src/python-pack.ts [entrypoint] +5
+[lang-runtime] Language Pack Runtime (13 files, coh=1.00 coup=0.00)
+  13 files, mostly utilities and entry points; entry points build-grammars.mjs, index.ts, pack-calls.ts; imports Tests; imported by Packages and Packages.
+  files: packages/lang-runtime/scripts/build-grammars.mjs, packages/lang-runtime/scripts/update-pack-goldens.mjs, packages/lang-runtime/src/index.ts [entrypoint], packages/lang-runtime/src/pack-calls.ts [utility], packages/lang-runtime/src/pack-entry.ts [entrypoint], packages/lang-runtime/src/pack-facts.ts [utility], packages/lang-runtime/src/pack-package.ts [utility], packages/lang-runtime/src/pack.ts [entrypoint], packages/lang-runtime/src/runner.ts [utility], packages/lang-runtime/src/testing/grammar.ts [test-helper] +3
 [lang-sql] Lang Sql (6 files, coh=1.00 coup=0.00)
-  Extracts SQL schemas and database facts from migrations and configuration to enable dependency introspection and schema-based analysis.
-  files: packages/lang-sql/src/index.ts [entrypoint], packages/lang-sql/src/pack.ts [entrypoint], packages/lang-sql/src/package-paths.ts [types], packages/lang-sql/src/sql-facts.ts [types], packages/lang-sql/src/sql-pack.ts [entrypoint], packages/lang-sql/src/sql-schema.ts [schema]
+  6 files, mostly utilities and entry points; entry points index.ts, sql-facts.ts, sql-pack.ts; imported by Packages.
+  files: packages/lang-sql/src/index.ts [entrypoint], packages/lang-sql/src/pack.ts [entrypoint], packages/lang-sql/src/package-paths.ts [utility], packages/lang-sql/src/sql-facts.ts [utility], packages/lang-sql/src/sql-pack.ts [utility], packages/lang-sql/src/sql-schema.ts [model]
 [lang-terraform] Lang Terraform (9 files, coh=1.00 coup=0.00)
-  Analyzes Terraform HCL configurations to extract resources, modules, variables, and infrastructure dependencies for IaC analysis.
-  files: packages/lang-terraform/src/index.ts [entrypoint], packages/lang-terraform/src/pack.ts [entrypoint], packages/lang-terraform/src/package-paths.ts [types], packages/lang-terraform/src/terraform-facts.ts [types], packages/lang-terraform/src/terraform-model.ts [model], packages/lang-terraform/src/terraform-pack.ts [entrypoint], packages/lang-terraform/src/terraform-resolve.ts [service], packages/lang-terraform/vitest.config.ts, packages/sourcevision/scripts/update-pack-goldens.mjs
-[language-pack-foundation] Language Pack Foundation (33 files, coh=1.00 coup=0.00)
-  Foundation contract and detection system providing build-file models, pack registry, and shared language abstractions.
-  files: packages/lang-kit/src/build-file.ts [model], packages/lang-kit/src/build-model.ts [model], packages/lang-kit/src/csharp.ts [utility], packages/lang-kit/src/detect.ts [service], packages/lang-kit/src/dir-glob.ts [utility], packages/lang-kit/src/go-build.ts [utility], packages/lang-kit/src/go.ts [types], packages/lang-kit/src/gradle-catalog.ts [utility], packages/lang-kit/src/gradle-script.ts [utility], packages/lang-kit/src/iac-kinds.ts [types] +23
+  9 files, mostly utilities and entry points; entry points index.ts; imports Tests; imported by Packages.
+  files: packages/lang-terraform/src/index.ts [entrypoint], packages/lang-terraform/src/pack.ts [entrypoint], packages/lang-terraform/src/package-paths.ts [utility], packages/lang-terraform/src/terraform-facts.ts [utility], packages/lang-terraform/src/terraform-model.ts [model], packages/lang-terraform/src/terraform-pack.ts [utility], packages/lang-terraform/src/terraform-resolve.ts [utility], packages/lang-terraform/vitest.config.ts, packages/sourcevision/scripts/update-pack-goldens.mjs
+[language-pack-foundation] Lang Kit (33 files, coh=1.00 coup=0.00)
+  33 files, mostly utilities and configuration; entry points build-file.ts, detect.ts, go-build.ts; imports Tests; imported by Packages.
+  files: packages/lang-kit/src/build-file.ts [model], packages/lang-kit/src/build-model.ts [model], packages/lang-kit/src/csharp.ts, packages/lang-kit/src/detect.ts [utility], packages/lang-kit/src/dir-glob.ts [utility], packages/lang-kit/src/go-build.ts [utility], packages/lang-kit/src/go.ts [config], packages/lang-kit/src/gradle-catalog.ts [utility], packages/lang-kit/src/gradle-script.ts [utility], packages/lang-kit/src/iac-kinds.ts [types] +23
 [llm-client] Llm Client (58 files, coh=1.00 coup=0.00)
   58 files, mostly utilities and services; entry points api-provider.ts, auth-guidance.ts, auth-token.ts; imports Tests; imported by Packages and Packages.
-  files: packages/llm-client/src/api-provider.ts [service], packages/llm-client/src/auth-guidance.ts [types], packages/llm-client/src/auth-token.ts [utility], packages/llm-client/src/auth.ts [service], packages/llm-client/src/budget-preflight.ts [service], packages/llm-client/src/child-env.ts [utility], packages/llm-client/src/claude-effort.ts [types], packages/llm-client/src/cli-brand.ts [utility], packages/llm-client/src/cli-log.ts [utility], packages/llm-client/src/cli-provider.ts [service] +48
-[rex] Rex (24 files, coh=0.45 coup=0.55)
-  Domain layer providing PRD analysis algorithms, schema validation, tree operations, and storage contracts for folder-tree backend persistence.
-  files: packages/rex/src/analyze/batch-types.ts [schema], packages/rex/src/cli/commands/chunked-review-state.ts [cli-command], packages/rex/src/cli/commands/chunked-review-types.ts [cli-command], packages/rex/src/cli/commands/chunked-review.ts [cli-command], packages/rex/src/cli/commands/fix.ts [cli-command], packages/rex/src/cli/commands/modification-intent.ts [cli-command], packages/rex/src/fix/index.ts [entrypoint], packages/rex/src/fix/tree.ts [service], packages/rex/src/fix/types.ts [types], packages/rex/src/migrations/migration.ts [model] +14
-[rex-cli] Rex CLI (255 files, coh=0.97 coup=0.03)
-  259 files, mostly utilities and cli commands; entry points acknowledge.ts, analyze-shared.ts, consolidation-guard.ts; imports Rex and Rex Fix; imported by Packages and Packages.
-  files: packages/rex/src/analyze/acknowledge.ts [utility], packages/rex/src/analyze/analyze-shared.ts [utility], packages/rex/src/analyze/consolidation-guard.ts [utility], packages/rex/src/analyze/decompose.ts [utility], packages/rex/src/analyze/dedupe.ts [utility], packages/rex/src/analyze/diff.ts [utility], packages/rex/src/analyze/escalate.ts [utility], packages/rex/src/analyze/extract.ts [utility], packages/rex/src/analyze/file-validation.ts [utility], packages/rex/src/analyze/guided.ts [service] +245
-[root] Root (4 files, coh=0.00 coup=0.00)
-  4 files; imports Tests.
-  files: pr-check.js [utility], scan_transcripts.py [utility], test-token-format.js [test-helper], vitest.config.js
+  files: packages/llm-client/src/api-provider.ts [service], packages/llm-client/src/auth-guidance.ts [service], packages/llm-client/src/auth-token.ts [utility], packages/llm-client/src/auth.ts [utility], packages/llm-client/src/budget-preflight.ts [utility], packages/llm-client/src/child-env.ts [utility], packages/llm-client/src/claude-effort.ts [service], packages/llm-client/src/cli-brand.ts [utility], packages/llm-client/src/cli-log.ts [utility], packages/llm-client/src/cli-provider.ts [service] +48
+[rex-cli] Rex (261 files, coh=0.99 coup=0.01)
+  261 files, mostly utilities and cli commands; entry points acknowledge.ts, analyze-shared.ts, consolidation-guard.ts; imports Rex Migrations; imported by Packages and Packages.
+  files: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts [utility], packages/rex/src/analyze/batch-types.ts [types], packages/rex/src/analyze/consolidation-guard.ts [utility], packages/rex/src/analyze/decompose.ts [utility], packages/rex/src/analyze/dedupe.ts [utility], packages/rex/src/analyze/diff.ts [utility], packages/rex/src/analyze/escalate.ts [service], packages/rex/src/analyze/extract.ts [utility], packages/rex/src/analyze/file-validation.ts [utility] +251
+[rex-core] Rex Core (1 files, coh=0.47 coup=0.53)
+  1 file, mostly entry points; entry points backfill-commit-attribution.ts, export.ts, health-warning.ts; imports Rex and Rex Migrations; imported by Packages and Packages.
+  files: packages/rex/src/public.ts [entrypoint]
+[rex-migrations] Rex Migrations (16 files, coh=0.56 coup=0.44)
+  16 files, mostly services and models; entry points migration.ts, pipeline.ts, plan-file.ts; imports Rex; imported by Packages and Rex.
+  files: packages/rex/src/migrations/migration.ts [model], packages/rex/src/migrations/pipeline.ts [service], packages/rex/src/migrations/plan-file.ts [model], packages/rex/src/migrations/registry.ts [entrypoint], packages/rex/src/migrations/v1-to-v2/apply.ts, packages/rex/src/migrations/v1-to-v2/capability-spec.ts [types], packages/rex/src/migrations/v1-to-v2/code-files.ts, packages/rex/src/migrations/v1-to-v2/index.ts [entrypoint], packages/rex/src/migrations/v1-to-v2/jev-review-pass.ts, packages/rex/src/migrations/v1-to-v2/migration-plan-data.ts [service] +6
+[root] Test Helpers (4 files, coh=0.00 coup=0.00)
+  4 files, mostly test helpers; imports Tests.
+  files: pr-check.js, scan_transcripts.py, test-token-format.js [test-helper], vitest.config.js
 [scripts] Build & CI Scripts (16 files, coh=0.00 coup=0.00)
-  Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+12 more)
+  Build, packaging, and CI scripts: backfill-release-tags.mjs, build-iso-skill.mjs, check-dependency-drift.mjs (+13 more)
   files: scripts/backfill-release-tags.mjs, scripts/build-iso-skill.mjs, scripts/check-dependency-drift.mjs, scripts/check-lockfile-integrity.mjs, scripts/check-obfuscated-code.mjs, scripts/cli-smoke-parity.mjs, scripts/export-preview-demo.mjs, scripts/grammar-suites.mjs, scripts/hench-callgraph-analysis.mjs, scripts/lib/stale-dist.d.mts +6
 [sourcevision] Sourcevision (149 files, coh=1.00 coup=0.00)
-  121 files, mostly utilities and services; entry points analysis-outcome.ts, analyze-progress.ts, archetypes.ts; imports Tests; imported by Packages and Packages.
+  149 files, mostly utilities and services; entry points java-scip.mjs, workspace-pack.mjs, analysis-outcome.ts; imports Tests; imported by Packages and Packages.
   files: packages/sourcevision/scripts/bench-java-parse.mjs, packages/sourcevision/scripts/corpus-sample.mjs, packages/sourcevision/scripts/database-corpus-report.mjs, packages/sourcevision/scripts/go-corpus-clone.mjs, packages/sourcevision/scripts/go-corpus-report.mjs, packages/sourcevision/scripts/go-corpus.mjs, packages/sourcevision/scripts/java-corpus-clone.mjs, packages/sourcevision/scripts/java-corpus-report.mjs, packages/sourcevision/scripts/java-corpus.mjs, packages/sourcevision/scripts/java-scip-compare.mjs +139
 [tests] Tests (4 files, coh=1.00 coup=0.00)
-  Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts
+  Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts (+1 more)
   files: packages/graview-face/tests/door.test.ts, packages/graview-face/tests/places.test.ts, packages/graview-face/tests/sync.test.ts, packages/sourcevision/tests/setup-ndx-home.ts
 [tests-2] Tests 2 (13 files, coh=1.00 coup=0.00)
-  Non-source files in tests: evals.test.js, record-goldens.js, score.js (+9 more)
+  Non-source files in tests: evals.test.js, record-goldens.js, score.js (+10 more)
   files: tests/gauntlet/sourcevision-evals/evals.test.js, tests/gauntlet/sourcevision-evals/record-goldens.js, tests/gauntlet/sourcevision-evals/score.js, tests/gauntlet/sourcevision-evals/score.test.js, tests/hidden-child-process-alias.d.mts, tests/hidden-child-process-alias.mjs, tests/hidden-child-process.js, tests/setup-color-env.js, tests/setup-judgment-env.js, tests/setup-ndx-home.js +3
 [tests-e2e] Tests (109 files, coh=1.00 coup=0.00)
-  Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+104 more)
+  Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+106 more)
   files: tests/e2e/agents-md-size-budget.test.js, tests/e2e/architecture-policy.test.js, tests/e2e/assistant-body-drift.test.js, tests/e2e/assistant-integration.test.js, tests/e2e/assistant-parity-smoke.test.js, tests/e2e/build-stamp-unpublished.test.js, tests/e2e/catalog-runtime-contract.test.js, tests/e2e/ci-draft-pr-gate.test.js, tests/e2e/ci-grammar-steps.test.js, tests/e2e/ci-merge-queue-trigger.test.js +99
 [tests-fixtures] Tests Fixtures (49 files, coh=1.00 coup=0.00)
   Non-source files in tests: child-double.mjs, spawn-preload.mjs, ci-child-double.mjs (+46 more)
@@ -96,7 +99,7 @@ Circulars: 27
   Non-source files in packages: cli-hints.test.ts, cli-init.test.ts, cross-vendor-run-record-smoke.test.ts (+5 more)
   files: packages/hench/tests/e2e/cli-hints.test.ts, packages/hench/tests/e2e/cli-init.test.ts, packages/hench/tests/e2e/cross-vendor-run-record-smoke.test.ts, packages/hench/tests/e2e/run-flag-conflicts.test.ts, packages/hench/tests/fixtures/cross-vendor-runtime.ts, packages/hench/tests/helpers/index.ts, packages/hench/tests/helpers/posix-shell.ts, packages/hench/tests/helpers/scripted-claude-cli.ts
 [tests-hench-integration] Tests Hench Integration (100 files, coh=1.00 coup=0.00)
-  Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+96 more)
+  Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+97 more)
   files: packages/hench/tests/integration/agent-commit-item-trailer-cli-loop.test.ts, packages/hench/tests/integration/agent-commit-item-trailer.test.ts, packages/hench/tests/integration/agent-model-override.test.ts, packages/hench/tests/integration/background-wait-codex.test.ts, packages/hench/tests/integration/background-wait-resume.test.ts, packages/hench/tests/integration/background-wait-spawn.test.ts, packages/hench/tests/integration/between-task-uncommitted-guard.test.ts, packages/hench/tests/integration/cascade-containment.test.ts, packages/hench/tests/integration/changed-files-capture.test.ts, packages/hench/tests/integration/cli-name-propagation.test.ts +90
 [tests-hench-unit] Tests Hench Unit (201 files, coh=1.00 coup=0.00)
   Non-source files in packages: adaptive.test.ts, adversarial-review.test.ts, change-magnitude.test.ts (+198 more)
@@ -144,31 +147,31 @@ Circulars: 27
   Non-source files in packages: ansi-reset-regression.test.ts, api-provider.test.ts, auth-guidance.test.ts (+58 more)
   files: packages/llm-client/tests/unit/ansi-reset-regression.test.ts, packages/llm-client/tests/unit/api-provider.test.ts, packages/llm-client/tests/unit/auth-guidance.test.ts, packages/llm-client/tests/unit/auth-token.test.ts, packages/llm-client/tests/unit/auth.test.ts, packages/llm-client/tests/unit/budget-preflight.test.ts, packages/llm-client/tests/unit/child-env.test.ts, packages/llm-client/tests/unit/claude-effort.test.ts, packages/llm-client/tests/unit/claude-legacy-fields.test.ts, packages/llm-client/tests/unit/cli-provider-cwd.test.ts +51
 [tests-packages] Tests Packages (26 files, coh=1.00 coup=0.00)
-  Non-source files in packages: project.ts, emit.test.ts, fake-cli.ts (+11 more)
+  Non-source files in packages: project.ts, emit.test.ts, pack-fixtures.ts (+23 more)
   files: packages/graview/tests/helpers/project.ts, packages/graview/tests/integration/emit.test.ts, packages/lang-go/tests/helpers/pack-fixtures.ts, packages/lang-go/tests/unit/index.test.ts, packages/lang-java/tests/helpers/pack-fixtures.ts, packages/lang-kit/tests/fixtures/budget-subjects.mjs, packages/lang-kit/tests/helpers/bounded-worker.mjs, packages/lang-kit/tests/helpers/call-within-budget.ts, packages/lang-kit/tests/helpers/ts-source-hooks.mjs, packages/lang-python/tests/helpers/pack-fixtures.ts +16
 [tests-rex-e2e] Tests Rex E2e (23 files, coh=1.00 coup=0.00)
   Non-source files in packages: add-stdin-hang.test.ts, cli-add-path-regression.test.ts, cli-analyze.test.ts (+20 more)
   files: packages/rex/tests/e2e/add-stdin-hang.test.ts, packages/rex/tests/e2e/cli-add-path-regression.test.ts, packages/rex/tests/e2e/cli-analyze.test.ts, packages/rex/tests/e2e/cli-fix.test.ts, packages/rex/tests/e2e/cli-folder-tree.test.ts, packages/rex/tests/e2e/cli-hints.test.ts, packages/rex/tests/e2e/cli-import.test.ts, packages/rex/tests/e2e/cli-init.test.ts, packages/rex/tests/e2e/cli-legacy-layout-notice.test.ts, packages/rex/tests/e2e/cli-migrate-plan.test.ts +13
 [tests-rex-integration] Tests Rex Integration (70 files, coh=1.00 coup=0.00)
-  Non-source files in packages: accept-keeps-loe.test.ts, add-auto-reshape.test.ts, add-collision-routing.test.ts (+66 more)
+  Non-source files in packages: accept-keeps-loe.test.ts, add-auto-reshape.test.ts, add-collision-routing.test.ts (+67 more)
   files: packages/rex/tests/integration/accept-keeps-loe.test.ts, packages/rex/tests/integration/add-auto-reshape.test.ts, packages/rex/tests/integration/add-collision-routing.test.ts, packages/rex/tests/integration/add-sibling-rename.test.ts, packages/rex/tests/integration/add-with-folder-per-task-migration.test.ts, packages/rex/tests/integration/append-log-parity.test.ts, packages/rex/tests/integration/backfill-commit-attribution.test.ts, packages/rex/tests/integration/backup-snapshots.test.ts, packages/rex/tests/integration/branch-guard.test.ts, packages/rex/tests/integration/change-commits.test.ts +60
-[tests-rex-unit] Tests Rex Unit (259 files, coh=1.00 coup=0.00)
-  Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+255 more)
-  files: packages/rex/tests/unit/analyze/__fixtures__/prompt-surfaces.ts, packages/rex/tests/unit/analyze/accept-single-transaction.test.ts, packages/rex/tests/unit/analyze/acknowledge.test.ts, packages/rex/tests/unit/analyze/analyze-cost-pricing.test.ts, packages/rex/tests/unit/analyze/body-merge-contract.test.ts, packages/rex/tests/unit/analyze/consolidation-guard.test.ts, packages/rex/tests/unit/analyze/decompose.test.ts, packages/rex/tests/unit/analyze/dedupe.test.ts, packages/rex/tests/unit/analyze/diff.test.ts, packages/rex/tests/unit/analyze/escalate.test.ts +249
+[tests-rex-unit] Tests Rex Unit (260 files, coh=1.00 coup=0.00)
+  Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+257 more)
+  files: packages/rex/tests/unit/analyze/__fixtures__/prompt-surfaces.ts, packages/rex/tests/unit/analyze/accept-single-transaction.test.ts, packages/rex/tests/unit/analyze/acknowledge.test.ts, packages/rex/tests/unit/analyze/analyze-cost-pricing.test.ts, packages/rex/tests/unit/analyze/body-merge-contract.test.ts, packages/rex/tests/unit/analyze/consolidation-guard.test.ts, packages/rex/tests/unit/analyze/decompose.test.ts, packages/rex/tests/unit/analyze/dedupe.test.ts, packages/rex/tests/unit/analyze/diff.test.ts, packages/rex/tests/unit/analyze/escalate.test.ts +250
 [tests-sourcevision-e2e] Tests Sourcevision E2e (7 files, coh=1.00 coup=0.00)
-  Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.test.ts (+2 more)
+  Non-source files in packages: cli-analyze.test.ts, cli-hints.test.ts, cli-iso.test.ts (+4 more)
   files: packages/sourcevision/tests/e2e/cli-analyze.test.ts, packages/sourcevision/tests/e2e/cli-hints.test.ts, packages/sourcevision/tests/e2e/cli-iso.test.ts, packages/sourcevision/tests/e2e/cli-pack.test.ts, packages/sourcevision/tests/e2e/cli-serve.test.ts, packages/sourcevision/tests/e2e/packed-tarball.test.ts, packages/sourcevision/tests/e2e/prd-epic-resolver-contract.test.ts
 [tests-sourcevision-fixtures] Tests Sourcevision Fixtures (68 files, coh=1.00 coup=0.00)
-  Non-source files in packages: main.go, router.go, setup.go (+43 more)
+  Non-source files in packages: main.go, router.go, setup.go (+65 more)
   files: packages/sourcevision/tests/fixtures/go-project/cmd/api/main.go, packages/sourcevision/tests/fixtures/go-project/cmd/api/router.go, packages/sourcevision/tests/fixtures/go-project/cmd/api/setup.go, packages/sourcevision/tests/fixtures/go-project/internal/config/config.go, packages/sourcevision/tests/fixtures/go-project/internal/handler/user.go, packages/sourcevision/tests/fixtures/go-project/internal/handler/user_test.go, packages/sourcevision/tests/fixtures/go-project/internal/middleware/auth.go, packages/sourcevision/tests/fixtures/go-project/internal/middleware/logging.go, packages/sourcevision/tests/fixtures/go-project/internal/repository/db.go, packages/sourcevision/tests/fixtures/go-project/internal/repository/drivers.go +58
 [tests-sourcevision-integration] Tests Sourcevision Integration (32 files, coh=1.00 coup=0.00)
   Non-source files in packages: analyze-model-resolution.test.ts, claude-config.test.ts, context.test.ts (+29 more)
   files: packages/sourcevision/tests/integration/analyze-model-resolution.test.ts, packages/sourcevision/tests/integration/claude-config.test.ts, packages/sourcevision/tests/integration/context.test.ts, packages/sourcevision/tests/integration/embedded-sql.test.ts, packages/sourcevision/tests/integration/go-pack-regex-parity.test.ts, packages/sourcevision/tests/integration/go-zones.test.ts, packages/sourcevision/tests/integration/imports-go-incremental-carryover.test.ts, packages/sourcevision/tests/integration/imports-go-incremental.test.ts, packages/sourcevision/tests/integration/imports-go.test.ts, packages/sourcevision/tests/integration/inventory-cache-fingerprint.test.ts +22
 [tests-sourcevision-unit] Tests Sourcevision Unit (141 files, coh=1.00 coup=0.00)
-  Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+123 more)
+  Non-source files in packages: analysis-outcome.test.ts, analyze-progress.test.ts, archetypes.test.ts (+138 more)
   files: packages/sourcevision/tests/unit/analyzers/analysis-outcome.test.ts, packages/sourcevision/tests/unit/analyzers/analyze-progress.test.ts, packages/sourcevision/tests/unit/analyzers/archetypes.test.ts, packages/sourcevision/tests/unit/analyzers/area-naming.test.ts, packages/sourcevision/tests/unit/analyzers/artifact-caps.test.ts, packages/sourcevision/tests/unit/analyzers/branch-work-classifier.test.ts, packages/sourcevision/tests/unit/analyzers/branch-work-collector.test.ts, packages/sourcevision/tests/unit/analyzers/branch-work-filter.test.ts, packages/sourcevision/tests/unit/analyzers/branch-work-store.test.ts, packages/sourcevision/tests/unit/analyzers/callgraph-findings.test.ts +131
 [tests-unit] Tests Unit (59 files, coh=1.00 coup=0.00)
-  Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+55 more)
+  Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+56 more)
   files: tests/unit/architecture-gate-reporting.test.js, tests/unit/check-dependency-drift.test.js, tests/unit/check-lockfile-integrity.test.js, tests/unit/child-lifecycle.test.js, tests/unit/claude-discovery.test.js, tests/unit/claude-mcp-pinned-registration.test.js, tests/unit/claude-mcp-scope-flag.test.js, tests/unit/cli-identity.test.js, tests/unit/cli-log.test.js, tests/unit/cli-smoke-parity.test.js +49
 [tests-web-e2e-ui] Tests Web E2e Ui (9 files, coh=1.00 coup=0.00)
   Non-source files in packages: console-errors.ts, fixture-project.ts, hench-runs-workflow.spec.ts (+6 more)
@@ -177,35 +180,32 @@ Circulars: 27
   Non-source files in packages: built-server-guard.ts, crash-detector-test-support.ts, job-tray.ts (+5 more)
   files: packages/web/tests/helpers/built-server-guard.ts, packages/web/tests/helpers/crash-detector-test-support.ts, packages/web/tests/helpers/job-tray.ts, packages/web/tests/helpers/prep-fixture.ts, packages/web/tests/helpers/temp-dir.ts, packages/web/tests/helpers/tree-work-count.ts, packages/web/tests/helpers/viewer-boot.ts, packages/web/tests/helpers/visibility-test-support.ts
 [tests-web-integration] Tests Web Integration (43 files, coh=1.00 coup=0.00)
-  Non-source files in packages: background-suspension-recovery.test.ts, boundary-check.test.ts, build-output-contract.test.ts (+39 more)
+  Non-source files in packages: background-suspension-recovery.test.ts, boundary-check.test.ts, build-output-contract.test.ts (+40 more)
   files: packages/web/tests/integration/background-suspension-recovery.test.ts, packages/web/tests/integration/boundary-check.test.ts, packages/web/tests/integration/build-output-contract.test.ts, packages/web/tests/integration/commits-surfacing.test.ts, packages/web/tests/integration/feature-gate-enforcement.test.ts, packages/web/tests/integration/hench-runs-dashboard.test.ts, packages/web/tests/integration/hub-admission-auth.test.ts, packages/web/tests/integration/hub-admission.test.ts, packages/web/tests/integration/hub-auth-token.test.ts, packages/web/tests/integration/hub-cards.test.ts +33
 [tests-web-unit] Packages (352 files, coh=1.00 coup=0.00)
-  Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+343 more)
+  Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+349 more)
   files: packages/web/tests/unit/helpers/built-server-guard.test.ts, packages/web/tests/unit/hub/admission.test.ts, packages/web/tests/unit/hub/home.test.ts, packages/web/tests/unit/hub/ndx-bin-identity.test.ts, packages/web/tests/unit/hub/new-project-form.test.ts, packages/web/tests/unit/hub/new-project-route.test.ts, packages/web/tests/unit/hub/new-project.test.ts, packages/web/tests/unit/hub/overview.test.ts, packages/web/tests/unit/hub/proxy-decide.test.ts, packages/web/tests/unit/hub/proxy-match.test.ts +342
-[viewer-message-pipeline] Viewer Message Pipeline (7 files, coh=1.00 coup=0.00)
+[viewer-message-pipeline] Message Pipeline (7 files, coh=1.00 coup=0.00)
   7 files, mostly utilities and services; entry points call-rate-limiter.ts, fetch-pipeline.ts, index.ts; imported by Packages and Packages.
-  files: packages/web/src/viewer/messaging/call-rate-limiter.ts [utility], packages/web/src/viewer/messaging/fetch-pipeline.ts [utility], packages/web/src/viewer/messaging/index.ts [entrypoint], packages/web/src/viewer/messaging/message-coalescer.ts [utility], packages/web/src/viewer/messaging/message-throttle.ts [utility], packages/web/src/viewer/messaging/request-dedup.ts [utility], packages/web/src/viewer/messaging/ws-pipeline.ts [utility]
+  files: packages/web/src/viewer/messaging/call-rate-limiter.ts [utility], packages/web/src/viewer/messaging/fetch-pipeline.ts [service], packages/web/src/viewer/messaging/index.ts [entrypoint], packages/web/src/viewer/messaging/message-coalescer.ts [utility], packages/web/src/viewer/messaging/message-throttle.ts [utility], packages/web/src/viewer/messaging/request-dedup.ts [utility], packages/web/src/viewer/messaging/ws-pipeline.ts [utility]
 [vitest-bench-config] REX Store State (2 files, coh=1.00 coup=0.00)
   Project configuration and manifest files: vitest.bench.config.ts, vitest.config.ts
   files: packages/rex/vitest.bench.config.ts, packages/rex/vitest.config.ts
 [web] Web (3 files, coh=0.00 coup=0.00)
-  3 files.
-  files: packages/web/build.js [config], packages/web/dev.js [config], packages/web/playwright.config.ts
+  3 files, mostly configuration and entry points.
+  files: packages/web/build.js [config], packages/web/dev.js [entrypoint], packages/web/playwright.config.ts
 [web-hub] Web Hub (11 files, coh=0.89 coup=0.11)
-  Multi-project hub registry, admission control, project lifecycle management, and central orchestration for the development platform.
-  files: packages/web/src/hub/admission.ts [middleware], packages/web/src/hub/children.ts [utility], packages/web/src/hub/exec-gateway.ts [gateway], packages/web/src/hub/home.ts [page], packages/web/src/hub/hub.ts [service], packages/web/src/hub/index.ts [entrypoint], packages/web/src/hub/new-project.ts [service], packages/web/src/hub/overview.ts [service], packages/web/src/hub/proxy.ts [middleware], packages/web/src/hub/registry.ts [service] +1
-[web-landing] Web Landing (2 files, coh=0.00 coup=0.00)
+  11 files, mostly services and pages; entry points admission.ts, home.ts, hub.ts; imports Web Server; imported by Packages and Packages.
+  files: packages/web/src/hub/admission.ts [service], packages/web/src/hub/children.ts [service], packages/web/src/hub/exec-gateway.ts [gateway], packages/web/src/hub/home.ts [page], packages/web/src/hub/hub.ts [service], packages/web/src/hub/index.ts [entrypoint], packages/web/src/hub/new-project.ts [page], packages/web/src/hub/overview.ts [page], packages/web/src/hub/proxy.ts [service], packages/web/src/hub/registry.ts [service] +1
+[web-landing] Landing Page (2 files, coh=0.00 coup=0.00)
   2 files, mostly pages; entry points landing.ts; imports Tests; imported by Packages.
   files: packages/web/src/landing/landing.ts [page], packages/web/vitest.config.ts
-[web-server] Web Server (105 files, coh=0.93 coup=0.07)
-  HTTP server composition root wiring Express routes, gateway modules, MCP handlers, and connecting application domains.
-  files: packages/web/src/public.ts [entrypoint], packages/web/src/server/aggregation-cache.ts [utility], packages/web/src/server/analysis-changes.ts [utility], packages/web/src/server/analyze-progress-watcher.ts [service], packages/web/src/server/cli-name.ts [utility], packages/web/src/server/concurrent-execution-metrics.ts [utility], packages/web/src/server/dashboard-usage.ts [service], packages/web/src/server/domain-gateway.ts [gateway], packages/web/src/server/effective-agent-config.ts [utility], packages/web/src/server/hench-config-fields.ts [types] +95
-[web-viewer] Web Viewer (295 files, coh=0.99 coup=0.01)
-  280 files, mostly components and pages; entry points v1.ts, base-path.ts, active-operations-tray.ts; imports Viewer Message Pipeline and Web Server; imported by Packages and Packages.
-  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/hub/request-guard.ts [middleware], packages/web/src/shared/auth.ts [utility], packages/web/src/shared/base-path.ts [utility], packages/web/src/shared/data-files.ts [types], packages/web/src/shared/features.ts [types], packages/web/src/shared/hub-admission.ts [service], packages/web/src/shared/index.ts [entrypoint], packages/web/src/shared/item-type.ts [types], packages/web/src/shared/origin.ts [utility] +285
-[web-viewer-2] Web Viewer 2 (1 files, coh=0.67 coup=0.33)
-  Preact UI components, hooks, views, performance utilities, and polling infrastructure for the dashboard interface.
-  files: packages/web/src/schema/v1.ts [schema]
+[web-server] Dashboard API (117 files, coh=1.00 coup=0.00)
+  117 files, mostly route handlers and utilities; entry points request-guard.ts, aggregation-cache.ts, analysis-changes.ts; imports Web Hub and Packages; imported by Packages and Packages.
+  files: packages/web/src/hub/request-guard.ts [middleware], packages/web/src/public.ts [entrypoint], packages/web/src/server/aggregation-cache.ts [utility], packages/web/src/server/analysis-changes.ts [service], packages/web/src/server/analyze-progress-watcher.ts [utility], packages/web/src/server/cli-name.ts [utility], packages/web/src/server/concurrent-execution-metrics.ts [utility], packages/web/src/server/dashboard-usage.ts [service], packages/web/src/server/domain-gateway.ts [gateway], packages/web/src/server/effective-agent-config.ts [config] +107
+[web-viewer] Dashboard Viewer (284 files, coh=0.99 coup=0.01)
+  284 files, mostly components and pages; entry points v1.ts, base-path.ts, active-operations-tray.ts; imports Web Server and Viewer Message Pipeline; imported by Packages and Packages.
+  files: packages/web/src/cli/index.ts [entrypoint], packages/web/src/schema/v1.ts [schema], packages/web/src/viewer/api.ts [service], packages/web/src/viewer/base-path.ts [utility], packages/web/src/viewer/bootstrap.ts [entrypoint], packages/web/src/viewer/components/action-icon.ts [component], packages/web/src/viewer/components/active-operations-tray.ts [component], packages/web/src/viewer/components/active-tasks-panel.ts [component], packages/web/src/viewer/components/analyze-controls.ts [component], packages/web/src/viewer/components/body-portal.ts [component] +274
 
 Detailed zone context: .sourcevision/zones/{id}/context.md
 
@@ -217,10 +217,10 @@ Most imported:
   packages/rex/src/store/index.ts ← packages/rex/src/analyze/scanners.ts, packages/rex/src/cli/commands/add-change.ts, packages/rex/src/cli/commands/add-reshape.ts, packages/rex/src/cli/commands/add-reshape.ts, packages/rex/src/cli/commands/add.ts +180
   packages/hench/tests/helpers/index.ts ← packages/hench/tests/helpers/scripted-claude-cli.ts, packages/hench/tests/integration/agent-commit-item-trailer-cli-loop.test.ts, packages/hench/tests/integration/agent-commit-item-trailer.test.ts, packages/hench/tests/integration/background-wait-codex.test.ts, packages/hench/tests/integration/background-wait-resume.test.ts +104
   packages/hench/src/prd/llm-gateway.ts ← packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/index.ts +142
-  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/decompose.ts +328
+  packages/rex/src/schema/index.ts ← packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/consolidation-guard.ts, packages/rex/src/analyze/decompose.ts, packages/rex/src/analyze/decompose.ts +329
   packages/hench/src/store/config.ts ← packages/hench/src/cli/commands/cache.ts, packages/hench/src/cli/commands/config.ts, packages/hench/src/cli/commands/init.ts, packages/hench/src/cli/commands/record.ts, packages/hench/src/cli/commands/run-resolve.ts +80
   packages/web/tests/helpers/server-route-test-support.ts ← packages/web/tests/integration/hub-cards.test.ts, packages/web/tests/integration/live-analyze-route.test.ts, packages/web/tests/integration/live-analyze-route.test.ts, packages/web/tests/integration/live-route.test.ts, packages/web/tests/integration/live-route.test.ts +90
-  packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/cli/commands/add-reshape.ts +62
+  packages/rex/src/core/tree.ts ← packages/rex/src/analyze/diff.ts, packages/rex/src/analyze/reason.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/analyze/reshape-reason.ts, packages/rex/src/cli/commands/add-reshape.ts +64
   packages/hench/src/agent/lifecycle/shared.ts ← packages/hench/src/agent/lifecycle/background-wait.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/fail-forward.ts, packages/hench/src/agent/lifecycle/gate-only-retry.ts +57
   packages/web/src/viewer/hooks/index.ts ← packages/web/src/viewer/api.ts, packages/web/src/viewer/components/active-operations-tray.ts, packages/web/src/viewer/components/active-operations-tray.ts, packages/web/src/viewer/components/active-tasks-panel.ts, packages/web/src/viewer/components/active-tasks-panel.ts +81
   packages/rex/src/cli/output.ts ← packages/rex/src/analyze/guided.ts, packages/rex/src/cli/commands/add-change.ts, packages/rex/src/cli/commands/add.ts, packages/rex/src/cli/commands/analyze.ts, packages/rex/src/cli/commands/backfill-commit-attribution.ts +49
@@ -335,42 +335,39 @@ Server routes: 152 endpoints in 32 handler(s)
 <findings>
 
 [warning] 27 circular dependency chains detected — see imports.json for details
-[warning] Bidirectional coupling: "rex" ↔ "rex-cli" (62+42 crossings) — consider extracting shared interface
+[warning] Bidirectional coupling: "rex-cli" ↔ "rex-migrations" (16+48 crossings) — consider extracting shared interface
 [warning] Fan-in hotspot: packages/web/src/viewer/hooks/index.ts receives calls from 54 files — high-impact module, changes may have wide ripple effects
 [warning] Generic zone name "Tests 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [tests-2]
-[warning] Generic zone name "Web Viewer 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose [web-viewer-2]
 [warning] Zone pin target "rex-prd-engine" did not form this analysis run — 12 pin(s) skipped and those files fell back to their Louvain zone. Single-target consolidations to "rex-prd-engine" are non-deterministic until it is a stable anchor. Skipped: packages/rex/src/analyze/batch-types.ts, packages/rex/src/cli/commands/fix.ts, packages/rex/src/core/keywords.ts, packages/rex/src/core/tree.ts, packages/rex/src/core/verify.ts, packages/rex/src/schema/index.ts, packages/rex/src/schema/levels.ts, packages/rex/src/schema/v1.ts, +4 more.
-[warning] Gateway-archetype files exist outside the documented gateway inventory (web hub/exec-gateway.ts). Add a policy assertion that every file sourcevision classifies as a gateway appears in docs/architecture/gateways.md, so undocumented gateways fail CI instead of drifting silently.
-[warning] Pack golden maintenance is duplicated (lang-runtime/scripts and sourcevision/scripts each have an update-pack-goldens.mjs), and the sourcevision copy is placed in the lang-terraform zone. Pack maintenance tooling has no clear owner. Consolidate it into lang-runtime, which already owns the build-grammars tooling for packs.
-[warning] The production-imported-only-by-tests detector does not model the 'loaded, never imported' packs tier. Every runtime-loaded language pack entry will be reported as dead or missing a caller, which erodes trust in that finding class. Pack entries resolved through src/language/pack-loader.ts should count as having a runtime caller.
-[warning] Zone pins and guidance target ids that this run no longer emits (web-shared, rex-prd-engine, hench-token-usage, rex-unit, web-sv-view-tests). Re-point the pins at the ids the analyser emits now, or add a pin validation that fails when a target zone never forms, so the documented zones and the analysed ones do not drift silently.
 [critical] God function: Graph in packages/web/src/viewer/views/graph.ts calls 245 unique functions — consider decomposing into smaller, focused functions
 [warning] God function: cliLoop in packages/hench/src/agent/lifecycle/cli-loop.ts calls 88 unique functions — consider decomposing into smaller, focused functions
 [warning] God function: buildZoneIsoModel in .claude/skills/iso-map/scripts/iso-map.mjs calls 73 unique functions — consider decomposing into smaller, focused functions
-[warning] Rename or re-pin the 255-file 'rex-cli' zone. It holds the PRD engine as well as the CLI commands, and the rex→rex-cli majority edge reads as the domain tier depending on CLI code. Pinning packages/rex/src/core/** and src/schema/** to a stable engine id would make the satellite-zone rule ('domain logic belongs in src/core/') checkable from zone edges.
-[warning] Teach the import-graph resolver to map workspace package specifiers through each package.json exports field, and to follow barrel re-exports (export * from / export { x } from), before running the imported-only-by-tests detector. Before: public.ts, index.ts and folder-tree-store.ts are flagged as dead. After: only files with no production path through gateways or barrels are flagged.
-... +56 more
+[warning] 5 potentially unused exports in packages/core/assistant-assets.js have no incoming calls: getRegistry, getAllSkillBodies, getMcpServer, renderClaudeSkill, renderAllClaudeSkills
+[warning] 5 potentially unused exports in packages/web/src/viewer/components/prd-tree/index-md-sections.ts have no incoming calls: ProgressTable, ChangesList, InfoSection, SummarySection, SubtasksList
+[warning] 5 potentially unused exports in packages/web/src/viewer/hooks/use-live.ts have no incoming calls: isAnalysisJob, isDeadRun, countsAsLive, livenessBadge, asLiveSnapshot
+[warning] Zone "tests-2" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID [tests-2]
+[warning] File "packages/hench/src/store/json.ts" is pinned to zone "Hench" but lives in packages/hench/src/store/ — consider moving to packages/hench/src/agent/lifecycle/ to align physical location with architectural zone [hench]
+[warning] File "packages/web/src/landing/landing.ts" is pinned to zone "Web Landing" but lives in packages/web/src/landing/ — consider moving to packages/web/ to align physical location with architectural zone [web-landing]
+[warning] File "packages/web/src/server/routes-rex/index-markdown.ts" is pinned to zone "Web Server" but lives in packages/web/src/server/routes-rex/ — consider moving to packages/web/src/server/ to align physical location with architectural zone [web-server]
+... +32 more
 
 </findings>
 
 <next-steps>
 
-[high] 7 related findings: Zone pin target "rex-prd-engine" did not form this analysis…
+[high] 3 related findings: Zone pin target "rex-prd-engine" did not form this analysis…
   category: refactor
-[high] 2 related findings: "packages/rex/src/core/override-escalation.ts" is productio…
-  files: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/consolidation-guard.ts
+[high] 3 related findings: "Rex CLI" imports "Rex Migrations" on 16 edge(s) while the …
+  files: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/analyze-shared.ts, packages/rex/src/analyze/batch-types.ts
   category: refactor
-[high] 6 related findings: "Web Viewer" imports "Web Hub Infrastructure" on 1 edge(s) …
-  files: packages/web/src/cli/index.ts, packages/web/src/hub/request-guard.ts, packages/web/src/shared/auth.ts
+[high] 2 related findings: "Web Server" imports "Web Hub" on 1 edge(s) while the 5 edg…
+  files: packages/web/src/hub/request-guard.ts, packages/web/src/public.ts, packages/web/src/server/aggregation-cache.ts
   category: refactor
 [high] Fan-in hotspot: packages/web/src/viewer/hooks/index.ts receives calls from 54 f…
   category: refactor
 [high] Graph in packages/web/src/viewer/views/graph.ts calls 245 unique functions
   category: fix
-[high] 2 related findings: hooks/index.ts barrel is the common node in the 4-, 6- and …
-  files: packages/web/src/cli/index.ts, packages/web/src/hub/request-guard.ts, packages/web/src/shared/auth.ts
-  category: fix
-[medium] 3 related findings: "Hench" imports "Tests Hench" on 3 edge(s) while the 15 edg…
+[medium] 2 related findings: "packages/hench/src/agent/completion.ts" is production code…
   files: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/adversarial-review.ts, packages/hench/src/agent/analysis/change-magnitude.ts
   category: refactor
 [medium] "packages/hench/tests/helpers/index.ts" is imported from 3 zones (hench, tests-…
@@ -385,17 +382,19 @@ Server routes: 152 endpoints in 32 handler(s)
 [medium] File "packages/web/src/landing/landing.ts" is pinned to zone "Web Landing" but …
   files: packages/web/src/landing/landing.ts, packages/web/vitest.config.ts
   category: refactor
-[medium] File "packages/web/src/server/routes-rex/index-markdown.ts" is pinned to zone "…
-  files: packages/web/src/public.ts, packages/web/src/server/aggregation-cache.ts, packages/web/src/server/analysis-changes.ts
+[medium] "packages/rex/src/public.ts" is production code imported only by tests (8 impor…
+  files: packages/rex/src/public.ts
   category: refactor
-[medium] CLI command handlers (cli/commands/chunked-review.ts, chunked-review-state.ts, …
-  files: packages/rex/src/analyze/batch-types.ts, packages/rex/src/cli/commands/chunked-review-state.ts, packages/rex/src/cli/commands/chunked-review-types.ts
+[medium] info: public.ts is the package's only '.' export and the target of the hench an…
+  files: packages/rex/src/public.ts
   category: extract
-[medium] rex meets the dual-fragility threshold (cohesion 0.45 < 0.5, coupling 0.55 > 0.…
-  files: packages/rex/src/analyze/batch-types.ts, packages/rex/src/cli/commands/chunked-review-state.ts, packages/rex/src/cli/commands/chunked-review-types.ts
-  category: refactor
 [medium] File "packages/web/src/viewer/hooks/use-gateway.ts" is pinned to zone "Web View…
-  files: packages/web/src/cli/index.ts, packages/web/src/hub/request-guard.ts, packages/web/src/shared/auth.ts
+  files: packages/web/src/cli/index.ts, packages/web/src/schema/v1.ts, packages/web/src/viewer/api.ts
+  category: refactor
+[medium] "pr-check.js" exports 1 declaration(s) (runPRCheck) that no file in the project…
+  files: pr-check.js, scan_transcripts.py, test-token-format.js
+  category: refactor
+[medium] 5 potentially unused exports in packages/core/assistant-assets.js have no incom…
   category: refactor
 
 </next-steps>

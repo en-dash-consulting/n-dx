@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "5ae23c3d-ce4f-4145-853d-2d2bccb796de":
+    status: "completed"
+    startedAt: "2026-10-08T02:44:27.954Z"
+    completedAt: "2026-10-08T02:48:27.745Z"
+    endedAt: "2026-10-08T02:48:27.745Z"
+    resolutionType: "code-change"
+    resolutionDetail: "detectLanguages appends Java beside other markers when a root Maven/Gradle file exists; detectLanguage unchanged."
+    appliedAt: "2026-10-08T02:48:27.745Z"
+    lastModified: "2026-10-08T02:48:28.007Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

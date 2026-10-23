@@ -1,0 +1,27 @@
+schema: "rex/v2"
+items:
+  "0e2b33cb-8962-4461-8bf6-b9da271a3197":
+    status: "completed"
+    startedAt: "2026-04-30T20:44:05.457Z"
+    completedAt: "2026-05-19T16:52:56.942Z"
+    endedAt: "2026-05-19T16:52:56.942Z"
+    resolutionType: "code-change"
+    resolutionDetail: "All regression tests already in place and passing. 7 e2e tests in cli-add-path-regression.test.ts cover epic/feature/task/subtask creation, deepest-path assertion, consistent format across levels, and consecutive additions. 6 resolveItem unit tests in tree.test.ts cover ID pass-through, exact title, case-insensitive, multi-match warning, no-match null, and ID short-circuit. MCP get_item title-based tests and cmdUpdate title-resolution tests in mcp.test.ts and update.test.ts. All 195 rex test files pass (4211 tests)."
+  "76bc42c5-5e68-4513-b341-e917c07c51e7":
+    status: "completed"
+    startedAt: "2026-04-30T20:51:12.922Z"
+    completedAt: "2026-04-30T21:00:16.441Z"
+    endedAt: "2026-04-30T21:00:16.441Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented folder-tree path output for ndx add command. Created getFolderTreePath utility that computes workspace-relative paths like .rex/tree/epic-slug/feature-slug/task-slug. Updated cmdAdd and cmdSmartAdd to use the utility instead of outputting markdown PRD file paths. All regression tests pass."
+  "e430a1e2-ce7a-454d-a15f-42d52652f0e0":
+    status: "completed"
+    startedAt: "2026-04-27T03:46:02.112Z"
+    completedAt: "2026-04-27T03:46:02.112Z"
+    appliedAt: "2026-04-27T03:46:02.112Z"
+  "efc7dfe8-6d04-44b7-8eb2-beb9111fafad":
+    status: "completed"
+    startedAt: "2026-04-27T03:23:33.524Z"
+    completedAt: "2026-04-27T03:46:02.093Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added prdPath display to cmdAdd and cmdSmartAdd. Text output prints `Added to: .rex/prd.md` (or branch-scoped `.rex/prd_{branch}_{date}.md`) before the summary; JSON output includes `prdPath` (string) for cmdAdd and `prdPaths` (array) for smart-add accept. Path is resolved from FileStore.getItemFileMap() so child items routed to a parent's owning branch file are reported correctly. Shared toMarkdownSourcePath helper added to prd-md-migration.ts and re-exported from store/index.ts. Added unit test for canonical (.rex/prd.md) and integration test for branch-scoped scenarios in add.test.ts and branch-scoped-add.test.ts; both verify text output ordering and JSON prdPath field."

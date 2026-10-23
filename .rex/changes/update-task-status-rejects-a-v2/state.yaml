@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "afb3ae88-97e8-4249-9102-c9ba8c9fce55":
+    status: "completed"
+    startedAt: "2026-10-15T06:08:42.785Z"
+    completedAt: "2026-10-15T06:14:52.831Z"
+    endedAt: "2026-10-15T06:14:52.831Z"
+    resolutionType: "code-change"
+    resolutionDetail: "update_task_status resolves a v2 display id or alias via resolveItemRef; test + changeset line added."
+    appliedAt: "2026-10-15T06:14:52.831Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T06:14:53.120Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

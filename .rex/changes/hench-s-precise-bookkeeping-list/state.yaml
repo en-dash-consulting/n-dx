@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "aed24e76-ec33-4d42-8ce8-8601d46eb920":
+    status: "completed"
+    startedAt: "2026-10-13T02:43:45.739Z"
+    completedAt: "2026-10-13T02:49:31.768Z"
+    endedAt: "2026-10-13T02:49:31.768Z"
+    resolutionType: "code-change"
+    resolutionDetail: "REX_BOOKKEEPING_ENTRIES adds product/ and changes/ via V2_PRODUCT_DIRNAME/V2_CHANGES_DIRNAME, moved from uncommitted-work-gate.ts to store/paths.ts (gate imports paths, so the move avoids a cycle). New paths.test.ts case covers both layouts."
+    appliedAt: "2026-10-13T02:49:31.768Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T02:49:33.303Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,6 +1,6 @@
 {
   "id": "sourcevision/sourcevision",
-  "name": "Sourcevision",
+  "name": "Sourcevision Core",
   "description": "23 files, primarily TypeScript",
   "files": [
     "packages/sourcevision/src/analyzers/branch-work-classifier.ts",

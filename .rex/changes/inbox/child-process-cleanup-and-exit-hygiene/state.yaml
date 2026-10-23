@@ -1,0 +1,30 @@
+schema: "rex/v2"
+items:
+  "366aad92-6938-4af5-8b56-e428fe787fea":
+    status: "completed"
+    startedAt: "2026-09-17T03:46:49.430Z"
+    completedAt: "2026-09-17T03:54:46.057Z"
+    endedAt: "2026-09-17T03:54:46.057Z"
+    lastModified: "2026-09-17T03:54:46.064Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "78ecaa15-4503-4f81-a368-355ced818762":
+    status: "completed"
+    startedAt: "2026-04-03T13:53:38.847Z"
+    completedAt: "2026-04-03T14:04:06.691Z"
+  "94cad81d-4c83-4c9f-aac5-e97259687f24":
+    status: "completed"
+    startedAt: "2026-04-03T14:04:10.569Z"
+    completedAt: "2026-04-03T14:08:57.865Z"
+  "b67648eb-e1a0-4420-89e0-2052b810ead4":
+    status: "completed"
+    startedAt: "2026-04-03T14:08:58.077Z"
+    completedAt: "2026-09-17T03:54:47.373Z"
+    endedAt: "2026-09-17T03:54:47.373Z"
+    appliedAt: "2026-09-17T03:54:47.373Z"
+    needsPlacement: true
+    lastModified: "2026-09-17T03:54:47.379Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "d3618484-b8ab-4ed5-a162-7602873aa162":
+    status: "completed"
+    startedAt: "2026-04-03T13:48:52.972Z"
+    completedAt: "2026-04-03T13:53:35.580Z"

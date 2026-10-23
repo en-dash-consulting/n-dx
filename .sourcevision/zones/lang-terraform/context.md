@@ -7,7 +7,7 @@
 Zone: Lang Terraform (`lang-terraform`)
 Files: 9, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Analyzes Terraform HCL configurations to extract resources, modules, variables, and infrastructure dependencies for IaC analysis.
+Description: 9 files, mostly utilities and entry points; entry points index.ts; imports Tests; imported by Packages.
 Entry points: packages/lang-terraform/src/index.ts
 Lines: 1216
 
@@ -58,23 +58,13 @@ Incoming (other zones → this zone):
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
 [anti-pattern] [warning] "packages/lang-terraform/src/index.ts" is production code imported only by tests (6 importer(s), all test files) — either it is dead or its real caller is missing
-[anti-pattern] [warning] packages/sourcevision/scripts/update-pack-goldens.mjs is in the lang-terraform zone, although it belongs to the sourcevision package and refreshes goldens for every pack, not only terraform. Pin it to the scripts or sourcevision zone so the pack zone holds only the terraform pack.
-[suggestion] [info] Replace the per-pack package-paths.ts with a helper exported from lang-runtime (next to pack-package.ts), for example resolvePackPaths(import.meta.url). Before: each pack keeps its own copy. After: each pack makes one call, and adding a pack no longer means copying a path-resolution file.
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- High cohesion (1) — files are tightly interconnected
-- Terraform model.ts and resolve.ts focus narrowly on HCL semantics, avoiding cross-language concerns or framework-specific logic
-- No upward or cross-pack dependencies despite being part of the multi-language analysis ecosystem
-- Consistent with language pack scaffolding pattern (vitest.config.ts, package-paths.ts) observed across all packs
 - "packages/lang-terraform/src/index.ts" is production code imported only by tests (6 importer(s), all test files) — either it is dead or its real caller is missing
-- The zone contains packages/sourcevision/scripts/update-pack-goldens.mjs, a sourcevision build script, because it imports the terraform pack. Louvain is grouping a cross-package dev script with the pack it touches rather than with the package it lives in.
-- packages/sourcevision/scripts/update-pack-goldens.mjs is in the lang-terraform zone, although it belongs to the sourcevision package and refreshes goldens for every pack, not only terraform. Pin it to the scripts or sourcevision zone so the pack zone holds only the terraform pack.
-- package-paths.ts is repeated in each language pack, and lang-runtime already has a pack-package.ts utility for package-level concerns. That gives the per-pack copies a shared owner one tier down, which satisfies the two-consumer rule.
-- Replace the per-pack package-paths.ts with a helper exported from lang-runtime (next to pack-package.ts), for example resolvePackPaths(import.meta.url). Before: each pack keeps its own copy. After: each pack makes one call, and adding a pack no longer means copying a path-resolution file.
 - [call graph] 136 internal calls, 1 outgoing, 40 incoming (cohesion: 0.99, coupling: 0.01)
 
 </insights>

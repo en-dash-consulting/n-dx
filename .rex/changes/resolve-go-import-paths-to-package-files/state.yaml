@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ac26cb7d-b471-45c9-849b-1423d936d015":
+    status: "completed"
+    startedAt: "2026-10-08T06:26:08.315Z"
+    completedAt: "2026-10-08T06:47:31.659Z"
+    endedAt: "2026-10-08T06:47:31.659Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added src/language/go-resolver.ts (goResolver + forProject reading go.mod/go.work/vendor/modules.txt), PackResolver.forProject hook, fixture tests/fixtures/go-resolver and integration tests incl. regex parity on go-project."
+    appliedAt: "2026-10-08T06:47:31.659Z"
+    lastModified: "2026-10-08T06:47:32.535Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "bffc9f7b-69a9-440c-b28f-32b51b7706c6":
+    status: "completed"
+    startedAt: "2026-10-09T19:29:04.019Z"
+    completedAt: "2026-10-09T19:31:04.205Z"
+    endedAt: "2026-10-09T19:31:04.205Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Exact-string assertions for get_capability unknown-ref and area refusals in mcp-product-tools.test.ts; rex src unchanged. Commit add4d9d41."
+    appliedAt: "2026-10-09T19:31:04.205Z"
+    lastModified: "2026-10-09T19:31:04.481Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

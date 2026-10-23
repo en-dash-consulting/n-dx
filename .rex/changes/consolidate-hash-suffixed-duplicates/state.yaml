@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "c60d547f-0106-4dda-af1c-56db695ae9f6":
+    status: "completed"
+    startedAt: "2026-05-14T13:36:50.853Z"
+    completedAt: "2026-05-14T14:01:53.104Z"
+    endedAt: "2026-05-14T14:01:53.104Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented GroupAction for parent-container strategy, updated survivor selection (children > no-suffix > createdAt > non-new), added reasonForBodyMerge for LLM-driven description merge, wired hash-suffix detection into cmdReshape with per-group CLI output, added archive recording in runScopedConsolidationPass. 6 files changed, 11 new tests, 4112 passing."
+    appliedAt: "2026-05-14T14:01:53.104Z"

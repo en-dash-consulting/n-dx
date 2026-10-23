@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b43e8502-f398-4622-8f30-376c11bd72d8":
+    status: "completed"
+    startedAt: "2026-10-09T05:07:12.820Z"
+    completedAt: "2026-10-09T05:22:33.663Z"
+    endedAt: "2026-10-09T05:22:33.663Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Extracted applyCriteriaDelta (core/apply-amendments.ts), used by applyModified and recordPlacement; place_change now refuses misfit criteria ids before writing."
+    appliedAt: "2026-10-09T05:22:33.663Z"
+    lastModified: "2026-10-09T05:22:34.721Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

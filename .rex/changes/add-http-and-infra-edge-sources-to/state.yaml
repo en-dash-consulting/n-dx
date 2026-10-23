@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "c28d2b18-f2ba-4fec-9d70-759d31effa19":
+    status: "completed"
+    startedAt: "2026-10-08T16:53:05.351Z"
+    completedAt: "2026-10-08T17:19:40.246Z"
+    endedAt: "2026-10-08T17:19:40.246Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added http and infra edge sources to analyzers/workspace-crossings.ts (no second aggregator). ZoneCrossing gains optional source + evidence; npm crossings tagged. Threshold: certain/likely drawn, inferred withheld with a stated reason and printed. WorkspaceMember gains baseUrl. sv workspace --status prints edge counts by source. Two-member fixture under tests/fixtures/workspace-crossings yields all three sources, asserted in workspace-crossing-sources.test.ts."
+    appliedAt: "2026-10-08T17:19:40.246Z"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-08T17:19:40.751Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

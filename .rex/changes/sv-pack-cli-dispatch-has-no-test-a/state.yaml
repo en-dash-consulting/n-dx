@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f45c9120-cf2b-4db9-b9d1-baab3a2e2302":
+    status: "completed"
+    startedAt: "2026-10-15T05:40:32.430Z"
+    completedAt: "2026-10-15T05:43:20.307Z"
+    endedAt: "2026-10-15T05:43:20.307Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added packages/sourcevision/tests/e2e/cli-pack.test.ts spawning the built CLI with isolated NDX_HOME."
+    appliedAt: "2026-10-15T05:43:20.307Z"
+    lastModified: "2026-10-15T05:43:22.041Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

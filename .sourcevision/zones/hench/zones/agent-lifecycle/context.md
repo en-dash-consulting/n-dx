@@ -158,11 +158,11 @@ Cross-dependencies between sub-zones:
 
 This zone has 7 sub-zone(s):
 
-- **Agent** (`hench/agent-lifecycle/agent`): 4 files, cohesion 0.38, coupling 0.62
+- **Agent State Management** (`hench/agent-lifecycle/agent`): 4 files, cohesion 0.38, coupling 0.62
 - **Analysis & Recovery** (`hench/agent-lifecycle/agent-analysis`): 3 files, cohesion 0.33, coupling 0.67
 - **Hench** (`hench/agent-lifecycle/agent-lifecycle`): 9 files, cohesion 0.46, coupling 0.54
 - **Commit Lifecycle** (`hench/agent-lifecycle/lifecycle`): 3 files, cohesion 0.4, coupling 0.6
-- **Process** (`hench/agent-lifecycle/process`): 7 files, cohesion 0.41, coupling 0.59
+- **Process Execution Pipeline** (`hench/agent-lifecycle/process`): 7 files, cohesion 0.41, coupling 0.59
 - **Test Infrastructure** (`hench/agent-lifecycle/tools`): 3 files, cohesion 0.57, coupling 0.43
 - **Completion Validation** (`hench/agent-lifecycle/validation`): 3 files, cohesion 0.4, coupling 0.6
 

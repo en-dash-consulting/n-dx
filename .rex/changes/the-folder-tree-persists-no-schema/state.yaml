@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ac6f568b-aba5-4120-bf9c-d0477b22f853":
+    status: "completed"
+    startedAt: "2026-09-11T12:16:38.677Z"
+    completedAt: "2026-09-11T22:30:38.340Z"
+    endedAt: "2026-09-11T22:30:38.340Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Shipped in PR #357 (39bff349): tree-meta.ts sidecar persists {title, schema} through a single shared shape across all four writers; both tree load paths (FolderTreeStore, FileStore) read the marker into doc.schema with SCHEMA_VERSION fallback for pre-marker trees. All five acceptance criteria are pinned by tests/unit/store/tree-schema-marker.test.ts (10 tests, verified green), including the newer-minor round-trip and the v1.1-marker → v1.1 bundle → v1 importer refusal."
+    appliedAt: "2026-09-11T22:30:38.340Z"
+    lastModified: "2026-09-11T22:30:38.365Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

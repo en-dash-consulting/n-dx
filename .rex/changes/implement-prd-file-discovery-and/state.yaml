@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "8be8d4fd-186f-4b70-b7ab-7c91f8a57134":
+    status: "completed"
+    startedAt: "2026-04-22T16:25:47.661Z"
+    completedAt: "2026-04-22T16:30:27.341Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented PRD file discovery and selection logic in packages/rex/src/store/prd-discovery.ts with 24 unit tests."
+    appliedAt: "2026-04-22T16:30:27.341Z"

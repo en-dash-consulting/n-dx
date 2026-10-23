@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "dc5bae73-cdb5-4b87-8d03-d59dfc7aa202":
+    status: "completed"
+    startedAt: "2026-10-01T01:06:07.699Z"
+    completedAt: "2026-10-01T01:39:11.936Z"
+    endedAt: "2026-10-01T01:39:11.936Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Every run now appends typed progress events as JSON Lines to .hench/runs/<runId>.events.jsonl, with the path on the additive RunRecord.eventsPath. New store/run-events.ts owns the vocabulary (9 kinds), the writer, the process-wide emitter, per-turn read batching and tool classification; both agent loops emit from hooks they already ran. Retention takes the sidecar with its run."
+    appliedAt: "2026-10-01T01:39:11.936Z"
+    lastModified: "2026-10-01T01:39:12.314Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

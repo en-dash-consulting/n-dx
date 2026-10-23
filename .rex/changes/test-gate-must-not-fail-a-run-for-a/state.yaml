@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "02351b92-4b60-43cf-b1bc-317ea895e39f":
+    status: "completed"
+    startedAt: "2026-09-03T21:16:43.584Z"
+    completedAt: "2026-09-03T21:28:09.692Z"
+    endedAt: "2026-09-03T21:28:09.692Z"
+    resolutionType: "code-change"
+    resolutionDetail: "runTestGate reads ExecResult.launched and reports an unexecutable gate as ran:false + reason; finalizeRun treats that as inconclusive so the PRD write and commit proceed and the retry loop terminates. Verified by neutering both halves (ran:true; failed status + 5 retries). All execShellCmd call sites audited: 4 fixed, 1 partial, 1 already correct, 1 annotated and tracked as 813ae0de."
+    appliedAt: "2026-09-03T21:28:09.692Z"
+    lastModified: "2026-09-03T21:28:09.733Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

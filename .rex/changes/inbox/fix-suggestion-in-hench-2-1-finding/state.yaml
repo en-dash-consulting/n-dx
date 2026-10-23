@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "0638f632-7657-49f9-abb6-2397ff52fffd":
+    status: "completed"
+    startedAt: "2026-04-19T03:06:02.871Z"
+    completedAt: "2026-04-19T03:08:16.151Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Already resolved in commit 05a7b840: pinned 3 token-usage files to hench-token-usage zone in .n-dx.json, renamed zone in zones.json with meaningful description, added hints.md entry, fixed stale dispatch.ts comment. Task was never marked complete."
+  "8f25e643-7876-4875-befe-8f7959a2e7de":
+    status: "completed"
+    startedAt: "2026-04-19T03:08:16.188Z"
+    completedAt: "2026-04-19T03:08:16.188Z"
+    appliedAt: "2026-04-19T03:08:16.188Z"
+    needsPlacement: true

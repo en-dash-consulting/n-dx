@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f0b1ce11-bee7-4545-a013-5e918f29b88f":
+    status: "completed"
+    startedAt: "2026-10-09T16:33:38.251Z"
+    completedAt: "2026-10-09T16:48:30.127Z"
+    endedAt: "2026-10-09T16:48:30.127Z"
+    resolutionType: "code-change"
+    resolutionDetail: "prune.ts: mergeKeepReason (any applied change) and deleteKeepReason (subtree holding a pruneKeepReason item). applyReshape skips merge/split proposals that trip them (\"Skipped: …\" in errors, rest of batch applies); reorganize-executor skips merge/delete/collapse likewise. ChangeLayerStore.withTransaction refuses removing a pruneKeepReason change (ChangeLayerWriteError). Unit + integration tests cover prune --accept consolidation, --smart, product show retired, reshape merge of modified-only applied change, store backstop."
+    appliedAt: "2026-10-09T16:48:30.127Z"
+    lastModified: "2026-10-09T16:48:30.386Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

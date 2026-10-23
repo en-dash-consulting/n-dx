@@ -1,0 +1,11 @@
+schema: "rex/v2"
+items:
+  "181b0e6e-fec8-4b08-b31e-8dd1e8d9d692":
+    status: "completed"
+    startedAt: "2026-10-16T05:22:35.363Z"
+    completedAt: "2026-10-16T05:24:45.434Z"
+    endedAt: "2026-10-16T05:24:45.434Z"
+    appliedAt: "2026-10-16T05:24:45.434Z"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-16T05:24:46.055Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

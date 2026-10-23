@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "4a1a2c31-7f1c-49fc-bfd8-2c8355893b53":
+    status: "completed"
+    startedAt: "2026-10-13T04:02:33.627Z"
+    completedAt: "2026-10-13T04:17:22.263Z"
+    endedAt: "2026-10-13T04:17:22.263Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run 2fdcaed2 committed 89c084229 + 6d67eea51; operator regenerated the iso-map skill script (expected drift). Output byte-identical; affected gate 5/5."
+    appliedAt: "2026-10-13T04:17:22.263Z"
+    lastModified: "2026-10-13T04:17:22.557Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

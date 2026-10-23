@@ -1,0 +1,19 @@
+---
+id: "08b9e858-4312-4945-9dd5-6c211884d5f6"
+type: "change"
+title: "Add rex product and rex change commands; ndx add creates a change"
+slug: "add-rex-product-and-rex-change"
+intent: "rex product show, rex product edit [--editorial], rex change place, rex change apply. On a v2 tree, ndx add, smart-add and capture create a change and propose placement; on a v1 tree they add a level-based item exactly as today.\n\nFlags: --criterion sets a work item's acceptanceCriteria, as rex add already does (#511); a capability's criteria use a distinct flag on rex product edit (for example --capability-criterion). Help text names which is which.\n\nDesign boundary (PR 18, 2026-10-09):\n- v1 trees keep today's behaviour exactly, as PR 17 did for add_item. On a v2 tree, ndx add, smart-add and capture create a change and propose placement; on a v1 tree they add a level-based item as today. rex health on a v1 tree reports exactly what it reports today; the v2 tree rules (f5d8c06e) and the landing check (da151468) run on v2 trees only. This repository's own PRD is v1, and ndx add, rex add, smart-add and rex health are used on it every day.\n- No skill text changes (.claude/, .agents/, packages/core/assistant-assets/skills/). Rewriting the PRD skills for v2 is PR 24 (d5f63839).\n- Write paths go through PR 31's store transaction (store.withTransaction).\n- Lane files: packages/rex/src/cli/ (commands, help), packages/rex/src/core/health.ts and the reshape/reorganize/prune modules, tree-diff, and packages/core for ndx add routing (spawn only, no library imports in orchestration scripts). Do not change web, hench, MCP tool shapes or the v2 schema.\n- Terminology: \"capability criteria\" for a capability's criteria; \"acceptance criteria\" (or \"done when\") for a work item's acceptanceCriteria. Never a bare \"criteria\" in help text or errors."
+acceptanceCriteria:
+  - "Each verb has help text and tests"
+  - "ndx add output names the created change and its placement"
+  - "rex product edit and rex change/ndx add use distinct flags for capability criteria and acceptance criteria, and the help text says so"
+amends: [{"target":"70443075-8352-48a4-a8ed-799505872d4b","delta":"modified","summary":"Add rex product and rex change commands; ndx add creates a change","base":"d5b1220de470710d2838aed60bb396ffed2f495d343ff0497aa36eea29e26314"}]
+priority: "medium"
+tags:
+  - "pr-18"
+  - "lane-rex-surface"
+  - "rex"
+  - "core"
+source: "roadmap"
+---

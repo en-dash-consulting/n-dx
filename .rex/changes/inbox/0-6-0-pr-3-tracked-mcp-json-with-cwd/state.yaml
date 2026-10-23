@@ -1,0 +1,46 @@
+schema: "rex/v2"
+items:
+  "63592288-b8af-4c43-94a9-79d1e5708866":
+    status: "completed"
+    startedAt: "2026-09-11T14:41:32.173Z"
+    completedAt: "2026-09-11T17:10:44.600Z"
+    endedAt: "2026-09-11T17:10:44.600Z"
+    lastModified: "2026-09-11T17:10:44.607Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "84ccf6bc-ea8c-441a-ab97-692826bab26a":
+    status: "completed"
+    startedAt: "2026-09-11T14:16:56.768Z"
+    completedAt: "2026-09-11T14:31:10.597Z"
+    endedAt: "2026-09-11T14:31:10.597Z"
+    lastModified: "2026-09-11T14:31:10.605Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "97fbaef0-3691-42b7-9149-70a0bc9aa5b2":
+    status: "completed"
+    startedAt: "2026-09-11T13:56:18.544Z"
+    completedAt: "2026-09-11T14:10:51.268Z"
+    endedAt: "2026-09-11T14:10:51.268Z"
+    lastModified: "2026-09-11T14:10:51.291Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9f0a2b51-beab-4984-b68d-96e3c33ca93a":
+    status: "completed"
+    startedAt: "2026-09-11T14:41:42.116Z"
+    completedAt: "2026-09-11T17:20:54.697Z"
+    endedAt: "2026-09-11T17:20:54.697Z"
+    lastModified: "2026-09-11T17:20:54.704Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b66dc09e-fda6-4f1e-a5df-a21e0362ce1e":
+    status: "completed"
+    startedAt: "2026-09-11T14:41:47.553Z"
+    completedAt: "2026-09-11T14:41:47.553Z"
+    endedAt: "2026-09-11T14:41:47.553Z"
+    appliedAt: "2026-09-11T14:41:47.553Z"
+    needsPlacement: true
+    lastModified: "2026-09-11T14:41:47.561Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e4df3296-b5d3-4e5e-b9d5-564524aa8a53":
+    status: "completed"
+    startedAt: "2026-09-11T14:38:11.379Z"
+    completedAt: "2026-09-11T16:58:02.526Z"
+    endedAt: "2026-09-11T16:58:02.526Z"
+    lastModified: "2026-09-11T16:58:02.533Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

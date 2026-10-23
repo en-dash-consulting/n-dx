@@ -1,0 +1,19 @@
+{
+  "id": "rex-core/rex-store/folder-tree-store-identity",
+  "name": "Folder Tree Store Identity",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/core/identity.ts",
+    "packages/rex/src/core/sync.ts",
+    "packages/rex/src/store/folder-tree-store.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/core/identity.ts",
+    "packages/rex/src/core/sync.ts",
+    "packages/rex/src/store/folder-tree-store.ts"
+  ],
+  "cohesion": 0.38,
+  "coupling": 0.63,
+  "fileCount": 3,
+  "lineCount": 1034
+}

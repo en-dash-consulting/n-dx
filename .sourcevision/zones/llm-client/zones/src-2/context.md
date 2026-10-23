@@ -5,25 +5,27 @@
 <zone>
 
 Zone: Src 2 (`llm-client/src-2`)
-Files: 4, Cohesion: 0.57, Coupling: 0.43
-Description: 4 files, primarily TypeScript
-Entry points: packages/llm-client/src/cli-brand.ts, packages/llm-client/src/help-format.ts, packages/llm-client/src/output.ts, packages/llm-client/src/vendor-header.ts
-Lines: 874
+Files: 5, Cohesion: 0.53, Coupling: 0.47
+Description: 5 files, primarily TypeScript
+Entry points: packages/llm-client/src/claude-effort.ts, packages/llm-client/src/cli-brand.ts, packages/llm-client/src/help-format.ts, packages/llm-client/src/output.ts, packages/llm-client/src/vendor-header.ts
+Lines: 1060
 
 </zone>
 
 <files>
 
+packages/llm-client/src/claude-effort.ts (TypeScript, 165 lines, source)
 packages/llm-client/src/cli-brand.ts (TypeScript, 57 lines, source)
 packages/llm-client/src/help-format.ts (TypeScript, 553 lines, source)
 packages/llm-client/src/output.ts (TypeScript, 134 lines, source)
-packages/llm-client/src/vendor-header.ts (TypeScript, 130 lines, source)
+packages/llm-client/src/vendor-header.ts (TypeScript, 151 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
+  packages/llm-client/src/claude-effort.ts → packages/llm-client/src/output.ts {warn}
   packages/llm-client/src/cli-brand.ts → packages/llm-client/src/help-format.ts {carolinaBlue, green, red, dim}
   packages/llm-client/src/cli-brand.ts → packages/llm-client/src/output.ts {isQuiet}
   packages/llm-client/src/vendor-header.ts → packages/llm-client/src/help-format.ts {yellow}

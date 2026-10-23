@@ -1,7 +1,7 @@
 {
   "id": "tests-web-integration",
   "name": "Tests Web Integration",
-  "description": "Non-source files in packages: background-suspension-recovery.test.ts, boundary-check.test.ts, build-output-contract.test.ts (+39 more)",
+  "description": "Non-source files in packages: background-suspension-recovery.test.ts, boundary-check.test.ts, build-output-contract.test.ts (+40 more)",
   "files": [
     "packages/web/tests/integration/background-suspension-recovery.test.ts",
     "packages/web/tests/integration/boundary-check.test.ts",

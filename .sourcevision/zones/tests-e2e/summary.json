@@ -1,7 +1,7 @@
 {
   "id": "tests-e2e",
   "name": "Tests",
-  "description": "Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+104 more)",
+  "description": "Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+106 more)",
   "files": [
     "tests/e2e/agents-md-size-budget.test.js",
     "tests/e2e/architecture-policy.test.js",
@@ -119,7 +119,7 @@
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 109,
-  "lineCount": 29892,
+  "lineCount": 29906,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

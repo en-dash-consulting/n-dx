@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "4c2738d2-c2e3-4656-b21c-0f281ee81cc5":
+    status: "completed"
+    startedAt: "2026-10-08T00:06:42.193Z"
+    completedAt: "2026-10-08T00:20:58.544Z"
+    endedAt: "2026-10-08T00:20:58.544Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Pinned grammar+CLI build script producing gitignored tree-sitter-java.wasm; web-tree-sitter 0.27.0 pinned; vitest parse test with skip."
+    appliedAt: "2026-10-08T00:20:58.544Z"
+    lastModified: "2026-10-08T00:20:58.795Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

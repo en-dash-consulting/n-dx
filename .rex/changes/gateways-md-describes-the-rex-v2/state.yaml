@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "ea2102fe-3ca1-441d-8366-8bf338c1529a":
+    status: "completed"
+    startedAt: "2026-10-13T03:20:44.228Z"
+    completedAt: "2026-10-13T03:23:25.027Z"
+    endedAt: "2026-10-13T03:23:25.027Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Rewrote gateways.md \"Rex v2 runtime surface\": #648 exports on main, runtime additions, export-once rule; table checked against public.ts."
+    appliedAt: "2026-10-13T03:23:25.027Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T03:23:25.311Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

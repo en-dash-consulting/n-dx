@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "9df350f1-c56a-4520-a01e-e7e33b97e354":
+    status: "completed"
+    startedAt: "2026-10-11T03:56:20.921Z"
+    completedAt: "2026-10-11T04:03:59.959Z"
+    endedAt: "2026-10-11T04:03:59.959Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run commits land for their task and realize capabilities through every placed change; git describes commit nodes; loadCommitFiles public"
+    appliedAt: "2026-10-11T04:03:59.959Z"
+    lastModified: "2026-10-11T04:04:00.218Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

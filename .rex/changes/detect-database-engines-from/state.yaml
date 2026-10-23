@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f1ea87fd-90d2-459a-ad44-0bf015166728":
+    status: "completed"
+    startedAt: "2026-10-08T08:27:19.763Z"
+    completedAt: "2026-10-08T08:38:50.101Z"
+    endedAt: "2026-10-08T08:38:50.101Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added in-memory database-engine detection from dependencies, images and config, with a driver table that carries provenance, tests that prove no credentials are kept, and a corpus report covering all four repos."
+    appliedAt: "2026-10-08T08:38:50.101Z"
+    lastModified: "2026-10-08T08:38:50.352Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "bf377f39-6996-4331-9a0c-fb102d07ce5b":
+    status: "completed"
+    startedAt: "2026-10-12T09:54:30.695Z"
+    completedAt: "2026-10-12T10:10:38.253Z"
+    endedAt: "2026-10-12T10:10:38.253Z"
+    resolutionType: "code-change"
+    resolutionDetail: "hench selects on v2 via rex's findNextWorkTask/findActionableWork/resolveWorkById through rex-gateway (new agent/planning/work-selection.ts); --task takes id or display id; loop ends on the no-tasks sentinel; --epic-by-epic and --epic refused on v2. Gateway ceiling 49→55, contracts updated, tests added."
+    appliedAt: "2026-10-12T10:10:38.253Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T10:10:38.982Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

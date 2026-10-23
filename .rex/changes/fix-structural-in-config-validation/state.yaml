@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "312ab8e2-ebdc-471b-8690-43ee7fcd033f":
+    status: "completed"
+    startedAt: "2026-04-18T15:10:02.147Z"
+    completedAt: "2026-04-18T15:10:02.147Z"
+    appliedAt: "2026-04-18T15:10:02.147Z"
+  "d2cc6bff-e96a-467e-bbd6-37bcf5fdc915":
+    status: "completed"
+    startedAt: "2026-04-18T15:04:36.706Z"
+    completedAt: "2026-04-18T15:10:02.108Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Moved tests/gauntlet/ into tests/integration/, removed gauntlet npm script, updated zone pins."

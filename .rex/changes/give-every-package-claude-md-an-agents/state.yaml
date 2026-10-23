@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b88dba61-ed61-4e1b-8cf0-8478c6d1e6eb":
+    status: "completed"
+    startedAt: "2026-10-06T22:54:19.230Z"
+    completedAt: "2026-10-06T23:27:32.838Z"
+    endedAt: "2026-10-06T23:27:32.838Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex, hench, web and core each have an AGENTS.md holding their governance, with CLAUDE.md reduced to the @AGENTS.md import. The .claude/rules bodies are now sections of packages/web/AGENTS.md and packages/core/AGENTS.md. PARTIAL: the two acceptance criteria about the rule files themselves (reduce to pointers, drop the \"create an analogous .claude/rules file\" instruction) are NOT met — .claude/ is a protected path and every write was refused pending an interactive approval this non-interactive run could not get. Split to task f2d64d8a with full instructions. Until it lands there are two copies, pinned against drift by instruction-alignment.test.js. Commit 7e7ef5666."
+    appliedAt: "2026-10-06T23:27:32.838Z"
+    lastModified: "2026-10-06T23:27:35.251Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

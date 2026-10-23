@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "636055a4-b6f0-4969-9ff3-8daae3f4f62d":
+    status: "completed"
+    startedAt: "2026-10-15T06:15:15.548Z"
+    completedAt: "2026-10-15T06:21:50.112Z"
+    endedAt: "2026-10-15T06:21:50.112Z"
+    resolutionType: "code-change"
+    resolutionDetail: "handleReleaseTask takes the store and resolves the ref via resolveItemRef; v2 display-id claim/release test added"
+    appliedAt: "2026-10-15T06:21:50.112Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T06:21:50.396Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

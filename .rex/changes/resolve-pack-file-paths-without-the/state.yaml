@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8ce5cd15-30aa-4d3a-8454-78ab70d3a936":
+    status: "completed"
+    startedAt: "2026-10-08T02:38:14.390Z"
+    completedAt: "2026-10-08T02:42:24.294Z"
+    endedAt: "2026-10-08T02:42:24.294Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Pack grammar and query paths now resolve lazily via package-paths.ts using dirname(fileURLToPath(import.meta.url)); jsdom regression test added."
+    appliedAt: "2026-10-08T02:42:24.294Z"
+    lastModified: "2026-10-08T02:42:24.541Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

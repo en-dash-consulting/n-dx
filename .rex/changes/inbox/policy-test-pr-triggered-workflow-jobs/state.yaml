@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "bde44f34-f15f-4e2c-8a9e-82f400814305":
+    status: "completed"
+    startedAt: "2026-10-12T19:28:05.421Z"
+    completedAt: "2026-10-12T19:33:35.184Z"
+    endedAt: "2026-10-12T19:33:35.184Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added tests/e2e/ci-draft-pr-gate.test.js (text-based, no YAML lib)"
+    appliedAt: "2026-10-12T19:33:35.184Z"
+    needsPlacement: true
+    lastModified: "2026-10-12T19:33:35.500Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -7,16 +7,16 @@
 Zone: Tests (`tests-e2e`)
 Files: 109, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+104 more)
+Description: Non-source files in tests: agents-md-size-budget.test.js, architecture-policy.test.js, assistant-body-drift.test.js (+106 more)
 Entry points: tests/e2e/e2e-helpers.js
-Lines: 29892
+Lines: 29906
 
 </zone>
 
 <files>
 
 tests/e2e/agents-md-size-budget.test.js (JavaScript, 159 lines, test)
-tests/e2e/architecture-policy.test.js (JavaScript, 2452 lines, test)
+tests/e2e/architecture-policy.test.js (JavaScript, 2466 lines, test)
 tests/e2e/assistant-body-drift.test.js (JavaScript, 114 lines, test)
 tests/e2e/assistant-integration.test.js (JavaScript, 679 lines, test)
 tests/e2e/assistant-parity-smoke.test.js (JavaScript, 348 lines, test)

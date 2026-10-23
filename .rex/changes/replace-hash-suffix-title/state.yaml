@@ -1,0 +1,29 @@
+schema: "rex/v2"
+items:
+  "1e0029c2-5719-4cef-aae2-61d8400a7d0b":
+    status: "completed"
+    startedAt: "2026-05-14T18:53:45.092Z"
+    completedAt: "2026-05-14T18:53:45.092Z"
+    endedAt: "2026-05-14T18:53:45.092Z"
+    appliedAt: "2026-05-14T18:53:45.092Z"
+  "95b5c864-f4de-4c66-bfba-3335c8f92b70":
+    status: "completed"
+    startedAt: "2026-05-14T18:44:03.701Z"
+    completedAt: "2026-05-14T18:53:44.228Z"
+    endedAt: "2026-05-14T18:53:44.228Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added configurable titleCollisionSimilarityThreshold to RexConfig/RexConfigSchema. detectNonDuplicateTitleCollisions accepts threshold param; runScopedConsolidationPass reads from config. Integration test covers merge (high-similarity) and rename (low-similarity) routing from cmdAdd."
+  "a063a3c7-f2df-4227-b176-b9f4aed75a84":
+    status: "completed"
+    startedAt: "2026-05-14T18:07:42.143Z"
+    completedAt: "2026-05-14T18:25:09.832Z"
+    endedAt: "2026-05-14T18:25:09.832Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented LLM-driven rename resolution for conflicting sibling titles: new rename-resolve.ts module, detectNonDuplicateTitleCollisions detection, Phase 1 rename path in runScopedConsolidationPass, archive audit trail, and 11 integration tests."
+  "b5924bd0-ca39-4052-a20a-6f2195fed052":
+    status: "completed"
+    startedAt: "2026-05-14T18:25:45.218Z"
+    completedAt: "2026-05-14T18:43:45.761Z"
+    endedAt: "2026-05-14T18:43:45.761Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Audited the full write pipeline (cmdAdd, runScopedConsolidationPass, store addItem, MCP handleAddItem, smart-add acceptProposals, extract.ts). No suffix-generation helper for titles exists — the behavior is already correct. Added two regression tests in add-auto-reshape.test.ts to enforce this invariant: (1) adding an exact-duplicate title triggers merge with no hash suffix on the survivor, (2) bulk multi-title duplicates all resolve via merge with no suffix. The existing hash-suffix consolidation detection (stripHashSuffix, detectHashSuffixDuplicates, detectHashSuffixDuplicatesInTree) remains intact for legacy data cleanup."

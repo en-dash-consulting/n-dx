@@ -1,0 +1,35 @@
+schema: "rex/v2"
+items:
+  "1132550d-e4dc-4103-b86a-c849b46d60f5":
+    status: "completed"
+    startedAt: "2026-04-23T03:02:59.730Z"
+    completedAt: "2026-04-23T03:06:08.854Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added legacy-migration note to README.md §Output Files and packages/rex/README.md §Project structure (new §PRD file layout subsection with before/after file tree). Other package READMEs already match current single-file PRD behavior — no edits needed for PRD scope."
+  "2e6f0a74-f49b-4bd6-92ab-088db5568c58":
+    status: "completed"
+    startedAt: "2026-04-23T03:09:12.193Z"
+    completedAt: "2026-04-23T03:10:36.889Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added markdown image-syntax placeholders with the literal label 'img_here' plus descriptive captions in two primary doc locations: root README.md (after the §Output Files legacy PRD migration note) and packages/rex/README.md (in the §PRD file layout subsection). Captions describe the intended diagram — the legacy branch-scoped multi-file layout (prd_{branch}_{date}.json) and its consolidation into the single canonical .rex/prd.json with sources renamed to .backup.<timestamp> on first load. The image syntax `![img_here](img_here)` is trivially find-and-replaceable when the real image is produced."
+  "4c148ee4-3f9c-47c3-8e82-9e02d6d4d7ae":
+    status: "completed"
+    startedAt: "2026-04-23T02:51:02.824Z"
+    completedAt: "2026-04-24T15:41:44.804Z"
+  "8894ca28-c09b-4fb7-a704-cde878a0990f":
+    status: "completed"
+    startedAt: "2026-04-24T20:51:00.332Z"
+    completedAt: "2026-04-24T20:55:20.172Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added Storage section to packages/rex/README.md documenting prd.md as primary, dual-write to prd.json, automatic on-load migration, manual migration via rex migrate-to-md, required vs optional fields, and how to edit prd.md by hand. Updated PACKAGE_GUIDELINES.md (.rex/ write-access protocol) to describe markdown-primary with prd.json as derived sync artifact, dual-write invariant, and updated write-ownership table. Updated TESTING.md rex integration scenario list to call out JSON→markdown migration and dual-write, and added test-file pointers for prd-md-migration, file-adapter-markdown-migration, markdown-roundtrip, and prd-write-routing."
+  "9a7cb6af-cd94-4904-9e5a-1274e996fc09":
+    status: "completed"
+    startedAt: "2026-04-23T03:10:48.937Z"
+    completedAt: "2026-04-23T03:15:07.826Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Updated TESTING.md Required Coverage table + scenario-to-file pointer table for legacy multi-file PRD migration, cross-vendor authoring regression, self-heal test gate, Codex-batch fallback, and pair-programming cross-vendor review. Added single-file PRD invariant paragraph to PACKAGE_GUIDELINES.md §.rex/ Write-Access Protocol. Verified no workflow guide docs reference branch-scoped or multi-file layouts (grep-clean across docs/guide/*). Cross-checked with docs/doc-delta-audit.md §3.4/§3.5/§6. Docs-only — no code or link breakage."
+  "ef9224cb-e708-4ff4-9dcd-954a86905915":
+    status: "completed"
+    startedAt: "2026-04-23T03:15:07.837Z"
+    completedAt: "2026-04-24T20:55:20.195Z"
+    appliedAt: "2026-04-24T20:55:20.195Z"

@@ -1,0 +1,20 @@
+---
+id: "a6c4edd0-36a6-4bcf-860f-6d61b6c900a3"
+type: "change"
+title: "toml-lite throws RangeError, not TomlSyntaxError, on a \\U escape above U+10FFFF, so readVersionCatalogs rethrows it"
+slug: "toml-lite-throws-rangeerror-not"
+intent: "Found by an adversarial review of task 203cd7bb (verdict: out-of-scope, pre-existing). The same code was in toml-lite.ts before that task; the task only moved it into `escape()`.\n\nFailure: packages/lang-kit/src/toml-lite.ts `escape()` calls `String.fromCodePoint(code)` without checking the range. A catalog value such as `x = \"\\UFFFFFFFF\"` throws `RangeError`. gradle-catalog.ts catches only `TomlSyntaxError` and rethrows anything else, so one malformed `gradle/*.versions.toml` aborts the Gradle build-model read instead of producing a notice. The pyproject.toml readers (task 203cd7bb) would hit the same path. In the same function, `Number.parseInt` takes partial hex (`\\u12zz` reads as U+0012).\n\nReachable through a Java/Gradle project's version catalog, or a pyproject.toml, that contains such an escape. Rare, but the contract is \"malformed input yields a notice\".\n\nFix (recommended): require exactly 4 or 8 hex digits, and reject code points above 0x10FFFF and surrogates (0xD800–0xDFFF) with `this.fail(\"invalid unicode escape\")`. Cost: a few lines and tests."
+acceptanceCriteria:
+  - "parseToml('x = \"\\\\UFFFFFFFF\"') throws TomlSyntaxError, not RangeError"
+  - "parseToml('x = \"\\\\u12zz\"') throws TomlSyntaxError"
+  - "parseToml('x = \"\\\\uD800\"') throws TomlSyntaxError"
+  - "A version catalog with such an escape yields a notice from readVersionCatalogs instead of a throw"
+touches:
+  - "62f9bb19-c606-422d-b643-a4877b6dfcfd"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "lang-kit"
+source: "ndx-adversarial-review"
+---

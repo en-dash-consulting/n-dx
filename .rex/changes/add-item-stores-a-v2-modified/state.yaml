@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "3dad263b-b819-486b-bc74-13eade3acd84":
+    status: "completed"
+    startedAt: "2026-10-09T05:39:24.202Z"
+    completedAt: "2026-10-09T05:51:28.300Z"
+    endedAt: "2026-10-09T05:51:28.300Z"
+    resolutionType: "code-change"
+    resolutionDetail: "addChangeNode calls applyCriteriaDelta per modified capability amendment; refuses and writes nothing"
+    appliedAt: "2026-10-09T05:51:28.300Z"
+    lastModified: "2026-10-09T05:51:28.558Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,34 @@
+schema: "rex/v2"
+items:
+  "10f16d23-0f2e-4d24-99a0-6852426fdefe":
+    status: "completed"
+    startedAt: "2026-10-11T00:20:43.747Z"
+    completedAt: "2026-10-11T00:33:16.336Z"
+    endedAt: "2026-10-11T00:33:16.336Z"
+    lastModified: "2026-10-11T00:33:16.619Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "25d98a98-f76b-4faa-9047-cd4590708770":
+    status: "completed"
+    startedAt: "2026-10-10T23:44:52.678Z"
+    completedAt: "2026-10-10T23:49:02.878Z"
+    endedAt: "2026-10-10T23:49:02.878Z"
+    resolutionType: "code-change"
+    resolutionDetail: "robot-wrangler.css moved to defined tokens; shell.css dirty indicator uses --orange; style-tokens test extended with fixture cases and robot-wrangler.css as strict sheet."
+    lastModified: "2026-10-10T23:49:03.148Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b9a59e46-7881-48ab-be02-ff59fdb60b68":
+    status: "completed"
+    startedAt: "2026-10-10T23:49:46.578Z"
+    completedAt: "2026-10-11T00:04:48.837Z"
+    endedAt: "2026-10-11T00:04:48.837Z"
+    lastModified: "2026-10-11T00:04:49.196Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f8121e9f-277e-4d6a-bbc2-68e9e2f62def":
+    status: "completed"
+    startedAt: "2026-10-11T00:04:50.361Z"
+    completedAt: "2026-10-11T00:33:17.529Z"
+    endedAt: "2026-10-11T00:33:17.529Z"
+    appliedAt: "2026-10-11T00:33:17.529Z"
+    needsPlacement: true
+    lastModified: "2026-10-11T00:33:17.800Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

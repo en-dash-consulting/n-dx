@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "0b6e8b1d-bf43-42b3-91df-74ed3f234c66":
+    status: "completed"
+    startedAt: "2026-04-19T03:56:20.830Z"
+    completedAt: "2026-04-19T03:59:49.910Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Produced docs/config-schema-ui-gap.md: 63 user-editable fields enumerated across all three config files; 19 present, 1 partial, 43 missing. P1–P6 priority gap list with control types and CLI commands. View placement recommendations for sibling implementation task."
+    appliedAt: "2026-04-19T03:59:49.910Z"

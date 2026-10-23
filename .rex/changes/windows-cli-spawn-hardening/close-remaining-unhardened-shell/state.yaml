@@ -1,0 +1,21 @@
+schema: "rex/v2"
+items:
+  "2d5988dc-74a2-4723-8234-0f7a8b7becfc":
+    status: "completed"
+    startedAt: "2026-08-17T21:04:25.277Z"
+    completedAt: "2026-08-17T21:04:25.277Z"
+    endedAt: "2026-08-17T21:04:25.277Z"
+  "67973131-6101-470b-bd9d-1cb6a98698c4":
+    status: "completed"
+    startedAt: "2026-08-17T20:38:53.248Z"
+    completedAt: "2026-08-17T20:51:41.224Z"
+    endedAt: "2026-08-17T20:51:41.224Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Part 1: all six claude-integration.js execSync sites (mcp remove/add + four --version probes) now use execFileSyncCli from win-spawn.js; unused execSync/logCliInvocation imports and duplicate manual logging removed. Part 2: deleted the hardcoded 12-file DEP0190_SCOPE and replaced it with a tree-wide scan (packages/ + scripts/ + pr-check.js) banning exec/execSync imports, shell:process.platform, and shell:true+args, with exemptions in a SHELL_STRING_EXEMPT map carrying reasons — export.js pointing at task c990fd76, plus ci.js and pr-check.js pnpm cases that were previously only mentioned in a comment and never enforced. Added a >100-file assertion so a broken scan cannot pass vacuously. TDD per AC5: a new file importing execSync failed the guard with no guard edit needed, then passed once hardened; probe deleted. Corrected the task's premise — paths WERE quoted in the old strings, so the & concern applied only to manifest-derived constants; the real defect is a trailing backslash escaping its own closing quote, which can exit 0 having stored a truncated command. Proved fixed on C:\\Users\\Tom&Jerry\\my proj (v2)\\ (backslash doubled, & stays quoted, 9 argv -> 9 tokens). AC2 not verified end-to-end by design: real `ndx init` would run `claude mcp remove --scope user rex` and delete the developer's live MCP registrations. AC6 needed no work — mcp add failures already surface at claude-integration.js:447 and assistant-integration.js:190. Also dropped claude-integration.js from the child_process allowlists in architecture-policy.test.js and ci.js (no longer imports child_process). Fixed 10 tests asserting the old implementation: re-pointed claude-discovery.test.js mocks from child_process to the win-spawn boundary, and updated mcp-registration.test.js source regexes to the argv shape. Typecheck clean; root suite 90 files / 2066 passed / 0 failed; rex's 3 failures are the known ambient-load flakes from task 676af18f."
+  "c990fd76-cedc-405f-8e36-86a98fa015cc":
+    status: "completed"
+    startedAt: "2026-08-17T20:53:59.502Z"
+    completedAt: "2026-08-17T21:04:22.919Z"
+    endedAt: "2026-08-17T21:04:22.919Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed an undiscovered blocker first: export.js's `await import(resolvePackagePath(...))` passed a bare absolute path, which Node's ESM loader rejects on Windows (ERR_UNSUPPORTED_ESM_URL_SCHEME, \"Received protocol 'c:'\"), aborting `ndx export` before any work. Wrapped in pathToFileURL(...).href. Verified export.js was the only production instance of that pattern. Then the documented items: `rm -rf \"<path>\"` -> rmSync({recursive,force}) with no shell (the original had no try/catch, so it threw and aborted the deploy on Windows); `git rm -rf . 2>/dev/null || true` -> argv git in a JS try/catch; and all 16 remaining execSync command strings -> execFileSyncCli argv, removing hand-quoting of tmpWorktree/dir that breaks on trailing backslashes and & / ^. Corrected the task's premise: unquoted ${branch} was not an injection vector since branch is the hardcoded \"n-dx-dashboard\"; the real exposure was project-derived paths. Retired export.js from SHELL_STRING_EXEMPT so the guard now scans it (56 tests green). VERIFIED END-TO-END on Windows per AC4/AC6: scratch repo named `e & p (v2)` with a LOCAL BARE origin so no real deploy target was contacted — EXIT=0, 28 files pushed, no .ndx-deploy-tmp leaked; a second run exercised the existing-branch worktree route (vs orphan) and also returned EXIT=0. Two environmental false starts recorded in the log (Windows MAX_PATH from a 170-char scratch base; missing git identity), neither an export.js defect. Typecheck clean; root suite 90 files / 2066 passed / 0 failed; rex's 3 failures are the known ambient-load flakes (task 676af18f)."

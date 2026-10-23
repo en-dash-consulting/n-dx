@@ -1,0 +1,29 @@
+schema: "rex/v2"
+items:
+  "173347ff-5fdb-40f7-ab0c-0d9b0803dc47":
+    status: "completed"
+    startedAt: "2026-10-15T21:23:19.672Z"
+    completedAt: "2026-10-15T21:47:30.249Z"
+    endedAt: "2026-10-15T21:47:30.249Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Java pack routes/outboundCalls merged into serverRoutes and outbound.json from the imports phase's single pack call; byte-identical without Java or the pack; added-only on petclinic and thingsboard (commit 26fb1d867)."
+    lastModified: "2026-10-15T21:47:30.551Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2147717e-b3b7-44b8-be38-bba001a14bc6":
+    status: "completed"
+    startedAt: "2026-10-15T21:47:31.402Z"
+    completedAt: "2026-10-21T04:23:39.475Z"
+    endedAt: "2026-10-21T04:23:39.475Z"
+    appliedAt: "2026-10-21T04:23:39.475Z"
+    needsPlacement: true
+    lastModified: "2026-10-21T04:23:39.475Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "24e2ec8b-215b-4074-bcaf-a4451a8e8ad4":
+    status: "completed"
+    startedAt: "2026-10-15T20:42:45.719Z"
+    completedAt: "2026-10-15T21:19:36.719Z"
+    endedAt: "2026-10-15T21:19:36.719Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Spring Boot FrameworkPack in lang-java producing routes and outboundCalls; contract additions in lang-kit; framework slot implemented in lang-runtime; Spring facts golden; spring-corpus-report.mjs with petclinic/thingsboard counts logged."
+    lastModified: "2026-10-15T21:19:37.021Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

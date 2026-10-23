@@ -1,0 +1,28 @@
+schema: "rex/v2"
+items:
+  "2fb0c11f-b6fe-4f62-acb6-f86b94ad2bda":
+    status: "completed"
+    startedAt: "2026-10-11T07:55:52.219Z"
+    completedAt: "2026-10-11T08:00:23.047Z"
+    endedAt: "2026-10-11T08:00:23.047Z"
+    resolutionType: "code-change"
+    resolutionDetail: "pairSupported true in /api/llm/config; review modes documented; patch changeset added."
+    lastModified: "2026-10-11T08:00:23.322Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "63f5fbf5-5991-4b9b-b1e2-dee981be4d4c":
+    status: "completed"
+    startedAt: "2026-10-11T07:41:31.435Z"
+    completedAt: "2026-10-11T07:55:34.025Z"
+    endedAt: "2026-10-11T07:55:34.025Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Pair review fix rounds: executor resumed with must-fix findings, tests re-run, fresh re-review, up to hench.review.rounds; unresolved must-fix fails review; rounds recorded on run.reviewRounds."
+    lastModified: "2026-10-11T07:55:34.309Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "db4fbc97-4611-4d88-ba37-7be795c073d3":
+    status: "completed"
+    startedAt: "2026-10-11T08:00:24.299Z"
+    completedAt: "2026-10-11T08:00:24.299Z"
+    endedAt: "2026-10-11T08:00:24.299Z"
+    appliedAt: "2026-10-11T08:00:24.299Z"
+    lastModified: "2026-10-11T08:00:24.576Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

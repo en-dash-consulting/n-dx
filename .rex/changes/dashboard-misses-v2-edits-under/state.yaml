@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "aeac2c3a-8d85-4c5f-904d-a0094eb2a0e8":
+    status: "completed"
+    startedAt: "2026-10-12T11:32:30.092Z"
+    completedAt: "2026-10-12T11:38:39.536Z"
+    endedAt: "2026-10-12T11:38:39.536Z"
+    resolutionType: "code-change"
+    resolutionDetail: "registerRexWatcher lazily adds the recursive watch when product/ or changes/ appears under .rex/ (option a); commit f1b5eeeac"
+    appliedAt: "2026-10-12T11:38:39.536Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T11:38:39.807Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

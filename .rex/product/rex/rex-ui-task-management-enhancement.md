@@ -1,0 +1,9 @@
+---
+id: "2171d478-2d5b-4926-8e85-837f52c99abd"
+type: "capability"
+title: "Rex UI Task Management Enhancement"
+slug: "rex-ui-task-management-enhancement"
+statement: "The Rex web dashboard lets users find, filter, select and create PRD items in the task tree and its detail panel, and its Smart Add form and the `ndx add` command delegate item creation to the rex CLI."
+criteria: [{"id":"c1","text":"When a task is selected, the detail panel shall let the user create a new item within that selected task."},{"id":"c2","text":"The Rex tasks UI shall let users create new tasks directly within the PRD tree without navigating to a separate form."},{"id":"c3","text":"When the user ctrl+clicks an item in the Rex tasks UI, the UI shall toggle that item's selection."},{"id":"c4","text":"When the user shift+clicks an item in the Rex tasks UI, the UI shall select the range of items between the previous selection and the clicked item."},{"id":"c5","text":"The Rex tasks UI shall provide multi-select through keyboard modifiers instead of checkboxes."},{"id":"c6","text":"The Rex tasks web UI shall let users search tasks, epics and features by title, description, tags or status."},{"id":"c7","text":"When the Smart Add form builds the CLI command, the dashboard shall pass only the user's current input to the `add` subcommand, without stale or unrelated UI text such as a previous task title."},{"id":"c8","text":"The Smart Add form shall submit only when the user explicitly submits, never on each keystroke or Enter press while the input is being composed."},{"id":"c9","text":"When the user runs `ndx add`, the orchestration CLI shall spawn `rex add` with the correct arguments and working directory instead of failing with a missing `.rex` error."},{"id":"c10","text":"The Rex dashboard tree view shall provide filter controls that show or hide items by status: pending, in_progress, completed, blocked, deferred and deleted."}]
+source: "smart-add"
+---

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "333f622f-2ea5-4f6b-9d41-97316ee009c4":
+    status: "completed"
+    startedAt: "2026-10-15T05:32:34.798Z"
+    completedAt: "2026-10-15T05:39:14.303Z"
+    endedAt: "2026-10-15T05:39:14.303Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Stage-then-swap for pack add --from; null manifest refused as not a pack bundle; tests added."
+    appliedAt: "2026-10-15T05:39:14.303Z"
+    lastModified: "2026-10-15T05:39:14.572Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

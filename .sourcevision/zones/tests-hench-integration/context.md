@@ -7,7 +7,7 @@
 Zone: Tests Hench Integration (`tests-hench-integration`)
 Files: 100, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+96 more)
+Description: Non-source files in packages: agent-commit-item-trailer-cli-loop.test.ts, agent-commit-item-trailer.test.ts, agent-model-override.test.ts (+97 more)
 Lines: 26934
 
 </zone>

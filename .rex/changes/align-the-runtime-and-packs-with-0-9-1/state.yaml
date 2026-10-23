@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "630a0d34-8a28-4e8e-a332-4524735486b5":
+    status: "completed"
+    startedAt: "2026-10-17T01:34:27.283Z"
+    completedAt: "2026-10-17T01:43:48.530Z"
+    endedAt: "2026-10-17T01:43:48.530Z"
+    resolutionType: "code-change"
+    resolutionDetail: "lang-kit, lang-runtime and the four packs set to 0.9.1; verify-build.js requires the lang-kit, lang-runtime, lang-java and lang-go dists; Packs row moved beside Domain in project-guidance.md and the root CLAUDE.md/AGENTS.md regenerated."
+    appliedAt: "2026-10-17T01:43:48.530Z"
+    lastModified: "2026-10-17T01:43:48.860Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

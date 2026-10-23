@@ -4,7 +4,7 @@
 
 <zone>
 
-Zone: Src 2 (`lang-kit/src-2`)
+Zone: Src 2 (`language-pack-foundation/src-2`)
 Files: 11, Cohesion: 0.70, Coupling: 0.30
 Description: 11 files, primarily TypeScript
 Entry points: packages/lang-kit/src/csharp.ts, packages/lang-kit/src/detect.ts, packages/lang-kit/src/go.ts, packages/lang-kit/src/java.ts, packages/lang-kit/src/python.ts, packages/lang-kit/src/registry.ts, packages/lang-kit/src/swift.ts, packages/lang-kit/src/terraform.ts, packages/lang-kit/src/typescript.ts

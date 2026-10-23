@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "09b2b8de-d993-44e6-b944-4bef6b47a5aa":
+    status: "completed"
+    startedAt: "2026-10-15T06:47:59.312Z"
+    completedAt: "2026-10-15T06:53:42.940Z"
+    endedAt: "2026-10-15T06:53:42.940Z"
+    resolutionType: "code-change"
+    resolutionDetail: "computeV2Health takes thresholds; MCP health defaults them when config.json is missing; CLI unchanged. Commit 1eadc845b."
+    appliedAt: "2026-10-15T06:53:42.940Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T06:53:43.229Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

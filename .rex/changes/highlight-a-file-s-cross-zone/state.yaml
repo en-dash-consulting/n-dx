@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "06071f9a-6d4f-4df6-9800-0a0ab2d95d0f":
+    status: "completed"
+    startedAt: "2026-07-24T18:44:43.657Z"
+    completedAt: "2026-07-24T19:01:03.278Z"
+    endedAt: "2026-07-24T19:01:03.278Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Hover/select on a connecting file row now draws highlight edges to each target zone box (collapsed or expanded) and highlights those boxes; clears on mouse-out/re-click. Pure helpers computeFileRowRect + buildFileHighlightEdges with 10 new unit tests."
+    appliedAt: "2026-07-24T19:01:03.278Z"

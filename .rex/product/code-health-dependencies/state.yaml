@@ -1,0 +1,43 @@
+schema: "rex/v2"
+items:
+  "07874b87-6683-4b55-8ed9-1555c5bd0d88":
+    status: "completed"
+    startedAt: "2026-02-27T04:40:55.059Z"
+    completedAt: "2026-02-27T04:40:55.059Z"
+    metAt: "96683156f05c92584b97df161f4fa868742493d90d3905d764f2500a040ecd42"
+  "10c4bdde-3d18-42f7-9718-3cba99d8f6b1":
+    status: "completed"
+    startedAt: "2026-02-27T04:02:08.292Z"
+    completedAt: "2026-02-27T04:02:08.292Z"
+    metAt: "90a4c2ea799252709d2d7522460a04f5a8789372e8c4b59cf39a76833d91385d"
+  "56f47d3d-d39d-4938-9923-b3735656ba7b":
+    status: "completed"
+    startedAt: "2026-05-26T01:55:39.245Z"
+    completedAt: "2026-05-26T01:55:39.245Z"
+    endedAt: "2026-05-26T01:55:39.245Z"
+    metAt: "3f069ec51e27d81f25253ba5015e6f7b9599c0ee2c63cb28de344a2b43fc1ae6"
+  "58d4e31f-c91b-4ba3-8559-a78a5e6f8350":
+    status: "completed"
+    startedAt: "2026-05-26T02:04:09.426Z"
+    completedAt: "2026-05-26T02:04:09.426Z"
+    endedAt: "2026-05-26T02:04:09.426Z"
+    metAt: "ee3166a8d49fe87959eb8c335922bf89e0af59e6a8cb59634dc8dd868454e68a"
+  "6a128173-0145-42a0-99bb-54308b9c0ec1":
+    status: "completed"
+    startedAt: "2026-04-19T03:24:10.418Z"
+    completedAt: "2026-09-10T17:10:34.022Z"
+    endedAt: "2026-09-10T17:10:34.022Z"
+    lastModified: "2026-09-10T17:10:34.029Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "ccbcaf61-4e36-4fb0-b965-be25520ae453":
+    status: "completed"
+    startedAt: "2026-04-08T04:29:31.235Z"
+    completedAt: "2026-04-08T04:41:56.446Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created cli-brand.js as single home for brand assets (mascot, phase messages, colors). Rewrote handleInit with themed phase messages, branded recap, NO_COLOR/quiet graceful degradation. 4 new tests added."
+    metAt: "b32d9308037a6b2c3c8b10b2f07613381ef18b0f80c5c1ee30c597825fcce7c7"
+  "f6c36dec-764a-4a56-adc7-cb11e66890c9":
+    status: "completed"
+    startedAt: "2026-04-08T22:59:36.242Z"
+    completedAt: "2026-04-08T22:59:36.242Z"
+    metAt: "ffc654898f659f22fa22a9e82e7e06f8bb9e8755c72475519b062a3764ae01d1"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "9fe81459-e04f-4246-a15f-89c381487139":
+    status: "completed"
+    startedAt: "2026-10-08T23:13:27.618Z"
+    completedAt: "2026-10-08T23:28:20.814Z"
+    endedAt: "2026-10-08T23:28:20.814Z"
+    resolutionType: "code-change"
+    resolutionDetail: "ChangeIntent/ChangeIntentSchema gain optional acceptanceCriteria: string[]; split rule moves the typed list; MCP add/edit descriptions clarified; tests for schema, split, spec hash/product status, v1 read and MCP round-trip."
+    appliedAt: "2026-10-08T23:28:20.814Z"
+    lastModified: "2026-10-08T23:28:21.035Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

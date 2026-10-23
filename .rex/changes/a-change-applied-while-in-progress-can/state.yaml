@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "147027ae-ad5c-48a0-b0d2-2d449a75fbcf":
+    status: "completed"
+    startedAt: "2026-10-15T04:39:24.135Z"
+    completedAt: "2026-10-15T04:55:41.504Z"
+    endedAt: "2026-10-15T04:55:41.504Z"
+    resolutionType: "code-change"
+    resolutionDetail: "applyAmendments refuses an open change with unfinished live tasks/nested changes (dry run exempt via allowOpenWork); completeChange/closeEnclosing close an applied, not-abandoned change without re-applying."
+    appliedAt: "2026-10-15T04:55:41.504Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T04:55:41.793Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "1bec62fb-a9f6-46c2-a5d9-5e602b88a21d":
+    status: "completed"
+    startedAt: "2026-10-01T15:47:46.379Z"
+    completedAt: "2026-10-01T15:56:53.947Z"
+    endedAt: "2026-10-01T15:56:53.947Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): a module-level live feed in use-live.ts with reference-counted subscribers, so there is one fetch, one WebSocket and one \"live\" poller however many readers there are. Reconnect backoff goes from 1s, doubling to a 30s cap, and the feed refetches when the socket reopens. New test file use-live-feed.test.ts."
+    appliedAt: "2026-10-01T15:56:53.947Z"
+    lastModified: "2026-10-01T15:56:54.326Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

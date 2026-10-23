@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "04e0520a-25d3-4ac9-be96-9552513bf52d":
+    status: "completed"
+    startedAt: "2026-10-15T07:10:46.081Z"
+    completedAt: "2026-10-15T07:18:37.690Z"
+    endedAt: "2026-10-15T07:18:37.690Z"
+    resolutionType: "code-change"
+    resolutionDetail: "ci.js scanRestrictedImports lists candidates with git ls-files --cached --others --exclude-standard (walk fallback outside git or when the project dir is ignored); commit 843c1e00d"
+    appliedAt: "2026-10-15T07:18:37.690Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    needsPlacement: true
+    lastModified: "2026-10-15T07:18:37.991Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

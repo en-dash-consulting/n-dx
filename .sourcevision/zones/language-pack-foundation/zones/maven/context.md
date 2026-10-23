@@ -4,7 +4,7 @@
 
 <zone>
 
-Zone: Maven (`lang-kit/maven`)
+Zone: Maven (`language-pack-foundation/maven`)
 Files: 3, Cohesion: 0.40, Coupling: 0.60
 Description: 3 files, primarily TypeScript
 Entry points: packages/lang-kit/src/java-maven-build.ts, packages/lang-kit/src/maven-properties.ts, packages/lang-kit/src/xml-lite.ts

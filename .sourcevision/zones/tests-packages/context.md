@@ -7,7 +7,7 @@
 Zone: Tests Packages (`tests-packages`)
 Files: 26, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: project.ts, emit.test.ts, fake-cli.ts (+11 more)
+Description: Non-source files in packages: project.ts, emit.test.ts, pack-fixtures.ts (+23 more)
 Entry points: packages/graview/tests/helpers/project.ts, packages/lang-go/tests/helpers/pack-fixtures.ts, packages/lang-java/tests/helpers/pack-fixtures.ts, packages/lang-kit/tests/helpers/call-within-budget.ts, packages/lang-python/tests/helpers/pack-fixtures.ts, packages/llm-client/tests/helpers/fake-cli.ts, packages/llm-client/tests/helpers/fake-spawn.ts, packages/llm-client/tests/helpers/posix-shell.ts, packages/rex/tests/helpers/index.ts, packages/rex/tests/helpers/jev-judge.ts, packages/rex/tests/helpers/rex-dir-test-support.ts, packages/rex/tests/helpers/v2-fixture.ts, packages/sourcevision/tests/helpers/index.ts, packages/sourcevision/tests/helpers/workspace-pack.ts, packages/web/tests/fixtures/v2-product-map.ts, packages/web/tests/setup/preact-frame-leak-guard.ts
 Lines: 3072
 

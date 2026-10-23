@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "66397a69-5347-4659-8852-4ff1724ae261":
+    status: "completed"
+    startedAt: "2026-10-08T02:38:48.300Z"
+    completedAt: "2026-10-08T02:38:48.300Z"
+    endedAt: "2026-10-08T02:38:48.300Z"
+    resolutionType: "code-change"
+    resolutionDetail: "All 29 .n-dx* literals in 22 files routed through resolveLayout (llm-client config loaders, hench cli-name/quota/archival/retention/test-command, web routes + dashboard usage ledger + CLI Timeouts page via configFile in GET /api/cli/timeouts). Inventory at zero. Also fixed dirname(stateDir) project-root recovery on .ndx/ via projectRootOf (llm-client, hench gateway, rex adapters). Per-package .ndx/config.json tests added. Branch feat/pr29-ndx-config-literals."
+    appliedAt: "2026-10-08T02:38:48.300Z"
+    lastModified: "2026-10-08T02:38:48.806Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

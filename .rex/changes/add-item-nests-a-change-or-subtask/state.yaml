@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ce39ed74-6789-480c-b299-e42a36ab2b42":
+    status: "completed"
+    startedAt: "2026-10-09T02:13:20.839Z"
+    completedAt: "2026-10-09T02:18:25.033Z"
+    endedAt: "2026-10-09T02:18:25.033Z"
+    resolutionType: "code-change"
+    resolutionDetail: "addChangeNode refuses a change under a closed change and a subtask under a task of a closed change, with ClosedChangeError (commit 73c0e9283)."
+    appliedAt: "2026-10-09T02:18:25.033Z"
+    lastModified: "2026-10-09T02:18:25.290Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

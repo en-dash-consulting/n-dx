@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "42d5dba1-28f7-4a46-876f-7b887ddbe759":
+    status: "completed"
+    startedAt: "2026-10-08T05:25:48.515Z"
+    completedAt: "2026-10-08T05:32:17.376Z"
+    endedAt: "2026-10-08T05:32:17.376Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Go corpus list, clone and report scripts; gitea 98.69% clean, import parity 3130/3131; microservices-demo 100%/100%."
+    appliedAt: "2026-10-08T05:32:17.376Z"
+    lastModified: "2026-10-08T05:32:17.592Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

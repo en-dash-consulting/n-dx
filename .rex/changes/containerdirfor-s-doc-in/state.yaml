@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "bacc0de7-7052-4dcd-b34d-743e48453418":
+    status: "completed"
+    startedAt: "2026-10-13T16:20:56.418Z"
+    completedAt: "2026-10-13T16:20:56.418Z"
+    endedAt: "2026-10-13T16:20:56.418Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Comment reworded by the operator in e53086e05 to defer to the file header's import list; iso-map bundle unchanged (build-iso-skill --check up to date); infrastructure tests 48 pass, policy suites 319 pass."
+    appliedAt: "2026-10-13T16:20:56.418Z"
+    lastModified: "2026-10-13T16:20:56.712Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

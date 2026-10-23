@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "fbbf2cf6-5391-4f9a-aa32-a92f48bcaed2":
+    status: "completed"
+    startedAt: "2026-10-08T19:54:51.931Z"
+    completedAt: "2026-10-08T21:29:58.021Z"
+    endedAt: "2026-10-08T21:29:58.021Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex backfill-commit-attribution is now a read-only trailer coverage report: commits reachable from the default branch, covered/uncovered by N-DX-Item or N-DX-Status, grouped by author and month with totals. --json and --ref=<branch> supported. Writes nothing (no PRD load, no trailer cache). Report logic in the new src/core/trailer-coverage.ts; the parser fixes from this branch carried over. 10 tests, rex integration tier green (56 files, 510 passed)."
+    appliedAt: "2026-10-08T21:29:58.021Z"
+    lastModified: "2026-10-08T21:29:58.585Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

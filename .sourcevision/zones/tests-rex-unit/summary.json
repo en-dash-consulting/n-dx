@@ -1,7 +1,7 @@
 {
   "id": "tests-rex-unit",
   "name": "Tests Rex Unit",
-  "description": "Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+255 more)",
+  "description": "Non-source files in packages: prompt-surfaces.ts, accept-single-transaction.test.ts, acknowledge.test.ts (+257 more)",
   "files": [
     "packages/rex/tests/unit/analyze/__fixtures__/prompt-surfaces.ts",
     "packages/rex/tests/unit/analyze/accept-single-transaction.test.ts",
@@ -166,6 +166,7 @@
     "packages/rex/tests/unit/core/reorganize-executor.test.ts",
     "packages/rex/tests/unit/core/reorganize.test.ts",
     "packages/rex/tests/unit/core/requirements-prioritization.test.ts",
+    "packages/rex/tests/unit/core/requirements-trace.test.ts",
     "packages/rex/tests/unit/core/requirements.test.ts",
     "packages/rex/tests/unit/core/reshape-group-action.test.ts",
     "packages/rex/tests/unit/core/reshape-kept-changes.test.ts",
@@ -266,8 +267,8 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 259,
-  "lineCount": 86979,
+  "fileCount": 260,
+  "lineCount": 87063,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

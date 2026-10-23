@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "c9c18715-b303-411c-b8b0-d44d0e91be57":
+    status: "completed"
+    startedAt: "2026-10-11T02:32:08.371Z"
+    completedAt: "2026-10-11T04:06:56.376Z"
+    endedAt: "2026-10-11T04:06:56.376Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run a3f6511e-4ba7-4230-ad57-5084e22a110f, commit cb3ce022c: sqlcQueryPaths became sqlcPaths(config, content, key) and reads schema: too; schema files are sqlFiles, query files files only; doc updated. The run failed its gate on a regression in embedded-sql.test.ts, captured as a separate fix task; not re-run."
+    appliedAt: "2026-10-11T04:06:56.376Z"
+    lastModified: "2026-10-11T04:06:56.677Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

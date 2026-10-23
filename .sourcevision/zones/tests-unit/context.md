@@ -7,7 +7,7 @@
 Zone: Tests Unit (`tests-unit`)
 Files: 59, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+55 more)
+Description: Non-source files in tests: architecture-gate-reporting.test.js, check-dependency-drift.test.js, check-lockfile-integrity.test.js (+56 more)
 Lines: 13861
 
 </zone>

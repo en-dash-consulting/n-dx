@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "16197f3e-5d24-4a8b-aa2c-3edbca2923d8":
+    status: "completed"
+    startedAt: "2026-10-13T04:10:46.756Z"
+    completedAt: "2026-10-13T04:25:06.248Z"
+    endedAt: "2026-10-13T04:25:06.248Z"
+    resolutionType: "code-change"
+    resolutionDetail: "withdrawCompletionClaim keeps a v2 completion whose change is applied (task-less change or enclosing change, via rex isAppliedChange/indexTree/enclosingChangeIds through the gateway): no reset, run error names uncommitted paths and commit commands with the N-DX-Item trailer, completion_kept logged, failed-run rollback skipped. Integration tests for the commit hook, review-repair staging and commit, and bypassed-gate paths, plus an applied-nothing withdraw. Gateway ceiling 62→65; patch changeset."
+    appliedAt: "2026-10-13T04:25:06.248Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T04:25:06.537Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

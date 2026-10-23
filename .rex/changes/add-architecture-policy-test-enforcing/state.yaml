@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "55365572-23e3-497d-a072-7aee77c8bf4f":
+    status: "completed"
+    startedAt: "2026-05-06T13:01:25.912Z"
+    completedAt: "2026-05-06T13:08:30.871Z"
+    endedAt: "2026-05-06T13:08:30.871Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added three new test cases to tests/e2e/architecture-policy.test.js that enforce the PRD storage invariant: no source files read/write .rex/prd.md outside the migration helper (migrate-to-folder-tree.ts, migrate-to-md.ts, prd-md-migration.ts). Test scans all packages, identifies violations with file:line references, and validates the allow list. Updated DOCUMENTED_POLICIES registry (count: 19→20)."
+    appliedAt: "2026-05-06T13:08:30.871Z"

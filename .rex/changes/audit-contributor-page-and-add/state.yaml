@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "10e8d95b-b703-4ed1-9c9b-da0e0c623b0a":
+    status: "completed"
+    startedAt: "2026-05-18T13:08:07.356Z"
+    completedAt: "2026-05-18T13:10:43.304Z"
+    endedAt: "2026-05-18T13:10:43.304Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added Prerequisites and Setup Steps sections to CONTRIBUTING.md; added dev-link subsection (§6) to existing Development setup section."
+    appliedAt: "2026-05-18T13:10:43.304Z"

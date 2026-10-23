@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "35ccf9ee-0cb4-48b8-8aa3-185d76939c20":
+    status: "completed"
+    startedAt: "2026-04-23T19:49:17.111Z"
+    completedAt: "2026-04-24T14:24:27.185Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented markdown-serializer.ts and markdown-parser.ts with self-contained YAML codec. Exported from public.ts. 128 new tests covering full field set, round-trip invariant, and all edge cases. All 3711 existing tests pass."
+    appliedAt: "2026-04-24T14:24:27.185Z"

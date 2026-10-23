@@ -1,6 +1,6 @@
 {
   "id": "web-landing",
-  "name": "Web Landing",
+  "name": "Landing Page",
   "description": "2 files, mostly pages; entry points landing.ts; imports Tests; imported by Packages.",
   "files": [
     "packages/web/src/landing/landing.ts",

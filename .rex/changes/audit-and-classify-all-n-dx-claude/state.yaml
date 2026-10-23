@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "62fafbbb-2583-4c1d-acc5-e7a63d89764d":
+    status: "completed"
+    startedAt: "2026-05-28T17:48:54.055Z"
+    completedAt: "2026-05-28T17:52:15.784Z"
+    endedAt: "2026-05-28T17:52:15.784Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created packages/core/assistant-assets/SKILLS.md with full classification table"
+    appliedAt: "2026-05-28T17:52:15.784Z"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "430f705e-21c5-4591-a540-82575d0ad156":
+    status: "completed"
+    startedAt: "2026-10-07T03:58:46.909Z"
+    completedAt: "2026-10-07T04:13:59.066Z"
+    endedAt: "2026-10-07T04:13:59.066Z"
+    resolutionType: "code-change"
+    resolutionDetail: "renameReplacing in atomic-write.ts retries win32 EPERM/EACCES/EBUSY (10..640 ms, ~1.3 s), cleans temp file, rethrows; all store temp-then-rename sites use atomicWrite. Commit 6187c2ad1."
+    appliedAt: "2026-10-07T04:13:59.066Z"
+    needsPlacement: true
+    lastModified: "2026-10-07T04:13:59.287Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

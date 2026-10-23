@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "d8b23226-f958-4fba-a873-eb35c9045761":
+    status: "completed"
+    startedAt: "2026-10-12T04:06:19.268Z"
+    completedAt: "2026-10-12T04:56:24.420Z"
+    endedAt: "2026-10-12T04:56:24.420Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Web reads node type through the shared/item-type.ts shim; item CRUD accepts `type`; criteria terminology applied. The home-page remap is left out: the v2 product views have no reader or route yet."
+    appliedAt: "2026-10-12T04:56:24.420Z"
+    lastModified: "2026-10-12T04:56:24.945Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

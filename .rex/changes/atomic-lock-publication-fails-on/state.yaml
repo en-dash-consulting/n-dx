@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "3290ab84-1bc6-423f-940a-f11eb553728f":
+    status: "completed"
+    startedAt: "2026-09-13T02:58:05.917Z"
+    completedAt: "2026-09-13T03:21:59.098Z"
+    endedAt: "2026-09-13T03:21:59.098Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Restored lock compatibility on filesystems without hard-link support via an atomic directory/rename publication backend, with incomplete publication treated as contended and regression coverage for platform error codes."
+    appliedAt: "2026-09-13T03:21:59.098Z"
+    lastModified: "2026-09-13T03:21:59.394Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

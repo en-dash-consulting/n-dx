@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "bad1ef80-40ca-44b1-8d8b-eff1b4b0ecd5":
+    status: "completed"
+    startedAt: "2026-04-30T19:53:45.630Z"
+    completedAt: "2026-04-30T20:06:12.709Z"
+    endedAt: "2026-04-30T20:06:12.709Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented task completion criteria gate that rejects code-classified tasks without code file changes. Created file-classifier module, task-completion-gate validation, integrated into performCommitPromptIfNeeded(), and added comprehensive test coverage (45 tests passing)."
+    appliedAt: "2026-04-30T20:06:12.709Z"

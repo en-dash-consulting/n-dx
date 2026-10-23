@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "06880a9a-8c1a-4e5b-a6c2-1f921f7a049a":
+    status: "completed"
+    startedAt: "2026-10-15T04:52:33.699Z"
+    completedAt: "2026-10-15T04:52:33.699Z"
+    endedAt: "2026-10-15T04:52:33.699Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Map in top rows, aligned grid, one action per tile"
+    appliedAt: "2026-10-15T04:52:33.699Z"
+    lastModified: "2026-10-15T04:52:34.030Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

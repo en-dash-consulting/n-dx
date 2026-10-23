@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "7b4ff540-8a22-4f56-9b0b-dcf9e68f6675":
+    status: "completed"
+    startedAt: "2026-04-29T18:16:35.551Z"
+    completedAt: "2026-04-29T18:21:35.326Z"
+    endedAt: "2026-04-29T18:21:35.326Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Extracted formatIterationBanner helper; moved banner from before each iteration to between iterations in both runIterations() and runLoop(); added format/placement tests."
+    appliedAt: "2026-04-29T18:21:35.326Z"

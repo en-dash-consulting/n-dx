@@ -7,7 +7,7 @@
 Zone: Lang Sql (`lang-sql`)
 Files: 6, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Extracts SQL schemas and database facts from migrations and configuration to enable dependency introspection and schema-based analysis.
+Description: 6 files, mostly utilities and entry points; entry points index.ts, sql-facts.ts, sql-pack.ts; imported by Packages.
 Entry points: packages/lang-sql/src/index.ts, packages/lang-sql/src/sql-facts.ts, packages/lang-sql/src/sql-pack.ts, packages/lang-sql/src/sql-schema.ts
 Lines: 218
 
@@ -47,23 +47,12 @@ Incoming (other zones → this zone):
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[anti-pattern] [info] The SQL pack is the only language pack without its own test zone: its tests/ and vitest.config.ts were folded into another community. Pin packages/lang-sql/tests/** to a tests-lang-sql zone in .n-dx.json so its test coverage shows up beside the other packs.
-[suggestion] [info] Document the pack file convention in the lang-runtime AGENTS.md: pack.ts is the contract-facing entry that the runtime loads, <lang>-pack.ts is the implementation, and <lang>-facts.ts holds the fact types. Add an assertion to the pack golden tests that every packages/lang-*/src has pack.ts, so a new pack cannot skip the loader entry.
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- High cohesion (1) — files are tightly interconnected
-- Compact zone (6 files) maintains tight focus—sql-facts.ts, sql-schema.ts, and sql-pack.ts are tightly integrated without scope creep
-- Schema extraction is orthogonal to other language packs, supporting independent evolution of database introspection capabilities
-- Package paths and SQL semantics are co-located without importing from other packs
-- packages/lang-sql has tests/ and vitest.config.ts on disk, but neither is in the lang-sql zone and no tests-lang-sql zone exists. The SQL pack's tests were absorbed into another zone, unlike terraform, python, java and go, which each have their own test zone.
-- The SQL pack is the only language pack without its own test zone: its tests/ and vitest.config.ts were folded into another community. Pin packages/lang-sql/tests/** to a tests-lang-sql zone in .n-dx.json so its test coverage shows up beside the other packs.
-- The pack has two files classified as entrypoints with overlapping names: pack.ts and sql-pack.ts. lang-terraform has the same pair (pack.ts and terraform-pack.ts), so a '<lang>-pack.ts plus pack.ts' convention is in use but not written down anywhere.
-- package-paths.ts is classified as [types] here and in lang-terraform. The name describes path resolution, not type declarations, so either the classifier mislabels it or the file is misnamed.
-- Document the pack file convention in the lang-runtime AGENTS.md: pack.ts is the contract-facing entry that the runtime loads, <lang>-pack.ts is the implementation, and <lang>-facts.ts holds the fact types. Add an assertion to the pack golden tests that every packages/lang-*/src has pack.ts, so a new pack cannot skip the loader entry.
 - [call graph] 5 internal calls, 0 outgoing, 12 incoming (cohesion: 1, coupling: 0)
 
 </insights>

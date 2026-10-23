@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f378e4b4-f8d6-45a8-9948-35aaffd86685":
+    status: "completed"
+    startedAt: "2026-09-22T03:53:25.880Z"
+    completedAt: "2026-09-22T04:42:24.283Z"
+    endedAt: "2026-09-22T04:42:24.283Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Cascade default for keyed users: run-ledger, judgment cache, naming by selection, fragility-banded escalation, verify+anchor findings, classify escalation, --narrate; live cascade 38 judged findings in 232 s vs narrate pass-1 3 findings in 80 s; no-key path unchanged"
+    appliedAt: "2026-09-22T04:42:24.283Z"
+    lastModified: "2026-09-22T04:42:24.293Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

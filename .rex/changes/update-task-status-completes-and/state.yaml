@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "da3ca62b-0153-445b-a2ed-5c85886d8907":
+    status: "completed"
+    startedAt: "2026-10-12T09:36:56.450Z"
+    completedAt: "2026-10-12T09:52:32.330Z"
+    endedAt: "2026-10-12T09:52:32.330Z"
+    resolutionType: "code-change"
+    resolutionDetail: "completeChange refuses while a live nested change or task is open; completing a change re-checks each pending enclosing change outward; a container never applies while a nested change is unapplied; ChangeCompletionResult.applies; v2-completion logs change_applied per applied change."
+    appliedAt: "2026-10-12T09:52:32.330Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T09:52:32.580Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

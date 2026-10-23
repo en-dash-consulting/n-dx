@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "0307f4fb-36f5-4770-8701-75bb42ac3726":
+    status: "completed"
+    startedAt: "2026-10-08T07:23:36.580Z"
+    completedAt: "2026-10-08T07:27:31.549Z"
+    endedAt: "2026-10-08T07:27:31.549Z"
+    resolutionType: "code-change"
+    resolutionDetail: "PackResolver.prepare takes optional `unparsed` paths; Go indexes them; pack-imports passes oversized/unreadable files."
+    appliedAt: "2026-10-08T07:27:31.549Z"
+    lastModified: "2026-10-08T07:27:31.800Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

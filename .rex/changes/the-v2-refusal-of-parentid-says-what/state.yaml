@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "6653f6b0-6f33-48ec-904c-810bc176120d":
+    status: "completed"
+    startedAt: "2026-10-13T16:47:40.293Z"
+    completedAt: "2026-10-13T16:51:00.240Z"
+    endedAt: "2026-10-13T16:51:00.240Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 parentId refusal in routes-rex/items.ts now names Add with no parent and rex add --type=task --parent=<id>; route test asserts wording."
+    appliedAt: "2026-10-13T16:51:00.240Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T16:51:00.994Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

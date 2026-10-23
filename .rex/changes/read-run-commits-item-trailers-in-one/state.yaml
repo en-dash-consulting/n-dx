@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "d827e9f0-309d-4c6d-869f-0ea24091522d":
+    status: "completed"
+    startedAt: "2026-10-09T05:37:49.878Z"
+    completedAt: "2026-10-09T14:46:05.686Z"
+    endedAt: "2026-10-09T14:46:05.686Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Verified and closed by the operator. Run d78b4a4d-94c6-4f82-86f2-77eca1f8eac3 (claude-sonnet-5-5, review claude-opus-5-5) passed its test gate but failed because its own commit was refused: the agent cd'd into packages/hench/src/agent/lifecycle and never returned to the project root, and its git -C retry is forbidden. The operator committed the run's three paths as e79963031. After rebuilding hench: agent-commit-item-trailer, cli-loop and loop tests 12/12, six static root policy tests pass."
+    appliedAt: "2026-10-09T14:46:05.686Z"
+    lastModified: "2026-10-09T14:46:08.702Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

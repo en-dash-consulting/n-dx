@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "3ca22dd0-c780-4dd9-8c6d-6b5d42fd6cc5":
+    status: "completed"
+    startedAt: "2026-10-02T00:08:19.179Z"
+    completedAt: "2026-10-02T00:13:17.808Z"
+    endedAt: "2026-10-02T00:13:17.808Z"
+    resolutionType: "code-change"
+    resolutionDetail: "hubSlots takes max(admission.running, snapshot repository live count); max/queued from header; available/level recomputed. Test + changeset added."
+    appliedAt: "2026-10-02T00:13:17.808Z"
+    lastModified: "2026-10-02T00:13:18.211Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

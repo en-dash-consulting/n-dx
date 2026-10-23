@@ -1,0 +1,19 @@
+---
+id: "afb3ae88-97e8-4249-9102-c9ba8c9fce55"
+type: "change"
+title: "update_task_status rejects a v2 display id that get_item accepts"
+slug: "update-task-status-rejects-a-v2"
+intent: "Found 2026-10-14 (v2 migration-path page). On a v2 tree, update_task_status takes the node id only: update_task_status({ id: \"CH-1\", ... }) answers \"Item \\\"CH-1\\\" not found\" (cli/mcp-tools/update-task-status.ts around lines 30-32, store.getItem matches by id), while get_item, apply_change and place_change resolve a display id (CH-1) or alias through indexTree().resolve.\n\nWorked together with 52d7ea63, which covers edit_item, move_item, merge_items and claim_task with the same resolver. Whichever runs first adds the shared resolver gated on the change-layer store; the other reuses it. v1 lookups are unchanged.\n\nOperator notes: MCP tool shapes are soft-frozen; widening an input to accept a display id is allowed, and needs a changeset line (patch, @n-dx/rex) fit for the release notes. Do not touch packages/rex/src/migrations/, store/prd-model-writer.ts, the rex migrate command or packages/rex/tests/unit/schema/v2.test.ts. Run the six static root policy tests before finishing: tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy and obfuscated-code-policy."
+acceptanceCriteria:
+  - "On the v2 fixture, update_task_status({ id: \"CH-1\", ... }) updates change c0000000-0000-4000-8000-000000000001 (test)"
+  - "update_task_status, edit_item, move_item, merge_items and claim_task resolve a display id or alias through the same lookup get_item uses (test per tool; edit, move, merge and claim are covered by 52d7ea63)"
+  - "v1 lookups are unchanged (existing tests pass unedited)"
+  - "The widened input has a changeset line fit for the release notes"
+touches:
+  - "61044424-6892-46b8-8b11-131e57373c91"
+priority: "medium"
+tags:
+  - "v2-hardening"
+  - "rex"
+source: "ndx-capture"
+---

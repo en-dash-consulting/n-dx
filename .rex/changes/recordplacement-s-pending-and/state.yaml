@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "7421c3a7-c561-48b9-8733-81480e9876b3":
+    status: "completed"
+    startedAt: "2026-10-09T19:24:17.670Z"
+    completedAt: "2026-10-09T19:24:17.670Z"
+    endedAt: "2026-10-09T19:24:17.670Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run f03e38b8 (claude-sonnet-5-5, review claude-opus-5-5), commit(s) 65955b19e (rebased onto the restacked branch as 75c9bf699); stale dist only; gate re-run green after rebuild (node scripts/run-all-tests.mjs affected 35558fa4c, 5/5 suites passed). Closed by the overnight Lane A session."
+    appliedAt: "2026-10-09T19:24:17.670Z"
+    lastModified: "2026-10-09T19:24:17.944Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

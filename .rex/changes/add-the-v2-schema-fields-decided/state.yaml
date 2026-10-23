@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "616f908a-19d8-42af-b550-25336a8f3f1f":
+    status: "completed"
+    startedAt: "2026-10-08T00:06:27.232Z"
+    completedAt: "2026-10-08T00:19:36.506Z"
+    endedAt: "2026-10-08T00:19:36.506Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added fix, Amendment.type/base, CheckResult.commit, reviewedHash, appliedAt, appliedAmendsHash; retired appliedIn/specReviewed via RETIRED_STATE_FIELDS + retired-state-field warning rule; unreviewed-spec and isOpenChange read the new fields."
+    appliedAt: "2026-10-08T00:19:36.506Z"
+    lastModified: "2026-10-08T00:19:36.744Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

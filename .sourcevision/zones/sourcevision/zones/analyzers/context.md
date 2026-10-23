@@ -319,7 +319,7 @@ This zone has 7 sub-zone(s):
 - **Analyzers 2** (`sourcevision/analyzers/analyzers-2`): 9 files, cohesion 0.36, coupling 0.64
 - **Detection** (`sourcevision/analyzers/detection`): 9 files, cohesion 0.63, coupling 0.37
 - **Enrich** (`sourcevision/analyzers/enrich`): 7 files, cohesion 0.48, coupling 0.52
-- **Enrich Cascade File Headers** (`sourcevision/analyzers/enrich-cascade-file-headers`): 3 files, cohesion 0.19, coupling 0.81
+- **Analysis Enrichment** (`sourcevision/analyzers/enrich-cascade-file-headers`): 3 files, cohesion 0.19, coupling 0.81
 - **Sourcevision** (`sourcevision/analyzers/sourcevision`): 14 files, cohesion 0.4, coupling 0.6
 - **Zone** (`sourcevision/analyzers/zone`): 9 files, cohesion 0.45, coupling 0.55
 

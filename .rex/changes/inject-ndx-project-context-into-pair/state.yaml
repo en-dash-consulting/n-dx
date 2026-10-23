@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "55b88bcd-8e8a-474a-9053-7e0ceba66ebe":
+    status: "completed"
+    startedAt: "2026-04-16T16:56:03.913Z"
+    completedAt: "2026-04-16T22:07:19.810Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added context assembly pipeline in pair-programming.js and threaded extraContext through hench's run/loop stack into buildPromptEnvelope."
+    appliedAt: "2026-04-16T22:07:19.810Z"

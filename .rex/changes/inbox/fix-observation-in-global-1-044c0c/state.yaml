@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "044c0c8e-adda-4265-827c-fa62b78b6dad":
+    status: "completed"
+    startedAt: "2026-04-17T15:47:26.842Z"
+    completedAt: "2026-04-17T15:47:26.842Z"
+    appliedAt: "2026-04-17T15:47:26.842Z"
+    needsPlacement: true
+  "c45f46d8-4b11-465d-a5ce-b3ca071ae2aa":
+    status: "completed"
+    startedAt: "2026-04-17T15:33:07.453Z"
+    completedAt: "2026-04-17T15:47:26.536Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Extended api.ts with hooks/component/nav re-exports; sidebar.ts now imports through api.ts instead of 4 direct web-viewer leaf files, reducing outbound zone crossings from 5 targets to 2 (external.ts + api.ts)"

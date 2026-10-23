@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b9a269f8-2123-4703-bfa0-677349fa71e1":
+    status: "completed"
+    startedAt: "2026-09-10T17:10:23.837Z"
+    completedAt: "2026-09-10T17:14:21.573Z"
+    endedAt: "2026-09-10T17:14:21.573Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Bundle import now defaults lastModified to the bundle's exportedAt for attribution-only items in both merge and replace modes, preserving the original author while making the item visible to remote sync. Covered by 5 unit tests and an e2e test."
+    appliedAt: "2026-09-10T17:14:21.573Z"
+    lastModified: "2026-09-10T17:14:21.598Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

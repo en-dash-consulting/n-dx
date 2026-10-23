@@ -4,7 +4,7 @@
 
 <zone>
 
-Zone: Lang Kit (`lang-kit/lang-kit`)
+Zone: Lang Kit (`language-pack-foundation/lang-kit`)
 Files: 6, Cohesion: 0.50, Coupling: 0.50
 Description: 6 files, primarily TypeScript
 Entry points: packages/lang-kit/src/build-model.ts, packages/lang-kit/src/go-build.ts, packages/lang-kit/src/gradle-catalog.ts, packages/lang-kit/src/gradle-script.ts, packages/lang-kit/src/java-gradle-build.ts, packages/lang-kit/src/toml-lite.ts

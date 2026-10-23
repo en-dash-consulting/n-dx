@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "c852de51-4539-48eb-b7e8-39e8c9877516":
+    status: "completed"
+    startedAt: "2026-10-15T05:30:59.887Z"
+    completedAt: "2026-10-15T05:38:39.774Z"
+    endedAt: "2026-10-15T05:38:39.774Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: baselineDirty threaded through performCommitPromptIfNeeded/withdrawCompletionClaim into keepAppliedCompletion; pre-run paths listed apart, excluded from git add/commit."
+    appliedAt: "2026-10-15T05:38:39.774Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T05:38:40.242Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

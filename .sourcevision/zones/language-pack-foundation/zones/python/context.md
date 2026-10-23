@@ -4,7 +4,7 @@
 
 <zone>
 
-Zone: Python (`lang-kit/python`)
+Zone: Python (`language-pack-foundation/python`)
 Files: 5, Cohesion: 0.57, Coupling: 0.43
 Description: 5 files, primarily TypeScript
 Entry points: packages/lang-kit/src/ini-lite.ts, packages/lang-kit/src/python-build.ts, packages/lang-kit/src/python-requirements.ts, packages/lang-kit/src/python-setup-py.ts

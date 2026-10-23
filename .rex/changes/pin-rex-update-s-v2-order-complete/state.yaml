@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "38978e4a-4c61-4546-989d-fed5e9514725":
+    status: "completed"
+    startedAt: "2026-10-13T03:23:57.106Z"
+    completedAt: "2026-10-13T03:33:59.579Z"
+    endedAt: "2026-10-13T03:33:59.579Z"
+    resolutionType: "code-change"
+    appliedAt: "2026-10-13T03:33:59.579Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T03:33:59.843Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

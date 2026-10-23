@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "1b7a44bc-a83a-47ad-9205-893373dd4fba":
+    status: "completed"
+    startedAt: "2026-10-11T04:22:55.681Z"
+    completedAt: "2026-10-11T04:25:57.998Z"
+    endedAt: "2026-10-11T04:25:57.998Z"
+    resolutionType: "code-change"
+    resolutionDetail: "sqlcPaths strips a ` #` comment outside quotes (scalar, flow list, block item) before unquoting. Commit b3cdd90c0."
+    appliedAt: "2026-10-11T04:25:57.998Z"
+    lastModified: "2026-10-11T04:25:58.274Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

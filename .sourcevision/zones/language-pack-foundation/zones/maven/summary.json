@@ -1,5 +1,5 @@
 {
-  "id": "lang-kit/maven",
+  "id": "language-pack-foundation/maven",
   "name": "Maven",
   "description": "3 files, primarily TypeScript",
   "files": [

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "07e84b24-f429-4fc3-940c-a748db0f7878":
+    status: "completed"
+    startedAt: "2026-09-22T18:28:15.566Z"
+    completedAt: "2026-09-22T18:52:07.289Z"
+    endedAt: "2026-09-22T18:52:07.289Z"
+    resolutionType: "code-change"
+    resolutionDetail: "partition-review.ts + analyzeZones gate (reuse and stability seed), 0.8 identity threshold after rejection, zones.partitionReview + lastAnalysis.partition; 18 unit tests; live n-site2 copy 20/30 small -> 0/31 with no reset. Jev map Noul is unit-tested only — n-site2 was fragmented, not borderline, so it was never asked live."
+    appliedAt: "2026-09-22T18:52:07.289Z"
+    lastModified: "2026-09-22T18:52:07.627Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

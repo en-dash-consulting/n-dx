@@ -1,6 +1,6 @@
 {
   "id": "sourcevision/cli/cli",
-  "name": "Cli",
+  "name": "CLI & MCP Core",
   "description": "6 files, primarily TypeScript",
   "files": [
     "packages/sourcevision/src/analyzers/convergence.ts",

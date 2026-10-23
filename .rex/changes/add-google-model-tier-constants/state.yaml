@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "e3b7ea79-3e89-4452-854d-f159a7ada1f4":
+    status: "completed"
+    startedAt: "2026-06-05T12:20:17.785Z"
+    completedAt: "2026-06-05T12:38:57.039Z"
+    endedAt: "2026-06-05T12:38:57.039Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added GOOGLE_MODELS, heavy tier to TaskWeight/TIER_MODELS, MODEL_CONTEXT_WINDOWS, MODEL_COSTS, and budget-preflight.ts module with 25 new tests."
+    appliedAt: "2026-06-05T12:38:57.039Z"

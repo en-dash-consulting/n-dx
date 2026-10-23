@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "9a09a196-c686-43a2-a55a-d463d36da077":
+    status: "completed"
+    startedAt: "2026-10-06T06:16:26.460Z"
+    completedAt: "2026-10-06T07:06:37.381Z"
+    endedAt: "2026-10-06T07:06:37.381Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Cleared the last 24 literal .rex/ .hench/ .sourcevision/ sites across 13 files and turned that half of the policy into a wall with no inventory escape. Criterion 1 is met for the three directories; .n-dx* config literals (29 across 22 files) stay on the ratchet, which is a separate sweep. Real defects fixed en route, both silent on a .ndx/ project: rex analyze stamped proposals with .sourcevision/zones.json, and hench's reviewer was told to list .rex/prd_tree/ before capturing, so the listing came back empty and duplicates got filed. sourcevision's prd-epic-resolver also built its PRD paths from a fixed .rex, but in a helper nothing calls, so it now asks the resolver with no behaviour change. New API: packages/web/src/viewer/state-paths.ts, a browser-safe twin of layoutStateNames() (layout.ts imports node:fs and cannot be bundled), pinned by layout-resolver-contract.test.js; CANONICAL_MARKDOWN_SOURCE_PATH in rex so the status bucket key and the attribution prefix come from one constant. Two documented ALLOWED entries: that twin, and LEGACY_SOURCE_FILE_PREFIX (a value in data on disk, not a constructed path). Detector self-test now floors files visited rather than literals found, so it keeps its teeth once the debt is zero."
+    appliedAt: "2026-10-06T07:06:37.381Z"
+    lastModified: "2026-10-06T15:11:41.050Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

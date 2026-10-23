@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "2a940e6b-1f27-4240-8f1e-e988a84ce241":
+    status: "completed"
+    startedAt: "2026-10-08T04:38:45.561Z"
+    completedAt: "2026-10-08T04:38:45.561Z"
+    endedAt: "2026-10-08T04:38:45.561Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Folded into bd27f348: a retired node reads health ok regardless of stale checks or an open fix change; module doc states it."
+    appliedAt: "2026-10-08T04:38:45.561Z"
+    lastModified: "2026-10-08T04:38:45.805Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,6 +1,6 @@
 {
   "id": "hench/agent-lifecycle/process",
-  "name": "Process",
+  "name": "Process Execution Pipeline",
   "description": "7 files, primarily TypeScript",
   "files": [
     "packages/hench/src/agent/analysis/review.ts",

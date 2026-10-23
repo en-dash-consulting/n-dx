@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "02c5b44e-a84a-4c77-b40c-10febaf2069c":
+    status: "completed"
+    startedAt: "2026-10-01T20:55:04.904Z"
+    completedAt: "2026-10-01T21:10:49.562Z"
+    endedAt: "2026-10-01T21:10:49.562Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added packages/web/src/server/run-liveness.ts (hench mirror + managed-child rule), wired liveness/livenessReason/canEnd and a per-verdict summary into /api/live and repo-wide runs/health, consolidated isPidAlive, e2e parity test and two-worktree integration test."
+    appliedAt: "2026-10-01T21:10:49.562Z"
+    lastModified: "2026-10-01T21:10:49.954Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

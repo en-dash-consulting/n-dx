@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "bbc6ffa4-3df7-423e-b4a7-9161feffbcc2":
+    status: "completed"
+    startedAt: "2026-06-04T19:18:44.215Z"
+    completedAt: "2026-06-04T19:35:54.221Z"
+    endedAt: "2026-06-04T19:35:54.221Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added Google/Gemini as third LLM provider across init-llm.js, config.js, cli.js, cli-ink.js, and llm-model-catalog.js with preflight, idempotency guard, and integration tests."
+    appliedAt: "2026-06-04T19:35:54.221Z"

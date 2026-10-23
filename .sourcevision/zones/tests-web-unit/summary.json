@@ -1,7 +1,7 @@
 {
   "id": "tests-web-unit",
   "name": "Packages",
-  "description": "Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+343 more)",
+  "description": "Non-source files in packages: built-server-guard.test.ts, admission.test.ts, home.test.ts (+349 more)",
   "files": [
     "packages/web/tests/unit/helpers/built-server-guard.test.ts",
     "packages/web/tests/unit/hub/admission.test.ts",
@@ -360,7 +360,7 @@
   "cohesion": 1,
   "coupling": 0,
   "fileCount": 352,
-  "lineCount": 92844,
+  "lineCount": 92861,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

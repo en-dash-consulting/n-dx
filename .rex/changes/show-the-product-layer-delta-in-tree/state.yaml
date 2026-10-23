@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "523e8231-1e57-468e-b166-c8cd76618b3b":
+    status: "completed"
+    startedAt: "2026-10-09T07:38:53.008Z"
+    completedAt: "2026-10-09T08:00:36.597Z"
+    endedAt: "2026-10-09T08:00:36.597Z"
+    resolutionType: "code-change"
+    resolutionDetail: "core/map-diff.ts (product-layer added/modified/retired), core/tree-diff-markdown.ts (host-neutral CommonMark, 50/section cap), tree-diff --format=markdown and --out (refused inside .rex/), help, docs/packages/rex.md, patch changeset. Tests: unit map-diff (8), integration tree-diff-sources map cases."
+    appliedAt: "2026-10-09T08:00:36.597Z"
+    lastModified: "2026-10-09T08:00:36.839Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "ecc9c0bd-5e40-4367-bccd-bc42d8877beb":
+    status: "completed"
+    startedAt: "2026-10-13T18:50:24.736Z"
+    completedAt: "2026-10-13T18:54:51.484Z"
+    endedAt: "2026-10-13T18:54:51.484Z"
+    resolutionType: "code-change"
+    resolutionDetail: "stageOf maps completed-unapplied to awaiting-apply; PATCH returns applied+reason; viewer label; changeset."
+    appliedAt: "2026-10-13T18:54:51.484Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:54:51.768Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

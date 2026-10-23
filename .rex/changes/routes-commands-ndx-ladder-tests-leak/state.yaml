@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "5b154933-05e7-4696-bb8a-20726cf1a068":
+    status: "completed"
+    startedAt: "2026-09-08T18:57:57.669Z"
+    completedAt: "2026-09-08T19:04:22.456Z"
+    endedAt: "2026-09-08T19:04:22.456Z"
+    appliedAt: "2026-09-08T19:04:22.456Z"
+    lastModified: "2026-09-08T19:04:22.472Z"
+    lastModifiedBy: "Hal Halberstadt <sterling.h@endash.us>"

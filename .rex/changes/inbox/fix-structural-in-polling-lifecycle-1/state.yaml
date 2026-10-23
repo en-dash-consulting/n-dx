@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "3dd2ccf4-9126-4b7a-a7f3-976f297488ab":
+    status: "completed"
+    startedAt: "2026-04-19T02:37:42.213Z"
+    completedAt: "2026-04-19T02:37:42.213Z"
+    appliedAt: "2026-04-19T02:37:42.213Z"
+    needsPlacement: true
+  "5e3f140b-acca-46ec-ad3f-ecbd273c0acb":
+    status: "completed"
+    startedAt: "2026-04-19T02:36:59.916Z"
+    completedAt: "2026-04-19T02:37:42.176Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Duplicate hooks/use-polling-suspension.ts was already removed in commit 9a7a3978. Only polling/use-polling-suspension.ts remains as the canonical location. Typecheck passes clean."

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "d3c20225-50a4-4913-b0c6-62ec0c45b3b6":
+    status: "completed"
+    startedAt: "2026-10-08T21:37:55.697Z"
+    completedAt: "2026-10-08T21:40:50.553Z"
+    endedAt: "2026-10-08T21:40:50.553Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added store/prd-model-transaction.ts to v2Files in v2.test.ts and named the store transaction in the comment. Test-only change."
+    appliedAt: "2026-10-08T21:40:50.553Z"
+    lastModified: "2026-10-08T21:40:50.822Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

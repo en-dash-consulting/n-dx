@@ -1,0 +1,22 @@
+schema: "rex/v2"
+items:
+  "012dc4ce-ed01-4ba6-81dc-6782d9c0ae61":
+    status: "completed"
+    startedAt: "2026-06-05T18:36:15.520Z"
+    completedAt: "2026-06-05T18:36:15.520Z"
+    endedAt: "2026-06-05T18:36:15.520Z"
+    appliedAt: "2026-06-05T18:36:15.520Z"
+  "3151022c-f35e-4e0e-acbe-25b701ef2cf9":
+    status: "completed"
+    startedAt: "2026-06-05T18:32:45.645Z"
+    completedAt: "2026-06-05T18:36:14.647Z"
+    endedAt: "2026-06-05T18:36:14.647Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Exported validateGoogleApiKey from config.js; added 7 unit tests to google-config-validation.test.js covering all four boundary cases (valid 39-char, valid 30-char min, too-short, wrong prefix, empty string) plus error message assertions; fixed mislabeled cli-config test."
+  "edd06255-7a7a-457a-8093-de91381a554b":
+    status: "completed"
+    startedAt: "2026-06-05T14:41:58.415Z"
+    completedAt: "2026-06-05T18:32:24.559Z"
+    endedAt: "2026-06-05T18:32:24.559Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed env var inconsistency (GOOGLE_API_KEY → GEMINI_API_KEY), wired googleConfig.apiKeyEnv into runtime factory, fixed error message typo, added 9 regression tests for ndx config llm.google.api_key validation."

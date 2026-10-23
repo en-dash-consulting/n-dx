@@ -1,0 +1,8 @@
+schema: "rex/v2"
+items:
+  "396910f4-1267-4cfb-ac6c-e9f6eef08b0f":
+    status: "completed"
+    startedAt: "2026-08-13T13:01:41.266Z"
+    completedAt: "2026-08-13T13:12:35.024Z"
+    endedAt: "2026-08-13T13:12:35.024Z"
+    appliedAt: "2026-08-13T13:12:35.024Z"

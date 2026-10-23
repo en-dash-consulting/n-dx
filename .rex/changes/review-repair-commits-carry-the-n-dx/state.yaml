@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8df7dc0a-b6ac-4a8a-85a5-e64e9442070b":
+    status: "completed"
+    startedAt: "2026-10-09T03:24:43.711Z"
+    completedAt: "2026-10-09T03:32:11.984Z"
+    endedAt: "2026-10-09T03:32:11.984Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Verified and closed by the operator. Run 31bed159-073b-4584-a101-f0624ca05017 (claude-sonnet-5-5, review claude-opus-5-5) failed only on the stale-dist test gate: the agent edited hench source without rebuilding dist/. Work is in 3ef649fef. After rebuilding hench: review-repairs.test.ts 11/11, affected gate 3/3 suites, six static root policy tests pass; git's parser reads N-DX-Item on the commit in one final block."
+    appliedAt: "2026-10-09T03:32:11.984Z"
+    lastModified: "2026-10-09T03:32:12.260Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

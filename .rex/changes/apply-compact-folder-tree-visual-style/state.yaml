@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "62fb47b8-2f99-4563-9424-5b95a52a49b3":
+    status: "completed"
+    startedAt: "2026-05-08T16:59:48.851Z"
+    completedAt: "2026-05-08T17:25:45.653Z"
+    endedAt: "2026-05-08T17:25:45.653Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Re-skinned MergeGraphView to use a compact, indented folder-tree layout matching the dashboard's PRD tree view. Replaced the per-level wide rhythm (ROW_H_LEVEL=110, COL_W_LEAF=180, balanced sibling spread) with DFS pre-order one-row-per-node compact rhythm (ROW_H=22, INDENT_W=22). Tree edges now render as straight L-shaped indent rails (no Béziers). Labels moved from below shape to inline-right. Node radii reduced (epic 13→7, feature 10→6, task 7→5, subtask 5→4). Added visual regression snapshot test locking exact (x,y) positions for a 5-node fixture: Epic→Feature→Task,Task,Epic at (0,0),(22,22),(44,44),(44,66),(0,88) — vertical span 88px vs prior ~330px. Shape-encoded epic/feature/task typing preserved. All 26 merge-graph tests pass; full monorepo suite green."
+    appliedAt: "2026-05-08T17:25:45.653Z"

@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "8d493315-ede5-4370-bae3-901630c5ec02":
+    status: "completed"
+    startedAt: "2026-04-30T19:34:47.206Z"
+    completedAt: "2026-04-30T19:53:26.442Z"
+    endedAt: "2026-04-30T19:53:26.442Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented plan-only completion detection in the hench agent loop. Added detectPlanOnlyIteration() to classify iterations, integrated re-prompting logic into the API loop with configurable max retries (default 2), and created comprehensive unit and integration tests (29+ test cases covering detection scenarios, config options, and re-prompt behavior)."
+    appliedAt: "2026-04-30T19:53:26.442Z"

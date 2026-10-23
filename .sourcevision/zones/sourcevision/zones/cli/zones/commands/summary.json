@@ -1,6 +1,6 @@
 {
   "id": "sourcevision/cli/commands",
-  "name": "Commands",
+  "name": "Analysis Command Layer",
   "description": "5 files, primarily TypeScript",
   "files": [
     "packages/sourcevision/src/analyzers/analyze-progress.ts",

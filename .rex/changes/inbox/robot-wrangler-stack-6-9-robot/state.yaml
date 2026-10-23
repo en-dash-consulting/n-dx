@@ -1,0 +1,38 @@
+schema: "rex/v2"
+items:
+  "51ea3d22-400e-4c1b-b3c7-2f429e282f9d":
+    status: "completed"
+    startedAt: "2026-10-11T07:17:01.634Z"
+    completedAt: "2026-10-11T07:22:01.679Z"
+    endedAt: "2026-10-11T07:22:01.679Z"
+    resolutionType: "code-change"
+    resolutionDetail: "CSS breakpoints (vendor 4→2 under 768px, review cards stack under 640px), removed .llm-save-hint and .llm-field-source, docs and patch changeset. Commit c08bcc9ca. Browser check not done."
+    lastModified: "2026-10-11T07:22:01.952Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5629434c-af5a-4890-9296-f9d8e9f35f6e":
+    status: "completed"
+    startedAt: "2026-10-11T06:56:40.792Z"
+    completedAt: "2026-10-11T07:07:13.990Z"
+    endedAt: "2026-10-11T07:07:13.990Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Local Server section: profile chips, host/port + Test connection, live models, collapsed advanced rows."
+    lastModified: "2026-10-11T07:07:14.237Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "da0706fe-245e-4cb6-a664-ad1c065ef875":
+    status: "completed"
+    startedAt: "2026-10-11T07:22:02.903Z"
+    completedAt: "2026-10-11T07:22:02.903Z"
+    endedAt: "2026-10-11T07:22:02.903Z"
+    appliedAt: "2026-10-11T07:22:02.903Z"
+    needsPlacement: true
+    lastModified: "2026-10-11T07:22:03.165Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "de68b4c2-33ad-446d-83d8-bc74383ba236":
+    status: "completed"
+    startedAt: "2026-10-11T07:07:26.556Z"
+    completedAt: "2026-10-11T07:16:42.810Z"
+    endedAt: "2026-10-11T07:16:42.810Z"
+    resolutionType: "code-change"
+    resolutionDetail: "SettingsFrame gained changeSummary, a Discard button and a muted disabled Save; Robot Wrangler passes per-edit summaries. Commit 47a19a744."
+    lastModified: "2026-10-11T07:16:43.126Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

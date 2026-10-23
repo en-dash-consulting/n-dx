@@ -1,6 +1,6 @@
 {
   "id": "sourcevision/cli/analyzers",
-  "name": "Analyzers",
+  "name": "Import Graph Analysis",
   "description": "4 files, primarily TypeScript",
   "files": [
     "packages/sourcevision/src/analyzers/imports.ts",

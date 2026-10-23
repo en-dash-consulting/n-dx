@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "d1e0b463-dd22-4ffd-b0e6-b711afd8f4f2":
+    status: "completed"
+    startedAt: "2026-04-29T18:48:34.716Z"
+    completedAt: "2026-04-29T18:54:55.035Z"
+    endedAt: "2026-04-29T18:54:55.035Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented deferred PRD status updates at commit time, staged PRD files alongside code changes, added regression tests"
+    appliedAt: "2026-04-29T18:54:55.035Z"

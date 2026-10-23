@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8686d48a-6fee-42da-af2e-f7b6c2268e50":
+    status: "completed"
+    startedAt: "2026-09-10T19:49:12.439Z"
+    completedAt: "2026-09-10T19:54:50.305Z"
+    endedAt: "2026-09-10T19:54:50.305Z"
+    resolutionType: "code-change"
+    resolutionDetail: "stampChangedItems now fills the halves of a stamp independently on a new item: lastModified is always set (sync needs it), lastModifiedBy only when the item brought none (provenance is the caller's). An item arriving with a timestamp but no author is left alone rather than given a fabricated one. Applies to every withTransaction caller on both store adapters, closing the general case behind a defect previously fixed only for bundle import; the import path's exportedAt default still wins because an existing timestamp is never overridden. Existing test strengthened (it was passing for the wrong reason) plus a mirror case; red in both adapters first, then green. Full suite clean, 6/6."
+    appliedAt: "2026-09-10T19:54:50.305Z"
+    lastModified: "2026-09-10T19:54:50.311Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

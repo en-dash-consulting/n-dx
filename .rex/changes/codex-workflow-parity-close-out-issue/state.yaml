@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8f00a8b7-57dc-4989-bb37-a32cc7db54fc":
+    status: "completed"
+    startedAt: "2026-08-06T22:14:02.459Z"
+    completedAt: "2026-08-06T22:14:02.459Z"
+    endedAt: "2026-08-06T22:14:02.459Z"
+    resolutionType: "code-change"
+    resolutionDetail: "All 6 acceptance criteria shipped in commit 56a63ea6 (PR #309, merged to main); PRD status was never flipped. Verified 2026-08-06: body-drift test exists (tests/e2e/assistant-body-drift.test.js), Changeset Versioning section lives in project-guidance.md and appears in both CLAUDE.md + AGENTS.md, .claude/skills/ removed from .gitignore with 12 skills git-tracked, checkSkillTracking() gitignore hint in assistant-integration.js, docs sweep done with assertions in assistant-parity-smoke.test.js, changeset .changeset/codex-parity-closeout.md present. 234 tests pass across the feature surface."
+    appliedAt: "2026-08-06T22:14:02.459Z"
+    lastModified: "2026-09-04T21:11:55.904Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
