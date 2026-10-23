@@ -217,6 +217,42 @@ describe("TopNav", () => {
     expect(root.querySelector(".project-context .breadcrumb-project")?.textContent).toBe("demo-project");
     expect(root.querySelector(".topnav-guide .guide-btn")).not.toBeNull();
   });
+
+  it("always shows the run-project control, disabled when no command was found", async () => {
+    await mount(nav("home"));
+    const btn = root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!;
+    expect(btn).not.toBeNull();
+    expect(btn.disabled).toBe(true);
+    expect(btn.title).toBe("No run or build command found in this project");
+    expect(btn.textContent).toContain("No run command");
+  });
+
+  it("enables the run-project control once a command is detected", async () => {
+    const fallback = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/run-commands") {
+        return jsonResponse({
+          commands: [{ id: "npm:dev", label: "npm run dev", kind: "run", bin: "npm", args: ["run", "dev"], source: "package.json" }],
+          status: null,
+        });
+      }
+      return fallback(input);
+    }));
+    await mount(nav("home"));
+    const btn = root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!;
+    expect(btn.disabled).toBe(false);
+    expect(btn.textContent).toContain("Found run command");
+    act(() => { btn.click(); });
+    expect(root.querySelector(".runcmd-start")?.textContent).toBe("Run npm run dev");
+  });
+
+  it("keeps the run-project control, disabled, in a static export", async () => {
+    window.__NDX_DEPLOYED__ = { basePath: "/", exportedAt: "" };
+    await mount(nav("home"));
+    const btn = root.querySelector<HTMLButtonElement>(".topnav-run .runcmd-btn")!;
+    expect(btn.disabled).toBe(true);
+    expect(btn.title).toContain("static export");
+  });
 });
 
 // ── Side stage links ───────────────────────────────────────────
@@ -555,6 +591,8 @@ describe("BottomBar", () => {
     act(() => { commands.click(); });
     expect(onToggleCommands).toHaveBeenCalledOnce();
     expect(root.querySelector(".theme-toggle")).not.toBeNull();
+    // The run-project control moved to the top nav.
+    expect(root.querySelector(".runcmd")).toBeNull();
   });
 });
 
