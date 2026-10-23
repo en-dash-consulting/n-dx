@@ -161,6 +161,8 @@ function jsonRows(added: Added[]) {
     id: node.id,
     type: node.type,
     title: node.title,
+    // The text the title was cut from, so a preview can show it is kept.
+    ...descriptionOf(node),
     ...(node.needsPlacement ? { needsPlacement: true } : {}),
     ...(suggestion
       ? {
@@ -175,6 +177,12 @@ function jsonRows(added: Added[]) {
         }
       : {}),
   }));
+}
+
+/** A node's description: a change keeps it as `intent`, a task or subtask as `description`. */
+function descriptionOf(node: RuleNode): { description?: string } {
+  const text = node.type === "change" ? (node as { intent?: string }).intent : (node as { description?: string }).description;
+  return text ? { description: text } : {};
 }
 
 function labelOf(target: Pick<RuleNode, "id" | "displayId" | "title"> | undefined) {

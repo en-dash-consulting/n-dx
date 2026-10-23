@@ -109,7 +109,7 @@ export interface PRDActionsState {
   /** Navigate to an item by ID (from detail panel links). */
   handleNavigateToItem: (id: string) => void;
   /** Add a child item from the detail panel. */
-  handleAddChild: (input: { title: string; parentId: string; type: string; description?: string; priority?: string }) => Promise<void>;
+  handleAddChild: (input: { title: string; parentId: string; type: string; description?: string; acceptanceCriteria?: string[]; priority?: string }) => Promise<void>;
   /** Add an item from the command bar form. */
   handleAddItem: (input: AddItemInput) => Promise<void>;
   /** Add an item from the inline tree form. */
@@ -222,7 +222,7 @@ export function usePRDActions({
   // ── Add child (from detail panel) ────────────────────────────────
 
   const handleAddChild = useCallback(
-    async (input: { title: string; parentId: string; type: string; description?: string; priority?: string }) => {
+    async (input: { title: string; parentId: string; type: string; description?: string; acceptanceCriteria?: string[]; priority?: string }) => {
       const res = await fetch("/api/rex/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

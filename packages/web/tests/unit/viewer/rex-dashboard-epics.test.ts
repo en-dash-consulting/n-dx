@@ -30,10 +30,10 @@ function dashboard(epicCount: number) {
   };
 }
 
-function stub(epicCount: number) {
+function stub(epicCount: number, dash: object = dashboard(epicCount)) {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    const body = url === "/api/rex/dashboard" ? dashboard(epicCount) : {};
+    const body = url === "/api/rex/dashboard" ? dash : {};
     return new Response(JSON.stringify(body), {
       status: url === "/api/rex/dashboard" ? 200 : 404,
       headers: { "Content-Type": "application/json" },
@@ -103,5 +103,39 @@ describe("Epic Progress", () => {
     await mount();
     expect(toggle()).toBeNull();
     expect(root.textContent).toContain("No epics defined yet.");
+  });
+
+  it("labels a v1 PRD's rows epics and counts each by its tasks", async () => {
+    stub(1);
+    await mount();
+    expect(root.querySelector(".rex-dash-epics h3")?.textContent).toBe("Epic Progress");
+    expect(root.querySelector(".rex-dash-epics .rex-dash-section-meta")?.textContent).toBe("1 epic");
+    expect(list()?.getAttribute("aria-label")).toBe("Epic progress");
+    expect(root.querySelector(".rex-dash-epic-count")?.textContent).toBe("1/4");
+  });
+});
+
+describe("Change Progress (v2)", () => {
+  const ONE = { total: 1, completed: 0, inProgress: 0, pending: 1, deferred: 0, blocked: 0 };
+  const v2 = (epics: object[]) => ({ ...dashboard(0), layout: "v2", epics });
+
+  it("labels the rows changes and shows a task-less change's status instead of a count", async () => {
+    stub(0, v2([
+      { id: "bare", title: "Bare", status: "pending", type: "change", selfCounted: true, stats: ONE, percentComplete: 0 },
+      { id: "tasks", title: "With tasks", status: "in_progress", type: "change", stats: STATS, percentComplete: 25 },
+    ]));
+    await mount();
+    expect(root.querySelector(".rex-dash-epics h3")?.textContent).toBe("Change Progress");
+    expect(root.querySelector(".rex-dash-epics .rex-dash-section-meta")?.textContent).toBe("2 changes");
+    expect(list()?.getAttribute("aria-label")).toBe("Change progress");
+    const counts = [...root.querySelectorAll(".rex-dash-epic-count")].map((el) => el.textContent);
+    expect(counts).toEqual(expect.arrayContaining(["pending", "1/4"]));
+    expect(counts).not.toContain("0/1");
+  });
+
+  it("says no changes when there are none", async () => {
+    stub(0, v2([]));
+    await mount();
+    expect(root.textContent).toContain("No changes defined yet.");
   });
 });

@@ -1,0 +1,53 @@
+schema: "rex/v2"
+items:
+  "1a63946a-eb94-46ec-ba08-3aee7bb7a869":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-23T03:03:07.731Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4e91343d-e1bc-449a-8a85-40d4d7fae389":
+    status: "completed"
+    startedAt: "2026-10-23T02:56:29.775Z"
+    completedAt: "2026-10-23T03:19:24.746Z"
+    endedAt: "2026-10-23T03:19:24.746Z"
+    activeIntervals: [{"end":"2026-10-23T03:09:47.373Z","start":"2026-10-23T02:56:29.775Z"},{"end":"2026-10-23T03:19:24.746Z","start":"2026-10-23T03:19:24.746Z"}]
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-23T03:19:24.746Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7b90b62a-a4cf-4a6b-b9ec-789e4dcc642f":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-22T17:14:35.293Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8f19e94a-452a-42f9-b912-f6eb96c5ace1":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-23T03:19:38.433Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b5a89672-4d03-4f4e-9a79-f529ba7ffe0a":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-23T03:19:40.739Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cf1f496d-ae11-47f0-bba9-9393ab776c06":
+    status: "completed"
+    startedAt: "2026-10-23T02:41:14.081Z"
+    completedAt: "2026-10-23T02:52:07.507Z"
+    endedAt: "2026-10-23T02:52:07.507Z"
+    activeIntervals: [{"end":"2026-10-23T02:52:07.507Z","start":"2026-10-23T02:41:14.081Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex computeStats/computeEpicStats count a task-less v2 change as itself (isTasklessChange); dashboard response carries layout; viewer labels changes on v2 and shows a task-less change's status."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-23T02:52:07.507Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fdeb0c2c-d796-403f-b43d-63885c61a085":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-22T17:14:34.374Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fe4ea50b-08ee-4636-ace3-1d60aeb0d4f4":
+    status: "completed"
+    startedAt: "2026-10-23T03:22:41.649Z"
+    completedAt: "2026-10-23T03:33:20.017Z"
+    endedAt: "2026-10-23T03:33:20.017Z"
+    activeIntervals: [{"end":"2026-10-23T03:33:20.017Z","start":"2026-10-23T03:22:41.649Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "On v2 the add panel is \"Add to Inbox\" (tab and panel): no Smart Add or proposal wording, Preview button, says the text becomes one Inbox change and names the next step; preview shows each change's cut title and its full text. rex add --format=json rows now carry description. v1 copy unchanged."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-23T03:33:20.017Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
