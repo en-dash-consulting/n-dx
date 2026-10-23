@@ -2,15 +2,28 @@ schema: "rex/v2"
 items:
   "1a63946a-eb94-46ec-ba08-3aee7bb7a869":
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-23T02:38:52.467Z"
+    lastModified: "2026-10-23T03:03:07.731Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4e91343d-e1bc-449a-8a85-40d4d7fae389":
+    status: "completed"
+    startedAt: "2026-10-23T02:56:29.775Z"
+    completedAt: "2026-10-23T03:19:24.746Z"
+    endedAt: "2026-10-23T03:19:24.746Z"
+    activeIntervals: [{"end":"2026-10-23T03:09:47.373Z","start":"2026-10-23T02:56:29.775Z"},{"end":"2026-10-23T03:19:24.746Z","start":"2026-10-23T03:19:24.746Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-22T17:14:32.504Z"
+    lastModified: "2026-10-23T03:19:24.746Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7b90b62a-a4cf-4a6b-b9ec-789e4dcc642f":
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-22T17:14:35.293Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8f19e94a-452a-42f9-b912-f6eb96c5ace1":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-23T03:19:38.433Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b5a89672-4d03-4f4e-9a79-f529ba7ffe0a":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-23T03:19:40.739Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cf1f496d-ae11-47f0-bba9-9393ab776c06":
     status: "completed"
