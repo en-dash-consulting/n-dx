@@ -13,8 +13,15 @@ items:
     lastModified: "2026-10-22T17:14:35.293Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cf1f496d-ae11-47f0-bba9-9393ab776c06":
+    status: "completed"
+    startedAt: "2026-10-23T02:41:14.081Z"
+    completedAt: "2026-10-23T02:52:07.507Z"
+    endedAt: "2026-10-23T02:52:07.507Z"
+    activeIntervals: [{"end":"2026-10-23T02:52:07.507Z","start":"2026-10-23T02:41:14.081Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex computeStats/computeEpicStats count a task-less v2 change as itself (isTasklessChange); dashboard response carries layout; viewer labels changes on v2 and shows a task-less change's status."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-22T17:14:33.448Z"
+    lastModified: "2026-10-23T02:52:07.507Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fdeb0c2c-d796-403f-b43d-63885c61a085":
     assignee: "Ryan Keith <ryan.k@endash.us>"

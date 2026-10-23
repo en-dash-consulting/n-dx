@@ -10,7 +10,8 @@
 
 import type { PRDItem, ItemStatus, Priority, Requirement } from "../schema/index.js";
 import { isRootLevel, isWorkItem } from "../schema/index.js";
-import { computeStats, type TreeStats } from "./stats.js";
+import { computeStats, isTasklessChange, type TreeStats } from "./stats.js";
+import { changeLayerType } from "./layer-projection.js";
 
 // ── Epic stats ──────────────────────────────────────────────────────
 
@@ -21,14 +22,22 @@ export interface EpicStats {
   priority?: Priority;
   stats: TreeStats;
   percentComplete: number;
+  /** Set on a projected v2 change; absent on a v1 epic. */
+  type?: "change";
+  /** Set when `stats` count the change itself because it has no live tasks. */
+  selfCounted?: true;
 }
 
-/** Compute per-epic stats. Each epic's descendants (tasks/subtasks) are counted. */
+/**
+ * Compute per-epic stats. Each epic's descendants (tasks/subtasks) are
+ * counted; a v2 change with no live tasks counts as itself.
+ */
 export function computeEpicStats(items: PRDItem[]): EpicStats[] {
   return items
     .filter((item) => isRootLevel(item.level))
     .map((epic) => {
-      const stats = computeStats(epic.children ?? []);
+      const selfCounted = isTasklessChange(epic);
+      const stats = computeStats(selfCounted ? [epic] : epic.children ?? []);
       return {
         id: epic.id,
         title: epic.title,
@@ -38,6 +47,8 @@ export function computeEpicStats(items: PRDItem[]): EpicStats[] {
         percentComplete: stats.total > 0
           ? Math.round((stats.completed / stats.total) * 100)
           : 0,
+        ...(changeLayerType(epic) === "change" ? { type: "change" as const } : {}),
+        ...(selfCounted ? { selfCounted: true as const } : {}),
       };
     });
 }
