@@ -4515,6 +4515,12 @@
   line-height: var(--leading-relaxed);
 }
 
+/* A v2 change's full text: keep its paragraphs and line breaks as typed. */
+.smart-add-preview-full-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Feature */
 .smart-add-preview-feature {
   margin-top: var(--space-2);

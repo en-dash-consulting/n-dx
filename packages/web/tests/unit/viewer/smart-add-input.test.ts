@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { SmartAddInput } from "../../../src/viewer/components/prd-tree/smart-add-input.js";
 
 function renderToDiv(vnode: ReturnType<typeof h>) {
@@ -785,6 +787,12 @@ describe("SmartAddInput on a v2 PRD", () => {
     expect(root.querySelector(".smart-add-preview-title")!.textContent).toBe(title);
     expect(root.querySelector(".smart-add-preview-full-text")!.textContent).toBe(full);
     expect(root.querySelector(".smart-add-next-step")!.textContent).toMatch(/^Next: place it on the capability/);
+  });
+
+  it("keeps the full text's line breaks in the preview", () => {
+    const css = readFileSync(join(import.meta.dirname, "../../../src/viewer/styles/prd-tree.css"), "utf8");
+    const rule = css.match(/\.smart-add-preview-full-text\s*\{([^}]*)\}/);
+    expect(rule?.[1]).toMatch(/white-space:\s*pre-wrap/);
   });
 
   it("keeps the v1 Smart Add wording when the layout is v1", () => {

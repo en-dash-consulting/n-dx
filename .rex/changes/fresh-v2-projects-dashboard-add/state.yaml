@@ -41,6 +41,13 @@ items:
     lastModified: "2026-10-22T17:14:34.374Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fe4ea50b-08ee-4636-ace3-1d60aeb0d4f4":
+    status: "completed"
+    startedAt: "2026-10-23T03:22:41.649Z"
+    completedAt: "2026-10-23T03:33:20.017Z"
+    endedAt: "2026-10-23T03:33:20.017Z"
+    activeIntervals: [{"end":"2026-10-23T03:33:20.017Z","start":"2026-10-23T03:22:41.649Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "On v2 the add panel is \"Add to Inbox\" (tab and panel): no Smart Add or proposal wording, Preview button, says the text becomes one Inbox change and names the next step; preview shows each change's cut title and its full text. rex add --format=json rows now carry description. v1 copy unchanged."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-22T17:14:31.519Z"
+    lastModified: "2026-10-23T03:33:20.017Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
