@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "SDLC walk skips the shared fixture directory list"
     appliedAt: "2026-10-21T13:43:47.435Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-21T13:43:48.116Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

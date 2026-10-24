@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "SQL and HCL grammars, queries, readers and tests moved into @n-dx/lang-sql and @n-dx/lang-terraform; sourcevision ships no grammar; corpus reports unchanged."
     appliedAt: "2026-10-13T18:10:38.370Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T18:10:38.657Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

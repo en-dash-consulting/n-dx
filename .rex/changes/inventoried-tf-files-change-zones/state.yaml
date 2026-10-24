@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "classifyRole: Terraform gets role test when a non-Terraform test pattern matches, else config. Commit 0be5294ed."
     appliedAt: "2026-10-11T05:24:11.457Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T05:24:12.984Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Shared isTerraformFile in terraform.ts used by detect.ts and inventory.ts; agreement test added."
     appliedAt: "2026-10-11T06:06:46.409Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T06:06:46.686Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

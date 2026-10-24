@@ -6,6 +6,7 @@ items:
     completedAt: "2026-10-21T17:04:23.624Z"
     endedAt: "2026-10-21T17:04:23.624Z"
     appliedAt: "2026-10-21T17:04:23.624Z"
+    shippedIn: "0.10.0"
     assignee: "Sterling H <sterling.h@endash.us>"
     lastModified: "2026-10-21T17:04:24.305Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

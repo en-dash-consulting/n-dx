@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Comment reworded by the operator in e53086e05 to defer to the file header's import list; iso-map bundle unchanged (build-iso-skill --check up to date); infrastructure tests 48 pass, policy suites 319 pass."
     appliedAt: "2026-10-13T16:20:56.418Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T16:20:56.712Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

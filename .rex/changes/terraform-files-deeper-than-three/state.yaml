@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option 1: detection walks through the inventory's shared walk (util/project-walk.ts) with the same skip set, no depth cap, early exit. Commit 17db381b3."
     appliedAt: "2026-10-11T06:29:27.526Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T06:29:27.802Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

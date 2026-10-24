@@ -44,6 +44,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "PR 17 draft #822: Terraform/TypeScript fallback (must-fix), Java build-output skips at module roots, inventory cache fingerprint, Java analysedLanguages, Ryan's missing-pack rule incl. previous-version installs; all verified byte-identical where expected against the restacked stack top."
     appliedAt: "2026-10-17T06:39:40.141Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T06:54:36.629Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4f696905-1c08-4ec6-bce1-ec7ae351701a":

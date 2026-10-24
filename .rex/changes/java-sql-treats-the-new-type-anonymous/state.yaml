@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option 1: capture renamed to anonymous.body in declarations.scm and pack-facts.ts by the operator. Embedded SQL, database report and analysis output byte-identical to PR 10; only the Java report's declarations capture count rises. lang-kit 93, policy 319, sourcevision 3054 passed, affected gate 6/6."
     appliedAt: "2026-10-13T16:13:50.489Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T16:13:50.999Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Added packages/sourcevision/tests/e2e/cli-pack.test.ts spawning the built CLI with isolated NDX_HOME."
     appliedAt: "2026-10-15T05:43:20.307Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-15T05:43:22.041Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
