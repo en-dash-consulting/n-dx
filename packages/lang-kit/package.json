@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/lang-kit",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "publishConfig": {
     "access": "public"
   },

@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "sqlcPaths block-list loop skips blank and #-comment lines instead of breaking; unit test covers both forms (b288db78a)"
     appliedAt: "2026-10-11T04:36:41.120Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T04:36:41.395Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

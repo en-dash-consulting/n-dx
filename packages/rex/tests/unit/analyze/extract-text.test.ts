@@ -9,6 +9,7 @@ import {
   extractPriorityTag,
 } from "../../../src/analyze/extract.js";
 import type { Proposal } from "../../../src/analyze/propose.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../../lang-kit/tests/helpers/call-within-budget.js";
 
 // ── Helpers ──
 
@@ -118,6 +119,29 @@ describe("extractRequirementSentences", () => {
     const text = "Support formats e.g. JSON and YAML. The system must handle errors.";
     const result = extractRequirementSentences(text);
     expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("trims the whole trailing run of periods and semicolons, keeping inner ones", () => {
+    expect(extractRequirementSentences("The system must read v1.2 of the spec...;;.")).toEqual([
+      "The system must read v1.2 of the spec",
+    ]);
+    expect(extractRequirementSentences("The system must read v1.2 of the spec;")).toEqual([
+      "The system must read v1.2 of the spec",
+    ]);
+  });
+});
+
+describe("extractRequirementSentences: on adversarial repository input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+  const EXTRACT = new URL("../../../src/analyze/extract.ts", import.meta.url);
+
+  it("is linear on a sentence with 300k periods that do not end it", async () => {
+    // The README of an analysed repository is unbounded input. `/[.;]+$/`
+    // backtracked from every period in the run, about 67 s at this size, well over the 5 s budget; the
+    // sentence is then far over the title cap, so the result is empty.
+    const text = `The system must handle it${".".repeat(300_000)}x`;
+    await expect(
+      callWithinBudget<typeof extractRequirementSentences>(EXTRACT, "extractRequirementSentences", text),
+    ).resolves.toEqual([]);
   });
 });
 

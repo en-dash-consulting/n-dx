@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "java-sql.ts reads explicit imports: Spring Data JDBC/R2DBC Query is native; relational Table reads value/unnamed."
     appliedAt: "2026-10-11T01:52:12.889Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T01:52:13.243Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,38 +1,13 @@
 /**
  * Windows-safe synchronous CLI helper for sourcevision.
  *
- * Sourcevision depends on @n-dx/llm-client (see package.json), so we can use
- * `buildWindowsCliCommandLine` from there instead of duplicating the quoting
- * logic. On Windows, routes through cmd.exe with windowsVerbatimArguments to
- * avoid EINVAL on .cmd shims (GH #37) and the DEP0190 deprecation (GH #69).
+ * A re-export of llm-client's `execFileSyncCli`, so the one cmd.exe recipe —
+ * verbatim quoting, the `%VAR%` and line-break refusal, `/v:off`, no console
+ * window — lives in one place. This file once carried its own copy of the
+ * recipe without the refusal; the import is what keeps the two from drifting
+ * again. Sourcevision depends on @n-dx/llm-client (see package.json).
  *
- * Used by branch-work-collector and prd-epic-resolver to spawn `rex` safely.
+ * Used by branch-work-collector and analyze-progress to spawn `rex` and `ps`.
  */
 
-import { execFileSync } from "node:child_process";
-import { buildWindowsCliCommandLine } from "@n-dx/llm-client";
-
-/**
- * Windows-safe synchronous CLI invocation.
- *
- * @param binary    Binary name or absolute path.
- * @param args      Argument list.
- * @param options   execFileSync options (input, encoding, stdio, timeout, …).
- */
-export function execFileSyncCli(
-  binary: string,
-  args: string[],
-  options: Parameters<typeof execFileSync>[2],
-): ReturnType<typeof execFileSync> {
-  // windowsHide: a console-less parent (the dashboard's hidden children, a
-  // detached narrate) would otherwise give every cmd.exe its own window.
-  if (process.platform === "win32") {
-    const cmdLine = buildWindowsCliCommandLine(binary, args);
-    return execFileSync("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
-      ...options,
-      windowsVerbatimArguments: true,
-      windowsHide: true,
-    } as Parameters<typeof execFileSync>[2]);
-  }
-  return execFileSync(binary, args, { ...options, windowsHide: true } as Parameters<typeof execFileSync>[2]);
-}
+export { execFileSyncCli } from "@n-dx/llm-client";

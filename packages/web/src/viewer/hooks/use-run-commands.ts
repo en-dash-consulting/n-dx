@@ -34,6 +34,8 @@ export interface RunCommandStatus {
 export interface RunCommandsState {
   commands: DetectedCommand[];
   status: RunCommandStatus | null;
+  /** True once the first read of the command list has settled, found or not. */
+  loaded: boolean;
   /** Rejection text from the last start/stop attempt, if any. */
   error: string | null;
   start: (id: string) => Promise<void>;
@@ -47,6 +49,7 @@ export function useRunCommands(enabled = true): RunCommandsState {
   const [commands, setCommands] = useState<DetectedCommand[]>([]);
   const [status, setStatus] = useState<RunCommandStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -72,15 +75,17 @@ export function useRunCommands(enabled = true): RunCommandsState {
     void (async () => {
       try {
         const res = await fetch("/api/run-commands");
-        if (!res.ok) return;
-        const body = (await res.json()) as { commands: DetectedCommand[]; status: RunCommandStatus };
-        if (!mounted.current) return;
-        setCommands(body.commands ?? []);
-        setStatus(body.status ?? null);
+        if (res.ok) {
+          const body = (await res.json()) as { commands: DetectedCommand[]; status: RunCommandStatus };
+          if (!mounted.current) return;
+          setCommands(body.commands ?? []);
+          setStatus(body.status ?? null);
+        }
       } catch {
         // A project with no detectable commands and an unreachable endpoint
-        // look the same from here: the control simply does not appear.
+        // look the same from here: the control stays disabled.
       }
+      if (mounted.current) setLoaded(true);
     })();
   }, [enabled]);
 
@@ -119,5 +124,5 @@ export function useRunCommands(enabled = true): RunCommandsState {
     }
   }, [refreshStatus]);
 
-  return { commands, status, error, start, stop };
+  return { commands, status, loaded, error, start, stop };
 }

@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Runtime, loader, facts adapter, build script and test helpers moved into @n-dx/lang-runtime; sourcevision imports them; corpus numbers match PR 11."
     appliedAt: "2026-10-13T17:15:06.443Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T17:15:07.358Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

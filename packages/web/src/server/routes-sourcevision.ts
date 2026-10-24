@@ -20,7 +20,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
 import { deriveNextSteps, setArchetypeOverride } from "./domain-gateway.js";
 import type { NextStep } from "./domain-gateway.js";
@@ -393,7 +393,7 @@ async function handleArchetypeOverride(
   try {
     setArchetypeOverride(ctx.projectDir, path, archetype);
   } catch (err) {
-    errorResponse(res, 500, `Failed to persist override: ${err instanceof Error ? err.message : String(err)}`);
+    errorResponse(res, 500, `Failed to persist override: ${errorMessage(err)}`);
     return;
   }
 
@@ -446,7 +446,7 @@ export function handleSourcevisionRoute(
       steps = steps.slice(0, limit);
       jsonResponse(res, 200, { steps, total: steps.length });
     } catch (err) {
-      errorResponse(res, 500, `Failed to derive next steps: ${err instanceof Error ? err.message : String(err)}`);
+      errorResponse(res, 500, `Failed to derive next steps: ${errorMessage(err)}`);
     }
     return true;
   }

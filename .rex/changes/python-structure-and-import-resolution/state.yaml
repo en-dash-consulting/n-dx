@@ -26,6 +26,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "PR 15 (#793) and PR 15b (#794): @n-dx/lang-python pack, lang-kit Python build readers, resolver with Python edges in analyze, analysedLanguages, skip-dir packages. Verified byte-identical without the pack against a PR 14 build; resolution 99.8-100% internal on the corpus. Remaining low follow-up 5ab436bd moved to the review follow-ups feature."
     appliedAt: "2026-10-16T00:02:26.954Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-16T00:02:27.256Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "84d7246f-f310-4641-9d41-7d3498834cdc":

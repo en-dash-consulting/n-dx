@@ -17,6 +17,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "PR 16 draft #796: fastapi/flask/django route framework packs and the python-clients outbound pack, verified byte-identical without the pack and added-only with it against PR 15b; remaining follow-ups (DRF imported routers, Django list capture cost, shadowed receiver confidence) stay pending under this feature."
     appliedAt: "2026-10-16T01:45:31.601Z"
+    shippedIn: "0.10.0"
     needsPlacement: true
     lastModified: "2026-10-16T01:45:54.500Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

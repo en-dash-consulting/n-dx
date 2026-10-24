@@ -37,6 +37,9 @@ export { prdLayout } from "@n-dx/rex";
 // Item writes on a v2 tree: the guard narrows resolveStore's answer to the
 // change-layer store, and completion is rex's own v2 completion (apply-on-complete).
 export { isChangeLayerStore, completeV2Work } from "@n-dx/rex";
+// A task added under a change from the detail panel: rex's own add rule (the
+// one MCP add_item runs), so a closed change, a split and the slug stay rex's.
+export { addChangeNode } from "@n-dx/rex";
 export type { PRDStore } from "@n-dx/rex";
 // The Product, Changes and capability views on a v2 tree: rex's model and its
 // derived product status, never recomputed in web (routes-rex/product.ts).

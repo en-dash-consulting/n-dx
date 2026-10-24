@@ -487,11 +487,16 @@ async function wouldBeReset(
  * quotes as quoting). A backslash is a path separator on win32, an escape in
  * POSIX. `~` is plain on win32 (8.3 short paths such as `RUNNER~1`) but is
  * tilde expansion in POSIX, so it stays quoted there.
+ *
+ * Inside win32 double quotes a backslash is literal except when it precedes a
+ * `"` or the closing quote (the MSVC argv rules every Node program decodes
+ * with), so those runs are doubled: `C:\My Repo\` prints as `"C:\My Repo\\"`,
+ * not `"C:\My Repo\"`, whose `\"` would be read as an escaped quote.
  */
 export function shellWord(word: string, platform: NodeJS.Platform = process.platform): string {
   const win = platform === "win32";
   if (win ? /^[\w@%+=:,./\\~-]+$/.test(word) : /^[\w@%+=:,./-]+$/.test(word)) return word;
-  if (win) return `"${word.replace(/"/g, '\\"')}"`;
+  if (win) return `"${word.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
   return `'${word.replace(/'/g, `'\\''`)}'`;
 }
 

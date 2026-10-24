@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Run e70597e0 committed 991aacac5; its gate failure (web/graview vitest resolving lang-kit dist) fixed by the operator in 3c443c3d9. Corpus reports and analysis output identical to PR 10; affected gate 5/5."
     appliedAt: "2026-10-13T04:01:16.139Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T04:01:17.169Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

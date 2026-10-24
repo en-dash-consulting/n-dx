@@ -151,7 +151,7 @@ describe("execShellCmd", () => {
     });
 
     expect(spawned.calls[0]!.cmd).toBe("cmd.exe");
-    expect(spawned.calls[0]!.args).toEqual(["/d", "/s", "/c", '"pnpm test"']);
+    expect(spawned.calls[0]!.args).toEqual(["/d", "/v:off", "/s", "/c", '"pnpm test"']);
     expect(spawned.calls[0]!.opts.windowsVerbatimArguments).toBe(true);
   });
 

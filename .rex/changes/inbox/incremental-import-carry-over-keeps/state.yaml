@@ -8,6 +8,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Carry-over accepts targets that are inventoried files or their parent directories; regression test in tests/integration/imports-go-incremental-carryover.test.ts"
     appliedAt: "2026-10-17T18:52:12.014Z"
+    shippedIn: "0.10.0"
     needsPlacement: true
     lastModified: "2026-10-17T18:52:13.148Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

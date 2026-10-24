@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "IaC walk skips test and fixture directories; regression test added"
     appliedAt: "2026-10-21T04:21:27.931Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-21T04:21:28.596Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

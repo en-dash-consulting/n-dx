@@ -7,14 +7,14 @@ import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import {
   findItemById, updateInTree,
   appendLog, API_SETTABLE_STATUSES,
 } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
-import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion } from "../rex-gateway.js";
+import { resolveStore, isChangeLayerStore, completeV2Work, cascadeParentCompletion, addChangeNode } from "../rex-gateway.js";
 import { getIndexMarkdown } from "./index-markdown.js";
 
 import {
@@ -185,7 +185,7 @@ async function cascadeV1Completion(
     // The status write has already committed. Failing the request here would
     // tell the dashboard the close did not happen when it did (a writer holding
     // the PRD lock past its timeout is enough), so report what was not closed.
-    return { completed, error: err instanceof Error ? err.message : String(err) };
+    return { completed, error: errorMessage(err) };
   }
   return { completed };
 }
@@ -217,7 +217,7 @@ async function handleItemPatch(
   try {
     updates = JSON.parse(await readBody(req, res)) as Record<string, unknown>;
   } catch (err) {
-    errorResponse(res, 400, `Invalid JSON body: ${String(err)}`);
+    errorResponse(res, 400, `Invalid JSON body: ${errorMessage(err)}`);
     return true;
   }
   const problem = validateItemPatch(updates);
@@ -252,7 +252,7 @@ async function handleItemPatch(
         if (!completing) throw err;
         // The completion is already on disk: publish it, and say the fields were not saved.
         await publishItemUpdate(ctx, store, itemId, { status: "completed" }, broadcast);
-        const message = err instanceof Error ? err.message : String(err);
+        const message = errorMessage(err);
         throw new Error(`Completed "${itemId}", but its other fields were not saved: ${message}`);
       }
     }
@@ -272,7 +272,7 @@ async function handleItemPatch(
       ...(cascade.error ? { autoCompleteError: cascade.error } : {}),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     if (err instanceof ItemNotFoundError) {
       errorResponse(res, 404, message);
     } else if (message.startsWith("No live ")) {
@@ -309,7 +309,7 @@ async function handleItemDelete(
   try {
     await store.removeItem(itemId);
   } catch (err) {
-    errorResponse(res, 404, `Item "${itemId}" could not be removed: ${String(err)}`);
+    errorResponse(res, 404, `Item "${itemId}" could not be removed: ${errorMessage(err)}`);
     return true;
   }
 
@@ -387,25 +387,19 @@ async function handleItemAdd(
     // on reload.
     const store = await resolveStore(ctx.rexDir);
 
-    // v2: the item is a change in the Inbox, placed later. Levels are a v1
-    // notion and are ignored. Only a change can be added here: any other
-    // `type` is refused, and so is a parent.
+    // v2: with no parent the item is a change in the Inbox, placed later; with
+    // one it is the parent's child (a task under a change, a subtask under a
+    // task). Levels are a v1 notion and are ignored.
     if (isChangeLayerStore(store)) {
+      if (input.parentId) {
+        return await addV2Child(res, ctx, store, { ...input, parentId: input.parentId, title: input.title.trim() }, broadcast);
+      }
       if (input.type !== undefined && input.type !== "change") {
         errorResponse(
           res,
           400,
           `Quick Add on a v2 project creates a change, not a ${String(input.type)}. ` +
-            'Omit type (or send "change") for an Inbox change, or use `rex add --type=<type> --parent=<id>` (or MCP add_item).',
-        );
-        return true;
-      }
-      if (input.parentId) {
-        errorResponse(
-          res,
-          400,
-          "Quick Add does not add a task under a change. " +
-            "Use Add with no parent for an Inbox change, or `rex add --type=task --parent=<id>` (or MCP add_item).",
+            'Omit type (or send "change") for an Inbox change, or add it from its parent\'s detail panel (or `rex add --type=<type> --parent=<id>`).',
         );
         return true;
       }
@@ -507,7 +501,7 @@ async function handleItemAdd(
     // `level` rides along for a client still reading the v1 spelling.
     jsonResponse(res, 201, { ok: true, id, type, level, title: item.title });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -541,6 +535,94 @@ async function addInboxChange(
   });
   if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
   jsonResponse(res, 201, { ok: true, id, type: "change", title: input.title, needsPlacement: true });
+  return true;
+}
+
+/** The child a v2 parent takes: a change takes tasks, a task subtasks. */
+const V2_CHILD_TYPE: Readonly<Record<string, "task" | "subtask">> = { change: "task", task: "subtask" };
+
+/** Rex's own refusals of an add, matched by name so no error class crosses the gateway. */
+const V2_ADD_REFUSALS: ReadonlySet<string> = new Set(["AddChangeNodeError", "ClosedChangeError", "ChangeLayerWriteError"]);
+
+/**
+ * Add a task under a change (or a subtask under a task) on a v2 tree, through
+ * rex's own add rule inside the change-layer store's transaction: a closed
+ * change is refused, a first task splits an in-progress change, and the slug
+ * is rex's.
+ */
+async function addV2Child(
+  res: ServerResponse,
+  ctx: ServerContext,
+  store: Parameters<typeof completeV2Work>[0],
+  input: {
+    title: string;
+    parentId: string;
+    type?: string;
+    description?: string;
+    priority?: string;
+    tags?: string[];
+    acceptanceCriteria?: string[];
+  },
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const parent = await store.getItem(input.parentId);
+  if (!parent) {
+    errorResponse(res, 404, `Parent "${input.parentId}" not found`);
+    return true;
+  }
+  const parentType = itemTypeOf(parent);
+  const type = V2_CHILD_TYPE[parentType];
+  if (!type) {
+    errorResponse(res, 400, `A ${parentType} takes no children on a v2 project`);
+    return true;
+  }
+  if (input.type !== undefined && input.type !== type) {
+    errorResponse(res, 400, `A ${parentType} takes a ${type}, not a ${String(input.type)}`);
+    return true;
+  }
+
+  let node: { id: string; title: string };
+  try {
+    ({ result: node } = await store.withModelTransaction((model) => {
+      const added = addChangeNode(
+        model.tree,
+        {
+          type,
+          title: input.title,
+          parentId: parent.id,
+          description: input.description || undefined,
+          acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
+          tags: Array.isArray(input.tags) ? input.tags : undefined,
+          // A subtask carries no priority.
+          priority: type === "task" && input.priority && isPriority(input.priority) ? input.priority : undefined,
+        },
+        { now: new Date() },
+      );
+      return { tree: added.tree, result: added.node };
+    }));
+  } catch (err) {
+    // As PATCH: a held lock is 409 and names the holder's PID; rex's refusal (a
+    // closed change, a broken v2 rule) is 400 with its reason; anything else is 500.
+    const message = errorMessage(err);
+    if (message.includes("Could not acquire PRD lock")) {
+      errorResponse(res, 409, message);
+    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
+      errorResponse(res, 400, message);
+    } else {
+      errorResponse(res, 500, message);
+    }
+    return true;
+  }
+
+  refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  appendLog(ctx, {
+    timestamp: new Date().toISOString(),
+    event: "item_added",
+    itemId: node.id,
+    detail: `Added ${type}: ${node.title} (via web)`,
+  });
+  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  jsonResponse(res, 201, { ok: true, id: node.id, type, title: node.title, parentId: parent.id });
   return true;
 }
 
@@ -611,7 +693,7 @@ async function handleBulkUpdate(
               result.reason = completion.reason;
             }
           } catch (err) {
-            result.error = err instanceof Error ? err.message : String(err);
+            result.error = errorMessage(err);
             refused.push(result);
           }
         }
@@ -639,7 +721,7 @@ async function handleBulkUpdate(
         } catch (err) {
           // The completions are on disk; report them and fall through to the
           // cache refresh and broadcast below.
-          const message = err instanceof Error ? err.message : String(err);
+          const message = errorMessage(err);
           for (const result of results) {
             if (!result.ok) continue;
             result.ok = false;
@@ -682,7 +764,7 @@ async function handleBulkUpdate(
 
     jsonResponse(res, 200, { ok: true, results, ...(autoCompleteError ? { autoCompleteError } : {}) });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -779,7 +861,7 @@ async function handleItemMerge(
 
     jsonResponse(res, 200, { ok: true, ...result });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }

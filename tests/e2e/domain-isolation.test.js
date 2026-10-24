@@ -770,9 +770,14 @@ describe("architecture policy: gateway enforcement", () => {
       ...walk(join(ROOT, "packages/graview/src")),
     ];
 
+    // Twin of ci.js's escapeRegExp: the names are layout constants, but escape
+    // every metacharacter rather than only the first dot so a renamed layout
+    // dir cannot silently become a regex operator here while ci.js still sees it.
+    const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
     for (const dataDir of DATA_DIRS) {
       it(`no source file imports from ${dataDir}/`, () => {
-        const escaped = dataDir.replace(".", "\\.");
+        const escaped = escapeRegExp(dataDir);
         const pattern = new RegExp(
           `(?:from\\s+["'][^"']*\\/${escaped}\\/|from\\s+["']${escaped}\\/|require\\(["'][^"']*\\/${escaped}\\/|require\\(["']${escaped}\\/)`,
         );

@@ -86,17 +86,30 @@ export function isAuthenticated(headers: AuthHeaders, expected: string): boolean
 /**
  * Pull `?ndx_token=` out of a request URL. `location` is the same URL with
  * the parameter removed, for the redirect that follows setting the cookie.
+ *
+ * The location is always a same-origin absolute path. Node hands the
+ * request-target to `req.url` unparsed, so `GET //evil.com/?ndx_token=T`,
+ * the absolute form `GET http://evil.com/x?ndx_token=T` and `/\evil.com/`
+ * all arrive verbatim, and echoing them into `Location` would send the
+ * browser off-origin (a scheme-relative URL, an absolute one, or `/\` which
+ * browsers read as `//`). Only a path starting with a single `/` is kept;
+ * anything else redirects to the dashboard root.
  */
 export function splitTokenQuery(url: string): { token: string | null; location: string } {
   const q = url.indexOf("?");
   if (q === -1) return { token: null, location: url };
-  const path = url.slice(0, q);
+  const path = sameOriginPath(url.slice(0, q));
   const params = new URLSearchParams(url.slice(q + 1));
   const token = params.get(AUTH_QUERY_PARAM);
   if (token === null) return { token: null, location: url };
   params.delete(AUTH_QUERY_PARAM);
   const rest = params.toString();
   return { token, location: rest ? `${path}?${rest}` : path };
+}
+
+/** `path` when it is one leading `/` not followed by `/` or `\`; otherwise `/`. */
+function sameOriginPath(path: string): string {
+  return /^\/(?![/\\])/.test(path) ? path : "/";
 }
 
 /**

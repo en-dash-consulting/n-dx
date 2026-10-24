@@ -21,7 +21,10 @@
  *
  * Errors are classified into categories (auth, timeout, rate-limit, unknown)
  * matching the shared {@link ErrorReason} enum. Rate-limit (429) and quota
- * exhaustion (RESOURCE_EXHAUSTED) errors map to `"rate-limit"`.
+ * exhaustion (RESOURCE_EXHAUSTED) errors map to `"rate-limit"`. Auth is a
+ * 401, a 403, or the 400 Google answers a wrong API key with (see
+ * {@link isGoogleAuthFailure}); all three go through `classifyAuthError` so
+ * the caller gets an `AuthFailureError` with re-authentication guidance.
  *
  * ## Dependencies
  *
@@ -174,9 +177,35 @@ export function resolveGoogleApiKey(
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-/** Classify an HTTP status code into an ErrorReason and throw. */
-function classifyAndThrow(status: number, message: string): never {
-  if (status === 401 || status === 403) {
+/**
+ * The `google.rpc.ErrorInfo.reason` Google puts in the body when the API key
+ * itself is rejected.
+ *
+ * Google answers a wrong key with HTTP 400, not 401: the body is
+ * `{ "error": { "code": 400, "status": "INVALID_ARGUMENT", "message": "API
+ * key not valid. Please pass a valid API key.", "details": [{ "@type":
+ * "type.googleapis.com/google.rpc.ErrorInfo", "reason": "API_KEY_INVALID",
+ * ... }] } }`, pretty-printed across lines. A 401 (`UNAUTHENTICATED`) comes
+ * back for a rejected OAuth token and a 403 (`PERMISSION_DENIED`) for a key
+ * without access to the API, so the status alone does not tell a bad key
+ * from a malformed request.
+ */
+const GOOGLE_API_KEY_INVALID_REASON = "API_KEY_INVALID";
+
+/**
+ * Whether a non-OK Gemini response is an authentication failure: a 401 or
+ * 403, or a 400 whose body carries {@link GOOGLE_API_KEY_INVALID_REASON}
+ * (as the `details[].reason`, or in the message). Matched on the raw body
+ * so the pretty-printed layout does not matter.
+ */
+export function isGoogleAuthFailure(status: number, body: string): boolean {
+  if (status === 401 || status === 403) return true;
+  return status === 400 && body.includes(GOOGLE_API_KEY_INVALID_REASON);
+}
+
+/** Classify an HTTP status code (and the body it came with) into an ErrorReason and throw. */
+function classifyAndThrow(status: number, body: string, message: string): never {
+  if (isGoogleAuthFailure(status, body)) {
     throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
       new ClaudeClientError(message, "auth", false);
   }
@@ -361,7 +390,7 @@ export function createGoogleApiProvider(
             const body = await response.text();
             const message = `Gemini API error ${response.status}: ${body}`;
 
-            if (response.status === 401 || response.status === 403) {
+            if (isGoogleAuthFailure(response.status, body)) {
               throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
                 new ClaudeClientError(message, "auth", false);
             }
@@ -443,10 +472,13 @@ export function createGoogleApiProvider(
           method: "GET",
           headers: { "x-goog-api-key": resolvedApiKey },
         });
-        if (response.status === 401 || response.status === 403) {
-          return false;
-        }
         if (!response.ok) {
+          // A wrong key is a 400 whose body names it; the status alone cannot
+          // tell it from a malformed request, so read the body for a 400 only.
+          const body = response.status === 400 ? await response.text() : "";
+          if (isGoogleAuthFailure(response.status, body)) {
+            return false;
+          }
           throw new ClaudeClientError(
             `Gemini models endpoint returned ${response.status}`,
             "unknown",
@@ -483,7 +515,7 @@ export function createGoogleApiProvider(
             const body = await response.text();
             const message = `Gemini API error ${response.status}: ${body}`;
 
-            if (response.status === 401 || response.status === 403) {
+            if (isGoogleAuthFailure(response.status, body)) {
               throw classifyAuthError(new Error(message), LLM_VENDOR.GOOGLE) ??
                 new ClaudeClientError(message, "auth", false);
             }
@@ -550,6 +582,7 @@ export function createGoogleApiProvider(
         const body = await response.text();
         classifyAndThrow(
           response.status,
+          body,
           `Gemini API stream error ${response.status}: ${body}`,
         );
       }

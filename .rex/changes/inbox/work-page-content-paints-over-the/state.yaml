@@ -8,6 +8,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Dialogs opened from page content or chrome render under body via BodyPortal (prepare-task modal, Guide, FAQ)"
     appliedAt: "2026-10-20T19:59:02.563Z"
+    shippedIn: "0.10.0"
     needsPlacement: true
     lastModified: "2026-10-20T19:59:02.918Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

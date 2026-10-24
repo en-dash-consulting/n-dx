@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Stage-then-swap for pack add --from; null manifest refused as not a pack bundle; tests added."
     appliedAt: "2026-10-15T05:39:14.303Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-15T05:39:14.572Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

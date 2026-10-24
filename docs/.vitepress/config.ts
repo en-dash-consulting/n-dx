@@ -113,6 +113,7 @@ export default defineConfig({
             { text: "Prompt Token Baseline", link: "/analysis/prompt-token-baseline" },
             { text: "Memory OS Behavior", link: "/process/memory-os-behavior" },
             { text: "Install Path Validation", link: "/process/install-path-validation" },
+            { text: "CodeQL Triage (Oct 2026)", link: "/process/codeql-triage-2026-10" },
           ],
         },
       ],

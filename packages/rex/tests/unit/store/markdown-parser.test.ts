@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseDocument, MarkdownParseError } from "../../../src/store/markdown-parser.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../../lang-kit/tests/helpers/call-within-budget.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -153,6 +154,52 @@ items:
     expect(desc).toContain("First paragraph.");
     expect(desc).toContain("## Heading inside description");
     expect(desc).toContain("Third paragraph.");
+  });
+});
+
+/** A one-epic document whose description is a block scalar with the given body lines. */
+function blockScalarDoc(indicator: string, bodyLines: string[]): string {
+  return fm(`\
+schema: rex/v1
+title: T
+items:
+  - id: "11111111-1111-1111-1111-111111111111"
+    level: epic
+    title: E
+    status: pending
+    description: ${indicator}
+${bodyLines.map((l) => (l === "" ? "" : `      ${l}`)).join("\n")}`);
+}
+
+describe("parseDocument: block scalars with many blank lines", () => {
+  // Thousands of blank lines between the first and last text lines: the
+  // chomping step must give the same value whatever the indicator, and must not
+  // re-scan the run of newlines once per newline in it.
+  const BLANKS = 5_000;
+  const inner = `a${"\n".repeat(BLANKS + 1)}b`;
+
+  it.each([
+    ["|", `${inner}\n`],
+    ["|-", inner],
+    ["|+", `${inner}\n`],
+  ])("reads a `%s` block with %i blank lines", (indicator, expected) => {
+    const result = parseDocument(blockScalarDoc(indicator, ["a", ...Array<string>(BLANKS).fill(""), "b"]));
+    if (!result.ok) throw result.error;
+    expect(result.data.items[0].description).toBe(expected);
+  });
+});
+
+describe("parseDocument: on adversarial repository input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+  const PARSER = new URL("../../../src/store/markdown-parser.ts", import.meta.url);
+
+  it("chomping is linear on a block scalar with 300k blank lines", async () => {
+    // `/\n*$/` backtracked from every newline in the run, about 55 s at this size, eleven times the 5 s budget on any machine.
+    const blanks = 300_000;
+    const doc = blockScalarDoc("|-", ["a", ...Array<string>(blanks).fill(""), "b"]);
+    await expect(callWithinBudget<typeof parseDocument>(PARSER, "parseDocument", doc)).resolves.toMatchObject({
+      ok: true,
+      data: { items: [{ description: `a${"\n".repeat(blanks + 1)}b` }] },
+    });
   });
 });
 

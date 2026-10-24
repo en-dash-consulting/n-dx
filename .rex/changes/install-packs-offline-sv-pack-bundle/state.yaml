@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "sv pack bundle and sv pack add --from with a Node-only tar archive; tests with an injected npm; docs and help updated (aa1a348b1)"
     appliedAt: "2026-10-15T05:00:11.223Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-15T05:00:11.518Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

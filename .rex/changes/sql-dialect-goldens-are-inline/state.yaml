@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Goldens now classify the verbatim PetClinic fixtures"
     appliedAt: "2026-10-11T01:59:59.348Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T01:59:59.619Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

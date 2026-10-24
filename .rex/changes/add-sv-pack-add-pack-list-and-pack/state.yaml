@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "sv pack add/list/remove in src/cli/commands/pack.ts; notices name `ndx sv pack add <lang>`; tests with fake npm."
     appliedAt: "2026-10-15T04:40:15.667Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-15T04:40:15.965Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -562,9 +562,14 @@ export async function resolveHubTarget(server, dir) {
   };
 }
 
-/** Last path segment, for either separator — the workspace key the server assigns. */
+/**
+ * Last path segment, for either separator — the workspace key the server
+ * assigns. The lookbehind pins the trailing-separator match to the start of
+ * its run, so a long run of separators is scanned once rather than once per
+ * starting position.
+ */
 function basenameOf(path) {
-  const trimmed = path.replace(/[/\\]+$/, "");
+  const trimmed = path.replace(/(?<![/\\])[/\\]+$/, "");
   const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
   return cut === -1 ? trimmed : trimmed.slice(cut + 1);
 }

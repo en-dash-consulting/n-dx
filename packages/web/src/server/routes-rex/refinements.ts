@@ -36,7 +36,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { appendLog } from "./rex-route-helpers.js";
 import { refreshPRDCache } from "../prd-io.js";
@@ -148,7 +148,7 @@ async function handleApplyRefinements(
     // The lock failure names the holder's PID. That is the single most useful
     // fact in the message, so it is passed through instead of being replaced
     // with wording of our own.
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     const locked = message.includes("Could not acquire PRD lock");
     errorResponse(res, locked ? 409 : 500, message);
     return true;

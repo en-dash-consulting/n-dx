@@ -2,7 +2,8 @@
  * Top navigation: the logo (which is also the way home), the project context
  * — hub link, project switcher, worktree · branch chip — the three stage tabs
  * — Analysis, Plan, Work — then, after a divider, the Live tab, the page's
- * guide and search. Settings and commands are on the bottom bar.
+ * guide, the run-project control and search. Settings and commands are on
+ * the bottom bar.
  *
  * A tab is active on its own stage page and on any view that stage lists,
  * so `/zones` keeps Analysis lit and `/hench-runs/<id>` keeps Plan lit.
@@ -17,6 +18,7 @@ import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { LiveTab } from "./live-tab.js";
 import { ProjectContext } from "./project-context.js";
 import { Guide } from "./guide.js";
+import { RunCommandControl } from "./run-command-control.js";
 
 export interface TopNavProps {
   view: ViewId;
@@ -81,6 +83,8 @@ export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch,
     ),
 
     h("div", { class: "topnav-guide" }, h(Guide, { view })),
+    // Always shown; disabled in a static export, which has no server to run anything.
+    h("div", { class: "topnav-run" }, h(RunCommandControl, { enabled: !isDeployedMode() })),
     h("button", {
       type: "button",
       class: "topnav-search",

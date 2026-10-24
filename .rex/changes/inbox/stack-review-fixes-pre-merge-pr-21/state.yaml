@@ -60,6 +60,7 @@ items:
     completedAt: "2026-10-20T18:59:05.167Z"
     endedAt: "2026-10-20T18:59:05.167Z"
     appliedAt: "2026-10-20T18:59:05.167Z"
+    shippedIn: "0.10.0"
     needsPlacement: true
     lastModified: "2026-10-20T18:59:05.491Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

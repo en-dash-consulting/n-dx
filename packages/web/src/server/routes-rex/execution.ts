@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "../types.js";
 import { WorkspaceScoped } from "../workspace-scoped.js";
-import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { findItemById, appendLog } from "./rex-route-helpers.js";
 import { loadPRDSync } from "../prd-io.js";
@@ -361,12 +361,12 @@ async function handleStartEpicByEpic(
     // Start execution asynchronously (don't await)
     executeEpicSequence(ctx, broadcast).catch((err) => {
       slot.state.status = "failed";
-      slot.state.error = String(err);
+      slot.state.error = errorMessage(err);
       slot.state.finishedAt = new Date().toISOString();
       broadcastExecutionState(slot, broadcast);
     });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -429,7 +429,7 @@ function handleExecutionResume(
   // Continue execution asynchronously
   executeEpicSequence(ctx, broadcast).catch((err) => {
     slot.state.status = "failed";
-    slot.state.error = String(err);
+    slot.state.error = errorMessage(err);
     slot.state.finishedAt = new Date().toISOString();
     broadcastExecutionState(slot, broadcast);
   });

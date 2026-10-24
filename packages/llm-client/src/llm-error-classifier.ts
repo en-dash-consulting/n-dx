@@ -51,15 +51,29 @@ export interface LLMErrorClassification {
  * vendors. Returns "" when there is nothing useful to add.
  */
 export function extractProviderDetail(rawMessage: string): string {
-  if (!rawMessage) return "";
+  return parseProviderDetail(rawMessage).detail;
+}
+
+/**
+ * {@link extractProviderDetail} with the provenance of what it returns.
+ *
+ * `fromJson` is true when the body parsed as a `{ error: {…} }` object and
+ * `detail` was built from its fields; false when `detail` is the body itself,
+ * echoed back because it was plain text (or JSON with nothing to show). A
+ * caller that wants a reason the provider stated, rather than a copy of the
+ * message it already holds, reads the flag.
+ */
+function parseProviderDetail(rawMessage: string): { detail: string; fromJson: boolean } {
+  if (!rawMessage) return { detail: "", fromJson: false };
 
   // Strip a leading "<Vendor> API error <NNN>: " / "... stream error <NNN>: "
   // prefix produced by the fetch-based providers, leaving the raw body.
   const prefix = /^[A-Za-z][\w.-]* API(?: stream)? error \d+:\s*/;
   const body = rawMessage.replace(prefix, "").trim();
-  if (!body) return "";
+  if (!body) return { detail: "", fromJson: false };
 
   let detail = body;
+  let fromJson = false;
 
   // Google and OpenAI both return { error: { message, status?, code? } }.
   if (body.startsWith("{")) {
@@ -90,7 +104,11 @@ export function extractProviderDetail(rawMessage: string): string {
           if (typeof d.retryDelay === "string") extras.push(`retry in ${d.retryDelay}`);
         }
         const head = label && message ? `${label}: ${message}` : label || message;
-        detail = [head, ...extras].filter(Boolean).join(" — ") || body;
+        const built = [head, ...extras].filter(Boolean).join(" — ");
+        if (built) {
+          detail = built;
+          fromJson = true;
+        }
       }
     } catch {
       // Not JSON after all — fall back to the raw body.
@@ -100,7 +118,7 @@ export function extractProviderDetail(rawMessage: string): string {
   // Collapse whitespace and truncate so multi-line bodies don't flood the terminal.
   detail = detail.replace(/\s+/g, " ").trim();
   if (detail.length > 300) detail = `${detail.slice(0, 297)}…`;
-  return detail;
+  return { detail, fromJson };
 }
 
 /**
@@ -149,9 +167,46 @@ function formatErrorSuffix(
 }
 
 /**
+ * How much of an error message the auth signatures below read.
+ *
+ * A provider error reaches the classifier whole: the fetch-based providers
+ * interpolate the entire `response.text()` body into `Error.message`, and
+ * hench hands over a vendor CLI's accumulated stderr. The status code and the
+ * error type sit at the head of either, and nothing behind the first few
+ * kilobytes tells auth from anything else, so the signatures read a window and
+ * their cost stops growing with the body. The JSON extractors
+ * (`extractProviderDetail`, `extractJsonErrorMessage`) keep reading the whole
+ * message, because the `error.message` worth showing can sit deep in a long
+ * body.
+ */
+export const CLASSIFY_WINDOW = 4096;
+
+/** The head of `message` that the auth signatures read; see {@link CLASSIFY_WINDOW}. */
+function boundForClassification(message: string): string {
+  return message.length > CLASSIFY_WINDOW ? message.slice(0, CLASSIFY_WINDOW) : message;
+}
+
+/**
+ * The words of one signature sit within a sentence of each other, never 80
+ * characters apart, so the gaps are bounded runs of non-newline characters
+ * rather than `.*`. With `.*` the three-word signature backtracked cubically:
+ * "invalid api " repeated to 48 kB took 59 s to fail to match. A bounded gap
+ * is tried at most 80 ways per start position, so the match is linear in the
+ * window.
+ *
+ * `api_key_invalid` is Google's `google.rpc.ErrorInfo.reason` for a rejected
+ * key. It arrives in a 400 whose message says "API key not valid" (no
+ * "invalid"), pretty-printed with the reason on its own line, so neither
+ * word-order alternative reaches it.
+ */
+const INVALID_API_KEY = /invalid[^\n]{0,80}?api[^\n]{0,80}?key|invalid_api_key|api_key_invalid/i;
+
+/**
  * Detect whether an error message signals an authentication or session-loss
  * problem — a credential that was never valid, or a CLI session that expired
  * or was revoked mid-run.
+ *
+ * Reads the first {@link CLASSIFY_WINDOW} characters of the message.
  *
  * Covers two families of signatures:
  *
@@ -168,13 +223,14 @@ function formatErrorSuffix(
  * to collide with adjacent categories — e.g. `token limit exceeded` (budget)
  * and `truncated at N tokens` (parse) are not matched.
  */
-export function isAuthError(message: string): boolean {
-  if (!message) return false;
+export function isAuthError(rawMessage: string): boolean {
+  if (!rawMessage) return false;
+  const message = boundForClassification(rawMessage);
   return (
     /\b401\b/.test(message) ||
     /\b403\b/.test(message) ||
-    /invalid.*api.*key/i.test(message) ||
-    /authentication.*(fail|error|invalid|expired|required)/i.test(message) ||
+    INVALID_API_KEY.test(message) ||
+    /authentication[^\n]{0,80}?(?:fail|error|invalid|expired|required)/i.test(message) ||
     /\bunauthorized\b/i.test(message) ||
     /not logged ?in/i.test(message) ||
     /please (log ?in|sign in|run [^.\n]*login)/i.test(message) ||
@@ -188,6 +244,31 @@ export function isAuthError(message: string): boolean {
     /login required|authentication required/i.test(message) ||
     /re-?authenticate/i.test(message)
   );
+}
+
+const DEBUG_SENTINEL_OPEN = "[ndx-debug:";
+
+/**
+ * Find the first `[ndx-debug:<path>]` sentinel with a non-empty path, and the
+ * one space before it if there is one — what `/ ?\[ndx-debug:([^\]]+)\]/`
+ * matched. A scan, not that regex: unanchored, the regex rescanned to the end
+ * of the message from every `[ndx-debug:` that has no closing `]`, which is
+ * quadratic in a message built of them. Here, an opening with no `]` after it
+ * means no later opening has one either, so the scan stops.
+ */
+function findDebugSentinel(message: string): { path: string; start: number; end: number } | null {
+  let open = message.indexOf(DEBUG_SENTINEL_OPEN);
+  while (open !== -1) {
+    const pathStart = open + DEBUG_SENTINEL_OPEN.length;
+    const close = message.indexOf("]", pathStart);
+    if (close === -1) return null;
+    if (close > pathStart) {
+      const start = open > 0 && message[open - 1] === " " ? open - 1 : open;
+      return { path: message.slice(pathStart, close), start, end: close + 1 };
+    }
+    open = message.indexOf(DEBUG_SENTINEL_OPEN, pathStart);
+  }
+  return null;
 }
 
 /**
@@ -213,11 +294,16 @@ export function classifyLLMError(
   // Upstream parsers (e.g. parseProposalResponse) may embed a
   // `[ndx-debug:<path>]` sentinel in the thrown error message, pointing at a
   // file containing the raw LLM response. Extract it so the parse branch can
-  // surface the path and underlying error detail back to the user.
-  const debugMatch = /\s*\[ndx-debug:([^\]]+)\]/.exec(err.message);
-  const debugPath = debugMatch ? debugMatch[1] : null;
+  // surface the path and underlying error detail back to the user. The only
+  // producer (rex's throwParseFailure) writes exactly one space before the
+  // sentinel, so the extractor takes at most one, and the trim() below makes
+  // the cleaned message the same whatever whitespace preceded it. The
+  // sentinel sits at the end of the message, so this reads the whole message,
+  // not the CLASSIFY_WINDOW the auth signatures read.
+  const debugMatch = findDebugSentinel(err.message);
+  const debugPath = debugMatch ? debugMatch.path : null;
   const cleanedMessage = debugMatch
-    ? err.message.replace(debugMatch[0], "").trim()
+    ? (err.message.slice(0, debugMatch.start) + err.message.slice(debugMatch.end)).trim()
     : err.message;
 
   // Concise provider reason (e.g. Gemini's RESOURCE_EXHAUSTED + quota metric),
@@ -462,54 +548,69 @@ function extractJsonErrorMessage(text: string): string {
  * provider payloads are scanned for 401/403 HTTP status codes,
  * `authentication_error` type, and `invalid_api_key` / expired-token
  * patterns before falling back to plain message matching.
+ *
+ * Detection reads the first {@link CLASSIFY_WINDOW} characters; the reason is
+ * extracted from the whole message.
+ *
+ * `authReason` is the provider's own `error.message` (with its status label,
+ * when the body carries one) whenever the message holds a JSON error body.
+ * A plain-text message states no reason of its own, so it is normalized to
+ * one of a fixed vocabulary instead of being echoed: "invalid API key",
+ * "token expired", "not logged in", "401 Unauthorized", "403 Forbidden",
+ * "unauthorized" or "authentication failed".
  */
 export function parseAuthPayload(
   rawMessage: string,
   _vendor: LLMVendor,
 ): { httpStatus: number | null; authReason: string } | null {
   if (!rawMessage) return null;
+  const message = boundForClassification(rawMessage);
 
   // Expired-token pattern covers both orders: "token expired" and "expired token".
+  // Bounded gaps, as in INVALID_API_KEY.
   const isExpiredCredential =
-    /expired.*(token|key)|(token|key).*expired|api.key.*expired/i.test(rawMessage);
+    /expired[^\n]{0,80}?(?:token|key)|(?:token|key)[^\n]{0,80}?expired|api.key[^\n]{0,80}?expired/i.test(message);
 
   const isAuth =
-    /\b(401|403)\b/.test(rawMessage) ||
-    /invalid.*api.*key|invalid_api_key/i.test(rawMessage) ||
-    /authentication.*(fail|error|invalid|expired)/i.test(rawMessage) ||
-    /authentication_error/i.test(rawMessage) ||
-    /unauthorized.*(request|access|error)/i.test(rawMessage) ||
+    /\b(401|403)\b/.test(message) ||
+    INVALID_API_KEY.test(message) ||
+    /authentication[^\n]{0,80}?(?:fail|error|invalid|expired)/i.test(message) ||
+    /authentication_error/i.test(message) ||
+    /unauthorized[^\n]{0,80}?(?:request|access|error)/i.test(message) ||
     isExpiredCredential ||
-    /not logged in|login required/i.test(rawMessage);
+    /not logged in|login required/i.test(message);
 
   if (!isAuth) return null;
 
-  const statusMatch = /\b(401|403)\b/.exec(rawMessage);
+  const statusMatch = /\b(401|403)\b/.exec(message);
   const httpStatus = statusMatch ? parseInt(statusMatch[1], 10) : null;
 
   // Try the vendor-prefix-aware extractor first (handles "Gemini API error 401: {...}").
-  // Only trust the result when it actually parsed JSON (no raw braces remaining).
-  const providerDetail = extractProviderDetail(rawMessage);
-  const cleanProviderDetail = providerDetail && !providerDetail.includes("{")
-    ? providerDetail
-    : "";
+  // Its detail is a reason only when it was built from the JSON body: a
+  // plain-text body comes back as the detail verbatim, and taking that as the
+  // reason would echo the message instead of normalizing it below.
+  const provider = parseProviderDetail(rawMessage);
+  const providerReason = provider.fromJson ? provider.detail : "";
 
   // Fall back to a generic JSON scan for messages without the vendor prefix
   // (e.g. Claude CLI stdout envelopes, plain SDK error strings).
-  const jsonReason = cleanProviderDetail || extractJsonErrorMessage(rawMessage);
+  const jsonReason = providerReason || extractJsonErrorMessage(rawMessage);
 
+  // No JSON reason anywhere: the message is plain text, so normalize it.
   let authReason = jsonReason;
   if (!authReason) {
-    if (/invalid.*api.*key|invalid_api_key/i.test(rawMessage)) {
+    if (INVALID_API_KEY.test(message)) {
       authReason = "invalid API key";
     } else if (isExpiredCredential) {
       authReason = "token expired";
-    } else if (/not logged in|login required/i.test(rawMessage)) {
+    } else if (/not logged in|login required/i.test(message)) {
       authReason = "not logged in";
     } else if (httpStatus === 401) {
       authReason = "401 Unauthorized";
     } else if (httpStatus === 403) {
       authReason = "403 Forbidden";
+    } else if (/unauthorized/i.test(message)) {
+      authReason = "unauthorized";
     } else {
       authReason = "authentication failed";
     }

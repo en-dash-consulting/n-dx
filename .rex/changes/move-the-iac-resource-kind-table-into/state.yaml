@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Run 2fdcaed2 committed 89c084229 + 6d67eea51; operator regenerated the iso-map skill script (expected drift). Output byte-identical; affected gate 5/5."
     appliedAt: "2026-10-13T04:17:22.263Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T04:17:22.557Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

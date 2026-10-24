@@ -15,7 +15,7 @@ import { TaskStartControl } from "../components/index.js";
 import { ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { usePolling } from "../hooks/index.js";
-import { itemTypeLabel } from "../external.js";
+import { itemTypeLabel, itemTypePlural } from "../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -35,6 +35,10 @@ interface EpicStats {
   priority?: string;
   stats: TreeStats;
   percentComplete: number;
+  /** Set on a v2 change; absent on a v1 epic. */
+  type?: "change";
+  /** Set when `stats` count the change itself because it has no tasks. */
+  selfCounted?: true;
 }
 
 interface PriorityDistribution {
@@ -84,6 +88,8 @@ interface DashboardData {
   title: string;
   stats: TreeStats;
   percentComplete: number;
+  /** Absent from an older server: read as v1. */
+  layout?: "v1" | "v2";
   epics: EpicStats[];
   nextTask: NextTask | null;
   /** Present when the top of the queue is claimed elsewhere — the card says so. */
@@ -197,7 +203,7 @@ function EpicCard({ epic, navigateTo }: { epic: EpicStats; navigateTo?: Navigate
     h("div", { class: "rex-dash-epic-top" },
       h("div", { class: "rex-dash-epic-info" },
         h(RexTaskLink, {
-          task: { id: epic.id, title: epic.title, status: epic.status, itemType: "epic", priority: epic.priority },
+          task: { id: epic.id, title: epic.title, status: epic.status, itemType: epic.type ?? "epic", priority: epic.priority },
           navigateTo,
           compact: true,
           showStatus: true,
@@ -228,7 +234,8 @@ function EpicCard({ epic, navigateTo }: { epic: EpicStats; navigateTo?: Navigate
           : null,
       ),
       h("span", { class: "rex-dash-epic-count" },
-        `${stats.completed}/${stats.total}`,
+        // A change with no tasks is its own unit of work: a 0/1 count says less than its status.
+        epic.selfCounted ? epic.status.replace(/_/g, " ") : `${stats.completed}/${stats.total}`,
       ),
     ),
   );
@@ -327,6 +334,10 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
   }
 
   const { stats, percentComplete, epics, nextTask, priorities } = data;
+  // v2's root rows are changes; v1's are epics.
+  const rootType = data.layout === "v2" ? "change" : "epic";
+  const rootLabel = itemTypeLabel(rootType);
+  const rootPlural = itemTypePlural(rootType);
 
   // Sort epics: in_progress first, then pending, then by completion
   const sortedEpics = useMemo(() => {
@@ -468,12 +479,12 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
               ),
         ),
 
-        // Epic progress list
+        // Epic (v1) or change (v2) progress list
         h("div", { class: "rex-dash-epics" },
           h("div", { class: "rex-dash-section-header" },
-            h("h3", null, "Epic Progress"),
+            h("h3", null, `${rootLabel} Progress`),
             h("span", { class: "rex-dash-section-meta" },
-              `${epics.length} epic${epics.length !== 1 ? "s" : ""}`,
+              `${epics.length} ${(epics.length === 1 ? rootLabel : rootPlural).toLowerCase()}`,
             ),
             sortedEpics.length > 0
               ? h("button", {
@@ -482,7 +493,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   onClick: toggleEpicsExpanded,
                   "aria-expanded": String(epicsExpanded),
                   "aria-controls": "rex-dash-epic-list",
-                  title: epicsExpanded ? "Show as a scrollable list" : "Show every epic",
+                  title: epicsExpanded ? "Show as a scrollable list" : `Show every ${rootLabel.toLowerCase()}`,
                 }, epicsExpanded ? "Collapse ▴" : "Expand ▾")
               : null,
           ),
@@ -493,13 +504,13 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                 // A scroll region must be reachable by keyboard.
                 tabIndex: epicsExpanded ? undefined : 0,
                 role: "region",
-                "aria-label": "Epic progress",
+                "aria-label": `${rootLabel} progress`,
               },
                 sortedEpics.map((epic) =>
                   h(EpicCard, { key: epic.id, epic, navigateTo }),
                 ),
               )
-            : h("div", { class: "rex-dash-empty-hint" }, "No epics defined yet."),
+            : h("div", { class: "rex-dash-empty-hint" }, `No ${rootPlural.toLowerCase()} defined yet.`),
         ),
 
         // No Epic-by-Epic panel: it ran `hench run` from the project's own build,

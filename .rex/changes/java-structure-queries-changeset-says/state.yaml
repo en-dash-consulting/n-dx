@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Dropped \"Nothing consumes the captures yet, so analysis output is unchanged.\" from .changeset/sv-java-structure-queries.md on the PR 3 branch."
     appliedAt: "2026-10-17T01:48:33.368Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T01:48:34.144Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

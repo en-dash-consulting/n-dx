@@ -281,6 +281,18 @@ export {
   resolveLocalTimeoutMs,
 } from "./local-api-provider.js";
 export type { LocalApiProviderOptions } from "./local-api-provider.js";
+
+// The one host-and-port shape rule for the local LLM endpoint. Inference,
+// the dashboard's probes and `ndx config` all splice these into a URL, so
+// they share one judgement of what may be spliced; core carries an inline
+// twin (spawn-only rule) pinned by tests/unit/local-endpoint-parity.test.js.
+export {
+  DEFAULT_LOCAL_HOST,
+  DEFAULT_LOCAL_PORT,
+  isPlausibleLlmHost,
+  isValidPort,
+  describeLocalEndpointProblem,
+} from "./local-endpoint.js";
 export type {
   GoogleApiProviderOptions,
   GeminiContent,
@@ -337,6 +349,7 @@ export {
   quoteWindowsToken,
   buildWindowsCliCommandLine,
   spawnCli,
+  execFileSyncCli,
   diagnoseCliInvocation,
   isCliNotFoundError,
   diagnoseCliNotFound,

@@ -1344,10 +1344,48 @@ function foldScalar(lines: string[]): string {
 }
 
 function applyChomping(content: string, chomping: "clip" | "strip" | "keep"): string {
-  if (chomping === "strip") return content.replace(/\n*$/, "");
+  if (chomping === "strip") return stripTrailingNewlines(content);
   if (chomping === "keep") return content + (content.endsWith("\n") ? "" : "\n");
   if (content === "") return "";
-  return content.replace(/\n*$/, "") + "\n";
+  return stripTrailingNewlines(content) + "\n";
+}
+
+/**
+ * `content` without its trailing newlines. A loop, not `/\n*$/`: that regex
+ * tries every newline in the body as a start, runs to the end of each run and
+ * backtracks when `$` fails, so a block scalar with a long run of blank lines in
+ * its middle costs quadratic time (6 s at 100k, on every `index.md` read).
+ */
+function stripTrailingNewlines(content: string): string {
+  let end = content.length;
+  while (end > 0 && content.charCodeAt(end - 1) === 10) end--;
+  return content.slice(0, end);
+}
+
+/**
+ * The escapes decoded in a double-quoted scalar that is not valid JSON: the
+ * single-character ones JSON defines. `\uXXXX` is handled in the decoder.
+ */
+const QUOTED_ESCAPES: Record<string, string> = {
+  n: "\n",
+  t: "\t",
+  r: "\r",
+  b: "\b",
+  f: "\f",
+  "/": "/",
+  '"': '"',
+  "\\": "\\",
+};
+
+/**
+ * The escapes of a double-quoted scalar JSON.parse refused, decoded in one
+ * left-to-right pass like JSON would: `\n \t \r \b \f \/ \" \\` and `\uXXXX`
+ * with exactly four hex digits. Any other `\c`, a `\u` short of four digits
+ * among them, stays as written.
+ */
+function decodeQuotedFallback(body: string): string {
+  return body.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (match, c: string) =>
+    c.length === 5 ? String.fromCharCode(parseInt(c.slice(1), 16)) : (QUOTED_ESCAPES[c] ?? match));
 }
 
 function parseScalar(s: string): unknown {
@@ -1365,19 +1403,18 @@ function parseScalar(s: string): unknown {
   }
   if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
     // Both writers quote with JSON.stringify, so JSON.parse decodes every
-    // escape in one pass. Sequential replaces cannot: they read the `\\n` of
-    // `C:\new` as a newline and never decode `\r` or `\uXXXX`. The replace
-    // chain remains only for hand-written escapes JSON lacks, e.g. `\x`.
+    // escape, `\uXXXX` included. Only a hand- or agent-written scalar with an
+    // escape JSON lacks, e.g. `\x`, reaches the fallback, which decodes the
+    // escapes JSON defines in one left-to-right pass and keeps any other `\c`
+    // as written. One pass matters: a chain of replaces re-read its own
+    // output, turning the `\\n` of `C:\\new` into `\n` and then into a line
+    // feed, and every save after that compounded the change.
     try {
       return JSON.parse(s) as string;
     } catch {
-      // Not valid JSON — decode the common escapes below.
+      // Not valid JSON — decode the JSON escapes below.
     }
-    return s.slice(1, -1)
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, "\\")
-      .replace(/\\n/g, "\n")
-      .replace(/\\t/g, "\t");
+    return decodeQuotedFallback(s.slice(1, -1));
   }
   if (s.startsWith("'") && s.endsWith("'") && s.length >= 2) {
     return s.slice(1, -1).replace(/''/g, "'");

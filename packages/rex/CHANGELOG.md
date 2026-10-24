@@ -1,5 +1,147 @@
 # @n-dx/rex
 
+## 0.10.0
+
+### Patch Changes
+
+- [#839](https://github.com/en-dash-consulting/n-dx/pull/839) [`27b5833`](https://github.com/en-dash-consulting/n-dx/commit/27b583370e486993ec1760d169db8f4461e0f9ef) Thanks [@endash-shal](https://github.com/endash-shal)! - Closing a feature's last task from the dashboard now completes the feature, and its epic when that was the epic's last open work, as `rex update` and the MCP `update_task_status` tool already did. The dashboard's status and bulk-status routes used to save only the task. Its feature stayed pending with every child done, so `ndx loop` selected the empty feature as the next task and handed the agent a run with nothing to do. The parent cascade is now one rex function, `cascadeParentCompletion`, shared by all three writers.
+
+- [#835](https://github.com/en-dash-consulting/n-dx/pull/835) [`96bc0a4`](https://github.com/en-dash-consulting/n-dx/commit/96bc0a4bddc1d5c6446e094d29a1b081801b257a) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx work` now completes a parent whose children are all completed, and commits the completed status. rex offers such a parent as the next task, but its work landed with its children, so a run on it changes no code. The completion gate refused every one of those runs ("No changes detected in git diff") and put the parent back to pending. The next run picked it again, and each refused run left its status writes uncommitted in `.rex/prd_tree/`. The gate now accepts an empty diff for a finalize-ready parent, using rex's own `allChildrenSuccessful` (now exported), and the completion commit carries it.
+  
+  The commit that lands a completed status now always has an `N-DX-Status: <id> in_progress → completed` trailer. On the commit-prompt path it never did: hench writes `completed` before the prompt runs, so the prompt read the item as already completed and left the trailer off. The completion-record commit had no status trailer at all.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`a5c696f`](https://github.com/en-dash-consulting/n-dx/commit/a5c696f3acc9e63a7f5228bc499e64b5c95bd0eb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex init` (and so `ndx init`) gives a project with no PRD an empty v2 tree, `product/index.md` stamped `rex/v2`, and no `prd_tree/`, so a new project no longer prints the v1 deprecation notice. A project that already has a PRD keeps its layout; moving a v1 PRD stays `ndx migrate`'s job. The next steps init prints use the v2 verb (`rex add --title=…`) whenever the tree is v2, fresh or migrated.
+  
+  Changes what a CLI command creates under the soft freeze: `rex init` / `ndx init` on a project with no PRD now writes the v2 layout instead of v1. No flag or MCP tool changes shape.
+  
+  On a v2 PRD whose product layer has no capability and no constraint, such as a fresh project, a change in the Inbox is no longer stuck: there is nowhere to place it, so `rex next`, `get_next_task` and `ndx work` select it and its tasks, `ndx work --task` runs it, and it completes when its last task does. With no target it stays unapplied in the Inbox until placed. Once the product layer has a capability or constraint, Inbox changes are held from selection and closing as before, and `change-placed-at-close` reports any that closed unplaced. rex exports `awaitsPlacement`, the one predicate all of these use.
+  
+  Changes a v2 selection and completion rule under the soft freeze: an Inbox change is held for placement only while the product layer has a capability or constraint to place it on. rex's public API gains `awaitsPlacement`; no MCP tool or CLI flag changes shape.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`a827aaa`](https://github.com/en-dash-consulting/n-dx/commit/a827aaa8d854d328271ff4411ba0fe6158c3195d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx migrate --apply [--plan=<path>] [--dry-run]` (`rex migrate-apply --plan=<path.json>`) applies a reviewed `ndx migrate --plan` plan, reading `./migration-plan.json` by default, where `ndx migrate --plan` writes. It writes `product/` and `changes/` and removes `prd_tree/` and `tree-meta.json` under one hold of the PRD lock, so the two layouts never sit side by side. Every v1 id is checked by count and id before anything is written and again on the tree read back. Changes the rules placed land on their capability; held changes, and items made after the plan, land in the Inbox, with any model pick recorded as a suggestion only. Release epics become no node, and a `blockedBy` ref to one is repointed at the changes it split into. A `blockedBy` ref to a capability, constraint or area names that node's open changes (a change held for the Inbox counts as open on the product node its v1 parent became, for this rewrite only), a product node's own `blockedBy` moves onto its open changes, and a ref with no open change to name is dropped as met; the cut change lists every rewrite and drop. The first change, "Product map and change layer", records the cut. A held change completed at or before the cut cannot be placed, so `rex health` reports its `change-placed-at-close` as a warning, not an error. So is v1 work completed between plan and apply, which the cut change lists; a held change completed in v2 after apply is still an error. Apply refuses a plan whose model pass stopped, and refuses while `.rex/prd.md`, `.rex/prd.json` or a branch-scoped PRD file sits beside the tree. On a v2 tree it reports so and exits zero. A `prd_tree/` left beside the v2 tree is removed only when it is what an interrupted apply left (it matches the plan's source or, with no plan, every id it holds is in the v2 tree); any other is refused and kept, naming the ids to re-capture, and `--dry-run` says which.
+  
+  `--dry-run` runs apply's checks, including the staged write and read-back, and prints per v1 kind how many items become each v2 type, how many are held for the Inbox and how many metadata values are dropped (`droppedMeta`, `droppedLog`), and each `blockedBy` rewrite and drop with its old and new refs; it writes nothing in the project.
+  
+  Soft freeze: `rex migrate-apply` is a new rex command and `--apply`, `--plan=<path>` and `--dry-run` are new `ndx migrate` flags; the `--plan` and `--out` behaviour of `ndx migrate --plan` and `rex migrate-plan` is unchanged.
+  
+  The v2 writer refuses to turn a folder into a leaf while its `state.yaml` holds top-level keys other than `schema` and `items`, naming the folder and the keys, instead of dropping them. `rex migrate-to-folder-tree` renames a converted `prd.json` to `prd.json.migrated`.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`be77a84`](https://github.com/en-dash-consulting/n-dx/commit/be77a847e3b0805b8e76c0d0ea89bcc0e099d538) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx migrate [dir]`, with neither `--plan` nor `--apply`, runs every migration step the project still needs, in order: the layout move into `.ndx/`, the `prd.md` / `prd.json` conversion to the folder tree, then `rex migrate-plan` (to `--out`, default `./migration-plan.json`) and `rex migrate-apply`. A step already done is skipped, so a failed run resumes where it stopped; `--dry-run` rehearses each step that can.
+  
+  rex commands on a v1 PRD (`prd_tree/` and no `product/`) keep working and print one deprecation line on stderr naming `ndx migrate`; the next release refuses v1 PRDs. The line is dropped under `--quiet`, and `NDX_LEGACY_NOTICE=off` silences it. `ndx ci`, `status`, `plan`, `add`, `recommend`, `refresh`, `work`, `analyze`, `self-heal`, `start`, `web` and `pair-programming` print it once per command, not once per rex process they spawn.
+  
+  Agents are never told to migrate and cannot: every hench run that `ndx work`, `ndx self-heal` and `ndx pair-programming` spawn gets `NDX_AGENT_RUN=1` and `NDX_LEGACY_NOTICE=off`, and `ndx migrate` (bare, `--plan` and `--apply`) refuses while `NDX_AGENT_RUN` is set: an operator runs the migration from their own shell.
+  
+  Soft freeze: bare `ndx migrate` used to exit 1 asking for `--plan`; it now runs the chain. `--plan` and `--apply` are unchanged. `NDX_LEGACY_NOTICE` (`off`) and `NDX_AGENT_RUN` are new environment variables read by rex and core.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`2b00932`](https://github.com/en-dash-consulting/n-dx/commit/2b00932c9219ba7eb18f446493e2549170aafe48) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx migrate --plan` shows the preflight banner and a run summary that lists the `--out` plan as written and says model calls are not counted. `llm.routes` for `prd.migrate.judge` (or `*`) turns the Jev review off.
+  
+  Adds a config key under the soft freeze: `llm.routes` accepts `prd.migrate.judge` (the migration's Jev review), and a route to a tier turns that review off. `ndx migrate --plan` prints the preflight banner and run summary. No flag or MCP tool changes shape.
+  
+  On Windows, the guard that keeps `rex export`, `rex migrate-plan --out`/`--summary` and `rex tree-diff` from writing inside the rex directory now sees through 8.3 short-name aliases such as `RUNNER~1`. It resolved paths with `fs.realpathSync`, which leaves short names unexpanded, so a project or output path written in short form slipped past the check. It now uses `realpathSync.native`; macOS and Linux behave as before.
+  
+  Fixes a CLI guard under the soft freeze (Windows only): the same commands refuse a path they already meant to refuse. No flag or MCP tool changes shape.
+
+- [#861](https://github.com/en-dash-consulting/n-dx/pull/861) [`240579c`](https://github.com/en-dash-consulting/n-dx/commit/240579c9200b144629a6069cf9a752d4eaaa1492) Thanks [@ryrykeith](https://github.com/ryrykeith)! - n-dx now tracks its own work on the v2 PRD: the repository's `.rex/` holds the product layer (areas, capabilities, constraints) and the change layer instead of the v1 `prd_tree/`, migrated with `ndx migrate --plan` and `--apply`. Nothing changes for projects that use n-dx; this is the migration the 0.10.0 release ships, run on n-dx itself first.
+
+- [#838](https://github.com/en-dash-consulting/n-dx/pull/838) [`9e18581`](https://github.com/en-dash-consulting/n-dx/commit/9e185812cb4ec52603e67d6c295568ea5334b4ec) Thanks [@endash-shal](https://github.com/endash-shal)! - Next-task selection no longer goes quadratic in PRD size, which had made the dashboard unresponsive on a large PRD. rex's ranking scored every item through `collectRequirements`, which re-finds the item with a full tree walk, so one `findNextTask` cost about half a second on a 2,800-item tree; it now traces requirements from the entry it already holds. The dashboard's Live monitor, which ranks the next five tasks every two seconds, also keeps each ranking per parsed PRD and excluded set instead of recomputing it every tick, so a tick that changes nothing costs nothing.
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`4ce8d35`](https://github.com/en-dash-consulting/n-dx/commit/4ce8d35c2939007e44995d3fc0334863965a0b4c) Thanks [@endash-shal](https://github.com/endash-shal)! - `crossReferenceChanges` no longer takes quadratic time reading file paths out of a PRD item's description or acceptance criteria that contain a long run of `-` or `a/`. A path now has to start at a token boundary, so three matches the old pattern found in the middle of a token are gone: `foo.bar/baz.ts` no longer yields `bar/baz.ts`, `https://github.com/org/repo.git` no longer yields `com/org/repo.git`, and `v1.2/foo.ts` no longer yields `2/foo.ts`. A path that starts a token is read as before, with or without a leading `./`, `../` or `/` (`../lib/x.ts` still gives `lib/x.ts`), and a `.`-led directory is now read whole: `.github/workflows/ci.yml` gives itself where it used to give `github/workflows/ci.yml`. The changed files passed in are reported back as given, as before.
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`60c910a`](https://github.com/en-dash-consulting/n-dx/commit/60c910a463e935bf6af6715f31a416e2ba1d7050) Thanks [@endash-shal](https://github.com/endash-shal)! - Code-coverage path matching honours a path separator: `lib/util.ts` in a task's description no longer matches a changed `mylib/util.ts`, while `src/lib/util.ts` still matches `lib/util.ts` in both directions. The index.md Commits table escapes `|` and `\` in the author cell as it already did in the message cell, and the dashboard's parser splits rows on unescaped pipes only and undoes both escapes, so a message or author holding either round-trips losslessly. The frontmatter fallback decoder (a double-quoted scalar that is not valid JSON) now also decodes `\b`, `\f`, `\/` and a four-hex-digit `\uXXXX` like JSON, keeping a shorter `\u` literal.
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`7c12c18`](https://github.com/en-dash-consulting/n-dx/commit/7c12c182e92139a5201affc48343ce00eb442f55) Thanks [@endash-shal](https://github.com/endash-shal)! - A hand- or agent-written `index.md` whose double-quoted frontmatter value holds an escape JSON lacks (such as `\x`) is now decoded in one pass. The fallback decoder read its own output: `C:\\new` became `C:\new` and then `C:` followed by a line feed, and every save after that compounded the change. The escapes JSON shares (`\n`, `\t`, `\r`, `\"`, `\\`) are decoded; any other `\c` is kept as written, as before.
+  
+  Four scans of repository content no longer take quadratic time: the block-scalar chomping in both the folder-tree parser and the legacy `prd.md` parser (a run of thousands of blank lines inside a description), the trailing-punctuation trim on a requirement sentence extracted from an analysed README, and the number check the legacy serializer runs on every string scalar. Results are unchanged. A commit message in a generated `index.md` commits table now escapes `\` as well as `|` and folds line breaks, so a message cannot break out of its cell. The web package drops an unused import.
+
+- [#862](https://github.com/en-dash-consulting/n-dx/pull/862) [`c92eb9c`](https://github.com/en-dash-consulting/n-dx/commit/c92eb9ca7114170beda601782aecae71992d40da) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 project the dashboard's add panel no longer calls itself Smart Add or says it generates proposals. It is "Add to Inbox": the text becomes one change in the Inbox, its first line the title and the full text its description, and the preview shows both and names the next step (place the change, then add its tasks). `rex add --format=json` on v2 now includes each change's `description`. v1 projects keep Smart Add as it was.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`582752e`](https://github.com/en-dash-consulting/n-dx/commit/582752ec5bda44987ab8d9614ec19620e84f3140) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx install-sample` on a v2 project adds the sample as a change with two tasks through `rex add`, instead of writing a `prd_tree/` beside `product/`; `ndx destroy-sample` removes it. A v1 project is unchanged.
+  
+  Changes what a CLI command writes under the soft freeze: on a v2 project `ndx install-sample` and `ndx destroy-sample` write the change layer (`{rex}/changes/`), not `prd_tree/`. No flag changes shape.
+  
+  `rex remove <id>` now works on a v2 PRD, removing a change, task or subtask inside the PRD lock. `ndx destroy-sample` on a v2 project uses it instead of deleting change folders itself, and fails naming the lock holder when another writer holds the lock.
+  
+  Widens a CLI command under the soft freeze: `rex remove` accepts v2 change, task and subtask ids (it refused v2 trees before). No flag or MCP tool changes shape.
+  
+  The first `/api/rex/prd` read after `ndx start` no longer answers 404 on a folder tree: the boot PRD cache is written before the server listens, so a request cannot beat it.
+  
+  Changes a v2 rule under the soft freeze: `change-placed-at-close` is a warning, not an error, for a change the migration held for placement that completed in v1, at or before the plan's cut or between the plan and apply (the cut change lists the latter). A held change that completes in v2 after apply is still an error. A `blockedBy` ref to a product node whose pending work is held in the Inbox now names the held changes instead of being dropped as met.
+  
+  The apply-side fixes on this layer (blockedBy rewrites onto open changes, the guarded `prd_tree/` leftover removal, the dry run listing each rewrite) are described in the `ndx migrate --apply` changeset, migrate-apply.md.
+
+- [#862](https://github.com/en-dash-consulting/n-dx/pull/862) [`6957df6`](https://github.com/en-dash-consulting/n-dx/commit/6957df6c10ddb5a49cc74d82a452470fc4b492f8) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 project the dashboard can add a task under a change. A change's detail panel offers "+ Add Task", with a title, description, criteria and priority, and the task is written under the change through rex's own add rule, as `rex add --type=task --parent=<id>` and MCP `add_item` write it. A completed change refuses a new task with rex's reason. `POST /api/rex/items` with a parent used to be refused on v2, which left a project started from the dashboard with changes that had no tasks.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`7fa688f`](https://github.com/en-dash-consulting/n-dx/commit/7fa688f0127249893d469e67716780ab8c1bb15d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex migrate-plan`, `rex migrate-apply --dry-run` and `rex migrate-apply` refuse a v1 tree with an item file the parser cannot read, such as unclosed front matter left by a hand edit or a merge conflict. The refusal names each file. Before this, the store's load dropped the parser's warning, so the plan and the dry run left the item out without saying so, and apply then removed `prd_tree/` along with that item's file. The v1 parser now marks a warning `skipped` when it drops an item, as the v2 reader already did.
+  
+  `rex migrate-apply` and its `--dry-run` print the v2 rule findings on the migrated tree, counted by rule (errors and warnings), as `rex health` then reports them. They are reported, not refused. A test now pins apply's refusal when the tree reads back without a v1 id.
+  
+  `rex migrate-apply` keeps a dissolved release epic's description and acceptance criteria under its line in the cut change's body, and moves its own `blockedBy` onto its open children, so a release's work still waits for the release it depended on.
+  
+  `migrate --apply`: when removing `prd_tree/` or `tree-meta.json` fails after the v2 tree is switched in (a handle held on Windows), apply now says the v2 tree is in place, names the leftovers and the underlying error, and gives the manual step to clear them, instead of throwing the raw error.
+  
+  `migrate --apply`: every leftover `prd_tree/` message now names the leftover and the same manual step (check the v2 tree holds everything in it, then delete it by hand). A failed removal after the switch no longer promises a re-run finishes the job, and a failed removal on an already-v2 apply says the v2 tree is in place instead of throwing the raw error.
+  
+  A migration plan's `metAt` now follows a capability's spec when a later pass redrafts it, instead of keeping the rules-stage draft's hash.
+  
+  `ndx migrate` (the bare chain) now shows the preflight banner, and its `--dry-run` runs no model unless `--with-models` is given
+  
+  `rex migrate-plan`, `rex migrate-apply` and `ndx migrate-layout` refuse inside an agent run (`NDX_AGENT_RUN` set), as `ndx migrate` already does.
+  
+  `rex migrate-to-folder-tree` keeps the PRD title
+  
+  The command wrote the tree but not `.rex/tree-meta.json`, so a migrated project
+  read back as "PRD". It now writes the sidecar with the source document's title.
+  
+  `rex migrate-slugs` on a v2 tree now says slugs are frozen there and applies to v1 trees only, instead of pointing at the v1 `rex migrate-to-folder-tree` command.
+  
+  Placing an Inbox change (`rex change place`) carries the non-tree files in its folder into `changes/<slug>/` with it, and removes the empty Inbox folder; a name clash refuses before anything is written.
+  
+  The v2 writer keeps a moved folder node's extra top-level `state.yaml` keys (keys a newer rex wrote) in its new folder. A node that moves and loses its last child in the same write is refused, naming its old folder and the keys, instead of dropping them.
+  
+  Writes on a v2 tree now stamp `lastModified` and `lastModifiedBy` on every
+  node they change, create or move, as v1 writes do. Before, `update_task_status`,
+  `edit_item`, `add_item` and `move_item` left a node's old stamp in place and
+  gave a new change none, so remote sync and the dashboard read v2 writes as
+  stale. A write that changes nothing stamps nothing. The stamp lands in the
+  node's `state.yaml` row, so a write now also rewrites that file.
+  
+  The rex MCP `get_capabilities` tool now reports `"schemaVersion": "rex/v2"` on a
+  v2 tree. It answered `"rex/v1"` beside `"adapter": "v2-change-layer"`, so a
+  client that reads `schemaVersion` took the tree for v1. A v1 tree still reports
+  `rex/v1`. The change layer store declares its version through the new optional
+  `schemaVersion` on `StoreCapabilities`.
+  
+  `get_product` now answers with a summary by default: each area with its counts
+  of capabilities and constraints by status, defective nodes and open changes.
+  Pass `area` (an id or display id) for that area's capabilities and constraints,
+  or `full: true` for the whole map, the previous default. On a large v2 tree the
+  whole map exceeded what an MCP client accepts and was refused. The
+  `/ndx-capture`, `/ndx-plan`, `/ndx-reshape` and `/ndx-adversarial-review`
+  skills read the summary, then the areas they need.
+  
+  The preflight banner and the dashboard's command effects name `changes/` and `product/` for the PRD on a v2 project instead of `prd_tree/`, which a v2 project does not have.
+  
+  The dashboard server turns off rex's v1-layout deprecation notice for the commands it spawns, so a failing rex spawn on a v1 project shows its real error and not the notice first.
+  
+  `rex next` labels v2 work by type (`[change]`, `[task]`, `[subtask]`), never `[epic]`. On a v2 tree, `level` in MCP and JSON payloads is the v1 projection of `type` and nesting: it stays for compatibility in this release and is deprecated. `type` is authoritative; the release that refuses v1 PRDs removes `level` from every v2 payload.
+  
+  Changes under the soft freeze:
+  - `ndx migrate --dry-run` (the bare chain) runs no model unless the new `--with-models` flag is given.
+  - `rex migrate-plan`, `rex migrate-apply` and `ndx migrate-layout` refuse inside an agent run.
+  - `rex migrate-plan`, `migrate-apply` and its dry run refuse a v1 tree with an item file the parser skipped.
+  - MCP `get_capabilities` reports `schemaVersion: rex/v2` on a v2 tree.
+  - MCP `get_product` answers with a per-area summary by default; `area` and `full: true` reach the detail, and `full: true` is the previous default.
+  - v2 writes stamp `lastModified` / `lastModifiedBy`.
+  - `level` is deprecated on v2 payloads (kept in this release); `rex next` text labels v2 work by type.
+  - The preflight banner and command effects name `changes/` and `product/` on a v2 project.
+
+- [#862](https://github.com/en-dash-consulting/n-dx/pull/862) [`dd7c1ed`](https://github.com/en-dash-consulting/n-dx/commit/dd7c1ed4fd2f34039b3b11b3416a34fc57d5a82f) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 project, progress counts a change with no tasks as one unit of work. A root change used to be counted like a v1 epic, a pure grouping, so an open change with no tasks counted for nothing and the Work page, the home Plan card and the status bar could read 100% while it was open. The Work page's progress panel now says changes rather than epics on v2, and a change with no tasks shows its status instead of 0/0. v1 numbers and labels are unchanged.
+
+- [#839](https://github.com/en-dash-consulting/n-dx/pull/839) [`0e03074`](https://github.com/en-dash-consulting/n-dx/commit/0e0307419bbbf9a6a8a0222908f523ebdfac06ea) Thanks [@endash-shal](https://github.com/endash-shal)! - Windows: no more console windows from n-dx's child processes. `exec()` and `spawnCli` in llm-client gain a `windowsHide` option that defaults to true, and every other production spawn in the monorepo passes it; a new root policy test (`windows-hide-policy`) fails any spawn that does not. The vendor-CLI log `claude_commands.log` is now gitignored by `ndx init` and discounted by hench's uncommitted-work gate, so a fresh project's first agent run no longer refuses completion over it. The Overview page's isometric hero shows its Options button again.
+- Updated dependencies [[`6144a9c`](https://github.com/en-dash-consulting/n-dx/commit/6144a9cd36eb62a872b0578dda68016c01f314e9), [`4443ec0`](https://github.com/en-dash-consulting/n-dx/commit/4443ec08e1432dd0648c5e1c8f972408d3bff5c9), [`166e33f`](https://github.com/en-dash-consulting/n-dx/commit/166e33fc06eee3b00482fa5283eb0e3731af6efe), [`2b00932`](https://github.com/en-dash-consulting/n-dx/commit/2b00932c9219ba7eb18f446493e2549170aafe48), [`2471bd7`](https://github.com/en-dash-consulting/n-dx/commit/2471bd7263746886671f0c29cb8abe94bf28b8c1), [`0e03074`](https://github.com/en-dash-consulting/n-dx/commit/0e0307419bbbf9a6a8a0222908f523ebdfac06ea)]:
+  - @n-dx/llm-client@0.10.0
+
 ## 0.9.1
 
 ### Patch Changes

@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option (a): web and graview vitest configs alias @n-dx/lang-kit to packages/lang-kit/src/index.ts (3c443c3d9). It was the cause of run e70597e0's gate failure, not only a stale-dist risk."
     appliedAt: "2026-10-13T04:01:20.891Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T04:01:22.037Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

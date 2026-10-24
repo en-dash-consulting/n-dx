@@ -10,5 +10,6 @@ items:
     resolutionDetail: "docs/packages/overview.md drops the fixed count, points to the .changeset fixed group, and names lang-kit, lang-runtime, the lang-* packs, graview and graview-face in the diagram and naming table."
     appliedAt: "2026-10-23T00:37:07.088Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-23T00:37:07.088Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

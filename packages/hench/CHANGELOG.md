@@ -1,5 +1,47 @@
 # @n-dx/hench
 
+## 0.10.0
+
+### Patch Changes
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`aa7886f`](https://github.com/en-dash-consulting/n-dx/commit/aa7886f0b4069fb6a06a0043d94f1b79b3afa709) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx config <pkg>.<key> <value>` refuses a key with a `__proto__`, `constructor` or `prototype` segment. `ndx config llm.__proto__.polluted x` followed `configs.llm["__proto__"]` onto `Object.prototype` and assigned there, in the CLI's own process; the write was never persisted, but the command now exits non-zero naming the segment and leaves every config file untouched. hench's `setConfigValue` applies the same guard behind its `CONFIG_FIELDS` allowlist.
+  
+  The `ndx work` command that `ndx work --resolve` prints is now correct on Windows for a path that ends in a backslash or contains a quote: backslashes before a `"` or the closing quote are doubled, as the argv rules every Node program decodes with require, so `C:\My Repo\` prints as `"C:\My Repo\\"` rather than `"C:\My Repo\"`.
+  
+  Four regular expressions that were quadratic on hostile input scan linearly: the `icacls` ACE parser behind owner-only config files (the same result on every icacls line; it now rejects a line with a `(` inside a flag group or a `:(` inside an identity, which icacls never prints), the trailing-separator trim in the MCP shim's workspace key, and the project-id slug in `ndx start` and its twin in the hub's new-project page (the same result on every input). `ndx ci`'s data-layer check now escapes every regex metacharacter in a layout directory name rather than only the dot.
+
+- [#835](https://github.com/en-dash-consulting/n-dx/pull/835) [`96bc0a4`](https://github.com/en-dash-consulting/n-dx/commit/96bc0a4bddc1d5c6446e094d29a1b081801b257a) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx work` now completes a parent whose children are all completed, and commits the completed status. rex offers such a parent as the next task, but its work landed with its children, so a run on it changes no code. The completion gate refused every one of those runs ("No changes detected in git diff") and put the parent back to pending. The next run picked it again, and each refused run left its status writes uncommitted in `.rex/prd_tree/`. The gate now accepts an empty diff for a finalize-ready parent, using rex's own `allChildrenSuccessful` (now exported), and the completion commit carries it.
+  
+  The commit that lands a completed status now always has an `N-DX-Status: <id> in_progress → completed` trailer. On the commit-prompt path it never did: hench writes `completed` before the prompt runs, so the prompt read the item as already completed and left the trailer off. The completion-record commit had no status trailer at all.
+
+- [#839](https://github.com/en-dash-consulting/n-dx/pull/839) [`2022063`](https://github.com/en-dash-consulting/n-dx/commit/2022063541e100ab26bf82d122eee011216b686d) Thanks [@endash-shal](https://github.com/endash-shal)! - A completed task now lands as one commit: its work, then its completion. Two
+  things split them. The agent commits during its session, before hench's gates
+  mark the task, so the completion followed in a `chore(prd)` record commit. And
+  where the commit prompt did stage the status with the code, hench then wrote
+  that commit's SHA onto the PRD item — a write that can only land after the
+  commit — so every completed run still ended in a trailing `chore(prd)` commit.
+  
+  The SHA write is gone: a commit is tied to its item by the `N-DX-Item` trailer,
+  as rex already attributes it. When the agent committed for itself, hench folds
+  the completion into the run's last commit, adding `N-DX-Status` and, if it was
+  missing, `N-DX-Item`. The fold only amends a commit this run made that is not
+  a merge, not on any remote, not for another item, with no git operation in
+  progress; otherwise the completion gets its own record commit and hench prints
+  why. A gate-only retry folds into the earlier attempt's work commit.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`a5c696f`](https://github.com/en-dash-consulting/n-dx/commit/a5c696f3acc9e63a7f5228bc499e64b5c95bd0eb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex init` (and so `ndx init`) gives a project with no PRD an empty v2 tree, `product/index.md` stamped `rex/v2`, and no `prd_tree/`, so a new project no longer prints the v1 deprecation notice. A project that already has a PRD keeps its layout; moving a v1 PRD stays `ndx migrate`'s job. The next steps init prints use the v2 verb (`rex add --title=…`) whenever the tree is v2, fresh or migrated.
+  
+  Changes what a CLI command creates under the soft freeze: `rex init` / `ndx init` on a project with no PRD now writes the v2 layout instead of v1. No flag or MCP tool changes shape.
+  
+  On a v2 PRD whose product layer has no capability and no constraint, such as a fresh project, a change in the Inbox is no longer stuck: there is nowhere to place it, so `rex next`, `get_next_task` and `ndx work` select it and its tasks, `ndx work --task` runs it, and it completes when its last task does. With no target it stays unapplied in the Inbox until placed. Once the product layer has a capability or constraint, Inbox changes are held from selection and closing as before, and `change-placed-at-close` reports any that closed unplaced. rex exports `awaitsPlacement`, the one predicate all of these use.
+  
+  Changes a v2 selection and completion rule under the soft freeze: an Inbox change is held for placement only while the product layer has a capability or constraint to place it on. rex's public API gains `awaitsPlacement`; no MCP tool or CLI flag changes shape.
+
+- [#839](https://github.com/en-dash-consulting/n-dx/pull/839) [`0e03074`](https://github.com/en-dash-consulting/n-dx/commit/0e0307419bbbf9a6a8a0222908f523ebdfac06ea) Thanks [@endash-shal](https://github.com/endash-shal)! - Windows: no more console windows from n-dx's child processes. `exec()` and `spawnCli` in llm-client gain a `windowsHide` option that defaults to true, and every other production spawn in the monorepo passes it; a new root policy test (`windows-hide-policy`) fails any spawn that does not. The vendor-CLI log `claude_commands.log` is now gitignored by `ndx init` and discounted by hench's uncommitted-work gate, so a fresh project's first agent run no longer refuses completion over it. The Overview page's isometric hero shows its Options button again.
+- Updated dependencies [[`27b5833`](https://github.com/en-dash-consulting/n-dx/commit/27b583370e486993ec1760d169db8f4461e0f9ef), [`96bc0a4`](https://github.com/en-dash-consulting/n-dx/commit/96bc0a4bddc1d5c6446e094d29a1b081801b257a), [`a5c696f`](https://github.com/en-dash-consulting/n-dx/commit/a5c696f3acc9e63a7f5228bc499e64b5c95bd0eb), [`6144a9c`](https://github.com/en-dash-consulting/n-dx/commit/6144a9cd36eb62a872b0578dda68016c01f314e9), [`4443ec0`](https://github.com/en-dash-consulting/n-dx/commit/4443ec08e1432dd0648c5e1c8f972408d3bff5c9), [`166e33f`](https://github.com/en-dash-consulting/n-dx/commit/166e33fc06eee3b00482fa5283eb0e3731af6efe), [`a827aaa`](https://github.com/en-dash-consulting/n-dx/commit/a827aaa8d854d328271ff4411ba0fe6158c3195d), [`be77a84`](https://github.com/en-dash-consulting/n-dx/commit/be77a847e3b0805b8e76c0d0ea89bcc0e099d538), [`2b00932`](https://github.com/en-dash-consulting/n-dx/commit/2b00932c9219ba7eb18f446493e2549170aafe48), [`240579c`](https://github.com/en-dash-consulting/n-dx/commit/240579c9200b144629a6069cf9a752d4eaaa1492), [`9e18581`](https://github.com/en-dash-consulting/n-dx/commit/9e185812cb4ec52603e67d6c295568ea5334b4ec), [`4ce8d35`](https://github.com/en-dash-consulting/n-dx/commit/4ce8d35c2939007e44995d3fc0334863965a0b4c), [`60c910a`](https://github.com/en-dash-consulting/n-dx/commit/60c910a463e935bf6af6715f31a416e2ba1d7050), [`7c12c18`](https://github.com/en-dash-consulting/n-dx/commit/7c12c182e92139a5201affc48343ce00eb442f55), [`c92eb9c`](https://github.com/en-dash-consulting/n-dx/commit/c92eb9ca7114170beda601782aecae71992d40da), [`582752e`](https://github.com/en-dash-consulting/n-dx/commit/582752ec5bda44987ab8d9614ec19620e84f3140), [`6957df6`](https://github.com/en-dash-consulting/n-dx/commit/6957df6c10ddb5a49cc74d82a452470fc4b492f8), [`7fa688f`](https://github.com/en-dash-consulting/n-dx/commit/7fa688f0127249893d469e67716780ab8c1bb15d), [`dd7c1ed`](https://github.com/en-dash-consulting/n-dx/commit/dd7c1ed4fd2f34039b3b11b3416a34fc57d5a82f), [`2471bd7`](https://github.com/en-dash-consulting/n-dx/commit/2471bd7263746886671f0c29cb8abe94bf28b8c1), [`0e03074`](https://github.com/en-dash-consulting/n-dx/commit/0e0307419bbbf9a6a8a0222908f523ebdfac06ea)]:
+  - @n-dx/rex@0.10.0
+  - @n-dx/llm-client@0.10.0
+
 ## 0.9.1
 
 ### Patch Changes
