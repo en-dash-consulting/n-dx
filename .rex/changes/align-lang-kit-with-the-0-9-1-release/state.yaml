@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "lang-kit 0.9.1; tests/e2e/fixed-group-versions.test.js; backfill skips packages absent at a row's commit; verify-build checks lang-kit; overview.md lists lang-kit."
     appliedAt: "2026-10-17T01:33:50.605Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T01:33:50.913Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

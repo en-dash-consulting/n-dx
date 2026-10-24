@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Run e0063090 committed 355993342 + 70df5d0ae; its gate failure (setup NDX_HOME overriding the e2e tests' N_DX_HOME) fixed by the operator in abaafe9b5. Affected gate 14/14; output identical."
     appliedAt: "2026-10-15T05:31:43.396Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-15T05:31:43.720Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

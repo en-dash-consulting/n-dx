@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Added .changeset/sv-terraform-inventory.md (@n-dx/sourcevision patch)"
     appliedAt: "2026-10-17T01:32:53.397Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T01:32:54.255Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

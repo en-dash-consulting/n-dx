@@ -35,6 +35,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "PR 19: prototype-free framework rule tables (Spring and Python) with an outbound row guard; framework, project-facts, project-notices and symbol-refine failures contained as notices; Django urlpatterns reassignment and splat forms keep earlier patterns. Verified byte-identical against PR 18 on the whole corpus."
     appliedAt: "2026-10-17T09:07:43.064Z"
+    shippedIn: "0.10.0"
     needsPlacement: true
     lastModified: "2026-10-17T09:19:00.114Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "hasTerraformMarker counts terragrunt.hcl, .tfvars and .tftest.hcl; Terragrunt-only test added."
     appliedAt: "2026-10-11T05:07:35.162Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T05:07:37.034Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

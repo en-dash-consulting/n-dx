@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Run a3f6511e-4ba7-4230-ad57-5084e22a110f, commit cb3ce022c: sqlcQueryPaths became sqlcPaths(config, content, key) and reads schema: too; schema files are sqlFiles, query files files only; doc updated. The run failed its gate on a regression in embedded-sql.test.ts, captured as a separate fix task; not re-run."
     appliedAt: "2026-10-11T04:06:56.376Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T04:06:56.677Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

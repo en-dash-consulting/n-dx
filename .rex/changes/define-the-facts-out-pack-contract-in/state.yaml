@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Facts-out contract in lang-kit/src/pack-contract.ts; sourcevision adapter pack-facts.ts; pack-imports builds from imports facts; build-reader types removed. Goldens unedited; corpus numbers match PR 10."
     appliedAt: "2026-10-13T04:33:38.928Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T04:33:39.477Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

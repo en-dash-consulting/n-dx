@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Run 37b402d5 + review repairs e3c6f3359; operator finished lockfile, guidance and instruction regeneration in a61fa15de. All gates pass (affected gate 9/9 suites)."
     appliedAt: "2026-10-13T03:10:28.064Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-13T03:10:28.390Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

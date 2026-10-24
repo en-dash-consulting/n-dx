@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Added .changeset/sv-terraform-zones-detection-roles.md (@n-dx/sourcevision patch) covering zones exclusion, any-depth detection, .terraform skip, case-sensitive isTerraformPath names and Terraform roles."
     appliedAt: "2026-10-17T01:28:44.773Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T01:28:45.695Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

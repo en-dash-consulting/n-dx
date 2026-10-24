@@ -116,6 +116,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "PR 20: linear Python requirement/uv-glob/pom/Maven parsing with revert-proof budget tests, memoised and depth-safe Maven interpolation, Terraform instance-cap test, sv pack --ignore-scripts, pack-dir lock and SHA-256 bundle verification, pinned wasi-sdk/binaryen (digests match GitHub's), CI grammar-step guard covering every pack suite group, release-scope checks. Verified byte-identical against PR 19 with a fresh verified toolchain build."
     appliedAt: "2026-10-17T11:20:54.587Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T11:20:54.912Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e105ad53-3d4a-4579-8bae-a1307cf0071b":

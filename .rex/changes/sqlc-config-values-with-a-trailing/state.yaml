@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "sqlcPaths strips a ` #` comment outside quotes (scalar, flow list, block item) before unquoting. Commit b3cdd90c0."
     appliedAt: "2026-10-11T04:25:57.998Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-11T04:25:58.274Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

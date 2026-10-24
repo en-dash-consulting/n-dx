@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Added .changeset/sv-go-generated-header.md (@n-dx/sourcevision patch)."
     appliedAt: "2026-10-17T01:26:14.889Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T01:26:15.197Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

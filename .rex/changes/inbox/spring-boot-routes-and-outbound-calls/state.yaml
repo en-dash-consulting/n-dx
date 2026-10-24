@@ -15,6 +15,7 @@ items:
     completedAt: "2026-10-21T04:23:39.475Z"
     endedAt: "2026-10-21T04:23:39.475Z"
     appliedAt: "2026-10-21T04:23:39.475Z"
+    shippedIn: "0.10.0"
     needsPlacement: true
     lastModified: "2026-10-21T04:23:39.475Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

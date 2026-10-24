@@ -53,6 +53,7 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "PR 18: python:/java: externals, Java module/source-set preference with test-artifact visibility, Go size-cap fallback and replace externals, Python __init__ re-exports, Gradle continuation, sqlc arrays; verified against PR 17. Low follow-ups moved to the review follow-ups feature."
     appliedAt: "2026-10-17T08:26:14.855Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T08:26:15.171Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e1f85d-5c45-45c2-bfc1-f607b2e10ffc":

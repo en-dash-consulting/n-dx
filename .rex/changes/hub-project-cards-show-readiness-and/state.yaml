@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Hub cards carry and render readiness and infrastructure counts"
     appliedAt: "2026-10-21T04:27:49.879Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-21T04:27:50.557Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

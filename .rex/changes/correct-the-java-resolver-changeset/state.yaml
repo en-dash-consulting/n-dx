@@ -8,5 +8,6 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Dropped \"Nothing consumes the resolver yet, so analysis output is unchanged\" from .changeset/sv-java-resolver.md."
     appliedAt: "2026-10-17T01:25:29.933Z"
+    shippedIn: "0.10.0"
     lastModified: "2026-10-17T01:25:30.235Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
