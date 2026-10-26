@@ -11,8 +11,20 @@ items:
     lastModified: "2026-10-26T18:40:55.050Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "8c045996-2f38-4940-8dc3-82eef87d6cf7":
-    lastModified: "2026-10-26T17:03:29.393Z"
+    status: "completed"
+    startedAt: "2026-10-26T18:41:09.317Z"
+    completedAt: "2026-10-26T19:05:48.271Z"
+    endedAt: "2026-10-26T19:05:48.271Z"
+    activeIntervals: [{"end":"2026-10-26T19:00:52.745Z","start":"2026-10-26T18:41:09.317Z"},{"end":"2026-10-26T19:05:48.271Z","start":"2026-10-26T19:05:48.271Z"}]
+    lastModified: "2026-10-26T19:05:48.271Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "e00f285c-6244-4f04-b441-097e5f0cfec0":
-    lastModified: "2026-10-26T17:29:16.918Z"
+    status: "completed"
+    startedAt: "2026-10-26T19:05:48.271Z"
+    completedAt: "2026-10-26T19:05:48.271Z"
+    endedAt: "2026-10-26T19:05:48.271Z"
+    activeIntervals: [{"end":"2026-10-26T19:05:48.271Z","start":"2026-10-26T19:05:48.271Z"}]
+    appliedAt: "2026-10-26T19:05:48.271Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-26T19:05:48.271Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
