@@ -38,6 +38,13 @@ import { vendorSessionDriver } from "./vendor-session-driver.js";
 
 type ChildProcess = ReturnType<typeof spawnCli>;
 
+/**
+ * How long an interrupted CLI gets to exit on SIGTERM before it is killed.
+ * An operator pressed Stop and waits on it, so this stays well under the 2 s
+ * an interrupt is allowed — not the 5 s default a background run gets.
+ */
+export const INTERRUPT_GRACE_MS = 500;
+
 export type VendorSessionState = "idle" | "running" | "ended";
 
 export interface VendorSessionOptions {
@@ -160,7 +167,7 @@ function createSession(
   async function stopChild(): Promise<void> {
     if (!child) return;
     interrupted = true;
-    await terminateProcessTree(child);
+    await terminateProcessTree(child, { forceKillTimeoutMs: INTERRUPT_GRACE_MS });
   }
 
   function runTurn(prompt: string, turn: number): Promise<SessionTurnResult> {
@@ -202,7 +209,9 @@ function createSession(
 
       const processLine = (line: string): void => {
         if (!line.trim()) return;
-        const event = driver.parseLine(line, turn);
+        // The whole reply: a conversation shows it, where hench's run
+        // records keep the driver's 500-character summary.
+        const event = driver.parseLine(line, turn, { textLimit: Infinity });
         if (event) emit(event);
         let raw: unknown;
         try {

@@ -576,6 +576,7 @@ export type {
   VendorSessionDriver,
   NormalizedCodexResponse,
   NormalizedCodexToolEvent,
+  ParseLineOptions,
 } from "./vendor-session-driver.js";
 export {
   claudeSessionDriver,

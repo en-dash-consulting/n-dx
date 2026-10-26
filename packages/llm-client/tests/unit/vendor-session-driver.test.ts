@@ -5,6 +5,7 @@ import {
   vendorSessionDriver,
   WINDOWS_STDIN_PROMPT_SEPARATOR,
 } from "../../src/vendor-session-driver.js";
+import type { VendorSessionDriver } from "../../src/vendor-session-driver.js";
 import { UsageMessageFilter } from "../../src/usage-dedup.js";
 
 describe("vendorSessionDriver", () => {
@@ -89,5 +90,24 @@ describe("session ids", () => {
     expect(claudeSessionDriver.extractSessionId({ type: "system", session_id: "a" })).toBe("a");
     expect(codexSessionDriver.extractSessionId({ type: "thread.started", thread_id: "t" })).toBe("t");
     expect(codexSessionDriver.extractSessionId({ type: "item.completed", thread_id: "x" })).toBeUndefined();
+  });
+});
+
+describe("text length", () => {
+  const long = "x".repeat(2000);
+  const lines: Array<[string, VendorSessionDriver, string, "text" | "completionSummary"]> = [
+    ["claude string message", claudeSessionDriver, JSON.stringify({ type: "assistant", message: long }), "text"],
+    ["claude result", claudeSessionDriver, JSON.stringify({ type: "result", result: long }), "completionSummary"],
+    ["codex agent_message", codexSessionDriver, JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: long } }), "text"],
+    ["codex message block", codexSessionDriver, JSON.stringify({ type: "message", content: [{ type: "output_text", text: long }] }), "text"],
+    ["codex summary", codexSessionDriver, JSON.stringify({ type: "summary", result: long }), "completionSummary"],
+  ];
+
+  it.each(lines)("keeps hench's 500-character summary of a %s by default", (_name, driver, line, field) => {
+    expect(driver.parseLine(line, 1)?.[field]).toHaveLength(500);
+  });
+
+  it.each(lines)("keeps the whole %s when the caller lifts the limit", (_name, driver, line, field) => {
+    expect(driver.parseLine(line, 1, { textLimit: Infinity })?.[field]).toBe(long);
   });
 });

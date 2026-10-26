@@ -33,8 +33,19 @@ import {
   parseStreamTokenUsageWithDiagnostic,
 } from "./token-usage.js";
 
+/** Default cap on assistant and completion text: hench keeps run summaries short. */
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TOOL_OUTPUT_LENGTH = 2000;
+
+/** How {@link VendorSessionDriver.parseLine} shapes an event. */
+export interface ParseLineOptions {
+  /**
+   * Longest assistant or completion text kept, default 500 — what hench's run
+   * records summarize with. A conversation that shows the reply passes
+   * `Infinity` to keep all of it.
+   */
+  readonly textLimit?: number;
+}
 
 // ── Turn arguments ───────────────────────────────────────────────────────
 
@@ -109,7 +120,7 @@ export interface VendorSessionDriver {
    */
   turnSpawn(input: SessionTurnInput, platform?: NodeJS.Platform): SessionTurnSpawn;
   /** Normalize one stdout line; `null` for lines that carry no event. */
-  parseLine(line: string, turn: number): RuntimeEvent | null;
+  parseLine(line: string, turn: number, options?: ParseLineOptions): RuntimeEvent | null;
   /** The session id one parsed line names, if it names one. */
   extractSessionId(rawJson: unknown): string | undefined;
   /**
@@ -212,7 +223,11 @@ function extractClaudeToolUseBlocks(
  * Lines that carry no event (empty, non-JSON, unknown types, usage-only
  * assistant messages) return `null`. Token usage is {@link VendorSessionDriver.usageEvent}'s.
  */
-export function parseClaudeStreamLine(line: string, turn: number): RuntimeEvent | null {
+export function parseClaudeStreamLine(
+  line: string,
+  turn: number,
+  { textLimit: limit = MAX_SUMMARY_LENGTH }: ParseLineOptions = {},
+): RuntimeEvent | null {
   if (!line.trim()) return null;
 
   let event: Record<string, unknown>;
@@ -232,7 +247,7 @@ export function parseClaudeStreamLine(line: string, turn: number): RuntimeEvent 
       let text: string | undefined;
 
       if (typeof message === "string") {
-        text = message.slice(0, MAX_SUMMARY_LENGTH);
+        text = message.slice(0, limit);
       } else if (message && typeof message === "object") {
         const blocks = (message as Record<string, unknown>).content as
           | Array<{ type: string; text?: string }>
@@ -318,7 +333,7 @@ export function parseClaudeStreamLine(line: string, turn: number): RuntimeEvent 
         turn,
         timestamp,
         completionSummary: event.result
-          ? (event.result as string).slice(0, MAX_SUMMARY_LENGTH)
+          ? (event.result as string).slice(0, limit)
           : undefined,
       };
     }
@@ -637,7 +652,11 @@ export function normalizeCodexResponse(raw: unknown): NormalizedCodexResponse {
  * completion family (`summary`, `response.completed`, `done`, `complete`).
  * Anything else, and non-JSON, returns `null`.
  */
-export function parseCodexJsonLine(line: string, turn: number): RuntimeEvent | null {
+export function parseCodexJsonLine(
+  line: string,
+  turn: number,
+  { textLimit: limit = MAX_SUMMARY_LENGTH }: ParseLineOptions = {},
+): RuntimeEvent | null {
   if (!line.trim()) return null;
 
   let event: Record<string, unknown>;
@@ -686,7 +705,7 @@ export function parseCodexJsonLine(line: string, turn: number): RuntimeEvent | n
           vendor,
           turn,
           timestamp,
-          text: item.text.slice(0, MAX_SUMMARY_LENGTH),
+          text: item.text.slice(0, limit),
         };
       }
 
@@ -747,7 +766,7 @@ export function parseCodexJsonLine(line: string, turn: number): RuntimeEvent | n
       if (Array.isArray(content)) {
         for (const block of content) {
           if ((block.type === "text" || block.type === "output_text") && block.text) {
-            text = block.text.slice(0, MAX_SUMMARY_LENGTH);
+            text = block.text.slice(0, limit);
           } else if ((block.type === "tool_use" || block.type === "function_call") && !firstToolCall) {
             const rawInput = block.input ?? parseMaybeJson(block.arguments);
             firstToolCall = {
@@ -761,7 +780,7 @@ export function parseCodexJsonLine(line: string, turn: number): RuntimeEvent | n
       }
 
       if (typeof event.text === "string" && !content) {
-        text = event.text.slice(0, MAX_SUMMARY_LENGTH);
+        text = event.text.slice(0, limit);
       }
 
       if (firstToolCall) {
@@ -825,9 +844,9 @@ export function parseCodexJsonLine(line: string, turn: number): RuntimeEvent | n
       }
       let summaryText: string | undefined;
       if (typeof event.result === "string") {
-        summaryText = event.result.slice(0, MAX_SUMMARY_LENGTH);
+        summaryText = event.result.slice(0, limit);
       } else if (typeof event.text === "string") {
-        summaryText = event.text.slice(0, MAX_SUMMARY_LENGTH);
+        summaryText = event.text.slice(0, limit);
       }
       return {
         type: "completion" as RuntimeEventType,
@@ -844,7 +863,7 @@ export function parseCodexJsonLine(line: string, turn: number): RuntimeEvent | n
 }
 
 /** The heuristic fallback for a line the structured parser could not map. */
-function parseCodexHeuristicLine(line: string, turn: number): RuntimeEvent | null {
+function parseCodexHeuristicLine(line: string, turn: number, limit: number): RuntimeEvent | null {
   const normalized = normalizeCodexResponse(line);
   const timestamp = new Date().toISOString();
   const vendor: LLMVendor = LLM_VENDOR.CODEX;
@@ -866,7 +885,7 @@ function parseCodexHeuristicLine(line: string, turn: number): RuntimeEvent | nul
       vendor,
       turn,
       timestamp,
-      text: normalized.assistantText.slice(0, MAX_SUMMARY_LENGTH),
+      text: normalized.assistantText.slice(0, limit),
     };
   }
   if (normalized.status === "error" && normalized.error) {
@@ -882,10 +901,12 @@ function parseCodexHeuristicLine(line: string, turn: number): RuntimeEvent | nul
 }
 
 /** Structured JSONL first, then the heuristic for unstructured output. */
-function parseCodexLine(line: string, turn: number): RuntimeEvent | null {
-  const structured = parseCodexJsonLine(line, turn);
+function parseCodexLine(line: string, turn: number, options: ParseLineOptions = {}): RuntimeEvent | null {
+  const structured = parseCodexJsonLine(line, turn, options);
   if (structured) return structured;
-  return line.trim() ? parseCodexHeuristicLine(line, turn) : null;
+  return line.trim()
+    ? parseCodexHeuristicLine(line, turn, options.textLimit ?? MAX_SUMMARY_LENGTH)
+    : null;
 }
 
 /**

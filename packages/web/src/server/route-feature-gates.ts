@@ -51,6 +51,12 @@ export interface RouteFeatureGate {
   feature: string;
   /** Paths this gate covers exactly (query string already stripped). */
   exact: readonly string[];
+  /**
+   * A path this gate covers with everything beneath it, for a feature that
+   * owns a whole route family with ids in the path. `/api/x` covers `/api/x`
+   * and `/api/x/…`, never `/api/xy`.
+   */
+  prefix?: string;
   /** Why these endpoints belong to this toggle. Read by humans, not code. */
   reason: string;
   /**
@@ -88,12 +94,20 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     exact: ["/api/sv/pr-markdown", "/api/sv/pr-markdown/state"],
     reason: "Reads for the PR Markdown page. Listed exactly so an unrelated subpath is still a 404, not a 403.",
   },
+  {
+    feature: "web.sidecar",
+    exact: [],
+    prefix: "/api/sidecar",
+    reason:
+      "Every Sidecar session route, reads included: a turn spends tokens through the vendor CLI, and the session ids are in the path.",
+  },
 ];
 
 /** The gate covering `pathname`, or null when the path is ungated. */
 export function findRouteFeatureGate(pathname: string): RouteFeatureGate | null {
   for (const gate of ROUTE_FEATURE_GATES) {
     if (gate.exact.includes(pathname)) return gate;
+    if (gate.prefix && (pathname === gate.prefix || pathname.startsWith(`${gate.prefix}/`))) return gate;
   }
   return null;
 }

@@ -26,7 +26,7 @@ export interface FeatureToggle {
    */
   details?: string;
   /** Which package owns this toggle. */
-  package: "sourcevision" | "rex" | "hench" | "git";
+  package: "sourcevision" | "rex" | "hench" | "git" | "web";
   /** Whether this is experimental, stable, or deprecated. */
   stability: "experimental" | "stable" | "deprecated";
   /** Current value (true = enabled). */

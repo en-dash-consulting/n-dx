@@ -38,7 +38,11 @@ if (${JSON.stringify(vendor)} === "claude") {
   const resumed = r >= 0 ? argv[r + 1] : undefined;
   const id = resumed ? (argv.includes("--fork-session") ? "fork-of-" + resumed : resumed) : "claude-1";
   out({ type: "system", subtype: "init", session_id: id });
-  if (prompt.includes("HANG")) {
+  if (prompt.includes("STUBBORN")) process.on("SIGTERM", () => {});
+  if (prompt.includes("LONG")) {
+    out({ type: "assistant", session_id: id, message: "a".repeat(2000) });
+    out({ type: "result", session_id: id, result: "r".repeat(2000) });
+  } else if (prompt.includes("HANG")) {
     out({ type: "assistant", session_id: id, message: { content: [{ type: "text", text: "working" }] } });
     setInterval(() => {}, 1000);
   } else {
@@ -55,7 +59,9 @@ if (${JSON.stringify(vendor)} === "claude") {
 } else {
   const id = argv[1] === "resume" ? argv[2] : "thread-1";
   out({ type: "thread.started", thread_id: id });
-  if (prompt.includes("HANG")) {
+  if (prompt.includes("LONG")) {
+    out({ type: "item.completed", item: { type: "agent_message", text: "a".repeat(2000) } });
+  } else if (prompt.includes("HANG")) {
     out({ type: "item.completed", item: { type: "agent_message", text: "working" } });
     setInterval(() => {}, 1000);
   } else {
@@ -87,7 +93,7 @@ function fake(vendor: "claude" | "codex"): string {
 }
 
 /** A turn the fake never finishes; `working` resolves once it has started. */
-function startHanging(vendor: "claude" | "codex") {
+function startHanging(vendor: "claude" | "codex", prompt = "HANG") {
   let markWorking!: () => void;
   const working = new Promise<void>((resolve) => { markWorking = resolve; });
   const session = startVendorSession({
@@ -96,7 +102,7 @@ function startHanging(vendor: "claude" | "codex") {
     binary: fake(vendor),
     onEvent: (e) => { if (e.text === "working") markWorking(); },
   });
-  return { session, pending: session.sendTurn("HANG"), working };
+  return { session, pending: session.sendTurn(prompt), working };
 }
 
 describe("claude sessions", () => {
@@ -167,6 +173,27 @@ describe("claude sessions", () => {
     expect(session.state).toBe("idle");
   });
 
+  it("stops a CLI that ignores SIGTERM within 2 s of an interrupt", async () => {
+    const { session, pending, working } = startHanging("claude", "STUBBORN HANG");
+    await working;
+    const started = Date.now();
+    await session.interrupt();
+    expect((await pending).status).toBe("interrupted");
+    // 2 s is the requirement itself, so it is not scaled. Measured 2026-10-26:
+    // whole test ~0.7 s with the 500 ms INTERRUPT_GRACE_MS; with the 5 s
+    // background default instead it ran past 5 s. Listed in
+    // tests/wall-clock-assertion-inventory.md.
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it("carries the whole reply in assistant and completion events and the turn text", async () => {
+    const session = startVendorSession({ vendor: "claude", cwd: dir, binary: fake("claude") });
+    const turn = await session.sendTurn("LONG");
+    expect(turn.events.find((e) => e.type === "assistant")?.text).toBe("a".repeat(2000));
+    expect(turn.events.find((e) => e.type === "completion")?.completionSummary).toBe("r".repeat(2000));
+    expect(turn.text).toBe("r".repeat(2000));
+  });
+
   it("refuses turns after end", async () => {
     const { session, pending, working } = startHanging("claude");
     await working;
@@ -218,6 +245,12 @@ describe("codex sessions", () => {
     await working;
     await session.interrupt();
     expect((await pending).status).toBe("interrupted");
+  });
+
+  it("carries the whole agent message", async () => {
+    const session = startVendorSession({ vendor: "codex", cwd: dir, binary: fake("codex") });
+    const turn = await session.sendTurn("LONG");
+    expect(turn.text).toBe("a".repeat(2000));
   });
 });
 

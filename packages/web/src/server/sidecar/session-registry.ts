@@ -229,6 +229,23 @@ export class SidecarSessionRegistry {
       .filter((frame) => frame.seq > after);
   }
 
+  /** Whether a turn is running in the session now. */
+  isRunning(id: string): boolean {
+    return this.live.get(id)?.session.state === "running";
+  }
+
+  /**
+   * Stop the running turn; the session stays usable and its next turn
+   * resumes. The turn settles as `interrupted`.
+   *
+   * @returns false when no turn was running.
+   */
+  async interrupt(id: string): Promise<boolean> {
+    if (!this.isRunning(id)) return false;
+    await this.live.get(id)?.session.interrupt();
+    return true;
+  }
+
   /** Stop any running turn; the session keeps its record and transcript but never resumes. */
   async end(id: string): Promise<void> {
     const record = this.records.get(id);

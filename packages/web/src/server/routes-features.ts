@@ -40,7 +40,7 @@ interface FeatureDefinition {
   impact: string;
   /** Longer explanation revealed by the toggle's info control. */
   details?: string;
-  package: "sourcevision" | "rex" | "hench" | "git";
+  package: FeatureToggle["package"];
   stability: "experimental" | "stable" | "deprecated";
   defaultValue: boolean;
 }
@@ -183,6 +183,16 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     description: "When every uncommitted file came from the same tool — all PRD files, or all SourceVision scan output — commit them automatically with a constant message instead of waiting for the button in the git panel.",
     impact: "Only ever commits a tree that contains nothing else, and never pushes. A tree holding any of your own work is left alone.",
     package: "git",
+    stability: "experimental",
+    defaultValue: false,
+  },
+  // ── Web dashboard ──────────────────────────────────────────────────
+  {
+    key: "web.sidecar",
+    label: "Sidecar",
+    description: "Hold conversations with a vendor CLI from the dashboard: each turn posts to the server, which runs the CLI and streams the reply back.",
+    impact: "Each turn spends tokens through your Claude or Codex CLI. When disabled, every /api/sidecar route refuses.",
+    package: "web",
     stability: "experimental",
     defaultValue: false,
   },
