@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/en-dash-consulting/n-dx/blob/main/packages/core/extension-manifest.schema.json",
+  "title": "n-dx extension manifest (ndx.extension), apiVersion 1",
+  "description": "The ndx.extension block of an extension's package.json. n-dx validates it with packages/core/extension-manifest.js, which also checks what a schema cannot: names against built-in commands, semver range syntax and project-link placeholders. See docs/architecture/extensions.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "name", "ndxVersion"],
+  "anyOf": [
+    { "required": ["commands"], "properties": { "commands": { "minItems": 1 } } },
+    { "required": ["sidecar"] }
+  ],
+  "dependentRequired": {
+    "hub": ["sidecar"],
+    "projectLinks": ["sidecar"]
+  },
+  "properties": {
+    "apiVersion": {
+      "description": "Contract version. A version n-dx does not speak is listed as incompatible and never run.",
+      "type": "integer",
+      "const": 1
+    },
+    "name": { "$ref": "#/$defs/name" },
+    "displayName": { "$ref": "#/$defs/text" },
+    "ndxVersion": {
+      "description": "Semver range of n-dx versions the extension supports, e.g. \">=0.10.0 <0.12.0\".",
+      "$ref": "#/$defs/text"
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "bin", "summary"],
+        "properties": {
+          "name": { "$ref": "#/$defs/name" },
+          "bin": { "$ref": "#/$defs/packagePath" },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[^\\r\\n]*$" }
+        }
+      }
+    },
+    "sidecar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bin"],
+      "properties": {
+        "bin": { "$ref": "#/$defs/packagePath" },
+        "health": { "$ref": "#/$defs/urlPath" },
+        "idleStopMinutes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "hub": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label"],
+      "properties": {
+        "label": { "$ref": "#/$defs/text" },
+        "description": { "$ref": "#/$defs/text" }
+      }
+    },
+    "projectLinks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "path"],
+        "properties": {
+          "label": { "$ref": "#/$defs/text" },
+          "path": {
+            "description": "Path under the extension's /x/<name>/ mount. {projectId} and {repoRoot} are the only placeholders.",
+            "$ref": "#/$defs/urlPath"
+          }
+        }
+      }
+    },
+    "configSchema": {
+      "description": "Path inside the package to a JSON Schema for the extension's config section.",
+      "$ref": "#/$defs/packagePath"
+    }
+  },
+  "$defs": {
+    "name": {
+      "description": "Lowercase slug. Must not be a built-in ndx command, an n-dx bin alias, or ext, x, hub or extensions.",
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "not": { "enum": ["ndx", "n-dx", "rex", "hench", "sourcevision", "sv", "ext", "x", "hub", "extensions"] }
+    },
+    "text": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "packagePath": {
+      "description": "Relative path inside the package.",
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "^(?:/|\\\\|[A-Za-z]:|\\.\\.(?:[/\\\\]|$))" }
+    },
+    "urlPath": { "type": "string", "pattern": "^/" }
+  }
+}
