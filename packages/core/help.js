@@ -259,6 +259,13 @@ const COMMAND_REGISTRY = [
     related: ["init", "work", "start"],
   },
   {
+    name: "extensions",
+    category: "Orchestration",
+    summary: "List, add, remove, enable, disable and check n-dx extensions",
+    keywords: ["extensions", "extension", "plugin", "add-on", "install", "approve", "enable", "disable", "doctor", "manifest"],
+    related: ["config", "hub"],
+  },
+  {
     name: "self-heal",
     category: "Orchestration",
     summary: "Iterative codebase improvement loop",
@@ -1782,6 +1789,49 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx trust revoke .", description: "Forget the decision" },
     ],
   },
+  extensions: {
+    summary: "list, add, remove, enable, disable and check n-dx extensions",
+    description:
+      "An extension is an npm package whose package.json has an ndx.extension\n" +
+      "block; it adds 'ndx <name>' commands and, through the hub, a web app.\n" +
+      "n-dx finds extensions in the project's dependencies, in your ndx home\n" +
+      "(installed by 'add'), in the global install n-dx came from, and in the\n" +
+      "paths listed under extensions.paths in <ndx home>/config.json.\n\n" +
+      "'add' installs into <ndx home>/extensions with npm, never into a\n" +
+      "project, and with install scripts off. An extension runs only once you\n" +
+      "approve it: 'enable' shows the package, version, source, commands and\n" +
+      "sidecar, then asks. The approval is tied to that version and manifest.\n" +
+      "'disable' hides an extension but keeps its approval, config and state\n" +
+      "folder. 'remove' uninstalls what 'add' installed and forgets the\n" +
+      "approval; --purge also deletes <ndx home>/ext/<name>/.\n\n" +
+      "States: enabled, disabled, unapproved, incompatible (unsupported\n" +
+      "apiVersion, or this n-dx is outside its ndxVersion), invalid (the\n" +
+      "manifest breaks the contract) and conflict (two packages claim a name).\n" +
+      "'doctor' checks every manifest, version range, declared path and name\n" +
+      "clash, prints one line per problem with its fix, and exits 1 if any.\n" +
+      "See docs/architecture/extensions.md.",
+    usage: [
+      "ndx extensions [list] [--json] [dir]",
+      "ndx extensions add <package>",
+      "ndx extensions remove <name> [--purge]",
+      "ndx extensions enable <name> [--yes]",
+      "ndx extensions disable <name>",
+      "ndx extensions info <name> [--json]",
+      "ndx extensions doctor [dir]",
+    ],
+    options: [
+      { flag: "--json", description: "list, info: print JSON (name, version, source, state, reason)" },
+      { flag: "--yes", description: "enable: approve without a prompt (CI, provisioning)" },
+      { flag: "--purge", description: "remove: also delete the extension's state folder" },
+    ],
+    examples: [
+      { command: "ndx extensions add @acme/ndx-recon", description: "Install an extension for your user" },
+      { command: "ndx extensions enable recon", description: "Review and approve it" },
+      { command: "ndx extensions list --json", description: "Every extension with its state and reason" },
+      { command: "ndx extensions doctor", description: "One line per problem, with its fix" },
+    ],
+    related: ["config", "hub"],
+  },
   "self-heal": {
     summary: "iterative codebase improvement loop",
     description:
@@ -1951,6 +2001,7 @@ export function formatMainHelp() {
     ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],
+    ["extensions <sub>", "Manage extensions (list|add|remove|enable|disable|info|doctor)"],
     ["install-sample [dir]", "Install a safe, destroyable sample webapp"],
     ["destroy-sample [dir]", "Remove the sample webapp and its PRD items"],
   ], pad);

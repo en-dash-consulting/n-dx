@@ -91,7 +91,9 @@
     "run-summary.js",
     "extension-manifest.js",
     "extension-manifest.schema.json",
-    "extension-discovery.js"
+    "extension-discovery.js",
+    "extension-state.js",
+    "extensions-command.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"

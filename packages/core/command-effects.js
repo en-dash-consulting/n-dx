@@ -556,6 +556,27 @@ export const COMMAND_EFFECTS = {
     next: "ndx work",
   },
 
+  extensions: {
+    command: "extensions",
+    summary: "List, install, approve, disable, remove or check n-dx extensions.",
+    reads: [
+      "~/.ndx/extensions/",
+      "~/.ndx/extensions.json",
+      "~/.ndx/config.json (extensions.paths)",
+      "the project's package.json and node_modules",
+      "the global node_modules n-dx came from",
+    ],
+    writes: [
+      { path: "~/.ndx/extensions.json", what: "the discovery cache, approvals and disabled extensions" },
+      { path: "~/.ndx/extensions/", what: "installed extension packages", conditional: true, when: "on add or remove" },
+      { path: "~/.ndx/ext/<name>/", what: "deletion of the extension's state folder", conditional: true, when: "on remove --purge" },
+    ],
+    llm: [],
+    network: [{ to: "remote", what: "the npm registry", when: "on add or remove" }],
+    duration: "seconds; add and remove take as long as npm does",
+    next: "ndx extensions enable <name>",
+  },
+
   "self-heal": {
     command: "self-heal",
     summary: "Loop: deep analysis, accept recommendations, then let the agent fix them.",

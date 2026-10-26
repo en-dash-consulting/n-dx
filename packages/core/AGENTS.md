@@ -13,6 +13,7 @@ prevent future contributors from replacing injection with direct imports.
 | `cli.js` | `pair-programming.js` | `registerChild` | `RegisterChild` (JSDoc `@callback`) |
 | `cli.js` | `migrate-chain.js` | `run`, `tools`, `migrateLayout` | `MigrateChainDeps` (JSDoc `@typedef`) |
 | `cli.js` | `sample-app.js` | `rexScript` | `SampleAppDeps` (JSDoc `@typedef`) |
+| `cli.js` | `extensions-command.js` | `builtinCommands` (data: `COMMAND_DISPATCH` keys and tool names, since `cli.js` cannot be imported); `runNpm`, `confirm` default to the real ones | `ExtensionsCommandDeps` (JSDoc `@typedef`) |
 
 Rules:
 - **Prefer injection over import** when the target module would otherwise need to import

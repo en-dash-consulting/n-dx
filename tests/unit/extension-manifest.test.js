@@ -15,6 +15,7 @@ import {
   validateExtensionManifest,
   formatProblem,
   isSemverRange,
+  satisfiesSemverRange,
   EXTENSION_MANIFEST_RULES,
   EXTENSION_MANIFEST_FIELDS,
   RESERVED_EXTENSION_NAMES,
@@ -181,6 +182,52 @@ describe("isSemverRange", () => {
   it.each(["", "  ", "latest", "0.10 or later", ">=", "1.2.3.4", "^01.0.0", "1.0.0 -", "||"])(
     "rejects %j", (range) => expect(isSemverRange(range)).toBe(false),
   );
+});
+
+describe("satisfiesSemverRange", () => {
+  // Each row was checked against npm's `semver.satisfies`.
+  it.each([
+    ["0.10.0", ">=0.10.0 <0.12.0", true],
+    ["0.11.9", ">=0.10.0 <0.12.0", true],
+    ["0.12.0", ">=0.10.0 <0.12.0", false],
+    ["0.9.9", ">=0.10.0 <0.12.0", false],
+    ["0.10.5", "^0.10.0", true],
+    ["0.11.0", "^0.10.0", false],
+    ["0.0.3", "^0.0.3", true],
+    ["0.0.4", "^0.0.3", false],
+    ["1.9.0", "^1.2.3", true],
+    ["2.0.0", "^1.2.3", false],
+    ["0.10.9", "^0.10", true],
+    ["0.9.0", "^0", true],
+    ["1.2.9", "~1.2.3", true],
+    ["1.3.0", "~1.2.3", false],
+    ["1.9.0", "~1", true],
+    ["1.4.0", "1.x", true],
+    ["2.0.0", "1.x", false],
+    ["0.10.3", "0.10", true],
+    ["5.0.0", "*", true],
+    ["0.10.0", "0.10.0", true],
+    ["0.10.1", "=0.10.0", false],
+    ["1.0.0", ">0.10", true],
+    ["0.10.9", ">0.10", false],
+    ["0.10.9", "<=0.10", true],
+    ["0.11.0", "<=0.10", false],
+    ["1.4.9", "1.2.0 - 1.4", true],
+    ["1.5.0", "1.2.0 - 1.4", false],
+    ["2.1.0", "^1.0.0 || ^2.0.0", true],
+    ["3.0.0", "^1.0.0 || ^2.0.0", false],
+    ["0.10.0", ">= 0.10.0", true],
+    ["v0.10.0", ">=0.10.0", true],
+    ["0.11.0-rc.1", ">=0.10.0", false],
+    ["0.11.0-rc.2", ">=0.11.0-rc.1", true],
+    ["0.11.0-rc.1", ">=0.11.0-rc.2", false],
+    ["0.11.0-rc.10", ">=0.11.0-rc.9", true],
+    ["0.11.0", ">=0.11.0-rc.1", true],
+    ["0.10.0", "latest", false],
+    ["not-a-version", ">=0.0.0", false],
+  ])("%s in %s is %s", (version, range, expected) => {
+    expect(satisfiesSemverRange(version, range)).toBe(expected);
+  });
 });
 
 describe("extension-manifest.schema.json", () => {

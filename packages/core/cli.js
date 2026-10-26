@@ -68,6 +68,7 @@ import {
   rollbackRefreshState,
 } from "./refresh-validate.js";
 import { handleInstallSample, handleDestroySample } from "./sample-app.js";
+import { runExtensions } from "./extensions-command.js";
 
 const CLI_ERROR_CODES = Object.freeze({
   NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
@@ -401,7 +402,7 @@ let staleCheckResult = null;
 // `mcp` joins them for a different reason than the rest: it speaks a protocol
 // on stdout, and a stale-project notice printed there desynchronises the
 // editor's parser for the whole session.
-const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth", "hub", "mcp"]);
+const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth", "hub", "mcp", "extensions"]);
 
 /**
  * Spawn options that make each child tree-killable by the tracker. Owned by
@@ -2558,6 +2559,18 @@ async function handleHub(rest) {
   }
 }
 
+async function handleExtensions(rest) {
+  try {
+    // Every built-in name, so no extension can be listed as runnable under one.
+    const builtinCommands = [...COMMAND_DISPATCH.keys(), ...Object.keys(tools)];
+    exitWithCleanup(await runExtensions(rest, { builtinCommands }));
+  } catch (err) {
+    if (err instanceof ExitRequest) throw err;
+    console.error(formatError(err));
+    exitWithCleanup(1);
+  }
+}
+
 async function handleStart(rest, commandName = "start") {
   const dir = resolveDir(rest);
   try {
@@ -3463,7 +3476,8 @@ const COMMAND_DISPATCH = new Map([
   ["start",             (rest) => handleStart(rest, "start")],
   ["web",               (rest) => handleStart(rest, "web")],
   ["hub",               handleHub],
-  ["mcp",               handleMcpShim],
+  ["extensions",        handleExtensions],
+  ["mcp",              handleMcpShim],
   ["export",            handleExport],
   ["install-sample",    (rest) => handleInstallSample(rest, { rexScript: tools.rex })],
   ["destroy-sample",    (rest) => handleDestroySample(rest, { rexScript: tools.rex })],

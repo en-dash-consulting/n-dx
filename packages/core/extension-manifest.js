@@ -350,6 +350,169 @@ export function isSemverRange(range) {
   });
 }
 
+/**
+ * Whether `version` is inside `range`, with npm's semantics: `^` and `~`,
+ * x-ranges and partial versions, hyphen ranges, `||`. As in npm, a prerelease
+ * version satisfies a comparator set only when one of the set's comparators
+ * names a prerelease of the same major.minor.patch, so `0.11.0-rc.1` is not
+ * inside `>=0.10.0`. A range {@link isSemverRange} rejects, or a version that
+ * is not `major.minor.patch`, is never satisfied.
+ *
+ * @param {string} version
+ * @param {string} range
+ * @returns {boolean}
+ */
+export function satisfiesSemverRange(version, range) {
+  const v = parseVersion(version);
+  if (!v || !isSemverRange(range)) return false;
+  return range.split("||").some((set) => {
+    const bounds = rangeSetBounds(set);
+    if (!bounds.every(({ op, to }) => compareBound(v, op, to))) return false;
+    if (v.pre.length === 0) return true;
+    return bounds.some(({ to }) => to.pre.length > 0 && to.major === v.major && to.minor === v.minor && to.patch === v.patch);
+  });
+}
+
+/**
+ * Whether `value` is an extension name n-dx could accept: a lowercase slug of
+ * the right length. Callers that build a path from a name check this first, so
+ * a name from an invalid manifest can never reach the file system.
+ *
+ * @param {unknown} value
+ * @returns {value is string}
+ */
+export function isExtensionNameSlug(value) {
+  return typeof value === "string" && SLUG.test(value) && value.length <= MAX_NAME_LENGTH;
+}
+
+/**
+ * @typedef {{major: number, minor: number, patch: number, pre: Array<string | number>}} SemverVersion
+ * @typedef {{op: "<" | "<=" | ">" | ">=" | "=", to: SemverVersion}} SemverBound
+ */
+
+/**
+ * @param {string} text
+ * @returns {SemverVersion | null}
+ */
+function parseVersion(text) {
+  const match = /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z.-]+)?$/.exec(text.trim());
+  if (!match) return null;
+  const pre = match[4] ? match[4].split(".").map((id) => (/^\d+$/.test(id) ? Number(id) : id)) : [];
+  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]), pre };
+}
+
+/**
+ * A partial version: `1`, `1.2`, `1.x`, `*`. Missing and wildcard parts are `null`.
+ *
+ * @param {string} text
+ */
+function parsePartial(text) {
+  const [core, ...preParts] = text.replace(/^v/, "").split("+")[0].split("-");
+  const nums = core.split(".").map((p) => (/^[xX*]$/.test(p) ? null : Number(p)));
+  while (nums.length < 3) nums.push(null);
+  const [major, minor, patch] = nums;
+  const pre = preParts.length > 0 ? preParts.join("-").split(".").map((id) => (/^\d+$/.test(id) ? Number(id) : id)) : [];
+  // npm treats every part after a wildcard as a wildcard too: `1.x.3` is `1.x`.
+  if (major === null) return { major: null, minor: null, patch: null, pre: [] };
+  if (minor === null) return { major, minor: null, patch: null, pre: [] };
+  return { major, minor, patch, pre: patch === null ? [] : pre };
+}
+
+/**
+ * The bounds one `||`-separated comparator set puts on a version.
+ *
+ * @param {string} set
+ * @returns {SemverBound[]}
+ */
+function rangeSetBounds(set) {
+  const parts = set.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 3 && parts[1] === "-") {
+    const lo = parsePartial(parts[0]);
+    const hi = parsePartial(parts[2]);
+    return [...comparatorBounds(">=", lo), ...comparatorBounds("<=", hi)];
+  }
+  /** @type {SemverBound[]} */
+  const bounds = [];
+  for (let i = 0; i < parts.length; i++) {
+    let token = parts[i];
+    if (/^(?:<=|>=|<|>|=|\^|~>?)$/.test(token) && i + 1 < parts.length) token += parts[++i];
+    const [, op = "", rest] = /^(<=|>=|<|>|=|\^|~>?)?(.*)$/.exec(token) ?? [];
+    bounds.push(...comparatorBounds(op, parsePartial(rest)));
+  }
+  return bounds;
+}
+
+/**
+ * @param {string} op
+ * @param {ReturnType<typeof parsePartial>} p
+ * @returns {SemverBound[]}
+ */
+function comparatorBounds(op, p) {
+  const { major, minor, patch, pre } = p;
+  const at = (/** @type {number} */ a, /** @type {number} */ b, /** @type {number} */ c, /** @type {Array<string | number>} */ r = []) =>
+    ({ major: a, minor: b, patch: c, pre: r });
+  if (major === null) return op === "<" || op === ">" ? [{ op: "<", to: at(0, 0, 0) }] : [];
+  const lower = at(major, minor ?? 0, patch ?? 0, pre);
+  // The first version past the partial: `1` → 2.0.0, `1.2` → 1.3.0, `1.2.3` → 1.2.3 itself.
+  const next = minor === null ? at(major + 1, 0, 0) : patch === null ? at(major, minor + 1, 0) : null;
+  switch (op) {
+    case "^": {
+      const upper = major > 0 || minor === null ? at(major + 1, 0, 0)
+        : minor > 0 || patch === null ? at(0, minor + 1, 0)
+          : at(0, 0, patch + 1);
+      return [{ op: ">=", to: lower }, { op: "<", to: upper }];
+    }
+    case "~": case "~>":
+      return [{ op: ">=", to: lower }, { op: "<", to: minor === null ? at(major + 1, 0, 0) : at(major, minor + 1, 0) }];
+    case ">=": return [{ op: ">=", to: lower }];
+    case ">": return next ? [{ op: ">=", to: next }] : [{ op: ">", to: lower }];
+    case "<": return [{ op: "<", to: lower }];
+    case "<=": return next ? [{ op: "<", to: next }] : [{ op: "<=", to: lower }];
+    default: return next ? [{ op: ">=", to: lower }, { op: "<", to: next }] : [{ op: "=", to: lower }];
+  }
+}
+
+/**
+ * @param {SemverVersion} v
+ * @param {SemverBound["op"]} op
+ * @param {SemverVersion} to
+ */
+function compareBound(v, op, to) {
+  const c = compareVersions(v, to);
+  switch (op) {
+    case "<": return c < 0;
+    case "<=": return c <= 0;
+    case ">": return c > 0;
+    case ">=": return c >= 0;
+    default: return c === 0;
+  }
+}
+
+/**
+ * Semver precedence: numbers, then a prerelease sorts before its release.
+ *
+ * @param {SemverVersion} a
+ * @param {SemverVersion} b
+ */
+function compareVersions(a, b) {
+  for (const key of /** @type {const} */ (["major", "minor", "patch"])) {
+    if (a[key] !== b[key]) return a[key] < b[key] ? -1 : 1;
+  }
+  if (a.pre.length === 0 || b.pre.length === 0) return b.pre.length - a.pre.length;
+  for (let i = 0; i < Math.max(a.pre.length, b.pre.length); i++) {
+    const x = a.pre[i];
+    const y = b.pre[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    if (x === y) continue;
+    if (typeof x === "number" && typeof y === "number") return x < y ? -1 : 1;
+    if (typeof x === "number") return -1;
+    if (typeof y === "number") return 1;
+    return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 /**
