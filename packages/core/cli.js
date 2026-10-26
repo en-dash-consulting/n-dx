@@ -69,6 +69,7 @@ import {
 } from "./refresh-validate.js";
 import { handleInstallSample, handleDestroySample } from "./sample-app.js";
 import { runExtensions } from "./extensions-command.js";
+import { EXTENSION_REFUSED_EXIT_CODE, resolveExtensionCommand, runExtensionCommand } from "./extension-dispatch.js";
 
 const CLI_ERROR_CODES = Object.freeze({
   NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
@@ -2559,11 +2560,14 @@ async function handleHub(rest) {
   }
 }
 
+/** Every built-in name, so no extension can be listed or run under one. */
+function builtinCommandNames() {
+  return [...COMMAND_DISPATCH.keys(), ...Object.keys(tools)];
+}
+
 async function handleExtensions(rest) {
   try {
-    // Every built-in name, so no extension can be listed as runnable under one.
-    const builtinCommands = [...COMMAND_DISPATCH.keys(), ...Object.keys(tools)];
-    exitWithCleanup(await runExtensions(rest, { builtinCommands }));
+    exitWithCleanup(await runExtensions(rest, { builtinCommands: builtinCommandNames() }));
   } catch (err) {
     if (err instanceof ExitRequest) throw err;
     console.error(formatError(err));
@@ -3426,11 +3430,41 @@ function handleHelp(rest) {
   exitWithCleanup(0);
 }
 
-function handleUnknownCommand(command) {
+/**
+ * `ndx <name>` for a name no built-in owns: run the enabled extension command
+ * that claims it, or report an unknown command — with the reason when an
+ * extension claims the name but cannot run.
+ */
+async function handleExtensionCommand(command, rest) {
+  const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+  const resolution = resolveExtensionCommand(command, { builtinCommands: builtinCommandNames(), ndxVersion: version });
+  switch (resolution.kind) {
+    case "run": {
+      // The extension owns Ctrl+C while it runs: runExtensionCommand forwards
+      // SIGINT/SIGTERM and waits, so ndx's kill-and-exit handlers stand down.
+      signalHandlers.dispose();
+      exitWithCleanup(await runExtensionCommand({ bin: resolution.bin, args: rest, spawn: spawnTracked }));
+      return;
+    }
+    case "refused":
+      console.error(resolution.message);
+      exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
+      return;
+    case "unavailable":
+      handleUnknownCommand(command, resolution.hint);
+      return;
+    default:
+      handleUnknownCommand(command);
+  }
+}
+
+function handleUnknownCommand(command, extensionHint) {
   const allCommands = [...getOrchestratorCommands(), "help"];
   const typoHint = formatTypoSuggestion(command, allCommands, "ndx ");
   console.error(`Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: ${command}`);
-  if (typoHint) {
+  if (extensionHint) {
+    console.error(`Hint: ${extensionHint}`);
+  } else if (typoHint) {
     console.error(`Hint: ${typoHint}`);
   } else {
     console.error("Hint: Run 'ndx --help' to see available commands, or 'ndx help <keyword>' to search.");
@@ -3646,8 +3680,10 @@ async function main() {
 
   // ── Stale-project detection (synchronous) ───────────────────────────────
   // Run before command dispatch so the notice can be shown after output.
-  // Skipped for init (about to fix staleness), help, version, and quiet mode.
-  if (!updateCheckQuiet && command && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp) {
+  // Skipped for init (about to fix staleness), help, version, and quiet mode,
+  // and for extension commands: n-dx resolves no project for an extension.
+  const builtin = builtinCommandNames().includes(command);
+  if (!updateCheckQuiet && builtin && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp) {
     try {
       staleCheckResult = checkProjectStaleness(dir);
     } catch {
@@ -3669,8 +3705,8 @@ async function main() {
       return;
     }
 
-    // ── Unknown command or no command ───────────────────────────────────────
-    if (command) return handleUnknownCommand(command);
+    // ── Extension command, unknown command, or no command ──────────────────
+    if (command) return handleExtensionCommand(command, rest);
 
     showMainHelp();
     exitWithCleanup(0);

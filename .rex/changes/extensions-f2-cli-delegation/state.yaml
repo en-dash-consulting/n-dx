@@ -4,7 +4,14 @@ items:
     lastModified: "2026-10-26T17:03:12.219Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "0d02f78e-7d40-4f25-837e-777eecf044fe":
-    lastModified: "2026-10-26T17:03:00.745Z"
+    status: "completed"
+    startedAt: "2026-10-26T18:00:47.944Z"
+    completedAt: "2026-10-26T18:12:07.230Z"
+    endedAt: "2026-10-26T18:12:07.230Z"
+    activeIntervals: [{"end":"2026-10-26T18:12:07.230Z","start":"2026-10-26T18:00:47.944Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extension-dispatch.js resolves and spawns extension commands; cli.js routes unknown names through it; unit, e2e and architecture-policy tests added."
+    lastModified: "2026-10-26T18:12:07.230Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "165648b5-2c3b-48b2-8911-fe42059c4381":
     lastModified: "2026-10-26T17:03:06.476Z"

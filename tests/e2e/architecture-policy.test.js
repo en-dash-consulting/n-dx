@@ -29,6 +29,7 @@
 
 import { describe, it, expect } from "vitest";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { checkArchitecturePolicy, checkRestrictedImports, isNdxMonorepo } from "../../packages/core/ci.js";
@@ -253,6 +254,83 @@ describe("architecture policy: orchestration spawn-only rule", () => {
   }
 });
 
+/**
+ * Extensions are spawned, never imported (docs/architecture/extensions.md):
+ * n-dx reads an extension's `package.json` and runs its `bin` as a child
+ * process. Two holes would break that: an extension module that loads code at
+ * run time, and an import by computed specifier anywhere in core, which could
+ * be pointed at a discovered package.
+ */
+describe("architecture policy: orchestration never imports extension code", () => {
+  const CORE = "packages/core";
+  /** Core modules allowed an `import()` whose specifier is computed, with why. */
+  const COMPUTED_IMPORTS = new Map([
+    ["packages/core/export.js", "rex's public API from the installed @n-dx/rex (pathToFileURL of a resolved path)"],
+  ]);
+  /** An `import(` not followed by a plain string literal and its closing paren. */
+  const COMPUTED_IMPORT = /\bimport\s*\(\s*(?!["'][^"'`$]*["']\s*\))/;
+
+  /** Core's own modules: its top-level .js files and bin/. */
+  function coreModules() {
+    return [CORE, `${CORE}/bin`].flatMap((dir) =>
+      readdirSync(join(ROOT, dir)).filter((f) => f.endsWith(".js")).map((f) => `${dir}/${f}`),
+    );
+  }
+
+  /** `rel`'s text with comment lines dropped, so JSDoc `import("…")` types do not count. */
+  function code(rel) {
+    return readFileSync(join(ROOT, rel), "utf-8")
+      .split("\n")
+      .filter((line) => !/^\s*(?:\/\/|\/?\*)/.test(line))
+      .join("\n");
+  }
+
+  const extensionModules = () => coreModules().filter((rel) => /\/extensions?-[a-z-]+\.js$/.test(rel));
+
+  it("sees the extension modules", () => {
+    expect(extensionModules()).toEqual(expect.arrayContaining([
+      `${CORE}/extension-discovery.js`,
+      `${CORE}/extension-dispatch.js`,
+      `${CORE}/extension-manifest.js`,
+      `${CORE}/extension-state.js`,
+      `${CORE}/extensions-command.js`,
+    ]));
+  });
+
+  it("extension modules import only node builtins and core peers, and load no code at run time", () => {
+    const violations = [];
+    for (const rel of extensionModules()) {
+      const text = code(rel);
+      for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s+)["']([^"']+)["']/g)) {
+        const builtin = m[1].startsWith("node:") || builtinModules.includes(m[1]);
+        if (!builtin && !m[1].startsWith("./")) violations.push(`${rel}: imports ${m[1]}`);
+      }
+      for (const [pattern, what] of [
+        [/\bimport\s*\(/, "dynamic import()"],
+        [/\brequire\s*\(|\bcreateRequire\b/, "require"],
+        [/\bnew\s+Function\b|["']node:vm["']/, "code evaluation"],
+      ]) {
+        if (pattern.test(text)) violations.push(`${rel}: ${what}`);
+      }
+    }
+    expect(violations, "an extension module that loads code could load an extension's; spawn it instead").toEqual([]);
+  });
+
+  it("core imports by computed specifier only where documented", () => {
+    const violations = coreModules()
+      .filter((rel) => COMPUTED_IMPORT.test(code(rel)))
+      .filter((rel) => !COMPUTED_IMPORTS.has(rel));
+    expect(violations, "a computed import() in core could load a discovered package").toEqual([]);
+  });
+
+  it("COMPUTED_IMPORTS has no stale entries", () => {
+    for (const rel of COMPUTED_IMPORTS.keys()) {
+      expect(existsSync(join(ROOT, rel)), `${rel} no longer exists`).toBe(true);
+      expect(COMPUTED_IMPORT.test(code(rel)), `${rel} no longer has a computed import()`).toBe(true);
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // CLAUDE.md policy coverage cross-reference
 // ---------------------------------------------------------------------------
@@ -281,6 +359,10 @@ const DOCUMENTED_POLICIES = [
   {
     rule: "Orchestration-tier scripts must spawn CLIs, not import libraries",
     enforcedBy: "architecture-policy.test.js → architecture policy: orchestration spawn-only rule",
+  },
+  {
+    rule: "Extensions are spawned, never imported: extension modules load no code, and core imports by computed specifier only where documented",
+    enforcedBy: "architecture-policy.test.js → architecture policy: orchestration never imports extension code",
   },
   {
     rule: "Cross-package runtime imports must flow through gateway modules",
@@ -561,7 +643,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(24);
+    expect(DOCUMENTED_POLICIES.length).toBe(25);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {

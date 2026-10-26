@@ -1,13 +1,15 @@
 /**
- * `ndx extensions` through the real CLI: dispatch, help, exit codes, and an
- * n-dx home of the test's own (`N_DX_HOME`). The subcommands themselves are
- * covered in tests/unit/extensions-command.test.js.
+ * `ndx extensions` and `ndx <extension command>` through the real CLI:
+ * dispatch, help, exit codes, signals, and an n-dx home of the test's own
+ * (`N_DX_HOME`). The subcommands and resolution themselves are covered in
+ * tests/unit/extensions-command.test.js and tests/unit/extension-dispatch.test.js.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createTmpDir, removeTmpDir, run, runResult } from "./e2e-helpers.js";
+import { CLI_PATH, createTmpDir, removeTmpDir, run, runResult } from "./e2e-helpers.js";
 
 let root;
 let home;
@@ -74,5 +76,95 @@ describe("ndx extensions", () => {
     run(["extensions", "enable", "recon", "--yes"], opts());
     const [row] = JSON.parse(run(["extensions", "list", "--json"], opts())).extensions;
     expect(row.state).toBe("enabled");
+  });
+});
+
+/**
+ * A user-installed extension `name` whose command prints its args and Node,
+ * then exits with the code in its first arg (or waits, given `wait`).
+ * Approved unless `approve` is false.
+ */
+function installEcho(name, { approve = true, ndxVersion = ">=0.0.0" } = {}) {
+  const folder = join(home, "extensions");
+  writeFileSync(join(mkdirp(folder), "package.json"), JSON.stringify({ name: "ndx-user-extensions", dependencies: { [`ndx-${name}`]: "^1.0.0" } }));
+  const dir = mkdirp(join(folder, "node_modules", `ndx-${name}`));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({
+    name: `ndx-${name}`,
+    version: "1.0.0",
+    ndx: { extension: { apiVersion: 1, name, ndxVersion, commands: [{ name, bin: "bin/cli.js", summary: name }] } },
+  }));
+  writeFileSync(join(mkdirp(join(dir, "bin")), "cli.js"), [
+    `process.on("SIGTERM", () => { console.log("got SIGTERM"); process.exit(7); });`,
+    `console.log("args " + JSON.stringify(process.argv.slice(2)) + " exec " + process.execPath);`,
+    `if (process.argv[2] === "wait") setInterval(() => {}, 1000);`,
+    `else process.exit(Number(process.argv[2] ?? 0));`,
+  ].join("\n"));
+  if (approve) run(["extensions", "enable", name, "--yes"], opts());
+}
+
+describe("ndx <extension command>", () => {
+  for (const code of [0, 1, 7]) {
+    it(`runs the bin with the remaining args and passes exit code ${code} through`, () => {
+      installEcho("recon");
+      const result = runResult(["recon", String(code), "--flag"], opts());
+      expect(result.code).toBe(code);
+      expect(result.stdout).toContain(`args ${JSON.stringify([String(code), "--flag"])}`);
+    });
+  }
+
+  it("runs the extension with the Node n-dx runs on", () => {
+    installEcho("recon");
+    expect(run(["recon"], opts())).toContain(`exec ${process.execPath}`);
+  });
+
+  it("a built-in always wins over an extension claiming its name", () => {
+    installEcho("version", { approve: false });
+    const out = run(["version"], opts());
+    expect(out).not.toContain("args");
+    expect(out.trim()).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it("an unapproved extension exits 2 with one line naming enable", () => {
+    installEcho("recon", { approve: false });
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(2);
+    expect(result.stdout).not.toContain("args");
+    expect(result.stderr.trim()).toMatch(/^Error: 'ndx recon' comes from .* — fix: ndx extensions enable recon$/);
+  });
+
+  it("a disabled extension's name is an unknown command with a hint", () => {
+    installEcho("recon");
+    run(["extensions", "disable", "recon"], opts());
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/Unknown command: recon/);
+    expect(result.stderr).toMatch(/Hint: extension recon .* is disabled: .*'ndx extensions enable recon'/);
+  });
+
+  it("an incompatible extension's name is an unknown command with a hint", () => {
+    installEcho("recon", { approve: false, ndxVersion: ">=99.0.0" });
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/Hint: extension recon .* is incompatible: needs n-dx >=99\.0\.0/);
+  });
+
+  it("a name nothing claims is today's unknown command", () => {
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/Unknown command: recon/);
+    expect(result.stderr).toMatch(/Hint: Run 'ndx --help'/);
+  });
+
+  it.skipIf(process.platform === "win32")("forwards SIGTERM to the extension and exits with its code", async () => {
+    installEcho("recon");
+    const child = spawn(process.execPath, [CLI_PATH, "recon", "wait"], { ...opts(), stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      if (stdout.includes("args ")) child.kill("SIGTERM");
+    });
+    const code = await new Promise((resolve) => child.on("close", resolve));
+    expect(stdout).toContain("got SIGTERM");
+    expect(code).toBe(7);
   });
 });
