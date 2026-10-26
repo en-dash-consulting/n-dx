@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "POST /api/sidecar/sessions/:id/turns and GET …/frames?after= exist"
   - "a reload resumes from the cursor"
   - "interrupt stops the turn within 2 s"
+  - "a turn's text and assistant events carry the full reply, not the 500-character summary, while hench's run summaries stay truncated as before"
 priority: "high"
 source: "caos"
 ---
