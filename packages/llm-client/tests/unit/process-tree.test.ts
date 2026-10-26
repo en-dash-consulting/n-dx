@@ -101,7 +101,7 @@ describe("terminateProcessTree — POSIX", () => {
    * these tests shell out to the host's real ps, which makes them depend on the
    * machine's actual process table.
    */
-  function fakePs(listing: string | string[]) {
+  function fakePs(listing: string | string[], delayMs = 1) {
     const calls: string[][] = [];
     // An array scripts successive passes, so a table that GROWS between reads can
     // be modelled — that is what proves the loop runs to a fixpoint rather than a
@@ -115,7 +115,7 @@ describe("terminateProcessTree — POSIX", () => {
       setTimeout(() => {
         proc.stdout.emit("data", Buffer.from(text));
         proc.emit("close", 0);
-      }, 1);
+      }, delayMs);
       return proc as unknown as ReturnType<typeof import("node:child_process").spawn>;
     }) as unknown as typeof import("node:child_process").spawn;
     return { impl, calls };
@@ -170,6 +170,46 @@ describe("terminateProcessTree — POSIX", () => {
     // Leaves before parents, and the unrelated pid 7000 is untouched.
     expect(signalled.map((s) => s.pid)).toEqual([6000, 5000]);
     expect(signalled.every((s) => s.signal === "SIGTERM")).toBe(true);
+  });
+
+  describe("a ps slower than the force-kill grace", () => {
+    // Grace 150 ms, ps answers in 400 ms: the read outlasts the grace.
+    const SLOW_MS = 400;
+    const LISTING = " 4242     1\n 5000  4242\n";
+
+    function run(extra: { scanTimeoutMs?: number }) {
+      const child = fakeChild(4242);
+      const alive = new Set([4242, 5000]);
+      const signalled: number[] = [];
+      const killGroup = (pid: number, signal: NodeJS.Signals | 0): void => {
+        if (pid < 0) throw new Error("ESRCH");
+        if (signal === 0) {
+          if (!alive.has(pid)) throw new Error("ESRCH");
+          return;
+        }
+        signalled.push(pid);
+        alive.delete(pid);
+      };
+      const done = terminateProcessTree(child, {
+        ...posix,
+        ...extra,
+        killGroup,
+        spawnImpl: fakePs(LISTING, SLOW_MS).impl,
+      });
+      return { done, signalled };
+    }
+
+    it("still finds and kills descendants when scanTimeoutMs outlasts it", async () => {
+      const { done, signalled } = run({ scanTimeoutMs: 2000 });
+      await done;
+      expect(signalled).toEqual([5000]);
+    });
+
+    it("defaults the scan budget to the grace, missing them", async () => {
+      const { done, signalled } = run({});
+      await done;
+      expect(signalled).toEqual([]);
+    });
   });
 
   it("escalates a straggler that ignores SIGTERM", async () => {

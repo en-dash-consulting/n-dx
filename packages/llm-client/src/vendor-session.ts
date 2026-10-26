@@ -45,6 +45,13 @@ type ChildProcess = ReturnType<typeof spawnCli>;
  */
 export const INTERRUPT_GRACE_MS = 500;
 
+/**
+ * Budget for the process-table read that finds the CLI's children. Separate from
+ * the grace: on a loaded host `ps` can outlast 500 ms, and an empty read leaves
+ * the children running. It is only a ceiling; the read usually takes a few ms.
+ */
+export const INTERRUPT_SCAN_MS = 1000;
+
 export type VendorSessionState = "idle" | "running" | "ended";
 
 export interface VendorSessionOptions {
@@ -167,7 +174,10 @@ function createSession(
   async function stopChild(): Promise<void> {
     if (!child) return;
     interrupted = true;
-    await terminateProcessTree(child, { forceKillTimeoutMs: INTERRUPT_GRACE_MS });
+    await terminateProcessTree(child, {
+      forceKillTimeoutMs: INTERRUPT_GRACE_MS,
+      scanTimeoutMs: INTERRUPT_SCAN_MS,
+    });
   }
 
   function runTurn(prompt: string, turn: number): Promise<SessionTurnResult> {

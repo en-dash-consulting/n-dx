@@ -14,7 +14,14 @@ items:
     lastModified: "2026-10-26T21:53:44.373Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3c3f21c2-b454-4968-8817-f5e6f12855b0":
-    lastModified: "2026-10-26T21:50:05.550Z"
+    status: "completed"
+    startedAt: "2026-10-26T22:21:27.200Z"
+    completedAt: "2026-10-26T22:26:18.906Z"
+    endedAt: "2026-10-26T22:26:18.906Z"
+    activeIntervals: [{"end":"2026-10-26T22:26:18.906Z","start":"2026-10-26T22:21:27.200Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): scanTimeoutMs on TerminateTreeOptions; vendor-session passes INTERRUPT_SCAN_MS (1 s) with the 500 ms grace."
+    lastModified: "2026-10-26T22:26:18.906Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "425819f5-821e-41ce-aaca-56fb84c3427e":
     status: "completed"
