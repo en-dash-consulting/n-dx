@@ -241,6 +241,21 @@ export {
   failureCategoryLabel,
 } from "@n-dx/llm-client";
 
+// ---- Vendor session drivers -------------------------------------------------
+// Per-vendor turn argv (fresh, resume, fork), line parsing and session-id
+// capture, shared with llm-client's resumable session API. The adapters build
+// on them, so hench's batch and fork strategies resume through the same args
+// the Sidecar's sessions do.
+export {
+  claudeSessionDriver,
+  codexSessionDriver,
+  vendorSessionDriver,
+  normalizeCodexResponse,
+  parseMaybeJson,
+  WINDOWS_STDIN_PROMPT_SEPARATOR,
+} from "@n-dx/llm-client";
+export type { NormalizedCodexResponse, NormalizedCodexToolEvent } from "@n-dx/llm-client";
+
 // ---- Prompt section measurement ---------------------------------------------
 // The extractor lives in the foundation tier so rex and sourcevision — which
 // sit below hench and cannot import from it — use the same implementation

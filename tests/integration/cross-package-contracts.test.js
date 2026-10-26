@@ -397,12 +397,15 @@ describe("hench → llm-client gateway contract", () => {
     "getAvailableMemory",
     "createAvailableMemoryReader",
     "resolveClaudeCliEffort",
+    "vendorSessionDriver",
+    "normalizeCodexResponse",
+    "parseMaybeJson",
   ];
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
-  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"];
-  const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME", "CLI_LOG_FILENAME"];
+  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW", "claudeSessionDriver", "codexSessionDriver"];
+  const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME", "CLI_LOG_FILENAME", "WINDOWS_STDIN_PROMPT_SEPARATOR"];
 
   for (const name of GATEWAY_FUNCTIONS) {
     it(`re-exports "${name}" as a function`, async () => {
@@ -914,7 +917,10 @@ describe("gateway export auto-detection", () => {
         "resolveLayout", "detectLayoutMode", "relativeToRoot", "projectRootOf",
         // Available-memory reading. One reading for hench, the dashboard and
         // the hub admission floor, so they cannot disagree about the machine.
-        "readAvailableMemory", "getAvailableMemory", "createAvailableMemoryReader"],
+        "readAvailableMemory", "getAvailableMemory", "createAvailableMemoryReader",
+        // Vendor session drivers: hench's CLI adapters resume, fork and parse
+        // through the same drivers llm-client's resumable sessions use.
+        "vendorSessionDriver", "normalizeCodexResponse", "parseMaybeJson"],
       ...["PROJECT_DIRS", "NEWEST_MODELS", "TIER_MODELS", "REVIEW_MODELS", "GOOGLE_MODELS",
         "VENDOR_CONTEXT_CHAR_LIMITS",
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
@@ -924,7 +930,8 @@ describe("gateway export auto-detection", () => {
         "NDX_CONTAINER_DIRNAME",
         // The vendor-CLI invocation log's file name: the uncommitted-work gate
         // discounts n-dx's own output by the name the writer uses.
-        "CLI_LOG_FILENAME"],
+        "CLI_LOG_FILENAME",
+        "claudeSessionDriver", "codexSessionDriver", "WINDOWS_STDIN_PROMPT_SEPARATOR"],
       ...["DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"],
     ]);
 
