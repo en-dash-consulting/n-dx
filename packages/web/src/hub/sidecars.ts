@@ -71,7 +71,8 @@ export type PlanSidecar = (name: string) => Promise<PlanResult>;
 
 export type EnsureResult =
   | { ok: true; port: number }
-  | { ok: false; status: number; error: string; logFile: string | null; retryAfterSeconds?: number };
+  /** `reason` is core's, when n-dx refused the plan: `none` or `refused` (both 404), `config`, `state`, `error`. */
+  | { ok: false; status: number; error: string; logFile: string | null; reason?: string; retryAfterSeconds?: number };
 
 export type SidecarState = "starting" | "running" | "stopped";
 
@@ -151,11 +152,13 @@ function megabytes(bytes: number): string {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
-/** Plan refusals as HTTP: no such sidecar is 404, a known one that must not run 403, anything else 503. */
+/**
+ * Plan refusals as HTTP. No such sidecar, and one that must not run (disabled,
+ * unapproved, missing bin), are both 404: either way nothing is mounted at the
+ * name, and the body's `reason` and message say which. Anything else is 503.
+ */
 function statusForReason(reason: string): number {
-  if (reason === "none") return 404;
-  if (reason === "refused") return 403;
-  return 503;
+  return reason === "none" || reason === "refused" ? 404 : 503;
 }
 
 class Sidecar {
@@ -211,7 +214,7 @@ export class SidecarManager {
    */
   ensure(name: string): Promise<EnsureResult> {
     if (!SidecarManager.isName(name)) {
-      return Promise.resolve({ ok: false, status: 404, error: `No extension sidecar is named "${name}"`, logFile: null });
+      return Promise.resolve({ ok: false, status: 404, error: `No extension sidecar is named "${name}"`, logFile: null, reason: "none" });
     }
     let s = this.sidecars.get(name);
     if (!s) {
@@ -293,7 +296,7 @@ export class SidecarManager {
     return s.crashes;
   }
 
-  private refuse(s: Sidecar, status: number, error: string, retryAfterSeconds?: number): EnsureResult {
+  private refuse(s: Sidecar, status: number, error: string, retryAfterSeconds?: number, reason?: string): EnsureResult {
     s.lastError = error;
     const logged = s.logFile ? ` See ${s.logFile}` : "";
     return {
@@ -301,6 +304,7 @@ export class SidecarManager {
       status,
       error: `${error}${status === 503 ? logged : ""}`,
       logFile: s.logFile,
+      ...(reason !== undefined ? { reason } : {}),
       ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
     };
   }
@@ -339,7 +343,7 @@ export class SidecarManager {
       return this.refuse(s, 503, "This hub was started without an n-dx CLI to launch extension sidecars. Restart it: ndx hub stop, then ndx start.");
     }
     const planned = await this.opts.plan(s.name);
-    if (!planned.ok) return this.refuse(s, statusForReason(planned.reason), planned.error);
+    if (!planned.ok) return this.refuse(s, statusForReason(planned.reason), planned.error, undefined, planned.reason);
     const plan = planned.plan;
     s.logFile = plan.logFile;
     s.idleStopMs = plan.idleStopMinutes * 60_000;

@@ -182,8 +182,18 @@ export function slugifyProjectId(name: string): string {
 }
 
 /**
+ * Whether `id` collides with a hub prefix: `x`, whose `/x/` mounts extension
+ * sidecars. Case-insensitive, since nothing else tells `X` and `x` apart to a
+ * reader. Twin of `isReservedProjectId` in packages/core/web.js.
+ */
+export function isReservedProjectId(id: string): boolean {
+  return id.toLowerCase() === "x";
+}
+
+/**
  * The id a new project gets: the slug of its folder name, with a 6-hex hash of
- * its path appended only when that slug already belongs to a different folder.
+ * its path appended only when that slug already belongs to a different folder,
+ * or is reserved ({@link isReservedProjectId}).
  *
  * Twin of `deriveProjectId` in packages/core/web.js, which hashes the origin
  * URL when there is one. A folder that has just been created has no remote, so
@@ -195,7 +205,7 @@ export function deriveProjectId(
 ): string {
   const slug = slugifyProjectId(basename(repoRoot));
   const holder = takenIds.get(slug);
-  if (holder === undefined || holder === repoRoot) return slug;
+  if (!isReservedProjectId(slug) && (holder === undefined || holder === repoRoot)) return slug;
   return `${slug}-${createHash("sha1").update(repoRoot).digest("hex").slice(0, 6)}`;
 }
 

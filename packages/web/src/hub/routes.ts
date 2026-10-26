@@ -46,7 +46,7 @@ import { detectBasePath, projectIdFromBasePath, safeDecodeSegment, stripBasePath
 import type { Hub, RegisterProjectInput } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
-import { defaultParentDir, deriveProjectId, planNewProject, writeHubMarkerFiles } from "./new-project.js";
+import { defaultParentDir, deriveProjectId, isReservedProjectId, planNewProject, writeHubMarkerFiles } from "./new-project.js";
 import type { NewProjectPlan } from "./new-project.js";
 
 const HUB_PREFIX = "/api/hub";
@@ -165,6 +165,9 @@ export function parseRegisterInput(body: unknown): { input: RegisterProjectInput
 
   if (typeof b.id !== "string" || !ID_PATTERN.test(b.id)) {
     return { problem: "id must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" };
+  }
+  if (isReservedProjectId(b.id)) {
+    return { problem: `id "${b.id}" is reserved: /x/ is where the hub mounts extension sidecars` };
   }
   if (typeof b.repoRoot !== "string" || !isAbsolute(b.repoRoot)) {
     return { problem: "repoRoot must be an absolute path" };

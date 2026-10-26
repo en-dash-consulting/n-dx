@@ -1122,15 +1122,25 @@ async function loadProjectName(repoRoot) {
 }
 
 /**
+ * Whether `id` collides with a hub prefix: `x`, whose `/x/` mounts extension
+ * sidecars; the hub refuses to register it. Twin of `isReservedProjectId` in
+ * packages/web/src/hub/new-project.ts.
+ */
+export function isReservedProjectId(id) {
+  return String(id).toLowerCase() === "x";
+}
+
+/**
  * A stable id for the repository. The slug of its name, with a 6-hex hash of
  * the origin URL (or the path, without a remote) appended only when the
  * registry already holds that id for a *different* repository — two clones
- * named "app" stay distinct without every project carrying a hash.
+ * named "app" stay distinct without every project carrying a hash — or when
+ * the slug is reserved (a repository named "x").
  */
 export function deriveProjectId(name, { repoRoot, remoteUrl, registryProjects }) {
   const slug = slugifyProjectId(name);
   const existing = registryProjects?.[slug];
-  if (!existing || existing.repoRoot === repoRoot) return slug;
+  if (!isReservedProjectId(slug) && (!existing || existing.repoRoot === repoRoot)) return slug;
   const hash = createHash("sha1").update(remoteUrl || repoRoot).digest("hex").slice(0, 6);
   return `${slug}-${hash}`;
 }

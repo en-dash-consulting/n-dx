@@ -1,10 +1,24 @@
 schema: "rex/v2"
 items:
   "70f98e05-28f8-41cd-8b2a-00daf670b08c":
-    lastModified: "2026-10-26T17:03:46.696Z"
+    status: "completed"
+    startedAt: "2026-10-26T23:23:58.122Z"
+    completedAt: "2026-10-26T23:35:35.229Z"
+    endedAt: "2026-10-26T23:35:35.229Z"
+    activeIntervals: [{"end":"2026-10-26T23:35:35.229Z","start":"2026-10-26T23:23:58.122Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Commit b45c2852c. Sidecar requests (HTTP and WebSocket) lose X-Ndx-Token, the ndx_token cookie and a bearer carrying the token, and gain X-Ndx-Base-Path: /x/<name>/. The bare /x/<name> answers 308 to /x/<name>/. Disabled and unapproved names answer 404 with core's reason in the body. Project id `x` is refused at registration and hashed by both id derivations."
+    lastModified: "2026-10-26T23:35:35.229Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "a06d55ad-f460-4588-8cd7-5bce4a913410":
-    lastModified: "2026-10-26T17:29:23.297Z"
+    status: "completed"
+    startedAt: "2026-10-26T23:35:35.229Z"
+    completedAt: "2026-10-26T23:35:35.229Z"
+    endedAt: "2026-10-26T23:35:35.229Z"
+    activeIntervals: [{"end":"2026-10-26T23:35:35.229Z","start":"2026-10-26T23:35:35.229Z"}]
+    appliedAt: "2026-10-26T23:35:35.229Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-26T23:35:35.229Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "ef7ca789-393d-4663-ac58-8aba713c51ad":
     status: "completed"
