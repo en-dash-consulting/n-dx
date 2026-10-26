@@ -225,8 +225,11 @@ function createSession(
       });
       proc.stdin?.end(spawnSpec.stdin, "utf-8");
 
-      proc.stdout?.on("data", (chunk: Buffer) => {
-        buffer += chunk.toString();
+      // Decode as a stream: a pipe chunk can end inside a multi-byte
+      // character, and decoding chunks one by one would corrupt it.
+      proc.stdout?.setEncoding("utf8");
+      proc.stdout?.on("data", (chunk: string) => {
+        buffer += chunk;
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
         for (const line of lines) processLine(line);

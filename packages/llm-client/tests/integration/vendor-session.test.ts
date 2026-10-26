@@ -8,7 +8,10 @@
  * so the tests can assert what each turn actually sent.
  */
 
+import type { ChildProcess } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -215,6 +218,34 @@ describe("codex sessions", () => {
     await working;
     await session.interrupt();
     expect((await pending).status).toBe("interrupted");
+  });
+});
+
+describe("output decoding", () => {
+  it("keeps a multi-byte character that a pipe chunk boundary splits", async () => {
+    const line = Buffer.from(
+      JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "café ✓" } }) + "\n",
+      "utf-8",
+    );
+    const cut = line.indexOf(Buffer.from("é")) + 1; // between the two bytes of é
+    const session = startVendorSession({
+      vendor: "codex",
+      cwd: dir,
+      spawn: () => {
+        const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+        const stdout = new PassThrough();
+        Object.assign(child, { stdin: new PassThrough(), stdout, stderr: new PassThrough(), pid: undefined });
+        setImmediate(() => {
+          stdout.write(line.subarray(0, cut));
+          stdout.write(line.subarray(cut));
+          stdout.end();
+          setImmediate(() => child.emit("close", 0));
+        });
+        return child as unknown as ChildProcess;
+      },
+    });
+    const turn = await session.sendTurn("hi");
+    expect(turn.text).toBe("café ✓");
   });
 });
 

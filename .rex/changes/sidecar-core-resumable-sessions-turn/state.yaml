@@ -7,10 +7,14 @@ items:
     lastModified: "2026-10-26T16:39:49.016Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "425819f5-821e-41ce-aaca-56fb84c3427e":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-26T18:31:04.702Z"
-    activeIntervals: [{"start":"2026-10-26T18:31:04.702Z"}]
-    lastModified: "2026-10-26T18:31:05.232Z"
+    completedAt: "2026-10-26T18:54:22.139Z"
+    endedAt: "2026-10-26T18:54:22.139Z"
+    activeIntervals: [{"end":"2026-10-26T18:54:22.139Z","start":"2026-10-26T18:31:04.702Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client startVendorSession/resumeVendorSession (start, sendTurn, interrupt, end, resume; Claude + Codex CLIs; RuntimeEvents with token usage) built on new vendor session drivers lifted from hench's adapters; hench adapters and fork-strategy capability check delegate to the drivers; existing hench adapter tests pass unchanged; createLLMClient untouched."
+    lastModified: "2026-10-26T18:54:22.139Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "777869b8-d76a-4cc1-8906-65f2d7d327aa":
     lastModified: "2026-10-26T16:39:52.947Z"
