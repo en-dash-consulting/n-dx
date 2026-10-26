@@ -30,7 +30,14 @@ items:
     lastModified: "2026-10-26T16:39:52.947Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7961018b-a81d-4b39-9bdb-fe54d0b81c28":
-    lastModified: "2026-10-26T21:03:31.758Z"
+    status: "completed"
+    startedAt: "2026-10-26T22:08:49.938Z"
+    completedAt: "2026-10-26T22:12:11.636Z"
+    endedAt: "2026-10-26T22:12:11.636Z"
+    activeIntervals: [{"end":"2026-10-26T22:12:11.636Z","start":"2026-10-26T22:08:49.938Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "session-registry.ts: list()/get() apply the TTL in memory via view(); only sendTurn sweeps and persists. Tests added."
+    lastModified: "2026-10-26T22:12:11.636Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "92c2fda1-e21b-47f4-9cc6-5ec5e0298248":
     lastModified: "2026-10-26T21:03:38.230Z"

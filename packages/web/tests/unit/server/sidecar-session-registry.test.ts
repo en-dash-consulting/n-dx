@@ -123,19 +123,30 @@ describe("idle TTL", () => {
     expect(resumed(spawned[1])).toBe("vendor-1");
   });
 
-  it("forgets the resume id after the TTL, persists that, and starts the next turn fresh", async () => {
+  it("reads report no resume id after the TTL and leave index.json untouched", async () => {
     const reg = registry();
     const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
     await reg.sendTurn(id, "one");
     clock += DEFAULT_SIDECAR_TTL_MS + 1;
+    const before = readFileSync(join(dir, "index.json"));
 
     expect(reg.list({ worktree: root })[0].resumeId).toBeUndefined();
-    const index = JSON.parse(readFileSync(join(dir, "index.json"), "utf-8"));
-    expect(index.sessions[0].resumeId).toBeUndefined();
+    expect(reg.get(id)?.resumeId).toBeUndefined();
+    expect(readFileSync(join(dir, "index.json")).equals(before)).toBe(true);
+  });
+
+  it("starts the next turn fresh after the TTL and persists the forgotten id", async () => {
+    const reg = registry();
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    await reg.sendTurn(id, "one");
+    clock += DEFAULT_SIDECAR_TTL_MS + 1;
+    reg.get(id);
 
     await reg.sendTurn(id, "two");
     expect(resumed(spawned[1])).toBeUndefined();
     expect(reg.get(id)?.resumeId).toBe("vendor-2");
+    const index = JSON.parse(readFileSync(join(dir, "index.json"), "utf-8"));
+    expect(index.sessions[0].resumeId).toBe("vendor-2");
   });
 
   it("forgets after a restart too", async () => {

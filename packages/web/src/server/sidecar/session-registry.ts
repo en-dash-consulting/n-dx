@@ -12,8 +12,9 @@
  *
  * **No idle processes, so idling is forgetting.** A session idle longer than
  * the TTL (default 2 h) loses its resume id; the record and transcript stay,
- * and its next turn starts a fresh vendor session. The sweep runs on every
- * registry access rather than on a timer.
+ * and its next turn starts a fresh vendor session. There is no timer: reads
+ * (`list`, `get`) apply the TTL in memory and never write, so a GET stays
+ * read-only; the writing paths (`sendTurn`) persist the forgetting.
  *
  * **Machine-local.** The directory carries its own `.gitignore` (`*`), so a
  * project with no ignore line for it still never commits a transcript.
@@ -168,17 +169,15 @@ export class SidecarSessionRegistry {
   }
 
   list(filter: { scope?: SidecarScope; worktree?: string } = {}): SidecarSessionRecord[] {
-    this.sweep();
     return [...this.records.values()]
       .filter((r) => (!filter.scope || r.scope === filter.scope)
         && (!filter.worktree || r.worktree === filter.worktree))
-      .map((r) => ({ ...r }));
+      .map((r) => this.view(r));
   }
 
   get(id: string): SidecarSessionRecord | undefined {
-    this.sweep();
     const record = this.records.get(id);
-    return record && { ...record };
+    return record && this.view(record);
   }
 
   /**
@@ -257,13 +256,25 @@ export class SidecarSessionRegistry {
     this.persist();
   }
 
-  /** Forget the resume id of every session idle longer than the TTL. */
+  /** Whether the record holds a resume id its idle time has already forfeited. */
+  private expired(record: SidecarSessionRecord): boolean {
+    return !!record.resumeId
+      && this.live.get(record.id)?.session.state !== "running"
+      && Date.parse(record.lastActivityAt) <= this.now() - this.ttlMs;
+  }
+
+  /** A copy of the record as a reader sees it: the TTL applied, nothing written. */
+  private view(record: SidecarSessionRecord): SidecarSessionRecord {
+    const copy = { ...record };
+    if (this.expired(record)) delete copy.resumeId;
+    return copy;
+  }
+
+  /** Forget the resume id of every session idle longer than the TTL, and persist that. */
   sweep(): void {
-    const cutoff = this.now() - this.ttlMs;
     let changed = false;
     for (const record of this.records.values()) {
-      if (!record.resumeId || this.live.get(record.id)?.session.state === "running") continue;
-      if (Date.parse(record.lastActivityAt) > cutoff) continue;
+      if (!this.expired(record)) continue;
       delete record.resumeId;
       this.live.delete(record.id);
       changed = true;
