@@ -7,5 +7,12 @@ items:
     lastModified: "2026-10-26T17:29:23.297Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "ef7ca789-393d-4663-ac58-8aba713c51ad":
-    lastModified: "2026-10-26T17:03:40.976Z"
+    status: "completed"
+    startedAt: "2026-10-26T19:06:05.677Z"
+    completedAt: "2026-10-26T19:28:59.312Z"
+    endedAt: "2026-10-26T19:28:59.312Z"
+    activeIntervals: [{"end":"2026-10-26T19:28:59.312Z","start":"2026-10-26T19:06:05.677Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub SidecarManager (packages/web/src/hub/sidecars.ts) behind /x/<name>/: lazy start on an ephemeral loopback port with a 20 s health wait (503 naming the log), idle stop (no requests, no WebSockets), stop on hub close, crash restart with backoff after 3 in 5 min, memory-floor refusal. The launch plan comes from the new `ndx extensions sidecar <name> --json`. Commit 615ad544b."
+    lastModified: "2026-10-26T19:28:59.312Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
