@@ -40,7 +40,14 @@ items:
     lastModified: "2026-10-26T22:12:11.636Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "92c2fda1-e21b-47f4-9cc6-5ec5e0298248":
-    lastModified: "2026-10-26T21:03:38.230Z"
+    status: "completed"
+    startedAt: "2026-10-26T22:18:28.712Z"
+    completedAt: "2026-10-26T22:21:12.210Z"
+    endedAt: "2026-10-26T22:21:12.210Z"
+    activeIntervals: [{"end":"2026-10-26T22:21:12.210Z","start":"2026-10-26T22:18:28.712Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "readFrames skips an unterminated final line and throws naming the file on a malformed complete line; first turn per session moves a trailing fragment to .corrupt and truncates it."
+    lastModified: "2026-10-26T22:21:12.210Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9753d37a-2e7e-4950-8eba-3015eee08734":
     issues: ["https://www.notion.so/3f7a80b71924810fb66ac7fbdc9bc4db","https://www.notion.so/3f7a80b719248165891cff1c8f0d0ace","https://www.notion.so/3f7a80b7192481c5a8fef7faf77e11e0","https://www.notion.so/3f7a80b7192481e0a645e0c1b1b7f2b7","https://www.notion.so/3f7a80b71924810492a8ca3948c3f474","https://www.notion.so/3f7a80b71924810499c9f380e11f53fd"]

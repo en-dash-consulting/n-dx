@@ -24,7 +24,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, truncateSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { addTokenUsage, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
 import type {
@@ -216,16 +216,27 @@ export class SidecarSessionRegistry {
     }
   }
 
-  /** Transcript frames after `cursor`, in order. */
+  /**
+   * Transcript frames after `cursor`, in order. Every frame is written with a
+   * trailing newline, so a final line without one is a crash mid-append and is
+   * skipped; a malformed line anywhere else is real corruption and throws.
+   */
   readFrames(id: string, after = 0): SidecarFrame[] {
     if (!this.records.has(id)) throw new Error(`No Sidecar session ${id}`);
     const path = this.transcriptPath(id);
     if (!existsSync(path)) return [];
-    return readFileSync(path, "utf-8")
-      .split("\n")
-      .filter((line) => line.trim())
-      .map((line) => JSON.parse(line) as SidecarFrame)
-      .filter((frame) => frame.seq > after);
+    const lines = readFileSync(path, "utf-8").split("\n");
+    lines.pop(); // "" after a clean final newline, else the partial fragment
+    const frames: SidecarFrame[] = [];
+    for (const [index, line] of lines.entries()) {
+      if (!line.trim()) continue;
+      try {
+        frames.push(JSON.parse(line) as SidecarFrame);
+      } catch (error) {
+        throw new Error(`${path} line ${index + 1} is not a JSON frame: ${(error as Error).message}`);
+      }
+    }
+    return frames.filter((frame) => frame.seq > after);
   }
 
   /** Whether a turn is running in the session now. */
@@ -310,9 +321,25 @@ export class SidecarSessionRegistry {
    */
   private reconcileCursor(record: SidecarSessionRecord): void {
     if (this.reconciled.has(record.id)) return;
+    this.dropPartialTail(record.id);
     const last = this.readFrames(record.id, record.cursor).at(-1);
     if (last) record.cursor = last.seq;
     this.reconciled.add(record.id);
+  }
+
+  /**
+   * A server killed mid-append leaves a last line without its newline; the next
+   * append would glue a frame onto it. Move the fragment to `<id>.jsonl.corrupt`
+   * and cut it from the transcript.
+   */
+  private dropPartialTail(id: string): void {
+    const path = this.transcriptPath(id);
+    if (!existsSync(path)) return;
+    const bytes = readFileSync(path);
+    if (bytes.length === 0 || bytes[bytes.length - 1] === 0x0a) return;
+    const keep = bytes.lastIndexOf(0x0a) + 1;
+    appendFileSync(`${path}.corrupt`, Buffer.concat([bytes.subarray(keep), Buffer.from("\n")]));
+    truncateSync(path, keep);
   }
 
   private appendFrame(record: SidecarSessionRecord, frame: SidecarFrame): void {

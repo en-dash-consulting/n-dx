@@ -8,7 +8,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -194,6 +194,44 @@ describe("transcripts", () => {
     const seqs = restarted.readFrames(id).map((f) => f.seq);
     expect(seqs).toEqual(seqs.map((_, i) => i + 1));
     expect(restarted.get(id)?.cursor).toBe(seqs.length);
+  });
+
+  it("reads every complete frame when the transcript ends in a partial line", async () => {
+    const reg = registry();
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    await reg.sendTurn(id, "one");
+    const complete = reg.readFrames(id);
+    appendFileSync(join(dir, `${id}.jsonl`), '{"seq":99,"at":"2026');
+
+    expect(registry().readFrames(id)).toEqual(complete);
+  });
+
+  it("appends the next turn on its own lines with consecutive seq after a fragment", async () => {
+    const reg = registry();
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    await reg.sendTurn(id, "one");
+    const count = reg.readFrames(id).length;
+    const path = join(dir, `${id}.jsonl`);
+    appendFileSync(path, '{"seq":99,"at":"2026');
+
+    const restarted = registry();
+    await restarted.sendTurn(id, "two");
+    const frames = restarted.readFrames(id);
+    expect(frames.map((f) => f.seq)).toEqual(frames.map((_, i) => i + 1));
+    expect(frames[count]).toMatchObject({ type: "user", text: "two" });
+    expect(readFileSync(`${path}.corrupt`, "utf-8")).toBe('{"seq":99,"at":"2026\n');
+  });
+
+  it("raises an error naming the file for a malformed complete middle line", async () => {
+    const reg = registry();
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    await reg.sendTurn(id, "one");
+    const path = join(dir, `${id}.jsonl`);
+    const lines = readFileSync(path, "utf-8").split("\n");
+    lines.splice(1, 0, "{not json");
+    writeFileSync(path, lines.join("\n"));
+
+    expect(() => reg.readFrames(id)).toThrow(path);
   });
 
   it("filters sessions by scope and worktree", () => {
