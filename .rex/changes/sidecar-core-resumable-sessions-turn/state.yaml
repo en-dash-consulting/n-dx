@@ -4,10 +4,17 @@ items:
     lastModified: "2026-10-26T16:39:50.980Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "287eab75-fe67-4039-b6a2-a14a6f39041b":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-26T21:37:51.402Z"
-    activeIntervals: [{"start":"2026-10-26T21:37:51.402Z"}]
-    lastModified: "2026-10-26T21:37:51.921Z"
+    completedAt: "2026-10-26T21:53:44.373Z"
+    endedAt: "2026-10-26T21:53:44.373Z"
+    activeIntervals: [{"end":"2026-10-26T21:53:44.373Z","start":"2026-10-26T21:37:51.402Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "web/src/server/routes-sidecar.ts: POST /api/sidecar/sessions/:id/turns (202) + sidecar:frames announcements with cursor + GET …/frames?after=; list/create/get/interrupt/end. web.sidecar flag (default off) gates the /api/sidecar prefix. llm-client: parseLine textLimit (sessions keep full text, hench keeps 500), interrupt grace 500 ms."
+    lastModified: "2026-10-26T21:53:44.373Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3c3f21c2-b454-4968-8817-f5e6f12855b0":
+    lastModified: "2026-10-26T21:50:05.550Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "425819f5-821e-41ce-aaca-56fb84c3427e":
     status: "completed"
@@ -30,7 +37,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9753d37a-2e7e-4950-8eba-3015eee08734":
     issues: ["https://www.notion.so/3f7a80b71924810fb66ac7fbdc9bc4db","https://www.notion.so/3f7a80b719248165891cff1c8f0d0ace","https://www.notion.so/3f7a80b7192481c5a8fef7faf77e11e0","https://www.notion.so/3f7a80b7192481e0a645e0c1b1b7f2b7","https://www.notion.so/3f7a80b71924810492a8ca3948c3f474","https://www.notion.so/3f7a80b71924810499c9f380e11f53fd"]
-    lastModified: "2026-10-26T21:03:38.230Z"
+    lastModified: "2026-10-26T21:50:05.550Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adba5290-d3e8-4d4c-89e0-bfcf456f0c85":
     status: "completed"
