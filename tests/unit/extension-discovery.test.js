@@ -1,0 +1,371 @@
+/**
+ * Extension discovery (packages/core/extension-discovery.js): the four sources
+ * and their precedence, conflicts, the mtime-keyed cache, and the guarantee
+ * that nothing but `package.json` is read.
+ *
+ * Cache cost is asserted by counting file-system calls, not by a clock
+ * (TESTING.md, Flake Resistance → Family 2): a warm call must make the same
+ * reads and stats with 20 extensions installed as with none.
+ *
+ * @see docs/architecture/extensions.md — "Where n-dx looks"
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join, sep } from "node:path";
+import {
+  discoverExtensions,
+  findGlobalRoot,
+  EXTENSIONS_CACHE_FILE,
+} from "../../packages/core/extension-discovery.js";
+
+const BUILTINS = ["init", "work", "status", "config", "start"];
+
+let root;
+let home;
+let project;
+let globalRoot;
+
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), "ndx-ext-discovery-"));
+  home = join(root, "home");
+  project = join(root, "project");
+  globalRoot = join(root, "global", "node_modules");
+  for (const dir of [home, project, globalRoot]) mkdirSync(dir, { recursive: true });
+});
+
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+});
+
+/** A package.json with an `ndx.extension` block named `name`. */
+function manifest(packageName, name, { version = "1.0.0", commands } = {}) {
+  return {
+    name: packageName,
+    version,
+    main: "index.js",
+    ndx: {
+      extension: {
+        apiVersion: 1,
+        name,
+        ndxVersion: ">=0.10.0",
+        commands: commands ?? [{ name, bin: "bin/cli.js", summary: `The ${name} extension` }],
+      },
+    },
+  };
+}
+
+function writeJson(path, value) {
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, JSON.stringify(value));
+}
+
+/** Install `pkg` under `<folder>/node_modules` and list it in `<folder>/package.json`. */
+function install(folder, pkg) {
+  const listing = join(folder, "package.json");
+  const current = existsSync(listing) ? JSON.parse(readFileSync(listing, "utf8")) : { name: "listing" };
+  current.dependencies = { ...current.dependencies, [pkg.name]: pkg.version };
+  writeJson(listing, current);
+  const dir = join(folder, "node_modules", ...pkg.name.split("/"));
+  writeJson(join(dir, "package.json"), pkg);
+  return dir;
+}
+
+const userFolder = () => join(home, "extensions");
+
+function devPath(dir, pkg) {
+  writeJson(join(dir, "package.json"), pkg);
+  const configPath = join(home, "config.json");
+  const config = existsSync(configPath) ? JSON.parse(readFileSync(configPath, "utf8")) : {};
+  config.extensions = { paths: [...(config.extensions?.paths ?? []), dir] };
+  writeJson(configPath, config);
+}
+
+function discover(extra = {}) {
+  return discoverExtensions({ builtinCommands: BUILTINS, home, projectDir: project, globalRoot, ...extra });
+}
+
+/** node:fs with every call counted and every file read recorded. */
+function countingFs() {
+  const counts = { readFileSync: 0, statSync: 0, readdirSync: 0, writeFileSync: 0 };
+  const reads = [];
+  const wrapped = { ...fs };
+  for (const name of Object.keys(counts)) {
+    wrapped[name] = (...args) => {
+      counts[name]++;
+      if (name === "readFileSync") reads.push(String(args[0]));
+      return fs[name](...args);
+    };
+  }
+  return { fs: wrapped, counts, reads };
+}
+
+describe("sources", () => {
+  it("finds manifests in the project, user, global and dev sources, in that order", () => {
+    install(project, manifest("@acme/ndx-alpha", "alpha"));
+    install(userFolder(), manifest("ndx-beta", "beta"));
+    writeJson(join(globalRoot, "@acme", "ndx-gamma", "package.json"), manifest("@acme/ndx-gamma", "gamma"));
+    devPath(join(root, "checkouts", "delta"), manifest("ndx-delta", "delta"));
+
+    const { extensions, errors } = discover();
+
+    expect(errors).toEqual([]);
+    expect(extensions.map((e) => [e.name, e.source, e.status])).toEqual([
+      ["alpha", "project", "valid"],
+      ["beta", "user", "valid"],
+      ["gamma", "global", "valid"],
+      ["delta", "dev", "valid"],
+    ]);
+  });
+
+  it("reads only packages a listing names, so a hoisted dependency is not an extension", () => {
+    install(project, manifest("ndx-listed", "listed"));
+    writeJson(join(project, "node_modules", "ndx-hoisted", "package.json"), manifest("ndx-hoisted", "hoisted"));
+
+    expect(discover().extensions.map((e) => e.name)).toEqual(["listed"]);
+  });
+
+  it("ignores packages without an ndx.extension block", () => {
+    install(project, { name: "lodash", version: "4.0.0" });
+    writeJson(join(globalRoot, "npm", "package.json"), { name: "npm", version: "10.0.0" });
+
+    expect(discover().extensions).toEqual([]);
+  });
+
+  it("reports a dev path that is not an extension", () => {
+    devPath(join(root, "checkouts", "plain"), { name: "plain" });
+
+    const { errors } = discover();
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toMatch(/declares no ndx.extension block/);
+  });
+
+  it("resolves relative dev paths against the n-dx home", () => {
+    writeJson(join(home, "work", "ext", "package.json"), manifest("ndx-rel", "rel"));
+    writeJson(join(home, "config.json"), { extensions: { paths: ["work/ext"] } });
+
+    expect(discover().extensions.map((e) => [e.name, e.dir])).toEqual([["rel", join(home, "work", "ext")]]);
+  });
+
+  it("does not scan the project's node_modules as the global source when n-dx is installed there", () => {
+    writeJson(join(project, "package.json"), { name: "app" });
+    writeJson(join(project, "node_modules", "ndx-unlisted", "package.json"), manifest("ndx-unlisted", "unlisted"));
+
+    expect(discover({ globalRoot: join(project, "node_modules") }).extensions).toEqual([]);
+  });
+
+  it("validates each manifest against the built-in commands", () => {
+    install(project, manifest("ndx-shadow", "status"));
+
+    const [ext] = discover().extensions;
+
+    expect(ext.status).toBe("invalid");
+    expect(ext.problems.map((p) => p.rule)).toContain("name-builtin");
+  });
+});
+
+describe("no package code runs", () => {
+  it("reads only package.json files, the home config and the cache", () => {
+    const marker = join(root, "ran");
+    const code = `require("fs").writeFileSync(${JSON.stringify(marker)}, "ran");\n`;
+    const dirs = [
+      install(project, { ...manifest("ndx-a", "a"), scripts: { preinstall: "node index.js" }, bin: { a: "bin/cli.js" } }),
+      install(userFolder(), manifest("ndx-b", "b")),
+    ];
+    const globalDir = join(globalRoot, "ndx-c");
+    writeJson(join(globalDir, "package.json"), manifest("ndx-c", "c"));
+    dirs.push(globalDir);
+    for (const dir of dirs) {
+      writeFileSync(join(dir, "index.js"), code);
+      mkdirSync(join(dir, "bin"), { recursive: true });
+      writeFileSync(join(dir, "bin", "cli.js"), code);
+    }
+    const counting = countingFs();
+
+    const { extensions } = discover({ fs: counting.fs });
+
+    expect(extensions.map((e) => e.name)).toEqual(["a", "b", "c"]);
+    expect(existsSync(marker)).toBe(false);
+    expect(new Set(counting.reads.map((p) => basename(p))))
+      .toEqual(new Set(["package.json", "config.json", EXTENSIONS_CACHE_FILE]));
+  });
+});
+
+describe("precedence and conflicts", () => {
+  it("lets the higher source win and names the copies it shadows", () => {
+    install(project, manifest("ndx-dup", "dup", { version: "3.0.0" }));
+    const userDir = install(userFolder(), manifest("ndx-dup", "dup", { version: "2.0.0" }));
+    const devDir = join(root, "checkouts", "dup");
+    devPath(devDir, manifest("ndx-dup", "dup", { version: "1.0.0-dev" }));
+
+    const { extensions } = discover();
+
+    expect(extensions).toHaveLength(1);
+    expect(extensions[0]).toMatchObject({ name: "dup", source: "project", version: "3.0.0", status: "valid" });
+    expect(extensions[0].shadowed).toEqual([
+      { source: "user", dir: userDir, version: "2.0.0" },
+      { source: "dev", dir: devDir, version: "1.0.0-dev" },
+    ]);
+  });
+
+  it("refuses both packages when two claim one extension name, each naming the other", () => {
+    const first = install(project, manifest("@one/ndx-recon", "recon"));
+    const second = install(userFolder(), manifest("@two/ndx-recon", "recon"));
+
+    const { extensions } = discover();
+
+    expect(extensions.map((e) => [e.packageName, e.status])).toEqual([
+      ["@one/ndx-recon", "conflict"],
+      ["@two/ndx-recon", "conflict"],
+    ]);
+    expect(extensions[0].conflicts).toEqual([{ packageName: "@two/ndx-recon", source: "user", dir: second, names: ["recon"] }]);
+    expect(extensions[1].conflicts).toEqual([{ packageName: "@one/ndx-recon", source: "project", dir: first, names: ["recon"] }]);
+  });
+
+  it("refuses both packages when one's command takes the other's name", () => {
+    install(project, manifest("ndx-a", "a", { commands: [{ name: "b", bin: "cli.js", summary: "b" }] }));
+    install(userFolder(), manifest("ndx-b", "b"));
+
+    expect(discover().extensions.map((e) => e.status)).toEqual(["conflict", "conflict"]);
+  });
+
+  it("leaves an incompatible manifest out of name conflicts, since it never runs", () => {
+    install(project, manifest("ndx-a", "same"));
+    const future = manifest("ndx-future", "same");
+    future.ndx.extension.apiVersion = 99;
+    install(userFolder(), future);
+
+    expect(discover().extensions.map((e) => e.status)).toEqual(["valid", "incompatible"]);
+  });
+});
+
+describe("cache", () => {
+  it("writes <ndx home>/extensions.json and reads no package on a warm call", () => {
+    install(userFolder(), manifest("ndx-a", "a"));
+    discover();
+    expect(existsSync(join(home, EXTENSIONS_CACHE_FILE))).toBe(true);
+
+    const counting = countingFs();
+    const { extensions } = discover({ fs: counting.fs });
+
+    expect(extensions.map((e) => e.name)).toEqual(["a"]);
+    expect(counting.reads.map((p) => basename(p)).sort()).toEqual(["config.json", EXTENSIONS_CACHE_FILE]);
+    expect(counting.counts.writeFileSync).toBe(0);
+  });
+
+  it("makes the same reads and stats warm with 20 extensions as with none", () => {
+    const warmCost = () => {
+      discover();
+      const counting = countingFs();
+      discover({ fs: counting.fs });
+      return counting.counts;
+    };
+    writeJson(join(userFolder(), "package.json"), { name: "listing" });
+    mkdirSync(join(userFolder(), "node_modules"));
+    const none = warmCost();
+    for (let i = 0; i < 20; i++) install(userFolder(), manifest(`ndx-e${i}`, `e${i}`));
+    const twenty = warmCost();
+
+    expect(discover().extensions).toHaveLength(20);
+    expect(twenty).toEqual(none);
+  });
+
+  it("recomputes a source when a package is added to it", () => {
+    install(userFolder(), manifest("ndx-a", "a"));
+    discover();
+    install(userFolder(), manifest("ndx-b", "b"));
+    bumpMtime(join(userFolder(), "node_modules"));
+
+    expect(discover().extensions.map((e) => e.name)).toEqual(["a", "b"]);
+  });
+
+  it("recomputes the global source when a scoped package is added", () => {
+    writeJson(join(globalRoot, "@acme", "ndx-a", "package.json"), manifest("@acme/ndx-a", "a"));
+    discover();
+    writeJson(join(globalRoot, "@acme", "ndx-b", "package.json"), manifest("@acme/ndx-b", "b"));
+    bumpMtime(join(globalRoot, "@acme"));
+
+    expect(discover().extensions.map((e) => e.name)).toEqual(["a", "b"]);
+  });
+
+  it("recomputes a dev path when its package.json changes", () => {
+    const dir = join(root, "checkouts", "x");
+    devPath(dir, manifest("ndx-x", "x"));
+    expect(discover().extensions[0].version).toBe("1.0.0");
+    writeJson(join(dir, "package.json"), manifest("ndx-x", "x", { version: "1.1.0" }));
+    bumpMtime(join(dir, "package.json"));
+
+    expect(discover().extensions[0].version).toBe("1.1.0");
+  });
+
+  it("keeps the file's other keys, where approvals live", () => {
+    writeJson(join(home, EXTENSIONS_CACHE_FILE), { approvals: { a: { hash: "h" } } });
+    install(userFolder(), manifest("ndx-a", "a"));
+    discover();
+
+    const file = JSON.parse(readFileSync(join(home, EXTENSIONS_CACHE_FILE), "utf8"));
+    expect(file.approvals).toEqual({ a: { hash: "h" } });
+    expect(file.discovery.version).toBe(1);
+  });
+
+  it("reports a cache file that is not JSON and leaves it untouched", () => {
+    writeFileSync(join(home, EXTENSIONS_CACHE_FILE), "{ not json");
+    install(userFolder(), manifest("ndx-a", "a"));
+
+    const { extensions, errors } = discover();
+
+    expect(extensions.map((e) => e.name)).toEqual(["a"]);
+    expect(errors.map((e) => e.path)).toEqual([join(home, EXTENSIONS_CACHE_FILE)]);
+    expect(readFileSync(join(home, EXTENSIONS_CACHE_FILE), "utf8")).toBe("{ not json");
+  });
+});
+
+describe("n-dx home", () => {
+  it("honours $NDX_HOME", () => {
+    const custom = join(root, "custom-home");
+    install(join(custom, "extensions"), manifest("ndx-a", "a"));
+
+    const result = discover({ home: undefined, env: { NDX_HOME: custom } });
+
+    expect(result.home).toBe(custom);
+    expect(result.extensions.map((e) => e.name)).toEqual(["a"]);
+    expect(existsSync(join(custom, EXTENSIONS_CACHE_FILE))).toBe(true);
+  });
+
+  it("uses the legacy ~/.n-dx when it is the only home present", () => {
+    const userHome = join(root, "os-home");
+    const legacy = join(userHome, ".n-dx");
+    install(join(legacy, "extensions"), manifest("ndx-a", "a"));
+
+    const result = discover({ home: undefined, env: {}, userHome });
+
+    expect(result.home).toBe(legacy);
+    expect(result.extensions.map((e) => e.name)).toEqual(["a"]);
+  });
+});
+
+describe("findGlobalRoot", () => {
+  const p = (...parts) => [sep === "\\" ? "C:" : "", ...parts].join(sep);
+
+  it("is the node_modules holding @n-dx/core in an npm global install", () => {
+    expect(findGlobalRoot(p("usr", "lib", "node_modules", "@n-dx", "core"))).toBe(p("usr", "lib", "node_modules"));
+  });
+
+  it("is the node_modules above .pnpm in a pnpm global install", () => {
+    const real = p("pnpm", "global", "5", "node_modules", ".pnpm", "@n-dx+core@0.10.0", "node_modules", "@n-dx", "core");
+    expect(findGlobalRoot(real)).toBe(p("pnpm", "global", "5", "node_modules"));
+  });
+
+  it("is null for a checkout", () => {
+    expect(findGlobalRoot(p("src", "n-dx", "packages", "core"))).toBeNull();
+  });
+});
+
+/** Move a path's mtime forward, as an install would; filesystems with coarse mtimes need it. */
+function bumpMtime(path) {
+  const later = new Date(Date.now() + 5_000);
+  utimesSync(path, later, later);
+}

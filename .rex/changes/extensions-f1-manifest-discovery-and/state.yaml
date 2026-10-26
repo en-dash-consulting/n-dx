@@ -15,5 +15,12 @@ items:
     lastModified: "2026-10-26T17:29:04.135Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "e9435b47-1ab2-4739-9338-ab00f1c518d6":
-    lastModified: "2026-10-26T17:02:43.406Z"
+    status: "completed"
+    startedAt: "2026-10-26T17:30:12.128Z"
+    completedAt: "2026-10-26T17:39:26.834Z"
+    endedAt: "2026-10-26T17:39:26.834Z"
+    activeIntervals: [{"end":"2026-10-26T17:39:26.834Z","start":"2026-10-26T17:30:12.128Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "packages/core/extension-discovery.js + tests/unit/extension-discovery.test.js (commit 6087b8c9c)"
+    lastModified: "2026-10-26T17:39:26.834Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

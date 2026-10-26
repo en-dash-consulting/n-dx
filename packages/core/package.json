@@ -90,7 +90,8 @@
     "migrate-chain.js",
     "run-summary.js",
     "extension-manifest.js",
-    "extension-manifest.schema.json"
+    "extension-manifest.schema.json",
+    "extension-discovery.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"
