@@ -25,6 +25,7 @@ import { discoverExtensions, USER_EXTENSIONS_DIRNAME, EXTENSIONS_CACHE_FILE } fr
 import { formatProblem, isExtensionNameSlug } from "./extension-manifest.js";
 import {
   approvalFor,
+  describeForApproval,
   extensionState,
   forgetApproval,
   readExtensionsFile,
@@ -129,7 +130,7 @@ function context(deps) {
     ndxVersion,
     discover,
     runNpm: deps.runNpm ?? defaultRunNpm,
-    confirm: deps.confirm ?? defaultConfirm(),
+    confirm: deps.confirm ?? terminalConfirm(),
     out: deps.out ?? ((/** @type {string} */ line) => console.log(line)),
     err: deps.err ?? ((/** @type {string} */ line) => console.error(line)),
   };
@@ -426,24 +427,6 @@ async function enable(ctx, name, yes) {
 }
 
 /**
- * What the user is approving: package, version, source, commands and sidecar.
- *
- * @param {DiscoveredExtension} ext
- * @param {string} reason
- */
-function describeForApproval(ext, reason) {
-  const m = ext.manifest;
-  const lines = [
-    `'${stateKey(ext)}' is ${reason}.`,
-    `  package  ${ext.packageName}@${ext.version ?? "?"}`,
-    `  source   ${ext.source} (${ext.dir})`,
-  ];
-  for (const c of m?.commands ?? []) lines.push(`  command  ndx ${c.name} → ${c.bin}`);
-  if (m?.sidecar) lines.push(`  sidecar  ${m.sidecar.bin}, served at /x/${m.name}/ by the hub`);
-  return lines;
-}
-
-/**
  * @param {Context} ctx
  * @param {string | undefined} name
  */
@@ -603,8 +586,13 @@ function defaultRunNpm(args, { cwd }) {
   });
 }
 
-/** A yes/no prompt on the terminal, or `undefined` when there is none. */
-function defaultConfirm() {
+/**
+ * A yes/no prompt on the terminal, or `undefined` when stdin or stdout is not
+ * a TTY. `ndx <name>` uses it to ask on an extension's first run.
+ *
+ * @returns {((question: string) => Promise<boolean>) | undefined}
+ */
+export function terminalConfirm() {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return undefined;
   return async (/** @type {string} */ question) => {
     const rl = createInterface({ input: process.stdin, output: process.stdout });

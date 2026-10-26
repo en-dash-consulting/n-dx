@@ -68,8 +68,8 @@ import {
   rollbackRefreshState,
 } from "./refresh-validate.js";
 import { handleInstallSample, handleDestroySample } from "./sample-app.js";
-import { runExtensions } from "./extensions-command.js";
-import { EXTENSION_REFUSED_EXIT_CODE, listExtensionCommands, resolveExtensionCommand, runExtensionCommand } from "./extension-dispatch.js";
+import { runExtensions, terminalConfirm } from "./extensions-command.js";
+import { approveOnFirstRun, EXTENSION_REFUSED_EXIT_CODE, listExtensionCommands, resolveExtensionCommand, runExtensionCommand } from "./extension-dispatch.js";
 import { extensionEnvironment } from "./extension-env.js";
 
 const CLI_ERROR_CODES = Object.freeze({
@@ -3434,11 +3434,16 @@ function handleHelp(rest) {
 /**
  * `ndx <name>` for a name no built-in owns: run the enabled extension command
  * that claims it, or report an unknown command — with the reason when an
- * extension claims the name but cannot run.
+ * extension claims the name but cannot run. An unapproved extension's first
+ * run asks on the terminal; without one it is refused with exit 2.
  */
 async function handleExtensionCommand(command, rest) {
   const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
-  const resolution = resolveExtensionCommand(command, { builtinCommands: builtinCommandNames(), ndxVersion: version });
+  const resolveOptions = { builtinCommands: builtinCommandNames(), ndxVersion: version };
+  let resolution = resolveExtensionCommand(command, resolveOptions);
+  if (await approveOnFirstRun(resolution, command, { confirm: terminalConfirm(), out: (line) => console.log(line) })) {
+    resolution = resolveExtensionCommand(command, resolveOptions);
+  }
   switch (resolution.kind) {
     case "run": {
       let env;

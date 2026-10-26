@@ -25,7 +25,14 @@ import * as nodeFs from "node:fs";
 import { constants as osConstants } from "node:os";
 import { join, resolve } from "node:path";
 import { discoverExtensions, EXTENSIONS_CACHE_FILE } from "./extension-discovery.js";
-import { extensionState, readExtensionsFile, stateKey } from "./extension-state.js";
+import {
+  describeForApproval,
+  extensionState,
+  readExtensionsFile,
+  recordApproval,
+  stateKey,
+  updateExtensionsFile,
+} from "./extension-state.js";
 import { treeKillSpawnOptions } from "./child-lifecycle.js";
 
 /** Exit code for an extension command that exists but cannot run. */
@@ -48,14 +55,25 @@ export const FORWARDED_SIGNALS = Object.freeze(["SIGINT", "SIGTERM"]);
  *   home discovery used, which the extension's environment names.
  * - `refused` — the command would run but must not yet: unapproved, or its
  *   `bin` is missing. `message` is one line naming the problem and the fix.
+ *   When the only problem is the missing approval, `approval` carries what
+ *   {@link approveOnFirstRun} needs to ask for it.
  * - `unavailable` — an extension claims the name but is disabled, incompatible,
  *   invalid or in conflict; `ndx` still reports an unknown command, and `hint`
  *   says why and what to run.
  *
  * @typedef {{kind: "builtin"} | {kind: "none"}
  *   | {kind: "run", ext: DiscoveredExtension, command: string, bin: string, home: string}
- *   | {kind: "refused", ext: DiscoveredExtension, message: string}
+ *   | {kind: "refused", ext: DiscoveredExtension, message: string, approval?: PendingApproval}
  *   | {kind: "unavailable", ext: DiscoveredExtension, state: ExtensionStateName, hint: string}} ExtensionResolution
+ */
+
+/**
+ * An unapproved extension's approval, as `ndx <name>` would record it.
+ *
+ * @typedef {object} PendingApproval
+ * @property {string} reason  Why it is unapproved.
+ * @property {string} home  The n-dx home holding `extensions.json`.
+ * @property {string} projectDir  The project a project-source approval is for.
  */
 
 /**
@@ -93,6 +111,7 @@ export function resolveExtensionCommand(name, options) {
       kind: "refused",
       ext,
       message: `Error: 'ndx ${name}' comes from ${label}, which is ${reason} — fix: ndx extensions enable ${key}`,
+      approval: { reason, home: discovery.home, projectDir },
     };
   }
   if (state !== "enabled") {
@@ -111,6 +130,44 @@ export function resolveExtensionCommand(name, options) {
     };
   }
   return { kind: "run", ext, command: name, bin, home: discovery.home };
+}
+
+/**
+ * Asks a yes/no question on the terminal.
+ *
+ * @callback ConfirmApproval
+ * @param {string} question
+ * @returns {Promise<boolean>}
+ */
+
+/**
+ * @typedef {object} FirstRunOptions
+ * @property {ConfirmApproval} [confirm]  Omitted when there is no terminal to ask on.
+ * @property {(line: string) => void} out
+ * @property {Date} [now]
+ */
+
+/**
+ * The first `ndx <name>` of an unapproved extension: show what would run —
+ * package, version, source, commands and sidecar — and ask. A yes records the
+ * approval exactly as `ndx extensions enable` does, so the command can run.
+ *
+ * Resolves to false, writing nothing, when the resolution is not waiting on an
+ * approval, when there is no terminal to ask on, or when the answer is no; the
+ * caller then reports the refusal, which names `ndx extensions enable`.
+ *
+ * @param {ExtensionResolution} resolution
+ * @param {string} command  The `<name>` that was run.
+ * @param {FirstRunOptions} options
+ * @returns {Promise<boolean>} Whether the extension is now approved.
+ */
+export async function approveOnFirstRun(resolution, command, { confirm, out, now }) {
+  if (resolution.kind !== "refused" || !resolution.approval || !confirm) return false;
+  const { ext, approval } = resolution;
+  for (const line of describeForApproval(ext, approval.reason)) out(line);
+  if (!(await confirm(`Approve '${stateKey(ext)}' and run 'ndx ${command}'?`))) return false;
+  updateExtensionsFile(approval.home, (file) => recordApproval(file, ext, { projectDir: approval.projectDir, now }));
+  return true;
 }
 
 /**

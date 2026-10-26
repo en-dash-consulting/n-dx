@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "6ab3826a-a3ed-47aa-a2b5-2fd4896ac98c":
-    lastModified: "2026-10-26T17:03:23.598Z"
+    status: "completed"
+    startedAt: "2026-10-26T18:33:08.483Z"
+    completedAt: "2026-10-26T18:40:55.050Z"
+    endedAt: "2026-10-26T18:40:55.050Z"
+    activeIntervals: [{"end":"2026-10-26T18:40:55.050Z","start":"2026-10-26T18:33:08.483Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "First `ndx <name>` of an unapproved extension describes it and asks; yes records the approval and runs. No TTY or a no: exit 2 naming `ndx extensions enable <name>`. Commit b555349e7."
+    lastModified: "2026-10-26T18:40:55.050Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "8c045996-2f38-4940-8dc3-82eef87d6cf7":
     lastModified: "2026-10-26T17:03:29.393Z"

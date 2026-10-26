@@ -190,6 +190,26 @@ export function stateKey(ext) {
 }
 
 /**
+ * What the user is approving: package, version, source, commands and sidecar.
+ * Shown by `ndx extensions enable` and by an extension's first `ndx <name>`.
+ *
+ * @param {import("./extension-discovery.js").DiscoveredExtension} ext
+ * @param {string} reason  Why it is unapproved, from {@link extensionState}.
+ * @returns {string[]}
+ */
+export function describeForApproval(ext, reason) {
+  const m = ext.manifest;
+  const lines = [
+    `'${stateKey(ext)}' is ${reason}.`,
+    `  package  ${ext.packageName}@${ext.version ?? "?"}`,
+    `  source   ${ext.source} (${ext.dir})`,
+  ];
+  for (const c of m?.commands ?? []) lines.push(`  command  ndx ${c.name} → ${c.bin}`);
+  if (m?.sidecar) lines.push(`  sidecar  ${m.sidecar.bin}, served at /x/${m.name}/ by the hub`);
+  return lines;
+}
+
+/**
  * Decide an extension's state. A problem with the package itself (invalid,
  * conflict, incompatible) outranks the user's decisions; disabling outranks
  * the lack of an approval.

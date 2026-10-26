@@ -13,7 +13,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { listExtensionCommands, resolveExtensionCommand, runExtensionCommand, EXTENSION_REFUSED_EXIT_CODE } from "../../packages/core/extension-dispatch.js";
+import { approveOnFirstRun, listExtensionCommands, resolveExtensionCommand, runExtensionCommand, EXTENSION_REFUSED_EXIT_CODE } from "../../packages/core/extension-dispatch.js";
 import { runExtensions } from "../../packages/core/extensions-command.js";
 
 const BUILTINS = ["init", "work", "status", "config", "extensions", "rex"];
@@ -43,8 +43,7 @@ function writeFile(path, text) {
  * Install a user-source extension named `name` with one command `name`, whose
  * bin is `script` (omit for a missing bin).
  */
-function install(name, { script, ndxVersion = ">=0.10.0", commands } = {}) {
-  const folder = join(home, "extensions");
+function install(name, { script, ndxVersion = ">=0.10.0", commands, folder = join(home, "extensions") } = {}) {
   const listing = join(folder, "package.json");
   const deps = existsSync(listing) ? JSON.parse(readFileSync(listing, "utf8")).dependencies : {};
   writeFile(listing, JSON.stringify({ name: "ndx-user-extensions", dependencies: { ...deps, [`ndx-${name}`]: "^1.0.0" } }));
@@ -132,6 +131,60 @@ describe("resolveExtensionCommand", () => {
     });
     await enable("recon");
     expect(resolveName("recon-report")).toMatchObject({ kind: "run", command: "recon-report", bin: join(dir, "bin", "cli.js") });
+  });
+});
+
+describe("approveOnFirstRun", () => {
+  const ask = (answer) => {
+    const questions = [];
+    return { questions, confirm: async (q) => { questions.push(q); return answer; } };
+  };
+
+  it("shows package, version, source and commands, asks, and on yes approves so the command runs", async () => {
+    const dir = install("recon", { script: "" });
+    const { questions, confirm } = ask(true);
+    const lines = [];
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm, out: (l) => lines.push(l) })).toBe(true);
+    expect(lines).toEqual([
+      "'recon' is not approved yet.",
+      "  package  ndx-recon@1.0.0",
+      `  source   user (${dir})`,
+      "  command  ndx recon → bin/cli.js",
+    ]);
+    expect(questions).toEqual(["Approve 'recon' and run 'ndx recon'?"]);
+    expect(resolveName("recon")).toMatchObject({ kind: "run", command: "recon" });
+    const approval = JSON.parse(readFileSync(join(home, "extensions.json"), "utf8")).approvals["ndx-recon"];
+    expect(approval).toMatchObject({ version: "1.0.0", source: "user" });
+  });
+
+  it("on no, or with no terminal to ask on, approves nothing and the refusal stands", async () => {
+    install("recon", { script: "" });
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm: ask(false).confirm, out: () => {} })).toBe(false);
+    const lines = [];
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { out: (l) => lines.push(l) })).toBe(false);
+    expect(lines).toEqual([]);
+    expect(existsSync(join(home, "extensions.json")) && JSON.parse(readFileSync(join(home, "extensions.json"), "utf8")).approvals).toBeFalsy();
+    expect(resolveName("recon").message).toMatch(/fix: ndx extensions enable recon$/);
+  });
+
+  it("never asks for a refusal an approval cannot fix", async () => {
+    install("recon");
+    await enable("recon");
+    const { questions, confirm } = ask(true);
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm, out: () => {} })).toBe(false);
+    expect(questions).toEqual([]);
+  });
+
+  it("approves a project-source extension for that project path only", async () => {
+    install("local", { script: "", folder: project });
+    expect(await approveOnFirstRun(resolveName("local"), "local", { confirm: ask(true).confirm, out: () => {} })).toBe(true);
+    expect(resolveName("local").kind).toBe("run");
+
+    // The same repository cloned elsewhere brings no approval with it.
+    const clone = join(root, "clone");
+    install("local", { script: "", folder: clone });
+    const cloned = resolveExtensionCommand("local", { ...deps(), cwd: clone });
+    expect(cloned).toMatchObject({ kind: "refused", approval: { reason: "not approved for this project" } });
   });
 });
 
