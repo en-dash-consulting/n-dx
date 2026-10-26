@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings, loadExtensionConfig } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -71,6 +71,7 @@ import { handleInstallSample, handleDestroySample } from "./sample-app.js";
 import { runExtensions, terminalConfirm } from "./extensions-command.js";
 import { approveOnFirstRun, EXTENSION_REFUSED_EXIT_CODE, listExtensionCommands, resolveExtensionCommand, runExtensionCommand } from "./extension-dispatch.js";
 import { extensionEnvironment } from "./extension-env.js";
+import { configCheckerByName, configCheckerFor } from "./extension-config-schema.js";
 
 const CLI_ERROR_CODES = Object.freeze({
   NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
@@ -2925,7 +2926,10 @@ async function handleExport(rest) {
 
 async function handleConfig(rest) {
   try {
-    await runConfig(rest);
+    await runConfig(rest, {
+      extensionConfigChecker: (name, dir, home) =>
+        configCheckerByName(name, { builtinCommands: builtinCommandNames(), projectDir: dir, home }),
+    });
   } catch (err) {
     console.error(formatError(err));
     exitWithCleanup(1);
@@ -3446,9 +3450,19 @@ async function handleExtensionCommand(command, rest) {
   }
   switch (resolution.kind) {
     case "run": {
+      const name = resolution.ext.name;
+      const config = await loadExtensionConfig({ dir: process.cwd(), home: resolution.home, name });
+      const violations = configCheckerFor(resolution.ext).check(config);
+      if (violations.length > 0) {
+        console.error(`Error: 'ndx ${command}' has a config section extensions.${name} that does not match its configSchema:`);
+        for (const violation of violations) console.error(`  ${violation.message}`);
+        console.error(`  fix: ndx config extensions.${name}.<key> <value>`);
+        exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
+        return;
+      }
       let env;
       try {
-        env = extensionEnvironment({ name: resolution.ext.name, home: resolution.home, ndxVersion: version });
+        env = extensionEnvironment({ name, home: resolution.home, ndxVersion: version, config });
       } catch (err) {
         console.error(`Error: 'ndx ${command}' could not prepare its state folder under ${resolution.home} (${err.code ?? err.message}) — fix: make the n-dx home writable, or set NDX_HOME`);
         exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);

@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { CLI_PATH, createTmpDir, removeTmpDir, run, runResult } from "./e2e-helpers.js";
 
@@ -227,6 +227,11 @@ describe("ndx <extension command>", () => {
     });
   }
 
+  it("hands the extension an empty config file when no section is set", () => {
+    installConfigReader("recon");
+    expect(JSON.parse(run(["recon"], opts()))).toEqual({});
+  });
+
   it.skipIf(process.platform === "win32")("forwards SIGTERM to the extension and exits with its code", async () => {
     installEcho("recon");
     const child = spawn(process.execPath, [CLI_PATH, "recon", "wait"], { ...opts(), stdio: ["ignore", "pipe", "pipe"] });
@@ -238,5 +243,92 @@ describe("ndx <extension command>", () => {
     const code = await new Promise((resolve) => child.on("close", resolve));
     expect(stdout).toContain("got SIGTERM");
     expect(code).toBe(7);
+  });
+});
+
+/**
+ * An approved user-installed extension `name` whose command prints the JSON
+ * file `NDX_EXTENSION_CONFIG` names, with `schema` as its configSchema when given.
+ */
+function installConfigReader(name, schema) {
+  installEcho(name, { approve: false });
+  const dir = join(home, "extensions", "node_modules", `ndx-${name}`);
+  writeFileSync(join(dir, "bin", "cli.js"), `process.stdout.write(require("node:fs").readFileSync(process.env.NDX_EXTENSION_CONFIG, "utf-8"));`);
+  if (schema) {
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
+    pkg.ndx.extension.configSchema = "schema/config.json";
+    writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
+    writeFileSync(join(mkdirp(join(dir, "schema")), "config.json"), JSON.stringify(schema));
+  }
+  run(["extensions", "enable", name, "--yes"], opts());
+}
+
+const RECON_SCHEMA = {
+  type: "object",
+  properties: {
+    mode: { enum: ["fast", "deep"] },
+    depth: { type: "integer", minimum: 1 },
+    target: { type: "string" },
+  },
+  required: ["target"],
+  additionalProperties: false,
+};
+
+const readJson = (path) => JSON.parse(readFileSync(path, "utf-8"));
+
+describe("ndx config extensions.<name>", () => {
+  it("merges the project section over the user's and hands the result to the extension", () => {
+    installConfigReader("recon", RECON_SCHEMA);
+    expect(run(["config", "extensions.recon.mode", "deep", "--user"], opts())).toContain("extensions.recon.mode = deep");
+    run(["config", "extensions.recon.depth", "3", "--user"], opts());
+    run(["config", "extensions.recon.mode", "fast"], opts());
+    run(["config", "extensions.recon.target", "12345"], opts());
+
+    expect(readJson(join(home, "config.json")).extensions.recon).toEqual({ mode: "deep", depth: 3 });
+    expect(readJson(join(root, ".n-dx.json")).extensions.recon).toEqual({ mode: "fast", target: "12345" });
+
+    const merged = { mode: "fast", depth: 3, target: "12345" };
+    expect(JSON.parse(run(["config", "extensions.recon", "--json"], opts()))).toEqual(merged);
+    expect(run(["config", "extensions.recon.depth"], opts()).trim()).toBe("3");
+    expect(JSON.parse(run(["recon"], opts()))).toEqual(merged);
+  });
+
+  it("refuses a value the configSchema rejects, unless --force", () => {
+    installConfigReader("recon", RECON_SCHEMA);
+    const bad = runResult(["config", "extensions.recon.mode", "slow"], opts());
+    expect(bad.code).toBe(1);
+    expect(bad.stderr).toContain('mode must be one of: "fast", "deep"');
+    expect(bad.stderr).toContain("--force");
+    expect(runResult(["config", "extensions.recon.depth", "0"], opts()).stderr).toContain("depth must be >= 1");
+    expect(runResult(["config", "extensions.recon.extra", "1"], opts()).stderr).toContain('must not have the property "extra"');
+
+    run(["config", "extensions.recon.mode", "slow", "--force"], opts());
+    expect(readJson(join(root, ".n-dx.json")).extensions.recon.mode).toBe("slow");
+  });
+
+  it("refuses to run an extension whose merged section breaks its schema, required keys included", () => {
+    installConfigReader("recon", RECON_SCHEMA);
+    run(["config", "extensions.recon.mode", "fast"], opts());
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('the section must have the property "target"');
+    expect(result.stderr).toContain("fix: ndx config extensions.recon.<key> <value>");
+  });
+
+  it("refuses a key for an extension that is not installed, unless --force", () => {
+    const result = runResult(["config", "extensions.ghost.mode", "fast"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/No installed extension is named "ghost" — fix: ndx extensions list/);
+    run(["config", "extensions.ghost.mode", "fast", "--force"], opts());
+    expect(run(["config", "extensions.ghost.mode"], opts()).trim()).toBe("fast");
+  });
+
+  it("says when the project config overrides a --user write", () => {
+    installConfigReader("recon");
+    run(["config", "extensions.recon.mode", "fast"], opts());
+    // runResult keeps stderr only on failure; this note comes with exit 0.
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "extensions.recon.mode", "deep", "--user"], { ...opts(), encoding: "utf-8", windowsHide: true });
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain('the project config also sets "extensions.recon.mode", and its value wins');
   });
 });

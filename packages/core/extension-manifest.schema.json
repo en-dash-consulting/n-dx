@@ -84,7 +84,7 @@
       "type": "string",
       "maxLength": 40,
       "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
-      "not": { "enum": ["ndx", "n-dx", "rex", "hench", "sourcevision", "sv", "ext", "x", "hub", "extensions"] }
+      "not": { "enum": ["ndx", "n-dx", "rex", "hench", "sourcevision", "sv", "ext", "x", "hub", "extensions", "paths"] }
     },
     "text": { "type": "string", "minLength": 1, "pattern": "\\S" },
     "packagePath": {

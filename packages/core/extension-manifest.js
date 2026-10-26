@@ -46,11 +46,13 @@ export const SUPPORTED_EXTENSION_API_VERSIONS = Object.freeze([1]);
 /**
  * Names no extension and no extension command may take, beyond the built-in
  * commands the caller passes: n-dx's own bin aliases and the words the
- * extension surfaces themselves use (`ndx extensions`, the `/x/` mount, `hub`).
+ * extension surfaces themselves use (`ndx extensions`, the `/x/` mount, `hub`,
+ * and `paths`, which discovery reads from the user config's `extensions`
+ * object beside the per-extension config sections).
  */
 export const RESERVED_EXTENSION_NAMES = Object.freeze([
   "ndx", "n-dx", "rex", "hench", "sourcevision", "sv",
-  "ext", "x", "hub", "extensions",
+  "ext", "x", "hub", "extensions", "paths",
 ]);
 
 /** Placeholders a `projectLinks[].path` may carry; the hub fills them in. */

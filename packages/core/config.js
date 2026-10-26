@@ -14,10 +14,11 @@ import {
   access,
   constants,
   stat,
+  mkdir,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { execFileSyncCli } from "./win-spawn.js";
-import { relativeToRoot, resolveLayout } from "./layout.js";
+import { relativeToRoot, resolveLayout, resolveNdxHome } from "./layout.js";
 import {
   describeUnrestrictedFile,
   restrictFileToOwner,
@@ -154,6 +155,10 @@ const PROJECT_SECTIONS = new Set([
   "features",
   "sourcevision",
   "selfHeal",
+  // Per-extension sections, `extensions.<name>`. Unlike the others it is also
+  // read from the user config and set through its own handler (see
+  // "Extension config sections" below).
+  "extensions",
 ]);
 
 /**
@@ -2507,6 +2512,17 @@ Experimental settings (.n-dx.json) — BETA, off by default:
                                     Equivalent one-off: NDX_POSIX_FREEZE_KILL=1
                                     Example: n-dx config experimental.posixFreezeTreeKill true
 
+Extension settings (<ndx home>/config.json and .n-dx.json):
+  extensions.<name>.<key>  any       A setting of the installed extension <name>.
+                                    The user config and the project config each
+                                    hold a section; the project's wins key by key.
+                                    Written to .n-dx.json, or to the user config
+                                    with --user. Checked against the extension's
+                                    configSchema when it declares one; a typed
+                                    property is coerced to the schema's type.
+                                    The merged section is the file the extension
+                                    finds at NDX_EXTENSION_CONFIG.
+
 Language detection override (.n-dx.json):
   language                 string    Primary project language (default: "auto")
                                     Valid values: typescript, javascript, go, auto
@@ -2539,7 +2555,9 @@ Local overrides (.n-dx.local.json):
 
 Options:
   --json                   Output as JSON
-  --force                  Skip validation when setting claude/llm config values
+  --force                  Skip validation when setting claude/llm/extensions config values
+  --user                   Write an extensions.<name>.<key> value to the user config
+                           (<ndx home>/config.json) instead of .n-dx.json
   --test-connection        Test configured claude.api_key and/or claude.cli_path
   --help, -h               Show this help
 
@@ -2697,6 +2715,13 @@ async function loadAllConfigs(dir) {
       configs[section] = projectConfig[section];
     }
   }
+
+  const extensions = deepMerge(
+    plainObject((await loadUserConfig(resolveNdxHome()))[EXTENSIONS_SECTION]),
+    plainObject(projectConfig[EXTENSIONS_SECTION]),
+  );
+  if (Object.keys(extensions).length > 0) configs[EXTENSIONS_SECTION] = extensions;
+  else delete configs[EXTENSIONS_SECTION];
 
   // Expose the top-level language field (scalar, not a section object)
   if (typeof projectConfig.language === "string") {
@@ -3396,9 +3421,192 @@ async function handleShowAll(configs, flags) {
   console.log();
 }
 
+// ── Extension config sections ────────────────────────────────────────────────
+
+/**
+ * Each extension owns `extensions.<name>` in the user config
+ * (`<ndx home>/config.json`) and in the project config, merged project over
+ * user, and checked against the manifest's `configSchema` when it names one
+ * (docs/architecture/extensions.md, "Config"). The check itself lives in
+ * extension-config-schema.js and reaches this file as an injected callback
+ * ({@link ConfigCommandDeps}). The user config's
+ * `extensions.paths` is discovery's, which is why `paths` is a reserved
+ * extension name.
+ */
+export const EXTENSIONS_SECTION = "extensions";
+
+/** The user config in the n-dx home. */
+const USER_CONFIG_FILE = "config.json";
+
+function userConfigPath(home) {
+  return join(home, USER_CONFIG_FILE);
+}
+
+async function loadUserConfig(home) {
+  return loadOptionalJSON(userConfigPath(home));
+}
+
+/** `value` when it is a plain object, else `{}`. */
+function plainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+/** `config.extensions[name]`, or `{}`. */
+function extensionSection(config, name) {
+  const sections = plainObject(config[EXTENSIONS_SECTION]);
+  return Object.hasOwn(sections, name) ? plainObject(sections[name]) : {};
+}
+
+/**
+ * Coerce a typed value the way {@link coerceValue} does, except that a type
+ * the schema declares wins over the guess: a `string` setting stays a string
+ * however numeric it looks.
+ */
+function coerceExtensionValue(newValue, existingValue, schemaType) {
+  switch (schemaType) {
+    case "string": return newValue;
+    case "number":
+    case "integer": return coerceValue(newValue, 0);
+    case "boolean": return coerceValue(newValue, false);
+    case "array": return coerceValue(newValue, []);
+    default: return coerceValue(newValue, existingValue);
+  }
+}
+
+/**
+ * One extension's config section: the user's `extensions.<name>` with the
+ * project's over it. What `NDX_EXTENSION_CONFIG` holds once the caller has
+ * checked it against the extension's `configSchema`.
+ *
+ * @param {object} options
+ * @param {string} options.dir  The project.
+ * @param {string} options.home  The n-dx home.
+ * @param {string} options.name  The extension's manifest `name`.
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function loadExtensionConfig({ dir, home, name }) {
+  return deepMerge(
+    extensionSection(await loadUserConfig(home), name),
+    extensionSection(await loadEffectiveProjectConfig(dir), name),
+  );
+}
+
+/**
+ * SET mode for `extensions.<name>.<key>`: writes the project config, or the
+ * user config with `--user`, after checking the merged result against the
+ * extension's `configSchema`. A missing `required` key is not an error here,
+ * since a section is filled one key at a time; the run refuses it instead.
+ */
+async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flags, deps) {
+  const fail = (message) => {
+    console.error(message);
+    process.exit(1);
+  };
+  const force = flags.force === "true";
+  const dotIdx = settingPath.indexOf(".");
+  const name = dotIdx === -1 ? "" : settingPath.slice(0, dotIdx);
+  const keyPath = dotIdx === -1 ? "" : settingPath.slice(dotIdx + 1);
+  if (!name || !keyPath) {
+    fail(`Invalid key "${keyArg}". Use ${EXTENSIONS_SECTION}.<name>.<key>`);
+    return;
+  }
+  let keyParts;
+  try {
+    splitSettingPath(name);
+    keyParts = splitSettingPath(keyPath);
+  } catch (err) {
+    fail(err.message);
+    return;
+  }
+
+  if (!deps.extensionConfigChecker) {
+    throw new TypeError("runConfig: deps.extensionConfigChecker is required to set an extensions.<name> key");
+  }
+  const home = resolveNdxHome();
+  const found = deps.extensionConfigChecker(name, dir, home);
+  if ("error" in found && !force) {
+    fail(`${found.error}\n  Use --force to set this value anyway.`);
+    return;
+  }
+  const checker = "checker" in found ? found.checker : undefined;
+
+  const user = await loadUserConfig(home);
+  const shared = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
+  const local = await loadLocalConfig(dir);
+  const merged = () => deepMerge(extensionSection(user, name), extensionSection(deepMerge(shared, local), name));
+
+  const existing = getByPath(merged(), keyPath);
+  if (existing !== null && typeof existing === "object" && !Array.isArray(existing)) {
+    fail(`Cannot set "${keyArg}" — it's an object. Set individual keys instead.`);
+    return;
+  }
+  let coerced;
+  try {
+    coerced = coerceExtensionValue(valueArg, existing, checker?.typeAt(keyParts));
+  } catch (err) {
+    fail(`Invalid value for "${keyArg}": ${err.message}`);
+    return;
+  }
+
+  const target = flags.user === "true" ? user : shared;
+  target[EXTENSIONS_SECTION] = plainObject(target[EXTENSIONS_SECTION]);
+  const section = extensionSection(target, name);
+  target[EXTENSIONS_SECTION][name] = section;
+  setByPath(section, keyPath, coerced);
+
+  if (checker && !force) {
+    const errors = checker.check(merged()).filter((e) => e.keyword !== "required");
+    if (errors.length > 0) {
+      fail([
+        `Invalid value for "${keyArg}": ${EXTENSIONS_SECTION}.${name} would not match its configSchema:`,
+        ...errors.map((e) => `  ${e.message}`),
+        "  Use --force to set this value anyway.",
+      ].join("\n"));
+      return;
+    }
+  }
+
+  if (target === user) {
+    await mkdir(home, { recursive: true });
+    await saveJSON(userConfigPath(home), user);
+  } else {
+    await saveProjectJSON(projectConfigPath(dir, PROJECT_CONFIG_FILE), shared);
+  }
+  console.log(`${keyArg} = ${formatValue(coerced)}`);
+  if (JSON.stringify(getByPath(merged(), keyPath)) !== JSON.stringify(coerced)) {
+    const winner = target === user ? "the project config" : projectConfigLabel(dir, LOCAL_CONFIG_FILE);
+    console.error(`Note: ${winner} also sets "${keyArg}", and its value wins.`);
+  }
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export async function runConfig(args) {
+/**
+ * Finds the installed extension `name` for the project `dir` and returns the
+ * checker for its `configSchema`, or why there is none. cli.js passes
+ * `configCheckerByName` (extension-config-schema.js): config.js imports
+ * nothing beyond node builtins and its two helpers.
+ *
+ * @callback ExtensionConfigCheckerLookup
+ * @param {string} name
+ * @param {string} dir
+ * @param {string} home
+ * @returns {{checker: import("./extension-config-schema.js").ExtensionConfigChecker} | {error: string}}
+ */
+
+/**
+ * What `cli.js` hands `ndx config`.
+ *
+ * @typedef {object} ConfigCommandDeps
+ * @property {ExtensionConfigCheckerLookup} [extensionConfigChecker]  Required
+ *   to set an `extensions.<name>` key; setting one without it throws.
+ */
+
+/**
+ * @param {string[]} args
+ * @param {ConfigCommandDeps} [deps]
+ */
+export async function runConfig(args, deps = {}) {
   const { flags, positional } = parseArgs(args);
 
   if (flags.help) {
@@ -3463,7 +3671,9 @@ export async function runConfig(args) {
     const pkg = keyArg.slice(0, dotIdx);
     const settingPath = keyArg.slice(dotIdx + 1);
 
-    if (PROJECT_SECTIONS.has(pkg)) {
+    if (pkg === EXTENSIONS_SECTION) {
+      await handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flags, deps);
+    } else if (PROJECT_SECTIONS.has(pkg)) {
       await handleSetProjectSection(
         dir,
         pkg,

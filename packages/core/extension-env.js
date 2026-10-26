@@ -37,7 +37,8 @@ export const EXTENSION_STATE_DIRNAME = "ext";
 
 /**
  * The file `NDX_EXTENSION_CONFIG` names, in the extension's state folder. It
- * holds `{}` until per-extension config sections fill it (feature F3).
+ * holds the merged `extensions.<name>` section (`loadExtensionConfig` in
+ * config.js), rewritten for every process.
  */
 export const EXTENSION_CONFIG_FILENAME = "ndx-config.json";
 
@@ -71,6 +72,7 @@ const AUTH_TOKEN_FILE = "auth.token";
  * @property {string} name  The manifest `name`.
  * @property {string} home  The resolved n-dx home.
  * @property {string} ndxVersion  The running n-dx.
+ * @property {Record<string, unknown>} [config]  The merged config section; defaults to `{}`.
  * @property {Record<string, string | undefined>} [baseEnv]  The user's environment; defaults to `process.env`.
  * @property {string} [ndxBin]  Defaults to {@link NDX_CLI_PATH}.
  * @property {ExtensionEnvFs} [fs]
@@ -94,7 +96,7 @@ export function extensionEnvironment(options) {
   const stateDir = extensionStateDir(options.home, options.name);
   const configFile = join(stateDir, EXTENSION_CONFIG_FILENAME);
   fs.mkdirSync(stateDir, { recursive: true });
-  fs.writeFileSync(configFile, "{}\n");
+  fs.writeFileSync(configFile, JSON.stringify(options.config ?? {}, null, 2) + "\n");
 
   const env = { ...(options.baseEnv ?? process.env) };
   for (const key of EXTENSION_ENV_VARS) delete env[key];

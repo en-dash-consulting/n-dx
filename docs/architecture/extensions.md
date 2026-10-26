@@ -98,7 +98,7 @@ Any publisher can ship an extension; nothing in the contract is specific to one 
 | Field | Rule |
 | --- | --- |
 | `apiVersion` | Integer contract version. An unknown version is listed as incompatible, never run |
-| `name` | Lowercase slug, unique across installed extensions, not a built-in command, bin alias or reserved word (`ext`, `x`, `hub`, `extensions`) |
+| `name` | Lowercase slug, unique across installed extensions, not a built-in command, bin alias or reserved word (`ext`, `x`, `hub`, `extensions`, `paths`) |
 | `ndxVersion` | Semver range the extension supports; outside it, the extension is disabled with the reason shown |
 | `commands[]` | Each `name` becomes `ndx <name>`; `bin` is a path inside the package, run with the same Node as n-dx |
 | `sidecar` | Optional web server the hub mounts at `/x/<name>/` |
@@ -178,7 +178,7 @@ With no hub running, extension commands still work; only sidecars and links need
 
 **Versioning.** Two numbers make compatibility checkable without running code. `apiVersion` is the contract this document defines; a breaking change to the environment, the proxy, the manifest or the versioned hub endpoints bumps it, and n-dx supports the current and previous version. `ndxVersion` is the extension's own range. Either mismatch leaves the extension listed but disabled, with the reason in `list`, `doctor` and the hub home.
 
-**Config.** Each extension owns one section, `extensions.<name>`, in `<ndx home>/config.json` (user) and `.n-dx.json` (project), merged project over user. `ndx config extensions.<name>.<key> <value>` reads and writes it, validated against `configSchema` when one is given. The merged result is what `NDX_EXTENSION_CONFIG` points at. `config.js` keeps its role as the one orchestration script that touches config files directly.
+**Config.** Each extension owns one section, `extensions.<name>`, in `<ndx home>/config.json` (user) and `.n-dx.json` (project), merged project over user. `ndx config extensions.<name>.<key> <value>` reads and writes it, validated against `configSchema` when one is given. It writes `.n-dx.json`, or the user config with `--user`. A missing `required` key does not stop a write, since a section is filled one key at a time. n-dx checks the validation keywords a config section needs (types, `enum`, `const`, object properties, arrays, string and number bounds, `allOf`/`anyOf`/`oneOf`/`not`) and reads annotations such as `format` as information; a schema using any other keyword, `$ref` included, is reported as one it cannot check (`packages/core/extension-config-schema.js`). The merged result is what `NDX_EXTENSION_CONFIG` points at; a run whose merged section breaks the schema, `required` included, is refused with exit 2. `paths` is a reserved name because the user config's `extensions.paths` is discovery's list of dev paths. `config.js` keeps its role as the one orchestration script that touches config files directly.
 
 **Disable and remove.** `disable` keeps the approval and config, but hides the commands, links and hub card. `remove` uninstalls a user-source package and deletes its approval; `--purge` also deletes `ext/<name>/`. A disabled extension's state folder is never touched.
 

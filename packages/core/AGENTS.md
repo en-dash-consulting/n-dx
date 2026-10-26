@@ -14,6 +14,7 @@ prevent future contributors from replacing injection with direct imports.
 | `cli.js` | `migrate-chain.js` | `run`, `tools`, `migrateLayout` | `MigrateChainDeps` (JSDoc `@typedef`) |
 | `cli.js` | `sample-app.js` | `rexScript` | `SampleAppDeps` (JSDoc `@typedef`) |
 | `cli.js` | `extensions-command.js` | `builtinCommands` (data: `COMMAND_DISPATCH` keys and tool names, since `cli.js` cannot be imported); `runNpm`, `confirm` default to the real ones | `ExtensionsCommandDeps` (JSDoc `@typedef`) |
+| `cli.js` | `config.js` | `extensionConfigChecker` (`configCheckerByName` from `extension-config-schema.js`, bound to `builtinCommands`), so setting `extensions.<name>.<key>` checks the extension's `configSchema` while `config.js` keeps importing only node builtins and its two helpers; setting one without it throws | `ConfigCommandDeps`, `ExtensionConfigCheckerLookup` (JSDoc `@typedef`/`@callback`) |
 | `cli.js` | `extension-dispatch.js` | `builtinCommands` (same data as above); `spawn` (the tracked spawn, so the module needs no `child_process` and the child is cleaned up with the rest); `confirm` (the terminal prompt for a first run, omitted when there is no TTY) | `ResolveOptions`, `SpawnExtension`, `FirstRunOptions` (JSDoc `@typedef`/`@callback`) |
 
 Rules:

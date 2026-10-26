@@ -42,6 +42,12 @@ function startHub({ alive = true, token = true } = {}) {
 }
 
 describe("extensionEnvironment", () => {
+  it("writes the merged config section to the file NDX_EXTENSION_CONFIG names", () => {
+    const env = build({ config: { mode: "fast", depth: 3 } });
+    expect(JSON.parse(readFileSync(env.NDX_EXTENSION_CONFIG, "utf-8"))).toEqual({ mode: "fast", depth: 3 });
+    expect(JSON.parse(readFileSync(build().NDX_EXTENSION_CONFIG, "utf-8"))).toEqual({});
+  });
+
   it("sets every contract variable but the hub's, on top of the user's environment", () => {
     const env = build();
     const stateDir = join(home, "ext", "recon");
