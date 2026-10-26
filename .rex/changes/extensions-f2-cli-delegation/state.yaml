@@ -14,7 +14,14 @@ items:
     lastModified: "2026-10-26T18:12:07.230Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "165648b5-2c3b-48b2-8911-fe42059c4381":
-    lastModified: "2026-10-26T17:03:06.476Z"
+    status: "completed"
+    startedAt: "2026-10-26T18:12:36.054Z"
+    completedAt: "2026-10-26T18:22:04.140Z"
+    endedAt: "2026-10-26T18:22:04.140Z"
+    activeIntervals: [{"end":"2026-10-26T18:22:04.140Z","start":"2026-10-26T18:12:36.054Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New packages/core/extension-env.js builds the contract environment. cli.js passes it to every extension command; unit and e2e tests cover it, including NDX_BIN re-entry from linked project and global installs."
+    lastModified: "2026-10-26T18:22:04.140Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "b32557a0-0121-4610-8e02-34af29bd26be":
     lastModified: "2026-10-26T17:29:10.554Z"
