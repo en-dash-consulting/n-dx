@@ -135,6 +135,8 @@ export class SidecarSessionRegistry {
   private readonly now: () => number;
   private readonly records = new Map<string, SidecarSessionRecord>();
   private readonly live = new Map<string, LiveSession>();
+  /** Sessions whose cursor has been checked against the transcript; see {@link reconcileCursor}. */
+  private readonly reconciled = new Set<string>();
 
   constructor(opts: SidecarRegistryOptions) {
     this.dir = opts.dir;
@@ -192,6 +194,7 @@ export class SidecarSessionRegistry {
     const live = this.liveSession(record);
     if (live.session.state === "running") throw new Error(`A turn is already running in Sidecar session ${id}`);
 
+    this.reconcileCursor(record);
     const append = (frame: SidecarFrame): void => {
       this.appendFrame(record, frame);
       onFrame?.(frame);
@@ -269,6 +272,19 @@ export class SidecarSessionRegistry {
     };
     this.live.set(record.id, entry);
     return entry;
+  }
+
+  /**
+   * Event frames reach the transcript before the index is saved, so a server
+   * that stopped mid-turn left the index cursor behind the transcript. Take
+   * the cursor from the transcript once per session per registry, or the next
+   * turn would reuse sequence numbers a client already fetched past.
+   */
+  private reconcileCursor(record: SidecarSessionRecord): void {
+    if (this.reconciled.has(record.id)) return;
+    const last = this.readFrames(record.id, record.cursor).at(-1);
+    if (last) record.cursor = last.seq;
+    this.reconciled.add(record.id);
   }
 
   private appendFrame(record: SidecarSessionRecord, frame: SidecarFrame): void {

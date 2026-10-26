@@ -167,6 +167,24 @@ describe("transcripts", () => {
     expect(after[0]).toMatchObject({ seq: frames.length + 1, type: "user", text: "two" });
   });
 
+  it("continues numbering after frames the index never recorded (server stopped mid-turn)", async () => {
+    const reg = registry();
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    await reg.sendTurn(id, "one");
+    // A turn's event frames reach the transcript before the index: a server
+    // that stops mid-turn leaves the index cursor at the user frame.
+    const indexPath = join(dir, "index.json");
+    const index = JSON.parse(readFileSync(indexPath, "utf-8"));
+    index.sessions[0].cursor = 1;
+    writeFileSync(indexPath, JSON.stringify(index));
+
+    const restarted = registry();
+    await restarted.sendTurn(id, "two");
+    const seqs = restarted.readFrames(id).map((f) => f.seq);
+    expect(seqs).toEqual(seqs.map((_, i) => i + 1));
+    expect(restarted.get(id)?.cursor).toBe(seqs.length);
+  });
+
   it("filters sessions by scope and worktree", () => {
     const reg = registry();
     reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
