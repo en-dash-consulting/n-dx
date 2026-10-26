@@ -44,7 +44,8 @@ export const FORWARDED_SIGNALS = Object.freeze(["SIGINT", "SIGTERM"]);
  *
  * - `builtin` — a built-in owns the name; never dispatched.
  * - `none` — no installed extension claims it.
- * - `run` — an enabled extension's command; `bin` exists.
+ * - `run` — an enabled extension's command; `bin` exists. `home` is the n-dx
+ *   home discovery used, which the extension's environment names.
  * - `refused` — the command would run but must not yet: unapproved, or its
  *   `bin` is missing. `message` is one line naming the problem and the fix.
  * - `unavailable` — an extension claims the name but is disabled, incompatible,
@@ -52,7 +53,7 @@ export const FORWARDED_SIGNALS = Object.freeze(["SIGINT", "SIGTERM"]);
  *   says why and what to run.
  *
  * @typedef {{kind: "builtin"} | {kind: "none"}
- *   | {kind: "run", ext: DiscoveredExtension, command: string, bin: string}
+ *   | {kind: "run", ext: DiscoveredExtension, command: string, bin: string, home: string}
  *   | {kind: "refused", ext: DiscoveredExtension, message: string}
  *   | {kind: "unavailable", ext: DiscoveredExtension, state: ExtensionStateName, hint: string}} ExtensionResolution
  */
@@ -120,7 +121,7 @@ export function resolveExtensionCommand(name, options) {
       message: `Error: 'ndx ${name}' comes from ${label}, whose bin ${command.bin} does not exist — fix: ndx extensions doctor`,
     };
   }
-  return { kind: "run", ext, command: name, bin };
+  return { kind: "run", ext, command: name, bin, home: discovery.home };
 }
 
 /**

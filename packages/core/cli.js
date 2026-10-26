@@ -70,6 +70,7 @@ import {
 import { handleInstallSample, handleDestroySample } from "./sample-app.js";
 import { runExtensions } from "./extensions-command.js";
 import { EXTENSION_REFUSED_EXIT_CODE, resolveExtensionCommand, runExtensionCommand } from "./extension-dispatch.js";
+import { extensionEnvironment } from "./extension-env.js";
 
 const CLI_ERROR_CODES = Object.freeze({
   NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
@@ -3440,10 +3441,18 @@ async function handleExtensionCommand(command, rest) {
   const resolution = resolveExtensionCommand(command, { builtinCommands: builtinCommandNames(), ndxVersion: version });
   switch (resolution.kind) {
     case "run": {
+      let env;
+      try {
+        env = extensionEnvironment({ name: resolution.ext.name, home: resolution.home, ndxVersion: version });
+      } catch (err) {
+        console.error(`Error: 'ndx ${command}' could not prepare its state folder under ${resolution.home} (${err.code ?? err.message}) — fix: make the n-dx home writable, or set NDX_HOME`);
+        exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
+        return;
+      }
       // The extension owns Ctrl+C while it runs: runExtensionCommand forwards
       // SIGINT/SIGTERM and waits, so ndx's kill-and-exit handlers stand down.
       signalHandlers.dispose();
-      exitWithCleanup(await runExtensionCommand({ bin: resolution.bin, args: rest, spawn: spawnTracked }));
+      exitWithCleanup(await runExtensionCommand({ bin: resolution.bin, args: rest, spawn: spawnTracked, env }));
       return;
     }
     case "refused":

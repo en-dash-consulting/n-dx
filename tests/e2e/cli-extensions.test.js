@@ -6,9 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { execFileSync, spawn } from "node:child_process";
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { CLI_PATH, createTmpDir, removeTmpDir, run, runResult } from "./e2e-helpers.js";
 
 let root;
@@ -102,6 +102,24 @@ function installEcho(name, { approve = true, ndxVersion = ">=0.0.0" } = {}) {
   if (approve) run(["extensions", "enable", name, "--yes"], opts());
 }
 
+/**
+ * An approved user-installed extension `name` whose command prints, as JSON,
+ * its NDX_* environment, whether its state folder exists, and what
+ * `NDX_BIN version` prints when it re-enters n-dx.
+ */
+function installReport(name) {
+  installEcho(name, { approve: false });
+  const bin = join(home, "extensions", "node_modules", `ndx-${name}`, "bin", "cli.js");
+  writeFileSync(bin, [
+    `const { execFileSync } = require("node:child_process");`,
+    `const { existsSync } = require("node:fs");`,
+    `const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("NDX_")));`,
+    `const reentered = execFileSync(process.execPath, [process.env.NDX_BIN, "version"], { encoding: "utf-8", windowsHide: true }).trim();`,
+    `console.log(JSON.stringify({ env, stateDirExists: existsSync(process.env.NDX_EXTENSION_STATE_DIR), reentered }));`,
+  ].join("\n"));
+  run(["extensions", "enable", name, "--yes"], opts());
+}
+
 describe("ndx <extension command>", () => {
   for (const code of [0, 1, 7]) {
     it(`runs the bin with the remaining args and passes exit code ${code} through`, () => {
@@ -154,6 +172,40 @@ describe("ndx <extension command>", () => {
     expect(result.stderr).toMatch(/Unknown command: recon/);
     expect(result.stderr).toMatch(/Hint: Run 'ndx --help'/);
   });
+
+  it("gives the extension the environment contract, and no token", () => {
+    installReport("recon");
+    writeFileSync(join(home, "auth.token"), "s3cret-token\n");
+    const report = JSON.parse(run(["recon"], opts()));
+    const stateDir = join(home, "ext", "recon");
+    expect(report.env).toMatchObject({
+      NDX_EXTENSION_API: "1",
+      NDX_VERSION: report.reentered,
+      NDX_BIN: realpathSync(CLI_PATH),
+      NDX_HOME: home,
+      NDX_EXTENSION_NAME: "recon",
+      NDX_EXTENSION_STATE_DIR: stateDir,
+      NDX_EXTENSION_CONFIG: join(stateDir, "ndx-config.json"),
+    });
+    expect(report.stateDirExists).toBe(true);
+    expect(report.env).not.toHaveProperty("NDX_HUB_URL");
+    expect(JSON.stringify(report)).not.toContain("s3cret-token");
+  });
+
+  // n-dx installed as a project dependency and globally: both reached through a
+  // node_modules link, as npm and pnpm install it.
+  for (const install of ["project", "global"]) {
+    it(`NDX_BIN re-enters the same n-dx from a ${install} install`, () => {
+      installReport("recon");
+      const prefix = install === "project" ? join(root, "app") : join(root, "global", "lib");
+      const coreDir = join(mkdirp(join(prefix, "node_modules", "@n-dx")), "core");
+      symlinkSync(dirname(CLI_PATH), coreDir, "junction");
+      const out = execFileSync(process.execPath, [join(coreDir, "cli.js"), "recon"], { ...opts(), encoding: "utf-8", windowsHide: true });
+      const report = JSON.parse(out);
+      expect(realpathSync(report.env.NDX_BIN)).toBe(realpathSync(join(coreDir, "cli.js")));
+      expect(report.reentered).toBe(run(["version"], opts()).trim());
+    });
+  }
 
   it.skipIf(process.platform === "win32")("forwards SIGTERM to the extension and exits with its code", async () => {
     installEcho("recon");

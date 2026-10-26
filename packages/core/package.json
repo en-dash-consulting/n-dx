@@ -94,7 +94,8 @@
     "extension-discovery.js",
     "extension-state.js",
     "extensions-command.js",
-    "extension-dispatch.js"
+    "extension-dispatch.js",
+    "extension-env.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"

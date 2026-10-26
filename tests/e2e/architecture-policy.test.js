@@ -291,6 +291,7 @@ describe("architecture policy: orchestration never imports extension code", () =
     expect(extensionModules()).toEqual(expect.arrayContaining([
       `${CORE}/extension-discovery.js`,
       `${CORE}/extension-dispatch.js`,
+      `${CORE}/extension-env.js`,
       `${CORE}/extension-manifest.js`,
       `${CORE}/extension-state.js`,
       `${CORE}/extensions-command.js`,
