@@ -11,6 +11,8 @@ package-lock.json
 # (they hold absolute paths for this checkout and install); safe to delete.
 .hench/mcp/
 .hench/session-cache.json
+# Dashboard Sidecar session index and transcripts (self-ignoring; listed for clarity).
+.hench/sidecar/
 .hench-commit-msg.txt
 .ndx-commit-msg.txt
 .run-logs/

@@ -239,6 +239,7 @@ export { usageMessageId, UsageMessageFilter } from "./usage-dedup.js";
 export {
   emptyAggregateTokenUsage,
   accumulateTokenUsage,
+  addTokenUsage,
 } from "./token-usage.js";
 
 export type {

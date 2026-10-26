@@ -249,6 +249,62 @@ describe("output decoding", () => {
   });
 });
 
+describe("child environment", () => {
+  const SECRET = "VENDOR_SESSION_TEST_TOKEN";
+
+  /** Run one turn and return the env the spawn received. */
+  async function spawnedEnv(opts: Partial<Parameters<typeof startVendorSession>[0]>): Promise<NodeJS.ProcessEnv> {
+    let env: NodeJS.ProcessEnv | undefined;
+    const session = startVendorSession({
+      vendor: "claude",
+      cwd: dir,
+      ...opts,
+      spawn: (_binary, _args, spawnOpts) => {
+        env = spawnOpts.env;
+        const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
+        const stdout = new PassThrough();
+        Object.assign(child, { stdin: new PassThrough(), stdout, stderr: new PassThrough(), pid: undefined });
+        setImmediate(() => {
+          stdout.end();
+          setImmediate(() => child.emit("close", 0));
+        });
+        return child as unknown as ChildProcess;
+      },
+    });
+    await session.sendTurn("hi");
+    if (!env) throw new Error("spawn received no env");
+    return env;
+  }
+
+  beforeEach(() => {
+    process.env[SECRET] = "do-not-pass";
+  });
+  afterEach(() => {
+    delete process.env[SECRET];
+  });
+
+  it("filters the parent environment when no env is given", async () => {
+    const env = await spawnedEnv({});
+    expect(env[SECRET]).toBeUndefined();
+    expect(env.PATH).toBe(process.env.PATH);
+  });
+
+  it("applies the guard.env policy it is given", async () => {
+    const env = await spawnedEnv({ envPolicy: { allow: [SECRET] } });
+    expect(env[SECRET]).toBe("do-not-pass");
+  });
+
+  it("injects a configured API key", async () => {
+    const env = await spawnedEnv({ llmConfig: { claude: { api_key: "configured" } } });
+    expect(env.ANTHROPIC_API_KEY).toBe("configured");
+  });
+
+  it("passes an explicit env through unchanged", async () => {
+    const explicit = { ONLY: "this" };
+    expect(await spawnedEnv({ env: explicit })).toBe(explicit);
+  });
+});
+
 describe("unsupported vendors", () => {
   it("have no resumable CLI session", () => {
     expect(() => startVendorSession({ vendor: "openai", cwd: "." })).toThrow(/No resumable CLI session/);

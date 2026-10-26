@@ -18,10 +18,14 @@
  * @module llm-client/vendor-session
  */
 
+import { resolveVendorCliEnv } from "./child-env.js";
+import type { EnvPolicyConfig } from "./child-env.js";
 import { spawnCli } from "./exec.js";
+import type { LLMConfig } from "./llm-types.js";
 import type { SpawnCliOptions } from "./exec.js";
 import { terminateProcessTree } from "./process-tree.js";
 import type { RuntimeEvent } from "./runtime-contract.js";
+import { addTokenUsage } from "./token-usage.js";
 import type { TokenUsage } from "./types.js";
 import { UsageMessageFilter } from "./usage-dedup.js";
 import type {
@@ -47,8 +51,16 @@ export interface VendorSessionOptions {
   readonly model?: string;
   /** CLI binary path; defaults to the driver's (`claude`, `codex`). */
   readonly binary?: string;
-  /** Child environment; defaults to the parent's. */
+  /**
+   * Child environment. When omitted, the parent's is filtered through
+   * {@link resolveVendorCliEnv} with {@link envPolicy} and {@link llmConfig};
+   * the unfiltered `process.env` is never passed.
+   */
   readonly env?: NodeJS.ProcessEnv;
+  /** The project's `guard.env` policy, applied when {@link env} is omitted. */
+  readonly envPolicy?: EnvPolicyConfig;
+  /** LLM config supplying a configured API key when {@link env} is omitted. */
+  readonly llmConfig?: LLMConfig;
   readonly claude?: ClaudeTurnFlags;
   readonly codex?: CodexTurnFlags;
   /** Called with each event as it is parsed. */
@@ -127,21 +139,14 @@ export function resumeVendorSession(
   return createSession(driver, opts, { sessionId, fork: opts.fork || undefined });
 }
 
-function addUsage(total: TokenUsage, add: TokenUsage): TokenUsage {
-  const sum: TokenUsage = { input: total.input + add.input, output: total.output + add.output };
-  const creation = (total.cacheCreationInput ?? 0) + (add.cacheCreationInput ?? 0);
-  const read = (total.cacheReadInput ?? 0) + (add.cacheReadInput ?? 0);
-  if (creation) sum.cacheCreationInput = creation;
-  if (read) sum.cacheReadInput = read;
-  return sum;
-}
-
 function createSession(
   driver: VendorSessionDriver,
   opts: VendorSessionOptions,
   initial: SessionResume | undefined,
 ): VendorSession {
   const spawnImpl = opts.spawn ?? spawnCli;
+  const env = opts.env
+    ?? resolveVendorCliEnv({ ...opts.llmConfig, vendor: driver.vendor }, opts.envPolicy);
   // One filter for the whole session: message ids are unique per
   // conversation, and a resumed turn may replay none of them.
   const usageFilter = new UsageMessageFilter();
@@ -184,7 +189,7 @@ function createSession(
       const emit = (event: RuntimeEvent): void => {
         events.push(event);
         if (event.type === "token_usage" && event.tokenUsage) {
-          tokenUsage = addUsage(tokenUsage, event.tokenUsage);
+          tokenUsage = addTokenUsage(tokenUsage, event.tokenUsage);
         } else if (event.type === "completion" && event.completionSummary) {
           completion = event.completionSummary;
         } else if (event.type === "assistant" && event.text) {
@@ -215,7 +220,7 @@ function createSession(
 
       const proc = spawnImpl(opts.binary ?? spawnSpec.binary, spawnSpec.args, {
         cwd: opts.cwd,
-        env: opts.env,
+        env,
         stdio: ["pipe", "pipe", "pipe"],
       });
       child = proc;
