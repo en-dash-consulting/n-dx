@@ -156,6 +156,7 @@ describe("ndx extensions list --json", () => {
       source: "user",
       state: "unapproved",
       reason: "not approved yet",
+      manifest: { apiVersion: 1, name: "recon" },
     });
   });
 
@@ -184,6 +185,7 @@ describe("ndx extensions list --json", () => {
     const row = await stateOf("broken");
     expect(row.state).toBe("invalid");
     expect(row.reason).toMatch(/commands\[0\]\.bin/);
+    expect(row.manifest).toBeNull();
   });
 
   it("prints a table, and says so when nothing is installed", async () => {

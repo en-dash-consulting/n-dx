@@ -16,6 +16,17 @@
  *                                   — unregister one worktree; the last one
  *                                     takes the project (and, with keepAlive
  *                                     off, the hub) with it
+ *   GET    /api/hub/extensions[?project=<id>]
+ *                                   — installed extensions: manifest, state,
+ *                                     compatibility, sidecar; with a project,
+ *                                     its resolved dashboard links
+ *   POST   /api/hub/extensions/:name/stop
+ *                                   — stop that extension's sidecar
+ *
+ * **Versioned.** `GET`/`POST /projects` and both `/extensions` routes are the
+ * extension API (docs/architecture/extensions.md, "Versioned hub API"): each
+ * answer carries `apiVersion`, and a breaking change to any of them bumps it.
+ * Their contract tests are packages/web/tests/integration/hub-extension-api.test.ts.
  *
  * Every one of those is also answered under a project prefix —
  * `/p/<id>/api/hub/queue` — and under a worktree slot — `/w/<key>/…`,
@@ -48,6 +59,8 @@ import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { renderCards } from "./home.js";
 import { defaultParentDir, deriveProjectId, isReservedProjectId, planNewProject, writeHubMarkerFiles } from "./new-project.js";
 import type { NewProjectPlan } from "./new-project.js";
+import { EXTENSION_API_VERSION, buildExtensionsAnswer } from "./extensions.js";
+import { SidecarManager } from "./sidecars.js";
 
 const HUB_PREFIX = "/api/hub";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -329,6 +342,26 @@ async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: 
   return true;
 }
 
+/**
+ * GET /api/hub/extensions[?project=<id>] — n-dx's extension list joined with
+ * the running sidecars. A project id (the query, else the `/p/<id>/` prefix)
+ * adds each extension's links resolved for that project; an unknown one is 404.
+ */
+async function handleExtensions(res: ServerResponse, hub: Hub, projectId: string | null): Promise<boolean> {
+  const project = projectId !== null ? hub.getProject(projectId) : null;
+  if (projectId !== null && !project) {
+    error(res, 404, `No project registered as "${projectId}"`);
+    return true;
+  }
+  const listed = await hub.listExtensions();
+  if (!listed.ok) {
+    error(res, 503, listed.error);
+    return true;
+  }
+  json(res, 200, buildExtensionsAnswer(listed, hub.sidecars.list(), project ?? undefined));
+  return true;
+}
+
 /** Handle a `/api/hub/*` request. Returns false when the path is not the hub's. */
 export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<boolean> {
   const [rawUrl, rawQuery = ""] = (req.url || "/").split("?");
@@ -375,7 +408,24 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   }
 
   if (path === "/projects" && method === "GET") {
-    json(res, 200, { projects: hub.listProjects() });
+    json(res, 200, { apiVersion: EXTENSION_API_VERSION, projects: hub.listProjects() });
+    return true;
+  }
+
+  if (path === "/extensions" && method === "GET") {
+    return handleExtensions(res, hub, new URLSearchParams(rawQuery).get("project") ?? scopedProjectId);
+  }
+
+  const stopMatch = path.match(/^\/extensions\/([^/]+)\/stop$/);
+  if (stopMatch && method === "POST") {
+    const name = safeDecodeSegment(stopMatch[1]);
+    if (!SidecarManager.isName(name)) {
+      error(res, 404, `No extension is named "${name}"`);
+      return true;
+    }
+    // Stopping one that is not running is not an error: the caller wants it
+    // stopped, and it is. The next request to `/x/<name>/` starts it again.
+    json(res, 200, { apiVersion: EXTENSION_API_VERSION, name, stopped: await hub.sidecars.stop(name) });
     return true;
   }
 
@@ -419,7 +469,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
       return true;
     }
     const { created, project } = await hub.registerProject(parsed.input);
-    json(res, created ? 201 : 200, { project });
+    json(res, created ? 201 : 200, { apiVersion: EXTENSION_API_VERSION, project });
     return true;
   }
 

@@ -43,6 +43,9 @@ export const SIDECAR_START_TIMEOUT_MS = 20_000;
 export const SIDECAR_CRASH_LIMIT = 3;
 export const SIDECAR_CRASH_WINDOW_MS = 5 * 60_000;
 
+/** The refusal of a hub started without `--ndx-cli`, which cannot ask n-dx about extensions. */
+export const NO_NDX_CLI = "This hub was started without an n-dx CLI to ask about extensions. Restart it: ndx hub stop, then ndx start.";
+
 /** An extension name, as the manifest validator allows it. Anything else is no sidecar. */
 const EXTENSION_NAME = /^[a-z0-9][a-z0-9-]*$/;
 const LOOPBACK = "127.0.0.1";
@@ -340,7 +343,7 @@ export class SidecarManager {
     }
 
     if (!this.opts.plan) {
-      return this.refuse(s, 503, "This hub was started without an n-dx CLI to launch extension sidecars. Restart it: ndx hub stop, then ndx start.");
+      return this.refuse(s, 503, NO_NDX_CLI);
     }
     const planned = await this.opts.plan(s.name);
     if (!planned.ok) return this.refuse(s, statusForReason(planned.reason), planned.error, undefined, planned.reason);

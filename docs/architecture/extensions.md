@@ -168,6 +168,17 @@ The hub (`packages/web/src/hub/`) gains extension sidecars as a second kind of c
 
 With no hub running, extension commands still work; only sidecars and links need the hub.
 
+**Versioned hub API.** These four endpoints are stable under `apiVersion` 1. Every answer carries `apiVersion`; a field listed here is removed or retyped only with a bump, and new fields may be added. Errors are `{ "error": "…" }`. Like every hub request, they need the per-user token, and a mutating one a loopback `Origin` or none. Contract tests: `packages/web/tests/integration/hub-extension-api.test.ts`.
+
+| Endpoint | Answer |
+| --- | --- |
+| `GET /api/hub/projects` | `{ apiVersion, projects }`; each project has `id`, `name`, `repoRoot`, `worktrees`, `ndxBin`, `port`, `pid`, `lastSeen` and `status` (`state`, `pid`, `port`, `attached`, `respawns`, `lastHealthAt`, `lastError`) |
+| `POST /api/hub/projects` | Takes `{ id, repoRoot, ndxBin, worktree?, name? }`. Answers `{ apiVersion, project }`: 201 when registered, 200 when already registered, 400 for a bad body |
+| `GET /api/hub/extensions[?project=<id>]` | `{ apiVersion, extensions, errors }`. Each extension has `name`, `packageName`, `version`, `source`, `state`, `reason`, `compatible` (false when incompatible or invalid), `manifest` (null when invalid), `mount` (`/x/<name>/` or null) and `sidecar` (`state`, `recentCrashes`, `lastError`, or null). With a project, it adds `links: [{ label, url }]`: the `projectLinks` filled in for that project, empty unless the extension is enabled. An unknown project is 404, and 503 means n-dx could not be asked. The list is the user, global and development sources, which are where the hub serves sidecars from |
+| `POST /api/hub/extensions/:name/stop` | `{ apiVersion, name, stopped }`. `stopped` is false when no sidecar was running, and the next request to `/x/<name>/` starts it again. 404 for a name no extension could have |
+
+The hub reads no manifest for these either: it runs `ndx extensions list --json` from the n-dx home. The hub's `apiVersion` is a twin of core's `EXTENSION_API_VERSION`, pinned by `tests/e2e/extension-api-version-parity.test.js`.
+
 ## Trust, versioning and config
 
 **Consent.** An extension runs only after the user approves it, the way Claude Code approves a project's MCP servers.

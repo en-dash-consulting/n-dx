@@ -75,6 +75,18 @@ export type {
   SidecarStatus,
   SidecarManagerOptions,
 } from "./sidecars.js";
+export { EXTENSION_API_VERSION, ndxCliLister, buildExtensionsAnswer, resolveProjectLink } from "./extensions.js";
+export type {
+  ExtensionStateName,
+  ExtensionManifest,
+  ExtensionListing,
+  ListResult,
+  ListExtensions,
+  ExtensionSidecarView,
+  ExtensionLinkView,
+  ExtensionView,
+  ExtensionsAnswer,
+} from "./extensions.js";
 export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER } from "./proxy.js";
 export type { ProxyDecision, SidecarForward } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";

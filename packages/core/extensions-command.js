@@ -71,6 +71,7 @@ export const EXTENSION_STATE_DIRNAME = "ext";
  * @property {import("./extension-state.js").ExtensionStateName} state
  * @property {string} reason
  * @property {string} dir
+ * @property {import("./extension-manifest.js").ExtensionManifest | null} manifest  Null when invalid; the hub reads `hub`, `sidecar` and `projectLinks` from it.
  */
 
 /**
@@ -194,6 +195,7 @@ function list(ctx, dir, json) {
     source: ext.source,
     ...stateOf(d, ext, ctx.ndxVersion),
     dir: ext.dir,
+    manifest: ext.manifest ?? null,
   }));
   if (json) {
     ctx.out(JSON.stringify({ extensions: rows, errors: d.errors }, null, 2));

@@ -49,6 +49,14 @@ Unknown, disabled and unapproved names are all 404, with core's `reason` in the
 body. `x` is reserved as a project id (`isReservedProjectId`, twinned in
 `packages/core/web.js`): registration refuses it and derivation hashes it.
 
+**Versioned API.** `GET`/`POST /api/hub/projects` and `/api/hub/extensions`
+(list, `:name/stop`) are the extension API, stable under `apiVersion` 1
+(docs/architecture/extensions.md, "Versioned hub API"). Their answers carry
+`apiVersion`; removing or retyping a field there needs a bump and an update to
+`tests/integration/hub-extension-api.test.ts`. `hub/extensions.ts` gets the list
+from `ndx extensions list --json`, and its `EXTENSION_API_VERSION` is core's
+twin, pinned by the root `extension-api-version-parity` test.
+
 ## Proxy and base path
 
 `hub/proxy.ts` forwards `/p/<id>/…` to that project's server with the prefix

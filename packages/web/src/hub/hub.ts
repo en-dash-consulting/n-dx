@@ -42,7 +42,9 @@ import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 import { guardHubRequest, upgradeRefusal } from "./request-guard.js";
-import { SidecarManager, ndxCliPlanner } from "./sidecars.js";
+import { NO_NDX_CLI, SidecarManager, ndxCliPlanner } from "./sidecars.js";
+import { ndxCliLister } from "./extensions.js";
+import type { ListExtensions } from "./extensions.js";
 import type { SidecarManagerOptions } from "./sidecars.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
 
@@ -108,6 +110,8 @@ export interface HubOptions {
   sidecars?: Partial<SidecarManagerOptions>;
   /** How often idle sidecars are looked for. Default 30 s. */
   sidecarSweepMs?: number;
+  /** Replaces asking `ndx extensions list --json` (tests). */
+  listExtensions?: ListExtensions;
   log?: (message: string) => void;
 }
 
@@ -259,6 +263,8 @@ export class Hub {
   readonly token: string | null;
   /** Extension sidecars mounted at `/x/<name>/`. */
   readonly sidecars: SidecarManager;
+  /** Installed extensions as n-dx reports them, for `GET /api/hub/extensions`. */
+  readonly listExtensions: ListExtensions;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -301,6 +307,8 @@ export class Hub {
       log: this.log,
       ...options.sidecars,
     });
+    this.listExtensions = options.listExtensions
+      ?? (options.ndxCli ? ndxCliLister(options.ndxCli, this.hubHome) : async () => ({ ok: false, error: NO_NDX_CLI }));
   }
 
   /** Dashboard-started runs in flight across every project that has a server. */

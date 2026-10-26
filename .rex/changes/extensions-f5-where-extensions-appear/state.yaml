@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "2b42b7b6-4d54-4824-bf97-93e2f5d6f8ba":
-    lastModified: "2026-10-26T17:03:58.318Z"
+    status: "completed"
+    startedAt: "2026-10-26T23:35:47.367Z"
+    completedAt: "2026-10-26T23:48:41.707Z"
+    endedAt: "2026-10-26T23:48:41.707Z"
+    activeIntervals: [{"end":"2026-10-26T23:48:41.707Z","start":"2026-10-26T23:35:47.367Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Commit bf200bf9f: GET /api/hub/extensions[?project=], POST /api/hub/extensions/:name/stop, apiVersion 1 on GET/POST /projects, docs and contract tests."
+    lastModified: "2026-10-26T23:48:41.707Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "40484365-0b30-45bf-bd5f-9e1315dbe8c6":
     lastModified: "2026-10-26T17:29:29.633Z"
