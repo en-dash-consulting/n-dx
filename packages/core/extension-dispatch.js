@@ -80,21 +80,10 @@ export function resolveExtensionCommand(name, options) {
   const builtins = new Set(options.builtinCommands);
   if (builtins.has(name)) return { kind: "builtin" };
 
-  const projectDir = resolve(options.cwd ?? process.cwd());
-  const discovery = discoverExtensions({
-    builtinCommands: builtins,
-    projectDir,
-    home: options.home,
-    env: options.env,
-    globalRoot: options.globalRoot,
-  });
+  const { discovery, file, projectDir } = discoverWithApprovals(builtins, options);
   const ext = discovery.extensions.find((candidate) => claims(candidate, name));
   if (!ext) return { kind: "none" };
 
-  // An unreadable extensions.json is among discovery's errors; with no
-  // approvals readable, the extension resolves as unapproved.
-  const unreadable = discovery.errors.some((e) => e.path === join(discovery.home, EXTENSIONS_CACHE_FILE));
-  const file = unreadable ? {} : readExtensionsFile(discovery.home);
   const { state, reason } = extensionState(ext, { file, ndxVersion: options.ndxVersion, projectDir });
   const label = describe(ext);
   const key = stateKey(ext);
@@ -122,6 +111,37 @@ export function resolveExtensionCommand(name, options) {
     };
   }
   return { kind: "run", ext, command: name, bin, home: discovery.home };
+}
+
+/**
+ * An enabled extension command, as `ndx --help` lists it.
+ *
+ * @typedef {{name: string, summary: string, extension: string}} ListedExtensionCommand
+ */
+
+/**
+ * Every command of every enabled extension, sorted by name: what `ndx --help`
+ * lists under its Extensions heading. Disabled, unapproved, incompatible,
+ * invalid and conflicting extensions list nothing, and neither does a command
+ * a built-in owns.
+ *
+ * @param {ResolveOptions} options
+ * @returns {ListedExtensionCommand[]}
+ */
+export function listExtensionCommands(options) {
+  const builtins = new Set(options.builtinCommands);
+  const { discovery, file, projectDir } = discoverWithApprovals(builtins, options);
+  /** @type {ListedExtensionCommand[]} */
+  const listed = [];
+  for (const ext of discovery.extensions) {
+    if (!ext.manifest) continue;
+    if (extensionState(ext, { file, ndxVersion: options.ndxVersion, projectDir }).state !== "enabled") continue;
+    for (const command of ext.manifest.commands ?? []) {
+      if (builtins.has(command.name)) continue;
+      listed.push({ name: command.name, summary: command.summary, extension: ext.name ?? ext.packageName });
+    }
+  }
+  return listed.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -204,6 +224,28 @@ export function runExtensionCommand(options) {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Discover the installed extensions and read their approvals.
+ *
+ * @param {Set<string>} builtins
+ * @param {ResolveOptions} options
+ */
+function discoverWithApprovals(builtins, options) {
+  const projectDir = resolve(options.cwd ?? process.cwd());
+  const discovery = discoverExtensions({
+    builtinCommands: builtins,
+    projectDir,
+    home: options.home,
+    env: options.env,
+    globalRoot: options.globalRoot,
+  });
+  // An unreadable extensions.json is among discovery's errors; with no
+  // approvals readable, every extension is unapproved.
+  const unreadable = discovery.errors.some((e) => e.path === join(discovery.home, EXTENSIONS_CACHE_FILE));
+  const file = unreadable ? {} : readExtensionsFile(discovery.home);
+  return { discovery, file, projectDir };
+}
 
 /**
  * Whether `ext` claims the command `name`: one of its manifest's commands, or —

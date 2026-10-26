@@ -1966,10 +1966,12 @@ export function formatOrchestratorCommandHelp(command) {
 }
 
 /**
- * Format the main ndx help page with workflow-based grouping.
+ * Format the main ndx help page with workflow-based grouping, then the enabled
+ * extension commands under their own heading when there are any.
+ * @param {{extensions?: {name: string, summary: string}[]}} [options]
  * @returns {string}
  */
-export function formatMainHelp() {
+export function formatMainHelp({ extensions = [] } = {}) {
   const lines = [];
 
   lines.push(`${bold("n-dx")} ${dim("—")} AI-powered development toolkit`);
@@ -2055,6 +2057,10 @@ export function formatMainHelp() {
     ["usage [dir]", "Token usage analytics (--group=day|week|month)"],
     ["ci [dir]", "Run analysis pipeline and validate PRD health"],
   ], pad);
+
+  if (extensions.length > 0) {
+    section("EXTENSIONS", extensions.map(({ name, summary }) => [name, summary]), pad);
+  }
 
   // ── Options ──
   lines.push(bold("OPTIONS"));

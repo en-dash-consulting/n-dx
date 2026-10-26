@@ -13,7 +13,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveExtensionCommand, runExtensionCommand, EXTENSION_REFUSED_EXIT_CODE } from "../../packages/core/extension-dispatch.js";
+import { listExtensionCommands, resolveExtensionCommand, runExtensionCommand, EXTENSION_REFUSED_EXIT_CODE } from "../../packages/core/extension-dispatch.js";
 import { runExtensions } from "../../packages/core/extensions-command.js";
 
 const BUILTINS = ["init", "work", "status", "config", "extensions", "rex"];
@@ -132,6 +132,37 @@ describe("resolveExtensionCommand", () => {
     });
     await enable("recon");
     expect(resolveName("recon-report")).toMatchObject({ kind: "run", command: "recon-report", bin: join(dir, "bin", "cli.js") });
+  });
+});
+
+describe("listExtensionCommands", () => {
+  const list = (builtinCommands) => listExtensionCommands(deps(builtinCommands));
+
+  it("lists every command of an enabled extension with its summary, sorted by name", async () => {
+    install("recon", {
+      script: "",
+      commands: [{ name: "recon-report", bin: "bin/cli.js", summary: "Write the report" }, { name: "recon", bin: "bin/cli.js", summary: "Run recon" }],
+    });
+    await enable("recon");
+    expect(list()).toEqual([
+      { name: "recon", summary: "Run recon", extension: "recon" },
+      { name: "recon-report", summary: "Write the report", extension: "recon" },
+    ]);
+  });
+
+  it("lists nothing for unapproved, disabled or incompatible extensions", async () => {
+    install("pending", { script: "" });
+    install("off", { script: "" });
+    await enable("off");
+    await disable("off");
+    install("future", { script: "", ndxVersion: ">=9.0.0" });
+    expect(list()).toEqual([]);
+  });
+
+  it("never lists a command a built-in owns", async () => {
+    install("recon", { script: "" });
+    await enable("recon");
+    expect(list([...BUILTINS, "recon"])).toEqual([]);
   });
 });
 

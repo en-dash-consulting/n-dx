@@ -69,7 +69,7 @@ import {
 } from "./refresh-validate.js";
 import { handleInstallSample, handleDestroySample } from "./sample-app.js";
 import { runExtensions } from "./extensions-command.js";
-import { EXTENSION_REFUSED_EXIT_CODE, resolveExtensionCommand, runExtensionCommand } from "./extension-dispatch.js";
+import { EXTENSION_REFUSED_EXIT_CODE, listExtensionCommands, resolveExtensionCommand, runExtensionCommand } from "./extension-dispatch.js";
 import { extensionEnvironment } from "./extension-env.js";
 
 const CLI_ERROR_CODES = Object.freeze({
@@ -3481,8 +3481,20 @@ function handleUnknownCommand(command, extensionHint) {
   exitWithCleanup(1);
 }
 
+/**
+ * The main help page, with the enabled extension commands. An extension
+ * problem never costs the user the built-in help: it is printed without the
+ * Extensions section, and the problem goes to stderr with the fix.
+ */
 function showMainHelp() {
-  console.log(formatMainHelp());
+  const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+  let extensions = [];
+  try {
+    extensions = listExtensionCommands({ builtinCommands: builtinCommandNames(), ndxVersion: version });
+  } catch (err) {
+    console.error(`Warning: extension commands are not listed (${err.message}) — fix: ndx extensions doctor`);
+  }
+  console.log(formatMainHelp({ extensions }));
 }
 
 // ── Command dispatch map ─────────────────────────────────────────────────────

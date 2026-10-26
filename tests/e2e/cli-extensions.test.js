@@ -166,6 +166,26 @@ describe("ndx <extension command>", () => {
     expect(result.stderr).toMatch(/Hint: extension recon .* is incompatible: needs n-dx >=99\.0\.0/);
   });
 
+  it("ndx --help lists enabled extension commands under EXTENSIONS with their summary", () => {
+    expect(run(["--help"], opts())).not.toContain("EXTENSIONS");
+    installEcho("recon", { approve: false });
+    expect(run(["--help"], opts())).not.toContain("EXTENSIONS");
+
+    run(["extensions", "enable", "recon", "--yes"], opts());
+    const help = run(["--help"], opts());
+    const section = help.slice(help.indexOf("EXTENSIONS"));
+    expect(section).toMatch(/^EXTENSIONS\n {2}recon +recon\n/);
+    expect(run([], opts())).toContain(section.split("\n\n")[0]);
+  });
+
+  it("ndx <name> --help is passed through to the extension", () => {
+    installEcho("recon");
+    writeFileSync(join(home, "extensions", "node_modules", "ndx-recon", "bin", "cli.js"), `console.log("args " + JSON.stringify(process.argv.slice(2)));`);
+    const result = runResult(["recon", "--help"], opts());
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`args ${JSON.stringify(["--help"])}`);
+  });
+
   it("a name nothing claims is today's unknown command", () => {
     const result = runResult(["recon"], opts());
     expect(result.code).toBe(1);
