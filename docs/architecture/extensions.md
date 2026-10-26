@@ -152,6 +152,7 @@ The hub (`packages/web/src/hub/`) gains extension sidecars as a second kind of c
 - **Idle stop.** With no request for `idleStopMinutes` (default 15) and no open WebSocket, the hub stops it. `ndx hub stop` stops all sidecars.
 - **Crash handling.** A crashed sidecar is restarted on the next request, with backoff after three crashes in five minutes. Output goes to `<ndx home>/ext/<name>/logs/`.
 - **Budget.** Sidecars count against the hub's existing memory floor (`registry.ts`), and the hub refuses to start one below it rather than starve project servers.
+- **Launch plan.** The hub reads no manifest. It runs `ndx extensions sidecar <name> --json`, which applies the same discovery, approval and config checks as `ndx <name>` and prints the bin, environment, `health` (default `/`), `idleStopMinutes` and log file; the hub spawns that bin itself. Sidecars come from the user, global and development sources: the hub serves no single project.
 
 **Proxy and auth**
 

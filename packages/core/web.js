@@ -1237,7 +1237,9 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
 
   const script = resolve(__dir, tools.web);
   const { CLAUDECODE: _cc, ...env } = process.env;
-  const hubArgs = [script, "hub", `--port=${port}`];
+  // `--ndx-cli`: the hub asks this n-dx for each extension sidecar's launch
+  // plan (`ndx extensions sidecar <name> --json`); it cannot import core.
+  const hubArgs = [script, "hub", `--port=${port}`, `--ndx-cli=${join(__dir, "cli.js")}`];
   if (tokenFile) hubArgs.push(`--token-file=${tokenFile}`);
   const child = spawn(process.execPath, hubArgs, {
     stdio: "ignore",

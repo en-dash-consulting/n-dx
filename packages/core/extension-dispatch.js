@@ -132,6 +132,68 @@ export function resolveExtensionCommand(name, options) {
   return { kind: "run", ext, command: name, bin, home: discovery.home };
 }
 
+/** Polled for a 200 before the hub proxies, when the manifest names no `health`. */
+export const DEFAULT_SIDECAR_HEALTH = "/";
+
+/** Minutes without traffic before the hub stops a sidecar, when the manifest says nothing. */
+export const DEFAULT_SIDECAR_IDLE_STOP_MINUTES = 15;
+
+/** The sidecar's output, under its state folder: what the hub's 503 names. */
+export const SIDECAR_LOG_DIRNAME = "logs";
+export const SIDECAR_LOG_FILENAME = "sidecar.log";
+
+/**
+ * What the hub's `/x/<name>/` resolves to (docs/architecture/extensions.md,
+ * "Sidecar lifecycle").
+ *
+ * - `run` — an enabled extension declaring a sidecar whose `bin` exists, with
+ *   the manifest's `health` and `idleStopMinutes` filled in from the defaults.
+ * - `none` — no installed extension of that name declares a sidecar.
+ * - `refused` — it would run but must not: not enabled (unapproved, disabled,
+ *   incompatible…) or its `bin` is missing. `message` names the fix. Nothing
+ *   asks here: the hub has no terminal, so approval is `ndx extensions enable`.
+ *
+ * @typedef {{kind: "none", message: string}
+ *   | {kind: "refused", ext: DiscoveredExtension, message: string}
+ *   | {kind: "run", ext: DiscoveredExtension, bin: string, home: string, health: string, idleStopMinutes: number}} SidecarResolution
+ */
+
+/**
+ * Resolve the sidecar the extension `name` declares.
+ *
+ * @param {string} name  The extension name, as in `/x/<name>/`.
+ * @param {ResolveOptions} options
+ * @returns {SidecarResolution}
+ */
+export function resolveExtensionSidecar(name, options) {
+  const builtins = new Set(options.builtinCommands);
+  const { discovery, file, projectDir } = discoverWithApprovals(builtins, options);
+  const ext = discovery.extensions.find((candidate) => candidate.name === name);
+  if (!ext || (ext.manifest && !ext.manifest.sidecar)) {
+    return { kind: "none", message: `Error: No installed extension named '${name}' declares a sidecar — fix: ndx extensions list` };
+  }
+
+  const { state, reason } = extensionState(ext, { file, ndxVersion: options.ndxVersion, projectDir });
+  if (state !== "enabled") {
+    const fix = state === "disabled" || state === "unapproved" ? `ndx extensions enable ${stateKey(ext)}` : "ndx extensions doctor";
+    return { kind: "refused", ext, message: `Error: the sidecar of ${describe(ext)} is not started: it is ${state} (${reason}) — fix: ${fix}` };
+  }
+
+  const sidecar = /** @type {NonNullable<NonNullable<DiscoveredExtension["manifest"]>["sidecar"]>} */ (ext.manifest?.sidecar);
+  const bin = resolve(ext.dir, sidecar.bin);
+  if (!(options.fs ?? nodeFs).existsSync(bin)) {
+    return { kind: "refused", ext, message: `Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} does not exist — fix: ndx extensions doctor` };
+  }
+  return {
+    kind: "run",
+    ext,
+    bin,
+    home: discovery.home,
+    health: sidecar.health ?? DEFAULT_SIDECAR_HEALTH,
+    idleStopMinutes: sidecar.idleStopMinutes ?? DEFAULT_SIDECAR_IDLE_STOP_MINUTES,
+  };
+}
+
 /**
  * Asks a yes/no question on the terminal.
  *

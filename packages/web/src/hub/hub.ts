@@ -42,6 +42,8 @@ import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 import { guardHubRequest, upgradeRefusal } from "./request-guard.js";
+import { SidecarManager, ndxCliPlanner } from "./sidecars.js";
+import type { SidecarManagerOptions } from "./sidecars.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
 
 export const DEFAULT_HUB_PORT = 3117;
@@ -96,6 +98,16 @@ export interface HubOptions {
    * `buildServeCommand` expects.
    */
   selfBin?: string;
+  /**
+   * `@n-dx/core`'s `cli.js`, which the hub asks for each extension sidecar's
+   * launch plan (`ndx extensions sidecar <name> --json`). Core's `web.js`
+   * passes it as `--ndx-cli`; without it every `/x/<name>/` answers 503.
+   */
+  ndxCli?: string;
+  /** Overrides for the {@link SidecarManager} (tests inject `plan`, timeouts and the clock). */
+  sidecars?: Partial<SidecarManagerOptions>;
+  /** How often idle sidecars are looked for. Default 30 s. */
+  sidecarSweepMs?: number;
   log?: (message: string) => void;
 }
 
@@ -245,6 +257,8 @@ export class Hub {
   readonly selfBin: string;
   /** The per-user token every request must present, or null when running without one. */
   readonly token: string | null;
+  /** Extension sidecars mounted at `/x/<name>/`. */
+  readonly sidecars: SidecarManager;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -279,6 +293,13 @@ export class Hub {
       freeMemory: options.freeMemory,
       drainIntervalMs: options.drainIntervalMs,
       log: this.log,
+    });
+    this.sidecars = new SidecarManager({
+      plan: options.ndxCli ? ndxCliPlanner(options.ndxCli, this.hubHome) : null,
+      memoryFloorBytes: this.admission.limits.memoryFloorBytes,
+      freeMemory: () => this.admission.availableMemoryBytes(),
+      log: this.log,
+      ...options.sidecars,
     });
   }
 
@@ -602,6 +623,10 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     void hub.healthCheckAll();
   }, healthIntervalMs);
   healthTimer.unref();
+  const sidecarTimer = setInterval(() => {
+    void hub.sidecars.sweepIdle();
+  }, options.sidecarSweepMs ?? 30_000);
+  sidecarTimer.unref();
 
   let closed = false;
   const handle: HubHandle = {
@@ -613,7 +638,11 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       if (closed) return;
       closed = true;
       clearInterval(healthTimer);
+      clearInterval(sidecarTimer);
       hub.admission.stop();
+      // Always, unlike project servers: nothing records a sidecar for the
+      // next hub to re-attach, so one left running would be orphaned.
+      await hub.sidecars.stopAll();
       if (closeOptions.stopChildren ?? true) {
         await hub.stopAll();
       } else {

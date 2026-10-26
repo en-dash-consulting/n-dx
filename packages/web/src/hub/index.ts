@@ -58,6 +58,22 @@ export type {
   QueueSnapshot,
   StartOutcome,
 } from "./admission.js";
+export {
+  SidecarManager,
+  ndxCliPlanner,
+  SIDECAR_START_TIMEOUT_MS,
+  SIDECAR_CRASH_LIMIT,
+  SIDECAR_CRASH_WINDOW_MS,
+} from "./sidecars.js";
+export type {
+  SidecarPlan,
+  PlanResult,
+  PlanSidecar,
+  EnsureResult,
+  SidecarState,
+  SidecarStatus,
+  SidecarManagerOptions,
+} from "./sidecars.js";
 export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
 export type { ProxyDecision } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";

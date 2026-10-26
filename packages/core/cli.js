@@ -69,8 +69,17 @@ import {
 } from "./refresh-validate.js";
 import { handleInstallSample, handleDestroySample } from "./sample-app.js";
 import { runExtensions, terminalConfirm } from "./extensions-command.js";
-import { approveOnFirstRun, EXTENSION_REFUSED_EXIT_CODE, listExtensionCommands, resolveExtensionCommand, runExtensionCommand } from "./extension-dispatch.js";
-import { extensionEnvironment } from "./extension-env.js";
+import {
+  approveOnFirstRun,
+  EXTENSION_REFUSED_EXIT_CODE,
+  listExtensionCommands,
+  resolveExtensionCommand,
+  resolveExtensionSidecar,
+  runExtensionCommand,
+  SIDECAR_LOG_DIRNAME,
+  SIDECAR_LOG_FILENAME,
+} from "./extension-dispatch.js";
+import { extensionEnvironment, extensionStateDir } from "./extension-env.js";
 import { configCheckerByName, configCheckerFor } from "./extension-config-schema.js";
 
 const CLI_ERROR_CODES = Object.freeze({
@@ -2568,6 +2577,10 @@ function builtinCommandNames() {
 }
 
 async function handleExtensions(rest) {
+  if (rest[0] === "sidecar") {
+    await handleExtensionSidecar(rest.slice(1));
+    return;
+  }
   try {
     exitWithCleanup(await runExtensions(rest, { builtinCommands: builtinCommandNames() }));
   } catch (err) {
@@ -2575,6 +2588,77 @@ async function handleExtensions(rest) {
     console.error(formatError(err));
     exitWithCleanup(1);
   }
+}
+
+/**
+ * `ndx extensions sidecar <name> [--json]` — the hub's launch plan for the
+ * sidecar mounted at `/x/<name>/`: the bin, the contract environment, the
+ * health path, the idle limit and the log file. The hub spawns the bin itself
+ * (packages/web/src/hub/sidecars.ts); asking here keeps discovery, approval,
+ * the config check and the environment in one place, the same one
+ * `ndx <name>` uses. Nothing is run. A refusal exits 2, and with `--json` also
+ * prints `{ error, reason }` so the hub can answer in the same words.
+ */
+async function handleExtensionSidecar(args) {
+  const json = args.includes("--json");
+  const name = args.find((a) => !a.startsWith("-"));
+  const refuse = (reason, message, extra = []) => {
+    if (json) console.log(JSON.stringify({ error: [message, ...extra].join("\n"), reason }));
+    console.error(message);
+    for (const line of extra) console.error(line);
+    exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
+  };
+  if (!name) {
+    refuse("usage", "Error: 'ndx extensions sidecar' needs an extension name.");
+    return;
+  }
+  const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+  const resolution = resolveExtensionSidecar(name, { builtinCommands: builtinCommandNames(), ndxVersion: version });
+  if (resolution.kind !== "run") {
+    refuse(resolution.kind, resolution.message);
+    return;
+  }
+
+  const config = await loadExtensionConfig({ dir: process.cwd(), home: resolution.home, name });
+  const violations = configCheckerFor(resolution.ext).check(config);
+  if (violations.length > 0) {
+    refuse("config", `Error: the sidecar of '${name}' has a config section extensions.${name} that does not match its configSchema:`, [
+      ...violations.map((v) => `  ${v.message}`),
+      `  fix: ndx config extensions.${name}.<key> <value>`,
+    ]);
+    return;
+  }
+  let env;
+  let logFile;
+  try {
+    env = extensionEnvironment({ name, home: resolution.home, ndxVersion: version, config });
+    const logDir = join(extensionStateDir(resolution.home, name), SIDECAR_LOG_DIRNAME);
+    mkdirSync(logDir, { recursive: true });
+    logFile = join(logDir, SIDECAR_LOG_FILENAME);
+  } catch (err) {
+    refuse("state", `Error: the sidecar of '${name}' could not prepare its state folder under ${resolution.home} (${err.code ?? err.message}) — fix: make the n-dx home writable, or set NDX_HOME`);
+    return;
+  }
+
+  const plan = {
+    name,
+    execPath: process.execPath,
+    bin: resolution.bin,
+    cwd: env.NDX_EXTENSION_STATE_DIR,
+    env,
+    health: resolution.health,
+    idleStopMinutes: resolution.idleStopMinutes,
+    logFile,
+  };
+  if (json) {
+    console.log(JSON.stringify(plan));
+  } else {
+    console.log(`sidecar  ${plan.bin}`);
+    console.log(`health   ${plan.health}`);
+    console.log(`idle     ${plan.idleStopMinutes} min`);
+    console.log(`log      ${plan.logFile}`);
+  }
+  exitWithCleanup(0);
 }
 
 async function handleStart(rest, commandName = "start") {

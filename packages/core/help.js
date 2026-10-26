@@ -1809,6 +1809,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       "manifest breaks the contract) and conflict (two packages claim a name).\n" +
       "'doctor' checks every manifest, version range, declared path and name\n" +
       "clash, prints one line per problem with its fix, and exits 1 if any.\n" +
+      "'sidecar' prints how the hub starts an enabled extension's web app at\n" +
+      "/x/<name>/ (bin, health path, idle limit, log file); the hub runs it.\n" +
       "See docs/architecture/extensions.md.",
     usage: [
       "ndx extensions [list] [--json] [dir]",
@@ -1818,9 +1820,10 @@ const ORCHESTRATOR_HELP_DEFS = {
       "ndx extensions disable <name>",
       "ndx extensions info <name> [--json]",
       "ndx extensions doctor [dir]",
+      "ndx extensions sidecar <name> [--json]",
     ],
     options: [
-      { flag: "--json", description: "list, info: print JSON (name, version, source, state, reason)" },
+      { flag: "--json", description: "list, info, sidecar: print JSON (name, version, source, state, reason)" },
       { flag: "--yes", description: "enable: approve without a prompt (CI, provisioning)" },
       { flag: "--purge", description: "remove: also delete the extension's state folder" },
     ],

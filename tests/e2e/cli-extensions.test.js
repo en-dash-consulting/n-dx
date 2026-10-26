@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { CLI_PATH, createTmpDir, removeTmpDir, run, runResult } from "./e2e-helpers.js";
 
@@ -330,5 +330,62 @@ describe("ndx config extensions.<name>", () => {
     const result = spawnSync(process.execPath, [CLI_PATH, "config", "extensions.recon.mode", "deep", "--user"], { ...opts(), encoding: "utf-8", windowsHide: true });
     expect(result.status).toBe(0);
     expect(result.stderr).toContain('the project config also sets "extensions.recon.mode", and its value wins');
+  });
+});
+
+/** A user-installed extension `name` that declares only a sidecar. */
+function installSidecar(name, { approve = true, sidecar = { bin: "bin/serve.js", health: "/healthz" } } = {}) {
+  const folder = join(home, "extensions");
+  writeFileSync(join(mkdirp(folder), "package.json"), JSON.stringify({ name: "ndx-user-extensions", dependencies: { [`ndx-${name}`]: "^1.0.0" } }));
+  const dir = mkdirp(join(folder, "node_modules", `ndx-${name}`));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({
+    name: `ndx-${name}`,
+    version: "1.0.0",
+    ndx: { extension: { apiVersion: 1, name, ndxVersion: ">=0.0.0", sidecar } },
+  }));
+  writeFileSync(join(mkdirp(join(dir, "bin")), "serve.js"), "// served by the hub\n");
+  if (approve) run(["extensions", "enable", name, "--yes"], opts());
+  return dir;
+}
+
+describe("ndx extensions sidecar", () => {
+  it("prints the hub's launch plan for an enabled sidecar, with the defaults filled in", () => {
+    const dir = installSidecar("recon", { sidecar: { bin: "bin/serve.js" } });
+    const plan = JSON.parse(run(["extensions", "sidecar", "recon", "--json"], opts()));
+    const stateDir = join(home, "ext", "recon");
+    expect(plan).toMatchObject({
+      name: "recon",
+      execPath: process.execPath,
+      bin: join(dir, "bin", "serve.js"),
+      cwd: stateDir,
+      health: "/",
+      idleStopMinutes: 15,
+      logFile: join(stateDir, "logs", "sidecar.log"),
+    });
+    expect(plan.env).toMatchObject({ NDX_EXTENSION_NAME: "recon", NDX_EXTENSION_STATE_DIR: stateDir });
+    expect(readJson(plan.env.NDX_EXTENSION_CONFIG)).toEqual({});
+    expect(readdirSync(join(stateDir, "logs"))).toEqual([]);
+  });
+
+  it("keeps the manifest's health path", () => {
+    installSidecar("recon");
+    expect(JSON.parse(run(["extensions", "sidecar", "recon", "--json"], opts())).health).toBe("/healthz");
+  });
+
+  it("refuses an unapproved sidecar with exit 2, naming enable", () => {
+    installSidecar("recon", { approve: false });
+    const result = runResult(["extensions", "sidecar", "recon", "--json"], opts());
+    expect(result.code).toBe(2);
+    const body = JSON.parse(result.stdout);
+    expect(body.reason).toBe("refused");
+    expect(body.error).toMatch(/is unapproved .* — fix: ndx extensions enable recon$/);
+    expect(result.stderr.trim()).toBe(body.error);
+  });
+
+  it("refuses a name with no sidecar with exit 2", () => {
+    installEcho("recon");
+    const result = runResult(["extensions", "sidecar", "recon", "--json"], opts());
+    expect(result.code).toBe(2);
+    expect(JSON.parse(result.stdout)).toMatchObject({ reason: "none" });
   });
 });

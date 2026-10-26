@@ -17,6 +17,9 @@
  *   a request that could mean two different repositories must not be
  *   guessed at.
  *
+ * `/x/<name>/…` is neither: it is an extension's sidecar, started on the
+ * first request (sidecars.ts) and forwarded with the prefix stripped.
+ *
  * `/hub` is the exception to both: it is the hub's own, and it serves the
  * chooser whatever is registered. That matters because `/` is overloaded —
  * the sole project's dashboard with one registered, the chooser with several
@@ -54,6 +57,8 @@ import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { homedir } from "node:os";
 import { renderHomePage } from "./home.js";
 import { defaultParentDir } from "./new-project.js";
+import { SidecarManager } from "./sidecars.js";
+import type { EnsureResult } from "./sidecars.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
 /** `ndx refresh --live-server` posts here; with several projects the body's `dir` picks one. */
@@ -68,10 +73,15 @@ const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
 const LIVE_PATH = "/api/live";
 /** The Prepare task modal's read: its admission strip reports the same gate state. */
 const PREP_PATH = /^\/api\/hench\/prep\/[^/]+$/;
+/** `/x/<name>` and everything under it: an extension's sidecar. */
+const SIDECAR_PATH_PREFIX = "/x/";
+const SIDECAR_PATH = /^\/x\/([^/]*)(\/.*)?$/;
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
   | { kind: "proxy"; project: ProjectView; path: string; prefix: string }
+  /** An extension sidecar, started on demand by the hub's {@link SidecarManager}. */
+  | { kind: "sidecar"; name: string; path: string; prefix: string }
   | { kind: "json"; status: number; body: unknown }
   | { kind: "html"; status: number; html: string }
   /**
@@ -93,6 +103,17 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
   const queryIdx = url.indexOf("?");
   const pathname = queryIdx === -1 ? url : url.slice(0, queryIdx);
   const query = queryIdx === -1 ? "" : url.slice(queryIdx);
+
+  // `/x/` is the extensions' reserved prefix, checked first so neither a
+  // project nor the root alias can claim it.
+  const sidecar = SIDECAR_PATH.exec(pathname);
+  if (sidecar) {
+    const name = sidecar[1];
+    if (!SidecarManager.isName(name)) {
+      return { kind: "json", status: 404, body: { error: `No extension sidecar is named "${name}"` } };
+    }
+    return { kind: "sidecar", name, path: (sidecar[2] || "/") + query, prefix: `${SIDECAR_PATH_PREFIX}${name}` };
+  }
 
   const prefix = detectBasePath(pathname);
   if (prefix) {
@@ -380,6 +401,17 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
   if (await handleReloadSignal(req, res, hub)) return;
   const decision = decideProxy(hub, req.url || "/");
   switch (decision.kind) {
+    case "sidecar": {
+      const started = await hub.sidecars.ensure(decision.name);
+      if (!started.ok) {
+        writeJson(res, started.status, sidecarRefusalBody(started));
+        return;
+      }
+      hub.sidecars.beginRequest(decision.name);
+      res.once("close", () => hub.sidecars.endRequest(decision.name));
+      proxyHttp(req, res, started.port, decision.path, decision.prefix);
+      return;
+    }
     case "proxy":
       if (await handleExecuteAdmission(req, res, hub, decision)) return;
       proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, undefined, await admissionHeadersFor(req, hub, decision));
@@ -565,9 +597,42 @@ async function handleExecuteAdmission(
   return true;
 }
 
+/** The JSON a refused `/x/<name>/` answers with: the message, and the log file when there is one. */
+function sidecarRefusalBody(result: Extract<EnsureResult, { ok: false }>): Record<string, unknown> {
+  return {
+    error: result.error,
+    ...(result.logFile ? { log: result.logFile } : {}),
+    ...(result.retryAfterSeconds !== undefined ? { retryAfterSeconds: result.retryAfterSeconds } : {}),
+  };
+}
+
+/** A sidecar upgrade: start it if needed, then pipe — counting the socket, which keeps the sidecar from idling out. */
+async function upgradeSidecar(
+  req: IncomingMessage,
+  socket: Duplex,
+  head: Buffer,
+  hub: Hub,
+  decision: Extract<ProxyDecision, { kind: "sidecar" }>,
+): Promise<void> {
+  const started = await hub.sidecars.ensure(decision.name);
+  if (socket.destroyed) return;
+  if (!started.ok) {
+    const reason = started.status === 404 ? "Not Found" : started.status === 403 ? "Forbidden" : "Service Unavailable";
+    socket.end(`HTTP/1.1 ${started.status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    return;
+  }
+  hub.sidecars.openSocket(decision.name);
+  socket.once("close", () => hub.sidecars.closeSocket(decision.name));
+  proxyUpgrade(req, socket, head, started.port, decision.path, decision.prefix);
+}
+
 /** Handle a WebSocket upgrade on the hub socket. */
 export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, hub: Hub): void {
   const decision = decideProxy(hub, req.url || "/", true);
+  if (decision.kind === "sidecar") {
+    void upgradeSidecar(req, socket, head, hub, decision).catch(() => socket.destroy());
+    return;
+  }
   if (decision.kind === "proxy") {
     proxyUpgrade(req, socket, head, decision.project.port!, decision.path, decision.prefix);
     return;

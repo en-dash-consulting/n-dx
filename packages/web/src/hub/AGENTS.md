@@ -31,6 +31,16 @@ already-resolved directory in `$NDX_HOME` — the orchestration tier still never
 imports this package, and keeps its own hand-written twin of the resolver in
 `packages/core/layout.js`.
 
+## Extension sidecars
+
+`hub/sidecars.ts` runs the sidecars mounted at `/x/<name>/` — lazy start,
+health wait, idle stop, crash backoff, the memory floor. The hub never reads a
+manifest: it spawns `ndx extensions sidecar <name> --json` (core's CLI, passed
+as `--ndx-cli`) for a launch plan and runs exactly that, so discovery, approval
+and the config check stay in core. Sidecars are always stopped with the hub,
+even when `close({ stopChildren: false })` leaves project servers to be
+re-attached, because nothing records them for the next hub.
+
 ## Proxy and base path
 
 `hub/proxy.ts` forwards `/p/<id>/…` to that project's server with the prefix
