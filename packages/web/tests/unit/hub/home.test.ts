@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { renderHomePage, renderCard, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel, readinessLabel, infrastructureLabel } from "../../../src/hub/home.js";
+import { renderHomePage, renderCard, renderExtensionCard, homeExtensions, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel, readinessLabel, infrastructureLabel } from "../../../src/hub/home.js";
 import type { HubOverview, ProjectCard } from "../../../src/hub/overview.js";
+import type { ExtensionView } from "../../../src/hub/extensions.js";
 
 /**
  * The hub home page, rendered and then read back out of a document.
@@ -321,6 +322,83 @@ describe("keyboard reachability", () => {
     const styles = renderToDocument(renderHomePage(TWO_PROJECTS)).querySelector("style")!.textContent!;
     expect(styles).toContain("a:focus-visible, button:focus-visible");
     expect(styles).toContain("outline:");
+  });
+});
+
+function ext(overrides: Partial<ExtensionView> = {}): ExtensionView {
+  return {
+    name: "recon",
+    packageName: "@acme/recon",
+    version: "1.2.0",
+    source: "user",
+    state: "enabled",
+    reason: "",
+    compatible: true,
+    manifest: {
+      apiVersion: 1, name: "recon", ndxVersion: ">=0.10",
+      sidecar: { bin: "server.js" },
+      hub: { label: "Recon", description: "Assess a repository" },
+    },
+    mount: "/x/recon/",
+    sidecar: { state: "stopped", recentCrashes: 0, lastError: null },
+    ...overrides,
+  };
+}
+
+describe("extensions on the home page", () => {
+  it("renders one linked card per enabled extension with a hub entry", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, "", [
+      ext(),
+      ext({ name: "graph", manifest: { apiVersion: 1, name: "graph", ndxVersion: "*", sidecar: { bin: "s.js" }, hub: { label: "Graph" } }, mount: "/x/graph/" }),
+    ]));
+    const cards = [...doc.querySelectorAll("#extensions .card")];
+    expect(cards).toHaveLength(2);
+    const link = cards[0].querySelector(".card-title a")!;
+    expect(link.textContent).toBe("Recon");
+    expect(link.getAttribute("href")).toBe("/x/recon/");
+    expect(cards[0].querySelector(".description")?.textContent).toBe("Assess a repository");
+    expect(cards[1].querySelector(".card-title a")?.getAttribute("href")).toBe("/x/graph/");
+    expect(doc.querySelector(".section-title")?.textContent).toBe("Extensions");
+  });
+
+  it("greys out incompatible and unapproved extensions with their reason, unlinked", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, "", [
+      ext({ state: "incompatible", compatible: false, reason: "needs n-dx >=2; this is 0.10.0" }),
+      ext({ name: "other", state: "unapproved", reason: "not approved yet" }),
+    ]));
+    const cards = [...doc.querySelectorAll("#extensions .card")];
+    expect(cards).toHaveLength(2);
+    for (const card of cards) {
+      expect(card.classList.contains("card-inactive")).toBe(true);
+      expect(card.querySelector("a")).toBeNull();
+    }
+    expect(cards[0].querySelector(".reason")?.textContent).toBe("incompatible: needs n-dx >=2; this is 0.10.0");
+    expect(cards[1].querySelector(".reason")?.textContent).toBe("unapproved: not approved yet");
+  });
+
+  it("leaves out extensions without a hub entry, and disabled, invalid or conflicting ones", () => {
+    const shown = homeExtensions([
+      ext({ manifest: { apiVersion: 1, name: "recon", ndxVersion: "*", sidecar: { bin: "s.js" } } }),
+      ext({ state: "disabled", reason: "disabled with 'ndx extensions disable'" }),
+      ext({ name: null, state: "invalid", compatible: false, manifest: null, mount: null, sidecar: null }),
+      ext({ state: "conflict", reason: "two packages" }),
+      ext({ name: "kept" }),
+    ]);
+    expect(shown.map((e) => e.name)).toEqual(["kept"]);
+  });
+
+  it("renders no Extensions row when none has a card", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS));
+    expect(doc.getElementById("extensions")).toBeNull();
+    expect(doc.querySelector(".section-title")).toBeNull();
+  });
+
+  it("escapes the manifest's label and description", () => {
+    const html = renderExtensionCard(ext({
+      manifest: { apiVersion: 1, name: "recon", ndxVersion: "*", sidecar: { bin: "s.js" }, hub: { label: "<b>x</b>", description: '"><script>' } },
+    }));
+    expect(html).not.toContain("<b>x</b>");
+    expect(html).not.toContain("<script>");
   });
 });
 

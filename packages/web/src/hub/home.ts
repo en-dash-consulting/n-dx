@@ -1,5 +1,6 @@
 /**
- * The hub's home page: one card per registered project.
+ * The hub's home page: one card per registered project, then an Extensions
+ * row with one card per extension that declares a `hub` entry.
  *
  * With several repositories registered, `/` has to answer "which one?" — and
  * the answer people actually use is not a list of names. It is which branch
@@ -33,6 +34,7 @@
  * @module web/hub/home
  */
 
+import type { ExtensionView } from "./extensions.js";
 import type { HubOverview, ProjectCard } from "./overview.js";
 
 export function escapeHtml(value: string): string {
@@ -173,6 +175,11 @@ h1 { font-size: 1.25rem; margin: 0; font-weight: 600; }
 .action-primary:hover { color: var(--bg); opacity: 0.9; }
 a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .empty { color: var(--text-dim); }
+.section-title { font-size: 0.9rem; font-weight: 600; color: var(--text-dim); margin: 2rem 0 0.75rem; }
+.card-inactive { opacity: 0.55; }
+.card-inactive .card-title span.name { color: var(--text-dim); font-weight: 600; font-size: 1rem; }
+.description { color: var(--text-dim); font-size: 0.78rem; margin: 0; }
+.reason { color: var(--orange); font-size: 0.75rem; margin: 0; overflow-wrap: anywhere; }
 .empty code { background: var(--bg-hover); padding: 0.1rem 0.35rem; border-radius: 4px; }
 
 /* New-project form */
@@ -458,13 +465,61 @@ export function renderCards(overview: HubOverview): string {
 }
 
 /**
+ * The extensions the home page shows: those that declare a `hub` entry and are
+ * either enabled or held back for a reason the operator can act on
+ * (incompatible, unapproved). A disabled one was switched off on purpose, and
+ * an invalid or conflicting one has no manifest the hub can trust a label from;
+ * `ndx extensions list` is where those are explained.
+ */
+export function homeExtensions(extensions: ExtensionView[]): ExtensionView[] {
+  return extensions.filter((ext) =>
+    ext.name !== null
+    && !!ext.manifest?.hub
+    && (ext.state === "enabled" || ext.state === "incompatible" || ext.state === "unapproved"));
+}
+
+/**
+ * One extension card. An enabled extension links to its mount; any other is
+ * greyed out with no link — the page behind it would refuse — and says why.
+ */
+export function renderExtensionCard(ext: ExtensionView): string {
+  const hub = ext.manifest!.hub!;
+  const label = escapeHtml(hub.label);
+  const description = hub.description ? `<p class="description">${escapeHtml(hub.description)}</p>` : "";
+  const version = ext.version ? `<span class="fact">${escapeHtml(ext.version)}</span>` : "";
+  if (ext.state === "enabled" && ext.mount) {
+    return `<li class="card card-extension">
+    <div class="card-title"><a href="${escapeHtml(ext.mount)}">${label}</a></div>
+    ${description}
+    <div class="facts">${version}</div>
+  </li>`;
+  }
+  return `<li class="card card-extension card-inactive">
+    <div class="card-title"><span class="name">${label}</span></div>
+    ${description}
+    <p class="reason">${escapeHtml(ext.state)}: ${escapeHtml(ext.reason)}</p>
+    <div class="facts">${version}</div>
+  </li>`;
+}
+
+/** The Extensions row, or nothing when no extension has a card to show. */
+export function renderExtensionsSection(extensions: ExtensionView[]): string {
+  const shown = homeExtensions(extensions);
+  if (shown.length === 0) return "";
+  return `<h2 class="section-title">Extensions</h2>
+  <ul class="cards" id="extensions">${shown.map(renderExtensionCard).join("")}</ul>`;
+}
+
+/**
  * The whole page.
  *
  * @param defaultParent Directory the new-project form offers to create in —
  *   {@link defaultParentDir}'s answer, passed in rather than computed here so
  *   this module stays pure rendering.
+ * @param extensions `GET /api/hub/extensions`'s entries; empty when the hub
+ *   could not list them, which leaves the row off rather than failing the page.
  */
-export function renderHomePage(overview: HubOverview, defaultParent = ""): string {
+export function renderHomePage(overview: HubOverview, defaultParent = "", extensions: ExtensionView[] = []): string {
   const { projects } = overview;
   const body = projects.length === 0
     ? `<p class="empty">No project is registered yet. Create one above, or run <code>ndx start</code> in a repository you already have.</p>`
@@ -501,6 +556,7 @@ export function renderHomePage(overview: HubOverview, defaultParent = ""): strin
   </header>
   ${renderNewProjectPanel(defaultParent)}
   ${body}
+  ${renderExtensionsSection(extensions)}
 </div>
 <script>
   (function () {

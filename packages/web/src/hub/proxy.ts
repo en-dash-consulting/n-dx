@@ -64,6 +64,8 @@ import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { homedir } from "node:os";
 import { renderHomePage } from "./home.js";
+import { buildExtensionsAnswer } from "./extensions.js";
+import type { ExtensionView } from "./extensions.js";
 import { defaultParentDir } from "./new-project.js";
 import { SidecarManager } from "./sidecars.js";
 import type { EnsureResult } from "./sidecars.js";
@@ -496,14 +498,37 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       // `/api/hub/overview` does it: a child started with `--token-file`
       // answers 401 without it, and every card would render "unreachable"
       // until the page's first client-side refresh corrected itself.
-      const overview = await buildHubOverview(projects, (port) => fetchChildSnapshot(port, 2_000, hub.token));
+      const [overview, extensions] = await Promise.all([
+        buildHubOverview(projects, (port) => fetchChildSnapshot(port, 2_000, hub.token)),
+        homeExtensionViews(hub),
+      ]);
       // Where the "New project" form offers to create: wherever most of the
       // registered projects already live, else the user's home.
-      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()));
+      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions);
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
       res.end(html);
       return;
     }
+  }
+}
+
+/** How long the home page waits for the extension list before rendering without it. */
+const HOME_EXTENSIONS_WAIT_MS = 3_000;
+
+/**
+ * The extensions for the home page's row: what `GET /api/hub/extensions`
+ * answers. A hub that cannot list them (no `--ndx-cli`, a failing or slow CLI)
+ * renders the page without the row — the projects are what the page is for.
+ */
+async function homeExtensionViews(hub: Hub): Promise<ExtensionView[]> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), HOME_EXTENSIONS_WAIT_MS); });
+  try {
+    const listed = await Promise.race([hub.listExtensions(), timeout]);
+    if (!listed?.ok) return [];
+    return buildExtensionsAnswer(listed, hub.sidecars.list()).extensions;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

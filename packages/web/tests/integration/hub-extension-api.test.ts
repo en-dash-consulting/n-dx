@@ -237,6 +237,23 @@ describe("GET /api/hub/extensions", () => {
   });
 });
 
+describe("the hub home", () => {
+  it("shows enabled extensions as links and incompatible ones greyed with their reason", async () => {
+    const h = await hub();
+    const html = await (await fetch(`http://127.0.0.1:${h.port}/`)).text();
+    expect(html).toContain('<a href="/x/recon/">recon card</a>');
+    expect(html).toContain("incompatible: future is incompatible");
+    expect(html).not.toContain("later card");
+  });
+
+  it("still renders, without the row, when n-dx cannot be asked", async () => {
+    const h = await hub({ listExtensions: undefined });
+    const res = await fetch(`http://127.0.0.1:${h.port}/`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).not.toContain('id="extensions"');
+  });
+});
+
 describe("POST /api/hub/extensions/:name/stop", () => {
   it("stops a running sidecar, and answers stopped: false when none runs", async () => {
     const h = await hub();
