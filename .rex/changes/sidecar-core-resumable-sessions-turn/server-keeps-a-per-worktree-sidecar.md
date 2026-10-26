@@ -8,6 +8,7 @@ acceptanceCriteria:
   - "sessions survive a server restart via the stored resume id"
   - "idle sessions forget their resume id after the TTL (default 2 h)"
   - "transcripts are machine-local and gitignored"
+  - "a vendor session started without an explicit env gets the guard.env-filtered environment (resolveVendorCliEnv), never the full process.env"
 priority: "high"
 source: "caos"
 ---
