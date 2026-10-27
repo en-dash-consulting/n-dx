@@ -4,13 +4,17 @@
  * for everything under the mount, so `bin/serve.js` sets Vite's `base` to it.
  * This plugin puts the prefix back on what arrives, HTTP and the HMR
  * WebSocket alike, so Vite and the door see the paths the page asked for.
- * At the root (`base` is `/`, as under `ndx graview serve .`) it does nothing.
+ * A request already under the mount (the sidecar's printed URL, Vite's
+ * direct HMR fallback) is left as it is. At the root (`base` is `/`, as
+ * under `ndx graview serve .`) it does nothing.
  */
 import type { IncomingMessage } from "node:http";
 import type { Plugin } from "vite";
 
-/** `url` as the hub forwarded it (`/a?b`), back under the mount `base` (`/x/name/`). */
+/** `url` as the hub forwarded it (`/a?b`), back under the mount `base` (`/x/name/`); unchanged when already under it. */
 export function underMount(base: string, url: string): string {
+  const bare = base.slice(0, -1);
+  if (url.startsWith(base) || url === bare || url.startsWith(`${bare}?`) || url.startsWith(`${bare}#`)) return url;
   return base + (url.startsWith("/") ? url.slice(1) : url);
 }
 
