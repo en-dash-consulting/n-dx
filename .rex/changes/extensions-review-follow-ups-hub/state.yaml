@@ -64,5 +64,12 @@ items:
     lastModified: "2026-10-27T15:22:18.186Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "ecfcc5a2-aff2-4a3d-832e-b402dd9dbdff":
-    lastModified: "2026-10-27T13:51:54.792Z"
+    status: "completed"
+    startedAt: "2026-10-27T16:01:49.727Z"
+    completedAt: "2026-10-27T16:06:36.148Z"
+    endedAt: "2026-10-27T16:06:36.148Z"
+    activeIntervals: [{"end":"2026-10-27T16:06:36.148Z","start":"2026-10-27T16:01:49.727Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "After the first healthy probe, the hub waits SIDECAR_SETTLE_MS (250 ms) or the child's exit, whichever comes first, and refuses the start if the child has gone. A new integration test covers a squatter server that answers health while the bin fails to bind."
+    lastModified: "2026-10-27T16:06:36.148Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

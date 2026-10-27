@@ -148,7 +148,7 @@ The hub (`packages/web/src/hub/`) gains extension sidecars as a second kind of c
 
 **Sidecar lifecycle**
 
-- **Lazy start.** The first request to `/x/<name>/` starts the sidecar's `bin` on an ephemeral loopback port, passed as `PORT`. The hub holds the request until `health` answers 200, up to 20 seconds, then returns 503 naming the log file.
+- **Lazy start.** The first request to `/x/<name>/` starts the sidecar's `bin` on an ephemeral loopback port, passed as `PORT`. The hub holds the request until `health` answers 200, up to 20 seconds, then returns 503 naming the log file. A sidecar that exits within 250 ms of that 200, as one does when another server took its port first and answered, is never marked running.
 - **Idle stop.** With no request for `idleStopMinutes` (default 15) and no open WebSocket, the hub stops it. `ndx hub stop` stops all sidecars.
 - **Crash handling.** A crashed sidecar is restarted on the next request, with backoff after three crashes in five minutes. Output goes to `<ndx home>/ext/<name>/logs/`.
 - **Budget.** Sidecars count against the hub's existing memory floor (`registry.ts`), and the hub refuses to start one below it rather than starve project servers.

@@ -13,7 +13,8 @@
  *
  * - **Lazy start.** The first request starts the bin on an ephemeral loopback
  *   port (`PORT`) and holds until `health` answers 200, up to
- *   {@link SIDECAR_START_TIMEOUT_MS}; then 503 naming the log file.
+ *   {@link SIDECAR_START_TIMEOUT_MS}; then 503 naming the log file. A bin that
+ *   exits within {@link SIDECAR_SETTLE_MS} of that answer is never running.
  * - **Idle stop.** {@link SidecarManager.sweepIdle} stops a sidecar with no
  *   request in flight, no open WebSocket and no traffic for `idleStopMinutes`.
  * - **Crash handling.** An exit the hub did not ask for is a crash; the next
@@ -39,6 +40,14 @@ import type { ManagedChild } from "./exec-gateway.js";
 
 /** How long the first request waits for `health` before answering 503. */
 export const SIDECAR_START_TIMEOUT_MS = 20_000;
+/**
+ * How long a sidecar must stay alive after its first healthy answer before it
+ * is marked running. The hub picks the port before the bin binds it, so a
+ * server that took the port in between answers health while ours exits with
+ * EADDRINUSE; this catches that exit. A bin slower to bind than this is not
+ * caught — only a nonce the health endpoint echoes would be.
+ */
+export const SIDECAR_SETTLE_MS = 250;
 /** Crashes within {@link SIDECAR_CRASH_WINDOW_MS} after which restarts back off. */
 export const SIDECAR_CRASH_LIMIT = 3;
 export const SIDECAR_CRASH_WINDOW_MS = 5 * 60_000;
@@ -100,6 +109,7 @@ export interface SidecarManagerOptions {
   startTimeoutMs?: number;
   healthPollMs?: number;
   healthTimeoutMs?: number;
+  settleMs?: number;
   stopGraceMs?: number;
   crashLimit?: number;
   crashWindowMs?: number;
@@ -392,12 +402,17 @@ export class SidecarManager {
 
     const deadline = Date.now() + (this.opts.startTimeoutMs ?? SIDECAR_START_TIMEOUT_MS);
     const url = `http://${LOOPBACK}:${port}${plan.health}`;
+    const gone = (when: string): EnsureResult => {
+      const how = exitCode === undefined ? "was stopped" : `exited with code ${exitCode ?? "null"}`;
+      return this.refuse(s, 503, `The ${s.name} sidecar ${how} ${when} ${plan.health}.`);
+    };
     while (Date.now() < deadline) {
-      if (s.handle !== handle) {
-        const how = exitCode === undefined ? "was stopped" : `exited with code ${exitCode ?? "null"}`;
-        return this.refuse(s, 503, `The ${s.name} sidecar ${how} before answering ${plan.health}.`);
-      }
+      if (s.handle !== handle) return gone("before answering");
       if (await this.healthy(url)) {
+        // The port was free when asked, not when the bin bound it: another
+        // server may have taken it and answered, while ours dies of EADDRINUSE.
+        await this.settle(handle);
+        if (s.handle !== handle) return gone("right after a 200 from");
         s.state = "running";
         s.lastActivity = this.now();
         this.log(`[hub] sidecar ${s.name} up (pid ${handle.pid}, port ${port})`);
@@ -410,6 +425,17 @@ export class SidecarManager {
     await this.stopSidecar(s);
     this.recordCrash(s, `did not answer ${plan.health} within ${seconds}s`);
     return this.refuse(s, 503, `The ${s.name} sidecar did not answer ${plan.health} within ${seconds}s.`);
+  }
+
+  /** Wait out {@link SIDECAR_SETTLE_MS}, or until `handle` exits, whichever is first. */
+  private async settle(handle: ManagedChild): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const elapsed = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, this.opts.settleMs ?? SIDECAR_SETTLE_MS);
+    });
+    // `done` settles the exit bookkeeping first: it was subscribed to before this.
+    await Promise.race([elapsed, handle.done]);
+    clearTimeout(timer);
   }
 
   private async healthy(url: string): Promise<boolean> {

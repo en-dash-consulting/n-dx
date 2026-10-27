@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { once } from "node:events";
+import { createServer as createHttpServer } from "node:http";
 import { connect } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -22,6 +23,22 @@ const FIXTURE = [
   `const mode = process.env.SIDECAR_MODE;`,
   `if (mode === "crash") { console.log("crashing"); process.exit(3); }`,
   `if (mode === "never-healthy") { console.log("hanging"); setInterval(() => {}, 1000); }`,
+  // Loses the port: binds only once another server holds it, then exits a moment after EADDRINUSE.
+  `else if (mode === "lost-race") {`,
+  `  const net = require("node:net");`,
+  `  const port = Number(process.env.PORT);`,
+  `  const bindOnceTaken = () => {`,
+  `    const probe = net.connect(port, "127.0.0.1");`,
+  `    probe.on("error", () => setTimeout(bindOnceTaken, 10));`,
+  `    probe.on("connect", () => {`,
+  `      probe.destroy();`,
+  `      const server = net.createServer();`,
+  `      server.on("error", (err) => { console.log("bind failed: " + err.code); setTimeout(() => process.exit(1), 100); });`,
+  `      server.listen(port, "127.0.0.1");`,
+  `    });`,
+  `  };`,
+  `  bindOnceTaken();`,
+  `}`,
   `else {`,
   `  const server = http.createServer((req, res) => {`,
   `    if (req.url === "/healthz") { res.writeHead(200); res.end("ok"); return; }`,
@@ -128,6 +145,38 @@ describe("SidecarManager", () => {
     expect(result).toMatchObject({ ok: false, status: 503, logFile });
     expect((result as { error: string }).error).toBe(`The recon sidecar did not answer /healthz within 1s. See ${logFile}`);
     expect(m.list()[0]).toMatchObject({ state: "stopped", pid: null, recentCrashes: 1 });
+  });
+
+  it("never marks running a sidecar that loses its port to a server that answers health first", async () => {
+    const { m } = manager("lost-race", { healthPollMs: 20, settleMs: 1_000 });
+    const logFile = planFor("recon").logFile;
+    const pending = m.ensure("recon");
+
+    // The port the hub picked, from its start line; then take it before the bin can.
+    let port = 0;
+    while (!port) {
+      const match = existsSync(logFile) ? /on port (\d+)/.exec(readFileSync(logFile, "utf-8")) : null;
+      if (match) port = Number(match[1]);
+      else await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    const squatter = createHttpServer((_req, res) => {
+      res.writeHead(200);
+      res.end("not recon");
+    });
+    squatter.listen(port, "127.0.0.1");
+    await once(squatter, "listening");
+    try {
+      const result = await pending;
+      expect(result).toMatchObject({ ok: false, status: 503, logFile });
+      expect((result as { error: string }).error).toBe(
+        `The recon sidecar exited with code 1 right after a 200 from /healthz. See ${logFile}`,
+      );
+      expect(m.list()[0]).toMatchObject({ state: "stopped", port: null, recentCrashes: 1 });
+      expect(readFileSync(logFile, "utf-8")).toContain("bind failed: EADDRINUSE");
+    } finally {
+      squatter.closeAllConnections();
+      squatter.close();
+    }
   });
 
   it("stops an idle sidecar after idleStopMinutes, but never one with a request in flight or an open WebSocket", async () => {
