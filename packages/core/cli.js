@@ -3557,8 +3557,9 @@ async function handleExtensionCommand(command, rest) {
         exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
         return;
       }
-      // The extension owns Ctrl+C while it runs: runExtensionCommand forwards
-      // SIGINT/SIGTERM and waits, so ndx's kill-and-exit handlers stand down.
+      // The extension owns Ctrl+C while it runs: it shares the terminal, and
+      // runExtensionCommand forwards SIGTERM/SIGHUP and waits, so ndx's
+      // kill-and-exit handlers stand down.
       signalHandlers.dispose();
       let code;
       try {

@@ -7,7 +7,7 @@ When `ndx <name>` matches no built-in command, n-dx finds the enabled extension 
 - **Node.** The `bin` runs on the same Node executable as n-dx (`process.execPath`). It needs no shebang and no executable bit.
 - **Working directory.** The caller's directory, unchanged. n-dx resolves no project for the extension, and does not read its arguments as one.
 - **No time limit.** n-dx's command timeout (`cli.timeoutMs`, `cli.timeouts.<command>`) applies to built-in commands only. An extension runs until it exits.
-- **I/O and signals.** stdio is inherited, and `SIGINT` and `SIGTERM` are forwarded.
+- **I/O and signals.** stdio is inherited, and the extension shares the terminal as a shell's foreground command would: Ctrl+C, Ctrl+Z and a closed terminal reach it directly, and it can open `/dev/tty` for a prompt (ssh, sudo, gpg). `SIGTERM`, and on POSIX `SIGHUP`, sent to `ndx` itself are forwarded.
 - **Exit code.** The extension's exit code becomes `ndx`'s. A command killed by a signal exits 128 plus the signal number.
 - **Help.** `ndx --help` lists enabled extension commands under **Extensions** with their `summary`. `ndx <name> --help` goes to the extension.
 - **Built-ins win.** An extension can never shadow a built-in command.

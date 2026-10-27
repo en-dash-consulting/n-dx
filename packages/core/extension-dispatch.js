@@ -34,13 +34,15 @@ import {
   stateKey,
   updateExtensionsFile,
 } from "./extension-state.js";
-import { treeKillSpawnOptions } from "./child-lifecycle.js";
 
 /** Exit code for an extension command that exists but cannot run. */
 export const EXTENSION_REFUSED_EXIT_CODE = 2;
 
-/** The signals `ndx` passes on to a running extension command. */
-export const FORWARDED_SIGNALS = Object.freeze(["SIGINT", "SIGTERM"]);
+/**
+ * The signals `ndx` passes on to a running extension command, by pid. Windows
+ * forwards SIGTERM alone: closing the console ends every process on it.
+ */
+export const FORWARDED_SIGNALS = Object.freeze(["SIGTERM", "SIGHUP"]);
 
 /**
  * @typedef {import("./extension-discovery.js").DiscoveredExtension} DiscoveredExtension
@@ -295,19 +297,19 @@ export function listExtensionCommands(options) {
  * @property {Record<string, string | undefined>} [env]  Defaults to `process.env`.
  * @property {string} [execPath]  The Node to run; defaults to n-dx's own.
  * @property {NodeJS.Platform} [platform]
- * @property {Pick<NodeJS.Process, "on" | "removeListener" | "kill">} [processRef]
+ * @property {Pick<NodeJS.Process, "on" | "removeListener">} [processRef]
  */
 
 /**
  * Run an extension command: n-dx's Node on `bin` with `args`, stdio inherited
  * and the working directory unchanged.
  *
- * While it runs, SIGINT and SIGTERM sent to `ndx` go to the extension, and
- * `ndx` waits for it rather than exiting. On POSIX the child leads its own
- * process group (so it can be tree-killed) and the signal goes to that group,
- * as a terminal's would. On Windows a console Ctrl+C already reaches every
- * process on the console, so SIGINT is not sent again — Node can only deliver
- * it there as a hard kill; SIGTERM is.
+ * The child is spawned the way a shell runs a foreground command: never
+ * detached, so on POSIX it stays in the terminal's session and process group.
+ * It can open /dev/tty (an ssh or sudo prompt), and Ctrl+C, Ctrl+Z and a
+ * closed terminal reach it directly. That is why SIGINT is not sent again;
+ * `ndx` only ignores it and waits. SIGTERM and SIGHUP, which may be aimed at
+ * `ndx` alone, are forwarded to the child's pid.
  *
  * Resolves to the extension's exit code, or 128 + the signal number when a
  * signal ended it.
@@ -318,7 +320,8 @@ export function listExtensionCommands(options) {
 export function runExtensionCommand(options) {
   const platform = options.platform ?? process.platform;
   const processRef = options.processRef ?? process;
-  const spawnOptions = { stdio: "inherit", env: options.env ?? process.env, ...treeKillSpawnOptions(platform) };
+  // Explicit, because cli.js's tracked spawn defaults to detached on POSIX.
+  const spawnOptions = { stdio: "inherit", env: options.env ?? process.env, detached: false };
 
   return new Promise((resolvePromise, reject) => {
     const child = options.spawn(options.execPath ?? process.execPath, [options.bin, ...options.args], spawnOptions);
@@ -326,19 +329,14 @@ export function runExtensionCommand(options) {
     /** @param {NodeJS.Signals} signal */
     const forward = (signal) => {
       if (child.exitCode !== null || child.signalCode !== null) return;
-      if (platform === "win32") {
-        if (signal !== "SIGINT") child.kill(signal);
-        return;
-      }
-      try {
-        processRef.kill(-(/** @type {number} */ (child.pid)), signal);
-      } catch {
-        // The group is gone or was never formed; the child itself may remain.
-        child.kill(signal);
-      }
+      child.kill(signal);
     };
+    const forwarded = platform === "win32" ? FORWARDED_SIGNALS.filter((signal) => signal !== "SIGHUP") : FORWARDED_SIGNALS;
     /** @type {Map<NodeJS.Signals, () => void>} */
-    const listeners = new Map(FORWARDED_SIGNALS.map((signal) => [signal, () => forward(signal)]));
+    const listeners = new Map([
+      ["SIGINT", () => {}],
+      ...forwarded.map((signal) => /** @type {const} */ ([signal, () => forward(signal)])),
+    ]);
     for (const [signal, listener] of listeners) processRef.on(signal, listener);
     const stopForwarding = () => {
       for (const [signal, listener] of listeners) processRef.removeListener(signal, listener);

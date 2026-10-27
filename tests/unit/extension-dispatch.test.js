@@ -303,7 +303,7 @@ describe("runExtensionCommand", () => {
     });
   }
 
-  for (const signal of ["SIGINT", "SIGTERM"]) {
+  for (const signal of ["SIGTERM", "SIGHUP"]) {
     it.skipIf(process.platform === "win32")(`forwards ${signal} and waits for the extension's own exit code`, async () => {
       const bin = join(root, "cli.js");
       writeFile(bin, [
@@ -311,7 +311,7 @@ describe("runExtensionCommand", () => {
         `console.log("ready");`,
         `setInterval(() => {}, 1000);`,
       ].join("\n"));
-      const processRef = Object.assign(new EventEmitter(), { kill: (pid, sig) => process.kill(pid, sig) });
+      const processRef = new EventEmitter();
       const sink = { onData: (out) => { if (out === "ready\n") processRef.emit(signal); } };
       const exit = await runExtensionCommand({ bin, args: [], spawn: pipedSpawn(sink), processRef });
       expect(exit).toBe(7);
@@ -321,11 +321,49 @@ describe("runExtensionCommand", () => {
     });
   }
 
-  it("on Windows sends SIGTERM to the child and leaves SIGINT to the console", async () => {
+  it.skipIf(process.platform === "win32")("runs the extension in ndx's own process group, so it shares the terminal", async () => {
+    const bin = join(root, "cli.js");
+    writeFile(bin, `console.log("ready"); setInterval(() => {}, 1000);`);
+    const sink = {};
+    let leadsGroup;
+    sink.onData = (out) => {
+      if (out !== "ready\n") return;
+      try {
+        process.kill(-sink.child.pid, 0);
+        leadsGroup = true;
+      } catch (err) {
+        leadsGroup = err.code !== "ESRCH";
+      }
+      sink.child.kill("SIGTERM");
+    };
+    const options = [];
+    const spawnRecording = (command, args, opts) => {
+      options.push(opts);
+      return pipedSpawn(sink)(command, args, opts);
+    };
+    await runExtensionCommand({ bin, args: [], spawn: spawnRecording, processRef: new EventEmitter() });
+    expect(options[0].detached).toBe(false);
+    expect(leadsGroup).toBe(false);
+  });
+
+  it("leaves SIGINT to the terminal: ndx waits and does not send it again", async () => {
     const kills = [];
     const child = Object.assign(new EventEmitter(), { exitCode: null, signalCode: null, pid: 1, kill: (sig) => kills.push(sig) });
-    const processRef = Object.assign(new EventEmitter(), { kill: () => { throw new Error("no process groups on Windows"); } });
+    const processRef = new EventEmitter();
+    const done = runExtensionCommand({ bin: "x.js", args: [], spawn: () => child, processRef, platform: "linux" });
+    processRef.emit("SIGINT");
+    expect(kills).toEqual([]);
+    child.emit("close", null, "SIGINT");
+    expect(await done).toBe(130);
+    expect(processRef.listenerCount("SIGINT")).toBe(0);
+  });
+
+  it("on Windows sends SIGTERM to the child and leaves SIGINT and SIGHUP to the console", async () => {
+    const kills = [];
+    const child = Object.assign(new EventEmitter(), { exitCode: null, signalCode: null, pid: 1, kill: (sig) => kills.push(sig) });
+    const processRef = new EventEmitter();
     const done = runExtensionCommand({ bin: "x.js", args: [], spawn: () => child, processRef, platform: "win32" });
+    expect(processRef.listenerCount("SIGHUP")).toBe(0);
     processRef.emit("SIGINT");
     processRef.emit("SIGTERM");
     child.emit("close", null, "SIGTERM");
