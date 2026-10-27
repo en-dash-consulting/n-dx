@@ -143,13 +143,16 @@ describe("shared guidance equivalence", () => {
 
 describe("public surface MCP inventory", () => {
   const document = () => readFileSync(join(ROOT, "docs/architecture/public-surface.md"), "utf8");
-  const documented = (server) => {
-    const section = document().split(`## ${server} MCP inventory\n`)[1]?.split("\n## ")[0] ?? "";
+  const documented = (server, text) => {
+    // Documentation may be checked out with CRLF on Windows. Heading
+    // boundaries describe Markdown structure, independent of checkout EOL.
+    text = text.replace(/\r\n/g, "\n");
+    const section = text.split(`## ${server} MCP inventory\n`)[1]?.split("\n## ")[0] ?? "";
     return [...section.matchAll(/^\| `([^`]+)` \|/gm)].map((match) => match[1]).sort();
   };
 
   for (const name of ["Rex", "Sourcevision"]) {
-    it(`lists exactly the ${name} tools returned over MCP`, async () => {
+    it.each(["LF", "CRLF"])(`lists exactly the ${name} tools returned over MCP (%s document)`, async (eol) => {
       const require = createRequire(join(ROOT, "packages/rex/package.json"));
       const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
       const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js");
@@ -166,7 +169,8 @@ describe("public surface MCP inventory", () => {
         await client.connect(clientTransport);
         const { tools } = await client.listTools();
         expect(tools.length).toBeGreaterThan(0);
-        expect(documented(name)).toEqual(tools.map((tool) => tool.name).sort());
+        const text = document().replace(/\r?\n/g, eol === "CRLF" ? "\r\n" : "\n");
+        expect(documented(name, text)).toEqual(tools.map((tool) => tool.name).sort());
       } finally {
         await client.close();
         await server?.close();
