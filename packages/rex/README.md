@@ -29,6 +29,21 @@ rex next myproject
 
 ## Commands
 
+### `rex migrate-diff --before=<plan.json> --after=<plan.json>`
+
+Compare two v1-to-v2 migration plans before applying one. Reports added,
+dropped, moved and changed entries in sentences, counts per target kind, and
+corrupt metadata totals counted once. Both paths are relative to the current
+directory. A project is not required and comparison writes no files.
+
+```bash
+ndx rex migrate-diff --before=old-plan.json --after=new-plan.json
+```
+
+Entry decisions, plan-wide summary decisions and pass completion are compared.
+Object key order, cut time, source digest and cached model answers alone do not
+count as decision changes. Identical decisions report no differences.
+
 ### `rex init [dir]`
 
 Create `.rex/` in the target directory with skeleton config, empty PRD, execution log, and default workflow.
