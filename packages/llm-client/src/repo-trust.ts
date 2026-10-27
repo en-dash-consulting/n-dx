@@ -47,8 +47,12 @@
  *
  * "Git-ignored" is checked, not assumed: a repository can commit its own
  * `.n-dx.local.json`. {@link isLocalConfigTracked} says whether it did, and
- * every reader that applies the local file regardless of trust asks it first
- * (see {@link userLocalConfigApplies}). A tracked local file is repository
+ * every reader that applies the local file regardless of trust checks first:
+ * the env-allow gates (hench's `applyRepoTrust`, `repoCommandEnv`, core's
+ * `applyRepoTrustToEnvPolicy`) read `localConfigTracked` from the
+ * {@link RepoExecutionConfig} they already hold, and the LLM config loaders
+ * pass the file through `trustedLocalConfig` (credential-routing), which asks
+ * {@link isLocalConfigTracked}. A tracked local file is repository
  * config: it is collected here, raises `local-config-tracked`, and applies
  * only once the checkout is trusted. Outside a git work tree nothing is
  * tracked, so the local file is the user's, as before; inside one, a git that
@@ -1015,21 +1019,6 @@ export function repoTrustState(
 /** Whether a caller should clamp and warn for this state. */
 export function isRestrictedState(state: RepoTrustState): boolean {
   return state === "untrusted" || state === "changed";
-}
-
-/**
- * Whether the machine-local config may be applied as the user's own, by a
- * reader that otherwise applies it whatever the trust state. True when the
- * file is not tracked by git ({@link isLocalConfigTracked}); a tracked one is
- * repository config and applies only while the checkout is not restricted.
- * A tracked file always raises `local-config-tracked`, so that means trusted.
- */
-export function userLocalConfigApplies(projectDir: string, options: RepoTrustStoreOptions = {}): boolean {
-  if (!isLocalConfigTracked(projectDir)) return true;
-  const config = collectRepoExecutionConfig(projectDir);
-  return !isRestrictedState(
-    repoTrustState(config, assessRepoExecutionConfig(config), readRepoTrustRecord(projectDir, options)),
-  );
 }
 
 /**

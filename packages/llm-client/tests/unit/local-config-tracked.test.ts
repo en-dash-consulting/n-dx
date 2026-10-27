@@ -6,12 +6,12 @@ import { tmpdir } from "node:os";
 import { loadLLMConfig } from "../../src/llm-config.js";
 import { loadClaudeConfig } from "../../src/config.js";
 import { repoCommandEnv } from "../../src/repo-command-env.js";
+import { trustedLocalConfig } from "../../src/credential-routing.js";
 import {
   collectRepoExecutionConfig,
   evaluateRepoTrust,
   isLocalConfigTracked,
   recordRepoTrust,
-  userLocalConfigApplies,
 } from "../../src/repo-trust.js";
 
 /**
@@ -68,6 +68,21 @@ afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
+/**
+ * The gates read `localConfigTracked` from the evaluation they hold, and
+ * `trustedLocalConfig` asks `isLocalConfigTracked`. A helper no gate calls
+ * reads as the established one to the next author, so none is exported.
+ */
+describe("the local-config trust surface", () => {
+  it("exports no local-config helper the gates do not use", async () => {
+    const api: Record<string, unknown> = await import("../../src/public.js");
+    const trust: Record<string, unknown> = await import("../../src/repo-trust.js");
+    expect(typeof api.isLocalConfigTracked).toBe("function");
+    expect("userLocalConfigApplies" in api).toBe(false);
+    expect("userLocalConfigApplies" in trust).toBe(false);
+  });
+});
+
 describe("isLocalConfigTracked", () => {
   it("is false outside a git repository, for an untracked file, and without a file", () => {
     writeLocal();
@@ -98,7 +113,8 @@ describe("a tracked .n-dx.local.json in an untrusted checkout", () => {
     expect(ev.findings.find((f) => f.code === "env-allow-added")?.values).toEqual([SENTINEL]);
     expect(ev.findings.find((f) => f.code === "vendor-cli-path")?.values).toEqual([`llm.claude.cli_path = ${REPO_BINARY}`]);
     expect(ev.config.sources).toContain(".n-dx.local.json");
-    expect(userLocalConfigApplies(repo)).toBe(false);
+    expect(ev.config.localConfigTracked).toBe(true);
+    expect(trustedLocalConfig(repo, LOCAL)).not.toEqual(LOCAL);
   });
 
   it("does not pass the variable it allows to a repository command", () => {
@@ -115,7 +131,7 @@ describe("a tracked .n-dx.local.json in an untrusted checkout", () => {
   it("applies again once the user trusts the checkout, and stops when it changes", async () => {
     recordRepoTrust(repo);
     expect(evaluateRepoTrust(repo).state).toBe("trusted");
-    expect(userLocalConfigApplies(repo)).toBe(true);
+    expect(trustedLocalConfig(repo, LOCAL)).toEqual(LOCAL);
     expect(passes(repoCommandEnv(repo, { env: parent() }))).toBe(true);
     expect((await loadLLMConfig(repo)).claude?.cli_path).toBe(REPO_BINARY);
 
