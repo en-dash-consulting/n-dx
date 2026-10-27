@@ -42,8 +42,15 @@ items:
     lastModified: "2026-10-27T19:07:17.750Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d2ae6bd7-a3b1-425f-957e-1e5654bd9b1c":
+    status: "completed"
+    startedAt: "2026-10-27T19:18:18.136Z"
+    completedAt: "2026-10-27T19:27:29.954Z"
+    endedAt: "2026-10-27T19:27:29.954Z"
+    activeIntervals: [{"end":"2026-10-27T19:27:29.954Z","start":"2026-10-27T19:18:18.136Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Windows-sized (20 s) grandchild ready wait, derived it() timeout, richer failure message; forced-slow check: old wait fails, new passes."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:45:45.261Z"
+    lastModified: "2026-10-27T19:27:29.954Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "da20dc09-9f7e-46f1-8772-5da52fa6a927":
     assignee: "Ryan Keith <ryan.k@endash.us>"

@@ -247,13 +247,18 @@ describe("stopping a detached server takes its children with it", () => {
   const CHILD_READY_TIMEOUT_MS = process.platform === "win32" ? 20_000 : 5000;
   const SERVER_READY_TIMEOUT_MS = 5000;
   const FORCE_KILL_TIMEOUT_MS = 2000;
+  /**
+   * terminateTreeByPid waits up to four grace periods: taskkill, its exit wait,
+   * then SIGTERM and SIGKILL on Windows; group then pid escalation on POSIX.
+   */
+  const TERMINATE_WORST_CASE_MS = 4 * FORCE_KILL_TIMEOUT_MS;
   const DEATH_TIMEOUT_MS = 5000;
   const QUIET_WINDOW_MS = 1000;
   /** Server wait + child wait + terminate + both death waits + quiet window + slack. */
   const TEST_TIMEOUT_MS =
     SERVER_READY_TIMEOUT_MS +
     CHILD_READY_TIMEOUT_MS +
-    FORCE_KILL_TIMEOUT_MS +
+    TERMINATE_WORST_CASE_MS +
     2 * DEATH_TIMEOUT_MS +
     QUIET_WINDOW_MS +
     10_000;
@@ -283,7 +288,7 @@ describe("stopping a detached server takes its children with it", () => {
     // The server's record must arrive before we attribute any delay to the shell
     // or its Node grandchild. Windows CI can defer a detached process long enough
     // to make an otherwise healthy child readiness timeout misleading.
-    if (!(await waitFor(() => serverLaunchError !== null || readReadyServerPid() !== null))) {
+    if (!(await waitFor(() => serverLaunchError !== null || readReadyServerPid() !== null, SERVER_READY_TIMEOUT_MS))) {
       throw new Error(
         serverLaunchError ?? "The detached stand-in server never announced startup.",
       );
