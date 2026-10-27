@@ -3,7 +3,7 @@
  * propose, through rex's transaction, the execution log and the broadcast.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
@@ -14,7 +14,19 @@ import type { ChangePlacement } from "../../../src/viewer/views/product-model.js
 import { resolveStore } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
-const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
+const modelLoads = vi.hoisted(() => vi.fn());
+vi.mock("../../../src/server/rex-gateway.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/server/rex-gateway.js")>();
+  return {
+    ...actual,
+    loadPrdModel: (...args: Parameters<typeof actual.loadPrdModel>) => {
+      modelLoads();
+      return actual.loadPrdModel(...args);
+    },
+  };
+});
+
+const FIXTURE =resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
 const AREA_ID = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY_ID = "a0000000-0000-4000-8000-000000000002";
 const PLACED_CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
@@ -111,6 +123,17 @@ describe("placement routes on a v2 project", () => {
   it("GET placement counts a change's tasks and carries its intent", async () => {
     const { body } = await json(await fetch(`${base}/changes/CH-1/placement`));
     expect(body.change).toMatchObject({ id: PLACED_CHANGE_ID, intent: "Shoppers on iPhone abandon at the card form.", status: "in_progress", taskCount: 1 });
+  });
+
+  it("GET changes/placements shortlists every awaiting change from one model load", async () => {
+    const second = await (await send("items", { title: "Pay by card shows a receipt" })).json();
+    modelLoads.mockClear();
+    const { status, body } = await json(await fetch(`${base}/changes/placements`));
+    expect(status).toBe(200);
+    expect(modelLoads).toHaveBeenCalledTimes(1);
+    expect(Object.keys(body.placements).sort()).toEqual([inboxId, second.id].sort());
+    const single = await json(await fetch(`${base}/changes/${inboxId}/placement`));
+    expect(body.placements[inboxId]).toEqual(single.body);
   });
 
   it("POST place touches a capability: clears needsPlacement, leaves the Inbox, logs and broadcasts", async () => {

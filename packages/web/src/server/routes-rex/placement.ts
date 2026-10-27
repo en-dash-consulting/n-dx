@@ -3,6 +3,8 @@
  * propose a new home for it.
  *
  *   GET  /api/rex/changes/:id/placement → { layout: "v2", change, relation, tied, shortlist }
+ *   GET  /api/rex/changes/placements    → { layout: "v2", placements: { [id]: placement | { error } } }
+ *                                         every open change awaiting placement, from one model load
  *   POST /api/rex/changes/:id/place     → { change, target, relation, warnings? }
  *   POST /api/rex/changes/:id/propose   → { change, proposed: { target, under, title, type }, warnings? }
  *
@@ -25,6 +27,8 @@ import {
   prdLayout,
   loadPrdModel,
   indexTree,
+  isOpenChange,
+  awaitsPlacement,
   resolveStore,
   suggestPlacement,
   recordPlacement,
@@ -145,6 +149,21 @@ export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePla
   };
 }
 
+/** The shortlist of every open change awaiting placement, keyed by change id. */
+export function buildAwaitingPlacements(tree: V2Tree): Record<string, ChangePlacementWire | { error: string }> {
+  const index = indexTree(tree);
+  const out: Record<string, ChangePlacementWire | { error: string }> = {};
+  for (const { node } of index.entries) {
+    if (node.type !== "change" || !isOpenChange(node) || !awaitsPlacement(index, node)) continue;
+    try {
+      out[node.id] = buildChangePlacement(tree, node.id);
+    } catch (err) {
+      out[node.id] = { error: errorMessage(err) };
+    }
+  }
+  return out;
+}
+
 // ── Body parsing ─────────────────────────────────────────────────────
 
 type Json = Record<string, unknown>;
@@ -235,6 +254,20 @@ async function handlePlacementRead(changeRef: string, res: ServerResponse, ctx: 
   return true;
 }
 
+async function handlePlacementsRead(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  if ((await prdLayout(ctx.rexDir)) !== "v2") {
+    errorResponse(res, 409, V1_REFUSAL);
+    return true;
+  }
+  try {
+    const { tree } = await loadPrdModel(ctx.rexDir);
+    jsonResponse(res, 200, { layout: "v2", placements: buildAwaitingPlacements(tree) });
+  } catch (err) {
+    refuse(res, err);
+  }
+  return true;
+}
+
 async function handlePlacementWrite(
   action: "place" | "propose",
   changeRef: string,
@@ -307,6 +340,7 @@ export function routePlacement(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): boolean | Promise<boolean> {
+  if (path === "changes/placements") return method === "GET" ? handlePlacementsRead(res, ctx) : false;
   const match = PLACEMENT_PATH.exec(path);
   if (!match) return false;
   const changeRef = decodeURIComponent(match[1]);

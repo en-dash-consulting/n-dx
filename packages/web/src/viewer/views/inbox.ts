@@ -12,7 +12,7 @@
  * nothing.
  *
  * Reads `GET /api/rex/changes` (rows with `awaitsPlacement`), each row's
- * shortlist from `GET /api/rex/changes/:id/placement`, and the applied count
+ * shortlist from `GET /api/rex/changes/placements`, and the applied count
  * from project status.
  *
  * @module viewer/views/inbox
@@ -195,31 +195,41 @@ export function useInbox(): InboxRead {
   return { load, rows, refetch };
 }
 
-/** Read every row's shortlist, in parallel, each time the change list is read. */
+/** Read every row's shortlist in one request, each time the change list is read. */
 function useShortlists(changes: readonly ChangeRow[] | null): ReadonlyMap<string, ShortlistRead> {
   const [reads, setReads] = useState<ReadonlyMap<string, ShortlistRead>>(new Map());
   useEffect(() => {
     if (!changes) return;
     let live = true;
-    for (const change of changes) {
-      readShortlist(change.id).then((read) => {
-        if (live) setReads((prev) => new Map(prev).set(change.id, read));
-      });
-    }
+    readShortlists(changes.map((c) => c.id)).then((next) => {
+      if (live) setReads(next);
+    });
     return () => { live = false; };
   }, [changes]);
   return reads;
 }
 
-async function readShortlist(id: string): Promise<ShortlistRead> {
+/** `GET /api/rex/changes/placements`: one model load on the server, however many rows. */
+async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<string, ShortlistRead>> {
+  const reads = new Map<string, ShortlistRead>();
+  const failAll = (error: string) => ids.forEach((id) => reads.set(id, { error }));
   try {
-    const res = await fetch(`/api/rex/changes/${encodeURIComponent(id)}/placement`);
-    const body = await res.json() as { error?: unknown };
-    if (!res.ok) return { error: typeof body.error === "string" ? body.error : `HTTP ${res.status}` };
-    return { placement: body as ChangePlacement };
+    const res = await fetch("/api/rex/changes/placements");
+    const body = await res.json() as { error?: unknown; placements?: Record<string, ChangePlacement | { error: string }> };
+    if (!res.ok || !body.placements) {
+      failAll(typeof body.error === "string" ? body.error : `HTTP ${res.status}`);
+      return reads;
+    }
+    for (const id of ids) {
+      const read = body.placements[id];
+      if (!read) reads.set(id, { error: "No shortlist for this change" });
+      else if ("error" in read) reads.set(id, { error: read.error });
+      else reads.set(id, { placement: read });
+    }
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+    failAll(err instanceof Error ? err.message : String(err));
   }
+  return reads;
 }
 
 /** The routed Inbox; in a Plan section it shows `limit` rows. */

@@ -88,6 +88,7 @@ function serve(changes: ChangeRow[], shortlists: ChangePlacement[], extra: Recor
     "/api/project": { cliName: "ndx" },
     "/api/rex/changes": { layout: "v2", changes },
     "/api/rex/product": { layout: "v2", map: MAP },
+    "/api/rex/changes/placements": { layout: "v2", placements: Object.fromEntries(shortlists.map((p) => [p.change.id, p])) },
     ...Object.fromEntries(shortlists.map((p) => [`/api/rex/changes/${p.change.id}/placement`, p])),
     ...extra,
   };

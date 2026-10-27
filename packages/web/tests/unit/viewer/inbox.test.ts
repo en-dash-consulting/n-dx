@@ -77,7 +77,7 @@ function serveInbox(changes: ChangeRow[], shortlists: ChangePlacement[], inbox =
   stub({
     "/api/rex/changes": { layout: "v2", changes },
     "/api/status": status(inbox),
-    ...Object.fromEntries(shortlists.map((p) => [`/api/rex/changes/${p.change.id}/placement`, p])),
+    "/api/rex/changes/placements": { layout: "v2", placements: Object.fromEntries(shortlists.map((p) => [p.change.id, p])) },
   });
 }
 
@@ -218,7 +218,16 @@ describe("InboxPage on a v2 project", () => {
   it("names a shortlist that failed to load instead of a guess", async () => {
     serveInbox([change("x")], []);
     await mount(h(InboxPage, { navigateTo: vi.fn() }));
-    expect(root.querySelector(".inbox-guess-error")?.textContent).toContain("not found");
+    expect(root.querySelector(".inbox-guess-error")?.textContent).toContain("No shortlist");
+  });
+
+  it("reads every shortlist in one request, however many rows", async () => {
+    const changes = Array.from({ length: 12 }, (_, i) => change(`c${i}`));
+    serveInbox(changes, changes.map((c) => placement(c.id, "possible")));
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    const urls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0] as string);
+    expect(urls.filter((u) => u.includes("placement"))).toEqual(["/api/rex/changes/placements"]);
+    expect(rowIds()).toHaveLength(12);
   });
 
   it("says 'Inbox is empty' at zero", async () => {
