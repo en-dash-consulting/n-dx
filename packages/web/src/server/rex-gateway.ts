@@ -49,6 +49,16 @@ export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
 // re-stamp or a drafted change), inside rex's own v2 transaction (routes-rex/product.ts).
 export { handleProductEdit, ProductEditError, withPrdModelTransaction } from "@n-dx/rex";
 
+// ---- Rex change placement ---------------------------------------------------
+// The Inbox routes read a change's placement shortlist and place or propose it
+// through rex's own rule (the one `rex change place` and MCP `place_change`
+// run), so the shortlist, the strength bands and the refusals stay rex's.
+export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError, placementStrength } from "@n-dx/rex";
+export type { ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate } from "@n-dx/rex";
+export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
+export type { RecordProposalInput, RecordProposalOptions, RecordProposalResult } from "@n-dx/rex";
+export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@n-dx/rex";
+
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it
 // completes, so a tree this build would re-slug must stop the run before it
