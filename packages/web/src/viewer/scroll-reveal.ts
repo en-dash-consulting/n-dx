@@ -17,7 +17,9 @@ const SECTION_SELECTORS = [
   ".overview-columns",
   ".rex-dash-header",
   ".rex-dash-next",
-  ".rex-dash-epics",
+  // Not `.rex-dash-epics`: it holds the Work page's progress list, which can
+  // run to a thousand-odd rows, and a reveal that never fired left the whole
+  // section transparent above the stage sections. Content is never gated on it.
   ".rex-dash-panel",
 ].join(", ");
 

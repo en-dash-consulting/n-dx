@@ -45,7 +45,11 @@ test("up next: navigation buttons, the epics toggle, the reorganize and restore 
   await expect(page).toHaveURL(/\/prd$/);
   await gotoView(page, "rex-dashboard");
 
-  const epics = page.locator("button.rex-dash-epics-toggle");
+  // Epic Progress is closed by default; open it to reach its Expand toggle.
+  const epicsHead = page.locator("button.rex-dash-epics-head");
+  await epicsHead.click();
+  await expect(epicsHead).toHaveAttribute("aria-expanded", "true");
+  const epics = page.locator("button.rex-dash-epics-toggle[aria-controls]");
   if (await epics.count()) {
     const was = await epics.getAttribute("aria-expanded");
     await epics.click();
