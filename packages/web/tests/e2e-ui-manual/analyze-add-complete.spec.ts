@@ -91,7 +91,6 @@ async function addTaskThroughForm(page: Page, title: string, description: string
 test("full analysis, then a task added through the form, completed by the agent", async ({ page }, testInfo) => {
   const tracker = trackConsoleErrors(page);
   const stampBefore = await manifestStamp(project.dir);
-  const baseSha = headSha(project.dir);
 
   await page.goto(`${dashboard.baseUrl}/analyze`, { waitUntil: "domcontentloaded" });
   await caption(page, "1/5 Run the full SourceVision analysis");
@@ -120,6 +119,7 @@ test("full analysis, then a task added through the form, completed by the agent"
   await caption(page, "4/5 Start the task with the agent");
   await expect(page.locator(".live-idle .live-card-title")).toHaveText(task.title, { timeout: 15_000 });
   await page.getByRole("button", { name: /More ways to run/ }).click();
+  const baseSha = headSha(project.dir);
   await page.getByRole("menuitem", { name: /^Start now/ }).click();
   const startedTaskId = await openLiveTask(page, task.id);
   expect(startedTaskId).toBe(task.id);
