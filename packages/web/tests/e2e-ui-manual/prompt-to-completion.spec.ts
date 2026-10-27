@@ -40,11 +40,15 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async ({}, testInfo) => {
-  if (!dashboard) return;
-  try {
-    await stopManualDashboard(dashboard);
-  } finally {
-    await attachRunArtifacts(testInfo, project.dir);
+  // beforeAll can create the project and then fail to start its dashboard;
+  // the fixture directory must still be removed.
+  if (!project) return;
+  if (dashboard) {
+    try {
+      await stopManualDashboard(dashboard);
+    } finally {
+      await attachRunArtifacts(testInfo, project.dir);
+    }
   }
   if (KEEP_FIXTURE) {
     console.log(`[e2e-manual] fixture kept at ${project.dir}`);
