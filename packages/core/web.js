@@ -54,9 +54,17 @@ import { createHash, randomBytes } from "crypto";
 import { readFile, writeFile, unlink, access } from "fs/promises";
 import { realpathSync, readFileSync, mkdirSync, writeFileSync, chmodSync, statSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
+import { fileURLToPath } from "url";
 import { NDX_HOME_ENV, resolveLayout, resolveNdxHome } from "./layout.js";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
+
+/**
+ * Core's own CLI, beside this file. Not `join(__dir, "cli.js")`: callers pass
+ * `__dir` as the n-dx root (the monorepo, or the folder holding the installed
+ * packages), which holds no `cli.js`.
+ */
+const NDX_CLI = fileURLToPath(new URL("./cli.js", import.meta.url));
 
 const DEFAULT_PORT = 3117;
 
@@ -1249,7 +1257,7 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
   const { CLAUDECODE: _cc, ...env } = process.env;
   // `--ndx-cli`: the hub asks this n-dx for each extension sidecar's launch
   // plan (`ndx extensions sidecar <name> --json`); it cannot import core.
-  const hubArgs = [script, "hub", `--port=${port}`, `--ndx-cli=${join(__dir, "cli.js")}`];
+  const hubArgs = [script, "hub", `--port=${port}`, `--ndx-cli=${NDX_CLI}`];
   if (tokenFile) hubArgs.push(`--token-file=${tokenFile}`);
   const child = spawn(process.execPath, hubArgs, {
     stdio: "ignore",

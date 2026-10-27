@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "2b2873ce-615f-49fc-abb2-9095369582a5":
-    lastModified: "2026-10-26T17:04:21.065Z"
+    status: "completed"
+    startedAt: "2026-10-27T13:01:41.373Z"
+    completedAt: "2026-10-27T13:18:47.489Z"
+    endedAt: "2026-10-27T13:18:47.489Z"
+    activeIntervals: [{"end":"2026-10-27T13:18:47.489Z","start":"2026-10-27T13:01:41.373Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixture package tests/e2e/fixture-extension/ and required suite tests/e2e/extension-fixture.test.js; root-extensions subset selects it on hub proxy/sidecar/extension changes; fixed hub --ndx-cli path in core web.js."
+    lastModified: "2026-10-27T13:18:47.489Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "490f51c9-4750-49b3-91ec-54ff58b90f97":
     lastModified: "2026-10-26T17:04:26.614Z"

@@ -1805,6 +1805,7 @@ describe("architecture policy: required test annotations", () => {
       "tests/e2e/cli-dev.test.js",
       "tests/integration/scheduler-startup.test.js",
       "packages/web/tests/e2e-ui/navigation.spec.ts",
+      "tests/e2e/extension-fixture.test.js",
     ];
 
     const violations = [];

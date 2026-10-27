@@ -3,7 +3,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
+  EXTENSION_HUB_FILES,
   ROOT_DOCS_TEST_FILES,
+  ROOT_EXTENSIONS_TEST_FILES,
   ROOT_DRIFT_TEST_FILES,
   ROOT_POLICY_TEST_FILES,
   ROOT_SUBSET_LABELS,
@@ -132,6 +134,23 @@ describe("selectAffected", () => {
 
   it("selects both root subsets for a web src change", () => {
     expect(select("packages/web/src/server/routes-hench.ts").suites).toEqual(["root-policy", "root-drift", "web"]);
+  });
+
+  // The extensions e2e suite is required on every change to the hub proxy;
+  // dispatch and discovery are core, which selects root.
+  it.each(EXTENSION_HUB_FILES)("selects root-extensions for %s", (file) => {
+    expect(existsSync(resolve(ROOT, file)), file).toBe(true);
+    expect(select(file).suites).toEqual(["root-policy", "root-drift", "root-extensions", "web"]);
+  });
+
+  it("runs the extensions suite for dispatch and discovery changes, through root", () => {
+    for (const file of ["packages/core/extension-dispatch.js", "packages/core/extension-discovery.js"]) {
+      expect(select(file).suites).toEqual(["root"]);
+    }
+  });
+
+  it("selects only web and the static subsets for a hub file that serves no extension", () => {
+    expect(select("packages/web/src/hub/registry.ts").suites).toEqual(["root-policy", "root-drift", "web"]);
   });
 
   // The three selections measured in the #546 review that went green at the
@@ -291,6 +310,7 @@ describe("root subset test files", () => {
       ROOT_POLICY_TEST_FILES,
       ROOT_DRIFT_TEST_FILES,
       ROOT_DOCS_TEST_FILES,
+      ROOT_EXTENSIONS_TEST_FILES,
     ]);
     const all = Object.values(ROOT_SUBSET_TEST_FILES).flat();
     expect(new Set(all).size).toBe(all.length);

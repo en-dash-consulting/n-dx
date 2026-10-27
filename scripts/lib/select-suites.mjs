@@ -124,6 +124,32 @@ export const ROOT_DOCS_TEST_FILES = [
 ];
 
 /**
+ * Label of the extensions e2e suite: the fixture extension driven through the
+ * real CLI and a real hub. Also a subset of `root`.
+ */
+export const ROOT_EXTENSIONS_LABEL = "root-extensions";
+
+/**
+ * The root test that proves the extensions contract across process
+ * boundaries (TESTING.md, "Required Tests"). It must run on every change to
+ * dispatch, discovery or the hub proxy. Dispatch and discovery live in core,
+ * whose every change selects `root`; the hub's side lives in web, whose source
+ * changes otherwise select only web and the policy and drift subsets, so
+ * {@link EXTENSION_HUB_FILES} select this label.
+ */
+export const ROOT_EXTENSIONS_TEST_FILES = ["tests/e2e/extension-fixture.test.js"];
+
+/**
+ * The web hub sources that serve extensions: the `/x/<name>/` proxy, the
+ * sidecar lifecycle and the extension API. A unit test fails if one is missing.
+ */
+export const EXTENSION_HUB_FILES = [
+  "packages/web/src/hub/proxy.ts",
+  "packages/web/src/hub/sidecars.ts",
+  "packages/web/src/hub/extensions.ts",
+];
+
+/**
  * Every label that runs a subset of `root`'s files, mapped to those files, in
  * run order. `root` supersedes all of them, and `all` / `packages` leave them
  * out. A unit test fails if a listed file is missing or appears twice.
@@ -132,6 +158,7 @@ export const ROOT_SUBSET_TEST_FILES = {
   [ROOT_POLICY_LABEL]: ROOT_POLICY_TEST_FILES,
   [ROOT_DRIFT_LABEL]: ROOT_DRIFT_TEST_FILES,
   [ROOT_DOCS_LABEL]: ROOT_DOCS_TEST_FILES,
+  [ROOT_EXTENSIONS_LABEL]: ROOT_EXTENSIONS_TEST_FILES,
 };
 
 /** The root-subset labels, in run order. */
@@ -401,6 +428,7 @@ export function selectAffected(changedFiles, manifests) {
           mark(ROOT_DRIFT_LABEL, file);
         }
         if (rest.startsWith("src/cli/")) mark(ROOT_LABEL, file);
+        if (EXTENSION_HUB_FILES.includes(file)) mark(ROOT_EXTENSIONS_LABEL, file);
       }
       continue;
     }
