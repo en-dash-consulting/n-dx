@@ -26,7 +26,7 @@ import {
   type RealVendorProject,
   type Vendor,
 } from "./helpers/real-vendor-project.js";
-import { prdItem, openLiveTask, waitForCompletedRunCount, attachRunArtifacts } from "./helpers/run-watch.js";
+import { prdItem, openLiveTask, snapshotRunIds, waitForCompletedRunCount, attachRunArtifacts } from "./helpers/run-watch.js";
 import { caption } from "./helpers/caption.js";
 import { hasCli, probeCredentials } from "./helpers/preconditions.js";
 
@@ -122,8 +122,9 @@ async function startThreeTasks(page: Page, firstTaskId: string): Promise<void> {
   // its visible text is "Start now · 3 tasks", so locate by that.
   const startNow = page.locator('.ready-menu [role="menuitem"]', { hasText: /^Start now/ });
   await expect(startNow).toContainText("3 tasks");
+  const knownRunIds = await snapshotRunIds(dashboard.baseUrl);
   await startNow.click();
-  await openLiveTask(page, firstTaskId);
+  await openLiveTask(page, firstTaskId, knownRunIds);
 }
 
 async function runLeg(page: Page, vendor: Vendor, taskIds: string[], testInfo: TestInfo): Promise<void> {
