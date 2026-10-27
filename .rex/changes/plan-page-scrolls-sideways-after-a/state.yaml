@@ -1,5 +1,14 @@
 schema: "rex/v2"
 items:
   "c261fd09-fec0-49c5-92ac-c3b4bfe9fe37":
-    lastModified: "2026-10-27T17:19:10.962Z"
+    status: "completed"
+    startedAt: "2026-10-27T23:15:22.085Z"
+    completedAt: "2026-10-27T23:22:36.902Z"
+    endedAt: "2026-10-27T23:22:36.902Z"
+    activeIntervals: [{"end":"2026-10-27T23:22:36.902Z","start":"2026-10-27T23:15:22.085Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Top nav hint/search-label breakpoint raised to 1100px; change preview titles wrap; browser + vitest regression tests; patch changeset."
+    appliedAt: "2026-10-27T23:22:36.902Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T23:22:36.902Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -23,7 +23,8 @@ import {
 
 const LONG_TITLE =
   "Shoppers paying by card want refunds they can start themselves from the order page without contacting support";
-const LONG_TARGET = "Refund requests initiated by the paying customer from the order history page, card payments only";
+const LONG_TARGET =
+  "Refund requests initiated by the paying customer from the order history page, card payments only, including partial refunds and refunds to an expired card";
 
 const PREVIEW = {
   preview: true,
@@ -113,9 +114,11 @@ for (const width of [1024, 768]) {
     );
     expect(clipped).toEqual([]);
 
-    // The title wraps: it is taller than one line.
-    const title = page.locator(".smart-add-preview-title");
-    const fontSize = await title.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-    expect((await title.boundingBox())!.height).toBeGreaterThan(fontSize * 2);
+    // The title and the placement target wrap: each is taller than one line.
+    for (const selector of [".smart-add-preview-title", ".smart-add-preview-task-title"]) {
+      const text = card.locator(selector).first();
+      const fontSize = await text.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect((await text.boundingBox())!.height, selector).toBeGreaterThan(fontSize * 2);
+    }
   });
 }

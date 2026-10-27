@@ -813,7 +813,19 @@ describe("SmartAddInput on a v2 PRD", () => {
       const rule = css.match(new RegExp(`${selector.replace(".", "\\.")}--wrap[^{]*\\{([^}]*)\\}`));
       expect(rule?.[1]).toMatch(/white-space:\s*normal/);
       expect(rule?.[1]).toMatch(/overflow-wrap:\s*anywhere/);
+      // Equal specificity: the modifier only wins if it comes after the base rule.
+      const base = css.search(new RegExp(`^${selector.replace(".", "\\.")}\\s*\\{`, "m"));
+      expect(base).toBeGreaterThan(-1);
+      expect(rule!.index!).toBeGreaterThan(base);
     }
+  });
+
+  it("drops the top bar's hints at the 1,024px desktop pane, so the bar fits the window", () => {
+    const css = readFileSync(join(import.meta.dirname, "../../../src/viewer/styles/shell.css"), "utf8");
+    const hiding = [...css.matchAll(/@media \(max-width:\s*(\d+)px\)\s*\{([\s\S]*?)\n\}/g)]
+      .filter(([, , body]) => /\.topnav-tab-hint[^{]*\{\s*display:\s*none/.test(body!))
+      .map(([, width]) => Number(width));
+    expect(Math.max(...hiding)).toBeGreaterThanOrEqual(1024);
   });
 
   it("keeps the v1 Smart Add wording when the layout is v1", () => {
