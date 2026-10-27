@@ -9,6 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { once } from "node:events";
 import { connect } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -24,10 +25,13 @@ const FIXTURE = [
   `  const server = http.createServer((req, res) => {`,
   `    if (req.url === "/healthz") { res.writeHead(200); res.end("ok"); return; }`,
   `    if (req.url === "/die") { res.writeHead(200); res.end("bye", () => process.exit(1)); return; }`,
+  `    console.log("request " + req.url);`,
+  `    if (req.url === "/hold") { res.writeHead(200); res.write("held"); return; }`,
   `    res.writeHead(200, { "Content-Type": "application/json" });`,
   `    res.end(JSON.stringify({ path: req.url, port: process.env.PORT, name: process.env.NDX_EXTENSION_NAME, headers: req.headers }));`,
   `  });`,
   `  server.on("upgrade", (req, socket) => {`,
+  `    if (req.url === "/ws-hold") { socket.write("HTTP/1.1 101 Switching Protocols\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\n\\r\\n"); socket.on("end", () => socket.end()); return; }`,
   `    socket.end("HTTP/1.1 101 Switching Protocols\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\n\\r\\n" + JSON.stringify({ path: req.url, headers: req.headers }));`,
   `  });`,
   `  server.listen(Number(process.env.PORT), "127.0.0.1", () => console.log("listening on " + process.env.PORT));`,
@@ -320,6 +324,122 @@ describe("hub /x/<name>/", () => {
     const res = await fetch(`http://127.0.0.1:${hub.port}/x/recon/`);
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "Error: the sidecar of recon is not started: it is disabled", reason: "refused" });
+  });
+
+  describe("idle stop through the proxy", () => {
+    /** The hub's log lines, and a promise that a sidecar was stopped as idle and has exited. */
+    function hubLog(): {
+      lines: string[];
+      log: (message: string) => void;
+      idleStopped: (name: string) => Promise<void>;
+    } {
+      const lines: string[] = [];
+      const waiters: Array<{ text: string; resolve: () => void }> = [];
+      const until = (text: string): Promise<void> => lines.some((l) => l.includes(text))
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => { waiters.push({ text, resolve }); });
+      return {
+        lines,
+        log: (message) => {
+          lines.push(message);
+          for (const w of waiters) if (message.includes(w.text)) w.resolve();
+        },
+        // The idle line is logged before the stop; wait for the exit too, or
+        // the temp dir, the sidecar's cwd, cannot be removed on Windows.
+        idleStopped: async (name) => {
+          await until(`sidecar ${name}: idle`);
+          const up = lines.find((l) => l.includes(`sidecar ${name} up (pid `))!;
+          const pid = Number(/\(pid (\d+)/.exec(up)![1]);
+          while (isPidAlive(pid)) await new Promise((resolve) => setTimeout(resolve, 20));
+        },
+      };
+    }
+
+    /** A hub sweeping every 50 ms for sidecars that idle out at once: only a count the proxy holds keeps one up. */
+    async function idleHub(log: (message: string) => void, plan?: (name: string) => Promise<PlanResult>): Promise<HubHandle> {
+      const hub = await startHub({
+        port: 0,
+        homeDir: join(dir, "home"),
+        keepAlive: true,
+        healthIntervalMs: 60_000,
+        sidecarSweepMs: 50,
+        log,
+        sidecars: {
+          plan: plan ?? (async (name) => ({ ok: true, plan: planFor(name, "ok", 0) })),
+          memoryFloorBytes: 0,
+          freeMemory: () => null,
+          healthPollMs: 50,
+          stopGraceMs: 2_000,
+        },
+      });
+      hubs.push(hub);
+      return hub;
+    }
+
+    /** Use `other` once and wait for the sweep that stops it, which judges every sidecar in the same pass. */
+    async function sweepPast(hub: HubHandle, idleStopped: (name: string) => Promise<void>): Promise<void> {
+      expect(await (await fetch(`http://127.0.0.1:${hub.port}/x/other/`)).json()).toMatchObject({ name: "other" });
+      await idleStopped("other");
+    }
+
+    it("holds a sidecar up while a proxied request is in flight", async () => {
+      const { lines, log, idleStopped } = hubLog();
+      const hub = await idleHub(log);
+      const held = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${hub.port}/x/recon/hold`, { signal: held.signal });
+      const first = await res.body!.getReader().read();
+      expect(new TextDecoder().decode(first.value)).toBe("held");
+
+      await sweepPast(hub, idleStopped);
+      expect(lines.join("\n")).not.toContain("sidecar recon: idle");
+
+      held.abort();
+      await idleStopped("recon");
+    });
+
+    it("holds a sidecar up while a proxied WebSocket is open", async () => {
+      const { lines, log, idleStopped } = hubLog();
+      const hub = await idleHub(log);
+      const socket = connect(hub.port, "127.0.0.1");
+      socket.write(
+        `GET /x/recon/ws-hold HTTP/1.1\r\nHost: 127.0.0.1:${hub.port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+      );
+      const [answer] = (await once(socket, "data")) as [Buffer];
+      expect(answer.toString("utf-8").split("\r\n")[0]).toBe("HTTP/1.1 101 Switching Protocols");
+
+      await sweepPast(hub, idleStopped);
+      expect(lines.join("\n")).not.toContain("sidecar recon: idle");
+
+      socket.destroy();
+      await idleStopped("recon");
+    });
+
+    it("neither counts nor forwards a request whose client left during the cold start, so the sidecar still idles out", async () => {
+      const { log, idleStopped } = hubLog();
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => { release = resolve; });
+      let markAsked!: () => void;
+      const asked = new Promise<void>((resolve) => { markAsked = resolve; });
+      const hub = await idleHub(log, async (name) => {
+        markAsked();
+        await released;
+        return { ok: true, plan: planFor(name, "ok", 0) };
+      });
+
+      const client = connect(hub.port, "127.0.0.1");
+      client.write(`GET /x/recon/aborted HTTP/1.1\r\nHost: 127.0.0.1:${hub.port}\r\n\r\n`);
+      await asked;
+      client.destroy();
+      // A round trip on a fresh connection: the hub reads the abandoned
+      // connection's close before this request, which was sent after it.
+      expect((await fetch(`http://127.0.0.1:${hub.port}/api/hub/health`)).ok).toBe(true);
+      release();
+
+      // The sidecar log is complete once its process has exited.
+      await idleStopped("recon");
+      expect(readFileSync(planFor("recon").logFile, "utf-8")).not.toContain("request /aborted");
+    });
   });
 
   describe("with the per-user token", () => {

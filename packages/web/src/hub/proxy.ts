@@ -467,7 +467,13 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
   const decision = decideProxy(hub, req.url || "/");
   switch (decision.kind) {
     case "sidecar": {
+      // A cold start can take seconds; a client gone by its end is neither
+      // counted (the count would never fall, and the sidecar never idle out)
+      // nor forwarded. upgradeSidecar's `socket.destroyed` is the same guard.
+      let gone = false;
+      res.once("close", () => { gone = true; });
       const started = await hub.sidecars.ensure(decision.name);
+      if (gone) return;
       if (!started.ok) {
         writeJson(res, started.status, sidecarRefusalBody(started));
         return;
