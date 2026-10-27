@@ -125,7 +125,7 @@ When `ndx <name>` matches no built-in command, the dispatcher looks the name up 
 - `stdio` is inherited and the extension shares the terminal's session, so Ctrl+C, Ctrl+Z and `/dev/tty` reach it directly. `SIGTERM`, and on POSIX `SIGHUP`, sent to `ndx` are forwarded. The extension's exit code becomes `ndx`'s exit code.
 - The working directory is unchanged; n-dx resolves no project for the extension.
 - `ndx --help` lists enabled extension commands under an **Extensions** heading with their `summary`. `ndx <name> --help` is passed through to the extension.
-- A missing `bin`, an unapproved manifest or an out-of-range `ndxVersion` exits 2 with one line naming the problem and the fix (`ndx extensions doctor`).
+- A missing `bin` or an unapproved manifest exits 2 with one line naming the problem and the fix (`ndx extensions doctor`, or `ndx extensions enable <name>`). A disabled or incompatible extension, including an out-of-range `ndxVersion`, is an "Unknown command" (exit 1) with a hint naming the extension, its state and the fix.
 
 **Environment every extension process gets (CLI and sidecar)**
 
