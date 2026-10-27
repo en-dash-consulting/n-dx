@@ -3476,19 +3476,18 @@ function coerceExtensionValue(newValue, existingValue, schemaType) {
 /**
  * One extension's config section: the user's `extensions.<name>` with the
  * project's over it. What `NDX_EXTENSION_CONFIG` holds once the caller has
- * checked it against the extension's `configSchema`.
+ * checked it against the extension's `configSchema`. Without `dir` (a
+ * sidecar, which serves no single project) it is the user's section alone.
  *
  * @param {object} options
- * @param {string} options.dir  The project.
+ * @param {string} [options.dir]  The project.
  * @param {string} options.home  The n-dx home.
  * @param {string} options.name  The extension's manifest `name`.
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function loadExtensionConfig({ dir, home, name }) {
-  return deepMerge(
-    extensionSection(await loadUserConfig(home), name),
-    extensionSection(await loadEffectiveProjectConfig(dir), name),
-  );
+  const project = dir === undefined ? {} : extensionSection(await loadEffectiveProjectConfig(dir), name);
+  return deepMerge(extensionSection(await loadUserConfig(home), name), project);
 }
 
 /**

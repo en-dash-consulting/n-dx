@@ -24,7 +24,7 @@ Every extension process, command or sidecar, gets the user's own environment plu
 | `NDX_HOME` | The resolved n-dx home |
 | `NDX_EXTENSION_NAME` | The manifest `name` |
 | `NDX_EXTENSION_STATE_DIR` | `<ndx home>/ext/<name>/`, created before the process starts. The only n-dx-owned place the extension may write |
-| `NDX_EXTENSION_CONFIG` | A JSON file holding the merged config section, rewritten for every process ([Config](./config.md)) |
+| `NDX_EXTENSION_CONFIG` | A JSON file holding the config section ([Config](./config.md)). A command gets a file of its own, removed when it exits; a sidecar gets `sidecar-config.json` |
 | `NDX_HUB_URL` | The running hub's base URL, such as `http://localhost:3117`. Unset when no hub runs |
 | `NDX_TOKEN_FILE` | The per-user token file. Set only with `NDX_HUB_URL`, and only when the file exists |
 

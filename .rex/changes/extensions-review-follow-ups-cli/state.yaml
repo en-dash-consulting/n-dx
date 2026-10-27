@@ -7,7 +7,14 @@ items:
     lastModified: "2026-10-27T13:51:35.552Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "6e69e53f-cb54-4427-b727-f0dee62e42c9":
-    lastModified: "2026-10-27T13:51:22.685Z"
+    status: "completed"
+    startedAt: "2026-10-27T13:52:42.019Z"
+    completedAt: "2026-10-27T14:04:40.485Z"
+    endedAt: "2026-10-27T14:04:40.485Z"
+    activeIntervals: [{"end":"2026-10-27T14:04:40.485Z","start":"2026-10-27T13:52:42.019Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Per-process ndx-config-<pid>-<rand>.json written tmp+rename and released on close, stale files swept; sidecars get user-only sidecar-config.json. Concurrency e2e test fails before the fix."
+    lastModified: "2026-10-27T14:04:40.485Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "6fd9edf1-f003-480c-b0ee-4c498c1ddf7b":
     lastModified: "2026-10-27T13:51:26.740Z"

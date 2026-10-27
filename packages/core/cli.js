@@ -79,7 +79,7 @@ import {
   SIDECAR_LOG_DIRNAME,
   SIDECAR_LOG_FILENAME,
 } from "./extension-dispatch.js";
-import { extensionEnvironment, extensionStateDir } from "./extension-env.js";
+import { extensionEnvironment, extensionStateDir, releaseExtensionConfig } from "./extension-env.js";
 import { configCheckerByName, configCheckerFor } from "./extension-config-schema.js";
 
 const CLI_ERROR_CODES = Object.freeze({
@@ -2622,7 +2622,8 @@ async function handleExtensionSidecar(args) {
     return;
   }
 
-  const config = await loadExtensionConfig({ dir: process.cwd(), home: resolution.home, name });
+  // A sidecar serves no single project, so it gets the user's section alone.
+  const config = await loadExtensionConfig({ home: resolution.home, name });
   const violations = configCheckerFor(resolution.ext).check(config);
   if (violations.length > 0) {
     refuse("config", `Error: the sidecar of '${name}' has a config section extensions.${name} that does not match its configSchema:`, [
@@ -2634,7 +2635,7 @@ async function handleExtensionSidecar(args) {
   let env;
   let logFile;
   try {
-    env = extensionEnvironment({ name, home: resolution.home, ndxVersion: version, config });
+    env = extensionEnvironment({ name, home: resolution.home, ndxVersion: version, config, sidecar: true });
     const logDir = join(extensionStateDir(resolution.home, name), SIDECAR_LOG_DIRNAME);
     mkdirSync(logDir, { recursive: true });
     logFile = join(logDir, SIDECAR_LOG_FILENAME);
@@ -3559,7 +3560,13 @@ async function handleExtensionCommand(command, rest) {
       // The extension owns Ctrl+C while it runs: runExtensionCommand forwards
       // SIGINT/SIGTERM and waits, so ndx's kill-and-exit handlers stand down.
       signalHandlers.dispose();
-      exitWithCleanup(await runExtensionCommand({ bin: resolution.bin, args: rest, spawn: spawnTracked, env }));
+      let code;
+      try {
+        code = await runExtensionCommand({ bin: resolution.bin, args: rest, spawn: spawnTracked, env });
+      } finally {
+        releaseExtensionConfig(env);
+      }
+      exitWithCleanup(code);
       return;
     }
     case "refused":

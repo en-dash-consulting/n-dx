@@ -147,7 +147,7 @@ describe("the fixture extension through the CLI", () => {
       NDX_HOME: home,
       NDX_EXTENSION_NAME: "fixture",
       NDX_EXTENSION_STATE_DIR: stateDir,
-      NDX_EXTENSION_CONFIG: join(stateDir, "ndx-config.json"),
+      NDX_EXTENSION_CONFIG: expect.stringMatching(/[\\/]ndx-config-\d+-[0-9a-f]+\.json$/),
     });
     expect(out.env.NDX_VERSION).toBe(ndxOk(["version"]).trim());
     expect(out.stateDirExists).toBe(true);

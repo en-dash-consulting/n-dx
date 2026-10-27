@@ -9,7 +9,10 @@ Each extension owns one section, `extensions.<name>`, in two places:
 
 `ndx config extensions.<name>.<key>` without a value reads the setting.
 
-The two sections are merged, the project's winning key by key. The merged section is written to the file `NDX_EXTENSION_CONFIG` names, in the extension's state folder, before every process starts. Read that file. Do not read the config files themselves.
+The two sections are merged, the project's winning key by key. The merged section is written to the file `NDX_EXTENSION_CONFIG` names, in the extension's state folder, before every process starts. Read that file. Do not read the config files themselves, and do not rely on its name.
+
+- A command gets a file of its own, so runs in different projects at once each read their own project's section. It is removed when the command exits.
+- A sidecar serves no single project, so it gets the user's section alone, in `sidecar-config.json`. A command run never changes it.
 
 ## Schema
 

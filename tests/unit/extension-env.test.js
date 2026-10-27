@@ -8,15 +8,18 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
   EXTENSION_API_VERSION,
+  EXTENSION_CONFIG_PREFIX,
   EXTENSION_ENV_VARS,
   NDX_CLI_PATH,
+  SIDECAR_CONFIG_FILENAME,
   extensionEnvironment,
   extensionStateDir,
+  releaseExtensionConfig,
 } from "../../packages/core/extension-env.js";
 
 const CORE_CLI = join(import.meta.dirname, "../../packages/core/cli.js");
@@ -31,6 +34,8 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
+
+const readJson = (path) => JSON.parse(readFileSync(path, "utf-8"));
 
 const build = (overrides = {}) =>
   extensionEnvironment({ name: "recon", home, ndxVersion: "0.10.0", baseEnv: { PATH: "/bin", USER_VAR: "kept" }, ...overrides });
@@ -60,8 +65,9 @@ describe("extensionEnvironment", () => {
       NDX_HOME: home,
       NDX_EXTENSION_NAME: "recon",
       NDX_EXTENSION_STATE_DIR: stateDir,
-      NDX_EXTENSION_CONFIG: join(stateDir, "ndx-config.json"),
     });
+    expect(dirname(env.NDX_EXTENSION_CONFIG)).toBe(stateDir);
+    expect(basename(env.NDX_EXTENSION_CONFIG)).toMatch(new RegExp(`^${EXTENSION_CONFIG_PREFIX}${process.pid}-[0-9a-f]+\\.json$`));
     expect(env).not.toHaveProperty("NDX_HUB_URL");
     expect(env).not.toHaveProperty("NDX_TOKEN_FILE");
     expect(EXTENSION_API_VERSION).toBe(1);
@@ -110,6 +116,36 @@ describe("extensionEnvironment", () => {
     expect(env).not.toHaveProperty("NDX_TOKEN_FILE");
     for (const key of EXTENSION_ENV_VARS) expect(env[key]).not.toBe("stale");
     expect(env.USER_VAR).toBe("kept");
+  });
+
+  it("gives every command process a config file of its own, removed on release", () => {
+    const first = build({ config: { who: "p1" } });
+    const second = build({ config: { who: "p2" } });
+    expect(first.NDX_EXTENSION_CONFIG).not.toBe(second.NDX_EXTENSION_CONFIG);
+    expect(readJson(first.NDX_EXTENSION_CONFIG)).toEqual({ who: "p1" });
+    releaseExtensionConfig(first);
+    expect(existsSync(first.NDX_EXTENSION_CONFIG)).toBe(false);
+    expect(readJson(second.NDX_EXTENSION_CONFIG)).toEqual({ who: "p2" });
+    // No temp file is left behind by the write-then-rename.
+    expect(readdirSync(extensionStateDir(home, "recon"))).toEqual([basename(second.NDX_EXTENSION_CONFIG)]);
+  });
+
+  it("writes a sidecar's config to its own file, which release keeps and command runs leave alone", () => {
+    const sidecar = build({ sidecar: true, config: { mode: "deep" } });
+    expect(sidecar.NDX_EXTENSION_CONFIG).toBe(join(extensionStateDir(home, "recon"), SIDECAR_CONFIG_FILENAME));
+    releaseExtensionConfig(build({ config: { who: "p1" } }));
+    releaseExtensionConfig(sidecar);
+    expect(readJson(sidecar.NDX_EXTENSION_CONFIG)).toEqual({ mode: "deep" });
+  });
+
+  it("sweeps config and temp files whose n-dx process is gone, and the old shared file", () => {
+    const stateDir = extensionStateDir(home, "recon");
+    mkdirSync(stateDir, { recursive: true });
+    const stale = ["ndx-config.json", "ndx-config-111-ab.json", "sidecar-config.json.111-cd.tmp"];
+    const live = ["ndx-config-222-ef.json", "mine.txt"];
+    for (const file of [...stale, ...live]) writeFileSync(join(stateDir, file), "{}");
+    const env = build({ isAlive: (pid) => pid === 222 });
+    expect(readdirSync(stateDir).sort()).toEqual([...live, basename(env.NDX_EXTENSION_CONFIG)].sort());
   });
 
   it("throws when the state folder cannot be created", () => {

@@ -205,8 +205,9 @@ describe("ndx <extension command>", () => {
       NDX_HOME: home,
       NDX_EXTENSION_NAME: "recon",
       NDX_EXTENSION_STATE_DIR: stateDir,
-      NDX_EXTENSION_CONFIG: join(stateDir, "ndx-config.json"),
+      NDX_EXTENSION_CONFIG: expect.stringMatching(/[\\/]ndx-config-\d+-[0-9a-f]+\.json$/),
     });
+    expect(dirname(report.env.NDX_EXTENSION_CONFIG)).toBe(stateDir);
     expect(report.stateDirExists).toBe(true);
     expect(report.env).not.toHaveProperty("NDX_HUB_URL");
     expect(JSON.stringify(report)).not.toContain("s3cret-token");
@@ -323,6 +324,37 @@ describe("ndx config extensions.<name>", () => {
     expect(run(["config", "extensions.ghost.mode"], opts()).trim()).toBe("fast");
   });
 
+  it("concurrent runs in different projects each read their own project's config", async () => {
+    // The command waits before reading, so a run that shared one config file
+    // with the others would read whichever project wrote it last.
+    installConfigReader("recon");
+    const bin = join(home, "extensions", "node_modules", "ndx-recon", "bin", "cli.js");
+    writeFileSync(bin, [
+      `setTimeout(() => process.stdout.write(require("node:fs").readFileSync(process.env.NDX_EXTENSION_CONFIG, "utf-8")), 1500);`,
+    ].join("\n"));
+    const projects = ["p1", "p2", "p3", "p4"].map((who) => {
+      const dir = mkdirp(join(root, who));
+      writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ extensions: { recon: { who } } }));
+      return { who, dir };
+    });
+    // Fill the discovery cache for each project first, so the parallel runs only
+    // read it: four runs rewriting <home>/extensions.json at once is a separate race.
+    for (const { dir } of projects) run(["extensions", "list", "--json"], { cwd: dir, env: env() });
+    const runIn = (dir) => new Promise((resolve) => {
+      const child = spawn(process.execPath, [CLI_PATH, "recon"], { cwd: dir, env: env(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => { stdout += chunk; });
+      child.stderr.on("data", (chunk) => { stderr += chunk; });
+      child.on("close", (code) => resolve({ code, stdout, stderr }));
+    });
+    const results = await Promise.all(projects.map(({ dir }) => runIn(dir)));
+    expect(results.map((r) => [r.code, r.stderr])).toEqual(projects.map(() => [0, ""]));
+    expect(results.map((r) => JSON.parse(r.stdout).who)).toEqual(projects.map((p) => p.who));
+    // Each run removes its own file when the command closes.
+    expect(readdirSync(join(home, "ext", "recon")).filter((f) => f.startsWith("ndx-config"))).toEqual([]);
+  });
+
   it("says when the project config overrides a --user write", () => {
     installConfigReader("recon");
     run(["config", "extensions.recon.mode", "fast"], opts());
@@ -365,6 +397,28 @@ describe("ndx extensions sidecar", () => {
     expect(plan.env).toMatchObject({ NDX_EXTENSION_NAME: "recon", NDX_EXTENSION_STATE_DIR: stateDir });
     expect(readJson(plan.env.NDX_EXTENSION_CONFIG)).toEqual({});
     expect(readdirSync(join(stateDir, "logs"))).toEqual([]);
+  });
+
+  it("gives the sidecar the user's config only, in a file no command run rewrites", () => {
+    // A command and a sidecar in one manifest, written before discovery first runs.
+    installEcho("recon", { approve: false });
+    const dir = join(home, "extensions", "node_modules", "ndx-recon");
+    const pkg = readJson(join(dir, "package.json"));
+    pkg.ndx.extension.sidecar = { bin: "bin/serve.js" };
+    writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
+    writeFileSync(join(dir, "bin", "serve.js"), "// served by the hub\n");
+    writeFileSync(join(dir, "bin", "cli.js"), `process.stdout.write(process.env.NDX_EXTENSION_CONFIG);`);
+    run(["extensions", "enable", "recon", "--yes"], opts());
+    run(["config", "extensions.recon.mode", "deep", "--user", "--force"], opts());
+    run(["config", "extensions.recon.who", "project", "--force"], opts());
+
+    const plan = JSON.parse(run(["extensions", "sidecar", "recon", "--json"], opts()));
+    expect(plan.env.NDX_EXTENSION_CONFIG).toBe(join(home, "ext", "recon", "sidecar-config.json"));
+    const before = readFileSync(plan.env.NDX_EXTENSION_CONFIG, "utf-8");
+    expect(JSON.parse(before)).toEqual({ mode: "deep" });
+
+    expect(run(["recon"], opts())).not.toBe(plan.env.NDX_EXTENSION_CONFIG);
+    expect(readFileSync(plan.env.NDX_EXTENSION_CONFIG, "utf-8")).toBe(before);
   });
 
   it("keeps the manifest's health path", () => {

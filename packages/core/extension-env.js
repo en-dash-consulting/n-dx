@@ -12,7 +12,7 @@
  * | `NDX_HOME`                | The resolved n-dx home |
  * | `NDX_EXTENSION_NAME`      | The manifest `name` |
  * | `NDX_EXTENSION_STATE_DIR` | `<ndx home>/ext/<name>/`, created here |
- * | `NDX_EXTENSION_CONFIG`    | A JSON file holding the extension's config section |
+ * | `NDX_EXTENSION_CONFIG`    | A JSON file holding the extension's config section; a command process's own |
  * | `NDX_HUB_URL`             | The running hub's base URL; unset when no hub runs |
  * | `NDX_TOKEN_FILE`          | The per-user token file; only with `NDX_HUB_URL`, and only when it exists |
  *
@@ -24,8 +24,9 @@
  * @module n-dx/extension-env
  */
 
+import { randomBytes } from "node:crypto";
 import * as nodeFs from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SUPPORTED_EXTENSION_API_VERSIONS } from "./extension-manifest.js";
 
@@ -36,11 +37,28 @@ export const EXTENSION_API_VERSION = Math.max(...SUPPORTED_EXTENSION_API_VERSION
 export const EXTENSION_STATE_DIRNAME = "ext";
 
 /**
- * The file `NDX_EXTENSION_CONFIG` names, in the extension's state folder. It
- * holds the merged `extensions.<name>` section (`loadExtensionConfig` in
- * config.js), rewritten for every process.
+ * A command process's `NDX_EXTENSION_CONFIG`, in the extension's state folder:
+ * `ndx-config-<ndx pid>-<random>.json`, holding the merged `extensions.<name>`
+ * section (`loadExtensionConfig` in config.js). One file per process, because
+ * runs in different projects merge different sections and may run at once.
+ * The caller removes it when the command closes ({@link releaseExtensionConfig});
+ * a file whose n-dx process died is swept by the next run.
  */
-export const EXTENSION_CONFIG_FILENAME = "ndx-config.json";
+export const EXTENSION_CONFIG_PREFIX = "ndx-config-";
+
+/**
+ * A sidecar's `NDX_EXTENSION_CONFIG`: the user's section only, since a sidecar
+ * serves no single project. A file of its own, so a command run never changes
+ * the config a running sidecar was started with.
+ */
+export const SIDECAR_CONFIG_FILENAME = "sidecar-config.json";
+
+/** A command's config file, or a temp file mid-write; group 1 is the writer's pid. */
+const COMMAND_CONFIG_FILE = /^ndx-config-(\d+)-[0-9a-f]+\.json$/;
+const TEMP_FILE = /\.json\.(\d+)-[0-9a-f]+\.tmp$/;
+
+/** The single shared file earlier versions wrote; removed when seen. */
+const LEGACY_CONFIG_FILENAME = "ndx-config.json";
 
 /** Every variable the contract sets; inherited copies are dropped first. */
 export const EXTENSION_ENV_VARS = Object.freeze([
@@ -64,7 +82,7 @@ const HUB_PID_FILE = "hub.pid";
 const AUTH_TOKEN_FILE = "auth.token";
 
 /**
- * @typedef {Pick<typeof nodeFs, "existsSync" | "mkdirSync" | "readFileSync" | "writeFileSync">} ExtensionEnvFs
+ * @typedef {Pick<typeof nodeFs, "existsSync" | "mkdirSync" | "readFileSync" | "readdirSync" | "renameSync" | "rmSync" | "writeFileSync">} ExtensionEnvFs
  */
 
 /**
@@ -73,6 +91,7 @@ const AUTH_TOKEN_FILE = "auth.token";
  * @property {string} home  The resolved n-dx home.
  * @property {string} ndxVersion  The running n-dx.
  * @property {Record<string, unknown>} [config]  The merged config section; defaults to `{}`.
+ * @property {boolean} [sidecar]  A sidecar's environment: the config goes to {@link SIDECAR_CONFIG_FILENAME}.
  * @property {Record<string, string | undefined>} [baseEnv]  The user's environment; defaults to `process.env`.
  * @property {string} [ndxBin]  Defaults to {@link NDX_CLI_PATH}.
  * @property {ExtensionEnvFs} [fs]
@@ -86,17 +105,23 @@ export function extensionStateDir(home, name) {
 
 /**
  * The environment for one extension process. Creates the state folder and the
- * config file; throws when it cannot, since the contract promises both.
+ * config file; throws when it cannot, since the contract promises both. The
+ * file is written whole and renamed into place, so no reader sees part of it.
  *
  * @param {ExtensionEnvOptions} options
  * @returns {Record<string, string | undefined>}
  */
 export function extensionEnvironment(options) {
   const fs = options.fs ?? nodeFs;
+  const isAlive = options.isAlive ?? isPidAlive;
   const stateDir = extensionStateDir(options.home, options.name);
-  const configFile = join(stateDir, EXTENSION_CONFIG_FILENAME);
   fs.mkdirSync(stateDir, { recursive: true });
-  fs.writeFileSync(configFile, JSON.stringify(options.config ?? {}, null, 2) + "\n");
+  sweepStaleConfigs(stateDir, fs, isAlive);
+  const configFile = join(
+    stateDir,
+    options.sidecar ? SIDECAR_CONFIG_FILENAME : `${EXTENSION_CONFIG_PREFIX}${process.pid}-${randomBytes(6).toString("hex")}.json`,
+  );
+  writeWhole(fs, configFile, JSON.stringify(options.config ?? {}, null, 2) + "\n");
 
   const env = { ...(options.baseEnv ?? process.env) };
   for (const key of EXTENSION_ENV_VARS) delete env[key];
@@ -111,12 +136,62 @@ export function extensionEnvironment(options) {
     NDX_EXTENSION_CONFIG: configFile,
   });
 
-  const hub = runningHub(options.home, fs, options.isAlive ?? isPidAlive);
+  const hub = runningHub(options.home, fs, isAlive);
   if (hub) {
     env.NDX_HUB_URL = hub.url;
     if (hub.tokenFile) env.NDX_TOKEN_FILE = hub.tokenFile;
   }
   return env;
+}
+
+/**
+ * Remove a command process's config file once the command has closed. A
+ * sidecar's file stays: the sidecar outlives the process that planned it.
+ *
+ * @param {Record<string, string | undefined>} env  What {@link extensionEnvironment} returned.
+ * @param {Pick<ExtensionEnvFs, "rmSync">} [fs]
+ */
+export function releaseExtensionConfig(env, fs = nodeFs) {
+  const file = env.NDX_EXTENSION_CONFIG;
+  if (file && COMMAND_CONFIG_FILE.test(basename(file))) fs.rmSync(file, { force: true });
+}
+
+/**
+ * Write `content` to a sibling temp file and rename it over `file`. A file
+ * already holding `content` is left alone, so concurrent plans of one sidecar
+ * do not race to replace an identical file.
+ *
+ * @param {ExtensionEnvFs} fs
+ * @param {string} file
+ * @param {string} content
+ */
+function writeWhole(fs, file, content) {
+  if (fs.existsSync(file) && fs.readFileSync(file, "utf-8") === content) return;
+  const tmp = `${file}.${process.pid}-${randomBytes(4).toString("hex")}.tmp`;
+  fs.writeFileSync(tmp, content);
+  try {
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    throw err;
+  }
+}
+
+/**
+ * Remove command config files and temp files whose n-dx process is gone
+ * (killed before it could clean up), and the shared file earlier versions wrote.
+ *
+ * @param {string} stateDir
+ * @param {ExtensionEnvFs} fs
+ * @param {(pid: number) => boolean} isAlive
+ */
+function sweepStaleConfigs(stateDir, fs, isAlive) {
+  for (const entry of fs.readdirSync(stateDir)) {
+    const match = COMMAND_CONFIG_FILE.exec(entry) ?? TEMP_FILE.exec(entry);
+    if (entry === LEGACY_CONFIG_FILENAME || (match && !isAlive(Number(match[1])))) {
+      fs.rmSync(join(stateDir, entry), { force: true });
+    }
+  }
 }
 
 /**
