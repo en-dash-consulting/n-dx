@@ -82,6 +82,14 @@ for (const colorScheme of ["light", "dark"] as const) {
     await expect(page.locator(".rex-dash-panel-breakdown .rex-dash-panel-title"))
       .toHaveText(["Priority Distribution", "Status Breakdown"]);
 
+    // Full width: the dashboard's blocks line up with the stage sections below.
+    const edges = await page.evaluate(() => {
+      const box = (sel: string) => { const r = document.querySelector(sel)!.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; };
+      return { section: box("main section.stage-section:not(.stage-section--plain)"), epics: box(".rex-dash-epics"), panels: box(".rex-dash-sidebar") };
+    });
+    expect(edges.epics, "Epic Progress spans the page").toEqual(edges.section);
+    expect(edges.panels, "the panel row spans the page").toEqual(edges.section);
+
     // The panels sit in one row at this width, all the same height.
     const panels = await page.locator(".rex-dash-panel").evaluateAll((els) =>
       els.map((el) => { const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; }));

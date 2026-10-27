@@ -3,8 +3,9 @@
    streamlined task management, and responsive design.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* No width cap: the dashboard is the Work page's lead section and spans the
+   page like the stage sections under it. */
 .rex-dash {
-  max-width: 1200px;
   min-height: 0;
 }
 
