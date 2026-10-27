@@ -68,11 +68,23 @@ export interface RunSummary {
   taskId?: string;
 }
 
-export async function listRuns(baseUrl: string): Promise<RunSummary[]> {
-  const res = await fetch(`${baseUrl}/api/hench/runs?limit=50&scope=repo`);
-  if (!res.ok) return [];
-  const body = (await res.json()) as { runs?: RunSummary[] };
-  return body.runs ?? [];
+export async function listRuns(baseUrl: string, timeoutMs = 10_000): Promise<RunSummary[]> {
+  // Workspace only, with no truncation: an omitted old run would look new
+  // when it later reappeared. A failed snapshot must never mean an empty one.
+  const res = await fetch(`${baseUrl}/api/hench/runs`, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`Cannot list manual flow runs: HTTP ${res.status}`);
+  const body = await res.json() as { runs?: RunSummary[] } | null;
+  if (!body || !Array.isArray(body.runs) || body.runs.some((run) =>
+    !run || typeof run.id !== "string" || !run.id.trim() || typeof run.status !== "string" ||
+    (run.taskId !== undefined && typeof run.taskId !== "string"))) {
+    throw new Error("Cannot list manual flow runs: invalid run list");
+  }
+  return body.runs;
+}
+
+/** Call before Start now, so a previous leg can never satisfy the waiter. */
+export async function snapshotRunIds(baseUrl: string): Promise<ReadonlySet<string>> {
+  return new Set((await listRuns(baseUrl)).map((run) => run.id));
 }
 
 const ACTIVE = new Set(["running", "in_progress", "starting", "pending"]);
@@ -83,24 +95,32 @@ const FAILED = new Set(["failed", "error", "timeout", "budget_exceeded"]);
  * task page. The Live overview shows a started run inline rather than
  * navigating, and hench picks the task by priority when several are
  * pending, so the run record — not the click — says which task is live.
- * Returns that task id; `expectedTaskId` wins when it is among the runs.
+ * Returns that task id; `expectedTaskId` wins among runs absent from the
+ * snapshot the caller took before Start now, including a fast finished run.
  */
-export async function openLiveTask(page: Page, expectedTaskId: string, timeoutMs = 60_000): Promise<string> {
+export async function openLiveTask(page: Page, expectedTaskId: string, knownRunIds: ReadonlySet<string>, timeoutMs = 60_000): Promise<string> {
   const baseUrl = new URL(page.url()).origin;
+  const deadline = performance.now() + timeoutMs;
   let taskId = "";
-  await expect
-    .poll(
-      async () => {
-        const runs = await listRuns(baseUrl);
-        const expected = runs.find((r) => r.taskId === expectedTaskId);
-        const latest = expected ?? runs.find((r) => ACTIVE.has(r.status) || r.status === "completed" || FAILED.has(r.status));
-        taskId = latest?.taskId ?? "";
-        return taskId ? "started" : "no run yet";
-      },
-      { timeout: timeoutMs, intervals: [1_000, 2_000], message: "waiting for the started run to be recorded" },
-    )
-    .toBe("started");
-  await page.goto(`${baseUrl}/live/task/${taskId}`, { waitUntil: "domcontentloaded" });
+  let observed: RunSummary[] = [];
+  try {
+    await expect
+      .poll(
+        async () => {
+          observed = await listRuns(baseUrl, Math.max(1, Math.ceil(deadline - performance.now())));
+          const runs = observed.filter((run) => !knownRunIds.has(run.id));
+          const expected = runs.find((r) => r.taskId === expectedTaskId);
+          const latest = expected ?? runs.find((r) => r.taskId && (ACTIVE.has(r.status) || TERMINAL.includes(r.status)));
+          taskId = latest?.taskId ?? "";
+          return taskId ? "started" : "no run yet";
+        },
+        { timeout: timeoutMs, intervals: [1_000, 2_000], message: "waiting for the started run to be recorded" },
+      )
+      .toBe("started");
+  } catch (error) {
+    throw new Error(`No new manual flow run was selected. Observed runs: ${JSON.stringify(observed)}. ${(error as Error).message}`, { cause: error });
+  }
+  await page.goto(`${baseUrl}/live/task/${encodeURIComponent(taskId)}`, { waitUntil: "domcontentloaded" });
   await expect(page.locator('nav[aria-label="Running now"]')).toHaveCount(1, { timeout: 15_000 });
   return taskId;
 }

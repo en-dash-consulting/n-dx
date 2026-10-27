@@ -19,7 +19,7 @@ import {
   KEEP_FIXTURE,
   type RealVendorProject,
 } from "./helpers/real-vendor-project.js";
-import { readPrdItems, prdItem, openLiveTask, waitForLiveTaskCompleted, attachRunArtifacts } from "./helpers/run-watch.js";
+import { readPrdItems, prdItem, openLiveTask, snapshotRunIds, waitForLiveTaskCompleted, attachRunArtifacts } from "./helpers/run-watch.js";
 import { caption } from "./helpers/caption.js";
 import { hasCli, probeCredentials } from "./helpers/preconditions.js";
 
@@ -93,11 +93,12 @@ test("a typed prompt becomes a task the agent completes", async ({ page }, testI
   await page.goto(`${dashboard.baseUrl}/live`, { waitUntil: "domcontentloaded" });
   await caption(page, "4/5 Start the task with the agent");
   await expect(page.locator(".live-idle .live-card-title")).toHaveText(task.title, { timeout: 15_000 });
+  const knownRunIds = await snapshotRunIds(dashboard.baseUrl);
   await page.getByRole("button", { name: /More ways to run/ }).click();
   await page.getByRole("menuitem", { name: /^Start now/ }).click();
 
   // The proposal may hold several tasks; hench starts the highest-priority one.
-  const startedTaskId = await openLiveTask(page, task.id);
+  const startedTaskId = await openLiveTask(page, task.id, knownRunIds);
   expect(created.map((i) => i.id), "the started task should be one the prompt created").toContain(startedTaskId);
   await caption(page, "5/5 Watching the run until it completes");
   await waitForLiveTaskCompleted(page);
