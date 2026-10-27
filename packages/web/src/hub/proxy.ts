@@ -379,9 +379,11 @@ export function proxyHttp(
     (upstreamRes) => {
       const outHeaders = { ...upstreamRes.headers };
       // A redirect the project server issues is root-relative from its point
-      // of view; the client is under the prefix.
+      // of view; the client is under the prefix. A sidecar's may already be
+      // under it, built from X-Ndx-Base-Path as the extension docs advise.
       const location = outHeaders.location;
-      if (prefix && typeof location === "string" && location.startsWith("/") && !location.startsWith("//")) {
+      const underMount = typeof location === "string" && (location === prefix || location.startsWith(`${prefix}/`));
+      if (prefix && typeof location === "string" && location.startsWith("/") && !location.startsWith("//") && !(sidecar && underMount)) {
         outHeaders.location = `${prefix}${location}`;
       }
       res.writeHead(upstreamRes.statusCode ?? 502, outHeaders);

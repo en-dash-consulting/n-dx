@@ -27,6 +27,7 @@ const FIXTURE = [
   `    if (req.url === "/healthz") { res.writeHead(200); res.end("ok"); return; }`,
   `    if (req.url === "/die") { res.writeHead(200); res.end("bye", () => process.exit(1)); return; }`,
   `    console.log("request " + req.url);`,
+  `    if (req.url.startsWith("/redirect?to=")) { res.writeHead(302, { Location: decodeURIComponent(req.url.slice(13)) }); res.end(); return; }`,
   `    if (req.url === "/hold") { res.writeHead(200); res.write("held"); return; }`,
   `    res.writeHead(200, { "Content-Type": "application/json" });`,
   `    res.end(JSON.stringify({ path: req.url, port: process.env.PORT, name: process.env.NDX_EXTENSION_NAME, headers: req.headers }));`,
@@ -326,6 +327,26 @@ describe("hub /x/<name>/", () => {
     // No sidecar survives its hub, whatever happens to the project servers.
     const port = Number(served.port);
     await expect(fetch(`http://127.0.0.1:${port}/healthz`)).rejects.toThrow();
+  });
+
+  it("maps a sidecar's root-relative redirect under the mount, and forwards one already under it unchanged", async () => {
+    const hub = await startHub({
+      port: 0,
+      homeDir: join(dir, "home"),
+      keepAlive: true,
+      healthIntervalMs: 60_000,
+      sidecars: { plan: async (name) => ({ ok: true, plan: planFor(name) }), memoryFloorBytes: 0, freeMemory: () => null, healthPollMs: 50 },
+    });
+    hubs.push(hub);
+    const redirect = async (to: string) =>
+      (await fetch(`http://127.0.0.1:${hub.port}/x/recon/redirect?to=${encodeURIComponent(to)}`, { redirect: "manual" })).headers.get("location");
+
+    expect(await redirect("/done")).toBe("/x/recon/done");
+    // Built from X-Ndx-Base-Path, as docs/extensions/hub-api.md advises.
+    expect(await redirect("/x/recon/done")).toBe("/x/recon/done");
+    expect(await redirect("/x/recon")).toBe("/x/recon");
+    // A path that only starts with the name is not under the mount.
+    expect(await redirect("/x/recondite")).toBe("/x/recon/x/recondite");
   });
 
   it("leaves no sidecar behind when a request starts one while the hub is closing", async () => {
