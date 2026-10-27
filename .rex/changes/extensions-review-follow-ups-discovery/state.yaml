@@ -54,7 +54,14 @@ items:
     lastModified: "2026-10-27T14:57:02.296Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "436bdb1a-8bc0-4250-8405-b506aa4590e3":
-    lastModified: "2026-10-27T13:51:16.437Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:38:59.519Z"
+    completedAt: "2026-10-27T15:42:40.104Z"
+    endedAt: "2026-10-27T15:42:40.104Z"
+    activeIntervals: [{"end":"2026-10-27T15:42:40.104Z","start":"2026-10-27T15:38:59.519Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "remove --purge skips the state folder when a shadowed non-user copy takes over, and names that copy"
+    lastModified: "2026-10-27T15:42:40.104Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "473f775b-508d-46fa-a65a-4c8e7e239fc2":
     status: "completed"

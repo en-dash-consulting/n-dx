@@ -375,12 +375,15 @@ async function remove(ctx, name, purge) {
     ctx.err(`Error: npm uninstall ${packageName} failed (exit ${code}).`);
     return 1;
   }
+  // The user copy won over another copy, which takes over now that it is gone.
+  const successor = ext?.source === "user" ? ext.shadowed.find((s) => s.source !== "user") : undefined;
   if (!ext || ext.source === "user") {
     updateExtensionsFile(d.home, (file) => {
       forgetApproval(file, packageName);
       if (ext) setDisabled(file, stateKey(ext), false);
     });
     ctx.out(`Removed ${packageName}.`);
+    if (successor) ctx.out(`The ${successor.source} copy at ${successor.dir} now applies.`);
   } else {
     // The user copy was shadowed; the approval and the disable belong to the copy still in use.
     ctx.out(`Removed the user copy of ${packageName}. The ${ext.source} copy at ${ext.dir} is still installed and still used.`);
@@ -392,6 +395,8 @@ async function remove(ctx, name, purge) {
       ctx.err(`Nothing purged: ${packageName} declares no valid extension name, so it has no state folder.`);
     } else if (ext && ext.source !== "user") {
       ctx.err(`Nothing purged: the ${ext.source} copy still uses the state folder of '${extName}'.`);
+    } else if (successor) {
+      ctx.err(`Nothing purged: the ${successor.source} copy at ${successor.dir} now uses the state folder of '${extName}'.`);
     } else {
       const stateDir = join(d.home, EXTENSION_STATE_DIRNAME, extName);
       nodeFs.rmSync(stateDir, { recursive: true, force: true });
