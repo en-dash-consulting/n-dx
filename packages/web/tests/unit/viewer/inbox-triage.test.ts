@@ -262,6 +262,18 @@ describe("the page's keyboard", () => {
     expect(selectedId()).toBe("b");
   });
 
+  it("the arrows move the selection on the focused queue, and only there", async () => {
+    serveThree();
+    await mountPage();
+    const list = $(".inbox-queue-list")!;
+    await key("ArrowDown", list);
+    expect(selectedId()).toBe("a");
+    await key("ArrowUp", list);
+    expect(selectedId()).toBe("c");
+    await key("ArrowDown");
+    expect(selectedId()).toBe("c");
+  });
+
   it("1–5 pick a candidate, T and A set the relation", async () => {
     serveThree();
     await mountPage();

@@ -4,7 +4,14 @@ items:
     lastModified: "2026-10-27T16:32:01.524Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2bdda5a6-d7b9-498b-ae07-a75d55f84ef9":
-    lastModified: "2026-10-27T16:32:00.179Z"
+    status: "completed"
+    startedAt: "2026-10-27T23:38:17.549Z"
+    completedAt: "2026-10-27T23:47:13.893Z"
+    endedAt: "2026-10-27T23:47:13.893Z"
+    activeIntervals: [{"end":"2026-10-27T23:47:13.893Z","start":"2026-10-27T23:38:17.549Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ba27bd3ac: InboxTriagePage (views/inbox-triage.ts) routed for the inbox view outside its Plan section; queue + inline ChangePlacementSection, Place & next, Skip, visit count, keyboard shortcuts; 15 view tests."
+    lastModified: "2026-10-27T23:47:13.893Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "df267cb1-964a-4eda-b50d-3680296ec447":
     lastModified: "2026-10-27T16:32:01.524Z"

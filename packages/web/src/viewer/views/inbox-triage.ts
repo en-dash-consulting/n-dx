@@ -54,6 +54,10 @@ export function shortcutFor(e: Pick<KeyboardEvent, "key" | "target" | "ctrlKey" 
     const el = e.target instanceof Element ? e.target : null;
     return el?.closest("button, a, summary") ? null : { kind: "place" };
   }
+  // The queue is a listbox, so its arrows move too; elsewhere they stay native (radio groups).
+  if ((key === "ArrowDown" || key === "ArrowUp") && e.target instanceof Element && e.target.getAttribute("role") === "listbox") {
+    return { kind: "move", delta: key === "ArrowDown" ? 1 : -1 };
+  }
   if (key >= "1" && key <= "5") return { kind: "pick", n: Number(key) };
   switch (key) {
     case "j": return { kind: "move", delta: 1 };
