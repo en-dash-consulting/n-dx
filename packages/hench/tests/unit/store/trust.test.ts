@@ -89,6 +89,27 @@ describe("applyRepoTrust", () => {
     expect(restricted.config.claudePath).toBe("/opt/claude");
   });
 
+  it("drops the repository's guard.env.allow until trusted, keeping local allow entries and every deny", () => {
+    const shipped = DEFAULT_HENCH_CONFIG();
+    shipped.guard = { ...shipped.guard, env: { allow: ["AWS_*"], deny: ["REPO_DENY"] } };
+    writeHenchConfig(shipped);
+    writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench: { guard: { env: { allow: ["MY_TEST_*"], deny: ["LOCAL_DENY"] } } } }));
+    // As loadConfig merges it: the local overlay replaces the arrays.
+    const config = DEFAULT_HENCH_CONFIG();
+    config.guard = { ...config.guard, env: { allow: ["AWS_*", "MY_TEST_*"], deny: ["REPO_DENY", "LOCAL_DENY"] } };
+
+    const restricted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+    expect(restricted.evaluation.state).toBe("untrusted");
+    expect(restricted.clamped).toBe(true);
+    expect(restricted.config.guard.env).toEqual({ allow: ["MY_TEST_*"], deny: ["REPO_DENY", "LOCAL_DENY"] });
+    const warning = formatTrustWarningForRun(restricted.evaluation, "api").join("\n");
+    expect(warning).toContain("guard.env.allow is ignored");
+    expect(warning).toContain(".n-dx.local.json");
+
+    recordRepoTrust(repo, { ndxHome: home });
+    expect(applyRepoTrust(config, repo, undefined, { ndxHome: home }).config.guard.env?.allow).toEqual(["AWS_*", "MY_TEST_*"]);
+  });
+
   it("clamps to the detected baseline, not the language the repository declares", () => {
     writeFileSync(join(repo, "package.json"), "{}");
     const declaredSwift = DEFAULT_HENCH_CONFIG("swift");

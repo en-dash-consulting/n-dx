@@ -35,16 +35,15 @@
  *   blocked paths union with it, so an untrusted checkout can only ever
  *   *tighten* what the user's defaults allow.
  *
- * `guard.env.allow` is surfaced rather than clamped. It names variables the
- * agent's child processes may keep, so a repository-supplied entry widens
- * what a model-chosen command can read — but the same field is how an
- * operator deliberately passes a credential their own test suite needs, and
- * the two are indistinguishable once merged. Clamping would silently undo the
- * operator's intent, so the entries go in the digest and into a warning
- * instead: the user is asked, rather than overruled. The one place the
- * entries are withheld is the environment of a repository-owned command (the
- * test gate, post-task tests, the dependency audit, rex's verify command):
- * `repoCommandEnv` honours them only while the repository is trusted.
+ * `guard.env.allow` names variables child processes may keep, so an entry
+ * the repository ships (`.hench/config.json`, the project config's `hench`
+ * section) widens what a model-chosen command can read. While the repository
+ * is not trusted those entries are dropped everywhere: from the agent's shell
+ * (hench's `applyRepoTrust`) and from repository-owned commands such as the
+ * test gate, post-task tests, the dependency audit and rex's verify command
+ * (`repoCommandEnv`). An operator who needs a credential in their own tests
+ * puts it in the git-ignored `.n-dx.local.json`, whose entries always apply,
+ * or accepts the checkout. `deny` entries only remove, so they always apply.
  *
  * The trust store is deliberately a plain file for now. It records a
  * decision, not a secret; an encrypted store is a later concern.
@@ -1031,6 +1030,10 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
     lines.push("  Until trusted, hench runs with the default guard (the repository's config can only tighten it),");
     lines.push("  bypassPermissions is lowered to acceptEdits, verify_criteria does not run the test command,");
     lines.push("  and the project config's API endpoints and API key variables are ignored.");
+    if (ev.findings.some((f) => f.code === "env-allow-added")) {
+      lines.push("  The repository's guard.env.allow is ignored too. If your own tests need one of those variables,");
+      lines.push(`  add it to hench.guard.env.allow in .n-dx.local.json, or accept the configuration.`);
+    }
     lines.push(`  To accept this configuration: ${accept}`);
   } else if (pendingTestCommand) {
     lines.push(`  verify_criteria and rex verify run the test command only once accepted: ${accept}`);
