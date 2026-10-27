@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b1dd0bde-32a5-418c-a046-917e7d407181":
+    status: "completed"
+    startedAt: "2026-10-01T03:32:21.363Z"
+    completedAt: "2026-10-01T03:55:07.846Z"
+    endedAt: "2026-10-01T03:55:07.846Z"
+    resolutionType: "code-change"
+    resolutionDetail: "New server/run-tail.ts (confinement, cursor readers, watch lease) + GET /api/hench/runs/:id/log?from= and /events?after= in routes-hench.ts; hench:run-appended frames via the request's tagged broadcaster; 30 tests."
+    appliedAt: "2026-10-01T03:55:07.846Z"
+    lastModified: "2026-10-01T03:55:08.256Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

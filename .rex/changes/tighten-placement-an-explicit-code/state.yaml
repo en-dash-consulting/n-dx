@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "dd0b540e-7b34-44d3-ac8e-299c4b9391b8":
+    status: "completed"
+    startedAt: "2026-10-08T05:03:59.289Z"
+    completedAt: "2026-10-08T05:10:58.351Z"
+    endedAt: "2026-10-08T05:10:58.351Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Code-health by tag only; amends needs leading verb + 'Relation: amends' marker; text model runs on empty shortlist with areas, unknown-area proposals dropped. Tests in placement*.test.ts."
+    appliedAt: "2026-10-08T05:10:58.351Z"
+    lastModified: "2026-10-08T05:10:58.673Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

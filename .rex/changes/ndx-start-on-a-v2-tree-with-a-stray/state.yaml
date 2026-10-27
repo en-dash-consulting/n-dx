@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "553621c0-4ccc-40a6-9ea1-c4e5b40b002e":
+    status: "completed"
+    startedAt: "2026-10-13T16:43:43.777Z"
+    completedAt: "2026-10-13T16:47:12.195Z"
+    endedAt: "2026-10-13T16:47:12.195Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Rex fix d1dc7f68 covers the startup path; added web test pinning it. start.ts unchanged."
+    appliedAt: "2026-10-13T16:47:12.195Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T16:47:12.479Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

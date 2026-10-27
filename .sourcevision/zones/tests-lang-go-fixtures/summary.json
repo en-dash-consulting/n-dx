@@ -1,0 +1,31 @@
+{
+  "id": "tests-lang-go-fixtures",
+  "name": "Tests Lang Go Fixtures",
+  "description": "Non-source files in packages: api.go, main.go, store.go (+9 more)",
+  "files": [
+    "packages/lang-go/tests/fixtures/go-resolver/api/api.go",
+    "packages/lang-go/tests/fixtures/go-resolver/api/cmd/server/main.go",
+    "packages/lang-go/tests/fixtures/go-resolver/api/internal/store/store.go",
+    "packages/lang-go/tests/fixtures/go-resolver/kit/log/log.go",
+    "packages/lang-go/tests/fixtures/go-resolver/lib/greet/greet.go",
+    "packages/lang-go/tests/fixtures/go-resolver/plain/main.go",
+    "packages/lang-go/tests/fixtures/go-resolver/plain/util/util.go",
+    "packages/lang-go/tests/fixtures/go-resolver/shared/shared.go",
+    "packages/lang-go/tests/fixtures/go-resolver/tools/internal/x/x.go",
+    "packages/lang-go/tests/fixtures/go-resolver/tools/main.go",
+    "packages/lang-go/tests/fixtures/language-packs/go/src/orders/service.go",
+    "packages/lang-go/tests/fixtures/language-packs/go/src/util/util.go"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 12,
+  "lineCount": 135,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

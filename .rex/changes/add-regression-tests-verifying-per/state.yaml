@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "ff7940bf-1dd2-4871-8e5a-53a4cac4fc10":
+    status: "completed"
+    startedAt: "2026-05-28T15:59:25.685Z"
+    completedAt: "2026-05-28T16:05:26.018Z"
+    endedAt: "2026-05-28T16:05:26.018Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added tests/e2e/skill-commit-isolation.test.js (28 structural tests) and tests/integration/skill-commit-behavior.test.js (14 behavioral git-fixture tests). All pass without network access or LLM calls."
+    appliedAt: "2026-05-28T16:05:26.018Z"

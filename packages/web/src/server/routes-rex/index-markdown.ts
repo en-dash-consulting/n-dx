@@ -10,7 +10,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadPRDSync } from "../prd-io.js";
-import { errorResponse } from "../response-utils.js";
+import { errorResponse, errorMessage } from "../response-utils.js";
 import { PRD_TREE_DIRNAME, resolveSiblingSlugs, type PRDItem } from "../rex-gateway.js";
 import type { ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
@@ -115,7 +115,7 @@ export function getIndexMarkdown(
     res.end(content);
     return true;
   } catch (err) {
-    errorResponse(res, 500, `Failed to read index.md: ${String(err)}`);
+    errorResponse(res, 500, `Failed to read index.md: ${errorMessage(err)}`);
     return true;
   }
 }

@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "11e14b47-8392-42ab-ba33-afc6085807d5":
+    status: "completed"
+    startedAt: "2026-04-21T17:09:01.983Z"
+    completedAt: "2026-04-21T17:17:09.123Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added resolveConfiguredModel + printVendorModelHeader to reshape, reorganize, and prune commands. 19 integration tests verify precedence (flag > config > default) and header ordering."
+    appliedAt: "2026-04-21T17:17:09.123Z"

@@ -1,0 +1,27 @@
+{
+  "id": "sourcevision/analyzers/analyzers",
+  "name": "Analyzers",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/analysis-outcome.ts",
+    "packages/sourcevision/src/analyzers/workspace-aggregate.ts",
+    "packages/sourcevision/src/analyzers/workspace-crossings.ts",
+    "packages/sourcevision/src/analyzers/workspace.ts",
+    "packages/sourcevision/src/paths.ts",
+    "packages/sourcevision/src/schema/data-files.ts",
+    "packages/sourcevision/src/util/paths.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/analysis-outcome.ts",
+    "packages/sourcevision/src/analyzers/workspace-aggregate.ts",
+    "packages/sourcevision/src/analyzers/workspace-crossings.ts",
+    "packages/sourcevision/src/analyzers/workspace.ts",
+    "packages/sourcevision/src/paths.ts",
+    "packages/sourcevision/src/schema/data-files.ts",
+    "packages/sourcevision/src/util/paths.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 7,
+  "lineCount": 2113
+}

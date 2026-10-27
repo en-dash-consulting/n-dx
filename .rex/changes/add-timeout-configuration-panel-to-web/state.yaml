@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "1160eb2b-e2d9-40ab-8f3a-fade05c697b8":
+    status: "completed"
+    startedAt: "2026-04-03T18:58:26.092Z"
+    completedAt: "2026-04-20T14:09:06.617Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Feature fully implemented in packages/web: CliTimeoutsView (cli-timeout.ts), routes-cli-timeout.ts (GET/PUT /api/cli/timeouts), CSS, view registry, server route registration, and unit tests. All 5 ACs satisfied."
+    appliedAt: "2026-04-20T14:09:06.617Z"

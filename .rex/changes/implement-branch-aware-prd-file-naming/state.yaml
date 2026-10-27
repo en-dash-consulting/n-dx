@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "e7e01442-70f8-42bf-8763-d31afb20acf9":
+    status: "completed"
+    startedAt: "2026-04-22T16:18:39.803Z"
+    completedAt: "2026-04-22T16:24:16.600Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added branch-naming.ts with sanitizeBranchName, resolveGitBranch, getFirstCommitDate, generatePRDFilename, resolvePRDFilename. 26 unit tests covering pure functions and git-dependent edge cases. Exported from store/index.ts and public.ts."
+    appliedAt: "2026-04-22T16:24:16.600Z"

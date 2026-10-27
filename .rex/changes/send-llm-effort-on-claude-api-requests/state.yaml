@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "0694393f-44d5-4bf0-abb2-f36c457b8fd5":
+    status: "completed"
+    startedAt: "2026-10-02T05:36:29.710Z"
+    completedAt: "2026-10-02T06:03:45.282Z"
+    endedAt: "2026-10-02T06:03:45.282Z"
+    resolutionType: "code-change"
+    resolutionDetail: "resolveClaudeApiEffort (llm-client/src/claude-effort.ts) applied by the API provider and hench's API loop; call sites thread resolveTaskModel effort; tests + changeset; commit 4c4a7402e."
+    appliedAt: "2026-10-02T06:03:45.282Z"
+    lastModified: "2026-10-02T06:03:45.649Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

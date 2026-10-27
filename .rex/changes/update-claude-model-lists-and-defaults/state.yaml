@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "44c9ca18-ad05-426f-a0f7-0d217140a593":
+    status: "completed"
+    startedAt: "2026-10-02T04:27:52.883Z"
+    completedAt: "2026-10-02T04:56:32.343Z"
+    endedAt: "2026-10-02T04:56:32.343Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added opus-5-5/sonnet-5-5/fable-5-1 (rates verified on pricing page), moved Claude defaults/tiers/aliases/review model, init catalog + legacy aliases, footer version rendering, help/docs, tests, changeset."
+    appliedAt: "2026-10-02T04:56:32.343Z"
+    lastModified: "2026-10-02T04:56:33.847Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

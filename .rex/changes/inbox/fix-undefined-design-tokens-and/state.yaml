@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "623a333a-753b-4609-8edc-6d21db064719":
+    status: "completed"
+    startedAt: "2026-08-17T15:41:43.504Z"
+    completedAt: "2026-08-17T15:41:43.504Z"
+    endedAt: "2026-08-17T15:41:43.504Z"
+    appliedAt: "2026-08-17T15:41:43.504Z"
+    needsPlacement: true

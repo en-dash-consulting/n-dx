@@ -56,6 +56,7 @@ export type { ProjectOverrideSource } from "@n-dx/llm-client";
 
 // ---- Shared constants -------------------------------------------------------
 export {
+  CLI_LOG_FILENAME,
   DEFAULT_LLM_VENDOR,
   LLM_VENDOR,
   LLM_VENDORS,

@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "21d0a1c3-10c5-486b-a712-7a9cc9ab30b3":
+    status: "completed"
+    startedAt: "2026-08-03T14:59:13.040Z"
+    completedAt: "2026-08-03T15:09:33.366Z"
+    endedAt: "2026-08-03T15:09:33.366Z"
+  "582769c3-90f7-4524-afe5-8fe3c7e4dc67":
+    status: "completed"
+    startedAt: "2026-08-03T15:10:30.060Z"
+    completedAt: "2026-08-03T15:25:58.971Z"
+    endedAt: "2026-08-03T15:25:58.971Z"
+  "716f8f93-0de9-409a-842e-0fb26bcd7fc0":
+    status: "completed"
+    startedAt: "2026-08-03T15:34:05.741Z"
+    completedAt: "2026-08-03T15:34:05.741Z"
+    endedAt: "2026-08-03T15:34:05.741Z"
+    appliedAt: "2026-08-03T15:34:05.741Z"
+  "c9a53f95-ecd2-4c20-8bcf-a917668ea7c6":
+    status: "completed"
+    startedAt: "2026-08-03T15:26:37.149Z"
+    completedAt: "2026-08-03T15:34:04.826Z"
+    endedAt: "2026-08-03T15:34:04.826Z"

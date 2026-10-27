@@ -1,0 +1,43 @@
+schema: "rex/v2"
+items:
+  "0c437e81-6092-45e7-a5dd-358d2c662184":
+    status: "completed"
+    startedAt: "2026-09-28T18:50:22.807Z"
+    completedAt: "2026-09-28T19:22:33.969Z"
+    endedAt: "2026-09-28T19:22:33.969Z"
+    lastModified: "2026-09-28T19:22:34.802Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "107fb07a-4c1a-4be0-94b3-0fcd12043962":
+    status: "completed"
+    startedAt: "2026-09-28T20:23:09.122Z"
+    completedAt: "2026-09-28T21:05:38.702Z"
+    endedAt: "2026-09-28T21:05:38.702Z"
+    resolutionType: "code-change"
+    resolutionDetail: "hench cache list/clear with --scope=parent|batch|all and --dead; CacheDefect split from identity rejections so only dead-for-everyone entries are evicted; per-run sweep of the scopes the active strategy does not read; settleBatchChain ends a chain on task failure. Cache-contents allowlist test proves no prompt content is persisted. Verified: build, typecheck, 4054 hench tests, 2729 root tests, live CLI smoke."
+    lastModified: "2026-09-28T21:05:39.541Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "2213c02b-5060-4f8f-80f1-15999102f45c":
+    status: "completed"
+    startedAt: "2026-10-09T04:38:02.565Z"
+    completedAt: "2026-10-09T04:38:02.565Z"
+    endedAt: "2026-10-09T04:38:02.565Z"
+    appliedAt: "2026-10-09T04:38:02.565Z"
+    needsPlacement: true
+    lastModified: "2026-10-09T04:38:03.080Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "75ddf4d1-c7f8-4a9e-a439-0f0b15310ed8":
+    status: "completed"
+    startedAt: "2026-09-28T21:59:05.159Z"
+    completedAt: "2026-09-29T15:16:10.375Z"
+    endedAt: "2026-09-29T15:16:10.375Z"
+    lastModified: "2026-09-29T15:16:12.693Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "adc8930f-0411-461c-956c-47f6438a228b":
+    status: "completed"
+    startedAt: "2026-09-28T21:05:47.106Z"
+    completedAt: "2026-09-28T21:58:56.923Z"
+    endedAt: "2026-09-28T21:58:56.923Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Validated the implementation committed as 1585ea9b (whose gate died against a stale dist), then closed the one gap against acceptance criterion 1: API-provider runs recorded no session decision at all. Added API_SESSION_DECISION (cold / api-provider), plumbed it through initRunRecord's new optional session field from all three API loop call sites, and added the prose to both the CLI and dashboard reason maps."
+    lastModified: "2026-09-28T21:58:57.776Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

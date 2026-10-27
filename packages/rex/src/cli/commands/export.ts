@@ -19,8 +19,10 @@
  * Not to be confused with `ndx export`, which publishes the static dashboard.
  */
 
-import { join, resolve, dirname, relative, isAbsolute } from "node:path";
+import { join, resolve, dirname, basename, relative, isAbsolute } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
+import { layoutStateNames } from "@n-dx/llm-client";
 import {
   resolveStore,
   prdLockPath,
@@ -152,19 +154,45 @@ export function resolveItemRef(items: PRDItem[], ref: string): ItemRefMatch[] {
  * every rex command. Nothing is ever legitimately exported into `.rex/`.
  */
 export function assertOutsideRexDir(outPath: string, dir: string, noun: string, example: string): void {
-  const rexRoot = resolveRexPaths(dir).rexDir;
-  const rel = relative(rexRoot, outPath);
-  const inside = rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
-  if (inside) {
-    // Named as the operator would see it in a listing — `.rex` or `.ndx/rex`
-    // depending on the layout, rather than a fixed string that is wrong on one
-    // of them.
-    const label = relative(dir, rexRoot).replaceAll("\\", "/");
-    throw new CLIError(
-      `Refusing to write a ${noun} inside ${label}/.`,
-      `${label}/ is PRD storage — pick a path outside it, e.g. --out=${example}`,
-    );
+  const target = canonicalPath(outPath);
+  // The current rex directory plus every state directory either layout names:
+  // on a legacy project `.ndx/` does not exist yet, and creating it to hold an
+  // output would flip layout detection.
+  const guarded = [
+    resolveRexPaths(dir).rexDir,
+    ...layoutStateNames().dirNames.map((name) => join(resolve(dir), name)),
+  ];
+  for (const guard of guarded) {
+    const rel = relative(canonicalPath(guard), target);
+    if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))) {
+      // Named as the operator would see it in a listing, not a fixed string.
+      const label = relative(dir, guard).replaceAll("\\", "/");
+      throw new CLIError(
+        `Refusing to write a ${noun} inside ${label}/.`,
+        `${label}/ is n-dx state — pick a path outside it, e.g. --out=${example}`,
+      );
+    }
   }
+}
+
+/**
+ * `path` with symlinks resolved through its nearest existing ancestor (the
+ * path itself may not exist yet), case-folded where filesystems usually are.
+ * Plain `path.relative` misses a symlink to a guarded directory, a `/tmp`
+ * versus `/private/tmp` alias, a Windows 8.3 short name (`RUNNER~1`) and `.REX`
+ * on a case-insensitive volume. Only `realpathSync.native` expands short names.
+ */
+function canonicalPath(path: string): string {
+  let existing = resolve(path);
+  const tail: string[] = [];
+  while (!existsSync(existing)) {
+    const parent = dirname(existing);
+    if (parent === existing) break;
+    tail.unshift(basename(existing));
+    existing = parent;
+  }
+  const real = join(existsSync(existing) ? realpathSync.native(existing) : existing, ...tail);
+  return process.platform === "darwin" || process.platform === "win32" ? real.toLowerCase() : real;
 }
 
 export async function cmdExport(dir: string, flags: Record<string, string>): Promise<void> {

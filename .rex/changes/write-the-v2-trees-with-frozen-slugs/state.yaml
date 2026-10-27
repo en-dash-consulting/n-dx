@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b037993a-b439-4441-b2c3-ccd9509f487e":
+    status: "completed"
+    startedAt: "2026-10-07T18:22:58.475Z"
+    completedAt: "2026-10-07T18:34:15.347Z"
+    endedAt: "2026-10-07T18:34:15.347Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added store/prd-model-writer.ts (writePrdModel), 17 tests, and canonicalized the v2 fixture. Commit 454b14880."
+    appliedAt: "2026-10-07T18:34:15.347Z"
+    lastModified: "2026-10-07T18:34:15.566Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

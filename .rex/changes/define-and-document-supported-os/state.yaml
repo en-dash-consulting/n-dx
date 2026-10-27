@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "b5b46766-b81c-44ac-b259-9a90ea1f4c43":
+    status: "completed"
+    startedAt: "2026-04-19T04:37:52.665Z"
+    completedAt: "2026-04-19T04:40:13.435Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added ## Requirements section with platform support table to README.md covering macOS (supported), Linux (supported), Windows WSL2 (supported), and Windows native (experimental)."
+    appliedAt: "2026-04-19T04:40:13.435Z"

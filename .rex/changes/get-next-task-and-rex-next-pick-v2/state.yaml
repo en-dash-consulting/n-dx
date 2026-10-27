@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "214ed10c-05ee-4f6d-9ed6-baed06ac865a":
+    status: "completed"
+    startedAt: "2026-10-12T08:18:22.856Z"
+    completedAt: "2026-10-12T08:35:24.024Z"
+    endedAt: "2026-10-12T08:35:24.024Z"
+    resolutionType: "code-change"
+    resolutionDetail: "get_next_task and rex next dispatch on the change-layer store to findNextWork via core/change-next-task.ts (v1 shape + type, displayId, parentChain[].type, changeId); nested changes are containers."
+    appliedAt: "2026-10-12T08:35:24.024Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T08:35:24.287Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

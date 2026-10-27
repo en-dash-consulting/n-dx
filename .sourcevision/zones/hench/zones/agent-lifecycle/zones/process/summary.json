@@ -1,0 +1,26 @@
+{
+  "id": "hench/agent-lifecycle/process",
+  "name": "Process Execution Pipeline",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/analysis/review.ts",
+    "packages/hench/src/process/exec-shell.ts",
+    "packages/hench/src/process/exec.ts",
+    "packages/hench/src/process/git-ancestry.ts",
+    "packages/hench/src/tools/cleanup-transformations.ts",
+    "packages/hench/src/tools/dead-code-analyzer.ts",
+    "packages/hench/src/tools/exec-shell.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/analysis/review.ts",
+    "packages/hench/src/process/exec.ts",
+    "packages/hench/src/process/git-ancestry.ts",
+    "packages/hench/src/tools/cleanup-transformations.ts",
+    "packages/hench/src/tools/dead-code-analyzer.ts",
+    "packages/hench/src/tools/exec-shell.ts"
+  ],
+  "cohesion": 0.41,
+  "coupling": 0.59,
+  "fileCount": 7,
+  "lineCount": 2503
+}

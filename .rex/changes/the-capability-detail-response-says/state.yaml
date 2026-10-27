@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "dfae74fb-f70e-4e7a-8a3a-ebfa2e1b7431":
+    status: "completed"
+    startedAt: "2026-10-13T18:57:01.473Z"
+    completedAt: "2026-10-13T19:00:32.467Z"
+    endedAt: "2026-10-13T19:00:32.467Z"
+    resolutionType: "code-change"
+    resolutionDetail: "buildCapabilityDetail returns met and specChangedSinceMet from metAt and specHash(nodeSpec(node)); route test with a revised node reading changing; changeset soft-freeze line."
+    appliedAt: "2026-10-13T19:00:32.467Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T19:00:32.772Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

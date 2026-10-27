@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "400f7e1e-ab50-429d-917b-dc38aa41ff3a":
+    status: "completed"
+    startedAt: "2026-04-19T03:35:57.566Z"
+    completedAt: "2026-04-19T03:39:08.521Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created docs/cli-ui-gap.md: 33 commands enumerated, rated full/partial/none, ranked by impact with implementation estimates."
+    appliedAt: "2026-04-19T03:39:08.521Z"

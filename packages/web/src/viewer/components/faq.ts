@@ -1,5 +1,6 @@
 import { h, Fragment } from "preact";
 import { ActionIcon } from "./action-icon.js";
+import { BodyPortal } from "./body-portal.js";
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { useCliName, resolveCliLabel } from "../hooks/index.js";
 
@@ -153,7 +154,8 @@ function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSec
     setExpandedSection((prev) => (prev === title ? null : title));
   }, []);
 
-  return h("div", {
+  // Opened from the bottom bar, whose z-index would cap the overlay's.
+  return h(BodyPortal, null, h("div", {
       class: "faq-overlay",
       onClick: onClose,
       role: "dialog",
@@ -217,7 +219,7 @@ function FAQModal({ onClose, initialSection }: { onClose: () => void; initialSec
         ),
       ),
     ),
-  );
+  ));
 }
 
 /**

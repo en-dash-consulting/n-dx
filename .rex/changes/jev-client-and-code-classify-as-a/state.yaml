@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "6c302b20-92d4-43ff-833d-74a62b9fc72b":
+    status: "completed"
+    startedAt: "2026-09-22T02:20:26.882Z"
+    completedAt: "2026-09-22T02:36:37.758Z"
+    endedAt: "2026-09-22T02:36:37.758Z"
+    resolutionType: "code-change"
+    resolutionDetail: "jev-client.ts + classifyBatchWithJev in sourcevision; resolveJudgmentRoute in @n-dx/llm-client; env-gated per-task-class routing; unit + e2e green; live run on this repo classified 191/277 files in 5.2 s"
+    appliedAt: "2026-09-22T02:36:37.758Z"
+    lastModified: "2026-09-22T02:36:37.770Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

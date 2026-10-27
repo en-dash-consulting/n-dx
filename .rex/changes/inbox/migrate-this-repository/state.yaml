@@ -1,0 +1,46 @@
+schema: "rex/v2"
+items:
+  "1c14cb3f-bcd7-456b-890d-b7b297e60a7e":
+    status: "completed"
+    startedAt: "2026-10-16T18:24:16.665Z"
+    completedAt: "2026-10-16T18:24:16.665Z"
+    endedAt: "2026-10-16T18:24:16.665Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-16T18:24:16.980Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1ddbce45-9768-4e21-bd5b-210f5d3cef47":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-22T18:49:10.000Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "21735168-45e9-4fc5-832f-1d8c6dc666a5":
+    lastModified: "2026-10-06T04:20:38.184Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "307252b3-1676-4c85-8e36-defa707e6d0b":
+    status: "completed"
+    startedAt: "2026-10-16T02:54:01.458Z"
+    completedAt: "2026-10-16T03:00:06.908Z"
+    endedAt: "2026-10-16T03:00:06.908Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Repo-PRD tests read either layout or skip on v2 with stated reason; v1 coverage kept on fixture."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-16T03:00:07.174Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5ca97c50-6fd3-4d97-99cd-42f7638eacfb":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    needsPlacement: true
+    lastModified: "2026-10-09T19:07:27.903Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8126e68e-9c80-4a35-a049-ac0415c38896":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-22T18:49:10.000Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9395aab1-87e4-4fee-a1b1-ee8fd6109fc4":
+    status: "completed"
+    startedAt: "2026-10-16T03:00:22.443Z"
+    completedAt: "2026-10-16T03:04:55.044Z"
+    endedAt: "2026-10-16T03:04:55.044Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Boot PRD cache is now written before the server listens (start.ts); integration test boots the built server with no cache and asserts the first /api/rex/prd is 200 on v1 and v2 trees. Commit cc52920fb."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-16T03:04:55.322Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

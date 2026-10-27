@@ -306,7 +306,7 @@ describe("buildShellInvocation", () => {
   it("falls back to cmd.exe on win32 when no POSIX shell is resolvable", () => {
     expect(buildShellInvocation("npm run test", "win32", false)).toEqual({
       cmd: "cmd.exe",
-      args: ["/d", "/s", "/c", '"npm run test"'],
+      args: ["/d", "/v:off", "/s", "/c", '"npm run test"'],
       kind: "cmd",
     });
   });
@@ -321,7 +321,7 @@ describe("buildShellInvocation", () => {
     // `/s` strips the outermost pair and leaves the rest verbatim, so quotes
     // the caller put around a spaced path must survive untouched.
     const { args } = buildShellInvocation('vitest run "src/a b/x.test.ts"', "win32", false);
-    expect(args[3]).toBe('"vitest run "src/a b/x.test.ts""');
+    expect(args[4]).toBe('"vitest run "src/a b/x.test.ts""');
   });
 });
 
@@ -407,7 +407,7 @@ describe("execShellCmd", () => {
     });
 
     expect(spawned.calls[0]!.cmd).toBe("cmd.exe");
-    expect(spawned.calls[0]!.args).toEqual(["/d", "/s", "/c", '"npm run test"']);
+    expect(spawned.calls[0]!.args).toEqual(["/d", "/v:off", "/s", "/c", '"npm run test"']);
     // Without this, Node re-quotes the already-self-quoted line and /s strips
     // the wrong pair.
     expect(spawned.calls[0]!.opts.windowsVerbatimArguments).toBe(true);
@@ -458,7 +458,7 @@ describe("getCurrentHead", () => {
       ["rev-parse", "HEAD"],
       // stderr is captured, not inherited: probing a directory that may not be
       // a repository must not print `fatal: not a git repository` to the user.
-      { cwd: "/project", encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+      { cwd: "/project", windowsHide: true, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
     );
   });
 
@@ -493,6 +493,7 @@ describe("getWorktreeRoot", () => {
       ["rev-parse", "--show-toplevel"],
       {
         cwd: "/does/not/exist/project/src",
+        windowsHide: true,
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "pipe"],
       },
@@ -526,6 +527,7 @@ describe("getGitCommonDir", () => {
       ["rev-parse", "--git-common-dir"],
       {
         cwd: "/does/not/exist/project",
+        windowsHide: true,
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "pipe"],
       },
@@ -1391,7 +1393,7 @@ describe("spawnCli", () => {
 
     expect(mockSpawn).toHaveBeenCalledWith(
       "cmd.exe",
-      ["/d", "/s", "/c", '"claude.cmd "--print" "hi""'],
+      ["/d", "/v:off", "/s", "/c", '"claude.cmd "--print" "hi""'],
       expect.objectContaining({ windowsVerbatimArguments: true }),
     );
     const spawnOpts = mockSpawn.mock.calls[0][2] as Record<string, unknown>;
@@ -1406,7 +1408,7 @@ describe("spawnCli", () => {
 
     expect(mockSpawn).toHaveBeenCalledWith(
       "cmd.exe",
-      ["/d", "/s", "/c", '""C:\\Program Files\\claude\\claude.cmd" "--print""'],
+      ["/d", "/v:off", "/s", "/c", '""C:\\Program Files\\claude\\claude.cmd" "--print""'],
       expect.objectContaining({ windowsVerbatimArguments: true }),
     );
   });

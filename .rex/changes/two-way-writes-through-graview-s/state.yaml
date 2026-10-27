@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "424ddbbe-f35a-4bff-bdc0-1a89e17ff387":
+    status: "completed"
+    startedAt: "2026-10-10T05:02:20.420Z"
+    completedAt: "2026-10-10T05:13:00.843Z"
+    endedAt: "2026-10-10T05:13:00.843Z"
+    resolutionType: "code-change"
+    resolutionDetail: "lastModified as the version in the projection, rexMcpEndpoint + ndx graview info and the serve hand-off in n-dx; the door, RemoteSystem, pre-empting loop and rail status in n-dx-graview, tested headless and proved live through the hub"
+    appliedAt: "2026-10-10T05:13:00.843Z"
+    lastModified: "2026-10-10T05:13:01.130Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

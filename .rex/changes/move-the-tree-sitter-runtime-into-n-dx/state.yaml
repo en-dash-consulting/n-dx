@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "ca4bde1e-6f52-43b8-a8d1-d75ef044d56a":
+    status: "completed"
+    startedAt: "2026-10-13T16:55:30.778Z"
+    completedAt: "2026-10-13T17:15:06.443Z"
+    endedAt: "2026-10-13T17:15:06.443Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Runtime, loader, facts adapter, build script and test helpers moved into @n-dx/lang-runtime; sourcevision imports them; corpus numbers match PR 11."
+    appliedAt: "2026-10-13T17:15:06.443Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-13T17:15:07.358Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -100,6 +100,17 @@
 .drop-box h2 { color: var(--accent); margin-bottom: var(--space-2); }
 .drop-box p { color: var(--text-dim); font-size: 14px; }
 
+/* A server that answered but would not serve the dashboard: a notice, not a drop target. */
+.drop-box.server-unavailable {
+  border-style: solid;
+  border-color: var(--orange);
+  max-width: 560px;
+  padding: var(--space-8) var(--space-10);
+}
+.drop-box.server-unavailable h2 { color: var(--orange); }
+.drop-box.server-unavailable p { margin: 0 0 var(--space-3); line-height: 1.5; }
+.drop-box.server-unavailable .server-unavailable-retry { margin: 0; font-size: 13px; }
+
 /* Locked view */
 .locked-view {
   display: flex;

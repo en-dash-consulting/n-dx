@@ -1,0 +1,22 @@
+---
+id: "779b0c9c-4f14-4333-8e96-fb5cca9439e4"
+type: "change"
+title: "infrastructure.ts keeps a fourth Terraform file set that disagrees with isTerraformFile on name case"
+slug: "infrastructure-ts-keeps-a-fourth"
+intent: "Verdict: out-of-scope (pre-existing; seen while reviewing 82129f65, which unified detect.ts and inventory.ts on isTerraformFile in language/terraform.ts). Severity low; no current failure.\n\npackages/sourcevision/src/analyzers/infrastructure.ts:494 isTerraformPath keeps its own copy of the Terraform file set because that module may import only node: builtins. It lowercases the whole name, but isTerraformFile matches terragrunt.hcl and *.tftest.hcl case-sensitively. Scenario: a file named Terragrunt.hcl or PLAN.TFTEST.HCL. infrastructure.ts treats it as Terraform and leaves it out of resource linking. Inventory and detection do not: inventory calls it Other, and detection finds no Terraform. Today the only effect is that a non-code file is left out of linking. But whenever the set changes, this copy can drift the way b88d60d0 did, and the agreement test added in 82129f65 does not cover it.\n\nOptions:\n1. Make the name-matching rules a builtin-only constant, e.g. a leaf module with no imports. Have both terraform.ts and infrastructure.ts use it. The catch: this feature's rule says infrastructure.ts is not edited, so it waits for the conversation with Sterling H.\n2. Export isTerraformPath and add it to the agreement test in terraform-config.test.ts. This is cheap, but it also edits infrastructure.ts.\nRecommend 2 once editing infrastructure.ts is allowed.\n\nDecision (Ryan, 2026-10-11, with Sterling H's OK to edit infrastructure.ts for this task only): option 2. A shared leaf module is ruled out because infrastructure.ts may import only node: builtins and type-only imports; the file says so in its header.\n- isTerraformPath in packages/sourcevision/src/analyzers/infrastructure.ts adopts isTerraformFile's rules: the extension (.tf, .tfvars) is compared lowercased; the names terragrunt.hcl and *.tftest.hcl are matched exactly, case-sensitive. Export it, and keep it builtin-only.\n- The agreement test in tests/unit/language/terraform-config.test.ts gains isTerraformPath alongside detection and the inventory.\n- Nothing else in infrastructure.ts changes; IAC_KINDS is not edited; nothing writes infrastructure.json or outbound.json.\n\nKnown gate failure: infrastructure.ts is bundled into the generated /iso-map skill script (.claude/skills/iso-map/scripts/iso-map.mjs, which holds its own copy of isTerraformPath). Agents cannot write .claude/, so tests/e2e/iso-skill-drift.test.js will fail in the run. Do not hand-edit the script. The Terraform side session regenerates it with node scripts/build-iso-skill.mjs after the run, checks that the diff is only isTerraformPath, and commits it with Ryan's OK."
+acceptanceCriteria:
+  - "isTerraformPath in infrastructure.ts is exported and decides with isTerraformFile's rules: .tf and .tfvars by lowercased extension, terragrunt.hcl and *.tftest.hcl by exact, case-sensitive name"
+  - "infrastructure.ts still imports only node: builtins and type-only imports"
+  - "The agreement test in terraform-config.test.ts covers detection, the inventory and isTerraformPath, and includes Terragrunt.hcl, PLAN.TFTEST.HCL, MAIN.TF, prod.TFVARS and main.tf.json"
+  - "No other edits to infrastructure.ts; IAC_KINDS unchanged; nothing writes infrastructure.json or outbound.json"
+  - "The sourcevision suite (SV_REQUIRE_GRAMMARS=1) and the static root policy tests pass; tests/e2e/iso-skill-drift.test.js is expected to fail until the session regenerates the skill script"
+touches:
+  - "8b4b34af-ec1d-4593-8266-67e39928289c"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "terraform"
+  - "sourcevision"
+source: "ndx-adversarial-review"
+---

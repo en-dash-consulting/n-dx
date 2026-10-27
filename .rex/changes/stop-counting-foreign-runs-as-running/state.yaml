@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f9b36652-edd2-45e2-ad07-01780bc6fc32":
+    status: "completed"
+    startedAt: "2026-10-02T02:09:14.900Z"
+    completedAt: "2026-10-02T02:15:35.717Z"
+    endedAt: "2026-10-02T02:15:35.717Z"
+    resolutionType: "code-change"
+    resolutionDetail: "liveRunningCount = liveRunCount (countsAsLive) + counts.jobs; tests + changeset added"
+    appliedAt: "2026-10-02T02:15:35.717Z"
+    lastModified: "2026-10-02T02:15:36.115Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

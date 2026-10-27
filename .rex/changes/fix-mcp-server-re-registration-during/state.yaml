@@ -1,0 +1,36 @@
+schema: "rex/v2"
+items:
+  "1809164d-c3be-4c8b-95c0-d8d29d2c87c1":
+    status: "completed"
+    startedAt: "2026-04-09T20:44:05.570Z"
+    completedAt: "2026-04-09T20:50:08.538Z"
+  "2f718148-1812-4472-99bb-56b0396057a8":
+    status: "completed"
+    startedAt: "2026-04-09T21:38:43.676Z"
+    completedAt: "2026-04-09T21:43:39.451Z"
+  "6da267b9-d888-42e2-aecb-9b112f60ed84":
+    status: "completed"
+    startedAt: "2026-04-09T21:10:06.271Z"
+    completedAt: "2026-04-10T18:34:31.906Z"
+    appliedAt: "2026-04-10T18:34:31.906Z"
+  "838b5702-f1cd-4839-a882-d2b135176d0a":
+    status: "completed"
+    startedAt: "2026-04-09T20:51:37.145Z"
+    completedAt: "2026-04-09T21:00:28.547Z"
+  "9474e0c0-dfca-486a-9b62-5b66fea5d235":
+    status: "completed"
+    startedAt: "2026-04-10T18:27:43.479Z"
+    completedAt: "2026-06-05T14:00:33.622Z"
+    endedAt: "2026-06-05T14:00:33.622Z"
+    resolutionType: "code-change"
+    resolutionDetail: "tests/integration/assistant-integration.test.js already exists with 4 passing tests covering both vendors, formatInitReport, and vendor-disable behavior. integration-coverage-policy satisfied."
+  "a9963fc8-717c-4d96-ab05-e4332cc42d65":
+    status: "completed"
+    startedAt: "2026-04-09T21:01:10.969Z"
+    completedAt: "2026-04-09T21:09:31.766Z"
+  "fa0a2b37-5288-42aa-8b20-1b2ad6beb0fb":
+    status: "completed"
+    startedAt: "2026-04-09T20:14:34.193Z"
+    completedAt: "2026-04-09T20:37:10.425Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Upgraded registerMcpServers to remove MCP servers from all three scopes (local, project, user) before re-adding, making ndx init fully idempotent."

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "6dceff60-d0b6-4d6e-894e-f6117d039cf3":
+    status: "completed"
+    startedAt: "2026-10-08T01:32:54.309Z"
+    completedAt: "2026-10-08T01:36:59.843Z"
+    endedAt: "2026-10-08T01:36:59.843Z"
+    resolutionType: "code-change"
+    resolutionDetail: "CI Linux leg builds the Java grammar (cached) and sets SV_REQUIRE_GRAMMARS=1; skipUnlessGrammar helper throws instead of skipping."
+    appliedAt: "2026-10-08T01:36:59.843Z"
+    lastModified: "2026-10-08T01:37:00.089Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

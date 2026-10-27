@@ -1,0 +1,29 @@
+schema: "rex/v2"
+items:
+  "68b54c8e-125b-439a-81a7-1810c62f3982":
+    status: "completed"
+    startedAt: "2026-05-08T16:19:22.306Z"
+    completedAt: "2026-05-08T16:36:13.286Z"
+    endedAt: "2026-05-08T16:36:13.286Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Reoriented merge graph to top-down layout with click-to-expand progressive disclosure. Only top-level (epic) PRD nodes render initially; clicking a node toggles its direct children and selects/highlights the subtree. Existing pan/zoom, click-to-detail, and node-shape encoding preserved."
+  "7da4ce50-0614-47db-8e6d-3fd142d41028":
+    status: "completed"
+    startedAt: "2026-05-08T16:10:10.819Z"
+    completedAt: "2026-05-08T16:18:25.142Z"
+    endedAt: "2026-05-08T16:18:25.142Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added MergeMetaPanel above the graph rendering timestamp, short SHA with copy-full-hash affordance, and author. Sources data from existing graph fetch (no duplicate fetching). Empty, no-merge, and multi-merge states all covered. 17 unit tests including clipboard, sync update, and refetch verification."
+  "8d85a3c0-8091-4e85-b585-424ba86bff49":
+    status: "completed"
+    startedAt: "2026-05-08T16:01:13.405Z"
+    completedAt: "2026-05-08T16:09:22.116Z"
+    endedAt: "2026-05-08T16:09:22.116Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Selecting a PRD node now highlights its full subtree (root + transitive descendants) plus all merges linked to anything in that subtree, and the detail panel surfaces a concise PRD front-matter summary (title, status, priority, tags) sourced from existing schema fields with em-dash placeholders for empty values."
+  "b2b3f19a-7d98-40b2-81aa-115170dc6e1d":
+    status: "completed"
+    startedAt: "2026-05-08T16:36:14.348Z"
+    completedAt: "2026-05-08T16:36:14.348Z"
+    endedAt: "2026-05-08T16:36:14.348Z"
+    appliedAt: "2026-05-08T16:36:14.348Z"

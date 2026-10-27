@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "1e977a49-67fa-4dbe-a039-54a3a0d651a3":
+    status: "completed"
+    startedAt: "2026-10-13T18:40:49.260Z"
+    completedAt: "2026-10-13T18:50:17.510Z"
+    endedAt: "2026-10-13T18:50:17.510Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): a v2 completion that stages an untracked intent file for its state row also stages tracked-but-deleted files under changes/ whose committed copy carries the same id (rex loadPrdModel over a scratch tree of git's copies), plus that folder's deleted state.yaml. Commit e99bf875d."
+    appliedAt: "2026-10-13T18:50:17.510Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:50:17.807Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

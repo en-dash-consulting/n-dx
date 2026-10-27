@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "3d03ab41-df50-4235-a057-f48a8af00ce7":
+    status: "completed"
+    startedAt: "2026-10-08T16:24:46.873Z"
+    completedAt: "2026-10-08T16:33:19.961Z"
+    endedAt: "2026-10-08T16:33:19.961Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added pure packages/rex/src/core/change-completion.ts (completeTask, completeChange, addTask) with tests; added to v2 isolation set; patch changeset."
+    appliedAt: "2026-10-08T16:33:19.961Z"
+    lastModified: "2026-10-12T08:18:06.585Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

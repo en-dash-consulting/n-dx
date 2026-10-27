@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "9ac16e77-6429-4b27-b0f1-f0711f1783cf":
+    status: "completed"
+    startedAt: "2026-10-08T03:11:34.302Z"
+    completedAt: "2026-10-08T03:23:59.925Z"
+    endedAt: "2026-10-08T03:23:59.925Z"
+    resolutionType: "code-change"
+    resolutionDetail: "javaSecondaryConfig (923b36b78, hench run 629c993a). The gate failed only on the load-sensitive runner memory test (captured separately); operator-verified with no other load: sourcevision 2523 tests and the six policy tests pass."
+    appliedAt: "2026-10-08T03:23:59.925Z"
+    lastModified: "2026-10-08T03:24:00.188Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

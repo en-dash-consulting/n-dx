@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, readFile, writeFile, chmod } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir, homedir } from "node:os";
 import { DEFAULT_TIMEOUT, withSandboxedClaudeConfig } from "./e2e-helpers.js";
@@ -234,6 +234,24 @@ describe("n-dx init provider selection", () => {
       expect(output).toContain("LLM configuration");
       expect(output).toMatch(/Provider\s+codex/);
     });
+  });
+
+  it("ignores the vendor-CLI invocation log in the project's .gitignore", async () => {
+    // Every claude/codex spawn appends to claude_commands.log in the project;
+    // left untracked, hench's uncommitted-work gate refused to complete a task
+    // over it in a project init had not ignored it for.
+    const tmpDir = await mkdtemp(join(tmpdir(), "ndx-init-e2e-"));
+    const binDir = await mkdtemp(join(tmpdir(), "ndx-init-bin-clilog-"));
+    try {
+      await writeFakeBinary(join(binDir, "claude"), { stdout: '{"result":"ok"}' });
+
+      run(["init", "--provider=claude", tmpDir], { env: pathEnvWith(binDir) });
+
+      const lines = (await readFile(join(tmpDir, ".gitignore"), "utf-8")).split("\n").map((l) => l.trim());
+      expect(lines).toContain("claude_commands.log*");
+    } finally {
+      await removeDirs(binDir, tmpDir);
+    }
   });
 
   it("persists selected provider to project settings", async () => {
@@ -733,6 +751,9 @@ describe("init establishes the folder layout", () => {
       env: {
         ...pathEnvWith(binDir),
         CLAUDE_CLI_PATH: "/nonexistent/path/to/claude",
+        // The suites' v1 init default (tests/setup-session-env.js) is off here:
+        // these runs are what a user gets.
+        NDX_INIT_LAYOUT: undefined,
       },
     });
   }
@@ -791,6 +812,11 @@ describe("init establishes the folder layout", () => {
       // `.mcp.json` is the documented exception — the vendor CLIs read it at
       // the repository root, so it stays there on both layouts.
       expect(existsSync(join(projectDir, ".mcp.json"))).toBe(true);
+
+      // The PRD starts as an empty v2 tree, so no command prints the v1 notice.
+      expect(readFileSync(join(projectDir, ".ndx", "rex", "product", "index.md"), "utf-8")).toContain('schema: "rex/v2"');
+      expect(existsSync(join(projectDir, ".ndx", "rex", "prd_tree"))).toBe(false);
+      expect(output).not.toContain("v1 layout (prd_tree/)");
     } finally {
       await removeDirs(binDir, projectDir);
     }

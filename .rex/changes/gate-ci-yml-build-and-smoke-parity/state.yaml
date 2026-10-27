@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "52c19495-4471-4159-8bd9-21afc24ebe6d":
+    status: "completed"
+    startedAt: "2026-10-12T19:13:39.354Z"
+    completedAt: "2026-10-12T19:20:37.368Z"
+    endedAt: "2026-10-12T19:20:37.368Z"
+    resolutionType: "code-change"
+    resolutionDetail: "ci.yml: pull_request types + job-level non-draft if on build and smoke-parity"
+    appliedAt: "2026-10-12T19:20:37.368Z"
+    lastModified: "2026-10-12T19:20:38.969Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

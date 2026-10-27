@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "2d77d055-20f4-4d3b-b1b4-73bf7133cd35":
+    status: "completed"
+    startedAt: "2026-05-06T19:08:38.021Z"
+    completedAt: "2026-05-06T19:51:21.286Z"
+    endedAt: "2026-05-06T19:51:21.286Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented single-child detection in PRD folder-tree serializer and parser. Serializer skips parent directory creation when a feature (or lower-level container) has exactly one child, embedding parent metadata in child's frontmatter using __parent* fields. Parser reconstructs parent-child relationships from embedded metadata, handling ancestor chains for nested single-children. All 29 parser tests passing, including 5 new single-child optimization tests validating round-trip serialization, metadata preservation, multi-child control, and nested chains."
+    appliedAt: "2026-05-06T19:51:21.286Z"

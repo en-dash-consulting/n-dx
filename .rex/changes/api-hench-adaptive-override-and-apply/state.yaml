@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "0a778581-d674-429c-827a-6b0e1ef22e0f":
+    status: "completed"
+    startedAt: "2026-09-11T22:02:05.570Z"
+    completedAt: "2026-09-11T22:02:05.570Z"
+    endedAt: "2026-09-11T22:02:05.570Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Both adaptive config-write routes (override + apply) now validate key/value against the shared CONFIG_FIELD_META allowlist (new hench-config-fields.ts, imported by routes-hench + routes-adaptive so they cannot drift): reject non-allowlisted keys, prototype-poisoning segments, and wrong types with 400 before writing; setConfigValue drops forbidden segments. 5 new tests (non-vacuous), full server unit suite 1115 pass, web typecheck clean."
+    appliedAt: "2026-09-11T22:02:05.570Z"
+    lastModified: "2026-09-11T22:02:05.576Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "08b9e858-4312-4945-9dd5-6c211884d5f6":
+    status: "completed"
+    startedAt: "2026-10-09T06:56:36.129Z"
+    completedAt: "2026-10-09T07:17:22.599Z"
+    endedAt: "2026-10-09T07:17:22.599Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex product show|edit and rex change place|apply added over the existing v2 core; rex add (manual and description modes, so ndx add) creates a change on a v2 tree and prints its suggested placement; --criterion stays acceptance criteria, --capability-criterion is capability criteria; v1 unchanged. Help and tests for each verb."
+    appliedAt: "2026-10-09T07:17:22.599Z"
+    lastModified: "2026-10-09T07:17:22.863Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

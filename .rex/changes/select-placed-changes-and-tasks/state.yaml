@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b0467938-b793-41ee-923d-cfd5c57322df":
+    status: "completed"
+    startedAt: "2026-10-08T15:59:29.558Z"
+    completedAt: "2026-10-08T16:08:38.494Z"
+    endedAt: "2026-10-08T16:08:38.494Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added pure v2 work selection core/change-selection.ts (findActionableWork, findNextWork, resolveWorkById, compareReleases) with unit tests covering all three criteria."
+    appliedAt: "2026-10-08T16:08:38.494Z"
+    lastModified: "2026-10-12T08:18:05.847Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

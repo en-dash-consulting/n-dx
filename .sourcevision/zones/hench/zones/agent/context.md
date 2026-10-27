@@ -5,78 +5,254 @@
 <zone>
 
 Zone: Agent (`hench/agent`)
-Files: 19, Cohesion: 0.45, Coupling: 0.55
-Description: 19 files, primarily TypeScript
-Entry points: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/index.ts, packages/hench/src/agent/analysis/livelock.ts, packages/hench/src/agent/analysis/plan-only-detection.ts, packages/hench/src/agent/analysis/spin.ts, packages/hench/src/agent/analysis/stuck.ts, packages/hench/src/agent/analysis/summary.ts, packages/hench/src/agent/analysis/workflow.ts, packages/hench/src/agent/lifecycle/context-prune.ts, packages/hench/src/agent/lifecycle/heartbeat.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/lifecycle/prompt-cache.ts, packages/hench/src/agent/lifecycle/token-budget.ts, packages/hench/src/agent/planning/prompt.ts, packages/hench/src/cli/token-logging.ts, packages/hench/src/quota/codex-token-retrieval.ts, packages/hench/src/schema/index.ts, packages/hench/src/store/run-token-index.ts, packages/hench/src/store/runs.ts
-Lines: 6051
+Files: 51, Cohesion: 0.58, Coupling: 0.42
+Description: 51 files, primarily TypeScript
+Entry points: packages/hench/src/agent/analysis/adaptive.ts, packages/hench/src/agent/analysis/adversarial-review.ts, packages/hench/src/agent/analysis/livelock.ts, packages/hench/src/agent/analysis/plan-only-detection.ts, packages/hench/src/agent/analysis/spin.ts, packages/hench/src/agent/analysis/workflow.ts, packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts, packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts, packages/hench/src/agent/lifecycle/agent-effort.ts, packages/hench/src/agent/lifecycle/background-wait.ts, packages/hench/src/agent/lifecycle/batch-divider.ts, packages/hench/src/agent/lifecycle/cli-loop.ts, packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts, packages/hench/src/agent/lifecycle/context-prune.ts, packages/hench/src/agent/lifecycle/event-accumulator.ts, packages/hench/src/agent/lifecycle/heartbeat.ts, packages/hench/src/agent/lifecycle/loop.ts, packages/hench/src/agent/lifecycle/orientation.ts, packages/hench/src/agent/lifecycle/pair-review-rounds.ts, packages/hench/src/agent/lifecycle/plan-mode-prompt.ts, packages/hench/src/agent/lifecycle/primer.ts, packages/hench/src/agent/lifecycle/prior-attempt-work.ts, packages/hench/src/agent/lifecycle/prompt-diagnostics.ts, packages/hench/src/agent/lifecycle/read-only-refusal.ts, packages/hench/src/agent/lifecycle/session-cache.ts, packages/hench/src/agent/lifecycle/spawn-budget.ts, packages/hench/src/agent/lifecycle/task-display.ts, packages/hench/src/agent/lifecycle/token-budget.ts, packages/hench/src/agent/lifecycle/token-usage.ts, packages/hench/src/agent/lifecycle/vendor-adapter.ts, packages/hench/src/agent/token-cost.ts, packages/hench/src/cli/commands/cache.ts, packages/hench/src/cli/commands/validate-tokens.ts, packages/hench/src/cli/help.ts, packages/hench/src/prd/llm-gateway.ts, packages/hench/src/quota/token-validation-hook.ts, packages/hench/src/quota/token-validation.ts, packages/hench/src/store/project-config.ts, packages/hench/src/store/runs.ts, packages/hench/src/tools/contracts.ts, packages/hench/src/tools/dispatch.ts, packages/hench/src/tools/files.ts, packages/hench/src/tools/git.ts, packages/hench/src/tools/shell.ts, packages/hench/src/types/output.ts
+Lines: 18189
 
 </zone>
 
 <files>
 
-packages/hench/src/agent/analysis/adaptive.ts (TypeScript, 534 lines, source)
+packages/hench/src/agent/analysis/adaptive.ts (TypeScript, 550 lines, source)
+packages/hench/src/agent/analysis/adversarial-review.ts (TypeScript, 1413 lines, source)
 packages/hench/src/agent/analysis/index.ts (TypeScript, 133 lines, source)
 packages/hench/src/agent/analysis/livelock.ts (TypeScript, 306 lines, source)
 packages/hench/src/agent/analysis/plan-only-detection.ts (TypeScript, 87 lines, source)
 packages/hench/src/agent/analysis/spin.ts (TypeScript, 41 lines, source)
-packages/hench/src/agent/analysis/stuck.ts (TypeScript, 88 lines, source)
-packages/hench/src/agent/analysis/summary.ts (TypeScript, 157 lines, source)
-packages/hench/src/agent/analysis/workflow.ts (TypeScript, 485 lines, source)
-packages/hench/src/agent/lifecycle/context-prune.ts (TypeScript, 685 lines, source)
-packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 118 lines, source)
-packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 2093 lines, source)
-packages/hench/src/agent/lifecycle/prompt-cache.ts (TypeScript, 224 lines, source)
-packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 80 lines, source)
-packages/hench/src/agent/planning/prompt.ts (TypeScript, 216 lines, source)
-packages/hench/src/cli/token-logging.ts (TypeScript, 181 lines, source)
-packages/hench/src/quota/codex-token-retrieval.ts (TypeScript, 362 lines, source)
-packages/hench/src/schema/index.ts (TypeScript, 73 lines, source)
-packages/hench/src/store/run-token-index.ts (TypeScript, 86 lines, source)
-packages/hench/src/store/runs.ts (TypeScript, 102 lines, source)
+packages/hench/src/agent/analysis/workflow.ts (TypeScript, 542 lines, source)
+packages/hench/src/agent/index.ts (TypeScript, 106 lines, source)
+packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts (TypeScript, 523 lines, source)
+packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts (TypeScript, 822 lines, source)
+packages/hench/src/agent/lifecycle/adapters/index.ts (TypeScript, 53 lines, source)
+packages/hench/src/agent/lifecycle/agent-effort.ts (TypeScript, 61 lines, source)
+packages/hench/src/agent/lifecycle/background-wait.ts (TypeScript, 102 lines, source)
+packages/hench/src/agent/lifecycle/batch-divider.ts (TypeScript, 58 lines, source)
+packages/hench/src/agent/lifecycle/cli-loop.ts (TypeScript, 3224 lines, source)
+packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts (TypeScript, 110 lines, source)
+packages/hench/src/agent/lifecycle/context-prune.ts (TypeScript, 687 lines, source)
+packages/hench/src/agent/lifecycle/event-accumulator.ts (TypeScript, 806 lines, source)
+packages/hench/src/agent/lifecycle/heartbeat.ts (TypeScript, 121 lines, source)
+packages/hench/src/agent/lifecycle/loop.ts (TypeScript, 2204 lines, source)
+packages/hench/src/agent/lifecycle/orientation.ts (TypeScript, 304 lines, source)
+packages/hench/src/agent/lifecycle/pair-review-rounds.ts (TypeScript, 154 lines, source)
+packages/hench/src/agent/lifecycle/plan-mode-prompt.ts (TypeScript, 130 lines, source)
+packages/hench/src/agent/lifecycle/primer.ts (TypeScript, 104 lines, source)
+packages/hench/src/agent/lifecycle/prior-attempt-work.ts (TypeScript, 79 lines, source)
+packages/hench/src/agent/lifecycle/prompt-diagnostics.ts (TypeScript, 51 lines, source)
+packages/hench/src/agent/lifecycle/read-only-refusal.ts (TypeScript, 96 lines, source)
+packages/hench/src/agent/lifecycle/session-cache.ts (TypeScript, 1126 lines, source)
+packages/hench/src/agent/lifecycle/spawn-budget.ts (TypeScript, 99 lines, source)
+packages/hench/src/agent/lifecycle/task-display.ts (TypeScript, 116 lines, source)
+packages/hench/src/agent/lifecycle/token-budget.ts (TypeScript, 70 lines, source)
+packages/hench/src/agent/lifecycle/token-usage.ts (TypeScript, 73 lines, source)
+packages/hench/src/agent/lifecycle/vendor-adapter.ts (TypeScript, 289 lines, source)
+packages/hench/src/agent/token-cost.ts (TypeScript, 181 lines, source)
+packages/hench/src/cli/commands/cache.ts (TypeScript, 214 lines, source)
+packages/hench/src/cli/commands/validate-tokens.ts (TypeScript, 224 lines, source)
+packages/hench/src/cli/help.ts (TypeScript, 624 lines, source)
+packages/hench/src/prd/llm-gateway.ts (TypeScript, 349 lines, source)
+packages/hench/src/quota/token-validation-hook.ts (TypeScript, 67 lines, source)
+packages/hench/src/quota/token-validation.ts (TypeScript, 516 lines, source)
+packages/hench/src/store/project-config.ts (TypeScript, 137 lines, source)
+packages/hench/src/store/runs.ts (TypeScript, 106 lines, source)
+packages/hench/src/tools/contracts.ts (TypeScript, 82 lines, source)
+packages/hench/src/tools/dispatch.ts (TypeScript, 292 lines, source)
+packages/hench/src/tools/files.ts (TypeScript, 135 lines, source)
+packages/hench/src/tools/git.ts (TypeScript, 108 lines, source)
+packages/hench/src/tools/pr-status-trailers.ts (TypeScript, 14 lines, source)
+packages/hench/src/tools/shell.ts (TypeScript, 19 lines, source)
+packages/hench/src/types/index.ts (TypeScript, 15 lines, source)
+packages/hench/src/types/output.ts (TypeScript, 403 lines, source)
+packages/hench/vitest.config.ts (TypeScript, 63 lines, config)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/hench/src/agent/analysis/adaptive.ts → packages/hench/src/schema/index.ts {RunRecord, HenchConfig}
+  packages/hench/src/agent/analysis/adaptive.ts → packages/hench/src/agent/token-cost.ts {contextWriteFloor, runBudgetedTokens}
   packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/adaptive.ts {analyzeAdaptive, collectMetrics, getAutoApplicable, DEFAULT_ADAPTIVE_SETTINGS}
   packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/adaptive.ts {ProjectMetrics, WorkflowAdjustment, AdjustmentNotification, AdaptiveSettings, AdaptiveAnalysis, AdjustmentCategory, AdjustmentPriority}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/adversarial-review.ts {buildReviewSystemPrompt, buildReviewBrief, parseReviewReport, readReviewReport, reviewReportPath, formatReviewSummary, unresolvedFindings, classifyUnresolved, formatUnresolvedWarning, deriveDisposition, parkDeferredFindings, deferredFindings, formatDeferredFindings, mergeDispositionsIntoRaw, reviewFindingId, REVIEW_SEVERITIES, REVIEW_VERDICTS, REVIEW_ACTIONS, REVIEW_DISPOSITIONS, REVIEW_REPORT_SUBDIR}
+  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/adversarial-review.ts {ReviewFinding, ReviewReport, UnresolvedBreakdown, DeferredFinding, ReviewSeverity, ReviewVerdict, ReviewAction, ReviewDisposition, ReviewPassOutcome, ReviewFailureReason, ReviewPromptContext}
   packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/livelock.ts {createLivelockDetector, isProgressTool, DEFAULT_LIVELOCK_THRESHOLD, DEFAULT_LIVELOCK_WINDOW}
   packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/livelock.ts {LivelockDetector, LivelockDetection, LivelockObservation, LivelockDetectorOptions}
   packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/spin.ts {updateEmptyTurnCount, isSpinningRun, DEFAULT_SPIN_THRESHOLD}
-  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/stuck.ts {countRecentFailures, isStuckTask, getStuckTaskIds}
-  packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/summary.ts {buildRunSummary}
   packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/workflow.ts {analyzeWorkflow, computeStats}
   packages/hench/src/agent/analysis/index.ts → packages/hench/src/agent/analysis/workflow.ts {WorkflowAnalysis, WorkflowStats, WorkflowSuggestion, SuggestionCategory, SuggestionPriority}
-  packages/hench/src/agent/analysis/plan-only-detection.ts → packages/hench/src/schema/index.ts {ToolCallRecord}
-  packages/hench/src/agent/analysis/stuck.ts → packages/hench/src/schema/index.ts {RunRecord}
-  packages/hench/src/agent/analysis/summary.ts → packages/hench/src/schema/index.ts {ToolCallRecord, RunSummaryData, CommandRecord, TestRecord}
-  packages/hench/src/agent/analysis/workflow.ts → packages/hench/src/schema/index.ts {RunRecord, RunStatus, HenchConfig}
-  packages/hench/src/agent/lifecycle/context-prune.ts → packages/hench/src/schema/index.ts {DEFAULT_PRUNE_CONFIG, MIN_PRUNE_PAIRS}
-  packages/hench/src/agent/lifecycle/context-prune.ts → packages/hench/src/schema/index.ts {PruneConfig, TokenUsage}
-  packages/hench/src/agent/lifecycle/heartbeat.ts → packages/hench/src/schema/index.ts {RunRecord}
+  packages/hench/src/agent/analysis/workflow.ts → packages/hench/src/agent/token-cost.ts {contextWriteFloor, contextWriteFloorFromCompletedRun, hasCacheWrites, highConsumptionThreshold, runBudgetedTokens}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/index.ts {collectReviewDiff, promptReview, revertChanges, buildRunSummary, countRecentFailures, isStuckTask, getStuckTaskIds}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/analysis/index.ts {ReviewResult, ReviewDiff}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/adapters/index.ts {resolveVendorAdapter, claudeCliAdapter, codexCliAdapter}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {cliLoop}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/cli-loop.ts {CliLoopOptions, CliLoopResult}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts {parseCodexCliTokenUsage}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts {CodexCliTokenUsage}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/event-accumulator.ts {EventAccumulator}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/event-accumulator.ts {AccumulatedTokenUsage, AccumulatedToolCalls, AccumulatedFailure}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/loop.ts {agentLoop}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/loop.ts {AgentLoopOptions, AgentLoopResult}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-budget.ts {TokenBudgetResult}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsage, parseStreamTokenUsage, emptyAggregateTokenUsage, accumulateTokenUsage, formatTokenUsage}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/token-usage.ts {AggregateTokenUsage}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter, SpawnConfig}
+  packages/hench/src/agent/index.ts → packages/hench/src/agent/token-cost.ts {BUDGET_TOKEN_CLASSES, countBudgetedTokens, runBudgetedTokens, contextWriteFloor, hasCacheWrites, highConsumptionThreshold, HIGH_COUNTED_TOKENS_PER_RUN_CACHED, HIGH_COUNTED_TOKENS_PER_RUN_UNCACHED}
+  packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter, SpawnConfig, VendorSpawnOptions, BackgroundWaitSignal}
+  packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR, assemblePrompt, classifyVendorError}
+  packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts → packages/hench/src/prd/llm-gateway.ts {PromptEnvelope, ExecutionPolicy, RuntimeEvent, RuntimeEventType, FailureCategory, LLMVendor}
+  packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter, SpawnConfig, VendorSpawnOptions}
+  packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR, assemblePrompt, compileCodexPolicyFlags, classifyVendorError}
+  packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts → packages/hench/src/prd/llm-gateway.ts {PromptEnvelope, ExecutionPolicy, RuntimeEvent, RuntimeEventType, FailureCategory, LLMVendor}
+  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts {claudeCliAdapter}
+  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/adapters/claude-cli-adapter.ts {claudeCliAdapter}
+  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts {codexCliAdapter}
+  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts {codexCliAdapter}
+  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter}
+  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR}
+  packages/hench/src/agent/lifecycle/adapters/index.ts → packages/hench/src/prd/llm-gateway.ts {LLMVendor}
+  packages/hench/src/agent/lifecycle/agent-effort.ts → packages/hench/src/prd/llm-gateway.ts {isModelCompatibleWithVendor, LLM_VENDOR, resolveClaudeApiEffort, resolveClaudeCliEffort, resolveTaskModel}
+  packages/hench/src/agent/lifecycle/agent-effort.ts → packages/hench/src/prd/llm-gateway.ts {ClaudeEffort, LLMConfig}
+  packages/hench/src/agent/lifecycle/background-wait.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {BackgroundWaitSignal}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/adversarial-review.ts {buildReviewSystemPrompt, buildReviewBrief, buildPairReviewSystemPrompt, buildPairReviewBrief, pairTaskBrief, readReviewReport, reviewReportPath, formatReviewSummary, classifyUnresolved, formatUnresolvedWarning, parkDeferredFindings, deferredFindings, mergeDispositionsIntoRaw, reviewModelSource, buildExecutorFixPrompt, buildExecutorFixSystemPrompt, carryForwardFindings}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/adversarial-review.ts {ReviewFinding, ReviewPassOutcome, ReviewReport, DeferredFinding}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/livelock.ts {createLivelockDetector}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/livelock.ts {LivelockDetection, LivelockDetector}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/analysis/spin.ts {isSpinningRun}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/adapters/index.ts {resolveVendorAdapter}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/agent-effort.ts {resolveAgentCliEffort}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/background-wait.ts {hasUnfinishedWork, WORK_SESSION_RESUME_MESSAGE, buildReviewResumeMessage, formatBackgroundWaitFailure}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/batch-divider.ts {buildTaskBoundaryDivider}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/codex-cli-token-parser.ts {parseCodexCliTokenUsage}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/event-accumulator.ts {EventAccumulator}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {startHeartbeat}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/orientation.ts {ensureWarmParent, ORIENTATION_LIFT_NOTICE}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/pair-review-rounds.ts {runPairReviewRounds}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/pair-review-rounds.ts {PairReviewStep}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/plan-mode-prompt.ts {handlePlanModeStall, formatPlanModeAppendix}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/prior-attempt-work.ts {describePriorAttemptWork, findPriorAttemptWork, suppressionNote}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/prior-attempt-work.ts {PriorAttemptWork}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/prompt-diagnostics.ts {extractPromptSectionDiagnostics, logPromptSections}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/read-only-refusal.ts {buildReadOnlyRetryNotice, describeReadOnlyRefusal, isReadOnlyRefusal}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/session-cache.ts {resolveSessionStrategy, clearSessionCache, readBatchChain, clearBatchChain, settleBatchChain, isBatchChainUsable, chainRefIdentity, policyFingerprint, sourcevisionFingerprint, evictDeadCacheEntries, unusedCacheScopes, cacheEntryAgeMs, DEFAULT_TASKS_PER_SESSION}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/session-cache.ts {BatchChainIdentity}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/spawn-budget.ts {createSpawnLedger, recordSpawn, spawnBudgetExhausted, describeSpawnBudget}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/spawn-budget.ts {SpawnReason}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget, formatBudgetExceeded}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/token-usage.ts {mapCodexUsageToTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {VendorAdapter, SpawnConfig, BackgroundWaitSignal}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/prd/llm-gateway.ts {UsageMessageFilter, LLM_VENDOR, resolveVendorModel, resolveTaskModel, resolveReviewModel, VENDOR_CONTEXT_CHAR_LIMITS, spawnCli, terminateProcessTree, diagnoseCliInvocation, diagnoseCliNotFound, classifyLLMError, isAuthError, relativeToRoot, resolveLayout, createPromptEnvelope, DEFAULT_EXECUTION_POLICY}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/prd/llm-gateway.ts {ExecutionPolicy, RuntimeEvent, PromptSection, PromptSectionName, TokenDiagnosticStatus}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {loadLLMConfig, resolveLLMVendor, resolveVendorCliPath, resolveVendorCliEnv}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/store/project-config.ts {LLMVendor}
+  packages/hench/src/agent/lifecycle/cli-loop.ts → packages/hench/src/types/output.ts {section, subsection, stream, info, detail, withHeartbeat}
+  packages/hench/src/agent/lifecycle/context-prune.ts → packages/hench/src/prd/llm-gateway.ts {isLLMVendor, resolveTaskModel}
+  packages/hench/src/agent/lifecycle/context-prune.ts → packages/hench/src/prd/llm-gateway.ts {LLMConfig, LLMProvider}
+  packages/hench/src/agent/lifecycle/context-prune.ts → packages/hench/src/types/output.ts {detail}
+  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/agent/lifecycle/adapters/codex-cli-adapter.ts {parseMaybeJson}
+  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsageWithDiagnostic, parseStreamTokenUsage}
+  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/agent/lifecycle/token-usage.ts {TokenDiagnosticStatus}
+  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/prd/llm-gateway.ts {LLMVendor, RuntimeEvent, FailureCategory}
+  packages/hench/src/agent/lifecycle/event-accumulator.ts → packages/hench/src/types/output.ts {stream, info}
   packages/hench/src/agent/lifecycle/heartbeat.ts → packages/hench/src/store/runs.ts {saveRun}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/analysis/livelock.ts {createLivelockDetector}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/analysis/livelock.ts {LivelockDetector}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/analysis/plan-only-detection.ts {detectPlanOnlyIteration, createExecutionReminder}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/analysis/spin.ts {updateEmptyTurnCount, DEFAULT_SPIN_THRESHOLD}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/agent-effort.ts {resolveAgentApiEffort}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/context-prune.ts {ConversationPruner, PRUNE_BRIDGE_TEXT, anthropicPruneShape, createContextSummarizer}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/context-prune.ts {PruneOutcome, PruneShape}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/heartbeat.ts {startHeartbeat}
-  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/prompt-cache.ts {buildCachedMessageRequest}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/token-budget.ts {checkTokenBudget}
-  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/schema/index.ts {HenchConfig, RunRecord, TurnTokenUsage, TokenUsage}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/agent/lifecycle/token-usage.ts {parseTokenUsageWithDiagnostic}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/prd/llm-gateway.ts {LLMProvider, GeminiToolProvider, GeminiContent, GeminiPart}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/store/project-config.ts {loadClaudeConfig, loadLLMConfig, resolveApiKey, resolveLLMVendor}
   packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/store/runs.ts {saveRun}
-  packages/hench/src/agent/lifecycle/prompt-cache.ts → packages/hench/src/schema/index.ts {PromptCacheTtl}
-  packages/hench/src/agent/lifecycle/token-budget.ts → packages/hench/src/schema/index.ts {TokenUsage}
-  packages/hench/src/agent/planning/prompt.ts → packages/hench/src/schema/index.ts {HenchConfig, TaskBrief, TaskBriefProject}
-  packages/hench/src/cli/token-logging.ts → packages/hench/src/schema/index.ts {TokenUsage}
-  packages/hench/src/quota/codex-token-retrieval.ts → packages/hench/src/schema/index.ts {TokenUsage}
-  packages/hench/src/store/run-token-index.ts → packages/hench/src/schema/index.ts {normalizeRunTokens}
-  packages/hench/src/store/run-token-index.ts → packages/hench/src/schema/index.ts {RunRecord, RunStatus, RunTokens}
-  packages/hench/src/store/run-token-index.ts → packages/hench/src/store/runs.ts {listRuns}
-  packages/hench/src/store/runs.ts → packages/hench/src/schema/index.ts {normalizeRunTokens, validateRunRecord}
-  packages/hench/src/store/runs.ts → packages/hench/src/schema/index.ts {RunRecord}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/tools/contracts.ts {ToolContext}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/tools/dispatch.ts {TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, dispatchTool}
+  packages/hench/src/agent/lifecycle/loop.ts → packages/hench/src/types/output.ts {section, subsection, stream, detail, info, withHeartbeat}
+  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/agent/lifecycle/primer.ts {readFreshPrimer}
+  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/agent/lifecycle/session-cache.ts {readSessionCache, writeSessionCache, clearSessionCache, isParentUsable, sourcevisionFingerprint, cacheEntryAgeMs}
+  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/agent/lifecycle/session-cache.ts {ParentRejection}
+  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/agent/lifecycle/vendor-adapter.ts {SpawnConfig, VendorAdapter}
+  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/prd/llm-gateway.ts {createPromptEnvelope}
+  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/prd/llm-gateway.ts {PromptSection, PromptSectionName, ExecutionPolicy}
+  packages/hench/src/agent/lifecycle/orientation.ts → packages/hench/src/types/output.ts {detail}
+  packages/hench/src/agent/lifecycle/pair-review-rounds.ts → packages/hench/src/agent/analysis/adversarial-review.ts {classifyUnresolved, countFixedFindings}
+  packages/hench/src/agent/lifecycle/pair-review-rounds.ts → packages/hench/src/agent/analysis/adversarial-review.ts {PairRecheck, ReviewFinding, ReviewPassOutcome}
+  packages/hench/src/agent/lifecycle/pair-review-rounds.ts → packages/hench/src/types/output.ts {info}
+  packages/hench/src/agent/lifecycle/plan-mode-prompt.ts → packages/hench/src/types/output.ts {info}
+  packages/hench/src/agent/lifecycle/primer.ts → packages/hench/src/prd/llm-gateway.ts {resolveLayout}
+  packages/hench/src/agent/lifecycle/prompt-diagnostics.ts → packages/hench/src/prd/llm-gateway.ts {extractPromptSectionDiagnostics}
+  packages/hench/src/agent/lifecycle/prompt-diagnostics.ts → packages/hench/src/types/output.ts {detail}
+  packages/hench/src/agent/lifecycle/read-only-refusal.ts → packages/hench/src/agent/analysis/livelock.ts {isProgressTool}
+  packages/hench/src/agent/lifecycle/session-cache.ts → packages/hench/src/prd/llm-gateway.ts {resolveLayout}
+  packages/hench/src/agent/lifecycle/task-display.ts → packages/hench/src/types/output.ts {subsection, stream, detail}
+  packages/hench/src/agent/lifecycle/token-budget.ts → packages/hench/src/agent/token-cost.ts {BUDGET_TOKEN_CLASSES, countBudgetedTokens}
+  packages/hench/src/agent/lifecycle/token-usage.ts → packages/hench/src/prd/llm-gateway.ts {parseTokenUsage, parseTokenUsageWithDiagnostic, parseStreamTokenUsage, parseStreamTokenUsageWithDiagnostic, mapCodexUsageToTokenUsage, accumulateTokenUsage, emptyAggregateTokenUsage}
+  packages/hench/src/agent/lifecycle/token-usage.ts → packages/hench/src/prd/llm-gateway.ts {TokenDiagnosticStatus, TokenParseResult, CodexTokenMapping, AggregateTokenUsage}
+  packages/hench/src/agent/lifecycle/vendor-adapter.ts → packages/hench/src/prd/llm-gateway.ts {LLMVendor, PromptEnvelope, ExecutionPolicy, RuntimeEvent, FailureCategory}
+  packages/hench/src/cli/commands/cache.ts → packages/hench/src/agent/lifecycle/session-cache.ts {CACHE_SCOPES, clearCacheScopes, evictDeadCacheEntries, listCacheEntries, DEFAULT_TASKS_PER_SESSION}
+  packages/hench/src/cli/commands/cache.ts → packages/hench/src/agent/lifecycle/session-cache.ts {CacheDefect, CacheScope}
+  packages/hench/src/cli/commands/validate-tokens.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR}
+  packages/hench/src/cli/commands/validate-tokens.ts → packages/hench/src/store/runs.ts {listRuns}
+  packages/hench/src/cli/commands/validate-tokens.ts → packages/hench/src/types/output.ts {section, subsection, stream, detail, info}
+  packages/hench/src/cli/help.ts → packages/hench/src/prd/llm-gateway.ts {formatHelp}
+  packages/hench/src/cli/help.ts → packages/hench/src/prd/llm-gateway.ts {HelpDefinition}
+  packages/hench/src/quota/token-validation-hook.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR}
+  packages/hench/src/quota/token-validation-hook.ts → packages/hench/src/quota/token-validation.ts {validateTokenReporting, validateVendorAttribution}
+  packages/hench/src/quota/token-validation-hook.ts → packages/hench/src/types/output.ts {detail, stream}
+  packages/hench/src/quota/token-validation.ts → packages/hench/src/prd/llm-gateway.ts {LLM_VENDOR, isLLMVendor}
+  packages/hench/src/quota/token-validation.ts → packages/hench/src/prd/llm-gateway.ts {LLMVendor}
+  packages/hench/src/store/project-config.ts → packages/hench/src/prd/llm-gateway.ts {deepMerge, loadProjectOverrides, loadProjectOverrideSources, mergeWithOverrides, PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE}
+  packages/hench/src/store/project-config.ts → packages/hench/src/prd/llm-gateway.ts {loadClaudeConfigFromDir, loadLLMConfigFromDir, DEFAULT_LLM_VENDOR, LLM_VENDOR, projectRootOf, sharedResolveApiKey, sharedResolveCliPath, sharedResolveVendorCliEnv}
+  packages/hench/src/store/project-config.ts → packages/hench/src/prd/llm-gateway.ts {ClaudeConfig, LLMConfig, LLMVendor, EnvPolicyConfig, ProjectOverrideSource}
+  packages/hench/src/store/runs.ts → packages/hench/src/prd/llm-gateway.ts {redactDeep, toCanonicalJSON}
+  packages/hench/src/tools/dispatch.ts → packages/hench/src/prd/llm-gateway.ts {toAnthropicToolDefs, toGeminiFunctionDeclarations}
+  packages/hench/src/tools/dispatch.ts → packages/hench/src/prd/llm-gateway.ts {ToolDefinition, AnthropicToolDef, GeminiFunctionDeclaration}
+  packages/hench/src/tools/dispatch.ts → packages/hench/src/tools/contracts.ts {ToolContext, RexToolHandlers, RexUpdateStatusParams, RexAppendLogParams, RexAddSubtaskParams}
+  packages/hench/src/tools/dispatch.ts → packages/hench/src/tools/files.ts {toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles}
+  packages/hench/src/tools/dispatch.ts → packages/hench/src/tools/git.ts {toolGit}
+  packages/hench/src/tools/dispatch.ts → packages/hench/src/tools/shell.ts {toolRunCommand}
+  packages/hench/src/tools/files.ts → packages/hench/src/tools/contracts.ts {ToolGuard}
+  packages/hench/src/tools/git.ts → packages/hench/src/tools/contracts.ts {ToolGuard}
+  packages/hench/src/tools/shell.ts → packages/hench/src/tools/contracts.ts {ToolGuard}
+  packages/hench/src/types/index.ts → packages/hench/src/types/output.ts {setQuiet, isQuiet, info, result, section, subsection, stream, detail}
+  packages/hench/src/types/output.ts → packages/hench/src/prd/llm-gateway.ts {setQuiet, isQuiet, setVerbose, isVerbose, setDebug, isDebug, info, result, verbose, debug, warn}
+  packages/hench/src/types/output.ts → packages/hench/src/prd/llm-gateway.ts {isQuiet, isVerbose, verbose, bold, dim, yellow, red, colorDim, colorWarn, colorPink, isColorEnabled}
 
 </imports>
+
+<sub-crossings>
+
+Cross-dependencies between sub-zones:
+  hench/agent/agent → hench/agent/analysis: 1
+  hench/agent/agent → hench/agent/hench: 2
+  hench/agent/agent → hench/agent/lifecycle: 8
+  hench/agent/agent → hench/agent/tools: 2
+  hench/agent/analysis → hench/agent/agent: 5
+  hench/agent/analysis → hench/agent/lifecycle: 12
+  hench/agent/hench → hench/agent/agent: 1
+  hench/agent/hench → hench/agent/lifecycle: 6
+  hench/agent/lifecycle → hench/agent/agent: 5
+  hench/agent/lifecycle → hench/agent/analysis: 1
+  hench/agent/lifecycle → hench/agent/hench: 6
+  hench/agent/tools → hench/agent/lifecycle: 2
+
+</sub-crossings>
+
+<sub-zones>
+
+This zone has 5 sub-zone(s):
+
+- **Agent** (`hench/agent/agent`): 7 files, cohesion 0.42, coupling 0.58
+- **Analysis** (`hench/agent/analysis`): 6 files, cohesion 0.57, coupling 0.43
+- **Hench** (`hench/agent/hench`): 8 files, cohesion 0.46, coupling 0.54
+- **Hench** (`hench/agent/lifecycle`): 24 files, cohesion 0.74, coupling 0.26
+- **Agent Tool Suite** (`hench/agent/tools`): 6 files, cohesion 0.82, coupling 0.18
+
+Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
+
+</sub-zones>

@@ -1,0 +1,23 @@
+schema: "rex/v2"
+items:
+  "3907de2e-6713-42b3-a260-47f05c6dbe71":
+    status: "completed"
+    startedAt: "2026-04-29T16:01:29.610Z"
+    completedAt: "2026-04-29T18:16:15.362Z"
+    endedAt: "2026-04-29T18:16:15.362Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Rewrote cmdMigrateToFolderTree with legacy source loading, level-count summary, and delete prompt"
+  "60a8e23e-106e-4313-b253-612a55b65d27":
+    status: "completed"
+    startedAt: "2026-04-29T18:21:59.248Z"
+    completedAt: "2026-04-29T18:28:26.072Z"
+    endedAt: "2026-04-29T18:28:26.072Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Updated all documentation references across CLAUDE.md, AGENTS.md, README, assistant-assets (project-guidance.md, claude-addendum.md), and prd-folder-tree-schema.md to describe .rex/tree/ as the sole PRD storage format."
+  "fcc28148-7187-4a28-b9fd-9f7d10cd2c89":
+    status: "completed"
+    startedAt: "2026-04-29T18:28:26.588Z"
+    completedAt: "2026-04-29T18:28:26.588Z"
+    endedAt: "2026-04-29T18:28:26.588Z"
+    appliedAt: "2026-04-29T18:28:26.588Z"
+    needsPlacement: true

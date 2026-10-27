@@ -1,7 +1,7 @@
 {
   "id": "web-hub",
-  "name": "Web Hub Infrastructure",
-  "description": "10 files, mostly pages and services; entry points index.ts, home.ts, hub.ts; imports Web Server; imported by Packages and Packages.",
+  "name": "Web Hub",
+  "description": "11 files, mostly services and pages; entry points admission.ts, home.ts, hub.ts; imports Web Server; imported by Packages and Packages.",
   "files": [
     "packages/web/src/hub/admission.ts",
     "packages/web/src/hub/children.ts",
@@ -9,27 +9,30 @@
     "packages/web/src/hub/home.ts",
     "packages/web/src/hub/hub.ts",
     "packages/web/src/hub/index.ts",
+    "packages/web/src/hub/new-project.ts",
     "packages/web/src/hub/overview.ts",
     "packages/web/src/hub/proxy.ts",
     "packages/web/src/hub/registry.ts",
-    "packages/web/src/hub/request-guard.ts"
+    "packages/web/src/hub/routes.ts"
   ],
   "entryPoints": [
     "packages/web/src/hub/admission.ts",
     "packages/web/src/hub/home.ts",
     "packages/web/src/hub/hub.ts",
     "packages/web/src/hub/index.ts",
+    "packages/web/src/hub/new-project.ts",
     "packages/web/src/hub/overview.ts",
-    "packages/web/src/hub/request-guard.ts"
+    "packages/web/src/hub/registry.ts",
+    "packages/web/src/hub/routes.ts"
   ],
-  "cohesion": 0.84,
-  "coupling": 0.16,
-  "fileCount": 10,
-  "lineCount": 2457,
+  "cohesion": 0.89,
+  "coupling": 0.11,
+  "fileCount": 11,
+  "lineCount": 3902,
   "riskMetrics": {
-    "cohesion": 0.84,
-    "coupling": 0.16,
-    "riskScore": 0.16000000000000003,
+    "cohesion": 0.89,
+    "coupling": 0.11,
+    "riskScore": 0.10999999999999999,
     "riskLevel": "healthy",
     "failsThreshold": false
   }

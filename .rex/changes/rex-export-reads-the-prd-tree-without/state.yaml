@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "315710a1-5e67-4942-89a0-dd534e0ca360":
+    status: "completed"
+    startedAt: "2026-09-10T17:01:38.839Z"
+    completedAt: "2026-09-10T17:08:54.245Z"
+    endedAt: "2026-09-10T17:08:54.245Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Export now loads the PRD under the file lock (both bundle and narrative renderings) and fails loudly naming the holder PID when the lock is contended. Pinned by tests/integration/export-lock.test.ts for both formats."
+    appliedAt: "2026-09-10T17:08:54.245Z"
+    lastModified: "2026-09-10T17:08:54.269Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

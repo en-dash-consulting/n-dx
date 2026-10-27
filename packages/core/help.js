@@ -100,8 +100,8 @@ const COMMAND_REGISTRY = [
   {
     name: "migrate",
     category: "Orchestration",
-    summary: "Plan the PRD's v1 → v2 migration and write it out for review",
-    keywords: ["migrate", "plan", "v2", "product", "change", "schema", "upgrade", "prd", "review"],
+    summary: "Migrate a project to the current layout and PRD schema, or plan and apply v1 → v2 step by step",
+    keywords: ["migrate", "plan", "apply", "v2", "product", "change", "schema", "upgrade", "prd", "review", "layout"],
     related: ["migrate-layout", "status", "validate"],
   },
   {
@@ -1258,35 +1258,52 @@ const ORCHESTRATOR_HELP_DEFS = {
     related: ["init", "which"],
   },
   migrate: {
-    summary: "plan the PRD's v1 → v2 migration and write it out for review",
+    summary: "migrate to the current layout and PRD schema, or plan and apply v1 → v2",
     description:
-      "Classifies every v1 item into the v2 product and change layers and\n" +
-      "writes the proposal to two files: the JSON plan, keyed by v1 item id,\n" +
-      "which the apply step will read, and a Markdown summary for a person.\n\n" +
-      "Nothing is written to the PRD. Planning is a pure read, and the two\n" +
-      "output files are the only artifacts; they must sit outside the rex\n" +
-      "directory and the command refuses a path inside it.\n\n" +
-      "--plan is required rather than implied. The other half of a migration\n" +
-      "applies a reviewed plan and does rewrite the PRD, so the read-only half\n" +
-      "is the one you ask for by name.\n\n" +
+      "With neither --plan nor --apply, runs every step the project still\n" +
+      "needs, in order: the layout move into .ndx/ (as migrate-layout), the\n" +
+      "prd.md / prd.json conversion to the folder tree, then the v1 → v2 plan\n" +
+      "(to --out, default ./migration-plan.json) and its apply. A step already\n" +
+      "done is skipped, so a failed run resumes where it stopped. --dry-run\n" +
+      "rehearses each step that can, and stops before the first that cannot.\n" +
+      "It runs no model by default (the plan is rules-only); --with-models\n" +
+      "turns the model passes on.\n\n" +
+      "--plan classifies every v1 item into the v2 product and change layers\n" +
+      "and writes the proposal to two files: the JSON plan, keyed by v1 item id,\n" +
+      "which --apply reads, and a Markdown summary for a person.\n\n" +
+      "Planning writes nothing to the PRD. The two output files are the only\n" +
+      "artifacts; they must sit outside the rex directory and the command\n" +
+      "refuses a path inside it.\n\n" +
+      "--apply writes the v2 tree from the reviewed plan and removes the v1\n" +
+      "tree, in one PRD transaction. --plan=<path> names the plan (default\n" +
+      "./migration-plan.json, where --plan writes it). --dry-run rehearses the\n" +
+      "apply, reports what each v1 kind becomes, and writes nothing.\n\n" +
       "Re-planning reads the plan already at --out and reuses every model\n" +
       "answer whose item, question and model still match, so an unchanged PRD\n" +
       "is re-planned into a byte-identical file without asking anything. That\n" +
       "is also the retry path after a model error: the answers already paid\n" +
       "for are kept and the next run continues from them.\n\n" +
-      "Delegates to 'rex migrate-plan', which documents the full flag set.",
-    usage: "ndx migrate --plan [options] [dir]",
+      "Delegates to 'rex migrate-plan' and 'rex migrate-apply', which document\n" +
+      "the full flag sets.",
+    usage: "ndx migrate [options] [dir] | ndx migrate --plan [options] [dir] | ndx migrate --apply [--plan=<path>] [--dry-run] [dir]",
     options: [
-      { flag: "--plan", description: "Required: plan the migration (the only mode implemented)" },
+      { flag: "--plan", description: "Plan the migration; with --apply, --plan=<path> names the plan to apply" },
+      { flag: "--apply", description: "Apply the reviewed plan (default ./migration-plan.json)" },
+      { flag: "--dry-run", description: "Rehearse and report; write nothing (without --plan or --apply the plan file is still written, rules-only unless --with-models)" },
+      { flag: "--with-models", description: "With --dry-run and no --plan or --apply: run the model passes too" },
+      { flag: "--no-commit", description: "Without --plan or --apply: move the layout without committing the move" },
       { flag: "--out=<path>", description: "Where to write the JSON plan (default: ./migration-plan.json)" },
       { flag: "--summary=<path>", description: "Where to write the Markdown summary (default: --out with .md)" },
       { flag: "--rules-only", description: "Run the rules alone: no model calls, no cost" },
       { flag: "--no-jev-review", description: "Skip the Jev review pass" },
     ],
     examples: [
+      { command: "ndx migrate .", description: "Run every step the project still needs" },
       { command: "ndx migrate --plan --rules-only .", description: "A free, deterministic first look" },
       { command: "ndx migrate --plan .", description: "Plan with the configured models" },
       { command: "ndx migrate --plan --out=./plans/v2.json .", description: "Write the plan somewhere else" },
+      { command: "ndx migrate --apply --dry-run .", description: "See what applying the plan would do" },
+      { command: "ndx migrate --apply --plan=./plans/v2.json .", description: "Apply a reviewed plan" },
     ],
     related: ["migrate-layout", "validate"],
   },
@@ -1928,7 +1945,9 @@ export function formatMainHelp() {
   section("SETUP", [
     ["init [dir]", "Initialize project"],
     ["migrate-layout [dir]", "Move existing state into .ndx/ (--dry-run, --no-commit)"],
+    ["migrate [dir]", "Run every layout and PRD schema migration step still needed (--dry-run)"],
     ["migrate --plan [dir]", "Plan the PRD's v1 → v2 migration for review (--rules-only)"],
+    ["migrate --apply [dir]", "Apply the reviewed migration plan (--plan=<path>, --dry-run)"],
     ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],

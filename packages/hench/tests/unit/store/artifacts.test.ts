@@ -52,6 +52,16 @@ describe("isHenchRuntimeArtifact", () => {
     expect(isHenchRuntimeArtifact(".run-logs-archive/x.log")).toBe(false);
   });
 
+  it("matches the vendor-CLI invocation log and its rotated predecessor", () => {
+    // llm-client appends to claude_commands.log on every vendor-CLI spawn —
+    // the dashboard's credential probe alone writes it — and rotates it to
+    // `.1`. A fresh project's first run refused to complete over it.
+    expect(isHenchRuntimeArtifact("claude_commands.log")).toBe(true);
+    expect(isHenchRuntimeArtifact("claude_commands.log.1")).toBe(true);
+    expect(isHenchRuntimeArtifact("claude_commands.log.2")).toBe(false);
+    expect(isHenchRuntimeArtifact("src/claude_commands.log")).toBe(false);
+  });
+
   it("does not match operator-authored hench content", () => {
     // .hench/config.json is expected to be tracked — discounting the whole
     // .hench/ tree would hide a real uncommitted config change from the gate.

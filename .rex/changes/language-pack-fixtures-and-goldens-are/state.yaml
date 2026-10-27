@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "64cf5020-7d7e-4ba9-b964-0ee9b77a18c0":
+    status: "completed"
+    startedAt: "2026-10-08T01:20:29.083Z"
+    completedAt: "2026-10-08T01:23:14.629Z"
+    endedAt: "2026-10-08T01:23:14.629Z"
+    resolutionType: "code-change"
+    resolutionDetail: ".gitattributes pins language-packs fixtures to eol=lf; prd-line-endings e2e checks it"
+    appliedAt: "2026-10-08T01:23:14.629Z"
+    lastModified: "2026-10-08T01:23:14.876Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,31 @@
+{
+  "id": "sourcevision/analyzers/analyzers-2",
+  "name": "Analyzers 2",
+  "description": "9 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/classify.ts",
+    "packages/sourcevision/src/analyzers/claude-client.ts",
+    "packages/sourcevision/src/analyzers/declared-rules.ts",
+    "packages/sourcevision/src/analyzers/enrich-batch.ts",
+    "packages/sourcevision/src/analyzers/enrich-judge.ts",
+    "packages/sourcevision/src/analyzers/token-usage.ts",
+    "packages/sourcevision/src/analyzers/typed-findings.ts",
+    "packages/sourcevision/src/analyzers/zone-naming.ts",
+    "packages/sourcevision/src/analyzers/zone-symbols.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/classify.ts",
+    "packages/sourcevision/src/analyzers/claude-client.ts",
+    "packages/sourcevision/src/analyzers/declared-rules.ts",
+    "packages/sourcevision/src/analyzers/enrich-batch.ts",
+    "packages/sourcevision/src/analyzers/enrich-judge.ts",
+    "packages/sourcevision/src/analyzers/token-usage.ts",
+    "packages/sourcevision/src/analyzers/typed-findings.ts",
+    "packages/sourcevision/src/analyzers/zone-naming.ts",
+    "packages/sourcevision/src/analyzers/zone-symbols.ts"
+  ],
+  "cohesion": 0.36,
+  "coupling": 0.64,
+  "fileCount": 9,
+  "lineCount": 4552
+}

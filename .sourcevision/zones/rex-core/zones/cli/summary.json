@@ -1,0 +1,22 @@
+{
+  "id": "rex-core/cli",
+  "name": "Cli",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/token-errors.ts",
+    "packages/rex/src/cli/commands/token-format.ts",
+    "packages/rex/src/cli/commands/usage.ts",
+    "packages/rex/src/core/token-store.ts",
+    "packages/rex/src/core/token-usage.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/token-format.ts",
+    "packages/rex/src/cli/commands/usage.ts",
+    "packages/rex/src/core/token-store.ts",
+    "packages/rex/src/core/token-usage.ts"
+  ],
+  "cohesion": 0.74,
+  "coupling": 0.26,
+  "fileCount": 5,
+  "lineCount": 1661
+}

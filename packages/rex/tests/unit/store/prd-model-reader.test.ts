@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { existsSync } from "node:fs";
 import { cp, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -64,10 +65,15 @@ function restamp(file: string, stamp: string): Promise<void> {
   return editText(file, (text) => text.replace(/^schema: .*$/m, `schema: "${stamp}"`));
 }
 
+// The repository's own PRD is read in whichever layout it is in. After
+// `ndx migrate --apply` it is v2 and has no prd_tree/, so the tests that read it
+// as v1 skip; the fixture variants keep the v1 coverage.
+const itRepoV1 = it.skipIf(!existsSync(join(REPO_REX_DIR, PRD_TREE_DIRNAME)));
+
 describe("v1 tree", () => {
-  it("parses this repository's tree to the same items as the v1 parser (golden)", async () => {
-    const today = await parseFolderTree(join(REPO_REX_DIR, PRD_TREE_DIRNAME));
-    const model = await loadPrdModel(REPO_REX_DIR, quiet);
+  async function expectGolden(rexDir: string, minItems: number): Promise<void> {
+    const today = await parseFolderTree(join(rexDir, PRD_TREE_DIRNAME));
+    const model = await loadPrdModel(rexDir, quiet);
 
     expect(model.layout).toBe("v1");
     expect(model.schema).toBe("rex/v1");
@@ -75,7 +81,7 @@ describe("v1 tree", () => {
 
     const before = flatten<PRDItem>(today.items);
     const after = flatten(model.tree.changes);
-    expect(before.length).toBeGreaterThan(100);
+    expect(before.length).toBeGreaterThan(minItems);
     expect(after.map(({ node, parent }) => [node.id, parent])).toEqual(before.map(({ node, parent }) => [node.id, parent]));
 
     const expectedType = { epic: "change", feature: "change", task: "task", subtask: "subtask" } as const;
@@ -86,6 +92,15 @@ describe("v1 tree", () => {
       expect(type).toBe(expectedType[item.level]);
       expect(slug).toBeTruthy();
     });
+  }
+
+  itRepoV1("parses this repository's tree to the same items as the v1 parser (golden)", () =>
+    expectGolden(REPO_REX_DIR, 100));
+
+  it("parses the v1 fixture to the same items as the v1 parser (golden)", async () => {
+    const rexDir = join(tmp, ".rex");
+    await cp(V1_FIXTURE, join(rexDir, PRD_TREE_DIRNAME), { recursive: true });
+    await expectGolden(rexDir, 0);
   });
 
   it("reads a v1 feature's acceptanceCriteria as the change's typed field", async () => {
@@ -97,7 +112,7 @@ describe("v1 tree", () => {
     expect(ChangeIntentSchema.shape.acceptanceCriteria.safeParse(change.acceptanceCriteria).success).toBe(true);
   });
 
-  it("names each item by its stored folder or file", async () => {
+  itRepoV1("names each item by its stored folder or file", async () => {
     const model = await loadPrdModel(REPO_REX_DIR, quiet);
     // The epic this task belongs to, stored as product-map-and-change-layer/index.md.
     expect(find(model, "72fe1093-132e-46f1-ad46-af304a453612")).toMatchObject({

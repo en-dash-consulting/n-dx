@@ -21,7 +21,7 @@ import type { LoadedData } from "../types.js";
 import {
   loadModules,
   loadFromFiles,
-  detectMode,
+  probeServer,
   onDataChange,
   clearOnChange,
   startPolling,
@@ -30,14 +30,33 @@ import {
 import { isFeatureDisabled, onDegradationChange } from "../performance/index.js";
 import { isDeployedMode } from "../deployed-mode.js";
 
+/**
+ * Where the page is running. `unavailable` is a server that answered but
+ * would not serve the dashboard (hub 503 during startup, a 401 on a stale
+ * token, …) — the hook keeps re-probing it and switches to `server` when it
+ * answers, so a tab opened too early recovers on its own.
+ */
+export type ViewerMode = "server" | "static" | "unavailable";
+
+/** Why the server is unavailable: the `/data` status (0 = request failed) and the refusal's own words. */
+export interface ServerUnavailable {
+  status: number;
+  detail: string | null;
+}
+
 export interface AppDataState {
   data: LoadedData;
   loading: boolean;
-  mode: "server" | "static";
+  mode: ViewerMode;
+  /** Set while `mode` is `unavailable`, null otherwise. */
+  serverError: ServerUnavailable | null;
   refreshToast: boolean;
   showDrop: boolean;
   setLoading: (loading: boolean) => void;
 }
+
+/** How often an unavailable server is asked again, after the probe's own retries are spent. */
+export const UNAVAILABLE_REPROBE_MS = 5000;
 
 const EMPTY_DATA: LoadedData = {
   manifest: null,
@@ -65,7 +84,8 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
   const { pausePolling = false } = options;
   const [data, setData] = useState<LoadedData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<"server" | "static">("static");
+  const [mode, setMode] = useState<ViewerMode>("static");
+  const [serverError, setServerError] = useState<ServerUnavailable | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
   const [showDrop, setShowDrop] = useState(false);
   const initialLoad = useRef(true);
@@ -99,35 +119,71 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
       }
     });
 
-    detectMode().then(async (m) => {
-      setMode(m);
-      if (m === "server") {
-        // Staged loading: load critical modules first for fast shell render,
-        // then load the rest in the background without blocking the UI.
-        await loadModules(PRIORITY_MODULES);
-        setLoading(false);
-        initialLoad.current = false;
-        // In deployed mode, data is static — polling would be wasteful.
-        if (!isDeployedMode()) {
-          startPolling(5000);
-        }
+    let cancelled = false;
+    let reprobeTimer: ReturnType<typeof setTimeout> | null = null;
 
-        // Load remaining modules in the background (non-blocking).
-        // Uses requestIdleCallback where available to avoid blocking the main
-        // thread; falls back to setTimeout for environments without it.
-        const scheduleDeferred = typeof requestIdleCallback === "function"
-          ? requestIdleCallback
-          : (cb: () => void) => setTimeout(cb, 50);
-        scheduleDeferred(() => {
-          loadModules(DEFERRED_MODULES);
-        });
-      } else {
-        setLoading(false);
-        setShowDrop(true);
+    const enterServerMode = async () => {
+      setMode("server");
+      setServerError(null);
+      // Staged loading: load critical modules first for fast shell render,
+      // then load the rest in the background without blocking the UI.
+      await loadModules(PRIORITY_MODULES);
+      if (cancelled) return;
+      setLoading(false);
+      initialLoad.current = false;
+      // In deployed mode, data is static — polling would be wasteful.
+      if (!isDeployedMode()) {
+        startPolling(5000);
       }
+
+      // Load remaining modules in the background (non-blocking).
+      // Uses requestIdleCallback where available to avoid blocking the main
+      // thread; falls back to setTimeout for environments without it.
+      const scheduleDeferred = typeof requestIdleCallback === "function"
+        ? requestIdleCallback
+        : (cb: () => void) => setTimeout(cb, 50);
+      scheduleDeferred(() => {
+        if (!cancelled) loadModules(DEFERRED_MODULES);
+      });
+    };
+
+    // The server answered but would not serve the dashboard. Ask again on a
+    // slow cadence — `ndx start` may still be bringing the project up — and
+    // enter server mode the moment it answers.
+    const reprobe = async () => {
+      const probe = await probeServer({ delaysMs: [] });
+      if (cancelled) return;
+      if (probe.mode === "server") {
+        setLoading(true);
+        await enterServerMode();
+        return;
+      }
+      if (probe.mode === "unavailable") {
+        setServerError({ status: probe.status, detail: probe.detail });
+      }
+      reprobeTimer = setTimeout(reprobe, UNAVAILABLE_REPROBE_MS);
+    };
+
+    probeServer().then(async (probe) => {
+      if (cancelled) return;
+      if (probe.mode === "server") {
+        await enterServerMode();
+        return;
+      }
+      setLoading(false);
+      if (probe.mode === "static") {
+        setMode("static");
+        setShowDrop(true);
+        return;
+      }
+      setMode("unavailable");
+      setServerError({ status: probe.status, detail: probe.detail });
+      reprobeTimer = setTimeout(reprobe, UNAVAILABLE_REPROBE_MS);
     });
 
     return () => {
+      cancelled = true;
+      if (reprobeTimer) clearTimeout(reprobeTimer);
       stopPolling();
       clearOnChange();
       if (toastTimerRef.current) {
@@ -152,9 +208,10 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
     }
   }, [shouldPause, mode]);
 
-  // Drag-and-drop (only active in static mode)
+  // Drag-and-drop (only active in static mode — an unavailable server is
+  // retried, not replaced by copies of its files)
   useEffect(() => {
-    if (mode === "server") return;
+    if (mode !== "static") return;
 
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault();
@@ -186,5 +243,5 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
     };
   }, [mode]);
 
-  return { data, loading, mode, refreshToast, showDrop, setLoading };
+  return { data, loading, mode, serverError, refreshToast, showDrop, setLoading };
 }

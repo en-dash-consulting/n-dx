@@ -17,7 +17,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
 
 1. Read the full structure and item counts from the `get_prd_status` answer:
    - **v1 tree:** the epic/feature structure
-   - **v2 tree:** the changes, the Inbox count and product status per area; call `get_product` (rex MCP) for the capabilities and constraints changes are placed on
+   - **v2 tree:** the changes, the Inbox count and product status per area; call `get_product` (rex MCP) with `area` for the capabilities and constraints changes are placed on in that area
 2. Analyze the current structure for problems:
    - **v1 tree:** **too many epics** (related epics that should be features under a broader epic); **wrong levels** (epics with no children that are really tasks, features that are really subtasks); **overlapping areas** (multiple epics/features covering the same domain); **orphaned items** (tasks at root level that belong under an existing epic); **naming inconsistency** (similar items with different naming conventions)
    - **v2 tree:** **unplaced changes** (changes in the Inbox, or changes placed on the wrong capability); **duplicate changes** (sibling changes doing the same work); **scattered work** (changes that belong under one larger change, or tasks under the wrong change); **naming inconsistency**. A node's type is fixed, so there are no level problems to fix
@@ -56,7 +56,7 @@ Use this when the PRD has grown organically and needs cleanup: too many top-leve
 ## MCP Tools Used
 
 - `get_prd_status` — read current structure
-- `get_product` — read the product layer (v2 tree)
+- `get_product` — read the product layer (v2 tree): areas with counts, or one area's capabilities and constraints with `area`
 - `add_item` — create new parent containers (v1 tree) or grouping changes (v2 tree)
 - `move_item` — reparent items under new parents
 - `place_change` — suggest and record where a change sits on the product layer (v2 tree)

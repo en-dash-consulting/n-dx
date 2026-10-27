@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "3c2af4a4-7106-47c7-84a4-755efd5c488c":
+    status: "completed"
+    startedAt: "2026-10-15T02:50:47.026Z"
+    completedAt: "2026-10-15T02:56:21.452Z"
+    endedAt: "2026-10-15T02:56:21.452Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Shared SVG ActionIcon for copy/close/more buttons"
+    appliedAt: "2026-10-15T02:56:21.452Z"
+    lastModified: "2026-10-15T02:56:21.747Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "b8e2793b-26db-4f33-8d01-f41404d5502f":
+    status: "completed"
+    startedAt: "2026-10-21T04:26:38.648Z"
+    completedAt: "2026-10-21T04:27:49.879Z"
+    endedAt: "2026-10-21T04:27:49.879Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Hub cards carry and render readiness and infrastructure counts"
+    appliedAt: "2026-10-21T04:27:49.879Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-21T04:27:50.557Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

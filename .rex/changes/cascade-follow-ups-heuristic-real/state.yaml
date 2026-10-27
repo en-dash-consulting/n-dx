@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "7576c53c-afd2-4407-8200-6b67fe513f80":
+    status: "completed"
+    startedAt: "2026-09-22T05:11:20.592Z"
+    completedAt: "2026-09-22T05:19:09.366Z"
+    endedAt: "2026-09-22T05:19:09.366Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Band [0.4,0.6) + cap 6 from measured distributions; heuristic real-problem Noul after assembleFindings; move-file Choice with stay; cross-scope dedupe; --per-zone passthrough; narrate machinery kept by decision"
+    appliedAt: "2026-09-22T05:19:09.366Z"
+    lastModified: "2026-09-22T05:19:09.377Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

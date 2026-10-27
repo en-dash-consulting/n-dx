@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "25a733b4-d4eb-4fb6-b5a7-0fc3232c58da":
+    status: "completed"
+    startedAt: "2026-10-09T08:43:59.918Z"
+    completedAt: "2026-10-09T08:52:56.137Z"
+    endedAt: "2026-10-09T08:52:56.137Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: product-reshape cannotCopy skips reparent/split of a node with tags, body, capability requirements or dependsOn, or one another live node names in dependsOn/appliesTo (id, displayId or alias); reason reported as \"Not drafted\". Unit + integration tests; doc and changeset updated."
+    appliedAt: "2026-10-09T08:52:56.137Z"
+    lastModified: "2026-10-09T08:52:56.403Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

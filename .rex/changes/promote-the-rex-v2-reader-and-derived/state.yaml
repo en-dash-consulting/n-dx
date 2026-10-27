@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ee838683-369f-4dfe-a933-8d3de55cfa36":
+    status: "completed"
+    startedAt: "2026-10-10T03:52:13.375Z"
+    completedAt: "2026-10-10T03:57:49.749Z"
+    endedAt: "2026-10-10T03:57:49.749Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 PRD model, index, derived edges/status/realization and report builders exported from @n-dx/rex public.ts; public-prd-model integration test; v2 isolation allowlist admits public.ts"
+    appliedAt: "2026-10-10T03:57:49.749Z"
+    lastModified: "2026-10-10T03:57:50.100Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

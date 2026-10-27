@@ -1,0 +1,54 @@
+schema: "rex/v2"
+items:
+  "032fbaf4-b120-4dc1-9bc3-004bc3d9d93f":
+    status: "completed"
+    startedAt: "2026-08-18T21:37:45.149Z"
+    completedAt: "2026-08-18T21:41:07.153Z"
+    endedAt: "2026-08-18T21:41:07.153Z"
+  "08ca827b-1a2d-4c32-b555-64a5eaffc271":
+    status: "completed"
+    startedAt: "2026-08-18T22:47:44.556Z"
+    completedAt: "2026-08-18T22:48:50.763Z"
+    endedAt: "2026-08-18T22:48:50.763Z"
+  "29a2a782-dfe9-40f6-ad62-1de097395062":
+    status: "completed"
+    startedAt: "2026-08-18T21:41:18.055Z"
+    completedAt: "2026-08-18T21:44:07.017Z"
+    endedAt: "2026-08-18T21:44:07.017Z"
+  "35a6da7c-a1a4-496a-8189-9cee15e5b486":
+    status: "completed"
+    startedAt: "2026-08-18T21:44:26.106Z"
+    completedAt: "2026-08-18T21:54:29.075Z"
+    endedAt: "2026-08-18T21:54:29.075Z"
+  "44bea9a4-d841-41b5-9a8b-cfe67d598298":
+    status: "completed"
+    startedAt: "2026-08-18T21:58:47.192Z"
+    completedAt: "2026-08-18T22:05:09.667Z"
+    endedAt: "2026-08-18T22:05:09.667Z"
+  "56a6860c-eb30-4f0a-bd3f-c3b9830e25e0":
+    status: "completed"
+    startedAt: "2026-08-18T22:49:28.655Z"
+    completedAt: "2026-08-18T22:50:35.809Z"
+    endedAt: "2026-08-18T22:50:35.809Z"
+  "7ac28a47-1e4f-414c-9ff3-f6e86fd5dfc2":
+    status: "completed"
+    startedAt: "2026-08-18T22:43:54.512Z"
+    completedAt: "2026-08-18T22:47:21.996Z"
+    endedAt: "2026-08-18T22:47:21.996Z"
+  "868493c8-081f-4d99-8037-9ecf8e933c9d":
+    status: "completed"
+    startedAt: "2026-08-18T22:54:58.592Z"
+    completedAt: "2026-08-18T22:54:58.592Z"
+    endedAt: "2026-08-18T22:54:58.592Z"
+    appliedAt: "2026-08-18T22:54:58.592Z"
+    needsPlacement: true
+  "e46feb51-c637-4b86-b39e-cb8ab72f0dc7":
+    status: "completed"
+    startedAt: "2026-08-18T22:50:58.512Z"
+    completedAt: "2026-08-18T22:54:57.622Z"
+    endedAt: "2026-08-18T22:54:57.622Z"
+  "f256f541-0261-4b26-943b-61f7fe0ce42c":
+    status: "completed"
+    startedAt: "2026-08-18T22:40:24.182Z"
+    completedAt: "2026-08-18T22:43:05.212Z"
+    endedAt: "2026-08-18T22:43:05.212Z"

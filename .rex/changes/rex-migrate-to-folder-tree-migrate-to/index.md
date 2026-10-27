@@ -1,0 +1,22 @@
+---
+id: "24797aca-c44d-40f1-ba23-85a81446884c"
+type: "change"
+title: "rex migrate-to-folder-tree, migrate-to-md and migrate-folder-tree-filenames do not refuse a v2 tree"
+slug: "rex-migrate-to-folder-tree-migrate-to"
+intent: "Found by the adversarial review of 74584d30. Verdict: should-fix. That task's description asked for every migrate-* command to stay v1-only, but only migrate-slugs was switched to resolveV1Store. The other three write files directly and never resolve a store, so the new FileStore guard does not cover them.\n\nFailure scenario: on a v2 project with a leftover `.rex/prd.md` or `.rex/prd.json`, `rex migrate-to-folder-tree .` passes the source through loadSourceDocument and then `serializeFolderTree(doc.items, treeRoot)`. That writes `.rex/prd_tree/` beside `product/`, the split tree this feature closes (packages/rex/src/cli/commands/migrate-to-folder-tree.ts:52-63). migrate-to-md likewise writes `prd.md` on a v2 tree, and migrate-folder-tree-filenames walks `prd_tree/` without checking the layout.\n\nReachability: only by running a legacy migration command on a v2 project. This is an operator mistake, but the commands are listed in help.\n\nFix options:\n(a) At the top of each command, refuse when `prdLayout(rexDir) === \"v2\"`, with a CLIError naming the v2 layout and saying nothing was written. Cheap. Recommended.\n(b) Put one shared helper in cli/ (e.g. `refuseOnV2(rexDir, command)`) and use it here and in restore (the sibling CLI task needs the same refusal)."
+acceptanceCriteria:
+  - "rex migrate-to-folder-tree on a v2 fixture copy with a .rex/prd.md refuses with a message naming the v2 layout and creates no prd_tree/ (test)"
+  - "rex migrate-to-md on a v2 fixture copy with a .rex/prd.json refuses and writes no prd.md (test)"
+  - "rex migrate-folder-tree-filenames on a v2 fixture copy refuses (test)"
+  - "v1 behaviour of all three commands is unchanged: existing tests pass unedited"
+touches:
+  - "40cb95a7-c1d5-4fd0-8041-74c7a928215f"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "pr-33"
+  - "lane-rex-store"
+  - "rex"
+source: "ndx-adversarial-review"
+---

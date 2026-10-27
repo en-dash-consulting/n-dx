@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "e5c37f4c-363c-4d0c-97a1-d110d89c6b8a":
+    status: "completed"
+    startedAt: "2026-05-27T18:35:34.043Z"
+    completedAt: "2026-05-27T18:40:07.399Z"
+    endedAt: "2026-05-27T18:40:07.399Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added regression tests in packages/hench/tests/integration/loop-timer-expiry-stall.test.ts to verify timer-expiry auto-commit handling in --yes mode. Tests confirm that performCommitPromptIfNeeded correctly detects didAutoCommit() and returns early without stalling the loop. Existing code fix (didAutoCommit() check) was already in place and working correctly."
+    appliedAt: "2026-05-27T18:40:07.399Z"

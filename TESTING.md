@@ -27,6 +27,62 @@ packages/<name>/tests/
   fixtures/       # Shared test data
 ```
 
+### Browser suites (web only)
+
+The web package has two Playwright suites beside its vitest tiers. Both drive
+the **built** dashboard (`packages/web/dist`) in headless Chromium, so rebuild
+web (`pnpm --filter @n-dx/web build`) after a source change and install the
+browser once (`npx playwright install chromium` in `packages/web`). Neither is
+run by `pnpm test` or by CI; vitest only collects `*.test.ts`, and these are
+`*.spec.ts`.
+
+**`tests/e2e-ui/` — automated, LLM-free** (`pnpm --filter @n-dx/web test:e2e-ui`).
+One fixture project and one `web serve` per spec file, local vendor on a dead
+port. Besides the required `navigation.spec.ts` and the workflow specs, the
+`happy-click/` directory holds one spec per page group (shell, SourceVision,
+Rex, Hench, Live, Settings) that presses each control on a page and asserts
+its intended effect, plus `sweep.spec.ts`, which deep-links every view and
+clicks every control the click policy allows as a broad "nothing throws" net.
+
+- The deny list is `happy-click/helpers/click-policy.ts`. A control that
+  spawns a process, needs the vendor, destroys fixture state or leaves the page
+  (clipboard, download, new tab, OS dialog) is named there and is exercised
+  only by a scripted test that knows what to assert. **Add to it in the same
+  change that adds such a control.**
+- One `test()` per page. Never click a control whose enabled state depends on
+  a pending effect: `expect(...).toBeEnabled()` first (Family 2 below).
+- The Settings pages sit behind a leave guard: a test that edits a field must
+  Discard or Save before it navigates (`happy-click/helpers/settings.ts`).
+- `createFixtureProject({ sources: true })` seeds a few importing source files
+  so Files, Zones and the map have data; the workflow specs use the bare
+  fixture.
+
+**`tests/e2e-ui-manual/` — manual, real vendor, video** (`pnpm --filter @n-dx/web test:e2e-manual`).
+Three flows against the operator's real Claude CLI login (and Codex when
+`codex` is on PATH): a typed prompt that becomes a task the agent completes;
+a full analysis, a task added through the Add form, completed by the agent;
+and a Settings vendor/model switch followed by a three-task iteration run on
+Claude, then on Codex. Every test records a 1280×720 video and a trace into
+`packages/web/test-results/manual/`, attaches the hench run records and run
+logs, and the HTML report is at `playwright-report/manual`
+(`pnpm --filter @n-dx/web test:e2e-manual:report`). Both directories are
+gitignored.
+
+- **It spends tokens and takes 20–60 minutes.** Runs are non-deterministic by
+  design; a failed agent run is reported with its attached record and log,
+  never retried.
+- Run it from a plain terminal, not from inside a Claude Code session — the
+  session's `CLAUDECODE` / `CLAUDE_CODE_SESSION_ID` leak into the spawned
+  server (Family 4), and only the first is stripped on the way to the agent.
+- Knobs: `NDX_E2E_CLAUDE_MODEL` (default `claude-haiku-4-5`),
+  `NDX_E2E_CODEX_MODEL` (default `gpt-5.5`), `NDX_E2E_RUN_TIMEOUT_MS` per task
+  (default 15 min), `NDX_E2E_ANALYZE_TIMEOUT_MS`, `NDX_E2E_MANUAL_TIMEOUT_MS`
+  per test (default 45 min), `NDX_E2E_KEEP_FIXTURE=1` to keep the temp project.
+- A flow skips, naming the reason, when its vendor CLI is missing or the
+  dashboard's own credential probe (`GET /api/commands/auth`) fails.
+- Run one flow at a time while iterating: `-- --grep prompt`, `--grep analysis`,
+  `--grep Claude`.
+
 ## Integration Test Tier
 
 The integration tier bridges the gap between unit tests (isolated) and e2e tests
@@ -387,6 +443,56 @@ signal exit code against the expected one, which reads as a product failure.
   scaled that cap by `BUDGET_MULTIPLIER` instead of raising it to a new fixed
   number.
 
+#### A worker exits with every test passing
+
+**Symptom:** a suite fails with `Worker exited unexpectedly with exit code 1`,
+or its log stops mid-output with no vitest summary, while every test in the
+run passed. The file it names passes standalone and on a re-run.
+
+**What is known** (vitest 5.0.4, investigated for `7db88b02` after five such
+failures in one session on 2026-10-14):
+
+- **It is not a test calling `process.exit`.** Vitest 5 replaces
+  `process.exit` inside a worker with an error naming the test file, so a
+  direct call fails that file with "process.exit unexpectedly called" rather
+  than killing the worker. `tests/unit/setup-exit-trace.test.js` pins this.
+  A bare exit code 1 therefore comes from outside the test's own call stack.
+- **The five sightings were not one mechanism.** Two were a temp-directory
+  removal racing a child that had not exited: `codex-mcp-contract` resolved
+  its MCP exchange on the answer and killed the server without waiting for
+  it, and `afterAll` removed the server's cwd. That is fixed by awaiting the
+  child's exit, not by a longer retry window. One was a Family 3 spawn
+  guardrail: `cli-init-git-preflight` killed a full `ndx init` at a fixed 25s;
+  that is scaled by `BUDGET_MULTIPLIER` now. The two rex worker exits (one
+  reported, one a truncated log) are unexplained, and the affected-gate
+  failure on `ed9a4a88` left no run record on the machine that saw it, so it
+  can be neither reproduced nor attributed.
+- **Reproduction under load:** five consecutive `pnpm validate` passes on
+  Windows 11 (2026-10-21, vitest 5.0.4; three stopping at the first failing
+  package, two with `--no-bail` so `web` ran too), with the exit tracer on,
+  produced no worker exit, no EPERM or EBUSY at teardown, and no traced
+  `process.exit` or uncaught error in any worker log. The worker exits did not
+  reproduce. Each pass did fail one sourcevision test, and deterministically:
+  `imports-go-incremental-carryover` fails on any checkout without the Go
+  grammar built, because the regex fallback keeps edges to a pruned package
+  directory. CI builds the grammar and never sees it. That is a product
+  defect, not a load effect; it is tracked on its own.
+
+**Rules:**
+
+- Do not raise retries or timeouts for a worker exit. There is no assertion to
+  retry; a retry turns a crash into a slower green run and throws away the
+  only evidence.
+- Run the failing selection again with `NDX_TEST_EXIT_TRACE=<dir>` set
+  (`tests/setup-exit-trace.js`, loaded by every package's vitest config). Each
+  worker appends to `<dir>/worker-<pid>.log`: the test files it started, the
+  stack of any `process.exit` call, any uncaught error, and its heap use and
+  active-handle count when it exits. The last `file` line in the log of the
+  worker that died is the file to investigate, whatever vitest named.
+- A test that kills a child must await the child's `exit` before removing
+  anything the child holds (its cwd, its open files). Waiting on the event
+  takes exactly as long as the machine needs; a retry window is a guess.
+
 ### Family 2 — Wall-clock and render-order assumptions
 
 **Symptom:** a timing ratio or `waitFor` that passes on an idle machine and
@@ -614,6 +720,11 @@ an agent running the suite inside Claude Code — ever saw the failure.
   To check whether a failure is a leak, run with `NDX_TEST_ISOLATE_ALL=1`, which
   puts every file back in its own worker: a failure that disappears is a leak
   in the shared project, one that stays is the test's own.
+- **`rex init` gives fixtures a v1 tree.** A new project gets an empty v2 PRD,
+  but most fixtures init and then `rex add epic`, so `tests/setup-session-env.js`
+  sets `NDX_INIT_LAYOUT=v1`. A test of what users get deletes it from its spawn
+  env (`packages/rex/tests/e2e/cli-init.test.ts`). Playwright loads no vitest
+  setup, so its fixture passes it explicitly.
 - **Fixture repos get their git config from one file, not from `git config`.**
   `tests/setup-session-env.js` writes a gitconfig (identity `Test
   <test@test.com>`, `core.autocrlf=false`, `core.eol=lf`, `commit.gpgsign=false`,
@@ -670,6 +781,21 @@ is not a legitimate absence — it means a declaration has gone stale (a boundar
 named over a moved file, a renamed directory) — so those gates assert the path
 exists and fail loudly. `tests/unit/architecture-gate-reporting.test.js` keeps
 both halves honest: it fails if any gate goes back to returning silently.
+
+### Windows console windows — every production spawn passes `windowsHide`
+
+`tests/e2e/windows-hide-policy.test.js` (in `root-policy`) scans every
+`spawn` / `spawnSync` / `execFile` / `execFileSync` under `packages/*` except
+tests and developer scripts, and fails on one whose options do not mention
+`windowsHide`. On Windows a parent without a console — the hub, the background
+dashboard, a detached `sv narrate`, or anything they spawned hidden — hands
+every unhidden console child its own visible window, for as long as that
+child lives. The flag has to travel with every hop, so the gate is a scan, not
+a list. Pass `windowsHide: true` for piped or ignored stdio,
+`windowsHide: !process.stdout.isTTY` for a child that must inherit the
+operator's terminal, or mark a deliberate exemption with
+`// windows-console: inherit <reason>`. The scanner is also runnable on its
+own: `node scripts/lib/windows-hide-scan.mjs`.
 
 ### Family 5 — the suite leaking into the developer's environment
 

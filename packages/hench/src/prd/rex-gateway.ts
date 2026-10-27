@@ -183,6 +183,11 @@ export { completeV2Work } from "@n-dx/rex";
 // applied, and which changes enclose a task, are rex's to answer.
 export { isAppliedChange, indexTree, enclosingChangeIds } from "@n-dx/rex";
 
+// `--task` refuses an Inbox change only while rex would hold it: on a product
+// layer with no capability or constraint, rex selects and closes it. Whether a
+// change is held for placement is rex's rule.
+export { awaitsPlacement } from "@n-dx/rex";
+
 // A completion commit stages an untracked intent file beside a state.yaml it
 // wrote only when that file's node has a row there; an operator's draft has
 // none. Which file holds which node, and which rows a folder holds, are the
@@ -214,7 +219,7 @@ export { resolveActor } from "@n-dx/rex";
 export { computeTimestampUpdates } from "@n-dx/rex";
 
 // ---- Parent auto-completion -------------------------------------------------
-export { findAutoCompletions, reconcileAutoCompletions } from "@n-dx/rex";
+export { allChildrenSuccessful, findAutoCompletions, reconcileAutoCompletions } from "@n-dx/rex";
 
 // ---- Parent reset -----------------------------------------------------------
 // The pure computation only. `cascadeParentReset` is deliberately not

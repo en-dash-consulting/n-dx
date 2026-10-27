@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "127a68ab-c1e8-4fef-aa08-53cbe95f2a33":
+    status: "completed"
+    startedAt: "2026-10-08T05:15:44.476Z"
+    completedAt: "2026-10-08T05:20:35.536Z"
+    endedAt: "2026-10-08T05:20:35.536Z"
+    resolutionType: "code-change"
+    resolutionDetail: "placementRelation: explicit Relation line (amends|touches) wins; else amending title verb → amends; fix/code-health force touches."
+    appliedAt: "2026-10-08T05:20:35.536Z"
+    lastModified: "2026-10-08T05:20:35.768Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

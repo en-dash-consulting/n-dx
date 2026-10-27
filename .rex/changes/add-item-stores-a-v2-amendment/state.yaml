@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "bfb8ed54-bb47-4647-a5f0-8cc46b8c1700":
+    status: "completed"
+    startedAt: "2026-10-09T06:12:32.690Z"
+    completedAt: "2026-10-09T06:27:00.438Z"
+    endedAt: "2026-10-09T06:27:00.438Z"
+    resolutionType: "code-change"
+    resolutionDetail: "applyAmendmentsProblems (core/apply-amendments.ts) dry-runs applyAmendments with force on the tree containing the new/placed change and returns apply's problems, discarding the result. addChangeNode and recordPlacement refuse on them (place_change: only problems the new amendment brings). refuseMisfitCriteria and recordPlacement's constraint/criteria-id checks removed; applyCriteriaDelta now module-private. Summary-only amendments (NOTHING_TO_MODIFY) and stale base stay accepted by decision. Tests: unit apply-amendments, change-add, change-place, integration v2-mcp-place-apply."
+    appliedAt: "2026-10-09T06:27:00.438Z"
+    lastModified: "2026-10-09T06:27:00.765Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

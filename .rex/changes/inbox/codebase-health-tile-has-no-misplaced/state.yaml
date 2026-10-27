@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "8df23503-a824-4f3c-8a0b-eef90973bccc":
+    status: "completed"
+    startedAt: "2026-10-15T05:24:58.853Z"
+    completedAt: "2026-10-15T05:28:45.816Z"
+    endedAt: "2026-10-15T05:28:45.816Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Info tips hidden in tiles, kept when opened"
+    appliedAt: "2026-10-15T05:28:45.816Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T05:28:46.095Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

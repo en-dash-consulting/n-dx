@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "3ac045d9-23d2-442e-8be6-28d13edea664":
+    status: "completed"
+    startedAt: "2026-03-11T02:19:29.143Z"
+    completedAt: "2026-03-11T02:24:01.931Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "All 6 integration tests already exist in packages/rex/tests/integration/cli/commands/smart-add-cache.test.ts and pass. Tests cover: savePending prdHash writing, loadPending prdHash reading, --accept with matching hash, --accept stale cache rejection, backward-compatible cache without prdHash, and maybeCacheSmartAddProposals hash passthrough. All use mocked LLM and temp directories."
+    appliedAt: "2026-03-11T02:24:01.931Z"

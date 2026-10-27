@@ -11,7 +11,9 @@
  * The mutation returns a new tree, which fits the pure v2 logic
  * (`core/change-completion.ts`, `core/change-selection.ts`): it returns a tree
  * and writes nothing. A tree returned unchanged writes nothing. A mutation
- * that throws writes nothing.
+ * that throws writes nothing. Every node the mutation changed, created or
+ * moved is stamped with `lastModified` / `lastModifiedBy`, as v1's store
+ * stamps its items; an unchanged node keeps its stamp.
  *
  * A v1 tree is refused before the mutation runs: it is written by
  * `store.withTransaction`. A tree past a schema refusal is never read for a
@@ -25,7 +27,10 @@ import { withLock, type LockOptions } from "./file-lock.js";
 import { PRD_TREE_DIRNAME, prdLockPath } from "./paths.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, loadPrdModel, type PrdModel } from "./prd-model-reader.js";
 import { writePrdModel, type WritePrdModelResult } from "./prd-model-writer.js";
-import type { V2Tree } from "../schema/v2-rules.js";
+import { canonicalJson } from "./state-writer.js";
+import { resolveActor } from "../core/identity.js";
+import { ITEM_BOOKKEEPING_FIELDS } from "../core/sync.js";
+import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 
 /** What a mutation returns: the tree to write and the caller's result. */
 export interface PrdModelEdit<T> {
@@ -64,15 +69,74 @@ export async function withPrdModelTransaction<T>(
   mutate: (model: PrdModel) => PrdModelEdit<T> | Promise<PrdModelEdit<T>>,
   options: PrdModelTransactionOptions = {},
 ): Promise<PrdModelTransactionResult<T>> {
+  // Resolved before the lock: the first call in a process shells out to git.
+  const actor = await resolveActor();
   return withLock(
     prdLockPath(rexDir),
     async () => {
       const model = await loadPrdModel(rexDir, { ignoreSchemaSkew: false });
       if (model.layout !== "v2") throw new PrdLayoutError(rexDir, model.layout);
+      // Signatured before `mutate` runs: a mutation may edit the loaded tree in place.
+      const before = signTree(model.tree);
       const edit = await mutate(model);
+      stampChangedNodes(edit.tree, before, { lastModified: (options.now?.() ?? new Date()).toISOString(), lastModifiedBy: actor });
       const written = await writePrdModel(rexDir, { ...model, tree: edit.tree }, { removed: edit.removed, now: options.now });
       return { result: edit.result, written };
     },
     options.lock,
   );
+}
+
+// ── Modification stamps ──────────────────────────────────────────
+
+/**
+ * A node's content signature: every field but sync bookkeeping, its parent's
+ * id (so a move reads as a change to the node moved) and its children's ids
+ * (so a parent gaining or losing a child reads as changed, as on v1).
+ */
+function nodeSignature(node: RuleNode, parentId: string | undefined): string {
+  const own: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key !== "children" && !ITEM_BOOKKEEPING_FIELDS.has(key)) own[key] = value;
+  }
+  return canonicalJson({ own, parentId, children: (node.children ?? []).map((c) => c.id) });
+}
+
+function* walkNodes(tree: V2Tree): Generator<{ node: RuleNode; parentId: string | undefined }> {
+  function* walk(nodes: readonly RuleNode[], parentId: string | undefined): Generator<{ node: RuleNode; parentId: string | undefined }> {
+    for (const node of nodes) {
+      yield { node, parentId };
+      yield* walk(node.children ?? [], node.id);
+    }
+  }
+  yield* walk(tree.product, undefined);
+  yield* walk(tree.changes, undefined);
+}
+
+/** Every node's {@link nodeSignature}, by id; computed eagerly, since the tree may then be mutated in place. */
+function signTree(tree: V2Tree): Map<string, string> {
+  const signatures = new Map<string, string>();
+  for (const { node, parentId } of walkNodes(tree)) signatures.set(node.id, nodeSignature(node, parentId));
+  return signatures;
+}
+
+/**
+ * Stamp `lastModified` / `lastModifiedBy` on every node of `tree` whose
+ * content differs from `before`, in place: the v2 counterpart of v1's
+ * `stampChangedItems`, with the same rules. A node unchanged is left alone, so
+ * a write that changes nothing stamps nothing. A new node gets the timestamp
+ * when it has none, and the author only when it brought none: an import or a
+ * caller that set them keeps its provenance.
+ */
+function stampChangedNodes(tree: V2Tree, before: ReadonlyMap<string, string>, stamp: { lastModified: string; lastModifiedBy: string }): void {
+  for (const { node, parentId } of walkNodes(tree)) {
+    const previous = before.get(node.id);
+    if (previous !== undefined) {
+      if (previous !== nodeSignature(node, parentId)) Object.assign(node, stamp);
+      continue;
+    }
+    if (node.lastModified) continue;
+    node.lastModified = stamp.lastModified;
+    if (!node.lastModifiedBy) node.lastModifiedBy = stamp.lastModifiedBy;
+  }
 }

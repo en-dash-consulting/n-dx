@@ -1,0 +1,481 @@
+schema: "rex/v2"
+items:
+  "00d195c1-d984-4708-9cfb-37eee5475122":
+    status: "completed"
+    startedAt: "2026-03-05T05:03:33.614Z"
+    completedAt: "2026-03-05T05:12:39.923Z"
+  "06164479-3023-4d63-9026-4c50bed97883":
+    status: "completed"
+    startedAt: "2026-03-11T14:06:42.747Z"
+    completedAt: "2026-03-11T14:10:10.559Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed majorityDirectory() to filter non-source files (images, config, build scripts) when computing zone directory majority, preventing false move-file recommendations caused by Louvain artifact files inflating package root counts."
+  "0debcab8-0b82-4b67-99ef-0a4bcfc81032":
+    status: "completed"
+    startedAt: "2026-03-07T02:33:46.980Z"
+    completedAt: "2026-03-07T02:39:29.935Z"
+  "0ef1785a-19c8-47ad-86e0-e7e385663165":
+    status: "completed"
+    startedAt: "2026-03-07T03:15:43.155Z"
+    completedAt: "2026-03-07T03:18:36.592Z"
+  "101568f8-c073-4554-8403-393697baa51c":
+    status: "completed"
+    startedAt: "2026-03-11T04:15:01.001Z"
+    completedAt: "2026-03-11T04:32:28.910Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed 3 critical findings with code/config changes, fixed 3 pre-existing test failures, acknowledged 5 warnings as by-design or false positives. Details: (1) crash→external.ts cycle broken by importing ViewId from shared/view-id.js directly with boundary-check exemption; (2) progressive-loader.ts zone-pinned to web-viewer to fix web-unit misclassification; (3) routes-mcp.ts zone-pinned to web-server to fix messaging-pipeline misplacement; (4) routes-data.ts imports verified safe (server-side only, no viewer contamination); (5) sourcevision→web import confirmed false positive (no actual cross-tier import); (6) hench-agent-monitor web-shared bypass acknowledged as by-design (viewer components legitimately need viewer); (7) rex-fix-command acknowledged as having legitimate domain logic; (8) hub-and-spoke partially addressed by crash cycle fix."
+  "109638b1-0eda-425d-a785-f2b87ecf6904":
+    status: "completed"
+    startedAt: "2026-03-09T00:30:23.465Z"
+    completedAt: "2026-03-09T00:48:14.440Z"
+  "1bd85bb8-db2a-46a2-ba7c-1f0048aeb359":
+    status: "completed"
+    startedAt: "2026-03-11T15:56:58.317Z"
+    completedAt: "2026-03-11T16:00:28.327Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Moved progressive-loader.ts from prd-tree/ to components/ to align physical location with web-viewer zone pin. Updated internal imports, test imports, @see references, and zone pin path in .n-dx.json."
+  "1f746194-8a84-4cf7-83bb-ffd828003a8b":
+    status: "completed"
+    startedAt: "2026-03-09T00:48:56.375Z"
+    completedAt: "2026-03-09T00:56:40.126Z"
+  "20db52b8-3434-4058-bd29-93bc901cc328":
+    status: "completed"
+    startedAt: "2026-03-08T07:21:59.666Z"
+    completedAt: "2026-03-08T07:23:33.837Z"
+  "2206ca27-b650-4e5c-add5-2df7242056e4":
+    status: "completed"
+    startedAt: "2026-03-10T04:37:06.414Z"
+    completedAt: "2026-03-10T04:46:24.800Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed all 9 relationship findings: zone pins for gateway files, landing page ownership documentation, boundary-check.test.ts clarifying comment, crash-detector test import migration, gateway-rules.json description update. Several findings were already addressed by prior work (hench-runs.ts already in views/, polling imports confirmed legitimate, parse-gateway-exports.mjs consolidation already done via gateway-rules.json)."
+  "251fbe0a-8b4f-4cb0-a22a-326bf24e64f4":
+    status: "completed"
+    startedAt: "2026-03-05T05:13:25.945Z"
+    completedAt: "2026-03-05T05:18:59.365Z"
+  "25a61f86-7ee3-42bf-9752-e3c89a8c5433":
+    status: "completed"
+    startedAt: "2026-03-08T04:33:13.504Z"
+    completedAt: "2026-03-08T04:45:17.760Z"
+  "2619bd1f-1c65-4a1f-af96-16a84294e3b6":
+    status: "completed"
+    startedAt: "2026-03-05T04:50:57.123Z"
+    completedAt: "2026-03-05T05:02:40.864Z"
+  "26791374-dca3-4403-973f-262a06d53fc2":
+    status: "completed"
+    startedAt: "2026-03-11T02:24:16.188Z"
+    completedAt: "2026-03-11T02:25:32.834Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Deleted dead duplicate packages/hench/src/shared/glob.ts — the canonical simpleGlobMatch lives in guard/paths.ts and is used by all consumers. The shared/ directory was removed as it had no other files."
+  "29244904-187d-4fd7-962d-111678c2bc11":
+    status: "completed"
+    startedAt: "2026-03-09T22:05:28.046Z"
+    completedAt: "2026-03-09T22:19:45.549Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed all 10 anti-pattern findings: zone-cycle enforcement test, Key Files table update, zone pin corrections (7 categories), dependency inversion fix, boundary test update, and generateStructuralInsights decomposition"
+  "2c481b23-6ae9-4a70-9a61-9f6d86f32daf":
+    status: "completed"
+    startedAt: "2026-03-09T00:16:28.944Z"
+    completedAt: "2026-03-09T00:22:34.641Z"
+  "3010ce31-28c9-42c4-b918-07b6a8a1613b":
+    status: "completed"
+    startedAt: "2026-03-08T17:45:09.198Z"
+    completedAt: "2026-03-08T17:57:01.166Z"
+  "33e8596e-7a9d-4194-8e3b-3b66edecb18b":
+    status: "completed"
+    startedAt: "2026-03-07T02:59:35.729Z"
+    completedAt: "2026-03-07T03:05:42.450Z"
+  "37c37dde-4887-48a0-97cc-6f99eaf0f386":
+    status: "completed"
+    startedAt: "2026-03-08T18:10:02.994Z"
+    completedAt: "2026-03-08T18:16:56.486Z"
+  "39caaaed-9d69-4e6a-91bd-6327deffd318":
+    status: "completed"
+    startedAt: "2026-03-08T07:02:27.647Z"
+    completedAt: "2026-03-08T07:14:19.862Z"
+  "4172340d-e3a3-4795-b441-96e0a68cdab3":
+    status: "completed"
+    startedAt: "2026-03-07T03:19:12.406Z"
+    completedAt: "2026-03-07T03:22:26.398Z"
+  "436ac6c9-4bf1-4faf-b715-e30a0aee5cbf":
+    status: "completed"
+    startedAt: "2026-03-08T01:28:02.825Z"
+    completedAt: "2026-03-08T01:31:57.648Z"
+  "491e1097-3e0a-4900-8cf3-fa36c42cafae":
+    status: "completed"
+    startedAt: "2026-03-07T02:17:02.814Z"
+    completedAt: "2026-03-07T02:32:43.844Z"
+  "4a2d6294-75e0-42f5-b445-9228184d75ad":
+    status: "completed"
+    startedAt: "2026-03-06T02:24:11.572Z"
+    completedAt: "2026-03-06T02:28:55.168Z"
+  "4c11effd-e8a0-43ed-a09f-7662c5d874a8":
+    status: "completed"
+    startedAt: "2026-03-08T05:00:56.419Z"
+    completedAt: "2026-03-08T05:12:26.786Z"
+  "510283d6-0316-4555-a175-582e4d7f3541":
+    status: "completed"
+    startedAt: "2026-03-11T01:33:59.267Z"
+    completedAt: "2026-03-11T01:43:27.221Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed 11 relationship findings: extracted ViewId to shared layer, split cross-zone test imports, verified remaining findings as already resolved or non-actionable"
+  "5316ae8d-023d-4a69-b724-57f82a7e780f":
+    status: "completed"
+    startedAt: "2026-03-11T02:25:57.416Z"
+    completedAt: "2026-03-11T02:38:47.604Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed 3 concrete architectural issues: (1) eliminated rex core/move.ts → cli/errors.ts layering violation by replacing CLIError with plain Error, (2) broke circular dependency chain polling→polling-restart→graceful-degradation→memory-monitor→polling by importing registerPollingSource directly from polling-state.ts instead of the barrel, (3) removed cross-zone coupling in usage-cleanup-scheduler.ts → prd-io.ts by making loadPRD an injected dependency. Remaining findings are informational zone-metric observations (cohesion/coupling scores, entry point counts, fan-in hotspots) that reflect expected architectural patterns."
+  "553258ae-5779-478f-8962-69dc48f72763":
+    status: "completed"
+    startedAt: "2026-03-09T00:57:19.422Z"
+    completedAt: "2026-03-09T01:07:42.717Z"
+  "566c29af-1fa7-41f6-bbeb-c9ed586ce2f0":
+    status: "completed"
+    startedAt: "2026-03-09T22:20:49.444Z"
+    completedAt: "2026-03-09T22:28:07.456Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed 19 suggestion findings: (1) pinned graph-interaction.test.ts and graph-zoom.test.ts to web-dashboard, (2) added KNOWN_VIOLATIONS staleness self-check, (3) replaced DOCUMENTED_POLICIES floor assertion with exact count, (4) added messaging/index.ts as enforced internal barrel in gateway-rules.json + domain-isolation.test.js, (5) added non-web zone coupling guard test, (6) added zone health annotations for 3 high-risk zones. Larger architectural items (SCC remediation, schema zone extraction) acknowledged via health annotations."
+  "57fcea74-4eb1-4867-9e7f-b4a59c743b77":
+    status: "completed"
+    startedAt: "2026-03-09T22:39:32.669Z"
+    completedAt: "2026-03-09T22:45:05.546Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Addressed 3 pattern findings: (1) added healthAnnotation for viewer-message-pipeline explaining outbound>inbound coupling is expected for a composed integration layer; (2) added healthAnnotation for web-ancillary residual zone acknowledging landing.ts pin and zero-cohesion invariant; (3) declared external.ts as intra-package viewer↔server gateway in CLAUDE.md/CODEX.md gateway table, documenting the web-viewer hub surface."
+  "5f81ff21-a931-49e0-8e76-2189bd06210f":
+    status: "completed"
+    startedAt: "2026-03-11T15:16:01.379Z"
+    completedAt: "2026-03-11T15:24:12.646Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Zone pins for batch-types.ts/keywords.ts/verify.ts, cli-dev.test.js timeout, boundary-check viewer-prd-interaction assertion, fix command e2e tests; remaining findings acknowledged as structural observations"
+  "603cdd22-0d5a-45bc-b79f-d04f44194a2e":
+    status: "completed"
+    startedAt: "2026-03-08T01:38:39.126Z"
+    completedAt: "2026-03-08T01:39:03.059Z"
+  "610c13c5-fe20-4049-bade-028ee4f18816":
+    status: "completed"
+    startedAt: "2026-03-11T05:42:43.994Z"
+    completedAt: "2026-03-11T05:52:15.814Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed sourcevision serve.ts tier inversion, added zone pins for misclassified files, updated cohesion exceptions, and added cross-package path enforcement test"
+  "6805bc75-ba25-4124-a5eb-c32e03cb4a4a":
+    status: "completed"
+    startedAt: "2026-03-08T07:23:49.432Z"
+    completedAt: "2026-03-08T07:24:25.317Z"
+  "68220e26-1cc6-4d14-91e4-b3d621ad0d4f":
+    status: "completed"
+    startedAt: "2026-03-11T02:39:44.888Z"
+    completedAt: "2026-03-11T02:45:13.132Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Pinned 7 build-tool and static asset files (build.js, dev.js, package.json, tsconfig.json, vitest.config.ts, SourceVision-F.png, SourceVision.png) from viewer-shell-assets zone to a new web-package-assets zone via .n-dx.json zone pins. Also cleaned up stale pin for deleted packages/hench/src/shared/glob.ts and removed resolved KNOWN_VIOLATIONS entry for packages/rex/src/core/move.ts."
+  "6a024d8b-7dfc-4707-8149-c8eb6fd41cbf":
+    status: "completed"
+    startedAt: "2026-03-05T04:40:48.395Z"
+    completedAt: "2026-03-05T04:50:54.678Z"
+  "6cab0ad8-c7df-4ca4-b9e2-e6f6f275719d":
+    status: "completed"
+    startedAt: "2026-03-09T22:29:02.246Z"
+    completedAt: "2026-03-09T22:38:49.447Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Pinned 4 web-ancillary files to web-dashboard to dissolve the residual zone. Added healthAnnotations for sourcevision-mcp-gateway (coupling 0.6) and web-dashboard (11 entry points). All 10 observation findings addressed through zone pins, health annotations, and acknowledgment of intentional architectural patterns."
+  "6d269c81-4eec-401b-95a0-85d7756677bd":
+    status: "completed"
+    startedAt: "2026-03-11T04:43:23.164Z"
+    completedAt: "2026-03-11T04:47:42.271Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added 3 new architectural policy tests: (1) production→test boundary enforcement in domain-isolation.test.js, (2) sub-zone barrel enforcement in boundary-check.test.ts ensuring crash imports go through crash/index.ts, (3) registered crash/index.ts as internal barrel in gateway-rules.json for re-export-only enforcement"
+  "7054370f-4ddb-45ab-85ab-dea1a6619a49":
+    status: "completed"
+    startedAt: "2026-03-06T02:34:16.610Z"
+    completedAt: "2026-03-06T02:42:01.776Z"
+  "731ea4c3-f02c-4ffb-a2bd-b5c9fea47424":
+    status: "completed"
+    startedAt: "2026-03-09T23:37:56.518Z"
+    completedAt: "2026-03-09T23:48:33.276Z"
+  "74c027ea-967a-4265-b1f2-0c814f3475ed":
+    status: "completed"
+    startedAt: "2026-03-07T17:52:10.984Z"
+    completedAt: "2026-03-07T17:57:47.084Z"
+  "7ae4227a-47a8-495b-aaa2-0764bcdb9f06":
+    status: "completed"
+    startedAt: "2026-03-10T04:12:41.348Z"
+    completedAt: "2026-03-10T04:20:59.029Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed 32 suggestion findings: zone pins for hench rex-gateway.ts and glob.ts, components barrel file, CDN manifest comments in HTML files, unit tests for throttle-controls and ws-health-panel, numeric suffix zone validation in sourcevision, and build output smoke tests"
+  "7be29eae-a985-49f8-badc-6a5bf257db36":
+    status: "completed"
+    startedAt: "2026-03-06T02:42:51.435Z"
+    completedAt: "2026-03-06T02:51:57.861Z"
+  "7db09c37-23c0-4d64-90ed-bc90ee3c595d":
+    status: "completed"
+    startedAt: "2026-03-07T02:08:13.639Z"
+    completedAt: "2026-03-07T02:16:05.730Z"
+  "8436507c-9699-44dc-b6c7-eb50cb4f1cbf":
+    status: "completed"
+    startedAt: "2026-03-08T06:25:49.328Z"
+    completedAt: "2026-03-08T06:36:17.110Z"
+  "8740aed4-fe8b-403b-9da3-ea7ab15510a4":
+    status: "completed"
+    startedAt: "2026-03-11T04:48:21.034Z"
+    completedAt: "2026-03-11T04:56:11.247Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed all 23 suggestion findings: 9 with code changes, 3 already resolved, 11 acknowledged/deferred with justification"
+  "89d758b4-b1cb-47ee-972b-12525e5f27de":
+    status: "completed"
+    startedAt: "2026-03-11T07:01:47.523Z"
+    completedAt: "2026-03-11T07:14:20.146Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed all 13 suggestion findings through code changes, documentation, and investigation-based acknowledgments. Key changes: (1) Added SUPPLEMENTARY_FILES to external.ts gateway, (2) Extracted FeatureToggle/FeaturesResponse to shared schema eliminating type duplication, (3) Added external.ts and api.ts to gateway-rules.json internalBarrels with namespace re-export support, (4) Added tests/integration/README.md documenting .js convention, (5) Documented web-shared addition policy in CLAUDE.md, (6) Fixed stale COHESION_EXCEPTIONS with current zone names. Investigation confirmed shared-types.ts has zero viewer imports — not the 32-edge cause."
+  "921cf630-faac-4721-8415-13c38ea8ee57":
+    status: "completed"
+    startedAt: "2026-03-10T00:15:04.773Z"
+    completedAt: "2026-03-10T00:20:15.778Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Pinned request-dedup.ts and its test to viewer-message-pipeline zone to dissolve the request-deduplication zone. Removed stale health annotation. All 9 findings addressed: 6 were already resolved by prior work (duplicate deletion, existing pins), 2 resolved by new pins, 1 acknowledged (fan-in hotspot by design)."
+  "929b6802-c85a-4cbf-a594-2c968a965306":
+    status: "completed"
+    startedAt: "2026-03-09T00:23:27.753Z"
+    completedAt: "2026-03-09T00:29:20.764Z"
+  "931eabce-d252-4b60-9023-da5c8c0371a8":
+    status: "completed"
+    startedAt: "2026-03-07T00:37:55.245Z"
+    completedAt: "2026-03-07T00:49:35.754Z"
+  "9e743ee1-0767-44cb-bea7-4c7e20a48945":
+    status: "completed"
+    startedAt: "2026-03-07T02:56:01.916Z"
+    completedAt: "2026-03-07T02:59:00.524Z"
+  "a391ed1b-fc38-41a1-bd85-b0c5d3e8a014":
+    status: "completed"
+    startedAt: "2026-03-08T01:36:16.972Z"
+    completedAt: "2026-03-08T01:38:27.788Z"
+  "a4aa9e56-ba46-4e97-8fb1-7d7bf404da88":
+    status: "completed"
+    startedAt: "2026-03-06T02:29:26.369Z"
+    completedAt: "2026-03-06T02:33:34.964Z"
+  "ab158626-5487-4370-936e-d00e0ff5425b":
+    status: "completed"
+    startedAt: "2026-03-11T15:24:57.198Z"
+    completedAt: "2026-03-11T15:40:48.679Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed 12 relationship findings: pinned 33 misclassified server files to web-server zone (fixing pre-existing layering test failure), added exhaustive server→viewer allowlist assertion, added hooks coupling guard, created rex domain-layer boundary integration test, and updated cohesion gate exceptions"
+  "ac044315-bef3-449a-8fdb-fce20ca917ec":
+    status: "completed"
+    startedAt: "2026-03-10T04:21:59.647Z"
+    completedAt: "2026-03-10T04:28:49.126Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed 21 observation findings: added script documentation, expanded barrel exports (components + polling), routed cross-zone imports through barrels to reduce entry point surface, audited sourcevision views (clean). Structural coupling/cohesion findings acknowledged as architecturally expected."
+  "ad1e620e-9a22-4c46-9c5a-35357b607b48":
+    status: "completed"
+    startedAt: "2026-03-11T13:47:37.289Z"
+    completedAt: "2026-03-11T14:06:05.640Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed all 20 suggestion findings across governance docs, zone detection, boundary tests, and zone assignment corrections"
+  "aed7fb61-1693-4166-84b6-7b70af7302c6":
+    status: "completed"
+    startedAt: "2026-03-11T01:44:00.419Z"
+    completedAt: "2026-03-11T01:57:50.768Z"
+  "b04b43ee-f886-4322-91e6-32ebcccb6866":
+    status: "completed"
+    startedAt: "2026-03-09T19:38:04.928Z"
+    completedAt: "2026-03-09T19:45:35.236Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Added 7 zone pins to dissolve crash zone and collapse web zone into web-viewer. Crash zone (3 findings): pinned 3 remaining test files to web-viewer, dissolving the zone entirely. Web zone (2 findings): pinned 4 remaining test files to web-viewer, reducing web zone to pure build infrastructure. Bidirectional coupling and entry point findings resolve as side effects. analyzeZones decomposition confirmed done by sibling task. Rex schema fan-in confirmed expected barrel behavior. Web-server coupling confirmed architecturally justified."
+  "b1e1bbdd-6c29-43f3-a955-cb962e38636a":
+    status: "completed"
+    startedAt: "2026-03-08T04:46:13.996Z"
+    completedAt: "2026-03-08T04:55:13.211Z"
+  "b2140cd8-dd60-4fed-ba39-74c0eb3f5d59":
+    status: "completed"
+    startedAt: "2026-03-06T23:54:01.595Z"
+    completedAt: "2026-03-06T23:58:53.657Z"
+  "b290a87e-ff66-48d7-8890-0929f14200bb":
+    status: "completed"
+    startedAt: "2026-03-05T04:31:13.435Z"
+    completedAt: "2026-03-05T04:39:54.230Z"
+  "b3d58129-c66a-4a58-84ce-f4906b06b700":
+    status: "completed"
+    startedAt: "2026-03-07T17:21:15.560Z"
+    completedAt: "2026-03-07T17:26:22.252Z"
+  "b5dae0e0-cd90-4c48-8119-fd43bc3e5a84":
+    status: "completed"
+    startedAt: "2026-03-06T23:37:31.000Z"
+    completedAt: "2026-03-06T23:53:59.147Z"
+  "b6a0364c-bba1-4ca3-84a4-31b5a005f2b7":
+    status: "completed"
+    startedAt: "2026-03-10T04:00:34.864Z"
+    completedAt: "2026-03-10T04:11:15.476Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Addressed all 16 anti-pattern findings: deleted dead parse-gateway-exports.mjs, added crash-detector runtime exports to performance barrel, added tab-visibility exports to polling barrel, routed cross-zone consumers through barrels, added zone pins for hench-runs.ts and use-polling.ts, wrote unit tests for polling-restart.ts (11 tests) and use-project-status.ts (5 tests), added loadPRD DI seam to usage-cleanup-scheduler.ts, decomposed cmdAnalyze into 4 focused helper functions, verified boundary-check.test.ts already enforces viewer→server boundary"
+  "b6c54982-0c3c-476f-aeee-7f5cc5f32c7c":
+    status: "completed"
+    startedAt: "2026-03-08T04:56:03.337Z"
+    completedAt: "2026-03-08T05:00:17.464Z"
+  "b8205144-f216-4461-8ae7-c8a0c66007fd":
+    status: "completed"
+    startedAt: "2026-03-06T18:22:07.771Z"
+    completedAt: "2026-03-06T18:27:04.517Z"
+  "b9d03c36-c84b-4763-a043-e390fd3ecb4b":
+    status: "completed"
+    startedAt: "2026-03-06T17:29:29.566Z"
+    completedAt: "2026-03-06T17:54:39.954Z"
+  "ba87c792-7a8a-4247-93c0-a608eee72baa":
+    status: "completed"
+    startedAt: "2026-03-11T05:55:12.827Z"
+    completedAt: "2026-03-11T05:58:14.893Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "All 13 observation findings verified. Key results: (1) rex-core↔rex-fix-command bidirectional coupling is a zone-map artifact from Louvain community detection — the single reverse edge is the CLI router dispatching to fix command handler, which is correct. (2) core/fix.ts has zero imports from CLI layer — no layering violation. (3) web-server→web-viewer has zero runtime imports — viewer boundary is clean. (4) crash↔web-viewer bidirectionality is already properly inverted via useCrashRecovery hook; crash only imports ViewId type from web-shared foundation layer. (5) web-peripheral zone metrics (cohesion 0.55, coupling 0.45, 10 entry points) reflect its nature as a catch-all residual from community detection — not an architectural concern. (6) web-viewer's 14 entry points are expected for the hub in hub-and-spoke architecture. (7) web-shared cohesion 0.46 is acceptable for a 5-file foundation zone with zero upward dependencies enforced by boundary-check.test.ts. No code changes required — all findings are correctly categorized as observations where the architecture is sound."
+  "bb55952e-1fb1-41bf-9875-d6daf3a5b288":
+    status: "completed"
+    startedAt: "2026-03-07T00:50:08.593Z"
+    completedAt: "2026-03-07T00:56:25.870Z"
+  "bbcf2eba-68d6-41af-8fb6-b4469218f9a4":
+    status: "completed"
+    startedAt: "2026-03-11T14:10:39.289Z"
+    completedAt: "2026-03-11T14:15:54.820Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Split loe-display.test.ts to fix zone misclassification, added two-consumer rule enforcement test for web-shared, verified server-usage-scheduler upward imports are type-only. Remaining findings acknowledged as deliberate architectural choices (satellite zones, composition root entry points)."
+  "bc1247a4-d914-4971-af3f-94cb56913989":
+    status: "completed"
+    startedAt: "2026-03-08T18:04:50.389Z"
+    completedAt: "2026-03-08T18:09:30.807Z"
+  "bcd3ec61-7d2f-40b7-96dd-80f864fe3c13":
+    status: "completed"
+    startedAt: "2026-03-06T23:18:28.105Z"
+    completedAt: "2026-03-06T23:18:28.105Z"
+    appliedAt: "2026-03-06T23:18:28.105Z"
+  "bcfe5bdf-685d-4be4-b581-581055424544":
+    status: "completed"
+    startedAt: "2026-03-09T19:46:05.569Z"
+    completedAt: "2026-03-09T19:54:29.822Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created viewer external gateway (external.ts) to funnel all cross-boundary imports through a single file. Updated 19 viewer files. Added boundary enforcement test. Pinned 5 stray viewer files to web-viewer zone."
+  "c04e8444-ae95-4f45-9979-9c8cd219caa8":
+    status: "completed"
+    startedAt: "2026-03-11T14:16:40.053Z"
+    completedAt: "2026-03-11T14:21:41.843Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Strengthened build-output-contract.test.ts with mount-point and source-HTML structural assertions. Updated CLAUDE.md web-shared baseline metrics (0.46→0.36 cohesion, 0.54→0.64 coupling) and documented that two-consumer rule and barrel import enforcement are now automated in boundary-check.test.ts. Three of five findings were stale (two-consumer rule already enforced, node-culler.ts doesn't exist, zone classification artifact)."
+  "c730c0c7-4546-4440-8eb9-0fc9c22e59cb":
+    status: "completed"
+    startedAt: "2026-03-11T15:41:16.659Z"
+    completedAt: "2026-03-11T15:55:30.301Z"
+  "cadffe40-c450-4a45-90c4-40a1c335eaf1":
+    status: "completed"
+    startedAt: "2026-03-10T00:20:52.552Z"
+    completedAt: "2026-03-10T00:31:53.658Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Re-pinned 4 MCP-route files (domain-gateway.ts, routes-mcp.ts, and their tests) from web-dashboard to new mcp-route-layer zone in .n-dx.json. Added zone type classification and health annotation. Removed stale sourcevision-mcp-gateway annotation."
+  "cc28dcfc-04e3-4ff4-8868-8e6f5c910c37":
+    status: "completed"
+    startedAt: "2026-03-09T22:45:39.523Z"
+    completedAt: "2026-03-09T22:53:07.894Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Moved request-dedup.ts from src/shared/ to src/viewer/messaging/ to resolve the dependency inversion (utility zone importing from consumer zone). Updated all imports, external.ts gateway, and documentation. The triangular import pattern is broken, the ungated inbound surface is eliminated, and artificial cross-zone edges from web-viewer-messaging will dissolve on next analysis."
+  "cc746139-c4ca-4b97-97bf-eb0772786707":
+    status: "completed"
+    startedAt: "2026-03-10T00:32:45.761Z"
+    completedAt: "2026-03-10T00:36:10.402Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Removed dead cross-zone re-export from shared/index.ts, pinned all 7 messaging files + 7 test files to viewer-message-pipeline zone, and separated landing.ts into dedicated web-landing zone"
+  "d2a70fe9-3e21-41a6-aca5-7ea4c47e1ac8":
+    status: "completed"
+    startedAt: "2026-03-06T18:14:50.750Z"
+    completedAt: "2026-03-06T18:21:32.613Z"
+  "d2bae4a2-90d4-4f6b-b76b-0c10c75da78f":
+    status: "completed"
+    startedAt: "2026-03-07T02:00:42.471Z"
+    completedAt: "2026-03-07T02:07:23.769Z"
+  "d8e50c7c-d2a3-40df-aaee-9e67380fc676":
+    status: "completed"
+    startedAt: "2026-03-08T18:17:38.307Z"
+    completedAt: "2026-03-08T18:29:08.180Z"
+  "dc30e866-3942-47dc-96fe-d8e8a792afa8":
+    status: "completed"
+    startedAt: "2026-03-09T19:28:29.053Z"
+    completedAt: "2026-03-09T19:34:46.443Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Applied zone pins to dissolve crash zone (5 files → web-viewer), web zone viewer files (10 files → web-viewer), and analyzers-3 zone (3 files → analyzers). Removed 7 dead exports across 4 files: 3 from polling-restart.ts, 2 from loader.ts, 1 from branch-work-filter.ts, 1 from prd-epic-resolver.ts. Validate zone acknowledged as healthy high-volume consumer per its own insights."
+  "dc7e920d-da53-49b3-b5c6-65086e60754b":
+    status: "completed"
+    startedAt: "2026-03-07T03:23:01.494Z"
+    completedAt: "2026-03-07T03:50:28.105Z"
+  "dd043475-16b3-4419-8aec-52cb76f992c7":
+    status: "completed"
+    startedAt: "2026-03-07T00:01:11.668Z"
+    completedAt: "2026-03-07T00:06:47.952Z"
+  "de890e4f-84bf-4eb8-8b5c-4c8b84156509":
+    status: "completed"
+    startedAt: "2026-03-11T16:01:06.651Z"
+    completedAt: "2026-03-11T16:10:27.878Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Addressed 26 observation findings via zone pin corrections in .n-dx.json: dissolved viewer-prd-interaction (4 files → web-viewer), dissolved web-viewer-unit-tests (2 files → web-viewer), completed prd-fix-command cleanup (3 files → rex-prd-engine), consolidated rex-e2e-config (5 e2e tests → rex-cli-e2e, 2 config/fixture files → appropriate zones). Verified inverted dependencies (server→viewer) are already resolved via injection pattern. Metric-based observations acknowledged as documented in CLAUDE.md governance."
+  "e25387fb-b60e-4055-9c30-76ca15f05e02":
+    status: "completed"
+    startedAt: "2026-03-08T01:32:10.448Z"
+    completedAt: "2026-03-08T01:35:45.114Z"
+  "e553f97e-34a5-4303-b54b-b71434306d6f":
+    status: "completed"
+    startedAt: "2026-03-09T23:49:55.557Z"
+    completedAt: "2026-03-09T23:57:15.451Z"
+    resolutionType: "code-change"
+    resolutionDetail: "All 13 suggestion findings addressed via documentation, dead code deletion, min zone size threshold, and health annotations."
+  "e813108f-27c4-4196-abbc-5cd52f4269b7":
+    status: "completed"
+    startedAt: "2026-03-10T04:29:25.088Z"
+    completedAt: "2026-03-10T04:36:33.932Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Relocated crash-detector.ts from performance/ to crash/ subdirectory with barrel; added status hook+types to components barrel; created 20 unit tests for 3 sourcevision page components"
+  "e991d894-32d5-400f-bda9-b947640c60f4":
+    status: "completed"
+    startedAt: "2026-03-11T05:58:45.290Z"
+    completedAt: "2026-03-11T07:00:32.892Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Pinned 11 viewer-internal files (components, views, graph, usage) from web-peripheral to web-viewer zone, eliminating all 4 bidirectional import warnings. Deleted dead node-culler.ts to improve web-shared cohesion above 0.5 threshold."
+  "ed7a9451-cccb-45a7-b028-62afb3714b0a":
+    status: "completed"
+    startedAt: "2026-03-11T04:33:32.070Z"
+    completedAt: "2026-03-11T04:42:34.428Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Gitignored execution-log.jsonl files (code change) and acknowledged all 15 observation findings after auditing each one: bidirectional couplings are community-detection artifacts or expected CLI dispatch patterns; fan-in hotspot on schema/index.ts is expected for a barrel file; hench-agent-monitor low cohesion/high coupling is a pure leaf consumer cluster; rex-fix-command metrics reflect thin CLI shim delegation; entry point counts are proportional to zone sizes; cross-tier imports verified as non-existent or type-only."
+  "eda8459d-58bd-4c57-818f-7c60f011b211":
+    status: "completed"
+    startedAt: "2026-03-08T17:57:51.793Z"
+    completedAt: "2026-03-08T18:03:51.024Z"
+  "ef00ef4f-7bf8-41b5-a032-eeea176b88f1":
+    status: "completed"
+    startedAt: "2026-03-08T04:22:52.355Z"
+    completedAt: "2026-03-08T04:33:10.892Z"
+  "ef4a47f0-273c-4c99-ae0a-8902ca66802a":
+    status: "completed"
+    startedAt: "2026-03-09T19:35:17.229Z"
+    completedAt: "2026-03-09T19:37:43.886Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Extracted 4 helper functions from analyzeZones: prepareScopeAndEdges, promoteSubAnalyses, computeMoveFindings, buildAnalyzeZonesResult. Reduces the god function from ~190 lines of inline logic to a clean orchestrator that delegates each phase to a named function."
+  "f01ad7fc-33bf-4b15-bb43-d665f0b3b688":
+    status: "completed"
+    startedAt: "2026-03-07T17:27:04.810Z"
+    completedAt: "2026-03-07T17:30:13.582Z"
+  "f036c159-2f2b-436b-b1eb-4cf74ae91e3a":
+    status: "completed"
+    startedAt: "2026-03-11T05:52:38.428Z"
+    completedAt: "2026-03-11T05:54:43.458Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed detectPinDivergence to skip move suggestions when the target directory is a subdirectory of the file's current directory, preventing false positives for zone-root gateway files like external.ts"
+  "f8e698df-c2d9-462f-ba04-84e2e8395907":
+    status: "completed"
+    startedAt: "2026-03-09T23:58:18.892Z"
+    completedAt: "2026-03-10T00:14:27.306Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed move-file analyzer to exclude test files from majority directory computation in pin divergence detection. Both findings were false positives caused by test files outnumbering source files in pinned zones."
+  "fb2f50df-9b43-48bc-8bcd-f6b985ecac23":
+    status: "completed"
+    startedAt: "2026-03-07T17:30:37.518Z"
+    completedAt: "2026-03-07T17:51:34.231Z"
+  "fe8a5762-efea-45c6-bf57-2f220e61f3ea":
+    status: "completed"
+    startedAt: "2026-03-11T13:24:55.624Z"
+    completedAt: "2026-03-11T13:46:51.341Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed 2 code issues (crash-detection barrel re-export removal, BatchAcceptanceRecord type moved to core), fixed pre-existing stale cohesion exceptions, acknowledged 5 findings as type-only/zone-classification/stale"
+  "feb70ee4-ff40-44b3-9de8-7f912de340e6":
+    status: "completed"
+    startedAt: "2026-03-08T07:15:24.124Z"
+    completedAt: "2026-03-08T07:21:18.531Z"

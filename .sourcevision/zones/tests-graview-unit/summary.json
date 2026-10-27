@@ -1,0 +1,25 @@
+{
+  "id": "tests-graview-unit",
+  "name": "Tests Graview Unit",
+  "description": "Non-source files in packages: declaration.test.ts, document.test.ts, graview-bin.test.ts (+3 more)",
+  "files": [
+    "packages/graview/tests/unit/declaration.test.ts",
+    "packages/graview/tests/unit/document.test.ts",
+    "packages/graview/tests/unit/graview-bin.test.ts",
+    "packages/graview/tests/unit/hub.test.ts",
+    "packages/graview/tests/unit/snapshot-file.test.ts",
+    "packages/graview/tests/unit/snapshot.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 6,
+  "lineCount": 685,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

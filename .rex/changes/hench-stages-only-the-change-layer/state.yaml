@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "1672bb20-6378-4950-847b-30b2508ce3e7":
+    status: "completed"
+    startedAt: "2026-10-13T04:30:59.343Z"
+    completedAt: "2026-10-13T04:40:18.614Z"
+    endedAt: "2026-10-13T04:40:18.614Z"
+    resolutionType: "code-change"
+    resolutionDetail: "commitPrdTreeIfStaged never stages product/ or changes/ wholesale on v2: with rex's save report it stages only reported paths; with none it stages nothing there. Mocked v2 test replaced by two real ChangeLayerStore tests; changeset corrected."
+    appliedAt: "2026-10-13T04:40:18.614Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T04:40:19.685Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

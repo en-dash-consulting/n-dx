@@ -725,6 +725,20 @@ export function resolveJudgmentRoute(
 }
 
 /**
+ * Whether `llm.routes` sends `taskClass` to a model tier (exact match, then
+ * longest glob prefix — the rules of {@link resolveJudgmentRoute}).
+ *
+ * For a class that is Jev opt-in by key alone, a tier route is the project's
+ * opt-out: it has no entry in {@link DEFAULT_JUDGMENT_ROUTES}, so
+ * `resolveJudgmentRoute` cannot answer for it. `"typesafe"` and no route at all
+ * both return false.
+ */
+export function routesToTier(taskClass: string, config?: LLMConfig): boolean {
+  const configured = matchTaskClass(taskClass, config?.routes);
+  return configured !== undefined && configured !== JUDGMENT_ROUTE_TYPESAFE;
+}
+
+/**
  * Recommended model per vendor for the adversarial review pass.
  *
  * ## Why review gets its own tier

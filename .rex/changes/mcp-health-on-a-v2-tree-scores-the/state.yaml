@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "4dad9dc0-0538-44a6-879d-ac9749104622":
+    status: "completed"
+    startedAt: "2026-10-15T06:22:10.341Z"
+    completedAt: "2026-10-15T06:39:18.707Z"
+    endedAt: "2026-10-15T06:39:18.707Z"
+    resolutionType: "code-change"
+    resolutionDetail: "MCP health adds a `v2` field (treeRules, warnings, landings) on a v2 tree via shared cli/v2-health.ts; commit 42eff0296"
+    appliedAt: "2026-10-15T06:39:18.707Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T06:39:18.989Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

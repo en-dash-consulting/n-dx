@@ -1,0 +1,24 @@
+schema: "rex/v2"
+items:
+  "88f1ce56-46ce-40bc-93a1-7010d8707085":
+    status: "completed"
+    startedAt: "2026-08-25T18:30:51.729Z"
+    completedAt: "2026-08-25T19:05:41.941Z"
+    endedAt: "2026-08-25T19:05:41.941Z"
+  "9ebc5a0b-692f-4017-ad3d-69fe40f45266":
+    status: "completed"
+    startedAt: "2026-09-03T14:34:07.439Z"
+    completedAt: "2026-09-03T14:48:21.740Z"
+    endedAt: "2026-09-03T14:48:21.740Z"
+    resolutionType: "code-change"
+    resolutionDetail: "acceptProposals now builds fully-nested epics via the new exported buildAcceptedItems and inserts them in a single store.withTransaction, so the intermediate childless-epic leaf that the stale-save guard tripped on is never written. Verified: full run-all-tests.mjs 6/6 suites green (rex 224 files / 4614 tests) where it was reproducibly red 2/2 before; a filesystem watcher over a real accept confirms general.md never appears; CLI output, item counts, batch record and analyze_accept log entry unchanged. withSelfHealTag routed through the store barrel to respect cli/commands/'s capped bypass surface."
+    lastModified: "2026-09-03T14:48:21.766Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "9fa85475-a6ff-474a-bf4f-e1f531df7916":
+    status: "completed"
+    startedAt: "2026-03-24T05:12:16.787Z"
+    completedAt: "2026-09-03T14:48:23.896Z"
+    endedAt: "2026-09-03T14:48:23.896Z"
+    appliedAt: "2026-09-03T14:48:23.896Z"
+    lastModified: "2026-09-03T14:48:23.919Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

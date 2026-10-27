@@ -20,7 +20,7 @@ export default defineConfig({
     // shell cannot change test verdicts. See tests/setup-color-env.js.
     setupFiles: [
       "../../tests/setup-color-env.js",
-      "../../tests/setup-session-env.js",
+      "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
       // Clears TYPESAFE_API_KEY. askJev reads it from process.env by default,
       // so without this an ambient key turns any test that forgets to pass
       // `env` into a live, billed request. Moved here with the Jev client.

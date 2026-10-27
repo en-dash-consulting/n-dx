@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "d6be924c-5a44-4bf2-8cef-8ce2eeef5c89":
+    status: "completed"
+    startedAt: "2026-10-12T07:53:13.112Z"
+    completedAt: "2026-10-12T08:06:58.232Z"
+    endedAt: "2026-10-12T08:06:58.232Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex CLI serves v2 via change-layer store; move rule-aware; analyze/recommend --accept/restore refuse on v2; tests added"
+    appliedAt: "2026-10-12T08:06:58.232Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T08:06:59.042Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

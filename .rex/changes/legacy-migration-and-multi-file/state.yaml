@@ -1,0 +1,19 @@
+schema: "rex/v2"
+items:
+  "65020dbd-1993-4e79-8a34-f4d414a9ec1e":
+    status: "completed"
+    startedAt: "2026-04-22T18:32:21.013Z"
+    completedAt: "2026-04-22T18:32:21.013Z"
+    appliedAt: "2026-04-22T18:32:21.013Z"
+  "c9867c35-7f69-401d-9908-03bac57a4d6c":
+    status: "completed"
+    startedAt: "2026-04-22T18:12:08.412Z"
+    completedAt: "2026-04-22T18:32:20.652Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Updated web prd-io.ts for multi-file aggregation, routes-data.ts for aggregated serving, search-index.ts for multi-file mtime tracking. Added 36 tests covering all acceptance criteria."
+  "e174fb23-4ce0-4377-95ca-250538d7635c":
+    status: "completed"
+    startedAt: "2026-04-22T17:13:43.023Z"
+    completedAt: "2026-04-22T17:44:03.271Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented automatic migration from single prd.json to branch-scoped multi-file format via migrateLegacyPRD() in prd-migration.ts, integrated into resolveStore(). Fresh rex init creates branch-scoped files in git repos."

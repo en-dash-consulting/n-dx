@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "61022482-f8de-4c2b-8cc0-78946df52c94":
+    status: "completed"
+    startedAt: "2026-04-23T15:52:30.570Z"
+    completedAt: "2026-04-23T16:02:11.645Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added pure per-PRD-item token rollup (aggregateItemTokenUsage) in packages/rex/src/core/item-token-rollup.ts + get_token_usage MCP tool. Tests cover self/descendants/total rollup, property-style invariant on random trees, orphan handling, and sub-50ms perf on 500 items × 5k runs."
+    appliedAt: "2026-04-23T16:02:11.645Z"

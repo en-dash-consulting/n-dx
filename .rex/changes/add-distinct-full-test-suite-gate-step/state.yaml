@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "3b422b8a-8112-461f-b727-b1036b2777ee":
+    status: "completed"
+    startedAt: "2026-04-30T15:21:12.772Z"
+    completedAt: "2026-04-30T15:39:50.582Z"
+    endedAt: "2026-04-30T15:39:50.582Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented mandatory full test suite gate with interactive failure handling, rerun loop, and three-action prompt (rerun/abort/skip). Gate runs unconditionally unless skipFullTestGate flag set, blocks commit on any test failure, and surfaces structured summary with package count and failure details."
+    appliedAt: "2026-04-30T15:39:50.582Z"

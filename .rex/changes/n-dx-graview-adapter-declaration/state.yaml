@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "c03409a5-301c-4b50-a4cf-3c9b416fbf6b":
+    status: "completed"
+    startedAt: "2026-10-10T04:00:24.498Z"
+    completedAt: "2026-10-10T04:25:15.384Z"
+    endedAt: "2026-10-10T04:25:15.384Z"
+    resolutionType: "code-change"
+    resolutionDetail: "@n-dx/graview package: declaration, snapshot projection, emit, binary resolution and ndx graview CLI; graviewDir on the layout resolver; dogfooded on n-dx and ../graview with graview check clean"
+    appliedAt: "2026-10-10T04:25:15.384Z"
+    lastModified: "2026-10-10T04:25:15.695Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

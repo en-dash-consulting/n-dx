@@ -20,6 +20,7 @@ import {
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { getConfigValue, setConfigValue } from "./hench-config-fields.js";
 
 // ---------------------------------------------------------------------------
 // Types — canonical definitions in src/shared/features.ts
@@ -208,31 +209,6 @@ function writeNdxConfig(projectDir: string, config: Record<string, unknown>): vo
   writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 
-/** Get a nested value from an object by dot-separated path. */
-function getByPath(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current == null || typeof current !== "object") return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
-/** Set a nested value in an object by dot-separated path. */
-function setByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split(".");
-  let current: Record<string, unknown> = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    if (current[part] == null || typeof current[part] !== "object") {
-      current[part] = {};
-    }
-    current = current[part] as Record<string, unknown>;
-  }
-  current[parts[parts.length - 1]] = value;
-}
-
 /** Build toggles list with current values from config. */
 function buildToggles(projectDir: string): FeatureToggle[] {
   const config = readNdxConfig(projectDir);
@@ -240,7 +216,7 @@ function buildToggles(projectDir: string): FeatureToggle[] {
 
   return FEATURE_REGISTRY.map((def) => {
     // Key in features section is relative (e.g., "sourcevision.callGraph")
-    const stored = getByPath(features, def.key);
+    const stored = getConfigValue(features, def.key);
     const enabled = typeof stored === "boolean" ? stored : def.defaultValue;
 
     return {
@@ -350,7 +326,7 @@ export async function handleFeaturesRoute(
 
       const applied: Array<{ key: string; enabled: boolean }> = [];
       for (const [key, value] of Object.entries(parsed.changes)) {
-        setByPath(features, key, value);
+        setConfigValue(features, key, value);
         applied.push({ key, enabled: value });
       }
 

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "f5d8c06e-1f67-4390-ab65-23b9799c6486":
+    status: "completed"
+    startedAt: "2026-10-09T06:31:11.629Z"
+    completedAt: "2026-10-09T06:47:02.052Z"
+    endedAt: "2026-10-09T06:47:02.052Z"
+    resolutionType: "code-change"
+    resolutionDetail: "cmdHealth runs checkV2Rules on v2 trees with maxCriteria from structureHealth; v1 unchanged; tests in health-v2.test.ts"
+    appliedAt: "2026-10-09T06:47:02.052Z"
+    lastModified: "2026-10-09T06:47:02.283Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

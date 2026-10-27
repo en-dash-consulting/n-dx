@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "880d8c8e-f201-40a7-beb1-09261d88bc45":
+    status: "completed"
+    startedAt: "2026-10-12T20:32:17.027Z"
+    completedAt: "2026-10-12T20:46:54.410Z"
+    endedAt: "2026-10-12T20:46:54.410Z"
+    resolutionType: "code-change"
+    resolutionDetail: "findActionableWork skips units whose change or any enclosing change is in excludeIds; update_task_status (in_progress) and claim_task refuse work inside a change another worktree claims (acquireWorkClaim). Unit + two-worktree MCP tests fail on the pre-fix source."
+    appliedAt: "2026-10-12T20:46:54.410Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T20:46:54.846Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

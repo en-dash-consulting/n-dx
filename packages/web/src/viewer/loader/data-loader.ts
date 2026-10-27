@@ -143,15 +143,106 @@ export async function loadFromFiles(files: FileList): Promise<LoadedData> {
   return currentData;
 }
 
-/** Check if we're running in server mode */
-export async function detectMode(): Promise<"server" | "static"> {
+/**
+ * What the first `GET /data` said about where this page is running.
+ *
+ * - `server`: a dashboard server answered; load from it.
+ * - `static`: nothing serves `/data` here (a `file://` open, or a plain
+ *   static host without the export's fetch adapter) — offer file drop.
+ * - `unavailable`: a server answered but would not serve the dashboard. The
+ *   hub says 503 while a project has no running server and 502 while the
+ *   child is unreachable, so a tab opened while `ndx start` is still bringing
+ *   the project up lands here; 401 is a missing or rotated token, 421 a
+ *   wrong Host, 409 the hub root with several projects. `status` 0 means
+ *   the request itself failed on an http(s) page — the server is gone.
+ *   Offering file drop for any of these sends the reader to copy files the
+ *   server already has.
+ */
+export type ServerProbe =
+  | { mode: "server" }
+  | { mode: "static" }
+  | { mode: "unavailable"; status: number; detail: string | null };
+
+export interface ServerProbeOptions {
+  fetchFn?: typeof fetch;
+  /** Pauses between attempts, in ms; attempts = length + 1. `[]` probes once. */
+  delaysMs?: readonly number[];
+  sleep?: (ms: number) => Promise<void>;
+  /**
+   * Whether a request that throws may succeed shortly (an http page whose
+   * server is restarting) or never will (a `file://` page). Defaults from
+   * `location.protocol`.
+   */
+  retryNetworkErrors?: boolean;
+}
+
+/** About ten seconds in total: long enough for `ndx start` to bring the project server up. */
+export const SERVER_PROBE_DELAYS_MS: readonly number[] = [500, 1000, 2000, 3000, 3500];
+
+/**
+ * Classify one `/data` status. `retry` says the same request stands a chance
+ * of succeeding a moment later, so the probe should wait and ask again.
+ */
+export function classifyProbeStatus(status: number): { result: ServerProbe; retry: boolean } {
+  if (status >= 200 && status < 300) return { result: { mode: "server" }, retry: false };
+  if (status === 404) return { result: { mode: "static" }, retry: false };
+  const result: ServerProbe = { mode: "unavailable", status, detail: null };
+  // Gateway answers: the hub is up, the project server is not (yet).
+  const retry = status === 502 || status === 503 || status === 504 || (status >= 500 && status < 600);
+  return { result, retry };
+}
+
+/** The `error` (and `hint`) a JSON refusal carries, or null. */
+async function readErrorDetail(res: Response): Promise<string | null> {
   try {
-    const res = await fetch("/data");
-    if (res.ok) return "server";
+    const body = (await res.json()) as { error?: unknown; hint?: unknown } | null;
+    if (!body || typeof body !== "object") return null;
+    const parts = [body.error, body.hint].filter((p): p is string => typeof p === "string" && p.length > 0);
+    return parts.length > 0 ? parts.join(" ") : null;
   } catch {
-    // Not in server mode
+    return null;
   }
-  return "static";
+}
+
+const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Ask `/data` where this page is running, retrying while the answer may
+ * still change. A one-shot probe locked a tab into file-drop mode whenever
+ * the hub answered 503 during startup; this one keeps asking for about ten
+ * seconds, and reports a refusal as a refusal.
+ */
+export async function probeServer(options: ServerProbeOptions = {}): Promise<ServerProbe> {
+  const fetchFn = options.fetchFn ?? fetch;
+  const delays = options.delaysMs ?? SERVER_PROBE_DELAYS_MS;
+  const sleep = options.sleep ?? defaultSleep;
+  const retryNetworkErrors = options.retryNetworkErrors
+    ?? (typeof location !== "undefined" && location.protocol.startsWith("http"));
+
+  let last: ServerProbe = { mode: "static" };
+  for (let attempt = 0; ; attempt++) {
+    let retry = false;
+    try {
+      const res = await fetchFn("/data");
+      const classified = classifyProbeStatus(res.status);
+      last = classified.result.mode === "unavailable"
+        ? { ...classified.result, detail: await readErrorDetail(res) }
+        : classified.result;
+      retry = classified.retry;
+    } catch (err) {
+      last = retryNetworkErrors
+        ? { mode: "unavailable", status: 0, detail: err instanceof Error ? err.message : null }
+        : { mode: "static" };
+      retry = retryNetworkErrors;
+    }
+    if (!retry || attempt >= delays.length) return last;
+    await sleep(delays[attempt]!);
+  }
+}
+
+/** Check if we're running in server mode. Prefer {@link probeServer}, which says why not. */
+export async function detectMode(): Promise<"server" | "static"> {
+  return (await probeServer()).mode === "server" ? "server" : "static";
 }
 
 /**

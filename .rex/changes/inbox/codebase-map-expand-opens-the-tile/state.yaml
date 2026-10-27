@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "44490502-e796-4024-b2cb-c8309d44c5aa":
+    status: "completed"
+    startedAt: "2026-10-15T14:50:37.214Z"
+    completedAt: "2026-10-15T14:52:05.815Z"
+    endedAt: "2026-10-15T14:52:05.815Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Map Expand opens the tile modal"
+    appliedAt: "2026-10-15T14:52:05.815Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T14:52:06.130Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

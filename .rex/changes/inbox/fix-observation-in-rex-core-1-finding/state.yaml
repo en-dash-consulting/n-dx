@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "0463cb81-0af7-480f-89c3-16d3425e4e83":
+    status: "completed"
+    startedAt: "2026-04-18T14:35:25.408Z"
+    completedAt: "2026-04-18T14:35:25.408Z"
+    appliedAt: "2026-04-18T14:35:25.408Z"
+    needsPlacement: true
+  "4099aa58-c7ee-4bcd-96e7-0b563a7aaca8":
+    status: "completed"
+    startedAt: "2026-04-18T14:29:35.888Z"
+    completedAt: "2026-04-18T14:35:25.371Z"
+    resolutionType: "code-change"
+    resolutionDetail: "core/fix.ts pass-through deleted; public.ts and cli/commands/fix.ts already import directly from fix/index.js; rex-core zone dissolved, committed as a2156e8d"

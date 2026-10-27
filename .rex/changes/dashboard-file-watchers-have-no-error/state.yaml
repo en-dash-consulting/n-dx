@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "70eb342f-9637-4ced-a11f-8d4b04febfea":
+    status: "completed"
+    startedAt: "2026-10-15T07:01:07.377Z"
+    completedAt: "2026-10-15T07:05:07.167Z"
+    endedAt: "2026-10-15T07:05:07.167Z"
+    resolutionType: "code-change"
+    resolutionDetail: "guardWatcher in start.ts attaches an 'error' listener (warn, close, drop) to the sourcevision, rex, hench and dev-viewer watchers; test emits 'error' on registerRexWatcher's watchers."
+    appliedAt: "2026-10-15T07:05:07.167Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T07:05:07.454Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

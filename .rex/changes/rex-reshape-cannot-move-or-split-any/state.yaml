@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "1413100d-f891-4313-b27a-bdbd6107ae6f":
+    status: "completed"
+    startedAt: "2026-10-09T15:42:41.742Z"
+    completedAt: "2026-10-09T15:50:00.335Z"
+    endedAt: "2026-10-09T15:50:00.335Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run b0cd816f (claude-opus-5-5, review claude-opus-5-5), commit(s) 039ee0c79; stale dist only; gate re-run green after rebuild (node scripts/run-all-tests.mjs affected 2644a3233, 5/5 suites passed). Closed by the overnight Lane A session."
+    appliedAt: "2026-10-09T15:50:00.335Z"
+    lastModified: "2026-10-09T15:50:00.604Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

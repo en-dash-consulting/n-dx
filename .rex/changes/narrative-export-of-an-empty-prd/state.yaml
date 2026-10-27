@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "15a698a7-9319-4493-af88-e80e689e5ff7":
+    status: "completed"
+    startedAt: "2026-09-10T17:26:50.344Z"
+    completedAt: "2026-09-10T17:30:06.979Z"
+    endedAt: "2026-09-10T17:30:06.979Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Empty-state message now reflects whether work was ever planned: empty/tombstone-only PRDs say no work is recorded yet, all-completed plans keep the finished phrasing, and scoped renders say \"this initiative\". Covered by four unit tests."
+    appliedAt: "2026-09-10T17:30:06.979Z"
+    lastModified: "2026-09-10T17:30:07.005Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

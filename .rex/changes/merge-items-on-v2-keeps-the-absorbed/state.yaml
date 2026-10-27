@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "3ba2a3ca-edc4-42cb-9a08-bfd833d721bf":
+    status: "completed"
+    startedAt: "2026-10-12T19:15:28.429Z"
+    completedAt: "2026-10-12T19:30:49.361Z"
+    endedAt: "2026-10-12T19:30:49.361Z"
+    resolutionType: "code-change"
+    resolutionDetail: "carryAliases in core/merge.ts, called from the v2 branch of merge_items; test and changeset line added (cbecfdbf2)"
+    appliedAt: "2026-10-12T19:30:49.361Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T19:30:51.398Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

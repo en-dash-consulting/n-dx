@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "91f294f3-6bd3-46ca-a8b4-aceaa7230456":
+    status: "completed"
+    startedAt: "2026-10-14T18:23:08.302Z"
+    completedAt: "2026-10-14T18:37:30.211Z"
+    endedAt: "2026-10-14T18:37:30.211Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option A: finishAnalyzeProgress now runs before removeStopHandlers in cmdAnalyze's finally block. Pinned by two unit tests recording process.listenerCount('SIGTERM') inside a finishAnalyzeProgress spy (complete and failed runs); both verified red on the old ordering."
+    appliedAt: "2026-10-14T18:37:30.211Z"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-14T18:37:30.773Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

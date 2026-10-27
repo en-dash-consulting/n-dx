@@ -1,0 +1,1931 @@
+{
+  "pack": "go",
+  "grammar": {
+    "name": "tree-sitter-go",
+    "version": "0.25.0"
+  },
+  "files": [
+    {
+      "status": "parsed",
+      "path": "src/orders/service.go",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_clause",
+            "text": "package orders",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 14
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "package_identifier",
+            "text": "orders",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 14
+            }
+          }
+        ],
+        "imports": [
+          {
+            "name": "import.spec",
+            "nodeType": "import_spec",
+            "text": "\"encoding/json\"",
+            "start": {
+              "line": 4,
+              "column": 1
+            },
+            "end": {
+              "line": 4,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "interpreted_string_literal_content",
+            "text": "encoding/json",
+            "start": {
+              "line": 4,
+              "column": 2
+            },
+            "end": {
+              "line": 4,
+              "column": 15
+            }
+          },
+          {
+            "name": "import.spec",
+            "nodeType": "import_spec",
+            "text": "\"fmt\"",
+            "start": {
+              "line": 5,
+              "column": 1
+            },
+            "end": {
+              "line": 5,
+              "column": 6
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "interpreted_string_literal_content",
+            "text": "fmt",
+            "start": {
+              "line": 5,
+              "column": 2
+            },
+            "end": {
+              "line": 5,
+              "column": 5
+            }
+          },
+          {
+            "name": "import.spec",
+            "nodeType": "import_spec",
+            "text": ". \"math\"",
+            "start": {
+              "line": 6,
+              "column": 1
+            },
+            "end": {
+              "line": 6,
+              "column": 9
+            }
+          },
+          {
+            "name": "import.dot",
+            "nodeType": "dot",
+            "text": ".",
+            "start": {
+              "line": 6,
+              "column": 1
+            },
+            "end": {
+              "line": 6,
+              "column": 2
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "interpreted_string_literal_content",
+            "text": "math",
+            "start": {
+              "line": 6,
+              "column": 4
+            },
+            "end": {
+              "line": 6,
+              "column": 8
+            }
+          },
+          {
+            "name": "import.spec",
+            "nodeType": "import_spec",
+            "text": "_ \"embed\"",
+            "start": {
+              "line": 7,
+              "column": 1
+            },
+            "end": {
+              "line": 7,
+              "column": 10
+            }
+          },
+          {
+            "name": "import.blank",
+            "nodeType": "blank_identifier",
+            "text": "_",
+            "start": {
+              "line": 7,
+              "column": 1
+            },
+            "end": {
+              "line": 7,
+              "column": 2
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "interpreted_string_literal_content",
+            "text": "embed",
+            "start": {
+              "line": 7,
+              "column": 4
+            },
+            "end": {
+              "line": 7,
+              "column": 9
+            }
+          },
+          {
+            "name": "import.spec",
+            "nodeType": "import_spec",
+            "text": "httpx \"net/http\"",
+            "start": {
+              "line": 8,
+              "column": 1
+            },
+            "end": {
+              "line": 8,
+              "column": 17
+            }
+          },
+          {
+            "name": "import.alias",
+            "nodeType": "package_identifier",
+            "text": "httpx",
+            "start": {
+              "line": 8,
+              "column": 1
+            },
+            "end": {
+              "line": 8,
+              "column": 6
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "interpreted_string_literal_content",
+            "text": "net/http",
+            "start": {
+              "line": 8,
+              "column": 8
+            },
+            "end": {
+              "line": 8,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.spec",
+            "nodeType": "import_spec",
+            "text": "\"os\"",
+            "start": {
+              "line": 11,
+              "column": 7
+            },
+            "end": {
+              "line": 11,
+              "column": 11
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "interpreted_string_literal_content",
+            "text": "os",
+            "start": {
+              "line": 11,
+              "column": 8
+            },
+            "end": {
+              "line": 11,
+              "column": 10
+            }
+          },
+          {
+            "name": "import.spec",
+            "nodeType": "import_spec",
+            "text": "`strings`",
+            "start": {
+              "line": 13,
+              "column": 7
+            },
+            "end": {
+              "line": 13,
+              "column": 16
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "raw_string_literal_content",
+            "text": "strings",
+            "start": {
+              "line": 13,
+              "column": 8
+            },
+            "end": {
+              "line": 13,
+              "column": 15
+            }
+          }
+        ],
+        "types": [
+          {
+            "name": "type.struct",
+            "nodeType": "type_spec",
+            "text": "Order struct {\n\tID     int64  `json:\"id\" db:\"order_id\"`\n\tStatus string `json:\"status,omitempty\"`\n\tNote   string \"legacy:\\\"tag\\\"\"\n\tWidth, Height int `json:\"size\"`\n\tAudit\n\tuntagged bool\n}",
+            "start": {
+              "line": 18,
+              "column": 5
+            },
+            "end": {
+              "line": 25,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 18,
+              "column": 5
+            },
+            "end": {
+              "line": 18,
+              "column": 10
+            }
+          },
+          {
+            "name": "type.interface",
+            "nodeType": "type_spec",
+            "text": "Repository interface {\n\tFind(id int64) (*Order, error)\n}",
+            "start": {
+              "line": 27,
+              "column": 5
+            },
+            "end": {
+              "line": 29,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "type_identifier",
+            "text": "Repository",
+            "start": {
+              "line": 27,
+              "column": 5
+            },
+            "end": {
+              "line": 27,
+              "column": 15
+            }
+          },
+          {
+            "name": "type.alias",
+            "nodeType": "type_alias",
+            "text": "Alias = Order",
+            "start": {
+              "line": 31,
+              "column": 5
+            },
+            "end": {
+              "line": 31,
+              "column": 18
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "type_identifier",
+            "text": "Alias",
+            "start": {
+              "line": 31,
+              "column": 5
+            },
+            "end": {
+              "line": 31,
+              "column": 10
+            }
+          },
+          {
+            "name": "type.struct",
+            "nodeType": "type_spec",
+            "text": "Page[T any] struct {\n\tItems []T `json:\"items\"`\n}",
+            "start": {
+              "line": 33,
+              "column": 5
+            },
+            "end": {
+              "line": 35,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "type_identifier",
+            "text": "Page",
+            "start": {
+              "line": 33,
+              "column": 5
+            },
+            "end": {
+              "line": 33,
+              "column": 9
+            }
+          },
+          {
+            "name": "type.parameters",
+            "nodeType": "type_parameter_list",
+            "text": "[T any]",
+            "start": {
+              "line": 33,
+              "column": 9
+            },
+            "end": {
+              "line": 33,
+              "column": 16
+            }
+          },
+          {
+            "name": "type.struct",
+            "nodeType": "type_spec",
+            "text": "Service struct {\n\trepo Repository\n}",
+            "start": {
+              "line": 37,
+              "column": 5
+            },
+            "end": {
+              "line": 39,
+              "column": 1
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "type_identifier",
+            "text": "Service",
+            "start": {
+              "line": 37,
+              "column": 5
+            },
+            "end": {
+              "line": 37,
+              "column": 12
+            }
+          }
+        ],
+        "functions": [
+          {
+            "name": "function.declaration",
+            "nodeType": "function_declaration",
+            "text": "func New(repo Repository) *Service {\n\treturn &Service{repo: repo}\n}",
+            "start": {
+              "line": 41,
+              "column": 0
+            },
+            "end": {
+              "line": 43,
+              "column": 1
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "New",
+            "start": {
+              "line": 41,
+              "column": 5
+            },
+            "end": {
+              "line": 41,
+              "column": 8
+            }
+          },
+          {
+            "name": "function.declaration",
+            "nodeType": "function_declaration",
+            "text": "func Map[T, U any](in []T, f func(T) U) []U {\n\tout := make([]U, 0, len(in))\n\tfor _, v := range in {\n\t\tout = append(out, f(v))\n\t}\n\treturn out\n}",
+            "start": {
+              "line": 45,
+              "column": 0
+            },
+            "end": {
+              "line": 51,
+              "column": 1
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "Map",
+            "start": {
+              "line": 45,
+              "column": 5
+            },
+            "end": {
+              "line": 45,
+              "column": 8
+            }
+          },
+          {
+            "name": "function.parameters",
+            "nodeType": "type_parameter_list",
+            "text": "[T, U any]",
+            "start": {
+              "line": 45,
+              "column": 8
+            },
+            "end": {
+              "line": 45,
+              "column": 18
+            }
+          }
+        ],
+        "methods": [
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "func (s *Service) Open(w httpx.ResponseWriter, r *httpx.Request) {\n\tfmt.Fprintln(w, s.repo.Find(1))\n\tjson.NewEncoder(w).Encode(map[string]string{\"state\": \"open\"})\n\t_ = os.Getenv(\"ORDERS_MODE\")\n\t_ = strings.ToUpper(`raw`)\n\tfmt.Println(Sqrt(2), fmt.Sprint(\"nested\", Abs(-1)))\n}",
+            "start": {
+              "line": 53,
+              "column": 0
+            },
+            "end": {
+              "line": 59,
+              "column": 1
+            }
+          },
+          {
+            "name": "method.receiver",
+            "nodeType": "pointer_type",
+            "text": "*Service",
+            "start": {
+              "line": 53,
+              "column": 8
+            },
+            "end": {
+              "line": 53,
+              "column": 16
+            }
+          },
+          {
+            "name": "method.pointer",
+            "nodeType": "pointer_type",
+            "text": "*Service",
+            "start": {
+              "line": 53,
+              "column": 8
+            },
+            "end": {
+              "line": 53,
+              "column": 16
+            }
+          },
+          {
+            "name": "method.receiver_type",
+            "nodeType": "type_identifier",
+            "text": "Service",
+            "start": {
+              "line": 53,
+              "column": 9
+            },
+            "end": {
+              "line": 53,
+              "column": 16
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "field_identifier",
+            "text": "Open",
+            "start": {
+              "line": 53,
+              "column": 18
+            },
+            "end": {
+              "line": 53,
+              "column": 22
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "func (o Order) Total() int64 {\n\treturn o.ID\n}",
+            "start": {
+              "line": 61,
+              "column": 0
+            },
+            "end": {
+              "line": 63,
+              "column": 1
+            }
+          },
+          {
+            "name": "method.receiver",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 61,
+              "column": 8
+            },
+            "end": {
+              "line": 61,
+              "column": 13
+            }
+          },
+          {
+            "name": "method.receiver_type",
+            "nodeType": "type_identifier",
+            "text": "Order",
+            "start": {
+              "line": 61,
+              "column": 8
+            },
+            "end": {
+              "line": 61,
+              "column": 13
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "field_identifier",
+            "text": "Total",
+            "start": {
+              "line": 61,
+              "column": 15
+            },
+            "end": {
+              "line": 61,
+              "column": 20
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "func (p *Page[T]) Len() int {\n\treturn len(p.Items)\n}",
+            "start": {
+              "line": 65,
+              "column": 0
+            },
+            "end": {
+              "line": 67,
+              "column": 1
+            }
+          },
+          {
+            "name": "method.receiver",
+            "nodeType": "pointer_type",
+            "text": "*Page[T]",
+            "start": {
+              "line": 65,
+              "column": 8
+            },
+            "end": {
+              "line": 65,
+              "column": 16
+            }
+          },
+          {
+            "name": "method.pointer",
+            "nodeType": "pointer_type",
+            "text": "*Page[T]",
+            "start": {
+              "line": 65,
+              "column": 8
+            },
+            "end": {
+              "line": 65,
+              "column": 16
+            }
+          },
+          {
+            "name": "method.receiver_type",
+            "nodeType": "type_identifier",
+            "text": "Page",
+            "start": {
+              "line": 65,
+              "column": 9
+            },
+            "end": {
+              "line": 65,
+              "column": 13
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "field_identifier",
+            "text": "Len",
+            "start": {
+              "line": 65,
+              "column": 18
+            },
+            "end": {
+              "line": 65,
+              "column": 21
+            }
+          },
+          {
+            "name": "method.declaration",
+            "nodeType": "method_declaration",
+            "text": "func (Page[T]) Kind() string { return \"page\" }",
+            "start": {
+              "line": 69,
+              "column": 0
+            },
+            "end": {
+              "line": 69,
+              "column": 46
+            }
+          },
+          {
+            "name": "method.receiver",
+            "nodeType": "generic_type",
+            "text": "Page[T]",
+            "start": {
+              "line": 69,
+              "column": 6
+            },
+            "end": {
+              "line": 69,
+              "column": 13
+            }
+          },
+          {
+            "name": "method.receiver_type",
+            "nodeType": "type_identifier",
+            "text": "Page",
+            "start": {
+              "line": 69,
+              "column": 6
+            },
+            "end": {
+              "line": 69,
+              "column": 10
+            }
+          },
+          {
+            "name": "method.name",
+            "nodeType": "field_identifier",
+            "text": "Kind",
+            "start": {
+              "line": 69,
+              "column": 15
+            },
+            "end": {
+              "line": 69,
+              "column": 19
+            }
+          }
+        ],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "make([]U, 0, len(in))",
+            "start": {
+              "line": 46,
+              "column": 8
+            },
+            "end": {
+              "line": 46,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "make",
+            "start": {
+              "line": 46,
+              "column": 8
+            },
+            "end": {
+              "line": 46,
+              "column": 12
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "([]U, 0, len(in))",
+            "start": {
+              "line": 46,
+              "column": 12
+            },
+            "end": {
+              "line": 46,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "len(in)",
+            "start": {
+              "line": 46,
+              "column": 21
+            },
+            "end": {
+              "line": 46,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "len",
+            "start": {
+              "line": 46,
+              "column": 21
+            },
+            "end": {
+              "line": 46,
+              "column": 24
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(in)",
+            "start": {
+              "line": 46,
+              "column": 24
+            },
+            "end": {
+              "line": 46,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "append(out, f(v))",
+            "start": {
+              "line": 48,
+              "column": 8
+            },
+            "end": {
+              "line": 48,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "append",
+            "start": {
+              "line": 48,
+              "column": 8
+            },
+            "end": {
+              "line": 48,
+              "column": 14
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(out, f(v))",
+            "start": {
+              "line": 48,
+              "column": 14
+            },
+            "end": {
+              "line": 48,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "f(v)",
+            "start": {
+              "line": 48,
+              "column": 20
+            },
+            "end": {
+              "line": 48,
+              "column": 24
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "f",
+            "start": {
+              "line": 48,
+              "column": 20
+            },
+            "end": {
+              "line": 48,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(v)",
+            "start": {
+              "line": 48,
+              "column": 21
+            },
+            "end": {
+              "line": 48,
+              "column": 24
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "fmt.Fprintln(w, s.repo.Find(1))",
+            "start": {
+              "line": 54,
+              "column": 1
+            },
+            "end": {
+              "line": 54,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "fmt",
+            "start": {
+              "line": 54,
+              "column": 1
+            },
+            "end": {
+              "line": 54,
+              "column": 4
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "Fprintln",
+            "start": {
+              "line": 54,
+              "column": 5
+            },
+            "end": {
+              "line": 54,
+              "column": 13
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(w, s.repo.Find(1))",
+            "start": {
+              "line": 54,
+              "column": 13
+            },
+            "end": {
+              "line": 54,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "s.repo.Find(1)",
+            "start": {
+              "line": 54,
+              "column": 17
+            },
+            "end": {
+              "line": 54,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "selector_expression",
+            "text": "s.repo",
+            "start": {
+              "line": 54,
+              "column": 17
+            },
+            "end": {
+              "line": 54,
+              "column": 23
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "Find",
+            "start": {
+              "line": 54,
+              "column": 24
+            },
+            "end": {
+              "line": 54,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(1)",
+            "start": {
+              "line": 54,
+              "column": 28
+            },
+            "end": {
+              "line": 54,
+              "column": 31
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "json.NewEncoder(w).Encode(map[string]string{\"state\": \"open\"})",
+            "start": {
+              "line": 55,
+              "column": 1
+            },
+            "end": {
+              "line": 55,
+              "column": 62
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "call_expression",
+            "text": "json.NewEncoder(w)",
+            "start": {
+              "line": 55,
+              "column": 1
+            },
+            "end": {
+              "line": 55,
+              "column": 19
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "json.NewEncoder(w)",
+            "start": {
+              "line": 55,
+              "column": 1
+            },
+            "end": {
+              "line": 55,
+              "column": 19
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "json",
+            "start": {
+              "line": 55,
+              "column": 1
+            },
+            "end": {
+              "line": 55,
+              "column": 5
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "NewEncoder",
+            "start": {
+              "line": 55,
+              "column": 6
+            },
+            "end": {
+              "line": 55,
+              "column": 16
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(w)",
+            "start": {
+              "line": 55,
+              "column": 16
+            },
+            "end": {
+              "line": 55,
+              "column": 19
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "Encode",
+            "start": {
+              "line": 55,
+              "column": 20
+            },
+            "end": {
+              "line": 55,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(map[string]string{\"state\": \"open\"})",
+            "start": {
+              "line": 55,
+              "column": 26
+            },
+            "end": {
+              "line": 55,
+              "column": 62
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "os.Getenv(\"ORDERS_MODE\")",
+            "start": {
+              "line": 56,
+              "column": 5
+            },
+            "end": {
+              "line": 56,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "os",
+            "start": {
+              "line": 56,
+              "column": 5
+            },
+            "end": {
+              "line": 56,
+              "column": 7
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "Getenv",
+            "start": {
+              "line": 56,
+              "column": 8
+            },
+            "end": {
+              "line": 56,
+              "column": 14
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"ORDERS_MODE\")",
+            "start": {
+              "line": 56,
+              "column": 14
+            },
+            "end": {
+              "line": 56,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "interpreted_string_literal",
+            "text": "\"ORDERS_MODE\"",
+            "start": {
+              "line": 56,
+              "column": 15
+            },
+            "end": {
+              "line": 56,
+              "column": 28
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "strings.ToUpper(`raw`)",
+            "start": {
+              "line": 57,
+              "column": 5
+            },
+            "end": {
+              "line": 57,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "strings",
+            "start": {
+              "line": 57,
+              "column": 5
+            },
+            "end": {
+              "line": 57,
+              "column": 12
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "ToUpper",
+            "start": {
+              "line": 57,
+              "column": 13
+            },
+            "end": {
+              "line": 57,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(`raw`)",
+            "start": {
+              "line": 57,
+              "column": 20
+            },
+            "end": {
+              "line": 57,
+              "column": 27
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "raw_string_literal",
+            "text": "`raw`",
+            "start": {
+              "line": 57,
+              "column": 21
+            },
+            "end": {
+              "line": 57,
+              "column": 26
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "fmt.Println(Sqrt(2), fmt.Sprint(\"nested\", Abs(-1)))",
+            "start": {
+              "line": 58,
+              "column": 1
+            },
+            "end": {
+              "line": 58,
+              "column": 52
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "fmt",
+            "start": {
+              "line": 58,
+              "column": 1
+            },
+            "end": {
+              "line": 58,
+              "column": 4
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "Println",
+            "start": {
+              "line": 58,
+              "column": 5
+            },
+            "end": {
+              "line": 58,
+              "column": 12
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(Sqrt(2), fmt.Sprint(\"nested\", Abs(-1)))",
+            "start": {
+              "line": 58,
+              "column": 12
+            },
+            "end": {
+              "line": 58,
+              "column": 52
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "Sqrt(2)",
+            "start": {
+              "line": 58,
+              "column": 13
+            },
+            "end": {
+              "line": 58,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "Sqrt",
+            "start": {
+              "line": 58,
+              "column": 13
+            },
+            "end": {
+              "line": 58,
+              "column": 17
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(2)",
+            "start": {
+              "line": 58,
+              "column": 17
+            },
+            "end": {
+              "line": 58,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "fmt.Sprint(\"nested\", Abs(-1))",
+            "start": {
+              "line": 58,
+              "column": 22
+            },
+            "end": {
+              "line": 58,
+              "column": 51
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "fmt",
+            "start": {
+              "line": 58,
+              "column": 22
+            },
+            "end": {
+              "line": 58,
+              "column": 25
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "Sprint",
+            "start": {
+              "line": 58,
+              "column": 26
+            },
+            "end": {
+              "line": 58,
+              "column": 32
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"nested\", Abs(-1))",
+            "start": {
+              "line": 58,
+              "column": 32
+            },
+            "end": {
+              "line": 58,
+              "column": 51
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "interpreted_string_literal",
+            "text": "\"nested\"",
+            "start": {
+              "line": 58,
+              "column": 33
+            },
+            "end": {
+              "line": 58,
+              "column": 41
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "Abs(-1)",
+            "start": {
+              "line": 58,
+              "column": 43
+            },
+            "end": {
+              "line": 58,
+              "column": 50
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "Abs",
+            "start": {
+              "line": 58,
+              "column": 43
+            },
+            "end": {
+              "line": 58,
+              "column": 46
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(-1)",
+            "start": {
+              "line": 58,
+              "column": 46
+            },
+            "end": {
+              "line": 58,
+              "column": 50
+            }
+          },
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "len(p.Items)",
+            "start": {
+              "line": 66,
+              "column": 8
+            },
+            "end": {
+              "line": 66,
+              "column": 20
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "identifier",
+            "text": "len",
+            "start": {
+              "line": 66,
+              "column": 8
+            },
+            "end": {
+              "line": 66,
+              "column": 11
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(p.Items)",
+            "start": {
+              "line": 66,
+              "column": 11
+            },
+            "end": {
+              "line": 66,
+              "column": 20
+            }
+          }
+        ],
+        "struct-tags": [
+          {
+            "name": "field.declaration",
+            "nodeType": "field_declaration",
+            "text": "ID     int64  `json:\"id\" db:\"order_id\"`",
+            "start": {
+              "line": 19,
+              "column": 1
+            },
+            "end": {
+              "line": 19,
+              "column": 40
+            }
+          },
+          {
+            "name": "field.name",
+            "nodeType": "field_identifier",
+            "text": "ID",
+            "start": {
+              "line": 19,
+              "column": 1
+            },
+            "end": {
+              "line": 19,
+              "column": 3
+            }
+          },
+          {
+            "name": "field.tag",
+            "nodeType": "raw_string_literal",
+            "text": "`json:\"id\" db:\"order_id\"`",
+            "start": {
+              "line": 19,
+              "column": 15
+            },
+            "end": {
+              "line": 19,
+              "column": 40
+            }
+          },
+          {
+            "name": "field.declaration",
+            "nodeType": "field_declaration",
+            "text": "Status string `json:\"status,omitempty\"`",
+            "start": {
+              "line": 20,
+              "column": 1
+            },
+            "end": {
+              "line": 20,
+              "column": 40
+            }
+          },
+          {
+            "name": "field.name",
+            "nodeType": "field_identifier",
+            "text": "Status",
+            "start": {
+              "line": 20,
+              "column": 1
+            },
+            "end": {
+              "line": 20,
+              "column": 7
+            }
+          },
+          {
+            "name": "field.tag",
+            "nodeType": "raw_string_literal",
+            "text": "`json:\"status,omitempty\"`",
+            "start": {
+              "line": 20,
+              "column": 15
+            },
+            "end": {
+              "line": 20,
+              "column": 40
+            }
+          },
+          {
+            "name": "field.declaration",
+            "nodeType": "field_declaration",
+            "text": "Note   string \"legacy:\\\"tag\\\"\"",
+            "start": {
+              "line": 21,
+              "column": 1
+            },
+            "end": {
+              "line": 21,
+              "column": 31
+            }
+          },
+          {
+            "name": "field.name",
+            "nodeType": "field_identifier",
+            "text": "Note",
+            "start": {
+              "line": 21,
+              "column": 1
+            },
+            "end": {
+              "line": 21,
+              "column": 5
+            }
+          },
+          {
+            "name": "field.tag",
+            "nodeType": "interpreted_string_literal",
+            "text": "\"legacy:\\\"tag\\\"\"",
+            "start": {
+              "line": 21,
+              "column": 15
+            },
+            "end": {
+              "line": 21,
+              "column": 31
+            }
+          },
+          {
+            "name": "field.declaration",
+            "nodeType": "field_declaration",
+            "text": "Width, Height int `json:\"size\"`",
+            "start": {
+              "line": 22,
+              "column": 1
+            },
+            "end": {
+              "line": 22,
+              "column": 32
+            }
+          },
+          {
+            "name": "field.name",
+            "nodeType": "field_identifier",
+            "text": "Width",
+            "start": {
+              "line": 22,
+              "column": 1
+            },
+            "end": {
+              "line": 22,
+              "column": 6
+            }
+          },
+          {
+            "name": "field.declaration",
+            "nodeType": "field_declaration",
+            "text": "Width, Height int `json:\"size\"`",
+            "start": {
+              "line": 22,
+              "column": 1
+            },
+            "end": {
+              "line": 22,
+              "column": 32
+            }
+          },
+          {
+            "name": "field.name",
+            "nodeType": "field_identifier",
+            "text": "Height",
+            "start": {
+              "line": 22,
+              "column": 8
+            },
+            "end": {
+              "line": 22,
+              "column": 14
+            }
+          },
+          {
+            "name": "field.tag",
+            "nodeType": "raw_string_literal",
+            "text": "`json:\"size\"`",
+            "start": {
+              "line": 22,
+              "column": 19
+            },
+            "end": {
+              "line": 22,
+              "column": 32
+            }
+          },
+          {
+            "name": "field.tag",
+            "nodeType": "raw_string_literal",
+            "text": "`json:\"size\"`",
+            "start": {
+              "line": 22,
+              "column": 19
+            },
+            "end": {
+              "line": 22,
+              "column": 32
+            }
+          },
+          {
+            "name": "field.declaration",
+            "nodeType": "field_declaration",
+            "text": "Items []T `json:\"items\"`",
+            "start": {
+              "line": 34,
+              "column": 1
+            },
+            "end": {
+              "line": 34,
+              "column": 25
+            }
+          },
+          {
+            "name": "field.name",
+            "nodeType": "field_identifier",
+            "text": "Items",
+            "start": {
+              "line": 34,
+              "column": 1
+            },
+            "end": {
+              "line": 34,
+              "column": 6
+            }
+          },
+          {
+            "name": "field.tag",
+            "nodeType": "raw_string_literal",
+            "text": "`json:\"items\"`",
+            "start": {
+              "line": 34,
+              "column": 11
+            },
+            "end": {
+              "line": 34,
+              "column": 25
+            }
+          }
+        ]
+      }
+    },
+    {
+      "status": "parsed",
+      "path": "src/util/util.go",
+      "hasErrorNodes": false,
+      "hasMissingNodes": false,
+      "captures": {
+        "packages": [
+          {
+            "name": "package.declaration",
+            "nodeType": "package_clause",
+            "text": "package util",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 12
+            }
+          },
+          {
+            "name": "package.name",
+            "nodeType": "package_identifier",
+            "text": "util",
+            "start": {
+              "line": 1,
+              "column": 8
+            },
+            "end": {
+              "line": 1,
+              "column": 12
+            }
+          }
+        ],
+        "imports": [
+          {
+            "name": "import.spec",
+            "nodeType": "import_spec",
+            "text": "\"fmt\"",
+            "start": {
+              "line": 3,
+              "column": 7
+            },
+            "end": {
+              "line": 3,
+              "column": 12
+            }
+          },
+          {
+            "name": "import.name",
+            "nodeType": "interpreted_string_literal_content",
+            "text": "fmt",
+            "start": {
+              "line": 3,
+              "column": 8
+            },
+            "end": {
+              "line": 3,
+              "column": 11
+            }
+          }
+        ],
+        "types": [
+          {
+            "name": "type.struct",
+            "nodeType": "type_spec",
+            "text": "Audit struct{}",
+            "start": {
+              "line": 5,
+              "column": 5
+            },
+            "end": {
+              "line": 5,
+              "column": 19
+            }
+          },
+          {
+            "name": "type.name",
+            "nodeType": "type_identifier",
+            "text": "Audit",
+            "start": {
+              "line": 5,
+              "column": 5
+            },
+            "end": {
+              "line": 5,
+              "column": 10
+            }
+          }
+        ],
+        "functions": [
+          {
+            "name": "function.declaration",
+            "nodeType": "function_declaration",
+            "text": "func Describe() { fmt.Println(\"util\") }",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 39
+            }
+          },
+          {
+            "name": "function.name",
+            "nodeType": "identifier",
+            "text": "Describe",
+            "start": {
+              "line": 7,
+              "column": 5
+            },
+            "end": {
+              "line": 7,
+              "column": 13
+            }
+          }
+        ],
+        "methods": [],
+        "calls": [
+          {
+            "name": "call.invocation",
+            "nodeType": "call_expression",
+            "text": "fmt.Println(\"util\")",
+            "start": {
+              "line": 7,
+              "column": 18
+            },
+            "end": {
+              "line": 7,
+              "column": 37
+            }
+          },
+          {
+            "name": "call.receiver",
+            "nodeType": "identifier",
+            "text": "fmt",
+            "start": {
+              "line": 7,
+              "column": 18
+            },
+            "end": {
+              "line": 7,
+              "column": 21
+            }
+          },
+          {
+            "name": "call.name",
+            "nodeType": "field_identifier",
+            "text": "Println",
+            "start": {
+              "line": 7,
+              "column": 22
+            },
+            "end": {
+              "line": 7,
+              "column": 29
+            }
+          },
+          {
+            "name": "call.arguments",
+            "nodeType": "argument_list",
+            "text": "(\"util\")",
+            "start": {
+              "line": 7,
+              "column": 29
+            },
+            "end": {
+              "line": 7,
+              "column": 37
+            }
+          },
+          {
+            "name": "call.string_argument",
+            "nodeType": "interpreted_string_literal",
+            "text": "\"util\"",
+            "start": {
+              "line": 7,
+              "column": 30
+            },
+            "end": {
+              "line": 7,
+              "column": 36
+            }
+          }
+        ],
+        "struct-tags": []
+      }
+    }
+  ],
+  "references": {
+    "src/orders/service.go": {
+      "files": [],
+      "external": [
+        {
+          "package": "stdlib:embed",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:encoding/json",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:fmt",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:math",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:net/http",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:os",
+          "symbols": [
+            "*"
+          ]
+        },
+        {
+          "package": "stdlib:strings",
+          "symbols": [
+            "*"
+          ]
+        }
+      ]
+    },
+    "src/util/util.go": {
+      "files": [],
+      "external": [
+        {
+          "package": "stdlib:fmt",
+          "symbols": [
+            "*"
+          ]
+        }
+      ]
+    }
+  }
+}

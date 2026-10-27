@@ -30,6 +30,12 @@ export interface CompletionValidationOptions {
   selfHeal?: boolean;
   /** Untracked paths present before the run; not counted as the run's changes. */
   baselineUntracked?: string[];
+  /**
+   * The task is a parent whose children are all completed (see
+   * `isFinalizeReadyParent`). Its work landed with its children, so an empty
+   * diff completes it instead of being refused.
+   */
+  finalizeReadyParent?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 30_000;
@@ -87,6 +93,13 @@ export async function validateCompletion(
     })) ?? [];
 
   if (changed.length === 0) {
+    if (options?.finalizeReadyParent) {
+      return {
+        valid: true,
+        hasChanges: false,
+        diffSummary: "none — every child is completed, so this run only closes the parent",
+      };
+    }
     return {
       valid: false,
       hasChanges: false,
@@ -182,6 +195,8 @@ export function formatValidationResult(result: CompletionValidationResult): stri
 
   if (result.hasChanges) {
     lines.push(`Changes detected: ${result.diffSummary ?? "yes"}`);
+  } else if (result.valid) {
+    lines.push(`Changes: ${result.diffSummary ?? "none"}`);
   } else {
     lines.push(result.reason ?? "No changes detected");
   }

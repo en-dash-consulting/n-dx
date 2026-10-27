@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "fe7084dc-1b20-4d0d-8fe1-31481255aa80":
+    status: "completed"
+    startedAt: "2026-08-21T14:16:56.483Z"
+    completedAt: "2026-08-21T14:22:22.142Z"
+    endedAt: "2026-08-21T14:22:22.142Z"
+    resolutionType: "code-change"
+    resolutionDetail: "main() now uses the new resolveExistingDir, which accepts a positional only when it names a real directory; the 25 handler call sites keep resolveDir unchanged. Unit test (11 cases) plus two e2e assertions confirmed to fail without the fix. typecheck clean, 1723 tests passing."
+    appliedAt: "2026-08-21T14:22:22.142Z"

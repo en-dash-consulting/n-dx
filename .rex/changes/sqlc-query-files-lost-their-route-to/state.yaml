@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "6bfc0a33-2ac2-4b2e-ac78-cc546780a8be":
+    status: "completed"
+    startedAt: "2026-10-11T04:09:12.247Z"
+    completedAt: "2026-10-11T04:17:13.452Z"
+    endedAt: "2026-10-11T04:17:13.452Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run 51c6bb49-b831-4654-abf3-b04311563b75, commit f12d91830: MigrationToolFinding gains optional queryFiles (sqlc only, existing .sql files under queries:, sorted); sqlFiles stays the schema files; embedded-sql.test.ts reads extractSqlcTables over queryFiles. The run stopped uncommitted because the sandbox blocked the full suite; the suite was run outside it (3066 passed) and the work committed by hand."
+    appliedAt: "2026-10-11T04:17:13.452Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-11T04:17:14.305Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

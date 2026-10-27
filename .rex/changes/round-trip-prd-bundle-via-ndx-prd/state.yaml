@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "0ef8ca7b-7fa8-4f0a-bc49-f10b04272ce7":
+    status: "completed"
+    startedAt: "2026-09-08T18:21:23.030Z"
+    completedAt: "2026-09-08T18:46:47.217Z"
+    endedAt: "2026-09-08T18:46:47.217Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added rex/core/prd-bundle.ts (format, strict version gate, additive merge), rex export + rex import-bundle CLI commands, and the ndx prd export|import orchestrator group. 36 new tests plus a verified round-trip of the real 1392-item PRD with zero field, parent, or membership differences."
+    appliedAt: "2026-09-08T18:46:47.217Z"
+    lastModified: "2026-09-08T18:46:47.224Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

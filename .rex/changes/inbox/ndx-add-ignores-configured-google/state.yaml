@@ -1,0 +1,11 @@
+schema: "rex/v2"
+items:
+  "46d8b92f-cc15-438a-84e0-9bac61a9adc7":
+    status: "completed"
+    startedAt: "2026-06-09T13:52:38.182Z"
+    completedAt: "2026-06-09T14:02:44.904Z"
+    endedAt: "2026-06-09T14:02:44.904Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added two Google vendor regression tests to smart-add-vendor-model-selection.test.ts. The config reading path was already correct via the dirname() adapter in rex/store/project-config.ts — the bug described in the task was pre-fixed. Tests confirm vendor=google correctly resolves to gemini-2.5-flash (standard tier) or a configured llm.google.model."
+    appliedAt: "2026-06-09T14:02:44.904Z"
+    needsPlacement: true

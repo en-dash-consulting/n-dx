@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "5a895e9d-b34e-402f-9839-9296c25080fc":
+    status: "completed"
+    startedAt: "2026-09-08T22:32:21.351Z"
+    completedAt: "2026-09-08T22:39:09.424Z"
+    endedAt: "2026-09-08T22:39:09.424Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Scope check moved ahead of the handler invocation at start.ts:627-632, so handleSourcevisionAskRoute is no longer constructed (and no longer reaches the model call) when sourcevision is out of scope. Stale comment replaced with the mechanism. Covered by a new child-process integration test that boots the real server; verified failing before the fix with the exact ERR_HTTP_HEADERS_SENT stack, passing after."
+    appliedAt: "2026-09-08T22:39:09.424Z"
+    lastModified: "2026-09-08T22:39:09.430Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

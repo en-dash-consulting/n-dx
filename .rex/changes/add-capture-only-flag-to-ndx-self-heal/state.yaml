@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "dee5cd0a-3cea-4a95-a549-921c0fe7940f":
+    status: "completed"
+    startedAt: "2026-05-15T21:39:02.368Z"
+    completedAt: "2026-05-15T21:48:30.100Z"
+    endedAt: "2026-05-15T21:48:30.100Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added --capture-only flag to handleSelfHeal in cli.js; updated help.js and self-heal.md; added 8 integration tests"
+    appliedAt: "2026-05-15T21:48:30.100Z"

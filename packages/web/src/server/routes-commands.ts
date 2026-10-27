@@ -45,7 +45,7 @@ import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { readAnalyzeProgress } from "./domain-gateway.js";
@@ -494,7 +494,7 @@ async function handleSvAnalyze(
         });
       }
     }).catch((err: unknown) => {
-      settleSvAnalyze(String(err), null);
+      settleSvAnalyze(errorMessage(err), null);
     });
 
     return true;
@@ -525,7 +525,7 @@ async function handleSvAnalyze(
       output: outputTail(result.stdout.trim(), 2000),
     });
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   } finally {
     releaseSvWriteLock(ctx);
   }
@@ -665,7 +665,7 @@ async function handleExport(
 
     jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -693,7 +693,7 @@ async function handleInstallSample(
 
     jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -721,7 +721,7 @@ async function handleDestroySample(
 
     jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -829,7 +829,7 @@ async function handleSelfHeal(
     selfHealStatus.running = false;
     selfHealStatus.finishedAt = new Date().toISOString();
     selfHealStatus.stopped = wasStopped;
-    selfHealStatus.error = wasStopped ? null : String(err);
+    selfHealStatus.error = wasStopped ? null : errorMessage(err);
     slot.child = null;
     slot.stopRequested = false;
 
@@ -1034,7 +1034,7 @@ async function handleInit(
   }).catch((err: unknown) => {
     initStatus.running = false;
     initStatus.finishedAt = new Date().toISOString();
-    initStatus.error = String(err);
+    initStatus.error = errorMessage(err);
   });
 
   return true;
@@ -1263,7 +1263,7 @@ async function handleRefresh(
       });
     }
   }).catch((err: unknown) => {
-    settleRefresh(String(err));
+    settleRefresh(errorMessage(err));
   });
 
   return true;
@@ -1401,7 +1401,7 @@ export function startAsyncJob(
       broadcast({ type: broadcastType, ok: !status.error, timestamp: status.finishedAt });
     }
   }).catch((err: unknown) => {
-    settle(String(err));
+    settle(errorMessage(err));
   });
 
   return true;
@@ -1569,7 +1569,7 @@ async function handleFix(
       jsonResponse(res, 200, { ok: true, dryRun, output: outputTail(result.stdout.trim(), 2000) });
     }
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -1670,7 +1670,7 @@ async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
   } catch (err) {
     // Report the failure in the body rather than as a 500: "could not check"
     // is a legitimate chip state, not a broken endpoint.
-    return { ok: false, output: "", error: String(err) };
+    return { ok: false, output: "", error: errorMessage(err) };
   }
 }
 
@@ -1731,7 +1731,7 @@ async function handleValidateTokens(
     }
     jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 4000) });
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -1761,7 +1761,7 @@ async function handleExportPdf(
     }
     jsonResponse(res, 200, { ok: true, output: outputTail(result.stdout.trim(), 2000) });
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -1925,7 +1925,7 @@ async function spawnCommandEffects(bin: string, args: string[], cwd: string): Pr
   try {
     parsed = JSON.parse(result.stdout) as { effects?: unknown };
   } catch (err) {
-    return { effects: null, error: `Unparseable effects output: ${String(err)}` };
+    return { effects: null, error: `Unparseable effects output: ${errorMessage(err)}` };
   }
   if (!parsed.effects || typeof parsed.effects !== "object") {
     return { effects: null, error: "CLI reported no effects declarations" };
@@ -1955,12 +1955,17 @@ const EFFECTS_LAYOUT_TOKENS = {
 
 /** This project's path for each layout token, relative to its root with forward slashes. */
 function effectsLayoutPaths(layout: ReturnType<typeof resolveLayout>, projectDir: string): Record<string, string> {
-  return Object.fromEntries(
+  const paths = Object.fromEntries(
     Object.entries(EFFECTS_LAYOUT_TOKENS).map(([token, field]) => [
       token,
       relative(projectDir, layout[field]).split(sep).join("/"),
     ]),
   );
+  // Twin of core's `prdTokenPaths`: a v2 project (`product/` present) keeps its PRD in changes/ and product/.
+  const rex = paths.rex;
+  return existsSync(join(layout.rexDir, "product"))
+    ? { ...paths, prd: `${rex}/changes/`, prdRead: `${rex}/product/ and ${rex}/changes/` }
+    : { ...paths, prd: `${rex}/prd_tree/`, prdRead: `${rex}/prd_tree/` };
 }
 
 /** Drop loaded declarations (tests, and a CLI swapped under a running server). */

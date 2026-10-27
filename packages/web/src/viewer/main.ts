@@ -29,6 +29,7 @@ import {
   initTheme,
   initDensity,
   RepoTrustStrip,
+  ServerUnavailableNotice,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -149,7 +150,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     () => createTripleClickDetector({ onTrigger: openNeolithic, requiredClicks: 7 }),
     [openNeolithic],
   );
-  const { data, loading, refreshToast, showDrop } = useAppData({ pausePolling: isFeatureDisabled("autoRefresh") });
+  const { data, loading, mode, serverError, refreshToast, showDrop } = useAppData({ pausePolling: isFeatureDisabled("autoRefresh") });
   // Read here rather than in the views that need it: the view renderers in
   // view-registry.ts are plain functions dispatched by `view`, so a hook called
   // inside one would be a conditional hook in this component. Problems and
@@ -314,7 +315,12 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
       h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     ),
-    (showDrop && !hasData)
+    // A server that answered but would not serve the dashboard is reported as
+    // such and retried; the file-drop box is for a page with no server at all.
+    (mode === "unavailable" && serverError && !hasData)
+      ? h(ServerUnavailableNotice, { error: serverError })
+      : null,
+    (mode === "static" && showDrop && !hasData)
       ? h("div", { class: "drop-overlay", role: "dialog", "aria-label": "File drop zone" },
           h("div", { class: "drop-box" },
             h("h2", null, "Drop .sourcevision files"),

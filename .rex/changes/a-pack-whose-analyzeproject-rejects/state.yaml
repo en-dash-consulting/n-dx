@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "5f66a6e6-de89-4ce3-aef5-5a4019da1ef3":
+    status: "completed"
+    startedAt: "2026-10-13T18:24:52.697Z"
+    completedAt: "2026-10-13T18:27:56.018Z"
+    endedAt: "2026-10-13T18:27:56.018Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Catch a rejecting pack analyzeProject in buildPackImportGraph and degrade only its language."
+    appliedAt: "2026-10-13T18:27:56.018Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-13T18:27:56.305Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

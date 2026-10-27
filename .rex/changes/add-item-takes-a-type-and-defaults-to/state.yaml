@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "fdddee24-1661-4f65-adc7-3946452bc8f8":
+    status: "completed"
+    startedAt: "2026-10-09T01:04:01.321Z"
+    completedAt: "2026-10-09T01:18:58.048Z"
+    endedAt: "2026-10-09T01:18:58.048Z"
+    resolutionType: "code-change"
+    resolutionDetail: "add_item dispatches on layout: v2 takes type (default change → Inbox with needsPlacement), refuses level; v1 unchanged, refuses v2-only types/fields. addTask refuses closed changes (ClosedChangeError suggests discoveredFrom follow-up). get_item reads v2."
+    appliedAt: "2026-10-09T01:18:58.048Z"
+    lastModified: "2026-10-09T16:36:47.354Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

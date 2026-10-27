@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "4d097853-07ec-4b66-966e-8149f155bf18":
+    status: "completed"
+    startedAt: "2026-10-08T05:17:06.648Z"
+    completedAt: "2026-10-08T05:17:06.648Z"
+    endedAt: "2026-10-08T05:17:06.648Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Closed by 127a68ab: placementRelation is title-led with an explicit Relation line winning; intent prose never decides. Tests cover the rename/new-layout, 'Do not add retries' and 'Add token rotation' cases."
+    appliedAt: "2026-10-08T05:17:06.648Z"
+    lastModified: "2026-10-08T05:17:06.914Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

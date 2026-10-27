@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "66d277b5-3540-490f-9891-9817a0dce580":
+    status: "completed"
+    startedAt: "2026-10-13T02:51:26.927Z"
+    completedAt: "2026-10-13T02:57:12.447Z"
+    endedAt: "2026-10-13T02:57:12.447Z"
+    resolutionType: "code-change"
+    resolutionDetail: "ci.yml PR trigger is [labeled] only; ci:run gate on build/test/smoke-parity; consume-label job; CONTRIBUTING and gate test updated."
+    appliedAt: "2026-10-13T02:57:12.447Z"
+    lastModified: "2026-10-13T02:57:13.690Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

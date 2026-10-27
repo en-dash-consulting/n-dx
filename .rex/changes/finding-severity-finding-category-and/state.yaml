@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "117b0560-2dd0-4c5d-9f7d-5149eb7e3318":
+    status: "completed"
+    startedAt: "2026-09-22T03:11:55.568Z"
+    completedAt: "2026-09-22T03:25:00.144Z"
+    endedAt: "2026-09-22T03:25:00.144Z"
+    resolutionType: "code-change"
+    resolutionDetail: "enrich-judge.ts (severity Score, category Choice, fragility Nouls) hooked in zones.ts before enforceSeverityRules; judged prompts drop the severity/category contract including the meta pass; live run graded 30 findings and 26 zones in 3 Jev requests"
+    appliedAt: "2026-09-22T03:25:00.144Z"
+    lastModified: "2026-09-22T03:25:00.157Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

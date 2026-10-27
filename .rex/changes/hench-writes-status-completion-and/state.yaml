@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "44043b84-1a8e-4ead-adf7-41d98f338bc2":
+    status: "completed"
+    startedAt: "2026-10-12T10:31:54.842Z"
+    completedAt: "2026-10-12T10:41:18.227Z"
+    endedAt: "2026-10-12T10:41:18.227Z"
+    resolutionType: "code-change"
+    resolutionDetail: "On v2, toolRexUpdateStatus completes through rex's completeV2Work (via rex-gateway): last task completes and applies its change; the v1 cascade is skipped on v2. Claims and the FileStore guard are covered by tests/integration/v2-status-completion.test.ts. v1 unchanged."
+    appliedAt: "2026-10-12T10:41:18.227Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T10:41:18.502Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

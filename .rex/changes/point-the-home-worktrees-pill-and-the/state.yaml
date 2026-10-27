@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "bce8e5c6-4ab5-47e1-8d15-9667a7be6392":
+    status: "completed"
+    startedAt: "2026-10-01T06:36:42.677Z"
+    completedAt: "2026-10-01T06:43:40.690Z"
+    endedAt: "2026-10-01T06:43:40.690Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Sessions pill, freshness badge and stuck-run badge now link to Live pages; web unit suite passes."
+    appliedAt: "2026-10-01T06:43:40.690Z"
+    lastModified: "2026-10-01T06:43:41.077Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

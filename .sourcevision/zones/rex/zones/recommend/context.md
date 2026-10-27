@@ -5,44 +5,50 @@
 <zone>
 
 Zone: Recommend (`rex/recommend`)
-Files: 9, Cohesion: 0.67, Coupling: 0.33
-Description: 9 files, primarily TypeScript
-Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/cli/commands/recommend.ts, packages/rex/src/recommend/conflict-detection.ts, packages/rex/src/recommend/create-from-recommendations.ts, packages/rex/src/recommend/similarity.ts, packages/rex/src/recommend/text-similarity-shared.ts, packages/rex/src/recommend/tree.ts, packages/rex/src/recommend/types.ts, packages/rex/src/store/self-heal-tag.ts
-Lines: 2270
+Files: 12, Cohesion: 0.82, Coupling: 0.18
+Description: 12 files, primarily TypeScript
+Entry points: packages/rex/src/analyze/acknowledge.ts, packages/rex/src/analyze/dedupe.ts, packages/rex/src/analyze/reconcile.ts, packages/rex/src/cli/commands/recommend.ts, packages/rex/src/cli/commands/reshape-detect-duplicates.ts, packages/rex/src/cli/commands/validate-interactive.ts, packages/rex/src/core/epic-correlation.ts, packages/rex/src/recommend/conflict-detection.ts, packages/rex/src/recommend/create-from-recommendations.ts, packages/rex/src/recommend/similarity.ts, packages/rex/src/recommend/types.ts
+Lines: 3434
 
 </zone>
 
 <files>
 
 packages/rex/src/analyze/acknowledge.ts (TypeScript, 185 lines, source)
-packages/rex/src/cli/commands/recommend.ts (TypeScript, 946 lines, source)
+packages/rex/src/analyze/dedupe.ts (TypeScript, 229 lines, source)
+packages/rex/src/analyze/reconcile.ts (TypeScript, 124 lines, source)
+packages/rex/src/cli/commands/recommend.ts (TypeScript, 1015 lines, source)
+packages/rex/src/cli/commands/reshape-detect-duplicates.ts (TypeScript, 179 lines, source)
+packages/rex/src/cli/commands/validate-interactive.ts (TypeScript, 344 lines, source)
+packages/rex/src/core/epic-correlation.ts (TypeScript, 278 lines, source)
 packages/rex/src/recommend/conflict-detection.ts (TypeScript, 357 lines, source)
 packages/rex/src/recommend/create-from-recommendations.ts (TypeScript, 446 lines, source)
 packages/rex/src/recommend/similarity.ts (TypeScript, 29 lines, source)
 packages/rex/src/recommend/text-similarity-shared.ts (TypeScript, 155 lines, source)
-packages/rex/src/recommend/tree.ts (TypeScript, 12 lines, source)
 packages/rex/src/recommend/types.ts (TypeScript, 93 lines, source)
-packages/rex/src/store/self-heal-tag.ts (TypeScript, 47 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
+  packages/rex/src/analyze/dedupe.ts → packages/rex/src/recommend/text-similarity-shared.ts {normalize, splitActionContent, rawSimilarity}
+  packages/rex/src/analyze/reconcile.ts → packages/rex/src/analyze/dedupe.ts {similarity}
   packages/rex/src/cli/commands/recommend.ts → packages/rex/src/analyze/acknowledge.ts {computeFindingHash, loadAcknowledged, saveAcknowledged, acknowledgeFinding, unacknowledgeFinding, resolveAckHash, isAcknowledged, isAcknowledgedFuzzy, ACK_REASON_CATEGORIES}
   packages/rex/src/cli/commands/recommend.ts → packages/rex/src/recommend/conflict-detection.ts {formatConflict, formatIntraBatchDuplicate}
   packages/rex/src/cli/commands/recommend.ts → packages/rex/src/recommend/conflict-detection.ts {RecommendationConflict, IntraBatchDuplicate}
   packages/rex/src/cli/commands/recommend.ts → packages/rex/src/recommend/create-from-recommendations.ts {createItemsFromRecommendations}
   packages/rex/src/cli/commands/recommend.ts → packages/rex/src/recommend/create-from-recommendations.ts {EnrichedRecommendation, RecommendationMeta, ConflictStrategy}
+  packages/rex/src/cli/commands/reshape-detect-duplicates.ts → packages/rex/src/analyze/dedupe.ts {similarity}
+  packages/rex/src/cli/commands/validate-interactive.ts → packages/rex/src/core/epic-correlation.ts {correlateEpiclessFeatures, formatScore}
+  packages/rex/src/cli/commands/validate-interactive.ts → packages/rex/src/core/epic-correlation.ts {CorrelationResult}
+  packages/rex/src/core/epic-correlation.ts → packages/rex/src/analyze/dedupe.ts {similarity}
   packages/rex/src/recommend/conflict-detection.ts → packages/rex/src/recommend/similarity.ts {similarity}
   packages/rex/src/recommend/conflict-detection.ts → packages/rex/src/recommend/text-similarity-shared.ts {normalize}
-  packages/rex/src/recommend/conflict-detection.ts → packages/rex/src/recommend/tree.ts {walkRecommendationTree}
   packages/rex/src/recommend/conflict-detection.ts → packages/rex/src/recommend/types.ts {EnrichedRecommendation, ItemLevel, ItemStatus, RecommendationMeta, RecommendationTreeItem}
   packages/rex/src/recommend/create-from-recommendations.ts → packages/rex/src/recommend/conflict-detection.ts {detectRecommendationConflicts}
   packages/rex/src/recommend/create-from-recommendations.ts → packages/rex/src/recommend/conflict-detection.ts {ConflictReport}
   packages/rex/src/recommend/create-from-recommendations.ts → packages/rex/src/recommend/types.ts {EnrichedRecommendation, RecommendationMeta, ConflictStrategy}
-  packages/rex/src/recommend/create-from-recommendations.ts → packages/rex/src/store/self-heal-tag.ts {withSelfHealTag}
   packages/rex/src/recommend/similarity.ts → packages/rex/src/recommend/text-similarity-shared.ts {normalize, bigrams, wordSet, splitActionContent, rawSimilarity}
-  packages/rex/src/recommend/tree.ts → packages/rex/src/recommend/types.ts {RecommendationTreeItem}
 
 </imports>

@@ -1,0 +1,43 @@
+schema: "rex/v2"
+items:
+  "28ce5a85-62f0-4ee1-83ba-cd4ce8cb0c48":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-22T18:49:10.000Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4301fba6-667a-4b59-b18d-6d1b18e16626":
+    startedAt: "2026-10-10T05:37:05.744Z"
+    lastModified: "2026-10-10T06:08:51.530Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "87adf364-8333-4c6b-b6f4-892481625262":
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    needsPlacement: true
+    lastModified: "2026-10-07T15:13:46.650Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8c88933a-a1f3-4799-a106-0c316e98a20c":
+    status: "completed"
+    startedAt: "2026-10-08T17:18:22.006Z"
+    completedAt: "2026-10-08T17:19:55.770Z"
+    endedAt: "2026-10-08T17:19:55.770Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed four concepts-page findings in glossary.md, stewards.md, index.md; vitepress build passes; committed 8ea09e4a7"
+    lastModified: "2026-10-08T17:19:56.022Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bc0aa415-331f-406f-8d14-2eff065dd91f":
+    status: "completed"
+    startedAt: "2026-10-08T07:26:22.353Z"
+    completedAt: "2026-10-08T07:30:29.824Z"
+    endedAt: "2026-10-08T07:30:29.824Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Five concepts pages under docs/guide/concepts/ plus a Concepts sidebar group, written and reviewed by hench run 56139eb6-ae65-450e-be65-1db53119577e. The run left them uncommitted because its sandbox refused pnpm docs:build; pnpm docs:build verified by hand and the pages committed unchanged in 2d38ade41."
+    lastModified: "2026-10-08T07:30:30.080Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c380c2fa-720a-4d83-ab7b-fd110dbf3ba9":
+    status: "completed"
+    startedAt: "2026-10-10T05:26:02.364Z"
+    completedAt: "2026-10-10T05:28:27.945Z"
+    endedAt: "2026-10-10T05:28:27.945Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Rewrote docs/guide/change-management.md against the folder tree; removed ndx schedule and rex archive-prune."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-10T05:28:28.211Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

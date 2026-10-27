@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "9708b8c6-a5ff-4e63-a05d-a3f38700f049":
+    status: "completed"
+    startedAt: "2026-05-14T13:13:35.418Z"
+    completedAt: "2026-05-14T13:36:32.152Z"
+    endedAt: "2026-05-14T13:36:32.152Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented scoped hash-suffix consolidation pass in add-reshape.ts; wired into add.ts and reshape.ts; 20 tests all pass."
+    appliedAt: "2026-05-14T13:36:32.152Z"

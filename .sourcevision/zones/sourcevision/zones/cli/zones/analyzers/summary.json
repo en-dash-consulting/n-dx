@@ -1,0 +1,21 @@
+{
+  "id": "sourcevision/cli/analyzers",
+  "name": "Import Graph Analysis",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "packages/sourcevision/src/analyzers/pack-imports.ts",
+    "packages/sourcevision/src/analyzers/terraform-infrastructure.ts",
+    "packages/sourcevision/src/language/pack-loader.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/imports.ts",
+    "packages/sourcevision/src/analyzers/pack-imports.ts",
+    "packages/sourcevision/src/analyzers/terraform-infrastructure.ts",
+    "packages/sourcevision/src/language/pack-loader.ts"
+  ],
+  "cohesion": 0.56,
+  "coupling": 0.44,
+  "fileCount": 4,
+  "lineCount": 1494
+}

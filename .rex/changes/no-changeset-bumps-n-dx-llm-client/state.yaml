@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8e7eef7b-0acd-4fc3-97c5-ad73bb3322b6":
+    status: "completed"
+    startedAt: "2026-09-10T17:10:32.818Z"
+    completedAt: "2026-09-10T17:10:32.818Z"
+    endedAt: "2026-09-10T17:10:32.818Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added \"@n-dx/llm-client\": patch to .changeset/prompt-envelope-rex-sourcevision.md — the changeset that already describes moving the section-measurement helpers into llm-client, so the declaration sits with the change that created the dependency (solution option 1). Verified by temporarily removing the two pre-existing on-main changesets that bump llm-client (harden-execshellcmd-windows-shell, sourcevision-ask-endpoint) and re-running changeset status --since=origin/main: @n-dx/llm-client is still listed, so the branch now declares the bump independently rather than relying on accidental coupling. Both files restored byte-identical. Option 3 (a CI check that every package with src/ changes is named in a changeset) was not done and remains open as a class-level guard."
+    appliedAt: "2026-09-10T17:10:32.818Z"
+    lastModified: "2026-09-10T17:10:32.831Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

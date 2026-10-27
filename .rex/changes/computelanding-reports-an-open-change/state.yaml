@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "b7520479-098e-4c2e-9c19-79a6f4649850":
+    status: "completed"
+    completedAt: "2026-10-08T20:05:12.142Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed by task ae3c8475 (commit b2b021a43, merged in #584): computeLanding now reports a change that is not completed or applied as \"change still open\", so resolveShippedIn gives no release for unfinished work. ae3c8475's description names this capture; it was not marked at the time. Closed in the PR 11 cleanup, 2026-10-08."
+    appliedAt: "2026-10-08T20:05:12.142Z"
+    lastModified: "2026-10-08T20:05:12.404Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "090749f5-1693-4d49-9a88-47387823670d":
+    status: "completed"
+    startedAt: "2026-04-19T04:42:49.026Z"
+    completedAt: "2026-04-19T04:47:38.918Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created NeolithicOverlay component with ASCII dino animation, full-viewport styling, dismiss-on-click/keypress, and useNeolithicOverlay hook with custom event seam for gesture detector."
+    appliedAt: "2026-04-19T04:47:38.918Z"

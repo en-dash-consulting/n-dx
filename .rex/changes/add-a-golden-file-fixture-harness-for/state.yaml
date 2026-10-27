@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "05774700-76ac-4624-b20e-f121ee233676":
+    status: "completed"
+    startedAt: "2026-10-08T01:04:05.749Z"
+    completedAt: "2026-10-08T01:10:34.407Z"
+    endedAt: "2026-10-08T01:10:34.407Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Golden harness with explicit update script; evals and non-Java output unchanged."
+    appliedAt: "2026-10-08T01:10:34.407Z"
+    lastModified: "2026-10-08T01:10:34.724Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

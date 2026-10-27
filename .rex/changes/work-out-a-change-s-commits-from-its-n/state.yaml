@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "e50d9c97-8cf6-409b-b9bb-c6d00f832599":
+    status: "completed"
+    startedAt: "2026-10-07T21:47:33.140Z"
+    completedAt: "2026-10-07T22:00:19.321Z"
+    endedAt: "2026-10-07T22:00:19.321Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Dropped commits from v2 ItemState and its zod schema (now in RETIRED_STATE_FIELDS, reported by a new retired-state-field warning rule). Added core/change-commits.ts, which computes a change's commits from N-DX-Item trailers (permalink or bare id) on commits reachable from main and caches the scan in rexDir/.cache keyed by the ref tip."
+    appliedAt: "2026-10-07T22:00:19.321Z"
+    lastModified: "2026-10-07T22:00:19.569Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "3e512e8b-b6d3-46eb-bba4-19f049e2829d":
+    status: "completed"
+    startedAt: "2026-09-10T17:21:05.058Z"
+    completedAt: "2026-09-10T17:24:48.593Z"
+    endedAt: "2026-09-10T17:24:48.593Z"
+    resolutionType: "code-change"
+    resolutionDetail: "ndx prd now has functional e2e coverage (round trip, missing/unknown subcommand including prototype-property names) and handlePrd's subcommand lookup is own-property-only via Object.hasOwn."
+    appliedAt: "2026-09-10T17:24:48.593Z"
+    lastModified: "2026-09-10T17:24:48.620Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

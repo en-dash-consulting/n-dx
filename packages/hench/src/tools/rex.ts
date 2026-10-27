@@ -5,6 +5,7 @@ import { PROJECT_DIRS, repoCommandEnv } from "../prd/llm-gateway.js";
 import { execShellCmd } from "../process/exec.js";
 import { completeV2Work, computeTimestampUpdates, isChangeLayerStore, reconcileAutoCompletions,validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
+import { isFinalizeReadyParent } from "../validation/finalize-ready.js";
 import type {
   RexToolHandlers,
   ToolContext,
@@ -51,6 +52,7 @@ export async function toolRexUpdateStatus(
       testCommand: options.testCommand,
       startingHead: options.startingHead,
       selfHeal: options.selfHeal,
+      finalizeReadyParent: await isFinalizeReadyParent(store, taskId),
     });
 
     if (!validation.valid) {

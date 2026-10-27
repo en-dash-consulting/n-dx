@@ -2,9 +2,11 @@
  * "Found run command" — start the project's dev server or a build from the
  * dashboard, and open it when it serves on localhost.
  *
- * Sits in the bottom bar beside the live indicators. It appears only when the
- * server actually detected something, so a project with no conventional entry
- * point gets no empty affordance.
+ * Sits in the top nav beside search, and is always there so it can be found
+ * in the same place on every project. It is disabled until the server reports
+ * a detected command: a project with no conventional entry point, or a static
+ * export with no server to run anything, shows it greyed out with the reason
+ * in its tooltip.
  *
  * The dropdown offers the commands the server detected and nothing else.
  * There is no free-text field and no extra-argument field: flags alone are
@@ -21,7 +23,7 @@ function kindLabel(kind: "run" | "build"): string {
 }
 
 export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
-  const { commands, status, error, start, stop } = useRunCommands(enabled);
+  const { commands, status, loaded, error, start, stop } = useRunCommands(enabled);
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -38,7 +40,28 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
     setOpen(false);
   }, [chosen, start]);
 
-  if (!enabled || commands.length === 0) return null;
+  // A job survives a reload, so a running one keeps the control usable even
+  // if detection were to come back empty.
+  const available = enabled && (commands.length > 0 || running);
+  if (!available) {
+    const reason = !enabled
+      ? "Run commands need the dashboard server; a static export has none"
+      : loaded
+        ? "No run or build command found in this project"
+        : "Looking for run and build commands…";
+    return h("div", { class: "runcmd" },
+      h("button", {
+        type: "button",
+        class: "runcmd-btn",
+        disabled: true,
+        title: reason,
+        "aria-label": `Run project: ${reason}`,
+      },
+        h("span", { class: "runcmd-glyph", "aria-hidden": "true" }, "▶"),
+        h("span", { class: "runcmd-label" }, enabled && loaded ? "No run command" : "Run"),
+      ),
+    );
+  }
 
   const statusText = running
     ? status!.label
@@ -65,7 +88,7 @@ export function RunCommandControl({ enabled = true }: { enabled?: boolean }) {
         ? h("span", { class: "runcmd-spinner", "aria-hidden": "true" })
         : h("span", { class: "runcmd-glyph", "aria-hidden": "true" }, "▶"),
       h("span", { class: "runcmd-label" }, statusText),
-      h("span", { class: "runcmd-caret", "aria-hidden": "true" }, "▲"),
+      h("span", { class: "runcmd-caret", "aria-hidden": "true" }, "▼"),
     ),
 
     // A served URL is the point of the whole control, so it sits outside the

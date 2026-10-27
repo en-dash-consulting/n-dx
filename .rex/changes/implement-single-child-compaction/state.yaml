@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "f2f52014-a452-4e7d-9665-73649f549473":
+    status: "completed"
+    startedAt: "2026-05-06T19:51:56.539Z"
+    completedAt: "2026-05-07T00:15:11.819Z"
+    endedAt: "2026-05-07T00:15:11.819Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented compactSingleChildren migration with full integration into reshape command. Detects and collapses single-child wrapper directories, embeds parent metadata using __parent* fields, and is idempotent. Includes unit and integration tests verifying correct operation and idempotency. Implementation spans: (1) compact-single-children.ts migration function, (2) reshape.ts CLI command integration, (3) folder-tree-serializer.ts forward-direction optimization. All acceptance criteria met."
+    appliedAt: "2026-05-07T00:15:11.819Z"

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { join } from "node:path";
 import { analyzeInventory } from "../../src/analyzers/inventory.js";
 import { analyzeImports } from "../../src/analyzers/imports.js";
-import { goConfig } from "../../src/language/go.js";
+import { goConfig } from "@n-dx/lang-kit";
 import type { Imports } from "../../src/schema/v1.js";
 
 const GO_FIXTURE = join(import.meta.dirname, "../fixtures/go-project");

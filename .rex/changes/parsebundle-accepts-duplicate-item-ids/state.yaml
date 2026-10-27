@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "68ee0634-87af-428f-a950-e0a8e3a1183b":
+    status: "completed"
+    startedAt: "2026-09-10T16:37:54.223Z"
+    completedAt: "2026-09-10T16:42:34.330Z"
+    endedAt: "2026-09-10T16:42:34.330Z"
+    resolutionType: "code-change"
+    resolutionDetail: "parseBundle now rejects any bundle claiming the same item id twice, with a BundleError naming the id and both claimant titles, before any write. Covered by 2 unit tests and an e2e test exercising both merge and replace modes."
+    appliedAt: "2026-09-10T16:42:34.330Z"
+    lastModified: "2026-09-10T16:42:34.355Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

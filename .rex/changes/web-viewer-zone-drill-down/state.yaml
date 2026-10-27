@@ -1,0 +1,7 @@
+schema: "rex/v2"
+items:
+  "feat-web-viewer-drilldown":
+    status: "completed"
+    startedAt: "2026-03-02T16:33:26.558Z"
+    completedAt: "2026-03-02T16:33:26.558Z"
+    appliedAt: "2026-03-02T16:33:26.558Z"

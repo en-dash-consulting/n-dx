@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "40834f3a-3416-4a89-86f8-345c49cca586":
+    status: "completed"
+    startedAt: "2026-05-26T02:12:24.122Z"
+    completedAt: "2026-05-26T02:24:15.123Z"
+    endedAt: "2026-05-26T02:24:15.123Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Removed 7 single-symbol/pass-through re-export and intermediate barrel files. Updated 10 consumers to import directly from source modules. 68 net lines deleted with zero circular dependencies."
+    appliedAt: "2026-05-26T02:24:15.123Z"

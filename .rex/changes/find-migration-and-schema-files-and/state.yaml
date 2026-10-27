@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8d693fcd-f39f-4008-8149-24596e014479":
+    status: "completed"
+    startedAt: "2026-10-08T08:06:44.764Z"
+    completedAt: "2026-10-08T08:16:49.756Z"
+    endedAt: "2026-10-08T08:16:49.756Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Pinned tree-sitter-sql 0.3.11, migration tool detection, table extraction, corpus report"
+    appliedAt: "2026-10-08T08:16:49.756Z"
+    lastModified: "2026-10-08T08:16:50.019Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "9590ed82-8bb0-4fff-ade9-35ba977116c0":
+    status: "completed"
+    startedAt: "2026-04-17T15:32:57.234Z"
+    completedAt: "2026-04-17T15:32:57.234Z"
+    appliedAt: "2026-04-17T15:32:57.234Z"
+    needsPlacement: true
+  "f85abf7d-3a25-424f-95b6-5d6fccb1340e":
+    status: "completed"
+    startedAt: "2026-04-17T15:30:15.718Z"
+    completedAt: "2026-04-17T15:32:57.191Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Finding is a false positive. Louvain places external.ts near web-server due to shared/schema/ connectivity bridge. All 21 importers are viewer files; pin to web-viewer is correct. Documented the reason inline in external.ts matching the web-server zone stability pattern."

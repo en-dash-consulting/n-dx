@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "5c71c175-ff37-4cf7-8a28-cba18a435184":
+    status: "completed"
+    startedAt: "2026-06-02T13:16:18.952Z"
+    completedAt: "2026-06-02T13:25:19.650Z"
+    endedAt: "2026-06-02T13:25:19.650Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added packages/core/git-preflight.js (isInsideGitRepo, runGitPreflight, runGitInit, formatGitWarningLines). Wired into handleInit before sub-tool setup; TTY paths show the explanation + y/n prompt and run `git init` on consent. Non-TTY/quiet runs skip the prompt and surface a persistent yellow warning in the recap (Ink + static paths). Existing git repos short-circuit silently. Added unit + e2e tests; bumped architecture-policy ALLOWED for child_process; added file to @n-dx/core package.json `files`."
+    appliedAt: "2026-06-02T13:25:19.650Z"

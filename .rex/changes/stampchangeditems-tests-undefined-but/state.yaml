@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "284a3e0a-7182-43b4-9e03-6182442fc631":
+    status: "completed"
+    startedAt: "2026-09-11T03:06:37.911Z"
+    completedAt: "2026-09-11T03:15:25.004Z"
+    endedAt: "2026-09-11T03:15:25.004Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Both halves of the new-item stamp now decide presence by truthiness, matching isModifiedSinceSync's `!meta.lastModified`. Reproduced against the built CLI before and after: a bundle item with lastModified null and an author previously stored with no timestamp line at all, and now stores a real ISO timestamp with the author intact. defaultTimestampFromExport was deliberately left undefined-only — making it null-aware would route such items into the unvalidated exportedAt path that the blocked sibling task 5d5e3e41 addresses, so the correct behaviour comes from not touching it. stampSynced's remoteId check is an optional-parameter presence test, not the same class; recorded so the next audit does not re-litigate it. 7 tests red first (3 per store adapter plus a real CLI import), all green. Full suite clean, 6/6."
+    appliedAt: "2026-09-11T03:15:25.004Z"
+    lastModified: "2026-09-11T03:15:25.010Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

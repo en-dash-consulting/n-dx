@@ -1,0 +1,23 @@
+{
+  "id": "hench/agent/analysis",
+  "name": "Analysis",
+  "description": "6 files, primarily TypeScript",
+  "files": [
+    "packages/hench/src/agent/analysis/adaptive.ts",
+    "packages/hench/src/agent/analysis/index.ts",
+    "packages/hench/src/agent/analysis/workflow.ts",
+    "packages/hench/src/agent/index.ts",
+    "packages/hench/src/agent/lifecycle/token-budget.ts",
+    "packages/hench/src/agent/token-cost.ts"
+  ],
+  "entryPoints": [
+    "packages/hench/src/agent/analysis/adaptive.ts",
+    "packages/hench/src/agent/analysis/workflow.ts",
+    "packages/hench/src/agent/lifecycle/token-budget.ts",
+    "packages/hench/src/agent/token-cost.ts"
+  ],
+  "cohesion": 0.57,
+  "coupling": 0.43,
+  "fileCount": 6,
+  "lineCount": 1582
+}

@@ -24,7 +24,8 @@ Resistance → Family 2.** Read it first. In short, and in preference order:
 if a file holding any of them is not named anywhere in this file:
 
 1. **A clock decides a bound** — the file reads a clock and an `expect` whose
-   subject names a duration is bounded by a comparison matcher.
+   subject names a duration, or subtracts a clock reading in place
+   (`expect(Date.now() - started)`), is bounded by a comparison matcher.
 2. **A real sleep is the barrier before the assertion** — an awaited non-zero
    `setTimeout`/`sleep` followed by an `expect(` with no `await` in between.
    Nothing here names a duration; the verdict is an ordering or a count that
@@ -123,14 +124,17 @@ it. The registered baseline is below.
 | `packages/rex/tests/unit/store/folder-tree-parser.test.ts:957` | (comment only) | Prose recording that this file already replaced an absolute budget with a growth ratio. The reference implementation of technique 2, alongside `write-path-profile.test.ts`. |
 | `packages/web/tests/integration/worktrees-route.test.ts:386` | `await new Promise((r) => setTimeout(r, 1_000))` then `expect(broadcast).not.toHaveBeenCalled()` | Proving an absence: the claim is that serving a worktree arms no second watcher, so the sleep is the window in which a spurious broadcast would show up. Load cannot turn this red — a busier machine makes a stray broadcast *less* likely to land inside the window, never more. The exposure is the opposite one, a false pass when a watcher fires late, which no bound can close; only asserting on the watcher registry itself would. Surfaced by the widened scanner (the `1_000` separator hid it from the old pattern), not newly written. |
 | `packages/web/tests/unit/setup/preact-frame-leak-guard.test.ts:46` | `await new Promise((resolve) => setTimeout(resolve, RAF_TIMEOUT + 50))` then `expect(getPendingFrameFallbackTimerCount()).toBe(before)` | Two timers, not a duration: preact's after-paint fallback is armed at `RAF_TIMEOUT`, and this waits `RAF_TIMEOUT + 50`. Timers fire in deadline order, so the fallback has always fired by the time this one does, however far behind the event loop is running — load delays both equally and cannot reorder them. Waiting it out is the point: the canary must not leave the pair pending, or it would trip the very guard it tests. Surfaced by the widened scanner (the `RAF_TIMEOUT + 50` expression hid it from the old pattern). |
+| `packages/lang-kit/tests/helpers/call-within-budget.ts`, used by `packages/lang-kit/tests/unit/python-requirements.test.ts`, `python-build.test.ts` (uv glob) and `java-modules.test.ts` (pathological poms) | No assertion and no clock read: two `setTimeout` budgets, `LOAD_BUDGET_MS` (1s) for worker start-up and `CALL_BUDGET_MS` (250ms) for the call, each × `NDX_TEST_TIME_MULTIPLIER`, past which the worker running the call is terminated and the test fails | A hang guardrail for linearity tests on repository input. The work is a synchronous regex or scan, which blocks its thread so vitest's per-test timeout never fires: a regression hung the suite until CI's job timeout and named no test. Off-thread, `worker.terminate()` interrupts the match. Counting is not available — the regressed cost is backtracking inside the regex engine. The calls return in milliseconds, so a load-only overrun needs 5s at the default multiplier; with the specifier pattern reverted to `\s*,?\s*`, the requirements test failed by name at 5.3s instead of hanging. The tests pass `BOUNDED_TEST_TIMEOUT_MS`, which sits above both budgets. |
 | `packages/rex/tests/unit/store/file-lock-publication.test.ts` | `expect(publication.links.length).toBeGreaterThan(1)` after an `acquireLock` that is expected to time out | A *count* driven by a real timer: how many publication attempts fit inside `acquireTimeoutMs`. Nothing in the assertion names a duration, and the sleep is inside `acquireLock` rather than in the test, so neither scanner shape sees it — the blind spot `wall-clock-inventory-policy.test.js` names in its own header ("a fixed retry count, say"). It failed under a loaded `pnpm validate` on 2026-10-15 with "expected 1 to be greater than 1", one attempt having consumed the whole 80ms window. Counting is not available: the retry loop is the subject, and the only evidence it ran is the attempts it made. Kept, with the budget widened from 80ms to 1000ms against a 10ms delay — measured at 59 attempts, so ~17ms each, turning a 4x margin into 30x. The behavioural claim the test is named for is now asserted without a clock beside it: the incomplete publication is still present and still empty, which a caller that had classified it as stale would have cleared. |
 
 ---
 
 ## Open — clock-derived and not yet converted
 
-No unscaled absolute budgets remain. Every site below follows the documented
-policy; they are listed because policy-compliant is not the same as good.
+Every site in the first table below follows the documented policy; they are
+listed because policy-compliant is not the same as good. The second table holds
+the four unscaled budgets the scan could not see until 2026-10-21, when it
+learned to read a clock subtracted in the `expect` subject.
 
 ### Open, scaled through `BUDGET_MULTIPLIER`
 
@@ -149,6 +153,28 @@ than scaling it" — and every one of these is named for a complexity claim.
 | `packages/hench/tests/unit/cli/commands/run-loop.test.ts:85,99` | `expect(elapsed).toBeLessThan(50 or 200 * BUDGET_MULTIPLIER)` |
 | `packages/web/tests/unit/server/routes-search.test.ts:288` | `expect(roundTripMs).toBeLessThan(500 * BUDGET_MULTIPLIER)` |
 | `packages/web/tests/unit/server/search-index.test.ts:550` | `expect(searchElapsed).toBeLessThan(200 * BUDGET_MULTIPLIER)` |
+| `tests/unit/file-permissions.test.js:89` | `expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER)` — bounds a hang in the `icacls` ACE regex on a 200k-repeat `:(` line. Technique 1 does not apply: the cost is the regex engine's backtracking, which nothing in the call can count, and a ratio on sub-millisecond work is unreliable (TESTING.md, rule 2). Measured: 19,888 ms with `[^)]` (the regression it guards), 0.8 ms with `[^()]`, against a 5 s default budget. |
+| `tests/unit/web-hub-mode.test.js:66` | `expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER)` — bounds a hang in `slugifyProjectId`'s trailing trim on a 100k-repeat interior `-.` run. Same reasoning as the row above. Measured: 25,333 ms with `[-.]+$`, 0.7 ms with the lookbehind, against a 5 s default budget. |
+| `packages/web/tests/unit/hub/new-project.test.ts:143` | `expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER)` — twin of the `web-hub-mode` row for the hub's copy of `slugifyProjectId`; same input, same measurements. |
+
+### Open — unscaled, surfaced by the widened detector
+
+`expect(Date.now() - started).toBeLessThan(n)` names no duration word, so the
+scan did not see the first four until it learned the in-place subtraction. The
+fifth names `elapsed` but was skipped anyway: the old regex's `g` flag carried
+`lastIndex` from one file's `.test()` into the next. All five predate the
+register's "no unscaled budgets" claim and were never looked at; they are
+written down here so that claim is true again in the only sense that matters —
+every site has been read. None is multiplier-scaled. Three of them cannot be,
+because their bound's job is to sit below another number.
+
+| Site | Assertion | What it bounds |
+|---|---|---|
+| `tests/unit/web-port-occupant.test.js:443` | `expect(Date.now() - started).toBeLessThan(3_000)` after `probeStatusEndpoint(port, 300)` against an occupant that accepts the connection and never answers | Guards the probe's own 300 ms timeout firing at all: without it the probe hangs behind the wedged server until vitest's per-test timeout, which names nothing. Unscaled, 10× the timeout it sits above — load has to hold a 300 ms timer for 2.7 s to flip it. Could take `BUDGET_MULTIPLIER`; nothing else in the test depends on the figure. |
+| `tests/unit/web-port-occupant.test.js:772` | `expect(Date.now() - started).toBeLessThan(2_000)` after `waitForPortFile(dir, 10_000, 10, …, () => false)` | *Discriminating*: separates "gave up when the server was gone" (one 10 ms poll) from "ran out the 10 s clock". The bound's job is to sit below 10 000, so it cannot be multiplier-scaled — ×20 would pass both outcomes, the `shell.test.ts:272` shape. 200× the expected reading. |
+| `packages/llm-client/tests/unit/process-tree.test.ts:419` | `expect(Date.now() - started).toBeLessThan(5000)` around `terminateProcessTree` with `forceKillTimeoutMs: 150` and a member that never reads as stopped | Guards the bounded best-effort: the kill must give up after the force-kill timeout instead of waiting for a `Z` state that never comes, which would hang until the per-test timeout. Unscaled, 33× the timeout it sits above. |
+| `packages/web/tests/unit/server/routes-hench-run-tail.test.ts:295` | `expect(Date.now() - writtenAt).toBeLessThan(1_000)` after `vi.waitFor(…, { timeout: 1_000 })` for the appended-content frame | The test's named claim *is* a latency: the tailer polls every `RUN_TAIL_POLL_MS` (250 ms) and a frame must follow an append within a second. The `waitFor` already fails at the same bound, so this restates its verdict rather than adding one — but it is a real SLA with four polls of headroom, unscaled, and the most load-sensitive site in this table. Scaling it means scaling the `waitFor` timeout with it. |
+| `packages/rex/tests/unit/core/requirements-trace.test.ts:82` | `expect(elapsed).toBeLessThan(250)` around one `findNextTask` over a 30-epic, 3 330-item tree | *Discriminating*: separates the linear selection from the quadratic one it replaced, which its comment records at ~500 ms here. The bound's job is to sit below that, so it cannot be multiplier-scaled — ×2 already passes the regression. The clean reading is not recorded. Counting `findNextTask`'s inner visits would replace the clock. |
 
 ---
 

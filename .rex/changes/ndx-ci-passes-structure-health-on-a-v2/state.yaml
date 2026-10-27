@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "c9af97e0-2692-42f1-b194-452e04513d26":
+    status: "completed"
+    startedAt: "2026-10-09T15:16:18.654Z"
+    completedAt: "2026-10-09T15:37:29.502Z"
+    endedAt: "2026-10-09T15:37:29.502Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Run 6fa19059 (claude-opus-5-5, review claude-opus-5-5), commit 17257acdc. The run's gate passed but completion was refused because an in-progress merge of PR 17 (staged by the Lane A session in the same worktree) read as 22 uncommitted paths. After the merge was committed (c05eaadd9), the same affected gate (node scripts/run-all-tests.mjs affected da54c06ef) passed 6/6 suites on the clean tree."
+    appliedAt: "2026-10-09T15:37:29.502Z"
+    lastModified: "2026-10-09T15:37:29.784Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "a63f9e13-2c9c-4ee4-9bb8-dba5bf671cb2":
+    status: "completed"
+    startedAt: "2026-09-08T23:22:35.792Z"
+    completedAt: "2026-09-08T23:34:01.858Z"
+    endedAt: "2026-09-08T23:34:01.858Z"
+    resolutionType: "code-change"
+    resolutionDetail: "--write now refuses a dirty tree (--allow-dirty marks the stamp <sha>-dirty plus dirty:true); recordings carry a git-independent contentHash over measured surfaces and skill bodies; tests/e2e/prompt-census.test.js fails when the repo stops matching that hash, so a stale baseline cannot merge. Baseline re-recorded from a clean tree — stamp 76b274e097b2 now resolves to a commit containing JSON_OBJECT_ONLY. Census script added to ALLOWED for child_process. Criterion 5 closed as already covered by two pre-existing --compare tests."
+    appliedAt: "2026-09-08T23:34:01.858Z"
+    lastModified: "2026-09-08T23:34:01.864Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

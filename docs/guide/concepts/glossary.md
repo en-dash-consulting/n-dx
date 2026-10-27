@@ -1,7 +1,7 @@
 # Glossary
 
 ::: warning The v2 model
-These terms belong to the v2 model. Its commands and MCP tools ship from 0.9.0, but `ndx init` creates v1 projects until the storage migration ships (see [v1 projects](../prd-storage#v1-projects)).
+These terms belong to the v2 model. Its commands and MCP tools ship from 0.9.0, and `ndx init` creates v2 projects; a v1 project is one that has not yet run `ndx migrate` (see [v1 projects](../prd-storage#v1-projects)).
 :::
 
 Each term is shown with an example from n-dx's own PRD.

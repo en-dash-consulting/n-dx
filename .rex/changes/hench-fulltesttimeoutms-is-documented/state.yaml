@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "4586aab3-0524-4f5f-8543-c53fbb89245e":
+    status: "completed"
+    startedAt: "2026-09-10T17:19:12.665Z"
+    completedAt: "2026-09-10T17:19:12.665Z"
+    endedAt: "2026-09-10T17:19:12.665Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Corrected both operator-facing docs to 900000 / 15 minutes (packages/core/config.js:1628, packages/hench/src/schema/v1.ts:238), and fixed a third stale copy found while checking criterion 4: tests/integration/test-gate-timeout-config.test.ts said the gate \"was hardcoded at 5 minutes\" when it was hardcoded at 15 (TEST_GATE_TIMEOUT = 900_000; 5m is the pre-\"RAISED 5m to 15m\" era). Added the drift guard from solution option 2: tests/unit/schema/validate.test.ts now asserts the zod default equals DEFAULT_TEST_GATE_TIMEOUT_MS instead of a hardcoded 900_000, which was itself a third mirror of the literal and why nothing caught the drift. Proved the guard has teeth by temporarily reverting the schema default to 300_000 and confirming it fails (\"expected 300000 to be 900000\"), then restoring. That import made the shell-spawn inventory policy test flag validate.test.ts, so added a \"Sites that need no guard\" row recording that it imports only the numeric constant and never calls runTestGate. Solution option 3 (always printing the configured timeout in finalizeRun) not done — out of scope for the docs fix. Build, typecheck, all package suites and the full root suite green."
+    appliedAt: "2026-09-10T17:19:12.665Z"
+    lastModified: "2026-09-10T17:19:12.672Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

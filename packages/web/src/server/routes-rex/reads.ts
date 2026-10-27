@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import type { ServerContext } from "../types.js";
 import { jsonResponse, errorResponse } from "../response-utils.js";
-import { loadPRDSync } from "../prd-io.js";
+import { isV2Tree, loadPRDSync } from "../prd-io.js";
 import { findNextTask, collectCompletedIds } from "./rex-route-helpers.js";
 
 import {
@@ -188,6 +188,8 @@ export function routePrdReads(
       const reqSummary = computeRequirementsSummary(doc.items);
       jsonResponse(res, 200, {
         title: doc.title,
+        // The viewer labels the root rows changes on v2 and epics on v1.
+        layout: isV2Tree(ctx.rexDir) ? "v2" : "v1",
         stats,
         percentComplete: stats.total > 0
           ? Math.round((stats.completed / stats.total) * 100)

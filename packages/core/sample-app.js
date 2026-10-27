@@ -3,6 +3,18 @@ import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync, statSync, re
 import { randomUUID } from "node:crypto";
 import { dim, cyan, green } from "./cli-brand.js";
 import { resolveLayout } from "./layout.js";
+import { hasV2Tree } from "./migrate-chain.js";
+import { execFileSyncCli } from "./win-spawn.js";
+
+/**
+ * Injected by cli.js: core spawns rex and imports none of it.
+ *
+ * @typedef {object} SampleAppDeps
+ * @property {string} rexScript  Path to the rex CLI script (`tools.rex`).
+ */
+
+/** Marks the sample's change on a v2 tree (`rex add --source`) and its items on a v1 one (a tag). */
+const SAMPLE_TAG = "sample-app";
 
 // Helper to write a file, creating its parent directories if needed
 function writeFileEnsureDir(filePath, content) {
@@ -146,10 +158,56 @@ function generatePrdMarkdown(item) {
   return frontmatter.join("\n") + "\n";
 }
 
-export async function handleInstallSample(rest) {
+/** Run rex with `--format=json` and parse what it prints. */
+function rexJson(deps, args) {
+  const out = execFileSyncCli(process.execPath, [deps.rexScript, ...args, "--format=json"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  return JSON.parse(out);
+}
+
+/** v2: a change with two tasks, added through `rex add` so rex owns the layout. */
+function installV2Items(targetDir, deps) {
+  if (!deps?.rexScript) throw new Error("install-sample on a v2 project needs the rex CLI path (SampleAppDeps.rexScript)");
+  const change = rexJson(deps, [
+    "add", "change",
+    "--title=Sample App Improvements",
+    "--description=Enhance the sample application with new features and bug fixes to demonstrate n-dx capabilities.",
+    `--source=${SAMPLE_TAG}`,
+    targetDir,
+  ]);
+  const tasks = [
+    {
+      title: "Fix Counter Bug",
+      description: "The counter in app.js concatenates string '1' instead of doing numerical addition. Fix the bug.",
+      criteria: ["Clicking increment adds 1 numerically to the counter"],
+    },
+    {
+      title: "Add Dark Mode",
+      description: "Implement a dark mode theme toggle. Add a button to the header that toggles a 'dark' class on the body, swapping the CSS variables to dark variants.",
+      criteria: ["Dark mode button exists in header", "Clicking button toggles dark mode styles"],
+    },
+  ];
+  for (const task of tasks) {
+    rexJson(deps, [
+      "add", "task",
+      `--parent=${change.id}`,
+      `--title=${task.title}`,
+      `--description=${task.description}`,
+      ...task.criteria.map((c) => `--criterion=${c}`),
+      targetDir,
+    ]);
+  }
+}
+
+/**
+ * @param {string[]} rest
+ * @param {SampleAppDeps} [deps]  Needed on a v2 project.
+ */
+export async function handleInstallSample(rest, deps) {
   const targetDir = rest[0] ? resolve(process.cwd(), rest[0]) : process.cwd();
   const sampleDir = join(targetDir, "sample-app");
-  const prdTreeDir = join(resolveLayout(targetDir).rexDir, "prd_tree");
 
   console.log(`\n${cyan("n-dx")} installing sample app into ${dim(sampleDir)}...`);
 
@@ -158,7 +216,18 @@ export async function handleInstallSample(rest) {
   writeFileEnsureDir(join(sampleDir, "style.css"), CSS_CONTENT);
   writeFileEnsureDir(join(sampleDir, "app.js"), JS_CONTENT);
 
-  // 2. Create PRD Tree
+  // 2. Create the sample PRD items in the project's layout
+  if (hasV2Tree(targetDir)) installV2Items(targetDir, deps);
+  else installV1Items(join(resolveLayout(targetDir).rexDir, "prd_tree"));
+
+  console.log(`${green("✔")} Sample app installed successfully!`);
+  console.log(`\n${cyan("Next Steps:")}`);
+  console.log(`  ndx status`);
+  console.log(`  ndx work --auto\n`);
+}
+
+/** v1: a hand-written epic, feature and two tasks in the folder tree. */
+function installV1Items(prdTreeDir) {
   const epicId = randomUUID();
   const featureId = randomUUID();
   const task1Id = randomUUID();
@@ -210,27 +279,62 @@ export async function handleInstallSample(rest) {
     tags: ["sample-app"],
     acceptanceCriteria: ["Dark mode button exists in header", "Clicking button toggles dark mode styles"]
   }));
-
-  console.log(`${green("✔")} Sample app installed successfully!`);
-  console.log(`\n${cyan("Next Steps:")}`);
-  console.log(`  ndx status`);
-  console.log(`  ndx work --auto\n`);
 }
 
-export async function handleDestroySample(rest) {
+/**
+ * @param {string[]} rest
+ * @param {SampleAppDeps} [deps]  Needed on a v2 project.
+ */
+export async function handleDestroySample(rest, deps) {
   const targetDir = rest[0] ? resolve(process.cwd(), rest[0]) : process.cwd();
   const sampleDir = join(targetDir, "sample-app");
-  const prdTreeDir = join(resolveLayout(targetDir).rexDir, "prd_tree");
+  const rexDir = resolveLayout(targetDir).rexDir;
 
   console.log(`\n${cyan("n-dx")} destroying sample app...`);
 
-  // Remove source files
+  // PRD first: a v2 removal that cannot take the PRD lock throws here, before
+  // anything is deleted.
+  if (hasV2Tree(targetDir)) removeV2Items(join(rexDir, "changes"), targetDir, deps);
+  else removeV1Items(join(rexDir, "prd_tree"));
+
   if (existsSync(sampleDir)) {
     rmSync(sampleDir, { recursive: true, force: true });
     console.log(`${green("✔")} Removed sample-app directory`);
   }
+  console.log(`${green("✔")} Sample app destroyed successfully!`);
+}
 
-  // Remove PRD items tagged with 'sample-app'
+/**
+ * v2: finds the changes `install-sample` added (`source: sample-app` in the
+ * folder's `index.md`; reading rex's on-disk contract, as `migrate-chain.js`
+ * does) and removes each with `rex remove`, which holds the PRD lock and logs.
+ * A change's tasks go with it. Core never deletes the folders itself.
+ */
+function removeV2Items(changesDir, targetDir, deps) {
+  if (!deps?.rexScript) throw new Error("destroy-sample on a v2 project needs the rex CLI path (SampleAppDeps.rexScript)");
+  const marker = new RegExp(`^source:\\s*["']?${SAMPLE_TAG}["']?\\s*$`, "m");
+  // A top-level change sits under changes/, or under changes/inbox/ while unplaced.
+  for (const parent of [changesDir, join(changesDir, "inbox")]) {
+    if (!existsSync(parent)) continue;
+    for (const entry of readdirSync(parent)) {
+      const dir = join(parent, entry);
+      if (!statSync(dir).isDirectory()) continue;
+      const index = join(dir, "index.md");
+      if (!existsSync(index)) continue;
+      const text = readFileSync(index, "utf8");
+      const id = /^id:\s*["']?([^"'\s]+)["']?\s*$/m.exec(text)?.[1];
+      if (!id || !marker.test(text)) continue;
+      execFileSyncCli(process.execPath, [deps.rexScript, "remove", id, "--yes", targetDir], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "inherit"],
+      });
+      console.log(`${green("✔")} Removed PRD change: ${entry}`);
+    }
+  }
+}
+
+/** v1: remove every item file tagged `sample-app`. */
+function removeV1Items(prdTreeDir) {
   function walkAndRemove(dir) {
     if (!existsSync(dir)) return;
     const entries = readdirSync(dir);
@@ -254,5 +358,4 @@ export async function handleDestroySample(rest) {
   }
 
   walkAndRemove(prdTreeDir);
-  console.log(`${green("✔")} Sample app destroyed successfully!`);
 }

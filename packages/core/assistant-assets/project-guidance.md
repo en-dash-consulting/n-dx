@@ -7,6 +7,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 - **sourcevision** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption.
 - **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/prd_tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
+- **lang-kit and packs** — `@n-dx/lang-kit`: language facts and the pack contract (foundation, no dependencies). `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs: sourcevision loads them at run time. See each package's `AGENTS.md`.
 - **graview** — Graview projection: `ndx graview emit|check|describe|serve|mcp` writes a `graview-document` declaration and a `{nodes, edges}` snapshot of the PRD, the analysis and the runs under the layout's graview dir, then spawns the `graview` CLI on them. No `@graview/*` dependency; the binary is a peer tool.
 - **graview-face** — The product face on Graview: a Vite + React app, published on its own and depended on by no other package, that compiles the emitted document and lays a shell, home and record pages in n-dx's words over the derived ones. `ndx graview serve` runs it.
 
@@ -21,8 +22,10 @@ Four-tier dependency hierarchy (each layer imports only from the layer below):
   Execution       hench                         (agent loops, tool dispatch)
        ↓
   Domain          rex · sourcevision            (independent, never import each other)
+  Packs           @n-dx/lang-runtime, lang-*    (beside Domain: loaded, never imported)
        ↓
   Foundation      @n-dx/llm-client              (shared types, API client)
+                  @n-dx/lang-kit                (language facts, pack contract)
 ```
 
 Zero circular dependencies. The web package sits alongside orchestration — it imports all domain packages to serve the unified dashboard.
@@ -137,7 +140,7 @@ different command: it publishes the static dashboard.)
 
 | Convention | Pattern | Notes |
 |-----------|---------|-------|
-| Naming | All packages are `@n-dx/` scoped (`@n-dx/core`, `@n-dx/rex`, `@n-dx/sourcevision`, `@n-dx/hench`, `@n-dx/llm-client`, `@n-dx/web`) | The unscoped `rex` / `hench` / `sourcevision` / `sv` names are **bin aliases**, not package names — they exist so the CLIs can be invoked directly after install, not for `npx <name>`. Changesets must use the scoped name — an unscoped name fails `changeset status` with "not in the workspace" |
+| Naming | All packages are `@n-dx/` scoped (`@n-dx/core`, `@n-dx/rex`, `@n-dx/sourcevision`, `@n-dx/hench`, `@n-dx/llm-client`, `@n-dx/lang-*`, `@n-dx/web`) | The unscoped `rex` / `hench` / `sourcevision` / `sv` names are **bin aliases**, not package names — they exist so the CLIs can be invoked directly after install, not for `npx <name>`. Changesets must use the scoped name — an unscoped name fails `changeset status` with "not in the workspace" |
 | Subpath exports | `"./dist/*": "./dist/*"` | Intentional escape hatch — not public API, no stability guarantee. See `PACKAGE_GUIDELINES.md` for acceptable/prohibited uses |
 
 ## Assistant Instruction Files

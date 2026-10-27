@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "5494682d-ad4b-41cc-8b59-59fa7b7e47f4":
+    status: "completed"
+    startedAt: "2026-05-18T12:53:49.021Z"
+    completedAt: "2026-05-18T12:56:09.007Z"
+    endedAt: "2026-05-18T12:56:09.007Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created docs/guide/skills.md enumerating all 9 manifest skills with name, purpose, trigger, and customization notes; added sidebar entry to VitePress config."
+    appliedAt: "2026-05-18T12:56:09.007Z"

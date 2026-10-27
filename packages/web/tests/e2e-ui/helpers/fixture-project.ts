@@ -13,7 +13,7 @@
  */
 
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:net";
@@ -21,7 +21,7 @@ import { createServer } from "node:net";
 // packages/web/tests/e2e-ui/helpers -> repo root is 5 levels up.
 const REPO_ROOT = resolve(import.meta.dirname, "../../../../..");
 const CORE_CLI = join(REPO_ROOT, "packages/core/cli.js");
-const REX_BIN = join(REPO_ROOT, "packages/core/bin/rex.js");
+export const REX_BIN = join(REPO_ROOT, "packages/core/bin/rex.js");
 const WEB_CLI = join(REPO_ROOT, "packages/web/dist/cli/index.js");
 
 export interface FixtureProject {
@@ -59,7 +59,7 @@ export async function createUninitializedFixtureProject(): Promise<string> {
 }
 
 /**
- * Create a fully-initialized project (folder-tree PRD backend, local LLM
+ * Create a fully-initialized project (v1 folder-tree PRD, local LLM
  * vendor) with one pending epic and one pending task under it, ready for
  * PRD and Hench Runs workflow tests.
  *
@@ -69,13 +69,42 @@ export async function createUninitializedFixtureProject(): Promise<string> {
  * process that fails fast, without risking a real autonomous agent run
  * against test fixture files.
  */
-export async function createFixtureProject(): Promise<FixtureProject> {
+export interface FixtureOptions {
+  /**
+   * Seed a few source files with imports before `ndx init`, so the analysis
+   * has an inventory, an import graph and a zone. The happy-click specs need
+   * this for Files, Zones and the map; the workflow specs do not.
+   */
+  sources?: boolean;
+}
+
+async function seedSources(dir: string): Promise<void> {
+  await mkdir(join(dir, "src", "lib"), { recursive: true });
+  const files: Record<string, string> = {
+    "src/index.js": 'import { greet } from "./lib/greet.js";\nimport { format } from "./lib/format.js";\n\nexport function main(name) {\n  return format(greet(name));\n}\n',
+    "src/lib/greet.js": 'import { format } from "./format.js";\n\nexport function greet(name) {\n  return format(`Hello, ${name}!`);\n}\n',
+    "src/lib/format.js": "export function format(text) {\n  return String(text).trim();\n}\n",
+    "src/cli.js": 'import { main } from "./index.js";\n\nconsole.log(main(process.argv[2] ?? "world"));\n',
+    "package.json": JSON.stringify({ name: "e2e-ui-fixture", version: "0.0.0", private: true, type: "module" }, null, 2) + "\n",
+  };
+  for (const [rel, content] of Object.entries(files)) await writeFile(join(dir, rel), content);
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  execFileSync(
+    "git",
+    ["-c", "user.email=e2e@test.local", "-c", "user.name=e2e-ui", "commit", "-q", "-m", "seed sources"],
+    { cwd: dir },
+  );
+}
+
+export async function createFixtureProject(options: FixtureOptions = {}): Promise<FixtureProject> {
   const dir = await createUninitializedFixtureProject();
+  if (options.sources) await seedSources(dir);
 
   execFileSync(
     "node",
     [CORE_CLI, "init", "--provider=local", "--no-claude", "--no-codex", dir],
-    { stdio: "pipe" },
+    // The fixture is a v1 epic and task; init alone gives a new project v2.
+    { stdio: "pipe", env: { ...process.env, NDX_INIT_LAYOUT: "v1" } },
   );
 
   const epicOut = execFileSync(
@@ -96,7 +125,9 @@ export async function createFixtureProject(): Promise<FixtureProject> {
 }
 
 export async function cleanupFixtureProject(dir: string): Promise<void> {
-  await rm(dir, { recursive: true, force: true });
+  // On Windows the just-killed server (or a child it spawned) can still hold
+  // a handle for a moment; EBUSY/EPERM is retried rather than failing the suite.
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
 export async function getFreePort(): Promise<number> {
@@ -151,4 +182,15 @@ export function stopDashboard(proc: ChildProcess): void {
   } catch {
     // already dead
   }
+}
+
+/**
+ * Stop the dashboard and wait for the process to exit, so a cleanup that
+ * follows does not race its file handles (Windows reports EBUSY otherwise).
+ */
+export async function stopDashboardAndWait(proc: ChildProcess, timeoutMs = 5_000): Promise<void> {
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  const exited = new Promise<void>((resolveExit) => proc.once("exit", () => resolveExit()));
+  stopDashboard(proc);
+  await Promise.race([exited, new Promise<void>((r) => setTimeout(r, timeoutMs))]);
 }

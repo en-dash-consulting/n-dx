@@ -65,7 +65,7 @@ describe("Guide modal accessibility", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
     act(() => { btn?.click(); });
-    const overlay = root.querySelector(".guide-overlay");
+    const overlay = document.querySelector(".guide-overlay");
     expect(overlay?.getAttribute("role")).toBe("dialog");
     expect(overlay?.getAttribute("aria-modal")).toBe("true");
   });
@@ -74,7 +74,7 @@ describe("Guide modal accessibility", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
     act(() => { btn?.click(); });
-    const overlay = root.querySelector(".guide-overlay");
+    const overlay = document.querySelector(".guide-overlay");
     expect(overlay?.getAttribute("aria-label")).toContain("Guide:");
   });
 
@@ -82,7 +82,7 @@ describe("Guide modal accessibility", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
     act(() => { btn?.click(); });
-    const closeBtn = root.querySelector(".guide-close");
+    const closeBtn = document.querySelector(".guide-close");
     expect(closeBtn?.getAttribute("aria-label")).toBe("Close guide");
   });
 
@@ -90,7 +90,7 @@ describe("Guide modal accessibility", () => {
     root = renderToDiv(h(Guide, { view: "overview" }));
     const btn = root.querySelector<HTMLElement>(".guide-btn");
     act(() => { btn?.click(); });
-    expect(root.querySelector(".guide-overlay")).not.toBeNull();
+    expect(document.querySelector(".guide-overlay")).not.toBeNull();
 
     // Commit inside act() so the Escape handler's setOpen(false) flushes
     // synchronously; no need to wait for preact's rAF/setTimeout(35)
@@ -101,7 +101,7 @@ describe("Guide modal accessibility", () => {
       );
     });
 
-    expect(root.querySelector(".guide-overlay")).toBeNull();
+    expect(document.querySelector(".guide-overlay")).toBeNull();
   });
 });
 

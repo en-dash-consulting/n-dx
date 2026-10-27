@@ -10,9 +10,9 @@ rather than original. The epic started from **22,670 per-call / 13,630 unique** 
 epic's overall reduction should be measured against. Use `--compare` for the delta
 since whatever is recorded here now.
 
-- **Recorded at** — 2026-10-16T13:59:54.988Z
-- **Commit** — `d8e9ee3d1049`
-- **Content hash** — `00c9207aead87d34` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
+- **Recorded at** — 2026-10-16T22:30:15.623Z
+- **Commit** — `c7b10d223337`
+- **Content hash** — `2d0fda542614f9b2` (identifies the measurement itself; `tests/e2e/prompt-census.test.js` fails when the repo no longer matches it)
 - **Model for cost/context figures** — `claude-sonnet-5`
 - **Surfaces** — 38
 - **Per-call total** — 23,454 tokens (what every surface costs, summed)
@@ -227,7 +227,7 @@ per section rather than as one literal. These are the same sections
 | `system` | 3,162 | 791 | 82.6% |
 | `brief` | 668 | 167 | 17.4% |
 
-## Workflow skills — 22,856 tokens, 13 skills
+## Workflow skills — 22,952 tokens, 13 skills
 
 A skill body enters the agent's context whole the moment the skill is invoked,
 so its size is a per-invocation bill in the same way a builder's fixed text is a
@@ -240,12 +240,12 @@ portability guards until this table gave them a number.
 
 | Skill | Shipped | Chars | Tokens |
 |---|:-:|---:|---:|
-| `ndx-adversarial-review` | yes | 24,105 | 6,027 |
-| `ndx-reshape` | yes | 10,150 | 2,538 |
-| `ndx-capture` | yes | 8,894 | 2,224 |
+| `ndx-adversarial-review` | yes | 24,117 | 6,030 |
+| `ndx-reshape` | yes | 10,250 | 2,563 |
+| `ndx-capture` | yes | 9,023 | 2,256 |
 | `iso-map` | — | 8,285 | 2,072 |
+| `ndx-plan` | yes | 8,027 | 2,007 |
 | `ndx-work` | yes | 7,984 | 1,996 |
-| `ndx-plan` | yes | 7,884 | 1,971 |
 | `triage` | — | 7,421 | 1,856 |
 | `dev-link` | — | 5,054 | 1,264 |
 | `ndx-config` | yes | 4,985 | 1,247 |

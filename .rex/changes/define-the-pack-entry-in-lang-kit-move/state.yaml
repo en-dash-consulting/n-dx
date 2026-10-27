@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "a195dc83-33b1-4dbd-a7c4-204b7608b8be":
+    status: "completed"
+    startedAt: "2026-10-13T17:19:50.606Z"
+    completedAt: "2026-10-13T17:52:30.108Z"
+    endedAt: "2026-10-13T17:52:30.108Z"
+    resolutionType: "code-change"
+    resolutionDetail: "474cff293: LanguagePackEntry in lang-kit, createPackEntry in lang-runtime, Java/Go moved into their packs, sourcevision pack-loader (pack dir → resolution, version check, install-command notices) replaces BUILTIN_PACKS. Corpus numbers match PR 11; all scoped and root policy gates pass."
+    appliedAt: "2026-10-13T17:52:30.108Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-13T17:52:30.478Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

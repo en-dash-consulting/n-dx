@@ -1,0 +1,9 @@
+---
+id: "22ba5028-7c95-4ecb-b74b-b5d4816bc0ae"
+type: "capability"
+title: "Project-aware Navigation and Context"
+slug: "project-aware-navigation-and-context"
+statement: "The dashboard shows the current project's name and status in its page title, header and sidebar, and offers deep links that open a specific PRD item or hench run directly, plus a top-level Token Usage destination."
+criteria: [{"id":"c1","text":"The dashboard header, navigation and sidebar shall display the current project's context and status indicators."},{"id":"c2","text":"The dashboard shall make Rex tasks clickable and navigable in every application view."},{"id":"c3","text":"When a user opens a deep link to a hench run, the dashboard shall route to the runs page, select that run and show its transcript."},{"id":"c4","text":"When a user opens a deep link to a PRD item, the dashboard shall route to the item's page, select the item and make it visible."},{"id":"c5","text":"The dashboard shall generate deep-link URLs in the same shareable format for every Rex item and hench run."},{"id":"c6","text":"The dashboard shall show the current project name in the page title and sidebar header in place of generic n-dx branding."},{"id":"c7","text":"The sidebar footer shall not show a workspace switcher."},{"id":"c8","text":"The dashboard shall display the project's configuration and provide an interface for switching between projects."},{"id":"c9","text":"The web server shall detect project metadata automatically and serve it through an API endpoint that navigation components read."},{"id":"c10","text":"The dashboard shall link each hench run to the PRD task it executed."},{"id":"c11","text":"The dashboard navigation shall list Token Usage as a top-level destination at the same level as Settings."},{"id":"c12","text":"When Token Usage is a top-level destination, the dashboard shall keep existing navigation routes working."}]
+source: "smart-add"
+---

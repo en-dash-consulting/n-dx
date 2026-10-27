@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "2d502362-a88c-4ea6-b136-870f405fa914":
+    status: "completed"
+    startedAt: "2026-10-12T18:40:24.837Z"
+    completedAt: "2026-10-12T18:54:46.830Z"
+    endedAt: "2026-10-12T18:54:46.830Z"
+    resolutionType: "code-change"
+    resolutionDetail: "restoreFromBackup and getAvailableBackups throw V2RestoreRefusedError on a v2 tree; commit 7bb564691"
+    appliedAt: "2026-10-12T18:54:46.830Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T18:54:47.933Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

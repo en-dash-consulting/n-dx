@@ -1,0 +1,9 @@
+---
+id: "b39d3ad8-6c3c-4e9b-9788-d18168348f90"
+type: "capability"
+title: "SourceVision UI Import Graph Enhancement"
+slug: "sourcevision-ui-import-graph-enhancement"
+statement: "The SourceVision UI shows a codebase's import and call graph, its zones and its files, with controls for showing or hiding the import graph, the zone detail slideout, filtering files and analysis-pass feedback."
+criteria: [{"id":"c1","text":"SourceVision shall extract a call graph that tracks function calls, method invocations and cross-module dependencies beyond simple imports."},{"id":"c2","text":"The SourceVision UI shall let the user toggle the import graph visualization on and off."},{"id":"c3","text":"When SourceVision detects changes and resets to a lower analysis pass, the SourceVision UI shall indicate the reset to the user."},{"id":"c4","text":"The n-dx toolkit shall provide a centralized configuration panel for managing experimental or problematic features."},{"id":"c5","text":"The SourceVision Zones page shall present zone details in an interactive slideout instead of a grid layout."},{"id":"c6","text":"The SourceVision Files page shall leave internal tool directories out of its default view."},{"id":"c7","text":"The SourceVision Files page shall provide an option to show all files, including internal tool directories."},{"id":"c8","text":"When the user clicks a zone node in the Zones graph, the SourceVision UI shall open the zone's detail slideout instead of collapsing the node."},{"id":"c9","text":"When the user clicks a zone node's info button, the SourceVision UI shall open the zone's detail slideout instead of collapsing the node."},{"id":"c10","text":"The Zones graph shall give the info button a visual affordance showing that it reveals more information."}]
+source: "smart-add"
+---

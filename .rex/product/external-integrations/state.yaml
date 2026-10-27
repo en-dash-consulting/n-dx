@@ -1,0 +1,44 @@
+schema: "rex/v2"
+items:
+  "08464700-9955-4338-87b6-afea0646a6f8":
+    status: "completed"
+    startedAt: "2026-04-07T14:28:53.235Z"
+    completedAt: "2026-04-07T14:28:53.235Z"
+    metAt: "eab1a62fc4e92eccf421c87d8bc87b9c55212cabe15a6c4bbdab17ec557c64e4"
+  "1fadb108-b5a8-405c-8699-bdba069663fc":
+    startedAt: "2026-10-10T05:13:01.951Z"
+    endedAt: "2026-10-11T12:26:44.957Z"
+    metAt: "d289a23f3b316760e2e3ec1c4372db3b9466a09dc36c2a8d862223a50463d748"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-13T19:53:18.025Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "4ee969d6-cb9e-41c1-85ac-f79b3b6a6ac3":
+    status: "completed"
+    startedAt: "2026-04-07T22:58:12.823Z"
+    completedAt: "2026-04-07T22:58:12.823Z"
+    metAt: "bebf962c1073bef611d30decc655c6a7be1f5cd6a2dfc156133a4fb9f09212c7"
+  "5fd0de0b-02c3-4895-88be-a0b13f404b8e":
+    status: "completed"
+    startedAt: "2026-02-18T09:31:53.840Z"
+    completedAt: "2026-02-18T09:31:53.840Z"
+    metAt: "2b1d0287d69fdba3635cd9c57828ac4622fb861df0ed8998c1c919908563f779"
+  "84562611-0193-412e-8642-7f5b0fab1d85":
+    status: "completed"
+    startedAt: "2026-02-24T18:08:30.754Z"
+    completedAt: "2026-02-24T18:08:30.754Z"
+    metAt: "9c105c13d89bccf9af47466b4eafbf12e6166e7ba39f73be1f0728fa29e2d36c"
+  "9679e55e-a3c0-43e3-b240-1e749613e9cc":
+    status: "completed"
+    startedAt: "2026-02-24T20:33:37.695Z"
+    completedAt: "2026-02-24T20:33:37.695Z"
+    metAt: "368dd61ea2c24c2a142cbd729a8777db546cd23b5b51ec08a3dae7369c9fac61"
+  "d0297439-0e0f-41de-9867-3b08f755a246":
+    startedAt: "2026-04-13T18:35:49.604Z"
+    endedAt: "2026-10-11T12:26:45.743Z"
+    lastModified: "2026-10-12T20:19:16.463Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"
+  "d47b4acc-646f-4ef8-8d43-7387fc0bb5ed":
+    status: "completed"
+    startedAt: "2026-02-09T15:47:21.698Z"
+    completedAt: "2026-02-09T15:47:21.698Z"
+    metAt: "c21ef498f74c177d3c974ed98a96ac160b30599418c09c976d3e8b55610ddc93"

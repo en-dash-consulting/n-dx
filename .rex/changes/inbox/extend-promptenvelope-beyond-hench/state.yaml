@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "6a4c8eac-7d3c-4535-a983-808cd9e04fbb":
+    status: "completed"
+    startedAt: "2026-09-08T14:59:51.215Z"
+    completedAt: "2026-09-08T16:24:30.268Z"
+    endedAt: "2026-09-08T16:24:30.268Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex and sourcevision prompts built through PromptEnvelope (19 + 7 surfaces) with per-section cost attribution via llm-client's shared measurement helpers. Prompt text unchanged apart from removed doubled blank lines. Baseline now reports a per-section breakdown per envelope-built package; census extractor follows local helpers so refactoring text into a helper no longer shrinks the count."
+    appliedAt: "2026-09-08T16:24:30.268Z"
+    needsPlacement: true
+    lastModified: "2026-09-08T16:24:30.294Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

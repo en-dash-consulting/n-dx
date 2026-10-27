@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "5fa5954d-cb5f-4c20-bb15-04aa969f7d03":
+    status: "completed"
+    startedAt: "2026-10-01T16:17:11.420Z"
+    completedAt: "2026-10-01T16:27:11.705Z"
+    endedAt: "2026-10-01T16:27:11.705Z"
+    resolutionType: "code-change"
+    resolutionDetail: "readLogChunk takes { final }. For a run that is not running, it emits the trailing unfinished character at EOF as U+FFFD. utf8CompletePrefixLength no longer holds back 0xC0, 0xC1 or 0xF5 and above. The client stop on a non-advancing next was already shipped in f5d84515."
+    appliedAt: "2026-10-01T16:27:11.705Z"
+    lastModified: "2026-10-01T16:27:13.595Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

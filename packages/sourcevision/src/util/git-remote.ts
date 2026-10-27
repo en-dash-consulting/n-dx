@@ -50,6 +50,7 @@ export type { ParsedGitRemote, RemoteHostKind } from "@n-dx/llm-client";
 export function gitCommand(root: string, args: string[]): string | undefined {
   try {
     return execFileSync("git", args, {
+      windowsHide: true,
       cwd: root,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "cbd8c3bf-9ef4-4c2f-8791-9584a20ee05f":
+    status: "completed"
+    startedAt: "2026-10-09T04:43:05.599Z"
+    completedAt: "2026-10-09T04:48:17.162Z"
+    endedAt: "2026-10-09T04:48:17.162Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Verified and closed by the operator. Run 3aa0f093-3eaf-4c9b-b482-a1ef82d02d49 (claude-sonnet-5-5, review claude-opus-5-5) failed only on the stale-dist test gate: the agent edited hench source without rebuilding dist/. Work is in b8b51e924 (commitMsgWatcherOptions helper + unit test). After rebuilding hench: new and watcher tests 10/10, affected gate 3/3 suites, six static root policy tests pass. b8b51e924 carries no N-DX-Item (runner on main predates the brief's trailer lines); left as is by the operator's decision."
+    appliedAt: "2026-10-09T04:48:17.162Z"
+    lastModified: "2026-10-09T04:48:17.433Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

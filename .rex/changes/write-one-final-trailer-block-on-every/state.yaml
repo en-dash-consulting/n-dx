@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "7a91cfb7-1b41-4336-837f-0d8b2a5aad56":
+    status: "completed"
+    startedAt: "2026-10-09T03:33:05.959Z"
+    completedAt: "2026-10-09T03:44:30.760Z"
+    endedAt: "2026-10-09T03:44:30.760Z"
+    resolutionType: "code-change"
+    resolutionDetail: "New appendTrailerBlock (hench agent/lifecycle/commit-trailers.ts) puts the work commit's N-DX-Status, N-DX, N-DX-Item and Co-Authored-By trailers in one final block, joining the agent's own trailer block when the message ends in one. The PRD-record commit gains an N-DX line. The system prompt's commit step says to write trailers as one block. Tests go through git's trailer parser. hench rebuilt."
+    appliedAt: "2026-10-09T03:44:30.760Z"
+    lastModified: "2026-10-09T03:44:31.270Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

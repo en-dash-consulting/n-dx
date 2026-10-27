@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "873df8ca-5145-40fd-97b7-b3d8549ab6be":
+    status: "completed"
+    startedAt: "2026-10-13T18:55:14.159Z"
+    completedAt: "2026-10-13T18:56:48.308Z"
+    endedAt: "2026-10-13T18:56:48.308Z"
+    resolutionType: "code-change"
+    resolutionDetail: "gateways.md hench row now lists the v2 surfaces re-exported by rex-gateway.ts and the 66 ceiling from architecture-policy.test.js."
+    appliedAt: "2026-10-13T18:56:48.308Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:56:48.592Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

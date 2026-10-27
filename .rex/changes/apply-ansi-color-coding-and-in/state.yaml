@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "1ccc2ffe-076b-4209-8ebb-ccf1ac871a44":
+    status: "completed"
+    startedAt: "2026-05-08T00:48:36.309Z"
+    completedAt: "2026-05-08T01:04:03.074Z"
+    endedAt: "2026-05-08T01:04:03.074Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented rex tree command with ANSI color-coding: completed items in magenta, in-progress items in yellow with ** markers, pending items in neutral. Colors respect NO_COLOR env and non-TTY detection. All colors sourced from @n-dx/llm-client. Tree renders full PRD hierarchy with status icons, progress bars for epics, priorities, timestamps, and metadata. Created tree.ts command handler, updated status-shared.ts to export helper functions, registered command in CLI dispatch and help text. Added 6 tests covering colors, NO_COLOR behavior, deleted item filtering. All tests pass. Committed to feature branch."
+    appliedAt: "2026-05-08T01:04:03.074Z"

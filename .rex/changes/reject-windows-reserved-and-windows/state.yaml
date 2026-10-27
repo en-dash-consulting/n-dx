@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "cbd9e418-7469-4444-a9c9-0eca62876c97":
+    status: "completed"
+    startedAt: "2026-10-07T20:26:01.556Z"
+    completedAt: "2026-10-07T20:32:18.096Z"
+    endedAt: "2026-10-07T20:32:18.096Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added exported isWindowsSafeSegment (folder-tree-serializer.ts, re-exported from store/index.ts); prd-model-writer assertSlug calls it in the planning pass, so the write is refused before any file is touched."
+    appliedAt: "2026-10-07T20:32:18.096Z"
+    lastModified: "2026-10-07T20:32:18.317Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

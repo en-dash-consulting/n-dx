@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "f6f0d98c-c5d3-49a1-8cd9-b5c8d20e909f":
+    status: "completed"
+    startedAt: "2026-10-17T18:49:31.155Z"
+    completedAt: "2026-10-17T18:52:12.014Z"
+    endedAt: "2026-10-17T18:52:12.014Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Carry-over accepts targets that are inventoried files or their parent directories; regression test in tests/integration/imports-go-incremental-carryover.test.ts"
+    appliedAt: "2026-10-17T18:52:12.014Z"
+    shippedIn: "0.10.0"
+    needsPlacement: true
+    lastModified: "2026-10-17T18:52:13.148Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "1a8ba3b8-82eb-4d90-9079-59810cedae7c":
+    status: "completed"
+    startedAt: "2026-06-04T19:45:36.240Z"
+    completedAt: "2026-06-05T18:04:55.512Z"
+    endedAt: "2026-06-05T18:04:55.512Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Wired Google vendor into hench llm-gateway (TIER_MODELS, GOOGLE_MODELS, GoogleConfig exports), fixed resolveAnalyzeTokenEventMetadata in analyze.ts to resolve Gemini model instead of \"unknown\", fixed modelSource determination in prune/reorganize/reshape to include google?.model, added two Google test cases to vendor-model-selection.test.ts."
+    appliedAt: "2026-06-05T18:04:55.512Z"

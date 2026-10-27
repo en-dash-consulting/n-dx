@@ -159,6 +159,7 @@ const SOURCEVISION_SUBCOMMANDS = [
   "reset",
   "workspace",
   "mcp",
+  "pack",
 ];
 
 const NDX_ORCHESTRATION_COMMANDS = [

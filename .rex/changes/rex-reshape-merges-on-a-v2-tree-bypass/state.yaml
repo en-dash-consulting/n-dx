@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "b22d3a8a-7da2-4bcb-afbc-4ca8093b40e5":
+    status: "completed"
+    startedAt: "2026-10-13T03:09:31.124Z"
+    completedAt: "2026-10-13T03:17:54.144Z"
+    endedAt: "2026-10-13T03:17:54.144Z"
+    resolutionType: "code-change"
+    resolutionDetail: "applyReshape takes { changeLayer }; v2 merges go through mergeChanges (commit 84224ba36)"
+    appliedAt: "2026-10-13T03:17:54.144Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T03:17:54.445Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

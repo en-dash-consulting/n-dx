@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "00474be0-22fb-4ea1-802c-f5770696f29a":
+    status: "completed"
+    startedAt: "2026-04-20T15:40:01.374Z"
+    completedAt: "2026-04-20T15:44:55.292Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Detached hench CLI error handling from prd/llm-gateway by importing foundation error primitives directly from @n-dx/llm-client, and added a boundary test to keep cli/errors.ts out of prd/."
+  "b0a511ce-9bfe-47fc-ab6e-1b66d27302d3":
+    status: "completed"
+    startedAt: "2026-04-20T15:45:20.089Z"
+    completedAt: "2026-04-20T15:45:20.089Z"
+    appliedAt: "2026-04-20T15:45:20.089Z"

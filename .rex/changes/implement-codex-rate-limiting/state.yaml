@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "7ad24227-1245-46bf-99e5-7ece2f6aca8c":
+    status: "completed"
+    startedAt: "2026-04-16T16:54:20.429Z"
+    completedAt: "2026-04-16T21:29:18.611Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added onRetry callback to CodexCliProviderOptions and CliProviderOptions. Default writes 'Rate limited — retrying in Xs… (attempt N of M)' to stderr before each rate-limit retry sleep. After exhausting retries on rate-limit, throws actionable ClaudeClientError with guidance instead of raw provider message. Added 4 targeted tests in codex-cli-provider.test.ts."
+    appliedAt: "2026-04-16T21:29:18.611Z"

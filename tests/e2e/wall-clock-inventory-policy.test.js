@@ -18,8 +18,14 @@
  * **Detector 1 — the clock decides a bound.** Requires both:
  *   1. The file reads a clock — `performance.now()`, `Date.now()`, or
  *      `process.hrtime`.
- *   2. An `expect(...)` whose subject names a duration is bounded by a
+ *   2. An `expect(...)` whose subject names a duration — or subtracts a clock
+ *      reading in place, `expect(performance.now() - start)` — is bounded by a
  *      comparison matcher.
+ *
+ * The in-place subtraction is the spelling that slipped past: nothing in
+ * `performance.now() - start` is a duration *word*, so three such budgets
+ * landed in the CodeQL stack's layer 6 unseen, and four older ones turned up
+ * when the detector learned the shape.
  *
  * Both halves are needed. Condition 2 alone catches fixture timestamps compared
  * for other reasons; condition 1 alone catches every file that stamps a fixture
@@ -103,14 +109,28 @@ const DURATION_WORD =
   "|uptime|Uptime|[Rr]enderTime|avgMs|totalMs|runningMs|stuckSince|[a-z]Time\\b|Ms\\b)";
 
 /**
- * An `expect()` whose subject names a duration, bounded by a comparison
- * matcher. The `[^;{}]` runs keep a match inside one statement so an unrelated
- * `expect` further down the test cannot be paired with a duration above it.
+ * A clock reading subtracted in place — `performance.now() - start`,
+ * `Date.now() - startedAt`. The subject names no duration word, but the
+ * difference *is* the duration. The trailing `-` is what keeps a clock
+ * compared against a fixture field, `expect(Date.now()).toBeGreaterThan(at)`,
+ * out of it: that is an ordering, not a bound on elapsed time. No test in the
+ * repo takes an `hrtime`/`bigint` difference, so that spelling is not matched.
+ */
+const CLOCK_DIFFERENCE = String.raw`(?:performance|Date)\.now\(\)\s*-`;
+
+/**
+ * An `expect()` whose subject names a duration or subtracts a clock reading,
+ * bounded by a comparison matcher. The `[^;{}]` runs keep a match inside one
+ * statement so an unrelated `expect` further down the test cannot be paired
+ * with a duration above it.
+ *
+ * No `g` flag: the scan only calls `.test()`, and a global regex carries its
+ * `lastIndex` from one file's match into the next file's scan.
  */
 const CLOCK_BOUNDED_ASSERTION = new RegExp(
-  String.raw`expect\(\s*[^;{}]{0,120}?\w*${DURATION_WORD}\w*[^;{}]{0,400}?` +
+  String.raw`expect\(\s*[^;{}]{0,120}?(?:\w*${DURATION_WORD}\w*|${CLOCK_DIFFERENCE})[^;{}]{0,400}?` +
     String.raw`\.toBe(?:Less|Greater)Than(?:OrEqual)?\(`,
-  "gs",
+  "s",
 );
 
 /**
@@ -272,6 +292,42 @@ describe("wall-clock assertion inventory completeness", () => {
     expect(flagged).toContain("packages/web/tests/unit/server/routes-search.test.ts");
     expect(flagged).toContain("packages/web/tests/unit/server/search-index.test.ts");
     expect(flagged).toContain("packages/rex/tests/unit/core/tree-hardened.test.ts");
+    // The in-place subtraction, once per clock: the layer-6 regex budget that
+    // slipped past the duration-word form, and the older port-occupant probe
+    // bound that the widened detector surfaced.
+    expect(flagged).toContain("tests/unit/file-permissions.test.js");
+    expect(flagged).toContain("tests/unit/web-port-occupant.test.js");
+  });
+
+  it("sees a clock subtracted in the expect subject (detector self-test)", () => {
+    // One probe per spelling the detector was blind to. Each is the statement
+    // as a test would write it, so a narrowing that breaks the shape breaks
+    // this before it breaks the inventory check.
+    const probes = [
+      "expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER);",
+      "expect(Date.now() - started).toBeLessThan(3_000);",
+      "expect(Date.now() - writtenAt).toBeLessThanOrEqual(1_000);",
+      "expect(Math.round(performance.now() - t0)).toBeGreaterThan(0);",
+      "expect(\n      performance.now() - start,\n      'budget',\n    ).toBeLessThan(LIMIT);",
+    ];
+    for (const probe of probes) {
+      expect(probe, probe).toMatch(CLOCK_BOUNDED_ASSERTION);
+    }
+  });
+
+  it("does not see a clock that is compared rather than subtracted", () => {
+    // Condition 2 earning its place for the new shape. An ordering against a
+    // fixture timestamp, a difference of two recorded fields, and an equality
+    // on the difference are not bounds on elapsed time.
+    const probes = [
+      "expect(Date.now()).toBeGreaterThan(record.createdAt);",
+      "expect(record.updatedAt - record.createdAt).toBeGreaterThanOrEqual(0);",
+      "expect(performance.now() - start).toBe(0);",
+      "const at = Date.now() - 90_000;\n    expect(items).toHaveLength(2);",
+    ];
+    for (const probe of probes) {
+      expect(probe, probe).not.toMatch(CLOCK_BOUNDED_ASSERTION);
+    }
   });
 
   it("does not flag the suites that were converted to counters", () => {

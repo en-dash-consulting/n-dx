@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "134b979c-eb41-42c2-b494-6ef795056b95":
+    status: "completed"
+    startedAt: "2026-09-10T19:27:40.242Z"
+    completedAt: "2026-09-10T19:46:10.690Z"
+    endedAt: "2026-09-10T19:46:10.690Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Already implemented by commit d834ab86 but left in_progress when that machine was interrupted; verified against all three acceptance criteria before closing. buildBundle deep-clones the items and calls stripSyncBookkeeping, which recursively deletes BUNDLE_STRIPPED_FIELDS (lastSyncedAt, remoteId) across the whole tree; prd-bundle.test.ts asserts the strip, that lastModified/lastModifiedBy survive it, that the source document is not mutated, and that a defaulted item reads as never-synced local work. Status corrected from this machine, not re-implemented. Note: d834ab86 shipped no changeset — tracked separately."
+    appliedAt: "2026-09-10T19:46:10.690Z"
+    lastModified: "2026-09-10T19:46:10.696Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "c1c8888b-be09-4ba6-9598-144eca831802":
+    status: "completed"
+    startedAt: "2026-10-12T10:41:51.416Z"
+    completedAt: "2026-10-12T10:41:51.416Z"
+    endedAt: "2026-10-12T10:41:51.416Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed by B1.3 (44043b84, run ffee9207, commit cb59756ad): hench completes v2 work through rex completeV2Work, so the last task completes its change and applyOn complete applies it. Closed overnight through rex."
+    appliedAt: "2026-10-12T10:41:51.416Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T10:41:52.968Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

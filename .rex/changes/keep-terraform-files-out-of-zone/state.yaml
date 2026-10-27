@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "43a98ad8-a0e3-4d7e-9ccb-d8ad34fa4927":
+    status: "completed"
+    startedAt: "2026-10-11T05:46:45.101Z"
+    completedAt: "2026-10-11T05:57:25.660Z"
+    endedAt: "2026-10-11T05:57:25.660Z"
+    resolutionType: "code-change"
+    resolutionDetail: "zones.ts prepareScopeAndEdges returns a zoned inventory without language Terraform; analyzeZones uses it throughout, so zones.json (descriptions, insights, inputFingerprint) is identical with and without Terraform."
+    appliedAt: "2026-10-11T05:57:25.660Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-11T05:57:26.550Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

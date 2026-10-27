@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "348adc29-0ba6-4b82-b306-000fb8944c3c":
+    status: "completed"
+    startedAt: "2026-10-08T03:58:07.523Z"
+    completedAt: "2026-10-08T04:05:27.811Z"
+    endedAt: "2026-10-08T04:05:27.811Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added java-scip-compare.mjs plus helpers, operator doc and tests. Indexes absent, so operator commands logged; G2 numbers pending."
+    appliedAt: "2026-10-08T04:05:27.811Z"
+    lastModified: "2026-10-08T04:05:30.077Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

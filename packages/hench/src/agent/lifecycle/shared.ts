@@ -66,6 +66,7 @@ import {
 import { discoverChangedFiles } from "../../validation/changed-files.js";
 import { extractCommitSubject } from "./commit-subject.js";
 import { appendTrailerBlock } from "./commit-trailers.js";
+import { operationInProgress } from "./git-operation.js";
 import { buildPreRunCommitSubject } from "./pre-run-commit-subject.js";
 import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
@@ -2641,6 +2642,12 @@ export interface PrdTreeCommitResult {
    * exact scope of the record still pending, rather than "the tree".
    */
   paths?: string[];
+  /**
+   * Set when the paths were folded into HEAD rather than committed on their
+   * own: the commit HEAD was, and the one that replaced it. A SHA recorded
+   * for the old commit (the review-repair commit) is re-pointed by the caller.
+   */
+  amended?: { from: string; to: string };
 }
 
 async function commitPrdTreeIfStaged(
@@ -2649,6 +2656,14 @@ async function commitPrdTreeIfStaged(
   producer: string,
   report?: SaveFileReport | null,
   itemId?: string,
+  status?: { from: string; to: string },
+  /**
+   * Amend HEAD with these paths under this full message instead of making a
+   * commit of their own — the caller has checked HEAD is the run's own,
+   * unpublished work commit ({@link completionFoldRefusal}). `message`,
+   * `producer` and `status` are then unused: the message already says it all.
+   */
+  amendMessage?: string,
 ): Promise<PrdTreeCommitResult> {
   const rootPaths = await prdPathsToStage(projectDir);
 
@@ -2688,6 +2703,19 @@ async function commitPrdTreeIfStaged(
   }
 
   try {
+    if (amendMessage !== undefined) {
+      const readHead = async () =>
+        (await execStdout("git", ["rev-parse", "HEAD"], { cwd: projectDir, timeout: 10_000 })).trim();
+      const from = await readHead();
+      // The same pathspec rule as below: an amend with paths takes HEAD's tree
+      // plus exactly these paths, and leaves every other index entry staged.
+      await execGitMutation(
+        projectDir,
+        ["commit", "--amend", "-m", amendMessage, "--", ...prdPaths],
+        30_000,
+      );
+      return { staged, paths: prdPaths, amended: { from, to: await readHead() } };
+    }
     // The pathspec is load-bearing. `git commit -m` with no pathspec commits
     // the whole index, so anything the operator had staged before the run —
     // a half-finished `git add -p`, say — landed under hench's own message
@@ -2703,6 +2731,7 @@ async function commitPrdTreeIfStaged(
     // which ends the block and leaves anything after it as body text git will
     // not parse as a trailer.
     const trailers = [
+      ...(itemId && status ? [`N-DX-Status: ${itemId} ${status.from} → ${status.to}`] : []),
       `N-DX: ${producer}`,
       ...(itemId ? [`N-DX-Item: ${itemId}`] : []),
       buildCoAuthoredByTrailerLine(),
@@ -2719,10 +2748,70 @@ async function commitPrdTreeIfStaged(
 }
 
 /**
- * Commit any uncommitted .rex/prd_tree changes produced by the task-completion
- * status update. Called on the autoCommit path only, where
- * performCommitPromptIfNeeded is a no-op and would otherwise leave the
- * metadata dirty in the working tree.
+ * Why the task's completion write cannot ride in HEAD, or null when it can.
+ *
+ * The order a task lands in is: the work is finished, the task is marked
+ * completed, and then the commit is made. When the executor committed its own
+ * work before hench's gates ran, that commit predates the completion, and the
+ * only way to keep the order is to fold the completion into it. That rewrites
+ * a commit, so it is done only when the rewrite cannot reach anyone: HEAD is a
+ * commit this run made on top of where it started, not a merge, not on any
+ * remote, not for some other item, and git is not mid-operation.
+ */
+async function completionFoldRefusal(
+  projectDir: string,
+  startHead: string | undefined,
+  taskId: string,
+): Promise<string | null> {
+  if (!startHead) return "the run recorded no starting commit";
+  const git = (args: string[]) => execStdout("git", args, { cwd: projectDir, timeout: 10_000 });
+  try {
+    const head = (await git(["rev-parse", "HEAD"])).trim();
+    if (!head || head === startHead) return "the run made no commit to fold it into";
+    // `rev-list` rather than `merge-base --is-ancestor`: the exit code does not
+    // always surface as a throw, and a count reads the same either way.
+    const behind = (await git(["rev-list", "--count", `${head}..${startHead}`])).trim();
+    if (behind !== "0") return "HEAD does not descend from the run's starting commit";
+    const parents = (await git(["rev-list", "--parents", "-n", "1", head])).trim().split(/\s+/);
+    if (parents.length > 2) return "HEAD is a merge commit";
+    const remotes = (await git(["for-each-ref", "--contains", head, "--format=%(refname)", "refs/remotes"])).trim();
+    if (remotes) return "HEAD is already on a remote";
+    const items = (await git(["log", "-1", "--format=%(trailers:key=N-DX-Item,valueonly)", head]))
+      .split("\n").map((l) => l.trim()).filter(Boolean);
+    if (items.length > 0 && !items.includes(taskId)) return `HEAD is the commit for ${items[0]}`;
+  } catch (err) {
+    return `git could not describe HEAD (${(err as Error).message})`;
+  }
+  const busy = await operationInProgress(projectDir);
+  if (busy) return `a git operation is in progress (${busy})`;
+  return null;
+}
+
+/**
+ * HEAD's message with the completion's trailers joined to its trailer block:
+ * the status transition, and `N-DX-Item` when the executor left it off — the
+ * commit is being rewritten anyway, and without it rex cannot attribute it.
+ */
+async function completionFoldMessage(
+  projectDir: string,
+  taskId: string,
+  status?: { from: string; to: string },
+): Promise<string> {
+  const message = await execStdout("git", ["log", "-1", "--format=%B", "HEAD"], { cwd: projectDir, timeout: 10_000 });
+  return appendTrailerBlock(message, [
+    ...(status ? [`N-DX-Status: ${taskId} ${status.from} → ${status.to}`] : []),
+    `N-DX-Item: ${taskId}`,
+  ]);
+}
+
+/**
+ * Land the task-completion PRD write.
+ *
+ * When the run's work is already committed — the executor's own commit, or
+ * the review-repair commit after it — the write is folded into that commit,
+ * so the work and its completion are one commit, in that order. Otherwise,
+ * and whenever {@link completionFoldRefusal} says folding is unsafe, it gets
+ * the `chore(prd)` record commit of its own, and the reason is printed.
  *
  * Skips silently when there are no staged changes or when not in a git repo.
  */
@@ -2731,6 +2820,8 @@ async function commitCompletionMetadata(
   taskId: string,
   origin?: RunGitOrigin,
   report?: SaveFileReport | null,
+  status?: { from: string; to: string },
+  startHead?: string,
 ): Promise<PrdTreeCommitResult> {
   // #360's guard, kept ahead of the staging helper so a moved checkout leaves
   // the tree exactly as it was. Reported, never thrown — the metadata staying
@@ -2752,11 +2843,17 @@ async function commitCompletionMetadata(
   // staging the whole `.rex/prd_tree/`, which under the no-concurrent-PRD-
   // writers contract is just this run's metadata, and a v2 tree stages nothing. The message reflects it may span the tree.
   const message = `chore(prd): commit PRD tree changes (task ${taskId} completed)`;
-  const result = await commitPrdTreeIfStaged(projectDir, message, "PRD record (task completion)", report, taskId);
+  const refusal = await completionFoldRefusal(projectDir, startHead, taskId);
+  const amendMessage = refusal === null ? await completionFoldMessage(projectDir, taskId, status) : undefined;
+  const result = await commitPrdTreeIfStaged(
+    projectDir, message, "PRD record (task completion)", report, taskId, status, amendMessage,
+  );
   if (result.error) {
     detail(`Warning: could not commit PRD tree changes: ${result.error.message}`);
+  } else if (result.staged > 0 && amendMessage !== undefined) {
+    detail(`Folded the completion into the work commit (${result.staged} PRD file(s))`);
   } else if (result.staged > 0) {
-    detail(`Committed completion metadata (${result.staged} PRD file(s))`);
+    info(`Committed the completion separately — ${refusal}.`);
   }
 
   // The completion's PRD write also appended the execution log, which hench
@@ -3167,6 +3264,7 @@ export async function performCommitPromptIfNeeded(
   taskId?: string,
   commitWatcher?: CommitMsgWatcher,
   baselineDirty?: string[],
+  priorStatus?: string,
 ): Promise<CommitPromptOutcome> {
   if (autoCommit || run.status !== "completed") return "not-applicable";
 
@@ -3325,8 +3423,12 @@ export async function performCommitPromptIfNeeded(
   //   when the dashboard moved. `itemIdFromTrailer` in rex's
   //   `core/change-commits.ts` unwraps a legacy permalink to the same id.
   // - Co-Authored-By: GitHub co-authorship attribution.
+  // finalizeRun writes "completed" before this prompt runs, so the item
+  // already reads completed above; the status it had before that write is
+  // what this commit records.
+  const statusFrom = priorStatus ?? oldStatus;
   const trailers = buildRunTrailers(run, taskId, {
-    status: oldStatus && newStatus && oldStatus !== newStatus ? { from: oldStatus, to: newStatus } : undefined,
+    status: statusFrom && newStatus && statusFrom !== newStatus ? { from: statusFrom, to: newStatus } : undefined,
   });
   try {
     const { writeFileSync } = await import("node:fs");
@@ -3340,7 +3442,13 @@ export async function performCommitPromptIfNeeded(
     await execGitMutation(projectDir, ["commit", "-F", PENDING_COMMIT_FILE], 30_000);
     info(`Commit created — ${stagedCount} file(s).`);
 
-    // Capture commit attribution and changed files after successful commit
+    // Capture the changed files after a successful commit.
+    //
+    // Nothing is written back to the PRD here. This commit already carries the
+    // task's completion; a write recording its SHA on the item could only land
+    // after it, so every completed run ended in a second `chore(prd)` commit.
+    // The commit names its item in the `N-DX-Item` trailer, which is what rex
+    // attributes by, and the run record lists it.
     if (store && taskId && run.status === "completed") {
       try {
         // Get the commit SHA
@@ -3363,41 +3471,12 @@ export async function performCommitPromptIfNeeded(
             detail(`Captured ${changes.length} file change(s) from commit ${sha.slice(0, 7)}`);
           }
         } catch (err) {
-          // Best-effort: if git diff-tree fails, proceed with attribution
+          // Best-effort: a failed git diff-tree leaves the summary as it was
           detail(`Warning: could not capture changed files: ${(err as Error).message}`);
         }
-
-        // Get commit metadata: hash, timestamp, author, email
-        const format = "%H%n%cI%n%an%n%ae";
-        const metaOutput = await execStdout("git", ["log", "-1", `--format=${format}`, sha], {
-          cwd: projectDir,
-          timeout: 10_000,
-        });
-        const lines = metaOutput.trim().split("\n");
-        if (lines.length >= 4) {
-          const hash = lines[0];
-          const timestamp = lines[1];
-          const author = lines[2];
-          const authorEmail = lines[3];
-
-          // Update PRD item with commit attribution (append to commits array)
-          const item = await store.getItem(taskId);
-          if (item) {
-            const existing = item.commits ?? [];
-            // Check if this commit is already recorded (idempotent)
-            if (!existing.some((c) => c.hash === hash)) {
-              const updatedCommits = [
-                ...existing,
-                { hash, author, authorEmail, timestamp },
-              ];
-              await store.updateItem(taskId, { commits: updatedCommits });
-              detail(`Attribution: recorded commit ${hash.slice(0, 7)}`);
-            }
-          }
-        }
       } catch (err) {
-        // Best-effort: commit attribution failure doesn't block commit flow
-        detail(`Warning: could not record commit attribution: ${(err as Error).message}`);
+        // Best-effort: failing to read HEAD doesn't block the commit flow
+        detail(`Warning: could not read the new commit: ${(err as Error).message}`);
       }
     }
   } catch (err) {
@@ -4553,10 +4632,17 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   // Update PRD status to "completed" immediately after test gate passes.
   // This ensures status is persisted to disk before the next iteration's
   // task selection, preventing re-selection of just-completed tasks.
+  // The status the item had before this write, for the N-DX-Status trailer of
+  // whichever commit lands it. Set only when this run makes the transition.
+  let completionTransition: { from: string; to: string } | undefined;
   if (opts.store && run.taskId && run.status === "completed") {
     const held = completionHold?.outcome === "not-applied" ? completionHold : undefined;
+    const priorStatus = (await opts.store.getItem(run.taskId))?.status;
     const updated = await updateCompletedTaskStatus(opts.store, run.taskId, run, held);
     if (updated) {
+      if (priorStatus && priorStatus !== "completed") {
+        completionTransition = { from: priorStatus, to: "completed" };
+      }
       if (held) held.outcome = "applied";
       detail(
         held
@@ -4596,6 +4682,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
     run.taskId,
     opts.commitWatcher,
     opts.baselineDirty,
+    completionTransition?.from,
   );
 
   // Review repairs: only the autoCommit path needs them swept here. The
@@ -4620,30 +4707,23 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
   }
 
-  // The PRD completion record gets a commit of its own on EVERY path that
-  // would otherwise leave it uncommitted — not just autoCommit, which was
-  // the whole of what this used to cover.
+  // The PRD completion write is landed on EVERY path that would otherwise
+  // leave it uncommitted, and in the order a task lands: work finished, task
+  // marked completed, then the commit.
   //
-  // `updateCompletedTaskStatus` writes the tree a few lines above, and on
-  // the prompt path the commit-attribution write lands *after* the commit it
-  // records. Either way the tree is dirty once the task is done. The
-  // autoCommit path had this second commit; the prompt path only ever got
-  // one by reaching its own `git commit`, and it bows out before that
-  // whenever the executor already committed for itself — no message file, an
-  // empty one, an empty index, or the watcher having fired first. All four
-  // are ordinary endings for a task where the agent commits as it goes, and
-  // every one of them left `prd_tree/` dirty with the task marked completed.
-  // The next autonomous run's pre-run gate then refused to start over a
-  // write hench had made itself: the task was done and the queue was stuck
-  // behind it.
+  // A prompt that committed already carried it, so there is nothing left to
+  // stage. Everywhere else the executor committed its own work before the
+  // completion existed — autoCommit, or a prompt that bowed out because the
+  // agent committed as it went (no message file, an empty one, an empty
+  // index, the watcher having fired first). The write is folded into that
+  // commit, so the task's work and its completion are one commit; only when
+  // folding is unsafe does it fall back to a `chore(prd)` record commit of
+  // its own. Left dirty, the next autonomous run's pre-run gate refused to
+  // start over a write hench had made itself.
   //
   // `declined` is the one exception. A human who said no at the prompt owns
   // the working tree from that point, and landing PRD state they just
   // refused to commit would take the decision back off them.
-  //
-  // Safe after a prompt that *did* commit: those PRD paths rode in that
-  // commit, so there is nothing left to stage — except the attribution
-  // write, which is exactly what this should pick up.
   if (run.taskId && commitPrompt !== "declined") {
     if (run.status === "completed") {
       // Drained here, at the commit point, so the pathspec covers every PRD
@@ -4653,7 +4733,22 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
         run.taskId,
         run,
         opts.store ? takeSaveFileReport(opts.store) : null,
+        // A prompt that committed carried the transition already.
+        commitPrompt === "committed" ? undefined : completionTransition,
+        // A gate-only retry starts at HEAD: its work is the earlier attempt's,
+        // committed from that attempt's base, and is what the completion joins.
+        run.gateOnlyRetry?.base ?? run.startHead,
       );
+      // The fold replaced HEAD; re-point the repair commit this record already
+      // holds for it. What records the commits as they stood before — the
+      // source run of a gate-only retry, `gateOnlyRetry.commits` — keeps the old
+      // SHA, which an amend leaves resolvable by its twin (same author, date and
+      // subject; see `hench show`).
+      const amended = completionMetadata.amended;
+      const review = run.review;
+      if (amended && review && "repairCommit" in review && review.repairCommit === amended.from) {
+        review.repairCommit = amended.to;
+      }
       if (completionMetadata.error) {
         // The task's own work already succeeded and validated — only the
         // follow-up PRD record commit failed to land. That is a pending
@@ -4740,8 +4835,9 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   run.commits = await collectRunCommits(projectDir, run.startHead);
 
   // A commit git cannot tie to this task is invisible to rex's change
-  // evidence. Record it for the run summary rather than amend it: the agent's
-  // commits are its own.
+  // evidence. Record it for the run summary. Only the commit the completion
+  // was folded into gains the trailer (commitCompletionMetadata); amending any
+  // other just to add one would rewrite history for nothing else.
   const missingItem = await findCommitsMissingItem(projectDir, run.commits, run.taskId);
   if (missingItem.length > 0) run.commitsMissingItem = missingItem;
   else delete run.commitsMissingItem;

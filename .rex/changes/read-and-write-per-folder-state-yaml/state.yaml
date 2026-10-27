@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "05447510-b86b-445c-ac6a-b48d24f286aa":
+    status: "completed"
+    startedAt: "2026-10-07T16:32:44.558Z"
+    completedAt: "2026-10-07T16:46:27.471Z"
+    endedAt: "2026-10-07T16:46:27.471Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added rex/src/store/state-writer.ts (load/parse/serialize/save state.yaml, revisedAt reconciliation) and isLockHeld in file-lock.ts; 22 unit tests in tests/unit/store/state-writer.test.ts."
+    appliedAt: "2026-10-07T16:46:27.471Z"
+    lastModified: "2026-10-07T16:46:27.699Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

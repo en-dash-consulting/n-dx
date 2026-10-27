@@ -1,0 +1,22 @@
+{
+  "id": "rex/store/rex",
+  "name": "Rex",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/store/folder-tree-mutations.ts",
+    "packages/rex/src/store/folder-tree-serializer.ts",
+    "packages/rex/src/store/slug-rule-guard.ts",
+    "packages/rex/src/store/targeted-update.ts",
+    "packages/rex/src/store/tree-meta.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/store/folder-tree-serializer.ts",
+    "packages/rex/src/store/slug-rule-guard.ts",
+    "packages/rex/src/store/targeted-update.ts",
+    "packages/rex/src/store/tree-meta.ts"
+  ],
+  "cohesion": 0.42,
+  "coupling": 0.58,
+  "fileCount": 5,
+  "lineCount": 2069
+}

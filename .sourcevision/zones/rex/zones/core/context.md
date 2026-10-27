@@ -5,80 +5,46 @@
 <zone>
 
 Zone: Core (`rex/core`)
-Files: 23, Cohesion: 0.36, Coupling: 0.64
-Description: 23 files, primarily TypeScript
-Entry points: packages/rex/src/cli/commands/health-warning.ts, packages/rex/src/cli/commands/report.ts, packages/rex/src/core/analytics.ts, packages/rex/src/core/facets.ts, packages/rex/src/core/health.ts, packages/rex/src/core/override-escalation.ts, packages/rex/src/core/prd-narrative.ts, packages/rex/src/core/remove-feature.ts, packages/rex/src/core/requirements.ts, packages/rex/src/core/scope-creep.ts, packages/rex/src/core/structural.ts, packages/rex/src/core/timestamps.ts, packages/rex/src/core/transitions.ts, packages/rex/src/core/work-item-link.ts, packages/rex/src/schema/index.ts, packages/rex/src/store/contracts.ts, packages/rex/src/store/folder-tree-index-generator.ts, packages/rex/src/store/folder-tree-store.ts, packages/rex/src/store/markdown-parser.ts, packages/rex/src/store/markdown-serializer.ts, packages/rex/src/store/notion-adapter.ts, packages/rex/src/store/notion-map.ts
-Lines: 6918
+Files: 11, Cohesion: 0.87, Coupling: 0.13
+Description: 11 files, primarily TypeScript
+Entry points: packages/rex/src/cli/commands/fix.ts, packages/rex/src/cli/commands/remove.ts, packages/rex/src/core/delete.ts, packages/rex/src/core/parent-completion.ts, packages/rex/src/core/remove-epic.ts, packages/rex/src/core/remove-feature.ts, packages/rex/src/core/remove-task.ts, packages/rex/src/core/timestamps.ts, packages/rex/src/fix/index.ts, packages/rex/src/fix/tree.ts, packages/rex/src/fix/types.ts
+Lines: 1940
 
 </zone>
 
 <files>
 
-packages/rex/src/cli/commands/health-warning.ts (TypeScript, 46 lines, source)
-packages/rex/src/cli/commands/report.ts (TypeScript, 279 lines, source)
-packages/rex/src/core/analytics.ts (TypeScript, 118 lines, source)
-packages/rex/src/core/facets.ts (TypeScript, 213 lines, source)
-packages/rex/src/core/health.ts (TypeScript, 564 lines, source)
-packages/rex/src/core/override-escalation.ts (TypeScript, 93 lines, source)
-packages/rex/src/core/prd-narrative.ts (TypeScript, 389 lines, source)
+packages/rex/src/cli/commands/fix.ts (TypeScript, 147 lines, source)
+packages/rex/src/cli/commands/remove.ts (TypeScript, 263 lines, source)
+packages/rex/src/core/delete.ts (TypeScript, 42 lines, source)
+packages/rex/src/core/parent-completion.ts (TypeScript, 302 lines, source)
+packages/rex/src/core/remove-epic.ts (TypeScript, 75 lines, source)
 packages/rex/src/core/remove-feature.ts (TypeScript, 286 lines, source)
-packages/rex/src/core/requirements.ts (TypeScript, 402 lines, source)
-packages/rex/src/core/scope-creep.ts (TypeScript, 72 lines, source)
-packages/rex/src/core/structural.ts (TypeScript, 383 lines, source)
-packages/rex/src/core/timestamps.ts (TypeScript, 119 lines, source)
-packages/rex/src/core/transitions.ts (TypeScript, 95 lines, source)
-packages/rex/src/core/work-item-link.ts (TypeScript, 88 lines, source)
-packages/rex/src/schema/index.ts (TypeScript, 87 lines, source)
-packages/rex/src/store/contracts.ts (TypeScript, 323 lines, source)
-packages/rex/src/store/folder-tree-index-generator.ts (TypeScript, 378 lines, source)
-packages/rex/src/store/folder-tree-store.ts (TypeScript, 408 lines, source)
-packages/rex/src/store/legacy-markdown-parser.ts (TypeScript, 460 lines, source)
-packages/rex/src/store/markdown-parser.ts (TypeScript, 589 lines, source)
-packages/rex/src/store/markdown-serializer.ts (TypeScript, 432 lines, source)
-packages/rex/src/store/notion-adapter.ts (TypeScript, 331 lines, source)
-packages/rex/src/store/notion-map.ts (TypeScript, 763 lines, source)
+packages/rex/src/core/remove-task.ts (TypeScript, 140 lines, source)
+packages/rex/src/core/timestamps.ts (TypeScript, 121 lines, source)
+packages/rex/src/fix/index.ts (TypeScript, 462 lines, source)
+packages/rex/src/fix/tree.ts (TypeScript, 44 lines, source)
+packages/rex/src/fix/types.ts (TypeScript, 58 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/rex/src/cli/commands/health-warning.ts → packages/rex/src/core/health.ts {checkStructureHealth}
-  packages/rex/src/cli/commands/health-warning.ts → packages/rex/src/schema/index.ts {StructureHealthThresholds}
-  packages/rex/src/cli/commands/report.ts → packages/rex/src/core/structural.ts {validateStructure}
-  packages/rex/src/cli/commands/report.ts → packages/rex/src/schema/index.ts {SCHEMA_VERSION}
-  packages/rex/src/cli/commands/report.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, ItemLevel}
-  packages/rex/src/core/analytics.ts → packages/rex/src/schema/index.ts {isRootLevel, isWorkItem}
-  packages/rex/src/core/analytics.ts → packages/rex/src/schema/index.ts {PRDItem, ItemStatus, Priority, Requirement}
-  packages/rex/src/core/facets.ts → packages/rex/src/schema/index.ts {PRDItem}
-  packages/rex/src/core/health.ts → packages/rex/src/schema/index.ts {isContainerLevel, isWorkItem, isRootLevel, getLevelLabel, getLevelPlural}
-  packages/rex/src/core/health.ts → packages/rex/src/schema/index.ts {PRDItem, StructureHealthThresholds}
-  packages/rex/src/core/override-escalation.ts → packages/rex/src/schema/index.ts {PRDItem}
-  packages/rex/src/core/prd-narrative.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, ItemStatus, Priority}
-  packages/rex/src/core/remove-feature.ts → packages/rex/src/schema/index.ts {getLevelLabel}
-  packages/rex/src/core/remove-feature.ts → packages/rex/src/schema/index.ts {PRDItem}
-  packages/rex/src/core/requirements.ts → packages/rex/src/schema/index.ts {PRDItem, Requirement, RequirementCategory, RequirementValidationType}
-  packages/rex/src/core/scope-creep.ts → packages/rex/src/schema/index.ts {isContainerLevel}
-  packages/rex/src/core/scope-creep.ts → packages/rex/src/schema/index.ts {PRDItem}
-  packages/rex/src/core/structural.ts → packages/rex/src/schema/index.ts {LEVEL_HIERARCHY, getContainerLevels, isWorkItem}
-  packages/rex/src/core/structural.ts → packages/rex/src/schema/index.ts {PRDItem, ItemLevel}
-  packages/rex/src/core/timestamps.ts → packages/rex/src/schema/index.ts {ActiveInterval, ItemStatus, PRDItem}
-  packages/rex/src/core/transitions.ts → packages/rex/src/schema/index.ts {ItemStatus}
-  packages/rex/src/core/work-item-link.ts → packages/rex/src/schema/index.ts {PRDItem, WorkItemLink}
-  packages/rex/src/store/contracts.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, RexConfig, LogEntry}
-  packages/rex/src/store/folder-tree-index-generator.ts → packages/rex/src/schema/index.ts {PRDItem, LogEntry}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/schema/index.ts {SCHEMA_VERSION}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, RexConfig, LogEntry}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/store/contracts.ts {buildSaveFileReport, mergeSaveFileReports}
-  packages/rex/src/store/folder-tree-store.ts → packages/rex/src/store/contracts.ts {PRDStore, StoreCapabilities, WriteOptions, SaveFileReport}
-  packages/rex/src/store/legacy-markdown-parser.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, ItemLevel, ItemStatus}
-  packages/rex/src/store/markdown-parser.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, ItemLevel, ItemStatus}
-  packages/rex/src/store/markdown-serializer.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, ItemLevel}
-  packages/rex/src/store/notion-adapter.ts → packages/rex/src/schema/index.ts {PRDDocument, PRDItem, RexConfig, LogEntry}
-  packages/rex/src/store/notion-adapter.ts → packages/rex/src/store/contracts.ts {PRDStore, StoreCapabilities, WriteOptions}
-  packages/rex/src/store/notion-adapter.ts → packages/rex/src/store/notion-map.ts {mapItemToNotion, mapNotionToItem, mapNotionToDocument, resolveParentPage, buildStatusGroupMap, validateDatabaseSchema}
-  packages/rex/src/store/notion-adapter.ts → packages/rex/src/store/notion-map.ts {NotionStatusGroup}
-  packages/rex/src/store/notion-map.ts → packages/rex/src/schema/index.ts {SCHEMA_VERSION, isRootLevel}
-  packages/rex/src/store/notion-map.ts → packages/rex/src/schema/index.ts {ItemLevel, ItemStatus, PRDItem, PRDDocument, Priority}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/fix/index.ts {detectIssues, applyFixes}
+  packages/rex/src/cli/commands/fix.ts → packages/rex/src/fix/index.ts {FixAction, FixKind}
+  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/remove-epic.ts {removeEpic}
+  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/remove-feature.ts {preCheckFeatureDeletion, removeFeature}
+  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/remove-task.ts {removeTask}
+  packages/rex/src/cli/commands/remove.ts → packages/rex/src/core/timestamps.ts {computeTimestampUpdates}
+  packages/rex/src/core/remove-epic.ts → packages/rex/src/core/delete.ts {deleteItem, cleanBlockedByRefs}
+  packages/rex/src/core/remove-feature.ts → packages/rex/src/core/delete.ts {deleteItem}
+  packages/rex/src/core/remove-task.ts → packages/rex/src/core/delete.ts {deleteItem, cleanBlockedByRefs}
+  packages/rex/src/core/remove-task.ts → packages/rex/src/core/parent-completion.ts {allChildrenSuccessful, AUTO_COMPLETABLE_STATUSES}
+  packages/rex/src/fix/index.ts → packages/rex/src/core/parent-completion.ts {AUTO_COMPLETABLE_STATUSES, SUCCESSFUL_CHILD_STATUSES, allChildrenSuccessful}
+  packages/rex/src/fix/index.ts → packages/rex/src/core/parent-completion.ts {ParentStatusNode}
+  packages/rex/src/fix/index.ts → packages/rex/src/fix/tree.ts {collectFixItemIds, collectFixTreePostOrder, walkFixTree}
+  packages/rex/src/fix/index.ts → packages/rex/src/fix/types.ts {FixAction, FixItem, FixItemStatus, FixKind, FixResult}
+  packages/rex/src/fix/tree.ts → packages/rex/src/fix/types.ts {FixItem}
 
 </imports>

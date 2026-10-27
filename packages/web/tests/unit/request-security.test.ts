@@ -184,6 +184,18 @@ describe("HTTP request token (per-user)", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
+  it("sends the cookie redirect to the root when the request-target is scheme-relative", () => {
+    // `GET //evil.com/?ndx_token=T` reaches req.url verbatim; the redirect
+    // must stay on this origin even though the token itself was correct.
+    const req = makeRequest("GET");
+    (req as { url?: string }).url = `//evil.com/?ndx_token=${TOKEN}`;
+    const res = makeResponse();
+    expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
+    expect(res.status()).toBe(302);
+    expect(res.headers.get("location")).toBe("/");
+    expect(res.headers.get("set-cookie")).toContain(`ndx_token=${TOKEN}`);
+  });
+
   it("does not accept the query token on a mutation, or a wrong query token at all", () => {
     const post = makeRequest("POST");
     (post as { url?: string }).url = `/api/x?ndx_token=${TOKEN}`;

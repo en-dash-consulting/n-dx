@@ -1,0 +1,26 @@
+schema: "rex/v2"
+items:
+  "05e58f79-5cc3-4c46-86c4-16ee85fadb77":
+    status: "completed"
+    startedAt: "2026-09-22T17:35:15.236Z"
+    completedAt: "2026-09-22T17:52:51.689Z"
+    endedAt: "2026-09-22T17:52:51.689Z"
+    lastModified: "2026-09-22T17:52:52.041Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a125725d-45df-498c-894a-ef1548243e4a":
+    status: "completed"
+    startedAt: "2026-09-22T17:52:52.931Z"
+    completedAt: "2026-09-22T17:52:52.931Z"
+    endedAt: "2026-09-22T17:52:52.931Z"
+    appliedAt: "2026-09-22T17:52:52.931Z"
+    lastModified: "2026-09-22T17:52:53.274Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c4c54811-35f7-4015-9729-6ce876384501":
+    status: "completed"
+    startedAt: "2026-09-22T17:07:48.347Z"
+    completedAt: "2026-09-22T17:24:17.197Z"
+    endedAt: "2026-09-22T17:24:17.197Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added optional disposition (fixed|dropped|offered|deferred) + reason to ReviewFinding in packages/hench/src/agent/analysis/adversarial-review.ts; parser leaves it undefined on absence/invalid value; prompt's verdict table and JSON schema now document it; formatReviewSummary prints it. Old-record fixture + per-disposition unit tests added."
+    lastModified: "2026-09-22T17:24:17.530Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

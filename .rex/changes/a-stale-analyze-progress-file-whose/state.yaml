@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "cdf48383-1831-48f3-8305-dc46e55f6522":
+    status: "completed"
+    startedAt: "2026-10-01T16:40:28.797Z"
+    completedAt: "2026-10-01T17:09:12.433Z"
+    endedAt: "2026-10-01T17:09:12.433Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): ps command-line check in readAnalyzeProgress and the Stop route; commit 912743eb3"
+    appliedAt: "2026-10-01T17:09:12.433Z"
+    lastModified: "2026-10-01T17:09:12.929Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

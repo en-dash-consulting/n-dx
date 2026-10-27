@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "f9cac7fd-8482-4bcb-b215-395cee472c47":
+    status: "completed"
+    startedAt: "2026-10-21T04:21:48.516Z"
+    completedAt: "2026-10-21T04:26:18.327Z"
+    endedAt: "2026-10-21T04:26:18.327Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Delivery & infrastructure panel on the Analyze dashboard and Overview; export ships the artifacts"
+    appliedAt: "2026-10-21T04:26:18.327Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-21T04:26:19.078Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

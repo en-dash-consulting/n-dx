@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ddac7e70-2cec-46ae-91af-467e376f972e":
+    status: "completed"
+    startedAt: "2026-10-11T12:05:14.826Z"
+    completedAt: "2026-10-11T12:26:43.900Z"
+    endedAt: "2026-10-11T12:26:43.900Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Both packages on Graview 0.1.22; the sync, door, resolution, types, snapshot format and declaration moved onto the framework's own features and the workarounds deleted; CI green locally except hench's credential-bound api-effort tests."
+    appliedAt: "2026-10-11T12:26:43.900Z"
+    lastModified: "2026-10-11T12:26:44.163Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

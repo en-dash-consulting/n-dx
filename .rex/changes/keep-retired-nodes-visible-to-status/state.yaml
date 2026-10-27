@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "578265ae-aaa1-4f21-a239-941b49ccd9d8":
+    status: "completed"
+    startedAt: "2026-10-08T04:10:35.389Z"
+    completedAt: "2026-10-08T04:22:40.700Z"
+    endedAt: "2026-10-08T04:22:40.700Z"
+    resolutionType: "code-change"
+    resolutionDetail: "productIndex (tombstone-aware) now backs computeProductStatus, deriveChangeKind callers, computeEdges, computeRealizedBy and resolveNode; retired = deleted + removed by an applied change; fixtures use deleted nodes."
+    appliedAt: "2026-10-08T04:22:40.700Z"
+    lastModified: "2026-10-08T04:22:40.964Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

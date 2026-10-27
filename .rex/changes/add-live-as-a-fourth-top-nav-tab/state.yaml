@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "dfb31a58-442b-4ee2-bbff-d2b0b0e58419":
+    status: "completed"
+    startedAt: "2026-10-01T04:39:02.880Z"
+    completedAt: "2026-10-01T04:52:58.414Z"
+    endedAt: "2026-10-01T04:52:58.414Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Live tab with status dot, count, hover/focus peek; Live view ids and routes registered"
+    appliedAt: "2026-10-01T04:52:58.414Z"
+    lastModified: "2026-10-01T04:52:58.800Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -893,3 +893,99 @@
 
 .analyze-status--ok { color: var(--green); }
 .analyze-status--err { color: var(--red); white-space: normal; }
+
+/* ── Delivery & infrastructure panel ─────────────────────────── */
+
+.delivery-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: 13px;
+}
+
+.delivery-score--good { color: var(--green); }
+.delivery-score--fair { color: var(--orange); }
+.delivery-score--poor { color: var(--red); }
+
+.delivery-overall {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.delivery-overall-score {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.delivery-overall-label { color: var(--text-dim); }
+
+.delivery-dimensions {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delivery-dimension,
+.delivery-dimension-detail > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr) 2.5rem;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.delivery-dimension-score {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.delivery-meter {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.delivery-meter > span { display: block; height: 100%; border-radius: 2px; }
+.delivery-meter--good > span { background: var(--green); }
+.delivery-meter--fair > span { background: var(--orange); }
+.delivery-meter--poor > span { background: var(--red); }
+
+.delivery-infra-counts,
+.delivery-note,
+.delivery-empty {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.delivery-note,
+.delivery-empty { color: var(--text-dim); font-size: 12px; }
+
+.delivery-section h3 { margin: 0 0 var(--space-2); }
+.delivery-section h4 { margin: var(--space-3) 0 var(--space-1); text-transform: capitalize; }
+
+.delivery-dimension-detail {
+  padding: var(--space-1-5) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.delivery-dimension-detail > summary { cursor: pointer; }
+
+.delivery-evidence,
+.delivery-gaps,
+.delivery-suggestions,
+.delivery-infra-group ul {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+  overflow-wrap: anywhere;
+}
+
+.delivery-gaps { color: var(--orange); }
+.delivery-excerpt { font-family: var(--font-mono); color: var(--text-dim); }
+.delivery-confidence,
+.delivery-infra-origin { color: var(--text-dim); }

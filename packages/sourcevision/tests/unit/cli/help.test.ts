@@ -22,6 +22,7 @@ describe("sourcevision CLI help", () => {
     "pr-markdown",
     "git-credential-helper",
     "mcp",
+    "pack",
   ];
 
   it("returns true for all known commands", () => {
@@ -30,6 +31,14 @@ describe("sourcevision CLI help", () => {
       expect(showCommandHelp(cmd)).toBe(true);
       expect(logSpy).toHaveBeenCalledOnce();
     }
+  });
+
+  it("pack: documents the project pack list (add with no language, listed packs marked)", () => {
+    showCommandHelp("pack");
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(output).toContain("add [<lang>]");
+    expect(output).toContain("sourcevision.packs");
+    expect(output).toContain("listed packs marked");
   });
 
   it("returns false for unknown commands", () => {

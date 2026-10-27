@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "21d8ea06-e366-4411-9f2e-ab49b500ede3":
+    status: "completed"
+    startedAt: "2026-10-12T08:26:27.891Z"
+    completedAt: "2026-10-12T08:26:27.891Z"
+    endedAt: "2026-10-12T08:26:27.891Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Fixed by 214ed10c: findActionableWork treats a change holding a live change as a container, gates nested work on every enclosing change; resolveWorkById resolves a task under a nested change (tests)."
+    appliedAt: "2026-10-12T08:26:27.891Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T08:26:28.163Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

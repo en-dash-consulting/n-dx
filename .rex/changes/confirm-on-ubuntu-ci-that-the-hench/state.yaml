@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "4a63ef64-622d-40a5-b948-04dbd306d1f6":
+    status: "completed"
+    startedAt: "2026-08-19T19:02:12.630Z"
+    completedAt: "2026-08-19T19:05:23.911Z"
+    endedAt: "2026-08-19T19:05:23.911Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "Prediction REFUTED, the outcome this task called more valuable. ubuntu's per-package step failed on the first run after the masking fix (32188420459) and went green on the next (32190469600); hench was not green as predicted — three test-runner cases asserted Windows behaviour unconditionally via hardcoded backslash paths — and llm-client failed too, a package the prediction never named. The web half proved untestable rather than confirmed: its two graph-view cases were fixed by a commit ordered earlier than the first run, so the window closed before it opened. Misattributed cause identified (group 1's \"passes on POSIX by construction\" argument holds for paths the code builds, not literals a test hands in) and corrected in feature 214f5636, along with a new third category: llm-client's POSIX tree kill never worked, a production defect with no Windows counterpart since taskkill needs no process group. Limit: per-package counts are unrecoverable — one aggregated step, and job logs are 403 without admin."
+    appliedAt: "2026-08-19T19:05:23.911Z"

@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "1e652885-f8f6-46b1-8fdc-f7ab1cc9b050":
+    status: "completed"
+    startedAt: "2026-04-29T18:55:13.022Z"
+    completedAt: "2026-05-15T13:33:04.769Z"
+    endedAt: "2026-05-15T13:33:04.769Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented all acceptance criteria: (1) N-DX-Status trailer already in shared.ts from prior work; (2) added git interpret-trailers + %(trailers) round-trip tests; (3) created pr-status-trailers.ts extractor + integration tests against fixture branches; (4) trailer already omitted when no status change; (5-9) created commit-msg-watcher.ts with fs.watch() + one-shot setTimeout timer (arms once, cancelled before finalizeRun, timeoutMs=0 disables it), wired into cli-loop.ts, integration tests verify auto-commit at configured timeout, cancellation before expiry, early-write detection, and disabled-timer behavior; (8) added commitMsgTimeoutMs field to HenchConfig (schema/v1.ts + validate.ts) with 300000ms default."
+    appliedAt: "2026-05-15T13:33:04.769Z"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "9a441abb-fc5c-4402-a14d-dfd24b3034e5":
+    status: "completed"
+    startedAt: "2026-10-09T01:19:01.356Z"
+    completedAt: "2026-10-09T02:13:17.416Z"
+    endedAt: "2026-10-09T02:13:17.416Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Four MCP tool modules over new pure core modules product-report.ts and change-place.ts; get_prd_status v2 branch; manifest, unit tests and mcp-transport e2e. Commit b03c3a745."
+    appliedAt: "2026-10-09T02:13:17.416Z"
+    lastModified: "2026-10-09T02:13:17.682Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

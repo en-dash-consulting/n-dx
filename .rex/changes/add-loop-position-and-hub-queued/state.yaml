@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "db56901f-a208-4d31-aad3-c6e4a88cea87":
+    status: "completed"
+    startedAt: "2026-10-14T20:29:25.670Z"
+    completedAt: "2026-10-14T20:58:11.277Z"
+    endedAt: "2026-10-14T20:58:11.277Z"
+    resolutionType: "code-change"
+    resolutionDetail: "hench records RunRecord.loop {mode, iteration, max?} at run start from the three loop drivers; routes-worktrees digests it and GET /api/live exposes it as runs[].loop. Queued execute requests ride the existing hub admission header, narrowed to the proxied project, and are laid over the cached snapshot as queue.queued — no extra I/O."
+    appliedAt: "2026-10-14T20:58:11.277Z"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-14T20:58:11.837Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "5b52f367-ce20-4eb2-a53e-23293ced070f":
+    status: "completed"
+    startedAt: "2026-10-12T09:06:05.326Z"
+    completedAt: "2026-10-12T09:12:24.656Z"
+    endedAt: "2026-10-12T09:12:24.656Z"
+    resolutionType: "code-change"
+    resolutionDetail: "areaOf in prdStatusReport maps each node to its top-level area; test and changeset added."
+    appliedAt: "2026-10-12T09:12:24.656Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T09:12:24.928Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

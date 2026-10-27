@@ -1,0 +1,22 @@
+---
+id: "bf27fa7e-01c4-48f2-9799-c2bc434dc1ef"
+type: "task"
+title: "Agents in ndx work runs see \"Run 'ndx migrate'\" on every rex command and can run the migration unasked"
+slug: "agents-in-ndx-work-runs-see-run-ndx"
+description: "Found by the adversarial review of ad842166 (run 4b2a3fc7). Verdict: should-fix; hench is outside lane-migration, so not fixed there.\n\nScenario: on any v1 project (this repo included), a CLI-provider `ndx work` run has the agent shell out to `rex status`, `rex update`, `ndx status` … Each prints on stderr: \"Deprecated: this PRD uses the v1 layout (prd_tree/). Run 'ndx migrate' to move it to v2; the next release refuses v1 PRDs.\" (packages/rex/src/cli/legacy-layout-notice.ts). An agent in acceptEdits mode may act on it and run `ndx migrate`. On a project already on .ndx/, that runs the model plan pass (paid) and the apply, which replaces prd_tree/ with a v2 tree that hench cannot yet work. On a legacy-layout project the layout step refuses the dirty tree, so the chain stops at step 1.\n\nReachable: yes, through every CLI-provider agent run on a v1 tree. Hench's in-process rex tools (tools/rex.ts) use the library and print nothing; only shelled-out commands are affected.\n\nOptions:\n1. (Recommended) hench sets NDX_LEGACY_NOTICE=off in the environment of the agent session it spawns (cli-loop). Cheap. Risk: none; operators still see the notice in their own shells.\n2. Reword the notice so it addresses the operator (\"an operator runs 'ndx migrate'; it rewrites the whole PRD\"). Cheaper, weaker: agents may still act on it.\n3. Have ndx migrate refuse to run inside a hench run (detect the run env). Stronger guard, but more code.\n\nOvernight 2026-10-12: not run. Option 1 is a hench change, outside stack C's boundary (not hench); option 3 is in core. Decision for Ryan before C3 (#PR 23c) merges: a v1 deprecation notice must not invite an agent to migrate this repository. Recommendation: option 1 in stack B's hench lane, plus option 3 (ndx migrate refuses inside a hench run) in stack C as a second guard."
+acceptanceCriteria:
+  - "A rex command run by an ndx work agent session (CLI provider) on a v1 tree prints no deprecation notice"
+  - "A test spawns the agent's command environment and asserts NDX_LEGACY_NOTICE=off (or an equivalent guard) reaches rex"
+  - "An operator's own rex command on a v1 tree still prints the notice once"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "pr-23"
+  - "lane-migration"
+  - "hench"
+  - "core"
+  - "needs-decision"
+  - "review-2026-10-12"
+source: "ndx-adversarial-review"
+---

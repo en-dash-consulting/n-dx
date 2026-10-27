@@ -1,8 +1,10 @@
 {
   "id": "tests-fixtures",
   "name": "Tests Fixtures",
-  "description": "Non-source files in tests: ci-child-double.mjs, ci-spawn-preload.mjs, docs-build-stub.mjs (+44 more)",
+  "description": "Non-source files in tests: child-double.mjs, spawn-preload.mjs, ci-child-double.mjs (+46 more)",
   "files": [
+    "tests/fixtures/agent-run-env/child-double.mjs",
+    "tests/fixtures/agent-run-env/spawn-preload.mjs",
     "tests/fixtures/ci-child-cleanup/ci-child-double.mjs",
     "tests/fixtures/ci-child-cleanup/ci-spawn-preload.mjs",
     "tests/fixtures/ci-child-cleanup/docs-build-stub.mjs",
@@ -54,8 +56,8 @@
   "entryPoints": [],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 47,
-  "lineCount": 869,
+  "fileCount": 49,
+  "lineCount": 911,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

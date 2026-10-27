@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "4fdeed51-b742-4d6e-a321-42d2be246084":
+    status: "completed"
+    startedAt: "2026-04-23T16:17:13.092Z"
+    completedAt: "2026-04-23T16:54:04.691Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added token-rollup and live-duration columns to the PRD tree view."
+    appliedAt: "2026-04-23T16:54:04.691Z"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "244cbf2b-4043-4021-bcdb-c26daabb3424":
+    status: "completed"
+    startedAt: "2026-10-14T13:52:05.150Z"
+    completedAt: "2026-10-14T14:19:55.512Z"
+    endedAt: "2026-10-14T14:19:55.512Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Hench's rolling window is off under vitest unless a test opts in via _overrideTTY (packages/hench/src/types/output.ts), so agent output reaches the runner through console.log and silent:\"passed-only\" can drop it on green and show it on failure. The prd.md-alongside-tree warning is gone from the rex suite: cli-fix.test.ts seeded .rex/prd.md on top of the tree rex init had just created, and now writes fixtures through the shared writePRD helper. cli-smart-add.test.ts collapses 29 `rex init` spawns into one hoisted template (34 tests unchanged) and tests/e2e/cli-config.test.js collapses 25 identical spawns — 22 `--help` plus 3 `config <dir>` — into two (185 tests unchanged). Measured: rex 95.99s to 80.42s; hench loses the gate prompt and 17 git \"Switched to a new branch\" lines that bypassed console capture."
+    appliedAt: "2026-10-14T14:19:55.512Z"
+    assignee: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-14T14:19:55.823Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

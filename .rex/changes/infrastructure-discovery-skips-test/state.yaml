@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "0e544e97-efc8-456a-8951-15f30f9bfc18":
+    status: "completed"
+    startedAt: "2026-10-21T04:19:25.345Z"
+    completedAt: "2026-10-21T04:21:27.931Z"
+    endedAt: "2026-10-21T04:21:27.931Z"
+    resolutionType: "code-change"
+    resolutionDetail: "IaC walk skips test and fixture directories; regression test added"
+    appliedAt: "2026-10-21T04:21:27.931Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-21T04:21:28.596Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

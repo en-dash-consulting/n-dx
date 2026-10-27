@@ -42,6 +42,15 @@ In-process contract tests that exercise real stores, gateways, and pipelines.
 
 Full CLI/process tests that spawn compiled `dist/` binaries. Root-level e2e tests use plain `.js` (no build step required). Package-internal tests use `.ts`.
 
+### Browser Suites (web)
+
+The web package also has two Playwright suites that drive the built dashboard in headless Chromium. Neither runs under `pnpm test` or in CI; rebuild web and run `npx playwright install chromium` once first.
+
+- `tests/e2e-ui/` — automated and LLM-free: `pnpm --filter @n-dx/web test:e2e-ui`. Its `happy-click/` specs press every safe control on every page and assert the intended effect; the deny list of controls a sweep must never press lives in `happy-click/helpers/click-policy.ts`.
+- `tests/e2e-ui-manual/` — manual, real vendor, video: `pnpm --filter @n-dx/web test:e2e-manual`. Three flows run against your Claude CLI login (and Codex when installed), record video and traces into `test-results/manual/`, and attach the hench run records. It spends tokens and takes 20–60 minutes; run it from a plain terminal, not inside a Claude Code session.
+
+Full rules, knobs and the click policy are in the repo's `TESTING.md` under "Browser suites (web only)".
+
 ### Gateway Admission Criterion
 
 Any new gateway module **must** have a corresponding integration test in the same PR:

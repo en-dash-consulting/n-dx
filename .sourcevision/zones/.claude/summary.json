@@ -1,20 +1,21 @@
 {
   "id": ".claude",
   "name": ".Claude Scripts",
-  "description": "Build, packaging, and CI scripts: iso-map.mjs",
+  "description": "Build, packaging, and CI scripts: iso-map.mjs, config.ts",
   "files": [
-    ".claude/skills/iso-map/scripts/iso-map.mjs"
+    ".claude/skills/iso-map/scripts/iso-map.mjs",
+    "docs/.vitepress/config.ts"
   ],
   "entryPoints": [],
-  "cohesion": 1,
+  "cohesion": 0,
   "coupling": 0,
-  "fileCount": 1,
-  "lineCount": 3268,
+  "fileCount": 2,
+  "lineCount": 3732,
   "riskMetrics": {
-    "cohesion": 1,
+    "cohesion": 0,
     "coupling": 0,
-    "riskScore": 0,
-    "riskLevel": "healthy",
+    "riskScore": 0.5,
+    "riskLevel": "at-risk",
     "failsThreshold": false
   }
 }

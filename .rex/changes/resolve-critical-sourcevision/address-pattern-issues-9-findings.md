@@ -1,0 +1,9 @@
+---
+id: "d4148da9-5f03-4853-90c8-fd19cc2da658"
+type: "task"
+title: "Address pattern issues (9 findings)"
+slug: "address-pattern-issues-9-findings"
+description: "- Client-server architectural boundary is well-maintained except for schema-infrastructure zone violation\n- Cross-cutting performance concerns are integrated into functional zones rather than separated into performance layers\n- Domain boundary success varies dramatically: hench achieves clean layered isolation while web shows architectural sprawl across 29 zones\n- Foundation anti-pattern where ui-foundation contains both infrastructure utilities and application-specific views\n- Inconsistent service abstraction patterns across utility zones - some achieve clean boundaries while others leak implementation details to consumers\n- Inconsistent use of abstraction patterns (hooks vs direct coupling) across similar UI zones indicates need for architectural standardization\n- Zone size distribution shows healthy specialization pattern broken by one oversized catch-all zone that needs decomposition\n- Critical architectural debt concentration in web package: 29 fragmented zones + god-zone pattern + systematic high coupling (12+ zones >0.6) indicates architectural reset needed before incremental improvements\n- Missing abstraction layer pattern spans visualization (charts + navigation), UI foundation (scattered across zones), and service interfaces (inconsistent contract patterns), indicating systematic under-architecture rather than over-engineering"
+priority: "critical"
+source: "sourcevision"
+---

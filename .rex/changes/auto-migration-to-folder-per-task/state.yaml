@@ -1,0 +1,22 @@
+schema: "rex/v2"
+items:
+  "4feb768c-2c8b-42d4-abb1-92fcb755106e":
+    status: "completed"
+    startedAt: "2026-05-07T19:26:13.571Z"
+    completedAt: "2026-05-07T22:14:55.274Z"
+    endedAt: "2026-05-07T22:14:55.274Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented pre-write folder-per-task migration check in ndx add command that detects and transparently migrates non-conforming task structures before persisting items. Migration is idempotent and thoroughly tested."
+  "59a410eb-d550-431f-97aa-66adab334494":
+    status: "completed"
+    startedAt: "2026-05-07T22:15:10.681Z"
+    completedAt: "2026-05-08T00:47:49.780Z"
+    endedAt: "2026-05-08T00:47:49.780Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented timestamped backup snapshots for PRD tree before structural migrations. Created backup-snapshots module with snapshot, prune, list, and restore functions. Integrated into both add.ts and reshape.ts commands with error handling that surfaces backup paths. Added .rex/.backups/ to .gitignore. 9 integration tests all passing."
+  "6c60e804-cafe-4aad-94e7-3787a16222db":
+    status: "completed"
+    startedAt: "2026-05-08T00:47:51.278Z"
+    completedAt: "2026-05-08T00:47:51.278Z"
+    endedAt: "2026-05-08T00:47:51.278Z"
+    appliedAt: "2026-05-08T00:47:51.278Z"

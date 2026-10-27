@@ -1,0 +1,41 @@
+{
+  "id": "sourcevision/analyzers/sourcevision",
+  "name": "Sourcevision",
+  "description": "14 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/archetypes.ts",
+    "packages/sourcevision/src/analyzers/area-naming.ts",
+    "packages/sourcevision/src/analyzers/callgraph-findings.ts",
+    "packages/sourcevision/src/analyzers/callgraph.ts",
+    "packages/sourcevision/src/analyzers/context.ts",
+    "packages/sourcevision/src/analyzers/csharp-imports.ts",
+    "packages/sourcevision/src/analyzers/llms-txt.ts",
+    "packages/sourcevision/src/analyzers/next-steps.ts",
+    "packages/sourcevision/src/analyzers/outbound-detection.ts",
+    "packages/sourcevision/src/analyzers/swift-imports.ts",
+    "packages/sourcevision/src/analyzers/zone-output.ts",
+    "packages/sourcevision/src/export/pdf-report.ts",
+    "packages/sourcevision/src/schema/index.ts",
+    "packages/sourcevision/src/util/merge.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/archetypes.ts",
+    "packages/sourcevision/src/analyzers/area-naming.ts",
+    "packages/sourcevision/src/analyzers/callgraph-findings.ts",
+    "packages/sourcevision/src/analyzers/callgraph.ts",
+    "packages/sourcevision/src/analyzers/context.ts",
+    "packages/sourcevision/src/analyzers/csharp-imports.ts",
+    "packages/sourcevision/src/analyzers/llms-txt.ts",
+    "packages/sourcevision/src/analyzers/next-steps.ts",
+    "packages/sourcevision/src/analyzers/outbound-detection.ts",
+    "packages/sourcevision/src/analyzers/swift-imports.ts",
+    "packages/sourcevision/src/analyzers/zone-output.ts",
+    "packages/sourcevision/src/export/pdf-report.ts",
+    "packages/sourcevision/src/schema/index.ts",
+    "packages/sourcevision/src/util/merge.ts"
+  ],
+  "cohesion": 0.4,
+  "coupling": 0.6,
+  "fileCount": 14,
+  "lineCount": 5737
+}

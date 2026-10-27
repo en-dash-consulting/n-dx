@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "c3c42584-28ba-4e4d-9651-6859e0f80426":
+    status: "completed"
+    startedAt: "2026-10-09T14:31:11.272Z"
+    completedAt: "2026-10-09T14:41:06.619Z"
+    endedAt: "2026-10-09T14:41:06.619Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Dry run counts NOTHING_TO_MODIFY, so place_change and add_item refuse a summary-only modified amendment; place_change adds a hint."
+    appliedAt: "2026-10-09T14:41:06.619Z"
+    lastModified: "2026-10-09T14:41:06.874Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

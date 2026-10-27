@@ -1,0 +1,34 @@
+schema: "rex/v2"
+items:
+  "92a1d68c-15d3-456e-af1e-82725f0e613c":
+    status: "completed"
+    startedAt: "2026-10-02T15:25:14.260Z"
+    completedAt: "2026-10-02T15:25:14.260Z"
+    endedAt: "2026-10-02T15:25:14.260Z"
+    lastModified: "2026-10-02T15:25:16.076Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "999638c7-f926-46d4-8894-1a9546502287":
+    status: "completed"
+    startedAt: "2026-10-02T15:36:05.752Z"
+    completedAt: "2026-10-02T15:50:04.311Z"
+    endedAt: "2026-10-02T15:50:04.311Z"
+    lastModified: "2026-10-02T15:50:04.704Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dbdac45a-14bd-4d1c-9630-df8bb3f7d9b6":
+    status: "completed"
+    startedAt: "2026-10-02T15:25:51.676Z"
+    completedAt: "2026-10-02T15:35:37.062Z"
+    endedAt: "2026-10-02T15:35:37.062Z"
+    resolutionType: "code-change"
+    resolutionDetail: "ViewMeta.pixelIcon + viewPixelIcon; PixelIcon in settings overlay nav/header and bottom-bar gear; robot glyph; CSS; changeset; tests."
+    lastModified: "2026-10-02T15:35:37.459Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e8591691-eb7b-4158-be29-adee856325af":
+    status: "completed"
+    startedAt: "2026-10-02T15:50:05.751Z"
+    completedAt: "2026-10-02T15:50:05.751Z"
+    endedAt: "2026-10-02T15:50:05.751Z"
+    appliedAt: "2026-10-02T15:50:05.751Z"
+    needsPlacement: true
+    lastModified: "2026-10-02T15:50:06.169Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

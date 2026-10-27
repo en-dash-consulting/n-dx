@@ -1,5 +1,400 @@
 # @n-dx/core
 
+## 0.10.0
+
+### Minor Changes
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`27d1f51`](https://github.com/en-dash-consulting/n-dx/commit/27d1f51604a5cf662c74fb3ce46d67c618b65b4a) Thanks [@ryrykeith](https://github.com/ryrykeith)! - 0.10.0 is the v2 migration release. `ndx migrate` moves a v1 PRD (`prd_tree/`) to the v2 product and change layers, `ndx init` starts new projects on v2, and rex commands on a v1 PRD print one deprecation line naming `ndx migrate`; the release after this one refuses v1 PRDs. Every `@n-dx/*` package is versioned together, so they all move to 0.10.0.
+
+### Patch Changes
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`3ee673a`](https://github.com/en-dash-consulting/n-dx/commit/3ee673a8ffbf033f459f7306b1863880f02414cc) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx config` skips `__proto__`, `constructor` and `prototype` keys while merging `.n-dx.json` and `.n-dx.local.json`. A literal `"__proto__"` key in either file used to set the merged object's prototype, so every reader of the project config saw fields the file never wrote as settings.
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`aa7886f`](https://github.com/en-dash-consulting/n-dx/commit/aa7886f0b4069fb6a06a0043d94f1b79b3afa709) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx config <pkg>.<key> <value>` refuses a key with a `__proto__`, `constructor` or `prototype` segment. `ndx config llm.__proto__.polluted x` followed `configs.llm["__proto__"]` onto `Object.prototype` and assigned there, in the CLI's own process; the write was never persisted, but the command now exits non-zero naming the segment and leaves every config file untouched. hench's `setConfigValue` applies the same guard behind its `CONFIG_FIELDS` allowlist.
+  
+  The `ndx work` command that `ndx work --resolve` prints is now correct on Windows for a path that ends in a backslash or contains a quote: backslashes before a `"` or the closing quote are doubled, as the argv rules every Node program decodes with require, so `C:\My Repo\` prints as `"C:\My Repo\\"` rather than `"C:\My Repo\"`.
+  
+  Four regular expressions that were quadratic on hostile input scan linearly: the `icacls` ACE parser behind owner-only config files (the same result on every icacls line; it now rejects a line with a `(` inside a flag group or a `:(` inside an identity, which icacls never prints), the trailing-separator trim in the MCP shim's workspace key, and the project-id slug in `ndx start` and its twin in the hub's new-project page (the same result on every input). `ndx ci`'s data-layer check now escapes every regex metacharacter in a layout directory name rather than only the dot.
+
+- [#838](https://github.com/en-dash-consulting/n-dx/pull/838) [`0f98b3e`](https://github.com/en-dash-consulting/n-dx/commit/0f98b3e0aa53d34e30cdd497538aa2778b4d3677) Thanks [@endash-shal](https://github.com/endash-shal)! - The Analyze dashboard and the Overview page gain a Delivery & infrastructure panel. It shows the SDLC readiness score from `readiness.json`, with each practice's score (tests, CI, CD, rollback, migrations, feature flags, quality gates, observability, agent safety), and the resources in `infrastructure.json` counted by kind. Opened, it lists each practice's evidence and gaps and every resource with the file that declares it. When an analysis has not written either file, it says to run `ndx analyze`. `ndx export` now copies both files, so a static dashboard shows the panel too.
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`166e33f`](https://github.com/en-dash-consulting/n-dx/commit/166e33fc06eee3b00482fa5283eb0e3731af6efe) Thanks [@endash-shal](https://github.com/endash-shal)! - One host and port shape rule for the local LLM endpoint. `@n-dx/llm-client` exports `isPlausibleLlmHost`, `isValidPort` and `describeLocalEndpointProblem`, and the local inference provider refuses a saved `llm.local.host` or `llm.local.port` that fails them before building its URL — a hand-edited `.n-dx.json` used to reach `fetch` unchecked. The dashboard imports the rule instead of carrying a copy, and reports a saved port written as a string as invalid rather than silently probing 1234. `ndx config llm.local.host` (and `llm.local.verifier.host`) refuses a host carrying a path, credentials, a second port or whitespace, and accepts `localhost`, `127.1`, `[::1]` and a LAN name — `127.1` was previously coerced to a number and refused. A parity test holds core's inline copy equal to llm-client's.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`a827aaa`](https://github.com/en-dash-consulting/n-dx/commit/a827aaa8d854d328271ff4411ba0fe6158c3195d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx migrate --apply [--plan=<path>] [--dry-run]` (`rex migrate-apply --plan=<path.json>`) applies a reviewed `ndx migrate --plan` plan, reading `./migration-plan.json` by default, where `ndx migrate --plan` writes. It writes `product/` and `changes/` and removes `prd_tree/` and `tree-meta.json` under one hold of the PRD lock, so the two layouts never sit side by side. Every v1 id is checked by count and id before anything is written and again on the tree read back. Changes the rules placed land on their capability; held changes, and items made after the plan, land in the Inbox, with any model pick recorded as a suggestion only. Release epics become no node, and a `blockedBy` ref to one is repointed at the changes it split into. A `blockedBy` ref to a capability, constraint or area names that node's open changes (a change held for the Inbox counts as open on the product node its v1 parent became, for this rewrite only), a product node's own `blockedBy` moves onto its open changes, and a ref with no open change to name is dropped as met; the cut change lists every rewrite and drop. The first change, "Product map and change layer", records the cut. A held change completed at or before the cut cannot be placed, so `rex health` reports its `change-placed-at-close` as a warning, not an error. So is v1 work completed between plan and apply, which the cut change lists; a held change completed in v2 after apply is still an error. Apply refuses a plan whose model pass stopped, and refuses while `.rex/prd.md`, `.rex/prd.json` or a branch-scoped PRD file sits beside the tree. On a v2 tree it reports so and exits zero. A `prd_tree/` left beside the v2 tree is removed only when it is what an interrupted apply left (it matches the plan's source or, with no plan, every id it holds is in the v2 tree); any other is refused and kept, naming the ids to re-capture, and `--dry-run` says which.
+  
+  `--dry-run` runs apply's checks, including the staged write and read-back, and prints per v1 kind how many items become each v2 type, how many are held for the Inbox and how many metadata values are dropped (`droppedMeta`, `droppedLog`), and each `blockedBy` rewrite and drop with its old and new refs; it writes nothing in the project.
+  
+  Soft freeze: `rex migrate-apply` is a new rex command and `--apply`, `--plan=<path>` and `--dry-run` are new `ndx migrate` flags; the `--plan` and `--out` behaviour of `ndx migrate --plan` and `rex migrate-plan` is unchanged.
+  
+  The v2 writer refuses to turn a folder into a leaf while its `state.yaml` holds top-level keys other than `schema` and `items`, naming the folder and the keys, instead of dropping them. `rex migrate-to-folder-tree` renames a converted `prd.json` to `prd.json.migrated`.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`be77a84`](https://github.com/en-dash-consulting/n-dx/commit/be77a847e3b0805b8e76c0d0ea89bcc0e099d538) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx migrate [dir]`, with neither `--plan` nor `--apply`, runs every migration step the project still needs, in order: the layout move into `.ndx/`, the `prd.md` / `prd.json` conversion to the folder tree, then `rex migrate-plan` (to `--out`, default `./migration-plan.json`) and `rex migrate-apply`. A step already done is skipped, so a failed run resumes where it stopped; `--dry-run` rehearses each step that can.
+  
+  rex commands on a v1 PRD (`prd_tree/` and no `product/`) keep working and print one deprecation line on stderr naming `ndx migrate`; the next release refuses v1 PRDs. The line is dropped under `--quiet`, and `NDX_LEGACY_NOTICE=off` silences it. `ndx ci`, `status`, `plan`, `add`, `recommend`, `refresh`, `work`, `analyze`, `self-heal`, `start`, `web` and `pair-programming` print it once per command, not once per rex process they spawn.
+  
+  Agents are never told to migrate and cannot: every hench run that `ndx work`, `ndx self-heal` and `ndx pair-programming` spawn gets `NDX_AGENT_RUN=1` and `NDX_LEGACY_NOTICE=off`, and `ndx migrate` (bare, `--plan` and `--apply`) refuses while `NDX_AGENT_RUN` is set: an operator runs the migration from their own shell.
+  
+  Soft freeze: bare `ndx migrate` used to exit 1 asking for `--plan`; it now runs the chain. `--plan` and `--apply` are unchanged. `NDX_LEGACY_NOTICE` (`off`) and `NDX_AGENT_RUN` are new environment variables read by rex and core.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`2b00932`](https://github.com/en-dash-consulting/n-dx/commit/2b00932c9219ba7eb18f446493e2549170aafe48) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx migrate --plan` shows the preflight banner and a run summary that lists the `--out` plan as written and says model calls are not counted. `llm.routes` for `prd.migrate.judge` (or `*`) turns the Jev review off.
+  
+  Adds a config key under the soft freeze: `llm.routes` accepts `prd.migrate.judge` (the migration's Jev review), and a route to a tier turns that review off. `ndx migrate --plan` prints the preflight banner and run summary. No flag or MCP tool changes shape.
+  
+  On Windows, the guard that keeps `rex export`, `rex migrate-plan --out`/`--summary` and `rex tree-diff` from writing inside the rex directory now sees through 8.3 short-name aliases such as `RUNNER~1`. It resolved paths with `fs.realpathSync`, which leaves short names unexpanded, so a project or output path written in short form slipped past the check. It now uses `realpathSync.native`; macOS and Linux behave as before.
+  
+  Fixes a CLI guard under the soft freeze (Windows only): the same commands refuse a path they already meant to refuse. No flag or MCP tool changes shape.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`582752e`](https://github.com/en-dash-consulting/n-dx/commit/582752ec5bda44987ab8d9614ec19620e84f3140) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx install-sample` on a v2 project adds the sample as a change with two tasks through `rex add`, instead of writing a `prd_tree/` beside `product/`; `ndx destroy-sample` removes it. A v1 project is unchanged.
+  
+  Changes what a CLI command writes under the soft freeze: on a v2 project `ndx install-sample` and `ndx destroy-sample` write the change layer (`{rex}/changes/`), not `prd_tree/`. No flag changes shape.
+  
+  `rex remove <id>` now works on a v2 PRD, removing a change, task or subtask inside the PRD lock. `ndx destroy-sample` on a v2 project uses it instead of deleting change folders itself, and fails naming the lock holder when another writer holds the lock.
+  
+  Widens a CLI command under the soft freeze: `rex remove` accepts v2 change, task and subtask ids (it refused v2 trees before). No flag or MCP tool changes shape.
+  
+  The first `/api/rex/prd` read after `ndx start` no longer answers 404 on a folder tree: the boot PRD cache is written before the server listens, so a request cannot beat it.
+  
+  Changes a v2 rule under the soft freeze: `change-placed-at-close` is a warning, not an error, for a change the migration held for placement that completed in v1, at or before the plan's cut or between the plan and apply (the cut change lists the latter). A held change that completes in v2 after apply is still an error. A `blockedBy` ref to a product node whose pending work is held in the Inbox now names the held changes instead of being dropped as met.
+  
+  The apply-side fixes on this layer (blockedBy rewrites onto open changes, the guarded `prd_tree/` leftover removal, the dry run listing each rewrite) are described in the `ndx migrate --apply` changeset, migrate-apply.md.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`7fa688f`](https://github.com/en-dash-consulting/n-dx/commit/7fa688f0127249893d469e67716780ab8c1bb15d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex migrate-plan`, `rex migrate-apply --dry-run` and `rex migrate-apply` refuse a v1 tree with an item file the parser cannot read, such as unclosed front matter left by a hand edit or a merge conflict. The refusal names each file. Before this, the store's load dropped the parser's warning, so the plan and the dry run left the item out without saying so, and apply then removed `prd_tree/` along with that item's file. The v1 parser now marks a warning `skipped` when it drops an item, as the v2 reader already did.
+  
+  `rex migrate-apply` and its `--dry-run` print the v2 rule findings on the migrated tree, counted by rule (errors and warnings), as `rex health` then reports them. They are reported, not refused. A test now pins apply's refusal when the tree reads back without a v1 id.
+  
+  `rex migrate-apply` keeps a dissolved release epic's description and acceptance criteria under its line in the cut change's body, and moves its own `blockedBy` onto its open children, so a release's work still waits for the release it depended on.
+  
+  `migrate --apply`: when removing `prd_tree/` or `tree-meta.json` fails after the v2 tree is switched in (a handle held on Windows), apply now says the v2 tree is in place, names the leftovers and the underlying error, and gives the manual step to clear them, instead of throwing the raw error.
+  
+  `migrate --apply`: every leftover `prd_tree/` message now names the leftover and the same manual step (check the v2 tree holds everything in it, then delete it by hand). A failed removal after the switch no longer promises a re-run finishes the job, and a failed removal on an already-v2 apply says the v2 tree is in place instead of throwing the raw error.
+  
+  A migration plan's `metAt` now follows a capability's spec when a later pass redrafts it, instead of keeping the rules-stage draft's hash.
+  
+  `ndx migrate` (the bare chain) now shows the preflight banner, and its `--dry-run` runs no model unless `--with-models` is given
+  
+  `rex migrate-plan`, `rex migrate-apply` and `ndx migrate-layout` refuse inside an agent run (`NDX_AGENT_RUN` set), as `ndx migrate` already does.
+  
+  `rex migrate-to-folder-tree` keeps the PRD title
+  
+  The command wrote the tree but not `.rex/tree-meta.json`, so a migrated project
+  read back as "PRD". It now writes the sidecar with the source document's title.
+  
+  `rex migrate-slugs` on a v2 tree now says slugs are frozen there and applies to v1 trees only, instead of pointing at the v1 `rex migrate-to-folder-tree` command.
+  
+  Placing an Inbox change (`rex change place`) carries the non-tree files in its folder into `changes/<slug>/` with it, and removes the empty Inbox folder; a name clash refuses before anything is written.
+  
+  The v2 writer keeps a moved folder node's extra top-level `state.yaml` keys (keys a newer rex wrote) in its new folder. A node that moves and loses its last child in the same write is refused, naming its old folder and the keys, instead of dropping them.
+  
+  Writes on a v2 tree now stamp `lastModified` and `lastModifiedBy` on every
+  node they change, create or move, as v1 writes do. Before, `update_task_status`,
+  `edit_item`, `add_item` and `move_item` left a node's old stamp in place and
+  gave a new change none, so remote sync and the dashboard read v2 writes as
+  stale. A write that changes nothing stamps nothing. The stamp lands in the
+  node's `state.yaml` row, so a write now also rewrites that file.
+  
+  The rex MCP `get_capabilities` tool now reports `"schemaVersion": "rex/v2"` on a
+  v2 tree. It answered `"rex/v1"` beside `"adapter": "v2-change-layer"`, so a
+  client that reads `schemaVersion` took the tree for v1. A v1 tree still reports
+  `rex/v1`. The change layer store declares its version through the new optional
+  `schemaVersion` on `StoreCapabilities`.
+  
+  `get_product` now answers with a summary by default: each area with its counts
+  of capabilities and constraints by status, defective nodes and open changes.
+  Pass `area` (an id or display id) for that area's capabilities and constraints,
+  or `full: true` for the whole map, the previous default. On a large v2 tree the
+  whole map exceeded what an MCP client accepts and was refused. The
+  `/ndx-capture`, `/ndx-plan`, `/ndx-reshape` and `/ndx-adversarial-review`
+  skills read the summary, then the areas they need.
+  
+  The preflight banner and the dashboard's command effects name `changes/` and `product/` for the PRD on a v2 project instead of `prd_tree/`, which a v2 project does not have.
+  
+  The dashboard server turns off rex's v1-layout deprecation notice for the commands it spawns, so a failing rex spawn on a v1 project shows its real error and not the notice first.
+  
+  `rex next` labels v2 work by type (`[change]`, `[task]`, `[subtask]`), never `[epic]`. On a v2 tree, `level` in MCP and JSON payloads is the v1 projection of `type` and nesting: it stays for compatibility in this release and is deprecated. `type` is authoritative; the release that refuses v1 PRDs removes `level` from every v2 payload.
+  
+  Changes under the soft freeze:
+  - `ndx migrate --dry-run` (the bare chain) runs no model unless the new `--with-models` flag is given.
+  - `rex migrate-plan`, `rex migrate-apply` and `ndx migrate-layout` refuse inside an agent run.
+  - `rex migrate-plan`, `migrate-apply` and its dry run refuse a v1 tree with an item file the parser skipped.
+  - MCP `get_capabilities` reports `schemaVersion: rex/v2` on a v2 tree.
+  - MCP `get_product` answers with a per-area summary by default; `area` and `full: true` reach the detail, and `full: true` is the previous default.
+  - v2 writes stamp `lastModified` / `lastModifiedBy`.
+  - `level` is deprecated on v2 payloads (kept in this release); `rex next` text labels v2 work by type.
+  - The preflight banner and command effects name `changes/` and `product/` on a v2 project.
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`2471bd7`](https://github.com/en-dash-consulting/n-dx/commit/2471bd7263746886671f0c29cb8abe94bf28b8c1) Thanks [@endash-shal](https://github.com/endash-shal)! - The Windows spawn guard now refuses what cmd.exe would actually expand. [#790](https://github.com/en-dash-consulting/n-dx/issues/790) refused a `%NAME%` token only when `NAME` was in the environment, but cmd.exe also expands variables it computes itself (`%CD%`, `%RANDOM%`, `%CMDCMDLINE%`, the undocumented `%__APPDIR__%` and `%__CD__%`, …) and reads the name before a `:~` or `:a=b` modifier, so `%CMDCMDLINE:~-1%` slipped through and expanded to a bare `"` that ended the argument. A token carrying a line break is refused too, since cmd.exe silently drops everything after it. Every cmd.exe invocation passes `/v:off`, and sourcevision's `execFileSyncCli` is llm-client's, so there is one recipe. Those sourcevision spawns (`rex tree`, `ps`) now appear in `claude_commands.log` like every other spawn through these helpers.
+
+- [#839](https://github.com/en-dash-consulting/n-dx/pull/839) [`0e03074`](https://github.com/en-dash-consulting/n-dx/commit/0e0307419bbbf9a6a8a0222908f523ebdfac06ea) Thanks [@endash-shal](https://github.com/endash-shal)! - Windows: no more console windows from n-dx's child processes. `exec()` and `spawnCli` in llm-client gain a `windowsHide` option that defaults to true, and every other production spawn in the monorepo passes it; a new root policy test (`windows-hide-policy`) fails any spawn that does not. The vendor-CLI log `claude_commands.log` is now gitignored by `ndx init` and discounted by hench's uncommitted-work gate, so a fresh project's first agent run no longer refuses completion over it. The Overview page's isometric hero shows its Options button again.
+- Updated dependencies [[`aa7886f`](https://github.com/en-dash-consulting/n-dx/commit/aa7886f0b4069fb6a06a0043d94f1b79b3afa709), [`27b5833`](https://github.com/en-dash-consulting/n-dx/commit/27b583370e486993ec1760d169db8f4461e0f9ef), [`0f98b3e`](https://github.com/en-dash-consulting/n-dx/commit/0f98b3e0aa53d34e30cdd497538aa2778b4d3677), [`ef16b52`](https://github.com/en-dash-consulting/n-dx/commit/ef16b523939f3f33dca5122b52130339cc303b40), [`96bc0a4`](https://github.com/en-dash-consulting/n-dx/commit/96bc0a4bddc1d5c6446e094d29a1b081801b257a), [`2022063`](https://github.com/en-dash-consulting/n-dx/commit/2022063541e100ab26bf82d122eee011216b686d), [`3234e51`](https://github.com/en-dash-consulting/n-dx/commit/3234e51ae4bb72169538bfeb55fcf80e54e9af74), [`0fc868e`](https://github.com/en-dash-consulting/n-dx/commit/0fc868e8884455bb11755ee0c1f72ba4508cc1dc), [`a5c696f`](https://github.com/en-dash-consulting/n-dx/commit/a5c696f3acc9e63a7f5228bc499e64b5c95bd0eb), [`331e040`](https://github.com/en-dash-consulting/n-dx/commit/331e04027029afc39db9b66722fbc1d155d538f3), [`f0547c4`](https://github.com/en-dash-consulting/n-dx/commit/f0547c402f756734ecf85a26365141d6bc806d03), [`a76c462`](https://github.com/en-dash-consulting/n-dx/commit/a76c4623ca1c9917fd5ebcfdd718ca448b36500e), [`1c9ca5e`](https://github.com/en-dash-consulting/n-dx/commit/1c9ca5e4cfcc161657a9958887463b2f8cd37a2a), [`f47ebc5`](https://github.com/en-dash-consulting/n-dx/commit/f47ebc52247e319e1f61e6a77b13701da2c06a8e), [`9ff58a3`](https://github.com/en-dash-consulting/n-dx/commit/9ff58a316861865c0cfe0237b95cbca755375f74), [`380dd67`](https://github.com/en-dash-consulting/n-dx/commit/380dd67fce4a3a4dea57b06681fc9ad3842e0e2f), [`295506c`](https://github.com/en-dash-consulting/n-dx/commit/295506cedd33d8d0d7ddaabf9b453b33a5b71413), [`24e4dba`](https://github.com/en-dash-consulting/n-dx/commit/24e4dba1b2278c4ed2d6309e7fa6a808c5f0ffb0), [`bcb494a`](https://github.com/en-dash-consulting/n-dx/commit/bcb494a54b15ba96c66083129f9191426bcb2b6b), [`6144a9c`](https://github.com/en-dash-consulting/n-dx/commit/6144a9cd36eb62a872b0578dda68016c01f314e9), [`4443ec0`](https://github.com/en-dash-consulting/n-dx/commit/4443ec08e1432dd0648c5e1c8f972408d3bff5c9), [`166e33f`](https://github.com/en-dash-consulting/n-dx/commit/166e33fc06eee3b00482fa5283eb0e3731af6efe), [`a827aaa`](https://github.com/en-dash-consulting/n-dx/commit/a827aaa8d854d328271ff4411ba0fe6158c3195d), [`be77a84`](https://github.com/en-dash-consulting/n-dx/commit/be77a847e3b0805b8e76c0d0ea89bcc0e099d538), [`2b00932`](https://github.com/en-dash-consulting/n-dx/commit/2b00932c9219ba7eb18f446493e2549170aafe48), [`240579c`](https://github.com/en-dash-consulting/n-dx/commit/240579c9200b144629a6069cf9a752d4eaaa1492), [`9e18581`](https://github.com/en-dash-consulting/n-dx/commit/9e185812cb4ec52603e67d6c295568ea5334b4ec), [`6095466`](https://github.com/en-dash-consulting/n-dx/commit/6095466c148ea9437f3263ebf4923c4484037799), [`b0b8e32`](https://github.com/en-dash-consulting/n-dx/commit/b0b8e32d5595265bd257a6f7f2d11587d189fef3), [`b7ae2e1`](https://github.com/en-dash-consulting/n-dx/commit/b7ae2e13d965735747f01d882f6a96d54318bc93), [`1bb77bf`](https://github.com/en-dash-consulting/n-dx/commit/1bb77bf3a8e6935295bcc59686fe79990f7a2a73), [`22a8d63`](https://github.com/en-dash-consulting/n-dx/commit/22a8d632eb780c0ba39340970e990d84c934bc39), [`bf141e2`](https://github.com/en-dash-consulting/n-dx/commit/bf141e29a91a42da1b2b6c184c291650f088ef92), [`f901248`](https://github.com/en-dash-consulting/n-dx/commit/f9012480fce7578a73592eeddc371f472026fed6), [`7e3cded`](https://github.com/en-dash-consulting/n-dx/commit/7e3cdedf02eb5ac2ef6daeaa11e02e20ef8c8725), [`4ce8d35`](https://github.com/en-dash-consulting/n-dx/commit/4ce8d35c2939007e44995d3fc0334863965a0b4c), [`60c910a`](https://github.com/en-dash-consulting/n-dx/commit/60c910a463e935bf6af6715f31a416e2ba1d7050), [`7c12c18`](https://github.com/en-dash-consulting/n-dx/commit/7c12c182e92139a5201affc48343ce00eb442f55), [`a4476cb`](https://github.com/en-dash-consulting/n-dx/commit/a4476cbe72bcc08c2a739d3eb30a68434e6369b9), [`1ce57b0`](https://github.com/en-dash-consulting/n-dx/commit/1ce57b0a9f991d118247806e8f4b1a07bc6561da), [`5036736`](https://github.com/en-dash-consulting/n-dx/commit/5036736f9c2ac584d09bab8cba121f8b531a3f3f), [`8e49fb7`](https://github.com/en-dash-consulting/n-dx/commit/8e49fb7984f76c5efc30a2b0d423e02be55aec92), [`100afd3`](https://github.com/en-dash-consulting/n-dx/commit/100afd3d1de9bbbecf2212e35c3f45ae50fffe1b), [`6becaf1`](https://github.com/en-dash-consulting/n-dx/commit/6becaf1a9863ea1dd585835b1755270501be5a64), [`796c395`](https://github.com/en-dash-consulting/n-dx/commit/796c395e3607c53378572e4af25bfe853537fa60), [`ee61f46`](https://github.com/en-dash-consulting/n-dx/commit/ee61f46e39a4fa763cf44bb20acbd6a8a831fdae), [`bb5c3a8`](https://github.com/en-dash-consulting/n-dx/commit/bb5c3a8242af4d0672e1abffdb2929704af8317b), [`1e68e16`](https://github.com/en-dash-consulting/n-dx/commit/1e68e164223627e1d987ed2a4488a4df6f47a1db), [`94eaddd`](https://github.com/en-dash-consulting/n-dx/commit/94eaddd9b6bb7652033934bb1296f62ac64446b3), [`7806b8b`](https://github.com/en-dash-consulting/n-dx/commit/7806b8bca81d6b776f016f5ac1e98ae255867450), [`c8e9543`](https://github.com/en-dash-consulting/n-dx/commit/c8e9543d95de373d92e0b5ab109317c870b33fc1), [`763f08f`](https://github.com/en-dash-consulting/n-dx/commit/763f08f1b0b76322a17901d4eb00af2b39653728), [`0625c57`](https://github.com/en-dash-consulting/n-dx/commit/0625c57081759d7195798af283a18dc14cc8bee3), [`334737b`](https://github.com/en-dash-consulting/n-dx/commit/334737bd41f40251a6217bfc409e7558509177e1), [`6d20bd4`](https://github.com/en-dash-consulting/n-dx/commit/6d20bd4e52f04a469ba11da408c9cbdba5bf16b6), [`d29704c`](https://github.com/en-dash-consulting/n-dx/commit/d29704ccf8729095614409dddbc354afde1a4bfa), [`5059d70`](https://github.com/en-dash-consulting/n-dx/commit/5059d70192fcb3a313dda6d829c66e7e39bca88f), [`1c042fb`](https://github.com/en-dash-consulting/n-dx/commit/1c042fb2f764c7153fa035c46361413b1fef94c5), [`af2fe02`](https://github.com/en-dash-consulting/n-dx/commit/af2fe02832e7ac2e9a601a3b6983c137ab17a3ef), [`953c449`](https://github.com/en-dash-consulting/n-dx/commit/953c449983359a3ffc0e94d5c1e4e969c897b9ae), [`7c2324e`](https://github.com/en-dash-consulting/n-dx/commit/7c2324e728bd5fed0b34e0a9a0b005f072d6db4f), [`faf4d18`](https://github.com/en-dash-consulting/n-dx/commit/faf4d183cfdb0d3191c688f99e8ea7d2aaf8fcad), [`51e3582`](https://github.com/en-dash-consulting/n-dx/commit/51e35829bb4bcca200d775418daa6fad09b70ec3), [`df60182`](https://github.com/en-dash-consulting/n-dx/commit/df601824a2589d91c43f469cdffcf777cfb9270e), [`c92eb9c`](https://github.com/en-dash-consulting/n-dx/commit/c92eb9ca7114170beda601782aecae71992d40da), [`582752e`](https://github.com/en-dash-consulting/n-dx/commit/582752ec5bda44987ab8d9614ec19620e84f3140), [`6957df6`](https://github.com/en-dash-consulting/n-dx/commit/6957df6c10ddb5a49cc74d82a452470fc4b492f8), [`7fa688f`](https://github.com/en-dash-consulting/n-dx/commit/7fa688f0127249893d469e67716780ab8c1bb15d), [`dd7c1ed`](https://github.com/en-dash-consulting/n-dx/commit/dd7c1ed4fd2f34039b3b11b3416a34fc57d5a82f), [`fb704d4`](https://github.com/en-dash-consulting/n-dx/commit/fb704d4c972b75ab3d5f64e45175d8def66c9a32), [`08de1ee`](https://github.com/en-dash-consulting/n-dx/commit/08de1eeb483ed2429189d3670ea47898b705c301), [`b6a6231`](https://github.com/en-dash-consulting/n-dx/commit/b6a62314c60727282da817354d42ddd1bc0a308b), [`a956d1f`](https://github.com/en-dash-consulting/n-dx/commit/a956d1faca55705049d1e1f8c86f658faaeda5e4), [`92161a4`](https://github.com/en-dash-consulting/n-dx/commit/92161a4b72c443a60f677c1e30892d10dbac636b), [`8ead882`](https://github.com/en-dash-consulting/n-dx/commit/8ead882b2bf9d64e9f982f1d6de582f30e3e6494), [`2471bd7`](https://github.com/en-dash-consulting/n-dx/commit/2471bd7263746886671f0c29cb8abe94bf28b8c1), [`0e03074`](https://github.com/en-dash-consulting/n-dx/commit/0e0307419bbbf9a6a8a0222908f523ebdfac06ea)]:
+  - @n-dx/hench@0.10.0
+  - @n-dx/web@0.10.0
+  - @n-dx/rex@0.10.0
+  - @n-dx/sourcevision@0.10.0
+  - @n-dx/llm-client@0.10.0
+  - @n-dx/graview@0.10.0
+
+## 0.9.1
+
+### Patch Changes
+
+- [#737](https://github.com/en-dash-consulting/n-dx/pull/737) [`1376e60`](https://github.com/en-dash-consulting/n-dx/commit/1376e6070399f5921431f24f2e6d88550b2b3800) Thanks [@endash-shal](https://github.com/endash-shal)! - Shrink the generated `AGENTS.md` so Codex reads all of it
+  
+  Codex concatenates `AGENTS.md` from the repository root down to the working
+  directory and stops at `project_doc_max_bytes`, dropping the rest with no
+  error. The root file had grown to 27 KB of a ~32 KiB budget, so a session
+  under a package with its own `AGENTS.md` lost most of that package's
+  guidance.
+  
+  The shared guidance now keeps the rules and sends the reasoning to
+  `docs/architecture/`: the spawn-versus-gateway signal table and the
+  command-pair concurrency table (both already in the architecture overview),
+  the PRD lock's enforcement detail and the two export carve-outs (already in
+  the PRD write-concurrency page), and the derived-file rows of Key Files,
+  which move to a new `docs/architecture/generated-files.md`. Nothing is
+  dropped — each cut leaves the rule in place and links to the fuller text.
+
+- [#787](https://github.com/en-dash-consulting/n-dx/pull/787) [`26d68a9`](https://github.com/en-dash-consulting/n-dx/commit/26d68a9c6bdbe1de498b43a777d517e75e1caecf) Thanks [@endash-shal](https://github.com/endash-shal)! - `assignee` can now be written, not only read. The field has been on the item schema and honoured by task selection for some time — `matchesAssignee` inherits it down the parent chain and `ndx work --mine` filters on it — but nothing exposed a way to set it, so hand-editing frontmatter was the only route.
+  
+  `rex update <id> --assignee="<name>"` sets it and `--assignee=` removes it, matching how `--source` behaves. MCP `edit_item` and `add_item` both take an `assignee` parameter, and on `edit_item` an empty string removes it so an item can be unassigned without touching files by hand. The value is trimmed on the way in, because selection matches it exactly.
+  
+  The v2 layout is covered too: `addChangeNode` carries `assignee` onto changes, tasks and subtasks, so a v2 PRD is not left with the same read-only field the v1 one had.
+  
+  No storage change was needed — the folder-tree serializer already round-tripped the field as an unknown extra, and v2 already routed it into `state.yaml` from `ItemStateSchema`.
+
+- [#747](https://github.com/en-dash-consulting/n-dx/pull/747) [`0e674d5`](https://github.com/en-dash-consulting/n-dx/commit/0e674d5b49ce61ea0c8979faf0e99c58bdbc936d) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx ci` lets any project opt in to restricted-import rules. Set
+  `ci.restrictedImports` in `.n-dx.json` to a list of
+  `{ "module": "node:child_process", "allow": ["src/lib/exec.ts"] }` rules: the
+  architecture-policy step fails on a file that imports the module outside its
+  allow list, naming the file, the module, the rule and how to allow it. With no
+  rule the step reports skipped. On the n-dx monorepo the step still enforces
+  `child-process-allowlist.json`, now as one instance of the same rule.
+  
+  The scan covers every JS and TS module flavour (`.js .mjs .cjs .jsx .ts .mts
+  .cts .tsx`) and, inside a git work tree, only the files git would commit, so
+  gitignored build output and agent worktrees are not flagged. A `.n-dx.json` or
+  `.n-dx.local.json` that is not valid JSON fails the step instead of reading as
+  "no rule configured".
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`c286985`](https://github.com/en-dash-consulting/n-dx/commit/c286985d3c05cbc18746ca7c854835e1a89f2acc) Thanks [@endash-shal](https://github.com/endash-shal)! - The three `.claude/rules` files are pointers now, so each seam registry and the
+  web gateway boundary have one copy — the `packages/<pkg>/AGENTS.md` section
+  every assistant reads — instead of two.
+  
+  `tests/e2e/instruction-alignment.test.js` no longer pins the rule files against
+  their AGENTS.md copies row for row. It holds every file in `.claude/rules/` to
+  being a pointer instead, whatever the file is named: no table row, a named
+  `packages/<pkg>/AGENTS.md`, a title that matches a section in the file it names,
+  and no instruction to create another rule file. A new
+  `.claude/rules/rex-zone-policy.md` carrying a policy table now fails; previously
+  only `*-injection-seams.md` names were checked, so any other name slipped
+  through with content Claude Code alone could read.
+
+- [#653](https://github.com/en-dash-consulting/n-dx/pull/653) [`115ce81`](https://github.com/en-dash-consulting/n-dx/commit/115ce81c49b2e88f9704c11038e49a20dfb4197c) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The README's Rex MCP tool list now names `claim_task`, `release_task` and `get_token_usage`.
+
+- [#647](https://github.com/en-dash-consulting/n-dx/pull/647) [`c044be1`](https://github.com/en-dash-consulting/n-dx/commit/c044be1a0c74959c8642cde6215c9c00a982ef97) Thanks [@dnaniel](https://github.com/dnaniel)! - The Graview declaration n-dx emits now carries a design, as data: a glance and page groups on every kind, computed fields (open changes and zones per capability, open tasks, runs and tokens per change, components per zone), a brand from one accent with a hue per kind and the n-dx mark, a home written as blocks, card, row and page blocks for capabilities, changes, zones and runs, and seven titled places: changes by status, runs by outcome, where capabilities live in code, what binds what, when changes closed, needs attention, and spend. `graview check` is clean on it.
+  
+  `ndx graview serve .` emits and runs the product face on the fresh projection, with `NDX_GRAVIEW_DIR` pointing at the files, instead of the bare `graview serve`, which is the store's wire and draws nothing. The face is `@n-dx/graview-face`, published on its own and depended on by no other n-dx package (a shell, home and record pages in n-dx's own words over the derived ones); it is found beside the adapter or installed, or named by `graview.app` in the project config. `--no-face` keeps the bare store.
+
+- [#647](https://github.com/en-dash-consulting/n-dx/pull/647) [`9667351`](https://github.com/en-dash-consulting/n-dx/commit/96673514addc91bf03a280b83bb895d9b0e4100b) Thanks [@dnaniel](https://github.com/dnaniel)! - `ndx graview emit` projects every source file by default (`--no-files` or `graview.includeFiles: false` leaves them out), and ties each one to the work: a commit to the files it changed (`changed`) and a capability to the files its realizing commits changed (`livesIn`), from the same commit-file read that already placed capabilities in zones. A capability's page lists the files it lives in, and a file's page lists its zone, the capabilities living there and the commits that changed it.
+
+- [#647](https://github.com/en-dash-consulting/n-dx/pull/647) [`2cd2e40`](https://github.com/en-dash-consulting/n-dx/commit/2cd2e40b5927eb23a9633aaddc37bbce559c3101) Thanks [@dnaniel](https://github.com/dnaniel)! - New package `@n-dx/graview`: a read-only projection of an n-dx project into [Graview](https://graview.dev). `ndx graview emit .` writes a `graview-document` declaration (the kinds area, capability, constraint, change, task, release, zone, component, run and commit, with every stored and derived rex relation as a typed edge, five titled lenses and two rules) and a `{nodes, edges}` seed snapshot built from the rex PRD model, sourcevision's zones and components, and hench's run records. `ndx graview check|describe|serve|mcp .` re-emit and spawn the `graview` CLI on the files, so the graph is never older than the tree on disk; `serve` is the store's HTTP and live WebSocket wire that a Graview face connects to, and `mcp` is read-only.
+  
+  No n-dx package depends on `@graview/*`: the binary is a peer tool resolved from `graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH, the installed product face's own `graview`, then `npx -y graview@0.1.20`. Output lands under the layout's new `graviewDir` (`.ndx/graview` or `.graview`), which `ndx init` now gitignores; nothing is written under the rex, sourcevision or hench directories, and the N-DX-Item trailer cache `computeRealizedBy` keeps goes under the graview dir too. File nodes are opt-in (`--files`).
+  
+  Commits and releases come from git for every tree, v1 included: each commit on main whose `N-DX-Item` trailer names a change or task is a `commit` node (subject, author, date) that `landedFor` it, and a finished change with no stamped `shippedIn` ships with the first release tag containing its landing, so each `release` is dated by its tag and counts what it shipped. The caches go under the graview dir.
+  
+  A v1 tree projects the product layer rex's migration plan proposes (the plan's rules stage, pure and deterministic): an epic is an area, a feature with completed work a capability with a template statement, a constraint-shaped feature a constraint, the work under them changes placed on them, the rest in the Inbox. Every product node from the plan says `proposed`, and `graview.proposeProductLayer: false` projects the tree as changes only.
+
+- [#647](https://github.com/en-dash-consulting/n-dx/pull/647) [`9e5fc39`](https://github.com/en-dash-consulting/n-dx/commit/9e5fc3965b81d5d3d78949ed33c67b118add8c99) Thanks [@dnaniel](https://github.com/dnaniel)! - The Graview projection carries rex's `lastModified` and `lastModifiedBy` on every change and task: the version a two-way sync agrees on. `ndx graview info .` names where the projection lands, which graview binary runs, and the hub's per-project rex MCP endpoint a product face writes back through; `ndx graview serve .` hands that face `NDX_REX_MCP_URL`, `NDX_TOKEN_FILE`, `NDX_PROJECT_ROOT` and `NDX_GRAVIEW_CLI` beside `NDX_GRAVIEW_DIR`. The sync loop itself runs in the product face (`@n-dx/graview-face`), because Graview's `SyncEngine` is a Graview interface and no n-dx package depends on `@graview/*`; rex stays the single PRD writer, and every push is a rex MCP write under the file lock and the execution log.
+
+- [#623](https://github.com/en-dash-consulting/n-dx/pull/623) [`090e111`](https://github.com/en-dash-consulting/n-dx/commit/090e111efc45edac8a0bcdf420fd55b2baabc117) Thanks [@mikemikimike](https://github.com/mikemikimike)! - Filter credential-shaped environment variables before launching vendor CLIs,
+  including retries and cross-vendor reviewers, while retaining the active
+  vendor's authentication, including Claude's active Bedrock and Vertex modes.
+  An explicit `hench.guard.env.allow` entry permits the matching variables to
+  reach hench runs and the cross-vendor reviewer; projects that need additional
+  credentials for tests or MCP servers must opt in there. One-shot completions
+  from rex, sourcevision and the dashboard always use the default filter.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`17257ac`](https://github.com/en-dash-consulting/n-dx/commit/17257acdcd976fae362ee09488bc2ddebebe2992) Thanks [@ryrykeith](https://github.com/ryrykeith)! - On a v2 tree, `rex health` exits 1 when a tree rule reports an error or the reader skipped a node; warnings alone exit 0. `ndx ci`'s structure-health step gates on that exit code and shows error, warning and skipped-node counts instead of "score: undefined". v1 is unchanged.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`3f50210`](https://github.com/en-dash-consulting/n-dx/commit/3f50210529ca205d7791cb798ade0162faf8debc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Review is now a project setting: `hench.review.mode` (`off`, `self`, `pair`;
+  default `off`), `hench.review.vendor` (`claude` or `codex`; unset means the
+  other one) and `hench.review.rounds` (1-3, default 2). `self` runs the review
+  pass exactly as `--review` does; `--review`, `--no-review` and a task's saved
+  `run.review` still win. `pair` is recognised but pair review is not built yet,
+  so it runs no review and says so — it never falls back to self review. Pair
+  mode is refused when the reviewer is the executor's own vendor, the executor is
+  not claude or codex, or the provider is `api`. `ndx config` rejects values
+  outside those sets, and `ndx work --resolve` reports the three settings under
+  `review`, each with the key that supplied it.
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`3e6c353`](https://github.com/en-dash-consulting/n-dx/commit/3e6c353d31a11130b1bef37419b45c6458080e76) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx migrate --plan` writes the v1 → v2 migration plan out for review.
+  
+  The classification, data and model passes already existed and were wired to
+  nothing. `rex migrate-plan` (which `ndx migrate --plan` spawns) now reads the
+  PRD under the store lock, runs the pipeline over it, and writes two files to an
+  operator-chosen path: the JSON plan keyed by v1 item id, which the apply step
+  will read, and a Markdown summary listing every v1 item with its target, the
+  proposed areas with their notes, the proposed constraints, the dissolved
+  release epics and the review queue.
+  
+  Nothing is written to the PRD — planning is a pure read. Both output paths are
+  refused anywhere inside the rex directory, under the same rule `rex export`
+  applies: a JSON document at `.rex/prd.json` would be read *as* the PRD on a
+  checkout without the tree.
+  
+  Re-planning reads the plan already at `--out` and reuses every model answer
+  whose item, question and model still match, and reuses its cut time unless
+  `--cut-at` overrides it — so an unchanged tree re-plans into a byte-identical
+  file without asking anything. That is also the retry path after a seam error:
+  the pass is recorded incomplete, the answers already paid for are kept, and the
+  next run continues from them.
+  
+  `--rules-only` runs the rules alone, free and fully deterministic. Otherwise
+  `rex.placement.models` chooses the placement tiers (text by default) and Jev
+  reviews the plan unless `--no-jev-review`. A text-only placement suggests
+  rather than places: under `autoAccept: agree` a held change stays held with the
+  suggestion recorded for a reviewer.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`65731af`](https://github.com/en-dash-consulting/n-dx/commit/65731afcf429ea011d2bb1ee4e5f537a6739b0e4) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The v2 migration plan can have Jev review it. Review runs when `rex.placement.models` is `jev` or `both`, or the `jevReview` option is set, and needs a TypeSafe key. Without a key the pass is skipped with one warning. Each item gets one Jev request (task class `prd.migrate.judge`) that batches its questions: a held item's kind and placement, whether an area's title names a job a user does, whether each criterion states product behaviour, and whether each linked test exercises its criterion. Each judged entry records its lowest confidence. The plan summary gains a review queue (held items first, then entries by ascending confidence) and counts of what Jev flagged and dropped. A test link Jev judges irrelevant is dropped only under `autoAccept: confident`. Otherwise it is flagged. A different kind or a process criterion is flagged, never applied. After Jev drops a link, review is re-checked against the approved spec hash, as after any redraft. Migrations may define `summarize`, which rebuilds the summary after every pass.
+
+- [#800](https://github.com/en-dash-consulting/n-dx/pull/800) [`d3a5d3b`](https://github.com/en-dash-consulting/n-dx/commit/d3a5d3b37e906d7bc5e43be8706f2ca5fd966086) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx move <id> [dir]` acts on the directory it names
+  
+  `handleMove` checked `process.cwd()` for `.rex` and then forwarded its
+  arguments unchanged, so the trailing `[dir]` its own help documents was never
+  used for the precondition. Run from anywhere that is not itself a project, the
+  command refused with `NDX_CLI_NOT_INITIALIZED` naming the current directory
+  even though the argument named a real one — the same defect fixed for
+  `ndx log`, which the log fix recorded as still open here.
+  
+  Both handlers now share one `resolveTrailingDir` helper, which takes the
+  second positional rather than the last: with no directory given the last
+  positional is the item id or the event name, so `ndx move abc --parent=def`
+  would otherwise look for a project at `./abc`. Delegation to `rex` is
+  unchanged — its `move` and `log` cases already read the same shape.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`7948ccd`](https://github.com/en-dash-consulting/n-dx/commit/7948ccd08e32444fc7fc43c8dd4570d3fe2a83c8) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `ndx pair-programming` now reviews with the configured reviewer. It takes the
+  vendor from `hench.review.vendor` (an invalid or primary-vendor value warns and
+  keeps the default), passes `llm.<reviewer>.reviewModel` then `llm.reviewModel`
+  to the reviewer CLI as `--model`, and runs up to `hench.review.rounds` (default
+  2) review and remediation cycles instead of one. Each round prints the reviewer
+  and model it used.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`a19f176`](https://github.com/en-dash-consulting/n-dx/commit/a19f1763d2d609be1957a1562f7083ef785a62bc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Pair review now runs end to end. With `hench.review.mode: "pair"`, the other
+  vendor's CLI reviews the diff and reports; must-fix findings resume the
+  executor's session to fix them, up to `hench.review.rounds`, and lesser findings
+  are captured to the PRD. `GET /api/llm/config` reports `review.pairSupported:
+  true`, so Robot Wrangler enables the Pair card. The review modes are documented
+  in the configuration guide.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`323ceca`](https://github.com/en-dash-consulting/n-dx/commit/323ceca26bf13747a83dfc71007e6c013fc91191) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `hench.review.mode: "pair"` now reviews. After a task validates, the other
+  vendor's CLI starts a fresh session, reads the task, the changed files and the
+  diff, edits nothing, and writes the findings report. The review runs on
+  `llm.<reviewer>.reviewModel`, then `llm.reviewModel`, then the vendor default,
+  and the run record carries `mode: "pair"`, the reviewer vendor and model. Until
+  the fix loop lands, every finding, must-fix included, is captured or queued and
+  the commit is not blocked. A reviewer CLI that is missing or signed out skips
+  the review with a warning under `--review-optional`, as before.
+
+- [#747](https://github.com/en-dash-consulting/n-dx/pull/747) [`4824bd7`](https://github.com/en-dash-consulting/n-dx/commit/4824bd7c8bc9919a24918a68a31441c3f3be3d03) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `/ndx-capture`, `/ndx-plan`, `/ndx-reshape`, `/ndx-work` and
+  `/ndx-adversarial-review` now find the PRD layout first (`get_prd_status`
+  answers `"layout": "v2"` on a v2 tree) and branch on it, for Claude and Codex
+  alike. On a v2 tree they pass `type` to `add_item`, never `level`, and create
+  changes rather than epics or features; a capture left in the Inbox shows its
+  suggested placement from `place_change`; `/ndx-reshape` restructures with
+  `place_change`, `move_item` and `merge_items` and never asks `edit_item` for a
+  level change; the overlap checks and commit steps cover `.rex/changes/` and
+  `.rex/product/`, `state.yaml` files included. On a v1 tree every skill behaves
+  as before. `tests/e2e/skill-prd-layout.test.js` pins both branches.
+  
+  `/ndx-reshape`'s description now reads "Restructure the PRD — regroup,
+  reparent, merge overlaps and place changes", without the level changes a v2
+  tree refuses, and the skills guide no longer says the PRD skills are v1-only.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177) Thanks [@dependabot](https://github.com/apps/dependabot)! - Production dependencies bumped: zod 4, ink 8, react 19.3, @anthropic-ai/sdk 0.131, @modelcontextprotocol/sdk 1.32.1 and pdfkit 0.20. TypeScript stays on 6.x because sourcevision parses source with its compiler API, which TypeScript 7 does not ship, and preact stays on 10.x until its web test and leave-guard changes are worked through. Schemas move to zod 4's two-argument `z.record`; reserved and loosely-typed state keys are declared optional, since zod 4 no longer treats a missing `z.unknown()` key as optional; and the SDLC evidence list keeps its at-least-one rule as a tuple so it still infers the non-empty type.
+
+- [#800](https://github.com/en-dash-consulting/n-dx/pull/800) [`4023e36`](https://github.com/en-dash-consulting/n-dx/commit/4023e36454b4cadb6f48e08bfe3cd17a2272e622) Thanks [@endash-shal](https://github.com/endash-shal)! - Register `ndx iso` in the command registry
+  
+  `cli.js` dispatched `iso` and `help.js` carried its help entry, but
+  `COMMAND_REGISTRY` had no row for it, so `getOrchestratorCommands()` omitted
+  it and every registry-driven check was blind to the command. Typing `ndx is .`
+  suggested `ndx ci, ndx fix, ndx sv` and never the command actually meant.
+  
+  `iso` now has a registry row, a `COMMAND_EFFECTS` declaration, and a row in
+  both command references. `ndx is .` suggests `ndx iso` first.
+
+- [#751](https://github.com/en-dash-consulting/n-dx/pull/751) [`404a454`](https://github.com/en-dash-consulting/n-dx/commit/404a4541b7a9a461b1bdcca7d8b7e692e724f079) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The release workflow's verify step no longer skips when npm has not caught up.
+  It decides whether the run published from the changesets action's `published`
+  output, waits with a bounded backoff for every package to appear on npm, and
+  fails with a clear error if one never does. `child-process-allowlist.json` lists
+  the new `scripts/verify-release-sync.mjs`, which drives `npm`, `git` and `gh`.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`57698aa`](https://github.com/en-dash-consulting/n-dx/commit/57698aa879627bb15c0d889595501198137c1a86) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The cross-vendor reviewer path now respects repository trust: in an untrusted
+  checkout the repository's `hench.guard.env.allow` entries are ignored (with a
+  one-time warning) until `ndx trust accept .`. It also reads `llm.<vendor>.cli_path`
+  from `.n-dx.local.json` before `.n-dx.json`, where `cli_path` is actually written.
+
+- [#800](https://github.com/en-dash-consulting/n-dx/pull/800) [`61954d9`](https://github.com/en-dash-consulting/n-dx/commit/61954d9dcdbf09d5d9f1899e4059ef22e0f657f1) Thanks [@endash-shal](https://github.com/endash-shal)! - Close the rex log follow-ups: `[dir]`, `--item`, `--format=json`, rotation race
+  
+  `ndx log <event> <dir>` refused when the current directory was not a project,
+  although the help documents the trailing `[dir]` and `rex log` has always read
+  it. The orchestrator checked `process.cwd()` for `.rex` before delegating, so
+  the documented form failed exactly where it was needed — a run from outside
+  the project. It now resolves the directory from the second positional, which
+  is where `rex log` reads it too.
+  
+  `ndx log --help` lists `--format=json`, which the command already forwarded.
+  
+  The workflow step and the `ndx-work` skill now show
+  `ndx log <event> --item=<task-id> --detail="..."`; without `--item` an entry
+  written through the CLI route is not tied to the task.
+  
+  Execution-log rotation took a stat and then a rename with nothing in between.
+  Every `rex log` / `ndx log` call is its own short-lived process, so two that
+  both saw an over-size log would both rename it: the first moved a megabyte of
+  history to `.1` and appended, then the second's rename overwrote that `.1`
+  with the single line the first had just written. The size is now re-read under
+  a lock, so the second writer sees the rotated file and does nothing. Appends
+  stay outside the lock, and a lock that cannot be taken appends without
+  rotating rather than failing.
+
+- [#616](https://github.com/en-dash-consulting/n-dx/pull/616) [`0316a48`](https://github.com/en-dash-consulting/n-dx/commit/0316a48dc8cead39507ed79811a0a0fcba6a2775) Thanks [@ryrykeith](https://github.com/ryrykeith)! - New `rex product show|edit` and `rex change place|apply` for a v2 PRD. On a v2 tree `rex add` (and `ndx add`) creates a change, or a task or subtask under `--parent`, and prints it with its suggested placement; a description becomes one change. `--criterion` stays a work item's acceptance criteria; a capability's capability criteria use `--capability-criterion`. v1 trees behave as before.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`2f124e3`](https://github.com/en-dash-consulting/n-dx/commit/2f124e378f0e63471d5d44e1cd5f241e25698dfe) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The run block gains reviewMode and reviewVendor; add_item and edit_item accept them. A task can now be pair-reviewed by a chosen vendor whatever the project default is. `ndx work` takes `--review-mode=<off|self|pair>` and `--reviewer=<claude|codex>`, and applies them as flag, then the task's `run`, then `hench.review.*`, then the default. A saved value the run cannot honour (a reviewer equal to the executor, or pair on an executor with no CLI counterpart) is skipped with a warning and never stops a loop. `ndx work --resolve` reports `reviewMode` and `reviewVendor` under `resolved`, each with its source, and `review` now holds only `rounds`.
+
+- [#658](https://github.com/en-dash-consulting/n-dx/pull/658) [`c357d36`](https://github.com/en-dash-consulting/n-dx/commit/c357d364ff0609368c12f8a797e468960fed53f6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Follow-ups to the vendor CLI credential filter:
+  
+  - Claude on Bedrock keeps its role and container credentials: the IRSA names
+    (`AWS_WEB_IDENTITY_TOKEN_FILE`, `AWS_ROLE_ARN`, `AWS_ROLE_SESSION_NAME`), the
+    ECS/Fargate `AWS_CONTAINER_*` names and `AWS_CA_BUNDLE` reach the CLI when
+    `CLAUDE_CODE_USE_BEDROCK` is on, and are stripped when it is off. When Bedrock
+    or Vertex mode is on and none of its credential variables are set, `ndx work`
+    says so once, by name only.
+  - The cross-vendor reviewer falls back to the shell test command when its
+    environment cannot be resolved (for example, an unreadable config), instead of
+    failing the review.
+  - The reviewer's shell test command no longer inherits the raw environment. It
+    gets the project's `hench.guard.env` policy, without the reviewer vendor's
+    authentication variables. If that policy cannot be loaded, the default filter
+    applies and the review banner says so.
+  - `ndx start --open` on Windows opens the dashboard without `cmd.exe`, so a
+    `%NAME%`-shaped sequence in the URL's token or project id is no longer
+    expanded.
+
+- [#790](https://github.com/en-dash-consulting/n-dx/pull/790) [`6f9db39`](https://github.com/en-dash-consulting/n-dx/commit/6f9db391476e7a2afff41389cb7f6d6dd85f6fa1) Thanks [@endash-shal](https://github.com/endash-shal)! - The Windows CLI spawn now refuses a command line that `cmd.exe` would rewrite before running it.
+  
+  `quoteWindowsToken` neutralises every `cmd.exe` metacharacter except one, and said so in its own comment: `%VAR%` is expanded *inside* double quotes, and the substituted text is then parsed as part of the command line. An expanded value holding a double quote therefore ends the argument early, and an `&` after it starts a second command. `cmd.exe` offers no escape for `%` outside a batch file, so quoting cannot close this — the limitation was written down as a caller contract instead, with nothing enforcing it.
+  
+  `spawnCli`, and the `spawnCli`/`execFileSyncCli` twins in `@n-dx/core`, now check the tokens against the environment they are about to pass and throw rather than spawn. The check is deliberately narrow: `cmd.exe` expands only a name it can resolve and leaves anything else literal, so a path that merely contains a percent sign (`C:\Users\100%cool\bin`) still spawns, and so does one naming a variable that is not set. Only a token that would actually be rewritten is refused, and no CLI the toolkit spawns passes one. Matching is case-insensitive, as Windows environment lookup is.
+  
+  POSIX spawns are unaffected — they never go through `cmd.exe`.
+- Updated dependencies [[`02aa8af`](https://github.com/en-dash-consulting/n-dx/commit/02aa8afe08842e6d56b65f52d3364007485b72c2), [`550c099`](https://github.com/en-dash-consulting/n-dx/commit/550c099f0e81cb18b20d3fecd619d549bf4d2f61), [`3049ac5`](https://github.com/en-dash-consulting/n-dx/commit/3049ac5ae0199c06b262d0bec554d0c6931db497), [`26d68a9`](https://github.com/en-dash-consulting/n-dx/commit/26d68a9c6bdbe1de498b43a777d517e75e1caecf), [`0fa0251`](https://github.com/en-dash-consulting/n-dx/commit/0fa0251bb16de71d69aabbe9243a86bf2325dadb), [`f0ca395`](https://github.com/en-dash-consulting/n-dx/commit/f0ca3954254f56bd20611e14459f607dc6181ff9), [`02eed9a`](https://github.com/en-dash-consulting/n-dx/commit/02eed9a6fa283936ae81862c213be3d4ee323b0a), [`7714de5`](https://github.com/en-dash-consulting/n-dx/commit/7714de5b3ea4e788597a5ff855ed83e1c88392d9), [`1923d4d`](https://github.com/en-dash-consulting/n-dx/commit/1923d4d06a947f1d6b296acbf7418e694c304cad), [`6f66b58`](https://github.com/en-dash-consulting/n-dx/commit/6f66b588046a3c844351ab6eba1879bb4b3dffbf), [`1abeb88`](https://github.com/en-dash-consulting/n-dx/commit/1abeb885cd14a6a61222aa5073e2700fa78ae260), [`f049fd4`](https://github.com/en-dash-consulting/n-dx/commit/f049fd445d2a22ceff1bce210e4be43a54ec8579), [`3a2ccdc`](https://github.com/en-dash-consulting/n-dx/commit/3a2ccdc41bacba049a8e37a60398df0916448508), [`cb236e9`](https://github.com/en-dash-consulting/n-dx/commit/cb236e93e169b0f10301f47ffa26e0bf681c9259), [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1), [`c750769`](https://github.com/en-dash-consulting/n-dx/commit/c7507690569c629694c704b358a10bb38925bf80), [`d7c49c3`](https://github.com/en-dash-consulting/n-dx/commit/d7c49c3927f08f5743f43274034dee29f6843ecb), [`0a08ba6`](https://github.com/en-dash-consulting/n-dx/commit/0a08ba6ac46544418a8666bcd971de1c9450374f), [`87a04a7`](https://github.com/en-dash-consulting/n-dx/commit/87a04a75471bdc7ad07464d596e6d584f46dc2e6), [`21b50b8`](https://github.com/en-dash-consulting/n-dx/commit/21b50b8cd794ad76f0df89533a2e97565cddda11), [`c044be1`](https://github.com/en-dash-consulting/n-dx/commit/c044be1a0c74959c8642cde6215c9c00a982ef97), [`9cd86f7`](https://github.com/en-dash-consulting/n-dx/commit/9cd86f796647d8a811cf5be425ecaa4e0ad99219), [`e3ba73a`](https://github.com/en-dash-consulting/n-dx/commit/e3ba73af715f498b6dfc482647b18444e57ed7cb), [`e6a3637`](https://github.com/en-dash-consulting/n-dx/commit/e6a363728757506a7454b05093802b56d465530a), [`9667351`](https://github.com/en-dash-consulting/n-dx/commit/96673514addc91bf03a280b83bb895d9b0e4100b), [`2cd2e40`](https://github.com/en-dash-consulting/n-dx/commit/2cd2e40b5927eb23a9633aaddc37bbce559c3101), [`9e5fc39`](https://github.com/en-dash-consulting/n-dx/commit/9e5fc3965b81d5d3d78949ed33c67b118add8c99), [`a4af06e`](https://github.com/en-dash-consulting/n-dx/commit/a4af06ec00bfd0fd8ed37bed21cf04885a99dc62), [`090e111`](https://github.com/en-dash-consulting/n-dx/commit/090e111efc45edac8a0bcdf420fd55b2baabc117), [`5ef4660`](https://github.com/en-dash-consulting/n-dx/commit/5ef4660a3d53c49946aa396c54c2dee20af7d920), [`17257ac`](https://github.com/en-dash-consulting/n-dx/commit/17257acdcd976fae362ee09488bc2ddebebe2992), [`4aae21c`](https://github.com/en-dash-consulting/n-dx/commit/4aae21c613d532b56a3b62fce0f362075110e4fa), [`15f6a6a`](https://github.com/en-dash-consulting/n-dx/commit/15f6a6ad3e2ecbc8f26cf361971dc2cd657dbc96), [`e542de9`](https://github.com/en-dash-consulting/n-dx/commit/e542de9907b31ff7d67d0f6283a9256686375a14), [`3f50210`](https://github.com/en-dash-consulting/n-dx/commit/3f50210529ca205d7791cb798ade0162faf8debc), [`a7f9a21`](https://github.com/en-dash-consulting/n-dx/commit/a7f9a218efa35fa898643a3eeec51a331c8a003b), [`0aa9b18`](https://github.com/en-dash-consulting/n-dx/commit/0aa9b184322e43d971c3725bca3b3d0bfec7ecd9), [`ffe0774`](https://github.com/en-dash-consulting/n-dx/commit/ffe0774afe9ca7e2344624d9516a4cdb70536899), [`06082f8`](https://github.com/en-dash-consulting/n-dx/commit/06082f8eb52ff8efcd03fa00f95aa098028a5a62), [`f0148e7`](https://github.com/en-dash-consulting/n-dx/commit/f0148e7462961b31a962677bc6310adec66438b1), [`24a3554`](https://github.com/en-dash-consulting/n-dx/commit/24a3554d4ff4403f429018fb2164f1bbdfd56937), [`0562de4`](https://github.com/en-dash-consulting/n-dx/commit/0562de42cb52dda567b9b1358d987e380519b51a), [`ec4cd53`](https://github.com/en-dash-consulting/n-dx/commit/ec4cd5313e430f27b93b38ca5ad643577d3852bc), [`3e6c353`](https://github.com/en-dash-consulting/n-dx/commit/3e6c353d31a11130b1bef37419b45c6458080e76), [`ee868a7`](https://github.com/en-dash-consulting/n-dx/commit/ee868a76f8d4b3f84183267b56d2c32fe959c66e), [`dc0ba79`](https://github.com/en-dash-consulting/n-dx/commit/dc0ba79f4e48dae6b7d803d201bdcb69602f2023), [`7964dc2`](https://github.com/en-dash-consulting/n-dx/commit/7964dc2f3c762f6f4aa77fc548f94bef3653ed3d), [`00ba308`](https://github.com/en-dash-consulting/n-dx/commit/00ba308ecb4ae783cdf4837686f3f8338ede1c0e), [`3b4978e`](https://github.com/en-dash-consulting/n-dx/commit/3b4978ec0d50d08b56b93996a565f7cc148efd43), [`df54b01`](https://github.com/en-dash-consulting/n-dx/commit/df54b0162a38250827499fd1f545dd4689dc2505), [`5032a7c`](https://github.com/en-dash-consulting/n-dx/commit/5032a7c9ff4346c62fc8898a32d7183d8cdc3f6d), [`5292bdb`](https://github.com/en-dash-consulting/n-dx/commit/5292bdb577c696e8ed05a9a2de2cf42b9d3b13fb), [`65731af`](https://github.com/en-dash-consulting/n-dx/commit/65731afcf429ea011d2bb1ee4e5f537a6739b0e4), [`8c6112e`](https://github.com/en-dash-consulting/n-dx/commit/8c6112e3182b7d624b8fc2ee6dbb84b411e203f7), [`e5b9066`](https://github.com/en-dash-consulting/n-dx/commit/e5b90660d44136bc568935a636703065933c7b04), [`91d20ad`](https://github.com/en-dash-consulting/n-dx/commit/91d20ad509f252d9d17f8128f1f2e5b8f3543609), [`1ffe0ca`](https://github.com/en-dash-consulting/n-dx/commit/1ffe0cae40b67858122ab14d26cdcb8b934afb22), [`a19f176`](https://github.com/en-dash-consulting/n-dx/commit/a19f1763d2d609be1957a1562f7083ef785a62bc), [`323ceca`](https://github.com/en-dash-consulting/n-dx/commit/323ceca26bf13747a83dfc71007e6c013fc91191), [`678d5ac`](https://github.com/en-dash-consulting/n-dx/commit/678d5ac1265ef761558b2a8111da944ef869ed70), [`fa4d7e9`](https://github.com/en-dash-consulting/n-dx/commit/fa4d7e903e9a59a3549f98678483b49dceeb6c45), [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177), [`1fef845`](https://github.com/en-dash-consulting/n-dx/commit/1fef84561e11c69328222c0cd87008db78e56a65), [`70f49fa`](https://github.com/en-dash-consulting/n-dx/commit/70f49fa920586f70243c1089d33c5394e33f9f6e), [`085b63d`](https://github.com/en-dash-consulting/n-dx/commit/085b63d208f9622328efd5ac6f2af18ca07c2846), [`32e9aea`](https://github.com/en-dash-consulting/n-dx/commit/32e9aea4d296c7c799e880adfccfeaf055a97d2d), [`35a5632`](https://github.com/en-dash-consulting/n-dx/commit/35a5632bc20dbb8e80d186330aad55395f2591b5), [`039ee0c`](https://github.com/en-dash-consulting/n-dx/commit/039ee0c79a06fb4786790f233b79a1a53628ef4b), [`9b5f740`](https://github.com/en-dash-consulting/n-dx/commit/9b5f7404da93f402fb75bae6b0da0556909e63a5), [`f0a4b80`](https://github.com/en-dash-consulting/n-dx/commit/f0a4b802eb0e435afea4466de0e5af56cf7b73c3), [`6e87f37`](https://github.com/en-dash-consulting/n-dx/commit/6e87f37a3943094dcf596e268b28c553be04cf1a), [`8dc95b8`](https://github.com/en-dash-consulting/n-dx/commit/8dc95b816b1b257f2ced1d8d27ba7e27c2c01bbd), [`4ffc297`](https://github.com/en-dash-consulting/n-dx/commit/4ffc29701453ef5e59ffa7d81d42c8be744b37f6), [`b05a659`](https://github.com/en-dash-consulting/n-dx/commit/b05a6599554b5d7893b6735f16c01636c573f04d), [`5dbf308`](https://github.com/en-dash-consulting/n-dx/commit/5dbf3086350e1530202ba7ea565400a5f5384290), [`4670da7`](https://github.com/en-dash-consulting/n-dx/commit/4670da73c3a43fb2616b0ed5f5d477373fff81e6), [`61954d9`](https://github.com/en-dash-consulting/n-dx/commit/61954d9dcdbf09d5d9f1899e4059ef22e0f657f1), [`0316a48`](https://github.com/en-dash-consulting/n-dx/commit/0316a48dc8cead39507ed79811a0a0fcba6a2775), [`23cb6f3`](https://github.com/en-dash-consulting/n-dx/commit/23cb6f36f4c3dcd33713c4201e58a8d5daa15291), [`4448fe4`](https://github.com/en-dash-consulting/n-dx/commit/4448fe4bfd8822e722e4548f66e947a3fb91d306), [`0c0c861`](https://github.com/en-dash-consulting/n-dx/commit/0c0c861564998e76cc0b51a602cd95956a6fb4db), [`e0ba4ae`](https://github.com/en-dash-consulting/n-dx/commit/e0ba4aeac84bb4ac6f6ec33334f469ba50c85c5b), [`27babd6`](https://github.com/en-dash-consulting/n-dx/commit/27babd637fe4677309053a15db9efc7b16743bce), [`c2e4fe7`](https://github.com/en-dash-consulting/n-dx/commit/c2e4fe71e4af63c58a64c4b2a1a45c167e27458e), [`60a920a`](https://github.com/en-dash-consulting/n-dx/commit/60a920aa1bd8e33d68e8bc083a174d88d496a42d), [`57b79b5`](https://github.com/en-dash-consulting/n-dx/commit/57b79b5facab35ec2d0529b3f5a598d8321d086d), [`b0f94fd`](https://github.com/en-dash-consulting/n-dx/commit/b0f94fda920907512fc743d3b3cb17bd639629d2), [`974ce1d`](https://github.com/en-dash-consulting/n-dx/commit/974ce1d4498a923c80c66b2d002f678383e714bd), [`9edf876`](https://github.com/en-dash-consulting/n-dx/commit/9edf8765d3b822e9cd93597900682af894bfb5fe), [`2740c0c`](https://github.com/en-dash-consulting/n-dx/commit/2740c0c41c30b48af4602ccc30278ba678552801), [`c9a4ce2`](https://github.com/en-dash-consulting/n-dx/commit/c9a4ce25124401c995c1e57c86a67d2f8199e4b0), [`1e56738`](https://github.com/en-dash-consulting/n-dx/commit/1e567383db94768b4377d58a8b0b6cc79c5de73b), [`273148b`](https://github.com/en-dash-consulting/n-dx/commit/273148b94449bd07dd5e299d8480d3e2f94bc933), [`c8c81b2`](https://github.com/en-dash-consulting/n-dx/commit/c8c81b2d3741448f67bafb995134c2706dbd6aab), [`a23735c`](https://github.com/en-dash-consulting/n-dx/commit/a23735ccadf4deade1eb3280be4da2c9aa8f58e3), [`93004a6`](https://github.com/en-dash-consulting/n-dx/commit/93004a6d35735109c42a32ca55ce5e4e214edb25), [`e605e9f`](https://github.com/en-dash-consulting/n-dx/commit/e605e9f3bf02b0d724ea72b7818d2f4533b195bb), [`2f124e3`](https://github.com/en-dash-consulting/n-dx/commit/2f124e378f0e63471d5d44e1cd5f241e25698dfe), [`d0398e5`](https://github.com/en-dash-consulting/n-dx/commit/d0398e50aa2749b6384d3e5e9f4b5a602b80d73d), [`7be556b`](https://github.com/en-dash-consulting/n-dx/commit/7be556b29f11a83557c1a704240f6e2838a8072e), [`8228a7e`](https://github.com/en-dash-consulting/n-dx/commit/8228a7eb48c34ea6eb394a1b56d2736c7e759553), [`173f13e`](https://github.com/en-dash-consulting/n-dx/commit/173f13e17743c32f839c1619fc221e7d8c584148), [`bf98c36`](https://github.com/en-dash-consulting/n-dx/commit/bf98c36b8d80364c2a745ff3d2594349be9fa7ae), [`7a6eeab`](https://github.com/en-dash-consulting/n-dx/commit/7a6eeabfe2a97d511ebbc980f0e1155134e88d48), [`c4a1a61`](https://github.com/en-dash-consulting/n-dx/commit/c4a1a614884022d74c477dc3d792550f7e7735cc), [`844b636`](https://github.com/en-dash-consulting/n-dx/commit/844b63698f9ccda4f81b83362257b16dfcb065c2), [`e41d31f`](https://github.com/en-dash-consulting/n-dx/commit/e41d31fff91f9599ffc1e85d38cf1fad8da9e162), [`af89c92`](https://github.com/en-dash-consulting/n-dx/commit/af89c92e0b643d37b1380bd4eb4c383a32168c67), [`20c1d2b`](https://github.com/en-dash-consulting/n-dx/commit/20c1d2be598d61a4cb1b055d8abd28b8127618a8), [`c357d36`](https://github.com/en-dash-consulting/n-dx/commit/c357d364ff0609368c12f8a797e468960fed53f6), [`0766fc9`](https://github.com/en-dash-consulting/n-dx/commit/0766fc96d9e266814c57c5bb29d3ae1b41ad99e7), [`3256c61`](https://github.com/en-dash-consulting/n-dx/commit/3256c61b794c6f14636f17050716480316da7435), [`35dffa3`](https://github.com/en-dash-consulting/n-dx/commit/35dffa3cc8056accb32fabc529716f69f326f9d5), [`15e6b65`](https://github.com/en-dash-consulting/n-dx/commit/15e6b654ab11a4bd4042e03dae0fe0f1ac76c2e3), [`097c06f`](https://github.com/en-dash-consulting/n-dx/commit/097c06f9cfe1a7ec87493e7cdf519f17d2acc08d), [`6f9db39`](https://github.com/en-dash-consulting/n-dx/commit/6f9db391476e7a2afff41389cb7f6d6dd85f6fa1)]:
+  - @n-dx/rex@0.9.1
+  - @n-dx/llm-client@0.9.1
+  - @n-dx/hench@0.9.1
+  - @n-dx/web@0.9.1
+  - @n-dx/sourcevision@0.9.1
+  - @n-dx/graview@0.9.1
+
 ## 0.9.0
 
 ### Minor Changes
