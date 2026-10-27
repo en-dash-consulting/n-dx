@@ -39,7 +39,7 @@ From an assistant, the same views are the `get_product`, `get_capability` and `g
 
 ### 1. Empty the Inbox
 
-Every new input lands as a change in the Inbox. A change that cannot be placed confidently waits with `needsPlacement`; autonomous runs skip it until someone places it.
+Every new input lands as a change in the Inbox. In the dashboard it is the Inbox section on Plan, and each change opens a placement panel ([Finding and placing an Inbox change](/packages/web#finding-and-placing-an-inbox-change-v2)). A change that cannot be placed confidently waits with `needsPlacement`; autonomous runs skip it until someone places it.
 
 ```sh
 rex change place <change> .                                   # the shortlist, best first

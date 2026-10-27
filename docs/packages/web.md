@@ -54,6 +54,27 @@ See [MCP Integration](/guide/mcp) for setup instructions.
 
 `PATCH /api/rex/items/:id` accepts only these fields: `status`, `failureReason`, `priority`, `tags`, `title`, `description`, `acceptanceCriteria` and `requirements`. Any other key (including `run`) is a `400` naming it. The update runs inside the PRD lock for the request's workspace and answers `409` when another process holds it. Saved run settings are written through `PUT /api/hench/prep/:taskId` (below), MCP `edit_item`, or `rex update --run` — not this route.
 
+## Finding and placing an Inbox change (v2)
+
+On a v2 project a change with no place on the product map waits in the Inbox, and `ndx work` skips its tasks until it is placed. The dashboard lists these changes and places them without leaving the page.
+
+**Find them.**
+
+- **Plan.** An Inbox section sits right after the capture bar and is always present. It lists open changes awaiting placement, strongest rex match first, weak and tied guesses last. It shows five rows and links to the rest (`N more · Open ↗`). At zero it is collapsed and reads "Inbox is empty".
+- **Counts.** The open count shows on the Plan tab and the bottom bar. It counts only open changes that need placement.
+- **Applied history.** Changes applied before they were placed cannot be placed. They appear only as a collapsed line ("N applied changes were never placed") under the list.
+- **Tasks tree.** An Inbox change carries an **Inbox** badge, and the **In the Inbox** facet filters the tree to them.
+- **Changes page.** An open change awaiting placement is tagged **Needs placement**; selecting the tag opens it.
+
+**Place one.** A row, badge or tag opens the change's detail panel. Its **Where it goes** section shows rex's shortlist, each entry with a strength and its reasons.
+
+1. Pick a candidate, or search capabilities and constraints.
+2. Choose the relation: **Touches**, or **Amends** with a criteria edit or a replacement statement.
+3. **Place** writes it. **Place & next** moves to the next Inbox change in the section's order. **Place & add another** adds a further touched place to the same change, for umbrella changes.
+4. If nothing fits, **Nothing fits** opens a form that proposes a new capability or constraint under an area.
+
+Nothing is placed automatically. Every write goes through the placement routes below. Until a change is placed, the panel's **+ Add Task** carries a note that the task won't run.
+
 ## Inbox placement routes (v2)
 
 On a v2 project a change captured without a home waits in the Inbox. Three routes
@@ -77,6 +98,7 @@ omits it on v1. `open` counts open changes awaiting placement (the ones
 `ndx work` refuses); `appliedUnplaced` counts applied changes still flagged
 `needsPlacement`, which are history and never placeable. Change rows from
 `GET /api/rex/changes` carry `awaitsPlacement` for open held changes.
+`GET /api/rex/changes/placements` returns every awaiting change's shortlist in one request, keyed by change id; a change whose shortlist cannot be built gets `{ error }`.
 
 ## Prepare task
 
