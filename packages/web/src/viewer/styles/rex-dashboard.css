@@ -394,11 +394,11 @@
   outline-offset: 1px;
 }
 
-/* Blocks, four to a row (two on a narrow screen, one on a phone) — the
-   Analysis page's tiles in miniature. */
+/* Blocks, two to a row (one on a phone) — the Analysis page's tiles in
+   miniature. */
 .rex-dash-epic-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
   align-content: start;
 }
@@ -551,19 +551,19 @@
 
 /* ── Right sidebar ────────────────────────────────────────────────── */
 
-/* Balanced columns, not a row: the panels differ in height by hundreds of
-   pixels, and a row left that difference as blank page under the short ones.
-   Columns stack the short panels beside the tall one. */
+/* The panels in one row, splitting it evenly however many there are
+   (Priority Distribution shows only when items have priorities) — two to a
+   row on a narrow screen, one on a phone. Stretched to the row's height:
+   they differ in height by hundreds of pixels, and top-aligned they left that
+   difference as blank page under the short ones. */
 .rex-dash-sidebar {
-  columns: 2 320px;
-  column-gap: var(--space-4);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: stretch;
   min-height: 0;
 }
-.rex-dash-sidebar > .rex-dash-panel {
-  break-inside: avoid;
-  margin-bottom: var(--space-4);
-}
-.rex-dash-sidebar > .rex-dash-panel:last-child { margin-bottom: 0; }
 
 /* Panel cards */
 .rex-dash-panel {
@@ -1039,11 +1039,9 @@
 
 @media (max-width: 960px) {
   .rex-dash-sidebar {
-    column-gap: var(--space-3);
-  }
-
-  .rex-dash-epic-list {
+    grid-auto-flow: row;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
   }
 }
 
@@ -1099,7 +1097,7 @@
   }
 
   .rex-dash-sidebar {
-    columns: 1;
+    grid-template-columns: 1fr;
   }
 
   .rex-dash-epic-list {

@@ -69,11 +69,17 @@ for (const colorScheme of ["light", "dark"] as const) {
       await expect(rows.nth(i).locator(".rex-task-link-title")).not.toHaveText("");
     }
 
-    // Blocks, four to a row at this width: the first four share a row and the fifth wraps.
-    const boxes = await Promise.all([0, 1, 2, 3, 4].map((i) => rows.nth(i).boundingBox()));
-    const [first, , , fourth, fifth] = boxes;
-    expect(first && fourth && Math.abs(first.y - fourth.y) < 2, "first four epics on one row").toBe(true);
-    expect(first && fifth && fifth.y > first.y + first.height - 1, "fifth epic on the next row").toBe(true);
+    // Blocks, two to a row: the first two share a row and the third wraps.
+    const [first, second, third] = await Promise.all([0, 1, 2].map((i) => rows.nth(i).boundingBox()));
+    expect(first && second && Math.abs(first.y - second.y) < 2, "first two epics on one row").toBe(true);
+    expect(first && third && third.y > first.y + first.height - 1, "third epic on the next row").toBe(true);
+
+    // The panels sit in one row at this width, all the same height.
+    const panels = await page.locator(".rex-dash-panel").evaluateAll((els) =>
+      els.map((el) => { const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; }));
+    expect(panels.length).toBeGreaterThan(1);
+    expect(new Set(panels.map((p) => p.top)).size, "panels on one row").toBe(1);
+    expect(new Set(panels.map((p) => p.bottom)).size, "panels the same height").toBe(1);
 
     // No gap: every block of the dashboard has another block directly under
     // it, and the first stage section follows Epic Progress. A row of panels
