@@ -222,6 +222,14 @@ describe("approveOnFirstRun", () => {
     expect(resolveName("recon").message).toMatch(/fix: ndx extensions enable recon$/);
   });
 
+  it("lets a Ctrl+C at the prompt (AbortError) through and approves nothing", async () => {
+    install("recon", { script: "" });
+    const interrupted = async () => { throw Object.assign(new Error("The operation was aborted"), { name: "AbortError" }); };
+    await expect(approveOnFirstRun(resolveName("recon"), "recon", { confirm: interrupted, out: () => {} })).rejects.toMatchObject({ name: "AbortError" });
+    expect(existsSync(join(home, "extensions.json")) && JSON.parse(readFileSync(join(home, "extensions.json"), "utf8")).approvals).toBeFalsy();
+    expect(resolveName("recon").kind).toBe("refused");
+  });
+
   it("never asks for a refusal an approval cannot fix", async () => {
     install("recon");
     await enable("recon");

@@ -3534,7 +3534,17 @@ async function handleExtensionCommand(command, rest) {
   const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
   const resolveOptions = { builtinCommands: builtinCommandNames(), ndxVersion: version };
   let resolution = resolveExtensionCommand(command, resolveOptions);
-  if (await approveOnFirstRun(resolution, command, { confirm: terminalConfirm(), out: (line) => console.log(line) })) {
+  let approved;
+  try {
+    approved = await approveOnFirstRun(resolution, command, { confirm: terminalConfirm(), out: (line) => console.log(line) });
+  } catch (err) {
+    // Ctrl+C at the prompt: readline holds the terminal in raw mode, so it
+    // arrives as an AbortError rather than SIGINT. Nothing was approved.
+    if (err?.name !== "AbortError") throw err;
+    exitWithCleanup(130);
+    return;
+  }
+  if (approved) {
     resolution = resolveExtensionCommand(command, resolveOptions);
   }
   switch (resolution.kind) {
