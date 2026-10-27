@@ -394,10 +394,11 @@
   outline-offset: 1px;
 }
 
-/* Blocks, two to a row — the Analysis page's tiles in miniature. */
+/* Blocks, four to a row (two on a narrow screen, one on a phone) — the
+   Analysis page's tiles in miniature. */
 .rex-dash-epic-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-3);
   align-content: start;
 }
@@ -1039,6 +1040,10 @@
 @media (max-width: 960px) {
   .rex-dash-sidebar {
     column-gap: var(--space-3);
+  }
+
+  .rex-dash-epic-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
