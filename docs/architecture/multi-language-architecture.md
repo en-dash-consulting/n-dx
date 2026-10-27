@@ -171,6 +171,8 @@ Hench's security guard uses language-specific allowed commands. Blocked paths ar
 
 The `guardDefaultsForLanguage(language)` function returns the appropriate template. The resolved language from `manifest.language` drives the selection.
 
+The trust assessment (`ndx trust .`) asks only for the detected language's own dependency directories: a repository guard that drops one — `node_modules/**` in a JS/TS checkout, `vendor/**` in Go, the Swift set in Swift — raises a `dependency-paths-removed` warning and needs `ndx trust accept .`, so hench clamps it until then. A guard that drops another ecosystem's directory raises nothing, because older `ndx init` defaults never listed them.
+
 ---
 
 ## Adding a New Language

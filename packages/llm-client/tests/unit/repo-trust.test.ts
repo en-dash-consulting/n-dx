@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import {
   assessRepoExecutionConfig,
@@ -367,6 +368,52 @@ describe("assessRepoExecutionConfig", () => {
   it("does not count a file named like an Xcode project as a swift marker", () => {
     writeFileSync(join(repo, "App.xcodeproj"), "");
     expect(collectRepoExecutionConfig(repo).detectedLanguage).toBe("typescript");
+  });
+
+  // A restricted checkout is clamped, but a guard whose only deviation was a
+  // dropped dependency directory used to read as baseline, so the clamp never
+  // ran and the block was simply absent (#816 F2).
+  it("makes a JS/TS guard that drops node_modules/** untrusted, naming it", () => {
+    writeJson("package.json", { name: "x" });
+    const blockedPaths = [...DEFAULT_GUARD.blockedPaths.filter((p) => p !== "node_modules/**"), ...SECRET_PATH_PATTERNS];
+    writeJson(".hench/config.json", { guard: { ...DEFAULT_GUARD, blockedPaths } });
+
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    expect(ev.findings.map((f) => [f.code, f.severity, f.values])).toEqual([
+      ["dependency-paths-removed", "warning", ["node_modules/**"]],
+    ]);
+    expect(ev.findings[0].message).toContain("node_modules/**");
+    expect(ev.state).toBe("untrusted");
+    expect(ev.restricted).toBe(true);
+  });
+
+  it.each([
+    ["go", "go.mod", ["vendor/**"]],
+    ["swift", "Package.swift", [".build/**", "Pods/**"]],
+  ])("names only the %s checkout's own dependency directories that its guard drops", (language, marker, dropped) => {
+    writeFileSync(join(repo, marker), "");
+    const current = guardBaselineForLanguage(language);
+    const guard = { ...current, blockedPaths: current.blockedPaths.filter((p) => !dropped.includes(p)) };
+    writeJson(".hench/config.json", { language, guard });
+    const findings = assessRepoExecutionConfig(collectRepoExecutionConfig(repo));
+    expect(findings.map((f) => [f.code, f.values])).toEqual([["dependency-paths-removed", dropped]]);
+  });
+
+  // Flagging every ecosystem would turn each checkout initialized before every
+  // baseline blocked them all untrusted on upgrade.
+  it("does not ask a JS/TS guard to block other ecosystems' directories, and accepts a **/ prefix", () => {
+    writeJson(".hench/config.json", {
+      guard: { ...DEFAULT_GUARD, blockedPaths: [".hench/**", ".rex/**", ".git/**", "**/node_modules/**"] },
+    });
+    const codes = assessRepoExecutionConfig(collectRepoExecutionConfig(repo)).map((f) => f.code);
+    expect(codes).not.toContain("dependency-paths-removed");
+  });
+
+  it("leaves this repository's own config at its current trust state", () => {
+    const own = fileURLToPath(new URL("../../../..", import.meta.url));
+    const ev = evaluateRepoTrust(own, { ndxHome: home });
+    expect(ev.findings.map((f) => f.code)).not.toContain("dependency-paths-removed");
+    expect(ev.state).toBe("baseline");
   });
 
   it("accepts the .ndx container layout's blocked path as covering hench and rex", () => {

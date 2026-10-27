@@ -410,6 +410,7 @@ export type RepoTrustFindingCode =
   | "language-mismatch"
   | "commands-added"
   | "blocked-paths-removed"
+  | "dependency-paths-removed"
   | "git-subcommands-added"
   | "env-allow-added"
   | "permission-bypass"
@@ -478,6 +479,14 @@ function coversDir(blocked: string[], dir: string): boolean {
   });
 }
 
+/** True when `blocked` lists `pattern` itself or its any-depth `**\/` form. */
+function blocksPattern(blocked: string[], pattern: string): boolean {
+  return blocked.some((p) => {
+    const n = p.replace(/\\/g, "/");
+    return n === pattern || n === `**/${pattern}`;
+  });
+}
+
 /**
  * List how the repository's configuration is wider than the baseline for its
  * detected language. Narrower is not reported. A missing guard means the
@@ -529,6 +538,19 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
         severity: "warning",
         message: `Lets the agent write to project state it is normally kept out of: ${removed.map((d) => (d === ".git" ? ".git/" : `.${d}/`)).join(", ")}`,
         values: removed,
+      });
+    }
+
+    // Only the detected language's directories: they are what `ndx init` has
+    // always written for it, so an initialized guard raises nothing. A guard
+    // that drops one would otherwise read as baseline and never be clamped.
+    const depsRemoved = LANGUAGE_BASELINES[detected].extraBlocked.filter((p) => !blocksPattern(config.guard!.blockedPaths, p));
+    if (depsRemoved.length) {
+      findings.push({
+        code: "dependency-paths-removed",
+        severity: "warning",
+        message: `Lets the agent write to the ${languageLabel(detected)} dependency directories it is normally kept out of: ${depsRemoved.join(", ")}`,
+        values: depsRemoved,
       });
     }
 
