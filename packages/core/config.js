@@ -2193,7 +2193,7 @@ Hench review settings (the review pass after a task validates):
 
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths
-                                           (default: .hench/**, .rex/**, .git/**, node_modules/**)
+                                           (default: .hench/**, .rex/**, .git/**, **/node_modules/**, …)
   hench.guard.allowedCommands    string[]  Whitelisted shell commands
                                            (default: npm, npx, node, git, tsc, vitest)
   hench.guard.commandTimeout     number    Command timeout in ms (default: 30000)

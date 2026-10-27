@@ -166,9 +166,15 @@ const LANGUAGE_BASELINES: Record<string, Pick<GuardBaseline, "allowedCommands"> 
  * `Package.swift` in a JS checkout — or a polyglot's root `go.mod` — would
  * drop `node_modules/**` from what an untrusted checkout is kept out of, and a
  * payload written there runs at the operator's next `npm install`.
+ *
+ * At any depth, as {@link SECRET_PATH_PATTERNS} are: hench's guard anchors a
+ * pattern at the project root, and a workspace package's or a polyglot
+ * frontend's `node_modules` runs at the next install as the root's does.
+ * `extraBlocked` keeps the root-anchored spelling, which is what `ndx init`
+ * wrote before this and what the own-ecosystem check still accepts.
  */
 const DEPENDENCY_BLOCKED: readonly string[] = [
-  ...new Set(Object.values(LANGUAGE_BASELINES).flatMap((b) => b.extraBlocked)),
+  ...new Set(Object.values(LANGUAGE_BASELINES).flatMap((b) => b.extraBlocked.map((p) => `**/${p}`))),
 ];
 
 /**
