@@ -1091,13 +1091,18 @@ export function resolveRepo(dir) {
   return { repoRoot, worktree, branch, remoteUrl, isRepo: true };
 }
 
-/** URL- and path-safe slug for a project id. */
+/**
+ * URL- and path-safe slug for a project id. The lookbehind on the trailing
+ * trim pins the match to the start of a `-.` run, so an interior run is
+ * rejected once instead of once per starting position (quadratic on a long
+ * name). Twin of `slugifyProjectId` in packages/web/src/hub/new-project.ts.
+ */
 export function slugifyProjectId(name) {
   const slug = String(name ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/-{2,}/g, "-")
-    .replace(/^[-.]+|[-.]+$/g, "");
+    .replace(/^[-.]+|(?<![-.])[-.]+$/g, "");
   return slug || "project";
 }
 

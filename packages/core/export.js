@@ -513,7 +513,11 @@ export async function runExport(args) {
 
   // ── Step 1: Copy sourcevision data files ───────────────────────────────
   console.log("[export] copying sourcevision data...");
-  const svDataFiles = ["manifest.json", "inventory.json", "imports.json", "zones.json", "components.json", "callgraph.json"];
+  const svDataFiles = [
+    "manifest.json", "inventory.json", "imports.json", "zones.json", "components.json", "callgraph.json",
+    // The Analyze dashboard's Delivery & infrastructure tile reads these two.
+    "readiness.json", "infrastructure.json",
+  ];
   const copiedFiles = [];
   for (const file of svDataFiles) {
     if (copyIfExists(join(svDir, file), join(outDir, "data", file))) {
@@ -840,7 +844,11 @@ function deployToGitHubPages(outDir, projectDir, cname) {
       } else {
         const timestamp = new Date().toISOString();
         const message = buildCommitMessage(`Deploy dashboard (${timestamp})`, "export/dashboard");
-        execFileSyncCli("git", ["commit", "-m", message], { cwd: tmpWorktree, stdio: "pipe" });
+        // The message goes through stdin, not `-m`: on Windows this runs through
+        // cmd.exe, which reads a command line only up to the first line break,
+        // so a `-m` body and its trailers were dropped there, and the wrapper
+        // now refuses a multi-line argument outright.
+        execFileSyncCli("git", ["commit", "-F", "-"], { cwd: tmpWorktree, stdio: "pipe", input: message });
         execFileSyncCli("git", ["push", "--force", "origin", branch], { cwd: tmpWorktree, stdio: "inherit" });
         console.log(`[export] pushed to ${branch}`);
       }

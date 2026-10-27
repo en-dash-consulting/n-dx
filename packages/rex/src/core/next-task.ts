@@ -2,7 +2,7 @@ import type {PRDItem, Priority} from "../schema/index.js";import { PRIORITY_ORDE
 import type { TreeEntry } from "./tree.js";
 import { walkTree, findItem } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";
-import { collectRequirements } from "./requirements.js";
+import { traceRequirements } from "./requirements.js";
 import { allChildrenSuccessful } from "./parent-completion.js";
 
 /** No item is being treated as completed-in-advance when explaining a choice. */
@@ -122,10 +122,15 @@ const RISK_TOLERANCE_MULTIPLIER: Record<RiskTolerance, number> = {
  */
 export function requirementsScore(
   entry: TreeEntry,
-  items: PRDItem[],
+  _items: PRDItem[],
   riskTolerance: RiskTolerance = "medium",
 ): number {
-  const traced = collectRequirements(items, entry.item.id);
+  // The entry already carries its parent chain, so trace from it rather than
+  // re-finding the item: `makeComparator` scores every item in the tree, and
+  // a `findItem` per item made selection quadratic — about half a second per
+  // call on a 2,800-item PRD, which the dashboard's Live monitor calls five
+  // times every two seconds.
+  const traced = traceRequirements(entry);
   if (traced.length === 0) return 0;
 
   let score = 0;

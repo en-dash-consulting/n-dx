@@ -9,6 +9,7 @@
 
 import { h, Fragment } from "preact";
 import { ActionIcon } from "./action-icon.js";
+import { BodyPortal } from "./body-portal.js";
 import { useState, useEffect } from "preact/hooks";
 import type { ViewId } from "../api.js";
 import { viewLabel } from "../api.js";
@@ -187,8 +188,9 @@ export function Guide({ view }: GuideProps) {
       "aria-label": "View guide for this page",
       "aria-expanded": String(open),
     }, "?"),
+    // The button lives in the top nav, whose z-index would cap the overlay's.
     open
-      ? h("div", { class: "guide-overlay", onClick: () => setOpen(false), role: "dialog", "aria-modal": "true", "aria-label": `Guide: ${title}` },
+      ? h(BodyPortal, null, h("div", { class: "guide-overlay", onClick: () => setOpen(false), role: "dialog", "aria-modal": "true", "aria-label": `Guide: ${title}` },
           h("div", { class: "guide-modal", onClick: (e: Event) => e.stopPropagation() },
             h("div", { class: "guide-header" },
               h("h2", null, title),
@@ -209,7 +211,7 @@ export function Guide({ view }: GuideProps) {
               ),
             ),
           ),
-        )
+        ))
       : null
   );
 }

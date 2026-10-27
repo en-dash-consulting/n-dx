@@ -163,8 +163,19 @@ function stdioJsonRpc(command, args, method, params = {}, timeoutMs = 10000, cwd
       const methodResponse = responses.find((r) => r.id === 2);
       if (methodResponse && !settled) {
         settled = true;
-        cleanup();
-        resolvePromise(methodResponse);
+        // Resolve once the server has exited, not when it answers. The server
+        // runs with cwd: tmpDir, and afterAll removes tmpDir: resolving on the
+        // answer let a loaded run reach that removal while the killed server
+        // still held the directory, which failed the suite EPERM on Windows
+        // with every test passing (TESTING.md Family 3). The exit is an event,
+        // so this waits exactly as long as the machine needs and no longer.
+        if (proc.exitCode !== null || proc.signalCode !== null) {
+          clearTimeout(timeout);
+          resolvePromise(methodResponse);
+        } else {
+          proc.once("exit", () => resolvePromise(methodResponse));
+          cleanup();
+        }
       }
     });
 

@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "26f04993-67f4-4d3a-a573-fd9d35d448a0":
+    status: "completed"
+    startedAt: "2026-04-19T04:23:26.685Z"
+    completedAt: "2026-04-19T04:37:38.124Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Reorganized sidebar SETTINGS section into CLI command order; renamed section headers in project-settings, feature-toggles, llm-provider, hench-config; moved hench-config from HENCH section and notion-config from REX section into SETTINGS."
+    appliedAt: "2026-04-19T04:37:38.124Z"

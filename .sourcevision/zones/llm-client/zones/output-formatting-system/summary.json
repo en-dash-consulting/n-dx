@@ -1,0 +1,23 @@
+{
+  "id": "llm-client/output-formatting-system",
+  "name": "Output Formatting System",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/llm-client/src/claude-effort.ts",
+    "packages/llm-client/src/cli-brand.ts",
+    "packages/llm-client/src/help-format.ts",
+    "packages/llm-client/src/output.ts",
+    "packages/llm-client/src/vendor-header.ts"
+  ],
+  "entryPoints": [
+    "packages/llm-client/src/claude-effort.ts",
+    "packages/llm-client/src/cli-brand.ts",
+    "packages/llm-client/src/help-format.ts",
+    "packages/llm-client/src/output.ts",
+    "packages/llm-client/src/vendor-header.ts"
+  ],
+  "cohesion": 0.53,
+  "coupling": 0.47,
+  "fileCount": 5,
+  "lineCount": 1060
+}

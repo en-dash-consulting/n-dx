@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b9fad242-b388-4995-8f18-1043ce097c16":
+    status: "completed"
+    startedAt: "2026-10-01T16:01:03.579Z"
+    completedAt: "2026-10-01T16:09:17.590Z"
+    endedAt: "2026-10-01T16:09:17.590Z"
+    resolutionType: "code-change"
+    resolutionDetail: "live-log.ts useRunLog: inFlight/again guard so only one read runs at a time; paging loop ends when more:true but cursor did not move. Two new tests; viewer suite green; committed f5d84515."
+    appliedAt: "2026-10-01T16:09:17.590Z"
+    lastModified: "2026-10-01T16:09:17.984Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

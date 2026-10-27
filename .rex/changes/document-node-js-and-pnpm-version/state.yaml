@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "ca9e532a-3383-4ae3-9639-99d824d393cb":
+    status: "completed"
+    startedAt: "2026-04-19T04:40:31.296Z"
+    completedAt: "2026-04-19T04:42:32.849Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added Node.js ≥18/pnpm ≥10 prerequisites to README Quick Start, docs/guide/getting-started.md, and docs/guide/quickstart.md; fixed npm→pnpm in quickstart.md; added pnpm to engines in root and core package.json; added .nvmrc with 22."
+    appliedAt: "2026-04-19T04:42:32.849Z"

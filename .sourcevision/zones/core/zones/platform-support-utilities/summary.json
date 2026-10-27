@@ -1,0 +1,24 @@
+{
+  "id": "core/platform-support-utilities",
+  "name": "Cross Platform Utilities",
+  "description": "6 files, primarily JavaScript",
+  "files": [
+    "packages/core/cli-log.js",
+    "packages/core/commit-trailers.js",
+    "packages/core/export.js",
+    "packages/core/gitignore.js",
+    "packages/core/win-spawn.js",
+    "scripts/soak-under-build-load.mjs"
+  ],
+  "entryPoints": [
+    "packages/core/cli-log.js",
+    "packages/core/commit-trailers.js",
+    "packages/core/export.js",
+    "packages/core/gitignore.js",
+    "packages/core/win-spawn.js"
+  ],
+  "cohesion": 0.38,
+  "coupling": 0.62,
+  "fileCount": 6,
+  "lineCount": 1667
+}

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "813ae0de-9d6c-4d39-82bd-92aa4416c07d":
+    status: "completed"
+    startedAt: "2026-09-04T13:08:48.200Z"
+    completedAt: "2026-09-04T13:30:02.445Z"
+    endedAt: "2026-09-04T13:30:02.445Z"
+    resolutionType: "code-change"
+    resolutionDetail: "runDependencyAudit now classifies each pnpm step and reports ran:false with a reason when it could not produce counts; inconclusive means warn-and-proceed, recorded on DependencyAuditResult. 8 unit tests added."
+    appliedAt: "2026-09-04T13:30:02.445Z"
+    lastModified: "2026-09-04T13:30:02.470Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

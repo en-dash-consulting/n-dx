@@ -1,0 +1,48 @@
+{
+  "id": "lang-python",
+  "name": "Python Language Pack",
+  "description": "15 files, mostly utilities and entry points; entry points django.ts, fastapi.ts, flask.ts; imported by Packages and Packages.",
+  "files": [
+    "packages/lang-python/src/django.ts",
+    "packages/lang-python/src/fastapi.ts",
+    "packages/lang-python/src/flask.ts",
+    "packages/lang-python/src/index.ts",
+    "packages/lang-python/src/pack.ts",
+    "packages/lang-python/src/package-paths.ts",
+    "packages/lang-python/src/python-clients.ts",
+    "packages/lang-python/src/python-imports.ts",
+    "packages/lang-python/src/python-notices.ts",
+    "packages/lang-python/src/python-pack.ts",
+    "packages/lang-python/src/python-resolver.ts",
+    "packages/lang-python/src/python-routers.ts",
+    "packages/lang-python/src/python-stdlib.ts",
+    "packages/lang-python/src/python-symbols.ts",
+    "packages/lang-python/src/python-web.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-python/src/django.ts",
+    "packages/lang-python/src/fastapi.ts",
+    "packages/lang-python/src/flask.ts",
+    "packages/lang-python/src/index.ts",
+    "packages/lang-python/src/pack.ts",
+    "packages/lang-python/src/package-paths.ts",
+    "packages/lang-python/src/python-clients.ts",
+    "packages/lang-python/src/python-notices.ts",
+    "packages/lang-python/src/python-pack.ts",
+    "packages/lang-python/src/python-resolver.ts",
+    "packages/lang-python/src/python-stdlib.ts",
+    "packages/lang-python/src/python-symbols.ts",
+    "packages/lang-python/src/python-web.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 15,
+  "lineCount": 3092,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

@@ -11,6 +11,11 @@
  * The `bar` layout is a single input row (no header, scope or examples) for
  * a stage page's lead section, where the full form crowded out the PRD.
  * Switching `bar` on an already-mounted instance keeps what has been typed.
+ *
+ * On a v2 PRD (`layout: "v2"`) there is no LLM breakdown: `rex add` makes one
+ * change per text, titled from its first line, with the full text as its
+ * description, in the Inbox. The panel says so instead of promising
+ * proposals — see {@link V2_COPY}.
  */
 
 import { h, Fragment } from "preact";
@@ -29,6 +34,8 @@ export interface SmartAddInputProps {
   bar?: boolean;
   /** Rendered after Generate in the `bar` row (e.g. a "More" toggle). */
   barAction?: ComponentChildren;
+  /** The served PRD's layout; v2 captures a change into the Inbox. Defaults to v1. */
+  layout?: "v1" | "v2";
 }
 
 interface QualityIssue {
@@ -56,6 +63,8 @@ export interface PreviewChange {
   id: string;
   type: string;
   title: string;
+  /** The full text, when the title had to be cut from it. */
+  description?: string;
   needsPlacement?: boolean;
   placement?: { relation: string; shortlist: PlacementCandidate[] };
 }
@@ -83,9 +92,60 @@ const EXAMPLE_PROMPTS = [
   "Implement real-time search with debounced filtering and result highlights",
 ];
 
+/** The panel's words. v1 generates proposals with an LLM; v2 captures a change. */
+interface PanelCopy {
+  title: string;
+  subtitle: string;
+  barPlaceholder: string;
+  placeholder: string;
+  inputLabel: string;
+  wholeProject: string;
+  scopeLabel: string;
+  moreToGo: string;
+  action: string;
+  actionLabel: string;
+  busy: string;
+  loadingText: string;
+}
+
+const V1_COPY: PanelCopy = {
+  title: "Smart Add",
+  subtitle: "Describe what you want to build, then click Generate.",
+  barPlaceholder: "Describe what to add to the plan…",
+  placeholder: "Describe a feature, improvement, or idea...",
+  inputLabel: "Smart add description",
+  wholeProject: "Entire project (new epics)",
+  scopeLabel: "Scope proposals under an existing epic or feature",
+  moreToGo: "more to generate proposals",
+  action: "Generate",
+  actionLabel: "Generate proposals",
+  busy: "Generating...",
+  loadingText: "Analyzing description and generating proposals...",
+};
+
+/** What comes after a v2 capture: the change waits in the Inbox until placed. */
+const V2_NEXT_STEP =
+  "Next: place it on the capability it changes, then add its tasks from its detail panel.";
+
+const V2_COPY: PanelCopy = {
+  title: "Add to Inbox",
+  subtitle: "Your text becomes one change in the Inbox: the first line is its title and the full text its description.",
+  barPlaceholder: "Describe a change for the Inbox…",
+  placeholder: "Describe a change: the first line becomes its title...",
+  inputLabel: "Change description",
+  wholeProject: "Inbox (new change)",
+  scopeLabel: "Add under an existing change",
+  moreToGo: "more to preview",
+  action: "Preview",
+  actionLabel: "Preview the change",
+  busy: "Previewing...",
+  loadingText: "Preparing the change...",
+};
+
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputProps) {
+export function SmartAddInput({ onPrdChanged, bar, barAction, layout }: SmartAddInputProps) {
+  const copy = layout === "v2" ? V2_COPY : V1_COPY;
   const [input, setInput] = useState("");
   const [state, setState] = useState<PreviewState>("idle");
   const [proposals, setProposals] = useState<RawProposal[]>([]);
@@ -383,10 +443,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
     bar
       ? null
       : h("div", { class: "smart-add-header" },
-          h("h3", { class: "smart-add-title" }, "Smart Add"),
-          h("p", { class: "smart-add-subtitle" },
-            "Describe what you want to build, then click Generate.",
-          ),
+          h("h3", { class: "smart-add-title" }, copy.title),
+          h("p", { class: "smart-add-subtitle" }, copy.subtitle),
         ),
 
     // Context selection dropdown
@@ -399,9 +457,9 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
             onChange: (e: Event) => {
               setSelectedScope((e.target as HTMLSelectElement).value);
             },
-            "aria-label": "Scope proposals under an existing epic or feature",
+            "aria-label": copy.scopeLabel,
           },
-            h("option", { value: "" }, "Entire project (new epics)"),
+            h("option", { value: "" }, copy.wholeProject),
             scopeOptions.map((opt) =>
               h("option", { key: opt.id, value: opt.id },
                 `${"  ".repeat(opt.depth)}${itemTypeLabel(opt.itemType)}: ${opt.title}`,
@@ -439,10 +497,10 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
       h("textarea", {
         class: "smart-add-textarea",
         value: input,
-        placeholder: bar ? "Describe what to add to the plan…" : "Describe a feature, improvement, or idea...",
+        placeholder: bar ? copy.barPlaceholder : copy.placeholder,
         onInput: (e: Event) => handleInput((e.target as HTMLTextAreaElement).value),
         rows: bar ? 1 : 4,
-        "aria-label": "Smart add description",
+        "aria-label": copy.inputLabel,
       }),
       // Character count + status indicator
       h("div", { class: "smart-add-input-status" },
@@ -455,14 +513,14 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
         // Min length hint
         trimmedLength > 0 && trimmedLength < MIN_INPUT_LENGTH
           ? h("span", { class: "smart-add-hint" },
-              `${MIN_INPUT_LENGTH - trimmedLength} more to generate proposals`,
+              `${MIN_INPUT_LENGTH - trimmedLength} ${copy.moreToGo}`,
             )
           : null,
         // Loading badge
         state === "loading"
           ? h("span", { class: "smart-add-loading-badge" },
               h("span", { class: "smart-add-spinner", "aria-hidden": "true" }),
-              " Generating...",
+              ` ${copy.busy}`,
             )
           : null,
       ),
@@ -472,8 +530,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
         type: "button",
         disabled: trimmedLength < MIN_INPUT_LENGTH || state === "loading",
         onClick: handleSubmit,
-        "aria-label": "Generate proposals",
-      }, state === "loading" ? "Generating..." : "Generate"),
+        "aria-label": copy.actionLabel,
+      }, state === "loading" ? copy.busy : copy.action),
       bar ? barAction : null,
     ),
 
@@ -484,7 +542,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
             h("div", { class: "smart-add-loading-bar-fill" }),
           ),
           h("span", { class: "smart-add-loading-text" },
-            "Analyzing description and generating proposals...",
+            copy.loadingText,
           ),
         )
       : null,
@@ -513,6 +571,8 @@ export function SmartAddInput({ onPrdChanged, bar, barAction }: SmartAddInputPro
               h(ChangePreviewCard, { key: change.id ?? ci, change }),
             ),
           ),
+
+          h("p", { class: "smart-add-preview-desc smart-add-next-step" }, V2_NEXT_STEP),
 
           h("div", { class: "smart-add-actions" },
             h("button", {
@@ -661,6 +721,9 @@ function ChangePreviewCard({ change }: ChangePreviewCardProps) {
     ),
 
     h("div", { class: "smart-add-preview-body" },
+      change.description
+        ? h("p", { class: "smart-add-preview-desc smart-add-preview-full-text" }, change.description)
+        : null,
       shortlist.length > 0
         ? h(Fragment, null,
             h("p", { class: "smart-add-preview-desc" }, "Suggested placement"),

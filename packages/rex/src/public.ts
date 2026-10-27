@@ -93,7 +93,7 @@ export type {
 
 // ---- Schema: v2 tree index ---------------------------------------------------
 
-export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, specHash, nodeSpec } from "./schema/v2-rules.js";
+export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, awaitsPlacement, specHash, nodeSpec } from "./schema/v2-rules.js";
 export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOptions } from "./schema/v2-rules.js";
 
 // ---- Core: product edges, status and realization -----------------------------
@@ -376,7 +376,7 @@ export type { TaskDuration } from "./core/durations.js";
 
 // ---- Core: parent auto-completion -------------------------------------------
 
-export { findAutoCompletions, reconcileAutoCompletions } from "./core/parent-completion.js";
+export { allChildrenSuccessful, findAutoCompletions, reconcileAutoCompletions, cascadeParentCompletion } from "./core/parent-completion.js";
 
 // ---- Core: parent status reset ----------------------------------------------
 
@@ -690,6 +690,9 @@ export type {
 } from "./core/change-completion.js";
 export { loadApplyOn } from "./core/apply-policy.js";
 export type { ApplyOn } from "./core/apply-policy.js";
+// Adding a node to the change layer: the rule MCP add_item and `rex add` run.
+export { addChangeNode, AddChangeNodeError } from "./core/change-add.js";
+export type { AddChangeNodeInput, AddChangeNodeResult } from "./core/change-add.js";
 export { completeV2Work } from "./cli/v2-completion.js";
 export type { V2Completion, V2CompletionOptions } from "./cli/v2-completion.js";
 export { ChangeLayerStore, isChangeLayerStore } from "./store/change-layer-store.js";

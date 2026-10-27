@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "11343373-2400-483d-9736-04f42cbce488":
+    status: "completed"
+    startedAt: "2026-04-20T19:33:37.471Z"
+    completedAt: "2026-04-20T19:34:22.499Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added \"Local Platform Testing\" section to README.md with prerequisites, copy-pasteable commands for Windows/macOS gauntlets, exit codes, and link to .local_testing/README.md for advanced options."
+    appliedAt: "2026-04-20T19:34:22.499Z"

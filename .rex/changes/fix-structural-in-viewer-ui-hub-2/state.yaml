@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "169b6a3b-5fd8-446e-a84c-858222530b72":
+    status: "completed"
+    startedAt: "2026-04-19T03:00:16.803Z"
+    completedAt: "2026-04-19T03:05:51.303Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added viewer-ui-hub gateway compliance guard to boundary-check.test.ts. Two rules: (1) ui-hub components must import cross-zone via api.js, not leaf hook/type reaches; (2) external files must use components/index.ts barrel. CLAUDE.md documentation was already complete from a prior session."
+  "bc5defb9-d003-450a-bdba-6bc728c22ff5":
+    status: "completed"
+    startedAt: "2026-04-19T03:05:51.342Z"
+    completedAt: "2026-04-19T03:05:51.342Z"
+    appliedAt: "2026-04-19T03:05:51.342Z"

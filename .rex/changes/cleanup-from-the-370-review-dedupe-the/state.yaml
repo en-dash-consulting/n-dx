@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "79132a2f-96d9-41f0-8eb9-28d4edf9de59":
+    status: "completed"
+    startedAt: "2026-09-12T10:17:17.958Z"
+    completedAt: "2026-09-12T10:28:20.118Z"
+    endedAt: "2026-09-12T10:28:20.118Z"
+    appliedAt: "2026-09-12T10:28:20.118Z"
+    lastModified: "2026-09-12T10:28:20.427Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

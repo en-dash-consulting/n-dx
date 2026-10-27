@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b05a6673-1f0b-488d-8282-ca360db2e6a7":
+    status: "completed"
+    startedAt: "2026-10-09T00:47:28.097Z"
+    completedAt: "2026-10-09T00:50:41.363Z"
+    endedAt: "2026-10-09T00:50:41.363Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added packages/rex/tests/unit/cli/mcp-tools-access.test.ts: hand-written expected-access table over REX_MCP_TOOLS, both branches of merge_items/reorganize, and a coverage check for added/removed tools. Commit 0665aadf8."
+    appliedAt: "2026-10-09T00:50:41.363Z"
+    lastModified: "2026-10-09T00:50:41.911Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

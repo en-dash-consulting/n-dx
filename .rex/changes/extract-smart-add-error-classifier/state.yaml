@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "d8036b40-fcf9-4d56-a89d-d315041e995b":
+    status: "completed"
+    startedAt: "2026-04-21T16:39:13.741Z"
+    completedAt: "2026-04-21T16:48:16.941Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Extracted classifySmartAddError into shared classifyLLMError in rex/src/cli/llm-error-classifier.ts. Added 5 new CLI_ERROR_CODES (AUTH_FAILED, LLM_RATE_LIMITED, LLM_SERVER_ERROR, NETWORK_ERROR, TIMEOUT). Extended ERROR_HINTS with 4 LLM patterns. 28 unit tests for the new classifier."
+    appliedAt: "2026-04-21T16:48:16.941Z"

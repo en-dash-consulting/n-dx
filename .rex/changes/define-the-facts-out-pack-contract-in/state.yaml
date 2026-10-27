@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "8fab5dc4-b075-413f-ac9d-04f6d8ce812f":
+    status: "completed"
+    startedAt: "2026-10-13T04:18:49.218Z"
+    completedAt: "2026-10-13T04:33:38.928Z"
+    endedAt: "2026-10-13T04:33:38.928Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Facts-out contract in lang-kit/src/pack-contract.ts; sourcevision adapter pack-facts.ts; pack-imports builds from imports facts; build-reader types removed. Goldens unedited; corpus numbers match PR 10."
+    appliedAt: "2026-10-13T04:33:38.928Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-13T04:33:39.477Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

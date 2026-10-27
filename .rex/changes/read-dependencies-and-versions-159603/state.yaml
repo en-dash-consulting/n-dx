@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "1596039e-ee3b-4708-b011-d691a08024aa":
+    status: "completed"
+    startedAt: "2026-10-08T05:56:21.087Z"
+    completedAt: "2026-10-08T06:07:18.203Z"
+    endedAt: "2026-10-08T06:07:18.203Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Gradle build reader + exact version catalog reader, best-effort marking, goldens"
+    appliedAt: "2026-10-08T06:07:18.203Z"
+    lastModified: "2026-10-08T06:07:18.463Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

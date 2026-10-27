@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "fbf65d5c-ea15-44bb-84c6-97927e87576a":
+    status: "completed"
+    startedAt: "2026-05-26T01:49:45.235Z"
+    completedAt: "2026-05-26T01:55:38.186Z"
+    endedAt: "2026-05-26T01:55:38.186Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Identified and removed 2 dead exports with zero production consumers: compactSingleChildren+CompactionResult from rex/core/compact-single-children.ts, and extractStatusTrailers+formatPrStatusSection+StatusTrailerEntry from hench/tools/pr-status-trailers.ts. Net code reduction: 135 lines. All acceptance criteria met: build passes, tests pass (1671/1695), zero external production consumers confirmed."
+    appliedAt: "2026-05-26T01:55:38.186Z"

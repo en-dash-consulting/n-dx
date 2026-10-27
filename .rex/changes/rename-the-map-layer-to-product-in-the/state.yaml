@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "761ab00d-e31b-4e8a-9c86-a4bde4584471":
+    status: "completed"
+    startedAt: "2026-10-07T15:54:03.409Z"
+    completedAt: "2026-10-07T16:01:16.820Z"
+    endedAt: "2026-10-07T16:01:16.820Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 schema: Layer \"product\" | \"changes\", ProductNodeType, PRODUCT_NODE_TYPES, layerOf → \"product\"; V2Tree.map → product; comments, rule messages and tests renamed."
+    appliedAt: "2026-10-07T16:01:16.820Z"
+    lastModified: "2026-10-07T16:01:17.035Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "50f24186-8c11-4eb2-bbca-9d83a731ab47":
+    status: "completed"
+    startedAt: "2026-08-19T16:32:56.191Z"
+    completedAt: "2026-08-19T17:27:48.172Z"
+    endedAt: "2026-08-19T17:27:48.172Z"
+    resolutionType: "code-change"
+    resolutionDetail: "AC 7 of 71e44890 satisfied on POSIX via ubuntu: PR en-dash-consulting/n-dx#329, sha bc90582c, run 32279143889, job \"Build & Validate\" step \"Run unit tests\" success, which runs llm-client's integration suite including both freeze policies. Confirmed by step conclusion plus structure, not by reading the log line (log download is 403 without admin); the silent-skip risk is ruled out separately. AC 2's macOS clause corrected as unsatisfiable — the macos-latest job runs only the root suite and never executes this test. Also reconciled TESTING.md, which did not merely lack guidance on complexity gates but banned them: Family 2 is now a graded hierarchy (count work, then assert growth, then scaled absolutes as hang guardrails only), plus a new rule against scaling a bound whose job is to sit below another number, and a flush-before-retry rule."
+    appliedAt: "2026-08-19T17:27:48.172Z"

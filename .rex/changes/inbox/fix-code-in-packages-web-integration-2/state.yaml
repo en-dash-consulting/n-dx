@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "0e8681dc-e39d-4f02-9aba-7972cbda15a3":
+    status: "completed"
+    startedAt: "2026-04-14T01:01:20.813Z"
+    completedAt: "2026-04-14T01:03:50.078Z"
+  "76ab3e87-ff97-40b3-94be-084cc92256fe":
+    status: "completed"
+    startedAt: "2026-04-14T01:03:50.293Z"
+    completedAt: "2026-04-14T01:03:50.293Z"
+    appliedAt: "2026-04-14T01:03:50.293Z"
+    needsPlacement: true

@@ -12,6 +12,10 @@ export {
   loadModules,
   loadFromFiles,
   detectMode,
+  probeServer,
+  classifyProbeStatus,
+  SERVER_PROBE_DELAYS_MS,
   startPolling,
   stopPolling,
 } from "./data-loader.js";
+export type { ServerProbe, ServerProbeOptions } from "./data-loader.js";

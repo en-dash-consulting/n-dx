@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "374df08e-08ca-4f94-bcbe-7bcf1dd0f630":
+    status: "completed"
+    startedAt: "2026-10-15T03:55:22.529Z"
+    completedAt: "2026-10-15T03:57:41.179Z"
+    endedAt: "2026-10-15T03:57:41.179Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Styled archetype button; shared select chevron with padding"
+    appliedAt: "2026-10-15T03:57:41.179Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T03:57:41.467Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

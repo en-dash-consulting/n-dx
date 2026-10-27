@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "e3e84949-2e0d-4f1f-9de4-a34a9aa2002f":
+    status: "completed"
+    startedAt: "2026-09-10T19:56:21.783Z"
+    completedAt: "2026-09-10T20:00:49.830Z"
+    endedAt: "2026-09-10T20:00:49.830Z"
+    resolutionType: "code-change"
+    resolutionDetail: "buildBundle stamps `doc.schema ?? SCHEMA_VERSION`, so a newer-minor document exports a bundle labelled with its own minor and parseBundle's gate refuses it instead of comparing equal minors and admitting unvalidated passthrough fields. Three tests: the document's version is stamped, an absent schema falls back to the running version, and a newer-minor bundle is refused end to end through a JSON round trip. The pre-existing envelope test was renamed — its fixture sits at the running version, so its schema assertion could not distinguish the two implementations. Follow-up captured as ac6f568b (tree persists no schema marker). Full suite clean, 6/6."
+    appliedAt: "2026-09-10T20:00:49.830Z"
+    lastModified: "2026-09-10T20:00:49.836Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

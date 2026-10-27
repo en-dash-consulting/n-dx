@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "a93e8867-0dab-43d5-8270-f2a0f6dbb47f":
+    status: "completed"
+    startedAt: "2026-10-01T16:27:41.897Z"
+    completedAt: "2026-10-01T16:36:09.925Z"
+    endedAt: "2026-10-01T16:36:09.925Z"
+    resolutionType: "code-change"
+    resolutionDetail: "live-task with no id normalises to live; Settings keeps and restores page ids; [ ] ignored under aria-modal; unit + Playwright tests added"
+    appliedAt: "2026-10-01T16:36:09.925Z"
+    lastModified: "2026-10-01T16:36:10.292Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

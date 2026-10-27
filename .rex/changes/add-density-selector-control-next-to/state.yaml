@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "933f5c2a-b488-46cc-83f9-15cfb1a76565":
+    status: "completed"
+    startedAt: "2026-05-14T19:06:14.323Z"
+    completedAt: "2026-05-14T19:09:20.561Z"
+    endedAt: "2026-05-14T19:09:20.561Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created SidebarDensitySelector component with initDensity(), wired into sidebar footer and main.ts, added inline script to index.html for flash-free init, CSS segmented control in layout.css, accessibility tests passing."
+    appliedAt: "2026-05-14T19:09:20.561Z"

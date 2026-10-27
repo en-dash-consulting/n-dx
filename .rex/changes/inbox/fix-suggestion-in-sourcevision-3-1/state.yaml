@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "4e6c049d-1870-462a-9aa0-501b9932b122":
+    status: "completed"
+    startedAt: "2026-04-03T14:35:15.361Z"
+    completedAt: "2026-04-03T14:35:15.361Z"
+    appliedAt: "2026-04-03T14:35:15.361Z"
+    needsPlacement: true
+  "d4bc1bc9-5b60-40fb-9719-9120ac718065":
+    status: "completed"
+    startedAt: "2026-04-03T14:35:10.827Z"
+    completedAt: "2026-04-16T20:48:21.503Z"
+    resolutionType: "acknowledgment"
+    resolutionDetail: "sourcevision-3 overflow zone does not exist in current codebase or any historical snapshot. The previous session's pins (vitest.config.ts, user.go, user_test.go → sourcevision) eliminated all sourcevision overflow communities. Current zones.json, .sourcevision/zones/, and CONTEXT.md confirm no sourcevision-[0-9] zones. Task was pre-resolved."

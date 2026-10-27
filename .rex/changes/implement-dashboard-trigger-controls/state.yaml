@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "5320dc1b-d8d6-483c-8bad-d9b4c6310d0f":
+    status: "completed"
+    startedAt: "2026-04-19T03:39:23.399Z"
+    completedAt: "2026-04-19T03:56:04.549Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added POST /api/commands/* routes and dashboard UI components for sv-analyze, sync, recommend, export, and self-heal commands. New Commands view, inline triggers in Overview/Suggestions, SyncPanel in Notion config."
+    appliedAt: "2026-04-19T03:56:04.549Z"

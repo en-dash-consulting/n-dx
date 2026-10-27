@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "caf9107a-de88-4cdd-be66-649219db5d0d":
+    status: "completed"
+    startedAt: "2026-10-14T19:11:30.831Z"
+    completedAt: "2026-10-14T19:29:47.087Z"
+    endedAt: "2026-10-14T19:29:47.087Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added readCapabilityCodeFiles (migrations/v1-to-v2/code-files.ts): reads .sourcevision zones.json and imports.json off disk, unions a title-matched zone's non-test files with the files the item's linked tests import, ranks and caps at 20, and returns {} with no analysis directory. rex migrate-plan passes the map to the drafter as options.codeFiles. No sourcevision import; the map stays plan input, so the v2 schema is unchanged."
+    appliedAt: "2026-10-14T19:29:47.087Z"
+    lastModified: "2026-10-14T19:29:47.657Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

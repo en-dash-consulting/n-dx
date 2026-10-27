@@ -1,0 +1,34 @@
+{
+  "id": "go-language-pack",
+  "name": "Lang Go",
+  "description": "8 files, mostly utilities and entry points; entry points go-pack.ts, go-resolver.ts, go-sql.ts; imports Tests; imported by Packages and Packages.",
+  "files": [
+    "packages/lang-go/src/go-pack.ts",
+    "packages/lang-go/src/go-resolver.ts",
+    "packages/lang-go/src/go-sql.ts",
+    "packages/lang-go/src/index.ts",
+    "packages/lang-go/src/pack.ts",
+    "packages/lang-go/src/package-paths.ts",
+    "packages/lang-go/vitest.config.ts",
+    "packages/lang-java/vitest.config.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-go/src/go-pack.ts",
+    "packages/lang-go/src/go-resolver.ts",
+    "packages/lang-go/src/go-sql.ts",
+    "packages/lang-go/src/index.ts",
+    "packages/lang-go/src/pack.ts",
+    "packages/lang-go/src/package-paths.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 8,
+  "lineCount": 592,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

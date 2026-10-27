@@ -2087,6 +2087,7 @@ function remoteToWebUrl(remote) {
 function gitCommand(root, args) {
   try {
     return execFileSync("git", args, {
+      windowsHide: true,
       cwd: root,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
@@ -2707,6 +2708,22 @@ function scanProject(root) {
 import { readFileSync as readFileSync2, existsSync as existsSync2, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
 import { join as join2, relative as relative2, extname as extname2, sep as sep2 } from "node:path";
 
+// packages/lang-kit/src/iac-kinds.ts
+var IAC_KINDS = [
+  [/bucket|blob_container|storage_account/, "bucket"],
+  [/sqs|_queue|servicebus_queue|pubsub_subscription/, "queue"],
+  [/sns|pubsub_topic|eventgrid|event_bus|eventbridge/, "topic"],
+  [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
+  [/elasticache|redis|memcache/, "cache"],
+  [/kinesis|kafka|msk|firehose/, "stream"],
+  [/cloudwatch_event_rule|events_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
+  [/secret|kms|vault|parameter/, "secrets"],
+  [
+    /lambda_function|serverless_function|cloud_run|cloudfunctions|container_app/,
+    "compute"
+  ]
+];
+
 // packages/sourcevision/src/schema/data-files.ts
 var DATA_FILES = {
   manifest: "manifest.json",
@@ -2754,20 +2771,6 @@ function readDeclaredConfig(root) {
   const infrastructure = (isoMap.infrastructure ?? []).filter((i) => i && typeof i.id === "string" && typeof i.name === "string").map((i) => ({ ...i, kind: i.kind || "service", origin: "config" }));
   return { seams, infrastructure };
 }
-var IAC_KINDS = [
-  [/bucket|blob_container|storage_account/, "bucket"],
-  [/sqs|_queue|servicebus_queue|pubsub_subscription/, "queue"],
-  [/sns|pubsub_topic|eventgrid|event_bus|eventbridge/, "topic"],
-  [/dynamodb|rds|_sql|spanner|firestore|bigtable|cosmosdb|documentdb|database/, "database"],
-  [/elasticache|redis|memcache/, "cache"],
-  [/kinesis|kafka|msk|firehose/, "stream"],
-  [/cloudwatch_event_rule|events_rule|scheduler|cron|eventbridge_rule/, "scheduler"],
-  [/secret|kms|vault|parameter/, "secrets"],
-  [
-    /lambda_function|serverless_function|cloud_run|cloudfunctions|container_app/,
-    "compute"
-  ]
-];
 function classifyResource(type) {
   const normalized = type.toLowerCase().replace(/::/g, "_").replace(/-/g, "_");
   for (const [pattern, kind] of IAC_KINDS) {
@@ -2784,6 +2787,8 @@ var IAC_SKIP = /* @__PURE__ */ new Set([
   "vendor",
   "coverage"
 ]);
+var FIXTURE_DIRS = /* @__PURE__ */ new Set(["fixtures", "__fixtures__", "testdata", "__mocks__"]);
+var IAC_TEST_DIRS = /* @__PURE__ */ new Set(["tests", "__tests__", ...FIXTURE_DIRS]);
 function findIaCFiles(root, limit = 400) {
   const terraform = [];
   const yaml = [];
@@ -2799,7 +2804,7 @@ function findIaCFiles(root, limit = 400) {
     for (const entry of entries) {
       const full = join2(dir, entry.name);
       if (entry.isDirectory()) {
-        if (IAC_SKIP.has(entry.name) || entry.name.startsWith(".")) continue;
+        if (IAC_SKIP.has(entry.name) || IAC_TEST_DIRS.has(entry.name.toLowerCase()) || entry.name.startsWith(".")) continue;
         walk(full, depth + 1);
         continue;
       }
@@ -2979,6 +2984,12 @@ function linkInfrastructure(infrastructure, filePaths, readFile) {
     return { ...infra, usedBy: [...found].sort() };
   });
 }
+function isTerraformPath(path) {
+  const ext = extname2(path).toLowerCase();
+  if (ext === ".tf" || ext === ".tfvars") return true;
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return name === "terragrunt.hcl" || name.endsWith(".tftest.hcl");
+}
 function computeInfrastructure(root, filePaths, readFile) {
   const config = readDeclaredConfig(root);
   const iac = discoverFromIaC(root);
@@ -2993,7 +3004,7 @@ function computeInfrastructure(root, filePaths, readFile) {
   });
   const infrastructure = linkInfrastructure(
     [...config.infrastructure, ...iac.infrastructure],
-    filePaths,
+    filePaths.filter((path) => !isTerraformPath(path)),
     read
   );
   return { seams: config.seams, infrastructure, sawIaC: iac.sawIaC };

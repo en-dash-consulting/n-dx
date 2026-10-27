@@ -1,0 +1,20 @@
+{
+  "id": "sourcevision/cli/sourcevision",
+  "name": "Sourcevision",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/index.ts",
+    "packages/sourcevision/src/analyzers/inventory.ts",
+    "packages/sourcevision/src/language/detect.ts",
+    "packages/sourcevision/src/util/project-walk.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/inventory.ts",
+    "packages/sourcevision/src/language/detect.ts",
+    "packages/sourcevision/src/util/project-walk.ts"
+  ],
+  "cohesion": 0.56,
+  "coupling": 0.44,
+  "fileCount": 4,
+  "lineCount": 1081
+}

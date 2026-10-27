@@ -31,7 +31,7 @@
  */
 
 import { execFile, execFileSync, spawn } from "node:child_process";
-import type { ChildProcess, StdioOptions } from "node:child_process";
+import type { ChildProcess, ExecFileSyncOptions, StdioOptions } from "node:child_process";
 import { existsSync, realpathSync, openSync, closeSync } from "node:fs";
 // Aliased: `resolve` is the conventional name for a Promise executor argument
 // throughout this file, and the import would be shadowed inside every one.
@@ -105,6 +105,15 @@ export interface ExecOptions {
    * descendants running.
    */
   treeKill?: boolean;
+  /**
+   * Windows only: start the child without a console window (CREATE_NO_WINDOW).
+   * Defaults to true. A parent that has no console itself — the hub, the
+   * background dashboard, `sv narrate`, or any child they spawned hidden —
+   * would otherwise hand every command its own visible window. Nothing in
+   * n-dx runs an interactive child through `exec`, so there is no reason to
+   * turn it off; the option exists so a caller can say so deliberately.
+   */
+  windowsHide?: boolean;
   /**
    * Stop the command when this signal aborts, its process tree included under
    * {@link treeKill}. Resolves `exitCode: null` with a `killed: true` error, like
@@ -208,6 +217,7 @@ export function exec(
     onData,
     input,
     treeKill = true,
+    windowsHide = true,
     signal: abortSignal,
     freeze = isPosixFreezeKillEnabled(env ?? process.env),
     _platform = process.platform as NodeJS.Platform,
@@ -264,6 +274,8 @@ export function exec(
         cwd,
         env,
         stdio: ["pipe", "pipe", "pipe"],
+        // No console window on Windows; see ExecOptions.windowsHide.
+        windowsHide,
         // This is the reason exec spawns rather than execFile'ing. execFile builds
         // its own options object for spawn and silently drops anything outside its
         // curated set, `detached` included — so on POSIX the child was never a
@@ -496,10 +508,10 @@ export function execStdout(
   args: string[],
   opts: ExecOptions,
 ): Promise<string> {
-  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env } = opts;
+  const { cwd, timeout, maxBuffer = DEFAULT_MAX_BUFFER, env, windowsHide = true } = opts;
 
   return new Promise((resolve) => {
-    execFile(cmd, args, { cwd, timeout, maxBuffer, env }, (_error, stdout) => {
+    execFile(cmd, args, { cwd, timeout, maxBuffer, env, windowsHide }, (_error, stdout) => {
       resolve((stdout ?? "").toString());
     });
   });
@@ -607,7 +619,7 @@ export function buildShellInvocation(
   posixShellAvailable: boolean,
 ): ShellInvocation {
   if (resolveShellKind(platform, posixShellAvailable) === "cmd") {
-    return { cmd: "cmd.exe", args: ["/d", "/s", "/c", `"${command}"`], kind: "cmd" };
+    return { cmd: "cmd.exe", args: ["/d", "/v:off", "/s", "/c", `"${command}"`], kind: "cmd" };
   }
   return { cmd: "sh", args: ["-c", command], kind: "posix" };
 }
@@ -648,6 +660,7 @@ export function execShellCmd(
 export function getCurrentHead(cwd: string): string | undefined {
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], {
+      windowsHide: true,
       cwd,
       encoding: "utf-8",
       // Captured, not inherited — same reason as gitRevParsePath: asking a
@@ -704,6 +717,7 @@ function gitRevParsePath(cwd: string, flag: string): string | null {
   let output: string;
   try {
     output = execFileSync("git", ["rev-parse", flag], {
+      windowsHide: true,
       cwd,
       encoding: "utf-8",
       // Capture stderr rather than inheriting it. Asking "is this a git
@@ -907,7 +921,7 @@ export function sanitizeBranchName(branch: string): string {
 function resolveExecutablePath(name: string): string | null {
   try {
     const cmd = process.platform === "win32" ? "where" : "which";
-    const output = execFileSync(cmd, [name], { stdio: "pipe", encoding: "utf-8" }) as string;
+    const output = execFileSync(cmd, [name], { windowsHide: true, stdio: "pipe", encoding: "utf-8" }) as string;
     const first = output.split(/\r?\n/).find((l) => l.trim().length > 0);
     return first?.trim() ?? null;
   } catch {
@@ -1547,6 +1561,15 @@ export interface SpawnCliOptions {
   /** stdio wiring passed through to spawn. */
   stdio?: StdioOptions;
   /**
+   * Windows only: start the vendor CLI without a console window. Defaults to
+   * true. The CLI runs under a hidden `ndx work` or a detached `sv narrate`
+   * far more often than under an operator's terminal, and a visible console
+   * for the whole run is the symptom that keeps coming back; a caller that
+   * runs the CLI interactively in the operator's own console passes
+   * `!process.stdout.isTTY`.
+   */
+  windowsHide?: boolean;
+  /**
    * @internal Override platform detection — for unit tests only.
    * Production callers must never pass this.
    */
@@ -1664,8 +1687,38 @@ export function buildWindowsCliCommandLine(binary: string, args: string[]): stri
   return [head, ...args.map(quoteWindowsToken)].join(" ");
 }
 
-/** A cmd.exe variable reference. Names cannot contain `%`, `=`, or a newline. */
-const WINDOWS_VAR_REF = /%([^%=\r\n]+)%/g;
+/**
+ * A cmd.exe variable reference: `%NAME%`, or `%NAME:~start,len%` and
+ * `%NAME:old=new%` with a modifier after the first `:`. The name is what
+ * precedes that colon; a modifier never changes which variable is read.
+ * TWIN: packages/core/win-spawn.js.
+ */
+const WINDOWS_VAR_REF = /%([^%\r\n]+)%/g;
+
+/**
+ * Names cmd.exe computes on the spot rather than reads from the environment,
+ * so no `env` lists them and an environment lookup alone never refuses them.
+ * Lower-case here; the lookup is case-insensitive, as cmd.exe's is.
+ * `%CMDCMDLINE%` is the dangerous one: its last character is the closing
+ * quote of the command line cmd.exe is running, so `%CMDCMDLINE:~-1%`
+ * smuggles a `"` past quoting and ends the argument. `%__APPDIR__%` and
+ * `%__CD__%` end in a backslash, which escapes the closing quote instead.
+ * TWIN: packages/core/win-spawn.js.
+ */
+const CMD_DYNAMIC_VARIABLES = new Set([
+  "cd",
+  "date",
+  "time",
+  "random",
+  "errorlevel",
+  "cmdextversion",
+  "cmdcmdline",
+  "highestnumanodenumber",
+  // Undocumented pseudo-variables: the cmd.exe binary's directory and the
+  // current directory with a trailing backslash. Neither is listed by `set`.
+  "__appdir__",
+  "__cd__",
+]);
 
 /** Windows environment names are case-insensitive; `process.env` is not. */
 function envHasName(env: NodeJS.ProcessEnv, name: string): boolean {
@@ -1674,6 +1727,20 @@ function envHasName(env: NodeJS.ProcessEnv, name: string): boolean {
     if (key.toLowerCase() === wanted) return env[key] !== undefined;
   }
   return false;
+}
+
+/**
+ * True when cmd.exe would rewrite the `%…%` reference whose inside is
+ * `reference`; false when it would leave it literal. The name is read up to
+ * the first `:`, so a modifier cannot hide it. A name starting with `=` is one
+ * of cmd.exe's hidden per-drive (`%=C:%`) or exit-code (`%=ExitCode%`)
+ * variables, resolvable without being in `env`.
+ * TWIN: packages/core/win-spawn.js.
+ */
+function cmdWouldExpand(env: NodeJS.ProcessEnv, reference: string): boolean {
+  const name = reference.split(":")[0]!;
+  if (name === "") return false;
+  return name.startsWith("=") || CMD_DYNAMIC_VARIABLES.has(name.toLowerCase()) || envHasName(env, name);
 }
 
 /**
@@ -1691,21 +1758,68 @@ function envHasName(env: NodeJS.ProcessEnv, name: string): boolean {
  * Enforcing the contract here is what turns it from a comment into a guarantee.
  * The check is deliberately narrow — cmd.exe only expands a name it can
  * resolve, leaving anything else literal, so a path that merely contains `%`
- * (`C:\100%cool\bin`) still spawns. Only a token that would actually be
- * rewritten is refused, and no CLI this spawns passes one.
+ * (`C:\100%cool\bin`) still spawns. Resolvable means: in `env`, one of cmd.exe's
+ * own dynamic variables, or a hidden `=`-prefixed one — and the name is read
+ * up to the first `:`, because `%CMDCMDLINE:~-1%` is still CMDCMDLINE. A line
+ * break is refused as well: cmd.exe reads a command line only up to the first
+ * one and silently drops the rest, so the child would run a different command
+ * from the one asked for.
+ *
+ * TWIN: packages/core/win-spawn.js (the orchestration tier must not import this
+ * package); `tests/unit/windows-quoting-parity.test.js` holds the two equal.
  */
-function assertNoWindowsEnvExpansion(tokens: readonly string[], env: NodeJS.ProcessEnv): void {
+export function assertNoWindowsEnvExpansion(tokens: readonly string[], env: NodeJS.ProcessEnv): void {
   for (const token of tokens) {
-    for (const match of token.matchAll(WINDOWS_VAR_REF)) {
-      const name = match[1]!;
-      if (!envHasName(env, name)) continue;
+    if (/[\r\n]/.test(token)) {
       throw new Error(
-        `Refusing to spawn: ${JSON.stringify(token)} contains %${name}%, which cmd.exe would expand ` +
+        `Refusing to spawn: ${JSON.stringify(token)} contains a line break. cmd.exe reads a command line ` +
+          `only up to the first line break, so the rest of this command would be silently dropped.`,
+      );
+    }
+    for (const match of token.matchAll(WINDOWS_VAR_REF)) {
+      const reference = match[1]!;
+      if (!cmdWouldExpand(env, reference)) continue;
+      throw new Error(
+        `Refusing to spawn: ${JSON.stringify(token)} contains %${reference}%, which cmd.exe would expand ` +
           `into the command line before running it. An expanded value containing a quote can end the ` +
           `argument and start another command, and quoting cannot prevent it.`,
       );
     }
   }
+}
+
+/**
+ * Synchronous twin of {@link spawnCli}: run a CLI and return its stdout, with
+ * the same Windows recipe and the same refusal. For callers that need the
+ * output before they can continue — sourcevision reads `rex tree` this way.
+ * Options are `execFileSync`'s; `windowsHide` defaults on, as everywhere else.
+ *
+ * TWIN: packages/core/win-spawn.js execFileSyncCli.
+ */
+export function execFileSyncCli(
+  binary: string,
+  args: string[],
+  options: ExecFileSyncOptions = {},
+  _platform: NodeJS.Platform = process.platform,
+): string | Buffer {
+  const cwd = typeof options.cwd === "string" ? options.cwd : undefined;
+  if (_platform === "win32") {
+    assertNoWindowsEnvExpansion([binary, ...args], options.env ?? process.env);
+    const cmdLine = buildWindowsCliCommandLine(binary, args);
+    logCliInvocation({ binary, args, cwd, via: "execFileSyncCli", platform: _platform, commandLine: cmdLine });
+    // `/v:off`: delayed `!VAR!` expansion is a registry setting `/d` does not
+    // reach; off, a `!` in a token stays a `!`. `/s` strips only the outer
+    // quote pair, keeping each token's own quotes.
+    // Node's ExecFileSyncOptions type omits windowsVerbatimArguments, though
+    // execFileSync honours it (it is a spawn option underneath); hence the cast.
+    return execFileSync("cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
+      windowsHide: true,
+      ...options,
+      windowsVerbatimArguments: true,
+    } as ExecFileSyncOptions);
+  }
+  logCliInvocation({ binary, args, cwd, via: "execFileSyncCli", platform: _platform });
+  return execFileSync(binary, args, { windowsHide: true, ...options });
 }
 
 /**
@@ -1732,8 +1846,8 @@ export function spawnCli(
   args: string[],
   opts: SpawnCliOptions = {},
 ): ChildProcess {
-  const { cwd, env, stdio, _platform = process.platform as NodeJS.Platform } = opts;
-  const baseOpts = { cwd, env, stdio };
+  const { cwd, env, stdio, windowsHide = true, _platform = process.platform as NodeJS.Platform } = opts;
+  const baseOpts = { cwd, env, stdio, windowsHide };
 
   if (_platform === "win32") {
     assertNoWindowsEnvExpansion([cliBinary, ...args], env ?? process.env);
@@ -1743,12 +1857,13 @@ export function spawnCli(
     // strips only the outermost quote pair, leaving the inner per-token quotes
     // (e.g. around a path containing spaces) intact. Without this wrapper, /s
     // would strip the binary path's own quotes and break spaced paths (#68).
-    return spawn("cmd.exe", ["/d", "/s", "/c", `"${cmdLine}"`], {
+    return spawn("cmd.exe", ["/d", "/v:off", "/s", "/c", `"${cmdLine}"`], {
       ...baseOpts,
+      windowsHide,
       windowsVerbatimArguments: true,
     });
   }
 
   logCliInvocation({ binary: cliBinary, args, cwd, via: "spawnCli", platform: _platform });
-  return spawn(cliBinary, args, baseOpts);
+  return spawn(cliBinary, args, { ...baseOpts, windowsHide });
 }

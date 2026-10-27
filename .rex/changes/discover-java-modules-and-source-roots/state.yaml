@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "24b251ed-e90b-42e9-af25-a3f5fb62628d":
+    status: "completed"
+    startedAt: "2026-10-08T02:05:05.461Z"
+    completedAt: "2026-10-08T02:09:24.418Z"
+    endedAt: "2026-10-08T02:09:24.418Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added src/language/java-modules.ts (discoverJavaModules) with unit tests for Maven, Gradle Groovy/Kotlin and no-build-file layouts."
+    appliedAt: "2026-10-08T02:09:24.418Z"
+    lastModified: "2026-10-08T02:09:24.675Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

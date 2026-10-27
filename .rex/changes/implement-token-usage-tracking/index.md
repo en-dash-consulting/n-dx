@@ -1,0 +1,30 @@
+---
+id: "1ae1ab98-c9b0-47a6-ba63-dded0edb0d51"
+type: "change"
+title: "Implement token usage tracking, reporting, and budget checking"
+slug: "implement-token-usage-tracking"
+intent: "End-to-end token analytics: extract and aggregate usage across packages, format reports with budget warnings, and check token/cost budgets with custom pricing."
+acceptanceCriteria:
+  - "Extracts token events from rex, hench, and sourcevision with proper filtering and error handling"
+  - "Skips invalid/malformed entries and non-JSON files"
+  - "Aggregates across multiple run files and all packages"
+  - "Filters by --since and --until using appropriate timestamps"
+  - "Maps event types to commands (e.g., smart_add_token_usage → smart-add)"
+  - "Groups events by package:command sorted by total tokens descending"
+  - "Groups events by time period (day/week/month) with correct boundary handling"
+  - "Formats zero usage appropriately"
+  - "Omits packages with zero usage from breakdown"
+  - "Formats warning and exceeded severity with appropriate headers"
+  - "Accepts custom pricing and handles fractional token counts"
+  - "Checks both token and cost budgets simultaneously"
+  - "Exceeded takes precedence over warning"
+  - "Treats zero and negative budgets as unlimited"
+amends: [{"target":"05338f33-e638-49b8-815f-ed12949f0c63","delta":"modified","summary":"Implement token usage tracking, reporting, and budget checking","base":"73fb0550a70ae61fd000a525c171c48528994693a88c0b0d0dc145b6567e2a3b"}]
+priority: "medium"
+tags:
+  - "token-usage"
+  - "aggregation"
+  - "filtering"
+  - "grouping"
+source: "llm"
+---

@@ -21,7 +21,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
 import {
   LLM_VENDOR,
@@ -32,9 +32,19 @@ import {
   parseLLMConfig,
   resolveLayout,
   getNextFailoverAttempt,
+  DEFAULT_LOCAL_HOST,
+  DEFAULT_LOCAL_PORT,
+  isPlausibleLlmHost,
+  isValidPort,
+  describeLocalEndpointProblem,
 } from "@n-dx/llm-client";
 import type { LLMConfig, LLMVendor, ClaudeFieldSource, ListableVendor } from "@n-dx/llm-client";
-import { VENDOR_PROVIDERS, validateConfigKeyValue, validateProviderForVendor } from "./hench-config-fields.js";
+import {
+  FORBIDDEN_CONFIG_SEGMENTS,
+  VENDOR_PROVIDERS,
+  validateConfigKeyValue,
+  validateProviderForVendor,
+} from "./hench-config-fields.js";
 import {
   readConfigSnapshot,
   readEffectiveNdxConfig,
@@ -319,8 +329,12 @@ function splitConfigPath(path: string): string[] {
 /**
  * Reject a parameterized path or value the resolver could not honor.
  * Returns an error message, or null when the change is acceptable.
+ *
+ * A delete (`deleting`) is held to the same path shape as a set — a tier is
+ * `llm.tiers.<vendor>.<tier>` whether it is being written or cleared — but
+ * not to the value rules, since there is no value.
  */
-function validateRoutingChange(path: string, value: unknown): string | null {
+function validateRoutingChange(path: string, value: unknown, deleting = false): string | null {
   if (path.startsWith("llm.tiers.")) {
     const rest = path.slice("llm.tiers.".length);
     const segments = rest.split(".");
@@ -335,11 +349,15 @@ function validateRoutingChange(path: string, value: unknown): string | null {
       return `Unknown tier "${tier}" in "${path}". Expected one of: ${[...TASK_TIERS].join(", ")}.`;
     }
     // Model ID validation is performed by validateModelForVendor, called after this path check
-    if (typeof value !== "string") {
+    if (!deleting && typeof value !== "string") {
       return `Value for "${path}" must be a model ID string.`;
     }
     return null;
   }
+
+  // Routes and effort are flat maps keyed by task class, so the path has no
+  // shape to hold a delete to; only a set has a value to check.
+  if (deleting) return null;
 
   if (path.startsWith("llm.routes.")) {
     if (typeof value !== "string" || !TASK_TIERS.has(value)) {
@@ -379,6 +397,9 @@ const NUMERIC_PATHS = new Set([
 
 /** Numeric paths validated as a TCP port (1–65535) rather than a plain positive integer. */
 const PORT_PATHS = new Set(["llm.local.port", "llm.local.verifier.port"]);
+
+/** String paths that name a server and are validated with `isPlausibleLlmHost`. */
+const HOST_PATHS = new Set(["llm.local.host", "llm.local.verifier.host"]);
 
 /** Numeric paths where 0 is meaningful (0 = no timeout) and must not be rejected. */
 const NON_NEGATIVE_PATHS = new Set(["llm.local.timeoutMs"]);
@@ -427,9 +448,17 @@ function getNumber(obj: Record<string, unknown>, key: string): number | null {
   return typeof v === "number" ? v : null;
 }
 
-/** Set a nested value by dot-separated path, creating intermediate objects. */
+/**
+ * Set a nested value by dot-separated path, creating intermediate objects.
+ *
+ * A `__proto__` / `constructor` / `prototype` segment is a no-op: walking
+ * through one lands on Object.prototype, and a write there reaches every
+ * object in the process. validateLlmChange refuses such a path first; this is
+ * the second line for a caller that bypasses it.
+ */
 function setByPath(obj: Record<string, unknown>, path: string, value: unknown): void {
   const parts = splitConfigPath(path);
+  if (parts.some((part) => FORBIDDEN_CONFIG_SEGMENTS.has(part))) return;
   let current: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
@@ -441,9 +470,14 @@ function setByPath(obj: Record<string, unknown>, path: string, value: unknown): 
   current[parts[parts.length - 1]] = value;
 }
 
-/** Delete a nested key by dot-separated path. */
+/**
+ * Delete a nested key by dot-separated path. Same prototype-chain guard as
+ * setByPath: `llm.tiers.__proto__.toString` once deleted Object.prototype's
+ * toString from the server process.
+ */
 function deleteByPath(obj: Record<string, unknown>, path: string): void {
   const parts = splitConfigPath(path);
+  if (parts.some((part) => FORBIDDEN_CONFIG_SEGMENTS.has(part))) return;
   let current: unknown = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     if (current == null || typeof current !== "object") return;
@@ -719,8 +753,6 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
 // Local server health probe
 // ---------------------------------------------------------------------------
 
-const DEFAULT_LOCAL_HOST = "localhost";
-const DEFAULT_LOCAL_PORT = 1234;
 const LOCAL_HEALTH_TIMEOUT_MS = 3_000;
 
 interface LocalStatusResponse {
@@ -728,6 +760,38 @@ interface LocalStatusResponse {
   url: string;
   models: string[];
   error?: string;
+}
+
+// The host and port shape rule — `isPlausibleLlmHost`, `isValidPort` and the
+// message `describeLocalEndpointProblem` writes — is `@n-dx/llm-client`'s:
+// inference builds the same `http://${host}:${port}/v1` URL the probes do,
+// so the dashboard imports the rule rather than carrying a copy of it.
+
+/**
+ * The host and port saved under `llm.local`, or the defaults where a key is
+ * absent (unset, null, or a cleared host). Both pass the shape check in the
+ * first shape; in the second a saved value that fails it — written by hand or
+ * by an older dashboard — is carried as written with the message that names
+ * it, so the caller reports it and never probes a URL built from it. A port
+ * saved as the string `"1234"` is therefore an error here, as it is for
+ * inference, and not a silent 1234.
+ */
+type SavedLocalEndpoint =
+  | { host: string; port: number; error: null }
+  | { host: unknown; port: unknown; error: string };
+
+function savedLocalEndpoint(llmLocal: Record<string, unknown>): SavedLocalEndpoint {
+  const savedHost = llmLocal["host"];
+  const savedPort = llmLocal["port"];
+  const host: unknown = savedHost == null || savedHost === "" ? DEFAULT_LOCAL_HOST : savedHost;
+  const port: unknown = savedPort == null ? DEFAULT_LOCAL_PORT : savedPort;
+  if (isPlausibleLlmHost(host) && isValidPort(port)) return { host, port, error: null };
+  return { host, port, error: describeLocalEndpointProblem(host, port) ?? "Invalid LLM host or port" };
+}
+
+/** The error-object shape `probeLocalServer` answers with, for an endpoint that was never fetched. */
+function unprobeableStatus(error: string): LocalStatusResponse {
+  return { ok: false, url: "", models: [], error };
 }
 
 /**
@@ -774,7 +838,7 @@ async function probeLocalServer(
       .filter(Boolean);
     return { ok: true, url, models };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errorMessage(err);
     const friendly = msg.includes("abort") || msg.includes("Cancel")
       ? "Timed out — is LM Studio running?"
       : isConnectionRefused(err)
@@ -851,7 +915,7 @@ async function runSmokeTest(
     return { ok: true, latencyMs, tokensPerSecond, outputTokens, reply, url };
   } catch (err) {
     const latencyMs = Date.now() - t0;
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = errorMessage(err);
     const friendly = msg.includes("abort") || msg.includes("Cancel")
       ? `Timed out after ${SMOKE_TEST_TIMEOUT_MS / 1000}s — model may still be loading`
       : isConnectionRefused(err)
@@ -1033,13 +1097,8 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
   };
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
-  const host = typeof llmLocal["host"] === "string" && llmLocal["host"]
-    ? llmLocal["host"]
-    : DEFAULT_LOCAL_HOST;
-  const port = typeof llmLocal["port"] === "number" && llmLocal["port"] > 0
-    ? llmLocal["port"]
-    : DEFAULT_LOCAL_PORT;
-  const localStatus = await probeLocalServer(host, port);
+  const local = savedLocalEndpoint(llmLocal);
+  const localStatus = local.error !== null ? unprobeableStatus(local.error) : await probeLocalServer(local.host, local.port);
 
   return {
     claude: cliEntry(
@@ -1063,7 +1122,9 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
       defaultModel: defaultModel(LLM_VENDOR.LOCAL),
       reachable: localStatus.ok,
       ...(localStatus.ok ? {} : { reason: localStatus.error ?? "Local server unreachable" }),
-      readiness: localReadiness(localStatus.ok, `${host}:${port}`),
+      // A saved endpoint that failed the shape check was never fetched: the
+      // card needs setup, with the shape error as its line, not "unreachable".
+      readiness: localReadiness(localStatus.ok, `${local.host}:${local.port}`, local.error),
     },
   };
 }
@@ -1087,11 +1148,21 @@ function validateLlmChange(
   value: string | boolean | number | null,
   vendorAfterChanges: string | null,
 ): string | null {
+  // Refused before any other rule, so the answer names the segment rather
+  // than a shape or vendor. Checked on the raw dotted path, not the
+  // flat-map-aware split: `llm.routes.__proto__` is a harmless own key once
+  // split, but nothing legitimate is ever named this way.
+  const poison = path.split(".").find((segment) => FORBIDDEN_CONFIG_SEGMENTS.has(segment));
+  if (poison) {
+    return `Invalid path "${path}": "${poison}" is not an allowed config key segment.`;
+  }
   // Legacy keys are read until 1.0.0 but never written. Refusing with the
   // replacement named beats the generic "unknown path" below, which would
   // leave a caller guessing that the key it can still *read* is not one
   // it may set.
-  const replacement = DEPRECATED_WRITE_PATHS[path];
+  // Own keys only: a path named after an Object.prototype member (`toString`)
+  // must fall through to the unknown-path refusal, not read the inherited function.
+  const replacement = Object.hasOwn(DEPRECATED_WRITE_PATHS, path) ? DEPRECATED_WRITE_PATHS[path] : undefined;
   if (replacement) {
     return `"${path}" is a deprecated key and is no longer written. Set "${replacement}" instead — ` +
       `the legacy value is still read until 1.0.0 and is left untouched.`;
@@ -1112,7 +1183,7 @@ function validateLlmChange(
       const n = Number(value);
       const isPort = PORT_PATHS.has(path);
       const valid = isPort
-        ? Number.isInteger(n) && n >= 1 && n <= 65535
+        ? isValidPort(n)
         : Number.isInteger(n) && n >= 0;
       if (!valid) {
         const expected = isPort ? "a valid port number (1–65535)" : "a non-negative integer";
@@ -1122,15 +1193,20 @@ function validateLlmChange(
   } else if (value !== null && typeof value !== "string") {
     return `Value for "${path}" must be a string or null, got ${typeof value}`;
   }
+  // A saved host is spliced into `http://${host}:${port}/v1/…` by the probes
+  // and by inference, so refuse a value that would rewrite that URL's path,
+  // query or authority at the write rather than at every reader.
+  if (HOST_PATHS.has(path) && value !== null && value !== "" && !isPlausibleLlmHost(value)) {
+    return `Value for "${path}" must be a hostname, an IPv4 address or a bracketed IPv6 address with no port, path, credentials or whitespace, got ${JSON.stringify(value)}`;
+  }
   if (path === "llm.vendor" && value !== null && !VALID_VENDORS.has(value.toString())) {
     return `llm.vendor must be one of: ${[...VALID_VENDORS].join(", ")}; got "${value}"`;
   }
-  // Routing paths carry their own shape and enum rules. Skipped for a
-  // null/"" value, which is a delete rather than a set.
-  if (value !== null && value !== "") {
-    const routingError = validateRoutingChange(path, value);
-    if (routingError) return routingError;
-  }
+  // Routing paths carry their own shape and enum rules. A null/"" value is a
+  // delete rather than a set: the path shape still applies, the value rules
+  // do not.
+  const routingError = validateRoutingChange(path, value, value === null || value === "");
+  if (routingError) return routingError;
   return validateModelForVendor(path, value) ?? validateReviewChange(path, value, vendorAfterChanges);
 }
 
@@ -1244,10 +1320,18 @@ export async function handleLlmRoute(
         errorResponse(res, 400, "Profile 'name' is required");
         return true;
       }
+      // The profile is stored and later spliced into a probe URL, so refuse a
+      // host or port that could not be one here rather than at every reader.
+      const host: unknown = typeof data.host === "string" && data.host ? data.host : DEFAULT_LOCAL_HOST;
+      const port: unknown = data.port === undefined ? DEFAULT_LOCAL_PORT : data.port;
+      if (!isPlausibleLlmHost(host) || !isValidPort(port)) {
+        errorResponse(res, 400, describeLocalEndpointProblem(host, port) ?? "Invalid LLM host or port");
+        return true;
+      }
       const profile: LocalProfile = {
         name: data.name.trim(),
-        host: typeof data.host === "string" && data.host ? data.host : DEFAULT_LOCAL_HOST,
-        port: typeof data.port === "number" && data.port > 0 ? data.port : DEFAULT_LOCAL_PORT,
+        host,
+        port,
         model: typeof data.model === "string" ? data.model : "",
       };
       const existing = readProfiles(ctx.projectDir);
@@ -1285,22 +1369,26 @@ export async function handleLlmRoute(
     const llm = (config["llm"] ?? {}) as Record<string, unknown>;
     const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
     // Saved config defaults
-    let host = typeof llmLocal["host"] === "string" && llmLocal["host"]
-      ? llmLocal["host"] : DEFAULT_LOCAL_HOST;
-    let port = typeof llmLocal["port"] === "number" && llmLocal["port"] > 0
-      ? llmLocal["port"] : DEFAULT_LOCAL_PORT;
+    let { host, port }: { host: unknown; port: unknown } = savedLocalEndpoint(llmLocal);
     let model = typeof llmLocal["model"] === "string" ? llmLocal["model"] : "";
     // Allow body overrides for unsaved edit values
     try {
       const rawBody = await readBody(req, res);
       if (rawBody.trim()) {
-        const body = JSON.parse(rawBody) as Partial<{ host: string; port: number; model: string }>;
+        const body = JSON.parse(rawBody) as Partial<{ host: unknown; port: unknown; model: unknown }>;
         if (typeof body.host === "string" && body.host) host = body.host;
-        if (typeof body.port === "number" && body.port > 0) port = body.port;
+        if (body.port !== undefined) port = body.port;
         if (typeof body.model === "string") model = body.model;
       }
     } catch {
       // Body is optional — malformed JSON falls back to saved config
+    }
+    // Both values are spliced into the probe URL, so a host carrying a path
+    // or credentials, or a port outside TCP's range, is refused before any
+    // request goes out — whichever of the body or the saved config it came from.
+    if (!isPlausibleLlmHost(host) || !isValidPort(port)) {
+      errorResponse(res, 400, describeLocalEndpointProblem(host, port) ?? "Invalid LLM host or port");
+      return true;
     }
     // The model count comes from the same host and port, so it describes the
     // server under test even when the edits are unsaved.
@@ -1315,13 +1403,8 @@ export async function handleLlmRoute(
     const config = readEffectiveNdxConfig(ctx.projectDir);
     const llm = (config["llm"] ?? {}) as Record<string, unknown>;
     const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
-    const host = typeof llmLocal["host"] === "string" && llmLocal["host"]
-      ? llmLocal["host"]
-      : DEFAULT_LOCAL_HOST;
-    const port = typeof llmLocal["port"] === "number" && llmLocal["port"] > 0
-      ? llmLocal["port"]
-      : DEFAULT_LOCAL_PORT;
-    const result = await probeLocalServer(host, port);
+    const local = savedLocalEndpoint(llmLocal);
+    const result = local.error !== null ? unprobeableStatus(local.error) : await probeLocalServer(local.host, local.port);
     jsonResponse(res, 200, result);
     return true;
   }

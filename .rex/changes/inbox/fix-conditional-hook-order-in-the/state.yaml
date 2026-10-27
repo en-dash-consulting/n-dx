@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "cbcc2814-37b6-4bbb-8b32-b45c752f33b0":
+    status: "completed"
+    startedAt: "2026-09-09T18:39:30.703Z"
+    completedAt: "2026-09-09T18:46:05.782Z"
+    endedAt: "2026-09-09T18:46:05.782Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Both views call every hook before the enrichment gate; findings memoized on the source array so the memo keyed on it works. Invariant pinned structurally (no use*() after an early return) because Preact does not surface hook-count changes at runtime, plus six threshold-transition tests. Commit ab6fa604."
+    appliedAt: "2026-09-09T18:46:05.782Z"
+    needsPlacement: true
+    lastModified: "2026-09-09T18:46:05.810Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

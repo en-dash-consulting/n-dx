@@ -1,0 +1,29 @@
+schema: "rex/v2"
+items:
+  "2cc75cd0-b22f-431a-a457-d82d895809fd":
+    status: "completed"
+    startedAt: "2026-10-11T08:29:44.584Z"
+    completedAt: "2026-10-11T08:29:44.584Z"
+    endedAt: "2026-10-11T08:29:44.584Z"
+    appliedAt: "2026-10-11T08:29:44.584Z"
+    needsPlacement: true
+    lastModified: "2026-10-11T08:29:44.859Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4a299c78-272b-4ff8-92b2-3e9ced88b46b":
+    status: "completed"
+    startedAt: "2026-10-11T08:19:42.821Z"
+    completedAt: "2026-10-11T08:29:43.385Z"
+    endedAt: "2026-10-11T08:29:43.385Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Prepare modal: Review (Off/Self/Pair) replaces the On/Off switch, plus Reviewer vendor; prep GET reports pairSupported; save and command line carry reviewMode/reviewVendor. Commit f473405d8."
+    lastModified: "2026-10-11T08:29:43.620Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f620332f-3247-4feb-9d05-251e5ac4f7fc":
+    status: "completed"
+    startedAt: "2026-10-11T08:01:49.942Z"
+    completedAt: "2026-10-11T08:19:18.988Z"
+    endedAt: "2026-10-11T08:19:18.988Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex run block gains reviewMode/reviewVendor; hench --review-mode/--reviewer with flag > task run > hench.review.* precedence; web allow-list; changeset. Commit a6c9e3ba7."
+    lastModified: "2026-10-11T08:19:19.283Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

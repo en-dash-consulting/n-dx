@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b1fac5d6-941f-4447-96e2-3089210cef78":
+    status: "completed"
+    startedAt: "2026-10-09T08:53:31.350Z"
+    completedAt: "2026-10-09T09:02:34.345Z"
+    endedAt: "2026-10-09T09:02:34.345Z"
+    resolutionType: "code-change"
+    resolutionDetail: "addProductReshapeChange drafts proposals one at a time, dry-running addChangeNode after each; a proposal that gets the change refused is skipped with apply's problems (AddChangeNodeError.problems), so reshape --accept no longer throws and the change-layer pass runs."
+    appliedAt: "2026-10-09T09:02:34.345Z"
+    lastModified: "2026-10-09T09:02:34.605Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

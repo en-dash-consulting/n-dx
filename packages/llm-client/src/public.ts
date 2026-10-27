@@ -171,6 +171,7 @@ export {
   resolveTaskModel,
   DEFAULT_ROUTES,
   resolveJudgmentRoute,
+  routesToTier,
   DEFAULT_JUDGMENT_ROUTES,
   JUDGMENT_ROUTE_TYPESAFE,
   TYPESAFE_API_KEY_ENV,
@@ -280,6 +281,18 @@ export {
   resolveLocalTimeoutMs,
 } from "./local-api-provider.js";
 export type { LocalApiProviderOptions } from "./local-api-provider.js";
+
+// The one host-and-port shape rule for the local LLM endpoint. Inference,
+// the dashboard's probes and `ndx config` all splice these into a URL, so
+// they share one judgement of what may be spliced; core carries an inline
+// twin (spawn-only rule) pinned by tests/unit/local-endpoint-parity.test.js.
+export {
+  DEFAULT_LOCAL_HOST,
+  DEFAULT_LOCAL_PORT,
+  isPlausibleLlmHost,
+  isValidPort,
+  describeLocalEndpointProblem,
+} from "./local-endpoint.js";
 export type {
   GoogleApiProviderOptions,
   GeminiContent,
@@ -336,6 +349,7 @@ export {
   quoteWindowsToken,
   buildWindowsCliCommandLine,
   spawnCli,
+  execFileSyncCli,
   diagnoseCliInvocation,
   isCliNotFoundError,
   diagnoseCliNotFound,
@@ -357,10 +371,11 @@ export type {
 // Process-tree termination — a kill that reaches descendants, not just the child.
 export {
   terminateProcessTree,
+  terminateTreeByPidSync,
   treeKillSpawnOptions,
   treeKillCommand,
 } from "./process-tree.js";
-export type { TerminateTreeOptions } from "./process-tree.js";
+export type { TerminateTreeOptions, TerminateByPidOptions } from "./process-tree.js";
 
 // Project feature toggles - read by the dashboard and by the run loop alike.
 export {
@@ -730,3 +745,8 @@ export {
   resolveVendorCliEnv,
 } from "./child-env.js";
 export type { EnvPolicy, EnvPolicyConfig } from "./child-env.js";
+
+// ---- Vendor-CLI invocation log ----------------------------------------------
+// The file name is public so consumers that classify a project's files (hench's
+// uncommitted-work gate, ndx init's gitignore) name the log the writer writes.
+export { CLI_LOG_FILENAME } from "./cli-log.js";

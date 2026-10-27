@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "52d7ea63-5637-4e35-a49a-3e86ad7a8c9f":
+    status: "completed"
+    startedAt: "2026-10-15T05:56:23.704Z"
+    completedAt: "2026-10-15T06:07:30.977Z"
+    endedAt: "2026-10-15T06:07:30.977Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Shared resolver ChangeLayerStore.resolveRef/resolveItemRef used by edit_item, move_item, merge_items, claim_task, rex update; hench --resolve reports subtask/container refusals with the run's messages."
+    appliedAt: "2026-10-15T06:07:30.977Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T06:07:31.266Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

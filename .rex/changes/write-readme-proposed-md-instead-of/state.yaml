@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "62576269-9a7f-4051-8a09-05b7ff914c88":
+    status: "completed"
+    startedAt: "2026-06-01T15:20:01.906Z"
+    completedAt: "2026-06-01T15:39:01.927Z"
+    endedAt: "2026-06-01T15:39:01.927Z"
+    resolutionType: "code-change"
+    resolutionDetail: "generateTargetReadme now writes README.proposed.md when a case-insensitive README variant exists (overwriting prior proposed files, never reading/touching the original). Init summary surfaces a single-line diff hint via cli.js (static path) and cli-ink.js (Ink TUI Recap). 6/6 regression tests green; full suite 1 flaky-only failure unrelated to init."
+    appliedAt: "2026-06-01T15:39:01.927Z"

@@ -1,0 +1,43 @@
+schema: "rex/v2"
+items:
+  "08ceeb30-fa7c-4450-aa43-9ae2b4479031":
+    status: "completed"
+    startedAt: "2026-08-20T17:51:04.000Z"
+    completedAt: "2026-08-20T17:52:17.226Z"
+    endedAt: "2026-08-20T17:52:17.226Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Step 1 now captures an ISO-8601 timestamp platform-neutrally; Step 7's record invocation passes it as --startedAt. Vendor copies regenerated; 159 asset tests green."
+  "13e50500-d6d2-48ba-8f56-56c53f553419":
+    status: "completed"
+    startedAt: "2026-08-20T19:17:04.599Z"
+    completedAt: "2026-08-20T19:18:25.094Z"
+    endedAt: "2026-08-20T19:18:25.094Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Step 7 now maps findings onto add_item's real parameters via an explicit table: level defaults to task, severity maps 1:1 onto priority, criteria go to the acceptanceCriteria array with the reason why, and source/tags carry provenance. 224 skill e2e tests green."
+  "262f3436-7206-499e-8fdf-5c93abbe89c1":
+    status: "completed"
+    startedAt: "2026-08-20T19:56:33.644Z"
+    completedAt: "2026-08-20T19:59:18.430Z"
+    endedAt: "2026-08-20T19:59:18.430Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Diff mode resolves the default branch via git symbolic-ref and asks the user when origin/HEAD is unset; the @{u} option in this item's description was verified wrong and not implemented. New tests/e2e/skill-portability.test.js guards against any skill naming a branch in a git command. Full root e2e green (1238 passed)."
+  "58171595-a659-490f-9c23-51044bfeb502":
+    status: "completed"
+    startedAt: "2026-08-21T14:10:12.574Z"
+    completedAt: "2026-08-21T14:12:18.027Z"
+    endedAt: "2026-08-21T14:12:18.027Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Topic mode now enumerates .rex/prd_tree/ using the same phrasing as the duplicate-check step, names get_prd_status for epic-level shape, and reframes get_item as fetch-by-known-ID. Guess-a-slug instruction removed. Full root e2e green (1238 passed)."
+  "75bd9dee-f2ad-414f-9ca4-45d9f5f0c910":
+    status: "completed"
+    startedAt: "2026-08-21T14:12:23.178Z"
+    completedAt: "2026-08-21T14:12:23.178Z"
+    endedAt: "2026-08-21T14:12:23.178Z"
+    appliedAt: "2026-08-21T14:12:23.178Z"
+  "9c9ea0ac-94f1-4f57-8cd1-64cf248fcdb2":
+    status: "completed"
+    startedAt: "2026-08-21T14:05:14.248Z"
+    completedAt: "2026-08-21T14:07:53.370Z"
+    endedAt: "2026-08-21T14:07:53.370Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Claim mode passes runTests: false so verify_criteria maps criteria without spawning the project's test command; Step 2 declares its discovered commands the only ones permitted to execute tests. AC3 verified by auditing every command Step 1 can issue. Full root e2e green (1238 passed)."

@@ -1,0 +1,43 @@
+{
+  "id": "lang-runtime",
+  "name": "Language Pack Runtime",
+  "description": "13 files, mostly utilities and entry points; entry points build-grammars.mjs, index.ts, pack-calls.ts; imports Tests; imported by Packages and Packages.",
+  "files": [
+    "packages/lang-runtime/scripts/build-grammars.mjs",
+    "packages/lang-runtime/scripts/update-pack-goldens.mjs",
+    "packages/lang-runtime/src/index.ts",
+    "packages/lang-runtime/src/pack-calls.ts",
+    "packages/lang-runtime/src/pack-entry.ts",
+    "packages/lang-runtime/src/pack-facts.ts",
+    "packages/lang-runtime/src/pack-package.ts",
+    "packages/lang-runtime/src/pack.ts",
+    "packages/lang-runtime/src/runner.ts",
+    "packages/lang-runtime/src/testing/grammar.ts",
+    "packages/lang-runtime/src/testing/pack-golden.ts",
+    "packages/lang-runtime/vitest.config.ts",
+    "packages/lang-sql/vitest.config.ts"
+  ],
+  "entryPoints": [
+    "packages/lang-runtime/scripts/build-grammars.mjs",
+    "packages/lang-runtime/src/index.ts",
+    "packages/lang-runtime/src/pack-calls.ts",
+    "packages/lang-runtime/src/pack-entry.ts",
+    "packages/lang-runtime/src/pack-facts.ts",
+    "packages/lang-runtime/src/pack-package.ts",
+    "packages/lang-runtime/src/pack.ts",
+    "packages/lang-runtime/src/runner.ts",
+    "packages/lang-runtime/src/testing/grammar.ts",
+    "packages/lang-runtime/src/testing/pack-golden.ts"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 13,
+  "lineCount": 1789,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

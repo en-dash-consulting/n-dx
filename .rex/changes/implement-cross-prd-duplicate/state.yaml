@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "4f0263fa-8da5-4a83-811c-01da1c4acdf7":
+    status: "completed"
+    startedAt: "2026-04-22T18:34:12.341Z"
+    completedAt: "2026-04-22T18:57:05.754Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Cross-PRD duplicate detection with older-file preference via ItemFileMap and comparePRDFileAge"
+    appliedAt: "2026-04-22T18:57:05.754Z"

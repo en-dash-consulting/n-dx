@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "1ed4d2ef-d06f-4485-8f07-1d98d1919c76":
+    status: "completed"
+    startedAt: "2026-10-15T03:57:50.506Z"
+    completedAt: "2026-10-15T04:01:33.841Z"
+    endedAt: "2026-10-15T04:01:33.841Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Status dock row with popovers above each pill"
+    appliedAt: "2026-10-15T04:01:33.841Z"
+    lastModified: "2026-10-15T04:01:34.126Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

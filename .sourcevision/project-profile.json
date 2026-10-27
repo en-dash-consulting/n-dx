@@ -4,9 +4,13 @@
   "languages": [
     "typescript",
     "javascript",
+    "python",
+    "java",
     "go",
-    "zig",
-    "python"
+    "sql",
+    "terraform",
+    "kotlin",
+    "zig"
   ],
   "frameworks": [
     "vitest"
@@ -26,6 +30,14 @@
   "ciSurfaces": [
     {
       "path": ".github/workflows/ci.yml",
+      "kind": "GitHub Actions"
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "kind": "GitHub Actions"
+    },
+    {
+      "path": ".github/workflows/dependency-review.yml",
       "kind": "GitHub Actions"
     },
     {

@@ -1115,11 +1115,22 @@ function startVerboseHeartbeat(
   }, VERBOSE_HEARTBEAT_INTERVAL_MS);
 }
 
+/**
+ * The dashboard surfaces a failing rex spawn's stderr as the error it shows, so
+ * rex's v1-layout deprecation notice would lead every message. Every spawn site
+ * inherits `process.env`; turning the notice off here covers them all, and the
+ * dashboard can state the deprecation itself.
+ */
+export function silenceChildLegacyNotice(env: NodeJS.ProcessEnv = process.env): void {
+  env["NDX_LEGACY_NOTICE"] = "off";
+}
+
 export async function startServer(
   targetDir: string,
   port: number = 3117,
   opts: ServerOptions = {},
 ): Promise<StartResult> {
+  silenceChildLegacyNotice();
   const absDir = resolve(targetDir);
   const layout = resolveLayout(absDir);
   const svDir = layout.sourcevisionDir;
@@ -1252,6 +1263,17 @@ export async function startServer(
   // Live overview frames: repository-wide, so every workspace's viewer gets them.
   watcherHandles.monitorIntervals.push(startLiveMonitor(registry.anchor.ctx, liveSourcesOf(registry), everyWorkspaceBroadcast));
 
+  // ── Generate ephemeral PRD JSON cache ────────────────────────────────
+  // `.rex/.cache/prd.json` is the fast-path read target for all web route
+  // handlers while the server is running; a folder tree has no `prd.md` or
+  // `prd.json` for `loadPRDSync` to fall back to. So it is written before the
+  // server listens: a request can never beat it and answer 404. The rex
+  // watcher refreshes it on every change; the `.cache/` directory is removed
+  // on shutdown.
+  if (isInScope(scope, "rex") && existsSync(rexDir)) {
+    await refreshPRDCache(rexDir);
+  }
+
   const server = createHttpServer(registry, ws, assets, wsHealthTracker, token);
 
   return new Promise<StartResult>((resolvePromise, rejectPromise) => {
@@ -1284,15 +1306,6 @@ export async function startServer(
         await writeFile(portFilePath, String(actualPort) + "\n", "utf-8");
       } catch {
         // Non-fatal: port file is a convenience, not a requirement
-      }
-
-      // ── Generate ephemeral PRD JSON cache ──────────────────────────────
-      // `.rex/.cache/prd.json` is the fast-path read target for all web
-      // route handlers while the server is running. It is regenerated here
-      // at boot and refreshed by the rex watcher on every change. The
-      // `.cache/` directory is removed on shutdown.
-      if (isInScope(scope, "rex") && existsSync(rexDir)) {
-        await refreshPRDCache(rexDir);
       }
 
       logStartup(actualPort, ctx, watcherHandles.henchRunsDir, token);

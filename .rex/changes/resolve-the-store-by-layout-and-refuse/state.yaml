@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "74584d30-c16b-4bdc-ab37-27a2df75fdcf":
+    status: "completed"
+    startedAt: "2026-10-12T07:10:37.652Z"
+    completedAt: "2026-10-12T07:25:07.419Z"
+    endedAt: "2026-10-12T07:25:07.419Z"
+    resolutionType: "code-change"
+    resolutionDetail: "resolveStore dispatches on layout (ChangeLayerStore on v2), resolveV1Store added; FileStore refuses v2 trees; rex init skips prd_tree/ on v2; init hint gated on no PRD in either layout."
+    appliedAt: "2026-10-12T07:25:07.419Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T07:25:07.694Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

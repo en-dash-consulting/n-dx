@@ -12,8 +12,11 @@
  * deleted tombstones are ignored. Completing a change (on its own or with its
  * last task) then checks each enclosing change outward. Only a `pending`
  * change auto-completes: an `in_progress` change is never swept (#368), so it
- * completes through {@link completeChange}. A change that still
- * `needsPlacement` is held: it may not close (`change-placed-at-close`).
+ * completes through {@link completeChange}. A change held for placement
+ * (`awaitsPlacement`: `needsPlacement` on a product layer with a capability
+ * or constraint to place it on) may not close (`change-placed-at-close`). On
+ * a product layer with neither, an Inbox change closes; with no target it
+ * stays unapplied until placed (`applyOnTrigger`).
  *
  * A completed change goes through `applyOnTrigger(…, "complete", …)`: applied
  * under `complete`, left open and unapplied under `review` or `release`. A
@@ -45,7 +48,7 @@
  * @module rex/core/change-completion
  */
 
-import { indexTree, isAppliedChange, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { awaitsPlacement, indexTree, isAppliedChange, isOpenChange, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import type { ResolutionType } from "../schema/index.js";
 import { AUTO_COMPLETABLE_STATUSES, SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
 import { computeTimestampUpdates } from "./timestamps.js";
@@ -307,7 +310,7 @@ function emptyResult(tree: V2Tree, completed: string[]): ChangeCompletionResult 
 }
 
 function closeChange(result: ChangeCompletionResult, change: RuleNode, options: ChangeCompletionOptions): ChangeCompletionResult {
-  if (change.needsPlacement) {
+  if (awaitsPlacement(indexTree(result.tree), change)) {
     result.held = { changeId: change.id, reason: "it still needs placement; a person must confirm its targets before it closes" };
     return result;
   }

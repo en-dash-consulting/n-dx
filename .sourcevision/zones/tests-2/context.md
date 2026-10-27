@@ -5,20 +5,54 @@
 <zone>
 
 Zone: Tests 2 (`tests-2`)
-Files: 3, Cohesion: 1.00, Coupling: 0.00
+Files: 13, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in tests: setup-color-env.js, setup-judgment-env.js, setup-session-env.js
-Lines: 84
+Description: Non-source files in tests: evals.test.js, record-goldens.js, score.js (+10 more)
+Entry points: tests/hidden-child-process-alias.mjs, tests/hidden-child-process.js, tests/vitest-isolation.mjs
+Lines: 1101
 
 </zone>
 
 <files>
 
+tests/gauntlet/sourcevision-evals/evals.test.js (JavaScript, 111 lines, test)
+tests/gauntlet/sourcevision-evals/record-goldens.js (JavaScript, 80 lines, test)
+tests/gauntlet/sourcevision-evals/score.js (JavaScript, 91 lines, test)
+tests/gauntlet/sourcevision-evals/score.test.js (JavaScript, 225 lines, test)
+tests/hidden-child-process-alias.d.mts (TypeScript, 10 lines, test)
+tests/hidden-child-process-alias.mjs (JavaScript, 18 lines, test)
+tests/hidden-child-process.js (JavaScript, 138 lines, test)
 tests/setup-color-env.js (JavaScript, 40 lines, test)
 tests/setup-judgment-env.js (JavaScript, 10 lines, test)
-tests/setup-session-env.js (JavaScript, 34 lines, test)
+tests/setup-ndx-home.js (JavaScript, 34 lines, test)
+tests/setup-session-env.js (JavaScript, 153 lines, test)
+tests/vitest-isolation.d.mts (TypeScript, 32 lines, test)
+tests/vitest-isolation.mjs (JavaScript, 159 lines, test)
 
 </files>
+
+<imports>
+
+Internal:
+  tests/gauntlet/sourcevision-evals/evals.test.js → tests/gauntlet/sourcevision-evals/score.js {archetypeAccuracy, zonePartitionSimilarity, projectForScoring}
+  tests/gauntlet/sourcevision-evals/score.test.js → tests/gauntlet/sourcevision-evals/score.js {archetypeAccuracy, zonePartitionSimilarity, projectForScoring}
+
+Incoming (other zones → this zone):
+  ← go-language-pack: packages/lang-go/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/lang-go/vitest.config.ts → tests/vitest-isolation.mjs; packages/lang-java/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/lang-java/vitest.config.ts → tests/vitest-isolation.mjs
+  ← graview: packages/graview/vitest.config.ts → tests/hidden-child-process-alias.mjs
+  ← graview-face: packages/graview-face/vitest.config.ts → tests/hidden-child-process-alias.mjs
+  ← hench: packages/hench/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/hench/vitest.config.ts → tests/vitest-isolation.mjs
+  ← lang-runtime: packages/lang-runtime/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/lang-runtime/vitest.config.ts → tests/vitest-isolation.mjs; packages/lang-sql/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/lang-sql/vitest.config.ts → tests/vitest-isolation.mjs
+  ← lang-terraform: packages/lang-terraform/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/lang-terraform/vitest.config.ts → tests/vitest-isolation.mjs
+  ← language-pack-foundation: packages/lang-kit/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/lang-kit/vitest.config.ts → tests/vitest-isolation.mjs; packages/lang-python/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/lang-python/vitest.config.ts → tests/vitest-isolation.mjs
+  ← llm-client: packages/llm-client/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/llm-client/vitest.config.ts → tests/vitest-isolation.mjs
+  ← root: vitest.config.js → tests/hidden-child-process-alias.mjs
+  ← sourcevision: packages/sourcevision/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/sourcevision/vitest.config.ts → tests/vitest-isolation.mjs
+  ← tests-unit: tests/unit/hidden-child-process.test.js → tests/hidden-child-process.js
+  ← vitest-bench-config: packages/rex/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/rex/vitest.config.ts → tests/vitest-isolation.mjs
+  ← web-landing: packages/web/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/web/vitest.config.ts → tests/vitest-isolation.mjs
+
+</imports>
 
 <findings>
 
@@ -33,5 +67,6 @@ tests/setup-session-env.js (JavaScript, 34 lines, test)
 - High cohesion (1) — files are tightly interconnected
 - Generic zone name "Tests 2" — enrichment did not assign a meaningful name reflecting this zone's domain purpose
 - Zone "tests-2" has a numeric suffix indicating an overflow community — pin its files to a named zone or merge with the base zone to eliminate the ambiguous ID
+- [call graph] 43 internal calls, 0 outgoing, 20 incoming (cohesion: 1, coupling: 0)
 
 </insights>

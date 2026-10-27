@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "bbbb68d6-5efa-4bd1-b4cf-77e5a437fa3f":
+    status: "completed"
+    startedAt: "2026-10-13T18:43:58.742Z"
+    completedAt: "2026-10-13T18:48:33.180Z"
+    endedAt: "2026-10-13T18:48:33.180Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 Quick Add answers type:\"change\" (level dropped), refuses other types; changeset corrected; commit 98c39a572"
+    appliedAt: "2026-10-13T18:48:33.180Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:48:33.623Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

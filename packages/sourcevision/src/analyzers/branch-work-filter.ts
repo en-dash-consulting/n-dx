@@ -288,6 +288,7 @@ function detectBaseBranch(dir: string): string {
 function getMergeBase(dir: string, baseBranch: string): string | null {
   try {
     const sha = execFileSync("git", ["merge-base", "HEAD", baseBranch], {
+      windowsHide: true,
       cwd: dir,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -309,6 +310,7 @@ function getCommitDate(dir: string, sha: string): string | null {
       ["log", "-1", "--format=%aI", sha],
       {
         cwd: dir,
+        windowsHide: true,
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
       },

@@ -12,7 +12,13 @@
 
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { quoteWindowsToken, buildWindowsCliCommandLine, execFileSyncCli, spawnCli } from "../../packages/core/win-spawn.js";
+import {
+  quoteWindowsToken,
+  buildWindowsCliCommandLine,
+  execFileSyncCli,
+  spawnCli,
+  assertNoWindowsEnvExpansion,
+} from "../../packages/core/win-spawn.js";
 
 // ---------------------------------------------------------------------------
 // quoteWindowsToken
@@ -164,5 +170,41 @@ describe("spawnCli", () => {
     });
     expect(typeof child.kill).toBe("function");
     child.kill("SIGTERM");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assertNoWindowsEnvExpansion — the refusal, exercised directly so it runs on
+// every platform (execFileSyncCli / spawnCli only reach it on win32)
+// ---------------------------------------------------------------------------
+
+describe("assertNoWindowsEnvExpansion (core twin)", () => {
+  it("refuses a variable the environment defines, case-insensitively", () => {
+    expect(() => assertNoWindowsEnvExpansion(["model%INJECT%"], { INJECT: "x" })).toThrow(/%INJECT%/);
+    expect(() => assertNoWindowsEnvExpansion(["%inject%"], { INJECT: "x" })).toThrow(/Refusing to spawn/);
+  });
+
+  it("refuses cmd.exe's own dynamic variables, which no environment lists", () => {
+    for (const token of ["m%CMDCMDLINE:~-1%", "x%CD%y", "%RANDOM%", "%ERRORLEVEL%", "%=C:%", "%=ExitCode%", "m%__APPDIR__%", "m%__CD__:~-1%"]) {
+      expect(() => assertNoWindowsEnvExpansion([token], {}), token).toThrow(/would expand/);
+    }
+  });
+
+  it("reads the name before a modifier", () => {
+    expect(() => assertNoWindowsEnvExpansion(["x%OS:~0,3%y"], { OS: "Windows_NT" })).toThrow(/%OS:~0,3%/);
+    expect(() => assertNoWindowsEnvExpansion(['x%OS:W=" & whoami & echo %y'], { OS: "Windows_NT" })).toThrow(
+      /Refusing to spawn/,
+    );
+  });
+
+  it("refuses a token holding a line break", () => {
+    expect(() => assertNoWindowsEnvExpansion(["a\necho SECOND"], {})).toThrow(/line break/);
+    expect(() => assertNoWindowsEnvExpansion(["a\r\necho SECOND"], {})).toThrow(/line break/);
+  });
+
+  it("leaves a lone percent sign and an unresolvable name alone", () => {
+    expect(() => assertNoWindowsEnvExpansion(["C:\\Users\\100%cool\\claude.cmd"], { PATH: "" })).not.toThrow();
+    expect(() => assertNoWindowsEnvExpansion(["50%undefined_var%x"], { PATH: "" })).not.toThrow();
+    expect(() => assertNoWindowsEnvExpansion(["%undefined_var:~1%"], { PATH: "" })).not.toThrow();
   });
 });

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "8104988a-a7b3-42bd-9431-a2adfd31a045":
+    status: "completed"
+    startedAt: "2026-10-13T18:14:16.465Z"
+    completedAt: "2026-10-13T18:14:16.465Z"
+    endedAt: "2026-10-13T18:14:16.465Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Baseline re-recorded in 52c23af56 (+11 tokens, inboxClause); tests/e2e/prompt-census.test.js passes."
+    appliedAt: "2026-10-13T18:14:16.465Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:14:16.806Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

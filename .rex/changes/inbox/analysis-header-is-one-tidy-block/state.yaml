@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "28f56c4d-9bb7-4058-a56a-ef4829635b95":
+    status: "completed"
+    startedAt: "2026-10-15T14:45:46.318Z"
+    completedAt: "2026-10-15T14:49:10.427Z"
+    endedAt: "2026-10-15T14:49:10.427Z"
+    resolutionType: "code-change"
+    resolutionDetail: "One-block header; split analyze control"
+    appliedAt: "2026-10-15T14:49:10.427Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T14:49:10.729Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

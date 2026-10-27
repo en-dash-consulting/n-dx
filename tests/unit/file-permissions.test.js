@@ -15,6 +15,9 @@ import {
 
 const WIN_PATH = "C:\\proj\\.n-dx.json";
 
+/** TESTING.md, Family 2: every absolute time budget is scaled through this. */
+const BUDGET_MULTIPLIER = Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
+
 /** Real `icacls <path>` output shapes, captured on Windows 11. */
 const ICACLS_INHERITED = `${WIN_PATH} NT AUTHORITY\\SYSTEM:(I)(F)
                           BUILTIN\\Administrators:(I)(F)
@@ -71,6 +74,19 @@ Se han procesado correctamente 1 archivos`;
   it("returns nothing for unparseable output", () => {
     expect(parseIcaclsOutput("", WIN_PATH)).toEqual([]);
     expect(parseIcaclsOutput("Access is denied.", WIN_PATH)).toEqual([]);
+  });
+
+  // A flag group excludes "(" as well as ")": same ACEs on every icacls line,
+  // and a line of alternating ":(" is rejected in one pass instead of retrying
+  // a group from every "(". This is a hang guardrail on a complexity claim the
+  // regex engine gives no counter for, so it is an absolute budget, scaled per
+  // TESTING.md Family 2. Measured at this length: 19,888 ms with `[^)]`,
+  // 0.8 ms with `[^()]`, against 250 ms × 20 = 5 s by default.
+  it("rejects a line of alternating ':(' within the scaled linear budget", () => {
+    const hostile = `${WIN_PATH} ${":(".repeat(200_000)}`;
+    const start = performance.now();
+    expect(parseIcaclsOutput(hostile, WIN_PATH)).toEqual([]);
+    expect(performance.now() - start).toBeLessThan(250 * BUDGET_MULTIPLIER);
   });
 });
 

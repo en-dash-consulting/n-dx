@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "12138fcd-c804-4da3-bf3d-10c563ea3397":
+    status: "completed"
+    startedAt: "2026-10-07T16:49:42.845Z"
+    completedAt: "2026-10-07T17:01:50.784Z"
+    endedAt: "2026-10-07T17:01:50.784Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added store/prd-model-reader.ts (loadPrdModel, SchemaSkewError, override, assertPrdModelWritable) with a v2 fixture and tests covering all five acceptance criteria."
+    appliedAt: "2026-10-07T17:01:50.784Z"
+    lastModified: "2026-10-07T17:01:51.002Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

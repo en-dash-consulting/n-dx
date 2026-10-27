@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "c634a331-1abb-4d4b-97fa-b7abd9bf0c1c":
+    status: "completed"
+    startedAt: "2026-10-13T15:45:40.020Z"
+    completedAt: "2026-10-13T15:50:08.158Z"
+    endedAt: "2026-10-13T15:50:08.158Z"
+    resolutionType: "code-change"
+    resolutionDetail: "buildPackImportGraph degrades (one notice, fallback named) a resolver pack whose produces omits imports; readSymbols throws for a pack without SYMBOL_RULES; new factGaps(pack) names both gaps."
+    appliedAt: "2026-10-13T15:50:08.158Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-13T15:50:08.445Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

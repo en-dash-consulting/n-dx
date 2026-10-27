@@ -87,6 +87,12 @@ describe("needsPlacement", () => {
     expect(ids(inbox)).toEqual([]);
   });
 
+  it("does not block selection on a product layer with no capability or constraint to place on", () => {
+    expect(ids({ product: [], changes: inbox.changes })).toEqual(["inbox-task", "inbox-solo"]);
+    expect(ids({ product: [node({ id: "area", type: "area" })], changes: inbox.changes })).toEqual(["inbox-task", "inbox-solo"]);
+    expect(ids({ product: [node({ id: "rule", type: "constraint" })], changes: inbox.changes })).toEqual([]);
+  });
+
   it("is runnable by id", () => {
     expect(resolveWorkById(inbox, "inbox-task")).toMatchObject({ kind: "task", node: { id: "inbox-task" }, change: { id: "inbox" } });
     expect(resolveWorkById(inbox, "inbox-solo")).toMatchObject({ kind: "change", node: { id: "inbox-solo" } });

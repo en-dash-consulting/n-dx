@@ -1,0 +1,28 @@
+{
+  "id": "tests-lang-java-integration",
+  "name": "Tests Lang Java Integration",
+  "description": "Non-source files in packages: embedded-sql.test.ts, java-build-file-failure.test.ts, java-pack-queries.test.ts (+6 more)",
+  "files": [
+    "packages/lang-java/tests/integration/embedded-sql.test.ts",
+    "packages/lang-java/tests/integration/java-build-file-failure.test.ts",
+    "packages/lang-java/tests/integration/java-pack-queries.test.ts",
+    "packages/lang-java/tests/integration/java-resolver.test.ts",
+    "packages/lang-java/tests/integration/pack-facts.test.ts",
+    "packages/lang-java/tests/integration/pack-golden.test.ts",
+    "packages/lang-java/tests/integration/spring-boot-scale.test.ts",
+    "packages/lang-java/tests/integration/spring-boot.test.ts",
+    "packages/lang-java/tests/integration/tree-sitter-java-grammar.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 9,
+  "lineCount": 1451,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

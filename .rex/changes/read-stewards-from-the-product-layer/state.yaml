@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "1e556ade-c4a9-443a-93e5-d87e5d409a45":
+    status: "completed"
+    startedAt: "2026-10-08T15:15:01.925Z"
+    completedAt: "2026-10-08T15:27:20.729Z"
+    endedAt: "2026-10-08T15:27:20.729Z"
+    resolutionType: "code-change"
+    resolutionDetail: "rex codeowners: pure planner + command, opt-in via config codeOwners, tests, README, changeset"
+    appliedAt: "2026-10-08T15:27:20.729Z"
+    lastModified: "2026-10-08T15:27:20.977Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

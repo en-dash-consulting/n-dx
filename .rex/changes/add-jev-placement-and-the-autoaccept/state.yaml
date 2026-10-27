@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "581f7bd2-4019-4a0d-b6fa-61588c91f431":
+    status: "completed"
+    startedAt: "2026-10-07T22:18:48.879Z"
+    completedAt: "2026-10-07T22:27:09.600Z"
+    endedAt: "2026-10-07T22:27:09.600Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added core/placement-policy.ts (settings, decidePlacement, Jev seam) + tests; registered prd.place.judge."
+    appliedAt: "2026-10-07T22:27:09.600Z"
+    lastModified: "2026-10-07T22:27:10.310Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

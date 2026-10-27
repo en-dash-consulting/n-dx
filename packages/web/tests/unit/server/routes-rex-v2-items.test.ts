@@ -90,12 +90,90 @@ describe("Rex item routes on a v2 project", () => {
     expect(await count()).toBe(before);
   });
 
-  it("POST /items refuses a parent, which v2 does not take until type-aware CRUD", async () => {
-    const res = await send("POST", "items", { title: "Nested", parentId: CHANGE_ID });
+  const taskFields = {
+    description: "Card form takes Apple Pay.",
+    acceptanceCriteria: ["Apple Pay button shows on Safari"],
+    priority: "high",
+  };
+
+  it("POST /items adds a task under a placed change", async () => {
+    const res = await send("POST", "items", { title: "Wire Apple Pay", parentId: CHANGE_ID, type: "task", ...taskFields });
+    expect(res.status).toBe(201);
+    const created = await res.json();
+    expect(created).toMatchObject({ ok: true, type: "task", title: "Wire Apple Pay", parentId: CHANGE_ID });
+    expect(created).not.toHaveProperty("level");
+
+    const change = (await (await resolveStore(rexDir)).getItem(CHANGE_ID))!;
+    const task = change.children?.find((c) => c.id === created.id);
+    expect(task).toMatchObject({ type: "task", title: "Wire Apple Pay", status: "pending", ...taskFields });
+  });
+
+  it("POST /items adds a task under an Inbox change, inferring the type from the parent", async () => {
+    const inbox = await (await send("POST", "items", { title: "Support gift cards" })).json();
+    const res = await send("POST", "items", { title: "Gift card balance check", parentId: inbox.id, ...taskFields });
+    expect(res.status).toBe(201);
+    const created = await res.json();
+    expect(created).toMatchObject({ type: "task", parentId: inbox.id });
+
+    const change = (await (await resolveStore(rexDir)).getItem(inbox.id))!;
+    expect(change.children?.map((c) => c.title)).toEqual(["Gift card balance check"]);
+    expect(change.needsPlacement).toBe(true);
+  });
+
+  it("POST /items refuses a change or feature under a change and writes nothing", async () => {
+    const before = JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items);
+    for (const type of ["change", "feature"]) {
+      const res = await send("POST", "items", { title: "Nested", parentId: CHANGE_ID, type });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toContain("a task");
+    }
+    expect(JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items)).toBe(before);
+  });
+
+  it("POST /items refuses a task under a completed change", async () => {
+    expect((await send("PATCH", `items/${TASK_ID}`, { status: "completed" })).status).toBe(200);
+    expect((await send("PATCH", `items/${CHANGE_ID}`, { status: "completed" })).status).toBe(200);
+    const res = await send("POST", "items", { title: "Late", parentId: CHANGE_ID, type: "task" });
     expect(res.status).toBe(400);
-    const { error } = await res.json();
-    expect(error).toContain("Add with no parent");
-    expect(error).toContain("rex add --type=task --parent=<id>");
+    expect((await res.json()).error).toMatch(/follow-up|completed|applied/i);
+  });
+
+  it("POST /items answers 404 for a parent that does not exist", async () => {
+    const res = await send("POST", "items", { title: "Orphan", parentId: "nope", type: "task" });
+    expect(res.status).toBe(404);
+  });
+
+  it("POST /items adds a subtask under a task", async () => {
+    const res = await send("POST", "items", { title: "Check the button", parentId: TASK_ID });
+    expect(res.status).toBe(201);
+    const created = await res.json();
+    expect(created).toMatchObject({ ok: true, type: "subtask", parentId: TASK_ID });
+
+    const task = (await (await resolveStore(rexDir)).getItem(TASK_ID))!;
+    expect(task.children?.find((c) => c.id === created.id)).toMatchObject({ type: "subtask", title: "Check the button" });
+  });
+
+  it("POST /items refuses a child under a subtask and writes nothing", async () => {
+    const subtask = await (await send("POST", "items", { title: "Leaf", parentId: TASK_ID })).json();
+    const before = JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items);
+    const res = await send("POST", "items", { title: "Too deep", parentId: subtask.id });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("takes no children");
+    expect(JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items)).toBe(before);
+  });
+
+  it("POST /items moves an in-progress change's criteria onto its first task", async () => {
+    const change = await (await send("POST", "items", { title: "Support gift cards", acceptanceCriteria: ["A balance shows"] })).json();
+    expect((await send("PATCH", `items/${change.id}`, { status: "in_progress" })).status).toBe(200);
+
+    const res = await send("POST", "items", { title: "Gift card balance check", parentId: change.id });
+    expect(res.status).toBe(201);
+    const created = await res.json();
+
+    const saved = (await (await resolveStore(rexDir)).getItem(change.id))!;
+    const task = saved.children?.find((c) => c.id === created.id);
+    expect(task).toMatchObject({ status: "in_progress", acceptanceCriteria: ["A balance shows"] });
+    expect(saved.acceptanceCriteria ?? []).toEqual([]);
   });
 
   it("PATCH status in_progress goes through the change-layer store", async () => {

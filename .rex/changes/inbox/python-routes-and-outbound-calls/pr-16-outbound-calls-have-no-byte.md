@@ -1,0 +1,21 @@
+---
+id: "0b4d2fc2-65cd-4a51-9f88-fe89b5d507fd"
+type: "task"
+title: "PR 16 outbound calls have no byte-identity or home-assistant timing evidence"
+slug: "pr-16-outbound-calls-have-no-byte"
+description: "Verdict: should-fix (severity medium). Found by the adversarial review of 32e56fc0.\n\nAcceptance criterion 5 of 32e56fc0 is asserted only. These were never run: sv analyze --fast byte-identical to the previous tip (t16a) for repos without Python and Python repos with the pack refused; outbound.json added-only with the pack, and components.json unchanged; home-assistant wall-clock with and without the pack against PR 15b. The agent session could not copy the corpus or run zsh scripts. No sourcevision code changed, and an integration test covers the pipeline (shop fixture), but nothing measured the real corpus.\n\nOption (only one): run the prepared harness /private/tmp/claude-501/-Users-ryankeith-ndx-core-n-dx--claude-worktrees-sv-lang-pr11-lang-kit-fba685/70bc6c6b-e3e3-4e02-8252-a472df4f8aa1/scratchpad/verify-t16b.sh. It reads the operator's t16a and base15b references read-only. Log the result on 32e56fc0. Cost: about 5 minutes of analyze runs."
+acceptanceCriteria:
+  - "sv analyze --fast output for petclinic, microservices-demo, terraform-aws-rds, workspace-crossings and sourcevision-src is identical to t16a"
+  - "Every Python corpus repository analyzed with the pack refused is identical to t16a"
+  - "With the pack, lang-added-only reports ADDED-ONLY ok in outbound mode for every Python corpus repository, with the added counts logged"
+  - "home-assistant analyze wall-clock with and without the pack is logged next to PR 15b and task 1"
+priority: "medium"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:medium"
+  - "lang-python"
+  - "outbound"
+  - "pr-16"
+  - "operator"
+source: "ndx-adversarial-review"
+---

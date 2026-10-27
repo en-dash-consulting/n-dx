@@ -23,7 +23,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
-import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import { appendLog } from "./rex-route-helpers.js";
 import {
   prdLayout,
@@ -467,7 +467,7 @@ async function handleProductEditRoute(
     broadcast?.({ type: "rex:prd-changed", timestamp: now.toISOString() });
   } catch (err) {
     // The lock failure names the holder's PID; pass it through.
-    const message = err instanceof Error ? err.message : String(err);
+    const message = errorMessage(err);
     const refused = err instanceof ProductEditError || message.includes("Could not acquire PRD lock");
     errorResponse(res, refused ? 409 : 500, message);
   }

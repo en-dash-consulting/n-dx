@@ -86,13 +86,13 @@ Claude uses double-underscore prefixes (`mcp__{server}__{tool}`) to namespace to
 
 ## Rex MCP Tools
 
-Rex reads the PRD's layout from disk. A v2 PRD is the product layer (`.ndx/rex/product/`) plus the change layer (`.ndx/rex/changes/`); see [The PRD](./concepts/). Until the storage migration ships, `ndx init` creates v1 projects (`.rex/prd_tree/`, one tree of items with levels), and the product-layer tools refuse them.
+Rex reads the PRD's layout from disk. A v2 PRD is the product layer (`.ndx/rex/product/`) plus the change layer (`.ndx/rex/changes/`); see [The PRD](./concepts/). `ndx init` creates v2 projects. A v1 project, one that has not yet run `ndx migrate`, keeps `.rex/prd_tree/` (one tree of items with levels), and the product-layer tools refuse it.
 
 ### Product layer and changes
 
 | Tool | Description |
 |------|-------------|
-| `get_product` | The product layer: areas, and the capabilities and constraints under them, each with computed status and health. v2 only |
+| `get_product` | The product layer. By default each area with its counts by computed status, defective nodes and open changes; `area` returns one area's capabilities and constraints with status and health; `full: true` returns every area that way. v2 only |
 | `get_capability` | One capability or constraint: statement, capability criteria, parent chain, status, health, and the changes that amend or touch it. v2 only |
 | `place_change` | Without a target, the shortlist of capabilities and constraints a change could amend or touch; with one, record it (`touches` or `amends`). v2 only |
 | `apply_change` | Apply a change's amendments to the product layer, as a steward. Refused whole, listing every problem, when an amendment does not fit. v2 only |

@@ -1,0 +1,26 @@
+{
+  "id": "sourcevision/cli/commands-2",
+  "name": "Sourcevision",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/cli/commands/constants.ts",
+    "packages/sourcevision/src/cli/commands/init.ts",
+    "packages/sourcevision/src/cli/commands/readiness.ts",
+    "packages/sourcevision/src/cli/commands/reset.ts",
+    "packages/sourcevision/src/cli/commands/workspace.ts",
+    "packages/sourcevision/src/cli/output.ts",
+    "packages/sourcevision/src/schema/validate.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/cli/commands/init.ts",
+    "packages/sourcevision/src/cli/commands/readiness.ts",
+    "packages/sourcevision/src/cli/commands/reset.ts",
+    "packages/sourcevision/src/cli/commands/workspace.ts",
+    "packages/sourcevision/src/cli/output.ts",
+    "packages/sourcevision/src/schema/validate.ts"
+  ],
+  "cohesion": 0.34,
+  "coupling": 0.66,
+  "fileCount": 7,
+  "lineCount": 1411
+}

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "db21d009-cd14-4b1e-8338-b560798fa7c9":
+    status: "completed"
+    startedAt: "2026-10-08T06:18:01.962Z"
+    completedAt: "2026-10-08T06:24:51.031Z"
+    endedAt: "2026-10-08T06:24:51.031Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added src/language/go-build.ts (readGoBuildModels, readGoWorkFiles) with fixtures and tests"
+    appliedAt: "2026-10-08T06:24:51.031Z"
+    lastModified: "2026-10-08T06:24:51.681Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

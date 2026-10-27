@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "211f95af-1dba-486c-bd90-538e9a199be8":
+    status: "completed"
+    startedAt: "2026-04-18T15:15:58.986Z"
+    completedAt: "2026-04-18T15:26:10.910Z"
+    resolutionType: "config-override"
+    resolutionDetail: "Updated CLAUDE.md dual-fragility governance table: consolidated rex-satellite zones, added sourcevision-view-layer, formalized 74-edge regression threshold."
+  "d3b0080a-4418-44e8-a838-2aaef97bf36b":
+    status: "completed"
+    startedAt: "2026-04-18T15:26:10.947Z"
+    completedAt: "2026-04-18T15:26:10.947Z"
+    appliedAt: "2026-04-18T15:26:10.947Z"
+    needsPlacement: true

@@ -457,7 +457,7 @@ async function handleCaptureNextSteps(
 
     jsonResponse(res, 200, { ok: true, created, skipped, epicId: created > 0 ? epicId : undefined });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -609,7 +609,7 @@ async function handleCaptureAsk(
       },
     });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -647,7 +647,7 @@ async function handleAnalyze(
     const body = await readBody(req, res);
     input = JSON.parse(body) as typeof input;
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
     return true;
   }
 
@@ -855,7 +855,7 @@ async function handleAcceptProposals(
 
     jsonResponse(res, 200, { ok: true, acceptedCount: toAccept.length, addedCount });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -1021,7 +1021,7 @@ async function handleAcceptEditedProposals(
 
     jsonResponse(res, 200, { ok: true, acceptedCount: selectedProposals.length, addedCount });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -1144,7 +1144,7 @@ async function handleSmartAddPreview(
       jsonResponse(res, 200, { proposals: [], confidence: 0, qualityIssues: [] });
     }
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }
@@ -1414,7 +1414,7 @@ async function handleBatchImport(
       try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
     }
   } catch (err) {
-    errorResponse(res, 500, String(err));
+    errorResponse(res, 500, errorMessage(err));
   }
   return true;
 }

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "aca995cd-18c8-465b-a120-f5eb942e208a":
+    status: "completed"
+    startedAt: "2026-09-23T14:22:31.843Z"
+    completedAt: "2026-09-23T14:22:31.843Z"
+    endedAt: "2026-09-23T14:22:31.843Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Subdivision threshold capped at 30 files; no test quarantine or test-zone splitting inside subdivisions; sliver fold with rebuilt split (or no split when only slivers balanced it); ZONE_ALGORITHM_VERSION 5; subzone-naming.ts (carry, Jev with parent-relative candidates, echo revert, deferred generation via narrate, ids follow names); iso model zoneScenes/leafEdges/parents; recursive in-place expansion with deepest-visible arcs. 2195 sv tests, evals 4/4, live n-site2 3-level expansion screenshot."
+    appliedAt: "2026-09-23T14:22:31.843Z"
+    lastModified: "2026-09-23T14:22:32.200Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

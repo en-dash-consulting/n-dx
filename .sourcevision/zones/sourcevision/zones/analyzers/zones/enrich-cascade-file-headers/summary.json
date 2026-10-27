@@ -1,0 +1,19 @@
+{
+  "id": "sourcevision/analyzers/enrich-cascade-file-headers",
+  "name": "Analysis Enrichment",
+  "description": "3 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/enrich-cascade.ts",
+    "packages/sourcevision/src/analyzers/file-headers.ts",
+    "packages/sourcevision/src/analyzers/rerun-judge.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/enrich-cascade.ts",
+    "packages/sourcevision/src/analyzers/file-headers.ts",
+    "packages/sourcevision/src/analyzers/rerun-judge.ts"
+  ],
+  "cohesion": 0.19,
+  "coupling": 0.81,
+  "fileCount": 3,
+  "lineCount": 953
+}

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "f5fa8dfc-0e7f-4202-88c5-063adb17ac09":
+    status: "completed"
+    startedAt: "2026-10-15T05:07:49.956Z"
+    completedAt: "2026-10-15T05:11:36.124Z"
+    endedAt: "2026-10-15T05:11:36.124Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Opened tile is an inset modal with a back trail"
+    appliedAt: "2026-10-15T05:11:36.124Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T05:11:36.810Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

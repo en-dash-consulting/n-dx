@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "f3c00d88-b7e7-4577-8535-fa645bfa291e":
+    status: "completed"
+    startedAt: "2026-10-15T04:18:21.322Z"
+    completedAt: "2026-10-15T04:22:08.415Z"
+    endedAt: "2026-10-15T04:22:08.415Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Purpose-built collapsed summaries per Analyze tile"
+    appliedAt: "2026-10-15T04:22:08.415Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T04:22:09.134Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "e578fe1e-d9b5-4539-a5c5-e43d5b376abb":
+    status: "completed"
+    startedAt: "2026-10-17T01:23:11.823Z"
+    completedAt: "2026-10-17T01:25:29.933Z"
+    endedAt: "2026-10-17T01:25:29.933Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Dropped \"Nothing consumes the resolver yet, so analysis output is unchanged\" from .changeset/sv-java-resolver.md."
+    appliedAt: "2026-10-17T01:25:29.933Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-17T01:25:30.235Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

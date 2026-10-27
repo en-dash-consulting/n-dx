@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "c6d1041e-9e6f-4524-b7ee-79148345cf8e":
+    status: "completed"
+    startedAt: "2026-10-01T19:20:13.855Z"
+    completedAt: "2026-10-01T19:52:25.336Z"
+    endedAt: "2026-10-01T19:52:25.336Z"
+    resolutionType: "code-change"
+    resolutionDetail: "finalizeRun's uncommitted-work gate now calls commitOrphanedReviewRepairs when autoCommit is off and no commit prompt follows. It commits the repairs through commitReviewRepairsIfNeeded only when HEAD moved past run.startHead and the repairs are the only dirt left; a refused commit renders formatReviewRepairsUncommittedRefusal, which names the cause and gives a git add/commit plus `ndx rex update --status=completed` recovery with no stash option and no re-run advice. Four integration tests added."
+    appliedAt: "2026-10-01T19:52:25.336Z"
+    lastModified: "2026-10-01T19:52:26.457Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

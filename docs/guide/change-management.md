@@ -5,7 +5,7 @@ Your PRD starts fresh and accurate. Three months later, finished work still sits
 The PRD is the product's requirements (the product layer: areas, capabilities, constraints) plus the changes being made to them (the change layer: changes, tasks, subtasks). See [The PRD](./concepts/). The two layers drift in different ways, and most of the requirements' drift is computed for you.
 
 ::: info v1 projects
-Until the storage migration ships, `ndx init` creates v1 projects: one tree of epics, features, tasks and subtasks in `.rex/prd_tree/`, with no product layer. A v1 PRD has only work items, so all of its drift is the work drift below. [v1 projects](#v1-projects) at the end covers what is different.
+`ndx init` creates v2 projects. A v1 project, one that has not yet run `ndx migrate`, is one tree of epics, features, tasks and subtasks in `.rex/prd_tree/`, with no product layer. A v1 PRD has only work items, so all of its drift is the work drift below. [v1 projects](#v1-projects) at the end covers what is different.
 :::
 
 ## What drifts

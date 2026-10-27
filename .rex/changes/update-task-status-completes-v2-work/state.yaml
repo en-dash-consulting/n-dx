@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "6a4bb0bf-80f0-4b85-9da2-29ac837e94a5":
+    status: "completed"
+    startedAt: "2026-10-12T08:36:11.385Z"
+    completedAt: "2026-10-12T08:53:17.853Z"
+    endedAt: "2026-10-12T08:53:17.853Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 completion wired into update_task_status and rex update --status via shared cli/v2-completion.ts (completeWork inside withPrdModelTransaction, applyOn per loadApplyOn)"
+    appliedAt: "2026-10-12T08:53:17.853Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T08:53:18.124Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

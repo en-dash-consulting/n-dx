@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "faaf7ebe-75bf-4e5a-a944-9d4aad46ac48":
+    status: "completed"
+    startedAt: "2026-09-09T01:22:19.853Z"
+    completedAt: "2026-09-09T01:27:03.150Z"
+    endedAt: "2026-09-09T01:27:03.150Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Replaced the bare-\\bnot\\b alternative with BOUNDARY_PHRASINGS, a reviewed list covering the two shapes the skills actually use (negated action, stated absence). Extracted statesItsBoundary() so fixtures run through the same code path as the real skills, and added five fixture tests pinning both directions. Docstring rewritten to describe a lexical phrase-list check and its deliberate cost. All 13 skills pass; suite 46/46."
+    appliedAt: "2026-09-09T01:27:03.150Z"
+    lastModified: "2026-09-09T01:27:03.157Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

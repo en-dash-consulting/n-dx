@@ -1,0 +1,38 @@
+schema: "rex/v2"
+items:
+  "b035430c-d6fd-4447-b118-c126c38a122d":
+    status: "completed"
+    startedAt: "2026-10-09T17:07:27.381Z"
+    completedAt: "2026-10-09T17:08:46.802Z"
+    endedAt: "2026-10-09T17:08:46.802Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added \"Landing a pull request\" section and fixed the squash-merge sentence in CONTRIBUTING.md; RELEASING.md step 4 now lands Version Packages through the queue."
+    lastModified: "2026-10-09T17:08:47.377Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b0bef249-33ca-4749-87ce-411e528f6dd8":
+    status: "completed"
+    startedAt: "2026-10-09T17:31:26.816Z"
+    completedAt: "2026-10-09T17:31:26.816Z"
+    endedAt: "2026-10-09T17:31:26.816Z"
+    appliedAt: "2026-10-09T17:31:26.816Z"
+    needsPlacement: true
+    lastModified: "2026-10-09T17:31:27.035Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b6fdec97-494e-497a-8dec-07bd399b0e41":
+    status: "completed"
+    startedAt: "2026-10-09T17:28:50.761Z"
+    completedAt: "2026-10-09T17:31:25.731Z"
+    endedAt: "2026-10-09T17:31:25.731Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Reworded PR template comment and commit-trailers test comment to \"merge commit whose body is the PR description\"; no 'squash' left."
+    lastModified: "2026-10-09T17:31:25.995Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cc1bdece-0de4-4aa1-8f5c-40a67df6c044":
+    status: "completed"
+    startedAt: "2026-10-09T17:02:08.355Z"
+    completedAt: "2026-10-09T17:05:47.744Z"
+    endedAt: "2026-10-09T17:05:47.744Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added merge_group trigger to ci.yml, CodeQL rationale comment, and tests/e2e/ci-merge-queue-trigger.test.js"
+    lastModified: "2026-10-09T17:05:48.005Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -5,15 +5,17 @@
 <zone>
 
 Zone: Tests Fixtures (`tests-fixtures`)
-Files: 47, Cohesion: 1.00, Coupling: 0.00
+Files: 49, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in tests: ci-child-double.mjs, ci-spawn-preload.mjs, docs-build-stub.mjs (+44 more)
-Lines: 869
+Description: Non-source files in tests: child-double.mjs, spawn-preload.mjs, ci-child-double.mjs (+46 more)
+Lines: 911
 
 </zone>
 
 <files>
 
+tests/fixtures/agent-run-env/child-double.mjs (JavaScript, 17 lines, test)
+tests/fixtures/agent-run-env/spawn-preload.mjs (JavaScript, 25 lines, test)
 tests/fixtures/ci-child-cleanup/ci-child-double.mjs (JavaScript, 59 lines, test)
 tests/fixtures/ci-child-cleanup/ci-spawn-preload.mjs (JavaScript, 66 lines, test)
 tests/fixtures/ci-child-cleanup/docs-build-stub.mjs (JavaScript, 29 lines, test)
@@ -125,14 +127,14 @@ Internal:
 <findings>
 
 [observation] [info] High cohesion (1) — files are tightly interconnected
-[suggestion] [info] Zone "tests-fixtures" has files across 22 directories — consider consolidating under a dedicated directory
+[suggestion] [info] Zone "tests-fixtures" has files across 23 directories — consider consolidating under a dedicated directory
 
 </findings>
 
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- Zone "tests-fixtures" has files across 22 directories — consider consolidating under a dedicated directory
+- Zone "tests-fixtures" has files across 23 directories — consider consolidating under a dedicated directory
 - [call graph] 25 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

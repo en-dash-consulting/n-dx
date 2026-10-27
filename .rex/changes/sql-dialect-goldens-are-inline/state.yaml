@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "28654161-87ce-46fe-a7a9-d119953b35be":
+    status: "completed"
+    startedAt: "2026-10-11T01:57:09.887Z"
+    completedAt: "2026-10-11T01:59:59.348Z"
+    endedAt: "2026-10-11T01:59:59.348Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Goldens now classify the verbatim PetClinic fixtures"
+    appliedAt: "2026-10-11T01:59:59.348Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-11T01:59:59.619Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

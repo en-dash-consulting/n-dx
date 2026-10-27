@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "cc902750-ded4-45eb-b726-5f159d8eca6e":
+    status: "completed"
+    startedAt: "2026-10-08T02:23:40.344Z"
+    completedAt: "2026-10-08T03:04:07.983Z"
+    endedAt: "2026-10-08T03:04:07.983Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Code from hench run 9444b5a0 (a01418929, 54dcd503b); the gate failure was the jsdom import-path bug fixed by 8ce5cd15 (5f3fdb3f2). Operator-verified 2026-10-08: web 5316 and sourcevision 2520 tests pass."
+    appliedAt: "2026-10-08T03:04:07.983Z"
+    lastModified: "2026-10-08T03:04:08.246Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

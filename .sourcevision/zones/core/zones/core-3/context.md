@@ -5,57 +5,31 @@
 <zone>
 
 Zone: Core 3 (`core/core-3`)
-Files: 18, Cohesion: 0.69, Coupling: 0.31
-Description: 18 files, primarily JavaScript
-Entry points: packages/core/cli-timeout.js, packages/core/gitattributes-pins.js, packages/core/help.js, packages/core/init-llm.js, packages/core/install-identity.js, packages/core/llm-model-catalog.js, packages/core/mcp-shim.js, packages/core/narration-status.js, packages/core/refresh-artifacts.js, packages/core/refresh-plan.js, packages/core/refresh-validate.js, packages/core/resolve-existing-dir.js, packages/core/self-heal-confirm.js, packages/core/stale-check.js, packages/core/update-check.js, packages/core/web.js
-Lines: 9467
+Files: 6, Cohesion: 0.38, Coupling: 0.62
+Description: 6 files, primarily JavaScript
+Entry points: packages/core/cli-log.js, packages/core/commit-trailers.js, packages/core/export.js, packages/core/gitignore.js, packages/core/win-spawn.js
+Lines: 1667
 
 </zone>
 
 <files>
 
-packages/core/cli-timeout.js (JavaScript, 151 lines, source)
-packages/core/cli.js (JavaScript, 3128 lines, source)
-packages/core/gitattributes-pins.js (JavaScript, 123 lines, source)
-packages/core/help.js (JavaScript, 1735 lines, source)
-packages/core/init-llm.js (JavaScript, 622 lines, source)
-packages/core/install-identity.js (JavaScript, 298 lines, source)
-packages/core/llm-model-catalog.js (JavaScript, 77 lines, source)
-packages/core/mcp-shim.js (JavaScript, 390 lines, source)
-packages/core/narration-status.js (JavaScript, 81 lines, source)
-packages/core/readme-generator.js (JavaScript, 428 lines, source)
-packages/core/refresh-artifacts.js (JavaScript, 54 lines, source)
-packages/core/refresh-plan.js (JavaScript, 99 lines, source)
-packages/core/refresh-validate.js (JavaScript, 175 lines, source)
-packages/core/resolve-existing-dir.js (JavaScript, 87 lines, source)
-packages/core/self-heal-confirm.js (JavaScript, 201 lines, source)
-packages/core/stale-check.js (JavaScript, 71 lines, source)
-packages/core/update-check.js (JavaScript, 211 lines, source)
-packages/core/web.js (JavaScript, 1536 lines, source)
+packages/core/cli-log.js (JavaScript, 187 lines, source)
+packages/core/commit-trailers.js (JavaScript, 108 lines, source)
+packages/core/export.js (JavaScript, 874 lines, source)
+packages/core/gitignore.js (JavaScript, 69 lines, source)
+packages/core/win-spawn.js (JavaScript, 182 lines, source)
+scripts/soak-under-build-load.mjs (JavaScript, 247 lines, build)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/core/cli.js → packages/core/cli-timeout.js {resolveCommandTimeout, withCommandTimeout}
-  packages/core/cli.js → packages/core/gitattributes-pins.js {ensureGitattributesRules, MERGE_DRIVER_CONFIG}
-  packages/core/cli.js → packages/core/help.js {formatTypoSuggestion, getOrchestratorCommands, searchHelp, formatSearchResults, formatToolHelp, formatMainHelp, formatOrchestratorCommandHelp}
-  packages/core/cli.js → packages/core/init-llm.js {resolveInitLLMSelection, promptLLMSelection, validateInitFlags, SUPPORTED_PROVIDERS}
-  packages/core/cli.js → packages/core/install-identity.js {collectInstallIdentity, formatInstallIdentity, formatWorkIdentityLine, readGitIdentity, shouldPrintWorkIdentity}
-  packages/core/cli.js → packages/core/mcp-shim.js {runMcpShim}
-  packages/core/cli.js → packages/core/narration-status.js {formatNarrationStatus, readNarrationState}
-  packages/core/cli.js → packages/core/readme-generator.js {generateTargetReadme}
-  packages/core/cli.js → packages/core/refresh-artifacts.js {refreshSourcevisionDashboardArtifacts}
-  packages/core/cli.js → packages/core/refresh-plan.js {buildRefreshPlan, RefreshPlanError}
-  packages/core/cli.js → packages/core/refresh-validate.js {snapshotRefreshState, validateRefreshCompletion, rollbackRefreshState}
-  packages/core/cli.js → packages/core/resolve-existing-dir.js {resolveExistingDir}
-  packages/core/cli.js → packages/core/self-heal-confirm.js {parseRecommendationsJson, formatQueuedTaskSummary, readSelfHealAutoConfirm, resolveAutoConfirm, runConfirmationPrompt}
-  packages/core/cli.js → packages/core/stale-check.js {checkProjectStaleness, formatStalenessNotice}
-  packages/core/cli.js → packages/core/update-check.js {startUpdateCheck, formatUpdateNotice}
-  packages/core/cli.js → packages/core/web.js {runWeb, runHub, isProcessRunning, readPidFile, isHubMarker, removePidFile, removePortFile}
-  packages/core/init-llm.js → packages/core/llm-model-catalog.js {LLM_MODEL_CATALOG, getModelsForVendor, getRecommendedModel}
-  packages/core/init-llm.js → packages/core/llm-model-catalog.js {getModelsForVendor, getRecommendedModel}
-  packages/core/mcp-shim.js → packages/core/web.js {hubHome, hubRequest, isHubMarker, loadHubPort, readHubRegistry, readPidFile, resolveRepo}
+  packages/core/export.js → packages/core/commit-trailers.js {buildCommitMessage}
+  packages/core/export.js → packages/core/gitignore.js {ensureGitignoreEntry, isGitTracked}
+  packages/core/export.js → packages/core/win-spawn.js {execFileSyncCli}
+  packages/core/win-spawn.js → packages/core/cli-log.js {logCliInvocation}
+  scripts/soak-under-build-load.mjs → packages/core/win-spawn.js {spawnCli}
 
 </imports>

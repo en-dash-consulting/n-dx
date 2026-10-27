@@ -1,0 +1,23 @@
+{
+  "id": "rex-core/rex-core",
+  "name": "Rex Core",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/remove.ts",
+    "packages/rex/src/core/delete.ts",
+    "packages/rex/src/core/remove-epic.ts",
+    "packages/rex/src/core/remove-feature.ts",
+    "packages/rex/src/core/remove-task.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/remove.ts",
+    "packages/rex/src/core/delete.ts",
+    "packages/rex/src/core/remove-epic.ts",
+    "packages/rex/src/core/remove-feature.ts",
+    "packages/rex/src/core/remove-task.ts"
+  ],
+  "cohesion": 0.67,
+  "coupling": 0.33,
+  "fileCount": 5,
+  "lineCount": 806
+}

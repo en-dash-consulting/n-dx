@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { EventEmitter } from "node:events";
-import { jsonResponse, errorResponse, readBody, MAX_REQUEST_BODY_BYTES } from "../../../src/server/response-utils.js";
+import { jsonResponse, errorResponse, errorMessage, readBody, MAX_REQUEST_BODY_BYTES } from "../../../src/server/response-utils.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 /** Minimal test server that calls a handler and captures the response. */
@@ -116,6 +116,31 @@ describe("errorResponse", () => {
       expect(body).toEqual({ error: "Something went wrong" });
     } finally {
       await closeRouteTestServer(server);
+    }
+  });
+});
+
+describe("errorMessage", () => {
+  it("returns an Error's message by name, without the class prefix or a stack frame", () => {
+    const message = errorMessage(new Error("x"));
+    expect(message).toBe("x");
+    expect(message).not.toMatch(/^Error:/);
+    expect(message).not.toMatch(/\n\s+at /);
+  });
+
+  it("answers a thrown non-Error with the fixed line and logs the value server-side", () => {
+    // Anything derived from a non-Error is still the exception as far as
+    // CodeQL's js/stack-trace-exposure can tell, so the value itself never
+    // crosses to the client — it goes to the server log instead.
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      for (const thrown of ["str", {}, undefined]) {
+        expect(errorMessage(thrown)).toBe("Unexpected error");
+      }
+      expect(log).toHaveBeenCalledTimes(3);
+      expect(log.mock.calls[0]).toContain("str");
+    } finally {
+      log.mockRestore();
     }
   });
 });

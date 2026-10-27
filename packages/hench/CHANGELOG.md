@@ -1,5 +1,470 @@
 # @n-dx/hench
 
+## 0.10.0
+
+### Patch Changes
+
+- [#846](https://github.com/en-dash-consulting/n-dx/pull/846) [`aa7886f`](https://github.com/en-dash-consulting/n-dx/commit/aa7886f0b4069fb6a06a0043d94f1b79b3afa709) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx config <pkg>.<key> <value>` refuses a key with a `__proto__`, `constructor` or `prototype` segment. `ndx config llm.__proto__.polluted x` followed `configs.llm["__proto__"]` onto `Object.prototype` and assigned there, in the CLI's own process; the write was never persisted, but the command now exits non-zero naming the segment and leaves every config file untouched. hench's `setConfigValue` applies the same guard behind its `CONFIG_FIELDS` allowlist.
+  
+  The `ndx work` command that `ndx work --resolve` prints is now correct on Windows for a path that ends in a backslash or contains a quote: backslashes before a `"` or the closing quote are doubled, as the argv rules every Node program decodes with require, so `C:\My Repo\` prints as `"C:\My Repo\\"` rather than `"C:\My Repo\"`.
+  
+  Four regular expressions that were quadratic on hostile input scan linearly: the `icacls` ACE parser behind owner-only config files (the same result on every icacls line; it now rejects a line with a `(` inside a flag group or a `:(` inside an identity, which icacls never prints), the trailing-separator trim in the MCP shim's workspace key, and the project-id slug in `ndx start` and its twin in the hub's new-project page (the same result on every input). `ndx ci`'s data-layer check now escapes every regex metacharacter in a layout directory name rather than only the dot.
+
+- [#835](https://github.com/en-dash-consulting/n-dx/pull/835) [`96bc0a4`](https://github.com/en-dash-consulting/n-dx/commit/96bc0a4bddc1d5c6446e094d29a1b081801b257a) Thanks [@endash-shal](https://github.com/endash-shal)! - `ndx work` now completes a parent whose children are all completed, and commits the completed status. rex offers such a parent as the next task, but its work landed with its children, so a run on it changes no code. The completion gate refused every one of those runs ("No changes detected in git diff") and put the parent back to pending. The next run picked it again, and each refused run left its status writes uncommitted in `.rex/prd_tree/`. The gate now accepts an empty diff for a finalize-ready parent, using rex's own `allChildrenSuccessful` (now exported), and the completion commit carries it.
+  
+  The commit that lands a completed status now always has an `N-DX-Status: <id> in_progress → completed` trailer. On the commit-prompt path it never did: hench writes `completed` before the prompt runs, so the prompt read the item as already completed and left the trailer off. The completion-record commit had no status trailer at all.
+
+- [#839](https://github.com/en-dash-consulting/n-dx/pull/839) [`2022063`](https://github.com/en-dash-consulting/n-dx/commit/2022063541e100ab26bf82d122eee011216b686d) Thanks [@endash-shal](https://github.com/endash-shal)! - A completed task now lands as one commit: its work, then its completion. Two
+  things split them. The agent commits during its session, before hench's gates
+  mark the task, so the completion followed in a `chore(prd)` record commit. And
+  where the commit prompt did stage the status with the code, hench then wrote
+  that commit's SHA onto the PRD item — a write that can only land after the
+  commit — so every completed run still ended in a trailing `chore(prd)` commit.
+  
+  The SHA write is gone: a commit is tied to its item by the `N-DX-Item` trailer,
+  as rex already attributes it. When the agent committed for itself, hench folds
+  the completion into the run's last commit, adding `N-DX-Status` and, if it was
+  missing, `N-DX-Item`. The fold only amends a commit this run made that is not
+  a merge, not on any remote, not for another item, with no git operation in
+  progress; otherwise the completion gets its own record commit and hench prints
+  why. A gate-only retry folds into the earlier attempt's work commit.
+
+- [#749](https://github.com/en-dash-consulting/n-dx/pull/749) [`a5c696f`](https://github.com/en-dash-consulting/n-dx/commit/a5c696f3acc9e63a7f5228bc499e64b5c95bd0eb) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `rex init` (and so `ndx init`) gives a project with no PRD an empty v2 tree, `product/index.md` stamped `rex/v2`, and no `prd_tree/`, so a new project no longer prints the v1 deprecation notice. A project that already has a PRD keeps its layout; moving a v1 PRD stays `ndx migrate`'s job. The next steps init prints use the v2 verb (`rex add --title=…`) whenever the tree is v2, fresh or migrated.
+  
+  Changes what a CLI command creates under the soft freeze: `rex init` / `ndx init` on a project with no PRD now writes the v2 layout instead of v1. No flag or MCP tool changes shape.
+  
+  On a v2 PRD whose product layer has no capability and no constraint, such as a fresh project, a change in the Inbox is no longer stuck: there is nowhere to place it, so `rex next`, `get_next_task` and `ndx work` select it and its tasks, `ndx work --task` runs it, and it completes when its last task does. With no target it stays unapplied in the Inbox until placed. Once the product layer has a capability or constraint, Inbox changes are held from selection and closing as before, and `change-placed-at-close` reports any that closed unplaced. rex exports `awaitsPlacement`, the one predicate all of these use.
+  
+  Changes a v2 selection and completion rule under the soft freeze: an Inbox change is held for placement only while the product layer has a capability or constraint to place it on. rex's public API gains `awaitsPlacement`; no MCP tool or CLI flag changes shape.
+
+- [#839](https://github.com/en-dash-consulting/n-dx/pull/839) [`0e03074`](https://github.com/en-dash-consulting/n-dx/commit/0e0307419bbbf9a6a8a0222908f523ebdfac06ea) Thanks [@endash-shal](https://github.com/endash-shal)! - Windows: no more console windows from n-dx's child processes. `exec()` and `spawnCli` in llm-client gain a `windowsHide` option that defaults to true, and every other production spawn in the monorepo passes it; a new root policy test (`windows-hide-policy`) fails any spawn that does not. The vendor-CLI log `claude_commands.log` is now gitignored by `ndx init` and discounted by hench's uncommitted-work gate, so a fresh project's first agent run no longer refuses completion over it. The Overview page's isometric hero shows its Options button again.
+- Updated dependencies [[`27b5833`](https://github.com/en-dash-consulting/n-dx/commit/27b583370e486993ec1760d169db8f4461e0f9ef), [`96bc0a4`](https://github.com/en-dash-consulting/n-dx/commit/96bc0a4bddc1d5c6446e094d29a1b081801b257a), [`a5c696f`](https://github.com/en-dash-consulting/n-dx/commit/a5c696f3acc9e63a7f5228bc499e64b5c95bd0eb), [`6144a9c`](https://github.com/en-dash-consulting/n-dx/commit/6144a9cd36eb62a872b0578dda68016c01f314e9), [`4443ec0`](https://github.com/en-dash-consulting/n-dx/commit/4443ec08e1432dd0648c5e1c8f972408d3bff5c9), [`166e33f`](https://github.com/en-dash-consulting/n-dx/commit/166e33fc06eee3b00482fa5283eb0e3731af6efe), [`a827aaa`](https://github.com/en-dash-consulting/n-dx/commit/a827aaa8d854d328271ff4411ba0fe6158c3195d), [`be77a84`](https://github.com/en-dash-consulting/n-dx/commit/be77a847e3b0805b8e76c0d0ea89bcc0e099d538), [`2b00932`](https://github.com/en-dash-consulting/n-dx/commit/2b00932c9219ba7eb18f446493e2549170aafe48), [`240579c`](https://github.com/en-dash-consulting/n-dx/commit/240579c9200b144629a6069cf9a752d4eaaa1492), [`9e18581`](https://github.com/en-dash-consulting/n-dx/commit/9e185812cb4ec52603e67d6c295568ea5334b4ec), [`4ce8d35`](https://github.com/en-dash-consulting/n-dx/commit/4ce8d35c2939007e44995d3fc0334863965a0b4c), [`60c910a`](https://github.com/en-dash-consulting/n-dx/commit/60c910a463e935bf6af6715f31a416e2ba1d7050), [`7c12c18`](https://github.com/en-dash-consulting/n-dx/commit/7c12c182e92139a5201affc48343ce00eb442f55), [`c92eb9c`](https://github.com/en-dash-consulting/n-dx/commit/c92eb9ca7114170beda601782aecae71992d40da), [`582752e`](https://github.com/en-dash-consulting/n-dx/commit/582752ec5bda44987ab8d9614ec19620e84f3140), [`6957df6`](https://github.com/en-dash-consulting/n-dx/commit/6957df6c10ddb5a49cc74d82a452470fc4b492f8), [`7fa688f`](https://github.com/en-dash-consulting/n-dx/commit/7fa688f0127249893d469e67716780ab8c1bb15d), [`dd7c1ed`](https://github.com/en-dash-consulting/n-dx/commit/dd7c1ed4fd2f34039b3b11b3416a34fc57d5a82f), [`2471bd7`](https://github.com/en-dash-consulting/n-dx/commit/2471bd7263746886671f0c29cb8abe94bf28b8c1), [`0e03074`](https://github.com/en-dash-consulting/n-dx/commit/0e0307419bbbf9a6a8a0222908f523ebdfac06ea)]:
+  - @n-dx/rex@0.10.0
+  - @n-dx/llm-client@0.10.0
+
+## 0.9.1
+
+### Patch Changes
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`550c099`](https://github.com/en-dash-consulting/n-dx/commit/550c099f0e81cb18b20d3fecd619d549bf4d2f61) Thanks [@endash-shal](https://github.com/endash-shal)! - The base workflow now tells an agent when to use the two v2 tools its run is
+  granted, and a task-less change is covered end to end as a unit of work.
+  
+  `get_capability` and `place_change` are in the rex MCP tools a run may call,
+  but no prompt asked for either, and the rule behind that list is that a tool
+  no prompt asks for does not belong in it. The base workflow
+  (`.rex/n-dx_workflow.md`, rewritten by `ndx init`) now says: on a v2 PRD, read
+  a capability with `get_capability` when the brief's trimmed entry cannot tell
+  you whether the change is finished (step 2); and place a follow-up captured
+  with `add_item` using `place_change`, because an untargeted change lands in
+  the Inbox carrying `needsPlacement` and is never selected autonomously from
+  there (step 9). The autonomous adversarial-review pass says the same of the
+  findings it captures. A test now checks that every granted tool is named in
+  the base workflow, and that `apply_change` — the one PRD write the completion
+  hold cannot withdraw — stays operator-only; the allowlist's own comment
+  carries that rationale.
+  
+  A hench integration test runs a task-less change through a real v2 tree: the
+  store `resolveStore` returns is the change layer, selection picks the change
+  itself and claims it, picks a task over its change where one exists, refuses
+  rather than falling back to the v1 selector when v2's rules leave nothing to
+  run, and a completion held on the claim is written to the change's
+  `state.yaml` once the test gate passes.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`1923d4d`](https://github.com/en-dash-consulting/n-dx/commit/1923d4d06a947f1d6b296acbf7418e694c304cad) Thanks [@endash-shal](https://github.com/endash-shal)! - Claude Code CLI runs now honour `llm.effort`, passing it as `--effort <level>`.
+  
+  The Messages API paths have sent `llm.effort` as `output_config.effort` since
+  the effort work landed, but CLI runs dropped it: the llm-client CLI provider
+  ignored `CompletionRequest.effort` and hench's CLI agent loop passed no
+  `--effort` at all. A project that set `llm.effort` got it on API runs and
+  silently not on CLI runs.
+  
+  Both now resolve through `resolveClaudeCliEffort`, which shares the API path's
+  validation — an unknown level or a model that does not accept effort is
+  dropped with the same warning — and stops before its per-model default.
+  `CLAUDE_DEFAULT_EFFORT` exists to hold the API's heavy tier at the depth it
+  had before Opus 5.5 lowered its own API default; Claude Code picks its own
+  default per model, so sending ours unasked would override that choice on every
+  run nobody configured. With no rule matched the flag is omitted and the CLI
+  decides.
+  
+  `agent/lifecycle/api-effort.ts` is now `agent-effort.ts`, since it serves both
+  of hench's loops.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`6f66b58`](https://github.com/en-dash-consulting/n-dx/commit/6f66b588046a3c844351ab6eba1879bb4b3dffbf) Thanks [@endash-shal](https://github.com/endash-shal)! - `contextWriteFloor` no longer returns 0 for a project whose prompt-cached runs
+  have all failed, so the tuners' token-budget clamps hold in the situation they
+  were built for.
+  
+  The floor counted only runs that both completed and wrote cache. A run set
+  with no completed run therefore measured 0, however much cache its runs wrote
+  — and every clamp built on it (`Math.max(proposed, floor)` in `adaptive.ts`
+  twice and `workflow.ts` once) degenerated to a no-op, on a project that was
+  already failing every run. It now falls back to the cheapest
+  `cacheCreationInput` among the cache-writing runs — the cache-write component
+  rather than the run's total, because a failed run's total also carries whatever
+  work it managed before failing.
+  
+  That fallback is an *upper* estimate of arrival cost, not a lower bound:
+  `cacheCreationInput` sums a run's cache writes over every turn, not the arrival
+  write alone. So it is applied only where a budget is being raised. The
+  high-usage cap in `workflow.ts` exists to curb waste, and flooring it with the
+  fallback would lift it to the cheapest runaway's whole cache-write total — on a
+  set of 3M-cache failures it proposed 3M instead of the intended reduction. That
+  cap now clamps only to a floor measured from a run that completed, and
+  `contextWriteFloorFromCompletedRun` says which kind of floor is in hand.
+  
+  The workflow tuner's high-usage threshold asked the same function a different
+  question — "is this project prompt-cached?" — by testing `floor > 0`. Those
+  are not the same question: whether totals carry cache writes is a property of
+  how the runs were made, while the floor needs a run that survived. A new
+  `hasCacheWrites` answers the first from any cache-writing run whatever its
+  status, and `WorkflowStats` carries it as `promptCached`. An all-failed
+  prompt-cached set no longer reads as uncached, so its 12x-inflated average is
+  compared against the 1.2M cached threshold instead of the 100K uncached one
+  and stops firing a suggestion the rescale exists to silence.
+  
+  Test hardening from the same review: both threshold tests now pin
+  `successRate < 0.5` so neither can pass because the suggestion's other half
+  stopped holding; the adaptive floor test is named for what it guards; and
+  there is a case at the shipped 600,000 template budget that states which
+  branch fires rather than looping over a possibly-empty list.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`f049fd4`](https://github.com/en-dash-consulting/n-dx/commit/f049fd445d2a22ceff1bce210e4be43a54ec8579) Thanks [@endash-shal](https://github.com/endash-shal)! - The dashboard's Adaptive and Workflow tuners now propose token budgets in the
+  units the budget is enforced in, and never below the cost a run pays to
+  arrive.
+  
+  `routes-adaptive.ts` and `routes-workflow.ts` each carried a self-contained
+  copy of hench's tuners, with the defect hench's own copy had already fixed:
+  `totalTokens` was `input + output`, which on a prompt-cached run is roughly a
+  twelfth of what `checkTokenBudget` enforces; the high-consumption threshold
+  was a fixed 100,000 in those smaller units; and no proposal was clamped to the
+  measured arrival cost. Unlike hench's tuners these routes are wired into the
+  dashboard, so an operator could press Apply on a budget below the context
+  write every run pays — and every run afterwards would fail before doing any
+  work.
+  
+  The counting rule, the arrival-cost floor and the two thresholds now live in
+  `packages/web/src/server/token-cost.ts`, a deliberate port of hench's module
+  shared by both routes. Web does not depend on hench and adding a gateway to
+  reach three pure functions would be an architecture change made in passing, so
+  the port stays — and `tests/e2e/token-cost-parity.test.js` drives both
+  implementations over the same fixtures and fails when they disagree. hench's
+  two threshold constants moved into its own `token-cost.ts` and are exported,
+  so the parity test compares real values rather than a third copy of the
+  literals.
+  
+  Adjustments are also no longer labelled "auto-applied". Nothing in the server
+  writes the config — the Apply button posts `automatic: false` — but the
+  notification type was `auto-applied` whenever adaptive mode was enabled, which
+  is the default, presenting an unapplied number as already in force.
+
+- [#809](https://github.com/en-dash-consulting/n-dx/pull/809) [`cb236e9`](https://github.com/en-dash-consulting/n-dx/commit/cb236e93e169b0f10301f47ffa26e0bf681c9259) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Update `@anthropic-ai/sdk` to 0.133 (hench, llm-client) and `zod` to 4.6.7 (hench, rex, sourcevision, web). Both are additive releases with no change to n-dx behaviour.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dev dependencies bumped, including vitest 5. No runtime change: the published packages ship the same code, and the one test that vitest 5 rejected (a `vi.mock` written inside a test body) now declares its mock at module scope.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`c750769`](https://github.com/en-dash-consulting/n-dx/commit/c7507690569c629694c704b358a10bb38925bf80) Thanks [@endash-shal](https://github.com/endash-shal)! - A Codex or Gemini project with `llm.effort` set no longer warns on every run
+  that its model "does not accept an effort setting".
+  
+  `llm.effort` is a Claude setting. Resolving it for a CLI spawn ran the
+  allowlist check whatever the vendor, and that check does more than drop the
+  value — it warns, which reads as a misconfiguration. Before hench's CLI loop
+  resolved effort at all, nothing was sent and nothing was printed. A non-Claude
+  model now returns before the check. A *Claude* model that cannot take effort
+  still warns, which is the case the warning is for.
+
+- [#787](https://github.com/en-dash-consulting/n-dx/pull/787) [`d7c49c3`](https://github.com/en-dash-consulting/n-dx/commit/d7c49c3927f08f5743f43274034dee29f6843ecb) Thanks [@endash-shal](https://github.com/endash-shal)! - Fail-forward mode: a settings toggle that commits work as it happens instead of letting it pile up uncommitted.
+  
+  With it on, an autonomous loop that finds work left in the tree after an iteration commits it and carries on, rather than refusing to continue — so an interrupted loop still leaves each finished iteration committed. Settings changes commit too, including ones made from the pre-run menu, which writes the same file through the same handler as the settings page. `--allow-dirty` suppresses it: the operator asked for their tree to be left alone.
+  
+  Every commit it makes is scoped to the paths that step touched and uses a constant message for its kind. Work that belongs to the operator is refused outright rather than committed: anything already staged (including a `git add -p` hunk selection), and anything at all while a merge, rebase, cherry-pick or revert is in progress — `git add` on a conflicted path marks it resolved, and mid-rebase the commit then succeeds with the conflict markers in it. A failed commit unstages whatever it had staged, so it leaves the index as it found it. It also refuses to commit a config that carries a credential. Commits carry the usual `N-DX` trailers. Nothing is ever pushed. Off by default, and with it off behaviour is unchanged.
+  
+  The toggle is read through `isFailForwardEnabled` in `@n-dx/llm-client` rather than from the dashboard's feature registry, because `ndx work` and the hench run loop are separate processes that never reach the web server — two readers of one toggle would have drifted. The value is re-read at each decision point, so turning it off mid-run is obeyed at the next boundary rather than after a restart.
+  
+  The toggle also carries an info control on the settings page explaining what is committed and when; `FeatureDefinition` gains an optional `details` field for toggles whose effects reach outside the dashboard.
+
+- [#726](https://github.com/en-dash-consulting/n-dx/pull/726) [`87a04a7`](https://github.com/en-dash-consulting/n-dx/commit/87a04a75471bdc7ad07464d596e6d584f46dc2e6) Thanks [@endash-shal](https://github.com/endash-shal)! - Stop a usage mark taken inside another mark's window from double-counting the overlap.
+  
+  `/ndx-work` marks a task and records it at the end; an `/ndx-adversarial-review`
+  run inside that window marks and records too. The inner record was consumed
+  first, so the task's window still contained it and claimed those tokens a second
+  time — `ndx usage` and `get_token_usage` both over-reported.
+  
+  Every record now charges the span it claimed to the marks still outstanding that
+  enclose it, and a mark's window is read less whatever was charged to it. The
+  nested records sum to the outer window instead of overlapping, and the task keeps
+  its own work from before and after the inner one.
+
+- [#647](https://github.com/en-dash-consulting/n-dx/pull/647) [`a4af06e`](https://github.com/en-dash-consulting/n-dx/commit/a4af06ec00bfd0fd8ed37bed21cf04885a99dc62) Thanks [@dnaniel](https://github.com/dnaniel)! - The v1-to-v2 migration plan marks a capability or constraint `met` when its v1 item completed, and the plan's data stage stamps `metAt` with the drafted spec's hash, as `appliedAt` already stamps a completed change: without it every migrated capability read proposed forever. `specHash` and `nodeSpec` join rex's public API. The Graview projection's proposed product layer stamps the same, so a completed feature's capability reads met, one with an open amending change reads changing, and the capability declaration drops its `metAt` datetime (rex's `metAt` is a spec hash, said through `intentStatus`).
+  
+  A run record's commits carry how each was tied to the run (`attribution`: `start-head` on the live path), and `hench backfill-commits [dir]` fills `commits` on every record written without `startHead`, from the main branch's history: a subject naming the run id, then an `N-DX-Item` trailer naming the run's task, then the run's time window when no other run's holds the commit (the window proper before the `--pad`, and never a window longer than `--max-window`, so a run an audit ended weeks later claims nothing). Merge and `chore(prd)` commits are never attributed; a record that has commits is left alone, so the command is idempotent; `--dry-run` reports without writing. On n-dx's own history it ties 638 commits to 569 of 673 runs.
+  
+  The projection reads that evidence: every commit a run record names is a `commit` node that `landedFor` the run's task, carrying the record's `attribution` (a trailer commit says `trailer`), with author and date from git. A capability is `realizedIn` the zones of the files changed by every commit that landed for a change placed on it, `amends` or `touches`, or for the work under that change, from trailers and run records alike; `loadCommitFiles` joins rex's public API for the file scan. The face's capability page, zone page and coverage picture fill in accordingly.
+
+- [#623](https://github.com/en-dash-consulting/n-dx/pull/623) [`090e111`](https://github.com/en-dash-consulting/n-dx/commit/090e111efc45edac8a0bcdf420fd55b2baabc117) Thanks [@mikemikimike](https://github.com/mikemikimike)! - Filter credential-shaped environment variables before launching vendor CLIs,
+  including retries and cross-vendor reviewers, while retaining the active
+  vendor's authentication, including Claude's active Bedrock and Vertex modes.
+  An explicit `hench.guard.env.allow` entry permits the matching variables to
+  reach hench runs and the cross-vendor reviewer; projects that need additional
+  credentials for tests or MCP servers must opt in there. One-shot completions
+  from rex, sourcevision and the dashboard always use the default filter.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`15f6a6a`](https://github.com/en-dash-consulting/n-dx/commit/15f6a6ad3e2ecbc8f26cf361971dc2cd657dbc96) Thanks [@endash-shal](https://github.com/endash-shal)! - A rex lock held while a run ends no longer counts as the run's own work.
+  
+  The blanket `.rex/` prefix that the bookkeeping list replaced covered
+  `prd.lock`, `prd.json.lock`, `reshape.lock` and `.backups/`. The list did not,
+  and `rex init` does not gitignore them either — it appends only
+  `n-dx_workflow.md`, `execution-log*.jsonl` and the derived cache. The lock and
+  backup patterns live in the `ndx.gitignore` block an operator pastes by hand,
+  so on a project that skipped that paste they are untracked and reach
+  `git status --porcelain --untracked-files=all`. A lock held while the
+  end-of-run snapshot was taken — the dashboard refreshing, an MCP write — read
+  as changed work and fired the full-suite gate on a run that had produced none.
+  
+  `prd_tree/`, `.cache/` and `tree-meta.json` are no longer spelled by hand in
+  that list either: the rex gateway already re-exports all three, and a rename on
+  rex's side the list did not follow would have silently stopped discounting what
+  it names.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`e542de9`](https://github.com/en-dash-consulting/n-dx/commit/e542de9907b31ff7d67d0f6283a9256686375a14) Thanks [@endash-shal](https://github.com/endash-shal)! - A task whose only change is `.rex/workflow.md` or `.rex/config.json` can
+  complete through `ndx work` again.
+  
+  Before the test gate, hench asks whether a run changed anything. That question
+  was answered by three directory prefixes — `.rex/`, `.hench/` and `.ndx/` —
+  and everything beneath one of them was bookkeeping. But not everything under
+  `.rex/` is: `workflow.md` goes into every agent brief and `config.json` is
+  project configuration. A run that edited only those read as "no changes", so
+  the gate never ran and the completion check rejected the claim — permanently,
+  since nothing the agent could do would produce a change the gate could see
+  ([#539](https://github.com/en-dash-consulting/n-dx/issues/539)). The `.ndx/` entry had the same effect on the container layout.
+  
+  The blanket prefixes are now an explicit list: all of hench's own state, plus
+  rex's own records — `prd_tree/`, `.cache/`, `execution-log.jsonl` and its
+  rotation, `tree-meta.json`, `archive.json`, `pending-proposals.json` and
+  `acknowledged-findings.json`. Everything else under `.rex/` or the container
+  counts as the run's work. The list is spelled for both layouts through the
+  layout resolver, and the changed-file gate, the reviewer's repaired-files
+  filter and the completion diff summary are all built from it, so the three
+  cannot disagree about what counts as work.
+  
+  One behaviour follows from the narrowing rather than being aimed at: analysis
+  output under `.ndx/sourcevision/` now counts as a change, as `.sourcevision/`
+  always did on the legacy layout. The two layouts had disagreed about an
+  otherwise identical run.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`3f50210`](https://github.com/en-dash-consulting/n-dx/commit/3f50210529ca205d7791cb798ade0162faf8debc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Review is now a project setting: `hench.review.mode` (`off`, `self`, `pair`;
+  default `off`), `hench.review.vendor` (`claude` or `codex`; unset means the
+  other one) and `hench.review.rounds` (1-3, default 2). `self` runs the review
+  pass exactly as `--review` does; `--review`, `--no-review` and a task's saved
+  `run.review` still win. `pair` is recognised but pair review is not built yet,
+  so it runs no review and says so — it never falls back to self review. Pair
+  mode is refused when the reviewer is the executor's own vendor, the executor is
+  not claude or codex, or the provider is `api`. `ndx config` rejects values
+  outside those sets, and `ndx work --resolve` reports the three settings under
+  `review`, each with the key that supplied it.
+
+- [#738](https://github.com/en-dash-consulting/n-dx/pull/738) [`a7f9a21`](https://github.com/en-dash-consulting/n-dx/commit/a7f9a218efa35fa898643a3eeec51a331c8a003b) Thanks [@endash-shal](https://github.com/endash-shal)! - Hench's rolling output window is off by default under vitest, so agent output reaches a test runner through `console.log` rather than raw `process.stdout` writes it cannot attribute to a test. A test that needs the window opts in with `_overrideTTY`.
+
+- [#715](https://github.com/en-dash-consulting/n-dx/pull/715) [`0aa9b18`](https://github.com/en-dash-consulting/n-dx/commit/0aa9b184322e43d971c3725bca3b3d0bfec7ecd9) Thanks [@endash-shal](https://github.com/endash-shal)! - hench runs work on a v2 tree. v1 is unchanged.
+  
+  - **Selection.** `ndx work` selects with rex's v2 selection (the unit `get_next_task` returns) instead of the v1 selector over the projected change layer, so Inbox changes and gated changes are no longer picked. `--task` accepts an id or a display id, and `--resolve` reports the unit by its real id and checks its claim on that id. `--loop` moves through v2 units until none are left. `--epic-by-epic` and `--epic` are refused because a v2 tree has no epic level.
+  - **Brief.** The agent brief is rex's change brief: the task, its change, and the capabilities and constraints the change touches or amends. Commit trailers and session filters still follow the task, and workflow.md is always carried, rendered outside rex's brief budget as on v1.
+  - **Completion.** hench completes a task through rex's v2 runtime (`completeV2Work`), as `update_task_status` does: completing a change's last task completes the change and applies its amendments per `rex.applyOn`. Before, the v1 ancestor cascade completed the change without applying it.
+  - **Bookkeeping.** A v2 tree's `product/` and `changes/` folders (`state.yaml` included, in both the `.rex` and `.ndx/rex` layouts) count as PRD bookkeeping: a completion's writes there no longer trigger the full-suite gate, read as reviewer repairs, or show up in the completion diff. The completion commit stages only the files rex's save report names, never `product/` or `changes/` whole, so an operator's edit in flight there stays out of it; with no report it stages nothing there (v1 still falls back to `prd_tree/` whole). A reported `state.yaml` also stages the untracked intent files of the nodes it holds rows for, so completing a follow-up placed through MCP after an earlier commit lands its `index.md` with its state instead of leaving a state row for a node git does not have; an operator's untracked draft in that folder has no row and stays out. When such a node's change was placed out of a committed Inbox (`place_change`), the whole move is staged: every committed Inbox file of that change and the untracked file now holding the same node, with their folders' `state.yaml`, so HEAD neither holds the change in two folders nor splits it between them. The review pass checks `changes/` and `changes/inbox/`, where unplaced changes wait, for an existing item before filing a duplicate.
+  - **Agent tools.** The agent's rex allowlist adds `get_capability` and `place_change`; `apply_change` stays operator-only.
+  - **Kept completion.** A failure after a completion applied its change (a rejected commit, review-repair staging or commit, or a bypassed completion followed by a failed test gate) no longer reopens the change, which used to leave the change pending with `appliedAt` set and the amendment in the product layer. hench keeps that completion and fails the run, listing every uncommitted path with the commands to commit them under the task's `N-DX-Item` trailer. A completion that applied nothing is still withdrawn as before.
+  - **Enclosing claims.** `ndx work --task=<id>` is refused when another worktree claims a change enclosing the task, naming the change and its holder, instead of working the task alongside it; `--resolve` reports the same refusal (`claimed-elsewhere`). Selection and `--resolve` share one `TaskClaims.heldByEnclosingChange` check.
+  - **Inbox.** `ndx work --task=<id>` is refused up front for an Inbox change (`needsPlacement`) or a task inside one, naming `rex change place` / `place_change`; `--resolve` reports the same refusal (`not-actionable`). Before, the run worked the change and ended completed with the item still open, because rex refuses to close an unplaced change.
+
+- [#741](https://github.com/en-dash-consulting/n-dx/pull/741) [`f0148e7`](https://github.com/en-dash-consulting/n-dx/commit/f0148e7462961b31a962677bc6310adec66438b1) Thanks [@endash-shal](https://github.com/endash-shal)! - Report a run's loop position and the hub's queued requests on `GET /api/live`
+  
+  The Live overview could list a `--loop` run but not say where in the chain it
+  was, and it counted the execute requests the hub had queued without naming any
+  of them.
+  
+  Hench now records the position on the run record at run start
+  (`RunRecord.loop`: the mode, the 1-based iteration and, for `--iterations=N`
+  alone, the planned total), so a run reports its place while it is still going
+  rather than only once it ends. A run started on its own carries no loop block —
+  "1 of 1" would be a loop that does not exist. `GET /api/live` exposes it as
+  `runs[].loop`.
+  
+  The queued requests reach the project server through the admission header the
+  hub's proxy already sets on every `/api/live`, narrowed to the project being
+  proxied the same way `GET /api/hub/queue` narrows under `/p/<id>/`. They are
+  laid over the cached snapshot as `queue.queued`, named from the PRD index the
+  answer already holds, so the request does no extra I/O and stays as fast as its
+  cache makes it. The counts beside the list stay machine-wide, so a project
+  waiting behind another project's run still sees why.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`a19f176`](https://github.com/en-dash-consulting/n-dx/commit/a19f1763d2d609be1957a1562f7083ef785a62bc) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Pair review now runs end to end. With `hench.review.mode: "pair"`, the other
+  vendor's CLI reviews the diff and reports; must-fix findings resume the
+  executor's session to fix them, up to `hench.review.rounds`, and lesser findings
+  are captured to the PRD. `GET /api/llm/config` reports `review.pairSupported:
+  true`, so Robot Wrangler enables the Pair card. The review modes are documented
+  in the configuration guide.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`323ceca`](https://github.com/en-dash-consulting/n-dx/commit/323ceca26bf13747a83dfc71007e6c013fc91191) Thanks [@ryrykeith](https://github.com/ryrykeith)! - `hench.review.mode: "pair"` now reviews. After a task validates, the other
+  vendor's CLI starts a fresh session, reads the task, the changed files and the
+  diff, edits nothing, and writes the findings report. The review runs on
+  `llm.<reviewer>.reviewModel`, then `llm.reviewModel`, then the vendor default,
+  and the run record carries `mode: "pair"`, the reviewer vendor and model. Until
+  the fix loop lands, every finding, must-fix included, is captured or queued and
+  the commit is not blocked. A reviewer CLI that is missing or signed out skips
+  the review with a warning under `--review-optional`, as before.
+
+- [#627](https://github.com/en-dash-consulting/n-dx/pull/627) [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177) Thanks [@dependabot](https://github.com/apps/dependabot)! - Production dependencies bumped: zod 4, ink 8, react 19.3, @anthropic-ai/sdk 0.131, @modelcontextprotocol/sdk 1.32.1 and pdfkit 0.20. TypeScript stays on 6.x because sourcevision parses source with its compiler API, which TypeScript 7 does not ship, and preact stays on 10.x until its web test and leave-guard changes are worked through. Schemas move to zod 4's two-argument `z.record`; reserved and loosely-typed state keys are declared optional, since zod 4 no longer treats a missing `z.unknown()` key as optional; and the SDLC evidence list keeps its at-least-one rule as a tuple so it still infers the non-empty type.
+
+- [#727](https://github.com/en-dash-consulting/n-dx/pull/727) [`1fef845`](https://github.com/en-dash-consulting/n-dx/commit/1fef84561e11c69328222c0cd87008db78e56a65) Thanks [@endash-shal](https://github.com/endash-shal)! - The prune defaults stay at 20 trigger-pairs and 10 retained. No behaviour
+  changes on upgrade; this records why they stand and pins them against a silent
+  future edit.
+  
+  They were carried over when 0.7.1 made them configurable, and the comment on
+  `DEFAULT_PRUNE_CONFIG` claimed they sat "where they were measured". They did
+  not. The 0.7.1 post-release measurement batch (rex task d08b0479) was the
+  measurement that was supposed to settle them, against the 10-run, $247.53
+  pre-optimization baseline — and it cannot bear on them at all, for a reason
+  that is structural rather than a gap in the data:
+  `DEFAULT_HENCH_CONFIG` sets `provider: "cli"`, and only the API loops prune.
+  `agent/lifecycle/cli-loop.ts` hands the conversation window to the vendor
+  binary and never constructs a `ConversationPruner`, so a batch of
+  default-config `ndx work` runs fires no prune whatever its cost totals say.
+  Its figures are evidence about prompt caching and the primer, not about these
+  two numbers. The batch's own deliverable,
+  `docs/analysis/prompt-token-batch-2-results.md`, was never written.
+  
+  What the pair does rest on is arithmetic, and that is now stated where the
+  values are: the gap between them is twenty messages, so each prune is followed
+  by ten turns of pure append — the growth shape the prompt cache rewards — and
+  the trigger is peak context. Moving either number trades a known cadence for
+  an unmeasured one.
+  
+  Two tests in `context-prune.test.ts` back this. One pins the three shipped
+  values as literals: the rest of that file is written against the exported
+  symbols, so before this nothing asserted the values themselves, and a
+  coordinated edit of the incidental `22`s elsewhere would have changed every
+  project's prune cadence on upgrade with the suite green. The other asserts the
+  gap property the defaults are chosen for — ten turns append after a prune
+  without one firing, and the next turn crosses the trigger.
+  
+  Settling the numbers on evidence still needs a batch run against an API-loop
+  provider; that is filed separately rather than left implied here.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`32e9aea`](https://github.com/en-dash-consulting/n-dx/commit/32e9aea4d296c7c799e880adfccfeaf055a97d2d) Thanks [@endash-shal](https://github.com/endash-shal)! - `hench show <run> --repoint` now resolves a commit whose object is gone, and
+  `get_token_usage` reports what a task actually cost.
+  
+  **Re-pointing from recorded facts.** A run record stores each commit's subject
+  and author date so a rewritten SHA can be matched to its twin. Those facts were
+  never read: rex answers "not in this repository" before any twin rule runs, and
+  its twin key is author *email* + author date + subject, which the record did
+  not carry. So the feature failed in precisely the case it was built for — a
+  pruned branch, a fresh clone, `git gc` after a squash merge. Run records now
+  carry `authorEmail`, and `repointCommits` takes an optional per-SHA `facts` map
+  it falls back on when git cannot resolve the SHA. The author-date-subject and
+  trailer-subject rules run from those facts; patch-id cannot, because it needs
+  the object itself. An unmatched SHA is still reported, never dropped.
+  
+  **Cost in the rollup.** `costUsd` was `0` on every tuple and nothing ever set
+  it, so `get_token_usage` reported zero cost for every PRD item. Each run is now
+  priced at the model it recorded, before the rollup sums — a task's Haiku and
+  Opus runs bill an order of magnitude apart, so one blended rate over the total
+  would be wrong for every item that mixed them. A run with no model, or one the
+  pricing table does not know, prices at the fallback rate, the same rate
+  `rex usage` quotes for it.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`8dc95b8`](https://github.com/en-dash-consulting/n-dx/commit/8dc95b816b1b257f2ced1d8d27ba7e27c2c01bbd) Thanks [@endash-shal](https://github.com/endash-shal)! - `hench review pending <run>` finds its report after the project has moved on
+  disk.
+  
+  It preferred the absolute `reportPath` stored on the run record, on the
+  reasoning that a stored path protects a moved project. It does the opposite: a
+  move is precisely when that path is stale, so the command failed with "Could
+  not read the review report" for a report sitting in the project's own
+  `.hench/reviews/` under its run id. Reports are keyed by run id in a fixed
+  subdirectory, so the canonical location is derivable wherever the project now
+  lives; it is tried first, and the recorded path is kept as a fallback for a
+  report that is genuinely somewhere else.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`57b79b5`](https://github.com/en-dash-consulting/n-dx/commit/57b79b5facab35ec2d0529b3f5a598d8321d086d) Thanks [@endash-shal](https://github.com/endash-shal)! - Run records keep each commit's author date, and `hench show <run> --repoint`
+  finds where a run's commits went after a rebase.
+  
+  A run record names commits — `startHead`, everything the run committed, and
+  the reviewer's `repairCommit` — and a stack rebase or squash merge rewrites
+  all of them at once. On 2026-10-07 every commit cited in the PR 27/8 and
+  [#548](https://github.com/en-dash-consulting/n-dx/issues/548)/[#549](https://github.com/en-dash-consulting/n-dx/issues/549) run records stopped being on main, and the record had nothing left
+  to find them by.
+  
+  Each commit a run produces now stores its author date beside its SHA and
+  subject, and the baseline gets the same treatment in a new `startHeadCommit`.
+  A rebase preserves author email, author date and subject, so those three are
+  what identify the twin.
+  
+  `hench show <run-id> --repoint` reports what moved, what was already on the
+  ref, and what could not be matched and why; `--write` applies it. The matching
+  rules come from rex's `repointCommits`, now part of its public API — a
+  hench-local copy would be a second definition of commit identity across a
+  rewrite, free to disagree with rex's about the same pair of SHAs. An
+  unmatched SHA is always reported and never dropped from the record.
+  
+  Records written before this change are still readable, and still re-point: the
+  rules read the old SHA's facts from git, so the stored copy is an aid rather
+  than a requirement.
+
+- [#662](https://github.com/en-dash-consulting/n-dx/pull/662) [`2f124e3`](https://github.com/en-dash-consulting/n-dx/commit/2f124e378f0e63471d5d44e1cd5f241e25698dfe) Thanks [@ryrykeith](https://github.com/ryrykeith)! - The run block gains reviewMode and reviewVendor; add_item and edit_item accept them. A task can now be pair-reviewed by a chosen vendor whatever the project default is. `ndx work` takes `--review-mode=<off|self|pair>` and `--reviewer=<claude|codex>`, and applies them as flag, then the task's `run`, then `hench.review.*`, then the default. A saved value the run cannot honour (a reviewer equal to the executor, or pair on an executor with no CLI counterpart) is skipped with a warning and never stops a loop. `ndx work --resolve` reports `reviewMode` and `reviewVendor` under `resolved`, each with its source, and `review` now holds only `rounds`.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`d0398e5`](https://github.com/en-dash-consulting/n-dx/commit/d0398e50aa2749b6384d3e5e9f4b5a602b80d73d) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: fixture git repositories take their identity, line-ending and signing config from one gitconfig that the shared vitest setup writes and points `GIT_CONFIG_GLOBAL` at, instead of two to five `git config` spawns per repository. hench's `initGitFixtureRepo` is now a bare `git init`. No production code changed.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`7be556b`](https://github.com/en-dash-consulting/n-dx/commit/7be556b29f11a83557c1a704240f6e2838a8072e) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: the slowest e2e and integration files build their fixture once and copy it per test, or run the CLI once per fixture state and assert many times, instead of spawning the CLI or git per test. Same tests, a third to a half of the wall time. No production code changed.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`8228a7e`](https://github.com/en-dash-consulting/n-dx/commit/8228a7eb48c34ea6eb394a1b56d2736c7e759553) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: each package's vitest config splits its files into a shared-worker project and an isolated one for files that mock modules or globals, through `tests/vitest-isolation.mjs`. Same tests, less per-file worker and module-graph cost. No production code changed.
+
+- [#694](https://github.com/en-dash-consulting/n-dx/pull/694) [`173f13e`](https://github.com/en-dash-consulting/n-dx/commit/173f13e17743c32f839c1619fc221e7d8c584148) Thanks [@endash-shal](https://github.com/endash-shal)! - Test-only: vitest keeps console output for failing tests and drops it for passing ones (`silent: "passed-only"`). A green run of the monorepo no longer prints thousands of lines of task briefs, init summaries and fixture warnings. No production code changed.
+
+- [#675](https://github.com/en-dash-consulting/n-dx/pull/675) [`7a6eeab`](https://github.com/en-dash-consulting/n-dx/commit/7a6eeabfe2a97d511ebbc980f0e1155134e88d48) Thanks [@endash-shal](https://github.com/endash-shal)! - Count each assistant message's tokens once, and price a task's runs in the dashboard.
+  
+  Claude's `--output-format stream-json` emits one `assistant` line per *content block*, not per message, and every line repeats the finished message in full — `usage` included. A turn that writes a sentence and calls three tools arrives as four lines carrying one turn's tokens four times. Claude Code's session transcripts have the same shape. Both of hench's live ingestion paths summed line by line, so every run's totals were multiplied by the turn's average block count: on a measured session, 234 usage-bearing lines carrying 57 distinct messages, a 4.27x over-count that recorded 23.5M cache-read tokens against the 5.5M actually read.
+  
+  `UsageMessageFilter` in `@n-dx/llm-client` holds the identity rule — the first sighting of a `message.id` counts, later ones do not. It is applied in `cli-loop`'s token extraction (both the event-pipeline and legacy paths) and in the transcript reader behind `hench record`. Repeats are flagged rather than dropped in the transcript, because cursors and marks address positions by the per-line uuid; removing lines would move every boundary and invalidate every cursor file on disk. Usage carrying no message id is still counted — a vendor that stamps none would otherwise lose its tokens entirely.
+  
+  The dashboard then had a second problem: it led with a single token total that counted cache reads alongside everything else. Cache reads bill at roughly a tenth of the input rate and outnumber the other three classes by an order of magnitude, so the figure read as tens of millions for work that cost a few dollars. The per-task aggregator now keeps the four billed classes apart instead of collapsing them to one number, and prices each run at the model that run recorded — one task's Haiku and Opus runs are no longer billed at a single blended rate. Cost rolls up through the PRD tree alongside tokens, and the tree's usage column leads with it; the token accounting moves to the cell tooltip, which reports newly-processed tokens and cache reads separately so the price and the token count can be reconciled.
+  
+  Two errors in the price table itself turned up on the way. `claude-sonnet-5` was priced at $3/$15 — the rates of the Sonnet 4.6 it replaced — overstating every Sonnet 5 figure by 50%; it is the toolkit's standard tier *and* the fallback every unrecognised model is priced at, so the error reached far more surfaces than the runs that named it. And `claude-fable-5-1` was absent, so a Fable 5.1 run silently priced at the Sonnet fallback; its cache-read rate is $0.25/MTok rather than the 0.1x the other Claude rows follow.
+  
+  Runs already recorded keep the totals they were written with — the run files do not retain message ids, so the over-count cannot be undone after the fact. Runs recorded from here on are correct.
+
+- [#747](https://github.com/en-dash-consulting/n-dx/pull/747) [`af89c92`](https://github.com/en-dash-consulting/n-dx/commit/af89c92e0b643d37b1380bd4eb4c383a32168c67) Thanks [@ryrykeith](https://github.com/ryrykeith)! - v2 completion and selection hold up.
+  
+  - A v2 change can no longer get stuck after being applied while in progress. `rex change apply` and MCP `apply_change` now refuse a change whose live tasks or nested changes are not all completed, naming them, and write nothing. Completing a change that was already applied (`rex update --status=completed`, `update_task_status`) closes it with `completedAt` and does not apply its amendments again.
+  - `ndx work --task=<change>` on a v2 tree no longer runs a change that still has open tasks. It runs and claims the change's next actionable task, skipping tasks another worktree has claimed, and never claims the change itself; `--resolve` reports that task. If every open task is claimed elsewhere, blocked or not actionable, the run is refused and names each task with the reason. A change with no tasks still runs as one unit. rex: `resolveWorkById` resolves such a change to its next runnable task (new `excludeIds` option), and `openChangeTasks` lists a change's open tasks.
+  - A kept v2 completion's run error no longer puts files that were already dirty before the run into its `git add` / `git commit` commands. It lists them apart, as dirty before the run and not part of the task.
+  - hench's `task-lookup.ts` imports rex through `src/prd/rex-gateway.ts`, and the domain-isolation policy now also fails on a dynamic `import("@n-dx/rex")` in hench outside the gateway.
+
+- [#747](https://github.com/en-dash-consulting/n-dx/pull/747) [`20c1d2b`](https://github.com/en-dash-consulting/n-dx/commit/20c1d2be598d61a4cb1b055d8abd28b8127618a8) Thanks [@ryrykeith](https://github.com/ryrykeith)! - v2 MCP tools take display ids and report v2 health.
+  
+  - On a v2 tree, the MCP tools `update_task_status`, `edit_item`, `move_item` (the item and the new parent), `merge_items`, `claim_task` and `release_task`, and the `rex update` command, accept a change's display id (`CH-1`) or alias as `get_item` does, instead of refusing it as "not found". The tools' inputs are wider; no output changes.
+  - On a v2 tree, the MCP `health` tool adds a `v2` field to its response: the tree rules, reader warnings and landing check that `rex health` shows. Every existing field is unchanged, and v1 responses are identical. A v2 project with no `.rex/config.json` gets its score and the v2 report on default thresholds.
+  - `rex health` and MCP `health` on a v2 tree no longer fail when `package.json` is not valid JSON; the title release-token rule skips and the rest of the report is returned.
+  - hench: `ndx work --resolve` reports a subtask or a container change with the run's own message ("is a subtask … Run the task instead", "holds other changes") rather than `task-not-found`.
+
+- [#658](https://github.com/en-dash-consulting/n-dx/pull/658) [`c357d36`](https://github.com/en-dash-consulting/n-dx/commit/c357d364ff0609368c12f8a797e468960fed53f6) Thanks [@ryrykeith](https://github.com/ryrykeith)! - Follow-ups to the vendor CLI credential filter:
+  
+  - Claude on Bedrock keeps its role and container credentials: the IRSA names
+    (`AWS_WEB_IDENTITY_TOKEN_FILE`, `AWS_ROLE_ARN`, `AWS_ROLE_SESSION_NAME`), the
+    ECS/Fargate `AWS_CONTAINER_*` names and `AWS_CA_BUNDLE` reach the CLI when
+    `CLAUDE_CODE_USE_BEDROCK` is on, and are stripped when it is off. When Bedrock
+    or Vertex mode is on and none of its credential variables are set, `ndx work`
+    says so once, by name only.
+  - The cross-vendor reviewer falls back to the shell test command when its
+    environment cannot be resolved (for example, an unreadable config), instead of
+    failing the review.
+  - The reviewer's shell test command no longer inherits the raw environment. It
+    gets the project's `hench.guard.env` policy, without the reviewer vendor's
+    authentication variables. If that policy cannot be loaded, the default filter
+    applies and the review banner says so.
+  - `ndx start --open` on Windows opens the dashboard without `cmd.exe`, so a
+    `%NAME%`-shaped sequence in the URL's token or project id is no longer
+    expanded.
+- Updated dependencies [[`02aa8af`](https://github.com/en-dash-consulting/n-dx/commit/02aa8afe08842e6d56b65f52d3364007485b72c2), [`550c099`](https://github.com/en-dash-consulting/n-dx/commit/550c099f0e81cb18b20d3fecd619d549bf4d2f61), [`3049ac5`](https://github.com/en-dash-consulting/n-dx/commit/3049ac5ae0199c06b262d0bec554d0c6931db497), [`26d68a9`](https://github.com/en-dash-consulting/n-dx/commit/26d68a9c6bdbe1de498b43a777d517e75e1caecf), [`0fa0251`](https://github.com/en-dash-consulting/n-dx/commit/0fa0251bb16de71d69aabbe9243a86bf2325dadb), [`f0ca395`](https://github.com/en-dash-consulting/n-dx/commit/f0ca3954254f56bd20611e14459f607dc6181ff9), [`02eed9a`](https://github.com/en-dash-consulting/n-dx/commit/02eed9a6fa283936ae81862c213be3d4ee323b0a), [`1923d4d`](https://github.com/en-dash-consulting/n-dx/commit/1923d4d06a947f1d6b296acbf7418e694c304cad), [`1abeb88`](https://github.com/en-dash-consulting/n-dx/commit/1abeb885cd14a6a61222aa5073e2700fa78ae260), [`cb236e9`](https://github.com/en-dash-consulting/n-dx/commit/cb236e93e169b0f10301f47ffa26e0bf681c9259), [`8507518`](https://github.com/en-dash-consulting/n-dx/commit/8507518864af56e93cf8a6c2aad6c3bb9a9236a1), [`d7c49c3`](https://github.com/en-dash-consulting/n-dx/commit/d7c49c3927f08f5743f43274034dee29f6843ecb), [`0a08ba6`](https://github.com/en-dash-consulting/n-dx/commit/0a08ba6ac46544418a8666bcd971de1c9450374f), [`2cd2e40`](https://github.com/en-dash-consulting/n-dx/commit/2cd2e40b5927eb23a9633aaddc37bbce559c3101), [`a4af06e`](https://github.com/en-dash-consulting/n-dx/commit/a4af06ec00bfd0fd8ed37bed21cf04885a99dc62), [`090e111`](https://github.com/en-dash-consulting/n-dx/commit/090e111efc45edac8a0bcdf420fd55b2baabc117), [`5ef4660`](https://github.com/en-dash-consulting/n-dx/commit/5ef4660a3d53c49946aa396c54c2dee20af7d920), [`17257ac`](https://github.com/en-dash-consulting/n-dx/commit/17257acdcd976fae362ee09488bc2ddebebe2992), [`4aae21c`](https://github.com/en-dash-consulting/n-dx/commit/4aae21c613d532b56a3b62fce0f362075110e4fa), [`ffe0774`](https://github.com/en-dash-consulting/n-dx/commit/ffe0774afe9ca7e2344624d9516a4cdb70536899), [`06082f8`](https://github.com/en-dash-consulting/n-dx/commit/06082f8eb52ff8efcd03fa00f95aa098028a5a62), [`0562de4`](https://github.com/en-dash-consulting/n-dx/commit/0562de42cb52dda567b9b1358d987e380519b51a), [`ec4cd53`](https://github.com/en-dash-consulting/n-dx/commit/ec4cd5313e430f27b93b38ca5ad643577d3852bc), [`3e6c353`](https://github.com/en-dash-consulting/n-dx/commit/3e6c353d31a11130b1bef37419b45c6458080e76), [`ee868a7`](https://github.com/en-dash-consulting/n-dx/commit/ee868a76f8d4b3f84183267b56d2c32fe959c66e), [`dc0ba79`](https://github.com/en-dash-consulting/n-dx/commit/dc0ba79f4e48dae6b7d803d201bdcb69602f2023), [`7964dc2`](https://github.com/en-dash-consulting/n-dx/commit/7964dc2f3c762f6f4aa77fc548f94bef3653ed3d), [`00ba308`](https://github.com/en-dash-consulting/n-dx/commit/00ba308ecb4ae783cdf4837686f3f8338ede1c0e), [`3b4978e`](https://github.com/en-dash-consulting/n-dx/commit/3b4978ec0d50d08b56b93996a565f7cc148efd43), [`df54b01`](https://github.com/en-dash-consulting/n-dx/commit/df54b0162a38250827499fd1f545dd4689dc2505), [`5032a7c`](https://github.com/en-dash-consulting/n-dx/commit/5032a7c9ff4346c62fc8898a32d7183d8cdc3f6d), [`5292bdb`](https://github.com/en-dash-consulting/n-dx/commit/5292bdb577c696e8ed05a9a2de2cf42b9d3b13fb), [`65731af`](https://github.com/en-dash-consulting/n-dx/commit/65731afcf429ea011d2bb1ee4e5f537a6739b0e4), [`8c6112e`](https://github.com/en-dash-consulting/n-dx/commit/8c6112e3182b7d624b8fc2ee6dbb84b411e203f7), [`e5b9066`](https://github.com/en-dash-consulting/n-dx/commit/e5b90660d44136bc568935a636703065933c7b04), [`91d20ad`](https://github.com/en-dash-consulting/n-dx/commit/91d20ad509f252d9d17f8128f1f2e5b8f3543609), [`1ffe0ca`](https://github.com/en-dash-consulting/n-dx/commit/1ffe0cae40b67858122ab14d26cdcb8b934afb22), [`fa4d7e9`](https://github.com/en-dash-consulting/n-dx/commit/fa4d7e903e9a59a3549f98678483b49dceeb6c45), [`00e7462`](https://github.com/en-dash-consulting/n-dx/commit/00e74627b65fe3bcc453d4330ef5d9969b82d177), [`70f49fa`](https://github.com/en-dash-consulting/n-dx/commit/70f49fa920586f70243c1089d33c5394e33f9f6e), [`085b63d`](https://github.com/en-dash-consulting/n-dx/commit/085b63d208f9622328efd5ac6f2af18ca07c2846), [`32e9aea`](https://github.com/en-dash-consulting/n-dx/commit/32e9aea4d296c7c799e880adfccfeaf055a97d2d), [`039ee0c`](https://github.com/en-dash-consulting/n-dx/commit/039ee0c79a06fb4786790f233b79a1a53628ef4b), [`9b5f740`](https://github.com/en-dash-consulting/n-dx/commit/9b5f7404da93f402fb75bae6b0da0556909e63a5), [`f0a4b80`](https://github.com/en-dash-consulting/n-dx/commit/f0a4b802eb0e435afea4466de0e5af56cf7b73c3), [`6e87f37`](https://github.com/en-dash-consulting/n-dx/commit/6e87f37a3943094dcf596e268b28c553be04cf1a), [`4ffc297`](https://github.com/en-dash-consulting/n-dx/commit/4ffc29701453ef5e59ffa7d81d42c8be744b37f6), [`b05a659`](https://github.com/en-dash-consulting/n-dx/commit/b05a6599554b5d7893b6735f16c01636c573f04d), [`5dbf308`](https://github.com/en-dash-consulting/n-dx/commit/5dbf3086350e1530202ba7ea565400a5f5384290), [`4670da7`](https://github.com/en-dash-consulting/n-dx/commit/4670da73c3a43fb2616b0ed5f5d477373fff81e6), [`61954d9`](https://github.com/en-dash-consulting/n-dx/commit/61954d9dcdbf09d5d9f1899e4059ef22e0f657f1), [`0316a48`](https://github.com/en-dash-consulting/n-dx/commit/0316a48dc8cead39507ed79811a0a0fcba6a2775), [`23cb6f3`](https://github.com/en-dash-consulting/n-dx/commit/23cb6f36f4c3dcd33713c4201e58a8d5daa15291), [`4448fe4`](https://github.com/en-dash-consulting/n-dx/commit/4448fe4bfd8822e722e4548f66e947a3fb91d306), [`0c0c861`](https://github.com/en-dash-consulting/n-dx/commit/0c0c861564998e76cc0b51a602cd95956a6fb4db), [`e0ba4ae`](https://github.com/en-dash-consulting/n-dx/commit/e0ba4aeac84bb4ac6f6ec33334f469ba50c85c5b), [`27babd6`](https://github.com/en-dash-consulting/n-dx/commit/27babd637fe4677309053a15db9efc7b16743bce), [`57b79b5`](https://github.com/en-dash-consulting/n-dx/commit/57b79b5facab35ec2d0529b3f5a598d8321d086d), [`c8c81b2`](https://github.com/en-dash-consulting/n-dx/commit/c8c81b2d3741448f67bafb995134c2706dbd6aab), [`a23735c`](https://github.com/en-dash-consulting/n-dx/commit/a23735ccadf4deade1eb3280be4da2c9aa8f58e3), [`e605e9f`](https://github.com/en-dash-consulting/n-dx/commit/e605e9f3bf02b0d724ea72b7818d2f4533b195bb), [`2f124e3`](https://github.com/en-dash-consulting/n-dx/commit/2f124e378f0e63471d5d44e1cd5f241e25698dfe), [`d0398e5`](https://github.com/en-dash-consulting/n-dx/commit/d0398e50aa2749b6384d3e5e9f4b5a602b80d73d), [`7be556b`](https://github.com/en-dash-consulting/n-dx/commit/7be556b29f11a83557c1a704240f6e2838a8072e), [`8228a7e`](https://github.com/en-dash-consulting/n-dx/commit/8228a7eb48c34ea6eb394a1b56d2736c7e759553), [`173f13e`](https://github.com/en-dash-consulting/n-dx/commit/173f13e17743c32f839c1619fc221e7d8c584148), [`bf98c36`](https://github.com/en-dash-consulting/n-dx/commit/bf98c36b8d80364c2a745ff3d2594349be9fa7ae), [`7a6eeab`](https://github.com/en-dash-consulting/n-dx/commit/7a6eeabfe2a97d511ebbc980f0e1155134e88d48), [`c4a1a61`](https://github.com/en-dash-consulting/n-dx/commit/c4a1a614884022d74c477dc3d792550f7e7735cc), [`844b636`](https://github.com/en-dash-consulting/n-dx/commit/844b63698f9ccda4f81b83362257b16dfcb065c2), [`e41d31f`](https://github.com/en-dash-consulting/n-dx/commit/e41d31fff91f9599ffc1e85d38cf1fad8da9e162), [`af89c92`](https://github.com/en-dash-consulting/n-dx/commit/af89c92e0b643d37b1380bd4eb4c383a32168c67), [`20c1d2b`](https://github.com/en-dash-consulting/n-dx/commit/20c1d2be598d61a4cb1b055d8abd28b8127618a8), [`c357d36`](https://github.com/en-dash-consulting/n-dx/commit/c357d364ff0609368c12f8a797e468960fed53f6), [`0766fc9`](https://github.com/en-dash-consulting/n-dx/commit/0766fc96d9e266814c57c5bb29d3ae1b41ad99e7), [`6f9db39`](https://github.com/en-dash-consulting/n-dx/commit/6f9db391476e7a2afff41389cb7f6d6dd85f6fa1)]:
+  - @n-dx/rex@0.9.1
+  - @n-dx/llm-client@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes

@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "962cd795-58ab-49a7-a179-ba553558ac4b":
+    status: "completed"
+    startedAt: "2026-05-01T14:01:54.728Z"
+    completedAt: "2026-05-01T14:17:20.198Z"
+    endedAt: "2026-05-01T14:17:20.198Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented atomic write path with file-locking and regression tests. Atomic writes and file-locking are operational. Targeted mutations API ready for store integration."
+    appliedAt: "2026-05-01T14:17:20.198Z"

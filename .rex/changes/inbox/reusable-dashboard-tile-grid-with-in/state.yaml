@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "cccbd450-bb82-4245-a054-50fc6dc07874":
+    status: "completed"
+    startedAt: "2026-10-15T04:02:38.951Z"
+    completedAt: "2026-10-15T04:05:09.383Z"
+    endedAt: "2026-10-15T04:05:09.383Z"
+    resolutionType: "code-change"
+    resolutionDetail: "TileGrid with in-place and full-screen expansion"
+    appliedAt: "2026-10-15T04:05:09.383Z"
+    needsPlacement: true
+    lastModified: "2026-10-15T04:05:09.671Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

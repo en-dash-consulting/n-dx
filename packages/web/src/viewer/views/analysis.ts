@@ -64,6 +64,21 @@ export function AnalysisView() {
     fetchLog();
   }, [fetchLog]);
 
+  // A v2 add captures a change into the Inbox rather than generating
+  // proposals, so the panel's words depend on the layout. /api/rex/changes
+  // answers `{ layout }` on both; a failed read keeps the v1 wording.
+  const [layout, setLayout] = useState<"v1" | "v2">("v1");
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/rex/changes")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { layout?: string } | null) => {
+        if (!cancelled && body?.layout === "v2") setLayout("v2");
+      })
+      .catch(() => { if (!cancelled) setLayout("v1"); });
+    return () => { cancelled = true; };
+  }, []);
+
   const handlePrdChanged = useCallback(() => {
     // Refresh log after proposals are accepted
     fetchLog();
@@ -98,7 +113,7 @@ export function AnalysisView() {
               class: `rex-analysis-tab${activeTab === "smart-add" ? " active" : ""}`,
               onClick: () => setActiveTab("smart-add"),
               type: "button",
-            }, "Smart Add"),
+            }, layout === "v2" ? "Add to Inbox" : "Smart Add"),
             h("button", {
               class: `rex-analysis-tab${activeTab === "batch-import" ? " active" : ""}`,
               onClick: () => setActiveTab("batch-import"),
@@ -116,7 +131,7 @@ export function AnalysisView() {
 
     // Tab content — collapsed, always the Smart Add row
     !expanded || activeTab === "smart-add"
-      ? h(SmartAddInput, { onPrdChanged: handlePrdChanged, bar: !expanded, barAction: expanded ? null : moreToggle })
+      ? h(SmartAddInput, { onPrdChanged: handlePrdChanged, bar: !expanded, barAction: expanded ? null : moreToggle, layout })
       : activeTab === "batch-import"
         ? h(BatchImportPanel, { onPrdChanged: handlePrdChanged })
         : h(AnalyzePanel, { onPrdChanged: handlePrdChanged }),

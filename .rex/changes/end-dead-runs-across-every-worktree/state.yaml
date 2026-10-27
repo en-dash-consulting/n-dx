@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "0803271f-012a-4d7d-8abe-8488cbf8641d":
+    status: "completed"
+    startedAt: "2026-10-01T21:13:13.755Z"
+    completedAt: "2026-10-01T21:24:55.876Z"
+    endedAt: "2026-10-01T21:24:55.876Z"
+    resolutionType: "code-change"
+    resolutionDetail: "POST /api/hench/runs/reconcile across every worktree; shared terminal shape in run-end.ts used by Mark stuck too (commit 94378e326)."
+    appliedAt: "2026-10-01T21:24:55.876Z"
+    lastModified: "2026-10-01T21:24:57.513Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

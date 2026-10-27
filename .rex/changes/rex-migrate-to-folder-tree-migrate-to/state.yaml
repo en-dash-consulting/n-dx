@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "24797aca-c44d-40f1-ba23-85a81446884c":
+    status: "completed"
+    startedAt: "2026-10-12T08:09:43.006Z"
+    completedAt: "2026-10-12T08:16:15.151Z"
+    endedAt: "2026-10-12T08:16:15.151Z"
+    resolutionType: "code-change"
+    resolutionDetail: "refuseOnV2 added to the three migrate commands; e2e tests in cli-v2-serve.test.ts"
+    appliedAt: "2026-10-12T08:16:15.151Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T08:16:15.422Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

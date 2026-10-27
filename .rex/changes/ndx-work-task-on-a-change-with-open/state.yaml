@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "fa6420d7-b21c-47ea-ab8a-e5ef42471cc1":
+    status: "completed"
+    startedAt: "2026-10-15T04:57:15.779Z"
+    completedAt: "2026-10-15T05:28:38.890Z"
+    endedAt: "2026-10-15T05:28:38.890Z"
+    resolutionType: "code-change"
+    resolutionDetail: "--task on a v2 change with open tasks resolves to and claims its next runnable task (skipping tasks claimed elsewhere); refused naming each task when none can run; --resolve reports the task; task-less change still one unit."
+    appliedAt: "2026-10-15T05:28:38.890Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T05:28:39.182Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

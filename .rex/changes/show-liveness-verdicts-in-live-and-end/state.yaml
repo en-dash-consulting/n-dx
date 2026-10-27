@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ffe5ed2f-62ab-4139-907f-d099aed2f978":
+    status: "completed"
+    startedAt: "2026-10-01T21:26:53.696Z"
+    completedAt: "2026-10-01T21:46:34.317Z"
+    endedAt: "2026-10-01T21:46:34.317Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Live shows liveness verdicts; End N dead runs and per-run End via reconcile route; Active Tasks panel shows verdict + Manage in Live link."
+    appliedAt: "2026-10-01T21:46:34.317Z"
+    lastModified: "2026-10-01T21:46:35.265Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

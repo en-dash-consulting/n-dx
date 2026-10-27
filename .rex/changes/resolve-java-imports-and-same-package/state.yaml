@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "e511c022-e759-4c42-bdb6-4951059e4ff8":
+    status: "completed"
+    startedAt: "2026-10-08T02:10:19.570Z"
+    completedAt: "2026-10-08T02:21:21.041Z"
+    endedAt: "2026-10-08T02:21:21.041Z"
+    resolutionType: "code-change"
+    resolutionDetail: "javaResolver in src/language/java-resolver.ts; PackResolver now prepare(files) → PreparedResolver.resolve(fromFile); fixture + goldens cover every case"
+    appliedAt: "2026-10-08T02:21:21.041Z"
+    lastModified: "2026-10-08T02:21:21.288Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

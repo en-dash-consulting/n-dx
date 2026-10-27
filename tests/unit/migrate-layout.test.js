@@ -288,6 +288,10 @@ describe.skipIf(!GIT_OK)("runMigrateLayout", () => {
     );
     expect(log).toContain("baseline");
     expect(git(["log", "-1", "--format=%s"], dir).trim()).toBe(MIGRATE_COMMIT_SUBJECT);
+    // The whole message lands, trailers included. On Windows the commit runs
+    // through cmd.exe, which drops everything after the first line break of a
+    // `-m` argument; the message therefore goes through stdin.
+    expect(git(["log", "-1", "--format=%B"], dir)).toContain("N-DX: migrate-layout");
   }, 60_000);
 
   it("is a no-op on a project already on .ndx/", async () => {

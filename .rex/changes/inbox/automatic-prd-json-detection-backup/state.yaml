@@ -1,0 +1,30 @@
+schema: "rex/v2"
+items:
+  "015a9f0b-46fc-4b8a-96e4-eeb04fc1a7f0":
+    status: "completed"
+    startedAt: "2026-04-30T16:08:53.868Z"
+    completedAt: "2026-04-30T16:30:57.868Z"
+    endedAt: "2026-04-30T16:30:57.868Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented ensureLegacyPrdMigrated() helper in rex/store that detects, backs up, and migrates legacy .rex/prd.json to folder-tree format. Idempotent via marker file, thread-safe via file locking. Exports from public API for CLI/MCP/web use. 12 unit tests cover idempotency, backup creation, error recovery, concurrency."
+  "1d772c01-64dc-4038-ae5d-6797fc23766f":
+    status: "completed"
+    startedAt: "2026-04-30T20:18:47.106Z"
+    completedAt: "2026-04-30T20:36:06.643Z"
+    endedAt: "2026-04-30T20:36:06.643Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented complete migration notification system: CLI banners with ANSI colors respecting NO_COLOR/TTY, execution log entries, MCP warning field injection, and comprehensive unit tests (45 tests). Wired into 5 core CLI commands. Suppression under --quiet/--json flags with always-on logging pattern."
+  "3f1a60ca-0821-4e6d-bb52-1de066675a6b":
+    status: "completed"
+    startedAt: "2026-04-30T20:36:07.865Z"
+    completedAt: "2026-04-30T20:36:07.865Z"
+    endedAt: "2026-04-30T20:36:07.865Z"
+    appliedAt: "2026-04-30T20:36:07.865Z"
+    needsPlacement: true
+  "c27cc067-a7f4-4cff-a087-aeedc1b161ba":
+    status: "completed"
+    startedAt: "2026-04-30T16:47:58.275Z"
+    completedAt: "2026-04-30T16:59:45.598Z"
+    endedAt: "2026-04-30T16:59:45.598Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Wired legacy-PRD migration check into all major entry points: MCP server (mcp.ts), web server (start.ts), and 10 key CLI commands (status, next, add, update, move, remove, validate, analyze, health, verify). Created comprehensive e2e test and audit document. Updated gateway exports and tests."

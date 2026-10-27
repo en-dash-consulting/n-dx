@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "05c59931-8008-40f1-aec2-f8a7c78d3106":
+    status: "completed"
+    startedAt: "2026-10-07T16:09:51.050Z"
+    completedAt: "2026-10-07T16:14:04.228Z"
+    endedAt: "2026-10-07T16:14:04.228Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added optional discoveredFrom { item?, run? } to v2 ChangeIntent and ChangeIntentSchema, with tests for a change with and without it."
+    appliedAt: "2026-10-07T16:14:04.228Z"
+    lastModified: "2026-10-07T16:14:04.450Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

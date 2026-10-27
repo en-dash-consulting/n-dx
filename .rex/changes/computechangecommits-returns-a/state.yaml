@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "aeb95776-a510-49ec-a8d6-1345c30a39f8":
+    status: "completed"
+    startedAt: "2026-10-07T22:32:28.295Z"
+    completedAt: "2026-10-07T22:37:16.097Z"
+    endedAt: "2026-10-07T22:37:16.097Z"
+    resolutionType: "code-change"
+    resolutionDetail: "loadTrailerCommits throws on a shallow clone (before the cache read), naming git fetch --unshallow and fetch-depth: 0."
+    appliedAt: "2026-10-07T22:37:16.097Z"
+    lastModified: "2026-10-07T22:37:16.342Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

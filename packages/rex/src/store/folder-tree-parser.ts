@@ -37,7 +37,11 @@ export interface ParseWarning {
   path: string;
   /** Human-readable description of the problem. */
   message: string;
-  /** The v2 reader dropped a node (and, for a folder, its contents) over this problem. */
+  /**
+   * The reader dropped an item over this problem: the v2 reader a node (and,
+   * for a folder, its contents), the v1 parser an item file or a subtask
+   * section. Unmarked warnings lose nothing.
+   */
   skipped?: true;
 }
 
@@ -321,10 +325,13 @@ async function discoverLeafChildMarkdownFiles(
     const filePath = join(dir, entry);
     if (filePath === itemFile) continue;
 
+    const from = warnings.length;
     const text = await readIndexFile(filePath, warnings, digests);
-    if (text === null) continue;
-    const fm = parseFrontmatter(text, filePath, warnings);
-    if (fm === null) continue;
+    const fm = text === null ? null : parseFrontmatter(text, filePath, warnings);
+    if (fm === null) {
+      markSkipped(warnings, from);
+      continue;
+    }
 
     // Legacy single-child shim — handled elsewhere; do not treat as leaf.
     if (fm.__parentId !== undefined) continue;
@@ -706,7 +713,7 @@ async function discoverItemFile(
   listing: DirListing | null,
 ): Promise<string | null> {
   if (!listing) {
-    warnings.push({ path: dir, message: "Directory not readable" });
+    warnings.push({ path: dir, message: "Directory not readable", skipped: true });
     return null;
   }
   const entries = listing.names;
@@ -730,6 +737,9 @@ async function discoverItemFile(
     message: markdownFiles.length === 0
       ? "No item markdown file found (expected index.md or title-named .md file)"
       : `Ambiguous item file: ${markdownFiles.length} non-index .md files and no index.md`,
+    // A folder holding only, say, a .gitkeep loses nothing; one holding item
+    // files or subfolders loses them with it.
+    ...(markdownFiles.length > 0 || listing.subdirs.length > 0 ? { skipped: true as const } : {}),
   });
   return null;
 }
@@ -749,17 +759,26 @@ async function parseItemFileFromFrontmatter(
   itemFiles: Map<string, string>,
   fromReconstructedParent: boolean = false,
 ): Promise<PRDItem | null> {
+  const from = warnings.length;
   const text = await readIndexFile(filePath, warnings, digests);
-  if (text === null) return null;
-
-  const fm = parseFrontmatter(text, filePath, warnings);
-  if (fm === null) return null;
+  const fm = text === null ? null : parseFrontmatter(text, filePath, warnings);
+  if (fm === null) {
+    markSkipped(warnings, from);
+    return null;
+  }
 
   if (typeof fm.id === "string" && fm.id) {
     itemFiles.set(fm.id, resolve(filePath));
   }
 
-  return buildItem(fm, filePath, depth, warnings, fromReconstructedParent);
+  const item = buildItem(fm, filePath, depth, warnings, fromReconstructedParent);
+  if (item === null) markSkipped(warnings, from);
+  return item;
+}
+
+/** Mark the warnings pushed since index `from` as the reason an item was dropped. */
+function markSkipped(warnings: ParseWarning[], from: number): void {
+  for (let i = from; i < warnings.length; i++) warnings[i] = { ...warnings[i], skipped: true };
 }
 
 async function readIndexFile(
@@ -994,7 +1013,7 @@ function parseSubtaskSection(
   // **ID:** `{uuid}`
   const idMatch = section.match(/\*\*ID:\*\*\s*`([^`]+)`/);
   if (!idMatch) {
-    warnings.push({ path: filePath, message: `Subtask "${title}" is missing **ID:** field` });
+    warnings.push({ path: filePath, message: `Subtask "${title}" is missing **ID:** field`, skipped: true });
     return null;
   }
   const id = idMatch[1].trim();
@@ -1325,10 +1344,48 @@ function foldScalar(lines: string[]): string {
 }
 
 function applyChomping(content: string, chomping: "clip" | "strip" | "keep"): string {
-  if (chomping === "strip") return content.replace(/\n*$/, "");
+  if (chomping === "strip") return stripTrailingNewlines(content);
   if (chomping === "keep") return content + (content.endsWith("\n") ? "" : "\n");
   if (content === "") return "";
-  return content.replace(/\n*$/, "") + "\n";
+  return stripTrailingNewlines(content) + "\n";
+}
+
+/**
+ * `content` without its trailing newlines. A loop, not `/\n*$/`: that regex
+ * tries every newline in the body as a start, runs to the end of each run and
+ * backtracks when `$` fails, so a block scalar with a long run of blank lines in
+ * its middle costs quadratic time (6 s at 100k, on every `index.md` read).
+ */
+function stripTrailingNewlines(content: string): string {
+  let end = content.length;
+  while (end > 0 && content.charCodeAt(end - 1) === 10) end--;
+  return content.slice(0, end);
+}
+
+/**
+ * The escapes decoded in a double-quoted scalar that is not valid JSON: the
+ * single-character ones JSON defines. `\uXXXX` is handled in the decoder.
+ */
+const QUOTED_ESCAPES: Record<string, string> = {
+  n: "\n",
+  t: "\t",
+  r: "\r",
+  b: "\b",
+  f: "\f",
+  "/": "/",
+  '"': '"',
+  "\\": "\\",
+};
+
+/**
+ * The escapes of a double-quoted scalar JSON.parse refused, decoded in one
+ * left-to-right pass like JSON would: `\n \t \r \b \f \/ \" \\` and `\uXXXX`
+ * with exactly four hex digits. Any other `\c`, a `\u` short of four digits
+ * among them, stays as written.
+ */
+function decodeQuotedFallback(body: string): string {
+  return body.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (match, c: string) =>
+    c.length === 5 ? String.fromCharCode(parseInt(c.slice(1), 16)) : (QUOTED_ESCAPES[c] ?? match));
 }
 
 function parseScalar(s: string): unknown {
@@ -1346,19 +1403,18 @@ function parseScalar(s: string): unknown {
   }
   if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
     // Both writers quote with JSON.stringify, so JSON.parse decodes every
-    // escape in one pass. Sequential replaces cannot: they read the `\\n` of
-    // `C:\new` as a newline and never decode `\r` or `\uXXXX`. The replace
-    // chain remains only for hand-written escapes JSON lacks, e.g. `\x`.
+    // escape, `\uXXXX` included. Only a hand- or agent-written scalar with an
+    // escape JSON lacks, e.g. `\x`, reaches the fallback, which decodes the
+    // escapes JSON defines in one left-to-right pass and keeps any other `\c`
+    // as written. One pass matters: a chain of replaces re-read its own
+    // output, turning the `\\n` of `C:\\new` into `\n` and then into a line
+    // feed, and every save after that compounded the change.
     try {
       return JSON.parse(s) as string;
     } catch {
-      // Not valid JSON — decode the common escapes below.
+      // Not valid JSON — decode the JSON escapes below.
     }
-    return s.slice(1, -1)
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, "\\")
-      .replace(/\\n/g, "\n")
-      .replace(/\\t/g, "\t");
+    return decodeQuotedFallback(s.slice(1, -1));
   }
   if (s.startsWith("'") && s.endsWith("'") && s.length >= 2) {
     return s.slice(1, -1).replace(/''/g, "'");

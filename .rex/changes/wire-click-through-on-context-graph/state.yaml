@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "a76e1030-7683-4d1c-97cb-a5b98b7cadc5":
+    status: "completed"
+    startedAt: "2026-05-08T11:01:56.564Z"
+    completedAt: "2026-05-08T11:13:41.404Z"
+    endedAt: "2026-05-08T11:13:41.404Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Wire click-through on context graph nodes to TaskDetail panel"
+    appliedAt: "2026-05-08T11:13:41.404Z"

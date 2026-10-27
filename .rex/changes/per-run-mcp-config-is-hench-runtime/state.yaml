@@ -1,0 +1,19 @@
+schema: "rex/v2"
+items:
+  "556e989d-6eee-403a-81d1-2d1cd421d0d5":
+    status: "completed"
+    startedAt: "2026-09-25T17:57:41.621Z"
+    completedAt: "2026-09-25T17:57:41.621Z"
+    endedAt: "2026-09-25T17:57:41.621Z"
+    appliedAt: "2026-09-25T17:57:41.621Z"
+    lastModified: "2026-09-25T17:57:41.968Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "da6ed767-ff0b-4eec-b647-bc55109f087a":
+    status: "completed"
+    startedAt: "2026-09-25T17:49:44.282Z"
+    completedAt: "2026-09-25T17:57:40.280Z"
+    endedAt: "2026-09-25T17:57:40.280Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added .hench/mcp/ to HENCH_RUNTIME_GITIGNORE_ENTRIES so the pre-run, loop and completion gates discount the per-run MCP config. Real-repo regression test (repo whose .gitignore lacks the entry) in uncommitted-work-gate.test.ts, exact-list assertion updated in pre-run-gate-own-state.test.ts, corrected the writeAgentMcpConfig comment, patch changeset for @n-dx/hench."
+    lastModified: "2026-09-25T17:57:40.634Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

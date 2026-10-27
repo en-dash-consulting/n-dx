@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "3cf80a6e-6a1c-4fe5-ae59-29aca43cbaf6":
+    status: "completed"
+    startedAt: "2026-10-10T04:27:13.889Z"
+    completedAt: "2026-10-10T04:59:02.599Z"
+    endedAt: "2026-10-10T04:59:02.599Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Declared design in n-dx.graview.json (glance, page groups, computed, brand, home and per-kind blocks, seven titled places; graview check clean) plus graview.app serve wiring; n-dx-graview product repo with a custom pages face, headless describePlace test and a clean axe pass"
+    appliedAt: "2026-10-10T04:59:02.599Z"
+    lastModified: "2026-10-10T04:59:02.874Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

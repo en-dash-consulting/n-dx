@@ -10,7 +10,9 @@ import { sanitizeBranchName } from "@n-dx/llm-client";
 
 export { sanitizeBranchName };
 
-const QUIET_GIT = { stdio: ["ignore", "pipe", "ignore"] as ["ignore", "pipe", "ignore"] };
+// windowsHide: these run under the dashboard's hidden children too, where an
+// unhidden git would get its own console window (tests/e2e/windows-hide-policy).
+const QUIET_GIT = { stdio: ["ignore", "pipe", "ignore"] as ["ignore", "pipe", "ignore"], windowsHide: true };
 
 /**
  * Resolve the current git branch name.

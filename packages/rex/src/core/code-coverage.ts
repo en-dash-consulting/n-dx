@@ -36,13 +36,27 @@ export interface CrossReferenceResult {
 
 /**
  * Extract file path references from a text string.
- * Matches common file path patterns (e.g. src/foo/bar.ts, ./lib/util.js).
+ * Matches common file path patterns (e.g. src/foo/bar.ts, ./lib/util.js,
+ * .github/x.yml) and returns them relative: a leading `/`, `./` or `../` is
+ * stripped, so `../lib/x.ts` gives `lib/x.ts`, the tail the old pattern gave,
+ * and the suffix match in crossReferenceChanges still finds it.
+ *
+ * @internal Exported for its unit test only; not part of rex's public API.
  */
-function extractFilePaths(text: string): string[] {
-  // Match paths like src/foo.ts, ./lib/bar.js, packages/x/y.ts
-  const pattern = /(?:\.\/)?(?:[\w@-]+\/)+[\w.-]+\.\w+/g;
+export function extractFilePaths(text: string): string[] {
+  // A match starts only at a token boundary: the lookbehind refuses a start
+  // right after a path character, so a pattern that fails on a long run of
+  // `-` or `a/` fails once rather than once per position (quadratic: PRD text
+  // of 50k such characters took 0.9 s; 256 KiB takes under 10 ms now). It also
+  // stops a match beginning in the middle of a token — `foo.bar/baz.ts`, a
+  // URL, `v1.2/foo.ts` — which used to leak tails like `bar/baz.ts`. Because
+  // `.` is in the lookbehind class, `./` and `../` prefixes and a `.`-led
+  // segment (`.github/`, `src/.hidden/`) are matched explicitly, whole, where
+  // the old pattern skipped to the segment after them.
+  const pattern = /(?<![\w@.\/-])\/?(?:\.\.?\/)*(?:\.?[\w@-]+\/)+[\w.-]+\.\w+/g;
   const matches = text.match(pattern);
-  return matches ? [...new Set(matches)] : [];
+  if (!matches) return [];
+  return [...new Set(matches.map((path) => path.replace(/^\/?(?:\.\.?\/)*/, "")))];
 }
 
 /**
@@ -66,9 +80,22 @@ function collectItemFilePaths(item: PRDItem): string[] {
 
 /**
  * Normalize a file path for matching (strip leading ./ and trailing whitespace).
+ * Applied to the caller's changed files too, so it leaves an absolute or UNC
+ * path as given: the result is reported back in matchedFiles/uncoveredChanges.
  */
 function normalizePath(path: string): string {
   return path.replace(/^\.\//, "").trim();
+}
+
+/**
+ * Whether `tail` is the whole of `path` or ends it after a `/`. A bare
+ * endsWith matched `lib/util.ts` to `mylib/util.ts`, and to every
+ * `**\/lib/util.ts` alike.
+ */
+function endsAtSeparator(path: string, tail: string): boolean {
+  if (path === tail) return true;
+  if (tail.length === 0 || path.length <= tail.length || !path.endsWith(tail)) return false;
+  return path.charCodeAt(path.length - tail.length - 1) === 47; // "/"
 }
 
 /**
@@ -94,8 +121,8 @@ export function crossReferenceChanges(
     for (const changed of normalizedChanges) {
       for (const itemPath of itemPaths) {
         // Match if the changed file ends with the item's referenced path
-        // or if the item's path ends with the changed file
-        if (changed.endsWith(itemPath) || itemPath.endsWith(changed) || changed === itemPath) {
+        // or the item's path ends with the changed file, at a `/` boundary.
+        if (endsAtSeparator(changed, itemPath) || endsAtSeparator(itemPath, changed)) {
           matchedFiles.push(changed);
           coveredFiles.add(changed);
           break;

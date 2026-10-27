@@ -1,0 +1,14 @@
+schema: "rex/v2"
+items:
+  "787fdfc1-ef04-45e9-a929-70730f5ea73f":
+    status: "completed"
+    startedAt: "2026-04-17T15:22:45.611Z"
+    completedAt: "2026-04-17T15:30:03.296Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Deleted root cli-brand.js (dead code, no importers). Updated ORCHESTRATION_PEERS in architecture-policy.test.js from \"cli-brand.js\" to \"packages/core/cli-brand.js\"."
+  "f2bd0934-032a-4ae8-b03b-f97ec7f122ae":
+    status: "completed"
+    startedAt: "2026-04-17T15:30:03.343Z"
+    completedAt: "2026-04-17T15:30:03.343Z"
+    appliedAt: "2026-04-17T15:30:03.343Z"
+    needsPlacement: true

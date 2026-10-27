@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "b5a52c01-e2c1-439d-800e-d930bef52aa4":
+    status: "completed"
+    startedAt: "2026-10-13T17:59:20.602Z"
+    completedAt: "2026-10-13T18:05:07.422Z"
+    endedAt: "2026-10-13T18:05:07.422Z"
+    resolutionType: "code-change"
+    resolutionDetail: "scopePrdPathsToReport stages a reported v2 state.yaml's untracked .md intent files; PROBE4 test added (red on old head). Commit 3b82d7d8a."
+    appliedAt: "2026-10-13T18:05:07.422Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:05:07.707Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

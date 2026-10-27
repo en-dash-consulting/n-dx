@@ -10,6 +10,7 @@ import {
 } from "../../../../src/cli/commands/config.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../../src/schema/v1.js";
 import type { HenchConfig } from "../../../../src/schema/v1.js";
+import { CLIError } from "../../../../src/cli/errors.js";
 
 describe("getConfigValue", () => {
   const config = DEFAULT_HENCH_CONFIG();
@@ -66,6 +67,20 @@ describe("setConfigValue", () => {
     const updated = setConfigValue(config, "guard.allowedCommands", ["npm", "git"]);
     expect(updated.guard.allowedCommands).toEqual(["npm", "git"]);
   });
+
+  // `"__proto__" in {}` is true, so the walk followed it onto Object.prototype
+  // and the final assignment landed on every object in the process. The
+  // callers allowlist the key first; this is the direct-call guard.
+  it.each(["__proto__.polluted", "constructor.prototype.polluted", "prototype"])(
+    "throws on %s instead of writing onto Object.prototype",
+    (path) => {
+      const config = DEFAULT_HENCH_CONFIG();
+      expect(() => setConfigValue(config, path, "x")).toThrow(CLIError);
+      expect(() => setConfigValue(config, path, "x")).toThrow(/reserved object property/);
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      expect(Object.prototype.hasOwnProperty.call(Object.prototype, "polluted")).toBe(false);
+    },
+  );
 });
 
 describe("coerceValue", () => {

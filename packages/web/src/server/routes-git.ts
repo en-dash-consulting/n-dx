@@ -33,7 +33,7 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { exec, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
-import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { isFeatureEnabled } from "./routes-features.js";
 
 // ---------------------------------------------------------------------------
@@ -517,7 +517,7 @@ async function handleGitIgnore(
     try {
       writeFileSync(gitignorePath, `${existing}${separator}${pattern}\n`, "utf-8");
     } catch (err) {
-      errorResponse(res, 500, `Failed to write .gitignore: ${err instanceof Error ? err.message : String(err)}`);
+      errorResponse(res, 500, `Failed to write .gitignore: ${errorMessage(err)}`);
       return true;
     }
   }

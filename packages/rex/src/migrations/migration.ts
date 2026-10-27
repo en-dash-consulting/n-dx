@@ -10,7 +10,9 @@
  * import. Planning (`./pipeline.ts`) runs the migration's rules, then its
  * stages: by default an optional text pass, then an optional Jev pass. Each
  * model stage calls its injected seam and never a client directly. The plan is written as a plan
- * file (`./plan-file.ts`) for review. `apply` is a slot: nothing fills it yet.
+ * file (`./plan-file.ts`) for review. `apply` is a slot nothing fills: v1-to-v2
+ * applies through its own module (`./v1-to-v2/apply.ts`), which needs the rex
+ * directory and the PRD lock as well as the plan.
  *
  * @module migrations/migration
  */
@@ -140,7 +142,7 @@ export interface MigrationDefinition<TData, TEntry, TSummary, TOptions = undefin
   summarize?(entries: Readonly<Record<string, TEntry>>, summary: TSummary, context: PlanContext<TOptions>): TSummary;
 }
 
-/** Applies a reviewed plan. A slot for the apply command; no migration fills it yet. */
+/** Applies a reviewed plan. A slot no migration fills; see the module comment. */
 export type ApplyPlan<TEntry, TSummary> = (plan: PlanFile<TEntry, TSummary>) => Promise<void>;
 
 export interface Migration<TData, TEntry, TSummary, TOptions = undefined> {

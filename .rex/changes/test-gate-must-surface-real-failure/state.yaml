@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "22477541-6076-4eac-bbab-0e8876fb7514":
+    status: "completed"
+    startedAt: "2026-09-03T21:37:58.896Z"
+    completedAt: "2026-09-03T21:48:35.447Z"
+    endedAt: "2026-09-03T21:48:35.447Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Parser reads both streams, never returns empty, names only genuinely-failing packages, and surfaces raw output. Timeouts report distinctly and keep partial output. TEST_GATE_TIMEOUT raised to 15m against the measured 248s. Verified end to end against a real failing test — assertion message now reaches the operator."
+    appliedAt: "2026-09-03T21:48:35.447Z"
+    lastModified: "2026-09-03T21:48:35.495Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

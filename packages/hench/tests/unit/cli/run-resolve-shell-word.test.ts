@@ -17,6 +17,16 @@ describe("shellWord", () => {
     expect(shellWord("C:\\My Repo\\app", "win32")).toBe('"C:\\My Repo\\app"');
   });
 
+  // MSVC argv rules: a backslash is literal unless it precedes a quote, so a
+  // run before the closing quote or an embedded quote is doubled. Without it
+  // `"C:\My Repo\"` reads as an escaped quote and the word swallows the rest
+  // of the command line.
+  it("doubles win32 backslashes before the closing quote and before an embedded quote", () => {
+    expect(shellWord("C:\\My Repo\\", "win32")).toBe('"C:\\My Repo\\\\"');
+    expect(shellWord('C:\\My "Repo"', "win32")).toBe('"C:\\My \\"Repo\\""');
+    expect(shellWord('a\\"b c', "win32")).toBe('"a\\\\\\"b c"');
+  });
+
   it("leaves a backslash path without spaces unquoted on win32", () => {
     expect(shellWord("C:\\repo\\app", "win32")).toBe("C:\\repo\\app");
   });

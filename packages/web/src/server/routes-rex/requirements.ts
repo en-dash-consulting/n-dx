@@ -5,7 +5,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import type { ServerContext } from "../types.js";
-import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
+import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { findItemById, appendLog } from "./rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
@@ -252,7 +252,7 @@ async function handleAddRequirement(
 
     jsonResponse(res, 201, { ok: true, id, requirement });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }
@@ -324,7 +324,7 @@ async function handleUpdateRequirement(
 
     jsonResponse(res, 200, { ok: true, requirement: existing });
   } catch (err) {
-    errorResponse(res, 400, String(err));
+    errorResponse(res, 400, errorMessage(err));
   }
   return true;
 }

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "fea3f678-2039-4a59-bba4-dc5f652f68d9":
+    status: "completed"
+    startedAt: "2026-10-15T07:05:39.616Z"
+    completedAt: "2026-10-15T07:10:32.583Z"
+    endedAt: "2026-10-15T07:10:32.583Z"
+    resolutionType: "code-change"
+    resolutionDetail: "registerRexWatcher tracks each PRD folder's watcher and inode; a changed inode closes the old watcher, drops it from the list and re-watches."
+    appliedAt: "2026-10-15T07:10:32.583Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T07:10:32.948Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

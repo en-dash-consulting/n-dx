@@ -65,6 +65,8 @@ function stubApi(opts: {
   profiles?: Json[];
   status?: Json;
   test?: Json;
+  /** Replaces the catalog's `local` entry. */
+  local?: Json;
 }) {
   const calls: Call[] = [];
   const mock = vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
@@ -73,7 +75,7 @@ function stubApi(opts: {
     const u = String(url);
     calls.push({ method, url: u, body });
     const ok = (json: unknown) => ({ ok: true, status: 200, json: async () => json });
-    if (u.includes("/api/llm/catalog")) return ok(CATALOG);
+    if (u.includes("/api/llm/catalog")) return ok(opts.local ? { ...CATALOG, local: opts.local } : CATALOG);
     if (u.includes("/api/llm/local-status")) {
       return ok(opts.status ?? { ok: true, url: "http://localhost:1234", models: LIVE_MODELS });
     }
@@ -158,6 +160,47 @@ describe("Robot Wrangler — Local vendor layout", () => {
     const before = api.count("local-status");
     await act(async () => { vi.advanceTimersByTime(10_000); });
     expect(api.count("local-status")).toBe(before + 1);
+  });
+
+  describe("a saved host or port the dashboard refused to probe", () => {
+    const SHAPE_ERROR = "Invalid LLM host: a host is a hostname, an IPv4 address or a bracketed IPv6 address";
+    const refused = {
+      models: [], providers: ["api"], defaultModel: "", reachable: false, reason: SHAPE_ERROR,
+      readiness: { state: "needs-setup", summary: SHAPE_ERROR },
+    };
+    const checkRows = () => Array.from(root.querySelectorAll<HTMLElement>(".llm-runcard-check"));
+    /** The run card's model-list row: "Live model list" or "Local server …". */
+    const modelListRow = () =>
+      checkRows().find((row) => /^(?:Live model list|Local server)/.test(row.querySelector(".llm-runcard-check-label")?.textContent ?? ""))!;
+
+    it("says the model list is not configured, not that the server is unreachable", async () => {
+      stubApi({ config: localConfig(), local: refused, status: { ok: false, url: "", models: [], error: SHAPE_ERROR } });
+      await mount();
+      const row = modelListRow();
+      expect(row.querySelector(".llm-runcard-check-label")?.textContent).toBe("Local server not configured");
+      expect(row.querySelector(".llm-runcard-check-detail")?.textContent).toBe(SHAPE_ERROR);
+      expect(row.classList.contains("llm-runcard-check-bad")).toBe(true);
+      expect(root.querySelector(".llm-runcard-checks")?.textContent).not.toContain("unreachable");
+    });
+
+    it("leaves the URL off the status pill, since no endpoint was contacted", async () => {
+      stubApi({ config: localConfig(), local: refused, status: { ok: false, url: "", models: [], error: SHAPE_ERROR } });
+      await mount();
+      const pill = section("Server").querySelector(".llm-status-pill")!;
+      expect(pill.textContent).toContain(SHAPE_ERROR);
+      expect(pill.querySelector(".llm-pill-url")).toBeNull();
+    });
+
+    it("still reads unreachable, with the URL it tried, when the probe itself failed", async () => {
+      stubApi({
+        config: localConfig(),
+        local: { models: [], providers: ["api"], defaultModel: "", reachable: false, reason: "Connection refused", readiness: { state: "unreachable", summary: "Not reachable · localhost:1234" } },
+        status: { ok: false, url: "http://localhost:1234", models: [], error: "Connection refused" },
+      });
+      await mount();
+      expect(modelListRow().querySelector(".llm-runcard-check-label")?.textContent).toBe("Local server unreachable");
+      expect(section("Server").querySelector(".llm-status-pill .llm-pill-url")?.textContent).toBe("http://localhost:1234");
+    });
   });
 
   describe("profiles", () => {

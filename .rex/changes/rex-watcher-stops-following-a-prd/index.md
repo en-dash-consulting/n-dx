@@ -1,0 +1,20 @@
+---
+id: "fea3f678-2039-4a59-bba4-dc5f652f68d9"
+type: "change"
+title: "Rex watcher stops following a PRD folder that is deleted and recreated while ndx start runs"
+slug: "rex-watcher-stops-following-a-prd"
+intent: "Verdict: should-fix (adversarial review of the lazy-watch fix for aeac2c3a). In registerRexWatcher (packages/web/src/server/start.ts), watchPrdFolder records each folder in a `watched` set and never removes it. If prd_tree/, product/ or changes/ is deleted and recreated while the server runs (git checkout of a branch without it and back, or a tool removing the folder), the .rex/ watcher fires and schedules one refresh, but no new recursive watch is added. On Linux (inotify) and Windows the old watch died with the old directory, so later edits inside the recreated folder leave .rex/.cache/prd.json stale until restart. macOS FSEvents watches by path and is unaffected. Folders present at boot behaved the same way before this change (they were never re-watched), so the gap is not new, but the lazy path keeps it.\n\nReachable: any branch switch in a served worktree that removes and restores a PRD folder. Mitigated: the recreation itself triggers one refresh.\n\nOptions: (a, recommended) keep a Map from folder name to FSWatcher. On a .rex/ event for that name, if the directory exists and its inode differs from the watched one (or simply always), close the old watcher, splice it out of `into`, and add a new one. Cost: about 15 lines plus a test. Risk: re-watching on every event for that name churns watchers on macOS, where child writes can report the folder name, so compare inodes. (b) Attach an 'error'/'close' listener that clears the entry. Cheaper, but inotify does not always emit an error when the directory is deleted.\n\nOperator notes (2026-10-14, v2 hardening 4/5): packages/web only, except the criteria's tests. Hal's draft #742 edits packages/web/src/server/routes-live*.ts, routes-worktrees.ts, the hub proxy and the Live viewer files; stay out of them. Do not edit packages/rex/tests/unit/schema/v2.test.ts. Add a changeset (patch, @n-dx/web). Run the six static root policy tests before finishing: tests/e2e/architecture-policy, domain-isolation, shell-spawn-inventory-policy, wall-clock-inventory-policy, layout-literal-policy and obfuscated-code-policy."
+acceptanceCriteria:
+  - "With registerRexWatcher watching a v2 rexDir, deleting changes/ and recreating it, then editing changes/<slug>/index.md, refreshes .rex/.cache/prd.json without a restart (test runs on Linux CI)"
+  - "Re-watching does not grow the caller's watcher list without bound: a replaced watcher is closed and removed from it"
+touches:
+  - "7a93b80b-7460-40c3-975d-5fd555ef4264"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "pr-36"
+  - "web"
+  - "v2-hardening"
+source: "ndx-adversarial-review"
+---

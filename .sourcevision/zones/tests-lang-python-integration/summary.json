@@ -1,0 +1,26 @@
+{
+  "id": "tests-lang-python-integration",
+  "name": "Tests Lang Python Integration",
+  "description": "Non-source files in packages: optional-readers.test.ts, pack-facts.test.ts, pack-golden.test.ts (+4 more)",
+  "files": [
+    "packages/lang-python/tests/integration/optional-readers.test.ts",
+    "packages/lang-python/tests/integration/pack-facts.test.ts",
+    "packages/lang-python/tests/integration/pack-golden.test.ts",
+    "packages/lang-python/tests/integration/python-clients.test.ts",
+    "packages/lang-python/tests/integration/python-frameworks.test.ts",
+    "packages/lang-python/tests/integration/python-resolver.test.ts",
+    "packages/lang-python/tests/integration/tree-sitter-python-grammar.test.ts"
+  ],
+  "entryPoints": [],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 7,
+  "lineCount": 1673,
+  "riskMetrics": {
+    "cohesion": 1,
+    "coupling": 0,
+    "riskScore": 0,
+    "riskLevel": "healthy",
+    "failsThreshold": false
+  }
+}

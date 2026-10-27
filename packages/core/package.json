@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/core",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "publishConfig": {
     "access": "public"
   },
@@ -87,6 +87,7 @@
     "layout.js",
     "init-summary.js",
     "migrate-layout.js",
+    "migrate-chain.js",
     "run-summary.js"
   ],
   "scripts": {

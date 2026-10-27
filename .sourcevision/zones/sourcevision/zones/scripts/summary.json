@@ -1,0 +1,38 @@
+{
+  "id": "sourcevision/scripts",
+  "name": "Scripts",
+  "description": "23 files, primarily JavaScript",
+  "files": [
+    "packages/sourcevision/scripts/bench-java-parse.mjs",
+    "packages/sourcevision/scripts/corpus-sample.mjs",
+    "packages/sourcevision/scripts/database-corpus-report.mjs",
+    "packages/sourcevision/scripts/go-corpus-clone.mjs",
+    "packages/sourcevision/scripts/go-corpus-report.mjs",
+    "packages/sourcevision/scripts/go-corpus.mjs",
+    "packages/sourcevision/scripts/java-corpus-clone.mjs",
+    "packages/sourcevision/scripts/java-corpus-report.mjs",
+    "packages/sourcevision/scripts/java-corpus.mjs",
+    "packages/sourcevision/scripts/java-scip-compare.mjs",
+    "packages/sourcevision/scripts/java-scip.mjs",
+    "packages/sourcevision/scripts/python-build-report.mjs",
+    "packages/sourcevision/scripts/python-corpus-clone.mjs",
+    "packages/sourcevision/scripts/python-corpus-report.mjs",
+    "packages/sourcevision/scripts/python-corpus.mjs",
+    "packages/sourcevision/scripts/python-outbound-report.mjs",
+    "packages/sourcevision/scripts/python-resolve-report.mjs",
+    "packages/sourcevision/scripts/python-routes-report.mjs",
+    "packages/sourcevision/scripts/spring-corpus-report.mjs",
+    "packages/sourcevision/scripts/sql-corpus-report.mjs",
+    "packages/sourcevision/scripts/tf-corpus-report.mjs",
+    "packages/sourcevision/scripts/tf-corpus.mjs",
+    "packages/sourcevision/scripts/workspace-pack.mjs"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/scripts/java-scip.mjs",
+    "packages/sourcevision/scripts/workspace-pack.mjs"
+  ],
+  "cohesion": 1,
+  "coupling": 0,
+  "fileCount": 23,
+  "lineCount": 2603
+}

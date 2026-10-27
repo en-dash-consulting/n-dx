@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "51749fa5-9948-4ca3-afa5-b23cbbc7573b":
+    status: "completed"
+    startedAt: "2026-05-28T15:47:09.315Z"
+    completedAt: "2026-05-28T15:55:59.693Z"
+    endedAt: "2026-05-28T15:55:59.693Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added terminal auto-commit step to ndx-config, ndx-plan, ndx-capture, ndx-reshape. Each step: check git status --porcelain (no-op if clean), git add -A, git commit with skill-scoped message. ndx-work and read-only skills untouched. Regenerated .agents/skills/ from source."
+    appliedAt: "2026-05-28T15:55:59.693Z"

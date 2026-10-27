@@ -1108,8 +1108,11 @@ function reviewChipText(review: ReviewInfo | undefined, executor: string, execut
 /** Where a vendor's model list came from: a short label, and the longer detail behind it. */
 function catalogOrigin(vendor: ViewerLLMVendor, entry: CatalogEntry): { label: string; detail: string | null } {
   if (vendor === VIEWER_LLM_VENDOR.LOCAL) {
-    return entry.reachable
-      ? { label: "Live model list", detail: "From the local server" }
+    if (entry.reachable) return { label: "Live model list", detail: "From the local server" };
+    // `needs-setup` means the saved host or port failed the shape check and no
+    // probe was sent, so there is no server to call unreachable yet.
+    return entry.readiness?.state === "needs-setup"
+      ? { label: "Local server not configured", detail: entry.reason ?? null }
       : { label: "Local server unreachable", detail: entry.reason ?? null };
   }
   return entry.source === "live"
@@ -1417,19 +1420,22 @@ function StatusPill({ status, onRefresh }: { status: LocalStatusResponse | null;
       refresh,
     );
   }
+  // An endpoint the server refused to probe answers `url: ""`; there is no
+  // address to show beside its error.
+  const url = status.url ? h("code", { class: "llm-pill-url" }, status.url) : null;
   if (status.ok) {
     const n = status.models.length;
     return h("span", { class: "llm-status-pill llm-status-ok" },
       h("span", { class: "llm-pill-dot" }),
       n > 0 ? `${n} model${n === 1 ? "" : "s"} available` : "Connected",
-      h("code", { class: "llm-pill-url" }, status.url),
+      url,
       refresh,
     );
   }
   return h("span", { class: "llm-status-pill llm-status-err" },
     h("span", { class: "llm-pill-dot" }),
     status.error ?? "Server unreachable",
-    h("code", { class: "llm-pill-url" }, status.url),
+    url,
     refresh,
   );
 }

@@ -172,7 +172,7 @@ ndx plan --accept .
 
 An existing codebase already does things, and the PRD should say so without inventing work for them. In the PRD's terms (see [The PRD](./concepts/)), what the code already does is the product layer: capabilities that read *met*. Only gaps, improvements and missing features arrive as changes.
 
-On a v1 project, which `ndx init` creates until the storage migration ships, there is no product layer. When scanning an existing codebase for the first time (empty PRD + existing code), the LLM performs a **baseline scan** instead: it marks already-implemented functionality as `completed` and only creates `pending` tasks for gaps. You won't get a wall of pending tasks for code that already works.
+On a v1 project, one that has not yet run `ndx migrate`, there is no product layer. When scanning an existing codebase for the first time (empty PRD + existing code), the LLM performs a **baseline scan** instead: it marks already-implemented functionality as `completed` and only creates `pending` tasks for gaps. You won't get a wall of pending tasks for code that already works.
 
 ### Reviewing the initial PRD
 

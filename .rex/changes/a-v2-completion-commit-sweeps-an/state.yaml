@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "aa78a8da-4ff4-46b4-86b2-77e67a8814a5":
+    status: "completed"
+    startedAt: "2026-10-13T18:24:17.380Z"
+    completedAt: "2026-10-13T18:40:15.492Z"
+    endedAt: "2026-10-13T18:40:15.492Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): a v2 completion stages an untracked intent .md beside a reported state.yaml only when its node has a row there, via rex loadPrdModel stateRows through rex-gateway (cap 65→66). New tests for a draft capability and a draft task; PROBE4 unedited and passing. Commit c9b41edff."
+    appliedAt: "2026-10-13T18:40:15.492Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:40:15.733Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

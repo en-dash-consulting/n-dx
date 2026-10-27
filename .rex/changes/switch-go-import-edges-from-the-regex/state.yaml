@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ab5f9130-3afb-4704-9d7d-3303eea8f9c9":
+    status: "completed"
+    startedAt: "2026-10-08T07:29:49.721Z"
+    completedAt: "2026-10-08T07:42:13.916Z"
+    endedAt: "2026-10-08T07:42:13.916Z"
+    resolutionType: "code-change"
+    resolutionDetail: "The Go pack now has the resolver attached. buildPackImportGraph reports degraded packs, including when forProject rejects, and imports.ts runs processGoFiles for a degraded Go pack. The resolver applies the longest-module-prefix rule. Tests cover all four fallback paths, incremental runs and the oversized-only package. Corpus parity is logged."
+    appliedAt: "2026-10-08T07:42:13.916Z"
+    lastModified: "2026-10-08T07:42:14.175Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

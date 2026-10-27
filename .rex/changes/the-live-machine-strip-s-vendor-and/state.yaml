@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "b5092c2f-84d3-4b0b-955f-d0024e5b97b1":
+    status: "completed"
+    startedAt: "2026-10-01T17:38:41.570Z"
+    completedAt: "2026-10-01T17:52:07.041Z"
+    endedAt: "2026-10-01T17:52:07.041Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Live routes resolve vendor/model via resolveEffectiveAgentConfig (commit 27683eeb3)"
+    appliedAt: "2026-10-01T17:52:07.041Z"
+    lastModified: "2026-10-01T17:52:08.955Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

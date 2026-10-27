@@ -166,6 +166,31 @@ function parseProgressTable(content: string): ProgressRow[] {
 }
 
 /**
+ * The cells of a generated table row, split on unescaped `|` only, with the
+ * generator's `\|` and `\\` undone (rex's escapeTableCell in
+ * folder-tree-index-generator.ts writes both). Any other `\c` is kept as
+ * written, so a message that spelled `\n` arrives as it was committed.
+ */
+function splitTableRow(line: string): string[] {
+  const cells: string[] = [];
+  let cell = "";
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === "\\" && (line[i + 1] === "|" || line[i + 1] === "\\")) {
+      cell += line[i + 1];
+      i++;
+    } else if (ch === "|") {
+      cells.push(cell);
+      cell = "";
+    } else {
+      cell += ch;
+    }
+  }
+  cells.push(cell);
+  return cells;
+}
+
+/**
  * Parse the Commits table from markdown.
  * Expected format: Markdown table with columns: Author, Hash, Message, Timestamp
  * Also handles legacy bullet-list format for backward compatibility.
@@ -189,8 +214,8 @@ function parseCommitsList(content: string): CommitRef[] {
       const line = lines[i].trim();
       if (!line || !line.startsWith("|")) break;
 
-      // Split by pipe and trim each cell
-      const parts = line.split("|");
+      // Split on unescaped pipes and trim each cell
+      const parts = splitTableRow(line);
       // Remove leading/trailing empty elements from pipe delimiters
       const cells = parts.slice(1, -1).map((c) => c.trim());
 

@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdHealth } from "../../../../src/cli/commands/health.js";
 import { withPrdModelTransaction } from "../../../../src/store/prd-model-transaction.js";
-import { indexTree } from "../../../../src/schema/v2-rules.js";
+import { CUT_CHANGE_BODY_PREFIX, CUT_CHANGE_TITLE, indexTree } from "../../../../src/schema/v2-rules.js";
 import { copyV2Fixture, editText } from "../../../helpers/v2-fixture.js";
 
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
@@ -89,6 +89,42 @@ describe("rex health exit code on a v2 tree", () => {
     await editText(capabilityFile(), (t) => t.replace('criteria: [', 'dependsOn: ["a0000000-0000-4000-8000-000000000099"]\ncriteria: ['));
     expect(await runExit()).toBe(1);
     expect(JSON.parse(out.join("\n")).treeRules).toContainEqual(expect.objectContaining({ severity: "error" }));
+  });
+
+  describe("a completed change the migration held for placement", () => {
+    const CUT = "2026-10-10T00:00:00.000Z";
+
+    async function addMigrated(heldCompletedAt: string) {
+      await withPrdModelTransaction(rexDir, (model) => {
+        const tree = structuredClone(model.tree);
+        const change = (id: string, title: string, fields: Record<string, unknown>) =>
+          ({ id, type: "change", title, slug: title.toLowerCase().replace(/\W+/g, "-"), status: "completed", touches: [CAPABILITY], ...fields }) as unknown as (typeof tree.changes)[number];
+        tree.changes.push(
+          change("e0000000-0000-4000-8000-000000000001", CUT_CHANGE_TITLE, {
+            body: `${CUT_CHANGE_BODY_PREFIX}, by plan 0123456789ab cut at ${CUT}.`,
+            startedAt: CUT,
+            completedAt: CUT,
+            appliedAt: CUT,
+          }),
+          change("e0000000-0000-4000-8000-000000000002", "Held v1 work", { needsPlacement: true, completedAt: heldCompletedAt, appliedAt: heldCompletedAt }),
+        );
+        return { tree, result: undefined };
+      });
+    }
+
+    it("exits 0, reporting it as a warning, when it completed before the cut", async () => {
+      await addMigrated("2026-09-01T00:00:00.000Z");
+      expect(await runExit()).toBeUndefined();
+      const { treeRules } = JSON.parse(out.join("\n"));
+      expect(treeRules).toContainEqual(expect.objectContaining({ rule: "change-placed-at-close", severity: "warning" }));
+      expect(treeRules).not.toContainEqual(expect.objectContaining({ severity: "error" }));
+    });
+
+    it("exits 1 when it completed after the cut", async () => {
+      await addMigrated("2026-10-11T00:00:00.000Z");
+      expect(await runExit()).toBe(1);
+      expect(JSON.parse(out.join("\n")).treeRules).toContainEqual(expect.objectContaining({ rule: "change-placed-at-close", severity: "error" }));
+    });
   });
 
   it("exits 1 when the reader skipped a folder with no index.md", async () => {

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "6b72bf55-a1d6-4f7c-b6db-812c74e0f120":
+    status: "completed"
+    startedAt: "2026-10-08T00:50:28.609Z"
+    completedAt: "2026-10-08T01:00:36.334Z"
+    endedAt: "2026-10-08T01:00:36.334Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added packages/sourcevision/src/language/runner.ts with unit tests in tests/unit/language/runner.test.ts"
+    appliedAt: "2026-10-08T01:00:36.334Z"
+    lastModified: "2026-10-08T01:00:37.370Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

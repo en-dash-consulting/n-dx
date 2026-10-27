@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ce03b7ed-9779-4ff6-9a9b-1462891620a3":
+    status: "completed"
+    startedAt: "2026-09-23T19:54:25.796Z"
+    completedAt: "2026-09-23T19:54:25.796Z"
+    endedAt: "2026-09-23T19:54:25.796Z"
+    resolutionType: "code-change"
+    resolutionDetail: "appUrl for product logos, favicon, notification icon; in-page scene switching in the iso runtime; IsoMapView regenerates on analysis stamp change; tests in web and sourcevision."
+    appliedAt: "2026-09-23T19:54:25.796Z"
+    lastModified: "2026-09-23T19:54:26.134Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

@@ -1,0 +1,27 @@
+{
+  "id": "sourcevision/analyzers/enrich",
+  "name": "Enrich",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/sourcevision/src/analyzers/enrich-config.ts",
+    "packages/sourcevision/src/analyzers/enrich-multiplex.ts",
+    "packages/sourcevision/src/analyzers/enrich-parsing.ts",
+    "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+    "packages/sourcevision/src/analyzers/enrich.ts",
+    "packages/sourcevision/src/analyzers/primer.ts",
+    "packages/sourcevision/src/analyzers/prompt-envelope.ts"
+  ],
+  "entryPoints": [
+    "packages/sourcevision/src/analyzers/enrich-config.ts",
+    "packages/sourcevision/src/analyzers/enrich-multiplex.ts",
+    "packages/sourcevision/src/analyzers/enrich-parsing.ts",
+    "packages/sourcevision/src/analyzers/enrich-per-zone.ts",
+    "packages/sourcevision/src/analyzers/enrich.ts",
+    "packages/sourcevision/src/analyzers/primer.ts",
+    "packages/sourcevision/src/analyzers/prompt-envelope.ts"
+  ],
+  "cohesion": 0.48,
+  "coupling": 0.52,
+  "fileCount": 7,
+  "lineCount": 2504
+}

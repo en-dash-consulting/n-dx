@@ -1,0 +1,23 @@
+{
+  "id": "rex-core/rex-store/rex-store",
+  "name": "Rex Store",
+  "description": "5 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/schema/validate.ts",
+    "packages/rex/src/store/file-adapter.ts",
+    "packages/rex/src/store/perf-flags.ts",
+    "packages/rex/src/store/prd-md-migration.ts",
+    "packages/rex/src/store/self-heal-tag.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/schema/validate.ts",
+    "packages/rex/src/store/file-adapter.ts",
+    "packages/rex/src/store/perf-flags.ts",
+    "packages/rex/src/store/prd-md-migration.ts",
+    "packages/rex/src/store/self-heal-tag.ts"
+  ],
+  "cohesion": 0.42,
+  "coupling": 0.58,
+  "fileCount": 5,
+  "lineCount": 1646
+}

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "efb1edb5-6916-4dd6-973e-c95685151e64":
+    status: "completed"
+    startedAt: "2026-10-09T15:01:03.394Z"
+    completedAt: "2026-10-09T15:13:23.560Z"
+    endedAt: "2026-10-09T15:13:23.560Z"
+    resolutionType: "code-change"
+    resolutionDetail: "title-release-token severity is warning; tests and patch changeset added"
+    appliedAt: "2026-10-09T15:13:23.560Z"
+    lastModified: "2026-10-09T15:13:24.409Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { serializeDocument } from "../../../src/store/markdown-serializer.js";
 import type { PRDDocument, PRDItem } from "../../../src/schema/index.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../../lang-kit/tests/helpers/call-within-budget.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,19 @@ describe("serializeDocument: quoting", () => {
     expect(frontMatterOf(out)).toContain('startedAt: "2026-01-01T10:00:00.000Z"');
   });
 
+  it.each(["42", "1.5", ".5", "1e5", "-3", "+7.", "2E-3"])(
+    "quotes %j, which YAML would otherwise read as a number",
+    (title) => {
+      const out = serializeDocument(minimalDoc([epic({ title })]));
+      expect(frontMatterOf(out)).toContain(`title: ${JSON.stringify(title)}`);
+    },
+  );
+
+  it.each(["1.2.3", "1e", "1.5x"])("leaves %j plain: not a number", (title) => {
+    const out = serializeDocument(minimalDoc([epic({ title })]));
+    expect(frontMatterOf(out)).toContain(`title: ${title}\n`);
+  });
+
   it("omits null/undefined fields", () => {
     const out = serializeDocument(minimalDoc([
       epic({ priority: undefined, description: undefined }),
@@ -165,6 +179,19 @@ describe("serializeDocument: quoting", () => {
       epic({ tags: [] }),
     ]));
     expect(frontMatterOf(out)).not.toContain("tags:");
+  });
+});
+
+describe("serializeDocument: on adversarial repository input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+  const SERIALIZER = new URL("../../../src/store/markdown-serializer.ts", import.meta.url);
+
+  it("the number check is linear on a title of 100k digits then a letter", async () => {
+    // Every string scalar goes through the check. `\d+\.?\d*` split the digits
+    // between its two runs in every way before giving up: 4.5 s at 50k digits.
+    const title = `${"1".repeat(100_000)}x`;
+    await expect(
+      callWithinBudget<typeof serializeDocument>(SERIALIZER, "serializeDocument", minimalDoc([epic({ title })])),
+    ).resolves.toContain(`title: ${title}\n`);
   });
 });
 

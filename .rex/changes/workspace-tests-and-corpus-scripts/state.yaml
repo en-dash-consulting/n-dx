@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "25bbb512-0590-43b4-81f0-1d4fe5105e2e":
+    status: "completed"
+    startedAt: "2026-10-13T18:16:20.149Z"
+    completedAt: "2026-10-13T18:23:50.367Z"
+    endedAt: "2026-10-13T18:23:50.367Z"
+    resolutionType: "code-change"
+    resolutionDetail: "sourcevision vitest setup points NDX_HOME at an empty temp dir; go-corpus-report and java-scip-compare pass an empty packDir via workspaceLoader; test plants a fake pack and asserts it is not used."
+    appliedAt: "2026-10-13T18:23:50.367Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-13T18:23:51.058Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

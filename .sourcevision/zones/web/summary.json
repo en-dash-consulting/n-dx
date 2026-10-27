@@ -1,18 +1,17 @@
 {
   "id": "web",
-  "name": "Web Server-Viewer Bridge",
-  "description": "4 files, mostly entry points.",
+  "name": "Web",
+  "description": "3 files, mostly configuration and entry points.",
   "files": [
     "packages/web/build.js",
     "packages/web/dev.js",
-    "packages/web/playwright.config.ts",
-    "packages/web/vitest.config.ts"
+    "packages/web/playwright.config.ts"
   ],
   "entryPoints": [],
   "cohesion": 0,
   "coupling": 0,
-  "fileCount": 4,
-  "lineCount": 439,
+  "fileCount": 3,
+  "lineCount": 407,
   "riskMetrics": {
     "cohesion": 0,
     "coupling": 0,

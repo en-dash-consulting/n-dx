@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "0811a096-cbfb-45b9-ad81-25663c438959":
+    status: "completed"
+    startedAt: "2026-10-12T11:09:57.410Z"
+    completedAt: "2026-10-12T11:22:49.466Z"
+    endedAt: "2026-10-12T11:22:49.466Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 cache built from resolveStore projection; prdExists/mtime/watcher cover product/ and changes/; gateway +prdLayout (ceiling 78→79)."
+    appliedAt: "2026-10-12T11:22:49.466Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T11:22:49.733Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "4a90da4f-b02b-416c-843f-08a0638f8be1":
+    status: "completed"
+    startedAt: "2026-10-12T19:57:29.735Z"
+    completedAt: "2026-10-12T19:57:29.735Z"
+    endedAt: "2026-10-12T19:57:29.735Z"
+    resolutionType: "code-change"
+    resolutionDetail: "b3901809f adds the ci:run label trigger, workflow_dispatch, the label-aware gate and both concurrency guards, plus CONTRIBUTING.md and test coverage. The run's test gate failed only because the worktree's build predated the rebase onto #703; after pnpm build the six failing files pass (114 tests). b613e6960 makes the draft-gate test accept CRLF checkouts (Windows CI failure on #704). Required tests pass (36)."
+    appliedAt: "2026-10-12T19:57:29.735Z"
+    needsPlacement: true
+    lastModified: "2026-10-12T19:57:30.037Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

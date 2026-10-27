@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "1c9a9160-e4fb-4e27-96b1-c0cdf0a9830c":
+    status: "completed"
+    startedAt: "2026-05-11T15:44:14.887Z"
+    completedAt: "2026-05-11T15:54:34.456Z"
+    endedAt: "2026-05-11T15:54:34.456Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added selfHeal.autoConfirm to .n-dx.json schema (PROJECT_SECTIONS + validator), documented precedence in help.js and config HELP_TEXT, and added regression coverage for flag-only / config-only / both / neither against the prompt gate plus a config CLI surface e2e suite."
+    appliedAt: "2026-05-11T15:54:34.456Z"

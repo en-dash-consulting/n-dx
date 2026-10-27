@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "ba39230d-a055-444c-8772-fb8c6fae1318":
+    status: "completed"
+    startedAt: "2026-10-08T00:27:25.578Z"
+    completedAt: "2026-10-08T00:38:03.336Z"
+    endedAt: "2026-10-08T00:38:03.336Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2-rules.ts: exported isAppliedChange/isOpenChange (applied = appliedAt only; completed-unapplied stays open), exported indexTree with includeTombstones (retired flag, ids before aliases, live before tombstones). New rules: change-placed-at-close, fix-not-spike, amendment-type, ref-unique, ref-resolves (errors), check-unique (error), check-requirement (warning). change-has-target skips needsPlacement; removed-target-live leaves missing targets to ref-resolves. Fixture tests in v2-rules.test.ts; patch changeset."
+    appliedAt: "2026-10-08T00:38:03.336Z"
+    lastModified: "2026-10-08T00:38:03.615Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

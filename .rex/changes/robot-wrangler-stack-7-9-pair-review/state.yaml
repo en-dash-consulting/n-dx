@@ -1,0 +1,28 @@
+schema: "rex/v2"
+items:
+  "1344521b-545a-46b1-acff-d13305f869dd":
+    status: "completed"
+    startedAt: "2026-10-11T07:23:54.948Z"
+    completedAt: "2026-10-11T07:28:41.782Z"
+    endedAt: "2026-10-11T07:28:41.782Z"
+    resolutionType: "code-change"
+    resolutionDetail: "pair-programming uses hench.review.vendor, llm reviewModel and hench.review.rounds; commit f2d0f64b5"
+    lastModified: "2026-10-11T07:28:42.053Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "21c9901f-3b7d-4e60-a0d1-a32e1693ee07":
+    status: "completed"
+    startedAt: "2026-10-11T07:29:05.428Z"
+    completedAt: "2026-10-11T07:40:30.216Z"
+    endedAt: "2026-10-11T07:40:30.216Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Pair branch in hench review pass: other vendor's CLI reviews fresh, report-only; recorded with mode/vendor/model."
+    lastModified: "2026-10-11T07:40:30.462Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "90d68335-0c86-4ed3-a227-b44e22a03161":
+    status: "completed"
+    startedAt: "2026-10-11T07:40:31.367Z"
+    completedAt: "2026-10-11T07:40:31.367Z"
+    endedAt: "2026-10-11T07:40:31.367Z"
+    appliedAt: "2026-10-11T07:40:31.367Z"
+    lastModified: "2026-10-11T07:40:31.610Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

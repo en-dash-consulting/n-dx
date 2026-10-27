@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "cea4d4df-7f07-4b7c-93ca-7a41faf03a4e":
+    status: "completed"
+    startedAt: "2026-09-03T18:20:58.130Z"
+    completedAt: "2026-09-03T18:29:48.334Z"
+    endedAt: "2026-09-03T18:29:48.334Z"
+    resolutionType: "code-change"
+    resolutionDetail: "chargeReviewToRun now merges the reviewer's turnTokenUsage into the run record alongside the aggregate, offsetting turn numbers past the executor's and tagging entries with the review model. 12 new unit tests."
+    appliedAt: "2026-09-03T18:29:48.334Z"
+    lastModified: "2026-09-04T21:11:24.231Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

@@ -226,10 +226,20 @@ async function saveProjectJSON(path, data) {
 /**
  * Deep merge source into target. Source values take precedence.
  * Arrays are replaced (not concatenated). Objects are recursively merged.
+ *
+ * Keys in {@link FORBIDDEN_SETTING_SEGMENTS} are dropped from both sides.
+ * `JSON.parse` makes a literal `"__proto__"` key in `.n-dx.json` an own
+ * property, and assigning it on a fresh object sets the result's prototype
+ * instead of a key — so a config file could hand every later reader a
+ * `polluted` field it never wrote. None of the three names is a setting.
  */
 function deepMerge(target, source) {
-  const result = { ...target };
+  const result = {};
+  for (const key of Object.keys(target)) {
+    if (!FORBIDDEN_SETTING_SEGMENTS.has(key)) result[key] = target[key];
+  }
   for (const key of Object.keys(source)) {
+    if (FORBIDDEN_SETTING_SEGMENTS.has(key)) continue;
     const srcVal = source[key];
     const tgtVal = result[key];
     if (
@@ -474,24 +484,47 @@ function isMachineLocalKey(keyArg) {
 const LLM_FLAT_MAP_SECTIONS = ["routes.", "effort."];
 
 /**
+ * Path segments that walk off the config object and onto `Object.prototype`.
+ * `ndx config llm.__proto__.polluted x` followed `configs.llm["__proto__"]`
+ * and assigned on every object in the process; the write is not persisted
+ * (JSON.stringify skips the prototype), but nothing in this file should be
+ * able to reach it. Inlined rather than imported from hench or web: config.js
+ * is orchestration-tier and imports from no package.
+ */
+const FORBIDDEN_SETTING_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
  * Split a section-relative setting path into object keys.
  *
  * Identical to `path.split(".")` except inside the flat-map sections above,
  * where everything after the section name is one literal key.
+ *
+ * Throws on a segment in {@link FORBIDDEN_SETTING_SEGMENTS}, so both
+ * `getByPath` and `setByPath` refuse before touching the object.
  *
  * @param {string} settingPath Path within the section (no package prefix).
  * @param {string} [pkg] Owning section, when known.
  * @returns {string[]}
  */
 function splitSettingPath(settingPath, pkg) {
+  let parts;
   if (pkg === "llm") {
     for (const prefix of LLM_FLAT_MAP_SECTIONS) {
       if (settingPath.startsWith(prefix) && settingPath.length > prefix.length) {
-        return [prefix.slice(0, -1), settingPath.slice(prefix.length)];
+        parts = [prefix.slice(0, -1), settingPath.slice(prefix.length)];
+        break;
       }
     }
   }
-  return settingPath.split(".");
+  parts ??= settingPath.split(".");
+  for (const part of parts) {
+    if (FORBIDDEN_SETTING_SEGMENTS.has(part)) {
+      throw new Error(
+        `Invalid key "${settingPath}": "${part}" is a reserved object property, not a setting.`,
+      );
+    }
+  }
+  return parts;
 }
 
 function getByPath(obj, path, pkg) {
@@ -560,6 +593,38 @@ function coerceValue(newValue, existingValue) {
     return newValue.split(",").map((s) => s.trim());
   }
   return newValue;
+}
+
+/**
+ * Settings that are strings whatever they look like. `coerceValue` turns a
+ * numeric-shaped first-time value into a number, which is right for a port
+ * and wrong for a host: `ndx config llm.local.host 127.1` would store the
+ * number 127.1, and every reader of the URL would then refuse it.
+ */
+const STRING_SETTINGS = new Set(["llm.local.host", "llm.local.verifier.host"]);
+
+/**
+ * Settings that are numbers whatever the file holds today. `coerceValue` keeps
+ * the existing value's type, so a hand-edited `"port": "1234"` would make every
+ * later `ndx config llm.local.port <n>` store another string, which the port
+ * rule then refuses; the one command the error message points at could never
+ * repair the file. A number setting is read as a number regardless.
+ */
+const NUMBER_SETTINGS = new Set(["llm.local.port", "llm.local.verifier.port"]);
+
+/**
+ * `coerceValue`, except that a known string setting is stored as typed and a
+ * known number setting is read as a number whatever the file holds today.
+ */
+function coerceSettingValue(pkg, settingPath, newValue, existingValue) {
+  const key = `${pkg}.${settingPath}`;
+  if (STRING_SETTINGS.has(key)) return newValue;
+  if (NUMBER_SETTINGS.has(key)) {
+    // A value that is not a number stays as typed, so the refusal quotes it.
+    const n = newValue.trim() === "" ? NaN : Number(newValue);
+    return Number.isNaN(n) ? newValue : n;
+  }
+  return coerceValue(newValue, existingValue);
 }
 
 // ── Claude config validation ─────────────────────────────────────────────────
@@ -1175,6 +1240,78 @@ function validateAutoFailover(value) {
   }
 }
 
+// ── Local LLM endpoint shape ─────────────────────────────────────────────────
+//
+// Twin of `isPlausibleLlmHost` / `isValidPort` in
+// packages/llm-client/src/local-endpoint.ts. The orchestration tier imports
+// nothing from packages (spawn-only rule), so the rule is inlined here and
+// tests/unit/local-endpoint-parity.test.js holds the two copies equal over a
+// table of hosts and ports — the same arrangement as win-spawn.js and
+// child-lifecycle.js. Change both in the same commit.
+
+/** RFC 1035's ceiling on a DNS name; longer than this cannot resolve. */
+const MAX_HOST_LENGTH = 253;
+
+/**
+ * Whether `host` is something `http://${host}:${port}/v1/…` can only ever
+ * address as a host. The dashboard's probes and the inference provider
+ * splice the saved host straight into a URL, so a value carrying `/`, `?`,
+ * `#`, `@`, `\` or whitespace would rewrite the path, the query or the
+ * authority of the request instead — `127.0.0.1/x?` fetches
+ * `/x?:1234/v1/models`, and `u@127.0.0.1` sends credentials. The round trip
+ * through `URL` proves the whole string is consumed as the hostname.
+ *
+ * A shape check, not an allowlist: a LAN GPU box is a supported configuration.
+ *
+ * @param {unknown} host
+ * @returns {host is string}
+ */
+export function isPlausibleLlmHost(host) {
+  if (typeof host !== "string" || host.length === 0 || host.length > MAX_HOST_LENGTH) return false;
+  if (/[\s/?#@\\]/.test(host)) return false;
+  let url;
+  try {
+    url = new URL(`http://${host}:1/`);
+  } catch {
+    return false;
+  }
+  // The whole input must have become the authority and nothing else. Compare
+  // the round-tripped URL, not the hostname text: WHATWG normalises `127.1`,
+  // an expanded IPv6 literal or an IDN name, and inference accepts all three.
+  return url.href === `http://${url.hostname}:1/`;
+}
+
+/**
+ * Whether `port` is a TCP port: an integer from 1 to 65535.
+ *
+ * @param {unknown} port
+ * @returns {port is number}
+ */
+export function isValidPort(port) {
+  return typeof port === "number" && Number.isInteger(port) && port >= 1 && port <= 65535;
+}
+
+/** Validator for a `local.*.host` key: refuses what the URL would misread. */
+function validateLocalHost(key) {
+  return (v) => {
+    if (!isPlausibleLlmHost(v)) {
+      throw new Error(
+        `Invalid ${key} "${v}". Expected a hostname, an IPv4 address or a bracketed IPv6 address ` +
+        `with no port, path, credentials or whitespace (e.g. localhost, 192.168.1.10, [::1], gpu-box.lan).`,
+      );
+    }
+  };
+}
+
+/** Validator for a `local.*.port` key: the value has already been coerced, so a non-number is refused as written. */
+function validateLocalPort(key) {
+  return (v) => {
+    if (!isValidPort(v)) {
+      throw new Error(`Invalid ${key} "${v}". Expected an integer between 1 and 65535.`);
+    }
+  };
+}
+
 /**
  * Validators for llm.* config keys in .n-dx.json.
  * Keys are setting paths relative to the llm section.
@@ -1193,17 +1330,8 @@ const LLM_VALIDATORS = {
   "google.lightModel": validateGoogleLightModel,
   "google.apiKeyEnv": validateGoogleApiKeyEnv,
   // local — LM Studio / OpenAI-compatible local server
-  "local.host": (v) => {
-    if (typeof v !== "string" || !v.trim()) {
-      throw new Error(`Invalid local.host "${v}". Expected a non-empty hostname.`);
-    }
-  },
-  "local.port": (v) => {
-    const n = Number(v);
-    if (!Number.isInteger(n) || n < 1 || n > 65535) {
-      throw new Error(`Invalid local.port "${v}". Expected an integer between 1 and 65535.`);
-    }
-  },
+  "local.host": validateLocalHost("local.host"),
+  "local.port": validateLocalPort("local.port"),
   "local.model": validateModel,
   "local.lightModel": validateModel,
   "local.maxContextTokens": (v) => {
@@ -1221,17 +1349,8 @@ const LLM_VALIDATORS = {
       );
     }
   },
-  "local.verifier.host": (v) => {
-    if (typeof v !== "string" || !v.trim()) {
-      throw new Error(`Invalid local.verifier.host "${v}". Expected a non-empty hostname.`);
-    }
-  },
-  "local.verifier.port": (v) => {
-    const n = Number(v);
-    if (!Number.isInteger(n) || n < 1 || n > 65535) {
-      throw new Error(`Invalid local.verifier.port "${v}". Expected an integer between 1 and 65535.`);
-    }
-  },
+  "local.verifier.host": validateLocalHost("local.verifier.host"),
+  "local.verifier.port": validateLocalPort("local.verifier.port"),
   "local.verifier.model": validateModel,
   "local.verifier.maxCycles": (v) => {
     const n = Number(v);
@@ -2768,7 +2887,7 @@ async function coerceAndValidateProjectValue(
 
   let coerced;
   try {
-    coerced = coerceValue(valueArg, existing);
+    coerced = coerceSettingValue(pkg, settingPath, valueArg, existing);
   } catch (err) {
     console.error(`Invalid value for "${keyArg}": ${err.message}`);
     process.exit(1);
@@ -3113,7 +3232,7 @@ async function handleSetPackageConfig(
 
   let coerced;
   try {
-    coerced = coerceValue(valueArg, existing);
+    coerced = coerceSettingValue(pkg, settingPath, valueArg, existing);
   } catch (err) {
     console.error(`Invalid value for "${keyArg}": ${err.message}`);
     process.exit(1);

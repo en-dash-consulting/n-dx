@@ -5,7 +5,7 @@ The core n-dx loop: **analyze** your codebase, **build** a PRD from findings and
 The PRD is the product's requirements (the product layer: areas, capabilities, constraints) plus the changes being made to them (the change layer: changes, tasks, subtasks). Findings and ideas enter as changes; completed changes update the requirements. See [The PRD](./concepts/).
 
 ::: info v1 projects
-Until the storage migration ships, `ndx init` creates v1 projects: the PRD is one tree of epics, features, tasks and subtasks in `.rex/prd_tree/`, with no product layer. The steps below note where a v1 project behaves differently.
+`ndx init` creates v2 projects. A v1 project, one that has not yet run `ndx migrate`, keeps its PRD as one tree of epics, features, tasks and subtasks in `.rex/prd_tree/`, with no product layer. The steps below note where a v1 project behaves differently.
 :::
 
 ## 1. Analyze

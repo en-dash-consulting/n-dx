@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "2c480d36-480d-479b-b896-dd8ca42aac38":
+    status: "completed"
+    startedAt: "2026-10-09T07:54:02.354Z"
+    completedAt: "2026-10-09T07:54:02.354Z"
+    endedAt: "2026-10-09T07:54:02.354Z"
+    resolutionType: "code-change"
+    resolutionDetail: "docs/packages/rex.md tree-diff entry and .changeset/tree-diff-product-map-markdown.md (@n-dx/rex patch), landed with 523e8231."
+    appliedAt: "2026-10-09T07:54:02.354Z"
+    lastModified: "2026-10-09T07:54:02.639Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,27 +1,20 @@
 {
   "id": "tests",
   "name": "Tests",
-  "description": "Non-source files in tests: evals.test.js, record-goldens.js, score.js (+5 more)",
+  "description": "Non-source files in packages: door.test.ts, places.test.ts, sync.test.ts (+1 more)",
   "files": [
-    "tests/gauntlet/sourcevision-evals/evals.test.js",
-    "tests/gauntlet/sourcevision-evals/record-goldens.js",
-    "tests/gauntlet/sourcevision-evals/score.js",
-    "tests/gauntlet/sourcevision-evals/score.test.js",
-    "tests/helpers/all-skills.js",
-    "tests/helpers/posix-shell.js",
-    "tests/helpers/real-process-tree.js",
-    "tests/helpers/symlink-support.js"
+    "packages/graview-face/tests/door.test.ts",
+    "packages/graview-face/tests/places.test.ts",
+    "packages/graview-face/tests/sync.test.ts",
+    "packages/sourcevision/tests/setup-ndx-home.ts"
   ],
   "entryPoints": [
-    "tests/helpers/all-skills.js",
-    "tests/helpers/posix-shell.js",
-    "tests/helpers/real-process-tree.js",
-    "tests/helpers/symlink-support.js"
+    "packages/sourcevision/tests/setup-ndx-home.ts"
   ],
   "cohesion": 1,
   "coupling": 0,
-  "fileCount": 8,
-  "lineCount": 971,
+  "fileCount": 4,
+  "lineCount": 414,
   "riskMetrics": {
     "cohesion": 1,
     "coupling": 0,

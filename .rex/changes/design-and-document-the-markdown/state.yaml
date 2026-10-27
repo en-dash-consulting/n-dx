@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "52811e0d-fa0f-4cf8-9879-020d35f90473":
+    status: "completed"
+    startedAt: "2026-04-23T19:26:31.234Z"
+    completedAt: "2026-04-23T19:46:56.962Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created packages/rex/docs/prd-markdown-schema.md — authoritative spec for the PRD markdown format covering all fields, hierarchy encoding, edge cases, and parser/serializer contracts."
+    appliedAt: "2026-04-23T19:46:56.962Z"

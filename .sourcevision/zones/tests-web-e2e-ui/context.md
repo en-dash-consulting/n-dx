@@ -5,20 +5,23 @@
 <zone>
 
 Zone: Tests Web E2e Ui (`tests-web-e2e-ui`)
-Files: 6, Cohesion: 1.00, Coupling: 0.00
+Files: 9, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
-Description: Non-source files in packages: console-errors.ts, fixture-project.ts, hench-runs-workflow.spec.ts (+3 more)
-Lines: 541
+Description: Non-source files in packages: console-errors.ts, fixture-project.ts, hench-runs-workflow.spec.ts (+6 more)
+Lines: 1393
 
 </zone>
 
 <files>
 
 packages/web/tests/e2e-ui/helpers/console-errors.ts (TypeScript, 48 lines, test)
-packages/web/tests/e2e-ui/helpers/fixture-project.ts (TypeScript, 154 lines, test)
+packages/web/tests/e2e-ui/helpers/fixture-project.ts (TypeScript, 155 lines, test)
 packages/web/tests/e2e-ui/hench-runs-workflow.spec.ts (TypeScript, 58 lines, test)
-packages/web/tests/e2e-ui/navigation.spec.ts (TypeScript, 106 lines, test)
+packages/web/tests/e2e-ui/navigation.spec.ts (TypeScript, 210 lines, test)
 packages/web/tests/e2e-ui/prd-workflow.spec.ts (TypeScript, 120 lines, test)
+packages/web/tests/e2e-ui/preview-demo.spec.ts (TypeScript, 301 lines, test)
+packages/web/tests/e2e-ui/preview-editor.spec.ts (TypeScript, 326 lines, test)
+packages/web/tests/e2e-ui/preview-export.spec.ts (TypeScript, 120 lines, test)
 packages/web/tests/e2e-ui/setup-wizard.spec.ts (TypeScript, 55 lines, test)
 
 </files>
@@ -39,6 +42,9 @@ Internal:
   packages/web/tests/e2e-ui/setup-wizard.spec.ts → packages/web/tests/e2e-ui/helpers/fixture-project.ts {createUninitializedFixtureProject, cleanupFixtureProject, startDashboard, stopDashboard}
   packages/web/tests/e2e-ui/setup-wizard.spec.ts → packages/web/tests/e2e-ui/helpers/fixture-project.ts {RunningDashboard}
 
+Outgoing (this zone → other zones):
+  → web-viewer: packages/web/tests/e2e-ui/navigation.spec.ts → packages/web/src/viewer/views/view-meta.ts
+
 </imports>
 
 <findings>
@@ -50,6 +56,6 @@ Internal:
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
-- [call graph] 35 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
+- [call graph] 77 internal calls, 0 outgoing, 0 incoming (cohesion: 1, coupling: 0)
 
 </insights>

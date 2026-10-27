@@ -1,0 +1,21 @@
+{
+  "id": "rex-core/rex-store/rex",
+  "name": "Rex",
+  "description": "4 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/export.ts",
+    "packages/rex/src/cli/commands/import-bundle.ts",
+    "packages/rex/src/core/prd-bundle.ts",
+    "packages/rex/src/store/prd-bundle-v2.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/export.ts",
+    "packages/rex/src/cli/commands/import-bundle.ts",
+    "packages/rex/src/core/prd-bundle.ts",
+    "packages/rex/src/store/prd-bundle-v2.ts"
+  ],
+  "cohesion": 0.71,
+  "coupling": 0.29,
+  "fileCount": 4,
+  "lineCount": 2213
+}

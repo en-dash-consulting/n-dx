@@ -1,0 +1,16 @@
+---
+id: "d7f5ba08-a413-44f2-a560-0423be6b4413"
+type: "capability"
+title: "Surface all new functions as dashboard pages/sections"
+slug: "surface-all-new-functions-as-dashboard"
+statement: "The dashboard gives rex, sourcevision, hench and orchestration functions their own pages and sections, and its navigation reaches each one."
+criteria: [{"id":"c1","text":"The dashboard navigation shall expose every page and section added for a previously uncovered function."},{"id":"c2","text":"The dashboard navigation shall make the Zones view, with its zone drill-down, reachable."},{"id":"c3","text":"The dashboard navigation shall make the Analysis view, with its plan proposal-review panels, reachable."},{"id":"c4","text":"The dashboard shall provide a refresh-data control that rebuilds sourcevision data and artifacts."},{"id":"c5","text":"While a dashboard-triggered refresh runs, the dashboard shall show the refresh's phase progress."},{"id":"c6","text":"The requirements and traceability page shall show a requirements coverage matrix."},{"id":"c7","text":"The requirements and traceability page shall show traceability for each acceptance criterion."},{"id":"c8","text":"The adaptive optimization page shall show the adaptive analysis and its settings."},{"id":"c9","text":"The adaptive optimization page shall let the user apply or dismiss an adaptive recommendation."},{"id":"c10","text":"The adaptive optimization page shall let the user lock or override an adaptive setting."},{"id":"c11","text":"The adaptive optimization page shall show the adaptive history."},{"id":"c12","text":"The validation view shall provide a fix-issues button that runs rex fix."},{"id":"c13","text":"The validation view shall provide a reshape flow that previews the diff before the change is applied."},{"id":"c14","text":"The validation view shall provide a Run-CI-check trigger that shows structured results."},{"id":"c15","text":"The Token Usage view shall show token usage grouped by period and by command, and against the budget."},{"id":"c16","text":"While a self-heal run is active, the dashboard shall show its current phase and iteration."},{"id":"c17","text":"While a self-heal run is active, the dashboard shall offer a control that stops it."},{"id":"c18","text":"The dashboard shall provide a control that exports the sourcevision analysis as a PDF."},{"id":"c19","text":"The dashboard shall let the user override a file's archetype classification."},{"id":"c20","text":"The dashboard shall show the distribution of PRD items across configured facets."},{"id":"c21","text":"The dashboard shall show an ndx auth status chip."},{"id":"c22","text":"The dashboard shall provide a trigger that runs hench validate-tokens."},{"id":"c23","text":"The dashboard shall provide a viewer for the execution log."}]
+tags:
+  - "web"
+  - "ui"
+  - "coverage"
+source: "ndx-capture"
+priority: "high"
+---
+
+The dashboard UI lags behind the toolkit's actual capabilities: functions/commands that exist in the packages (rex, sourcevision, hench, core orchestration) have no page or section in the web UI, so the product is not fully usable from the dashboard. Audit every function/command/capability that lacks UI representation, then add dashboard pages or sections so each one can be used and applied from the UI.

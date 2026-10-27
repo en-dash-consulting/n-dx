@@ -5,51 +5,51 @@
 <zone>
 
 Zone: Analyzers 2 (`sourcevision/analyzers-2`)
-Files: 12, Cohesion: 0.54, Coupling: 0.46
-Description: 12 files, primarily TypeScript
-Entry points: packages/sourcevision/src/analyzers/components.ts, packages/sourcevision/src/analyzers/manifest.ts, packages/sourcevision/src/analyzers/route-detection.ts, packages/sourcevision/src/analyzers/server-route-detection.ts, packages/sourcevision/src/analyzers/workspace-aggregate.ts, packages/sourcevision/src/analyzers/workspace-crossings.ts, packages/sourcevision/src/analyzers/workspace.ts, packages/sourcevision/src/constants.ts, packages/sourcevision/src/schema/data-files.ts, packages/sourcevision/src/util/paths.ts
-Lines: 3049
+Files: 13, Cohesion: 0.43, Coupling: 0.57
+Description: 13 files, primarily TypeScript
+Entry points: packages/sourcevision/src/analyzers/branch-work-classifier.ts, packages/sourcevision/src/analyzers/branch-work-filter.ts, packages/sourcevision/src/analyzers/branch-work-store.ts, packages/sourcevision/src/analyzers/infrastructure.ts, packages/sourcevision/src/analyzers/project-profile.ts, packages/sourcevision/src/analyzers/readiness-score.ts, packages/sourcevision/src/analyzers/risk-scoring.ts, packages/sourcevision/src/analyzers/sdlc-profile.ts, packages/sourcevision/src/analyzers/yaml-subset.ts, packages/sourcevision/src/export/iso-declared.ts, packages/sourcevision/src/generators/pr-markdown-template.ts, packages/sourcevision/src/schema/v1.ts, packages/sourcevision/src/util/sort.ts
+Lines: 7005
 
 </zone>
 
 <files>
 
-packages/sourcevision/src/analyzers/components.ts (TypeScript, 834 lines, source)
-packages/sourcevision/src/analyzers/manifest.ts (TypeScript, 101 lines, source)
-packages/sourcevision/src/analyzers/route-detection.ts (TypeScript, 377 lines, source)
-packages/sourcevision/src/analyzers/server-route-detection.ts (TypeScript, 336 lines, source)
-packages/sourcevision/src/analyzers/workspace-aggregate.ts (TypeScript, 501 lines, source)
-packages/sourcevision/src/analyzers/workspace-crossings.ts (TypeScript, 297 lines, source)
-packages/sourcevision/src/analyzers/workspace.ts (TypeScript, 379 lines, source)
-packages/sourcevision/src/constants.ts (TypeScript, 7 lines, source)
-packages/sourcevision/src/schema/data-files.ts (TypeScript, 14 lines, source)
-packages/sourcevision/src/util/debug-stopwatch.ts (TypeScript, 93 lines, source)
-packages/sourcevision/src/util/debug-timing.ts (TypeScript, 106 lines, source)
-packages/sourcevision/src/util/paths.ts (TypeScript, 4 lines, source)
+packages/sourcevision/src/analyzers/branch-work-classifier.ts (TypeScript, 241 lines, source)
+packages/sourcevision/src/analyzers/branch-work-filter.ts (TypeScript, 378 lines, source)
+packages/sourcevision/src/analyzers/branch-work-store.ts (TypeScript, 126 lines, source)
+packages/sourcevision/src/analyzers/infrastructure.ts (TypeScript, 609 lines, source)
+packages/sourcevision/src/analyzers/project-profile.ts (TypeScript, 308 lines, source)
+packages/sourcevision/src/analyzers/readiness-score.ts (TypeScript, 786 lines, source)
+packages/sourcevision/src/analyzers/risk-scoring.ts (TypeScript, 415 lines, source)
+packages/sourcevision/src/analyzers/sdlc-profile.ts (TypeScript, 1453 lines, source)
+packages/sourcevision/src/analyzers/yaml-subset.ts (TypeScript, 411 lines, source)
+packages/sourcevision/src/export/iso-declared.ts (TypeScript, 72 lines, source)
+packages/sourcevision/src/generators/pr-markdown-template.ts (TypeScript, 344 lines, source)
+packages/sourcevision/src/schema/v1.ts (TypeScript, 1582 lines, source)
+packages/sourcevision/src/util/sort.ts (TypeScript, 280 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/analyzers/route-detection.ts {ROUTE_EXPORT_NAMES, parseFileRoutePattern, buildRouteTree, findRoutesConfig, parseRoutesConfig, findRoutesDir}
-  packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/analyzers/server-route-detection.ts {detectServerRoutes}
-  packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/util/debug-timing.ts {debugTimed, debugTimedAsync, checkpoint}
-  packages/sourcevision/src/analyzers/components.ts → packages/sourcevision/src/util/paths.ts {toPosix}
-  packages/sourcevision/src/analyzers/manifest.ts → packages/sourcevision/src/constants.ts {SV_DIR, TOOL_VERSION}
-  packages/sourcevision/src/analyzers/route-detection.ts → packages/sourcevision/src/util/paths.ts {toPosix}
-  packages/sourcevision/src/analyzers/server-route-detection.ts → packages/sourcevision/src/util/debug-timing.ts {debugTimed, debugTimedAsync, checkpoint}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace-crossings.ts {buildPackageMap, computeCrossRepoCrossings}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace.ts {promoteZones, promoteCrossings, buildSubAnalysisRefs, detectSubAnalyses}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/analyzers/workspace.ts {SubAnalysis}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/constants.ts {SV_DIR, TOOL_VERSION}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES, SUPPLEMENTARY_FILES}
-  packages/sourcevision/src/analyzers/workspace-aggregate.ts → packages/sourcevision/src/util/paths.ts {toPosix}
-  packages/sourcevision/src/analyzers/workspace-crossings.ts → packages/sourcevision/src/analyzers/workspace.ts {SubAnalysis}
-  packages/sourcevision/src/analyzers/workspace-crossings.ts → packages/sourcevision/src/util/paths.ts {toPosix}
-  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/constants.ts {SV_DIR}
-  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/schema/data-files.ts {DATA_FILES}
-  packages/sourcevision/src/analyzers/workspace.ts → packages/sourcevision/src/util/paths.ts {toPosix}
-  packages/sourcevision/src/util/debug-timing.ts → packages/sourcevision/src/util/debug-stopwatch.ts {startStopwatch, stopStopwatch}
+  packages/sourcevision/src/analyzers/branch-work-classifier.ts → packages/sourcevision/src/schema/v1.ts {BranchWorkRecordItem, BranchWorkEpicSummary, ChangeSignificance}
+  packages/sourcevision/src/analyzers/branch-work-filter.ts → packages/sourcevision/src/schema/v1.ts {BranchWorkRecordItem}
+  packages/sourcevision/src/analyzers/branch-work-store.ts → packages/sourcevision/src/schema/v1.ts {BranchWorkRecord}
+  packages/sourcevision/src/analyzers/infrastructure.ts → packages/sourcevision/src/schema/v1.ts {InfraLink, InfraResource, InfrastructureData}
+  packages/sourcevision/src/analyzers/project-profile.ts → packages/sourcevision/src/schema/v1.ts {Inventory, Imports, ProjectProfile, ReleaseInfrastructure, ProjectSurface}
+  packages/sourcevision/src/analyzers/readiness-score.ts → packages/sourcevision/src/analyzers/sdlc-profile.ts {hasAutomaticTrigger}
+  packages/sourcevision/src/analyzers/readiness-score.ts → packages/sourcevision/src/schema/v1.ts {SdlcDetection, SdlcEvidence, SdlcProfile}
+  packages/sourcevision/src/analyzers/risk-scoring.ts → packages/sourcevision/src/schema/v1.ts {ZoneRiskMetrics, RiskJustificationEntry}
+  packages/sourcevision/src/analyzers/sdlc-profile.ts → packages/sourcevision/src/analyzers/yaml-subset.ts {isMap, listAt, parseYamlSubset, stringAt, YamlSubsetError}
+  packages/sourcevision/src/analyzers/sdlc-profile.ts → packages/sourcevision/src/analyzers/yaml-subset.ts {YamlValue}
+  packages/sourcevision/src/analyzers/sdlc-profile.ts → packages/sourcevision/src/export/iso-declared.ts {discoverFromIaC}
+  packages/sourcevision/src/analyzers/sdlc-profile.ts → packages/sourcevision/src/schema/v1.ts {SdlcCiJob, SdlcCiPipeline, SdlcCiStep, SdlcCommand, SdlcCommandKind, SdlcContainer, SdlcDeployment, SdlcEvidence, SdlcEvidenceList, SdlcFeatureFlag, SdlcIac, SdlcMigration, SdlcObservability, SdlcParseFailure, SdlcProfile, SdlcQualityGate, SdlcRollback, SdlcStepKind, SdlcTestFramework, SdlcTestSuite}
+  packages/sourcevision/src/analyzers/sdlc-profile.ts → packages/sourcevision/src/util/sort.ts {cmp}
+  packages/sourcevision/src/export/iso-declared.ts → packages/sourcevision/src/analyzers/infrastructure.ts {computeInfrastructure, discoverFromIaC, linkInfrastructure, ndxContainer, projectConfigFor, readDeclaredConfig, readInfrastructure, toInfrastructureData, fromInfrastructureData}
+  packages/sourcevision/src/export/iso-declared.ts → packages/sourcevision/src/analyzers/infrastructure.ts {computeInfrastructure, fromInfrastructureData}
+  packages/sourcevision/src/export/iso-declared.ts → packages/sourcevision/src/analyzers/infrastructure.ts {DeclaredArchitecture, DeclaredInfra, DeclaredSeam}
+  packages/sourcevision/src/export/iso-declared.ts → packages/sourcevision/src/schema/v1.ts {InfrastructureData}
+  packages/sourcevision/src/generators/pr-markdown-template.ts → packages/sourcevision/src/schema/v1.ts {BranchWorkRecord, BranchWorkRecordItem, ChangeSignificance}
 
 </imports>

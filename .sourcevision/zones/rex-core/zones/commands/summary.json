@@ -1,0 +1,26 @@
+{
+  "id": "rex-core/commands",
+  "name": "Commands",
+  "description": "7 files, primarily TypeScript",
+  "files": [
+    "packages/rex/src/cli/commands/status-sections.ts",
+    "packages/rex/src/cli/commands/status-shared.ts",
+    "packages/rex/src/cli/commands/status-work-cycle.ts",
+    "packages/rex/src/cli/commands/status.ts",
+    "packages/rex/src/cli/commands/tree.ts",
+    "packages/rex/src/core/stats.ts",
+    "packages/rex/src/core/verify.ts"
+  ],
+  "entryPoints": [
+    "packages/rex/src/cli/commands/status-sections.ts",
+    "packages/rex/src/cli/commands/status-work-cycle.ts",
+    "packages/rex/src/cli/commands/status.ts",
+    "packages/rex/src/cli/commands/tree.ts",
+    "packages/rex/src/core/stats.ts",
+    "packages/rex/src/core/verify.ts"
+  ],
+  "cohesion": 0.8,
+  "coupling": 0.2,
+  "fileCount": 7,
+  "lineCount": 1785
+}

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "87faadae-110b-4f55-80a9-048a49b28d74":
+    status: "completed"
+    startedAt: "2026-10-15T13:11:36.339Z"
+    completedAt: "2026-10-15T13:30:21.642Z"
+    endedAt: "2026-10-15T13:30:21.642Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Derived both stale migrate-slugs descriptions from a new SLUG_RULE_SUMMARY constant beside SLUG_RULE_VERSION; added a dedicated `rex migrate-slugs --help` page; split the conformance test's failure message by mismatch count; added migrate-slugs-docs.test.ts pinning the summary to serializer behaviour."
+    appliedAt: "2026-10-15T13:30:21.642Z"
+    lastModified: "2026-10-15T13:30:22.240Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "400e3b84-aa62-46d9-9a0d-861cdfbc981b":
+    status: "completed"
+    startedAt: "2026-10-08T19:30:24.620Z"
+    completedAt: "2026-10-08T19:54:30.619Z"
+    endedAt: "2026-10-08T19:54:30.619Z"
+    resolutionType: "code-change"
+    resolutionDetail: "N-DX-Item now emitted on hench's chore(prd) record commit, the /ndx-work and /ndx-capture skill commits, and available to core's trailer builder — under a stated one-item rule, with a test per path and a PR template ending in a trailer block."
+    appliedAt: "2026-10-08T19:54:30.619Z"
+    lastModified: "2026-10-08T19:54:31.156Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

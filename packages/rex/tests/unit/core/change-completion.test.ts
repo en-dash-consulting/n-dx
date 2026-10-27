@@ -75,6 +75,16 @@ describe("completeTask", () => {
     expect(theChange(result.tree).status).toBeUndefined();
   });
 
+  it("closes an Inbox change on a product layer with no capability or constraint, unapplied while it has no target", () => {
+    const inbox = node({ id: "ch", type: "change", needsPlacement: true, children: [task("t")] });
+    const result = completeTask({ product: [node({ id: "area", type: "area" })], changes: [inbox] }, "t", opts());
+    expect(result.held).toBeNull();
+    expect(result.completed).toEqual(["t", "ch"]);
+    expect(result.apply).toMatchObject({ applied: false, reason: expect.stringContaining("no target; it applies once placed") });
+    expect(theChange(result.tree)).toMatchObject({ status: "completed", needsPlacement: true });
+    expect(theChange(result.tree).appliedAt).toBeUndefined();
+  });
+
   it("reports a refused apply and keeps the change completed and unapplied", () => {
     const stale = change({ amends: [{ delta: "modified", target: "cap", base: "stale", proposed: NEW, summary: "Add wallets" }], children: [task("t")] });
     const result = completeTask(tree(stale), "t", opts());
@@ -240,6 +250,8 @@ describe("completeWork", () => {
 
   it("refuses a change that still needs placement, but completes its task and holds the change", () => {
     expect(() => completeWork(tree(change({ needsPlacement: true })), "ch", opts())).toThrow(/Cannot complete change ch: it still needs placement/);
+    const empty = completeWork({ product: [], changes: [node({ id: "ch", type: "change", needsPlacement: true })] }, "ch", opts());
+    expect(empty.completed).toEqual(["ch"]);
     const result = completeWork(tree(change({ needsPlacement: true, children: [task("t")] })), "t", opts());
     expect(result.completed).toEqual(["t"]);
     expect(result.held?.changeId).toBe("ch");

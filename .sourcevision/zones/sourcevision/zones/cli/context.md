@@ -5,58 +5,214 @@
 <zone>
 
 Zone: Cli (`sourcevision/cli`)
-Files: 12, Cohesion: 0.30, Coupling: 0.70
-Description: 12 files, primarily TypeScript
-Entry points: packages/sourcevision/src/analyzers/branch-work-collector.ts, packages/sourcevision/src/analyzers/convergence.ts, packages/sourcevision/src/analyzers/run-ledger.ts, packages/sourcevision/src/cli/commands/analyze-phases.ts, packages/sourcevision/src/cli/commands/analyze.ts, packages/sourcevision/src/cli/commands/export-pdf.ts, packages/sourcevision/src/cli/commands/narrate.ts, packages/sourcevision/src/cli/commands/pr-markdown.ts, packages/sourcevision/src/cli/commands/prd-epic-resolver.ts, packages/sourcevision/src/cli/mcp.ts, packages/sourcevision/src/cli/sourcevision-core.ts, packages/sourcevision/src/util/exec-cli.ts
-Lines: 3954
+Files: 37, Cohesion: 0.62, Coupling: 0.38
+Description: 37 files, primarily TypeScript
+Entry points: packages/sourcevision/src/analyzers/analyze-progress.ts, packages/sourcevision/src/analyzers/convergence.ts, packages/sourcevision/src/analyzers/imports.ts, packages/sourcevision/src/analyzers/inventory.ts, packages/sourcevision/src/analyzers/pack-imports.ts, packages/sourcevision/src/analyzers/run-ledger.ts, packages/sourcevision/src/analyzers/terraform-infrastructure.ts, packages/sourcevision/src/cli/commands/analyze-phases.ts, packages/sourcevision/src/cli/commands/analyze.ts, packages/sourcevision/src/cli/commands/export-pdf.ts, packages/sourcevision/src/cli/commands/git-credential-helper.ts, packages/sourcevision/src/cli/commands/init.ts, packages/sourcevision/src/cli/commands/narrate.ts, packages/sourcevision/src/cli/commands/pack-archive.ts, packages/sourcevision/src/cli/commands/pack-lock.ts, packages/sourcevision/src/cli/commands/pack.ts, packages/sourcevision/src/cli/commands/pr-markdown.ts, packages/sourcevision/src/cli/commands/readiness.ts, packages/sourcevision/src/cli/commands/reset.ts, packages/sourcevision/src/cli/commands/validate.ts, packages/sourcevision/src/cli/commands/workspace.ts, packages/sourcevision/src/cli/errors.ts, packages/sourcevision/src/cli/help.ts, packages/sourcevision/src/cli/mcp.ts, packages/sourcevision/src/cli/output.ts, packages/sourcevision/src/cli/serve.ts, packages/sourcevision/src/cli/sourcevision-core.ts, packages/sourcevision/src/language/detect.ts, packages/sourcevision/src/language/pack-loader.ts, packages/sourcevision/src/language/package-paths.ts, packages/sourcevision/src/schema/validate.ts, packages/sourcevision/src/util/project-walk.ts
+Lines: 10650
 
 </zone>
 
 <files>
 
-packages/sourcevision/src/analyzers/branch-work-collector.ts (TypeScript, 457 lines, source)
+packages/sourcevision/src/analyzers/analyze-progress.ts (TypeScript, 563 lines, source)
 packages/sourcevision/src/analyzers/convergence.ts (TypeScript, 226 lines, source)
-packages/sourcevision/src/analyzers/run-ledger.ts (TypeScript, 133 lines, source)
-packages/sourcevision/src/cli/commands/analyze-phases.ts (TypeScript, 732 lines, source)
-packages/sourcevision/src/cli/commands/analyze.ts (TypeScript, 705 lines, source)
-packages/sourcevision/src/cli/commands/export-pdf.ts (TypeScript, 128 lines, source)
-packages/sourcevision/src/cli/commands/narrate.ts (TypeScript, 368 lines, source)
-packages/sourcevision/src/cli/commands/pr-markdown.ts (TypeScript, 160 lines, source)
-packages/sourcevision/src/cli/commands/prd-epic-resolver.ts (TypeScript, 321 lines, source)
-packages/sourcevision/src/cli/mcp.ts (TypeScript, 610 lines, source)
-packages/sourcevision/src/cli/sourcevision-core.ts (TypeScript, 79 lines, source)
-packages/sourcevision/src/util/exec-cli.ts (TypeScript, 35 lines, source)
+packages/sourcevision/src/analyzers/imports.ts (TypeScript, 816 lines, source)
+packages/sourcevision/src/analyzers/index.ts (TypeScript, 32 lines, source)
+packages/sourcevision/src/analyzers/inventory.ts (TypeScript, 650 lines, source)
+packages/sourcevision/src/analyzers/pack-imports.ts (TypeScript, 260 lines, source)
+packages/sourcevision/src/analyzers/run-ledger.ts (TypeScript, 239 lines, source)
+packages/sourcevision/src/analyzers/terraform-infrastructure.ts (TypeScript, 173 lines, source)
+packages/sourcevision/src/cli/commands/analyze-phases.ts (TypeScript, 802 lines, source)
+packages/sourcevision/src/cli/commands/analyze.ts (TypeScript, 879 lines, source)
+packages/sourcevision/src/cli/commands/constants.ts (TypeScript, 1 lines, source)
+packages/sourcevision/src/cli/commands/export-pdf.ts (TypeScript, 129 lines, source)
+packages/sourcevision/src/cli/commands/git-credential-helper.ts (TypeScript, 76 lines, source)
+packages/sourcevision/src/cli/commands/init.ts (TypeScript, 69 lines, source)
+packages/sourcevision/src/cli/commands/iso.ts (TypeScript, 158 lines, source)
+packages/sourcevision/src/cli/commands/narrate.ts (TypeScript, 381 lines, source)
+packages/sourcevision/src/cli/commands/pack-archive.ts (TypeScript, 229 lines, source)
+packages/sourcevision/src/cli/commands/pack-lock.ts (TypeScript, 187 lines, source)
+packages/sourcevision/src/cli/commands/pack.ts (TypeScript, 717 lines, source)
+packages/sourcevision/src/cli/commands/pr-markdown.ts (TypeScript, 180 lines, source)
+packages/sourcevision/src/cli/commands/readiness.ts (TypeScript, 167 lines, source)
+packages/sourcevision/src/cli/commands/reset.ts (TypeScript, 62 lines, source)
+packages/sourcevision/src/cli/commands/validate.ts (TypeScript, 72 lines, source)
+packages/sourcevision/src/cli/commands/workspace.ts (TypeScript, 236 lines, source)
+packages/sourcevision/src/cli/errors.ts (TypeScript, 136 lines, source)
+packages/sourcevision/src/cli/help.ts (TypeScript, 439 lines, source)
+packages/sourcevision/src/cli/index.ts (TypeScript, 194 lines, source)
+packages/sourcevision/src/cli/mcp-workspace.ts (TypeScript, 147 lines, source)
+packages/sourcevision/src/cli/mcp.ts (TypeScript, 754 lines, source)
+packages/sourcevision/src/cli/output.ts (TypeScript, 112 lines, source)
+packages/sourcevision/src/cli/serve.ts (TypeScript, 47 lines, source)
+packages/sourcevision/src/cli/sourcevision-core.ts (TypeScript, 82 lines, source)
+packages/sourcevision/src/language/detect.ts (TypeScript, 153 lines, source)
+packages/sourcevision/src/language/pack-loader.ts (TypeScript, 245 lines, source)
+packages/sourcevision/src/language/package-paths.ts (TypeScript, 27 lines, source)
+packages/sourcevision/src/schema/validate.ts (TypeScript, 764 lines, source)
+packages/sourcevision/src/util/project-walk.ts (TypeScript, 246 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
-  packages/sourcevision/src/analyzers/branch-work-collector.ts → packages/sourcevision/src/util/exec-cli.ts {execFileSyncCli}
+  packages/sourcevision/src/analyzers/analyze-progress.ts → packages/sourcevision/src/analyzers/run-ledger.ts {setRunLedgerListener, snapshotRunLedger}
+  packages/sourcevision/src/analyzers/imports.ts → packages/sourcevision/src/analyzers/pack-imports.ts {buildPackImportGraph, isPackFile, noticeListedPacks, packsFor, readPackFrameworkFacts}
+  packages/sourcevision/src/analyzers/imports.ts → packages/sourcevision/src/analyzers/pack-imports.ts {PackImportsOptions}
+  packages/sourcevision/src/analyzers/imports.ts → packages/sourcevision/src/analyzers/terraform-infrastructure.ts {isTerraformSource}
+  packages/sourcevision/src/analyzers/imports.ts → packages/sourcevision/src/language/detect.ts {detectLanguages, loadInventoryConfig}
+  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/imports.ts {analyzeImports, extractImports, extractPackageName}
+  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/inventory.ts {analyzeInventory, detectLanguage, classifyRole, deriveCategory, isBinary}
+  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/analyzers/inventory.ts {InventoryOptions, InventoryResult, InventoryStats}
+  packages/sourcevision/src/analyzers/index.ts → packages/sourcevision/src/util/project-walk.ts {loadIgnoreFilter, IgnoreFilter}
+  packages/sourcevision/src/analyzers/inventory.ts → packages/sourcevision/src/language/detect.ts {detectProjectLanguage, loadInventoryConfig}
+  packages/sourcevision/src/analyzers/inventory.ts → packages/sourcevision/src/language/package-paths.ts {sourcevisionVersion}
+  packages/sourcevision/src/analyzers/inventory.ts → packages/sourcevision/src/util/project-walk.ts {loadIgnoreFilter, projectSkip, walkProjectFiles}
+  packages/sourcevision/src/analyzers/pack-imports.ts → packages/sourcevision/src/language/pack-loader.ts {INSTALLABLE_PACKS, KNOWN_PACKS, isSuggestedPack, loadPack, packInstallCommand}
+  packages/sourcevision/src/analyzers/pack-imports.ts → packages/sourcevision/src/language/pack-loader.ts {InstallablePack, KnownPack, PackLoaderOptions}
+  packages/sourcevision/src/analyzers/terraform-infrastructure.ts → packages/sourcevision/src/analyzers/pack-imports.ts {noticeListedPacks}
+  packages/sourcevision/src/analyzers/terraform-infrastructure.ts → packages/sourcevision/src/language/pack-loader.ts {KNOWN_PACKS, isSuggestedPack, loadPack, packInstallCommand}
+  packages/sourcevision/src/analyzers/terraform-infrastructure.ts → packages/sourcevision/src/language/pack-loader.ts {KnownPack, PackLoaderOptions}
+  packages/sourcevision/src/cli/commands/analyze-phases.ts → packages/sourcevision/src/analyzers/imports.ts {readImportsPackFrameworkFacts}
+  packages/sourcevision/src/cli/commands/analyze-phases.ts → packages/sourcevision/src/analyzers/inventory.ts {inventoryFingerprint, withPackAnalysedLanguages}
+  packages/sourcevision/src/cli/commands/analyze-phases.ts → packages/sourcevision/src/cli/output.ts {info}
   packages/sourcevision/src/cli/commands/analyze-phases.ts → packages/sourcevision/src/cli/sourcevision-core.ts {DATA_FILES, toCanonicalJSON, analyzeInventory, detectLanguages, mergeLanguageConfigs, analyzeImports, analyzeClassifications, enrichClassificationsWithLLM, mergeClassificationResults, analyzeZones, analyzeComponents, analyzeCallGraph, computeZoneCallStats, generateCallGraphFindings, deduplicateFindings, enforceSeverityRules, readManifest, writeManifest, updateManifestModule, updateManifestError, detectSubAnalyses, buildSubAnalysisRefs, createSnapshot, computeDeltas, loadLatestReport, saveReport, formatDeltaReport}
   packages/sourcevision/src/cli/commands/analyze-phases.ts → packages/sourcevision/src/cli/sourcevision-core.ts {ZoneAnchor, AnalyzeTokenUsage, CallGraph, Classifications, ConvergenceReport, ImportEdge, Inventory, InventoryResult}
-  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/run-ledger.ts {startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger}
-  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/analyze-phases.ts {runInventoryPhase, runImportsPhase, runClassificationsPhase, runZonesPhase, runComponentsPhase, runCallGraphPhase, PhasePrerequsiteError, PhaseError, MAX_ENRICHMENT_PASS}
+  packages/sourcevision/src/cli/commands/analyze-phases.ts → packages/sourcevision/src/language/pack-loader.ts {KNOWN_PACKS}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/analyze-progress.ts {isAnalyzeProgressActive, startAnalyzeProgress, finishAnalyzeProgress, markPhaseStarted, markPhaseEnded, markScope, noteAnalyzeError, openRootPhase}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/run-ledger.ts {startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/analyzers/terraform-infrastructure.ts {enrichTerraformInfrastructure}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/analyze-phases.ts {runInventoryPhase, runImportsPhase, runClassificationsPhase, runZonesPhase, runComponentsPhase, runCallGraphPhase, packFrameworkFacts, suggestPack, optionalPacksLine, PhasePrerequsiteError, PhaseError, MAX_ENRICHMENT_PASS}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/analyze-phases.ts {AnalyzeContext}
-  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/narrate.ts {carryNarration, cmdNarrate, NARRATION_LOG, takeOverNarration}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/init.ts {cmdInit}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/narrate.ts {carryNarration, cmdNarrate, narrationLogPath, takeOverNarration}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/narrate.ts {NarrateDeps}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/commands/pr-markdown.ts {generatePrMarkdownFile}
-  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/sourcevision-core.ts {SV_DIR, DATA_FILES, SUPPLEMENTARY_FILES, readManifest, writeManifest, generateLlmsTxt, generateContext, emitZoneOutputs, assessAllZoneRisks, deduplicateFindings, enforceSeverityRules, toCanonicalJSON, emptyAnalyzeTokenUsage, formatTokenUsage, detectSubAnalyses, setLLMConfig, setProjectDir, getAuthMode, getLLMVendor}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/output.ts {info}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/sourcevision-core.ts {DATA_FILES, SUPPLEMENTARY_FILES, readManifest, writeManifest, updateManifestError, generateLlmsTxt, generateContext, emitZoneOutputs, assessAllZoneRisks, deduplicateFindings, enforceSeverityRules, toCanonicalJSON, emptyAnalyzeTokenUsage, formatTokenUsage, detectSubAnalyses, setLLMConfig, setProjectDir, getAuthMode, getLLMVendor}
   packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/cli/sourcevision-core.ts {RiskJustificationEntry, ZoneType, Manifest}
+  packages/sourcevision/src/cli/commands/analyze.ts → packages/sourcevision/src/language/detect.ts {loadInventoryConfig}
+  packages/sourcevision/src/cli/commands/constants.ts → packages/sourcevision/src/cli/sourcevision-core.ts {TOOL_VERSION}
+  packages/sourcevision/src/cli/commands/export-pdf.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/export-pdf.ts → packages/sourcevision/src/cli/output.ts {info, result}
   packages/sourcevision/src/cli/commands/export-pdf.ts → packages/sourcevision/src/cli/sourcevision-core.ts {DATA_FILES}
   packages/sourcevision/src/cli/commands/export-pdf.ts → packages/sourcevision/src/cli/sourcevision-core.ts {Manifest, Inventory, Imports, Zones, Components}
+  packages/sourcevision/src/cli/commands/git-credential-helper.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/git-credential-helper.ts → packages/sourcevision/src/cli/output.ts {info}
+  packages/sourcevision/src/cli/commands/init.ts → packages/sourcevision/src/cli/commands/constants.ts {TOOL_VERSION}
+  packages/sourcevision/src/cli/commands/init.ts → packages/sourcevision/src/cli/output.ts {info}
+  packages/sourcevision/src/cli/commands/init.ts → packages/sourcevision/src/cli/sourcevision-core.ts {SCHEMA_VERSION}
+  packages/sourcevision/src/cli/commands/iso.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/iso.ts → packages/sourcevision/src/cli/output.ts {info, result}
   packages/sourcevision/src/cli/commands/narrate.ts → packages/sourcevision/src/analyzers/run-ledger.ts {startRunLedger, snapshotRunLedger, formatRunLedger}
   packages/sourcevision/src/cli/commands/narrate.ts → packages/sourcevision/src/cli/commands/analyze-phases.ts {loadHints, loadFileArchetypes}
   packages/sourcevision/src/cli/commands/narrate.ts → packages/sourcevision/src/cli/commands/analyze-phases.ts {AnalyzeContext}
+  packages/sourcevision/src/cli/commands/narrate.ts → packages/sourcevision/src/cli/output.ts {info}
   packages/sourcevision/src/cli/commands/narrate.ts → packages/sourcevision/src/cli/sourcevision-core.ts {DATA_FILES, readManifest, writeManifest, toCanonicalJSON, deduplicateFindings, enforceSeverityRules}
+  packages/sourcevision/src/cli/commands/pack-lock.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/cli/commands/pack-archive.ts {ArchiveError, MAX_BUNDLE_BYTES, collectTree, readTarGz, writeTarGz}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/cli/commands/pack-archive.ts {ArchiveEntry}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/cli/commands/pack-lock.ts {withPackLock}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/cli/output.ts {result}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/language/detect.ts {loadInventoryConfig}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/language/pack-loader.ts {defaultPackDir, INSTALLABLE_PACKS, KNOWN_PACKS, loadPack}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/language/pack-loader.ts {InstallablePack, PackLoaderOptions}
+  packages/sourcevision/src/cli/commands/pack.ts → packages/sourcevision/src/language/package-paths.ts {sourcevisionVersion}
+  packages/sourcevision/src/cli/commands/pr-markdown.ts → packages/sourcevision/src/cli/errors.ts {requireSvDir}
+  packages/sourcevision/src/cli/commands/pr-markdown.ts → packages/sourcevision/src/cli/output.ts {info}
   packages/sourcevision/src/cli/commands/pr-markdown.ts → packages/sourcevision/src/cli/sourcevision-core.ts {collectBranchWork, classifyItems, renderPRMarkdownFromRecord}
-  packages/sourcevision/src/cli/commands/pr-markdown.ts → packages/sourcevision/src/cli/sourcevision-core.ts {BranchWorkRecord, BranchWorkRecordItem, BranchWorkEpicSummary, BranchWorkResult}
-  packages/sourcevision/src/cli/commands/prd-epic-resolver.ts → packages/sourcevision/src/util/exec-cli.ts {execFileSyncCli}
-  packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/cli/sourcevision-core.ts {DATA_FILES, generateContext, deriveNextSteps, setArchetypeOverride, SV_DIR, TOOL_VERSION}
+  packages/sourcevision/src/cli/commands/pr-markdown.ts → packages/sourcevision/src/cli/sourcevision-core.ts {BranchWorkRecord, BranchWorkRecordItem, BranchWorkEpicSummary, BranchWorkResult, RexBridge}
+  packages/sourcevision/src/cli/commands/readiness.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/readiness.ts → packages/sourcevision/src/cli/output.ts {result}
+  packages/sourcevision/src/cli/commands/readiness.ts → packages/sourcevision/src/cli/sourcevision-core.ts {DATA_FILES}
+  packages/sourcevision/src/cli/commands/readiness.ts → packages/sourcevision/src/schema/validate.ts {SdlcProfileSchema, formatValidationErrors, validate}
+  packages/sourcevision/src/cli/commands/reset.ts → packages/sourcevision/src/cli/output.ts {info}
+  packages/sourcevision/src/cli/commands/reset.ts → packages/sourcevision/src/cli/sourcevision-core.ts {detectSubAnalyses}
+  packages/sourcevision/src/cli/commands/validate.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/validate.ts → packages/sourcevision/src/cli/output.ts {info, result}
+  packages/sourcevision/src/cli/commands/validate.ts → packages/sourcevision/src/cli/sourcevision-core.ts {validate, ManifestSchema, InventorySchema, ImportsSchema, ZonesSchema, ComponentsSchema, DATA_FILES}
+  packages/sourcevision/src/cli/commands/workspace.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/commands/workspace.ts → packages/sourcevision/src/cli/output.ts {info}
+  packages/sourcevision/src/cli/commands/workspace.ts → packages/sourcevision/src/cli/sourcevision-core.ts {loadWorkspaceConfig, saveWorkspaceConfig, resolveMembers, writeWorkspaceOutput, getWorkspaceStatus, getWorkspaceEdgeCounts, toPosix}
+  packages/sourcevision/src/cli/commands/workspace.ts → packages/sourcevision/src/cli/sourcevision-core.ts {WorkspaceMember}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/analyze.ts {cmdAnalyze, narrateDeps}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/export-pdf.ts {cmdExportPdf}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/git-credential-helper.ts {cmdGitCredentialHelper}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/init.ts {cmdInit}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/iso.ts {cmdIso, parseIsoArgs}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/narrate.ts {cmdNarrate}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/pack.ts {cmdPack}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/pr-markdown.ts {cmdPrMarkdown}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/readiness.ts {cmdReadiness}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/reset.ts {cmdReset}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/validate.ts {cmdValidate}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/commands/workspace.ts {cmdWorkspace}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/errors.ts {CLIError, handleCLIError, requireSvDir}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/help.ts {usage, showCommandHelp}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/mcp.ts {startMcpServer}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/output.ts {setQuiet, setVerbose, setDebug}
+  packages/sourcevision/src/cli/index.ts → packages/sourcevision/src/cli/serve.ts {startServe}
+  packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/cli/commands/readiness.ts {computeReadinessForProject, READINESS_CAVEAT}
+  packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/cli/errors.ts {CLIError}
+  packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/cli/mcp-workspace.ts {WorkspaceBinding}
+  packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/cli/mcp-workspace.ts {BoundWorkspace}
+  packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/cli/sourcevision-core.ts {DATA_FILES, generateContext, deriveNextSteps, setArchetypeOverride, TOOL_VERSION}
   packages/sourcevision/src/cli/mcp.ts → packages/sourcevision/src/cli/sourcevision-core.ts {Manifest, Inventory, Imports, Classifications, Zones, Components}
-  packages/sourcevision/src/cli/sourcevision-core.ts → packages/sourcevision/src/analyzers/branch-work-collector.ts {collectBranchWork}
-  packages/sourcevision/src/cli/sourcevision-core.ts → packages/sourcevision/src/analyzers/branch-work-collector.ts {BranchWorkResult}
   packages/sourcevision/src/cli/sourcevision-core.ts → packages/sourcevision/src/analyzers/convergence.ts {createSnapshot, computeDeltas, loadLatestReport, saveReport, formatDeltaReport}
   packages/sourcevision/src/cli/sourcevision-core.ts → packages/sourcevision/src/analyzers/convergence.ts {ConvergenceReport}
+  packages/sourcevision/src/cli/sourcevision-core.ts → packages/sourcevision/src/analyzers/imports.ts {analyzeImports}
+  packages/sourcevision/src/cli/sourcevision-core.ts → packages/sourcevision/src/analyzers/inventory.ts {analyzeInventory}
+  packages/sourcevision/src/cli/sourcevision-core.ts → packages/sourcevision/src/analyzers/inventory.ts {InventoryResult}
+  packages/sourcevision/src/cli/sourcevision-core.ts → packages/sourcevision/src/language/detect.ts {detectLanguages}
+  packages/sourcevision/src/language/detect.ts → packages/sourcevision/src/util/project-walk.ts {loadIgnoreFilter, projectSkip, walkProjectFiles}
+  packages/sourcevision/src/language/pack-loader.ts → packages/sourcevision/src/language/package-paths.ts {sourcevisionVersion}
 
 </imports>
+
+<sub-crossings>
+
+Cross-dependencies between sub-zones:
+  sourcevision/cli/analyzers → sourcevision/cli/cli-commands: 1
+  sourcevision/cli/analyzers → sourcevision/cli/sourcevision: 1
+  sourcevision/cli/cli → sourcevision/cli/analyzers: 1
+  sourcevision/cli/cli → sourcevision/cli/commands-2: 3
+  sourcevision/cli/cli → sourcevision/cli/commands-3: 3
+  sourcevision/cli/cli → sourcevision/cli/sourcevision: 3
+  sourcevision/cli/cli-commands → sourcevision/cli/analyzers: 2
+  sourcevision/cli/cli-commands → sourcevision/cli/cli: 3
+  sourcevision/cli/cli-commands → sourcevision/cli/commands: 2
+  sourcevision/cli/cli-commands → sourcevision/cli/commands-2: 6
+  sourcevision/cli/cli-commands → sourcevision/cli/commands-3: 6
+  sourcevision/cli/cli-commands → sourcevision/cli/sourcevision: 1
+  sourcevision/cli/commands → sourcevision/cli/analyzers: 3
+  sourcevision/cli/commands → sourcevision/cli/cli: 6
+  sourcevision/cli/commands → sourcevision/cli/commands-2: 4
+  sourcevision/cli/commands → sourcevision/cli/commands-3: 1
+  sourcevision/cli/commands → sourcevision/cli/sourcevision: 2
+  sourcevision/cli/commands-2 → sourcevision/cli/cli: 6
+  sourcevision/cli/commands-2 → sourcevision/cli/commands-3: 2
+  sourcevision/cli/commands-3 → sourcevision/cli/cli: 2
+  sourcevision/cli/commands-3 → sourcevision/cli/commands-2: 3
+  sourcevision/cli/sourcevision → sourcevision/cli/analyzers: 1
+  sourcevision/cli/sourcevision → sourcevision/cli/cli-commands: 1
+
+</sub-crossings>
+
+<sub-zones>
+
+This zone has 7 sub-zone(s):
+
+- **Import Graph Analysis** (`sourcevision/cli/analyzers`): 4 files, cohesion 0.56, coupling 0.44
+- **CLI & MCP Core** (`sourcevision/cli/cli`): 6 files, cohesion 0.31, coupling 0.69
+- **CLI Command Set** (`sourcevision/cli/cli-commands`): 6 files, cohesion 0.32, coupling 0.68
+- **Analysis Command Layer** (`sourcevision/cli/commands`): 5 files, cohesion 0.47, coupling 0.53
+- **Sourcevision** (`sourcevision/cli/commands-2`): 7 files, cohesion 0.34, coupling 0.66
+- **Export & Auxiliary** (`sourcevision/cli/export-and-auxiliary`): 5 files, cohesion 0.33, coupling 0.67
+- **Sourcevision** (`sourcevision/cli/sourcevision`): 4 files, cohesion 0.56, coupling 0.44
+
+Detailed sub-zone context available in `zones/{sub-zone-id}/context.md`
+
+</sub-zones>

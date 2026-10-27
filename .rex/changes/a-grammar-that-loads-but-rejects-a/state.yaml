@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "302b3909-f481-4577-a120-db5c3726b9d4":
+    status: "completed"
+    startedAt: "2026-10-08T05:26:10.996Z"
+    completedAt: "2026-10-08T05:31:28.811Z"
+    endedAt: "2026-10-08T05:31:28.811Z"
+    resolutionType: "code-change"
+    resolutionDetail: "runner.prepare compiles pack queries; buildPackImportGraph guards it per pack with one notice, inventory-only fallback."
+    appliedAt: "2026-10-08T05:31:28.811Z"
+    lastModified: "2026-10-08T05:31:29.897Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

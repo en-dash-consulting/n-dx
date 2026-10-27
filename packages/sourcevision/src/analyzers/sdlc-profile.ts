@@ -11,7 +11,7 @@
  * YAML, JSON, TOML, Dockerfiles and `.tf`. Widening it would pollute zone
  * detection — a repository of CI workflows is not a repository about CI — so
  * this walks for itself, as `project-profile.ts` and the IaC discovery already
- * do. `inventory.ts` is untouched; its `IgnoreFilter` is reused, because a
+ * do. The inventory's `IgnoreFilter` (`util/project-walk.ts`) is reused, because a
  * second `.gitignore` interpreter would drift from the first.
  *
  * ## Deterministic, and that is the whole point
@@ -35,8 +35,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 
-import { loadIgnoreFilter, type IgnoreFilter } from "./inventory.js";
+import { loadIgnoreFilter, type IgnoreFilter } from "../util/project-walk.js";
 import { discoverFromIaC } from "../export/iso-declared.js";
+import { FIXTURE_DIRS } from "./infrastructure.js";
 import { cmp } from "../util/sort.js";
 import {
   isMap,
@@ -45,7 +46,7 @@ import {
   stringAt,
   YamlSubsetError,
   type YamlValue,
-} from "./yaml-subset.js";
+} from "@n-dx/lang-kit";
 import type {
   SdlcCiJob,
   SdlcCiPipeline,
@@ -212,6 +213,9 @@ export function walkProject(root: string, ignore: IgnoreFilter): WalkResult {
 
       if (entry.isDirectory()) {
         if (SKIP_DIRS.has(entry.name)) continue;
+        // A fixture's manifests and workflows belong to the project it fakes,
+        // and would otherwise be cited as this repository's evidence.
+        if (FIXTURE_DIRS.has(entry.name.toLowerCase())) continue;
         if (ignore.ignores(rel + "/")) continue;
         descend(full, depth + 1);
         if (truncated) return;

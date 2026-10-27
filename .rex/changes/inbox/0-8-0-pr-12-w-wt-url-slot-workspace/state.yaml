@@ -1,0 +1,29 @@
+schema: "rex/v2"
+items:
+  "592e5c5f-8007-4fb3-860e-9eb4ee37e760":
+    status: "completed"
+    startedAt: "2026-09-16T16:52:42.802Z"
+    completedAt: "2026-09-16T17:00:48.015Z"
+    endedAt: "2026-09-16T17:00:48.015Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Broadcasts are tagged per workspace (\"*\" for process-wide), the viewer pipeline and raw consumers drop foreign frames (untagged = anchor), and the breadcrumb branch chip is a keyboard-accessible worktree listbox that navigates to /w/<key>/<view>; unit tests for tagging, filtering and the switcher, integration asserts the tag."
+    lastModified: "2026-09-16T17:00:48.393Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "d3c822e4-7d47-447f-b0fa-eca2c3791417":
+    status: "completed"
+    startedAt: "2026-09-16T17:00:49.336Z"
+    completedAt: "2026-09-16T17:00:49.336Z"
+    endedAt: "2026-09-16T17:00:49.336Z"
+    appliedAt: "2026-09-16T17:00:49.336Z"
+    needsPlacement: true
+    lastModified: "2026-09-16T17:00:49.714Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fe40eba6-bc8e-4d12-9b5f-f91389f3a0ca":
+    status: "completed"
+    startedAt: "2026-09-16T16:45:21.211Z"
+    completedAt: "2026-09-16T16:49:24.332Z"
+    endedAt: "2026-09-16T16:49:24.332Z"
+    resolutionType: "code-change"
+    resolutionDetail: "/w/<key>/ slot composed into the viewer base path and stripped server-side before dispatch with registry lookup, X-Ndx-Workspace header support and a 404 page for unknown keys; slot-less paths stay the anchor's; parsing tests and a compiled-server integration test green."
+    lastModified: "2026-09-16T16:49:24.708Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

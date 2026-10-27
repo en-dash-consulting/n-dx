@@ -65,7 +65,7 @@ describe("cliLoop — agent commit N-DX-Item", () => {
     };
   };
 
-  it("sends the run's trailer lines in the brief and records the agent commit that lacks them", async () => {
+  it("sends the run's trailer lines in the brief and names the item on the agent commit that lacked them", async () => {
     cli.script(commitsWithoutItem);
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { cliLoop } = await import("../../src/agent/lifecycle/cli-loop.js");
@@ -89,25 +89,16 @@ describe("cliLoop — agent commit N-DX-Item", () => {
     expect(taskPrompt).toContain(`· run ${run.id}\nN-DX-Item: task-1`);
     expect(systemPrompt).not.toContain("task-1");
 
+    // The agent committed without the trailer. The task's completion was then
+    // folded into that commit, which names the item while it is rewritten, so
+    // nothing is left for the missing-trailer report.
     const workCommit = run.commits?.find((c) => c.subject === "feat: the feature");
     expect(workCommit).toBeDefined();
-    // The report names the commit and what it lacks, not how the run tied it.
-    // authorDate and authorEmail are pinned against git rather than asserted as
-    // shapes: they are what rex's twin rule keys on, so a wrong value is as
-    // bad as a missing one and expect.any would accept both.
-    const factOf = (fmt: string): string =>
-      execFileSync("git", ["log", "-1", `--format=${fmt}`, workCommit!.sha], {
-        cwd: projectDir,
-        encoding: "utf-8",
-      }).trim();
-    expect(run.commitsMissingItem).toEqual([
-      {
-        sha: workCommit!.sha,
-        subject: workCommit!.subject,
-        authorDate: factOf("%aI"),
-        authorEmail: factOf("%ae"),
-        items: [],
-      },
-    ]);
+    const item = execFileSync(
+      "git", ["log", "-1", "--format=%(trailers:key=N-DX-Item,valueonly)", workCommit!.sha],
+      { cwd: projectDir, encoding: "utf-8" },
+    ).trim();
+    expect(item).toBe("task-1");
+    expect(run.commitsMissingItem).toBeUndefined();
   });
 });

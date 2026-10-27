@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "8956fb2a-6e3a-40f2-bc49-19fd641b4523":
+    status: "completed"
+    startedAt: "2026-04-30T13:26:59.195Z"
+    completedAt: "2026-04-30T13:45:47.378Z"
+    endedAt: "2026-04-30T13:45:47.378Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented commit attribution for hench-driven status transitions. Hench post-commit hook now captures commit SHA, author, email, timestamp and updates PRD item's commits array. Implemented rex backfill-commit-attribution command to populate commits from git history N-DX-Status trailers. Both features are idempotent and handle edge cases. Added comprehensive integration and unit tests. Commit: 98c5d48a"
+    appliedAt: "2026-04-30T13:45:47.378Z"

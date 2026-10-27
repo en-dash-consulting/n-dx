@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "df292b37-e2f6-448f-ba8b-22f6f301a41e":
+    status: "completed"
+    startedAt: "2026-04-27T05:35:57.785Z"
+    completedAt: "2026-04-27T13:13:51.778Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented --show-individual flag for ndx/rex status with per-PRD breakdown (sections + JSON array)"
+    appliedAt: "2026-04-27T13:13:51.778Z"

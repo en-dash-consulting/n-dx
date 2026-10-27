@@ -4,6 +4,8 @@ import {
   CONFIG_GROUP_DEFAULTS,
   VENDOR_PROVIDERS,
   completeConfigGroups,
+  getConfigValue,
+  setConfigValue,
   validateConfigKeyValue,
   validateFieldValue,
   validateProviderForVendor,
@@ -165,6 +167,11 @@ describe("validateConfigKeyValue", () => {
 });
 
 describe("validateProviderForVendor", () => {
+  it("treats a vendor named after an Object.prototype member as unrecognized, not as a provider list", () => {
+    expect(validateProviderForVendor("cli", "toString")).toBeNull();
+    expect(validateProviderForVendor("api", "constructor")).toBeNull();
+  });
+
   it("accepts cli or api for claude", () => {
     expect(validateProviderForVendor("cli", "claude")).toBeNull();
     expect(validateProviderForVendor("api", "claude")).toBeNull();
@@ -257,5 +264,32 @@ describe("completeConfigGroups", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+/**
+ * `setConfigValue` is the last line between a dotted key and the prototype
+ * chain: the hench, adaptive and features routes all write by path through it.
+ * The route tests pin their own allowlists; this pins the helper itself, so a
+ * route that lost its allowlist would still write nothing.
+ */
+describe("setConfigValue", () => {
+  it("writes nothing for a path with a prototype-chain segment", () => {
+    for (const path of ["__proto__.polluted", "constructor.prototype.x", "prototype"]) {
+      const target: Record<string, unknown> = {};
+      setConfigValue(target, path, 1);
+      expect(Object.keys(target), path).toEqual([]);
+      expect(getConfigValue(target, path), path).not.toBe(1);
+    }
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).x).toBeUndefined();
+  });
+
+  it("creates the intermediate objects an ordinary path needs", () => {
+    const target: Record<string, unknown> = { retry: { baseDelayMs: 1000 } };
+    setConfigValue(target, "retry.maxRetries", 3);
+    setConfigValue(target, "guard.commandTimeout", 45000);
+    expect(target).toEqual({ retry: { baseDelayMs: 1000, maxRetries: 3 }, guard: { commandTimeout: 45000 } });
+    expect(getConfigValue(target, "retry.maxRetries")).toBe(3);
   });
 });

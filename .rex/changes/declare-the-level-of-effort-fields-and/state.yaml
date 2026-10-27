@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "c3303c54-9650-4875-8353-d3d7d6875bbc":
+    status: "completed"
+    startedAt: "2026-10-07T16:03:26.242Z"
+    completedAt: "2026-10-07T16:07:58.847Z"
+    endedAt: "2026-10-07T16:07:58.847Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 change and task intent declare loeRationale (string) and loeConfidence (low|medium|high) beside loe, and reserve effort with no shape. The intent/state table comment lists the new fields."
+    appliedAt: "2026-10-07T16:07:58.847Z"
+    lastModified: "2026-10-07T16:07:59.491Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

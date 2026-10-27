@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "d6092558-f7ae-4b7f-94ae-26a2a30cd8ef":
+    status: "completed"
+    startedAt: "2026-10-01T05:19:31.246Z"
+    completedAt: "2026-10-01T05:28:27.923Z"
+    endedAt: "2026-10-01T05:28:27.923Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Running-now bar on every Live page with keyboard cycling, worktree links and finished retention"
+    appliedAt: "2026-10-01T05:28:27.923Z"
+    lastModified: "2026-10-01T05:28:28.311Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

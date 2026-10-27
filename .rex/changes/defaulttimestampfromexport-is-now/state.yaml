@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "5d5e3e41-6c63-4ed3-b3a4-9f40ac10e24e":
+    status: "completed"
+    startedAt: "2026-09-11T10:53:30.555Z"
+    completedAt: "2026-09-11T11:00:15.068Z"
+    endedAt: "2026-09-11T11:00:15.068Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Deleted defaultTimestampFromExport and both mergeBundle call sites rather than validating exportedAt. Decided by who the helper applies to: it only fires on an item with an author and no timestamp, a shape rex no longer produces, so its only beneficiaries come from hand-authored or third-party bundles — the same untrusted source as the exportedAt it would trust. Filling a missing timestamp is now the store transaction's job alone; exportedAt reaches only the JSON report and the log entry, verified by checking every consumer. Confirmed against the built CLI for \"yesterday\", a future-dated ISO value, and a valid one: all three now yield a real transaction timestamp with the author preserved. The unit block was rewritten rather than dropped since the guarantee moved, and the e2e test now asserts the timestamp is not the bundle's exportedAt, which is what would regress silently. Full suite clean, 6/6."
+    appliedAt: "2026-09-11T11:00:15.068Z"
+    lastModified: "2026-09-11T11:00:15.074Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "7f00d3e6-73ec-40cb-9bfa-7685378309f8":
+    status: "completed"
+    startedAt: "2026-10-01T20:43:43.990Z"
+    completedAt: "2026-10-01T21:08:10.353Z"
+    endedAt: "2026-10-01T21:08:10.353Z"
+    resolutionType: "code-change"
+    resolutionDetail: "commitStep in buildSystemPrompt (agent/planning/prompt.ts) now carries a bareGitRule for both autoCommit values: git must begin the command line, never behind `cd ... &&`, a subshell, or `git -C`, with a return-to-root instruction if the agent moved. Allowlist unchanged. Four unit tests in tests/unit/agent/prompt.test.ts."
+    appliedAt: "2026-10-01T21:08:10.353Z"
+    lastModified: "2026-10-01T21:08:10.707Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

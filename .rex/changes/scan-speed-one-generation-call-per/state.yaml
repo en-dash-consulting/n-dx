@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "8feb4427-a679-42d7-8f54-0c67880ee791":
+    status: "completed"
+    startedAt: "2026-09-22T14:18:27.481Z"
+    completedAt: "2026-09-22T14:44:25.286Z"
+    endedAt: "2026-09-22T14:44:25.286Z"
+    resolutionType: "code-change"
+    resolutionDetail: "One name-proposal call, one narration call, both detached behind `sv narrate` with --wait to block; caos fresh run 4.5 min → results in 2 s, names+narration done in the background at 119 s; no-change re-run 2 s"
+    appliedAt: "2026-09-22T14:44:25.286Z"
+    lastModified: "2026-09-22T14:44:25.300Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

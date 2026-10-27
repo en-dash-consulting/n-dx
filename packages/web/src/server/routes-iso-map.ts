@@ -23,7 +23,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
-import { errorResponse } from "./response-utils.js";
+import { errorResponse, errorMessage } from "./response-utils.js";
 import { buildIsoModel, renderIsoMap, loadIsoInput } from "./domain-gateway.js";
 import type { IsoSourceMode } from "./domain-gateway.js";
 
@@ -227,7 +227,7 @@ export function handleIsoMapRoute(
     errorResponse(
       res,
       500,
-      `Failed to build the architecture map: ${err instanceof Error ? err.message : String(err)}`,
+      `Failed to build the architecture map: ${errorMessage(err)}`,
     );
     return true;
   }

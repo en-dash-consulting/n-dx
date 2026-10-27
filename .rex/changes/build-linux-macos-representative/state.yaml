@@ -1,0 +1,9 @@
+schema: "rex/v2"
+items:
+  "c17d8735-2570-4af2-9b47-83a6b751e310":
+    status: "completed"
+    startedAt: "2026-04-20T19:13:53.689Z"
+    completedAt: "2026-04-20T19:16:21.307Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented Dockerfile.macos with Ubuntu LTS base, test-base-commands.sh smoke test script, and ndx-macos docker-compose service. All acceptance criteria met: image builds successfully, runs ndx init/analyze/status/config without errors, docker-compose.yml includes ndx-macos service, proper exit codes on success/failure."
+    appliedAt: "2026-04-20T19:16:21.307Z"

@@ -1,7 +1,7 @@
 {
   "id": "rex/analyze",
   "name": "Analyze",
-  "description": "16 files, primarily TypeScript",
+  "description": "26 files, primarily TypeScript",
   "files": [
     "packages/rex/src/analyze/analyze-shared.ts",
     "packages/rex/src/analyze/consolidation-guard.ts",
@@ -12,13 +12,23 @@
     "packages/rex/src/analyze/guided.ts",
     "packages/rex/src/analyze/llm-bridge.ts",
     "packages/rex/src/analyze/modify-reason.ts",
+    "packages/rex/src/analyze/place-reason.ts",
     "packages/rex/src/analyze/prompt-envelope.ts",
     "packages/rex/src/analyze/propose-group-renames.ts",
     "packages/rex/src/analyze/propose.ts",
     "packages/rex/src/analyze/reason.ts",
     "packages/rex/src/analyze/rename-resolve.ts",
+    "packages/rex/src/analyze/reshape-reason.ts",
     "packages/rex/src/analyze/scanners.ts",
-    "packages/rex/src/analyze/validate-modification.ts"
+    "packages/rex/src/analyze/spec-draft-reason.ts",
+    "packages/rex/src/analyze/validate-modification.ts",
+    "packages/rex/src/cli/commands/status-sections.ts",
+    "packages/rex/src/cli/commands/status-shared.ts",
+    "packages/rex/src/cli/commands/status-work-cycle.ts",
+    "packages/rex/src/cli/commands/status.ts",
+    "packages/rex/src/cli/commands/tree.ts",
+    "packages/rex/src/core/stats.ts",
+    "packages/rex/src/core/verify.ts"
   ],
   "entryPoints": [
     "packages/rex/src/analyze/analyze-shared.ts",
@@ -30,16 +40,25 @@
     "packages/rex/src/analyze/guided.ts",
     "packages/rex/src/analyze/llm-bridge.ts",
     "packages/rex/src/analyze/modify-reason.ts",
+    "packages/rex/src/analyze/place-reason.ts",
     "packages/rex/src/analyze/prompt-envelope.ts",
     "packages/rex/src/analyze/propose-group-renames.ts",
     "packages/rex/src/analyze/propose.ts",
     "packages/rex/src/analyze/reason.ts",
     "packages/rex/src/analyze/rename-resolve.ts",
+    "packages/rex/src/analyze/reshape-reason.ts",
     "packages/rex/src/analyze/scanners.ts",
-    "packages/rex/src/analyze/validate-modification.ts"
+    "packages/rex/src/analyze/spec-draft-reason.ts",
+    "packages/rex/src/analyze/validate-modification.ts",
+    "packages/rex/src/cli/commands/status-sections.ts",
+    "packages/rex/src/cli/commands/status-work-cycle.ts",
+    "packages/rex/src/cli/commands/status.ts",
+    "packages/rex/src/cli/commands/tree.ts",
+    "packages/rex/src/core/stats.ts",
+    "packages/rex/src/core/verify.ts"
   ],
-  "cohesion": 0.78,
-  "coupling": 0.22,
-  "fileCount": 16,
-  "lineCount": 8549
+  "cohesion": 0.69,
+  "coupling": 0.31,
+  "fileCount": 26,
+  "lineCount": 11137
 }

@@ -1,0 +1,36 @@
+schema: "rex/v2"
+items:
+  "5aa0a3ab-46ba-4299-afec-ce8fec53bba7":
+    status: "completed"
+    startedAt: "2026-07-15T14:29:39.724Z"
+    completedAt: "2026-07-15T16:24:27.432Z"
+    endedAt: "2026-07-15T16:24:27.432Z"
+  "9dfac9fd-ef90-44c2-80ce-5d8b72535bca":
+    status: "completed"
+    startedAt: "2026-09-09T02:28:28.465Z"
+    completedAt: "2026-09-09T02:35:08.191Z"
+    endedAt: "2026-09-09T02:35:08.191Z"
+    resolutionType: "code-change"
+    resolutionDetail: "excludeHenchRuntimeArtifacts now takes projectDir (required, so tsc checks both call sites) and resolves the project's repo-relative prefix, applying it to the artifact patterns so a sibling project's .hench/ stays outside the match. Both paths are canonicalised via realpath first — git rev-parse returns realpaths while projectDir often does not, which silently reintroduced the bug on macOS; caught by the new tests. Eight new tests cover the nested layout end-to-end; empty prefix outside a repo preserves prior behaviour."
+    lastModified: "2026-09-09T02:35:08.197Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "9ffe3e1c-d192-4bea-a117-c646e28cac53":
+    status: "completed"
+    startedAt: "2026-07-17T18:11:46.449Z"
+    completedAt: "2026-09-09T02:35:09.315Z"
+    endedAt: "2026-09-09T02:35:09.315Z"
+    appliedAt: "2026-09-09T02:35:09.315Z"
+    lastModified: "2026-09-09T02:35:09.321Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
+  "cec156b2-8d88-40fb-999b-89571208dfd6":
+    status: "completed"
+    startedAt: "2026-07-17T15:50:23.198Z"
+    completedAt: "2026-07-17T18:11:45.526Z"
+    endedAt: "2026-07-17T18:11:45.526Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Pre-run commit gate now measures change magnitude (files + lines changed via git diff HEAD --numstat) with configurable hench.git.checkpointThreshold (default 200, 0 disables) and hench.git.requireCleanTree; --allow-dirty overrides config. New shared helper measureChangeMagnitude for future checkpoint sites. 36 unit tests cover quiet path, escalation, requireCleanTree, and flag-over-config precedence."
+  "e76192c9-1aa4-43db-bb83-8b39cc25de84":
+    status: "completed"
+    startedAt: "2026-07-14T20:50:53.364Z"
+    completedAt: "2026-07-14T21:59:41.744Z"
+    endedAt: "2026-07-14T21:59:41.744Z"

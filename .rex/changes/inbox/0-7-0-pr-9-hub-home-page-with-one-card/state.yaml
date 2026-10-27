@@ -1,0 +1,20 @@
+schema: "rex/v2"
+items:
+  "03d4c9e2-9de7-4567-b4e1-6a21440fe1cd":
+    status: "completed"
+    startedAt: "2026-09-17T02:57:33.221Z"
+    completedAt: "2026-09-17T02:57:33.221Z"
+    endedAt: "2026-09-17T02:57:33.221Z"
+    appliedAt: "2026-09-17T02:57:33.221Z"
+    needsPlacement: true
+    lastModified: "2026-09-17T02:57:33.593Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1073b478-bdc0-4f23-9a1c-8aa6eec44bae":
+    status: "completed"
+    startedAt: "2026-09-17T02:49:07.129Z"
+    completedAt: "2026-09-17T02:57:31.902Z"
+    endedAt: "2026-09-17T02:57:31.902Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Hub root serves a card per project built from GET /api/hub/overview (registry joined onto each child's status and git routes), with a live refresh, the dashboard's theme mechanism, keyboard-reachable controls, and a Start working link into the project's Runs view rather than a second execute route."
+    lastModified: "2026-09-17T02:57:32.280Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"

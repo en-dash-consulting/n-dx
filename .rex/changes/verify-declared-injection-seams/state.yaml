@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "d9e4fb4a-1cbf-4933-82aa-10f58de1f3db":
+    status: "completed"
+    startedAt: "2026-09-04T21:24:30.055Z"
+    completedAt: "2026-09-04T21:24:38.050Z"
+    endedAt: "2026-09-04T21:24:38.050Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Declared seams are now checked against callgraph.json. New indexCalleesByFile + verifySeamCallbacks in iso-sources.ts (keeps unresolved-callee edges, which aggregateCallEdges drops — an injected callback is a parameter, so those are the only evidence a seam has); evidence is searched across the receiving zone because a receiving module routinely delegates the callbacks on. The model carries IsoSeamVerification; the page draws an unverified seam thinner/fainter with a sparser dash, says so in the aria-label and panel, names the matched file and expression per corroborated callback, and lists uncalled callbacks in the footer. No call graph, or no callbacks declared, reports as unchecked rather than unverified. 19 new tests in iso-seam-verification.test.ts (unit + through the model + jsdom page); skill bundle regenerated; docs updated. Also fixed the stale .n-dx.json declaration, which named packages/web/src/server/register-scheduler.ts — a path that has not existed since the file moved into task-usage/, and exactly the failure mode this task describes."
+    appliedAt: "2026-09-04T21:24:38.050Z"
+    lastModified: "2026-09-04T21:24:38.080Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

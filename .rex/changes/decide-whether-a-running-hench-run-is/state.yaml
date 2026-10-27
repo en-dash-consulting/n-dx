@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "fb20ed48-0a1e-4c82-b556-a5a7a1dc8d9d":
+    status: "completed"
+    startedAt: "2026-10-01T20:37:46.991Z"
+    completedAt: "2026-10-01T20:51:58.804Z"
+    endedAt: "2026-10-01T20:51:58.804Z"
+    resolutionType: "code-change"
+    resolutionDetail: "run-liveness.ts with host → pid/heartbeat → lock-fallback evidence, EPERM-alive probe, 24 unit tests, @n-dx/hench patch changeset (f89586ffd). The test gate had failed on a pre-existing wall-clock-inventory-policy violation, now fixed (d63f7ff17)."
+    appliedAt: "2026-10-01T20:51:58.804Z"
+    lastModified: "2026-10-01T20:52:00.685Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

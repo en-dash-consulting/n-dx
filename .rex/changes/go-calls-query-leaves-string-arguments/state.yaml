@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "66e1a9f2-49d3-4320-8363-ea8414d44ab9":
+    status: "completed"
+    startedAt: "2026-10-08T08:39:56.351Z"
+    completedAt: "2026-10-08T08:45:38.286Z"
+    endedAt: "2026-10-08T08:45:38.286Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added a nameless call pattern in Go calls.scm; tests pin the innermost-arguments pairing and golden string arguments."
+    appliedAt: "2026-10-08T08:45:38.286Z"
+    lastModified: "2026-10-08T08:45:38.544Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

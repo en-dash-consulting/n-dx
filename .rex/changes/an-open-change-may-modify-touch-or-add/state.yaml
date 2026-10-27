@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "2f000cd0-cc4d-4280-ba07-50f7e3d5c6c6":
+    status: "completed"
+    startedAt: "2026-10-08T01:07:43.823Z"
+    completedAt: "2026-10-08T01:13:41.444Z"
+    endedAt: "2026-10-08T01:13:41.444Z"
+    resolutionType: "code-change"
+    resolutionDetail: "removed-target-live widened to touches, modified/removed targets and added under of open changes; duplicate added target now a ref-resolves error (d6051f7d too)"
+    appliedAt: "2026-10-08T01:13:41.444Z"
+    lastModified: "2026-10-08T01:13:41.687Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

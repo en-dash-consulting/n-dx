@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/sourcevision",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "license": "Elastic-2.0",
   "description": "Codebase analysis tool with structured, git-friendly output",
   "repository": {
@@ -34,18 +34,28 @@
     "typecheck": "tsc --noEmit",
     "test": "node ../../scripts/run-vitest-bind-aware.mjs sourcevision",
     "test:watch": "vitest",
+    "test:update-goldens": "node scripts/update-pack-goldens.mjs",
     "validate": "tsc --noEmit && vitest run",
     "prepare": "pnpm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
+    "@n-dx/lang-kit": "workspace:*",
     "@n-dx/llm-client": "workspace:*",
     "ora": "^9.4.1",
     "pdfkit": "^0.20.2",
     "typescript": "^6.0.3",
     "zod": "^4.6.7"
   },
+  "optionalDependencies": {
+    "@n-dx/lang-go": "workspace:*"
+  },
   "devDependencies": {
+    "@n-dx/lang-java": "workspace:*",
+    "@n-dx/lang-python": "workspace:*",
+    "@n-dx/lang-runtime": "workspace:*",
+    "@n-dx/lang-sql": "workspace:*",
+    "@n-dx/lang-terraform": "workspace:*",
     "@types/node": "^26.6.5",
     "@types/pdfkit": "^0.17.6",
     "jsdom": "^30.1.2",

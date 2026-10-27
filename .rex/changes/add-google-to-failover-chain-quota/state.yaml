@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "d07acdb3-2e83-4078-8ee7-49c0a9221d26":
+    status: "completed"
+    startedAt: "2026-06-05T12:39:23.518Z"
+    completedAt: "2026-06-05T12:49:17.602Z"
+    endedAt: "2026-06-05T12:49:17.602Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Added Google to failover chain, quota status logging, and token usage attribution"
+    appliedAt: "2026-06-05T12:49:17.602Z"

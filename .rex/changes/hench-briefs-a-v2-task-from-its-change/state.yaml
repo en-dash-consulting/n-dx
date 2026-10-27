@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "dfb907e5-c2ab-4d02-85d1-5a668d91d369":
+    status: "completed"
+    startedAt: "2026-10-12T10:11:39.426Z"
+    completedAt: "2026-10-12T10:31:41.038Z"
+    endedAt: "2026-10-12T10:31:41.038Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Work landed in b86a911cf (run 8e84c4d6, opus-5-5 / opus-5-5 review, v1 brief byte-identical per both reviews). Both runs 8e84c4d6 and c5687b94 failed the gate only on tests/e2e/prompt-census.test.js, because the baseline was not re-recorded for the +3 tokens of v2 fixed text in formatTaskBrief. Task 823cb29d (run 6d95babb, b80f8662c) regenerated the baseline; its gate is green. Closed overnight through rex."
+    appliedAt: "2026-10-12T10:31:41.038Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T10:31:42.577Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

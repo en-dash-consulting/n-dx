@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "d31d9aa8-e401-464a-918b-e757830a9ccc":
+    status: "completed"
+    startedAt: "2026-10-06T04:45:03.239Z"
+    completedAt: "2026-10-06T06:15:40.295Z"
+    endedAt: "2026-10-06T06:15:40.295Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Routed every remaining literal .rex/.hench/.sourcevision/.n-dx* path in packages/core, plus the enumerated hench and web files, through the layout resolver. Layout-literal debt 149 -> 56; core is now at zero. Added layoutStateNames() to both resolver twins for classifiers that must recognise both layouts, and stateDirNameUnder()/BOOKKEEPING_DIR_PREFIXES to hench's paths module (consolidating three copies of the same idiom). Fixed the detector's comment blanker, which read the /* inside a glob like \".hench/**\" as a block comment and hid 14 sites in 7 files."
+    appliedAt: "2026-10-06T06:15:40.295Z"
+    lastModified: "2026-10-06T06:15:40.732Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "4fc2d793-dbd7-4544-acf7-44131221b26c":
+    status: "completed"
+    startedAt: "2026-10-08T00:32:22.776Z"
+    completedAt: "2026-10-08T00:32:22.776Z"
+    endedAt: "2026-10-08T00:32:22.776Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Resolved by ba39230d item 7: amendment-type rule errors on a type carried by a modified or removed amendment; an added amendment without type defaults to capability and is not reported (Ryan's decision), with fixtures for both cases."
+    appliedAt: "2026-10-08T00:32:22.776Z"
+    lastModified: "2026-10-08T00:32:23.352Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

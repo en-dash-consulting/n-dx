@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "b6aca952-e7df-46de-96e9-e2cefaff2fcd":
+    status: "completed"
+    startedAt: "2026-05-11T21:37:51.892Z"
+    completedAt: "2026-05-11T21:45:54.886Z"
+    endedAt: "2026-05-11T21:45:54.886Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented pre-reshape git commit capture and merge audit trail recording in archive.json. Created git-utils module for git HEAD hash capture with fallback to 'no-git'. Extended ArchiveBatch, MergeAction, and ReshapeResult types to track merge details. Updated reshape CLI to record pre-reshape commit once per invocation, append entries to archive.json per merge with reasoning, output merge operations with rollback instruction. Added comprehensive tests covering git repo, non-git fallback, and audit trail structure. All acceptance criteria verified."
+    appliedAt: "2026-05-11T21:45:54.886Z"

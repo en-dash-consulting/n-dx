@@ -11,6 +11,10 @@ import {
 } from "../../../src/viewer/utils/index-md-parser.js";
 import { CommitsList } from "../../../src/viewer/components/prd-tree/index-md-sections.js";
 import type { CommitRef } from "../../../src/viewer/utils/index-md-parser.js";
+import type { PRDItem } from "@n-dx/rex";
+// The generator is not in rex's public barrel; the dist subpath is the
+// documented escape hatch for a test over a built artifact.
+import { generateIndexMd } from "@n-dx/rex/dist/store/folder-tree-index-generator.js";
 
 describe("index-md-parser", () => {
   describe("parseIndexMd", () => {
@@ -152,6 +156,56 @@ Just a summary, no other sections.
       expect(sections.commits?.[0].hash).toBe("abc1234");
       expect(sections.commits?.[0].message).toBe("Add feature");
       expect(sections.commits?.[0].timestamp).toBe("2026-04-30T12:00:00Z");
+    });
+
+    it("splits a commits row on unescaped pipes only and unescapes \\| and \\\\", () => {
+      // rex's generator writes `\|` for a pipe and `\\` for a backslash in the
+      // author and message cells. A bare split on `|` broke the row apart and
+      // left both escapes in the text.
+      const markdown = `## Commits
+
+| Author | Hash | Message | Timestamp |
+|--------|------|---------|-----------|
+| Dev \\| Ops | \`abc1234\` | keep C:\\\\path \\| and a literal \\n | 2026-04-30T12:00:00Z |
+`;
+
+      const sections = parseIndexMd(markdown);
+
+      expect(sections.commits).toEqual([{
+        hash: "abc1234",
+        author: "Dev | Ops",
+        authorEmail: "",
+        timestamp: "2026-04-30T12:00:00Z",
+        message: "keep C:\\path | and a literal \\n",
+      }]);
+    });
+
+    it("round-trips a commit with pipes and backslashes through rex's generator losslessly", () => {
+      const commit = {
+        hash: "0123456789abcdef0123456789abcdef01234567",
+        author: "Dev | Ops \\ Team",
+        authorEmail: "dev@example.com",
+        timestamp: "2026-04-20T10:00:00Z",
+        message: "fix(a): keep C:\\path | and `x` \\| not a cell, \\\\ two",
+      };
+      const item: PRDItem = {
+        id: "t-1",
+        level: "task",
+        title: "Task with a commit",
+        status: "completed",
+        commits: [commit],
+      };
+
+      const sections = parseIndexMd(generateIndexMd(item, [], []));
+
+      // The table carries the short hash and no email; everything else is as committed.
+      expect(sections.commits).toEqual([{
+        hash: commit.hash.slice(0, 7),
+        author: commit.author,
+        authorEmail: "",
+        timestamp: commit.timestamp,
+        message: commit.message,
+      }]);
     });
 
     it("parses changes section correctly", () => {

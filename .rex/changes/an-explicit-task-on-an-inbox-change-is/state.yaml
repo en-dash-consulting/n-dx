@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "360033a8-12a5-496d-b525-27695bd84d27":
+    status: "completed"
+    startedAt: "2026-10-13T18:14:47.965Z"
+    completedAt: "2026-10-13T18:21:08.031Z"
+    endedAt: "2026-10-13T18:21:08.031Z"
+    resolutionType: "code-change"
+    resolutionDetail: "On v2, --task and --resolve refuse an Inbox change or a task in one up front (inboxRefusal in work-selection.ts, wired in brief.ts and run-resolve.ts), naming place_change. Commit aa9f92d35."
+    appliedAt: "2026-10-13T18:21:08.031Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T18:21:08.303Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

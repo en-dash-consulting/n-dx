@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "2b93e208-5953-45ca-9180-0e4a6cb7b972":
+    status: "completed"
+    startedAt: "2026-10-07T02:56:46.843Z"
+    completedAt: "2026-10-07T03:11:53.782Z"
+    endedAt: "2026-10-07T03:11:53.782Z"
+    resolutionType: "code-change"
+    resolutionDetail: "isPidAlive (hench canonical + web mirror) rejects non-positive/non-integer pids and, on win32, pids not a multiple of 4 before kill(pid,0); win32 simulated in unit tests; parity test pins the probes. Windows CI still the final check."
+    appliedAt: "2026-10-07T03:11:53.782Z"
+    lastModified: "2026-10-07T03:11:54.372Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

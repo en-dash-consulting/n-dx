@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "381cbc77-8637-4a25-92cf-5766698b060f":
+    status: "completed"
+    startedAt: "2026-10-07T23:22:08.384Z"
+    completedAt: "2026-10-07T23:26:19.141Z"
+    endedAt: "2026-10-07T23:26:19.141Z"
+    resolutionType: "code-change"
+    resolutionDetail: "placement-policy.ts: reserved none-of-these choice (abstained, never accepted/agrees); confidence outside [0,1] or non-finite rejected with warning. Tests added."
+    appliedAt: "2026-10-07T23:26:19.141Z"
+    lastModified: "2026-10-07T23:26:19.390Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

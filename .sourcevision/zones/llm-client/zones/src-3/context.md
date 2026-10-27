@@ -5,27 +5,39 @@
 <zone>
 
 Zone: Src 3 (`llm-client/src-3`)
-Files: 4, Cohesion: 0.55, Coupling: 0.45
-Description: 4 files, primarily TypeScript
-Entry points: packages/llm-client/src/cli-log.ts, packages/llm-client/src/exec.ts, packages/llm-client/src/interrupt-forwarding.ts, packages/llm-client/src/process-tree.ts
-Lines: 2675
+Files: 9, Cohesion: 0.39, Coupling: 0.61
+Description: 9 files, primarily TypeScript
+Entry points: packages/llm-client/src/cli-log.ts, packages/llm-client/src/codex-cli-provider.ts, packages/llm-client/src/exec.ts, packages/llm-client/src/interrupt-forwarding.ts, packages/llm-client/src/process-tree.ts, packages/llm-client/src/prompt-diagnostics.ts, packages/llm-client/src/runtime-contract.ts, packages/llm-client/src/token-usage.ts, packages/llm-client/src/workspace-roots.ts
+Lines: 4559
 
 </zone>
 
 <files>
 
 packages/llm-client/src/cli-log.ts (TypeScript, 216 lines, source)
-packages/llm-client/src/exec.ts (TypeScript, 1647 lines, source)
+packages/llm-client/src/codex-cli-provider.ts (TypeScript, 469 lines, source)
+packages/llm-client/src/exec.ts (TypeScript, 1754 lines, source)
 packages/llm-client/src/interrupt-forwarding.ts (TypeScript, 157 lines, source)
 packages/llm-client/src/process-tree.ts (TypeScript, 655 lines, source)
+packages/llm-client/src/prompt-diagnostics.ts (TypeScript, 150 lines, source)
+packages/llm-client/src/runtime-contract.ts (TypeScript, 592 lines, source)
+packages/llm-client/src/token-usage.ts (TypeScript, 446 lines, source)
+packages/llm-client/src/workspace-roots.ts (TypeScript, 120 lines, source)
 
 </files>
 
 <imports>
 
 Internal:
+  packages/llm-client/src/codex-cli-provider.ts → packages/llm-client/src/exec.ts {diagnoseCliInvocation, diagnoseCliNotFound, spawnCli}
+  packages/llm-client/src/codex-cli-provider.ts → packages/llm-client/src/runtime-contract.ts {DEFAULT_EXECUTION_POLICY}
+  packages/llm-client/src/codex-cli-provider.ts → packages/llm-client/src/runtime-contract.ts {ExecutionPolicy, SandboxMode, ApprovalPolicy}
   packages/llm-client/src/exec.ts → packages/llm-client/src/cli-log.ts {logCliInvocation}
   packages/llm-client/src/exec.ts → packages/llm-client/src/interrupt-forwarding.ts {forwardsInterrupts, processInterruptForwarder}
   packages/llm-client/src/exec.ts → packages/llm-client/src/process-tree.ts {terminateProcessTree, treeKillSpawnOptions}
+  packages/llm-client/src/prompt-diagnostics.ts → packages/llm-client/src/runtime-contract.ts {PromptEnvelope}
+  packages/llm-client/src/runtime-contract.ts → packages/llm-client/src/token-usage.ts {TokenCacheProvenance}
+  packages/llm-client/src/token-usage.ts → packages/llm-client/src/runtime-contract.ts {TokenDiagnosticStatus}
+  packages/llm-client/src/workspace-roots.ts → packages/llm-client/src/exec.ts {getGitCommonDir, getWorktreeRoot}
 
 </imports>

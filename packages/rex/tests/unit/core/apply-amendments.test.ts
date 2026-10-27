@@ -10,7 +10,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, bodyNotes, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
-import { specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { checkV2Rules, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
 import { isWindowsSafeSegment } from "../../../src/store/folder-tree-serializer.js";
 import { loadPrdModel } from "../../../src/store/prd-model-reader.js";
@@ -518,6 +518,20 @@ describe("applyAmendments: rules on the result", () => {
   it("refuses a constraint whose appliesTo names no node", () => {
     const constraint = add({ target: "con-2", type: "constraint", title: "C", appliesTo: ["missing"] });
     expect(refusal(() => applyAmendments(tree([constraint]), CHANGE, OPTS)).findings.map((f) => f.rule)).toEqual(["ref-resolves"]);
+  });
+
+  it("applies the first capability while a change that closed unplaced on the empty product layer waits in the Inbox", () => {
+    const node = (fields: Record<string, unknown>) => ({ title: fields.id, slug: fields.id, ...fields }) as RuleNode;
+    const input: V2Tree = {
+      product: [node({ id: "area", type: "area" })],
+      changes: [
+        node({ id: "closed", type: "change", status: "completed", needsPlacement: true }),
+        node({ id: "boot", type: "change", status: "completed", amends: [{ target: "cap-1", delta: "added", summary: "a", under: "area", title: "First", proposed: "Users can sign in." }] }),
+      ],
+    };
+    const { tree: applied } = applyAmendments(input, "boot", OPTS);
+    expect(get(applied, "boot").appliedAt).toBe(APPLIED_AT);
+    expect(checkV2Rules(applied, { now: NOW }, ["change-placed-at-close"]).map((f) => f.nodeId)).toEqual(["closed"]);
   });
 
   it("tolerates an error the input already had", () => {

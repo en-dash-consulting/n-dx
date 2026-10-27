@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "a3c71293-a6a1-457e-9106-1438becad576":
+    status: "completed"
+    startedAt: "2026-10-13T15:51:30.283Z"
+    completedAt: "2026-10-13T15:56:38.528Z"
+    endedAt: "2026-10-13T15:56:38.528Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: declarations.scm captures anonymous class bodies; readSymbols leaves container absent for members inside one; SymbolFact.container documents it."
+    appliedAt: "2026-10-13T15:56:38.528Z"
+    shippedIn: "0.10.0"
+    lastModified: "2026-10-13T15:56:38.964Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

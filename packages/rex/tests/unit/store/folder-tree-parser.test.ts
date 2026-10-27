@@ -11,18 +11,22 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parseFolderTree, parseFrontmatter, type ParseWarning } from "../../../src/store/folder-tree-parser.js";
 import { emitYamlField } from "../../../src/store/folder-tree-serializer.js";
 import type { PRDItem } from "../../../src/schema/index.js";
+import { BOUNDED_TEST_TIMEOUT_MS, callWithinBudget } from "../../../../lang-kit/tests/helpers/call-within-budget.js";
 
 // No BUDGET_MULTIPLIER here. The perf assertion below guards complexity, and it
 // now says so directly by comparing growth between two tree sizes rather than
 // scaling an absolute wall-clock budget. See that test for the reasoning, and
 // TESTING.md "Flake Resistance" for where scaled absolute budgets are still the
-// right tool (genuine latency budgets, not complexity claims).
+// right tool (genuine latency budgets, not complexity claims). The one budget
+// in this file, `callWithinBudget` at the end, is a hang guardrail: a regex
+// that backtracks blocks the thread it runs on, so it runs off-thread where a
+// regression fails the test by name instead of hanging the suite.
 
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -294,6 +298,24 @@ describe("parseFolderTree: folder-tree fixtures", () => {
         message: "No item markdown file found (expected index.md or title-named .md file)",
       }),
     ]);
+    // The folder holds only a .gitkeep: nothing was dropped with it.
+    expect(result.warnings[0]!.skipped).toBeUndefined();
+  });
+
+  it("a folder with no item file but subfolders is marked skipped: its subtree is dropped", async () => {
+    const root = await mkdtemp(join(tmpdir(), "rex-parser-skipped-"));
+    try {
+      await mkdir(join(root, "lost-epic", "lost-feature"), { recursive: true });
+      await writeFile(
+        join(root, "lost-epic", "lost-feature", "index.md"),
+        '---\nid: "f1"\nlevel: "feature"\ntitle: "Lost"\nstatus: "pending"\n---\n',
+      );
+      const result = await parseFolderTree(root);
+      expect(result.items).toEqual([]);
+      expect(result.warnings).toEqual([expect.objectContaining({ path: join(root, "lost-epic"), skipped: true })]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("malformed frontmatter → partial load with warning", async () => {
@@ -305,6 +327,7 @@ describe("parseFolderTree: folder-tree fixtures", () => {
         // join() builds the warning path, so the separator is "\" on Windows.
         path: expect.stringContaining(join("broken-epic-bbbbbbbb", "index.md")),
         message: "Unclosed frontmatter block (missing closing ---)",
+        skipped: true,
       }),
     ]);
   });
@@ -1124,5 +1147,70 @@ describe("parseFrontmatter: double-quoted escapes", () => {
   it("still reads a hand-written escape JSON lacks", () => {
     const fm = parseFrontmatter('---\ntitle: "a\\x b"\n---\n', "index.md", []);
     expect(fm).toEqual({ title: "a\\x b" });
+  });
+
+  it("decodes a hand-written scalar's escapes once, never re-reading its own output", () => {
+    // `\x` makes the scalar invalid JSON, so the fallback decoder runs. In it
+    // `\\` must come out as one backslash that is then left alone: a chain of
+    // replaces turned the `\\n` of `C:\\new` into `\n` and then into a line
+    // feed, and every save after that compounded the change.
+    const fm = parseFrontmatter('---\ntitle: "\\x41 and C:\\\\new"\n---\n', "index.md", []);
+    expect(fm).toEqual({ title: "\\x41 and C:\\new" });
+  });
+
+  it("decodes the escapes JSON shares in the fallback: quote, tab, CR, LF, backslash", () => {
+    const fm = parseFrontmatter('---\ntitle: "\\x \\"q\\" tab\\t cr\\r lf\\n bs\\\\ end"\n---\n', "index.md", []);
+    expect(fm).toEqual({ title: '\\x "q" tab\t cr\r lf\n bs\\ end' });
+  });
+
+  it("decodes \\b, \\f, \\/ and \\uXXXX in the fallback like JSON", () => {
+    // The same scalar with the `\x` removed is valid JSON, and JSON.parse
+    // gives the same value: the fallback must not read it differently.
+    const body = 'bs\\b ff\\f sl\\/ u\\u00e9\\u00C9\\u0041 end';
+    const fm = parseFrontmatter(`---\ntitle: "\\x ${body}"\n---\n`, "index.md", []);
+    expect(fm).toEqual({ title: `\\x ${JSON.parse(`"${body}"`) as string}` });
+    expect(fm).toEqual({ title: "\\x bs\b ff\f sl/ u\u00e9\u00c9A end" });
+  });
+
+  it("keeps a \\u escape short of four hex digits literal in the fallback", () => {
+    const fm = parseFrontmatter('---\ntitle: "\\x \\u12 \\u12G4 \\u00e tail \\u"\n---\n', "index.md", []);
+    expect(fm).toEqual({ title: "\\x \\u12 \\u12G4 \\u00e tail \\u" });
+  });
+
+  it("decodes a \\uXXXX escape once, never re-reading its own output", () => {
+    // `\u005c` is a backslash; decoded, it must not then escape the `n`.
+    const fm = parseFrontmatter('---\ntitle: "\\x \\u005cn"\n---\n', "index.md", []);
+    expect(fm).toEqual({ title: "\\x \\n" });
+  });
+});
+
+describe("parseFrontmatter: block scalars with many blank lines", () => {
+  // A literal block whose body holds thousands of blank lines between its first
+  // and last text lines: the chomping step must give the same value whatever the
+  // indicator, and must not re-scan the run of newlines for each of them.
+  const BLANKS = 5_000;
+  const body = ["  a", ...Array<string>(BLANKS).fill(""), "  b"].join("\n");
+  const inner = `a${"\n".repeat(BLANKS + 1)}b`;
+
+  it.each([
+    ["|", `${inner}\n`],
+    ["|-", inner],
+    ["|+", `${inner}\n`],
+  ])("reads a `%s` block with %i blank lines", (indicator, expected) => {
+    const fm = parseFrontmatter(`---\ndescription: ${indicator}\n${body}\n---\n`, "index.md", []);
+    expect(fm).toEqual({ description: expected });
+  });
+});
+
+describe("parseFrontmatter: on adversarial repository input", { timeout: BOUNDED_TEST_TIMEOUT_MS }, () => {
+  const PARSER = new URL("../../../src/store/folder-tree-parser.ts", import.meta.url);
+
+  it("chomping is linear on a block scalar with 300k blank lines", async () => {
+    // `/\n*$/` backtracked from every newline in the run, about 55 s at this size, eleven times the 5 s budget on any machine.
+    const blanks = 300_000;
+    const raw = `---\ndescription: |-\n  a\n${"\n".repeat(blanks)}  b\n---\n`;
+    await expect(
+      callWithinBudget<typeof parseFrontmatter>(PARSER, "parseFrontmatter", raw, "index.md", []),
+    ).resolves.toEqual({ description: `a${"\n".repeat(blanks + 1)}b` });
   });
 });

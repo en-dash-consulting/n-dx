@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "ddd88998-9b4f-45af-b73c-92ceb28e72d6":
+    status: "completed"
+    startedAt: "2026-10-13T04:41:20.758Z"
+    completedAt: "2026-10-13T04:48:07.708Z"
+    endedAt: "2026-10-13T04:48:07.708Z"
+    resolutionType: "code-change"
+    resolutionDetail: "v2 explicit --task refuses when another worktree claims an enclosing change"
+    appliedAt: "2026-10-13T04:48:07.708Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T04:48:08.512Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

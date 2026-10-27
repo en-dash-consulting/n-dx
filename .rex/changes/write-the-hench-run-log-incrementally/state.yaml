@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "2b3d4191-e2ca-4d64-9944-c4e05734f5fc":
+    status: "completed"
+    startedAt: "2026-10-01T00:25:24.904Z"
+    completedAt: "2026-10-01T01:03:37.141Z"
+    endedAt: "2026-10-01T01:03:37.141Z"
+    resolutionType: "code-change"
+    resolutionDetail: "openRunLog() streams captured output into .run-logs/<ts>-<runId>.log from run start; RunRecord gains an additive logPath. Byte-identical to the end-of-run writer (regression test). Also discounted .run-logs/ as a hench runtime artifact and kept the .gitignore write at run end, so a run no longer blocks on its own log."
+    appliedAt: "2026-10-01T01:03:37.141Z"
+    lastModified: "2026-10-01T01:03:37.516Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

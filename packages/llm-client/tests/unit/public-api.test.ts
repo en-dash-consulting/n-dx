@@ -722,3 +722,17 @@ describe("public API — Jev client and judgment cache", () => {
     expect(internal.filter((name) => name in api)).toEqual([]);
   });
 });
+
+describe("public API — local endpoint shape rule", () => {
+  // Inference, the dashboard and `ndx config` must share one judgement of a
+  // host and port, so the rule is public and core's inline twin is pinned to
+  // it by tests/unit/local-endpoint-parity.test.js at the repository root.
+  it("exports the host and port predicates, the describer and the defaults", async () => {
+    const api: Record<string, unknown> = await import("../../src/public.js");
+    expect(typeof api["isPlausibleLlmHost"]).toBe("function");
+    expect(typeof api["isValidPort"]).toBe("function");
+    expect(typeof api["describeLocalEndpointProblem"]).toBe("function");
+    expect(api["DEFAULT_LOCAL_HOST"]).toBe("localhost");
+    expect(api["DEFAULT_LOCAL_PORT"]).toBe(1234);
+  });
+});

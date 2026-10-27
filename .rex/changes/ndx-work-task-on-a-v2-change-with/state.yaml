@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "b135e1f6-b6ea-434e-ac34-51986408db99":
+    status: "completed"
+    startedAt: "2026-10-15T05:30:03.644Z"
+    completedAt: "2026-10-15T05:30:03.644Z"
+    endedAt: "2026-10-15T05:30:03.644Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Covered by fa6420d7 (runs 9775dbd1 and 31edb319, opus/opus; commits 5cfd0a252, a2c72495d, ef4c65ae4). packages/hench/tests/integration/v2-explicit-task-claims.test.ts: runs and claims the change's next task, never the change; passes over a task another worktree holds; refused naming each task when every open task is claimed elsewhere or blocked. No separate run. Closed overnight 2026-10-14; confirm."
+    appliedAt: "2026-10-15T05:30:03.644Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-15T05:30:11.049Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

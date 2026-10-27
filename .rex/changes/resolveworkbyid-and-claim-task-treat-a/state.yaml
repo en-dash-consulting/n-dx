@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "fdb3a84a-bb5e-4397-817a-d71928f463e7":
+    status: "completed"
+    startedAt: "2026-10-12T09:12:43.642Z"
+    completedAt: "2026-10-12T09:22:33.369Z"
+    endedAt: "2026-10-12T09:22:33.369Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: shared changeWorkShape (unit/tasks/container) in core/change-selection.ts used by findActionableWork, resolveWorkById (null for a container) and claim_task (refuses a container, naming nested changes/tasks). Exported from public.ts; gateways.md + patch changeset. Commit 2f32bc4fc."
+    appliedAt: "2026-10-12T09:22:33.369Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-12T09:22:33.619Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

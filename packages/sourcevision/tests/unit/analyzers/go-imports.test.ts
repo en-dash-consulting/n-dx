@@ -293,6 +293,28 @@ describe("extractGoImports — alias, blank, and dot import variants", () => {
   });
 });
 
+// ── extractGoImports — targets outside the inventory ─────────────────────────
+
+describe("extractGoImports — targetExists", () => {
+  const source = 'package main\n\nimport (\n\t"github.com/example/go-project/internal/config"\n\t"github.com/example/go-project/vendored"\n)\n';
+
+  it("keeps an internal import whose directory holds no inventoried file as an external package", () => {
+    const { edges, external } = extractGoImports(source, "main.go", MODULE_PATH, {
+      targetExists: (to) => to === "internal/config",
+    });
+    expect(edges.map((e) => e.to)).toEqual(["internal/config"]);
+    expect(external).toEqual([
+      { package: "github.com/example/go-project/vendored", importedBy: ["main.go"], symbols: ["*"] },
+    ]);
+  });
+
+  it("emits every internal import as an edge when no inventory is given", () => {
+    const { edges, external } = extractGoImports(source, "main.go", MODULE_PATH);
+    expect(edges.map((e) => e.to)).toEqual(["internal/config", "vendored"]);
+    expect(external).toEqual([]);
+  });
+});
+
 // ── extractGoImports — stdlib classification ─────────────────────────────────
 
 describe("extractGoImports — stdlib classification", () => {

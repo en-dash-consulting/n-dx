@@ -1,0 +1,22 @@
+schema: "rex/v2"
+items:
+  "0aea4097-e427-4262-80a4-cff4920707e6":
+    status: "completed"
+    startedAt: "2026-04-30T20:36:31.044Z"
+    completedAt: "2026-04-30T20:43:44.189Z"
+    endedAt: "2026-04-30T20:43:44.189Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Implemented dashboard rendering of accurate changed-file counts with per-file details. Added FileChangesList component using CollapsibleSection to display git status codes and file classifications. Integrated into RunDetailView to show explicit 'no changes' for zero-file runs. Added regression tests with known fileChangesWithStatus entries. All acceptance criteria met."
+  "a1062845-51ec-48be-b909-54d0a549f6cd":
+    status: "completed"
+    startedAt: "2026-04-30T20:43:45.405Z"
+    completedAt: "2026-04-30T20:43:45.405Z"
+    endedAt: "2026-04-30T20:43:45.405Z"
+    appliedAt: "2026-04-30T20:43:45.405Z"
+  "dd9a6c51-116a-4497-842c-df4640507902":
+    status: "completed"
+    startedAt: "2026-04-30T20:06:32.352Z"
+    completedAt: "2026-04-30T20:17:58.322Z"
+    endedAt: "2026-04-30T20:17:58.322Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Created git-changed-files module with deterministic post-commit capture using git show --name-status. Integrated into performCommitPromptIfNeeded to capture exact files from commit SHAs. Added fileChangesWithStatus field to RunSummaryData schema. Comprehensive test coverage: 13 unit tests + 5 integration tests verifying single/multi-commit scenarios with all change types (add, modify, delete) against git output."

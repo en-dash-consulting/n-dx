@@ -1,0 +1,12 @@
+schema: "rex/v2"
+items:
+  "fb239feb-b201-4a18-93d0-130371db8c89":
+    status: "completed"
+    startedAt: "2026-10-15T04:17:55.897Z"
+    completedAt: "2026-10-15T04:17:55.897Z"
+    endedAt: "2026-10-15T04:17:55.897Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Analyze renders as a tile dashboard; Terrain removed"
+    appliedAt: "2026-10-15T04:17:55.897Z"
+    lastModified: "2026-10-15T04:17:56.709Z"
+    lastModifiedBy: "Nick Daniel <nick@endash.us>"

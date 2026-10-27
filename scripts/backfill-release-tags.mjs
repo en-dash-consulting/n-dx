@@ -45,7 +45,7 @@ const VERSIONS = [
 ];
 
 const SCOPE = "@n-dx";
-const PACKAGES = ["core", "rex", "sourcevision", "hench", "llm-client", "web"];
+const PACKAGES = ["core", "rex", "lang-kit", "lang-runtime", "lang-java", "lang-go", "lang-sql", "lang-terraform", "lang-python", "sourcevision", "hench", "llm-client", "web"];
 
 const execute = process.argv.includes("--execute");
 if (process.argv.some((a) => a.startsWith("-") && a !== "--execute" && a !== "--dry-run")) {
@@ -127,9 +127,17 @@ try {
     const commit = run("git", ["rev-parse", "--verify", `${shortSha}^{commit}`]).trim();
     console.log(`\n== ${version} @ ${commit.slice(0, 8)} ==`);
 
-    // Validate every package first so a bad row aborts before any push.
-    const entries = PACKAGES.map((pkg) => {
-      const pkgJson = JSON.parse(run("git", ["show", `${commit}:packages/${pkg}/package.json`]));
+    // Validate every package first so a bad row aborts before any push. A
+    // package added after this row's release (lang-kit) has no package.json
+    // at its commit and is skipped, not treated as a bad row.
+    const entries = [];
+    for (const pkg of PACKAGES) {
+      const pkgJsonText = tryRun("git", ["show", `${commit}:packages/${pkg}/package.json`]);
+      if (pkgJsonText === null) {
+        console.log(`  skip package  ${pkg} (not in the tree at ${shortSha})`);
+        continue;
+      }
+      const pkgJson = JSON.parse(pkgJsonText);
       if (pkgJson.version !== version) {
         throw new Error(`packages/${pkg}/package.json at ${shortSha} is ${pkgJson.version}, expected ${version}`);
       }
@@ -138,8 +146,8 @@ try {
       if (body === null) {
         throw new Error(`No "## ${version}" section in packages/${pkg}/CHANGELOG.md at ${shortSha}`);
       }
-      return { pkg, tag: `${SCOPE}/${pkg}@${version}`, body };
-    });
+      entries.push({ pkg, tag: `${SCOPE}/${pkg}@${version}`, body });
+    }
 
     // Tags: create locally where missing, then push the batch for this version.
     const toPush = [];

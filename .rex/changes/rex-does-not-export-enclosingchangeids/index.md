@@ -1,0 +1,20 @@
+---
+id: "76bd115f-2f0e-4410-b6c2-d1e314e277af"
+type: "change"
+title: "rex does not export enclosingChangeIds, so hench's explicit --task on v2 can claim a task inside a change another worktree holds"
+slug: "rex-does-not-export-enclosingchangeids"
+intent: "Adversarial review of 060cd0654 (A claim on a task-less change covers the task it splits into). Severity low, verdict should-fix.\n\nThe rule that a claim on a change covers the work inside it now lives in two places. Selection enforces it in core/change-selection.ts (findActionableWork, exported). The claim side enforces it in cli/mcp-tools/claims.ts (acquireWorkClaim), using enclosingChangeIds from core/change-selection.ts. public.ts:592 exports findNextWork, findActionableWork, resolveWorkById and changeWorkShape, but not enclosingChangeIds.\n\nFailure scenario: hench's explicit-task path (packages/hench/src/agent/planning/brief.ts:275) claims the named task directly with claims.claim(taskId). Once stack B (roadmap PR 35) moves hench to v2, consider this sequence. Worktree A sets task-less change C to in_progress, then splits it into task T. Worktree B runs `ndx work --task=T`. B claims T and works it alongside A. B's autonomous selection is safe because it passes excludeIds to findActionableWork.\n\nReachability: none today, because hench is still v1. It becomes reachable when hench gains v2 explicit-task selection.\n\nOptions:\n(1) Recommended. Export enclosingChangeIds through public.ts and document it in docs/architecture/gateways.md, so hench's B1 gateway can refuse an explicit --task inside a foreign-claimed change. Cost: one export plus a public-surface test.\n(2) Move the enclosing check into ClaimsStore.claim itself, with an optional enclosing-ids argument, so every caller gets it. Cost: a store API change. Risk: v1 callers must be unaffected."
+acceptanceCriteria:
+  - "packages/rex/src/public.ts exports enclosingChangeIds (or an equivalent claim helper), and a public-surface test imports it from public.ts and checks it against the v2 fixture"
+  - "docs/architecture/gateways.md lists the new export"
+touches:
+  - "b86f9199-bd84-45e8-95a8-bad39e42ebeb"
+priority: "low"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:low"
+  - "pr-34"
+  - "lane-rex-domain"
+  - "review-2026-10-12"
+source: "ndx-adversarial-review"
+---

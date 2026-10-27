@@ -1,6 +1,6 @@
 # Packages
 
-n-dx is composed of six packages in a strict dependency hierarchy.
+n-dx is a set of `@n-dx/*` packages in a strict dependency hierarchy. All of them are published together at one version; the member list is the `fixed` group in [`.changeset/config.json`](https://github.com/en-dash-consulting/n-dx/blob/main/.changeset/config.json).
 
 ```
   @n-dx/core                    CLI orchestrator (spawns the tool CLIs)
@@ -8,11 +8,17 @@ n-dx is composed of six packages in a strict dependency hierarchy.
   hench                         agent loops, tool dispatch
        ↓
   rex · sourcevision            PRD management · static analysis
+  @n-dx/lang-runtime, lang-*    language packs (loaded by sourcevision, never imported)
        ↓
   @n-dx/llm-client              shared types, API client
+  @n-dx/lang-kit                language facts, pack contract
 ```
 
-The `@n-dx/web` package sits alongside these as a coordination layer, importing from both domain packages through gateway modules.
+Three packages sit beside the hierarchy:
+
+- `@n-dx/web` is a coordination layer, importing from both domain packages through gateway modules.
+- `@n-dx/graview` projects the PRD, the analysis and the runs into a Graview document for `ndx graview`.
+- `@n-dx/graview-face` is the Vite + React app that `ndx graview serve` runs; no other package depends on it.
 
 ## Package Summary
 
@@ -52,7 +58,7 @@ The `@n-dx/web` package sits alongside these as a coordination layer, importing 
 
 ## Naming Convention
 
-All packages are published under the `@n-dx/` scope. The root package `@n-dx/core` depends on all sub-packages and registers CLI commands on install.
+All packages are published under the `@n-dx/` scope. The root package `@n-dx/core` depends on the tool packages and registers CLI commands on install. The language packs are opt-in; `@n-dx/lang-go` is an optional dependency of sourcevision.
 
 | npm Package | CLI Commands | Description |
 |-------------|-------------|-------------|
@@ -62,6 +68,11 @@ All packages are published under the `@n-dx/` scope. The root package `@n-dx/cor
 | `@n-dx/sourcevision` | `sourcevision`, `sv` | Static analysis |
 | `@n-dx/llm-client` | — | LLM foundation (library only) |
 | `@n-dx/web` | — | Dashboard + MCP server |
+| `@n-dx/lang-kit` | — | Language facts and the pack contract (library only) |
+| `@n-dx/lang-runtime` | — | Tree-sitter runtime the packs share (library only) |
+| `@n-dx/lang-go`, `@n-dx/lang-java`, `@n-dx/lang-python`, `@n-dx/lang-sql`, `@n-dx/lang-terraform` | — | Language packs; install with `ndx sv pack add <lang>` |
+| `@n-dx/graview` | `ndx-graview` (run as `ndx graview`) | Graview projection |
+| `@n-dx/graview-face` | `ndx-graview-face` (run as `ndx graview serve`) | Graview product face |
 
 ## Public API
 

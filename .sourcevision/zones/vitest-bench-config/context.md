@@ -8,14 +8,14 @@ Zone: REX Store State (`vitest-bench-config`)
 Files: 2, Cohesion: 1.00, Coupling: 0.00
 Risk: healthy (score: 0.00)
 Description: Project configuration and manifest files: vitest.bench.config.ts, vitest.config.ts
-Lines: 66
+Lines: 78
 
 </zone>
 
 <files>
 
 packages/rex/vitest.bench.config.ts (TypeScript, 38 lines, config)
-packages/rex/vitest.config.ts (TypeScript, 28 lines, config)
+packages/rex/vitest.config.ts (TypeScript, 40 lines, config)
 
 </files>
 
@@ -23,6 +23,9 @@ packages/rex/vitest.config.ts (TypeScript, 28 lines, config)
 
 Internal:
   packages/rex/vitest.bench.config.ts → packages/rex/vitest.config.ts {default}
+
+Outgoing (this zone → other zones):
+  → tests-2: packages/rex/vitest.config.ts → tests/hidden-child-process-alias.mjs; packages/rex/vitest.config.ts → tests/vitest-isolation.mjs
 
 </imports>
 
@@ -35,5 +38,6 @@ Internal:
 <insights>
 
 - High cohesion (1) — files are tightly interconnected
+- [call graph] 0 internal calls, 1 outgoing, 0 incoming (cohesion: 0, coupling: 1)
 
 </insights>

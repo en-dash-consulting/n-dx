@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "eb208a9e-1443-4fd0-8d1c-899dea1a2ba8":
+    status: "completed"
+    startedAt: "2026-04-29T02:06:16.128Z"
+    completedAt: "2026-04-29T02:15:01.144Z"
+    endedAt: "2026-04-29T02:15:01.144Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Removed writeFile calls targeting prd.json and branch-scoped prd_*.json from resolvePRDFile (prd-discovery.ts) and cmdInit (init.ts). No production write code for prd.json remains in packages/rex/src outside the ndx-start cache path."
+    appliedAt: "2026-04-29T02:15:01.144Z"

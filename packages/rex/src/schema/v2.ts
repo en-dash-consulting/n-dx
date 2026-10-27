@@ -562,9 +562,11 @@ export interface ItemState {
   /** Changes and tasks: informational readiness. */
   ready?: boolean;
   /**
-   * Changes: in the Inbox; a person must confirm the change's targets. Blocks
-   * autonomous selection, exempts the change from `change-has-target`, and
-   * must be cleared before the change completes (`change-placed-at-close`).
+   * Changes: in the Inbox; a person must confirm the change's targets. Exempts
+   * the change from `change-has-target`. While the product layer has a
+   * capability or constraint to place it on (`awaitsPlacement`), it also blocks
+   * autonomous selection and must be cleared before the change completes
+   * (`change-placed-at-close`).
    */
   needsPlacement?: boolean;
   lastModified?: string;

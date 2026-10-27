@@ -41,18 +41,20 @@ test("empty state shows the pending task and a working Start button", async ({ p
   await expect(page.getByText("No runs yet.")).toBeVisible();
   await expect(page.locator(".hench-empty-next-task").getByText("E2E Fixture Task")).toBeVisible();
 
-  const startButton = page.getByRole("button", { name: "Run this task with the agent" });
-  await expect(startButton).toBeVisible();
-  await startButton.click();
-
-  // Button shows immediate "Starting…" loading state from the POST itself.
-  await expect(page.getByRole("button", { name: /Starting…|Run this task with the agent/ })).toBeVisible();
+  // Since the Prepare task modal (#503) and run modes (#513) the empty state
+  // renders the split Start control: the primary button opens the modal, and
+  // "Start now" in its menu is the one-click start.
+  await expect(page.getByRole("button", { name: "Prepare a run of this task with the agent" })).toBeVisible();
+  await page.getByRole("button", { name: "More ways to run this task" }).click();
+  await page.getByRole("menuitem", { name: /^Start now/ }).click();
 
   // The view must show *some* live feedback within a few seconds — either
-  // the run transitioning through starting/running, or (as in this fixture,
-  // where the LLM vendor is unreachable) an explicit failure message. What
-  // it must never do is sit unchanged forever with zero indication.
-  await expect(page.locator(".hench-empty-live-progress")).toBeVisible({ timeout: 8_000 });
+  // the run transitioning through starting/running (a successful Start now
+  // hands the viewer to the Live task page, whose status chip is that
+  // feedback), or (as in this fixture, where the LLM vendor is unreachable)
+  // the empty state's explicit "Failed to start" block. What it must never
+  // do is sit unchanged forever with zero indication.
+  await expect(page.locator(".hench-empty-live-progress, .live-task-status").first()).toBeVisible({ timeout: 8_000 });
 
   expect(tracker.errors).toEqual([]);
 });

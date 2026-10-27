@@ -1,0 +1,13 @@
+schema: "rex/v2"
+items:
+  "143469bb-be4e-44dc-8682-9c732c1d3771":
+    status: "completed"
+    startedAt: "2026-10-13T04:26:26.045Z"
+    completedAt: "2026-10-13T04:30:00.111Z"
+    endedAt: "2026-10-13T04:30:00.111Z"
+    resolutionType: "code-change"
+    resolutionDetail: "New integration test drives runAdversarialReviewPass on v2 and v1 fixtures; fails when the reviewDedupeDir call is reverted."
+    appliedAt: "2026-10-13T04:30:00.111Z"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-13T04:30:00.643Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

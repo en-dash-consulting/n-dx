@@ -1,0 +1,10 @@
+schema: "rex/v2"
+items:
+  "7a7e8498-ca1b-4bed-94ca-0048f74eefe1":
+    status: "completed"
+    startedAt: "2026-05-19T16:40:11.687Z"
+    completedAt: "2026-05-19T16:47:13.068Z"
+    endedAt: "2026-05-19T16:47:13.068Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Wired resolveItem into handleGetItem (mcp-tools.ts), cmdUpdate (update.ts), and cmdRemove (remove.ts). All downstream canonical-UUID operations use the resolved item.id. Internal engine call sites (reorganize, reshape, move) unchanged. 9 new tests cover title resolution and non-matching-query error cases across all three entry points. 4211/4211 tests pass."
+    appliedAt: "2026-05-19T16:47:13.068Z"
