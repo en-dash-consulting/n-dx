@@ -47,7 +47,7 @@ const SIDECAR_CODEX_POLICY: ExecutionPolicy = {
 export interface SidecarBrokerEndpoint {
   /** The session's broker MCP endpoint (Streamable HTTP). */
   url: string;
-  /** Headers every broker request carries: the dashboard token, the workspace. */
+  /** Headers every broker request carries: the session's broker credential, the workspace. Never the dashboard token. */
   headers: Record<string, string>;
 }
 
@@ -62,7 +62,7 @@ export function brokerMcpConfig(endpoint?: SidecarBrokerEndpoint): { mcpServers:
 
 /**
  * Write a session's MCP config to `<dir>/<id>.mcp.json` and return its path.
- * Owner-only (0600): the headers can carry the dashboard token.
+ * Owner-only (0600): the headers carry the session's broker credential.
  */
 export function writeBrokerMcpConfig(dir: string, sessionId: string, endpoint?: SidecarBrokerEndpoint): string {
   ensureSidecarDir(dir);

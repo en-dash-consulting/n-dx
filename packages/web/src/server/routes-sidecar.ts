@@ -46,6 +46,7 @@ import type { SessionTurnStatus } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { errorMessage, errorResponse, jsonResponse, readBody } from "./response-utils.js";
+import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/broker-credential.js";
 import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
@@ -110,24 +111,18 @@ export interface SidecarRouteOptions {
   brokerFor?: (projectDir: string) => SidecarBroker;
 }
 
-/** The token this server requires, which a session's CLI presents to the broker. */
-let dashboardToken: string | null = null;
-
-/** Wire what the routes need from startup; call before the first request. */
-export function initSidecarRoutes(opts: { token: string | null }): void {
-  dashboardToken = opts.token;
-}
-
 /**
  * Where a session in `ctx`'s workspace reaches its broker: this server's own
  * loopback port, addressed to the workspace. No port (a test context) means no broker.
+ * The session presents its own broker credential, never the dashboard token:
+ * the config file that holds it is readable by the session's Read tool.
  */
-function brokerEndpoint(ctx: ServerContext, sessionId: string): SidecarBrokerEndpoint | undefined {
+export function sidecarBrokerEndpoint(ctx: ServerContext, sessionId: string): SidecarBrokerEndpoint | undefined {
   if (!ctx.port) return undefined;
   return {
     url: `http://127.0.0.1:${ctx.port}${PREFIX}/${sessionId}/mcp`,
     headers: {
-      ...(dashboardToken && { "X-Ndx-Token": dashboardToken }),
+      [SIDECAR_BROKER_KEY_HEADER]: sidecarBrokerCredential(sessionId),
       ...(ctx.workspace && { [WORKSPACE_HEADER]: ctx.workspace }),
     },
   };
@@ -139,7 +134,7 @@ const brokers = new Map<string, SidecarBroker>();
 function defaultRegistryFor(ctx: ServerContext): SidecarSessionRegistry {
   let registry = registries.get(ctx.projectDir);
   if (!registry) {
-    registry = createWorktreeSidecarRegistry(ctx.projectDir, { broker: (id) => brokerEndpoint(ctx, id) });
+    registry = createWorktreeSidecarRegistry(ctx.projectDir, { broker: (id) => sidecarBrokerEndpoint(ctx, id) });
     registries.set(ctx.projectDir, registry);
   }
   return registry;

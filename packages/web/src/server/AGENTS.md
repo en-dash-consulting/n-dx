@@ -23,6 +23,10 @@ server (`server/request-security.ts`) cannot drift:
 - **Every listener gets the gate.** A new `createServer` here calls
   `handleRequestSecurity` (or the hub's `guardHubRequest`) before routing, and
   its `upgrade` handler applies `isTrustedHost` plus the origin check.
+- **One credential besides the token.** A Sidecar session's CLI presents a
+  per-session broker key (`sidecar/broker-credential.ts`), accepted only on a
+  `POST` to that session's raw `/api/sidecar/sessions/<id>/mcp` target. Its
+  MCP config file is readable by the session, so it never carries the token.
 - **`GET` must be read-only** — one that writes a file or spawns a process is a
   bug even on loopback.
 - **Internal clients use a loopback name**, never the machine's hostname or

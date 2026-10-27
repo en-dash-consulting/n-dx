@@ -54,7 +54,8 @@ import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
-import { handleSidecarRoute, initSidecarRoutes } from "./routes-sidecar.js";
+import { handleSidecarRoute } from "./routes-sidecar.js";
+import { isSidecarBrokerRequest } from "./sidecar/broker-credential.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { handleRexSettingsRoute } from "./routes-rex-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
@@ -957,7 +958,8 @@ function createHttpServer(
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
-      if (handleRequestSecurity(req, res, { token })) return;
+      // A Sidecar session's CLI presents its own broker credential, valid on its /mcp route only.
+      if (handleRequestSecurity(req, res, { token, scopedCredential: isSidecarBrokerRequest })) return;
       // Request-scoped context. Two things can name a worktree and they do not
       // rank equally: `X-Ndx-Workspace` wins over a leading `/w/<key>/`.
       //
@@ -1245,8 +1247,6 @@ export async function startServer(
     rex: (rctx) => createRexMcpServer(rctx.projectDir),
     sv: (rctx) => createSourcevisionMcpServer(rctx.projectDir),
   });
-  // A Sidecar session's CLI presents the token to its broker on this server.
-  initSidecarRoutes({ token });
 
   // Start MCP schema watcher — replaces factories with subprocess proxies when
   // either package's dist/ directory changes after a rebuild.  New MCP sessions

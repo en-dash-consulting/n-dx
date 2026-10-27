@@ -63,7 +63,7 @@ describe("Claude spawn", () => {
     const dir = join(root, ".hench", "sidecar");
     const connect = sidecarSessionConnect(dir, (id) => ({
       url: `http://127.0.0.1:3117/api/sidecar/sessions/${id}/mcp`,
-      headers: { "X-Ndx-Token": "tok", "x-ndx-workspace": "main" },
+      headers: { "x-ndx-sidecar-key": "key", "x-ndx-workspace": "main" },
     }));
     const session = startVendorSession({ ...connect(record("claude")), vendor: "claude", cwd: root, spawn: recordingSpawn });
     await session.sendTurn("one");
@@ -89,7 +89,7 @@ describe("Claude spawn", () => {
         "ndx-sidecar": {
           type: "http",
           url: "http://127.0.0.1:3117/api/sidecar/sessions/sess-1/mcp",
-          headers: { "X-Ndx-Token": "tok", "x-ndx-workspace": "main" },
+          headers: { "x-ndx-sidecar-key": "key", "x-ndx-workspace": "main" },
         },
       },
     });
