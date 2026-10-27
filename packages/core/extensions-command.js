@@ -397,12 +397,16 @@ async function remove(ctx, name, purge) {
 
   if (purge) {
     const extName = ext?.name;
+    // The state folder is keyed by extension name, so another package with the same name shares it.
+    const claimant = d.extensions.find((e) => e.packageName !== packageName && e.name === extName);
     if (!isExtensionNameSlug(extName)) {
       ctx.err(`Nothing purged: ${packageName} declares no valid extension name, so it has no state folder.`);
     } else if (ext && ext.source !== "user") {
       ctx.err(`Nothing purged: the ${ext.source} copy still uses the state folder of '${extName}'.`);
     } else if (successor) {
       ctx.err(`Nothing purged: the ${successor.source} copy at ${successor.dir} now uses the state folder of '${extName}'.`);
+    } else if (claimant) {
+      ctx.err(`Nothing purged: ${claimant.packageName} (${claimant.source}, ${claimant.dir}) also claims '${extName}' and uses its state folder.`);
     } else {
       const stateDir = join(d.home, EXTENSION_STATE_DIRNAME, extName);
       nodeFs.rmSync(stateDir, { recursive: true, force: true });

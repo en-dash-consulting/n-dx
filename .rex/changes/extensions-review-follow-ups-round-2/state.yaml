@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "00cd9a30-8a64-4626-8491-d6131ac019fa":
-    lastModified: "2026-10-27T17:22:55.590Z"
+    status: "completed"
+    startedAt: "2026-10-27T17:54:39.595Z"
+    completedAt: "2026-10-27T17:59:02.543Z"
+    endedAt: "2026-10-27T17:59:02.543Z"
+    activeIntervals: [{"end":"2026-10-27T17:59:02.543Z","start":"2026-10-27T17:54:39.595Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "remove --purge skips the purge and names the package when another discovered package has the same extension name"
+    lastModified: "2026-10-27T17:59:02.543Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "02f9888b-e27d-4a1e-adce-779eab7467a9":
     lastModified: "2026-10-27T17:23:05.143Z"

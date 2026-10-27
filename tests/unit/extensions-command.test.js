@@ -361,6 +361,21 @@ describe("ndx extensions remove", () => {
     expect(JSON.parse((await ndx(["list", "--json"], { globalRoot })).out).extensions).toEqual([expect.objectContaining({ name: "recon", source: "global" })]);
   });
 
+  it("--purge keeps the state folder when another package claims the same extension name, and names it", async () => {
+    const globalRoot = join(root, "global", "node_modules");
+    writePackage(join(globalRoot, "@b", "recon"), extensionPackage("@b/recon", "recon"));
+    installInto(userFolder(), extensionPackage("@a/recon", "recon"));
+    const stateDir = join(home, "ext", "recon");
+    mkdirSync(stateDir, { recursive: true });
+
+    const { code, err } = await ndx(["remove", "@a/recon", "--purge"], { globalRoot });
+
+    expect(code).toBe(0);
+    expect(existsSync(stateDir)).toBe(true);
+    expect(err).toMatch(/Nothing purged: @b\/recon \(global, .*recon\) also claims 'recon' and uses its state folder\./);
+    expect(JSON.parse((await ndx(["list", "--json"], { globalRoot })).out).extensions).toEqual([expect.objectContaining({ packageName: "@b/recon" })]);
+  });
+
   it("keeps the state folder without --purge", async () => {
     installInto(userFolder(), extensionPackage("ndx-recon", "recon"));
     mkdirSync(join(home, "ext", "recon"), { recursive: true });
