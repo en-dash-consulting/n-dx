@@ -152,6 +152,22 @@ describe("resolveExtensionCommand", () => {
     await enable("recon");
     expect(resolveName("recon-report")).toMatchObject({ kind: "run", command: "recon-report", bin: join(dir, "bin", "cli.js") });
   });
+
+  it("runs a command ndx --help lists even when a higher-precedence invalid extension has its name", async () => {
+    // The invalid manifest never runs, so discovery counts no conflict; the
+    // enabled package that declares the command must be the one dispatched.
+    install("recon", { folder: project, commands: [{ name: "recon", bin: "../escape.js", summary: "r" }] });
+    const dir = install("other", { script: "", commands: [{ name: "recon", bin: "bin/cli.js", summary: "Run recon" }] });
+    await enable("other");
+
+    expect(listExtensionCommands(deps()).map((c) => c.name)).toEqual(["recon"]);
+    expect(resolveName("recon")).toMatchObject({ kind: "run", command: "recon", bin: join(dir, "bin", "cli.js") });
+  });
+
+  it("still names an invalid extension when nothing valid claims its name", () => {
+    install("recon", { commands: [{ name: "recon", bin: "../escape.js", summary: "r" }] });
+    expect(resolveName("recon")).toMatchObject({ kind: "unavailable", state: "invalid" });
+  });
 });
 
 describe("approveOnFirstRun", () => {

@@ -100,7 +100,7 @@ export function resolveExtensionCommand(name, options) {
   if (builtins.has(name)) return { kind: "builtin" };
 
   const { discovery, file, projectDir } = discoverWithApprovals(builtins, options);
-  const ext = discovery.extensions.find((candidate) => claims(candidate, name));
+  const ext = claimant(discovery.extensions, (candidate) => claims(candidate, name));
   if (!ext) return { kind: "none" };
 
   const { state, reason } = extensionState(ext, { file, ndxVersion: options.ndxVersion, projectDir });
@@ -178,7 +178,7 @@ export const SIDECAR_LOG_FILENAME = "sidecar.log";
 export function resolveExtensionSidecar(name, options) {
   const builtins = new Set(options.builtinCommands);
   const { discovery, file, projectDir } = discoverWithApprovals(builtins, options);
-  const ext = discovery.extensions.find((candidate) => candidate.name === name);
+  const ext = claimant(discovery.extensions, (candidate) => candidate.name === name);
   if (!ext || (ext.manifest && !ext.manifest.sidecar)) {
     return { kind: "none", message: `Error: No installed extension named '${name}' declares a sidecar — fix: ndx extensions list` };
   }
@@ -377,6 +377,20 @@ function discoverWithApprovals(builtins, options) {
   const unreadable = discovery.errors.some((e) => e.path === join(discovery.home, EXTENSIONS_CACHE_FILE));
   const file = unreadable ? {} : readExtensionsFile(discovery.home);
   return { discovery, file, projectDir };
+}
+
+/**
+ * The extension a name resolves to: the first in precedence order with a
+ * readable manifest, else the first refused one. Discovery counts conflicts
+ * only between readable manifests, so an invalid or incompatible package
+ * sharing a name must not hide the one `ndx --help` lists.
+ *
+ * @param {DiscoveredExtension[]} extensions
+ * @param {(ext: DiscoveredExtension) => boolean} matches
+ * @returns {DiscoveredExtension | undefined}
+ */
+function claimant(extensions, matches) {
+  return extensions.find((ext) => ext.manifest && matches(ext)) ?? extensions.find(matches);
 }
 
 /**
