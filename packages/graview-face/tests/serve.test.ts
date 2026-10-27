@@ -26,18 +26,23 @@ function freePort(): Promise<number> {
   });
 }
 
-async function healthy(url: string, child: ChildProcess, output: () => string): Promise<void> {
-  const until = Date.now() + 60_000;
-  while (Date.now() < until) {
-    if (child.exitCode !== null) throw new Error(`serve.js exited ${child.exitCode}:\n${output()}`);
-    try {
-      if ((await fetch(url)).ok) return;
-    } catch {
-      // Not listening yet.
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new Error(`serve.js never answered ${url}:\n${output()}`);
+/**
+ * Resolves when serve.js prints its URL, which it does only after Vite's
+ * listen() resolved; rejects if it exits first. No deadline of its own: the
+ * beforeAll hook timeout is the hang guardrail.
+ */
+function listening(child: ChildProcess, host: string): Promise<void> {
+  let output = "";
+  return new Promise((done, fail) => {
+    const onData = (chunk: Buffer) => {
+      // Vite bolds the port, so drop the colour codes before matching.
+      output += String(chunk).replace(/\x1b\[[0-9;]*m/g, "");
+      if (output.includes(host)) done();
+    };
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.once("exit", (code) => fail(new Error(`serve.js exited ${code} before listening:\n${output}`)));
+  });
 }
 
 describe("the mount the hub serves the face at", () => {
@@ -52,7 +57,6 @@ describe("bin/serve.js under the hub", () => {
   let child: ChildProcess;
   let origin: string;
   let scratch: string;
-  let output = "";
 
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), "graview-face-serve-"));
@@ -63,9 +67,7 @@ describe("bin/serve.js under the hub", () => {
       env: { ...process.env, PORT: String(port), NDX_EXTENSION_NAME: "graview-face", NDX_GRAVIEW_DIR: scratch },
       stdio: ["ignore", "pipe", "pipe"],
     });
-    child.stdout?.on("data", (c) => (output += String(c)));
-    child.stderr?.on("data", (c) => (output += String(c)));
-    await healthy(`${origin}/`, child, () => output);
+    await listening(child, `127.0.0.1:${port}`);
   }, 90_000);
 
   afterAll(() => {
