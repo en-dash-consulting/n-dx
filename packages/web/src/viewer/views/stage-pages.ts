@@ -23,6 +23,7 @@ import {
   viewGlyph,
   type StageId,
   type StageSection,
+  type StageSectionBadge,
   type StageTab,
   type StageTile,
 } from "./stages.js";
@@ -61,6 +62,31 @@ interface SectionProps {
   renderView: RenderView;
 }
 
+interface BadgeDef {
+  /** The count, or null while status is unknown or the tree has none (v1). */
+  count(status: ProjectStatus | null): number | null;
+  /** Accessible name for the pill. */
+  label(count: number): string;
+}
+
+const BADGES: Record<StageSectionBadge, BadgeDef> = {
+  inbox: {
+    count: (status) => status?.rex.inbox?.open ?? null,
+    label: (n) => `${n} change${n === 1 ? "" : "s"} in the Inbox`,
+  },
+};
+
+/**
+ * A section with a header count. Its own component so only badged sections
+ * subscribe to project status; `useProjectStatus` refetches on
+ * `rex:prd-changed`, so the count follows a placement without a reload.
+ */
+export function BadgedSection(props: SectionProps) {
+  const status = useProjectStatus();
+  const def = props.section.badge ? BADGES[props.section.badge] : null;
+  return h(Section, { ...props, count: def ? def.count(status) : null });
+}
+
 /** The stage's lead section: the view itself, in the page, no dropdown. */
 function PlainSection({ section, renderView }: Pick<SectionProps, "section" | "renderView">) {
   return h("section", { class: "stage-section stage-section--plain", "data-view": section.view, "aria-label": viewLabel(section.view) },
@@ -68,10 +94,12 @@ function PlainSection({ section, renderView }: Pick<SectionProps, "section" | "r
   );
 }
 
-function Section({ stage, section, navigateTo, renderView }: SectionProps) {
+function Section({ stage, section, navigateTo, renderView, count = null }: SectionProps & { count?: number | null }) {
   const key = `${stage}:${section.view}`;
-  const [open, setOpen] = useState<boolean>(() =>
-    readOpenState()[key] ?? !!section.open);
+  // The user's stored choice, if any; otherwise the section's default, which
+  // for `openWhenNonEmpty` follows the count as it arrives and changes.
+  const [chosen, setChosen] = useState<boolean | undefined>(() => readOpenState()[key]);
+  const open = chosen ?? (section.openWhenNonEmpty && count !== null ? count > 0 : !!section.open);
   // Scroll sections: bounded by default, full length on Expand. Stored beside
   // the open state under "<stage>:<view>:full".
   const fullKey = `${key}:full`;
@@ -85,9 +113,10 @@ function Section({ stage, section, navigateTo, renderView }: SectionProps) {
 
   const toggle = () => {
     const next = !open;
-    setOpen(next);
+    setChosen(next);
     writeOpenState(key, next);
   };
+  const badge = section.badge ? BADGES[section.badge] : null;
   const toggleFull = () => {
     const next = !full;
     setFull(next);
@@ -111,6 +140,12 @@ function Section({ stage, section, navigateTo, renderView }: SectionProps) {
       },
         h("span", { class: "stage-section-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
         h("span", { class: "stage-section-title" }, title),
+        badge && count !== null
+          ? h("span", { class: "stage-section-badge", "data-count": String(count) },
+              h("span", { "aria-hidden": "true" }, count.toLocaleString()),
+              h("span", { class: "sr-only" }, badge.label(count)),
+            )
+          : null,
         h("span", { class: "stage-section-blurb" }, blurb),
       ),
       section.scroll && open
@@ -216,7 +251,7 @@ export function StagePage({ stage, validViews, navigateTo, renderView, renderPan
       if (s.plain) return h(PlainSection, { key: s.view, section: s, renderView });
       // A tiled stage keeps only its plain lead section; the tiles replace the rest.
       if (def.tiles) return null;
-      return h(Section, { key: s.view, stage, section: s, navigateTo, renderView });
+      return h(s.badge ? BadgedSection : Section, { key: s.view, stage, section: s, navigateTo, renderView });
     }),
     def.tiles
       ? h(TileGrid, { stage, tiles, tabsOf, renderView, renderPanel, renderSummary, besideDetail: detailOpen })

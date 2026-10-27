@@ -70,7 +70,20 @@ export interface StageSection {
   featureGate?: string;
   /** Built on demand by the server — absent from a static export. */
   requiresServer?: boolean;
+  /**
+   * A count read from project status (`/api/status`), shown as a pill after
+   * the title so it is visible while the section is collapsed.
+   */
+  badge?: StageSectionBadge;
+  /**
+   * Open by default while the `badge` count is above zero. A stored open or
+   * closed choice still wins.
+   */
+  openWhenNonEmpty?: boolean;
 }
+
+/** Counts a section header can show; each is read in `stage-pages.ts`. */
+export type StageSectionBadge = "inbox";
 
 /**
  * A part of the page that is not a view of its own — a panel the stage page

@@ -16,7 +16,14 @@ items:
     lastModified: "2026-10-27T16:31:05.167Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b140b377-b5af-4498-9b38-eb70ddf13947":
-    lastModified: "2026-10-27T16:30:56.697Z"
+    status: "completed"
+    startedAt: "2026-10-27T22:15:21.887Z"
+    completedAt: "2026-10-27T22:21:47.336Z"
+    endedAt: "2026-10-27T22:21:47.336Z"
+    activeIntervals: [{"end":"2026-10-27T22:21:47.336Z","start":"2026-10-27T22:15:21.887Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "StageSection.badge + openWhenNonEmpty; BadgedSection reads useProjectStatus (refetch on rex:prd-changed); orange pill with sr-only label. Commit 5407025c2."
+    lastModified: "2026-10-27T22:21:47.336Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ecac94e1-42b4-4b61-829b-6a801dc94ee6":
     lastModified: "2026-10-27T16:30:51.518Z"
