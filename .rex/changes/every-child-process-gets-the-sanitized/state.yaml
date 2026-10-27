@@ -26,8 +26,15 @@ items:
     lastModified: "2026-10-27T18:38:32.223Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4200bf3a-b973-4480-87e0-f81892b6de86":
+    status: "completed"
+    startedAt: "2026-10-27T19:15:12.463Z"
+    completedAt: "2026-10-27T19:28:10.178Z"
+    endedAt: "2026-10-27T19:28:10.178Z"
+    activeIntervals: [{"end":"2026-10-27T19:28:10.178Z","start":"2026-10-27T19:15:12.463Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "repoCommandEnv takes the trust store from options.trust (RepoTrustStoreOptions) or process.env, never from options.env; RepoCommandEnvOptions no longer extends RepoTrustStoreOptions. core loadShellTestEnv passes { trust }."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T15:19:06.979Z"
+    lastModified: "2026-10-27T19:28:10.178Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "56517553-4651-4eec-aa2d-0788d1193da2":
     status: "completed"

@@ -2798,7 +2798,7 @@ export async function loadShellTestEnv(dir, options = {}) {
       policyError: err instanceof Error ? err.message : String(err),
     };
   }
-  return { env: repoCommandEnv(dir, options.trust) };
+  return { env: repoCommandEnv(dir, { trust: options.trust }) };
 }
 
 // ── Test connection handler ──────────────────────────────────────────────────

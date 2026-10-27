@@ -55,11 +55,11 @@ describe("repoCommandEnv", () => {
 
   it("honours the repository's allow entry once the user trusts it, and drops it again when it changes", () => {
     writeJson(".hench/config.json", { guard: { env: { allow: [SENTINEL] } } });
-    recordRepoTrust(repo, { env: { NDX_HOME: home } });
-    expect(visible(repoCommandEnv(repo, { env: parent() }), SENTINEL)).toBe(true);
+    recordRepoTrust(repo, { ndxHome: home });
+    expect(visible(repoCommandEnv(repo, { env: parent(), trust: { ndxHome: home } }), SENTINEL)).toBe(true);
 
     writeJson(".hench/config.json", { guard: { env: { allow: [SENTINEL, "OTHER_TOKEN"] } } });
-    expect(visible(repoCommandEnv(repo, { env: parent() }), SENTINEL)).toBe(false);
+    expect(visible(repoCommandEnv(repo, { env: parent(), trust: { ndxHome: home } }), SENTINEL)).toBe(false);
   });
 
   it("ignores an allow entry in the tracked project config while untrusted", () => {
@@ -76,6 +76,25 @@ describe("repoCommandEnv", () => {
   it("applies a repository deny entry whatever the trust state", () => {
     writeJson(".hench/config.json", { guard: { env: { deny: [OTHER] } } });
     expect(visible(repoCommandEnv(repo, { env: parent() }), OTHER)).toBe(false);
+  });
+
+  it("reads the user's trust record when the environment it filters has no NDX_HOME", () => {
+    writeJson(".hench/config.json", { guard: { env: { allow: [SENTINEL] } } });
+    recordRepoTrust(repo, { ndxHome: home });
+    const env = { PATH: "/usr/bin", [SENTINEL]: "sentinel" };
+    expect(visible(repoCommandEnv(repo, { env, trust: { ndxHome: home } }), SENTINEL)).toBe(true);
+  });
+
+  it("never locates the trust store from the environment it filters", () => {
+    writeJson(".hench/config.json", { guard: { env: { allow: [SENTINEL] } } });
+    recordRepoTrust(repo, { ndxHome: home });
+    const elsewhere = mkdtempSync(join(tmpdir(), "ndx-cmd-env-elsewhere-"));
+    try {
+      const env = repoCommandEnv(repo, { env: parent(), trust: { ndxHome: elsewhere } });
+      expect(visible(env, SENTINEL)).toBe(false);
+    } finally {
+      rmSync(elsewhere, { recursive: true, force: true });
+    }
   });
 
   it("never mutates the parent environment", () => {

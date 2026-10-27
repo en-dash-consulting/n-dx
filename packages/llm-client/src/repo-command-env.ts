@@ -31,13 +31,16 @@ import {
   type RepoTrustStoreOptions,
 } from "./repo-trust.js";
 
-export interface RepoCommandEnvOptions extends RepoTrustStoreOptions {
-  /**
-   * The parent environment to filter. Defaults to `process.env`. The same
-   * environment locates the trust store (`NDX_HOME`), as it does for the
-   * rest of the trust API.
-   */
+export interface RepoCommandEnvOptions {
+  /** The parent environment to filter. Defaults to `process.env`. */
   env?: NodeJS.ProcessEnv;
+  /**
+   * Where the user's trust store is. Defaults to the real one, located from
+   * `process.env`. Never taken from `env`: a caller filtering an environment
+   * that has already lost `NDX_HOME` would otherwise read a trust record
+   * other than the one the user wrote.
+   */
+  trust?: RepoTrustStoreOptions;
 }
 
 function stringList(value: unknown): string[] {
@@ -68,7 +71,7 @@ export function repoCommandEnv(projectDir: string, options: RepoCommandEnvOption
   const state = repoTrustState(
     config,
     assessRepoExecutionConfig(config),
-    readRepoTrustRecord(projectDir, options),
+    readRepoTrustRecord(projectDir, options.trust),
   );
   const local = localEnvPolicy(projectDir);
   const policy = compileEnvPolicy({
