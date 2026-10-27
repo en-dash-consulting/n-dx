@@ -458,6 +458,9 @@ describe("request body size limit (integration)", () => {
     });
   }
 
+  /** Socket errors a client sees when the server hangs up while it is still sending. */
+  const EARLY_CLOSE_CODES = ["EPIPE", "ECONNRESET", "ECONNABORTED"];
+
   it("answers 413 on an over-cap chunked body that declares no Content-Length", async () => {
     const { server, port, sent } = await startBodyReadingServer();
     const limitMessage = `Request body exceeds the ${MAX_REQUEST_BODY_BYTES}-byte limit.`;
@@ -494,11 +497,12 @@ describe("request body size limit (integration)", () => {
         const timer = setTimeout(() => reject(new Error("timeout")), 5000);
         socket.on("data", (part: Buffer) => { received += part.toString("utf-8"); });
         // The server answers 413 and hangs up while the body is still coming.
-        // A write or read that loses that race fails with EPIPE/ECONNRESET,
-        // possibly before the 413 is read (#523). That is the expected close,
-        // not a failure: what the server sent is checked from `sent` below.
+        // A write or read that loses that race fails with EPIPE/ECONNRESET
+        // (ECONNABORTED on Windows), possibly before the 413 is read (#523).
+        // That is the expected close, not a failure: what the server sent is
+        // checked from `sent` below.
         socket.on("error", (err: NodeJS.ErrnoException) => {
-          if (err.code === "EPIPE" || err.code === "ECONNRESET") abort = err.code;
+          if (err.code && EARLY_CLOSE_CODES.includes(err.code)) abort = err.code;
           else reject(err);
         });
         socket.on("close", () => {
@@ -524,7 +528,7 @@ describe("request body size limit (integration)", () => {
         expect(client.received.split("\r\n")[0]).toContain("413");
         expect(client.received).toContain(limitMessage);
       } else {
-        expect(client.abort).toMatch(/^(EPIPE|ECONNRESET)$/);
+        expect(EARLY_CLOSE_CODES).toContain(client.abort);
       }
     } finally {
       if (server.listening) await new Promise<void>((r) => server.close(() => r()));
