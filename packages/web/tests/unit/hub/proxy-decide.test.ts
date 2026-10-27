@@ -73,6 +73,20 @@ describe("decideProxy: a sidecar never sees ndx_token in the query", () => {
     expect(decideProxy(one, "/x/recon?ndx_token=T", true)).toMatchObject({ kind: "sidecar", path: "/" });
   });
 
+  it("forwards every other segment byte for byte", () => {
+    // URLSearchParams would rewrite each of these: %20 → +, bare key → c=,
+    // / and ~ escaped, invalid UTF-8 %E9 → %EF%BF%BD.
+    const rest = "a=%20b&c&path=/a/b~c&cb=%E9&d=x+y&&e=%2F";
+    for (const upgrade of [false, true]) {
+      expect(decideProxy(one, `/x/recon/page?${rest}&ndx_token=T`, upgrade)).toMatchObject({ kind: "sidecar", path: `/page?${rest}` });
+      expect(decideProxy(one, `/x/recon/page?ndx_token=T&${rest}`, upgrade)).toMatchObject({ kind: "sidecar", path: `/page?${rest}` });
+    }
+  });
+
+  it("drops an encoded or repeated ndx_token key too", () => {
+    expect(decideProxy(one, "/x/recon/?a=1&ndx%5Ftoken=T&ndx_token=U")).toMatchObject({ kind: "sidecar", path: "/?a=1" });
+  });
+
   it("drops it from the trailing-slash redirect", () => {
     expect(decideProxy(one, "/x/recon?q=2&ndx_token=T")).toEqual({ kind: "redirect", location: "/x/recon/?q=2" });
   });

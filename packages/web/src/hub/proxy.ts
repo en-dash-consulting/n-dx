@@ -46,7 +46,6 @@ import type { Duplex } from "node:stream";
 import {
   AUTH_COOKIE_NAME,
   AUTH_HEADER_NAME,
-  AUTH_QUERY_PARAM,
   HUB_ADMISSION_HEADER,
   HUB_PATH,
   checkRunOptions,
@@ -58,6 +57,7 @@ import {
   stripBasePath,
   stripWorkspaceSlot,
   checkRunMode,
+  removeTokenParam,
   tokensEqual,
 } from "../shared/index.js";
 import type { RunMode, RunOptions } from "../shared/index.js";
@@ -193,10 +193,8 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
  */
 function withoutTokenParam(query: string): string {
   if (!query) return query;
-  const params = new URLSearchParams(query.slice(1));
-  if (!params.has(AUTH_QUERY_PARAM)) return query;
-  params.delete(AUTH_QUERY_PARAM);
-  const rest = params.toString();
+  const { token, rest } = removeTokenParam(query.slice(1));
+  if (token === null) return query;
   return rest ? `?${rest}` : "";
 }
 

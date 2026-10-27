@@ -11,7 +11,14 @@ items:
     lastModified: "2026-10-27T17:59:02.543Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "02f9888b-e27d-4a1e-adce-779eab7467a9":
-    lastModified: "2026-10-27T17:23:05.143Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:12:37.605Z"
+    completedAt: "2026-10-27T18:16:27.857Z"
+    endedAt: "2026-10-27T18:16:27.857Z"
+    activeIntervals: [{"end":"2026-10-27T18:16:27.857Z","start":"2026-10-27T18:12:37.605Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "removeTokenParam in shared/auth.ts drops only ndx_token segments from the raw query; proxy withoutTokenParam and splitTokenQuery use it."
+    lastModified: "2026-10-27T18:16:27.857Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "14c2f50f-112b-4fff-a07e-ae5820c5dbaa":
     lastModified: "2026-10-27T17:23:19.800Z"

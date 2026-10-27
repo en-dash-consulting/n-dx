@@ -99,12 +99,34 @@ export function splitTokenQuery(url: string): { token: string | null; location: 
   const q = url.indexOf("?");
   if (q === -1) return { token: null, location: url };
   const path = sameOriginPath(url.slice(0, q));
-  const params = new URLSearchParams(url.slice(q + 1));
-  const token = params.get(AUTH_QUERY_PARAM);
+  const { token, rest } = removeTokenParam(url.slice(q + 1));
   if (token === null) return { token: null, location: url };
-  params.delete(AUTH_QUERY_PARAM);
-  const rest = params.toString();
   return { token, location: rest ? `${path}?${rest}` : path };
+}
+
+/**
+ * Remove every `ndx_token` segment from a raw query string (no leading `?`).
+ * `token` is the first one's decoded value, or null when there is none.
+ *
+ * Every other segment is kept byte for byte. Re-serialising through
+ * `URLSearchParams` would rewrite them: `%20` becomes `+`, a bare key gains
+ * `=`, `/` and `~` are escaped, and invalid UTF-8 such as `%E9` is replaced
+ * by `%EF%BF%BD` — data loss for whoever reads the query next.
+ */
+export function removeTokenParam(query: string): { token: string | null; rest: string } {
+  let token: string | null = null;
+  const kept: string[] = [];
+  for (const segment of query.split("&")) {
+    // One segment through URLSearchParams decodes its key exactly as a full
+    // parse would (`+`, percent escapes), so `ndx%5Ftoken=T` is caught too.
+    const [entry] = new URLSearchParams(segment);
+    if (entry?.[0] === AUTH_QUERY_PARAM) {
+      token ??= entry[1];
+      continue;
+    }
+    kept.push(segment);
+  }
+  return { token, rest: token === null ? query : kept.join("&") };
 }
 
 /** `path` when it is one leading `/` not followed by `/` or `\`; otherwise `/`. */
