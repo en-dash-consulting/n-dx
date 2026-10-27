@@ -28,7 +28,14 @@ items:
     lastModified: "2026-10-27T15:27:37.037Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "cb9b167b-479f-4ae5-b618-52fe27fa4211":
-    lastModified: "2026-10-27T13:51:48.582Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:27:46.894Z"
+    completedAt: "2026-10-27T15:31:04.626Z"
+    endedAt: "2026-10-27T15:31:04.626Z"
+    activeIntervals: [{"end":"2026-10-27T15:31:04.626Z","start":"2026-10-27T15:27:46.894Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "proxy.ts skips the Location rewrite for sidecars when Location equals the prefix or starts with prefix + '/'; hub-sidecars test covers both cases and a /x/recondite near-miss."
+    lastModified: "2026-10-27T15:31:04.626Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "d3e8d81c-b5db-4094-ad90-f4df8fe06082":
     lastModified: "2026-10-27T13:51:52.686Z"
