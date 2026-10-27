@@ -19,7 +19,14 @@ items:
     lastModified: "2026-10-27T14:39:15.813Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "3ac5b6b4-1452-4ccb-8d81-b84cce474af8":
-    lastModified: "2026-10-27T13:51:59.528Z"
+    status: "completed"
+    startedAt: "2026-10-27T16:14:43.925Z"
+    completedAt: "2026-10-27T16:14:43.925Z"
+    endedAt: "2026-10-27T16:14:43.925Z"
+    activeIntervals: [{"end":"2026-10-27T16:14:43.925Z","start":"2026-10-27T16:14:43.925Z"}]
+    appliedAt: "2026-10-27T16:14:43.925Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T16:14:43.925Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "9a784d5f-3468-4e89-acc1-6395304c4fd4":
     status: "completed"
@@ -60,7 +67,14 @@ items:
     lastModified: "2026-10-27T16:01:38.009Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "dc6d3692-a206-4348-ab5e-18cad96e97dc":
-    lastModified: "2026-10-27T13:51:59.528Z"
+    status: "completed"
+    startedAt: "2026-10-27T16:10:40.905Z"
+    completedAt: "2026-10-27T16:14:43.925Z"
+    endedAt: "2026-10-27T16:14:43.925Z"
+    activeIntervals: [{"end":"2026-10-27T16:14:43.925Z","start":"2026-10-27T16:10:40.905Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "homeExtensions keeps incompatible entries with a null manifest; renderExtensionCard labels them by name. HOME_EXTENSIONS_WAIT_MS moved to home.ts; both timeouts pinned by tests. Commit aad7e53f1."
+    lastModified: "2026-10-27T16:14:43.925Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "e4387d5b-5cb9-49c8-906a-c78fb748a4e1":
     status: "completed"
