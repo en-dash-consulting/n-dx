@@ -64,7 +64,7 @@ import type { RunMode, RunOptions } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { homedir } from "node:os";
-import { renderHomePage } from "./home.js";
+import { HOME_EXTENSIONS_WAIT_MS, renderHomePage } from "./home.js";
 import { buildExtensionsAnswer } from "./extensions.js";
 import type { ExtensionView } from "./extensions.js";
 import { defaultParentDir } from "./new-project.js";
@@ -535,9 +535,6 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
     }
   }
 }
-
-/** How long the home page waits for the extension list before rendering without it. */
-const HOME_EXTENSIONS_WAIT_MS = 3_000;
 
 /**
  * The extensions for the home page's row: what `GET /api/hub/extensions`

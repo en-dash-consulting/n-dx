@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { renderHomePage, renderCard, renderExtensionCard, homeExtensions, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel, readinessLabel, infrastructureLabel } from "../../../src/hub/home.js";
+import { renderHomePage, renderCard, renderExtensionCard, homeExtensions, HOME_EXTENSIONS_WAIT_MS, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel, readinessLabel, infrastructureLabel } from "../../../src/hub/home.js";
 import type { HubOverview, ProjectCard } from "../../../src/hub/overview.js";
 import type { ExtensionView } from "../../../src/hub/extensions.js";
 
@@ -374,6 +374,22 @@ describe("extensions on the home page", () => {
     }
     expect(cards[0].querySelector(".reason")?.textContent).toBe("incompatible: needs n-dx >=2; this is 0.10.0");
     expect(cards[1].querySelector(".reason")?.textContent).toBe("unapproved: not approved yet");
+  });
+
+  it("greys out an apiVersion-incompatible extension by name, though its manifest is unread", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, "", [
+      ext({ state: "incompatible", compatible: false, reason: "apiVersion must be 1", manifest: null, mount: null, sidecar: null }),
+    ]));
+    const cards = [...doc.querySelectorAll("#extensions .card")];
+    expect(cards).toHaveLength(1);
+    expect(cards[0].classList.contains("card-inactive")).toBe(true);
+    expect(cards[0].querySelector("a")).toBeNull();
+    expect(cards[0].querySelector(".card-title .name")?.textContent).toBe("recon");
+    expect(cards[0].querySelector(".reason")?.textContent).toBe("incompatible: apiVersion must be 1");
+  });
+
+  it("waits 3 s for the extension list before rendering the page without it", () => {
+    expect(HOME_EXTENSIONS_WAIT_MS).toBe(3_000);
   });
 
   it("leaves out extensions without a hub entry, and disabled, invalid or conflicting ones", () => {

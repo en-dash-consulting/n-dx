@@ -14,7 +14,7 @@ import { createServer as createHttpServer } from "node:http";
 import { connect } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SidecarManager, isPidAlive, ndxCliPlanner, startHub } from "../../src/hub/index.js";
+import { SIDECAR_START_TIMEOUT_MS, SidecarManager, isPidAlive, ndxCliPlanner, startHub } from "../../src/hub/index.js";
 import type { HubHandle, PlanResult, SidecarManagerOptions, SidecarPlan } from "../../src/hub/index.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
 
@@ -118,6 +118,11 @@ function logGate(text: string): { log: (message: string) => void; seen: Promise<
 }
 
 describe("SidecarManager", () => {
+  it("gives a sidecar 20 s to answer health by default", () => {
+    // The contract docs/architecture/extensions.md promises extension authors.
+    expect(SIDECAR_START_TIMEOUT_MS).toBe(20_000);
+  });
+
   it("starts on first use on a loopback port and waits for health; concurrent first requests share one start", async () => {
     const { m, asked } = manager();
     const [a, b] = await Promise.all([m.ensure("recon"), m.ensure("recon")]);

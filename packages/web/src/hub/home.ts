@@ -464,18 +464,27 @@ export function renderCards(overview: HubOverview): string {
   return overview.projects.map(renderCard).join("");
 }
 
+/** How long the home page waits for the extension list before rendering without it. */
+export const HOME_EXTENSIONS_WAIT_MS = 3_000;
+
 /**
  * The extensions the home page shows: those that declare a `hub` entry and are
  * either enabled or held back for a reason the operator can act on
  * (incompatible, unapproved). A disabled one was switched off on purpose, and
  * an invalid or conflicting one has no manifest the hub can trust a label from;
  * `ndx extensions list` is where those are explained.
+ *
+ * An `apiVersion` this n-dx does not speak leaves the manifest unread (null),
+ * so whether it declares `hub` is unknown. It is shown by name anyway: the
+ * upgrade its reason asks for is the action the card is there to prompt.
  */
 export function homeExtensions(extensions: ExtensionView[]): ExtensionView[] {
-  return extensions.filter((ext) =>
-    ext.name !== null
-    && !!ext.manifest?.hub
-    && (ext.state === "enabled" || ext.state === "incompatible" || ext.state === "unapproved"));
+  return extensions.filter((ext) => {
+    if (ext.name === null) return false;
+    if (ext.state === "incompatible" && ext.manifest === null) return true;
+    return !!ext.manifest?.hub
+      && (ext.state === "enabled" || ext.state === "incompatible" || ext.state === "unapproved");
+  });
 }
 
 /**
@@ -483,9 +492,10 @@ export function homeExtensions(extensions: ExtensionView[]): ExtensionView[] {
  * greyed out with no link — the page behind it would refuse — and says why.
  */
 export function renderExtensionCard(ext: ExtensionView): string {
-  const hub = ext.manifest!.hub!;
-  const label = escapeHtml(hub.label);
-  const description = hub.description ? `<p class="description">${escapeHtml(hub.description)}</p>` : "";
+  // No manifest (an unreadable `apiVersion`): the name is the only label there is.
+  const hub = ext.manifest?.hub;
+  const label = escapeHtml(hub ? hub.label : ext.name ?? ext.packageName);
+  const description = hub?.description ? `<p class="description">${escapeHtml(hub.description)}</p>` : "";
   const version = ext.version ? `<span class="fact">${escapeHtml(ext.version)}</span>` : "";
   if (ext.state === "enabled" && ext.mount) {
     return `<li class="card card-extension">
