@@ -52,7 +52,9 @@
  * `applyRepoTrustToEnvPolicy`) read `localConfigTracked` from the
  * {@link RepoExecutionConfig} they already hold, and the LLM config loaders
  * pass the file through `trustedLocalConfig` (credential-routing), which asks
- * {@link isLocalConfigTracked}. A tracked local file is repository
+ * {@link isLocalConfigTracked}. Core, which spawns rather than imports, mirrors
+ * that check for `cli.claudePath` (`isGitTrackedOrUnanswered` in
+ * `packages/core/gitignore.js`). A tracked local file is repository
  * config: it is collected here, raises `local-config-tracked`, and applies
  * only once the checkout is trusted. Outside a git work tree nothing is
  * tracked, so the local file is the user's, as before; inside one, a git that
