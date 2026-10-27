@@ -34,8 +34,15 @@ items:
     lastModified: "2026-10-27T19:49:54.041Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c354b598-2c38-4049-a534-443923746d2c":
+    status: "completed"
+    startedAt: "2026-10-27T19:51:36.805Z"
+    completedAt: "2026-10-27T19:57:14.799Z"
+    endedAt: "2026-10-27T19:57:14.799Z"
+    activeIntervals: [{"end":"2026-10-27T19:57:14.799Z","start":"2026-10-27T19:51:36.805Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Staleness probe now written to an os tmpdir; PROMPT_CENSUS_ROOT seam (inert unless set) points it at the repo. Commit 12dd3362b, closes #632."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:46:02.899Z"
+    lastModified: "2026-10-27T19:57:14.799Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd7b335d-310a-4700-86a8-0b064b689618":
     status: "completed"
@@ -60,8 +67,15 @@ items:
     lastModified: "2026-10-27T19:27:29.954Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "da20dc09-9f7e-46f1-8772-5da52fa6a927":
+    status: "completed"
+    startedAt: "2026-10-27T19:57:14.799Z"
+    completedAt: "2026-10-27T19:57:14.799Z"
+    endedAt: "2026-10-27T19:57:14.799Z"
+    activeIntervals: [{"end":"2026-10-27T19:57:14.799Z","start":"2026-10-27T19:57:14.799Z"}]
+    appliedAt: "2026-10-27T19:57:14.799Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:49:43.894Z"
+    lastModified: "2026-10-27T19:57:14.799Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f720598e-9179-40e1-87d7-ece32720ac81":
     status: "completed"
