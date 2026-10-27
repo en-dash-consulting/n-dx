@@ -57,7 +57,7 @@ export function useProductRead<T>(url: string, pick: (body: Record<string, unkno
 }
 
 /** `useProductRead` plus a `refetch` for a page that writes and must show the result. */
-function useRefetchableProductRead<T>(
+export function useRefetchableProductRead<T>(
   url: string,
   pick: (body: Record<string, unknown>) => T,
 ): { load: Load<T>; refetch: () => void } {

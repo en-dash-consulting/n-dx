@@ -272,6 +272,25 @@ export interface ProposeChangeRequest {
   criteria?: { add: Array<{ id: string; text: string }> };
 }
 
+/**
+ * Why rex refused a placement or a proposal: the `kind` of a 422 answer from
+ * `/place` or `/propose`, mirroring rex's `ChangePlacementErrorKind`.
+ * `no-such-change` arrives as a 404 instead.
+ */
+export type PlacementRefusalKind =
+  | "not-a-target"
+  | "content-needs-amends"
+  | "already-amends"
+  | "already-proposed"
+  | "rule-errors"
+  | "nothing-to-modify"
+  | "apply-problems"
+  | "no-such-change"
+  | "change-not-open"
+  | "not-an-area"
+  | "empty-title"
+  | "invalid-proposal";
+
 /** Answer of `POST /api/rex/changes/:id/propose`. */
 export interface ProposeChangeResult {
   change: string;

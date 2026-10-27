@@ -105,6 +105,10 @@ export const DENY_CLASS: string[] = [
   "prep-btn",
   "workspace-card-stop",
   "iso-hero-btn",
+  // Placing or proposing takes a change out of the Inbox; nothing puts it back.
+  "cp-place",
+  "cp-propose-btn",
+  "cp-propose-next",
 ];
 
 export interface ControlIdentity {

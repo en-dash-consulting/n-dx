@@ -19,10 +19,10 @@
  */
 
 import { h } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { useProjectStatus } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
-import { Pending, StaleNotice, useProductRead } from "./product-pages.js";
+import { Pending, StaleNotice, useRefetchableProductRead, type Load } from "./product-pages.js";
 import type { ChangePlacement, ChangeRow, PlacementCandidate, PlacementStrength } from "./product-model.js";
 
 /** Rows the Plan section shows before linking to the full page. */
@@ -76,7 +76,7 @@ export function sortInbox(rows: readonly InboxRow[]): InboxRow[] {
 // ── Rows ─────────────────────────────────────────────────────────────
 
 /** Dot and word together: the strength never rests on colour alone. */
-function StrengthChip({ strength }: { strength: GuessStrength }) {
+export function StrengthChip({ strength }: { strength: GuessStrength }) {
   return h("span", { class: `inbox-strength inbox-strength-${strength}`, "data-strength": strength },
     h("span", { class: "inbox-strength-dot", "aria-hidden": "true" }),
     strength,
@@ -168,6 +168,33 @@ export function InboxView({ rows, appliedUnplaced, limit, onOpenChange, onOpenAl
 
 // ── Page ─────────────────────────────────────────────────────────────
 
+export interface InboxRead {
+  /** Every change, as `GET /api/rex/changes` answers. */
+  load: Load<ChangeRow[]>;
+  /** Open changes awaiting placement, with their shortlists, in the section's order. */
+  rows: InboxRow[];
+  /** Read again now, rather than on the next `rex:prd-changed`. */
+  refetch: () => void;
+}
+
+/**
+ * The Inbox as the Plan section orders it. The detail panel's placement
+ * reads it too, so "N of M" and "Place & next" follow the same order.
+ */
+export function useInbox(): InboxRead {
+  const { load, refetch } = useRefetchableProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
+  const waiting = useMemo(
+    () => (load.state === "ready" ? load.data.filter((c) => c.awaitsPlacement) : null),
+    [load],
+  );
+  const shortlists = useShortlists(waiting);
+  const rows = useMemo(
+    () => sortInbox((waiting ?? []).map((change) => ({ change, shortlist: shortlists.get(change.id) }))),
+    [waiting, shortlists],
+  );
+  return { load, rows, refetch };
+}
+
 /** Read every row's shortlist, in parallel, each time the change list is read. */
 function useShortlists(changes: readonly ChangeRow[] | null): ReadonlyMap<string, ShortlistRead> {
   const [reads, setReads] = useState<ReadonlyMap<string, ShortlistRead>>(new Map());
@@ -197,16 +224,14 @@ async function readShortlist(id: string): Promise<ShortlistRead> {
 
 /** The routed Inbox; in a Plan section it shows `limit` rows. */
 export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limit?: number }) {
-  const load = useProductRead("/api/rex/changes",
-    (body) => (body.changes as ChangeRow[]).filter((c) => c.awaitsPlacement));
-  const shortlists = useShortlists(load.state === "ready" ? load.data : null);
+  const { load, rows } = useInbox();
   const status = useProjectStatus();
   if (load.state === "v1") return null;
   if (load.state !== "ready") return h(Pending, { load });
   return h("div", null,
     h(StaleNotice, { message: load.refreshError }),
     h(InboxView, {
-      rows: load.data.map((change) => ({ change, shortlist: shortlists.get(change.id) })),
+      rows,
       appliedUnplaced: status?.rex.inbox?.appliedUnplaced ?? null,
       limit,
       onOpenChange: (id) => navigateTo?.("prd", { taskId: id }),

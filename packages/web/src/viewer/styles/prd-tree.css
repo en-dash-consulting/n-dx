@@ -1654,6 +1654,196 @@
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
+.task-add-child-note {
+  margin-top: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--orange);
+}
+
+/* Inbox placement (in detail panel). Everything wraps inside --panel-w
+   (320px, 280px under the responsive breakpoint): no fixed widths. */
+.cp-section,
+.cp-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cp-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  font-size: var(--font-sm);
+}
+
+.cp-position {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+}
+
+.cp-shortlist,
+.cp-relation {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cp-relation {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cp-relation legend {
+  width: 100%;
+}
+
+.cp-target {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.cp-target.is-checked {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.cp-target-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cp-target-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.cp-target-kind,
+.cp-target-detail,
+.cp-shortlist-pending,
+.cp-shortlist-empty,
+.cp-search-empty,
+.cp-search-area {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+}
+
+.cp-shortlist-warning {
+  font-size: var(--font-xs);
+  color: var(--orange);
+}
+
+.cp-shortlist-error,
+.cp-refusal {
+  font-size: var(--font-sm);
+  color: var(--red);
+}
+
+.cp-refusal {
+  padding: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--red) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.cp-refusal-hint {
+  margin-top: var(--space-1);
+  color: var(--text);
+}
+
+.cp-search-input,
+.cp-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: var(--font-sm);
+}
+
+.cp-search-results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cp-search-result {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  font: inherit;
+  font-size: var(--font-sm);
+  background: none;
+  border: 0;
+  color: var(--text);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.cp-search-result:hover,
+.cp-search-result:focus-visible {
+  background: var(--bg-hover);
+}
+
+.cp-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cp-amends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.task-acceptance-criteria.is-invalid {
+  outline: 1px solid var(--red);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.cp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cp-placed-line {
+  font-size: var(--font-sm);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.cp-warnings {
+  margin-top: var(--space-1);
+  font-size: var(--font-xs);
+  color: var(--orange);
+}
+
+.cp-warnings ul {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+}
+
 /* Add child form (in detail panel) */
 .task-add-child-form {
   margin-top: var(--space-2);
