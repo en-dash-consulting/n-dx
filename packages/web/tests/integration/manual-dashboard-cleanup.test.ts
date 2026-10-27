@@ -106,7 +106,13 @@ describe("manual flow interrupted during an agent run", () => {
         expect(alive(ready.agentPid)).toBe(false);
         expect(alive(ready.vendorPid)).toBe(false);
       }, { timeout: 10_000 });
-      if (!apiFails) expect(proc.exitCode).toBe(0);
+      if (!apiFails) {
+        // Windows force-terminates on ChildProcess.kill('SIGTERM'); it does
+        // not run the stand-in's POSIX handler that exits with code zero.
+        // Keep checking the exact shutdown result as well as child death.
+        if (process.platform === "win32") expect(proc.signalCode).toBe("SIGTERM");
+        else expect(proc.exitCode).toBe(0);
+      }
     } finally {
       await terminateProcessTree(proc, { freeze: true });
       // Only our two known child PIDs, retained even if a broken helper has
