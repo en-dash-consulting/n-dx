@@ -194,6 +194,8 @@ export interface ChangeRow {
   shippedIn?: string;
   /** Placement on the map still needs a decision. */
   needsPlacement?: boolean;
+  /** Open and held for placement by rex: `ndx work` refuses it. Absent on applied history. */
+  awaitsPlacement?: boolean;
   amends: AmendedNode[];
   touches: TouchedNode[];
   taskCount: number;

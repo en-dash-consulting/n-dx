@@ -16,7 +16,10 @@ import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse } from "./response-utils.js";
 import { DATA_FILES } from "../shared/index.js";
-import { computeStats, collectCompletedIds, findNextTask, walkTree } from "./rex-gateway.js";
+import {
+  computeStats, collectCompletedIds, findNextTask, walkTree,
+  prdLayout, loadPrdModel, indexTree, isOpenChange, isAppliedChange, awaitsPlacement,
+} from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 import type { ReadinessScore, RepoIdentity, OutboundData, InfrastructureData } from "./domain-gateway.js";
 import { loadPRDSync } from "./prd-io.js";
@@ -97,6 +100,14 @@ export interface PRDItemAttribution {
   sourceFile: string | null;
 }
 
+/** The Inbox, counted from rex's own placement rules. */
+export interface InboxCounts {
+  /** Open changes rex holds for placement — the ones `ndx work` refuses. */
+  open: number;
+  /** Applied changes still flagged `needsPlacement`: history, never placeable. */
+  appliedUnplaced: number;
+}
+
 export interface RexStatus {
   /** Whether a PRD exists. */
   exists: boolean;
@@ -112,6 +123,8 @@ export interface RexStatus {
   nextTaskTitle: string | null;
   /** Attribution data for every PRD item: branch and sourceFile, null when absent. */
   items: PRDItemAttribution[];
+  /** Inbox counts. Present on a v2 tree only; omitted on v1. */
+  inbox?: InboxCounts;
 }
 
 export interface HenchStatus {
@@ -392,6 +405,29 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
   }
 }
 
+/** Inbox counts for a v2 tree, or undefined on v1 or when the tree cannot be read. */
+async function readInboxCounts(ctx: ServerContext): Promise<InboxCounts | undefined> {
+  try {
+    if ((await prdLayout(ctx.rexDir)) !== "v2") return undefined;
+    const { tree } = await loadPrdModel(ctx.rexDir);
+    const index = indexTree(tree);
+    let open = 0;
+    let appliedUnplaced = 0;
+    for (const { node, root } of index.entries) {
+      if (root !== "changes" || node.type !== "change") continue;
+      if (isOpenChange(node)) {
+        if (awaitsPlacement(index, node)) open++;
+      } else if (isAppliedChange(node) && node.needsPlacement) {
+        appliedUnplaced++;
+      }
+    }
+    return { open, appliedUnplaced };
+  } catch {
+    // An unreadable tree is the PRD routes' error to report; the status poll omits the count.
+    return undefined;
+  }
+}
+
 function extractHenchStatus(ctx: ServerContext): HenchStatus {
   const henchDir = resolveLayout(ctx.projectDir).henchDir;
   const configPath = join(henchDir, "config.json");
@@ -475,11 +511,12 @@ export function buildServerInfo(ctx: ServerContext): ServerInfo {
   };
 }
 
-function buildProjectStatus(ctx: ServerContext): ProjectStatus {
+async function buildProjectStatus(ctx: ServerContext): Promise<ProjectStatus> {
+  const inbox = await readInboxCounts(ctx);
   return {
     projectDir: ctx.projectDir,
     sv: extractSvStatus(ctx),
-    rex: extractRexStatus(ctx),
+    rex: { ...extractRexStatus(ctx), ...(inbox ? { inbox } : {}) },
     hench: extractHenchStatus(ctx),
     server: buildServerInfo(ctx),
     initialized: isProjectInitialized(ctx),
@@ -493,11 +530,11 @@ function buildProjectStatus(ctx: ServerContext): ProjectStatus {
 const STATUS_PREFIX = "/api/status";
 
 /** Handle project status API requests. Returns true if the request was handled. */
-export function handleStatusRoute(
+export async function handleStatusRoute(
   req: IncomingMessage,
   res: ServerResponse,
   ctx: ServerContext,
-): boolean {
+): Promise<boolean> {
   // Strip the query string — a trailing "?_=1" cache-buster (or any future
   // query param) must not fall through this exact-equality match to a 404.
   const url = (req.url || "/").split("?")[0];
@@ -512,7 +549,7 @@ export function handleStatusRoute(
     return true;
   }
 
-  const status = buildProjectStatus(ctx);
+  const status = await buildProjectStatus(ctx);
   slot.entry = { status, projectDir: ctx.projectDir, timestamp: now };
   jsonResponse(res, 200, status);
   return true;
