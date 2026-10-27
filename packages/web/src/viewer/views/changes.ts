@@ -2,21 +2,25 @@
  * Changes view — open and shipped work, grouped by planned release and stage.
  *
  * Releases are a field on a change, never a container, so the grouping here
- * is a presentation of `plannedRelease` rather than a tree walk. Within a
- * release, changes sit under their stage in lifecycle order; the unscheduled
- * group comes last because it is a backlog, not the next release.
+ * is a presentation of `plannedRelease` rather than a tree walk. Releases run
+ * newest first, with the unscheduled group on top while it holds open work.
+ * Within a release, open stages lead in lifecycle order and applied/shipped
+ * changes collapse behind a count; long intents clamp to two lines.
  *
  * Driven entirely by its `changes` prop: `product-pages.ts` fetches it from
  * `GET /api/rex/changes`, and tests render it from a fixture.
  */
 
 import { h, Fragment } from "preact";
+import { useState } from "preact/hooks";
 import { BrandedHeader } from "../components/index.js";
 import {
   CHANGE_STAGE_LABELS,
   groupChangesByRelease,
+  isAppliedStage,
   type ChangeRow,
   type ReleaseGroup,
+  type StageGroup,
 } from "./product-model.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -63,6 +67,35 @@ function NeedsPlacement({ change, onSelect }: {
   }, "Needs placement");
 }
 
+/**
+ * Intents longer than this, or with a line break, get a "more" control.
+ * Whether text overflows two lines depends on layout the view cannot see
+ * before paint, so the control follows the text rather than a measurement.
+ */
+const INTENT_CLAMP_CHARS = 160;
+
+function intentIsLong(intent: string): boolean {
+  return intent.length > INTENT_CLAMP_CHARS || intent.includes("\n");
+}
+
+/** The change's intent, clamped to two lines until expanded. */
+function Intent({ intent }: { intent: string }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!intentIsLong(intent)) return h("p", { class: "ch-intent" }, intent);
+  return h(Fragment, null,
+    h("p", {
+      class: expanded ? "ch-intent" : "ch-intent ch-intent-clamped",
+      "data-expanded": expanded ? "true" : "false",
+    }, intent),
+    h("button", {
+      type: "button",
+      class: "ch-intent-toggle",
+      "aria-expanded": expanded ? "true" : "false",
+      onClick: () => setExpanded(!expanded),
+    }, expanded ? "less" : "more"),
+  );
+}
+
 function Change({ change, onSelect }: {
   change: ChangeRow;
   onSelect?: (id: string) => void;
@@ -85,7 +118,7 @@ function Change({ change, onSelect }: {
       change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
     ),
-    change.intent ? h("p", { class: "ch-intent" }, change.intent) : null,
+    change.intent ? h(Intent, { intent: change.intent }) : null,
     h(MapLinks, { change }),
     h("div", { class: "ch-change-meta" },
       h(TaskProgress, { change }),
@@ -96,10 +129,31 @@ function Change({ change, onSelect }: {
   );
 }
 
+function Stage({ stage, onSelectChange }: {
+  stage: StageGroup;
+  onSelectChange?: (id: string) => void;
+}) {
+  return h("div", { class: "ch-stage", "data-stage": stage.stage },
+    h("h4", { class: "ch-stage-header" },
+      CHANGE_STAGE_LABELS[stage.stage],
+      h("span", { class: "ch-stage-count" }, `${stage.changes.length}`),
+    ),
+    h("ul", { class: "ch-change-list" },
+      stage.changes.map((change) =>
+        h(Change, { key: change.id, change, onSelect: onSelectChange })),
+    ),
+  );
+}
+
+/** One release: open stages, then applied history behind a count. */
 function Release({ group, onSelectChange }: {
   group: ReleaseGroup;
   onSelectChange?: (id: string) => void;
 }) {
+  const [showApplied, setShowApplied] = useState(false);
+  const open = group.stages.filter((s) => !isAppliedStage(s.stage));
+  const applied = group.stages.filter((s) => isAppliedStage(s.stage));
+
   return h("section", {
     class: "ch-release",
     "aria-label": group.label,
@@ -109,18 +163,18 @@ function Release({ group, onSelectChange }: {
       group.label,
       h("span", { class: "ch-release-count" }, `${group.changeCount}`),
     ),
-    group.stages.map((stage) =>
-      h("div", { key: stage.stage, class: "ch-stage", "data-stage": stage.stage },
-        h("h4", { class: "ch-stage-header" },
-          CHANGE_STAGE_LABELS[stage.stage],
-          h("span", { class: "ch-stage-count" }, `${stage.changes.length}`),
-        ),
-        h("ul", { class: "ch-change-list" },
-          stage.changes.map((change) =>
-            h(Change, { key: change.id, change, onSelect: onSelectChange })),
-        ),
-      ),
-    ),
+    open.map((stage) => h(Stage, { key: stage.stage, stage, onSelectChange })),
+    group.appliedCount > 0
+      ? h("button", {
+          type: "button",
+          class: "ch-applied-toggle",
+          "aria-expanded": showApplied ? "true" : "false",
+          onClick: () => setShowApplied(!showApplied),
+        }, `${group.appliedCount} applied ${showApplied ? "▾" : "▸"}`)
+      : null,
+    showApplied
+      ? applied.map((stage) => h(Stage, { key: stage.stage, stage, onSelectChange }))
+      : null,
   );
 }
 

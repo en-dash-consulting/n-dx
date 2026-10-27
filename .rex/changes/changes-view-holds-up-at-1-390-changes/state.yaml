@@ -1,14 +1,24 @@
 schema: "rex/v2"
 items:
+  "50a1ca05-8be6-45ed-8b62-33a076dcd4fe":
+    lastModified: "2026-10-27T23:54:50.699Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "91443fd6-379c-495b-bb76-1c22faf54cfc":
     lastModified: "2026-10-27T17:19:43.639Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9edad54b-76d5-402a-a6bc-67a77229b43c":
-    lastModified: "2026-10-27T17:19:44.836Z"
+    lastModified: "2026-10-27T23:54:50.699Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e5d4cd80-c44d-4ba4-8ccf-bbcb47a84dc9":
     lastModified: "2026-10-27T17:19:44.836Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f367bfaa-691c-4153-87f4-6ae5f2b8e2ce":
-    lastModified: "2026-10-27T17:19:42.441Z"
+    status: "completed"
+    startedAt: "2026-10-27T23:48:56.450Z"
+    completedAt: "2026-10-27T23:56:13.077Z"
+    endedAt: "2026-10-27T23:56:13.077Z"
+    activeIntervals: [{"end":"2026-10-27T23:56:13.077Z","start":"2026-10-27T23:48:56.450Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Commit eb384cfe8: newest-first semver release order, Unscheduled first with open work, applied collapsed per release, intents clamped with more/less; tests updated and added."
+    lastModified: "2026-10-27T23:56:13.077Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

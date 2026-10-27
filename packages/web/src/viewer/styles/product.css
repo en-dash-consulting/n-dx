@@ -211,6 +211,36 @@
   font-size: var(--font-sm);
   color: var(--text-dim);
   line-height: var(--leading-normal);
+  white-space: pre-line;
+}
+
+.ch-intent-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.ch-intent-toggle,
+.ch-applied-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--font-xs);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.ch-applied-toggle {
+  align-self: flex-start;
+  font-size: var(--font-sm);
+}
+
+.ch-intent-toggle:hover,
+.ch-applied-toggle:hover {
+  text-decoration: underline;
 }
 
 .ch-map-links {

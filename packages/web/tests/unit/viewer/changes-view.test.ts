@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { h } from "preact";
+import { act } from "preact/test-utils";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 import { ChangesView } from "../../../src/viewer/views/changes.js";
 import {
@@ -54,14 +55,22 @@ describe("ChangesView: Needs placement tag", () => {
   });
 });
 
+/** Expand every release's applied history. */
+function showApplied(el: HTMLElement): void {
+  act(() => {
+    for (const toggle of el.querySelectorAll<HTMLButtonElement>(".ch-applied-toggle")) toggle.click();
+  });
+}
+
 describe("ChangesView", () => {
-  it("groups by planned release, lowest version first and unscheduled last", () => {
+  it("groups by planned release, unscheduled open work first, then newest version first", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
-    expect(releaseHeadings(el)).toEqual(["0.9.0", "1.0.0", UNSCHEDULED_RELEASE_LABEL]);
+    expect(releaseHeadings(el)).toEqual([UNSCHEDULED_RELEASE_LABEL, "1.0.0", "0.9.0"]);
   });
 
   it("orders stages within a release by lifecycle and drops empty ones", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
+    showApplied(el);
 
     const release = el.querySelector('[data-release="0.9.0"]');
     const stages = [...(release?.querySelectorAll(".ch-stage") ?? [])]
@@ -70,6 +79,61 @@ describe("ChangesView", () => {
     expect(stages).toEqual(["ready", "applied", "shipped"]);
     // "proposed" and "in-progress" have no 0.9.0 change, so they do not render.
     expect(stages).not.toContain("proposed");
+  });
+
+  it("collapses applied and shipped changes behind a count until asked", () => {
+    const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
+    const release = el.querySelector('[data-release="0.9.0"]')!;
+    const toggle = release.querySelector<HTMLButtonElement>(".ch-applied-toggle")!;
+
+    const stages = () => [...release.querySelectorAll(".ch-stage")].map((s) => s.getAttribute("data-stage"));
+    expect(stages()).toEqual(["ready"]);
+    expect(toggle.textContent).toBe("2 applied ▸");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(el.querySelector('[data-change-id="change-jev-client"]')).toBeNull();
+
+    act(() => { toggle.click(); });
+    expect(stages()).toEqual(["ready", "applied", "shipped"]);
+    expect(toggle.textContent).toBe("2 applied ▾");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(el.querySelector('[data-change-id="change-jev-client"]')).not.toBeNull();
+
+    act(() => { toggle.click(); });
+    expect(stages()).toEqual(["ready"]);
+  });
+
+  it("shows no applied toggle on a release with no applied history", () => {
+    const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
+    expect(el.querySelector('[data-release="1.0.0"] .ch-applied-toggle')).toBeNull();
+  });
+
+  it("clamps a long intent to two lines with a more control", () => {
+    const long = { ...CHANGES_FIXTURE[0], id: "long", intent: "First paragraph.\n\nSecond paragraph." } as ChangeRow;
+    const el = mount(h(ChangesView, { changes: [long] }));
+    const intent = el.querySelector('[data-change-id="long"] .ch-intent')!;
+    const more = el.querySelector<HTMLButtonElement>('[data-change-id="long"] .ch-intent-toggle')!;
+
+    expect(intent.classList.contains("ch-intent-clamped")).toBe(true);
+    expect(more.textContent).toBe("more");
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+
+    act(() => { more.click(); });
+    expect(intent.classList.contains("ch-intent-clamped")).toBe(false);
+    expect(intent.getAttribute("data-expanded")).toBe("true");
+    expect(more.textContent).toBe("less");
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("clamps an intent past the length limit even on one line", () => {
+    const long = { ...CHANGES_FIXTURE[0], id: "long", intent: "word ".repeat(40).trim() } as ChangeRow;
+    const el = mount(h(ChangesView, { changes: [long] }));
+    expect(el.querySelector('[data-change-id="long"] .ch-intent-clamped')).not.toBeNull();
+  });
+
+  it("gives a short intent no more control", () => {
+    const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
+    expect(el.querySelector(".ch-intent-toggle")).toBeNull();
+    expect(el.querySelector(".ch-intent-clamped")).toBeNull();
   });
 
   it("renders each change under its own release and stage", () => {
@@ -90,6 +154,7 @@ describe("ChangesView", () => {
     const el = mount(h(ChangesView, {
       changes: [row("a", "applied"), row("b", "awaiting-apply"), row("c", "in-progress")],
     }));
+    showApplied(el);
     const stages = [...el.querySelectorAll(".ch-stage")];
     expect(stages.map((s) => s.getAttribute("data-stage"))).toEqual(["in-progress", "awaiting-apply", "applied"]);
     expect(stages[1].querySelector(".ch-stage-header")?.textContent).toContain("Waiting for a steward to apply it");
@@ -106,6 +171,7 @@ describe("ChangesView", () => {
 
   it("shows what each change does to the map", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
+    showApplied(el);
 
     const amending = el.querySelector('[data-change-id="change-run-field"]');
     expect(amending?.querySelector(".ch-amends")?.textContent).toContain("modified");
@@ -135,6 +201,7 @@ describe("ChangesView", () => {
 
   it("shows the release a shipped change landed in", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
+    showApplied(el);
     const shipped = el.querySelector('[data-change-id="change-jev-client"]');
     expect(shipped?.querySelector(".ch-shipped-in")?.textContent).toBe("shipped in 0.9.0");
   });
@@ -171,49 +238,68 @@ describe("groupChangesByRelease", () => {
     ...over,
   });
 
-  it("sorts releases as versions, not as strings", () => {
+  it("sorts releases newest first as versions, not as strings", () => {
     const groups = groupChangesByRelease([
       change({ id: "a", plannedRelease: "0.10.0" }),
       change({ id: "b", plannedRelease: "0.9.0" }),
       change({ id: "c", plannedRelease: "1.0.0" }),
     ]);
-    expect(groups.map((g) => g.label)).toEqual(["0.9.0", "0.10.0", "1.0.0"]);
+    expect(groups.map((g) => g.label)).toEqual(["1.0.0", "0.10.0", "0.9.0"]);
   });
 
-  it("falls back to string order for releases that are not versions", () => {
+  it("falls back to reverse string order for releases that are not versions", () => {
     const groups = groupChangesByRelease([
-      change({ id: "a", plannedRelease: "next" }),
-      change({ id: "b", plannedRelease: "2026-Q4" }),
+      change({ id: "a", plannedRelease: "2026-Q4" }),
+      change({ id: "b", plannedRelease: "next" }),
     ]);
-    expect(groups.map((g) => g.label)).toEqual(["2026-Q4", "next"]);
+    expect(groups.map((g) => g.label)).toEqual(["next", "2026-Q4"]);
   });
 
   // Number.parseInt stops at the first non-digit, so a guard that parsed and
   // checked for NaN would read both of these as 2026, compare them equal, and
-  // leave them in arrival order — Q4 above Q1.
+  // leave them in arrival order.
   it("orders quarter labels as text rather than reading them as numbers", () => {
     const groups = groupChangesByRelease([
-      change({ id: "a", plannedRelease: "2026-Q4" }),
-      change({ id: "b", plannedRelease: "2026-Q1" }),
+      change({ id: "a", plannedRelease: "2026-Q1" }),
+      change({ id: "b", plannedRelease: "2026-Q4" }),
       change({ id: "c", plannedRelease: "2026-Q2" }),
     ]);
-    expect(groups.map((g) => g.label)).toEqual(["2026-Q1", "2026-Q2", "2026-Q4"]);
+    expect(groups.map((g) => g.label)).toEqual(["2026-Q4", "2026-Q2", "2026-Q1"]);
   });
 
-  it("does not read a prerelease suffix as another version segment", () => {
+  it("orders a prerelease below its release, by semver precedence", () => {
     const groups = groupChangesByRelease([
       change({ id: "a", plannedRelease: "1.0.0-rc.1" }),
       change({ id: "b", plannedRelease: "1.0.0" }),
       change({ id: "c", plannedRelease: "2.0.0" }),
+      change({ id: "d", plannedRelease: "1.0.0-rc.10" }),
+      change({ id: "e", plannedRelease: "1.0.0-beta" }),
+      change({ id: "f", plannedRelease: "0.9.0" }),
     ]);
-    // "1.0.0-rc.1" is not all-numeric, so it is ordered as text — which keeps
-    // it next to 1.0.0 rather than letting a parsed trailing 1 push it past
-    // 1.0.0 as a fourth segment. Semver prerelease precedence (rc *before*
-    // 1.0.0) is deliberately not implemented; see compareReleases.
-    expect(groups.map((g) => g.label)).toEqual(["1.0.0", "1.0.0-rc.1", "2.0.0"]);
+    // rc.10 > rc.1 numerically; "rc" > "beta" as text; any prerelease < 1.0.0.
+    expect(groups.map((g) => g.label))
+      .toEqual(["2.0.0", "1.0.0", "1.0.0-rc.10", "1.0.0-rc.1", "1.0.0-beta", "0.9.0"]);
   });
 
-  it("counts every change in a release across its stages", () => {
+  it("leads with unscheduled while it holds open work", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "1.0.0" }),
+      change({ id: "b", stage: "applied" }),
+      change({ id: "c", stage: "ready" }),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual([UNSCHEDULED_RELEASE_LABEL, "1.0.0"]);
+  });
+
+  it("puts unscheduled last once all of it is applied or shipped", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "1.0.0" }),
+      change({ id: "b", stage: "applied" }),
+      change({ id: "c", stage: "shipped" }),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["1.0.0", UNSCHEDULED_RELEASE_LABEL]);
+  });
+
+  it("counts every change in a release across its stages, and the applied ones", () => {
     const groups = groupChangesByRelease([
       change({ id: "a", plannedRelease: "1.0.0", stage: "ready" }),
       change({ id: "b", plannedRelease: "1.0.0", stage: "shipped" }),
@@ -221,6 +307,7 @@ describe("groupChangesByRelease", () => {
     ]);
     expect(groups).toHaveLength(1);
     expect(groups[0].changeCount).toBe(3);
+    expect(groups[0].appliedCount).toBe(1);
     expect(groups[0].stages.map((s) => s.stage)).toEqual(["ready", "shipped"]);
     expect(groups[0].stages[0].changes.map((c) => c.id)).toEqual(["a", "c"]);
   });
@@ -241,8 +328,8 @@ describe("groupChangesByRelease", () => {
       change({ id: "a", plannedRelease: "" }),
       change({ id: "b", plannedRelease: "next" }),
     ]);
-    expect(groups.map((g) => g.label)).toEqual(["next", UNSCHEDULED_RELEASE_LABEL]);
-    expect(groups[1].changeCount).toBe(1);
+    expect(groups.map((g) => g.label)).toEqual([UNSCHEDULED_RELEASE_LABEL, "next"]);
+    expect(groups[0].changeCount).toBe(1);
   });
 
   it("treats a whitespace-only planned release as unscheduled", () => {
@@ -251,8 +338,8 @@ describe("groupChangesByRelease", () => {
       change({ id: "b", plannedRelease: "\t\n" }),
       change({ id: "c", plannedRelease: "next" }),
     ]);
-    expect(groups.map((g) => g.label)).toEqual(["next", UNSCHEDULED_RELEASE_LABEL]);
-    expect(groups[1].changeCount).toBe(2);
+    expect(groups.map((g) => g.label)).toEqual([UNSCHEDULED_RELEASE_LABEL, "next"]);
+    expect(groups[0].changeCount).toBe(2);
   });
 
   it("groups blank and missing planned releases together", () => {

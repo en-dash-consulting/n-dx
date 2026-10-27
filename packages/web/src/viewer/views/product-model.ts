@@ -93,6 +93,15 @@ export const CHANGE_STAGE_LABELS: Readonly<Record<ChangeStage, string>> = {
   shipped: "Shipped",
 };
 
+/**
+ * Stages past the point of work: the change's amendments are on the map.
+ * The Changes view collapses them behind a count, because open work is what a
+ * reader comes for.
+ */
+export function isAppliedStage(stage: ChangeStage): boolean {
+  return stage === "applied" || stage === "shipped";
+}
+
 /** Heading for changes with no `plannedRelease`. */
 export const UNSCHEDULED_RELEASE_LABEL = "Unscheduled";
 
@@ -431,46 +440,83 @@ export interface ReleaseGroup {
   label: string;
   stages: StageGroup[];
   changeCount: number;
+  /** Changes at an applied or shipped stage (`isAppliedStage`). */
+  appliedCount: number;
 }
 
 /** A release segment that may be read as a number: digits and nothing else. */
 const NUMERIC_SEGMENT = /^\d+$/;
 
 /**
- * Order two release labels.
- *
- * Compared segment by segment as numbers only when *every* segment of both
- * labels is digits, so `0.9.0` precedes `0.10.0`. Testing each segment matters
- * more than it looks: `Number.parseInt` stops at the first non-digit, so a
- * parse-and-check-for-NaN guard reads `2026-Q4` as the number 2026 — two
- * quarters then compare equal and fall back to whatever order they arrived in.
- *
- * Anything else is ordered as text. That orders quarters and codenames
- * sensibly; it does *not* give a prerelease its semver precedence, so `1.0.0`
- * sorts before `1.0.0-rc.1` rather than after it. Encoding prerelease
- * precedence means a semver parser, and `plannedRelease` is a free-text field
- * with no validation behind it — a parser would be guessing at input nothing
- * constrains.
+ * A version label: dot-separated digits, optionally a `-` prerelease of
+ * dot-separated alphanumeric identifiers (`1.0.0`, `0.10`, `1.0.0-rc.1`).
+ * Build metadata (`+…`) is not accepted; it carries no precedence in semver.
  */
-function compareReleases(a: string, b: string): number {
+const VERSION = /^(\d+(?:\.\d+)*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+
+/** Semver prerelease precedence: numeric identifiers below alphanumeric ones. */
+function comparePrerelease(a: string, b: string): number {
   const left = a.split(".");
   const right = b.split(".");
-  const numeric = (parts: string[]) => parts.every((p) => NUMERIC_SEGMENT.test(p));
-  if (!numeric(left) || !numeric(right)) return a.localeCompare(b);
-  for (let i = 0; i < Math.max(left.length, right.length); i++) {
-    const diff = Number(left[i] ?? 0) - Number(right[i] ?? 0);
+  for (let i = 0; i < Math.min(left.length, right.length); i++) {
+    const l = left[i]!;
+    const r = right[i]!;
+    const lNum = NUMERIC_SEGMENT.test(l);
+    const rNum = NUMERIC_SEGMENT.test(r);
+    if (lNum && rNum) {
+      const diff = Number(l) - Number(r);
+      if (diff !== 0) return diff;
+    } else if (lNum !== rNum) {
+      return lNum ? -1 : 1;
+    } else if (l !== r) {
+      return l < r ? -1 : 1;
+    }
+  }
+  return left.length - right.length;
+}
+
+/**
+ * Order two release labels, oldest first.
+ *
+ * Two version labels (`VERSION`) compare by semver: the numeric core segment
+ * by segment, so `0.9.0` precedes `0.10.0`, then a prerelease below its
+ * release, so `1.0.0-rc.1` precedes `1.0.0`. The pattern tests every segment
+ * on purpose: `Number.parseInt` stops at the first non-digit, so a
+ * parse-and-check-for-NaN guard reads `2026-Q4` as the number 2026 and two
+ * quarters compare equal.
+ *
+ * Anything else — quarters, codenames, a version against a codename — is
+ * ordered as text. `plannedRelease` is free text with no validation behind it,
+ * so only labels that are unambiguously versions get version precedence.
+ */
+function compareReleases(a: string, b: string): number {
+  const left = VERSION.exec(a);
+  const right = VERSION.exec(b);
+  if (!left || !right) return a.localeCompare(b);
+  const leftCore = left[1]!.split(".");
+  const rightCore = right[1]!.split(".");
+  for (let i = 0; i < Math.max(leftCore.length, rightCore.length); i++) {
+    const diff = Number(leftCore[i] ?? 0) - Number(rightCore[i] ?? 0);
     if (diff !== 0) return diff;
   }
-  return 0;
+  const leftPre = left[2];
+  const rightPre = right[2];
+  if (leftPre === undefined || rightPre === undefined) {
+    // A release outranks its own prerelease.
+    return (leftPre === undefined ? 1 : 0) - (rightPre === undefined ? 1 : 0);
+  }
+  return comparePrerelease(leftPre, rightPre);
 }
 
 /**
  * Group changes by planned release, then by stage.
  *
- * Releases sort as versions when every segment is numeric and
- * lexicographically otherwise, so `0.9.0` precedes `0.10.0`. The unscheduled
- * group is always last: it is a backlog, not the next release. Stages keep
- * `CHANGE_STAGE_ORDER` and empty stages are dropped, so a release heading
+ * Releases run newest first (`compareReleases`, reversed): the next release
+ * is the one being planned, and history sits below it. The unscheduled group
+ * leads while it holds open work — that is where captured changes wait to be
+ * placed — and drops to the bottom once everything in it is applied, as a
+ * backlog of history. Stages keep `CHANGE_STAGE_ORDER`, so open stages lead
+ * and applied ones trail, and empty stages are dropped, so a release heading
  * shows only the stages it actually has.
  *
  * `plannedRelease` is free text the schema only requires to be a string, so a
@@ -499,21 +545,27 @@ export function groupChangesByRelease(changes: readonly ChangeRow[]): ReleaseGro
       .map((stage) => ({ stage, changes: rows.filter((c) => c.stage === stage) }))
       .filter((group) => group.changes.length > 0);
 
+  const appliedCount = (rows: ChangeRow[]) => rows.filter((c) => isAppliedStage(c.stage)).length;
+
   const groups: ReleaseGroup[] = [...byRelease.entries()]
-    .sort(([a], [b]) => compareReleases(a, b))
+    .sort(([a], [b]) => compareReleases(b, a))
     .map(([release, rows]) => ({
       release,
       label: release,
       stages: toStages(rows),
       changeCount: rows.length,
+      appliedCount: appliedCount(rows),
     }));
 
   if (unscheduled.length > 0) {
-    groups.push({
+    const backlog: ReleaseGroup = {
       label: UNSCHEDULED_RELEASE_LABEL,
       stages: toStages(unscheduled),
       changeCount: unscheduled.length,
-    });
+      appliedCount: appliedCount(unscheduled),
+    };
+    if (backlog.appliedCount < backlog.changeCount) groups.unshift(backlog);
+    else groups.push(backlog);
   }
 
   return groups;
