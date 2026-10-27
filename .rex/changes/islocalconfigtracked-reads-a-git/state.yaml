@@ -3,9 +3,19 @@ items:
   "139b71eb-523f-43c3-9ce9-c015ab551cfc":
     assignee: "Ryan Keith <ryan.k@endash.us>"
     needsPlacement: false
-    lastModified: "2026-10-27T21:07:05.080Z"
+    lastModified: "2026-10-27T21:35:38.263Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3bc4c88a-66f3-42f4-8849-9f0b6b42eb50":
+    lastModified: "2026-10-27T21:35:38.263Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "92cd4988-0eff-49ab-a62c-eb3bd880c28b":
+    status: "completed"
+    startedAt: "2026-10-27T21:31:57.679Z"
+    completedAt: "2026-10-27T21:46:15.161Z"
+    endedAt: "2026-10-27T21:46:15.161Z"
+    activeIntervals: [{"end":"2026-10-27T21:46:15.161Z","start":"2026-10-27T21:31:57.679Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "git exit 1 = untracked; other git failures inside a work tree (.git found walking up) count .n-dx.local.json as tracked, in llm-client isLocalConfigTracked and core readConfiguredClaudePath."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T21:07:07.227Z"
+    lastModified: "2026-10-27T21:46:15.161Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

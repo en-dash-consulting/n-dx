@@ -37,7 +37,7 @@ import {
 } from "./assistant-assets.js";
 import { getCliName } from "./cli-identity.js";
 import { resolveLayout } from "./layout.js";
-import { isGitTracked } from "./gitignore.js";
+import { isGitTrackedOrUnanswered } from "./gitignore.js";
 import { homedir } from "os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -480,7 +480,8 @@ function writeMcpJson(dir) {
  * user's environment. llm-client's trust review flags a shared one
  * (`vendor-cli-path`), and `ndx config cli.claudePath` writes the local file.
  * A local file git tracks is the repository's too (`local-config-tracked`),
- * so it is not read either.
+ * so it is not read either — nor is one git cannot answer for inside a work
+ * tree, since a committed file would look the same.
  * Returns undefined if not set.
  * @param {string|null} dir
  * @returns {string|undefined}
@@ -488,7 +489,7 @@ function writeMcpJson(dir) {
 function readConfiguredClaudePath(dir) {
   if (!dir) return undefined;
   const layout = resolveLayout(dir);
-  if (!existsSync(layout.localConfigFile) || isGitTracked(relative(layout.root, layout.localConfigFile), layout.root)) {
+  if (!existsSync(layout.localConfigFile) || isGitTrackedOrUnanswered(relative(layout.root, layout.localConfigFile), layout.root)) {
     return undefined;
   }
   try {

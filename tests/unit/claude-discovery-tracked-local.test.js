@@ -10,8 +10,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { discoverClaudeCli } from "../../packages/core/claude-integration.js";
 
@@ -42,6 +42,20 @@ describe.skipIf(process.platform === "win32")("discoverClaudeCli and a committed
 
     expect(existsSync(marker)).toBe(false);
     expect(result.searched?.join("\n") ?? "").not.toContain("repo-claude");
+  });
+
+  it("never runs it when git fails inside the work tree", () => {
+    // A git that cannot answer (dubious ownership exits 128) cannot tell a
+    // committed file from the user's, so the file is not read.
+    const bin = join(dir, "stub-bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "git"), "#!/bin/sh\nexit 128\n");
+    chmodSync(join(bin, "git"), 0o755);
+    vi.stubEnv("PATH", `${bin}${delimiter}${process.env.PATH ?? ""}`);
+
+    discoverClaudeCli(dir);
+
+    expect(existsSync(marker)).toBe(false);
   });
 
   it("runs the user's untracked one", () => {

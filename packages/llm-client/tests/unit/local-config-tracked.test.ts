@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadLLMConfig } from "../../src/llm-config.js";
 import { loadClaudeConfig } from "../../src/config.js";
@@ -138,5 +138,50 @@ describe("an untracked .n-dx.local.json", () => {
       expect(passes(repoCommandEnv(repo, { env: parent() }))).toBe(true);
       expect((await loadLLMConfig(repo)).claude?.cli_path).toBe(REPO_BINARY);
     }
+  });
+});
+
+/**
+ * Only git's own "not in the index" answer (exit 1) means untracked. Any other
+ * failure inside a git work tree (dubious ownership, git missing, a corrupt
+ * index, a timeout) cannot tell a committed file from the user's, so the file
+ * is held back until the checkout is trusted. Outside a work tree it applies.
+ */
+describe("when git cannot answer", () => {
+  /** A `git` that fails the way `detected dubious ownership` does. */
+  function stubFailingGit(): void {
+    const bin = join(home, "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "git"), "#!/bin/sh\necho 'fatal: detected dubious ownership' >&2\nexit 128\n");
+    chmodSync(join(bin, "git"), 0o755);
+    vi.stubEnv("PATH", `${bin}${delimiter}${process.env.PATH ?? ""}`);
+  }
+
+  function expectGated(): void {
+    expect(isLocalConfigTracked(repo)).toBe(true);
+    expect(evaluateRepoTrust(repo).state).not.toBe("baseline");
+    expect(passes(repoCommandEnv(repo, { env: parent() }))).toBe(false);
+  }
+
+  it.skipIf(process.platform === "win32")("inside a work tree, a git exiting 128 counts the file as tracked", () => {
+    writeLocal();
+    trackLocal();
+    stubFailingGit();
+    expectGated();
+  });
+
+  it("inside a work tree, a corrupt index counts the file as tracked", () => {
+    writeLocal();
+    trackLocal();
+    writeFileSync(join(repo, ".git", "index"), "not an index");
+    expectGated();
+  });
+
+  it.skipIf(process.platform === "win32")("outside a work tree, the file keeps applying as the user's own", () => {
+    writeLocal();
+    stubFailingGit();
+    expect(isLocalConfigTracked(repo)).toBe(false);
+    expect(evaluateRepoTrust(repo).state).toBe("baseline");
+    expect(passes(repoCommandEnv(repo, { env: parent() }))).toBe(true);
   });
 });

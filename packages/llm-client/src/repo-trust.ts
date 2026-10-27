@@ -50,8 +50,9 @@
  * every reader that applies the local file regardless of trust asks it first
  * (see {@link userLocalConfigApplies}). A tracked local file is repository
  * config: it is collected here, raises `local-config-tracked`, and applies
- * only once the checkout is trusted. Outside a git repository nothing is
- * tracked, so the local file is the user's, as before.
+ * only once the checkout is trusted. Outside a git work tree nothing is
+ * tracked, so the local file is the user's, as before; inside one, a git that
+ * cannot answer counts the file as tracked.
  *
  * The trust store is deliberately a plain file for now. It records a
  * decision, not a secret; an encrypted store is a later concern.
@@ -80,7 +81,7 @@ import {
   resolveNdxHome,
   type ResolveNdxHomeOptions,
 } from "./layout.js";
-import { isGitTracked } from "./exec.js";
+import { gitTracksPath, insideGitWorkTree } from "./exec.js";
 import { toCanonicalJSON } from "./json.js";
 import { deepMerge } from "./project-config.js";
 
@@ -409,14 +410,17 @@ function sectionOf(config: Record<string, unknown> | null, key: string): Record<
  * but ignoring does not untrack a committed file, and a repository can commit
  * one on purpose. A tracked file is repository content, not the user's.
  *
- * False when the file is absent (nothing to apply), and outside a git
- * repository or without git (nothing is tracked), so the file keeps applying
- * there as the user's own. Spawns git only when the file exists.
+ * False when the file is absent (nothing to apply), when git answers "not in
+ * the index", and outside any git work tree (no `.git` walking up), so the
+ * file keeps applying there as the user's own. When git cannot answer inside a
+ * work tree (dubious ownership, git missing, a corrupt index, a timeout) a
+ * committed file would be indistinguishable from the user's, so it counts as
+ * tracked and waits for trust. Spawns git only when the file exists.
  */
 export function isLocalConfigTracked(projectDir: string): boolean {
   const layout = resolveLayout(projectDir);
   if (!existsSync(layout.localConfigFile)) return false;
-  return isGitTracked(layout.root, relOf(layout.root, layout.localConfigFile));
+  return gitTracksPath(layout.root, relOf(layout.root, layout.localConfigFile)) ?? insideGitWorkTree(layout.root);
 }
 
 function relOf(root: string, path: string): string {

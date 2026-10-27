@@ -35,7 +35,7 @@ import type { ChildProcess, ExecFileSyncOptions, StdioOptions } from "node:child
 import { existsSync, realpathSync, openSync, closeSync } from "node:fs";
 // Aliased: `resolve` is the conventional name for a Promise executor argument
 // throughout this file, and the import would be shadowed inside every one.
-import { isAbsolute, resolve as resolvePath } from "node:path";
+import { dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
 import { logCliInvocation } from "./cli-log.js";
 import { forwardsInterrupts, processInterruptForwarder } from "./interrupt-forwarding.js";
 import { terminateProcessTree, treeKillSpawnOptions } from "./process-tree.js";
@@ -677,10 +677,12 @@ export function getCurrentHead(cwd: string): string | undefined {
 /**
  * Synchronous git helper — is `relPath` (relative to `cwd`) in the git index?
  *
- * False outside a repository, without git, or when git fails: callers ask
- * "is this file repository content?", and a checkout git cannot read has none.
+ * True or false only when git answers: exit 0 is tracked, exit 1 is git's own
+ * "not in the index". Undefined for every other outcome — no repository, git
+ * missing, `detected dubious ownership`, a corrupt index, the timeout — so the
+ * caller decides what an unanswered question means.
  */
-export function isGitTracked(cwd: string, relPath: string): boolean {
+export function gitTracksPath(cwd: string, relPath: string): boolean | undefined {
   try {
     execFileSync("git", ["ls-files", "--error-unmatch", "--", relPath], {
       windowsHide: true,
@@ -692,8 +694,16 @@ export function isGitTracked(cwd: string, relPath: string): boolean {
       stdio: ["ignore", "pipe", "pipe"],
     });
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    return (err as { status?: number | null }).status === 1 ? false : undefined;
+  }
+}
+
+/** Is `dir`, or a directory above it, the top of a git work tree (has a `.git` entry)? */
+export function insideGitWorkTree(dir: string): boolean {
+  for (let d = resolvePath(dir); ; d = dirname(d)) {
+    if (existsSync(join(d, ".git"))) return true;
+    if (dirname(d) === d) return false;
   }
 }
 
