@@ -29,7 +29,14 @@ items:
     lastModified: "2026-10-27T13:51:29.407Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "d287f3f5-da82-4200-b7b2-5a9a580eae94":
-    lastModified: "2026-10-27T13:51:24.736Z"
+    status: "completed"
+    startedAt: "2026-10-27T14:05:08.677Z"
+    completedAt: "2026-10-27T14:09:34.996Z"
+    endedAt: "2026-10-27T14:09:34.996Z"
+    activeIntervals: [{"end":"2026-10-27T14:09:34.996Z","start":"2026-10-27T14:05:08.677Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "main() in cli.js skips the project-config read and the command timeout for extension commands; e2e tests cover cli.timeoutMs 1000 with a 2 s bin (exit 7 passes through) and a positional dir carrying its own .n-dx.json."
+    lastModified: "2026-10-27T14:09:34.996Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "d66c59d3-bdb2-4117-ae83-f91377fa3bb6":
     lastModified: "2026-10-27T13:51:31.503Z"

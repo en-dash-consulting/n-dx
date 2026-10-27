@@ -3805,9 +3805,16 @@ async function main() {
   // key-beats-directory tiebreaker the config handler itself applies
   // (isConfigKey); disagreeing here made `ndx config hench` read config from
   // ./hench and report an initialized project as stale.
-  const dir = resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
-  const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
-  const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+  //
+  // An extension command gets neither: n-dx resolves no project for an
+  // extension, its arguments are its own, and it runs as long as it likes.
+  const builtin = builtinCommandNames().includes(command);
+  const extension = Boolean(command) && !builtin;
+  const dir = extension
+    ? process.cwd()
+    : resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
+  const projectConfig = extension ? {} : await loadProjectConfig(dir).catch(() => ({}));
+  const timeoutMs = extension ? 0 : resolveCommandTimeout(command ?? "", projectConfig);
 
   // Resolve BETA experimental flags from the same config read, so childEnv() can
   // forward them to sub-CLIs without a second filesystem hit.
@@ -3817,7 +3824,6 @@ async function main() {
   // Run before command dispatch so the notice can be shown after output.
   // Skipped for init (about to fix staleness), help, version, and quiet mode,
   // and for extension commands: n-dx resolves no project for an extension.
-  const builtin = builtinCommandNames().includes(command);
   if (!updateCheckQuiet && builtin && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp) {
     try {
       staleCheckResult = checkProjectStaleness(dir);

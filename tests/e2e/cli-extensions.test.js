@@ -130,6 +130,25 @@ describe("ndx <extension command>", () => {
     });
   }
 
+  it("an extension outlives cli.timeoutMs and passes its own exit code through", () => {
+    installEcho("recon");
+    writeFileSync(join(home, "extensions", "node_modules", "ndx-recon", "bin", "cli.js"), `setTimeout(() => process.exit(7), 2000);`);
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ cli: { timeoutMs: 1000 } }));
+    const result = runResult(["recon"], opts());
+    expect(result.stderr).not.toMatch(/timed out/);
+    expect(result.code).toBe(7);
+  });
+
+  it("an extension's positional argument is not read as an n-dx project", () => {
+    installEcho("recon");
+    writeFileSync(join(home, "extensions", "node_modules", "ndx-recon", "bin", "cli.js"), `setTimeout(() => process.exit(7), 2000);`);
+    const other = mkdirp(join(root, "other"));
+    writeFileSync(join(other, ".n-dx.json"), JSON.stringify({ cli: { timeoutMs: 1000 } }));
+    const result = runResult(["recon", other], opts());
+    expect(result.stderr).not.toMatch(/timed out/);
+    expect(result.code).toBe(7);
+  });
+
   it("runs the extension with the Node n-dx runs on", () => {
     installEcho("recon");
     expect(run(["recon"], opts())).toContain(`exec ${process.execPath}`);
