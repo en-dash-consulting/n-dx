@@ -50,6 +50,19 @@ function MapLinks({ change }: { change: ChangeRow }) {
   );
 }
 
+/** Open and held: opens the change's detail panel, where it is placed. */
+function NeedsPlacement({ change, onSelect }: {
+  change: ChangeRow;
+  onSelect?: (id: string) => void;
+}) {
+  if (!onSelect) return h("span", { class: "tag ch-needs-placement" }, "Needs placement");
+  return h("button", {
+    type: "button",
+    class: "tag ch-needs-placement ch-needs-placement-link",
+    onClick: () => onSelect(change.id),
+  }, "Needs placement");
+}
+
 function Change({ change, onSelect }: {
   change: ChangeRow;
   onSelect?: (id: string) => void;
@@ -69,7 +82,7 @@ function Change({ change, onSelect }: {
           }, change.title)
         : h("span", { class: "ch-change-title" }, change.title),
       change.spike ? h("span", { class: "tag ch-spike" }, "Spike") : null,
-      change.needsPlacement ? h("span", { class: "tag ch-needs-placement" }, "Needs placement") : null,
+      change.awaitsPlacement ? h(NeedsPlacement, { change, onSelect }) : null,
       change.priority ? h("span", { class: "tag ch-priority" }, change.priority) : null,
     ),
     change.intent ? h("p", { class: "ch-intent" }, change.intent) : null,

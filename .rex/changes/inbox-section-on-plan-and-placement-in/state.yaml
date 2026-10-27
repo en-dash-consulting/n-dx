@@ -14,7 +14,14 @@ items:
     lastModified: "2026-10-27T16:31:21.304Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1591411c-4f94-4956-bcb7-cb7935677015":
-    lastModified: "2026-10-27T16:31:13.438Z"
+    status: "completed"
+    startedAt: "2026-10-27T22:58:17.007Z"
+    completedAt: "2026-10-27T23:02:14.322Z"
+    endedAt: "2026-10-27T23:02:14.322Z"
+    activeIntervals: [{"end":"2026-10-27T23:02:14.322Z","start":"2026-10-27T22:58:17.007Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Orange Inbox count on Plan tab, \"Inbox N\" bottom-bar pill (opens inbox view), hidden at 0/v1; Changes shows Needs placement only on awaitsPlacement rows and opens the detail panel. Tests added."
+    lastModified: "2026-10-27T23:02:14.322Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "21a8d036-41d6-45fb-b10c-181f074f3e4f":
     lastModified: "2026-10-27T22:49:17.113Z"

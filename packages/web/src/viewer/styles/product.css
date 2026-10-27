@@ -508,3 +508,6 @@
   color: var(--text-muted);
   cursor: pointer;
 }
+
+.ch-needs-placement-link { background: none; font: inherit; font-size: inherit; cursor: pointer; }
+.ch-needs-placement-link:hover { background: color-mix(in srgb, var(--orange) 12%, transparent); }

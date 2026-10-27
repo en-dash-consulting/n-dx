@@ -34,6 +34,26 @@ function releaseHeadings(el: HTMLElement): string[] {
     .map((h2) => h2.firstChild?.textContent?.trim() ?? "");
 }
 
+describe("ChangesView: Needs placement tag", () => {
+  const held = { ...CHANGES_FIXTURE[0], id: "held", stage: "proposed", awaitsPlacement: true } as ChangeRow;
+  const flagged = { ...CHANGES_FIXTURE[0], id: "flagged", stage: "applied", needsPlacement: true } as ChangeRow;
+  const plain = { ...CHANGES_FIXTURE[0], id: "plain", stage: "proposed" } as ChangeRow;
+
+  it("shows only on rows that await placement, not on flagged applied history", () => {
+    const el = mount(h(ChangesView, { changes: [held, flagged, plain], onSelectChange: () => {} }));
+    const tagged = [...el.querySelectorAll(".ch-needs-placement")]
+      .map((t) => t.closest("[data-change-id]")?.getAttribute("data-change-id"));
+    expect(tagged).toEqual(["held"]);
+  });
+
+  it("opens the change's detail panel", () => {
+    const seen: string[] = [];
+    const el = mount(h(ChangesView, { changes: [held], onSelectChange: (id: string) => seen.push(id) }));
+    (el.querySelector("button.ch-needs-placement") as HTMLButtonElement).click();
+    expect(seen).toEqual(["held"]);
+  });
+});
+
 describe("ChangesView", () => {
   it("groups by planned release, lowest version first and unscheduled last", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
@@ -108,7 +128,6 @@ describe("ChangesView", () => {
 
     const stewards = el.querySelector('[data-change-id="change-stewards"]');
     expect(stewards?.querySelector(".ch-progress-empty")?.textContent).toBe("no tasks");
-    expect(stewards?.querySelector(".ch-needs-placement")).not.toBeNull();
 
     expect(el.querySelector('[data-change-id="change-forked-sessions"] .ch-spike')).not.toBeNull();
     expect(el.querySelector('[data-change-id="change-placement-engine"] .ch-spike')).toBeNull();
