@@ -8,13 +8,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { once } from "node:events";
 import { connect } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SidecarManager, isPidAlive, ndxCliPlanner, startHub } from "../../src/hub/index.js";
 import type { HubHandle, PlanResult, SidecarManagerOptions, SidecarPlan } from "../../src/hub/index.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
 
 const FIXTURE = [
   `const http = require("node:http");`,
@@ -52,7 +53,7 @@ beforeEach(() => {
 afterEach(async () => {
   while (hubs.length) await hubs.pop()!.close({ stopChildren: true });
   while (managers.length) await managers.pop()!.stopAll();
-  rmSync(dir, { recursive: true, force: true });
+  await removeTempDir(dir);
 });
 
 function planFor(name: string, mode = "ok", idleStopMinutes = 15): SidecarPlan {
@@ -60,7 +61,9 @@ function planFor(name: string, mode = "ok", idleStopMinutes = 15): SidecarPlan {
     name,
     execPath: process.execPath,
     bin,
-    cwd: dir,
+    // Not `dir`: Windows locks a live process's cwd, so a sidecar still
+    // exiting at teardown would keep the temp dir from being removed.
+    cwd: tmpdir(),
     env: { ...process.env, NDX_EXTENSION_NAME: name, SIDECAR_MODE: mode },
     health: "/healthz",
     idleStopMinutes,
@@ -345,7 +348,7 @@ describe("hub /x/<name>/", () => {
           for (const w of waiters) if (message.includes(w.text)) w.resolve();
         },
         // The idle line is logged before the stop; wait for the exit too, or
-        // the temp dir, the sidecar's cwd, cannot be removed on Windows.
+        // its log file in the temp dir is still open at teardown on Windows.
         idleStopped: async (name) => {
           await until(`sidecar ${name}: idle`);
           const up = lines.find((l) => l.includes(`sidecar ${name} up (pid `))!;
