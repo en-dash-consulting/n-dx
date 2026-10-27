@@ -789,7 +789,10 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
   // as the user's own, so it is repository config the user has to accept.
   if (config.localConfigTracked) {
     // `.n-dx.local.json`, or `.ndx/config.local.json` on the container layout.
-    const file = config.sources.find((s) => s.endsWith("local.json")) ?? ".n-dx.local.json";
+    // `collectRepoExecutionConfig` always lists it; the fallback names the legacy file.
+    const legacy = resolveLayout(".", { mode: "legacy" });
+    const file = config.sources.find((s) => s.endsWith("local.json"))
+      ?? relativeToRoot(legacy, legacy.localConfigFile);
     findings.push({
       code: "local-config-tracked",
       severity: "warning",

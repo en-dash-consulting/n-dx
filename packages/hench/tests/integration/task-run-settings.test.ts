@@ -557,6 +557,8 @@ describe("ndx work --resolve reports the task's saved settings", () => {
       JSON.stringify({ llm: { claude: { cli_path: process.execPath } } }),
       "utf-8",
     );
+    // Ignored, as `ndx init` leaves it: a committed one is repository config.
+    await writeFile(join(projectDir, ".gitignore"), ".n-dx.local.json\n", "utf-8");
     commitGitFixtureBaseline(projectDir);
     vi.spyOn(console, "error").mockImplementation(() => {});
   });

@@ -115,6 +115,8 @@ beforeAll(async () => {
   await writeFile(join(templateDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: CLAUDE.vendor } }), "utf-8");
   // cli_path is machine-local: a shared one applies only once the repository is trusted.
   await writeFile(join(templateDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: CLAUDE.claude } }), "utf-8");
+  // Ignored, as `ndx init` leaves it: a committed one is repository config.
+  await writeFile(join(templateDir, ".gitignore"), ".n-dx.local.json\n", "utf-8");
   commitGitFixtureBaseline(templateDir);
 });
 

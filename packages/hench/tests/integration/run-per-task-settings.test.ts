@@ -128,6 +128,8 @@ async function setup(document: unknown, llm: Record<string, unknown> = {}): Prom
     JSON.stringify({ llm: { claude: { cli_path: process.execPath }, ...(codex ? { codex } : {}) } }),
     "utf-8",
   );
+  // Ignored, as `ndx init` leaves it: a committed one is repository config.
+  await writeFile(join(projectDir, ".gitignore"), ".n-dx.local.json\n", "utf-8");
   commitGitFixtureBaseline(projectDir);
 }
 
