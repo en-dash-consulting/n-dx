@@ -5,8 +5,15 @@ items:
     lastModified: "2026-10-27T17:45:38.707Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3039164b-8369-450c-8745-9b133c345ae7":
+    status: "completed"
+    startedAt: "2026-10-27T18:09:41.690Z"
+    completedAt: "2026-10-27T18:11:28.338Z"
+    endedAt: "2026-10-27T18:11:28.338Z"
+    activeIntervals: [{"end":"2026-10-27T18:11:28.338Z","start":"2026-10-27T18:09:41.690Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "cli-serve.test.ts afterEach rm now uses maxRetries:10, retryDelay:100 with a Windows handle-release comment."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:45:29.589Z"
+    lastModified: "2026-10-27T18:11:28.338Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7f70e60d-151b-4fd5-bb80-7c1d07e61131":
     assignee: "Ryan Keith <ryan.k@endash.us>"
