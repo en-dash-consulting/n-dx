@@ -17,6 +17,8 @@ import {
   inboxPosition,
   nextCriterionId,
   placedLine,
+  requestPlacement,
+  takePlacementRequest,
   takeTitleFocus,
 } from "../../../src/viewer/components/prd-tree/change-placement.js";
 import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
@@ -225,6 +227,18 @@ describe("an Inbox change's panel", () => {
     // Nothing is chosen for the person: Place waits for a pick.
     expect(button("Place")?.disabled).toBe(true);
     expect(spies.onInboxState).toHaveBeenLastCalledWith(true);
+  });
+
+  it("opens on Amends with the target Quick Add asked for, once", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1"), candidate("cap-2")], { relation: "touches" })]);
+    requestPlacement("a", { relation: "amends", target: { target: "cap-2", title: "A1.2 Home cap-2", area: "Checkout" } });
+    await mountSection("a");
+
+    expect($<HTMLInputElement>('.cp-relation input[value="amends"]')?.checked).toBe(true);
+    expect($<HTMLInputElement>('.cp-target[data-target="cap-2"] input')?.checked).toBe(true);
+    // The shortlist row replaced the request's target, so the Amends form has its type.
+    expect($(".cp-target.is-checked .cp-target-title")?.textContent).toBe("Home cap-2");
+    expect(takePlacementRequest("a")).toBeNull();
   });
 
   it("is a single Placed line for a change that has left the Inbox", async () => {

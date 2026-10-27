@@ -57,12 +57,39 @@ export function takeTitleFocus(id: string): boolean {
   return true;
 }
 
+// ── Opening the form on a relation ───────────────────────────────────
+
+/** What a caller asked the place form to open with. */
+export interface PlacementRequest {
+  relation: PlacementRelation;
+  target?: PlacementTarget;
+}
+
+let pendingPlacement: { changeId: string; request: PlacementRequest } | null = null;
+
+/**
+ * Ask the place form to open on `request` when it next opens `changeId` —
+ * Quick Add's "Amends…" lands on Where it goes with Amends selected.
+ */
+export function requestPlacement(changeId: string, request: PlacementRequest): void {
+  pendingPlacement = { changeId, request };
+}
+
+/** The request for `changeId`, once. */
+export function takePlacementRequest(changeId: string): PlacementRequest | null {
+  if (pendingPlacement?.changeId !== changeId) return null;
+  const { request } = pendingPlacement;
+  pendingPlacement = null;
+  return request;
+}
+
 // ── Model ────────────────────────────────────────────────────────────
 
 /** A node a change can be placed on: a shortlist candidate, or a search pick. */
 export interface PlacementTarget {
   target: string;
-  type: "capability" | "constraint";
+  /** Absent on a Quick Add preview candidate whose node the server could not read. */
+  type?: "capability" | "constraint";
   title: string;
   area: string;
   statement?: string;
@@ -191,7 +218,8 @@ function matched(reasons: readonly string[]): string {
   return reasons.map((r) => r.replace(/^words: /, "matched ")).join(" · ");
 }
 
-function TargetRow({ name, target, checked, onChoose }: {
+/** One radio row: a target's title, strength (or kind), area and matched words. */
+export function TargetRow({ name, target, checked, onChoose }: {
   name: string;
   target: PlacementTarget;
   checked: boolean;
@@ -211,7 +239,7 @@ function TargetRow({ name, target, checked, onChoose }: {
 }
 
 /** Search over every capability and constraint, grouped by area. */
-function TargetSearch({ map, mapError, onChoose }: {
+export function TargetSearch({ map, mapError, onChoose }: {
   map: ProductMap | null;
   /** Why the product map could not be read; shown in place of the search. */
   mapError?: string;
@@ -289,8 +317,10 @@ interface PlaceFormProps {
 function PlaceForm({ changeId, changeTitle, read, map, mapError, another, hasNext, onPlaced, onNothingFits, onDone }: PlaceFormProps) {
   const placement = read && "placement" in read ? read.placement : null;
   const shortlist = placement?.shortlist ?? [];
-  const [chosen, setChosen] = useState<PlacementTarget | null>(null);
-  const [relation, setRelation] = useState<PlacementRelation>(placement?.relation ?? "touches");
+  // A caller's request (Quick Add's "Amends…") outranks the rules' relation.
+  const [requested] = useState(() => (another ? null : takePlacementRequest(changeId)));
+  const [chosen, setChosen] = useState<PlacementTarget | null>(requested?.target ?? null);
+  const [relation, setRelation] = useState<PlacementRelation>(requested?.relation ?? placement?.relation ?? "touches");
   const [summary, setSummary] = useState("");
   const [proposed, setProposed] = useState("");
   const [drafts, setDrafts] = useState<CriterionDraft[]>([]);
@@ -299,7 +329,12 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, hasNex
   const criteriaRef = useRef<HTMLDivElement>(null);
 
   // The rules' relation arrives with the shortlist; an extra place only touches.
-  useEffect(() => { if (placement) setRelation(placement.relation); }, [placement?.relation]);
+  useEffect(() => { if (placement && !requested) setRelation(placement.relation); }, [placement?.relation]);
+  // A requested target becomes its shortlist row once read: that row carries type and criteria.
+  useEffect(() => {
+    const row = requested?.target && shortlist.find((c) => c.target === requested.target!.target);
+    if (row && chosen?.target === row.target) setChosen(row);
+  }, [shortlist.length]);
   const effectiveRelation: PlacementRelation = another ? "touches" : relation;
 
   // The target's criteria seed the Amends form; a search pick reads them.

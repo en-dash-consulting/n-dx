@@ -4763,10 +4763,10 @@
   white-space: nowrap;
 }
 
-/* A v2 change card's text is shown whole: a long title or target wraps.
-   Kept after both base rules, which it overrides at equal specificity. */
-.smart-add-preview-title--wrap,
-.smart-add-preview-task-title--wrap {
+/* A v2 change card's title is shown whole: a long one wraps. Kept after
+   the base rule, which it overrides at equal specificity. Its placement
+   rows are `.cp-target`, which wrap on their own. */
+.smart-add-preview-title--wrap {
   overflow: visible;
   text-overflow: clip;
   white-space: normal;

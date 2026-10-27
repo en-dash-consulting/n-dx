@@ -16,9 +16,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, readFile } from "node:fs/promises";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, cpSync } from "node:fs";
 import { removeTempDir } from "../helpers/temp-dir.js";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { resolveStore } from "@n-dx/rex";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
 
@@ -379,5 +380,102 @@ describe("Quick Add on a v2 PRD", () => {
     expect(data.added).toBe(2);
     expect(data.changes).toHaveLength(2);
     expect(broadcasts.map((b) => b.type)).toContain("rex:prd-changed");
+  });
+});
+
+/**
+ * Capture-time placement on a real v2 tree: the preview's shortlist carries
+ * what a choice needs, and each path the Preview offers lands where it says.
+ * `rex add` stays mocked; the item route writes the tree for real.
+ */
+describe("Quick Add placement on a v2 tree", () => {
+  const FIXTURE = resolve(__dirname, "../../../rex/tests/fixtures/v2-tree");
+  const CAPABILITY_ID = "a0000000-0000-4000-8000-000000000002";
+
+  let tmpDir: string;
+  let rexDir: string;
+  let server: Server;
+  let port: number;
+
+  /** rex's preview row: score and reasons, no strength, area or tie. */
+  const previewWith = (shortlist: Array<Record<string, unknown>>) => ({
+    ...V2_PREVIEW,
+    changes: [{ ...V2_PREVIEW.changes[0], placement: { relation: "touches", shortlist } }],
+  });
+
+  beforeEach(async () => {
+    execCalls.length = 0;
+    tmpDir = await mkdtemp(join(tmpdir(), "smart-add-v2-place-"));
+    rexDir = join(tmpDir, ".rex");
+    const svDir = join(tmpDir, ".sourcevision");
+    await mkdir(svDir, { recursive: true });
+    cpSync(FIXTURE, rexDir, { recursive: true });
+    const ctx: ServerContext = { projectDir: tmpDir, svDir, rexDir, dev: false };
+    ({ server, port } = await startTestServer(ctx, (() => {}) as unknown as WebSocketBroadcaster));
+  });
+
+  afterEach(async () => {
+    await closeRouteTestServer(server);
+    await removeTempDir(tmpDir);
+  });
+
+  it("completes each candidate with rex's strength band, the target's area and type, and the tie", async () => {
+    mockExecResult = {
+      stdout: JSON.stringify(previewWith([
+        { target: CAPABILITY_ID, relation: "touches", score: 11, reasons: ["words: card"], title: "Pay by card", displayId: "A1.1" },
+        { target: "a0000000-0000-4000-8000-000000000001", relation: "touches", score: 11, reasons: [], title: "Checkout" },
+      ])),
+      stderr: "", exitCode: 0, error: null,
+    };
+
+    const { changes } = await (await post(port, "/api/rex/smart-add-preview", { text: "Support refunds when paying by card" })).json();
+
+    expect(changes[0].placement.tied).toBe(true);
+    expect(changes[0].placement.shortlist[0]).toMatchObject({
+      target: CAPABILITY_ID, type: "capability", area: "Checkout", score: 11, strength: "strong", reasons: ["words: card"],
+    });
+  });
+
+  it("is untied when the top pick scores alone, and keeps a strength rex already sent", async () => {
+    mockExecResult = {
+      stdout: JSON.stringify(previewWith([
+        { target: CAPABILITY_ID, relation: "touches", score: 12, strength: "strong", reasons: [] },
+        { target: "unknown-target", relation: "touches", score: 3, reasons: [] },
+      ])),
+      stderr: "", exitCode: 0, error: null,
+    };
+
+    const { changes } = await (await post(port, "/api/rex/smart-add-preview", { text: "Support refunds when paying by card" })).json();
+
+    expect(changes[0].placement.tied).toBe(false);
+    expect(changes[0].placement.shortlist.map((c: { strength: string; area: string }) => [c.strength, c.area]))
+      .toEqual([["strong", "Checkout"], ["weak", ""]]);
+  });
+
+  it("Add & place creates a change outside the Inbox that touches the chosen node", async () => {
+    const res = await post(port, "/api/rex/items", {
+      title: "Support refunds when paying by card",
+      description: "Support refunds when paying by card\n\nBack to the same card.",
+      touches: [CAPABILITY_ID],
+    });
+
+    expect(res.status).toBe(201);
+    const created = await res.json();
+    expect(created.needsPlacement).toBe(false);
+    const item = await (await resolveStore(rexDir)).getItem(created.id);
+    expect(item).toMatchObject({ type: "change", touches: [CAPABILITY_ID] });
+    expect(item).not.toHaveProperty("needsPlacement", true);
+    // No rex add spawn: the item route writes through rex's add rule in-process.
+    expect(execCalls).toHaveLength(0);
+  });
+
+  it("Leave it in the Inbox and Amends… accept through rex add, which reports the change id the panel opens", async () => {
+    mockExecResult = { stdout: JSON.stringify(V2_ACCEPTED), stderr: "", exitCode: 0, error: null };
+
+    const res = await post(port, "/api/rex/smart-add-accept", { text: "Support refunds when paying by card" });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).changes).toEqual([expect.objectContaining({ id: V2_ACCEPTED.id, needsPlacement: true })]);
+    expect(execCalls[0].args).toContain("--accept");
   });
 });

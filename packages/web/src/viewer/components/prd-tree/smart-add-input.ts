@@ -24,6 +24,9 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "preact/hooks"
 import { ProposalEditor } from "./proposal-editor.js";
 import type { RawProposal } from "./proposal-editor.js";
 import { isContainerType, isRootType, itemTypeLabel, itemTypeOf } from "../../external.js";
+import { TargetRow, TargetSearch, requestPlacement, type PlacementTarget } from "./change-placement.js";
+import { useProductRead } from "../../views/product-pages.js";
+import type { PlacementRelation, PlacementStrength, ProductMap } from "../../views/product-model.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -36,6 +39,8 @@ export interface SmartAddInputProps {
   barAction?: ComponentChildren;
   /** The served PRD's layout; v2 captures a change into the Inbox. Defaults to v1. */
   layout?: "v1" | "v2";
+  /** Open a change's detail panel; "Amends…" lands there after Add. */
+  onOpenChange?: (id: string) => void;
 }
 
 interface QualityIssue {
@@ -44,14 +49,31 @@ interface QualityIssue {
   message: string;
 }
 
-/** One ranked capability or constraint the change could be placed on. */
+/**
+ * One ranked capability or constraint the change could be placed on, as
+ * `completePreviewPlacement` in `server/routes-rex/placement.ts` sends it.
+ */
 interface PlacementCandidate {
   /** Id of the target; `title` names it when the server could resolve it. */
   target: string;
-  relation: string;
+  type?: "capability" | "constraint";
+  relation?: string;
   title?: string;
   displayId?: string;
+  score?: number;
+  strength?: PlacementStrength;
+  reasons?: string[];
+  area?: string;
 }
+
+/** What a preview card does on Add: leave its change in the Inbox (`target: null`) or place it. */
+export interface PlacementChoice {
+  target: PlacementTarget | null;
+  relation: PlacementRelation;
+}
+
+/** A card's outcome on Add; `none` is a change that needs no placement (a task under a change). */
+type PlacementEffect = "none" | "inbox" | "place" | "amend";
 
 /**
  * A change `rex add` would create on a v2 PRD, as the preview forwards it.
@@ -66,7 +88,7 @@ export interface PreviewChange {
   /** The full text, when the title had to be cut from it. */
   description?: string;
   needsPlacement?: boolean;
-  placement?: { relation: string; shortlist: PlacementCandidate[] };
+  placement?: { relation: PlacementRelation; tied?: boolean; shortlist: PlacementCandidate[] };
 }
 
 type PreviewState = "idle" | "loading" | "done" | "error";
@@ -123,9 +145,85 @@ const V1_COPY: PanelCopy = {
   loadingText: "Analyzing description and generating proposals...",
 };
 
-/** What comes after a v2 capture: the change waits in the Inbox until placed. */
-const V2_NEXT_STEP =
-  "Next: place it on the capability it changes, then add its tasks from its detail panel.";
+// ── Placement choice (v2) ────────────────────────────────────────────
+
+/** A preview candidate as a radio row's target. */
+function candidateTarget(c: PlacementCandidate): PlacementTarget {
+  return {
+    target: c.target,
+    ...(c.type ? { type: c.type } : {}),
+    title: [c.displayId, c.title ?? c.target].filter(Boolean).join(" "),
+    area: c.area ?? "",
+    ...(c.strength ? { strength: c.strength } : {}),
+    ...(c.reasons ? { reasons: c.reasons } : {}),
+  };
+}
+
+/**
+ * IB8: the top pick is pre-selected only when it is strong and the shortlist
+ * is not tied; otherwise the change is left in the Inbox. A runner-up can
+ * score strong too and be the wrong home, so anything less is a person's call.
+ */
+export function defaultPlacementChoice(change: PreviewChange): PlacementChoice {
+  const placement = change.placement;
+  const relation = placement?.relation ?? "touches";
+  const top = placement?.shortlist[0];
+  if (!change.needsPlacement || !top || top.strength !== "strong" || placement?.tied) return { target: null, relation };
+  return { target: candidateTarget(top), relation };
+}
+
+function effectOf(change: PreviewChange, choice: PlacementChoice | undefined): PlacementEffect {
+  if (!change.needsPlacement) return "none";
+  if (!choice?.target) return "inbox";
+  return choice.relation === "amends" ? "amend" : "place";
+}
+
+/** The primary button's words for what Add will do. */
+export function acceptLabel(changes: PreviewChange[], choices: PlacementChoice[]): string {
+  const effects = changes.map((c, i) => effectOf(c, choices[i]));
+  const n = changes.length;
+  if (n === 1) {
+    switch (effects[0]) {
+      case "place": return "Add 1 change & place it";
+      case "amend": return "Add & amend…";
+      case "inbox": return "Add to Inbox";
+      default: return "Add 1 change";
+    }
+  }
+  const placed = effects.filter((e) => e === "place").length;
+  if (placed) return `Add ${n} changes & place ${placed}`;
+  return effects.some((e) => e !== "none") ? `Add ${n} changes to the Inbox` : `Add ${n} changes`;
+}
+
+/** What follows Add, in the words of what was chosen; null when nothing needs placing. */
+export function nextStepCopy(changes: PreviewChange[], choices: PlacementChoice[]): string | null {
+  const effects = changes.map((c, i) => effectOf(c, choices[i]));
+  if (effects.every((e) => e === "none")) return null;
+  if (changes.length > 1) {
+    return "Placed changes skip the Inbox; the rest wait there until placed. Next: add each change's tasks from its detail panel.";
+  }
+  switch (effects[0]) {
+    case "place":
+      return `It goes on ${choices[0].target!.title} and skips the Inbox. Next: add its tasks from its detail panel.`;
+    case "amend":
+      return "It goes to the Inbox, then its detail panel opens at Where it goes with Amends selected, to say what it changes.";
+    default:
+      return "It waits in the Inbox. Next: place it on the capability it changes, then add its tasks from its detail panel.";
+  }
+}
+
+async function postJson<T>(url: string, body: unknown, fallback: string): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: fallback }));
+    throw new Error(errBody.error || `HTTP ${res.status}`);
+  }
+  return await res.json() as T;
+}
 
 const V2_COPY: PanelCopy = {
   title: "Add to Inbox",
@@ -144,12 +242,14 @@ const V2_COPY: PanelCopy = {
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function SmartAddInput({ onPrdChanged, bar, barAction, layout }: SmartAddInputProps) {
+export function SmartAddInput({ onPrdChanged, bar, barAction, layout, onOpenChange }: SmartAddInputProps) {
   const copy = layout === "v2" ? V2_COPY : V1_COPY;
   const [input, setInput] = useState("");
   const [state, setState] = useState<PreviewState>("idle");
   const [proposals, setProposals] = useState<RawProposal[]>([]);
   const [changes, setChanges] = useState<PreviewChange[]>([]);
+  // One placement choice per previewed change, by index.
+  const [choices, setChoices] = useState<PlacementChoice[]>([]);
   const [confidence, setConfidence] = useState(0);
   const [qualityIssues, setQualityIssues] = useState<QualityIssue[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -259,7 +359,9 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout }: SmartAdd
 
       setProposals(data.proposals ?? []);
       // A v2 PRD previews changes instead of proposals.
-      setChanges(data.preview ? (data.changes ?? []) : []);
+      const previewChanges: PreviewChange[] = data.preview ? (data.changes ?? []) : [];
+      setChanges(previewChanges);
+      setChoices(previewChanges.map(defaultPlacementChoice));
       setConfidence(data.confidence ?? 0);
       setQualityIssues(data.qualityIssues ?? []);
       setState("done");
@@ -366,31 +468,54 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout }: SmartAdd
     const previewed = previewedRef.current;
     if (changes.length === 0 || !previewed) return;
 
+    const effects = changes.map((c, i) => effectOf(c, choices[i]));
     setAccepting(true);
+    setError(null);
+    let created: Array<{ id: string }> = [];
     try {
-      const res = await fetch("/api/rex/smart-add-accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(previewed),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ error: "Accept failed" }));
-        throw new Error(errBody.error || `HTTP ${res.status}`);
+      if (effects.includes("place")) {
+        // A placed change skips the Inbox: each card is added on its own, with
+        // `touches` naming its target, so rex's add rule places it in the same write.
+        for (const [i, change] of changes.entries()) {
+          const target = effects[i] === "place" ? choices[i].target!.target : null;
+          try {
+            created = [...created, await postJson<{ id: string }>("/api/rex/items", {
+              title: change.title,
+              ...(change.description ? { description: change.description } : {}),
+              ...(target ? { touches: [target] } : {}),
+            }, "Add failed")];
+          } catch (err) {
+            if (!created.length) throw err;
+            const message = err instanceof Error ? err.message : String(err);
+            throw new Error(`${message} (${created.length} of ${changes.length} changes were added before it failed)`);
+          }
+        }
+      } else {
+        const accepted = await postJson<{ changes?: Array<{ id: string }> }>("/api/rex/smart-add-accept", previewed, "Accept failed");
+        created = accepted.changes ?? [];
       }
 
       setInput("");
       setChanges([]);
+      setChoices([]);
       setState("idle");
       previewedRef.current = null;
       refreshScopes();
       onPrdChanged();
+
+      // Amends…: the change is in the Inbox; its panel opens on the amendment.
+      const amend = effects.indexOf("amend");
+      const amendId = amend >= 0 ? created[amend]?.id : undefined;
+      if (amendId && onOpenChange) {
+        requestPlacement(amendId, { relation: "amends", ...(choices[amend].target ? { target: choices[amend].target! } : {}) });
+        onOpenChange(amendId);
+      }
     } catch (err) {
       setError(String(err));
     } finally {
       setAccepting(false);
     }
-  }, [changes, onPrdChanged, refreshScopes]);
+  }, [changes, choices, onPrdChanged, onOpenChange, refreshScopes]);
 
   // ── Editor callbacks ─────────────────────────────────────────────
 
@@ -566,13 +691,17 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout }: SmartAdd
             ),
           ),
 
-          h("div", { class: "smart-add-preview" },
-            changes.map((change, ci) =>
-              h(ChangePreviewCard, { key: change.id ?? ci, change }),
-            ),
-          ),
+          h(ChangePreviewList, {
+            changes,
+            choices,
+            onChoose: (index: number, choice: PlacementChoice) =>
+              setChoices((prev) => prev.map((c, i) => (i === index ? choice : c))),
+          }),
 
-          h("p", { class: "smart-add-preview-desc smart-add-next-step" }, V2_NEXT_STEP),
+          (() => {
+            const next = nextStepCopy(changes, choices);
+            return next ? h("p", { class: "smart-add-preview-desc smart-add-next-step" }, next) : null;
+          })(),
 
           h("div", { class: "smart-add-actions" },
             h("button", {
@@ -580,10 +709,7 @@ export function SmartAddInput({ onPrdChanged, bar, barAction, layout }: SmartAdd
               onClick: handleAcceptChanges,
               disabled: accepting,
               type: "button",
-            }, accepting
-              ? "Adding..."
-              : `Add ${changes.length} change${changes.length !== 1 ? "s" : ""}`,
-            ),
+            }, accepting ? "Adding..." : acceptLabel(changes, choices)),
           ),
         )
       : null,
@@ -701,12 +827,49 @@ function ConfidenceBar({ confidence }: ConfidenceBarProps) {
 
 // ── Change Preview Card (v2 PRD) ────────────────────────────────────
 
-interface ChangePreviewCardProps {
-  change: PreviewChange;
+interface ChangePreviewListProps {
+  changes: PreviewChange[];
+  choices: PlacementChoice[];
+  onChoose: (index: number, choice: PlacementChoice) => void;
 }
 
-function ChangePreviewCard({ change }: ChangePreviewCardProps) {
+/** The previewed changes, with the product map their "Search all" fields share. */
+function ChangePreviewList({ changes, choices, onChoose }: ChangePreviewListProps) {
+  const product = useProductRead<ProductMap>("/api/rex/product", (body) => body.map as ProductMap);
+  const map = product.state === "ready" ? product.data ?? null : null;
+  const mapError = product.state === "error" ? product.message : undefined;
+  return h("div", { class: "smart-add-preview" },
+    changes.map((change, ci) =>
+      h(ChangePreviewCard, {
+        key: change.id ?? ci,
+        change,
+        name: `smart-add-place-${ci}`,
+        choice: choices[ci] ?? defaultPlacementChoice(change),
+        onChoose: (choice: PlacementChoice) => onChoose(ci, choice),
+        map,
+        mapError,
+      }),
+    ),
+  );
+}
+
+interface ChangePreviewCardProps {
+  change: PreviewChange;
+  /** Radio group name, unique per card. */
+  name: string;
+  choice: PlacementChoice;
+  onChoose: (choice: PlacementChoice) => void;
+  map: ProductMap | null;
+  mapError?: string;
+}
+
+function ChangePreviewCard({ change, name, choice, onChoose, map, mapError }: ChangePreviewCardProps) {
   const shortlist = change.placement?.shortlist ?? [];
+  const targets = shortlist.map(candidateTarget);
+  const chosen = choice.target;
+  const searchPick = chosen && !targets.some((t) => t.target === chosen.target) ? chosen : null;
+  const choose = (target: PlacementTarget | null) => onChoose({ ...choice, target });
+  const inInbox = !!change.needsPlacement && (!chosen || choice.relation === "amends");
 
   return h(
     "div",
@@ -715,33 +878,48 @@ function ChangePreviewCard({ change }: ChangePreviewCardProps) {
     h("div", { class: "smart-add-preview-epic" },
       h("span", { class: "prd-level-badge prd-level-epic" }, "Change"),
       h("span", { class: "smart-add-preview-title smart-add-preview-title--wrap" }, change.title),
-      change.needsPlacement
-        ? h("span", { class: "smart-add-preview-count" }, "Inbox")
-        : null,
+      inInbox ? h("span", { class: "smart-add-preview-count" }, "Inbox") : null,
     ),
 
     h("div", { class: "smart-add-preview-body" },
       change.description
         ? h("p", { class: "smart-add-preview-desc smart-add-preview-full-text" }, change.description)
         : null,
-      shortlist.length > 0
-        ? h(Fragment, null,
-            h("p", { class: "smart-add-preview-desc" }, "Suggested placement"),
-            h("div", { class: "smart-add-preview-tasks" },
-              shortlist.map((candidate, ci) =>
-                h("div", { key: ci, class: "smart-add-preview-task" },
-                  h("span", { class: "smart-add-preview-ac-badge" }, candidate.relation),
-                  h("span", { class: "smart-add-preview-task-title smart-add-preview-task-title--wrap" },
-                    [candidate.displayId, candidate.title ?? candidate.target]
-                      .filter(Boolean).join(" "),
-                  ),
+      change.needsPlacement
+        ? h("div", { class: "cp-form smart-add-place" },
+            h("fieldset", { class: "cp-shortlist" },
+              h("legend", { class: "smart-add-preview-desc" }, "Suggested placement"),
+              !shortlist.length
+                ? h("div", { class: "cp-shortlist-empty" }, "No placement suggested. Search, or leave it in the Inbox.")
+                : null,
+              change.placement?.tied
+                ? h("div", { class: "cp-shortlist-warning", role: "note", "data-warning": "tied" },
+                    "Tied: the top matches score the same, so their order means nothing.")
+                : null,
+              targets.map((t) => h(TargetRow, { key: t.target, name, target: t, checked: chosen?.target === t.target, onChoose: choose })),
+              searchPick ? h(TargetRow, { key: searchPick.target, name, target: searchPick, checked: true, onChoose: choose }) : null,
+              h("label", { class: `cp-target smart-add-place-inbox${chosen ? "" : " is-checked"}`, "data-target": "" },
+                h("input", { type: "radio", name, value: "", checked: !chosen, onChange: () => choose(null) }),
+                h("span", { class: "cp-target-body" },
+                  h("span", { class: "cp-target-head" }, h("span", { class: "cp-target-title" }, "Leave it in the Inbox")),
+                  h("span", { class: "cp-target-detail" }, "Place it later from its detail panel or the Inbox."),
                 ),
               ),
             ),
+            h(TargetSearch, { map, mapError, onChoose: choose }),
+            chosen
+              ? h("fieldset", { class: "cp-relation" },
+                  h("legend", { class: "task-section-label" }, "Relation"),
+                  (["touches", "amends"] as const).map((r) =>
+                    h("label", { key: r, class: "cp-relation-option" },
+                      h("input", { type: "radio", name: `${name}-relation`, value: r, checked: choice.relation === r, onChange: () => onChoose({ ...choice, relation: r }) }),
+                      r === "touches" ? "Touches" : "Amends…",
+                    ),
+                  ),
+                )
+              : null,
           )
-        : h("p", { class: "smart-add-preview-desc" },
-            "No placement suggested — it waits in the Inbox until one is recorded.",
-          ),
+        : null,
     ),
   );
 }

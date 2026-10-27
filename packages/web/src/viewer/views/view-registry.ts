@@ -254,8 +254,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "inbox": ({ navigateTo, inSection }) =>
     h(InboxPage, { navigateTo, limit: inSection ? INBOX_SECTION_ROWS : undefined }),
 
-  "analysis": () =>
-    h(AnalysisView, null),
+  "analysis": ({ navigateTo }) =>
+    h(AnalysisView, { navigateTo }),
 
   "merge-graph": ({ navigateTo }) =>
     h(MergeGraphView, { navigateTo }),

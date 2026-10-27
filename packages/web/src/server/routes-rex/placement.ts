@@ -34,6 +34,7 @@ import {
   recordPlacement,
   recordProposal,
   ChangePlacementError,
+  placementStrength,
   withPrdModelTransaction,
 } from "../rex-gateway.js";
 import type { RuleNode, V2Tree, RecordPlacementInput, RecordProposalInput } from "../rex-gateway.js";
@@ -101,17 +102,22 @@ export interface ProposeChangeResultWire {
 
 // ── Shortlist ────────────────────────────────────────────────────────
 
-/** The shortlist for `changeRef`, with each candidate's title, area, statement and criteria. */
-export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePlacementWire {
-  const suggestion = suggestPlacement(tree, changeRef);
-  const index = indexTree(tree);
+/** The title of the area a node sits under, or "" when it sits under none or is unknown. */
+function areaTitles(index: ReturnType<typeof indexTree>): (id: string) => string {
   const parentOf = new Map<string, RuleNode | undefined>(index.entries.map((e) => [e.node.id, e.parent]));
-  const areaOf = (node: RuleNode): string => {
-    for (let p = parentOf.get(node.id); p; p = parentOf.get(p.id)) {
+  return (id) => {
+    for (let p = parentOf.get(id); p; p = parentOf.get(p.id)) {
       if (p.type === "area") return p.title;
     }
     return "";
   };
+}
+
+/** The shortlist for `changeRef`, with each candidate's title, area, statement and criteria. */
+export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePlacementWire {
+  const suggestion = suggestPlacement(tree, changeRef);
+  const index = indexTree(tree);
+  const areaOf = areaTitles(index);
 
   const change = index.resolve(suggestion.change)!;
   const tasks = (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
@@ -123,7 +129,7 @@ export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePla
       target: node.id,
       type: node.type,
       title: node.title,
-      area: areaOf(node),
+      area: areaOf(node.id),
       ...(typeof node.statement === "string" ? { statement: node.statement } : {}),
       criteria: criteria.map((c) => ({ id: c.id, text: c.text })),
       score: candidate.score,
@@ -145,6 +151,62 @@ export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePla
     },
     relation: suggestion.relation,
     tied: suggestion.tied,
+    shortlist,
+  };
+}
+
+// ── Quick Add preview ────────────────────────────────────────────────
+
+/** A Quick Add preview candidate: rex's row, with the strength, reasons and area a choice needs. */
+export interface PreviewPlacementCandidateWire {
+  target: string;
+  /** Absent when the target could not be read from the project's tree. */
+  type?: "capability" | "constraint";
+  relation?: PlacementRelationWire;
+  title?: string;
+  displayId?: string;
+  score: number;
+  strength: PlacementStrengthWire;
+  reasons: string[];
+  /** The area the target sits under; "" when none or the tree could not be read. */
+  area: string;
+}
+
+/** A preview change's placement, with `tied` as the detail panel's shortlist carries it. */
+export interface PreviewPlacementWire {
+  relation: PlacementRelationWire;
+  /** The top two candidates score the same, so the rules name no single leader. */
+  tied: boolean;
+  shortlist: PreviewPlacementCandidateWire[];
+}
+
+/**
+ * Complete the placement `rex add` previewed for one change. Rex's rows carry
+ * score and reasons, and strength when rex is current; strength comes from
+ * rex's own band when it is absent, the area from `tree` (the project's tree:
+ * the shortlisted targets exist there even though the change does not yet).
+ * Anything that is not a placement passes through untouched.
+ */
+export function completePreviewPlacement(placement: unknown, tree: V2Tree | null): unknown {
+  const p = placement as { relation?: unknown; shortlist?: unknown } | null;
+  if (!p || typeof p !== "object" || !Array.isArray(p.shortlist)) return placement;
+  const index = tree ? indexTree(tree) : null;
+  const areaOf = index ? areaTitles(index) : () => "";
+  const shortlist = (p.shortlist as Array<Record<string, unknown>>).map((c): PreviewPlacementCandidateWire => {
+    const score = typeof c.score === "number" ? c.score : 0;
+    const type = typeof c.target === "string" ? index?.resolve(c.target)?.type : undefined;
+    return {
+      ...(c as unknown as PreviewPlacementCandidateWire),
+      ...(type === "capability" || type === "constraint" ? { type } : {}),
+      score,
+      strength: (c.strength as PlacementStrengthWire | undefined) ?? placementStrength(score),
+      reasons: Array.isArray(c.reasons) ? (c.reasons as string[]) : [],
+      area: typeof c.target === "string" ? areaOf(c.target) : "",
+    };
+  });
+  return {
+    ...p,
+    tied: shortlist.length > 1 && shortlist[0].score === shortlist[1].score,
     shortlist,
   };
 }
