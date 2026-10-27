@@ -13,6 +13,12 @@
  *   one waits on its own card, so the CLI must not ask a second time — and in
  *   `-p` mode there is nobody to ask.
  *
+ * Verified on the real CLI (Claude Code 2.1.309, F1 probe p6, design §11.1):
+ * the empty `--setting-sources` is accepted, the session gets only Read, Grep,
+ * Glob and the broker tools whatever the settings files allow, and a broker
+ * call held 65 s returns normally. Not yet verified: a card held for many
+ * minutes on the Streamable HTTP transport.
+ *
  * **Codex.** A read-only sandbox that never asks for approval. A resumed
  * thread keeps the policy it started with.
  */
