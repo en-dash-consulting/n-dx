@@ -194,6 +194,18 @@ describe("rex change place --propose", () => {
     expect((await node(id)).amends[0].target).toBe(body.proposed.target);
   });
 
+  it("refuses a repeat proposal on the same change, in plain wording, and writes nothing", async () => {
+    const id = await addInbox("Refunds by card");
+    const proposed = "A shopper is refunded to the card";
+    await cmdChange(tmp, "place", id, { ...PROPOSE, proposed });
+    const before = await loadPrdModel(rexDir);
+    const err = (await cmdChange(tmp, "place", id, { ...PROPOSE, proposed, title: " REFUND BY CARD " }).catch((e: Error) => e)) as CLIError;
+    expect(err).toBeInstanceOf(CLIError);
+    expect(err.message).toMatch(/already proposes capability "Refund by card" under "Checkout"/);
+    expect(await loadPrdModel(rexDir)).toEqual(before);
+    expect((await node(id)).amends).toHaveLength(1);
+  });
+
   it("refuses --propose with --target or --relation, with a hint, and writes nothing", async () => {
     const id = await addInbox("Refunds by card");
     const before = await loadPrdModel(rexDir);

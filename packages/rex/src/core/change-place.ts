@@ -55,6 +55,7 @@ export type ChangePlacementErrorKind =
   | "not-a-target"
   | "content-needs-amends"
   | "already-amends"
+  | "already-proposed"
   | "rule-errors"
   | "nothing-to-modify"
   | "apply-problems"
@@ -262,6 +263,18 @@ export function recordProposal(
   }
   const title = input.title.trim();
   if (!title) throw new ChangePlacementError("A proposed capability or constraint needs a title", "empty-title");
+
+  // Each proposal mints a fresh target id, so apply cannot see a repeat: refuse it here.
+  const wanted = title.toLowerCase();
+  const existing = (change.amends ?? []).find(
+    (a) => a.delta === "added" && a.type === input.type && a.under !== undefined && index.resolve(a.under) === area && a.title?.trim().toLowerCase() === wanted,
+  );
+  if (existing) {
+    throw new ChangePlacementError(
+      `Change ${label} already proposes ${input.type} "${existing.title}" under "${area.title}"`,
+      "already-proposed",
+    );
+  }
 
   const checked = asProposal({
     target: (options.newId ?? randomUUID)(),

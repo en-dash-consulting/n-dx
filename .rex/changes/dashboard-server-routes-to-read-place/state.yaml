@@ -16,7 +16,14 @@ items:
     lastModified: "2026-10-27T19:06:02.773Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "db652118-ffa4-4b4d-afec-8a3b0dba43e4":
-    lastModified: "2026-10-27T19:05:40.842Z"
+    status: "completed"
+    startedAt: "2026-10-27T19:16:57.669Z"
+    completedAt: "2026-10-27T19:38:02.901Z"
+    endedAt: "2026-10-27T19:38:02.901Z"
+    activeIntervals: [{"end":"2026-10-27T19:29:19.863Z","start":"2026-10-27T19:16:57.669Z"},{"end":"2026-10-27T19:38:02.901Z","start":"2026-10-27T19:38:02.901Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "recordProposal refuses a repeat added amendment (same type, resolved area, trimmed case-insensitive title) with kind already-proposed; CLI maps it, MCP returns it; unit, CLI and MCP tests. Work from run 40e9449b, committed by hand after the agent's commit was blocked."
+    lastModified: "2026-10-27T19:38:02.901Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ed64adff-ca54-4b02-8adb-67616ff02c2b":
     lastModified: "2026-10-27T16:29:32.623Z"

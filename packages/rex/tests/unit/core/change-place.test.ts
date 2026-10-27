@@ -293,6 +293,46 @@ describe("recordProposal", () => {
     expect(err!.plain).not.toMatch(/get_product/);
   });
 
+  describe("a repeat proposal", () => {
+    const first = () => recordProposal(tree(), "ch", wallets, NOW, opts).tree;
+    const repeat = (input: Record<string, unknown>) => refusal(() => recordProposal(first(), "ch", { ...wallets, ...input } as typeof wallets, NOW, { newId: () => "other" }));
+
+    it.each([
+      ["the same title", {}],
+      ["the title trimmed and in another case", { title: "  PAY BY WALLET " }],
+      ["the area given by alias or display id", { under: "A1" }],
+    ])("is refused for %s, naming the title and the area", (_label, input) => {
+      const t = first();
+      t.product[0].displayId = "A1";
+      const err = refusal(() => recordProposal(t, "ch", { ...wallets, ...input }, NOW, { newId: () => "other" }));
+      expect(err).toBeInstanceOf(ChangePlacementError);
+      expect(err!.kind).toBe("already-proposed");
+      expect(err!.plain).toContain('"Pay by wallet"');
+      expect(err!.plain).toContain('"Payments"');
+      expect(changeIn(t).amends).toHaveLength(1);
+    });
+
+    it("is refused when the stored amendment names the area by display id", () => {
+      const t = tree({ amends: [{ target: "x", delta: "added", type: "capability", under: "A1", title: "Pay by wallet", summary: "s" }] });
+      t.product[0].displayId = "A1";
+      expect(refusal(() => recordProposal(t, "ch", wallets, NOW))!.kind).toBe("already-proposed");
+    });
+
+    it.each([
+      ["a different title", { title: "Pay by bank transfer" }],
+      ["a different type", { type: "constraint" as const }],
+    ])("is allowed with %s", (_label, input) => {
+      expect(repeat(input)).toBeUndefined();
+    });
+
+    it("is allowed under a different area", () => {
+      const t = first();
+      t.product.push(node({ id: "ship", type: "area", title: "Shipping", children: [] }));
+      const { tree: next } = recordProposal(t, "ch", { ...wallets, under: "ship" }, NOW, { newId: () => "other" });
+      expect(changeIn(next).amends).toHaveLength(2);
+    });
+  });
+
   it("names get_product only in the MCP wording of an under that is not an area", () => {
     expect(refusal(() => recordProposal(tree(), "ch", { ...wallets, under: "nope" }, NOW))!.message).toMatch(/\(see get_product\)$/);
   });

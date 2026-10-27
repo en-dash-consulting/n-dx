@@ -295,6 +295,17 @@ describe("place_change", () => {
       expect((await log()).at(-1)).toMatchObject({ event: "change_proposed", itemId: id, detail: `capability under ${AREA}: Refund by card` });
     });
 
+    it("refuses a repeat proposal on the same change, naming the title and area, and writes nothing", async () => {
+      const id = await inboxChange("Refunds by card");
+      const proposed = "A shopper is refunded to the card";
+      json(await handlePlaceChange(store(), rexDir, { id, propose: { ...PROPOSE, proposed } }));
+      const before = await files();
+      const message = error(await handlePlaceChange(store(), rexDir, { id, propose: { ...PROPOSE, proposed, title: " refund BY card" } }));
+      expect(message).toMatch(/already proposes capability "Refund by card" under "/);
+      expect(await files()).toEqual(before);
+      expect((await log()).filter((e) => e.event === "change_proposed")).toHaveLength(1);
+    });
+
     it("refuses propose with target (or any placement field), writing nothing", async () => {
       const id = await inboxChange("Refunds by card");
       const before = await files();

@@ -225,6 +225,7 @@ function placementRefusal(err: ChangePlacementError): CLIError {
         `Pass --proposed="...", --${CAPABILITY_CRITERION_FLAG}="<id>: <text>" or --${REMOVE_CAPABILITY_CRITERION_FLAG}=<id>, or use --relation=touches.`,
       );
     case "already-amends":
+    case "already-proposed":
     case "rule-errors":
     case "apply-problems":
     case "no-such-change":
