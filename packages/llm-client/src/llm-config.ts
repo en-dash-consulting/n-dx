@@ -8,7 +8,7 @@
 import { access, readFile } from "node:fs/promises";
 import { resolveLayout } from "./layout.js";
 import { deepMerge } from "./project-config.js";
-import { trustedProjectConfig } from "./credential-routing.js";
+import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import {
   LLM_VENDOR,
   isLLMVendor,
@@ -289,9 +289,10 @@ export function parseLLMConfig(root: Record<string, unknown>): LLMConfig {
 export async function loadLLMConfig(dir: string): Promise<LLMConfig> {
   const { root, configFile, localConfigFile } = resolveLayout(dir);
   // The project config's endpoints and key variables apply only while the
-  // repository is trusted; the local file's always do. See credential-routing.ts.
+  // repository is trusted; the local file's always do, unless the repository
+  // commits it. See credential-routing.ts.
   const projectData = trustedProjectConfig(root, await loadJSONFile(configFile));
-  const localData = await loadJSONFile(localConfigFile);
+  const localData = trustedLocalConfig(root, await loadJSONFile(localConfigFile));
 
   // Merge project and local configs (local wins)
   let merged: Record<string, unknown> | null = projectData;

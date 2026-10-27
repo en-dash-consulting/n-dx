@@ -2,7 +2,8 @@
  * A `claudePath` the repository ships in `.hench/config.json` is the binary
  * `ndx work` would spawn as the Claude CLI when no `cli_path` is set. Until
  * the user trusts the repository it is never run; the user's own
- * `.n-dx.local.json` `hench.claudePath` always is (#635 follow-up).
+ * `.n-dx.local.json` `hench.claudePath` always is (#635 follow-up), unless the
+ * repository commits that file (#686 follow-up).
  *
  * Drives the real `cmdRun` and the real CLI loop. Each stand-in binary only
  * records that it ran and exits non-zero, so the run fails after the spawn —
@@ -101,11 +102,40 @@ describe.skipIf(process.platform === "win32")("hench claudePath and repository t
     await standIn(local, "local-claude");
     await writeHenchConfig({ claudePath: join(projectDir, "repo-claude") });
     await writeFile(join(projectDir, ".n-dx.local.json"), JSON.stringify({ hench: { claudePath: local } }), "utf-8");
+    // Ignored, as `ndx init` leaves it, so the baseline commit does not track it.
+    await writeFile(join(projectDir, ".gitignore"), ".n-dx.local.json\n", "utf-8");
     commitGitFixtureBaseline(projectDir);
 
     await runOnce();
 
     expect(await ran()).toContain("local-claude");
     expect(await ran()).not.toContain("repo-claude");
+  });
+
+  async function commitLocalClaudePath(): Promise<void> {
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ hench: { claudePath: join(projectDir, "repo-claude") } }),
+      "utf-8",
+    );
+    commitGitFixtureBaseline(projectDir);
+  }
+
+  it("never spawns a claudePath from a .n-dx.local.json the repository commits", async () => {
+    await commitLocalClaudePath();
+
+    await runOnce();
+
+    expect(await ran()).not.toContain("repo-claude");
+    expect(await ran()).toContain("path-claude");
+  });
+
+  it("spawns a committed .n-dx.local.json claudePath once the repository is trusted", async () => {
+    await commitLocalClaudePath();
+    recordRepoTrust(projectDir);
+
+    await runOnce();
+
+    expect(await ran()).toContain("repo-claude");
   });
 });

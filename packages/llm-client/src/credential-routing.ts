@@ -12,9 +12,11 @@
  * apply only while the repository is trusted — `trusted` in
  * {@link evaluateRepoTrust}, since setting one is itself a `credential-routing`
  * finding and so never reads as `baseline`. The same fields from the user's
- * `.n-dx.local.json` (git-ignored, theirs) always apply. Both config loaders,
+ * `.n-dx.local.json` (git-ignored, theirs) always apply, unless the repository
+ * commits that file: then it is gated the same way. Both config loaders,
  * `loadLLMConfig` and `loadClaudeConfig`, read the project config through
- * {@link trustedProjectConfig}.
+ * {@link trustedProjectConfig} and the local one through
+ * {@link trustedLocalConfig}.
  *
  * The vendor CLI binary (`*.cli_path`) follows the same rule: a repository
  * that chose it would run its own script with the user's environment.
@@ -29,6 +31,7 @@ import {
   assessRepoExecutionConfig,
   collectRepoExecutionConfig,
   credentialRoutingIn,
+  isLocalConfigTracked,
   isRestrictedState,
   readRepoTrustRecord,
   repoTrustState,
@@ -78,20 +81,49 @@ export function trustedProjectConfig(
   projectConfig: Record<string, unknown> | null,
   options: RepoTrustStoreOptions = {},
 ): Record<string, unknown> | null {
-  if (!projectConfig) return projectConfig;
-  const gated = [...credentialRoutingIn(projectConfig), ...vendorCliPathsIn(projectConfig)];
-  if (gated.length === 0) return projectConfig;
+  return gateConfig(projectRoot, projectConfig, "project config", options);
+}
+
+/**
+ * The machine-local config as the loaders should read it: unchanged while it
+ * is the user's own (not tracked by git), and gated like the project config
+ * when the repository commits it ({@link isLocalConfigTracked}).
+ *
+ * @param projectRoot  The project root.
+ * @param localConfig  The parsed local config, or null when absent.
+ */
+export function trustedLocalConfig(
+  projectRoot: string,
+  localConfig: Record<string, unknown> | null,
+  options: RepoTrustStoreOptions = {},
+): Record<string, unknown> | null {
+  if (!localConfig || !isLocalConfigTracked(projectRoot)) return localConfig;
+  return gateConfig(projectRoot, localConfig, "committed local config", options);
+}
+
+function gateConfig(
+  projectRoot: string,
+  config: Record<string, unknown> | null,
+  label: string,
+  options: RepoTrustStoreOptions,
+): Record<string, unknown> | null {
+  if (!config) return config;
+  const gated = [...credentialRoutingIn(config), ...vendorCliPathsIn(config)];
+  if (gated.length === 0) return config;
 
   const repo = collectRepoExecutionConfig(projectRoot);
   const state = repoTrustState(repo, assessRepoExecutionConfig(repo), readRepoTrustRecord(projectRoot, options));
-  if (!isRestrictedState(state)) return projectConfig;
+  if (!isRestrictedState(state)) return config;
 
-  if (!warned.has(projectRoot)) {
-    warned.add(projectRoot);
+  const key = `${projectRoot}\0${label}`;
+  if (!warned.has(key)) {
+    warned.add(key);
     warn(
-      `[ndx] Ignoring the project config's API endpoint / API key variable / vendor CLI path until you trust this repository (ndx trust accept .): ${gated.map((r) => r.split(" = ")[0]).join(", ")}. ` +
-        "Set them in .n-dx.local.json to use them without trusting the repository.",
+      `[ndx] Ignoring the ${label}'s API endpoint / API key variable / vendor CLI path until you trust this repository (ndx trust accept .): ${gated.map((r) => r.split(" = ")[0]).join(", ")}. ` +
+        (repo.localConfigTracked
+          ? "The repository commits .n-dx.local.json, so it is not your own config here."
+          : "Set them in .n-dx.local.json to use them without trusting the repository."),
     );
   }
-  return withoutTrustGatedFields(projectConfig);
+  return withoutTrustGatedFields(config);
 }

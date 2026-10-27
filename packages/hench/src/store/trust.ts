@@ -10,7 +10,9 @@
  * permission mode is lowered to `acceptEdits`, a `claudePath` it ships
  * gives way to the user's `.n-dx.local.json` one, and the `guard.env.allow`
  * entries it ships are dropped (the user's `.n-dx.local.json` entries and
- * every `deny` entry stay). The repository's config can
+ * every `deny` entry stay). A `.n-dx.local.json` git tracks is the
+ * repository's, so neither its `claudePath` nor its `allow` entries survive
+ * the clamp. The repository's config can
  * only ever tighten what the user's own defaults allow. At baseline, a
  * root-anchored blocked path the baseline lists at any depth (an older
  * `node_modules/**`) is widened to that form.
@@ -80,7 +82,9 @@ export function applyRepoTrust(
     }
     return { evaluation, config: { ...config, guard: { ...config.guard, blockedPaths } }, permissionMode, clamped: true };
   }
-  const local = localHenchSection(projectDir);
+  // A local file the repository commits is its config, not the user's, and
+  // the checkout is restricted here: none of it applies.
+  const local = evaluation.config.localConfigTracked ? undefined : localHenchSection(projectDir);
   // `guard.env.allow` names credentials the agent's shell keeps, so only the
   // user's own `.n-dx.local.json` may add entries here; `deny` only removes.
   const localAllow = stringList(local?.guard?.env?.allow);

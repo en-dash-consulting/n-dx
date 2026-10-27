@@ -14,7 +14,9 @@
  * config's `hench` section) is honoured only while the repository is trusted
  * (`baseline` or `trusted`, see {@link evaluateRepoTrust}). The user's own
  * local config (`.n-dx.local.json`, git-ignored) is theirs, so its entries
- * always apply. `deny` entries can only remove variables and always apply.
+ * always apply — unless git tracks it, when it is the repository's
+ * (`isLocalConfigTracked`). `deny` entries can only remove variables and
+ * always apply.
  *
  * @module llm-client/repo-command-env
  */
@@ -74,9 +76,12 @@ export function repoCommandEnv(projectDir: string, options: RepoCommandEnvOption
     readRepoTrustRecord(projectDir, options.trust),
   );
   const local = localEnvPolicy(projectDir);
+  // A tracked local file is repository config: its `allow` is already folded
+  // into `config.envAllow` and applies only while trusted. `deny` only removes.
+  const localAllow = config.localConfigTracked ? [] : local.allow;
   const policy = compileEnvPolicy({
     deny: [...config.envDeny, ...local.deny],
-    allow: [...(isRestrictedState(state) ? [] : config.envAllow), ...local.allow],
+    allow: [...(isRestrictedState(state) ? [] : config.envAllow), ...localAllow],
   });
   return sanitizeChildEnv(options.env ?? process.env, policy);
 }

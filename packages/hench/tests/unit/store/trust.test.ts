@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -87,6 +88,26 @@ describe("applyRepoTrust", () => {
     const restricted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
     expect(restricted.evaluation.state).toBe("untrusted");
     expect(restricted.config.claudePath).toBe("/opt/claude");
+  });
+
+  it("treats a .n-dx.local.json the repository commits as repository config: no allow entry or claudePath until trusted", () => {
+    writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench: { claudePath: "./tools/claude", guard: { env: { allow: ["AWS_*"] } } } }));
+    execFileSync("git", ["init", "-q"], { cwd: repo, stdio: "ignore" });
+    execFileSync("git", ["add", "-f", ".n-dx.local.json"], { cwd: repo, stdio: "ignore" });
+    // As loadConfig merges it.
+    const config = { ...DEFAULT_HENCH_CONFIG(), claudePath: "./tools/claude" };
+    config.guard = { ...config.guard, env: { allow: ["AWS_*"] } };
+
+    const restricted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+    expect(restricted.evaluation.state).toBe("untrusted");
+    expect(restricted.evaluation.findings.map((f) => f.code)).toContain("local-config-tracked");
+    expect(restricted.config.guard.env?.allow).toEqual([]);
+    expect(restricted.config.claudePath).toBeUndefined();
+
+    recordRepoTrust(repo, { ndxHome: home });
+    const trusted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+    expect(trusted.config.guard.env?.allow).toEqual(["AWS_*"]);
+    expect(trusted.config.claudePath).toBe("./tools/claude");
   });
 
   it("drops the repository's guard.env.allow until trusted, keeping local allow entries and every deny", () => {

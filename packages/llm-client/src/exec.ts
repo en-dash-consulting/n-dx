@@ -675,6 +675,29 @@ export function getCurrentHead(cwd: string): string | undefined {
 }
 
 /**
+ * Synchronous git helper — is `relPath` (relative to `cwd`) in the git index?
+ *
+ * False outside a repository, without git, or when git fails: callers ask
+ * "is this file repository content?", and a checkout git cannot read has none.
+ */
+export function isGitTracked(cwd: string, relPath: string): boolean {
+  try {
+    execFileSync("git", ["ls-files", "--error-unmatch", "--", relPath], {
+      windowsHide: true,
+      cwd,
+      encoding: "utf-8",
+      timeout: 5000,
+      // See getCurrentHead — an untracked file or a non-repository is an
+      // expected answer, so git's stderr is captured rather than printed.
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Synchronous git helper — get the current branch name.
  *
  * Returns undefined if git fails (e.g. not a git repo). Note that a detached

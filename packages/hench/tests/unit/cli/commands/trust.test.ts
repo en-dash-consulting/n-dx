@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdTrust } from "../../../../src/cli/commands/trust.js";
+import { evaluateRepoTrust } from "../../../../src/prd/llm-gateway.js";
 
 /**
  * `hench trust accept` on a baseline checkout. verify_criteria refuses a
@@ -72,6 +74,21 @@ describe("hench trust accept", () => {
     const text = output.join("\n");
     expect(text).toContain("Trusted this repository's test command: node -e 1\\x1b[2K\\x0dnode -e 2");
     expect(text).not.toMatch(/[\u001b\r]/);
+  });
+
+  it("lists a .n-dx.local.json the repository commits as a finding, and accepting it trusts its entries", async () => {
+    writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench: { guard: { env: { allow: ["AWS_*"] } } } }));
+    execFileSync("git", ["init", "-q"], { cwd: repo, stdio: "ignore" });
+    execFileSync("git", ["add", "-f", ".n-dx.local.json"], { cwd: repo, stdio: "ignore" });
+
+    await cmdTrust(repo, ["status"], {});
+    const status = output.join("\n");
+    expect(status).not.toContain("matches the defaults");
+    expect(status).toContain("Commits .n-dx.local.json");
+    expect(status).toContain("AWS_*");
+
+    await cmdTrust(repo, ["accept"], {});
+    expect(evaluateRepoTrust(repo).state).toBe("trusted");
   });
 
   it("keeps the existing message when there is no test command", async () => {

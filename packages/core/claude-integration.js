@@ -37,6 +37,7 @@ import {
 } from "./assistant-assets.js";
 import { getCliName } from "./cli-identity.js";
 import { resolveLayout } from "./layout.js";
+import { isGitTracked } from "./gitignore.js";
 import { homedir } from "os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -478,14 +479,20 @@ function writeMcpJson(dir) {
  * review, so a path the repository ships would run its own script with the
  * user's environment. llm-client's trust review flags a shared one
  * (`vendor-cli-path`), and `ndx config cli.claudePath` writes the local file.
+ * A local file git tracks is the repository's too (`local-config-tracked`),
+ * so it is not read either.
  * Returns undefined if not set.
  * @param {string|null} dir
  * @returns {string|undefined}
  */
 function readConfiguredClaudePath(dir) {
   if (!dir) return undefined;
+  const layout = resolveLayout(dir);
+  if (!existsSync(layout.localConfigFile) || isGitTracked(relative(layout.root, layout.localConfigFile), layout.root)) {
+    return undefined;
+  }
   try {
-    const raw = readFileSync(resolveLayout(dir).localConfigFile, "utf-8");
+    const raw = readFileSync(layout.localConfigFile, "utf-8");
     const cfg = JSON.parse(raw);
     const p = cfg?.cli?.claudePath;
     return typeof p === "string" && p.length > 0 ? p : undefined;

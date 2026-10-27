@@ -142,6 +142,8 @@ ndx config llm.claude.cli_path /path/to/claude .
 A `*.cli_path` or `*.api_endpoint` in the shared `.n-dx.json` (and `llm.google.apiKeyEnv`) applies only once you trust the repository (`ndx trust accept .`): it picks the binary n-dx runs with your environment, or where your key is sent. Until then n-dx ignores it with a warning naming the field. The same keys in `.n-dx.local.json` always apply.
 
 Hench's `claudePath`, the fallback when no `cli_path` is set, follows the same rule: from `.hench/config.json` or the `hench` section of `.n-dx.json` it applies only once the repository is trusted, and `hench.claudePath` in `.n-dx.local.json` always does. `ndx init` writes a Claude binary it finds outside `PATH` there, and moves one an older init wrote into `.hench/config.json` to the same place, with or without Claude integration and without overriding a local one; a `claudePath` you set there by hand stays.
+
+"Always applies" holds while `.n-dx.local.json` is untracked. A repository that commits the file (`git add -f`, or a checkout that never ran `ndx init`) makes it repository config: the trust review lists it (`local-config-tracked`) with the settings it carries, and nothing in it — `guard.env.allow`, `claudePath`, `cli.claudePath`, `cli_path`, `api_endpoint`, `apiKeyEnv` — applies until you trust the checkout. `ndx init` never probes a `cli.claudePath` from a tracked file. Outside a git repository nothing is tracked, so the file applies as before.
 :::
 
 ### Effort (API mode)

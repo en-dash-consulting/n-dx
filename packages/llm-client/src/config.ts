@@ -8,7 +8,7 @@
 import { readFile, access } from "node:fs/promises";
 import { resolveLayout } from "./layout.js";
 import { deepMerge } from "./project-config.js";
-import { trustedProjectConfig } from "./credential-routing.js";
+import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import type { ClaudeConfig } from "./types.js";
 import {
   LLM_VENDOR,
@@ -892,7 +892,7 @@ export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
   // api_endpoint from the project config applies only while the repository
   // is trusted; see credential-routing.ts.
   const projectData = trustedProjectConfig(root, await loadJSONFile(configFile));
-  const localData = await loadJSONFile(localConfigFile);
+  const localData = trustedLocalConfig(root, await loadJSONFile(localConfigFile));
 
   // Merge project and local configs (local wins)
   let merged: Record<string, unknown> | null = projectData;

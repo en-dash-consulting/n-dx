@@ -45,6 +45,14 @@
  * puts it in the git-ignored `.n-dx.local.json`, whose entries always apply,
  * or accepts the checkout. `deny` entries only remove, so they always apply.
  *
+ * "Git-ignored" is checked, not assumed: a repository can commit its own
+ * `.n-dx.local.json`. {@link isLocalConfigTracked} says whether it did, and
+ * every reader that applies the local file regardless of trust asks it first
+ * (see {@link userLocalConfigApplies}). A tracked local file is repository
+ * config: it is collected here, raises `local-config-tracked`, and applies
+ * only once the checkout is trusted. Outside a git repository nothing is
+ * tracked, so the local file is the user's, as before.
+ *
  * The trust store is deliberately a plain file for now. It records a
  * decision, not a secret; an encrypted store is a later concern.
  *
@@ -72,6 +80,7 @@ import {
   resolveNdxHome,
   type ResolveNdxHomeOptions,
 } from "./layout.js";
+import { isGitTracked } from "./exec.js";
 import { toCanonicalJSON } from "./json.js";
 import { deepMerge } from "./project-config.js";
 
@@ -299,6 +308,12 @@ export interface RepoExecutionConfig {
   /** The project config's `rex.test`, else `.rex/config.json` → `test`: the command rex runs. */
   testCommand: string | null;
   mcpServers: RepoMcpServer[];
+  /**
+   * True when the machine-local config file (`.n-dx.local.json`) is in the
+   * git index: the repository ships it, so its execution-relevant fields are
+   * folded into the ones above and it applies only once trusted.
+   */
+  localConfigTracked: boolean;
   /** sha256 over the canonical JSON of everything above except `sources`, `detectedLanguage` and `envDeny`. */
   digest: string;
 }
@@ -382,6 +397,28 @@ function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/** `config[key]` when it is a plain object, else null. */
+function sectionOf(config: Record<string, unknown> | null, key: string): Record<string, unknown> | null {
+  const value = config?.[key];
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+/**
+ * Is the machine-local config file (`.n-dx.local.json`, or the `.ndx/`
+ * container's `config.local.json`) in the git index? `ndx init` ignores it,
+ * but ignoring does not untrack a committed file, and a repository can commit
+ * one on purpose. A tracked file is repository content, not the user's.
+ *
+ * False when the file is absent (nothing to apply), and outside a git
+ * repository or without git (nothing is tracked), so the file keeps applying
+ * there as the user's own. Spawns git only when the file exists.
+ */
+export function isLocalConfigTracked(projectDir: string): boolean {
+  const layout = resolveLayout(projectDir);
+  if (!existsSync(layout.localConfigFile)) return false;
+  return isGitTracked(layout.root, relOf(layout.root, layout.localConfigFile));
+}
+
 function relOf(root: string, path: string): string {
   if (!path.startsWith(root)) return path;
   // Forward slashes, not the platform separator. These strings are shown to
@@ -398,7 +435,10 @@ function relOf(root: string, path: string): string {
  * Hench overrides in the project config file (`.n-dx.json`, or the `.ndx/`
  * container's `config.json`) are deep-merged over `.hench/config.json` the way
  * hench's own loader folds them, because that file is often tracked too. The
- * user's `.n-dx.local.json` is not read: it is git-ignored and theirs.
+ * user's `.n-dx.local.json` is read only when git tracks it
+ * ({@link isLocalConfigTracked}): then the repository ships it, and its
+ * sections fold in last, as every loader folds the local file. An untracked
+ * one is the user's and stays out.
  */
 export function collectRepoExecutionConfig(projectDir: string): RepoExecutionConfig {
   const layout = resolveLayout(projectDir);
@@ -410,15 +450,17 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   if (henchConfig) sources.push(relOf(root, henchConfigPath));
 
   const projectConfig = readJson(layout.configFile);
-  const projectHench = projectConfig && typeof projectConfig.hench === "object" && projectConfig.hench && !Array.isArray(projectConfig.hench)
-    ? (projectConfig.hench as Record<string, unknown>)
-    : null;
+  const projectHench = sectionOf(projectConfig, "hench");
   if (projectHench) sources.push(relOf(root, layout.configFile));
+
+  const localConfigTracked = isLocalConfigTracked(projectDir);
+  const localConfig = localConfigTracked ? readJson(layout.localConfigFile) : null;
+  if (localConfigTracked) sources.push(relOf(root, layout.localConfigFile));
 
   // Deep, as hench's loader and core's loadAllConfigs fold them: a shallow
   // spread let a project-config `guard` without `env` drop the hench file's
   // `guard.env.deny`, so repository commands kept a variable the user denied.
-  const merged = deepMerge(henchConfig ?? {}, projectHench ?? {});
+  const merged = deepMerge(deepMerge(henchConfig ?? {}, projectHench ?? {}), sectionOf(localConfig, "hench") ?? {});
   const rawGuard = merged.guard && typeof merged.guard === "object" && !Array.isArray(merged.guard)
     ? (merged.guard as Record<string, unknown>)
     : null;
@@ -443,20 +485,24 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   // it loads its config, so a `rex.test` there is the command that runs. Left
   // out, a repository could swap the command after the user accepted the one
   // they reviewed without moving the digest (#686).
-  const projectRex = projectConfig && typeof projectConfig.rex === "object" && projectConfig.rex && !Array.isArray(projectConfig.rex)
-    ? (projectConfig.rex as Record<string, unknown>)
-    : null;
-  const projectTest = projectRex ? optionalString(projectRex.test) : null;
-  const credentialRouting = credentialRoutingIn(projectConfig);
+  const projectTest = optionalString(sectionOf(localConfig, "rex")?.test)
+    ?? optionalString(sectionOf(projectConfig, "rex")?.test);
+  // A field the tracked local file sets wins over the project config's, as
+  // in every loader's merge, so the effective value is what is listed.
+  const effective = localConfig ? deepMerge(projectConfig ?? {}, localConfig) : projectConfig;
+  const credentialRouting = credentialRoutingIn(effective);
   // Hench falls back to `claudePath` when no `cli_path` is set, so it chooses
   // the Claude binary too. The bare PATH name chooses nothing, and leaving it
   // out keeps the digest of every checkout `ndx init` wrote it into.
   const henchClaudePath = optionalString(merged.claudePath);
   const vendorCliPaths = [
-    ...vendorCliPathsIn(projectConfig),
+    ...vendorCliPathsIn(effective),
     ...(henchClaudePath && henchClaudePath !== "claude" ? [`hench.claudePath = ${henchClaudePath}`] : []),
   ].sort();
-  if ((projectTest || credentialRouting.length || vendorCliPaths.length) && !projectHench) {
+  const projectSetsGated = optionalString(sectionOf(projectConfig, "rex")?.test)
+    || credentialRoutingIn(projectConfig).length
+    || vendorCliPathsIn(projectConfig).length;
+  if (projectSetsGated && !projectHench) {
     sources.push(relOf(root, layout.configFile));
   }
 
@@ -499,6 +545,8 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     provider: optionalString(merged.provider),
     testCommand: projectTest ?? optionalString(rexConfig?.test),
     mcpServers,
+    // Present only when tracked, so no untracked checkout's digest moves.
+    ...(localConfigTracked ? { localConfigTracked: true } : {}),
   };
 
   return {
@@ -510,6 +558,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     envDeny: [...envDeny].sort(),
     credentialRouting,
     vendorCliPaths,
+    localConfigTracked,
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
 }
@@ -528,7 +577,8 @@ export type RepoTrustFindingCode =
   | "permission-bypass"
   | "test-command"
   | "mcp-servers"
-  | "secret-paths-unblocked";
+  | "secret-paths-unblocked"
+  | "local-config-tracked";
 
 export interface RepoTrustFinding {
   code: RepoTrustFindingCode;
@@ -732,6 +782,19 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
         ? `Defines a test command that chains or fetches: ${config.testCommand}`
         : `Defines the test command n-dx runs for verification: ${config.testCommand}`,
       values: [config.testCommand],
+    });
+  }
+
+  // A warning whatever the file holds: every reader would otherwise apply it
+  // as the user's own, so it is repository config the user has to accept.
+  if (config.localConfigTracked) {
+    // `.n-dx.local.json`, or `.ndx/config.local.json` on the container layout.
+    const file = config.sources.find((s) => s.endsWith("local.json")) ?? ".n-dx.local.json";
+    findings.push({
+      code: "local-config-tracked",
+      severity: "warning",
+      message: `Commits ${file}, the machine-local config n-dx otherwise applies as yours; its settings apply only once trusted`,
+      values: [file],
     });
   }
 
@@ -948,6 +1011,21 @@ export function isRestrictedState(state: RepoTrustState): boolean {
 }
 
 /**
+ * Whether the machine-local config may be applied as the user's own, by a
+ * reader that otherwise applies it whatever the trust state. True when the
+ * file is not tracked by git ({@link isLocalConfigTracked}); a tracked one is
+ * repository config and applies only while the checkout is not restricted.
+ * A tracked file always raises `local-config-tracked`, so that means trusted.
+ */
+export function userLocalConfigApplies(projectDir: string, options: RepoTrustStoreOptions = {}): boolean {
+  if (!isLocalConfigTracked(projectDir)) return true;
+  const config = collectRepoExecutionConfig(projectDir);
+  return !isRestrictedState(
+    repoTrustState(config, assessRepoExecutionConfig(config), readRepoTrustRecord(projectDir, options)),
+  );
+}
+
+/**
  * Evaluate a repository against the user's trust store.
  *
  * A repository with no `warning` findings is `baseline` whatever the store
@@ -1034,7 +1112,11 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
     lines.push("  Until trusted, hench runs with the default guard (the repository's config can only tighten it),");
     lines.push("  bypassPermissions is lowered to acceptEdits, verify_criteria does not run the test command,");
     lines.push("  and the project config's API endpoints and API key variables are ignored.");
-    if (ev.findings.some((f) => f.code === "env-allow-added")) {
+    const tracked = ev.findings.find((f) => f.code === "local-config-tracked");
+    if (tracked) {
+      lines.push(`  The committed ${tracked.values[0]} is ignored too, as repository config. To keep settings of your own,`);
+      lines.push("  untrack it (git rm --cached) and keep it ignored, or accept the configuration.");
+    } else if (ev.findings.some((f) => f.code === "env-allow-added")) {
       lines.push("  The repository's guard.env.allow is ignored too. If your own tests need one of those variables,");
       lines.push(`  add it to hench.guard.env.allow in .n-dx.local.json, or accept the configuration.`);
     }

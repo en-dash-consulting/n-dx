@@ -433,6 +433,8 @@ export {
   evaluateRepoTrust,
   formatRepoTrustReport,
   escapeTerminalControls,
+  isLocalConfigTracked,
+  userLocalConfigApplies,
 } from "./repo-trust.js";
 export type {
   GuardBaseline,

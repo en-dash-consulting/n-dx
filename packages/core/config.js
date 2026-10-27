@@ -2741,7 +2741,8 @@ const warnedUntrustedEnvAllow = new Set();
 
 /**
  * Drop repository-supplied `guard.env.allow` entries unless the user trusts
- * this checkout. The user's own `.n-dx.local.json` entries always apply, as in
+ * this checkout. The user's own `.n-dx.local.json` entries always apply (unless
+ * git tracks that file, when they are the repository's), as in
  * hench's agent shell (`applyRepoTrust`) and llm-client's `repoCommandEnv`.
  * `deny` is kept: it only narrows. "Not trusted" is
  * `evaluateRepoTrust(...).restricted` (untrusted or changed), which is also
@@ -2753,7 +2754,8 @@ async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust) {
   const { evaluateRepoTrust } = await import("@n-dx/llm-client");
   const evaluation = evaluateRepoTrust(dir, trust);
   if (!evaluation.restricted) return envPolicy;
-  const localAllow = await loadLocalEnvAllow(dir);
+  // A local file the repository commits is its config: restricted, none of it applies.
+  const localAllow = evaluation.config.localConfigTracked ? [] : await loadLocalEnvAllow(dir);
   const dropped = envPolicy.allow.filter((entry) => !localAllow.includes(entry));
   if (dropped.length && !warnedUntrustedEnvAllow.has(dir)) {
     warnedUntrustedEnvAllow.add(dir);
