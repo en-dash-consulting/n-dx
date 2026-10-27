@@ -20,6 +20,7 @@ import {
   findGlobalRoot,
   EXTENSIONS_CACHE_FILE,
 } from "../../packages/core/extension-discovery.js";
+import { updateExtensionsFile, setDisabled, forgetApproval } from "../../packages/core/extension-state.js";
 
 const BUILTINS = ["init", "work", "status", "config", "start"];
 
@@ -330,6 +331,55 @@ describe("cache", () => {
     const file = JSON.parse(readFileSync(join(home, EXTENSIONS_CACHE_FILE), "utf8"));
     expect(file.approvals).toEqual({ a: { hash: "h" } });
     expect(file.discovery.version).toBe(1);
+  });
+
+  it("keeps a disable, approval and removal written while discovery was scanning", () => {
+    const cachePath = join(home, EXTENSIONS_CACHE_FILE);
+    writeJson(cachePath, { approvals: { "ndx-gone": { manifestHash: "h" } } });
+    install(userFolder(), manifest("ndx-a", "a"));
+    // Another process changes the file after discovery's first read of it.
+    let interleaved = false;
+    const racing = {
+      ...fs,
+      readFileSync: (...args) => {
+        const result = fs.readFileSync(...args);
+        if (!interleaved && String(args[0]) === cachePath) {
+          interleaved = true;
+          updateExtensionsFile(home, (file) => {
+            setDisabled(file, "a", true);
+            forgetApproval(file, "ndx-gone");
+            file.approvals["ndx-a"] = { manifestHash: "new" };
+          });
+        }
+        return result;
+      },
+    };
+
+    discover({ fs: racing });
+
+    const file = JSON.parse(readFileSync(cachePath, "utf8"));
+    expect(interleaved).toBe(true);
+    expect(Object.keys(file.disabled)).toEqual(["a"]);
+    expect(file.approvals).toEqual({ "ndx-a": { manifestHash: "new" } });
+    expect(Object.keys(file.discovery.sources)).toContain(`user:${userFolder()}`);
+  });
+
+  it("does not overwrite a cache file that became unreadable during discovery", () => {
+    const cachePath = join(home, EXTENSIONS_CACHE_FILE);
+    install(userFolder(), manifest("ndx-a", "a"));
+    let reads = 0;
+    const racing = {
+      ...fs,
+      readFileSync: (...args) => {
+        if (String(args[0]) === cachePath && ++reads === 2) writeFileSync(cachePath, "{ not json");
+        return fs.readFileSync(...args);
+      },
+    };
+
+    const { errors } = discover({ fs: racing });
+
+    expect(errors.map((e) => e.path)).toEqual([cachePath]);
+    expect(readFileSync(cachePath, "utf8")).toBe("{ not json");
   });
 
   it("reports a cache file that is not JSON and leaves it untouched", () => {

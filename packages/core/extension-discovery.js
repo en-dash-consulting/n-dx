@@ -172,8 +172,8 @@ export function discoverExtensions(options) {
   if (globalRoot && !globalIsProject) scans.push({ source: "global", scan: globalScan(globalRoot) });
   for (const path of devPaths(fs, home, errors)) scans.push({ source: "dev", scan: devScan(path) });
 
-  /** @type {Record<string, SourceEntry>} */
-  const nextSources = { ...cached };
+  /** @type {Record<string, SourceEntry>} Only the entries this call recomputed. */
+  const recomputed = {};
   let changed = !isObject(cache.discovery) || cache.discovery.version !== CACHE_VERSION;
   /** @type {Array<{source: ExtensionSource, found: FoundPackage}>} */
   const found = [];
@@ -182,16 +182,14 @@ export function discoverExtensions(options) {
     let entry = cached[key];
     if (!isFresh(fs, entry)) {
       entry = scan.read(fs);
-      nextSources[key] = entry;
+      recomputed[key] = entry;
       changed = true;
     }
     for (const error of entry.errors) errors.push(error);
     for (const pkg of entry.packages) found.push({ source, found: pkg });
   }
 
-  if (changed && cacheFile.ok) {
-    writeCache(fs, cachePath, { ...cache, discovery: { version: CACHE_VERSION, sources: nextSources } }, errors);
-  }
+  if (changed && cacheFile.ok) writeCache(fs, cachePath, recomputed, errors);
 
   return { extensions: resolveWinners(found, options.builtinCommands), errors, home };
 }
@@ -518,12 +516,25 @@ function readJson(fs, path, errors, report = true) {
  * sees half of it. A failure is reported, not thrown: the cache only saves
  * work, and discovery's result is already complete.
  *
+ * The file is read again just before the write and only the `discovery` key is
+ * changed, so an approval, disable or removal another process wrote while this
+ * one was scanning is kept rather than undone. Source entries another process
+ * cached meanwhile are kept too, unless this call recomputed the same source.
+ * A file that has stopped being readable JSON is left alone.
+ *
  * @param {DiscoveryFs} fs
  * @param {string} path
- * @param {unknown} value
+ * @param {Record<string, SourceEntry>} recomputed  Source entries this call read afresh.
  * @param {DiscoveryError[]} errors
  */
-function writeCache(fs, path, value, errors) {
+function writeCache(fs, path, recomputed, errors) {
+  const current = readJson(fs, path, errors);
+  if (!current.ok) return;
+  const file = isObject(current.value) ? current.value : {};
+  const sources = isObject(file.discovery) && file.discovery.version === CACHE_VERSION && isObject(file.discovery.sources)
+    ? file.discovery.sources
+    : {};
+  const value = { ...file, discovery: { version: CACHE_VERSION, sources: { ...sources, ...recomputed } } };
   const tmp = `${path}.${process.pid}.tmp`;
   try {
     fs.mkdirSync(dirname(path), { recursive: true });

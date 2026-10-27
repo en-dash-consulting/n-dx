@@ -53,7 +53,14 @@ items:
     lastModified: "2026-10-27T14:15:48.882Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "52c9a605-a471-417c-b9dc-181af66e293a":
-    lastModified: "2026-10-27T13:51:07.733Z"
+    status: "completed"
+    startedAt: "2026-10-27T14:46:44.874Z"
+    completedAt: "2026-10-27T14:50:54.818Z"
+    endedAt: "2026-10-27T14:50:54.818Z"
+    activeIntervals: [{"end":"2026-10-27T14:50:54.818Z","start":"2026-10-27T14:46:44.874Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extension-discovery.js writeCache re-reads extensions.json just before writing and replaces only the discovery key, merging only recomputed source entries; tests interleave a disable/removal/approval with a cache write (commit 566f1953f)"
+    lastModified: "2026-10-27T14:50:54.818Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "612513ef-4a1b-4c8f-94fe-8cd6d51ad4cd":
     lastModified: "2026-10-27T13:51:18.561Z"
