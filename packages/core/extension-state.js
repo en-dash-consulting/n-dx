@@ -26,8 +26,8 @@
 
 import { createHash } from "node:crypto";
 import * as nodeFs from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { EXTENSIONS_CACHE_FILE } from "./extension-discovery.js";
+import { join, resolve } from "node:path";
+import { EXTENSIONS_CACHE_FILE, replaceExtensionsFile } from "./extension-discovery.js";
 import { escapeControlCharacters, satisfiesSemverRange } from "./extension-manifest.js";
 
 /**
@@ -63,7 +63,7 @@ export const EXTENSION_STATES = Object.freeze(["enabled", "disabled", "unapprove
  */
 
 /**
- * @typedef {Pick<typeof nodeFs, "readFileSync" | "writeFileSync" | "renameSync" | "mkdirSync">} StateFs
+ * @typedef {Pick<typeof nodeFs, "readFileSync" | "writeFileSync" | "renameSync" | "mkdirSync" | "readdirSync" | "rmSync">} StateFs
  */
 
 /**
@@ -105,9 +105,9 @@ export function readExtensionsFile(home, fs = nodeFs) {
 }
 
 /**
- * Read the file, let `mutate` change it, and write it back through a temporary
- * file and a rename. The read is immediately before the write, so a discovery
- * cache written by another process a moment earlier is kept.
+ * Read the file, let `mutate` change it, and write it back with
+ * {@link replaceExtensionsFile}. The read is immediately before the write, so a
+ * discovery cache written by another process a moment earlier is kept.
  *
  * @param {string} home
  * @param {(file: ExtensionsFile) => void} mutate
@@ -116,11 +116,7 @@ export function readExtensionsFile(home, fs = nodeFs) {
 export function updateExtensionsFile(home, mutate, fs = nodeFs) {
   const file = readExtensionsFile(home, fs);
   mutate(file);
-  const path = join(home, EXTENSIONS_CACHE_FILE);
-  const tmp = `${path}.${process.pid}.tmp`;
-  fs.mkdirSync(dirname(path), { recursive: true });
-  fs.writeFileSync(tmp, `${JSON.stringify(file, null, 2)}\n`);
-  fs.renameSync(tmp, path);
+  replaceExtensionsFile(fs, join(home, EXTENSIONS_CACHE_FILE), `${JSON.stringify(file, null, 2)}\n`);
 }
 
 /**

@@ -41,7 +41,7 @@
  */
 
 import * as nodeFs from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveNdxHome } from "./layout.js";
 import { validateExtensionManifest } from "./extension-manifest.js";
@@ -125,7 +125,7 @@ const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "optionalDependenc
 /**
  * The file-system calls discovery makes; injectable so tests can count them.
  *
- * @typedef {Pick<typeof nodeFs, "statSync" | "readFileSync" | "readdirSync" | "writeFileSync" | "renameSync" | "mkdirSync">} DiscoveryFs
+ * @typedef {Pick<typeof nodeFs, "statSync" | "readFileSync" | "readdirSync" | "writeFileSync" | "renameSync" | "mkdirSync" | "rmSync">} DiscoveryFs
  */
 
 /**
@@ -539,14 +539,97 @@ function writeCache(fs, path, recomputed, errors) {
     ? file.discovery.sources
     : {};
   const value = { ...file, discovery: { version: CACHE_VERSION, sources: boundProjectEntries({ ...sources }, recomputed) } };
-  const tmp = `${path}.${process.pid}.tmp`;
   try {
-    fs.mkdirSync(dirname(path), { recursive: true });
-    fs.writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`);
-    fs.renameSync(tmp, path);
+    replaceExtensionsFile(fs, path, `${JSON.stringify(value, null, 2)}\n`);
   } catch (error) {
     errors.push({ path, message: `cache not written: ${/** @type {Error} */ (error).message}` });
   }
+}
+
+/** Rename errors Windows raises while another process has the target open. */
+const TRANSIENT_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
+
+/** Total time a rename keeps retrying, and the longest single wait. */
+const RENAME_RETRY_BUDGET_MS = 2000;
+const RENAME_RETRY_MAX_WAIT_MS = 100;
+
+/**
+ * Write `text` to `extensions.json` through `<path>.<pid>.tmp` and a rename,
+ * so a reader never sees half of it. Discovery's cache write and every
+ * approval, disable and removal share this file.
+ *
+ * Windows refuses a rename onto a file another process has open, which
+ * concurrent `ndx` runs reading the file do all the time, so a transient
+ * EPERM, EACCES or EBUSY is retried with backoff (as graceful-fs does) before
+ * it is thrown. The temp file is removed whenever the rename does not happen,
+ * and temp files left by processes that are gone are swept first.
+ *
+ * @param {Pick<typeof nodeFs, "mkdirSync" | "writeFileSync" | "renameSync" | "readdirSync" | "rmSync">} fs
+ * @param {string} path
+ * @param {string} text
+ * @param {{sleep?: (ms: number) => void, isAlive?: (pid: number) => boolean}} [options]
+ */
+export function replaceExtensionsFile(fs, path, text, { sleep = sleepSync, isAlive = isPidAlive } = {}) {
+  fs.mkdirSync(dirname(path), { recursive: true });
+  sweepStaleTempFiles(fs, path, isAlive);
+  const tmp = `${path}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(tmp, text);
+    for (let waited = 0, wait = 5; ; wait = Math.min(wait * 2, RENAME_RETRY_MAX_WAIT_MS)) {
+      try {
+        fs.renameSync(tmp, path);
+        return;
+      } catch (error) {
+        const code = /** @type {NodeJS.ErrnoException} */ (error).code;
+        if (!code || !TRANSIENT_RENAME_CODES.has(code) || waited >= RENAME_RETRY_BUDGET_MS) throw error;
+      }
+      sleep(wait);
+      waited += wait;
+    }
+  } catch (error) {
+    fs.rmSync(tmp, { force: true });
+    throw error;
+  }
+}
+
+/**
+ * Remove `<path>.<pid>.tmp` files whose process is gone: a write killed
+ * between its temp file and its rename. A live process's temp file is a write
+ * in progress and is left alone.
+ *
+ * @param {Pick<typeof nodeFs, "readdirSync" | "rmSync">} fs
+ * @param {string} path
+ * @param {(pid: number) => boolean} isAlive
+ */
+function sweepStaleTempFiles(fs, path, isAlive) {
+  const prefix = `${basename(path)}.`;
+  for (const entry of fs.readdirSync(dirname(path))) {
+    if (!entry.startsWith(prefix)) continue;
+    const match = /^(\d+)\.tmp$/.exec(entry.slice(prefix.length));
+    if (match && Number(match[1]) !== process.pid && !isAlive(Number(match[1]))) {
+      fs.rmSync(join(dirname(path), entry), { force: true });
+    }
+  }
+}
+
+/** @param {number} pid */
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM: the process exists but belongs to someone else.
+    return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
+  }
+}
+
+/**
+ * Block for `ms`. The writers are synchronous, so a retry cannot yield.
+ *
+ * @param {number} ms
+ */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 /**

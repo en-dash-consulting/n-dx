@@ -12,12 +12,15 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync, utimesSync, symlinkSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { basename, join, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   discoverExtensions,
   findGlobalRoot,
+  replaceExtensionsFile,
   EXTENSIONS_CACHE_FILE,
   MAX_PROJECT_ENTRIES,
 } from "../../packages/core/extension-discovery.js";
@@ -407,6 +410,109 @@ describe("cache", () => {
     expect(extensions.map((e) => e.name)).toEqual(["a"]);
     expect(errors.map((e) => e.path)).toEqual([join(home, EXTENSIONS_CACHE_FILE)]);
     expect(readFileSync(join(home, EXTENSIONS_CACHE_FILE), "utf8")).toBe("{ not json");
+  });
+});
+
+describe("writing extensions.json", () => {
+  const cachePath = () => join(home, EXTENSIONS_CACHE_FILE);
+  const tempFiles = () => readdirSync(home).filter((entry) => entry.endsWith(".tmp"));
+  const errno = (code) => Object.assign(new Error(`${code}: rename`), { code });
+
+  /** node:fs whose renameSync throws `code` for the first `times` calls. */
+  function failingRename(code, times = Infinity) {
+    let calls = 0;
+    return {
+      ...fs,
+      renameSync: (...args) => {
+        if (++calls <= times) throw errno(code);
+        return fs.renameSync(...args);
+      },
+    };
+  }
+
+  it.each(["EPERM", "EACCES", "EBUSY"])("retries a rename refused with %s until it succeeds", (code) => {
+    const waits = [];
+    replaceExtensionsFile(failingRename(code, 3), cachePath(), "{}\n", { sleep: (ms) => waits.push(ms) });
+
+    expect(readFileSync(cachePath(), "utf8")).toBe("{}\n");
+    expect(waits).toHaveLength(3);
+    expect(tempFiles()).toEqual([]);
+  });
+
+  it("gives up after its retry budget, throws and removes the temp file", () => {
+    let waited = 0;
+    expect(() => replaceExtensionsFile(failingRename("EPERM"), cachePath(), "{}\n", { sleep: (ms) => (waited += ms) })).toThrow(/EPERM/);
+
+    expect(waited).toBeGreaterThanOrEqual(2000);
+    expect(existsSync(cachePath())).toBe(false);
+    expect(tempFiles()).toEqual([]);
+  });
+
+  it("does not retry an error that is not transient", () => {
+    const waits = [];
+    expect(() => replaceExtensionsFile(failingRename("EXDEV"), cachePath(), "{}\n", { sleep: (ms) => waits.push(ms) })).toThrow(/EXDEV/);
+
+    expect(waits).toEqual([]);
+    expect(tempFiles()).toEqual([]);
+  });
+
+  it("removes the temp file when discovery's cache write fails", () => {
+    install(userFolder(), manifest("ndx-a", "a"));
+
+    const { errors } = discover({ fs: failingRename("EXDEV") });
+
+    expect(errors.map((e) => e.message)).toEqual([expect.stringContaining("cache not written")]);
+    expect(tempFiles()).toEqual([]);
+  });
+
+  it("removes the temp file when an approval write fails", () => {
+    expect(() => updateExtensionsFile(home, (file) => setDisabled(file, "a", true), failingRename("EXDEV"))).toThrow(/EXDEV/);
+
+    expect(tempFiles()).toEqual([]);
+  });
+
+  it("sweeps temp files left by processes that are gone and keeps a live one's", () => {
+    writeFileSync(`${cachePath()}.111.tmp`, "{");
+    writeFileSync(`${cachePath()}.222.tmp`, "{");
+    writeFileSync(join(home, "other.json.111.tmp"), "{");
+
+    replaceExtensionsFile(fs, cachePath(), "{}\n", { isAlive: (pid) => pid === 222 });
+
+    expect(tempFiles().sort()).toEqual([`${EXTENSIONS_CACHE_FILE}.222.tmp`, "other.json.111.tmp"]);
+  });
+
+  it("concurrent list and approval writers from separate processes all succeed and leave no temp file", async () => {
+    install(userFolder(), manifest("ndx-a", "a"));
+    const discovery = pathToFileURL(join(import.meta.dirname, "../../packages/core/extension-discovery.js")).href;
+    const state = pathToFileURL(join(import.meta.dirname, "../../packages/core/extension-state.js")).href;
+    // Each worker alternates a discovery from a directory it has not scanned
+    // (so the cache is rewritten) with a disable/enable write.
+    const script = `
+      import { mkdirSync } from "node:fs";
+      import { join } from "node:path";
+      import { discoverExtensions } from ${JSON.stringify(discovery)};
+      import { updateExtensionsFile, setDisabled } from ${JSON.stringify(state)};
+      const [home, root, id] = process.argv.slice(1);
+      for (let i = 0; i < 25; i++) {
+        const projectDir = join(root, "projects", id + "-" + i);
+        mkdirSync(projectDir, { recursive: true });
+        const { errors } = discoverExtensions({ builtinCommands: [], home, projectDir, globalRoot: join(root, "global", "node_modules") });
+        if (errors.length) { console.error(JSON.stringify(errors)); process.exit(2); }
+        updateExtensionsFile(home, (file) => setDisabled(file, "a", i % 2 === 0));
+      }
+    `;
+    const run = (id) => new Promise((done) => {
+      const child = spawn(process.execPath, ["--input-type=module", "-e", script, home, root, String(id)], { stdio: ["ignore", "ignore", "pipe"] });
+      let stderr = "";
+      child.stderr.on("data", (chunk) => (stderr += chunk));
+      child.on("close", (status) => done({ status, stderr }));
+    });
+
+    const results = await Promise.all(Array.from({ length: 8 }, (_, id) => run(id)));
+
+    expect(results).toEqual(Array.from({ length: 8 }, () => ({ status: 0, stderr: "" })));
+    expect(() => JSON.parse(readFileSync(cachePath(), "utf8"))).not.toThrow();
+    expect(tempFiles()).toEqual([]);
   });
 });
 
