@@ -3763,7 +3763,12 @@ async function main() {
   updateCheckQuiet = rest.some((a) => a === "--quiet" || a === "-q");
   cliVerbose = rest.some((a) => a === "--verbose" || a === "--debug");
   cliDebug = rest.some((a) => a === "--debug");
-  if (!updateCheckQuiet) {
+  // A command no built-in owns runs an extension (or is unknown), and its
+  // output is the extension's own: no n-dx update notice joins its stderr.
+  // A top-level flag (--version, --help) is still n-dx's.
+  const builtin = builtinCommandNames().includes(command);
+  const extension = Boolean(command) && !builtin;
+  if (!updateCheckQuiet && !(extension && !command.startsWith("-"))) {
     try {
       const { version: currentVersion } = JSON.parse(
         readFileSync(join(__dir, "package.json"), "utf-8"),
@@ -3809,8 +3814,6 @@ async function main() {
   //
   // An extension command gets neither: n-dx resolves no project for an
   // extension, its arguments are its own, and it runs as long as it likes.
-  const builtin = builtinCommandNames().includes(command);
-  const extension = Boolean(command) && !builtin;
   const dir = extension
     ? process.cwd()
     : resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);

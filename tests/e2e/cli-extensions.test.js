@@ -149,6 +149,27 @@ describe("ndx <extension command>", () => {
     expect(result.code).toBe(7);
   });
 
+  it("an extension run carries no n-dx update notice; a built-in run still does", () => {
+    installEcho("recon");
+    // A cached newer release makes the notice deterministic, with no network.
+    const tmp = mkdirp(join(root, "tmp"));
+    writeFileSync(join(tmp, "n-dx-update-check.json"), JSON.stringify({ checkedAt: Date.now(), latestVersion: "999.0.0" }));
+    // spawnSync, not runResult: runResult drops stderr on exit 0, where the notice is printed.
+    const ndx = (args) => spawnSync(process.execPath, [CLI_PATH, ...args], {
+      cwd: root,
+      env: { ...env(), TMPDIR: tmp, TEMP: tmp, TMP: tmp },
+      encoding: "utf-8",
+      windowsHide: true,
+    });
+
+    const extension = ndx(["recon", "0"]);
+    expect(extension.status).toBe(0);
+    expect(extension.stdout).toContain("args");
+    expect(extension.stderr).not.toMatch(/Update available/);
+
+    expect(ndx(["version"]).stderr).toMatch(/Update available/);
+  });
+
   it("runs the extension with the Node n-dx runs on", () => {
     installEcho("recon");
     expect(run(["recon"], opts())).toContain(`exec ${process.execPath}`);

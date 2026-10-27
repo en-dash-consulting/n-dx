@@ -30,7 +30,12 @@ items:
     lastModified: "2026-10-27T13:51:37.652Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "76f0d280-28d7-4ef3-a086-36ded6465eca":
-    lastModified: "2026-10-27T13:51:33.521Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:47:07.021Z"
+    completedAt: "2026-10-27T15:52:02.886Z"
+    endedAt: "2026-10-27T15:52:02.886Z"
+    activeIntervals: [{"end":"2026-10-27T15:52:02.886Z","start":"2026-10-27T15:47:07.021Z"}]
+    lastModified: "2026-10-27T15:52:02.886Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "7ee5c876-10a1-4aed-bafd-a3a360fd0832":
     status: "completed"
