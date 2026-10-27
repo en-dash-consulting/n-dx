@@ -54,8 +54,15 @@ items:
     lastModified: "2026-10-16T22:37:54.011Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "64e133c5-7ea1-462f-9a73-11fbd3b1658b":
+    status: "completed"
+    startedAt: "2026-10-27T19:49:02.337Z"
+    completedAt: "2026-10-27T19:56:55.867Z"
+    endedAt: "2026-10-27T19:56:55.867Z"
+    activeIntervals: [{"end":"2026-10-27T19:56:55.867Z","start":"2026-10-27T19:49:02.337Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Mode-neutral missing-credentials line via hench cliEnvReportLine (executor and pair reviewer); dead doc links fixed; changeset names uncovered modes (Hal #817 F2)."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T15:19:02.698Z"
+    lastModified: "2026-10-27T19:56:55.867Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82468601-c666-4943-a9ac-b11bb0149372":
     assignee: "Ryan Keith <ryan.k@endash.us>"

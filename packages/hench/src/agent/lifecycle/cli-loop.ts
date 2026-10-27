@@ -102,6 +102,7 @@ import {
   resolveLLMVendor,
   resolveVendorCliPath,
   resolveVendorCliEnv,
+  cliEnvReportLine,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
@@ -2375,12 +2376,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // CLI-specific: load config for CLI path and env resolution
   const cliBinary = resolveVendorCliPath(llmConfig, config);
   const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
-    detail(
-      kind === "missing-credentials"
-        ? `CLI environment: cloud mode is on but none of ${names.join(", ")} is set; the CLI falls back to default credential files or instance metadata`
-        : `CLI environment: stripped ${names.join(", ")}`,
-      { captureWhenQuiet: true },
-    );
+    detail(cliEnvReportLine("CLI environment", names, kind), { captureWhenQuiet: true });
   });
 
   // Pin the spawned session's MCP servers to *this* project directory, so the
@@ -2424,8 +2420,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         vendor: reviewVendor,
         cliBinary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
         cliEnv: pairVendor
-          ? resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names) => {
-            detail(`${pairVendor} reviewer environment: stripped ${names.join(", ")}`, { captureWhenQuiet: true });
+          ? resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names, kind) => {
+            detail(cliEnvReportLine(`${pairVendor} reviewer environment`, names, kind), { captureWhenQuiet: true });
           })
           : cliEnv,
         ...(pairVendor

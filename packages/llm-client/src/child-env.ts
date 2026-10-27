@@ -104,7 +104,7 @@ export function strippedEnvNames(env: NodeJS.ProcessEnv, policy: EnvPolicy): str
   return Object.keys(env).filter((name) => env[name] !== undefined && !envNameAllowed(name, policy)).sort();
 }
 
-/** What `onStripped` is reporting: names removed, or a cloud mode whose credentials never arrived. */
+/** What `onStripped` is reporting: names removed, or a vendor mode whose credentials never arrived. */
 export type EnvReportKind = "stripped" | "missing-credentials";
 
 /** Bedrock names that address or trust-anchor the endpoint but are not credentials. */
@@ -170,14 +170,16 @@ const VENDOR_MODES: readonly VendorMode[] = [
   },
   // Codex with a model provider from the user's own Codex config, such as Azure
   // OpenAI, whose key Codex reads from the variable the provider's `env_key` names:
-  // https://github.com/openai/codex/blob/main/docs/config.md#model_providers
+  // https://developers.openai.com/codex/config-advanced
   {
     vendor: LLM_VENDOR.CODEX, active: (env) => codexProviderKey(env).length > 0,
     credentials: codexProviderKey, plumbing: [],
   },
   // Gemini CLI on Vertex AI, by Google Cloud API key (GOOGLE_API_KEY), service
   // account key file, or application default credentials, with project and location:
-  // https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/authentication.md
+  // https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/authentication.mdx
+  // (GOOGLE_GENAI_USE_VERTEXAI itself is documented in the repository README's
+  // Vertex AI section: https://github.com/google-gemini/gemini-cli#readme)
   {
     vendor: LLM_VENDOR.GOOGLE, active: flag("GOOGLE_GENAI_USE_VERTEXAI"),
     credentials: names(["GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS"]),

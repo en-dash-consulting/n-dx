@@ -5,7 +5,7 @@
  * (default `~/.codex`): top-level `model_provider`, or the one the selected
  * `profile` sets, and reads that provider's API key from the variable its
  * `env_key` names (for Azure OpenAI, typically `AZURE_OPENAI_API_KEY`).
- * https://github.com/openai/codex/blob/main/docs/config.md#model_providers
+ * https://developers.openai.com/codex/config-advanced
  *
  * Only the user's home config is read. A repository-local `.codex/config.toml`
  * or the repository's n-dx config could name any variable, and naming is all
