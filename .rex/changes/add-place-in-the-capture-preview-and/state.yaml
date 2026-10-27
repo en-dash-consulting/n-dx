@@ -10,5 +10,12 @@ items:
     lastModified: "2026-10-27T16:32:01.524Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f08da1e0-5214-4cf0-a4b6-a717c58b6f7d":
-    lastModified: "2026-10-27T16:31:58.793Z"
+    status: "completed"
+    startedAt: "2026-10-27T23:23:23.212Z"
+    completedAt: "2026-10-27T23:38:01.991Z"
+    endedAt: "2026-10-27T23:38:01.991Z"
+    activeIntervals: [{"end":"2026-10-27T23:38:01.991Z","start":"2026-10-27T23:23:23.212Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Capture Preview cards offer candidates (strength, area, matched words), Leave it in the Inbox, Search all, Touches/Amends…; IB8 default; Add & place posts touches to POST /api/rex/items; Amends… opens the detail panel on Amends. Commit 4b5ac4bff."
+    lastModified: "2026-10-27T23:38:01.991Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

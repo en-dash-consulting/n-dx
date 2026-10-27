@@ -452,6 +452,22 @@ describe("Quick Add placement on a v2 tree", () => {
       .toEqual([["strong", "Checkout"], ["weak", ""]]);
   });
 
+  it("still previews the change, with blank areas, when the project's tree cannot be read", async () => {
+    // A product root rex cannot parse: the area lookup fails, the preview must not.
+    await writeFile(join(rexDir, "product", "index.md"), "---\nnot: [valid\n---\n");
+    mockExecResult = {
+      stdout: JSON.stringify(previewWith([{ target: CAPABILITY_ID, relation: "touches", score: 12, reasons: [] }])),
+      stderr: "", exitCode: 0, error: null,
+    };
+
+    const res = await post(port, "/api/rex/smart-add-preview", { text: "Support refunds when paying by card" });
+
+    expect(res.status).toBe(200);
+    const { changes } = await res.json();
+    expect(changes).toHaveLength(1);
+    expect(changes[0].placement.shortlist[0]).toMatchObject({ target: CAPABILITY_ID, strength: "strong", area: "" });
+  });
+
   it("Add & place creates a change outside the Inbox that touches the chosen node", async () => {
     const res = await post(port, "/api/rex/items", {
       title: "Support refunds when paying by card",
