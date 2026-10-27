@@ -7,6 +7,8 @@ intent: "Layer 2 of 2 for the security findings: #686 finding 3 (the test gate, 
 acceptanceCriteria:
   - "Closes #686 (finding 3) and #635"
   - "Each fix has a test that fails on the code before the fix and passes with it"
+touches:
+  - "1bb0333a-d834-4e68-81d6-d728c2f8fcef"
 priority: "high"
 tags:
   - "security"
