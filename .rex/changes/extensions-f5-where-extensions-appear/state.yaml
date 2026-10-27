@@ -17,5 +17,12 @@ items:
     lastModified: "2026-10-26T17:04:09.798Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "f88f9d7b-df3b-4d24-acee-43e61b6f4371":
-    lastModified: "2026-10-26T17:04:04.038Z"
+    status: "completed"
+    startedAt: "2026-10-26T23:49:10.291Z"
+    completedAt: "2026-10-26T23:54:58.911Z"
+    endedAt: "2026-10-26T23:54:58.911Z"
+    activeIntervals: [{"end":"2026-10-26T23:54:58.911Z","start":"2026-10-26T23:49:10.291Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Commit eacb92048: Extensions row on the hub home (home.ts), fed from the hub's extension list in proxy.ts."
+    lastModified: "2026-10-26T23:54:58.911Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
