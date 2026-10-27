@@ -11,7 +11,14 @@ items:
     lastModified: "2026-10-27T14:26:36.390Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "0c1401b1-5398-41c9-bc05-98d172048518":
-    lastModified: "2026-10-27T13:51:11.950Z"
+    status: "completed"
+    startedAt: "2026-10-27T14:57:12.312Z"
+    completedAt: "2026-10-27T15:01:26.785Z"
+    endedAt: "2026-10-27T15:01:26.785Z"
+    activeIntervals: [{"end":"2026-10-27T15:01:26.785Z","start":"2026-10-27T14:57:12.312Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "checkPackagePath rejects /^[A-Za-z]:/; dispatch resolves bins through new packageFile() and refuses paths outside the package (fdc1f1c88)."
+    lastModified: "2026-10-27T15:01:26.785Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "0cc63aed-a641-4bbc-9a43-b2b18713c668":
     status: "completed"

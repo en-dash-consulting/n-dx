@@ -13,7 +13,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { approveOnFirstRun, listExtensionCommands, resolveExtensionCommand, runExtensionCommand, EXTENSION_REFUSED_EXIT_CODE } from "../../packages/core/extension-dispatch.js";
+import { approveOnFirstRun, listExtensionCommands, packageFile, resolveExtensionCommand, runExtensionCommand, EXTENSION_REFUSED_EXIT_CODE } from "../../packages/core/extension-dispatch.js";
 import { describeForApproval } from "../../packages/core/extension-state.js";
 import { runExtensions } from "../../packages/core/extensions-command.js";
 
@@ -70,6 +70,25 @@ async function enable(name) {
 async function disable(name) {
   expect(await runExtensions(["disable", name], { ...deps(), out: () => {}, err: () => {} })).toBe(0);
 }
+
+describe("packageFile", () => {
+  it("resolves a path inside the package", () => {
+    expect(packageFile(project, "bin/cli.js")).toBe(join(project, "bin", "cli.js"));
+    expect(packageFile(project, "./bin/../cli.js")).toBe(join(project, "cli.js"));
+    expect(packageFile(project, "..cli.js")).toBe(join(project, "..cli.js"));
+  });
+
+  it("refuses a path that resolves outside the package", () => {
+    for (const bin of ["../cli.js", "bin/../../cli.js", ".", "..", join(root, "cli.js")]) {
+      expect(packageFile(project, bin), bin).toBeNull();
+    }
+  });
+
+  it.runIf(process.platform === "win32")("refuses a drive-relative path on Windows", () => {
+    const otherDrive = /^[cC]:/.test(project) ? "D:" : "C:";
+    expect(packageFile(project, `${otherDrive}evil.js`)).toBeNull();
+  });
+});
 
 describe("resolveExtensionCommand", () => {
   it("resolves an enabled extension's command to its bin", async () => {

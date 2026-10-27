@@ -81,6 +81,7 @@ const PROJECT_LINK_FIELDS = ["label", "path"];
 const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const MAX_NAME_LENGTH = 40;
 const MAX_SUMMARY_LENGTH = 100;
+const DRIVE_PREFIX = /^[A-Za-z]:/;
 // C0, DEL and C1: newlines, tabs, ESC (terminal escape sequences) and the rest.
 const CONTROL_CHARACTER = /\p{Cc}/u;
 const CONTROL_CHARACTERS = /\p{Cc}/gu;
@@ -640,7 +641,9 @@ function checkPackagePath(value, path, report) {
   if (value === undefined) { report(path, "required", "is missing"); return; }
   if (!checkString(value, path, report)) return;
   const normalized = posix.normalize(value.replace(/\\/g, "/"));
-  if (isAbsolute(value) || win32.isAbsolute(value) || normalized === ".." || normalized.startsWith("../")) {
+  // `D:cli.js` is drive-relative: not absolute to either platform, yet Windows
+  // resolves it against D:'s cwd, outside the package. The schema forbids it too.
+  if (isAbsolute(value) || win32.isAbsolute(value) || DRIVE_PREFIX.test(value) || normalized === ".." || normalized.startsWith("../")) {
     report(path, "package-path", `"${value}" is not inside the package`);
   }
 }

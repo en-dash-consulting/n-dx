@@ -226,10 +226,19 @@ describe("validateExtensionManifest", () => {
   });
 
   it("rejects package paths that escape the package on either platform", () => {
-    for (const bin of ["/etc/cli.js", "C:\\tools\\cli.js", "..\\cli.js", "bin/../../cli.js", ".."]) {
+    for (const bin of ["/etc/cli.js", "C:\\tools\\cli.js", "D:cli.js", "..\\cli.js", "bin/../../cli.js", ".."]) {
       const result = validate(pkg((m) => { m.commands[0].bin = bin; }));
       expect(result.problems.map((p) => p.rule), bin).toContain("package-path");
     }
+  });
+
+  it("rejects a drive-relative sidecar.bin and configSchema", () => {
+    const result = validate(pkg((m) => {
+      m.sidecar = { bin: "D:serve.js" };
+      m.configSchema = "d:schema.json";
+    }));
+    expect(result.problems.filter((p) => p.rule === "package-path").map((p) => p.path).sort())
+      .toEqual(["ndx.extension.configSchema", "ndx.extension.sidecar.bin"]);
   });
 });
 

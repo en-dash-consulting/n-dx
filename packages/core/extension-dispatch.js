@@ -23,7 +23,7 @@
 
 import * as nodeFs from "node:fs";
 import { constants as osConstants } from "node:os";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { discoverExtensions, EXTENSIONS_CACHE_FILE } from "./extension-discovery.js";
 import { escapeControlCharacters } from "./extension-manifest.js";
 import {
@@ -122,7 +122,14 @@ export function resolveExtensionCommand(name, options) {
 
   const command = ext.manifest?.commands?.find((c) => c.name === name);
   if (!command) return { kind: "none" };
-  const bin = resolve(ext.dir, command.bin);
+  const bin = packageFile(ext.dir, command.bin);
+  if (bin === null) {
+    return {
+      kind: "refused",
+      ext,
+      message: `Error: 'ndx ${name}' comes from ${label}, whose bin ${command.bin} is outside the package — fix: ndx extensions doctor`,
+    };
+  }
   if (!(options.fs ?? nodeFs).existsSync(bin)) {
     return {
       kind: "refused",
@@ -183,7 +190,10 @@ export function resolveExtensionSidecar(name, options) {
   }
 
   const sidecar = /** @type {NonNullable<NonNullable<DiscoveredExtension["manifest"]>["sidecar"]>} */ (ext.manifest?.sidecar);
-  const bin = resolve(ext.dir, sidecar.bin);
+  const bin = packageFile(ext.dir, sidecar.bin);
+  if (bin === null) {
+    return { kind: "refused", ext, state, message: `Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} is outside the package — fix: ndx extensions doctor` };
+  }
   if (!(options.fs ?? nodeFs).existsSync(bin)) {
     return { kind: "refused", ext, state, message: `Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} does not exist — fix: ndx extensions doctor` };
   }
@@ -380,6 +390,23 @@ function discoverWithApprovals(builtins, options) {
 function claims(ext, name) {
   if (ext.manifest) return (ext.manifest.commands ?? []).some((c) => c.name === name);
   return ext.name === name || ext.conflicts.some((c) => c.names.includes(name));
+}
+
+/**
+ * The absolute path of `path` inside the package folder `dir`, or `null` when
+ * it resolves outside it. The manifest validator already refuses such paths;
+ * this holds at spawn time too, where a drive-relative `D:cli.js` would
+ * otherwise resolve against D:'s cwd on Windows.
+ *
+ * @param {string} dir
+ * @param {string} path
+ * @returns {string | null}
+ */
+export function packageFile(dir, path) {
+  const file = resolve(dir, path);
+  const rel = relative(dir, file);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  return file;
 }
 
 /** @param {DiscoveredExtension} ext */
