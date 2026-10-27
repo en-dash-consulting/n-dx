@@ -19,6 +19,7 @@ import {
   discoverExtensions,
   findGlobalRoot,
   EXTENSIONS_CACHE_FILE,
+  MAX_PROJECT_ENTRIES,
 } from "../../packages/core/extension-discovery.js";
 import { updateExtensionsFile, setDisabled, forgetApproval } from "../../packages/core/extension-state.js";
 
@@ -362,6 +363,21 @@ describe("cache", () => {
     expect(Object.keys(file.disabled)).toEqual(["a"]);
     expect(file.approvals).toEqual({ "ndx-a": { manifestHash: "new" } });
     expect(Object.keys(file.discovery.sources)).toContain(`user:${userFolder()}`);
+  });
+
+  it("keeps only the most recently scanned project entries", () => {
+    const dirs = Array.from({ length: 50 }, (_, i) => join(root, "projects", `p${i}`));
+    for (const dir of dirs) {
+      mkdirSync(dir, { recursive: true });
+      discover({ projectDir: dir });
+    }
+    // A project dropped from the cache is rescanned and becomes the newest.
+    discover({ projectDir: dirs[0] });
+
+    const keys = Object.keys(JSON.parse(readFileSync(join(home, EXTENSIONS_CACHE_FILE), "utf8")).discovery.sources);
+    const projects = keys.filter((key) => key.startsWith("project:"));
+    expect(projects).toEqual([...dirs.slice(-(MAX_PROJECT_ENTRIES - 1)), dirs[0]].map((dir) => `project:${dir}`));
+    expect(keys).toContain(`user:${userFolder()}`);
   });
 
   it("does not overwrite a cache file that became unreadable during discovery", () => {

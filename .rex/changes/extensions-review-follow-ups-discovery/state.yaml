@@ -31,7 +31,14 @@ items:
     lastModified: "2026-10-27T14:20:40.017Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "143e479a-714f-44dd-8047-636012e9ee5b":
-    lastModified: "2026-10-27T13:51:18.561Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:42:49.717Z"
+    completedAt: "2026-10-27T15:46:56.354Z"
+    endedAt: "2026-10-27T15:46:56.354Z"
+    activeIntervals: [{"end":"2026-10-27T15:46:56.354Z","start":"2026-10-27T15:42:49.717Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "writeCache keeps the 20 most recently scanned project: entries (MAX_PROJECT_ENTRIES); commit a1f2f2f0b"
+    lastModified: "2026-10-27T15:46:56.354Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "1466e27e-19f4-413a-bb45-265042446ece":
     status: "completed"
@@ -84,7 +91,14 @@ items:
     lastModified: "2026-10-27T14:50:54.818Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "612513ef-4a1b-4c8f-94fe-8cd6d51ad4cd":
-    lastModified: "2026-10-27T13:51:18.561Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:46:56.354Z"
+    completedAt: "2026-10-27T15:46:56.354Z"
+    endedAt: "2026-10-27T15:46:56.354Z"
+    activeIntervals: [{"end":"2026-10-27T15:46:56.354Z","start":"2026-10-27T15:46:56.354Z"}]
+    appliedAt: "2026-10-27T15:46:56.354Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T15:46:56.354Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "8327401a-6629-49c4-aa66-d2746d0ad07b":
     status: "completed"

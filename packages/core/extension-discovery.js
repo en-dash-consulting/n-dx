@@ -58,6 +58,9 @@ export const USER_EXTENSIONS_DIRNAME = "extensions";
 /** Bumped when the shape of a cached source entry changes; older entries are recomputed. */
 const CACHE_VERSION = 1;
 
+/** Most project sources the cache keeps; older ones are rescanned when next used. */
+export const MAX_PROJECT_ENTRIES = 20;
+
 const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "optionalDependencies"];
 
 /**
@@ -519,7 +522,8 @@ function readJson(fs, path, errors, report = true) {
  * The file is read again just before the write and only the `discovery` key is
  * changed, so an approval, disable or removal another process wrote while this
  * one was scanning is kept rather than undone. Source entries another process
- * cached meanwhile are kept too, unless this call recomputed the same source.
+ * cached meanwhile are kept too, unless this call recomputed the same source,
+ * but only the {@link MAX_PROJECT_ENTRIES} most recently scanned projects stay.
  * A file that has stopped being readable JSON is left alone.
  *
  * @param {DiscoveryFs} fs
@@ -534,7 +538,7 @@ function writeCache(fs, path, recomputed, errors) {
   const sources = isObject(file.discovery) && file.discovery.version === CACHE_VERSION && isObject(file.discovery.sources)
     ? file.discovery.sources
     : {};
-  const value = { ...file, discovery: { version: CACHE_VERSION, sources: { ...sources, ...recomputed } } };
+  const value = { ...file, discovery: { version: CACHE_VERSION, sources: boundProjectEntries({ ...sources }, recomputed) } };
   const tmp = `${path}.${process.pid}.tmp`;
   try {
     fs.mkdirSync(dirname(path), { recursive: true });
@@ -543,6 +547,26 @@ function writeCache(fs, path, recomputed, errors) {
   } catch (error) {
     errors.push({ path, message: `cache not written: ${/** @type {Error} */ (error).message}` });
   }
+}
+
+/**
+ * Merge `recomputed` into `sources`, then drop the oldest `project:` entries
+ * past {@link MAX_PROJECT_ENTRIES}. Each project directory n-dx runs in adds one,
+ * so without a bound the file grows forever and every run parses all of it.
+ * Key order is recency: a recomputed entry moves to the end.
+ *
+ * @param {Record<string, SourceEntry>} sources
+ * @param {Record<string, SourceEntry>} recomputed
+ * @returns {Record<string, SourceEntry>}
+ */
+function boundProjectEntries(sources, recomputed) {
+  for (const [key, entry] of Object.entries(recomputed)) {
+    delete sources[key];
+    sources[key] = entry;
+  }
+  const projects = Object.keys(sources).filter((key) => key.startsWith("project:"));
+  for (const key of projects.slice(0, Math.max(0, projects.length - MAX_PROJECT_ENTRIES))) delete sources[key];
+  return sources;
 }
 
 /**
