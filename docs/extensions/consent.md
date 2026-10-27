@@ -5,7 +5,7 @@ An extension runs only after the user approves it, the same way Claude Code asks
 - **First run.** The first `ndx <name>` shows the package, version, source, commands and sidecar, then asks. Without a terminal to ask on, it exits 2 and names `ndx extensions enable <name>`.
 - **The hub never asks.** A request for an unapproved extension's `/x/<name>/` answers 404 with the reason. Approve it from the CLI.
 - **Non-interactive approval.** `ndx extensions enable <name> --yes` approves without a prompt, for CI and provisioning scripts.
-- **What an approval covers.** The approval stores a hash of the `ndx.extension` block plus the package version. If either changes, n-dx asks again. Changing the extension's scripts without bumping the version does not.
+- **What an approval covers.** The approval stores a hash of the `ndx.extension` block, the package version, the source and the real path of the package directory. If any of them changes, n-dx asks again, so a same-named, same-version copy installed somewhere else is not covered. Changing the extension's scripts without bumping the version does not.
 - **Project-source extensions** are approved per project path. Cloning a repository never brings an approval with it, so a repo's own extensions never run unapproved.
 - **Install scripts.** `ndx extensions add` installs with `--ignore-scripts`, so no package code runs before approval. Discovery itself only reads `package.json`.
 

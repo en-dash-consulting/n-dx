@@ -13,9 +13,11 @@
  * - `disabled` — `{ [extensionName]: { disabledAt } }`. Disabling keeps the
  *   approval, so enabling again does not ask again.
  *
- * An approval holds a hash of the `ndx.extension` block and the package
- * version; a change to either leaves the extension unapproved until it is
- * approved again.
+ * An approval holds a hash of the `ndx.extension` block, the package version,
+ * the source and the real path of the package directory; a change to any of
+ * them leaves the extension unapproved until it is approved again. Binding the
+ * directory is what stops a same-named, same-version copy somewhere else — a
+ * cloned repo's `node_modules` — from running under another copy's approval.
  *
  * Whatever else is in the file (discovery's cache) is kept as it was read.
  *
@@ -44,6 +46,7 @@ export const EXTENSION_STATES = Object.freeze(["enabled", "disabled", "unapprove
  * @property {string | undefined} version
  * @property {string} manifestHash
  * @property {string} source
+ * @property {string} dir  Real path of the approved package directory.
  * @property {string} approvedAt
  */
 
@@ -146,7 +149,7 @@ export function approvalFor(file, ext, projectDir) {
 export function recordApproval(file, ext, { projectDir, now = new Date() } = {}) {
   if (!ext.manifest) throw new TypeError("recordApproval: only a valid manifest can be approved");
   /** @type {Approval} */
-  const record = { version: ext.version, manifestHash: manifestHash(ext.manifest), source: ext.source, approvedAt: now.toISOString() };
+  const record = { version: ext.version, manifestHash: manifestHash(ext.manifest), source: ext.source, dir: realDir(ext.dir), approvedAt: now.toISOString() };
   if (ext.source === "project") {
     if (!projectDir) throw new TypeError("recordApproval: a project-source extension needs projectDir");
     const projects = isObject(file.projectApprovals) ? file.projectApprovals : (file.projectApprovals = {});
@@ -243,6 +246,9 @@ export function extensionState(ext, { file, ndxVersion, projectDir }) {
   if (!approval) {
     return { state: "unapproved", reason: ext.source === "project" ? "not approved for this project" : "not approved yet" };
   }
+  if (approval.source !== ext.source || typeof approval.dir !== "string" || !sameDir(approval.dir, realDir(ext.dir))) {
+    return { state: "unapproved", reason: `the approval is for another copy (${approval.source ?? "?"}: ${approval.dir ?? "unknown"})` };
+  }
   if (approval.version !== ext.version) {
     return { state: "unapproved", reason: `version changed since approval (${approval.version ?? "none"} → ${ext.version ?? "none"})` };
   }
@@ -253,6 +259,31 @@ export function extensionState(ext, { file, ndxVersion, projectDir }) {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * The real path of a package directory, so a symlinked install and its target
+ * are one copy. A directory that no longer exists keeps its resolved path: it
+ * can match nothing installed, which is the answer wanted.
+ *
+ * @param {string} dir
+ * @returns {string}
+ */
+function realDir(dir) {
+  try {
+    return nodeFs.realpathSync(dir);
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code === "ENOENT") return resolve(dir);
+    throw error;
+  }
+}
+
+/**
+ * @param {string} a
+ * @param {string} b
+ */
+function sameDir(a, b) {
+  return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
 
 /**
  * JSON with object keys sorted at every level.

@@ -22,7 +22,14 @@ items:
     lastModified: "2026-10-27T13:51:16.437Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "473f775b-508d-46fa-a65a-4c8e7e239fc2":
-    lastModified: "2026-10-27T13:50:59.377Z"
+    status: "completed"
+    startedAt: "2026-10-27T14:09:58.346Z"
+    completedAt: "2026-10-27T14:15:48.882Z"
+    endedAt: "2026-10-27T14:15:48.882Z"
+    activeIntervals: [{"end":"2026-10-27T14:15:48.882Z","start":"2026-10-27T14:09:58.346Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Approvals bound to source + real package dir; findGlobalRoot refuses a node_modules with package.json beside it (except under $PNPM_HOME/global)."
+    lastModified: "2026-10-27T14:15:48.882Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "52c9a605-a471-417c-b9dc-181af66e293a":
     lastModified: "2026-10-27T13:51:07.733Z"

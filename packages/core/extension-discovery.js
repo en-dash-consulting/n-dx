@@ -41,7 +41,7 @@
  */
 
 import * as nodeFs from "node:fs";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveNdxHome } from "./layout.js";
 import { validateExtensionManifest } from "./extension-manifest.js";
@@ -198,19 +198,43 @@ export function discoverExtensions(options) {
 
 /**
  * The global `node_modules` this n-dx was installed into, or `null` when it runs
- * from a checkout. Covers npm (`<prefix>/lib/node_modules/@n-dx/core`) and
- * pnpm, whose real path runs through `node_modules/.pnpm/…`.
+ * from a checkout or from a project's own install. Covers npm
+ * (`<prefix>/lib/node_modules/@n-dx/core`) and pnpm, whose real path runs
+ * through `node_modules/.pnpm/…`.
+ *
+ * A `node_modules` with a `package.json` beside it is a project's, not a global
+ * one: a repo that lists `@n-dx/core` as a dependency must not have every
+ * package in its `node_modules` scanned as globally installed, where a user
+ * approval could cover it. pnpm's global directory is the exception — it has a
+ * `package.json` — and is recognised only under `$PNPM_HOME/global/`. A pnpm
+ * global directory configured elsewhere yields no global source.
  *
  * @param {string} [coreDir]  `@n-dx/core`'s directory; defaults to this module's.
+ * @param {{env?: Record<string, string | undefined>, fs?: Pick<typeof nodeFs, "statSync">}} [options]
  * @returns {string | null}
  */
-export function findGlobalRoot(coreDir = dirname(fileURLToPath(import.meta.url))) {
+export function findGlobalRoot(coreDir = dirname(fileURLToPath(import.meta.url)), { env = process.env, fs = nodeFs } = {}) {
   const parts = resolve(coreDir).split(sep);
   const pnpm = parts.lastIndexOf(".pnpm");
-  if (pnpm > 0 && parts[pnpm - 1] === "node_modules") return parts.slice(0, pnpm).join(sep);
   const n = parts.length;
-  if (n >= 3 && parts[n - 2] === "@n-dx" && parts[n - 3] === "node_modules") return parts.slice(0, n - 2).join(sep);
-  return null;
+  let root = null;
+  if (pnpm > 0 && parts[pnpm - 1] === "node_modules") root = parts.slice(0, pnpm).join(sep);
+  else if (n >= 3 && parts[n - 2] === "@n-dx" && parts[n - 3] === "node_modules") root = parts.slice(0, n - 2).join(sep);
+  if (root === null) return null;
+  if (!fs.statSync(join(dirname(root), "package.json"), { throwIfNoEntry: false })) return root;
+  const pnpmGlobal = env.PNPM_HOME ? resolve(env.PNPM_HOME, "global") : undefined;
+  return pnpmGlobal && isInside(pnpmGlobal, root) ? root : null;
+}
+
+/**
+ * Whether `path` is strictly below `dir`.
+ *
+ * @param {string} dir
+ * @param {string} path
+ */
+function isInside(dir, path) {
+  const rel = relative(dir, path);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
 // ── sources ──────────────────────────────────────────────────────────────────

@@ -362,6 +362,31 @@ describe("findGlobalRoot", () => {
   it("is null for a checkout", () => {
     expect(findGlobalRoot(p("src", "n-dx", "packages", "core"))).toBeNull();
   });
+
+  it("is null for a project that installs @n-dx/core itself, run from any subdirectory", () => {
+    const repo = join(root, "cloned-repo");
+    writeJson(join(repo, "package.json"), { name: "cloned-repo", devDependencies: { "@n-dx/core": "^0.10.0" } });
+    const core = join(repo, "node_modules", "@n-dx", "core");
+    mkdirSync(core, { recursive: true });
+    expect(findGlobalRoot(core, { env: {} })).toBeNull();
+    expect(findGlobalRoot(join(repo, "node_modules", ".pnpm", "@n-dx+core@0.10.0", "node_modules", "@n-dx", "core"), { env: {} })).toBeNull();
+  });
+
+  it("is the node_modules of a real npm global prefix, which has no package.json", () => {
+    const core = join(root, "prefix", "lib", "node_modules", "@n-dx", "core");
+    mkdirSync(core, { recursive: true });
+    expect(findGlobalRoot(core, { env: {} })).toBe(join(root, "prefix", "lib", "node_modules"));
+  });
+
+  it("is pnpm's global directory, which has a package.json, only under $PNPM_HOME/global", () => {
+    const pnpmHome = join(root, "pnpm-home");
+    writeJson(join(pnpmHome, "global", "5", "package.json"), { dependencies: { "@n-dx/core": "0.10.0" } });
+    const core = join(pnpmHome, "global", "5", "node_modules", ".pnpm", "@n-dx+core@0.10.0", "node_modules", "@n-dx", "core");
+    mkdirSync(core, { recursive: true });
+    expect(findGlobalRoot(core, { env: { PNPM_HOME: pnpmHome } })).toBe(join(pnpmHome, "global", "5", "node_modules"));
+    expect(findGlobalRoot(core, { env: {} })).toBeNull();
+    expect(findGlobalRoot(core, { env: { PNPM_HOME: join(root, "elsewhere") } })).toBeNull();
+  });
 });
 
 /** Move a path's mtime forward, as an install would; filesystems with coarse mtimes need it. */

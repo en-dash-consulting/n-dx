@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runExtensions } from "../../packages/core/extensions-command.js";
@@ -336,6 +336,31 @@ describe("ndx extensions enable and disable", () => {
     installInto(clone, extensionPackage("ndx-local", "local"));
     const { out } = await ndx(["list", "--json"], { cwd: clone });
     expect(JSON.parse(out).extensions.find((e) => e.name === "local")).toMatchObject({ state: "unapproved", reason: "not approved for this project" });
+  });
+
+  it("an approval covers only the copy approved, not a same-named, same-version copy elsewhere", async () => {
+    const pkg = extensionPackage("ndx-foo", "foo");
+    const approvedRoot = join(root, "approved-global", "node_modules");
+    const otherRoot = join(root, "clone", "node_modules");
+    writePackage(join(approvedRoot, "ndx-foo"), pkg);
+    writePackage(join(otherRoot, "ndx-foo"), pkg);
+    const state = async (globalRoot) => JSON.parse((await ndx(["list", "--json"], { globalRoot })).out).extensions.find((e) => e.name === "foo");
+
+    expect((await ndx(["enable", "foo", "--yes"], { globalRoot: approvedRoot })).code).toBe(0);
+    expect(readJson(join(home, "extensions.json")).approvals["ndx-foo"]).toMatchObject({ source: "global", dir: realpathSync(join(approvedRoot, "ndx-foo")) });
+    expect((await state(approvedRoot)).state).toBe("enabled");
+
+    // Same source, other directory.
+    expect(await state(otherRoot)).toMatchObject({ state: "unapproved", reason: expect.stringMatching(/^the approval is for another copy \(global: /) });
+
+    // Approved in the user source; the user copy goes and a global one is left.
+    installInto(userFolder(), pkg);
+    expect((await ndx(["enable", "foo", "--yes"], { globalRoot: approvedRoot })).code).toBe(0);
+    expect(readJson(join(home, "extensions.json")).approvals["ndx-foo"]).toMatchObject({ source: "user" });
+    rmSync(join(userFolder(), "node_modules", "ndx-foo"), { recursive: true });
+    clock += 10;
+    utimesSync(join(userFolder(), "node_modules"), clock, clock);
+    expect(await state(approvedRoot)).toMatchObject({ state: "unapproved", reason: expect.stringMatching(/^the approval is for another copy \(user: /) });
   });
 
   it("refuses to enable an incompatible extension", async () => {
