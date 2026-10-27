@@ -8,7 +8,7 @@
  * open change already placed.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -85,6 +85,28 @@ describe("v2 Inbox counts", () => {
     const applied = changes.find((c) => c.id === APPLIED);
     expect(applied?.needsPlacement).toBe(true);
     expect(applied).not.toHaveProperty("awaitsPlacement");
+  });
+
+  it("recounts only when the PRD cache file is rewritten", async () => {
+    // Counting loads the whole v2 model; the status poll must not repeat it
+    // while nothing has written the PRD (every write rewrites the cache file).
+    const cacheFile = join(rexDir, ".cache", "prd.json");
+    mkdirSync(join(rexDir, ".cache"), { recursive: true });
+    writeFileSync(cacheFile, "{}\n");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      expect((await get("/api/status")).rex.inbox.open).toBe(1);
+
+      writeChange(rexDir, "second-held", "c0000000-0000-4000-8000-0000000000e4", ["needsPlacement: true"]);
+      vi.setSystemTime(Date.now() + 10_000); // past the 5 s status cache
+      expect((await get("/api/status")).rex.inbox.open).toBe(1);
+
+      writeFileSync(cacheFile, "{ }\n");
+      vi.setSystemTime(Date.now() + 10_000);
+      expect((await get("/api/status")).rex.inbox.open).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("omits rex.inbox on a v1 tree", async () => {

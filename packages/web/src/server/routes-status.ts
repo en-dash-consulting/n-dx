@@ -8,7 +8,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveLayout } from "@n-dx/llm-client";
@@ -22,7 +22,7 @@ import {
 } from "./rex-gateway.js";
 import type { PRDDocument, TreeStats } from "./rex-gateway.js";
 import type { ReadinessScore, RepoIdentity, OutboundData, InfrastructureData } from "./domain-gateway.js";
-import { loadPRDSync } from "./prd-io.js";
+import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
 import { isProjectInitialized } from "./routes-static.js";
 import { isRunStale } from "./run-staleness.js";
 
@@ -218,6 +218,7 @@ const statusCaches = new WorkspaceScoped<{ entry: StatusCache | null }>(() => ({
 /** Clear the status cache for every workspace (exposed for testing and route invalidation). */
 export function clearStatusCache(): void {
   statusCaches.clear();
+  inboxMemos.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -405,8 +406,44 @@ function extractRexStatus(ctx: ServerContext): RexStatus {
   }
 }
 
+/**
+ * Inbox counts, memoized per workspace against the PRD cache file's stat.
+ *
+ * Counting loads the whole v2 model — about 1.5 s on a 1,200-change tree —
+ * and the status poll outlives the 5 s status cache, so recounting on every
+ * poll would re-read the tree every 10 s per open tab. Every PRD write and
+ * watcher refresh rewrites `.rex/.cache/prd.json`, so its stat says when the
+ * counts can have moved. With no cache file there is no signal, and each call
+ * recounts. Concurrent callers share one in-flight read.
+ */
+interface InboxMemo {
+  key: string | null;
+  counts: Promise<InboxCounts | undefined> | null;
+}
+
+const inboxMemos = new WorkspaceScoped<InboxMemo>(() => ({ key: null, counts: null }));
+
+function prdCacheKey(rexDir: string): string | null {
+  try {
+    const s = statSync(join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON));
+    return `${s.mtimeMs}:${s.size}`;
+  } catch {
+    return null;
+  }
+}
+
+function readInboxCounts(ctx: ServerContext): Promise<InboxCounts | undefined> {
+  const memo = inboxMemos.get(ctx);
+  const key = prdCacheKey(ctx.rexDir);
+  if (memo.counts && key !== null && memo.key === key) return memo.counts;
+  const counts = countInbox(ctx);
+  memo.key = key;
+  memo.counts = counts;
+  return counts;
+}
+
 /** Inbox counts for a v2 tree, or undefined on v1 or when the tree cannot be read. */
-async function readInboxCounts(ctx: ServerContext): Promise<InboxCounts | undefined> {
+async function countInbox(ctx: ServerContext): Promise<InboxCounts | undefined> {
   try {
     if ((await prdLayout(ctx.rexDir)) !== "v2") return undefined;
     const { tree } = await loadPrdModel(ctx.rexDir);
