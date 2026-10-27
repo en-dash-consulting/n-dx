@@ -15,13 +15,16 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   runShellTestCommand,
   runCrossVendorReview,
   formatReviewBanner,
 } from "../../packages/core/pair-programming.js";
 
-const { recordRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+const { collectRepoExecutionConfig, recordRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+const CLI = fileURLToPath(new URL("../../packages/core/cli.js", import.meta.url));
 
 const FIXTURE_ENV = {
   NDX_REVIEW_FIXTURE_SECRET: "fixture-secret",
@@ -49,6 +52,17 @@ afterEach(() => {
 
 function writeProjectConfig(config) {
   writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify(config), "utf-8");
+}
+
+/** `.hench/config.json` denies `name`; `.n-dx.json` carries a guard with only blockedPaths. */
+function writeHenchAndProjectGuards(name) {
+  mkdirSync(join(tmpDir, ".hench"));
+  writeFileSync(
+    join(tmpDir, ".hench", "config.json"),
+    JSON.stringify({ guard: { allowedCommands: ["npm", "node"], allowedGitSubcommands: ["status"], env: { deny: [name] } } }),
+    "utf-8",
+  );
+  writeProjectConfig({ hench: { guard: { blockedPaths: [".git/**"] } } });
 }
 
 /** A test command that prints which fixture variables reached it. */
@@ -127,6 +141,41 @@ describe("runShellTestCommand environment", () => {
     const result = await runShellTestCommand(probeCommand(), tmpDir, undefined, undefined, { ndxHome: join(tmpDir, "ndx-home") });
 
     expect(probedNames(result.output)).toEqual(["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"]);
+  });
+
+  it("keeps .hench/config.json's guard.env.deny when .n-dx.json carries a guard section without env", async () => {
+    // A plain name the default deny list does not cover, so only the user's deny strips it.
+    const name = "NDX_REVIEW_FIXTURE_DB_URL";
+    const saved = process.env[name];
+    process.env[name] = "fixture-db";
+    try {
+      writeHenchAndProjectGuards(name);
+      const probe = join(tmpDir, "deny-probe.js");
+      writeFileSync(probe, `console.log('PROBE ' + JSON.stringify(${JSON.stringify(name)} in process.env));\n`, "utf-8");
+
+      const result = await runShellTestCommand(`"${process.execPath}" "${probe}"`, tmpDir, undefined, undefined, { ndxHome: join(tmpDir, "ndx-home") });
+
+      expect(result.exitCode).toBe(0);
+      expect(probedNames(result.output)).toBe(false);
+    } finally {
+      if (saved === undefined) delete process.env[name];
+      else process.env[name] = saved;
+    }
+  });
+
+  it("collects the same merged guard that core's config loader resolves", () => {
+    writeHenchAndProjectGuards("NDX_REVIEW_FIXTURE_DB_URL");
+    const shown = spawnSync(process.execPath, [CLI, "config", "hench.guard", "--json", tmpDir], { encoding: "utf-8" });
+    expect(shown.status, shown.stderr).toBe(0);
+    const coreGuard = JSON.parse(shown.stdout.slice(shown.stdout.indexOf("{"), shown.stdout.lastIndexOf("}") + 1));
+
+    const collected = collectRepoExecutionConfig(tmpDir);
+    expect(collected.guard).toEqual({
+      allowedCommands: coreGuard.allowedCommands,
+      blockedPaths: coreGuard.blockedPaths,
+      allowedGitSubcommands: coreGuard.allowedGitSubcommands ?? [],
+    });
+    expect(collected.envDeny).toEqual(coreGuard.env.deny);
   });
 
   it("falls back to the default deny policy, and says so, when the project policy is invalid", async () => {

@@ -73,6 +73,7 @@ import {
   type ResolveNdxHomeOptions,
 } from "./layout.js";
 import { toCanonicalJSON } from "./json.js";
+import { deepMerge } from "./project-config.js";
 
 /**
  * The legacy layout's paths, resolved once by name.
@@ -395,7 +396,7 @@ function relOf(root: string, path: string): string {
  * Read the repository's execution-relevant configuration.
  *
  * Hench overrides in the project config file (`.n-dx.json`, or the `.ndx/`
- * container's `config.json`) are folded over `.hench/config.json` the way
+ * container's `config.json`) are deep-merged over `.hench/config.json` the way
  * hench's own loader folds them, because that file is often tracked too. The
  * user's `.n-dx.local.json` is not read: it is git-ignored and theirs.
  */
@@ -414,7 +415,10 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     : null;
   if (projectHench) sources.push(relOf(root, layout.configFile));
 
-  const merged: Record<string, unknown> = { ...(henchConfig ?? {}), ...(projectHench ?? {}) };
+  // Deep, as hench's loader and core's loadAllConfigs fold them: a shallow
+  // spread let a project-config `guard` without `env` drop the hench file's
+  // `guard.env.deny`, so repository commands kept a variable the user denied.
+  const merged = deepMerge(henchConfig ?? {}, projectHench ?? {});
   const rawGuard = merged.guard && typeof merged.guard === "object" && !Array.isArray(merged.guard)
     ? (merged.guard as Record<string, unknown>)
     : null;

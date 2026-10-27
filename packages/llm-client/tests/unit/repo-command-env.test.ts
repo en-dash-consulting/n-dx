@@ -78,6 +78,12 @@ describe("repoCommandEnv", () => {
     expect(visible(repoCommandEnv(repo, { env: parent() }), OTHER)).toBe(false);
   });
 
+  it("keeps .hench/config.json's deny entry when the project config carries a guard section without env", () => {
+    writeJson(".hench/config.json", { guard: { env: { deny: [OTHER] } } });
+    writeJson(".n-dx.json", { hench: { guard: { blockedPaths: [".git/**"] } } });
+    expect(visible(repoCommandEnv(repo, { env: parent() }), OTHER)).toBe(false);
+  });
+
   it("reads the user's trust record when the environment it filters has no NDX_HOME", () => {
     writeJson(".hench/config.json", { guard: { env: { allow: [SENTINEL] } } });
     recordRepoTrust(repo, { ndxHome: home });

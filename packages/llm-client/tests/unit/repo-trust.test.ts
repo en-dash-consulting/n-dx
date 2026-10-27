@@ -195,6 +195,19 @@ describe("collectRepoExecutionConfig", () => {
     expect(collectRepoExecutionConfig(repo).permissionMode).toBeNull();
   });
 
+  it("deep-merges the project config's guard over .hench/config.json's, as hench and core load it", () => {
+    writeJson(".hench/config.json", { guard: { ...DEFAULT_GUARD, env: { deny: ["MY_DB_URL"], allow: ["CI_TOKEN"] } } });
+    writeJson(".n-dx.json", { hench: { guard: { blockedPaths: [".git/**"] } } });
+    const c = collectRepoExecutionConfig(repo);
+    expect(c.guard).toEqual({
+      allowedCommands: DEFAULT_GUARD.allowedCommands,
+      blockedPaths: [".git/**"],
+      allowedGitSubcommands: DEFAULT_GUARD.allowedGitSubcommands,
+    });
+    expect(c.envDeny).toEqual(["MY_DB_URL"]);
+    expect(c.envAllow).toEqual(["CI_TOKEN"]);
+  });
+
   // Every field folded into the digest moves it for *every* repository, so a
   // field added with an always-present empty value would re-open trust across
   // the board on upgrade: a repository the user trusted reads as `changed`,
