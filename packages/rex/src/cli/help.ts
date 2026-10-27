@@ -193,6 +193,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     summary: "place or apply a change (v2 PRD)",
     usage: [
       "rex change place <change> [--target=<node>] [--relation=touches|amends] [options] [dir]",
+      "rex change place <change> --propose --type=capability|constraint --under=<area> --title=\"...\" [options] [dir]",
       "rex change apply <change> [--force] [dir]",
     ],
     description:
@@ -201,7 +202,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "With --target, record it: touches joins the change's touches; amends adds\n" +
       "an amendment, whose new statement (--proposed) and capability criteria\n" +
       "edits (--capability-criterion, --remove-capability-criterion) apply needs.\n" +
-      "Either clears needsPlacement. Only an open change is placed.\n\n" +
+      "When nothing on the shortlist fits, --propose records a new capability or\n" +
+      "constraint under a live area instead (not with --target or --relation); it\n" +
+      "joins the product layer when the change is applied.\n" +
+      "Each clears needsPlacement. Only an open change is placed.\n\n" +
       "apply: apply the change's amendments to the product layer as a steward,\n" +
       "whatever rex.applyOn says, and stamp the change applied. Refused whole,\n" +
       "listing every problem, when an amendment does not fit or its target's spec\n" +
@@ -213,9 +217,13 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     options: [
       { flag: "--target=<node>", description: "place: capability or constraint (id or display id); omit for the shortlist" },
       { flag: "--relation=<r>", description: "place: touches or amends (default: the rules' relation)" },
-      { flag: "--summary=\"...\"", description: "place, amends: the amendment's summary (default: the change's title)" },
-      { flag: "--proposed=\"...\"", description: "place, amends: the target's replacement statement" },
-      { flag: "--capability-criterion=\"<id>: <text>\"", description: "place, amends: add (new id) or replace (existing id) a capability criterion of the target (repeatable)" },
+      { flag: "--propose", description: "place: propose a new capability or constraint; needs --type, --under and --title" },
+      { flag: "--type=<t>", description: "place, propose: capability or constraint" },
+      { flag: "--under=<area>", description: "place, propose: the live area it goes under (id or display id)" },
+      { flag: "--title=\"...\"", description: "place, propose: the new node's title" },
+      { flag: "--summary=\"...\"", description: "place, amends or propose: the amendment's summary (default: the change's title)" },
+      { flag: "--proposed=\"...\"", description: "place, amends: the target's replacement statement; propose: the new node's statement" },
+      { flag: "--capability-criterion=\"<id>: <text>\"", description: "place, amends: add (new id) or replace (existing id) a capability criterion of the target; propose: one of the new capability's (repeatable)" },
       { flag: "--remove-capability-criterion=<id>", description: "place, amends: remove a capability criterion of the target (repeatable)" },
       { flag: "--force", description: "apply: apply amendments whose target's spec moved since drafting" },
       { flag: "--format=json", description: "Machine-readable output" },
@@ -224,6 +232,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex change place CH-2", description: "Show where the change could go" },
       { command: "rex change place CH-2 --target=A1.1 --relation=touches", description: "It works on the capability" },
       { command: "rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion=\"c3: A refund reaches the card\"", description: "It adds a capability criterion" },
+      { command: "rex change place CH-2 --propose --type=capability --under=A1 --title=\"Refund by card\"", description: "Nothing fits: propose a new capability" },
       { command: "rex change apply CH-2", description: "Apply its amendments to the product layer" },
     ],
     related: ["product", "add", "health"],

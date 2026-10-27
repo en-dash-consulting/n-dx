@@ -110,6 +110,7 @@ const VALUE_KEYS = new Set([
   "type",
   "target",
   "relation",
+  "under",
   "summary",
   "migration",
   "cut-at",

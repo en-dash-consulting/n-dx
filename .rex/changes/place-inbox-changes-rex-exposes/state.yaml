@@ -17,7 +17,14 @@ items:
     lastModified: "2026-10-27T16:28:25.325Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "93852535-8174-4ac8-883b-d6f444c2cb46":
-    lastModified: "2026-10-27T16:28:19.691Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:33:44.533Z"
+    completedAt: "2026-10-27T18:43:28.095Z"
+    endedAt: "2026-10-27T18:43:28.095Z"
+    activeIntervals: [{"end":"2026-10-27T18:43:28.095Z","start":"2026-10-27T18:33:44.533Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "rex change place --propose and place_change propose record a new capability/constraint via recordProposal, log change_proposed; help, tool description and tests updated."
+    lastModified: "2026-10-27T18:43:28.095Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fb0b3070-5a37-4772-9c17-0564a0c2a547":
     lastModified: "2026-10-27T16:28:32.133Z"
