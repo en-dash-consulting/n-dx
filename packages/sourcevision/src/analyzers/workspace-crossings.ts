@@ -549,19 +549,31 @@ function matchLiteralTarget(
   caller: SubAnalysis,
   target: string,
   candidates: SubAnalysis[],
-): HttpMatch | null {
+): HttpMatch | { ambiguous: string[] } | null {
   const host = hostOf(target);
   if (!host) return null;
   const path = pathOf(target);
 
   let best: HttpMatch | null = null;
+  let tied: string[] = [];
+  const endpointOf = (url: string): URL | null => {
+    try { return new URL(url.includes("://") ? url : `http://${url}`); }
+    catch { return null; }
+  };
+  const endpoint = endpointOf(target);
+  if (!endpoint) return null;
 
   for (const member of candidates) {
     if (member.id === caller.id) continue;
 
     const declaredHost = member.baseUrl ? hostOf(member.baseUrl) : null;
-    const hostDeclared = declaredHost !== null && declaredHost === host;
-    const nameResembles = memberNames(member).some((n) => sameIdentity(firstLabel(host), n));
+    const declaredEndpoint = member.baseUrl ? endpointOf(member.baseUrl) : null;
+    const basePath = member.baseUrl ? pathOf(member.baseUrl).replace(/\/$/, "") : "";
+    const hostDeclared = declaredHost !== null && declaredEndpoint !== null && declaredEndpoint.host === endpoint.host &&
+      (!/^https?:\/\//i.test(member.baseUrl!) || !/^https?:\/\//i.test(target) || declaredEndpoint.origin === endpoint.origin) &&
+      (!basePath || path === basePath || path.startsWith(`${basePath}/`));
+    // An explicit endpoint contradicting the target outweighs name resemblance.
+    const nameResembles = !member.baseUrl && memberNames(member).some((n) => sameIdentity(firstLabel(host), n));
 
     if (!hostDeclared && !nameResembles) continue;
 
@@ -593,10 +605,13 @@ function matchLiteralTarget(
     };
     if (!best || CONFIDENCE_RANK[confidence] > CONFIDENCE_RANK[best.confidence]) {
       best = candidate;
+      tied = [member.prefix];
+    } else if (CONFIDENCE_RANK[confidence] === CONFIDENCE_RANK[best.confidence]) {
+      tied.push(member.prefix);
     }
   }
 
-  return best;
+  return tied.length > 1 ? { ambiguous: tied.sort() } : best;
 }
 
 /**
@@ -694,7 +709,13 @@ export function computeHttpCrossings(
       let match: HttpMatch | null = null;
 
       if (dep.targetSource === "literal") {
-        match = matchLiteralTarget(caller, dep.target, members);
+        const resolved = matchLiteralTarget(caller, dep.target, members);
+        if (resolved && "ambiguous" in resolved) {
+          addWithheld({ source: "http", fromMember: caller.prefix, toMember: "", confidence: "inferred",
+            reason: `${dep.target} matches more than one member (${resolved.ambiguous.join(", ")}); declare distinct base URLs or routes` });
+          continue;
+        }
+        match = resolved;
         if (match && !clears(match.confidence)) {
           addWithheld({
             source: "http",
@@ -793,8 +814,10 @@ const SHARED_BY_NAME_KINDS: ReadonlySet<string> = new Set([
 
 /** The literals that identify a resource, falling back to its name. */
 function resourceLiterals(resource: InfraResource): string[] {
-  const literals = resource.literals?.length ? resource.literals : [resource.name];
-  return literals.filter((l) => l.length > 2);
+  // IaC ids and declaration labels are local, even when two repos use them.
+  const literals = resource.literals ?? [];
+  const localLabel = resource.id.startsWith("infra:") ? resource.id.slice(resource.id.lastIndexOf(".") + 1) : undefined;
+  return literals.filter((l) => l.length > 2 && l !== localLabel);
 }
 
 /**
@@ -850,7 +873,7 @@ export function computeInfraCrossings(
 
       for (const resourceA of a.infrastructure?.resources ?? []) {
         for (const resourceB of b.infrastructure?.resources ?? []) {
-          const sameId = resourceA.id === resourceB.id;
+          const sameId = resourceA.id === resourceB.id && /^arn:/.test(resourceA.id);
           const sharedName =
             !sameId &&
             SHARED_BY_NAME_KINDS.has(resourceA.kind) &&
@@ -862,7 +885,7 @@ export function computeInfraCrossings(
           const confidence: Confidence = sameId ? "certain" : "likely";
           const what = sameId
             ? `resource ${resourceA.id}`
-            : `${resourceA.kind} "${resourceA.name}"`;
+            : `${resourceA.kind} "${resourceA.name}" (${resourceA.id}, ${resourceB.id})`;
 
           const linkA = (a.infrastructure?.links ?? []).find((l) => l.resourceId === resourceA.id);
           const linkB = (b.infrastructure?.links ?? []).find((l) => l.resourceId === resourceB.id);
