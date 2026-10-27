@@ -571,14 +571,67 @@ describe("findGlobalRoot", () => {
     expect(findGlobalRoot(core, { env: {} })).toBe(join(root, "prefix", "lib", "node_modules"));
   });
 
-  it("is pnpm's global directory, which has a package.json, only under $PNPM_HOME/global", () => {
-    const pnpmHome = join(root, "pnpm-home");
-    writeJson(join(pnpmHome, "global", "5", "package.json"), { dependencies: { "@n-dx/core": "0.10.0" } });
-    const core = join(pnpmHome, "global", "5", "node_modules", ".pnpm", "@n-dx+core@0.10.0", "node_modules", "@n-dx", "core");
+  /**
+   * Install `@n-dx/core` into a global directory that, like the real ones, has
+   * a package.json beside its node_modules; returns core's real directory.
+   */
+  const installGlobal = (globalDir, { viaPnpm = false } = {}) => {
+    writeJson(join(globalDir, "package.json"), { dependencies: { "@n-dx/core": "0.10.0" } });
+    const core = viaPnpm
+      ? join(globalDir, "node_modules", ".pnpm", "@n-dx+core@0.10.0", "node_modules", "@n-dx", "core")
+      : join(globalDir, "node_modules", "@n-dx", "core");
     mkdirSync(core, { recursive: true });
-    expect(findGlobalRoot(core, { env: { PNPM_HOME: pnpmHome } })).toBe(join(pnpmHome, "global", "5", "node_modules"));
-    expect(findGlobalRoot(core, { env: {} })).toBeNull();
-    expect(findGlobalRoot(core, { env: { PNPM_HOME: join(root, "elsewhere") } })).toBeNull();
+    return core;
+  };
+
+  it("is pnpm's global directory under $PNPM_HOME/global", () => {
+    const pnpmHome = join(root, "pnpm-home");
+    const core = installGlobal(join(pnpmHome, "global", "5"), { viaPnpm: true });
+    const opts = { home: join(root, "user"), platform: "linux" };
+    expect(findGlobalRoot(core, { ...opts, env: { PNPM_HOME: pnpmHome } })).toBe(join(pnpmHome, "global", "5", "node_modules"));
+    expect(findGlobalRoot(core, { ...opts, env: {} })).toBeNull();
+    expect(findGlobalRoot(core, { ...opts, env: { PNPM_HOME: join(root, "elsewhere") } })).toBeNull();
+  });
+
+  it.each([
+    ["linux", (h) => join(h, ".local", "share", "pnpm")],
+    ["darwin", (h) => join(h, "Library", "pnpm")],
+    ["win32", (h) => join(h, "AppData", "Local", "pnpm")],
+  ])("is pnpm's default global directory on %s when PNPM_HOME is unset", (platform, pnpmHome) => {
+    const home = join(root, "user");
+    const core = installGlobal(join(pnpmHome(home), "global", "5"), { viaPnpm: true });
+    expect(findGlobalRoot(core, { env: {}, home, platform })).toBe(join(pnpmHome(home), "global", "5", "node_modules"));
+  });
+
+  it.each([
+    ["yarn classic on linux", "linux", {}, (h) => join(h, ".config", "yarn", "global")],
+    ["yarn classic under XDG_DATA_HOME", "linux", { XDG_DATA_HOME: "data" }, () => join(root, "data", "yarn", "global")],
+    ["yarn classic on Windows", "win32", { LOCALAPPDATA: "local" }, () => join(root, "local", "Yarn", "Data", "global")],
+    ["yarn classic's configured global folder", "linux", { YARN_GLOBAL_FOLDER: "yarn-global" }, () => join(root, "yarn-global")],
+    ["bun", "darwin", {}, (h) => join(h, ".bun", "install", "global")],
+    ["bun under BUN_INSTALL", "linux", { BUN_INSTALL: "bun" }, () => join(root, "bun", "install", "global")],
+  ])("is the global directory of %s", (_label, platform, relEnv, globalDir) => {
+    const home = join(root, "user");
+    const env = Object.fromEntries(Object.entries(relEnv).map(([k, v]) => [k, join(root, v)]));
+    const core = installGlobal(globalDir(home));
+    expect(findGlobalRoot(core, { env, home, platform })).toBe(join(globalDir(home), "node_modules"));
+  });
+
+  it("is null for a project inside a known global directory's parent, or named like one", () => {
+    const home = join(root, "user");
+    const opts = { env: {}, home, platform: "linux" };
+    // A project beside the global directory, and one whose own path ends in global/…
+    expect(findGlobalRoot(installGlobal(join(home, ".config", "yarn", "project")), opts)).toBeNull();
+    expect(findGlobalRoot(installGlobal(join(root, "clones", "install", "global")), opts)).toBeNull();
+    expect(findGlobalRoot(installGlobal(join(root, "clones", "global", "5"), { viaPnpm: true }), opts)).toBeNull();
+  });
+
+  it("matches a known global directory reached through a symlinked home", () => {
+    const realHome = join(root, "real-home");
+    const core = installGlobal(join(realHome, ".bun", "install", "global"));
+    const linkedHome = join(root, "linked-home");
+    symlinkSync(realHome, linkedHome, "junction");
+    expect(findGlobalRoot(core, { env: {}, home: linkedHome, platform: "linux" })).toBe(join(realHome, ".bun", "install", "global", "node_modules"));
   });
 });
 

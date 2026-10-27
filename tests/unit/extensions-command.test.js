@@ -564,11 +564,28 @@ describe("ndx extensions info", () => {
 });
 
 describe("ndx extensions doctor", () => {
+  /** A global source, so these tests see no note about a missing one. */
+  const withGlobal = () => {
+    const globalRoot = join(root, "global", "node_modules");
+    mkdirSync(globalRoot, { recursive: true });
+    return { globalRoot };
+  };
+
   it("exits 0 and says so when nothing is wrong", async () => {
     installInto(userFolder(), extensionPackage("ndx-recon", "recon"));
-    const { code, out } = await ndx(["doctor"]);
+    const { code, out } = await ndx(["doctor"], withGlobal());
     expect(code).toBe(0);
     expect(out).toBe("No problems found in 1 extension.");
+  });
+
+  it("notes when no global source was recognised, without counting it as a problem", async () => {
+    installInto(userFolder(), extensionPackage("ndx-recon", "recon"));
+    const { code, out } = await ndx(["doctor"], { globalRoot: null });
+    expect(code).toBe(0);
+    expect(out.split("\n")).toEqual([
+      expect.stringMatching(/^Note: this n-dx is not in a recognised global install .*globally installed extensions are not discovered\.$/),
+      "No problems found in 1 extension.",
+    ]);
   });
 
   it("prints one line per problem, each with its fix, and exits 1", async () => {
@@ -581,7 +598,7 @@ describe("ndx extensions doctor", () => {
     listing.dependencies["ndx-gone"] = "^1.0.0";
     writeJson(join(userFolder(), "package.json"), listing);
 
-    const { code, out, err } = await ndx(["doctor"]);
+    const { code, out, err } = await ndx(["doctor"], withGlobal());
 
     expect(code).toBe(1);
     const lines = out.split("\n");

@@ -109,7 +109,7 @@ Any publisher can ship an extension; nothing in the contract is specific to one 
 
 1. **Project:** the project's own `node_modules`, for packages listed in its `package.json`. Applies to commands run in that project.
 2. **User:** `<ndx home>/extensions/node_modules`, installed by `ndx extensions add <package>`. Applies everywhere.
-3. **Global:** the global npm or pnpm root that n-dx itself was installed from.
+3. **Global:** the global npm, pnpm, yarn classic or bun root that n-dx itself was installed from.
 4. **Development:** paths listed in `extensions.paths` in `<ndx home>/config.json`, for working on an extension from a checkout.
 
 When the same package is found in several sources, the highest one wins and `ndx extensions info` names the others. Two different packages claiming one name are both refused, with both paths shown. The result is cached in `<ndx home>/extensions.json` and recomputed when the modification time of a source folder, or of a found extension's `package.json`, changes (a linked package is a symlink, so editing it moves no folder), so `ndx --help` does not walk `node_modules` every time.

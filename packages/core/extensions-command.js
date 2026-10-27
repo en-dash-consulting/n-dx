@@ -507,6 +507,10 @@ function doctor(ctx, dir) {
   const d = ctx.discover(dir);
   const problems = doctorProblems(d, ctx.ndxVersion);
   for (const line of problems) ctx.out(line);
+  // Not a problem: a checkout or a project's own install has no global source.
+  if (d.globalRoot === null) {
+    ctx.out("Note: this n-dx is not in a recognised global install (npm, pnpm, yarn classic, bun), so globally installed extensions are not discovered.");
+  }
   if (problems.length > 0) {
     ctx.err(`${problems.length} problem${problems.length === 1 ? "" : "s"} found.`);
     return 1;

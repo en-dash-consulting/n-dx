@@ -44,7 +44,7 @@ Highest precedence first:
 | --- | --- | --- |
 | `project` | The project's `node_modules`, for packages its `package.json` lists | Commands run in that project |
 | `user` | `<ndx home>/extensions/node_modules`, installed by `ndx extensions add` | Everywhere |
-| `global` | The global `node_modules` n-dx itself was installed into. A `node_modules` with a `package.json` beside it is a project's and never the global source, except pnpm's global directory under `$PNPM_HOME/global` | Everywhere |
+| `global` | The global `node_modules` n-dx itself was installed into. A `node_modules` with a `package.json` beside it is a project's and never the global source, except the global directories of pnpm (`$PNPM_HOME/global`, or pnpm's default home), yarn classic (its default global folder, or `$YARN_GLOBAL_FOLDER`) and bun (`$BUN_INSTALL/install/global`, default `~/.bun`). `ndx extensions doctor` says when no global source was recognised | Everywhere |
 | `dev` | Package directories in `extensions.paths` of `<ndx home>/config.json`. Relative paths resolve against the home | Everywhere |
 
 The n-dx home is `$NDX_HOME`, then `$N_DX_HOME`, then `~/.ndx`, then the legacy `~/.n-dx`.

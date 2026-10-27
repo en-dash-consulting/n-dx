@@ -60,7 +60,14 @@ items:
     lastModified: "2026-10-27T18:03:17.700Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "d882ed86-4d9e-475e-a3f4-5546e59535d1":
-    lastModified: "2026-10-27T17:23:02.717Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:05:16.834Z"
+    completedAt: "2026-10-27T18:12:26.745Z"
+    endedAt: "2026-10-27T18:12:26.745Z"
+    activeIntervals: [{"end":"2026-10-27T18:12:26.745Z","start":"2026-10-27T18:05:16.834Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "findGlobalRoot recognises pnpm (PNPM_HOME or platform default), yarn classic (default or YARN_GLOBAL_FOLDER) and bun global dirs by location, symlink-tolerant; doctor notes when no global source was recognised."
+    lastModified: "2026-10-27T18:12:26.745Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "e0167d83-bac8-45cb-b6fc-3a94330d1f6a":
     status: "completed"

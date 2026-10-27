@@ -42,6 +42,7 @@
 
 import * as nodeFs from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { resolveNdxHome } from "./layout.js";
 import { validateExtensionManifest } from "./extension-manifest.js";
@@ -120,6 +121,7 @@ const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "optionalDependenc
  * @property {DiscoveredExtension[]} extensions  One per package, winners only, in precedence order.
  * @property {DiscoveryError[]} errors
  * @property {string} home  The n-dx home used.
+ * @property {string | null} globalRoot  The `global` source scanned; `null` when none was recognised.
  */
 
 /**
@@ -194,27 +196,33 @@ export function discoverExtensions(options) {
 
   if (changed && cacheFile.ok) writeCache(fs, cachePath, recomputed, errors);
 
-  return { extensions: resolveWinners(found, options.builtinCommands), errors, home };
+  return {
+    extensions: resolveWinners(found, options.builtinCommands),
+    errors,
+    home,
+    globalRoot: globalRoot && !globalIsProject ? globalRoot : null,
+  };
 }
 
 /**
  * The global `node_modules` this n-dx was installed into, or `null` when it runs
  * from a checkout or from a project's own install. Covers npm
- * (`<prefix>/lib/node_modules/@n-dx/core`) and pnpm, whose real path runs
- * through `node_modules/.pnpm/…`.
+ * (`<prefix>/lib/node_modules/@n-dx/core`), pnpm, whose real path runs through
+ * `node_modules/.pnpm/…`, yarn classic and bun.
  *
  * A `node_modules` with a `package.json` beside it is a project's, not a global
  * one: a repo that lists `@n-dx/core` as a dependency must not have every
  * package in its `node_modules` scanned as globally installed, where a user
- * approval could cover it. pnpm's global directory is the exception — it has a
- * `package.json` — and is recognised only under `$PNPM_HOME/global/`. A pnpm
- * global directory configured elsewhere yields no global source.
+ * approval could cover it. The global directories of pnpm, yarn classic and bun
+ * have a `package.json` too, so they are recognised by location instead
+ * ({@link knownGlobalDirs}). One configured anywhere else yields no global
+ * source, which `ndx extensions doctor` reports.
  *
  * @param {string} [coreDir]  `@n-dx/core`'s directory; defaults to this module's.
- * @param {{env?: Record<string, string | undefined>, fs?: Pick<typeof nodeFs, "statSync">}} [options]
+ * @param {{env?: Record<string, string | undefined>, home?: string, platform?: NodeJS.Platform, fs?: Pick<typeof nodeFs, "statSync" | "realpathSync">}} [options]
  * @returns {string | null}
  */
-export function findGlobalRoot(coreDir = dirname(fileURLToPath(import.meta.url)), { env = process.env, fs = nodeFs } = {}) {
+export function findGlobalRoot(coreDir = dirname(fileURLToPath(import.meta.url)), { env = process.env, home = homedir(), platform = process.platform, fs = nodeFs } = {}) {
   const parts = resolve(coreDir).split(sep);
   const pnpm = parts.lastIndexOf(".pnpm");
   const n = parts.length;
@@ -223,8 +231,50 @@ export function findGlobalRoot(coreDir = dirname(fileURLToPath(import.meta.url))
   else if (n >= 3 && parts[n - 2] === "@n-dx" && parts[n - 3] === "node_modules") root = parts.slice(0, n - 2).join(sep);
   if (root === null) return null;
   if (!fs.statSync(join(dirname(root), "package.json"), { throwIfNoEntry: false })) return root;
-  const pnpmGlobal = env.PNPM_HOME ? resolve(env.PNPM_HOME, "global") : undefined;
-  return pnpmGlobal && isInside(pnpmGlobal, root) ? root : null;
+  const found = root;
+  return knownGlobalDirs(env, home, platform).some((dir) => isInside(dir, found) || isInside(realPath(fs, dir), found)) ? root : null;
+}
+
+/**
+ * The global directories — each a `package.json` beside a `node_modules` — that
+ * pnpm, yarn classic and bun install into, by default or as the environment
+ * configures them. A package manager's default stays in the list when its
+ * variable is set, and is the only entry when it is not: a hub started from a
+ * GUI, cron or a service often runs without the shell's `PNPM_HOME`.
+ *
+ * @param {Record<string, string | undefined>} env
+ * @param {string} home
+ * @param {NodeJS.Platform} platform
+ * @returns {string[]}
+ */
+export function knownGlobalDirs(env, home, platform) {
+  const win = platform === "win32";
+  const localAppData = env.LOCALAPPDATA || join(home, "AppData", "Local");
+  const pnpmHome = win ? join(localAppData, "pnpm")
+    : platform === "darwin" ? join(home, "Library", "pnpm")
+      : join(env.XDG_DATA_HOME || join(home, ".local", "share"), "pnpm");
+  const yarnGlobal = win && env.LOCALAPPDATA ? join(env.LOCALAPPDATA, "Yarn", "Data", "global")
+    : !win && env.XDG_DATA_HOME ? join(env.XDG_DATA_HOME, "yarn", "global")
+      : join(home, ".config", "yarn", "global");
+  const dirs = [
+    ...(env.PNPM_HOME ? [join(env.PNPM_HOME, "global")] : []),
+    join(pnpmHome, "global"),
+    ...(env.YARN_GLOBAL_FOLDER ? [env.YARN_GLOBAL_FOLDER] : []),
+    yarnGlobal,
+    join(env.BUN_INSTALL || join(home, ".bun"), "install", "global"),
+  ];
+  return [...new Set(dirs.map((dir) => resolve(dir)))];
+}
+
+/**
+ * `dir` with symlinks resolved when it exists, so a linked home still matches
+ * the real path n-dx runs from.
+ *
+ * @param {Pick<typeof nodeFs, "statSync" | "realpathSync">} fs
+ * @param {string} dir
+ */
+function realPath(fs, dir) {
+  return fs.statSync(dir, { throwIfNoEntry: false }) ? fs.realpathSync(dir) : dir;
 }
 
 /**
