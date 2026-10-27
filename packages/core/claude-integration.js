@@ -18,7 +18,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync, readdirSync, realpathSync } from "fs";
 import { createRequire } from "module";
-import { isAbsolute, join, resolve } from "path";
+import { basename, isAbsolute, join, resolve } from "path";
 // execFileSyncCli, not execSync: every argument here is a filesystem path
 // (the claude binary, the resolved MCP entrypoint, the project dir). Building a
 // cmd.exe command line by hand around those broke on `&`, `^`, `(`, `)`, `!` and
@@ -499,23 +499,75 @@ function readConfiguredClaudePath(dir) {
  * machine's, and because hench honours a `claudePath` the repository ships
  * (`.hench/config.json`) only once the repository is trusted.
  *
+ * Older inits wrote the discovered path into `.hench/config.json`, where it
+ * now reads as a repository-chosen binary and leaves the user's own checkout
+ * untrusted. A `claudePath` there that is a discovery candidate is moved to
+ * the local file; any other value was set by hand and is left alone.
+ *
  * The bare `claude` found on PATH is hench's default and is not written.
- * Skips when hench is not initialized or the local config is unreadable.
+ * Skips when hench is not initialized or a config file is unreadable.
  * @param {string|null} dir  Project root
  * @param {string} resolvedPath
  */
 function persistDiscoveredClaudePath(dir, resolvedPath) {
-  if (!dir || resolvedPath === "claude") return;
+  if (!dir) return;
   const layout = resolveLayout(dir);
-  if (!existsSync(join(layout.henchDir, "config.json"))) return;
+  const henchConfigFile = join(layout.henchDir, "config.json");
+  if (!existsSync(henchConfigFile)) return;
   try {
+    // Unreadable: nothing to move, but a path found now is still persisted.
+    const henchConfig = readJsonObject(henchConfigFile);
+    const stale = henchConfig && typeof henchConfig.claudePath === "string"
+      && isClaudeDiscoveryCandidate(henchConfig.claudePath)
+      ? henchConfig.claudePath
+      : undefined;
+
     const local = existsSync(layout.localConfigFile) ? JSON.parse(readFileSync(layout.localConfigFile, "utf-8")) : {};
-    if (!local || typeof local !== "object" || Array.isArray(local)) return;
-    const hench = local.hench && typeof local.hench === "object" && !Array.isArray(local.hench) ? local.hench : {};
-    if (hench.claudePath === resolvedPath) return; // already correct
-    local.hench = { ...hench, claudePath: resolvedPath };
-    writeFileSync(layout.localConfigFile, JSON.stringify(local, null, 2) + "\n", "utf-8");
-  } catch { /* skip — non-critical: hench rediscovers nothing, it falls back to `claude` on PATH */ }
+    if (!isPlainObject(local)) return;
+    const hench = isPlainObject(local.hench) ? local.hench : {};
+    // A path found now wins; a moved one never overrides a local choice.
+    const target = resolvedPath !== "claude" ? resolvedPath : (hench.claudePath ? undefined : stale);
+    if (target && hench.claudePath !== target) {
+      local.hench = { ...hench, claudePath: target };
+      writeFileSync(layout.localConfigFile, JSON.stringify(local, null, 2) + "\n", "utf-8");
+    }
+
+    // Removed only after the local write, so a failure there loses nothing.
+    if (stale) {
+      delete henchConfig.claudePath;
+      writeFileSync(henchConfigFile, JSON.stringify(henchConfig, null, 2) + "\n", "utf-8");
+    }
+  } catch { /* skip — non-critical: hench falls back to `claude` on PATH */ }
+}
+
+/** @param {unknown} v @returns {v is Record<string, unknown>} */
+function isPlainObject(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * @param {string} path
+ * @returns {Record<string, unknown> | null}  null when missing, malformed or not an object
+ */
+function readJsonObject(path) {
+  let parsed;
+  try { parsed = JSON.parse(readFileSync(path, "utf-8")); } catch { return null; }
+  return isPlainObject(parsed) ? parsed : null;
+}
+
+/**
+ * Whether `p` is a path {@link discoverClaudeCli} could have found in step 4.
+ * Any nvm version counts, including one since uninstalled.
+ * @param {string} p
+ */
+function isClaudeDiscoveryCandidate(p) {
+  if (buildClaudeWellKnownCandidates().includes(p)) return true;
+  const nvmVersionsDir = join(homedir(), ".nvm", "versions", "node");
+  const binDir = dirname(p);
+  return process.platform !== "win32"
+    && basename(p) === "claude"
+    && basename(binDir) === "bin"
+    && dirname(dirname(binDir)) === nvmVersionsDir;
 }
 
 /**
