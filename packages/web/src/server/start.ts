@@ -54,7 +54,7 @@ import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
-import { handleSidecarRoute } from "./routes-sidecar.js";
+import { handleSidecarRoute, initSidecarRoutes } from "./routes-sidecar.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { handleRexSettingsRoute } from "./routes-rex-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
@@ -1245,6 +1245,8 @@ export async function startServer(
     rex: (rctx) => createRexMcpServer(rctx.projectDir),
     sv: (rctx) => createSourcevisionMcpServer(rctx.projectDir),
   });
+  // A Sidecar session's CLI presents the token to its broker on this server.
+  initSidecarRoutes({ token });
 
   // Start MCP schema watcher — replaces factories with subprocess proxies when
   // either package's dist/ directory changes after a rebuild.  New MCP sessions

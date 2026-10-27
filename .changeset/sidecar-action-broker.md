@@ -1,0 +1,6 @@
+---
+"@n-dx/llm-client": patch
+"@n-dx/web": patch
+---
+
+Every side effect a Sidecar session can cause now goes through one broker, the new `ndx-sidecar` MCP server, which the dashboard serves at `/api/sidecar/sessions/:id/mcp` while a turn runs. Its tools are `run_command`, `start_work`, `propose_prd_change`, `place_change_card`, `propose_edit`, `github_read`, `draft_github_post`, `migration_decision` and `ledger_append`. Each write tool waits on a permission card: it is announced as a `sidecar:card` WebSocket message, listed at `GET …/cards`, and decided at `POST …/cards/:cardId`. It goes through without a card only when it matches the Sidecar allow-list (`GET`/`DELETE /api/sidecar/allow-list`). Only an exact command and GitHub reads can be allow-listed; work, resets, pushes, edits, PRD writes, placements, migration decisions and posts never can. An approved call is recorded but not carried out yet. The Claude CLI now spawns with `--tools Read,Grep,Glob`, `--setting-sources ""`, the broker as its only MCP server (`--strict-mcp-config`) and `--allowed-tools mcp__ndx-sidecar`, so the operator's own `permissions.allow` rules never decide a call. Codex spawns in a read-only sandbox that never asks for approval. llm-client's `ClaudeTurnFlags` gains `tools` and `settingSources`.

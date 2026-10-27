@@ -66,6 +66,18 @@ export interface SessionResume {
 export interface ClaudeTurnFlags {
   /** `--allowed-tools` entries. Absent omits the flag. */
   readonly allowedTools?: readonly string[];
+  /**
+   * `--tools`: the only built-in tools the session gets. Unlike a deny list,
+   * an allowlist also excludes built-ins a later CLI release adds. Absent
+   * omits the flag (every built-in).
+   */
+  readonly tools?: readonly string[];
+  /**
+   * `--setting-sources`: which settings files load (`user`, `project`,
+   * `local`). Empty loads none, so no `permissions.allow` rule in them can
+   * approve a call. Absent omits the flag (all of them).
+   */
+  readonly settingSources?: readonly string[];
   /** `--effort <level>`, already validated for the model. */
   readonly effort?: string;
   /** `--permission-mode <mode>`. */
@@ -173,6 +185,10 @@ function claudeTurnSpawn(
           ...(isWindows ? [allowedTools.join(",")] : allowedTools),
         ]
       : []),
+    // One comma-separated token on every platform. An empty list becomes an
+    // empty argument ("none"), not an omitted flag ("all").
+    ...(flags.tools ? ["--tools", flags.tools.join(",")] : []),
+    ...(flags.settingSources ? ["--setting-sources", flags.settingSources.join(",")] : []),
     ...(input.model ? ["--model", input.model] : []),
     ...(flags.effort ? ["--effort", flags.effort] : []),
     ...(flags.permissionMode ? ["--permission-mode", flags.permissionMode] : []),

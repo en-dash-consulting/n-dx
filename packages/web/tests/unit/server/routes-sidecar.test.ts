@@ -16,11 +16,16 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { VendorSessionOptions } from "@n-dx/llm-client";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
+  createAnnouncingBroker,
   handleSidecarRoute,
+  type SidecarCardMessage,
   type SidecarFramesMessage,
   type SidecarFramesResponse,
 } from "../../../src/server/routes-sidecar.js";
+import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
 import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -32,6 +37,7 @@ let ctx: ServerContext;
 let server: RouteTestServer;
 let messages: SidecarFramesMessage[];
 let registry: SidecarSessionRegistry;
+let broker: SidecarBroker;
 let spawns: number;
 
 /** Claude stand-in: resumes `--resume <id>`, else mints `vendor-<n>`. */
@@ -84,8 +90,9 @@ beforeEach(async () => {
   waiters = [];
   spawns = 0;
   registry = newRegistry();
+  broker = createAnnouncingBroker(join(root, ".hench", "sidecar"), broadcast);
   server = await startRouteTestServer((req, res) =>
-    handleSidecarRoute(req, res, ctx, broadcast, { registryFor: () => registry }));
+    handleSidecarRoute(req, res, ctx, broadcast, { registryFor: () => registry, brokerFor: () => broker }));
 });
 
 afterEach(async () => {
@@ -114,7 +121,7 @@ async function frames(id: string, after: number): Promise<SidecarFramesResponse>
 
 /** Resolves with the announcement that closes a turn in session `id`, already sent or still to come. */
 function turnClosed(id: string): Promise<SidecarFramesMessage> {
-  const isClosing = (m: SidecarFramesMessage): boolean => m.sessionId === id && !m.running;
+  const isClosing = (m: SidecarFramesMessage): boolean => m.type === "sidecar:frames" && m.sessionId === id && !m.running;
   const sent = messages.find(isClosing);
   if (sent) return Promise.resolve(sent);
   return new Promise((resolve) => {
@@ -248,5 +255,123 @@ describe("interrupt", () => {
   it("reports false when no turn runs", async () => {
     const id = await createSession();
     expect(await (await api(`/${id}/interrupt`, { method: "POST" })).json()).toEqual({ interrupted: false });
+  });
+});
+
+describe("broker", () => {
+  /** An MCP client on the session's broker, connected as the vendor CLI would be. */
+  async function brokerClient(id: string): Promise<Client> {
+    const client = new Client({ name: "test-cli", version: "0" });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${server.baseUrl}/api/sidecar/sessions/${id}/mcp`)));
+    return client;
+  }
+
+  /** The `sidecar:card` announcement with `status`, already sent or still to come. */
+  function cardAnnounced(id: string, status: string): Promise<SidecarCardMessage> {
+    const matches = (m: unknown): m is SidecarCardMessage => {
+      const c = m as SidecarCardMessage;
+      return c.type === "sidecar:card" && c.sessionId === id && c.status === status;
+    };
+    const sent = (messages as unknown[]).find(matches);
+    if (sent) return Promise.resolve(sent);
+    return new Promise((resolve) => {
+      waiters.push((m) => {
+        if (!matches(m)) return false;
+        resolve(m);
+        return true;
+      });
+    });
+  }
+
+  async function runningSession(): Promise<string> {
+    const id = await createSession();
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "HANG" } });
+    return id;
+  }
+
+  function resultText(result: Awaited<ReturnType<Client["callTool"]>>): string {
+    return (result.content as Array<{ text: string }>)[0].text;
+  }
+
+  it("serves the nine broker tools while a turn runs, and refuses with no turn running", async () => {
+    const idle = await createSession();
+    const refused = await fetch(`${server.baseUrl}/api/sidecar/sessions/${idle}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    expect(refused.status).toBe(409);
+
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      "draft_github_post", "github_read", "ledger_append", "migration_decision", "place_change_card",
+      "propose_edit", "propose_prd_change", "run_command", "start_work",
+    ]);
+    await client.close();
+    await api(`/${id}/interrupt`, { method: "POST" });
+  });
+
+  it("holds a write tool's call until the operator decides its card", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "t1" } });
+
+    const { cardId } = await cardAnnounced(id, "pending");
+    const { cards } = await (await api(`/${id}/cards`)).json() as { cards: SidecarCard[] };
+    expect(cards).toEqual([
+      expect.objectContaining({ id: cardId, tool: "start_work", kind: "work", allowListKey: null, status: "pending" }),
+    ]);
+
+    // Work can never be allow-listed, whatever the operator asks.
+    const remember = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", remember: true } });
+    expect(remember.status).toBe(409);
+
+    const decided = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "deny", reason: "later" } });
+    expect(decided.status).toBe(200);
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/denied card .*later/);
+
+    await client.close();
+    await api(`/${id}/interrupt`, { method: "POST" });
+  });
+
+  it("lets a remembered command through the allow-list without a card, until it is revoked", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const argv = ["ndx", "status", "."];
+    const first = client.callTool({ name: "run_command", arguments: { argv } });
+    const { cardId } = await cardAnnounced(id, "pending");
+    await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", remember: true } });
+    expect(resultText(await first)).toMatch(/approved card/);
+
+    const second = await client.callTool({ name: "run_command", arguments: { argv } });
+    expect(resultText(second)).toMatch(/Sidecar allow-list/);
+    expect(broker.cards(id)).toHaveLength(1);
+
+    const listed = await (await fetch(`${server.baseUrl}/api/sidecar/allow-list`)).json();
+    expect(listed).toEqual({ rules: [{ tool: "run_command", key: JSON.stringify(argv) }] });
+    const revoked = await fetch(`${server.baseUrl}/api/sidecar/allow-list`, {
+      method: "DELETE",
+      body: JSON.stringify({ tool: "run_command", key: JSON.stringify(argv) }),
+    });
+    expect(await revoked.json()).toEqual({ removed: true });
+
+    await client.close();
+    await api(`/${id}/interrupt`, { method: "POST" });
+  });
+
+  it("withdraws a pending card when the operator stops the turn", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const call = client.callTool({ name: "propose_edit", arguments: { path: "a.ts", diff: "-a\n+b" } });
+    await cardAnnounced(id, "pending");
+    await api(`/${id}/interrupt`, { method: "POST" });
+    await cardAnnounced(id, "withdrawn");
+    expect(broker.cards(id)[0].status).toBe("withdrawn");
+    expect((await call).isError).toBe(true);
+    await client.close();
   });
 });

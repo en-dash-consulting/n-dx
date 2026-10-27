@@ -35,6 +35,24 @@ describe("claude turn spawn", () => {
     expect(stdin).toBe(`sys${WINDOWS_STDIN_PROMPT_SEPARATOR}hi`);
   });
 
+  it("passes the built-in tool allowlist as one token and an empty setting-sources list as an empty argument", () => {
+    for (const platform of ["linux", "win32"] as const) {
+      const { args } = claudeSessionDriver.turnSpawn(
+        { systemPrompt: "", prompt: "hi", claude: { tools: ["Read", "Grep", "Glob"], settingSources: [] } },
+        platform,
+      );
+      expect(args.slice(args.indexOf("--tools"), args.indexOf("--tools") + 2)).toEqual(["--tools", "Read,Grep,Glob"]);
+      expect(args.slice(args.indexOf("--setting-sources"), args.indexOf("--setting-sources") + 2))
+        .toEqual(["--setting-sources", ""]);
+    }
+  });
+
+  it("omits --tools and --setting-sources when the caller sets neither", () => {
+    const { args } = claudeSessionDriver.turnSpawn({ systemPrompt: "", prompt: "hi", claude: {} }, "linux");
+    expect(args).not.toContain("--tools");
+    expect(args).not.toContain("--setting-sources");
+  });
+
   it("forks only alongside a resume", () => {
     const { args } = claudeSessionDriver.turnSpawn(
       { systemPrompt: "", prompt: "hi", resume: { sessionId: "s", fork: true } },

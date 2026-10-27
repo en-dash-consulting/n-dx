@@ -24,7 +24,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, truncateSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, truncateSync } from "node:fs";
 import { join } from "node:path";
 import { addTokenUsage, resolveLayout, resumeVendorSession, startVendorSession } from "@n-dx/llm-client";
 import type {
@@ -36,6 +36,8 @@ import type {
 } from "@n-dx/llm-client";
 import { writeRunFileAtomic } from "../run-end.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
+import { ensureSidecarDir } from "./sidecar-dir.js";
+import { sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
 
 /** Idle time after which a session forgets its resume id. */
 export const DEFAULT_SIDECAR_TTL_MS = 2 * 60 * 60 * 1000;
@@ -95,19 +97,43 @@ interface IndexFile {
   sessions: SidecarSessionRecord[];
 }
 
+export interface WorktreeSidecarRegistryOptions extends Pick<SidecarRegistryOptions, "ttlMs" | "now"> {
+  /** Where a session reaches the `ndx-sidecar` broker; absent gives it no MCP server at all. */
+  broker?: (sessionId: string) => SidecarBrokerEndpoint | undefined;
+}
+
+/** The directory holding a worktree's Sidecar index, transcripts, cards and allow-list. */
+export function worktreeSidecarDir(projectDir: string): string {
+  return join(resolveLayout(projectDir).henchDir, "sidecar");
+}
+
 /**
  * The worktree-scope registry for `projectDir`: `<henchDir>/sidecar/`, each
  * session's vendor CLI given the project's guard.env-filtered environment
- * (never the server's full `process.env`) — see `session-env.ts`.
+ * (never the server's full `process.env`) — see `session-env.ts` — and spawned
+ * read-only with the broker as its only MCP server — see `spawn-policy.ts`.
  */
 export function createWorktreeSidecarRegistry(
   projectDir: string,
-  opts: Pick<SidecarRegistryOptions, "ttlMs" | "now"> = {},
+  opts: WorktreeSidecarRegistryOptions = {},
 ): SidecarSessionRegistry {
-  return new SidecarSessionRegistry({
-    ...opts,
-    dir: join(resolveLayout(projectDir).henchDir, "sidecar"),
-    connect: (record) => resolveSidecarSessionEnv(record.worktree),
+  const { broker, ...rest } = opts;
+  const dir = worktreeSidecarDir(projectDir);
+  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker) });
+}
+
+/**
+ * What every Sidecar session's vendor CLI is opened with: the filtered
+ * environment, the read-only spawn flags and a fresh MCP config naming only
+ * the broker.
+ */
+export function sidecarSessionConnect(
+  dir: string,
+  broker?: WorktreeSidecarRegistryOptions["broker"],
+): SidecarSessionConnect {
+  return (record) => ({
+    ...resolveSidecarSessionEnv(record.worktree),
+    ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, broker?.(record.id))),
   });
 }
 
@@ -343,7 +369,7 @@ export class SidecarSessionRegistry {
   }
 
   private appendFrame(record: SidecarSessionRecord, frame: SidecarFrame): void {
-    this.ensureDir();
+    ensureSidecarDir(this.dir);
     appendFileSync(this.transcriptPath(record.id), JSON.stringify(frame) + "\n", "utf-8");
     record.cursor = frame.seq;
   }
@@ -356,14 +382,8 @@ export class SidecarSessionRegistry {
     return new Date(this.now()).toISOString();
   }
 
-  private ensureDir(): void {
-    mkdirSync(this.dir, { recursive: true });
-    const ignore = join(this.dir, ".gitignore");
-    if (!existsSync(ignore)) writeFileSync(ignore, "*\n", "utf-8");
-  }
-
   private persist(): void {
-    this.ensureDir();
+    ensureSidecarDir(this.dir);
     const index: IndexFile = { schema: INDEX_SCHEMA, sessions: [...this.records.values()] };
     writeRunFileAtomic(this.dir, INDEX_NAME, index as unknown as Record<string, unknown>);
   }
