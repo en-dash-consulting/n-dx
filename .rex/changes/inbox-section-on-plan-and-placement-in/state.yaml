@@ -10,10 +10,13 @@ items:
     lastModified: "2026-10-27T16:31:13.438Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "21a8d036-41d6-45fb-b10c-181f074f3e4f":
-    lastModified: "2026-10-27T16:31:21.304Z"
+    lastModified: "2026-10-27T22:31:48.422Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "480edc01-5573-43aa-b559-026a53513984":
     lastModified: "2026-10-27T16:31:05.167Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6773438c-7c3f-4a98-8568-c8908c024270":
+    lastModified: "2026-10-27T22:31:48.422Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b140b377-b5af-4498-9b38-eb70ddf13947":
     status: "completed"
@@ -26,5 +29,12 @@ items:
     lastModified: "2026-10-27T22:21:47.336Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ecac94e1-42b4-4b61-829b-6a801dc94ee6":
-    lastModified: "2026-10-27T22:22:14.175Z"
+    status: "completed"
+    startedAt: "2026-10-27T22:22:33.798Z"
+    completedAt: "2026-10-27T22:34:09.788Z"
+    endedAt: "2026-10-27T22:34:09.788Z"
+    activeIntervals: [{"end":"2026-10-27T22:34:09.788Z","start":"2026-10-27T22:22:33.798Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New views/inbox.ts (InboxPage + InboxView, sortInbox/bestGuess); `inbox` view id, meta, route, registry renderer; Plan section after analysis/before prd with badge \"inbox\", openWhenNonEmpty, requiresServer. 12 unit tests."
+    lastModified: "2026-10-27T22:34:09.788Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

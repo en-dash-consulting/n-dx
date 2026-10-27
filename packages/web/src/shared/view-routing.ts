@@ -31,6 +31,7 @@ export const REX_SCOPE_VIEWS: readonly ViewId[] = [
   "prd",
   "product",
   "changes",
+  "inbox",
   "analysis",
   "merge-graph",
   "validation",

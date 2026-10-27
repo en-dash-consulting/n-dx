@@ -183,6 +183,8 @@ export const STAGES: Readonly<Record<StageId, StageDef>> = {
     id: "plan",
     sections: [
       { view: "analysis", plain: true },
+      // Right after the capture bar, which captures into it; open while it holds anything.
+      { view: "inbox", requiresServer: true, badge: "inbox", openWhenNonEmpty: true },
       { view: "prd", open: true, fill: true },
       { view: "product", requiresServer: true },
       { view: "changes", requiresServer: true },

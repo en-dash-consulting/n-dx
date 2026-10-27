@@ -55,6 +55,8 @@ import {
   MergeGraphView,
   ProductPage,
   ChangesPage,
+  InboxPage,
+  INBOX_SECTION_ROWS,
 } from "./domain-rex.js";
 
 import {
@@ -121,6 +123,11 @@ export interface ViewRenderContext {
    * list only what exists here; absent, every view is assumed to exist.
    */
   validViews?: ReadonlySet<ViewId>;
+  /**
+   * Rendered inside a stage page's section rather than on its own page, so a
+   * long list may show its head and link to the full page (the Inbox).
+   */
+  inSection?: boolean;
 }
 
 // ── Registry ───────────────────────────────────────────────────
@@ -140,7 +147,7 @@ function stage(id: StageId): ViewRenderer {
     // On a tiled stage the lead Overview drops what its tiles show.
     renderView: (view: ViewId) => (view === "overview" && STAGES[id].tiles
       ? h(Overview, { data: ctx.data, jobs: ctx.jobs, variant: "lead" })
-      : renderActiveView(view, ctx)),
+      : renderActiveView(view, { ...ctx, inSection: true })),
     renderPanel: (panel: StagePanelId, opened: boolean, grid: TileGridApi) => renderPanel(panel, opened, grid, ctx),
     renderSummary: id === "analyze" ? (tile: StageTile) => analyzeTileSummary(tile, ctx.data) : undefined,
     detailOpen: ctx.detailOpen ?? false,
@@ -243,6 +250,9 @@ const REGISTRY: Record<string, ViewRenderer> = {
 
   "changes": ({ navigateTo }) =>
     h(ChangesPage, { navigateTo }),
+
+  "inbox": ({ navigateTo, inSection }) =>
+    h(InboxPage, { navigateTo, limit: inSection ? INBOX_SECTION_ROWS : undefined }),
 
   "analysis": () =>
     h(AnalysisView, null),

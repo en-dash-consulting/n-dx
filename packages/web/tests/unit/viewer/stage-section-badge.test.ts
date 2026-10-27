@@ -51,7 +51,7 @@ async function mount(vnode: VNode): Promise<void> {
   await settle();
 }
 
-// The Inbox is a sibling task's view; any view id exercises the mechanism.
+// The mechanism is view-agnostic; inbox.test.ts covers the real Inbox entry.
 const INBOX: StageSection = { view: "changes", badge: "inbox", openWhenNonEmpty: true };
 const rendered: string[] = [];
 const section = (s: StageSection = INBOX) => h(BadgedSection, {

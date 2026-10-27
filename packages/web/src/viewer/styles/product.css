@@ -400,3 +400,111 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* ── Inbox view ────────────────────────────────────────────────── */
+
+.inbox-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.inbox-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.inbox-row {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
+.inbox-row:hover {
+  background: var(--bg-hover);
+}
+
+.inbox-row-head,
+.inbox-row-foot {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.inbox-row-foot {
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  font-size: var(--font-xs);
+  color: var(--text-dim);
+}
+
+.inbox-guess {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.inbox-guess-label,
+.inbox-guess-area,
+.inbox-guess-pending,
+.inbox-guess-none {
+  color: var(--text-muted);
+}
+
+.inbox-guess-error {
+  color: var(--red);
+}
+
+/* Strength: a dot and its word, so colour is never the only signal. */
+.inbox-strength {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-1);
+  font-weight: var(--weight-medium);
+}
+
+.inbox-strength-dot {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.inbox-strength-strong { color: var(--green); }
+.inbox-strength-possible { color: var(--accent); }
+.inbox-strength-tied { color: var(--orange); }
+.inbox-strength-weak { color: var(--text-muted); }
+
+.inbox-place {
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.inbox-place:hover {
+  border-color: var(--accent);
+}
+
+.inbox-more {
+  align-self: flex-start;
+  font-size: var(--font-sm);
+}
+
+.inbox-applied summary {
+  font-size: var(--font-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}

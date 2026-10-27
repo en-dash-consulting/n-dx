@@ -109,7 +109,7 @@ function Section({ stage, section, navigateTo, renderView, count = null }: Secti
   // Named by its view: the same string the breadcrumb shows once the "Open"
   // link has been followed.
   const title = viewLabel(section.view);
-  const blurb = viewBlurb(section.view);
+  const blurb = resolveCliLabel(viewBlurb(section.view), useCliName());
 
   const toggle = () => {
     const next = !open;
