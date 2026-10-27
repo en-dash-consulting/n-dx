@@ -12,10 +12,24 @@ items:
     lastModified: "2026-10-27T16:11:54.447Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5d6f42fa-0b0a-4dfd-b87e-2dbe2f068a62":
+    status: "completed"
+    startedAt: "2026-10-27T16:31:46.785Z"
+    completedAt: "2026-10-27T16:31:46.785Z"
+    endedAt: "2026-10-27T16:31:46.785Z"
+    activeIntervals: [{"end":"2026-10-27T16:31:46.785Z","start":"2026-10-27T16:31:46.785Z"}]
+    appliedAt: "2026-10-27T16:31:46.785Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T15:44:12.049Z"
+    lastModified: "2026-10-27T16:31:46.785Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d17bd9c5-6b58-4e8c-9a80-01d2bd73d828":
+    status: "completed"
+    startedAt: "2026-10-27T16:22:26.810Z"
+    completedAt: "2026-10-27T16:31:46.785Z"
+    endedAt: "2026-10-27T16:31:46.785Z"
+    activeIntervals: [{"end":"2026-10-27T16:31:46.785Z","start":"2026-10-27T16:22:26.810Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "repo-trust.ts: new warning finding dependency-paths-removed names the detected language's extraBlocked entries a guard omits (exact or **/ form), so such a checkout is untrusted and clamped."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T15:17:37.501Z"
+    lastModified: "2026-10-27T16:31:46.785Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
