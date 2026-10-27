@@ -20,7 +20,14 @@ items:
     lastModified: "2026-10-27T17:23:10.019Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "35e2dfd2-9f53-4753-8228-01b4128991b8":
-    lastModified: "2026-10-27T17:23:00.344Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:03:28.190Z"
+    completedAt: "2026-10-27T18:05:06.387Z"
+    endedAt: "2026-10-27T18:05:06.387Z"
+    activeIntervals: [{"end":"2026-10-27T18:05:06.387Z","start":"2026-10-27T18:03:28.190Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx-door.ts hands mcpDoor req.url without the hub base (query kept); serve.test.ts POSTs /ndx/mcp stripped and under /x/graview-face/. Commit 9363d5ab4."
+    lastModified: "2026-10-27T18:05:06.387Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "3798c6e4-317b-4fe9-8aeb-41491e0def28":
     lastModified: "2026-10-27T17:23:12.417Z"

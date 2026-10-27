@@ -104,7 +104,9 @@ describe("bin/serve.js under the hub", () => {
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), "graview-face-serve-"));
     writeFileSync(join(scratch, "document.json"), JSON.stringify({ name: "hub-mounted" }));
-    ({ child, origin } = await startServe({ ...process.env, NDX_EXTENSION_NAME: "graview-face", NDX_GRAVIEW_DIR: scratch }, "127.0.0.1"));
+    const env: NodeJS.ProcessEnv = { ...process.env, NDX_EXTENSION_NAME: "graview-face", NDX_GRAVIEW_DIR: scratch };
+    delete env["NDX_REX_MCP_URL"];
+    ({ child, origin } = await startServe(env, "127.0.0.1"));
   }, 90_000);
 
   afterAll(() => {
@@ -153,5 +155,23 @@ describe("bin/serve.js under the hub", () => {
     expect(await document.json()).toEqual({ name: "hub-mounted" });
     const info = (await (await fetch(`${origin}/ndx/sync-info`)).json()) as { live: boolean };
     expect(info.live).toBe(true);
+  });
+
+  it("hands POST /ndx/mcp to the MCP door, stripped or under the mount", async () => {
+    const html = await (await fetch(`${origin}/`)).text();
+    const key = /<meta name="ndx-door" content="([0-9a-f]+)"/.exec(html)?.[1];
+    expect(key).toBeTruthy();
+    for (const path of ["/ndx/mcp", `${MOUNT}ndx/mcp`]) {
+      const response = await fetch(`${origin}${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-ndx-door": key! },
+        body: JSON.stringify({ name: "get_item", arguments: { id: "x" } }),
+      });
+      expect(response.status).toBe(200);
+      // No rex endpoint is set, so the door reached the call and reports sync off.
+      const body = (await response.json()) as { ok: boolean; error: string };
+      expect(body).toMatchObject({ ok: false });
+      expect(body.error).toContain("sync is off");
+    }
   });
 });

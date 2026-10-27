@@ -221,6 +221,8 @@ export function ndxDoor(): Plugin {
           }
           if (url === "/ndx/mcp") {
             if (!keyed(req)) return json(res, 403, { ok: false, error: "refused: not from this face's own pages" });
+            // The door matches its path exactly, so it is handed the path without the base.
+            req.url = url + (req.url ?? "").slice(asked.length);
             return door(req, res, next);
           }
         } catch (error) {
