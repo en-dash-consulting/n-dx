@@ -33,5 +33,12 @@ items:
     lastModified: "2026-10-27T19:38:02.901Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ed64adff-ca54-4b02-8adb-67616ff02c2b":
-    lastModified: "2026-10-27T16:29:32.623Z"
+    status: "completed"
+    startedAt: "2026-10-27T21:46:49.461Z"
+    completedAt: "2026-10-27T21:56:50.432Z"
+    endedAt: "2026-10-27T21:56:50.432Z"
+    activeIntervals: [{"end":"2026-10-27T21:56:50.432Z","start":"2026-10-27T21:46:49.461Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "routes-rex/placement.ts: GET placement, POST place, POST propose via rex; 422/404/409 mapping; wire types mirrored with drift check; routes-rex-placement.test.ts (24 tests)."
+    lastModified: "2026-10-27T21:56:50.432Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

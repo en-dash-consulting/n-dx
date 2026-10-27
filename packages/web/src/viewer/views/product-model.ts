@@ -200,6 +200,83 @@ export interface ChangeRow {
   completedTaskCount: number;
 }
 
+// ── Inbox placement ──────────────────────────────────────────────────
+
+/** How a change relates to the node it is placed on: works on it, or edits its requirements. */
+export type PlacementRelation = "touches" | "amends";
+
+/** How firmly rex's rules back a candidate, from its score. */
+export type PlacementStrength = "strong" | "possible" | "weak";
+
+/** One candidate home on the placement shortlist, best first. */
+export interface PlacementCandidate {
+  target: string;
+  type: "capability" | "constraint";
+  title: string;
+  /** Title of the candidate's nearest area; empty when it sits under none. */
+  area: string;
+  statement?: string;
+  criteria: Array<{ id: string; text: string }>;
+  score: number;
+  strength: PlacementStrength;
+  /** Which rules fired. */
+  reasons: string[];
+}
+
+/** `GET /api/rex/changes/:id/placement` on a v2 project. */
+export interface ChangePlacement {
+  layout: "v2";
+  change: { id: string; title: string; intent?: string; status: string; taskCount: number; tags?: string[] };
+  /** The rules' relation for this change; every candidate carries it. */
+  relation: PlacementRelation;
+  /** The top two candidates share a score, so their order is arbitrary. */
+  tied: boolean;
+  shortlist: PlacementCandidate[];
+}
+
+/** Criterion edits an `amends` placement carries. */
+export interface PlacementCriteriaDelta {
+  add?: Array<{ id: string; text: string }>;
+  replace?: Array<{ id: string; text: string }>;
+  remove?: string[];
+}
+
+/** Body of `POST /api/rex/changes/:id/place`. `proposed` and `criteria` need relation `amends`. */
+export interface PlaceChangeRequest {
+  target: string;
+  relation?: PlacementRelation;
+  summary?: string;
+  proposed?: string;
+  criteria?: PlacementCriteriaDelta;
+}
+
+/** Answer of `POST /api/rex/changes/:id/place`. */
+export interface PlaceChangeResult {
+  change: string;
+  target: string;
+  relation: PlacementRelation;
+  /** Problems other open changes cause; the placement is stored anyway. */
+  warnings?: string[];
+}
+
+/** Body of `POST /api/rex/changes/:id/propose`: a new home when nothing on the shortlist fits. */
+export interface ProposeChangeRequest {
+  type: "capability" | "constraint";
+  /** Live area the new node goes under. */
+  under: string;
+  title: string;
+  summary?: string;
+  proposed?: string;
+  criteria?: { add: Array<{ id: string; text: string }> };
+}
+
+/** Answer of `POST /api/rex/changes/:id/propose`. */
+export interface ProposeChangeResult {
+  change: string;
+  proposed: { target: string; under: string; title: string; type: "capability" | "constraint" };
+  warnings?: string[];
+}
+
 // ── Capability page ──────────────────────────────────────────────────
 
 /** One acceptance criterion, with the capability it came from when inherited. */
