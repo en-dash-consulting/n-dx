@@ -674,15 +674,22 @@ export function getCurrentHead(cwd: string): string | undefined {
   }
 }
 
+/** git's answer to "is this path in the index?", or why it gave none. */
+export type GitTrackAnswer =
+  | { state: "tracked" }
+  | { state: "untracked" }
+  | { state: "unanswered"; reason: string };
+
 /**
  * Synchronous git helper — is `relPath` (relative to `cwd`) in the git index?
  *
- * True or false only when git answers: exit 0 is tracked, exit 1 is git's own
- * "not in the index". Undefined for every other outcome — no repository, git
- * missing, `detected dubious ownership`, a corrupt index, the timeout — so the
- * caller decides what an unanswered question means.
+ * Tracked or untracked only when git answers: exit 0 is tracked, exit 1 is
+ * git's own "not in the index". Every other outcome — no repository, git
+ * missing, `detected dubious ownership`, a corrupt index, the timeout — is
+ * unanswered, with git's first stderr line (else the spawn error) as the
+ * reason, so the caller decides what it means and can say why.
  */
-export function gitTracksPath(cwd: string, relPath: string): boolean | undefined {
+export function gitTracksPath(cwd: string, relPath: string): GitTrackAnswer {
   try {
     execFileSync("git", ["ls-files", "--error-unmatch", "--", relPath], {
       windowsHide: true,
@@ -693,9 +700,12 @@ export function gitTracksPath(cwd: string, relPath: string): boolean | undefined
       // expected answer, so git's stderr is captured rather than printed.
       stdio: ["ignore", "pipe", "pipe"],
     });
-    return true;
+    return { state: "tracked" };
   } catch (err) {
-    return (err as { status?: number | null }).status === 1 ? false : undefined;
+    const e = err as { status?: number | null; stderr?: string | Buffer; message?: string };
+    if (e.status === 1) return { state: "untracked" };
+    const stderrLine = String(e.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+    return { state: "unanswered", reason: stderrLine ?? e.message ?? "git failed" };
   }
 }
 

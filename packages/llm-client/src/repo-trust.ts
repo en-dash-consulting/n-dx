@@ -58,7 +58,8 @@
  * config: it is collected here, raises `local-config-tracked`, and applies
  * only once the checkout is trusted. Outside a git work tree nothing is
  * tracked, so the local file is the user's, as before; inside one, a git that
- * cannot answer counts the file as tracked.
+ * cannot answer counts the file as tracked, and the finding says git could not
+ * confirm it is untracked ({@link RepoExecutionConfig.localConfigUnanswered}).
  *
  * The trust store is deliberately a plain file for now. It records a
  * decision, not a secret; an encrypted store is a later concern.
@@ -321,6 +322,13 @@ export interface RepoExecutionConfig {
    * folded into the ones above and it applies only once trusted.
    */
   localConfigTracked: boolean;
+  /**
+   * Set when {@link localConfigTracked} holds only because git could not
+   * answer inside a work tree: git's reason (its first stderr line). The file
+   * may well be the user's, so the review must not call it committed. Not in
+   * the digest.
+   */
+  localConfigUnanswered: string | null;
   /** sha256 over the canonical JSON of everything above except `sources`, `detectedLanguage` and `envDeny`. */
   digest: string;
 }
@@ -424,9 +432,22 @@ function sectionOf(config: Record<string, unknown> | null, key: string): Record<
  * tracked and waits for trust. Spawns git only when the file exists.
  */
 export function isLocalConfigTracked(projectDir: string): boolean {
+  return localConfigTrackState(projectDir).tracked;
+}
+
+/**
+ * {@link isLocalConfigTracked}, plus git's reason when the answer is "tracked"
+ * only because git could not say (`unanswered`), so the review can tell the
+ * user to fix git rather than untrack a file the repository may not commit.
+ */
+function localConfigTrackState(projectDir: string): { tracked: boolean; unanswered: string | null } {
   const layout = resolveLayout(projectDir);
-  if (!existsSync(layout.localConfigFile)) return false;
-  return gitTracksPath(layout.root, relOf(layout.root, layout.localConfigFile)) ?? insideGitWorkTree(layout.root);
+  if (!existsSync(layout.localConfigFile)) return { tracked: false, unanswered: null };
+  const answer = gitTracksPath(layout.root, relOf(layout.root, layout.localConfigFile));
+  if (answer.state !== "unanswered") return { tracked: answer.state === "tracked", unanswered: null };
+  return insideGitWorkTree(layout.root)
+    ? { tracked: true, unanswered: answer.reason }
+    : { tracked: false, unanswered: null };
 }
 
 function relOf(root: string, path: string): string {
@@ -463,7 +484,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   const projectHench = sectionOf(projectConfig, "hench");
   if (projectHench) sources.push(relOf(root, layout.configFile));
 
-  const localConfigTracked = isLocalConfigTracked(projectDir);
+  const { tracked: localConfigTracked, unanswered: localConfigUnanswered } = localConfigTrackState(projectDir);
   const localConfig = localConfigTracked ? readJson(layout.localConfigFile) : null;
   if (localConfigTracked) sources.push(relOf(root, layout.localConfigFile));
 
@@ -569,6 +590,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     credentialRouting,
     vendorCliPaths,
     localConfigTracked,
+    localConfigUnanswered,
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
 }
@@ -806,7 +828,9 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
     findings.push({
       code: "local-config-tracked",
       severity: "warning",
-      message: `Commits ${file}, the machine-local config n-dx otherwise applies as yours; its settings apply only once trusted`,
+      message: config.localConfigUnanswered
+        ? `git could not confirm ${file} is untracked (${config.localConfigUnanswered}), so it is treated as repository config; its settings apply only once trusted`
+        : `Commits ${file}, the machine-local config n-dx otherwise applies as yours; its settings apply only once trusted`,
       values: [file],
     });
   }
@@ -1111,7 +1135,11 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
     lines.push("  bypassPermissions is lowered to acceptEdits, verify_criteria does not run the test command,");
     lines.push("  and the project config's API endpoints and API key variables are ignored.");
     const tracked = ev.findings.find((f) => f.code === "local-config-tracked");
-    if (tracked) {
+    if (tracked && ev.config.localConfigUnanswered) {
+      // git rm --cached would fail with the same error, and the file may not be committed.
+      lines.push(`  ${tracked.values[0]} is ignored too, because git could not say whether the repository commits it.`);
+      lines.push(`  Fix git (e.g. git config --global --add safe.directory <this checkout>), or accept the configuration.`);
+    } else if (tracked) {
       lines.push(`  The committed ${tracked.values[0]} is ignored too, as repository config. To keep settings of your own,`);
       lines.push("  untrack it (git rm --cached) and keep it ignored, or accept the configuration.");
     } else if (ev.findings.some((f) => f.code === "env-allow-added")) {

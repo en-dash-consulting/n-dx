@@ -10,6 +10,7 @@ import { trustedLocalConfig } from "../../src/credential-routing.js";
 import {
   collectRepoExecutionConfig,
   evaluateRepoTrust,
+  formatRepoTrustReport,
   isLocalConfigTracked,
   recordRepoTrust,
 } from "../../src/repo-trust.js";
@@ -184,6 +185,34 @@ describe("when git cannot answer", () => {
     trackLocal();
     stubFailingGit();
     expectGated();
+  });
+
+  /**
+   * Gated, but not diagnosed as committed: git never said so, and
+   * `git rm --cached` fails with the same error.
+   */
+  it.skipIf(process.platform === "win32")("says git could not confirm the file is untracked, not that the repository commits it", () => {
+    writeLocal();
+    trackLocal();
+    stubFailingGit();
+    const ev = evaluateRepoTrust(repo);
+    const finding = ev.findings.find((f) => f.code === "local-config-tracked");
+    expect(finding?.message).toContain("git could not confirm .n-dx.local.json is untracked");
+    expect(finding?.message).toContain("detected dubious ownership");
+    expect(finding?.message).not.toMatch(/^Commits /);
+    const report = formatRepoTrustReport(ev).join("\n");
+    expect(report).not.toContain("git rm --cached");
+    expect(report).toContain("safe.directory");
+    expect(report).toContain("ndx trust accept .");
+  });
+
+  it("a file git reports as tracked keeps the committed diagnosis and git rm --cached advice", () => {
+    writeLocal();
+    trackLocal();
+    const ev = evaluateRepoTrust(repo);
+    const finding = ev.findings.find((f) => f.code === "local-config-tracked");
+    expect(finding?.message).toMatch(/^Commits \.n-dx\.local\.json/);
+    expect(formatRepoTrustReport(ev).join("\n")).toContain("git rm --cached");
   });
 
   it("inside a work tree, a corrupt index counts the file as tracked", () => {
