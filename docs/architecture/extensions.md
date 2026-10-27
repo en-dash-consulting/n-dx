@@ -34,7 +34,7 @@ n-dx should let separately installed packages add `ndx <name>` commands and a hu
 | Consumer | Uses | Proves |
 | --- | --- | --- |
 | Recon (private assessment add-on, first extension, built by En Dash) | `ndx recon ...` commands, a hub page that batch-prepares many repos with per-repo progress, project links | A real multi-repo workflow, private code on public seams |
-| Graview product face | Its sidecar launch, today hard-wired in `serveProductApp` | The manifest replaces a one-off integration |
+| Graview product face | Its sidecar launch: `ndx graview serve` runs the plan `ndx extensions sidecar graview-face` prints (once hard-wired in `serveProductApp`) | The manifest replaces a one-off integration |
 | Fixture extension (`tests/e2e`) | One command, one sidecar, one project link | Every contract rule has a test |
 
 ## How it fits

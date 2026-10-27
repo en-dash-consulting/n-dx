@@ -11,7 +11,14 @@ items:
     lastModified: "2026-10-27T13:18:47.489Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "490f51c9-4750-49b3-91ec-54ff58b90f97":
-    lastModified: "2026-10-26T17:04:26.614Z"
+    status: "completed"
+    startedAt: "2026-10-27T13:19:09.644Z"
+    completedAt: "2026-10-27T13:29:55.362Z"
+    endedAt: "2026-10-27T13:29:55.362Z"
+    activeIntervals: [{"end":"2026-10-27T13:29:55.362Z","start":"2026-10-27T13:19:09.644Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "graview-face declares an ndx.extension sidecar; ndx graview serve runs core's sidecar launch plan (src/face.ts) instead of findProductFace/serveProductApp; same flags and env, checked by packages/graview/tests/e2e/serve-face.test.ts."
+    lastModified: "2026-10-27T13:29:55.362Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "514d0d0b-2f53-491b-a0eb-237113b9880f":
     lastModified: "2026-10-26T17:29:35.978Z"

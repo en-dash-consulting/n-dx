@@ -63,12 +63,18 @@ commits did (`livesIn`), all from the one commit-file read the zones of
 
 ### The product face
 
-`graview.app` in the project config names a checkout of a Graview product
-built from the emitted document (`@n-dx/graview-face`, published on its own and depended on by nothing). With
-it set, `ndx graview serve .` emits, then runs that product's dev server with
+The product face is a Graview product built from the emitted document
+(`@n-dx/graview-face`, published on its own and depended on by nothing), and
+an n-dx extension: its `ndx.extension` block declares the `graview-face`
+sidecar. `src/face.ts` never looks for it or reads its manifest; it asks the
+core CLI that spawned this one (`NDX_CLI_PATH`) for the sidecar's launch
+plan, the same question the hub asks for `/x/<name>/`, so discovery,
+approval and the extension environment stay core's. With the face enabled,
+`ndx graview serve .` emits, then runs that plan in the foreground with
 `NDX_GRAVIEW_DIR` pointing at the fresh files, instead of the bare
 `graview serve` (which is the store's HTTP and WebSocket wire and draws
-nothing). The declaration's `views` (home, per-kind card/row/page blocks),
+nothing). An unapproved face is refused with exit 2; a disabled or missing
+one gets the bare store. `graview.app` is retired and only warned about. The declaration's `views` (home, per-kind card/row/page blocks),
 `glance`, `page` groups, `computed` fields, `brand` and titled `lenses` are
 what that face draws; keep the data there, and React only in the product.
 

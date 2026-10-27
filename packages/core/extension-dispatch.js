@@ -150,11 +150,13 @@ export const SIDECAR_LOG_FILENAME = "sidecar.log";
  *   the manifest's `health` and `idleStopMinutes` filled in from the defaults.
  * - `none` — no installed extension of that name declares a sidecar.
  * - `refused` — it would run but must not: not enabled (unapproved, disabled,
- *   incompatible…) or its `bin` is missing. `message` names the fix. Nothing
- *   asks here: the hub has no terminal, so approval is `ndx extensions enable`.
+ *   incompatible…) or its `bin` is missing. `message` names the fix, and
+ *   `state` is the extension's (`enabled` when only the bin is missing).
+ *   Nothing asks here: the hub has no terminal, so approval is
+ *   `ndx extensions enable`.
  *
  * @typedef {{kind: "none", message: string}
- *   | {kind: "refused", ext: DiscoveredExtension, message: string}
+ *   | {kind: "refused", ext: DiscoveredExtension, state: ExtensionStateName, message: string}
  *   | {kind: "run", ext: DiscoveredExtension, bin: string, home: string, health: string, idleStopMinutes: number}} SidecarResolution
  */
 
@@ -176,13 +178,13 @@ export function resolveExtensionSidecar(name, options) {
   const { state, reason } = extensionState(ext, { file, ndxVersion: options.ndxVersion, projectDir });
   if (state !== "enabled") {
     const fix = state === "disabled" || state === "unapproved" ? `ndx extensions enable ${stateKey(ext)}` : "ndx extensions doctor";
-    return { kind: "refused", ext, message: `Error: the sidecar of ${describe(ext)} is not started: it is ${state} (${reason}) — fix: ${fix}` };
+    return { kind: "refused", ext, state, message: `Error: the sidecar of ${describe(ext)} is not started: it is ${state} (${reason}) — fix: ${fix}` };
   }
 
   const sidecar = /** @type {NonNullable<NonNullable<DiscoveredExtension["manifest"]>["sidecar"]>} */ (ext.manifest?.sidecar);
   const bin = resolve(ext.dir, sidecar.bin);
   if (!(options.fs ?? nodeFs).existsSync(bin)) {
-    return { kind: "refused", ext, message: `Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} does not exist — fix: ndx extensions doctor` };
+    return { kind: "refused", ext, state, message: `Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} does not exist — fix: ndx extensions doctor` };
   }
   return {
     kind: "run",

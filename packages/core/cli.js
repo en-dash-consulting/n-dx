@@ -2596,14 +2596,17 @@ async function handleExtensions(rest) {
  * health path, the idle limit and the log file. The hub spawns the bin itself
  * (packages/web/src/hub/sidecars.ts); asking here keeps discovery, approval,
  * the config check and the environment in one place, the same one
- * `ndx <name>` uses. Nothing is run. A refusal exits 2, and with `--json` also
- * prints `{ error, reason }` so the hub can answer in the same words.
+ * `ndx <name>` uses. `ndx graview serve` asks the same question for the
+ * product face, and runs the plan in the foreground. Nothing is run here. A
+ * refusal exits 2, and with `--json` also prints `{ error, reason }` (plus the
+ * extension's `state` when it was refused) so the caller can answer in the
+ * same words.
  */
 async function handleExtensionSidecar(args) {
   const json = args.includes("--json");
   const name = args.find((a) => !a.startsWith("-"));
-  const refuse = (reason, message, extra = []) => {
-    if (json) console.log(JSON.stringify({ error: [message, ...extra].join("\n"), reason }));
+  const refuse = (reason, message, extra = [], state = undefined) => {
+    if (json) console.log(JSON.stringify({ error: [message, ...extra].join("\n"), reason, ...(state ? { state } : {}) }));
     console.error(message);
     for (const line of extra) console.error(line);
     exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
@@ -2615,7 +2618,7 @@ async function handleExtensionSidecar(args) {
   const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
   const resolution = resolveExtensionSidecar(name, { builtinCommands: builtinCommandNames(), ndxVersion: version });
   if (resolution.kind !== "run") {
-    refuse(resolution.kind, resolution.message);
+    refuse(resolution.kind, resolution.message, [], resolution.kind === "refused" ? resolution.state : undefined);
     return;
   }
 
@@ -2642,6 +2645,7 @@ async function handleExtensionSidecar(args) {
 
   const plan = {
     name,
+    dir: resolution.ext.dir,
     execPath: process.execPath,
     bin: resolution.bin,
     cwd: env.NDX_EXTENSION_STATE_DIR,
