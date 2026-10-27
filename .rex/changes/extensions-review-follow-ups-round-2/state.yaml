@@ -43,7 +43,14 @@ items:
     lastModified: "2026-10-27T17:22:53.196Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "eb5711bb-8730-40bc-bbd4-606c31bb5ae2":
-    lastModified: "2026-10-27T17:22:45.894Z"
+    status: "completed"
+    startedAt: "2026-10-27T17:23:47.289Z"
+    completedAt: "2026-10-27T17:27:26.350Z"
+    endedAt: "2026-10-27T17:27:26.350Z"
+    activeIntervals: [{"end":"2026-10-27T17:27:26.350Z","start":"2026-10-27T17:23:47.289Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runExtensions accepts --quiet, -q, --verbose, --debug for every subcommand; unknown flags still refused; unit test covers both."
+    lastModified: "2026-10-27T17:27:26.350Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "fc7cb80d-1cb7-4074-bbad-165858721bb5":
     lastModified: "2026-10-27T17:23:19.800Z"

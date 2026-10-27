@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync, realpathSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
-import { localSpecPath, runExtensions } from "../../packages/core/extensions-command.js";
+import { EXTENSIONS_SUBCOMMANDS, localSpecPath, runExtensions } from "../../packages/core/extensions-command.js";
 import { EXTENSION_STATES, manifestHash } from "../../packages/core/extension-state.js";
 
 const BUILTINS = ["init", "work", "status", "config", "start", "extensions"];
@@ -293,6 +293,17 @@ describe("ndx extensions add", () => {
     expect(err).toMatch(/npm_config_/);
     expect(npmCalls).toEqual([]);
     expect((await ndx(["remove", "recon", "--force"])).err).toMatch(/'ndx extensions remove' does not take --force/);
+  });
+
+  it("takes n-dx's global flags with every subcommand and still refuses an unknown one", async () => {
+    for (const sub of EXTENSIONS_SUBCOMMANDS) {
+      for (const flag of ["--quiet", "-q", "--verbose", "--debug"]) {
+        expect((await ndx([sub, flag])).err).not.toMatch(/does not take/);
+      }
+    }
+    const { code, err } = await ndx(["list", "--quiet", "--loud"]);
+    expect(code).toBe(1);
+    expect(err).toMatch(/'ndx extensions list' does not take --loud\./);
   });
 
   it("fails when npm does", async () => {

@@ -58,6 +58,12 @@ const SUBCOMMAND_FLAGS = Object.freeze({
 });
 
 /**
+ * n-dx's global flags, which `cli.js` reads from the whole command line and
+ * leaves in place. Every subcommand takes them.
+ */
+const GLOBAL_FLAGS = Object.freeze(["--quiet", "-q", "--verbose", "--debug"]);
+
+/**
  * What `ndx extensions` needs from its caller. `builtinCommands` comes from
  * `cli.js`, which cannot be imported; the rest default to the real thing and
  * are injectable for tests.
@@ -101,7 +107,7 @@ export async function runExtensions(args, deps) {
   const flags = new Set(args.filter((a) => a.startsWith("-")));
   const [sub = "list", ...positionals] = args.filter((a) => !a.startsWith("-"));
   const json = flags.has("--json") || flags.has("--format=json");
-  const unknown = [...flags].filter((f) => !(SUBCOMMAND_FLAGS[sub] ?? []).includes(f));
+  const unknown = [...flags].filter((f) => !GLOBAL_FLAGS.includes(f) && !(SUBCOMMAND_FLAGS[sub] ?? []).includes(f));
   if (Object.hasOwn(SUBCOMMAND_FLAGS, sub) && unknown.length > 0) {
     ctx.err(`Error: 'ndx extensions ${sub}' does not take ${unknown.join(", ")}.`);
     if (sub === "add") {
