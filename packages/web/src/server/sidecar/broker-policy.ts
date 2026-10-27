@@ -74,15 +74,16 @@ export interface AllowListRule {
 
 /**
  * A command that starts work, resets state or pushes is never allow-listed,
- * however the operator answers its card. The rule is on argv tokens, so it
- * holds for `ndx work`, `git reset` and `git push` alike, and errs toward
- * asking.
+ * however the operator answers its card. The rule is on the words inside
+ * every argv token, not the tokens alone, so a command wrapped in a shell
+ * string (`sh -c "ndx work ."`) is caught as well as `ndx work`, `git reset`
+ * and `git push`. It errs toward asking: a token that merely contains one of
+ * the words (`work.md`) is never allow-listed either.
  */
 function commandNeverAllowListed(argv: readonly string[]): boolean {
-  return argv.some((token) => {
-    const t = token.toLowerCase();
-    return t === "work" || t === "reset" || t === "push" || t.startsWith("--push");
-  });
+  return argv
+    .flatMap((token) => token.toLowerCase().split(/[^a-z0-9-]+/))
+    .some((word) => word === "work" || word === "reset" || word === "push" || word.startsWith("--push"));
 }
 
 /**

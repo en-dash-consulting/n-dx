@@ -69,7 +69,11 @@ describe("allow-listability", () => {
   });
 
   it("never allow-lists a command that works, resets or pushes", () => {
-    for (const argv of [["ndx", "work", "."], ["git", "reset", "--hard"], ["git", "push"], ["ndx", "ship", "--push=origin"]]) {
+    for (const argv of [
+      ["ndx", "work", "."], ["git", "reset", "--hard"], ["git", "push"], ["ndx", "ship", "--push=origin"],
+      // Wrapped in a shell string, the words are inside one token.
+      ["sh", "-c", "ndx work ."], ["bash", "-lc", "git fetch && git push origin HEAD"], ["cmd", "/c", "git reset --hard"],
+    ]) {
       expect(allowListKey("run_command", { argv })).toBeNull();
     }
   });
