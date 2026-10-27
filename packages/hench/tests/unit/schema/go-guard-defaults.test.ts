@@ -12,16 +12,17 @@ import type { ProjectLanguage } from "../../../src/schema/v1.js";
 
 describe("guardDefaultsForLanguage", () => {
   describe("Go defaults", () => {
-    it("includes vendor/** in blocked paths", () => {
+    it("includes **/vendor/** in blocked paths", () => {
       const guard = guardDefaultsForLanguage("go");
-      expect(guard.blockedPaths).toContain("vendor/**");
+      expect(guard.blockedPaths).toContain("**/vendor/**");
     });
 
-    // Every language blocks every ecosystem's dependency directories: a polyglot
-    // Go checkout still has a JS frontend's node_modules/ (#816 F1).
-    it("also blocks node_modules/** in blocked paths", () => {
+    // Every language blocks every ecosystem's dependency directories, at any
+    // depth: a polyglot Go checkout still has a JS frontend's web/node_modules/
+    // (#816 F1, #686).
+    it("also blocks **/node_modules/** in blocked paths", () => {
       const guard = guardDefaultsForLanguage("go");
-      expect(guard.blockedPaths).toContain("node_modules/**");
+      expect(guard.blockedPaths).toContain("**/node_modules/**");
     });
 
     it("blocks .hench/**, .rex/**, and .git/**", () => {
@@ -78,14 +79,14 @@ describe("guardDefaultsForLanguage", () => {
   });
 
   describe("JS/TS defaults (regression guard)", () => {
-    it("includes node_modules/** in blocked paths", () => {
+    it("includes **/node_modules/** in blocked paths", () => {
       const guard = guardDefaultsForLanguage();
-      expect(guard.blockedPaths).toContain("node_modules/**");
+      expect(guard.blockedPaths).toContain("**/node_modules/**");
     });
 
     it("also blocks the other ecosystems' dependency directories", () => {
       const guard = guardDefaultsForLanguage();
-      for (const p of ["vendor/**", ".build/**", "Pods/**"]) expect(guard.blockedPaths).toContain(p);
+      for (const p of ["**/vendor/**", "**/.build/**", "**/Pods/**"]) expect(guard.blockedPaths).toContain(p);
     });
 
     it("blocks .hench/**, .rex/**, and .git/**", () => {
@@ -115,13 +116,13 @@ describe("guardDefaultsForLanguage", () => {
     it("returns JS/TS defaults for typescript language", () => {
       const guard = guardDefaultsForLanguage("typescript");
       expect(guard.allowedCommands).toContain("npm");
-      expect(guard.blockedPaths).toContain("node_modules/**");
+      expect(guard.blockedPaths).toContain("**/node_modules/**");
     });
 
     it("returns JS/TS defaults for javascript language", () => {
       const guard = guardDefaultsForLanguage("javascript");
       expect(guard.allowedCommands).toContain("npm");
-      expect(guard.blockedPaths).toContain("node_modules/**");
+      expect(guard.blockedPaths).toContain("**/node_modules/**");
     });
 
     it("returns a fresh object each call (not the same reference)", () => {
@@ -148,7 +149,7 @@ describe("DEFAULT_HENCH_CONFIG", () => {
       const config = DEFAULT_HENCH_CONFIG("go");
       expect(config.guard.allowedCommands).toContain("go");
       expect(config.guard.allowedCommands).toContain("golangci-lint");
-      expect(config.guard.blockedPaths).toContain("vendor/**");
+      expect(config.guard.blockedPaths).toContain("**/vendor/**");
     });
 
     it("preserves non-guard defaults", () => {
@@ -169,7 +170,7 @@ describe("DEFAULT_HENCH_CONFIG", () => {
       const config = DEFAULT_HENCH_CONFIG();
       expect(config.guard.allowedCommands).toContain("npm");
       expect(config.guard.allowedCommands).toContain("vitest");
-      expect(config.guard.blockedPaths).toContain("node_modules/**");
+      expect(config.guard.blockedPaths).toContain("**/node_modules/**");
       expect(config.guard.allowedCommands).not.toContain("go");
     });
 

@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { applyRepoTrust, formatTrustWarningForRun, trustSummaryForRun } from "../../../src/store/trust.js";
-import { recordRepoTrust } from "../../../src/prd/llm-gateway.js";
+import { guardBaselineForLanguage, recordRepoTrust } from "../../../src/prd/llm-gateway.js";
+import { GuardError, validatePath } from "../../../src/guard/paths.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
 
 let repo: string;
@@ -94,21 +95,56 @@ describe("applyRepoTrust", () => {
 
   // A marker file is repository content: a zero-byte Package.swift in a JS
   // checkout must not drop node_modules/** from the clamp (#816 F1).
-  it("keeps node_modules/** blocked when a JS checkout ships a swift marker", () => {
+  it("keeps node_modules blocked when a JS checkout ships a swift marker", () => {
     writeFileSync(join(repo, "package.json"), "{}");
     writeFileSync(join(repo, "Package.swift"), "");
     const config = DEFAULT_HENCH_CONFIG();
     config.guard = {
       ...config.guard,
       allowedCommands: [...config.guard.allowedCommands, "bash"],
-      blockedPaths: config.guard.blockedPaths.filter((p) => p !== "node_modules/**"),
+      blockedPaths: config.guard.blockedPaths.filter((p) => p !== "**/node_modules/**"),
     };
     writeHenchConfig(config);
 
     const applied = applyRepoTrust(config, repo, undefined, { ndxHome: home });
     expect(applied.evaluation.config.detectedLanguage).toBe("swift");
     expect(applied.evaluation.state).toBe("untrusted");
-    expect(applied.config.guard.blockedPaths).toContain("node_modules/**");
+    expect(applied.config.guard.blockedPaths).toContain("**/node_modules/**");
+  });
+
+  // A root go.mod picks the go baseline; the JS frontend's node_modules sits
+  // in web/, and a payload written there runs at the next install (#686).
+  it("refuses a write to a nested node_modules in an untrusted polyglot checkout", () => {
+    writeFileSync(join(repo, "go.mod"), "module x\n");
+    mkdirSync(join(repo, "web"));
+    writeFileSync(join(repo, "web", "package.json"), "{}");
+    const config = DEFAULT_HENCH_CONFIG("go");
+    config.guard = { ...config.guard, allowedCommands: [...config.guard.allowedCommands, "bash"], blockedPaths: [".hench/**", ".rex/**", ".git/**"] };
+    writeHenchConfig(config);
+
+    const applied = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+    expect(applied.evaluation.state).toBe("untrusted");
+    expect(() => validatePath("web/node_modules/.bin/vite", repo, applied.config.guard.blockedPaths)).toThrow(GuardError);
+    expect(() => validatePath("web/src/main.ts", repo, applied.config.guard.blockedPaths)).not.toThrow();
+  });
+
+  // A guard `ndx init` wrote before the blocks reached any depth reads as
+  // baseline, so it is never clamped; a repository can ship one to keep
+  // packages/*/node_modules writable. The root entry is widened to any depth,
+  // which tightens without changing the trust state; what the guard dropped
+  // stays dropped.
+  it("keeps a nested node_modules blocked under a baseline guard that lists only the root one", () => {
+    writeFileSync(join(repo, "package.json"), "{}");
+    const config = DEFAULT_HENCH_CONFIG();
+    config.guard = { ...config.guard, blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"] };
+    writeHenchConfig(config);
+
+    const applied = applyRepoTrust(config, repo, "bypassPermissions", { ndxHome: home });
+    expect(applied.evaluation.state).toBe("baseline");
+    expect(applied.permissionMode).toBe("bypassPermissions");
+    expect(applied.config.guard.allowedCommands).toEqual(config.guard.allowedCommands);
+    expect(() => validatePath("packages/a/node_modules/x/package.json", repo, applied.config.guard.blockedPaths)).toThrow(GuardError);
+    expect(applied.config.guard.blockedPaths).not.toContain(".env");
   });
 
   it("summarises for the run record and warns with the CLI-provider note", () => {
@@ -127,5 +163,25 @@ describe("applyRepoTrust", () => {
     expect(lines[0]).toContain("NOT TRUSTED");
     expect(lines.some((l) => l.includes("provider=cli"))).toBe(true);
     expect(formatTrustWarningForRun(applied.evaluation, "api").some((l) => l.includes("provider=cli"))).toBe(false);
+  });
+});
+
+describe("guard baseline dependency directories", () => {
+  it.each(["typescript", "javascript", "go", "swift", undefined])("blocks root and nested dependency directories for %s", (language) => {
+    const { blockedPaths } = guardBaselineForLanguage(language);
+    for (const p of [
+      "node_modules/x/index.js",
+      "web/node_modules/.bin/x",
+      "packages/a/node_modules/x/package.json",
+      "vendor/a.go",
+      "svc/vendor/a.go",
+      "ios/Pods/x",
+      "app/.build/debug/x",
+      "app/DerivedData/x",
+      "app/Carthage/x",
+    ]) {
+      expect(() => validatePath(p, repo, blockedPaths), `${language}: ${p}`).toThrow(GuardError);
+    }
+    expect(() => validatePath("packages/a/src/index.ts", repo, blockedPaths)).not.toThrow();
   });
 });
