@@ -128,6 +128,25 @@ describe("applyRepoTrust", () => {
     expect(() => validatePath("web/src/main.ts", repo, applied.config.guard.blockedPaths)).not.toThrow();
   });
 
+  // A guard `ndx init` wrote before the blocks reached any depth reads as
+  // baseline, so it is never clamped; a repository can ship one to keep
+  // packages/*/node_modules writable. The root entry is widened to any depth,
+  // which tightens without changing the trust state; what the guard dropped
+  // stays dropped.
+  it("keeps a nested node_modules blocked under a baseline guard that lists only the root one", () => {
+    writeFileSync(join(repo, "package.json"), "{}");
+    const config = DEFAULT_HENCH_CONFIG();
+    config.guard = { ...config.guard, blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"] };
+    writeHenchConfig(config);
+
+    const applied = applyRepoTrust(config, repo, "bypassPermissions", { ndxHome: home });
+    expect(applied.evaluation.state).toBe("baseline");
+    expect(applied.permissionMode).toBe("bypassPermissions");
+    expect(applied.config.guard.allowedCommands).toEqual(config.guard.allowedCommands);
+    expect(() => validatePath("packages/a/node_modules/x/package.json", repo, applied.config.guard.blockedPaths)).toThrow(GuardError);
+    expect(applied.config.guard.blockedPaths).not.toContain(".env");
+  });
+
   it("summarises for the run record and warns with the CLI-provider note", () => {
     const widened = DEFAULT_HENCH_CONFIG();
     widened.guard = { ...widened.guard, allowedCommands: ["bash"] };

@@ -8,7 +8,9 @@
  * language (marker files, not the config's `language`) —
  * allowlists intersect, blocked paths union — and a `bypassPermissions`
  * permission mode is lowered to `acceptEdits`. The repository's config can
- * only ever tighten what the user's own defaults allow.
+ * only ever tighten what the user's own defaults allow. At baseline, a
+ * root-anchored blocked path the baseline lists at any depth (an older
+ * `node_modules/**`) is widened to that form.
  *
  * Two things this does not do. It does not refuse to run: an unattended
  * `ndx work --loop` on a fresh clone should still make progress, just under
@@ -33,7 +35,7 @@ import type { HenchConfig, PermissionMode, RunTrustRecord } from "../schema/inde
 
 export interface RepoTrustApplied {
   evaluation: RepoTrustEvaluation;
-  /** The config to run with: clamped when restricted, the input otherwise. */
+  /** The config to run with: clamped when restricted, root dependency blocks widened at baseline, the input when trusted. */
   config: HenchConfig;
   /** The permission mode to run with: lowered from bypassPermissions when restricted. */
   permissionMode: PermissionMode | undefined;
@@ -53,12 +55,26 @@ export function applyRepoTrust(
   options: RepoTrustStoreOptions = {},
 ): RepoTrustApplied {
   const evaluation = evaluateRepoTrust(projectDir, options);
-  if (!evaluation.restricted) {
+  if (evaluation.state === "trusted") {
     return { evaluation, config, permissionMode, clamped: false };
   }
   // The detected language, never `config.language`: that is the repository's
   // own claim, and a JS checkout declaring swift would keep xcodebuild.
   const baseline = guardBaselineForLanguage(evaluation.config.detectedLanguage);
+  if (!evaluation.restricted) {
+    // A guard `ndx init` wrote before the dependency blocks reached any depth
+    // lists only `node_modules/**`, reads as baseline, and would otherwise
+    // leave packages/*/node_modules writable. Each root-anchored entry whose
+    // `**/` form the baseline lists gains that form. Nothing the guard dropped
+    // is re-added: at baseline that is the user's choice to make.
+    const anyDepth = baseline.blockedPaths.filter((p) => p.startsWith("**/"));
+    const widened = anyDepth.filter((p) => config.guard.blockedPaths.includes(p.slice(3)));
+    const blockedPaths = [...new Set([...config.guard.blockedPaths, ...widened])];
+    if (blockedPaths.length === config.guard.blockedPaths.length) {
+      return { evaluation, config, permissionMode, clamped: false };
+    }
+    return { evaluation, config: { ...config, guard: { ...config.guard, blockedPaths } }, permissionMode, clamped: true };
+  }
   const guard = clampGuardToBaseline(config.guard, baseline);
   const lowered = permissionMode === "bypassPermissions" ? "acceptEdits" : permissionMode;
   const guardChanged =
