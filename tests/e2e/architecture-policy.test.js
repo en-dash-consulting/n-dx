@@ -258,8 +258,8 @@ describe("architecture policy: orchestration spawn-only rule", () => {
  * Extensions are spawned, never imported (docs/architecture/extensions.md):
  * n-dx reads an extension's `package.json` and runs its `bin` as a child
  * process. Two holes would break that: an extension module that loads code at
- * run time, and an import by computed specifier anywhere in core, which could
- * be pointed at a discovered package.
+ * run time, and an `import()` or `require` by computed specifier anywhere in
+ * core, which could be pointed at a discovered package.
  */
 describe("architecture policy: orchestration never imports extension code", () => {
   const CORE = "packages/core";
@@ -269,6 +269,28 @@ describe("architecture policy: orchestration never imports extension code", () =
   ]);
   /** An `import(` not followed by a plain string literal and its closing paren. */
   const COMPUTED_IMPORT = /\bimport\s*\(\s*(?!["'][^"'`$]*["']\s*\))/;
+  /** Core modules allowed a require whose specifier is computed, with why. */
+  const COMPUTED_REQUIRES = new Map();
+  /** A call's opening paren not followed by a plain string literal and its closing paren. */
+  const NON_LITERAL_CALL = String.raw`\s*\(\s*(?!["'][^"'\`$]*["']\s*\))`;
+
+  /**
+   * Whether `text` loads a module by computed specifier through `require`: a
+   * bare `require(…)`, a `createRequire(…)` result called directly or through
+   * the name it is bound to (also via `.call` / `.apply`). `.resolve()` only
+   * locates a file and runs nothing, so it does not count.
+   */
+  function hasComputedRequire(text) {
+    const names = ["require"];
+    for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[\w$]+\.)?createRequire\s*\(/g)) {
+      names.push(m[1]);
+    }
+    const callee = names.map((n) => n.replace(/\$/g, "\\$")).join("|");
+    return [
+      new RegExp(String.raw`(?<![\w$.])(?:${callee})(?:\s*\.\s*(?:call|apply))?` + NON_LITERAL_CALL),
+      new RegExp(String.raw`\bcreateRequire\s*\([^()]*(?:\([^()]*\)[^()]*)*\)` + NON_LITERAL_CALL),
+    ].some((pattern) => pattern.test(text));
+  }
 
   /** Core's own modules: its top-level .js files and bin/. */
   function coreModules() {
@@ -329,6 +351,41 @@ describe("architecture policy: orchestration never imports extension code", () =
       expect(existsSync(join(ROOT, rel)), `${rel} no longer exists`).toBe(true);
       expect(COMPUTED_IMPORT.test(code(rel)), `${rel} no longer has a computed import()`).toBe(true);
     }
+  });
+
+  it("core requires by computed specifier only where documented", () => {
+    const violations = coreModules()
+      .filter((rel) => hasComputedRequire(code(rel)))
+      .filter((rel) => !COMPUTED_REQUIRES.has(rel));
+    expect(violations, "a computed require in core could load a discovered package").toEqual([]);
+  });
+
+  it("COMPUTED_REQUIRES has no stale entries", () => {
+    for (const rel of COMPUTED_REQUIRES.keys()) {
+      expect(existsSync(join(ROOT, rel)), `${rel} no longer exists`).toBe(true);
+      expect(hasComputedRequire(code(rel)), `${rel} no longer has a computed require`).toBe(true);
+    }
+  });
+
+  it("the computed-require check sees every way core can call require", () => {
+    const flagged = [
+      'const _require = createRequire(import.meta.url);\n_require(resolution.bin);',
+      'const r = module.createRequire(import.meta.url);\nr(path);',
+      'const _require = createRequire(import.meta.url);\n_require.call(null, "x");',
+      "createRequire(import.meta.url)(spec);",
+      "createRequire(pathToFileURL(dir))(spec);",
+      "require(name);",
+      "require(`./${name}`);",
+    ];
+    const allowed = [
+      'const _require = createRequire(import.meta.url);\n_require.resolve(npmName + "/package.json");',
+      'const _require = createRequire(import.meta.url);\n_require("./x.json");',
+      'require("node:fs");',
+      "foo.require(name);",
+      "my_require(name);",
+    ];
+    expect(flagged.filter((text) => !hasComputedRequire(text))).toEqual([]);
+    expect(allowed.filter((text) => hasComputedRequire(text))).toEqual([]);
   });
 });
 

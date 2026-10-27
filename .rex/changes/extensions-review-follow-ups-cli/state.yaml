@@ -53,5 +53,12 @@ items:
     lastModified: "2026-10-27T14:09:34.996Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "d66c59d3-bdb2-4117-ae83-f91377fa3bb6":
-    lastModified: "2026-10-27T13:51:31.503Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:12:21.947Z"
+    completedAt: "2026-10-27T15:16:20.728Z"
+    endedAt: "2026-10-27T15:16:20.728Z"
+    activeIntervals: [{"end":"2026-10-27T15:16:20.728Z","start":"2026-10-27T15:12:21.947Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "architecture-policy now flags computed require/createRequire calls in core, allowlisted via COMPUTED_REQUIRES (commit 6c141bce8)"
+    lastModified: "2026-10-27T15:16:20.728Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
