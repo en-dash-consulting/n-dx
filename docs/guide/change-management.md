@@ -46,7 +46,11 @@ rex change place <change> .                                   # the shortlist, b
 rex change place <change> --target=<node> --relation=touches . # it works on the capability
 rex change place <change> --target=<node> --relation=amends \
   --capability-criterion="c3: A refund reaches the card" .    # it changes the requirement
+rex change place <change> --propose --type=capability \
+  --under=<area> --title="Refund by card" .                   # nothing fits: propose a new one
 ```
+
+`--propose` (MCP: `place_change` with `propose: {type, under, title}`) records a new capability or constraint under any live area as an `added` amendment on the change, and clears `needsPlacement`. It is not accepted yet: the node reaches the map only when the change is [applied](./concepts/changes-and-apply). `--summary`, `--proposed` (the statement) and, for a capability, `--capability-criterion` describe it; `--target` and `--relation` cannot be combined with it.
 
 A change that only *touches* a capability is a fix or a refactor: it writes nothing to the product layer and needs no steward. A change that *amends* one carries the new statement or capability criteria, and [apply](./concepts/changes-and-apply) writes them when it completes.
 

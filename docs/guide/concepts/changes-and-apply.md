@@ -71,6 +71,7 @@ Each step above has a CLI command and an MCP tool. All of them work on a v2 PRD 
 | Add a task or subtask to a change | `rex add task --title="…" --parent=<change>` | `add_item` (type `task` or `subtask`, `parentId`) |
 | See where a change could go | `rex change place <change>` | `place_change` (no target) |
 | Place it | `rex change place <change> --target=<node> --relation=touches\|amends` | `place_change` (with target) |
+| Propose a new capability or constraint when nothing fits | `rex change place <change> --propose --type=capability\|constraint --under=<area> --title="…"` | `place_change` (with `propose`) |
 | Apply it as a steward | `rex change apply <change>` | `apply_change` |
 | Edit a requirement directly | `rex product edit <node> --statement="…"` or `--capability-criterion="<id>: <text>"` | — |
 

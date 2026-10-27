@@ -24,6 +24,7 @@ On a v2 PRD, `ndx add --file=spec.md` creates one change from the file, with no 
 rex change place <change>                 # the shortlist of capabilities it could amend or touch
 rex change place <change> --target=<node> --relation=amends \
   --capability-criterion="c3: A refund reaches the card"
+rex change place <change> --propose --type=capability --under=<area> --title="Refund by card"  # nothing fits
 ```
 
 ::: info v1 projects

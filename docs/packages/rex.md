@@ -90,6 +90,7 @@ rex product edit A1.1 --capability-criterion="c3: A refund reaches the card" .  
 rex product edit A1.1 --statement="..." --editorial .                              # reword it; stays met
 rex change place CH-2 .                              # the placement shortlist
 rex change place CH-2 --target=A1.1 --relation=amends --capability-criterion="c3: ..." .
+rex change place CH-2 --propose --type=capability --under=A1 --title="Refund by card" .   # nothing fits: propose a new node
 rex change apply CH-2 .                              # apply its amendments to the product layer
 ```
 
@@ -149,7 +150,7 @@ Available via `rex mcp .` (stdio) or `ndx start .` (HTTP). Claude Code prefixes 
 |------|-------------|
 | `get_product` | v2: the product layer: areas with counts by default, one area's nodes with computed status and health with `area`, every area with `full` |
 | `get_capability` | v2: one capability or constraint with its capability criteria and the changes on it |
-| `place_change` | v2: a change's placement shortlist, or record a placement (`touches` or `amends`) |
+| `place_change` | v2: a change's placement shortlist, record a placement (`touches` or `amends`), or `propose` a new capability or constraint |
 | `apply_change` | v2: apply a change's amendments to the product layer, as a steward |
 | `get_prd_status` | PRD title and stats. v2: change counts, Inbox count, product status per area, changes per release. v1: per-epic stats |
 | `get_next_task` | Next actionable task based on priority and dependencies (skips tasks claimed by another worktree) |
