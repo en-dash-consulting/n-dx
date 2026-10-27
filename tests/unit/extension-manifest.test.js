@@ -14,6 +14,7 @@ import { join } from "node:path";
 import {
   validateExtensionManifest,
   formatProblem,
+  escapeControlCharacters,
   isSemverRange,
   satisfiesSemverRange,
   EXTENSION_MANIFEST_RULES,
@@ -37,18 +38,23 @@ const BASE = Object.freeze({
   configSchema: "schema/config.json",
 });
 
-/** A package.json around `BASE` after `edit` has changed a copy of it. */
+/**
+ * A package.json around `BASE` after `edit` has changed a copy of it. `edit`
+ * also receives the package.json, for the rules about the package itself.
+ */
 function pkg(edit = () => {}) {
   const block = structuredClone(BASE);
-  const result = edit(block);
-  return { name: "@acme/ndx-recon", version: "1.0.0", ndx: { extension: result === undefined ? block : result } };
+  const packageJson = { name: "@acme/ndx-recon", version: "1.0.0", ndx: { extension: block } };
+  const result = edit(block, packageJson);
+  if (result !== undefined) packageJson.ndx.extension = result;
+  return packageJson;
 }
 
 function validate(packageJson) {
   return validateExtensionManifest(packageJson, { builtinCommands: BUILTINS });
 }
 
-/** @type {Record<string, { fail: (m: any) => any, pass: (m: any) => any }>} */
+/** @type {Record<string, { fail: (m: any, p: any) => any, pass: (m: any, p: any) => any }>} */
 const RULE_FIXTURES = {
   "block-object": { fail: () => "recon", pass: () => {} },
   "api-version-integer": { fail: (m) => { m.apiVersion = "1"; }, pass: (m) => { m.apiVersion = 1; } },
@@ -62,9 +68,14 @@ const RULE_FIXTURES = {
     pass: (m) => { m.commands[0].name = "statuses"; },
   },
   "non-empty-string": { fail: (m) => { m.displayName = "  "; }, pass: (m) => { m.displayName = "Recon"; } },
+  "control-character": {
+    fail: (m) => { m.commands[0].bin = "bin/cli.js\n  source   user (/safe/place)"; },
+    pass: (m) => { m.commands[0].bin = "bin/cli.js"; },
+  },
+  "package-version": { fail: (m, p) => { p.version = "1.0.0\u001b[2K"; }, pass: (m, p) => { p.version = "1.0.0-rc.1"; } },
   "summary-length": {
-    fail: (m) => { m.commands[0].summary = "line one\nline two"; },
-    pass: (m) => { m.commands[0].summary = "line one"; },
+    fail: (m) => { m.commands[0].summary = "x".repeat(101); },
+    pass: (m) => { m.commands[0].summary = "x".repeat(100); },
   },
   "ndx-version-range": { fail: (m) => { m.ndxVersion = "0.10 or later"; }, pass: (m) => { m.ndxVersion = "^0.10.0"; } },
   "array": { fail: (m) => { m.projectLinks = BASE.projectLinks[0]; }, pass: (m) => { m.projectLinks = []; } },
@@ -177,6 +188,41 @@ describe("validateExtensionManifest", () => {
     const result = validate(pkg((m) => { m.projectLinks[0].path = "/p/{{projectName}}"; }));
     expect(result.problems.map((p) => p.rule)).toEqual(["link-placeholder"]);
     expect(result.problems[0].message).toContain("{projectName}");
+  });
+
+  it("refuses a control character in every manifest string and in the package name", () => {
+    const edits = {
+      "ndx.extension.displayName": (m) => { m.displayName = "Recon\u001b[1A"; },
+      "ndx.extension.ndxVersion": (m) => { m.ndxVersion = ">=0.10.0\t"; },
+      "ndx.extension.commands[0].bin": (m) => { m.commands[0].bin = "bin/cli.js\r"; },
+      "ndx.extension.commands[0].summary": (m) => { m.commands[0].summary = "Assess\u0085"; },
+      "ndx.extension.sidecar.bin": (m) => { m.sidecar.bin = "bin/serve.js\u0007"; },
+      "ndx.extension.sidecar.health": (m) => { m.sidecar.health = "/healthz\u007f"; },
+      "ndx.extension.hub.label": (m) => { m.hub.label = "Recon\n"; },
+      "ndx.extension.hub.description": (m) => { m.hub.description = "Batch\u0000"; },
+      "ndx.extension.projectLinks[0].label": (m) => { m.projectLinks[0].label = "\u009b2J"; },
+      "ndx.extension.projectLinks[0].path": (m) => { m.projectLinks[0].path = "/project/\u001b"; },
+      "ndx.extension.configSchema": (m) => { m.configSchema = "schema/\u001bconfig.json"; },
+      "name": (m, p) => { p.name = "@acme/ndx-recon\u001b[2K"; },
+    };
+    for (const [path, edit] of Object.entries(edits)) {
+      const result = validate(pkg(edit));
+      expect(result.status, path).toBe("invalid");
+      expect(result.problems.find((p) => p.path === path)?.rule, path).toBe("control-character");
+      for (const problem of result.problems) expect(formatProblem(problem), path).not.toMatch(/\p{Cc}/u);
+    }
+  });
+
+  it("requires the package version to be a semver version", () => {
+    for (const version of [undefined, 1, "", "1.0", "latest", "1.0.0 \n"]) {
+      const result = validate(pkg((m, p) => { p.version = version; }));
+      expect(result.problems.map((p) => p.rule), String(version)).toEqual(["package-version"]);
+    }
+  });
+
+  it("escapeControlCharacters writes every control character as a visible escape", () => {
+    expect(escapeControlCharacters("a\u001b[2Kb\nc\u009bd\u007f")).toBe("a\\x1b[2Kb\\x0ac\\x9bd\\x7f");
+    expect(escapeControlCharacters("C:\\tools — ok")).toBe("C:\\tools — ok");
   });
 
   it("rejects package paths that escape the package on either platform", () => {

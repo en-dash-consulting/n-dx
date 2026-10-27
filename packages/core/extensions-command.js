@@ -22,7 +22,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
 import { discoverExtensions, USER_EXTENSIONS_DIRNAME, EXTENSIONS_CACHE_FILE } from "./extension-discovery.js";
-import { formatProblem, isExtensionNameSlug } from "./extension-manifest.js";
+import { escapeControlCharacters, formatProblem, isExtensionNameSlug } from "./extension-manifest.js";
 import {
   approvalFor,
   describeForApproval,
@@ -112,6 +112,8 @@ function context(deps) {
   if (!deps || !deps.builtinCommands) throw new TypeError("runExtensions: deps.builtinCommands is required");
   const cwd = deps.cwd ?? process.cwd();
   const ndxVersion = deps.ndxVersion ?? ownVersion();
+  const out = deps.out ?? ((/** @type {string} */ line) => console.log(line));
+  const err = deps.err ?? ((/** @type {string} */ line) => console.error(line));
   /** @param {string | undefined} dir */
   const discover = (dir) => {
     const projectDir = resolve(cwd, dir ?? ".");
@@ -132,8 +134,11 @@ function context(deps) {
     discover,
     runNpm: deps.runNpm ?? defaultRunNpm,
     confirm: deps.confirm ?? terminalConfirm(),
-    out: deps.out ?? ((/** @type {string} */ line) => console.log(line)),
-    err: deps.err ?? ((/** @type {string} */ line) => console.error(line)),
+    // Lines quote package names, versions, paths and manifest strings, so no
+    // control character in them reaches the terminal. JSON escapes its own.
+    out: (/** @type {string} */ line) => out(escapeControlCharacters(line)),
+    err: (/** @type {string} */ line) => err(escapeControlCharacters(line)),
+    json: (/** @type {unknown} */ value) => out(JSON.stringify(value, null, 2)),
   };
 }
 
@@ -198,13 +203,14 @@ function list(ctx, dir, json) {
     manifest: ext.manifest ?? null,
   }));
   if (json) {
-    ctx.out(JSON.stringify({ extensions: rows, errors: d.errors }, null, 2));
+    ctx.json({ extensions: rows, errors: d.errors });
     return 0;
   }
   if (rows.length === 0) {
     ctx.out("No extensions installed. Add one with 'ndx extensions add <package>'.");
   } else {
-    const table = [["NAME", "VERSION", "SOURCE", "STATE", "REASON"], ...rows.map((r) => [r.name ?? r.packageName, r.version ?? "-", r.source, r.state, r.reason])];
+    // Escaped before padding, so the columns line up with what is printed.
+    const table = [["NAME", "VERSION", "SOURCE", "STATE", "REASON"], ...rows.map((r) => [r.name ?? r.packageName, r.version ?? "-", r.source, r.state, r.reason].map(escapeControlCharacters))];
     const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)));
     for (const row of table) ctx.out(row.map((cell, i) => (i === row.length - 1 ? cell : cell.padEnd(widths[i]))).join("  ").trimEnd());
   }
@@ -226,7 +232,7 @@ function info(ctx, name, json) {
   const { state, reason } = stateOf(d, ext, ctx.ndxVersion);
   const approval = approvalFor(d.file, ext, d.projectDir);
   if (json) {
-    ctx.out(JSON.stringify({
+    ctx.json({
       name: ext.name ?? null,
       packageName: ext.packageName,
       version: ext.version ?? null,
@@ -239,7 +245,7 @@ function info(ctx, name, json) {
       problems: ext.problems,
       shadowed: ext.shadowed,
       conflicts: ext.conflicts,
-    }, null, 2));
+    });
     return 0;
   }
   const m = ext.manifest;

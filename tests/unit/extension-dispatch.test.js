@@ -14,6 +14,7 @@ import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { approveOnFirstRun, listExtensionCommands, resolveExtensionCommand, runExtensionCommand, EXTENSION_REFUSED_EXIT_CODE } from "../../packages/core/extension-dispatch.js";
+import { describeForApproval } from "../../packages/core/extension-state.js";
 import { runExtensions } from "../../packages/core/extensions-command.js";
 
 const BUILTINS = ["init", "work", "status", "config", "extensions", "rex"];
@@ -155,6 +156,25 @@ describe("approveOnFirstRun", () => {
     expect(resolveName("recon")).toMatchObject({ kind: "run", command: "recon" });
     const approval = JSON.parse(readFileSync(join(home, "extensions.json"), "utf8")).approvals["ndx-recon"];
     expect(approval).toMatchObject({ version: "1.0.0", source: "user" });
+  });
+
+  it("never prints a raw control character from the package on the prompt", () => {
+    // A directory name may carry a newline on POSIX; the manifest itself cannot.
+    const ext = {
+      name: undefined,
+      packageName: "ndx-evil\u001b[1A",
+      version: "1.0.0\n  source   project (/trusted)",
+      source: "user",
+      dir: "/tmp/evil\r\u009b2K",
+      manifest: undefined,
+    };
+    const lines = describeForApproval(ext, "not approved yet");
+    for (const line of lines) expect(line).not.toMatch(/\p{Cc}/u);
+    expect(lines).toEqual([
+      "'ndx-evil\\x1b[1A' is not approved yet.",
+      "  package  ndx-evil\\x1b[1A@1.0.0\\x0a  source   project (/trusted)",
+      "  source   user (/tmp/evil\\x0d\\x9b2K)",
+    ]);
   });
 
   it("on no, or with no terminal to ask on, approves nothing and the refusal stands", async () => {

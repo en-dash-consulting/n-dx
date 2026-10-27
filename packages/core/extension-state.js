@@ -28,7 +28,7 @@ import { createHash } from "node:crypto";
 import * as nodeFs from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { EXTENSIONS_CACHE_FILE } from "./extension-discovery.js";
-import { satisfiesSemverRange } from "./extension-manifest.js";
+import { escapeControlCharacters, satisfiesSemverRange } from "./extension-manifest.js";
 
 /**
  * Every state an installed extension can be in. Only `enabled` runs.
@@ -209,7 +209,9 @@ export function describeForApproval(ext, reason) {
   ];
   for (const c of m?.commands ?? []) lines.push(`  command  ndx ${c.name} → ${c.bin}`);
   if (m?.sidecar) lines.push(`  sidecar  ${m.sidecar.bin}, served at /x/${m.name}/ by the hub`);
-  return lines;
+  // The package's own name, version and directory are printed whether or not
+  // its manifest validated, so none of them may reach the terminal raw.
+  return lines.map(escapeControlCharacters);
 }
 
 /**

@@ -34,7 +34,7 @@ The `ndx.extension` block of the package's `package.json`. It is the only thing 
 | `projectLinks[]` | no, needs `sidecar` | `label` and `path` for a link in every project's dashboard header. `path` starts with `/` and resolves under `/x/<name>/`. `{projectId}` and `{repoRoot}` are the only placeholders, each URL-encoded |
 | `configSchema` | no | Relative path inside the package to a JSON Schema for the extension's config section ([Config](./config.md)) |
 
-Unknown fields are refused. A package path cannot be absolute or climb out of the package with `..`. Each problem is reported as one line that names the package, the JSON path, the rule and the fix.
+Unknown fields are refused. A package path cannot be absolute or climb out of the package with `..`. No string, and not the package's own `name`, may contain a control character (newline, tab, escape sequence), and the package's `version` must be a semver version such as `1.0.0`: both are shown on the approval prompt, and `list`, `info` and the prompt print any control character from a package as a visible `\xNN` escape. Each problem is reported as one line that names the package, the JSON path, the rule and the fix.
 
 ## Where n-dx looks
 

@@ -27,7 +27,14 @@ items:
     lastModified: "2026-10-27T13:51:18.561Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "1466e27e-19f4-413a-bb45-265042446ece":
-    lastModified: "2026-10-27T13:51:05.660Z"
+    status: "completed"
+    startedAt: "2026-10-27T14:39:31.775Z"
+    completedAt: "2026-10-27T14:46:35.065Z"
+    endedAt: "2026-10-27T14:46:35.065Z"
+    activeIntervals: [{"end":"2026-10-27T14:46:35.065Z","start":"2026-10-27T14:39:31.775Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Validator rules control-character (every manifest string, package name) and package-version (semver, discovery passes version); list/info/doctor/approval prompt escape control characters as \\xNN (commit 5aad4404b)"
+    lastModified: "2026-10-27T14:46:35.065Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "37e5c938-463a-472a-8666-046c3511d5b2":
     lastModified: "2026-10-27T13:51:09.866Z"

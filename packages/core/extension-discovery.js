@@ -404,7 +404,7 @@ function resolveWinners(found, builtinCommands) {
       if (!samePath(winner.dir, pkg.dir)) winner.shadowed.push({ source, dir: pkg.dir, version: pkg.version });
       continue;
     }
-    const validation = validateExtensionManifest({ name: pkg.packageName, ndx: { extension: pkg.block } }, { builtinCommands });
+    const validation = validateExtensionManifest({ name: pkg.packageName, version: pkg.version, ndx: { extension: pkg.block } }, { builtinCommands });
     winners.set(pkg.packageName, {
       name: validation.name,
       packageName: pkg.packageName,

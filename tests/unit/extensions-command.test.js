@@ -188,6 +188,28 @@ describe("ndx extensions list --json", () => {
     expect(row.manifest).toBeNull();
   });
 
+  it("reports a package whose version is not semver as invalid, never approvable", async () => {
+    installInto(userFolder(), extensionPackage("ndx-odd", "odd", { version: "latest" }));
+    const row = await stateOf("odd");
+    expect(row).toMatchObject({ state: "invalid", version: "latest" });
+    expect(row.reason).toMatch(/version/);
+    const enable = await ndx(["enable", "odd", "--yes"]);
+    expect(enable.code).toBe(1);
+    expect(readJson(join(home, "extensions.json")).approvals ?? {}).toEqual({});
+  });
+
+  it("list and info print a package's control characters as visible escapes", async () => {
+    const spoof = "1.0.0\n  source   project (/trusted)\u001b[2K";
+    installInto(userFolder(), extensionPackage("ndx-spoof", "spoof", { version: spoof }));
+    for (const args of [["list"], ["info", "spoof"], ["doctor"]]) {
+      const { out, err } = await ndx(args);
+      expect(`${out}\n${err}`, args.join(" ")).not.toMatch(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/);
+      expect(out.split("\n").some((line) => line.startsWith("  source   project")), args.join(" ")).toBe(false);
+    }
+    expect((await ndx(["info", "spoof"])).out).toContain("1.0.0\\x0a  source   project (/trusted)\\x1b[2K");
+    expect((await stateOf("spoof")).version).toBe(spoof);
+  });
+
   it("prints a table, and says so when nothing is installed", async () => {
     expect((await ndx(["list"])).out).toMatch(/No extensions installed/);
     installInto(userFolder(), extensionPackage("ndx-recon", "recon"));

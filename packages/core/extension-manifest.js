@@ -26,6 +26,15 @@
  * Every problem is one line naming the package, the JSON path, the rule and the
  * fix (`formatProblem`), so `ndx extensions doctor` can print them as they come.
  *
+ * ## Strings reach the terminal
+ *
+ * Every manifest string, and the package's `name` and `version`, is printed by
+ * `ndx extensions list`, `info` and the approval prompt, so a control character
+ * in one could rewrite what the user approves. The validator refuses them
+ * (`control-character`, `package-version`), and the printers pass what they
+ * show through {@link escapeControlCharacters}, which also covers packages
+ * that never validated.
+ *
  * ## Built-in command names are passed in
  *
  * An extension name or command must not shadow a built-in command. The
@@ -72,6 +81,9 @@ const PROJECT_LINK_FIELDS = ["label", "path"];
 const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const MAX_NAME_LENGTH = 40;
 const MAX_SUMMARY_LENGTH = 100;
+// C0, DEL and C1: newlines, tabs, ESC (terminal escape sequences) and the rest.
+const CONTROL_CHARACTER = /\p{Cc}/u;
+const CONTROL_CHARACTERS = /\p{Cc}/gu;
 
 /**
  * Every rule the validator applies, with the fix it prints. The test suite
@@ -87,6 +99,8 @@ export const EXTENSION_MANIFEST_RULES = Object.freeze({
   "name-reserved": "choose a name that is not an n-dx bin alias or a reserved word",
   "name-builtin": "choose a name that is not a built-in ndx command",
   "non-empty-string": "set a non-empty string",
+  "control-character": "remove the control characters (newlines, tabs, escape sequences) from the string",
+  "package-version": "set package.json `version` to a semver version, e.g. 1.0.0",
   "summary-length": `keep the summary to one line of at most ${MAX_SUMMARY_LENGTH} characters`,
   "ndx-version-range": "use a semver range, e.g. \">=0.10.0 <0.12.0\"",
   "array": "make it an array",
@@ -211,6 +225,16 @@ export function validateExtensionManifest(packageJson, options) {
     return { status: "incompatible", name, manifest: undefined, problems };
   }
 
+  // The package around the block: its name and version are shown for approval
+  // and the version is part of what an approval binds to.
+  if (typeof pkg.name === "string" && CONTROL_CHARACTER.test(pkg.name)) {
+    report("name", "control-character", "contains a control character");
+  }
+  // parseVersion trims, so surrounding whitespace (a newline too) is refused here.
+  if (typeof pkg.version !== "string" || pkg.version !== pkg.version.trim() || !parseVersion(pkg.version)) {
+    report("version", "package-version", pkg.version === undefined ? "is missing" : `is ${describe(pkg.version)}, not a semver version`);
+  }
+
   checkUnknown(block, EXTENSION_MANIFEST_FIELDS, "ndx.extension", report);
 
   if (block.name === undefined) report(at("name"), "required", "is missing");
@@ -240,8 +264,9 @@ export function validateExtensionManifest(packageJson, options) {
         checkPackagePath(command.bin, `${path}.bin`, report);
         if (command.summary === undefined) report(`${path}.summary`, "required", "is missing");
         else if (checkString(command.summary, `${path}.summary`, report)
-          && (command.summary.length > MAX_SUMMARY_LENGTH || /[\r\n]/.test(command.summary))) {
-          report(`${path}.summary`, "summary-length", `is ${command.summary.length} characters or spans lines`);
+          && command.summary.length > MAX_SUMMARY_LENGTH) {
+          // A line break is a control character, refused by checkString.
+          report(`${path}.summary`, "summary-length", `is ${command.summary.length} characters`);
         }
       });
     }
@@ -322,7 +347,19 @@ export function validateExtensionManifest(packageJson, options) {
  * @returns {string}
  */
 export function formatProblem(problem) {
-  return `${problem.package}: ${problem.path} ${problem.message} [${problem.rule}] — fix: ${problem.fix}`;
+  return escapeControlCharacters(`${problem.package}: ${problem.path} ${problem.message} [${problem.rule}] — fix: ${problem.fix}`);
+}
+
+/**
+ * `text` with every control character written as a visible `\xNN` escape, so
+ * a value from a package can never move the cursor, recolour the terminal or
+ * start a line of its own. Apply it to anything printed from a package.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function escapeControlCharacters(text) {
+  return text.replace(CONTROL_CHARACTERS, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
 }
 
 /**
@@ -530,7 +567,7 @@ function isObject(value) {
 function describe(value) {
   if (value === null) return "null";
   if (Array.isArray(value)) return "an array";
-  if (typeof value === "string") return `"${value}"`;
+  if (typeof value === "string") return JSON.stringify(value);
   if (typeof value === "object") return "an object";
   return `${typeof value} ${String(value)}`;
 }
@@ -558,9 +595,15 @@ function checkUnknown(obj, known, path, report) {
  * @returns {value is string}
  */
 function checkString(value, path, report) {
-  if (typeof value === "string" && value.trim() !== "") return true;
-  report(path, "non-empty-string", `is ${describe(value)}`);
-  return false;
+  if (typeof value !== "string" || value.trim() === "") {
+    report(path, "non-empty-string", `is ${describe(value)}`);
+    return false;
+  }
+  if (CONTROL_CHARACTER.test(value)) {
+    report(path, "control-character", `${describe(value)} contains a control character`);
+    return false;
+  }
+  return true;
 }
 
 /**

@@ -25,6 +25,7 @@ import * as nodeFs from "node:fs";
 import { constants as osConstants } from "node:os";
 import { join, resolve } from "node:path";
 import { discoverExtensions, EXTENSIONS_CACHE_FILE } from "./extension-discovery.js";
+import { escapeControlCharacters } from "./extension-manifest.js";
 import {
   describeForApproval,
   extensionState,
@@ -229,7 +230,7 @@ export async function approveOnFirstRun(resolution, command, { confirm, out, now
   if (resolution.kind !== "refused" || !resolution.approval || !confirm) return false;
   const { ext, approval } = resolution;
   for (const line of describeForApproval(ext, approval.reason)) out(line);
-  if (!(await confirm(`Approve '${stateKey(ext)}' and run 'ndx ${command}'?`))) return false;
+  if (!(await confirm(escapeControlCharacters(`Approve '${stateKey(ext)}' and run 'ndx ${command}'?`)))) return false;
   updateExtensionsFile(approval.home, (file) => recordApproval(file, ext, { projectDir: approval.projectDir, now }));
   return true;
 }
