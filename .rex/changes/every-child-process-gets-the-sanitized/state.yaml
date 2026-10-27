@@ -1,5 +1,8 @@
 schema: "rex/v2"
 items:
+  "1a2f02b9-8a3a-43da-9464-94bc3cdedb1d":
+    lastModified: "2026-10-27T18:36:17.194Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "23dd18ba-59a6-4e42-bdaa-fe1a9072f7db":
     status: "completed"
     startedAt: "2026-10-17T03:41:54.700Z"
@@ -11,8 +14,15 @@ items:
     lastModified: "2026-10-17T03:48:33.317Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "33ed7463-3ab9-426a-960c-1e6f01ab695b":
+    status: "completed"
+    startedAt: "2026-10-27T18:33:23.049Z"
+    completedAt: "2026-10-27T18:38:32.223Z"
+    endedAt: "2026-10-27T18:38:32.223Z"
+    activeIntervals: [{"end":"2026-10-27T18:38:32.223Z","start":"2026-10-27T18:33:23.049Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "loadShellTestEnv delegates to llm-client repoCommandEnv; repo guard.env.allow reaches the pair reviewer's shell test only once trusted"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-17T01:21:38.153Z"
+    lastModified: "2026-10-27T18:38:32.223Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4200bf3a-b973-4480-87e0-f81892b6de86":
     assignee: "Ryan Keith <ryan.k@endash.us>"
@@ -34,7 +44,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82468601-c666-4943-a9ac-b11bb0149372":
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T18:01:04.844Z"
+    lastModified: "2026-10-27T18:36:17.194Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8b8fe23b-ee8b-4b82-8fb8-ddf64625c6cb":
     status: "completed"

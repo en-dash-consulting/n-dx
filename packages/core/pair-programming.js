@@ -833,20 +833,23 @@ export function buildRemediationContext(feedback, description, priorContext) {
  * Always spawns via the system shell so quoted arguments and compound
  * commands (e.g. "pnpm -r test") are handled correctly.
  *
- * The child never inherits the raw parent environment: it gets `process.env`
- * filtered by the project's `hench.guard.env` policy (see `loadShellTestEnv`),
- * or by the default deny policy when the project's cannot be loaded — reported
+ * The child never inherits the raw parent environment: it gets the one
+ * repository-command environment (see `loadShellTestEnv`), where the
+ * repository's own `guard.env.allow` counts only once the checkout is trusted,
+ * or the default deny policy when the project's cannot be loaded — reported
  * as `envWarning`. If no filtered environment can be built, nothing is spawned.
  *
  * @param {string} testCommand  Full shell command (e.g. "pnpm test").
  * @param {string} dir          Working directory.
  * @param {number} [timeout=120000]  Max run time in ms.
+ * @param {typeof doNotTrack} [registerChild]
+ * @param {import("@n-dx/llm-client").RepoTrustStoreOptions} [trust]  Relocates the trust store.
  * @returns {Promise<{ exitCode: number; output: string; envWarning?: string }>}
  */
-export async function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack) {
+export async function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack, trust) {
   let shellEnv;
   try {
-    shellEnv = await loadShellTestEnv(dir);
+    shellEnv = await loadShellTestEnv(dir, { trust });
   } catch (err) {
     return {
       exitCode: 1,

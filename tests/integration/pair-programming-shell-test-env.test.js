@@ -2,16 +2,17 @@
  * The reviewer's shell test command runs with a filtered environment.
  *
  * `runShellTestCommand` spawns the project's test command with `shell: true`.
- * It must never hand the child the raw parent environment: the project's
- * `hench.guard.env` policy applies (its `allow` entries are how tests get the
- * variables they need), without a vendor CLI's authentication exceptions.
+ * It must never hand the child the raw parent environment: llm-client's
+ * `repoCommandEnv` builds it, so the project's `hench.guard.env` policy applies
+ * without a vendor CLI's authentication exceptions, and the repository's own
+ * `allow` entries count only once the checkout is trusted.
  * When that policy cannot be loaded — which is also what sends
  * `runCrossVendorReview` to this fallback — the default deny policy applies
  * and the result says so. Assertions are made in the real child process.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -19,6 +20,8 @@ import {
   runCrossVendorReview,
   formatReviewBanner,
 } from "../../packages/core/pair-programming.js";
+
+const { recordRepoTrust } = await import("../../packages/llm-client/dist/public.js");
 
 const FIXTURE_ENV = {
   NDX_REVIEW_FIXTURE_SECRET: "fixture-secret",
@@ -84,14 +87,46 @@ function writeMockReviewer() {
 }
 
 describe("runShellTestCommand environment", () => {
-  it("applies the project's guard.env policy without vendor authentication exceptions", async () => {
+  it("applies a trusted project's guard.env policy without vendor authentication exceptions", async () => {
     writeProjectConfig({ hench: { guard: { env: { allow: ["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"] } } } });
+    const trust = { ndxHome: join(tmpDir, "ndx-home") };
+    recordRepoTrust(tmpDir, trust);
 
-    const result = await runShellTestCommand(probeCommand(), tmpDir);
+    const result = await runShellTestCommand(probeCommand(), tmpDir, undefined, undefined, trust);
 
     expect(result.exitCode).toBe(0);
     expect(probedNames(result.output)).toEqual(["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"]);
     expect(result.envWarning).toBeUndefined();
+  });
+
+  it("drops a repository-supplied guard.env.allow while the checkout is untrusted (#686)", async () => {
+    mkdirSync(join(tmpDir, ".hench"));
+    writeFileSync(
+      join(tmpDir, ".hench", "config.json"),
+      JSON.stringify({ guard: { env: { allow: ["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"] } } }),
+      "utf-8",
+    );
+    const trust = { ndxHome: join(tmpDir, "ndx-home") };
+
+    const untrusted = await runShellTestCommand(probeCommand(), tmpDir, undefined, undefined, trust);
+    expect(untrusted.exitCode).toBe(0);
+    expect(probedNames(untrusted.output)).toEqual([]);
+
+    recordRepoTrust(tmpDir, trust);
+    const trusted = await runShellTestCommand(probeCommand(), tmpDir, undefined, undefined, trust);
+    expect(probedNames(trusted.output)).toEqual(["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"]);
+  });
+
+  it("keeps the user's own .n-dx.local.json allow entry while the checkout is untrusted", async () => {
+    writeFileSync(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ hench: { guard: { env: { allow: ["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"] } } } }),
+      "utf-8",
+    );
+
+    const result = await runShellTestCommand(probeCommand(), tmpDir, undefined, undefined, { ndxHome: join(tmpDir, "ndx-home") });
+
+    expect(probedNames(result.output)).toEqual(["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"]);
   });
 
   it("falls back to the default deny policy, and says so, when the project policy is invalid", async () => {

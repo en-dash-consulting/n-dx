@@ -2772,29 +2772,33 @@ async function loadProjectEnvPolicy(dir) {
 }
 
 /**
- * Environment for the reviewer's shell test command: `process.env` filtered by
- * the project's `hench.guard.env` policy, with none of a vendor CLI's
- * authentication exceptions — the test command is not a vendor CLI.
+ * Environment for the reviewer's shell test command. Built by llm-client's
+ * `repoCommandEnv`, the one builder for repository-owned commands: the
+ * project's `hench.guard.env` policy with none of a vendor CLI's
+ * authentication exceptions, and the repository's own `allow` entries only
+ * once the checkout is trusted.
  *
- * When the project policy cannot be loaded or compiled, the default deny
- * policy applies and `policyError` says why, so the caller can report it.
+ * `repoCommandEnv` skips a malformed policy list without saying so, so the
+ * policy is compiled here first; when that fails, the default deny policy
+ * applies and `policyError` says why, so the caller can report it.
  * Never returns the unfiltered parent environment.
  *
  * @param {string} dir
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions }} [options]
+ *   `trust` relocates the repository-trust store; omitted, the user's real one.
  * @returns {Promise<{ env: NodeJS.ProcessEnv; policyError?: string }>}
  */
-export async function loadShellTestEnv(dir) {
-  const { compileEnvPolicy, sanitizeChildEnv } = await import("@n-dx/llm-client");
-  let policy;
-  let policyError;
+export async function loadShellTestEnv(dir, options = {}) {
+  const { compileEnvPolicy, repoCommandEnv, sanitizeChildEnv } = await import("@n-dx/llm-client");
   try {
-    policy = compileEnvPolicy(await loadProjectEnvPolicy(dir));
+    compileEnvPolicy(await loadProjectEnvPolicy(dir));
   } catch (err) {
-    policy = compileEnvPolicy(undefined);
-    policyError = err instanceof Error ? err.message : String(err);
+    return {
+      env: sanitizeChildEnv(process.env, compileEnvPolicy(undefined)),
+      policyError: err instanceof Error ? err.message : String(err),
+    };
   }
-  const env = sanitizeChildEnv(process.env, policy);
-  return policyError === undefined ? { env } : { env, policyError };
+  return { env: repoCommandEnv(dir, options.trust) };
 }
 
 // ── Test connection handler ──────────────────────────────────────────────────
