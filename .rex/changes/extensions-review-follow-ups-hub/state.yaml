@@ -18,7 +18,14 @@ items:
     lastModified: "2026-10-27T13:51:50.689Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "c400642c-8e21-4338-b3c5-997c2a3be4a2":
-    lastModified: "2026-10-27T13:51:46.481Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:22:37.878Z"
+    completedAt: "2026-10-27T15:27:37.037Z"
+    endedAt: "2026-10-27T15:27:37.037Z"
+    activeIntervals: [{"end":"2026-10-27T15:27:37.037Z","start":"2026-10-27T15:22:37.878Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "SidecarManager gains a closed flag set by stopAll; start refuses 503 on entry and again after the plan/port awaits, before spawning. Hub close stops listening before the stops and closes connections after. Two tests: manager-level in-flight plan, and hub-level request during close; neither leaves a process."
+    lastModified: "2026-10-27T15:27:37.037Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "cb9b167b-479f-4ae5-b618-52fe27fa4211":
     lastModified: "2026-10-27T13:51:48.582Z"

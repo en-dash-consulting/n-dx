@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { once } from "node:events";
 import { connect } from "node:net";
 import { join } from "node:path";
@@ -226,7 +226,47 @@ describe("SidecarManager", () => {
     expect(await blind.ensure("recon")).toMatchObject({ ok: false, status: 503, error: expect.stringMatching(/without an n-dx CLI/) });
     expect(await blind.ensure("Not_A_Name")).toMatchObject({ ok: false, status: 404 });
   });
+
+  it("spawns nothing once stopAll has begun, including a start whose plan was in flight", async () => {
+    const gate = gatedPlan();
+    const { m } = manager("ok", { plan: gate.plan });
+    const inFlight = m.ensure("recon");
+    await gate.asked;
+    await m.stopAll();
+    gate.release();
+
+    expect(await inFlight).toMatchObject({ ok: false, status: 503, error: "Not starting the recon sidecar: the hub is shutting down." });
+    expect(await m.ensure("other")).toMatchObject({ ok: false, status: 503 });
+    expect(gate.count()).toBe(1);
+    expect(m.list().every((s) => s.pid === null)).toBe(true);
+    // The spawn path writes its "starting" line first, so no log file means no process.
+    expect(existsSync(planFor("recon").logFile)).toBe(false);
+  });
 });
+
+/** A plan that resolves only on `release()`, with a promise of its first call. */
+function gatedPlan(): { plan: SidecarManagerOptions["plan"]; asked: Promise<void>; release: () => void; count: () => number } {
+  let count = 0;
+  let resolveAsked!: () => void;
+  const asked = new Promise<void>((resolve) => {
+    resolveAsked = resolve;
+  });
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return {
+    plan: async (name): Promise<PlanResult> => {
+      count++;
+      resolveAsked();
+      await released;
+      return { ok: true, plan: planFor(name) };
+    },
+    asked,
+    release,
+    count: () => count,
+  };
+}
 
 describe("ndxCliPlanner", () => {
   it("parses core's plan, and its refusal", async () => {
@@ -286,6 +326,30 @@ describe("hub /x/<name>/", () => {
     // No sidecar survives its hub, whatever happens to the project servers.
     const port = Number(served.port);
     await expect(fetch(`http://127.0.0.1:${port}/healthz`)).rejects.toThrow();
+  });
+
+  it("leaves no sidecar behind when a request starts one while the hub is closing", async () => {
+    const gate = gatedPlan();
+    const hub = await startHub({
+      port: 0,
+      homeDir: join(dir, "home"),
+      keepAlive: true,
+      healthIntervalMs: 60_000,
+      sidecars: { plan: gate.plan, memoryFloorBytes: 0, freeMemory: () => null, healthPollMs: 50, stopGraceMs: 2_000 },
+    });
+    const port = hub.port;
+    const request = fetch(`http://127.0.0.1:${port}/x/recon/`).then((r) => r.status, () => "closed");
+    await gate.asked;
+    const closing = hub.close({ stopChildren: true });
+    // The listener is gone at once, not after the stops.
+    await expect(fetch(`http://127.0.0.1:${port}/x/other/`)).rejects.toThrow();
+    gate.release();
+    await closing;
+
+    // Answered 503 before closeAllConnections, or cut off by it; never served.
+    expect([503, "closed"]).toContain(await request);
+    expect(existsSync(planFor("recon").logFile)).toBe(false);
+    expect(gate.count()).toBe(1);
   });
 
   it("answers a refused start with its status, error and log file", async () => {

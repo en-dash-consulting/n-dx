@@ -186,6 +186,8 @@ export class SidecarManager {
   private readonly opts: SidecarManagerOptions;
   private readonly now: () => number;
   private readonly log: (message: string) => void;
+  /** Set by {@link stopAll}: from then on nothing is spawned, or it would outlive the hub. */
+  private closed = false;
 
   constructor(options: SidecarManagerOptions) {
     this.opts = options;
@@ -287,8 +289,9 @@ export class SidecarManager {
     return true;
   }
 
-  /** Stop every sidecar: hub shutdown and `ndx hub stop`. */
+  /** Stop every sidecar for good: hub shutdown and `ndx hub stop`. Later starts are refused. */
   async stopAll(): Promise<void> {
+    this.closed = true;
     await Promise.all(Array.from(this.sidecars.values(), (s) => this.stopSidecar(s)));
   }
 
@@ -318,7 +321,12 @@ export class SidecarManager {
     this.log(`[hub] sidecar ${s.name}: ${error}`);
   }
 
+  private refuseClosed(s: Sidecar): EnsureResult {
+    return this.refuse(s, 503, `Not starting the ${s.name} sidecar: the hub is shutting down.`);
+  }
+
   private async start(s: Sidecar): Promise<EnsureResult> {
+    if (this.closed) return this.refuseClosed(s);
     const limit = this.opts.crashLimit ?? SIDECAR_CRASH_LIMIT;
     const crashes = this.recentCrashes(s);
     if (crashes.length >= limit) {
@@ -348,10 +356,13 @@ export class SidecarManager {
     const planned = await this.opts.plan(s.name);
     if (!planned.ok) return this.refuse(s, statusForReason(planned.reason), planned.error, undefined, planned.reason);
     const plan = planned.plan;
+    const port = await freePort();
+    // stopAll may have run while the plan or the port was awaited; it saw no
+    // handle to stop, so spawning now would orphan the process.
+    if (this.closed) return this.refuseClosed(s);
     s.logFile = plan.logFile;
     s.idleStopMs = plan.idleStopMinutes * 60_000;
 
-    const port = await freePort();
     mkdirSync(dirname(plan.logFile), { recursive: true });
     appendFileSync(plan.logFile, `\n[hub] ${new Date().toISOString()} starting ${plan.bin} on port ${port}\n`);
     const handle = spawnManaged(plan.execPath, [plan.bin], {

@@ -648,6 +648,11 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
       clearInterval(healthTimer);
       clearInterval(sidecarTimer);
       hub.admission.stop();
+      // Stop accepting connections first: the stops below take seconds, and a
+      // request arriving meanwhile could start what they are tearing down.
+      const serverClosed = new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
       // Always, unlike project servers: nothing records a sidecar for the
       // next hub to re-attach, so one left running would be orphaned.
       await hub.sidecars.stopAll();
@@ -657,10 +662,8 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
         hub.persist();
       }
       removeHubPidFile(hubPidPath(hub.hubHome));
-      await new Promise<void>((resolve) => {
-        server.close(() => resolve());
-        server.closeAllConnections?.();
-      });
+      server.closeAllConnections?.();
+      await serverClosed;
     },
   };
   closeSelf = () => handle.close({ stopChildren: true });
