@@ -4,8 +4,8 @@
  *
  * It re-queries the page before every click (a click can replace the DOM),
  * skips anything the click policy denies, and after each click undoes the
- * obvious side effects so the next control is reachable: an open dialog or
- * menu gets Escape, a navigation goes back to the page under test.
+ * obvious side effects so the next control is reachable: an open dialog,
+ * menu or listbox gets Escape, a navigation goes back to the page under test.
  *
  * The sweep is a net, not a proof — it asserts "no page error, shell still
  * mounted", which catches handlers that throw. What a control is *meant* to
@@ -53,8 +53,9 @@ async function settle(page: Page, returnTo: string): Promise<void> {
     await page.goto(returnTo, { waitUntil: "domcontentloaded" });
     return;
   }
-  // Dialogs and menus close on Escape; a leave guard answers "keep editing".
-  const dialog = page.locator('[role="dialog"], [role="menu"]');
+  // Dialogs, menus and listboxes (the PRD status picker) close on Escape; a
+  // leave guard answers "keep editing".
+  const dialog = page.locator('[role="dialog"], [role="menu"], [role="listbox"]');
   if (await dialog.count()) {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(100);
