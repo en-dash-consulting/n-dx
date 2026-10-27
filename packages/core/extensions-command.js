@@ -23,6 +23,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
 import { discoverExtensions, USER_EXTENSIONS_DIRNAME, EXTENSIONS_CACHE_FILE } from "./extension-discovery.js";
+import { isPromptInterrupt, PROMPT_INTERRUPTED_EXIT_CODE } from "./extension-dispatch.js";
 import { escapeControlCharacters, formatProblem, isExtensionNameSlug } from "./extension-manifest.js";
 import {
   approvalFor,
@@ -473,7 +474,14 @@ async function enable(ctx, name, yes) {
         ctx.err(`Hint: Run 'ndx extensions enable ${label} --yes' to approve it without a prompt.`);
         return 2;
       }
-      if (!(await ctx.confirm(`Approve and enable '${label}'?`))) {
+      let yes;
+      try {
+        yes = await ctx.confirm(`Approve and enable '${label}'?`);
+      } catch (err) {
+        if (isPromptInterrupt(err)) return PROMPT_INTERRUPTED_EXIT_CODE;
+        throw err;
+      }
+      if (!yes) {
         ctx.err(`'${label}' was not approved.`);
         return 1;
       }

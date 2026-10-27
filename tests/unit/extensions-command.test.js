@@ -439,6 +439,14 @@ describe("ndx extensions enable and disable", () => {
     expect(asked).toEqual(["Approve and enable 'recon'?", "Approve and enable 'recon'?"]);
   });
 
+  it("exits 130 without a word on Ctrl+C at the prompt (AbortError), and approves nothing", async () => {
+    const interrupted = async () => { throw Object.assign(new Error("The operation was aborted"), { name: "AbortError" }); };
+    const { code, err } = await ndx(["enable", "recon"], { confirm: interrupted });
+    expect(code).toBe(130);
+    expect(err).toBe("");
+    expect((await stateOf("recon")).state).toBe("unapproved");
+  });
+
   it("disable keeps the approval, so enabling again does not ask", async () => {
     await ndx(["enable", "recon", "--yes"]);
     expect((await ndx(["disable", "recon"])).code).toBe(0);

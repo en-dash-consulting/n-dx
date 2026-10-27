@@ -180,7 +180,7 @@ describe("approveOnFirstRun", () => {
     const dir = install("recon", { script: "" });
     const { questions, confirm } = ask(true);
     const lines = [];
-    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm, out: (l) => lines.push(l) })).toBe(true);
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm, out: (l) => lines.push(l) })).toBe("approved");
     expect(lines).toEqual([
       "'recon' is not approved yet.",
       "  package  ndx-recon@1.0.0",
@@ -214,18 +214,18 @@ describe("approveOnFirstRun", () => {
 
   it("on no, or with no terminal to ask on, approves nothing and the refusal stands", async () => {
     install("recon", { script: "" });
-    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm: ask(false).confirm, out: () => {} })).toBe(false);
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm: ask(false).confirm, out: () => {} })).toBe("not-approved");
     const lines = [];
-    expect(await approveOnFirstRun(resolveName("recon"), "recon", { out: (l) => lines.push(l) })).toBe(false);
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { out: (l) => lines.push(l) })).toBe("not-approved");
     expect(lines).toEqual([]);
     expect(existsSync(join(home, "extensions.json")) && JSON.parse(readFileSync(join(home, "extensions.json"), "utf8")).approvals).toBeFalsy();
     expect(resolveName("recon").message).toMatch(/fix: ndx extensions enable recon$/);
   });
 
-  it("lets a Ctrl+C at the prompt (AbortError) through and approves nothing", async () => {
+  it("reports a Ctrl+C at the prompt (AbortError) as interrupted and approves nothing", async () => {
     install("recon", { script: "" });
     const interrupted = async () => { throw Object.assign(new Error("The operation was aborted"), { name: "AbortError" }); };
-    await expect(approveOnFirstRun(resolveName("recon"), "recon", { confirm: interrupted, out: () => {} })).rejects.toMatchObject({ name: "AbortError" });
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm: interrupted, out: () => {} })).toBe("interrupted");
     expect(existsSync(join(home, "extensions.json")) && JSON.parse(readFileSync(join(home, "extensions.json"), "utf8")).approvals).toBeFalsy();
     expect(resolveName("recon").kind).toBe("refused");
   });
@@ -234,13 +234,13 @@ describe("approveOnFirstRun", () => {
     install("recon");
     await enable("recon");
     const { questions, confirm } = ask(true);
-    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm, out: () => {} })).toBe(false);
+    expect(await approveOnFirstRun(resolveName("recon"), "recon", { confirm, out: () => {} })).toBe("not-approved");
     expect(questions).toEqual([]);
   });
 
   it("approves a project-source extension for that project path only", async () => {
     install("local", { script: "", folder: project });
-    expect(await approveOnFirstRun(resolveName("local"), "local", { confirm: ask(true).confirm, out: () => {} })).toBe(true);
+    expect(await approveOnFirstRun(resolveName("local"), "local", { confirm: ask(true).confirm, out: () => {} })).toBe("approved");
     expect(resolveName("local").kind).toBe("run");
 
     // The same repository cloned elsewhere brings no approval with it.

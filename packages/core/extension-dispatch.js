@@ -218,6 +218,23 @@ export function resolveExtensionSidecar(name, options) {
  */
 
 /**
+ * `ndx`'s exit code when Ctrl+C answers an approval prompt: the shell's code
+ * for SIGINT. Nothing is approved and nothing is printed.
+ */
+export const PROMPT_INTERRUPTED_EXIT_CODE = 130;
+
+/**
+ * Whether `err` is Ctrl+C at a {@link ConfirmApproval} prompt. readline holds
+ * the terminal in raw mode, so the keypress arrives as an AbortError, not SIGINT.
+ *
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+export function isPromptInterrupt(err) {
+  return /** @type {{name?: unknown} | null | undefined} */ (err)?.name === "AbortError";
+}
+
+/**
  * @typedef {object} FirstRunOptions
  * @property {ConfirmApproval} [confirm]  Omitted when there is no terminal to ask on.
  * @property {(line: string) => void} out
@@ -229,22 +246,32 @@ export function resolveExtensionSidecar(name, options) {
  * package, version, source, commands and sidecar — and ask. A yes records the
  * approval exactly as `ndx extensions enable` does, so the command can run.
  *
- * Resolves to false, writing nothing, when the resolution is not waiting on an
- * approval, when there is no terminal to ask on, or when the answer is no; the
- * caller then reports the refusal, which names `ndx extensions enable`.
+ * Resolves to `not-approved`, writing nothing, when the resolution is not
+ * waiting on an approval, when there is no terminal to ask on, or when the
+ * answer is no; the caller then reports the refusal, which names
+ * `ndx extensions enable`. Ctrl+C at the prompt resolves to `interrupted`,
+ * also writing nothing; the caller exits {@link PROMPT_INTERRUPTED_EXIT_CODE}
+ * without a word.
  *
  * @param {ExtensionResolution} resolution
  * @param {string} command  The `<name>` that was run.
  * @param {FirstRunOptions} options
- * @returns {Promise<boolean>} Whether the extension is now approved.
+ * @returns {Promise<"approved" | "not-approved" | "interrupted">}
  */
 export async function approveOnFirstRun(resolution, command, { confirm, out, now }) {
-  if (resolution.kind !== "refused" || !resolution.approval || !confirm) return false;
+  if (resolution.kind !== "refused" || !resolution.approval || !confirm) return "not-approved";
   const { ext, approval } = resolution;
   for (const line of describeForApproval(ext, approval.reason)) out(line);
-  if (!(await confirm(escapeControlCharacters(`Approve '${stateKey(ext)}' and run 'ndx ${command}'?`)))) return false;
+  let yes;
+  try {
+    yes = await confirm(escapeControlCharacters(`Approve '${stateKey(ext)}' and run 'ndx ${command}'?`));
+  } catch (err) {
+    if (isPromptInterrupt(err)) return "interrupted";
+    throw err;
+  }
+  if (!yes) return "not-approved";
   updateExtensionsFile(approval.home, (file) => recordApproval(file, ext, { projectDir: approval.projectDir, now }));
-  return true;
+  return "approved";
 }
 
 /**

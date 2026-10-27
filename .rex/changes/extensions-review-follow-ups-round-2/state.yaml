@@ -72,7 +72,14 @@ items:
     lastModified: "2026-10-27T18:19:16.257Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "69051203-482f-47c2-985a-51565fcc89fe":
-    lastModified: "2026-10-27T17:23:14.898Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:27:29.358Z"
+    completedAt: "2026-10-27T18:32:37.859Z"
+    endedAt: "2026-10-27T18:32:37.859Z"
+    activeIntervals: [{"end":"2026-10-27T18:32:37.859Z","start":"2026-10-27T18:27:29.358Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "enable returns 130 silently on AbortError; approveOnFirstRun resolves \"interrupted\" instead of throwing; both covered by unit tests that fail on revert."
+    lastModified: "2026-10-27T18:32:37.859Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "9171679e-18fb-4773-8ec6-cc42f7984420":
     lastModified: "2026-10-27T17:23:17.346Z"
