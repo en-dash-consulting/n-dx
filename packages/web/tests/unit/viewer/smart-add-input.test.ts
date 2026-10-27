@@ -795,6 +795,27 @@ describe("SmartAddInput on a v2 PRD", () => {
     expect(rule?.[1]).toMatch(/white-space:\s*pre-wrap/);
   });
 
+  it("wraps a long change title and target instead of running past the card", async () => {
+    const title = "Shoppers paying by card want refunds they can start themselves from the order page without contacting support";
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ...v2Preview, changes: [{ ...v2Preview.changes[0], title }] }),
+    });
+
+    const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v2" }));
+    await typeAndGenerate(root, title);
+    await vi.runAllTimersAsync();
+    await flush();
+
+    const css = readFileSync(join(import.meta.dirname, "../../../src/viewer/styles/prd-tree.css"), "utf8");
+    for (const selector of [".smart-add-preview-title", ".smart-add-preview-task-title"]) {
+      expect(root.querySelector(selector)!.classList.contains(`${selector.slice(1)}--wrap`)).toBe(true);
+      const rule = css.match(new RegExp(`${selector.replace(".", "\\.")}--wrap[^{]*\\{([^}]*)\\}`));
+      expect(rule?.[1]).toMatch(/white-space:\s*normal/);
+      expect(rule?.[1]).toMatch(/overflow-wrap:\s*anywhere/);
+    }
+  });
+
   it("keeps the v1 Smart Add wording when the layout is v1", () => {
     const root = renderToDiv(h(SmartAddInput, { onPrdChanged: vi.fn(), layout: "v1" }));
     expect(root.querySelector(".smart-add-title")!.textContent).toBe("Smart Add");

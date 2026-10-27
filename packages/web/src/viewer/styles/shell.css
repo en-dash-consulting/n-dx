@@ -653,10 +653,16 @@
 
 /* ── Narrow screens ──────────────────────────────────────────────────── */
 
-@media (max-width: 960px) {
+/* The bar is 1,068px wide with its hints and search label, so they drop below
+   1,100px — at 1,024px (the Claude desktop browser pane) it would otherwise
+   push the page wider than the window. */
+@media (max-width: 1100px) {
   /* The product hints drop; Live has none to drop, and keeps its dot and count. */
   .topnav-search-label, .topnav-subtitle, .topnav-tab-hint { display: none; }
   .topnav-search { min-width: 0; }
+}
+
+@media (max-width: 960px) {
   .settings-overlay-nav { width: 200px; }
 }
 

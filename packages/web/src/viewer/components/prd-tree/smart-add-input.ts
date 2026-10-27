@@ -714,7 +714,7 @@ function ChangePreviewCard({ change }: ChangePreviewCardProps) {
 
     h("div", { class: "smart-add-preview-epic" },
       h("span", { class: "prd-level-badge prd-level-epic" }, "Change"),
-      h("span", { class: "smart-add-preview-title" }, change.title),
+      h("span", { class: "smart-add-preview-title smart-add-preview-title--wrap" }, change.title),
       change.needsPlacement
         ? h("span", { class: "smart-add-preview-count" }, "Inbox")
         : null,
@@ -731,7 +731,7 @@ function ChangePreviewCard({ change }: ChangePreviewCardProps) {
               shortlist.map((candidate, ci) =>
                 h("div", { key: ci, class: "smart-add-preview-task" },
                   h("span", { class: "smart-add-preview-ac-badge" }, candidate.relation),
-                  h("span", { class: "smart-add-preview-task-title" },
+                  h("span", { class: "smart-add-preview-task-title smart-add-preview-task-title--wrap" },
                     [candidate.displayId, candidate.title ?? candidate.target]
                       .filter(Boolean).join(" "),
                   ),

@@ -4708,6 +4708,15 @@
   line-height: var(--leading-relaxed);
 }
 
+/* A v2 change card's text is shown whole: a long title or target wraps. */
+.smart-add-preview-title--wrap,
+.smart-add-preview-task-title--wrap {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* A v2 change's full text: keep its paragraphs and line breaks as typed. */
 .smart-add-preview-full-text {
   white-space: pre-wrap;
