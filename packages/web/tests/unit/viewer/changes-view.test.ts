@@ -5,7 +5,7 @@
  *
  * @see src/viewer/views/changes.ts
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { h } from "preact";
 import { act } from "preact/test-utils";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
@@ -55,12 +55,20 @@ describe("ChangesView: Needs placement tag", () => {
   });
 });
 
-/** Expand every release's applied history. */
+/** Choose a filter chip by its data-filter value. */
+function pick(el: HTMLElement, value: string): void {
+  act(() => { el.querySelector<HTMLButtonElement>(`[data-filter="${value}"]`)!.click(); });
+}
+
+/** Show applied history: the Applied filter, with every group expanded. */
 function showApplied(el: HTMLElement): void {
+  pick(el, "applied");
   act(() => {
     for (const toggle of el.querySelectorAll<HTMLButtonElement>(".ch-applied-toggle")) toggle.click();
   });
 }
+
+beforeEach(() => { localStorage.clear(); });
 
 describe("ChangesView", () => {
   it("groups by planned release, unscheduled open work first, then newest version first", () => {
@@ -70,7 +78,8 @@ describe("ChangesView", () => {
 
   it("orders stages within a release by lifecycle and drops empty ones", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
-    showApplied(el);
+    pick(el, "release:0.9.0");
+    act(() => { el.querySelector<HTMLButtonElement>(".ch-applied-toggle")!.click(); });
 
     const release = el.querySelector('[data-release="0.9.0"]');
     const stages = [...(release?.querySelectorAll(".ch-stage") ?? [])]
@@ -83,6 +92,7 @@ describe("ChangesView", () => {
 
   it("collapses applied and shipped changes behind a count until asked", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
+    pick(el, "release:0.9.0");
     const release = el.querySelector('[data-release="0.9.0"]')!;
     const toggle = release.querySelector<HTMLButtonElement>(".ch-applied-toggle")!;
 
@@ -104,6 +114,7 @@ describe("ChangesView", () => {
 
   it("shows no applied toggle on a release with no applied history", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
+    pick(el, "release:1.0.0");
     expect(el.querySelector('[data-release="1.0.0"] .ch-applied-toggle')).toBeNull();
   });
 
@@ -154,7 +165,8 @@ describe("ChangesView", () => {
     const el = mount(h(ChangesView, {
       changes: [row("a", "applied"), row("b", "awaiting-apply"), row("c", "in-progress")],
     }));
-    showApplied(el);
+    pick(el, "release:2.0.0");
+    act(() => { el.querySelector<HTMLButtonElement>(".ch-applied-toggle")!.click(); });
     const stages = [...el.querySelectorAll(".ch-stage")];
     expect(stages.map((s) => s.getAttribute("data-stage"))).toEqual(["in-progress", "awaiting-apply", "applied"]);
     expect(stages[1].querySelector(".ch-stage-header")?.textContent).toContain("Waiting for a steward to apply it");
@@ -171,18 +183,18 @@ describe("ChangesView", () => {
 
   it("shows what each change does to the map", () => {
     const el = mount(h(ChangesView, { changes: CHANGES_FIXTURE }));
-    showApplied(el);
 
     const amending = el.querySelector('[data-change-id="change-run-field"]');
     expect(amending?.querySelector(".ch-amends")?.textContent).toContain("modified");
     expect(amending?.querySelector(".ch-amends")?.textContent).toContain("Autonomous task runs");
 
+    const unplaced = el.querySelector('[data-change-id="change-timeline"]');
+    expect(unplaced?.querySelector(".ch-map-none")?.textContent).toBe("Unplaced");
+
+    showApplied(el);
     const touching = el.querySelector('[data-change-id="change-jev-client"]');
     expect(touching?.querySelector(".ch-touches")?.textContent).toContain("Architecture integrity");
     expect(touching?.querySelector(".ch-amends")).toBeNull();
-
-    const unplaced = el.querySelector('[data-change-id="change-timeline"]');
-    expect(unplaced?.querySelector(".ch-map-none")?.textContent).toBe("Unplaced");
   });
 
   it("surfaces task progress, effort, spike and needs-placement", () => {
@@ -223,6 +235,95 @@ describe("ChangesView", () => {
     const el = mount(h(ChangesView, { changes: [] }));
     expect(el.querySelector(".empty-state")?.textContent).toContain("No changes yet");
     expect(el.querySelectorAll(".ch-release")).toHaveLength(0);
+  });
+});
+
+describe("ChangesView filters", () => {
+  const row = (id: string, stage: ChangeRow["stage"], plannedRelease?: string): ChangeRow => ({
+    id, title: id, stage, plannedRelease, amends: [], touches: [], taskCount: 0, completedTaskCount: 0,
+  });
+  const MIXED = [
+    row("o1", "ready", "1.0.0"), row("a1", "applied", "1.0.0"), row("a2", "shipped", "1.0.0"),
+    row("o2", "proposed"), row("a3", "applied"), row("a4", "applied", "0.9.0"),
+  ];
+  const chip = (el: HTMLElement, value: string) =>
+    el.querySelector<HTMLButtonElement>(`[data-filter="${value}"]`)!;
+  const ids = (el: HTMLElement) =>
+    [...el.querySelectorAll("[data-change-id]")].map((n) => n.getAttribute("data-change-id"));
+
+  it("defaults to Open: the first screen holds only open changes", () => {
+    const el = mount(h(ChangesView, { changes: MIXED }));
+    expect(chip(el, "open").getAttribute("aria-pressed")).toBe("true");
+    expect(ids(el)).toEqual(["o2", "o1"]);
+    // 0.9.0 has nothing open, so it has no group.
+    expect(releaseHeadings(el)).toEqual([UNSCHEDULED_RELEASE_LABEL, "1.0.0"]);
+  });
+
+  it("shows counts on Open, Applied and each release chip", () => {
+    const el = mount(h(ChangesView, { changes: MIXED }));
+    const text = (v: string) => chip(el, v).textContent;
+    expect(text("open")).toBe("Open2");
+    expect(text("applied")).toBe("Applied4");
+    expect(text("release:1.0.0")).toBe("1.0.03");
+    expect(text("release:0.9.0")).toBe("0.9.01");
+    expect(text("unscheduled")).toBe(`${UNSCHEDULED_RELEASE_LABEL}2`);
+  });
+
+  it("Applied lists groups collapsed, and mounts no rows until one is expanded", () => {
+    const el = mount(h(ChangesView, { changes: MIXED }));
+    pick(el, "applied");
+    expect(el.querySelectorAll(".ch-release")).toHaveLength(3);
+    expect(ids(el)).toEqual([]);
+    expect(el.querySelectorAll(".ch-change")).toHaveLength(0);
+
+    act(() => { el.querySelector<HTMLButtonElement>('[data-release="1.0.0"] .ch-applied-toggle')!.click(); });
+    expect(ids(el)).toEqual(["a1", "a2"]);
+  });
+
+  it("a release filter shows that release alone, open rows plus collapsed applied", () => {
+    const el = mount(h(ChangesView, { changes: MIXED }));
+    pick(el, "release:1.0.0");
+    expect(releaseHeadings(el)).toEqual(["1.0.0"]);
+    expect(ids(el)).toEqual(["o1"]);
+    expect(el.querySelector(".ch-applied-toggle")!.textContent).toBe("2 applied ▸");
+  });
+
+  it("remembers the choice per viewer in localStorage", () => {
+    const first = mount(h(ChangesView, { changes: MIXED }));
+    pick(first, "release:1.0.0");
+    expect(localStorage.getItem("ndx.changes.filter")).toBe("release:1.0.0");
+    cleanupRenderedDiv(first);
+
+    const again = mount(h(ChangesView, { changes: MIXED }));
+    expect(chip(again, "release:1.0.0").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("falls back to Open when the remembered release no longer exists", () => {
+    localStorage.setItem("ndx.changes.filter", "release:9.9.9");
+    const el = mount(h(ChangesView, { changes: MIXED }));
+    expect(chip(el, "open").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("still works when localStorage throws", () => {
+    const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("denied"); });
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("denied"); });
+    try {
+      const el = mount(h(ChangesView, { changes: MIXED }));
+      expect(chip(el, "open").getAttribute("aria-pressed")).toBe("true");
+      pick(el, "applied");
+      expect(chip(el, "applied").getAttribute("aria-pressed")).toBe("true");
+    } finally {
+      get.mockRestore();
+      set.mockRestore();
+    }
+  });
+
+  it("mounts no rows for a large collapsed applied group", () => {
+    const many = Array.from({ length: 1241 }, (_, i) => row(`a${i}`, "applied"));
+    const el = mount(h(ChangesView, { changes: [...many, row("open", "proposed")] }));
+    pick(el, "unscheduled");
+    expect(el.querySelectorAll(".ch-change")).toHaveLength(1);
+    expect(el.querySelector(".ch-applied-toggle")!.textContent).toBe("1241 applied ▸");
   });
 });
 

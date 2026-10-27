@@ -145,14 +145,23 @@ function Stage({ stage, onSelectChange }: {
   );
 }
 
-/** One release: open stages, then applied history behind a count. */
-function Release({ group, onSelectChange }: {
+/** What a release group shows: open work, applied history, or both. */
+type GroupMode = "open" | "applied" | "all";
+
+/**
+ * One release. Applied history is a collapsed section whose rows mount only
+ * once it is expanded, so a group of 1,241 applied changes costs a button.
+ */
+function Release({ group, mode, onSelectChange }: {
   group: ReleaseGroup;
+  mode: GroupMode;
   onSelectChange?: (id: string) => void;
 }) {
   const [showApplied, setShowApplied] = useState(false);
-  const open = group.stages.filter((s) => !isAppliedStage(s.stage));
-  const applied = group.stages.filter((s) => isAppliedStage(s.stage));
+  const open = mode === "applied" ? [] : group.stages.filter((s) => !isAppliedStage(s.stage));
+  const applied = mode === "open" ? [] : group.stages.filter((s) => isAppliedStage(s.stage));
+  const count = mode === "open" ? group.changeCount - group.appliedCount
+    : mode === "applied" ? group.appliedCount : group.changeCount;
 
   return h("section", {
     class: "ch-release",
@@ -161,10 +170,10 @@ function Release({ group, onSelectChange }: {
   },
     h("h3", { class: "section-header" },
       group.label,
-      h("span", { class: "ch-release-count" }, `${group.changeCount}`),
+      h("span", { class: "ch-release-count" }, `${count}`),
     ),
     open.map((stage) => h(Stage, { key: stage.stage, stage, onSelectChange })),
-    group.appliedCount > 0
+    applied.length > 0
       ? h("button", {
           type: "button",
           class: "ch-applied-toggle",
@@ -178,6 +187,48 @@ function Release({ group, onSelectChange }: {
   );
 }
 
+// ── Filters ──────────────────────────────────────────────────────────
+
+const FILTER_STORAGE_KEY = "ndx.changes.filter";
+const UNSCHEDULED_FILTER = "unscheduled";
+const RELEASE_PREFIX = "release:";
+
+function filterOf(group: ReleaseGroup): string {
+  return group.release ? `${RELEASE_PREFIX}${group.release}` : UNSCHEDULED_FILTER;
+}
+
+function readStoredFilter(): string {
+  try {
+    return localStorage.getItem(FILTER_STORAGE_KEY) ?? "open";
+  } catch {
+    return "open";
+  }
+}
+
+function storeFilter(value: string): void {
+  try {
+    localStorage.setItem(FILTER_STORAGE_KEY, value);
+  } catch {
+    // Storage can be unavailable (private mode, quota); the choice then lasts the session.
+  }
+}
+
+function FilterChip({ value, label, count, active, onPick }: {
+  value: string;
+  label: string;
+  count: number;
+  active: boolean;
+  onPick: (value: string) => void;
+}) {
+  return h("button", {
+    type: "button",
+    class: active ? "ch-filter ch-filter-active" : "ch-filter",
+    "data-filter": value,
+    "aria-pressed": active ? "true" : "false",
+    onClick: () => onPick(value),
+  }, label, h("span", { class: "ch-filter-count" }, `${count}`));
+}
+
 // ── View ─────────────────────────────────────────────────────────────
 
 export function ChangesView({ changes, onSelectChange }: {
@@ -185,7 +236,21 @@ export function ChangesView({ changes, onSelectChange }: {
   /** Opens a change. Omitted, titles render as plain text. */
   onSelectChange?: (id: string) => void;
 }) {
+  const [stored, setStored] = useState(readStoredFilter);
   const groups = groupChangesByRelease(changes);
+  const appliedTotal = groups.reduce((n, g) => n + g.appliedCount, 0);
+  const openTotal = changes.length - appliedTotal;
+
+  // A remembered release that no longer exists falls back to the default.
+  const known = new Set(groups.map(filterOf));
+  const filter = stored === "open" || stored === "applied" || known.has(stored) ? stored : "open";
+  const pick = (value: string) => { setStored(value); storeFilter(value); };
+
+  const mode: GroupMode = filter === "open" ? "open" : filter === "applied" ? "applied" : "all";
+  const shown = groups.filter((g) =>
+    mode === "open" ? g.appliedCount < g.changeCount
+    : mode === "applied" ? g.appliedCount > 0
+    : filterOf(g) === filter);
 
   return h("div", { class: "ch-container" },
     h("div", { class: "view-header" },
@@ -199,8 +264,18 @@ export function ChangesView({ changes, onSelectChange }: {
       ? h("div", { class: "empty-state", role: "status" },
           "No changes yet. Captured work appears here, grouped by the release it is planned for.")
       : h(Fragment, null,
-          groups.map((group) =>
-            h(Release, { key: group.release ?? "unscheduled", group, onSelectChange })),
+          h("div", { class: "ch-filters", role: "group", "aria-label": "Filter changes" },
+            h(FilterChip, { value: "open", label: "Open", count: openTotal, active: filter === "open", onPick: pick }),
+            h(FilterChip, { value: "applied", label: "Applied", count: appliedTotal, active: filter === "applied", onPick: pick }),
+            groups.map((g) => h(FilterChip, {
+              key: filterOf(g), value: filterOf(g), label: g.label, count: g.changeCount,
+              active: filter === filterOf(g), onPick: pick,
+            })),
+          ),
+          shown.length === 0
+            ? h("div", { class: "empty-state", role: "status" }, "Nothing matches this filter.")
+            : shown.map((group) =>
+                h(Release, { key: `${filter}:${filterOf(group)}`, group, mode, onSelectChange })),
         ),
   );
 }
