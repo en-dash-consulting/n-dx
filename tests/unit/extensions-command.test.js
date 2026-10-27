@@ -631,3 +631,9 @@ it("rejects an unknown subcommand", async () => {
   expect(code).toBe(1);
   expect(err).toMatch(/Unknown 'ndx extensions' subcommand: frobnicate/);
 });
+
+it.each(["constructor", "toString", "__proto__"])("rejects the inherited name %s as an unknown subcommand", async (sub) => {
+  const { code, err } = await ndx([sub, "--json"]);
+  expect(code).toBe(1);
+  expect(err).toMatch(new RegExp(`Unknown 'ndx extensions' subcommand: ${sub}`));
+});

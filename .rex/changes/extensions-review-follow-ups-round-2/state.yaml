@@ -44,7 +44,14 @@ items:
     lastModified: "2026-10-27T18:05:06.387Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "3798c6e4-317b-4fe9-8aeb-41491e0def28":
-    lastModified: "2026-10-27T17:23:12.417Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:23:48.026Z"
+    completedAt: "2026-10-27T18:27:18.998Z"
+    endedAt: "2026-10-27T18:27:18.998Z"
+    activeIntervals: [{"end":"2026-10-27T18:27:18.998Z","start":"2026-10-27T18:23:48.026Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runExtensions looks up SUBCOMMAND_FLAGS by own key only; constructor/toString/__proto__ reach the unknown-subcommand error. Test added. Commit 6f6a86c8e."
+    lastModified: "2026-10-27T18:27:18.998Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "3cb484e4-8668-491e-8927-268164c5d410":
     status: "completed"

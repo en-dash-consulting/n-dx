@@ -107,8 +107,12 @@ export async function runExtensions(args, deps) {
   const flags = new Set(args.filter((a) => a.startsWith("-")));
   const [sub = "list", ...positionals] = args.filter((a) => !a.startsWith("-"));
   const json = flags.has("--json") || flags.has("--format=json");
-  const unknown = [...flags].filter((f) => !GLOBAL_FLAGS.includes(f) && !(SUBCOMMAND_FLAGS[sub] ?? []).includes(f));
-  if (Object.hasOwn(SUBCOMMAND_FLAGS, sub) && unknown.length > 0) {
+  // Own keys only: an inherited name such as `constructor` must reach the
+  // unknown-subcommand path, not a prototype function.
+  const known = Object.hasOwn(SUBCOMMAND_FLAGS, sub);
+  const allowed = known ? SUBCOMMAND_FLAGS[sub] : [];
+  const unknown = [...flags].filter((f) => !GLOBAL_FLAGS.includes(f) && !allowed.includes(f));
+  if (known && unknown.length > 0) {
     ctx.err(`Error: 'ndx extensions ${sub}' does not take ${unknown.join(", ")}.`);
     if (sub === "add") {
       ctx.err(`Hint: npm settings such as the registry come from npm's own config: an npm_config_* variable, or ${join(userFolder(ctx.discover(undefined).home), ".npmrc")}.`);
