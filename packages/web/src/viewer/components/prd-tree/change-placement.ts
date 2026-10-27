@@ -25,7 +25,7 @@ import { h, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { useCliName } from "../../hooks/index.js";
 import { StrengthChip, useInbox, type ShortlistRead } from "../../views/inbox.js";
-import { useProductRead } from "../../views/product-pages.js";
+import { Pending, useProductRead } from "../../views/product-pages.js";
 import type {
   CapabilityDetail,
   ChangeRow,
@@ -211,7 +211,12 @@ function TargetRow({ name, target, checked, onChoose }: {
 }
 
 /** Search over every capability and constraint, grouped by area. */
-function TargetSearch({ map, onChoose }: { map: ProductMap | null; onChoose: (t: PlacementTarget) => void }) {
+function TargetSearch({ map, mapError, onChoose }: {
+  map: ProductMap | null;
+  /** Why the product map could not be read; shown in place of the search. */
+  mapError?: string;
+  onChoose: (t: PlacementTarget) => void;
+}) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const hit = (title: string, statement?: string) =>
@@ -230,6 +235,8 @@ function TargetSearch({ map, onChoose }: { map: ProductMap | null; onChoose: (t:
       })),
     },
   ].filter((g) => g.targets.length);
+
+  if (mapError !== undefined) return h("div", { class: "cp-search" }, h(Pending, { load: { state: "error", message: mapError } }));
 
   return h("div", { class: "cp-search" },
     h("input", {
@@ -270,6 +277,7 @@ interface PlaceFormProps {
   changeTitle: string;
   read: ShortlistRead | undefined;
   map: ProductMap | null;
+  mapError?: string;
   /** Placing an extra touches after a first place (IB3). */
   another: boolean;
   hasNext: boolean;
@@ -278,7 +286,7 @@ interface PlaceFormProps {
   onDone: () => void;
 }
 
-function PlaceForm({ changeId, changeTitle, read, map, another, hasNext, onPlaced, onNothingFits, onDone }: PlaceFormProps) {
+function PlaceForm({ changeId, changeTitle, read, map, mapError, another, hasNext, onPlaced, onNothingFits, onDone }: PlaceFormProps) {
   const placement = read && "placement" in read ? read.placement : null;
   const shortlist = placement?.shortlist ?? [];
   const [chosen, setChosen] = useState<PlacementTarget | null>(null);
@@ -366,7 +374,7 @@ function PlaceForm({ changeId, changeTitle, read, map, another, hasNext, onPlace
       searchPick ? h(TargetRow, { key: searchPick.target, name, target: searchPick, checked: true, onChoose: setChosen }) : null,
     ),
 
-    h(TargetSearch, { map, onChoose: setChosen }),
+    h(TargetSearch, { map, mapError, onChoose: setChosen }),
 
     another
       ? null
@@ -437,12 +445,13 @@ interface ProposeFormProps {
   changeId: string;
   changeTitle: string;
   map: ProductMap | null;
+  mapError?: string;
   hasNext: boolean;
   onProposed: (result: ProposeChangeResult, next: boolean) => void;
   onBack: () => void;
 }
 
-function ProposeForm({ changeId, changeTitle, map, hasNext, onProposed, onBack }: ProposeFormProps) {
+function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack }: ProposeFormProps) {
   const [type, setType] = useState<"capability" | "constraint">("capability");
   const [under, setUnder] = useState("");
   const [title, setTitle] = useState("");
@@ -480,7 +489,7 @@ function ProposeForm({ changeId, changeTitle, map, hasNext, onProposed, onBack }
       class: "cp-input", value: under,
       onChange: (e: Event) => setUnder((e.target as HTMLSelectElement).value),
     },
-      h("option", { value: "" }, map ? "Choose an area" : "Loading…"),
+      h("option", { value: "" }, map ? "Choose an area" : mapError !== undefined ? `Could not load: ${mapError}` : "Loading…"),
       areas.map((a) => h("option", { key: a.id, value: a.id }, a.title)),
     )),
     field("Title", h("input", {
@@ -640,7 +649,8 @@ function PlacementForms({ proposing, place, propose }: {
 }) {
   const product = useProductRead<ProductMap>("/api/rex/product", (body) => body.map as ProductMap);
   const map = product.state === "ready" ? product.data : null;
+  const mapError = product.state === "error" ? product.message : undefined;
   return proposing
-    ? h(ProposeForm, { ...propose, map })
-    : h(PlaceForm, { key: place.another ? "another" : "first", ...place, map });
+    ? h(ProposeForm, { ...propose, map, mapError })
+    : h(PlaceForm, { key: place.another ? "another" : "first", ...place, map, mapError });
 }

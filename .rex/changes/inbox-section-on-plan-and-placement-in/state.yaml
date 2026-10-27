@@ -30,7 +30,14 @@ items:
     lastModified: "2026-10-27T23:05:07.441Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "43945df9-5aae-4bf6-a818-61ddc5cb259f":
-    lastModified: "2026-10-27T22:49:17.113Z"
+    status: "completed"
+    startedAt: "2026-10-27T23:07:01.908Z"
+    completedAt: "2026-10-27T23:09:46.233Z"
+    endedAt: "2026-10-27T23:09:46.233Z"
+    activeIntervals: [{"end":"2026-10-27T23:09:46.233Z","start":"2026-10-27T23:07:01.908Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Placement search and propose area show \"Could not load: …\" when the product read errors; tests added."
+    lastModified: "2026-10-27T23:09:46.233Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "480edc01-5573-43aa-b559-026a53513984":
     status: "completed"

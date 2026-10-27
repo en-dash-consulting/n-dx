@@ -280,6 +280,46 @@ describe("an Inbox change's panel", () => {
   });
 });
 
+describe("when the product map read fails", () => {
+  /** Serve a healthy project, then wrap fetch so only the product map read answers 500. Returns the healthy fetch. */
+  function failProductRead(message: string): typeof fetch {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    const good = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) =>
+      url === "/api/rex/product"
+        ? new Response(JSON.stringify({ error: message }), { status: 500 })
+        : good(url, init)));
+    return good;
+  }
+
+  it("shows the error in place of the search, and keeps the shortlist", async () => {
+    failProductRead("PRD is locked by pid 7");
+    await mountSection("a");
+    expect($(".cp-search-input")).toBeNull();
+    expect($(".cp-search")?.textContent).toContain("Could not load: PRD is locked by pid 7");
+    expect(root.textContent).not.toContain("Loading the product map");
+    expect($('.cp-target[data-target="cap-1"]')).not.toBeNull();
+    expect(button("Place")).not.toBeNull();
+  });
+
+  it("shows the error in the proposal form's area field, and a later good read restores both", async () => {
+    const good = failProductRead("HTTP boom");
+    await mountSection("a");
+    await click(button("Nothing fits"));
+    const area = $$<HTMLSelectElement>(".cp-propose select")[1];
+    expect(area.options[0].textContent).toBe("Could not load: HTTP boom");
+    expect(button("Propose")?.disabled).toBe(true);
+
+    // Remount against a healthy server: the read succeeds and the forms return.
+    vi.stubGlobal("fetch", good);
+    await act(async () => { render(null, root); });
+    await mountSection("a");
+    expect($(".cp-search-input")?.hasAttribute("disabled")).toBe(false);
+    await click(button("Nothing fits"));
+    expect($$<HTMLSelectElement>(".cp-propose select")[1].options[0].textContent).toBe("Choose an area");
+  });
+});
+
 // ── Writes ───────────────────────────────────────────────────────────
 
 describe("placing", () => {
