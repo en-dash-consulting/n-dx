@@ -213,6 +213,16 @@ describe("validateExtensionManifest", () => {
     }
   });
 
+  it("refuses a bidi control character, which reorders a printed line", () => {
+    for (const bidi of ["\u202a", "\u202b", "\u202c", "\u202d", "\u202e", "\u2066", "\u2067", "\u2068", "\u2069"]) {
+      const result = validate(pkg((m) => { m.commands[0].summary = `Assess ${bidi}gnp.exe`; }));
+      const label = `U+${bidi.charCodeAt(0).toString(16)}`;
+      expect(result.status, label).toBe("invalid");
+      expect(result.problems.find((p) => p.path === "ndx.extension.commands[0].summary")?.rule, label).toBe("control-character");
+      for (const problem of result.problems) expect(formatProblem(problem), label).not.toContain(bidi);
+    }
+  });
+
   it("requires the package version to be a semver version", () => {
     for (const version of [undefined, 1, "", "1.0", "latest", "1.0.0 \n"]) {
       const result = validate(pkg((m, p) => { p.version = version; }));
@@ -222,6 +232,7 @@ describe("validateExtensionManifest", () => {
 
   it("escapeControlCharacters writes every control character as a visible escape", () => {
     expect(escapeControlCharacters("a\u001b[2Kb\nc\u009bd\u007f")).toBe("a\\x1b[2Kb\\x0ac\\x9bd\\x7f");
+    expect(escapeControlCharacters("a\u202ab\u202ec\u2066d\u2069")).toBe("a\\u202ab\\u202ec\\u2066d\\u2069");
     expect(escapeControlCharacters("C:\\tools — ok")).toBe("C:\\tools — ok");
   });
 

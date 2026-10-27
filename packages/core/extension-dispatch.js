@@ -64,6 +64,9 @@ export const FORWARDED_SIGNALS = Object.freeze(["SIGTERM", "SIGHUP"]);
  *   invalid or in conflict; `ndx` still reports an unknown command, and `hint`
  *   says why and what to run.
  *
+ * `message` and `hint` quote package text (name, version, reason), so they
+ * arrive with control characters already escaped and are safe to print as is.
+ *
  * @typedef {{kind: "builtin"} | {kind: "none"}
  *   | {kind: "run", ext: DiscoveredExtension, command: string, bin: string, home: string}
  *   | {kind: "refused", ext: DiscoveredExtension, message: string, approval?: PendingApproval}
@@ -113,13 +116,13 @@ export function resolveExtensionCommand(name, options) {
     return {
       kind: "refused",
       ext,
-      message: `Error: 'ndx ${name}' comes from ${label}, which is ${reason} — fix: ndx extensions enable ${key}`,
+      message: escapeControlCharacters(`Error: 'ndx ${name}' comes from ${label}, which is ${reason} — fix: ndx extensions enable ${key}`),
       approval: { reason, home: discovery.home, projectDir },
     };
   }
   if (state !== "enabled") {
     const fix = state === "disabled" ? `ndx extensions enable ${key}` : "ndx extensions doctor";
-    return { kind: "unavailable", ext, state, hint: `${label} provides '${name}' but is ${state}: ${reason}. Run '${fix}'.` };
+    return { kind: "unavailable", ext, state, hint: escapeControlCharacters(`${label} provides '${name}' but is ${state}: ${reason}. Run '${fix}'.`) };
   }
 
   const command = ext.manifest?.commands?.find((c) => c.name === name);
@@ -129,14 +132,14 @@ export function resolveExtensionCommand(name, options) {
     return {
       kind: "refused",
       ext,
-      message: `Error: 'ndx ${name}' comes from ${label}, whose bin ${command.bin} is outside the package — fix: ndx extensions doctor`,
+      message: escapeControlCharacters(`Error: 'ndx ${name}' comes from ${label}, whose bin ${command.bin} is outside the package — fix: ndx extensions doctor`),
     };
   }
   if (!(options.fs ?? nodeFs).existsSync(bin)) {
     return {
       kind: "refused",
       ext,
-      message: `Error: 'ndx ${name}' comes from ${label}, whose bin ${command.bin} does not exist — fix: ndx extensions doctor`,
+      message: escapeControlCharacters(`Error: 'ndx ${name}' comes from ${label}, whose bin ${command.bin} does not exist — fix: ndx extensions doctor`),
     };
   }
   return { kind: "run", ext, command: name, bin, home: discovery.home };
@@ -182,22 +185,22 @@ export function resolveExtensionSidecar(name, options) {
   const { discovery, file, projectDir } = discoverWithApprovals(builtins, options);
   const ext = claimant(discovery.extensions, (candidate) => candidate.name === name);
   if (!ext || (ext.manifest && !ext.manifest.sidecar)) {
-    return { kind: "none", message: `Error: No installed extension named '${name}' declares a sidecar — fix: ndx extensions list` };
+    return { kind: "none", message: escapeControlCharacters(`Error: No installed extension named '${name}' declares a sidecar — fix: ndx extensions list`) };
   }
 
   const { state, reason } = extensionState(ext, { file, ndxVersion: options.ndxVersion, projectDir });
   if (state !== "enabled") {
     const fix = state === "disabled" || state === "unapproved" ? `ndx extensions enable ${stateKey(ext)}` : "ndx extensions doctor";
-    return { kind: "refused", ext, state, message: `Error: the sidecar of ${describe(ext)} is not started: it is ${state} (${reason}) — fix: ${fix}` };
+    return { kind: "refused", ext, state, message: escapeControlCharacters(`Error: the sidecar of ${describe(ext)} is not started: it is ${state} (${reason}) — fix: ${fix}`) };
   }
 
   const sidecar = /** @type {NonNullable<NonNullable<DiscoveredExtension["manifest"]>["sidecar"]>} */ (ext.manifest?.sidecar);
   const bin = packageFile(ext.dir, sidecar.bin);
   if (bin === null) {
-    return { kind: "refused", ext, state, message: `Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} is outside the package — fix: ndx extensions doctor` };
+    return { kind: "refused", ext, state, message: escapeControlCharacters(`Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} is outside the package — fix: ndx extensions doctor`) };
   }
   if (!(options.fs ?? nodeFs).existsSync(bin)) {
-    return { kind: "refused", ext, state, message: `Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} does not exist — fix: ndx extensions doctor` };
+    return { kind: "refused", ext, state, message: escapeControlCharacters(`Error: the sidecar of ${describe(ext)} is not started: its bin ${sidecar.bin} does not exist — fix: ndx extensions doctor`) };
   }
   return {
     kind: "run",

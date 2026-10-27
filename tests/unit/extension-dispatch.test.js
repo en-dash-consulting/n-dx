@@ -168,6 +168,17 @@ describe("resolveExtensionCommand", () => {
     install("recon", { commands: [{ name: "recon", bin: "../escape.js", summary: "r" }] });
     expect(resolveName("recon")).toMatchObject({ kind: "unavailable", state: "invalid" });
   });
+
+  it("never puts a raw control character from the package in the unknown-command hint", () => {
+    // Validation stops at the version, so this text reaches the hint unvetted.
+    const dir = install("recon", { script: "" });
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+    writeFile(join(dir, "package.json"), JSON.stringify({ ...pkg, version: "1.0.0\u001b[2K\u202e" }));
+    const resolved = resolveName("recon");
+    expect(resolved).toMatchObject({ kind: "unavailable", state: "invalid" });
+    expect(resolved.hint).not.toMatch(/[\p{Cc}\u202a-\u202e\u2066-\u2069]/u);
+    expect(resolved.hint).toContain("ndx-recon 1.0.0\\x1b[2K\\u202e");
+  });
 });
 
 describe("approveOnFirstRun", () => {

@@ -82,7 +82,14 @@ items:
     lastModified: "2026-10-27T18:32:37.859Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "9171679e-18fb-4773-8ec6-cc42f7984420":
-    lastModified: "2026-10-27T17:23:17.346Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:32:48.687Z"
+    completedAt: "2026-10-27T18:38:23.122Z"
+    endedAt: "2026-10-27T18:38:23.122Z"
+    activeIntervals: [{"end":"2026-10-27T18:38:23.122Z","start":"2026-10-27T18:32:48.687Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extension-dispatch.js escapes every resolution message and hint where it is built; control-character rule and escaper cover U+202A-202E and U+2066-2069 (escaped as \\uNNNN). Tests in extension-dispatch and extension-manifest unit suites. Commit b864e9412."
+    lastModified: "2026-10-27T18:38:23.122Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "b4ca7979-70ef-4f57-844f-d58ab2cec3d7":
     status: "completed"

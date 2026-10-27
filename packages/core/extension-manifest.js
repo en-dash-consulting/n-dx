@@ -82,9 +82,11 @@ const SLUG = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const MAX_NAME_LENGTH = 40;
 const MAX_SUMMARY_LENGTH = 100;
 const DRIVE_PREFIX = /^[A-Za-z]:/;
-// C0, DEL and C1: newlines, tabs, ESC (terminal escape sequences) and the rest.
-const CONTROL_CHARACTER = /\p{Cc}/u;
-const CONTROL_CHARACTERS = /\p{Cc}/gu;
+// C0, DEL and C1: newlines, tabs, ESC (terminal escape sequences) and the rest;
+// plus the bidi embedding, override and isolate controls, which reorder a
+// printed line visually without moving the cursor.
+const CONTROL_CHARACTER = /[\p{Cc}\u202a-\u202e\u2066-\u2069]/u;
+const CONTROL_CHARACTERS = /[\p{Cc}\u202a-\u202e\u2066-\u2069]/gu;
 
 /**
  * Every rule the validator applies, with the fix it prints. The test suite
@@ -100,7 +102,7 @@ export const EXTENSION_MANIFEST_RULES = Object.freeze({
   "name-reserved": "choose a name that is not an n-dx bin alias or a reserved word",
   "name-builtin": "choose a name that is not a built-in ndx command",
   "non-empty-string": "set a non-empty string",
-  "control-character": "remove the control characters (newlines, tabs, escape sequences) from the string",
+  "control-character": "remove the control characters (newlines, tabs, escape sequences, bidi controls) from the string",
   "package-version": "set package.json `version` to a semver version, e.g. 1.0.0",
   "summary-length": `keep the summary to one line of at most ${MAX_SUMMARY_LENGTH} characters`,
   "ndx-version-range": "use a semver range, e.g. \">=0.10.0 <0.12.0\"",
@@ -352,15 +354,19 @@ export function formatProblem(problem) {
 }
 
 /**
- * `text` with every control character written as a visible `\xNN` escape, so
- * a value from a package can never move the cursor, recolour the terminal or
- * start a line of its own. Apply it to anything printed from a package.
+ * `text` with every control character written as a visible `\xNN` (or, for a
+ * bidi control, `\uNNNN`) escape, so a value from a package can never move the
+ * cursor, recolour the terminal, start a line of its own or reorder the line
+ * it is on. Apply it to anything printed from a package.
  *
  * @param {string} text
  * @returns {string}
  */
 export function escapeControlCharacters(text) {
-  return text.replace(CONTROL_CHARACTERS, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
+  return text.replace(CONTROL_CHARACTERS, (c) => {
+    const code = c.charCodeAt(0);
+    return code > 0xff ? `\\u${code.toString(16)}` : `\\x${code.toString(16).padStart(2, "0")}`;
+  });
 }
 
 /**
