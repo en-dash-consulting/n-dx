@@ -50,6 +50,7 @@ const FIXTURE = [
   `    res.end(JSON.stringify({ path: req.url, port: process.env.PORT, name: process.env.NDX_EXTENSION_NAME, headers: req.headers }));`,
   `  });`,
   `  server.on("upgrade", (req, socket) => {`,
+  `    console.log("upgrade " + req.url);`,
   `    if (req.url === "/ws-hold") { socket.write("HTTP/1.1 101 Switching Protocols\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\n\\r\\n"); socket.on("end", () => socket.end()); return; }`,
   `    socket.end("HTTP/1.1 101 Switching Protocols\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\n\\r\\n" + JSON.stringify({ path: req.url, headers: req.headers }));`,
   `  });`,
@@ -602,6 +603,34 @@ describe("hub /x/<name>/", () => {
       // The sidecar log is complete once its process has exited.
       await idleStopped("recon");
       expect(readFileSync(planFor("recon").logFile, "utf-8")).not.toContain("request /aborted");
+    });
+
+    it("neither counts nor forwards a WebSocket whose client left during the cold start, so the sidecar still idles out", async () => {
+      const { log, idleStopped } = hubLog();
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => { release = resolve; });
+      let markAsked!: () => void;
+      const asked = new Promise<void>((resolve) => { markAsked = resolve; });
+      const hub = await idleHub(log, async (name) => {
+        markAsked();
+        await released;
+        return { ok: true, plan: planFor(name, "ok", 0) };
+      });
+
+      // /ws-hold holds the handshake open, so a forwarded upgrade would keep
+      // the sidecar counted, and up, for good.
+      const client = connect(hub.port, "127.0.0.1");
+      client.write(
+        `GET /x/recon/ws-hold HTTP/1.1\r\nHost: 127.0.0.1:${hub.port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n",
+      );
+      await asked;
+      client.destroy();
+      expect((await fetch(`http://127.0.0.1:${hub.port}/api/hub/health`)).ok).toBe(true);
+      release();
+
+      await idleStopped("recon");
+      expect(readFileSync(planFor("recon").logFile, "utf-8")).not.toContain("upgrade /ws-hold");
     });
   });
 

@@ -488,7 +488,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
     case "sidecar": {
       // A cold start can take seconds; a client gone by its end is neither
       // counted (the count would never fall, and the sidecar never idle out)
-      // nor forwarded. upgradeSidecar's `socket.destroyed` is the same guard.
+      // nor forwarded. upgradeSidecar's `gone` is the same guard.
       let gone = false;
       res.once("close", () => { gone = true; });
       const started = await hub.sidecars.ensure(decision.name);
@@ -732,8 +732,20 @@ async function upgradeSidecar(
   hub: Hub,
   decision: Extract<ProxyDecision, { kind: "sidecar" }>,
 ): Promise<void> {
+  // After 'upgrade' Node detaches the parser's end handler and the socket
+  // allows half-open, so a client that leaves during a cold start leaves it
+  // ended, not destroyed: watch for the end as well.
+  let gone = false;
+  const leave = (): void => { gone = true; };
+  socket.once("end", leave);
+  socket.once("close", leave);
   const started = await hub.sidecars.ensure(decision.name);
-  if (socket.destroyed) return;
+  socket.off("end", leave);
+  socket.off("close", leave);
+  if (gone || socket.destroyed || socket.readableEnded) {
+    socket.destroy();
+    return;
+  }
   if (!started.ok) {
     const reason = started.status === 404 ? "Not Found" : "Service Unavailable";
     socket.end(`HTTP/1.1 ${started.status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
