@@ -30,9 +30,12 @@ import type { Amendment, ChangeNode, CriteriaDelta } from "../schema/v2.js";
 import { applyAmendmentsProblems, NOTHING_TO_MODIFY, pendingWarnings } from "./apply-amendments.js";
 import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import {
+  PLACEMENT_SHORTLIST_SIZE,
   placementRelation,
+  placementStrength,
   rankPlacementCandidates,
   type PlacementCandidate,
+  type PlacementStrength,
   type PlacementChange,
   type PlacementNode,
   type PlacementRelation,
@@ -72,23 +75,37 @@ export const PLACEMENT_CONTENT_NEEDS_AMENDS = "proposed and criteria describe an
 /** Suffix of the MCP-facing refusal for an amends placement with nothing to modify. */
 const NOTHING_TO_MODIFY_PLACE_HINT = ". Pass proposed or criteria, or use relation touches";
 
+/** A ranked candidate with its score's band (`placementStrength`). */
+export interface SuggestedPlacementCandidate extends PlacementCandidate {
+  strength: PlacementStrength;
+}
+
 export interface PlacementSuggestion {
   /** Id of the change placed. */
   change: string;
   /** The rules' relation for this change; every candidate carries it. */
   relation: PlacementRelation;
+  /**
+   * The top two candidates share a score: their order is the id tiebreak, not
+   * the rules, so the first is no better a pick than the second.
+   */
+  tied: boolean;
   /** Rules ranking, best first. Empty when no rule fired. */
-  shortlist: PlacementCandidate[];
+  shortlist: SuggestedPlacementCandidate[];
 }
 
 /** Rank the live capabilities and constraints the open change `changeRef` could amend or touch. */
-export function suggestPlacement(tree: V2Tree, changeRef: string, shortlistSize?: number): PlacementSuggestion {
+export function suggestPlacement(tree: V2Tree, changeRef: string, shortlistSize = PLACEMENT_SHORTLIST_SIZE): PlacementSuggestion {
   const change = openChange(tree, changeRef);
   const input = placementInput(change);
+  // Rank at least two, so a tie shows even when the caller asks for one.
+  const ranked = rankPlacementCandidates(input, placementNodes(tree), Math.max(shortlistSize, 2));
+  const [top, next] = ranked;
   return {
     change: change.id,
     relation: placementRelation(input),
-    shortlist: rankPlacementCandidates(input, placementNodes(tree), shortlistSize),
+    tied: top !== undefined && next !== undefined && top.score === next.score,
+    shortlist: ranked.slice(0, shortlistSize).map((c) => ({ ...c, strength: placementStrength(c.score) })),
   };
 }
 

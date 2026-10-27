@@ -187,7 +187,8 @@ describe("place_change", () => {
   it("returns the rules' shortlist without writing when no target is given", async () => {
     const id = await inboxChange("Support refunds when paying by card");
     const body = json(await handlePlaceChange(store(), rexDir, { id }));
-    expect(body).toMatchObject({ change: id, relation: "amends", shortlist: [{ target: CAPABILITY, relation: "amends" }] });
+    expect(body).toMatchObject({ change: id, relation: "amends", tied: false, shortlist: [{ target: CAPABILITY, relation: "amends" }] });
+    expect(body.shortlist[0].strength).toMatch(/^(strong|possible|weak)$/);
     expect(json(await handleGetItem(store(), rexDir, { id })).item.needsPlacement).toBe(true);
   });
 

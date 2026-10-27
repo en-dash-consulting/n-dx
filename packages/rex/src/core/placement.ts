@@ -122,6 +122,21 @@ const WEIGHT_PATH_MENTION = 3;
 const WEIGHT_PACKAGE_MENTION = 2;
 const WEIGHT_TOKEN = 1;
 
+/** How firmly the rules back a candidate, from its score. */
+export type PlacementStrength = "strong" | "possible" | "weak";
+
+/** Lowest score that reads as strong. */
+export const PLACEMENT_STRONG_SCORE = 10;
+/** Lowest score that reads as possible; anything below is weak. */
+export const PLACEMENT_POSSIBLE_SCORE = 6;
+
+/** The strength band of a candidate's score: the one definition every surface uses. */
+export function placementStrength(score: number): PlacementStrength {
+  if (score >= PLACEMENT_STRONG_SCORE) return "strong";
+  if (score >= PLACEMENT_POSSIBLE_SCORE) return "possible";
+  return "weak";
+}
+
 /** Leading verbs of a title that ask for behaviour the product does not have yet, or a different one. */
 const AMENDING_VERBS = new Set([
   "add", "introduce", "support", "allow", "enable", "implement", "expose", "offer", "provide",

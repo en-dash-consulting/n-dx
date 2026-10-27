@@ -96,6 +96,18 @@ export type {
 export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, awaitsPlacement, specHash, nodeSpec } from "./schema/v2-rules.js";
 export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOptions } from "./schema/v2-rules.js";
 
+// ---- Core: change placement --------------------------------------------------
+// Rank where an open change belongs and record the choice: the same core the
+// CLI (`rex change place`) and MCP (`place_change`) call. `placementStrength`
+// holds the strength bands, so no surface keeps its own thresholds.
+
+export { suggestPlacement, recordPlacement, ChangePlacementError } from "./core/change-place.js";
+export type {
+  ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate, RecordPlacementInput, RecordPlacementResult,
+} from "./core/change-place.js";
+export { placementStrength, PLACEMENT_STRONG_SCORE, PLACEMENT_POSSIBLE_SCORE } from "./core/placement.js";
+export type { PlacementCandidate, PlacementStrength } from "./core/placement.js";
+
 // ---- Core: product edges, status and realization -----------------------------
 // The derived relations a v2 tree implies: which changes touch a product node,
 // which constraints bind it, what it shares changes with, and (through the

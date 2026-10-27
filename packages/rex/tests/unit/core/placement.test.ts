@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   placeChange,
   placementRelation,
+  placementStrength,
   rankPlacementCandidates,
   type PlacementChange,
   type PlacementNode,
@@ -61,6 +62,12 @@ describe("rankPlacementCandidates (rules)", () => {
   it("breaks ties by id", () => {
     const tied: PlacementNode[] = [{ id: "b", title: "alpha" }, { id: "a", title: "alpha" }];
     expect(rankPlacementCandidates({ title: "alpha" }, tied).map((c) => c.target)).toEqual(["a", "b"]);
+  });
+});
+
+describe("placementStrength", () => {
+  it("is strong at 10 or more, possible from 6 to 9 and weak at 5 or less", () => {
+    expect([1, 5, 6, 9, 10, 14].map(placementStrength)).toEqual(["weak", "weak", "possible", "possible", "strong", "strong"]);
   });
 });
 

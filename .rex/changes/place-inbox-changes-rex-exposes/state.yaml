@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "235d4530-4f87-4605-a451-d0f14432f45d":
-    lastModified: "2026-10-27T16:27:48.011Z"
+    status: "completed"
+    startedAt: "2026-10-27T17:32:21.406Z"
+    completedAt: "2026-10-27T17:47:57.599Z"
+    endedAt: "2026-10-27T17:47:57.599Z"
+    activeIntervals: [{"end":"2026-10-27T17:47:57.599Z","start":"2026-10-27T17:32:21.406Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Placement exported from rex public.ts; suggestions carry tied and per-candidate strength from placementStrength in core/placement.ts; shown in rex change place text/json and MCP place_change."
+    lastModified: "2026-10-27T17:47:57.599Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4751430d-3aa0-4d1b-b637-94b53d7caf1a":
     lastModified: "2026-10-27T16:28:32.133Z"

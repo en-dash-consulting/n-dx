@@ -69,7 +69,8 @@ export const placeChangeTool = defineTool({
   name: "place_change",
   description:
     "Place a v2 change on the product layer. Without target: returns the rules' shortlist of capabilities and constraints the change " +
-    "could amend or touch, best first, and the relation the rules chose. With target: records it (touches joins the change's touches; " +
+    "could amend or touch, best first, each with a strength (strong, possible or weak), the relation the rules chose, and tied when the " +
+    "top two share a score (their order is then arbitrary). With target: records it (touches joins the change's touches; " +
     "amends adds a modified amendment and needs proposed text or a criteria delta, or it is refused as apply_change would) and clears needsPlacement. " +
     "Only an open change is placed.",
   schema: {

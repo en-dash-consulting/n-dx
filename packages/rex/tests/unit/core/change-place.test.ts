@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
 import { ChangePlacementError, recordPlacement, suggestPlacement } from "../../../src/core/change-place.js";
+import { placementStrength } from "../../../src/core/placement.js";
 import { indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ slug: fields.id as string, ...fields }) as RuleNode;
@@ -46,6 +47,43 @@ describe("suggestPlacement", () => {
     const s = suggestPlacement(tree({ title: "Split the store module", tags: ["code-health"] }), "ch");
     expect(s.relation).toBe("touches");
     expect(s.shortlist[0]).toMatchObject({ target: "arch", relation: "touches" });
+  });
+
+  const twins = (second: string): V2Tree => ({
+    product: [
+      node({
+        id: "area",
+        type: "area",
+        title: "Area",
+        children: [
+          node({ id: "zeta", type: "capability", title: "Ledger export" }),
+          node({ id: "alpha", type: "capability", title: second }),
+        ],
+      }),
+    ],
+    changes: [node({ id: "ch", type: "change", title: "Ledger export speed", needsPlacement: true })],
+  });
+
+  it("reports tied when the top two candidates share a score, even with a shortlist of one", () => {
+    const s = suggestPlacement(twins("Ledger export"), "ch");
+    expect(s.tied).toBe(true);
+    expect(s.shortlist.map((c) => c.target)).toEqual(["alpha", "zeta"]);
+    expect(suggestPlacement(twins("Ledger export"), "ch", 1)).toMatchObject({ tied: true, shortlist: [{ target: "alpha" }] });
+  });
+
+  it("reports not tied when one candidate leads, or only one matched", () => {
+    expect(suggestPlacement(twins("Ledger"), "ch").tied).toBe(false);
+    expect(suggestPlacement(twins("Unrelated"), "ch")).toMatchObject({ tied: false, shortlist: [{ target: "zeta" }] });
+    expect(suggestPlacement(twins("Unrelated"), "ch").shortlist).toHaveLength(1);
+  });
+
+  it("gives each candidate the strength band of its score", () => {
+    const s = suggestPlacement(twins("Ledger"), "ch");
+    expect(s.shortlist.map((c) => [c.target, c.score, c.strength])).toEqual([
+      ["zeta", 2, "weak"],
+      ["alpha", 1, "weak"],
+    ]);
+    for (const c of suggestPlacement(tree(), "ch").shortlist) expect(c.strength).toBe(placementStrength(c.score));
   });
 });
 

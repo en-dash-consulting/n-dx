@@ -126,7 +126,7 @@ describe("rex change place", () => {
     const id = await addInbox("Support refunds when paying by card");
     out.length = 0;
     await cmdChange(tmp, "place", id, {});
-    expect(text()).toMatch(/A1\.1 Pay by card \(amends\)/);
+    expect(text()).toMatch(/A1\.1 Pay by card \(amends, weak\)/);
     expect(text()).toContain(`rex change place ${id} --target=A1.1 --relation=amends`);
     expect((await node(id)).needsPlacement).toBe(true);
   });
@@ -238,7 +238,7 @@ describe("rex add on a v2 tree", () => {
     await cmdAddChange(tmp, undefined, { title: "Support refunds when paying by card" }, { criterion: ["A refund reaches the card"] });
     expect(text()).toContain("Created change: Support refunds when paying by card");
     expect(text()).toContain("Placement: Inbox (needs placement)");
-    expect(text()).toMatch(/A1\.1 Pay by card \(amends\)/);
+    expect(text()).toMatch(/A1\.1 Pay by card \(amends, weak\)/);
     const created = (await changes()).find((c) => c.title === "Support refunds when paying by card")!;
     expect(created).toMatchObject({ needsPlacement: true, acceptanceCriteria: ["A refund reaches the card"] });
   });
