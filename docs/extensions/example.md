@@ -101,4 +101,4 @@ ndx extensions add ndx-hello
 ndx extensions enable hello
 ```
 
-`add` installs into `<ndx home>/extensions` with `--ignore-scripts`, so no install script runs before the user approves the extension. A project can also list the package in its own `package.json`. n-dx then runs it only for that project, after an approval tied to that project's path.
+`add` installs into `<ndx home>/extensions` with `--ignore-scripts`, so no install script runs before the user approves the extension. A package that is not on a registry installs from a path, resolved against the directory `add` runs in: `ndx extensions add ./ndx-hello-1.0.0.tgz` or `ndx extensions add ../ndx-hello`. `add` takes no npm flags; set the registry and similar through npm's own config (`npm_config_registry`, or `<ndx home>/extensions/.npmrc`). A project can also list the package in its own `package.json`. n-dx then runs it only for that project, after an approval tied to that project's path.

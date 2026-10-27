@@ -18,6 +18,7 @@
  */
 
 import * as nodeFs from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
@@ -41,6 +42,20 @@ export const EXTENSIONS_SUBCOMMANDS = Object.freeze(["list", "add", "remove", "e
 
 /** Directory under the n-dx home holding each extension's state folder. */
 export const EXTENSION_STATE_DIRNAME = "ext";
+
+/**
+ * The flags each subcommand takes. Any other flag is refused rather than
+ * dropped, so `add --registry=…` never installs from the default registry.
+ */
+const SUBCOMMAND_FLAGS = Object.freeze({
+  list: ["--json", "--format=json"],
+  add: [],
+  remove: ["--purge"],
+  enable: ["--yes", "-y"],
+  disable: [],
+  info: ["--json", "--format=json"],
+  doctor: [],
+});
 
 /**
  * What `ndx extensions` needs from its caller. `builtinCommands` comes from
@@ -86,6 +101,16 @@ export async function runExtensions(args, deps) {
   const flags = new Set(args.filter((a) => a.startsWith("-")));
   const [sub = "list", ...positionals] = args.filter((a) => !a.startsWith("-"));
   const json = flags.has("--json") || flags.has("--format=json");
+  const unknown = [...flags].filter((f) => !(SUBCOMMAND_FLAGS[sub] ?? []).includes(f));
+  if (Object.hasOwn(SUBCOMMAND_FLAGS, sub) && unknown.length > 0) {
+    ctx.err(`Error: 'ndx extensions ${sub}' does not take ${unknown.join(", ")}.`);
+    if (sub === "add") {
+      ctx.err(`Hint: npm settings such as the registry come from npm's own config: an npm_config_* variable, or ${join(userFolder(ctx.discover(undefined).home), ".npmrc")}.`);
+    } else {
+      ctx.err("Hint: Run 'ndx extensions --help' for the options each subcommand takes.");
+    }
+    return 1;
+  }
   switch (sub) {
     case "list": return list(ctx, positionals[0], json);
     case "add": return add(ctx, positionals[0]);
@@ -130,6 +155,7 @@ function context(deps) {
     return { ...result, projectDir, file: unreadable ? {} : readExtensionsFile(result.home) };
   };
   return {
+    cwd,
     ndxVersion,
     discover,
     runNpm: deps.runNpm ?? defaultRunNpm,
@@ -280,15 +306,23 @@ async function add(ctx, spec) {
   }
   const folder = userFolder(ctx.discover(undefined).home);
   ensureUserFolder(folder);
+  // npm runs in the user folder, so a path the user typed is made absolute
+  // against where they typed it.
+  const localPath = localSpecPath(spec, ctx.cwd);
   const before = listedPackages(folder);
-  const code = await ctx.runNpm(["install", spec, "--save", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: folder });
+  const code = await ctx.runNpm(["install", localPath ?? spec, "--save", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: folder });
   if (code !== 0) {
-    ctx.err(`Error: npm install ${spec} failed (exit ${code}); nothing was added.`);
+    ctx.err(`Error: npm install ${localPath ?? spec} failed (exit ${code}); nothing was added.`);
     return 1;
   }
   const after = listedPackages(folder);
-  const added = [...after].filter((p) => !before.has(p));
-  const candidates = added.length > 0 ? added : [packageNameOf(spec)].filter((p) => after.has(p));
+  const added = [...after.keys()].filter((p) => !before.has(p));
+  const changed = [...after.keys()].filter((p) => before.has(p) && before.get(p) !== after.get(p));
+  // A re-add leaves the listing as it was; find the entry by what it points at.
+  const same = localPath === null
+    ? [packageNameOf(spec)].filter((p) => after.has(p))
+    : [...after].filter(([, value]) => value.startsWith("file:") && resolve(folder, value.slice("file:".length)) === localPath).map(([p]) => p);
+  const candidates = added.length + changed.length > 0 ? [...added, ...changed] : same;
 
   const d = ctx.discover(undefined);
   const found = candidates.map((p) => d.extensions.find((e) => e.packageName === p)).filter((e) => e !== undefined);
@@ -479,7 +513,7 @@ export function doctorProblems(d, ndxVersion) {
   for (const error of d.errors) lines.push(`${error.path}: ${error.message} — fix: ${discoveryErrorFix(error, d.home)}`);
 
   const folder = userFolder(d.home);
-  for (const packageName of listedPackages(folder)) {
+  for (const packageName of listedPackages(folder).keys()) {
     if (!nodeFs.existsSync(join(folder, "node_modules", ...packageName.split("/"), "package.json"))) {
       lines.push(`${packageName}: listed in ${join(folder, "package.json")} but not installed — fix: run 'ndx extensions add ${packageName}', or 'ndx extensions remove ${packageName}'`);
     }
@@ -549,21 +583,41 @@ function ensureUserFolder(folder) {
 }
 
 /**
- * Package names the user folder's `package.json` depends on.
+ * The user folder's `package.json` dependencies: package name → the spec npm
+ * saved for it (`^1.2.0`, `file:../../checkout`, …).
  *
  * @param {string} folder
- * @returns {Set<string>}
+ * @returns {Map<string, string>}
  */
 function listedPackages(folder) {
   let pkg;
   try {
     pkg = JSON.parse(nodeFs.readFileSync(join(folder, "package.json"), "utf8"));
   } catch (error) {
-    if (/** @type {NodeJS.ErrnoException} */ (error).code === "ENOENT") return new Set();
+    if (/** @type {NodeJS.ErrnoException} */ (error).code === "ENOENT") return new Map();
     throw new Error(`${join(folder, "package.json")} cannot be read: ${/** @type {Error} */ (error).message}`);
   }
   const deps = pkg && typeof pkg.dependencies === "object" && pkg.dependencies !== null ? pkg.dependencies : {};
-  return new Set(Object.keys(deps));
+  return new Map(Object.entries(deps).map(([name, value]) => [name, String(value)]));
+}
+
+/**
+ * The absolute path an npm spec names on disk, or `null` for a registry,
+ * git or URL spec. npm reads a spec as a path when it starts with `.`, `/`,
+ * `\`, `~/` or a drive letter, has a `file:` prefix, or ends in `.tgz`,
+ * `.tar.gz` or `.tar`.
+ *
+ * @param {string} spec
+ * @param {string} cwd  Where the user ran the command.
+ * @returns {string | null}
+ */
+export function localSpecPath(spec, cwd) {
+  const path = spec.startsWith("file:") ? spec.slice("file:".length) : spec;
+  if (/^~[\\/]/.test(path)) return resolve(homedir(), path.slice(2));
+  const isPath = spec.startsWith("file:")
+    || /^(\.\.?([\\/]|$)|[\\/]|[A-Za-z]:)/.test(path)
+    || (/\.(tgz|tar\.gz|tar)$/i.test(path) && !/^[a-z][a-z0-9+.-]*:\/\//i.test(path));
+  return isPath ? resolve(cwd, path) : null;
 }
 
 /**

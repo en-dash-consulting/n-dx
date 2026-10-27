@@ -1798,7 +1798,9 @@ const ORCHESTRATOR_HELP_DEFS = {
       "(installed by 'add'), in the global install n-dx came from, and in the\n" +
       "paths listed under extensions.paths in <ndx home>/config.json.\n\n" +
       "'add' installs into <ndx home>/extensions with npm, never into a\n" +
-      "project, and with install scripts off. An extension runs only once you\n" +
+      "project, and with install scripts off. A relative path or tarball is\n" +
+      "read from the current directory; npm flags are refused, so set the\n" +
+      "registry through npm's config. An extension runs only once you\n" +
       "approve it: 'enable' shows the package, version, source, commands and\n" +
       "sidecar, then asks. The approval is tied to that version and manifest.\n" +
       "'disable' hides an extension but keeps its approval, config and state\n" +
@@ -1814,7 +1816,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       "See docs/architecture/extensions.md.",
     usage: [
       "ndx extensions [list] [--json] [dir]",
-      "ndx extensions add <package>",
+      "ndx extensions add <package | path | tarball>",
       "ndx extensions remove <name> [--purge]",
       "ndx extensions enable <name> [--yes]",
       "ndx extensions disable <name>",

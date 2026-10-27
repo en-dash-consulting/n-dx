@@ -12,8 +12,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync, realpathSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { runExtensions } from "../../packages/core/extensions-command.js";
+import { isAbsolute, join, relative } from "node:path";
+import { localSpecPath, runExtensions } from "../../packages/core/extensions-command.js";
 import { EXTENSION_STATES, manifestHash } from "../../packages/core/extension-state.js";
 
 const BUILTINS = ["init", "work", "status", "config", "start", "extensions"];
@@ -83,10 +83,10 @@ let clock = Math.floor(Date.now() / 1000);
  * installs; two writes within one timestamp tick would otherwise look like
  * none to discovery's cache.
  */
-function installInto(folder, pkg, options) {
+function installInto(folder, pkg, options, saved = `^${pkg.version}`) {
   const listing = join(folder, "package.json");
   const current = existsSync(listing) ? readJson(listing) : { name: "listing" };
-  current.dependencies = { ...current.dependencies, [pkg.name]: `^${pkg.version}` };
+  current.dependencies = { ...current.dependencies, [pkg.name]: saved };
   writeJson(listing, current);
   writePackage(join(folder, "node_modules", ...pkg.name.split("/")), pkg, options);
   clock += 10;
@@ -100,9 +100,20 @@ async function fakeNpm(args, { cwd }) {
   const [verb, ...rest] = args;
   const names = rest.filter((a) => !a.startsWith("-"));
   if (verb === "install") {
-    const pkg = registry[names[0]];
+    const spec = names[0];
+    if (!isAbsolute(spec)) {
+      const pkg = registry[spec];
+      if (!pkg) return 1;
+      installInto(cwd, pkg);
+      return 0;
+    }
+    // A path, read from cwd as npm would: a folder with a package.json, or a
+    // tarball the test registered under its absolute path. npm saves either
+    // as a relative file: spec.
+    if (!existsSync(spec)) return 1;
+    const pkg = existsSync(join(spec, "package.json")) ? readJson(join(spec, "package.json")) : registry[spec];
     if (!pkg) return 1;
-    installInto(cwd, pkg);
+    installInto(cwd, pkg, undefined, `file:${relative(cwd, spec).replaceAll("\\", "/")}`);
     return 0;
   }
   if (verb === "uninstall") {
@@ -245,10 +256,64 @@ describe("ndx extensions add", () => {
     expect(readJson(join(userFolder(), "package.json")).dependencies).toEqual({});
   });
 
+  it("installs a relative tarball or folder from where the command runs, not from the ndx home", async () => {
+    const tarball = join(project, "ndx-recon-1.0.0.tgz");
+    writeFileSync(tarball, "");
+    registry[tarball] = extensionPackage("@acme/ndx-recon", "recon");
+    const checkout = join(root, "checkouts", "hello");
+    writePackage(checkout, extensionPackage("ndx-hello", "hello"));
+
+    const fromTarball = await ndx(["add", "./ndx-recon-1.0.0.tgz"]);
+    const fromFolder = await ndx(["add", "../checkouts/hello"]);
+
+    expect(fromTarball).toMatchObject({ code: 0, err: "" });
+    expect(fromFolder).toMatchObject({ code: 0, err: "" });
+    expect(npmCalls.map((c) => c.args[1])).toEqual([tarball, checkout]);
+    expect(npmCalls.every((c) => c.cwd === userFolder())).toBe(true);
+    expect(fromTarball.out).toMatch(/Added @acme\/ndx-recon@1\.0\.0 as 'recon'/);
+    expect(fromFolder.out).toMatch(/Added ndx-hello@1\.0\.0 as 'hello'/);
+  });
+
+  it("reports an extension re-added by path as that extension", async () => {
+    writePackage(join(root, "checkouts", "hello"), extensionPackage("ndx-hello", "hello"));
+    expect((await ndx(["add", "../checkouts/hello"])).code).toBe(0);
+
+    const again = await ndx(["add", "../checkouts/hello"]);
+
+    expect(again).toMatchObject({ code: 0, err: "" });
+    expect(again.out).toMatch(/Added ndx-hello@1\.0\.0 as 'hello'/);
+    expect(npmCalls.map((c) => c.args[0])).toEqual(["install", "install"]);
+  });
+
+  it("refuses a flag it does not take instead of dropping it", async () => {
+    registry["@acme/ndx-recon"] = extensionPackage("@acme/ndx-recon", "recon");
+    const { code, err } = await ndx(["add", "@acme/ndx-recon", "--registry=https://npm.example.com"]);
+    expect(code).toBe(1);
+    expect(err).toMatch(/'ndx extensions add' does not take --registry=https:\/\/npm\.example\.com/);
+    expect(err).toMatch(/npm_config_/);
+    expect(npmCalls).toEqual([]);
+    expect((await ndx(["remove", "recon", "--force"])).err).toMatch(/'ndx extensions remove' does not take --force/);
+  });
+
   it("fails when npm does", async () => {
     const { code, err } = await ndx(["add", "@acme/missing"]);
     expect(code).toBe(1);
     expect(err).toMatch(/npm install @acme\/missing failed/);
+  });
+});
+
+describe("localSpecPath", () => {
+  it("resolves the specs npm reads as paths against the caller's cwd, and leaves the rest alone", () => {
+    const cwd = join(root, "here");
+    expect(localSpecPath("./pkg.tgz", cwd)).toBe(join(cwd, "pkg.tgz"));
+    expect(localSpecPath("../folder", cwd)).toBe(join(root, "folder"));
+    expect(localSpecPath("..", cwd)).toBe(root);
+    expect(localSpecPath("pkg.tgz", cwd)).toBe(join(cwd, "pkg.tgz"));
+    expect(localSpecPath("file:../folder", cwd)).toBe(join(root, "folder"));
+    expect(localSpecPath(join(root, "abs"), cwd)).toBe(join(root, "abs"));
+    for (const spec of ["@acme/ndx-recon", "ndx-recon@1.2.0", "github:acme/ndx-recon", "https://example.com/ndx-recon.tgz", "git+https://example.com/r.git"]) {
+      expect(localSpecPath(spec, cwd), spec).toBeNull();
+    }
   });
 });
 

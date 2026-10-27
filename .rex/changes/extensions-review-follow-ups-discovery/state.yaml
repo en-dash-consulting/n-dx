@@ -37,7 +37,14 @@ items:
     lastModified: "2026-10-27T14:46:35.065Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "37e5c938-463a-472a-8666-046c3511d5b2":
-    lastModified: "2026-10-27T13:51:09.866Z"
+    status: "completed"
+    startedAt: "2026-10-27T14:51:04.862Z"
+    completedAt: "2026-10-27T14:57:02.296Z"
+    endedAt: "2026-10-27T14:57:02.296Z"
+    activeIntervals: [{"end":"2026-10-27T14:57:02.296Z","start":"2026-10-27T14:51:04.862Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extensions-command.js: localSpecPath resolves path/tarball specs against the caller's cwd before npm runs in the user folder; listing diff by saved spec plus file: match finds a re-added path; per-subcommand flag allowlist refuses unknown flags. Commit c5f8f194e."
+    lastModified: "2026-10-27T14:57:02.296Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "436bdb1a-8bc0-4250-8405-b506aa4590e3":
     lastModified: "2026-10-27T13:51:16.437Z"
