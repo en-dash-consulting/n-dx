@@ -480,8 +480,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
         writeJson(res, started.status, sidecarRefusalBody(started));
         return;
       }
-      hub.sidecars.beginRequest(decision.name);
-      res.once("close", () => hub.sidecars.endRequest(decision.name));
+      res.once("close", hub.sidecars.beginRequest(decision.name));
       proxyHttp(req, res, started.port, decision.path, decision.prefix, undefined, {}, sidecarForward(hub, decision));
       return;
     }
@@ -726,8 +725,7 @@ async function upgradeSidecar(
     socket.end(`HTTP/1.1 ${started.status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
     return;
   }
-  hub.sidecars.openSocket(decision.name);
-  socket.once("close", () => hub.sidecars.closeSocket(decision.name));
+  socket.once("close", hub.sidecars.openSocket(decision.name));
   proxyUpgrade(req, socket, head, started.port, decision.path, decision.prefix, sidecarForward(hub, decision));
 }
 

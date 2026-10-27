@@ -175,6 +175,8 @@ class Sidecar {
   lastActivity = 0;
   inflight = 0;
   sockets = 0;
+  /** Bumped whenever an instance is let go, so releases from its connections no longer count. */
+  generation = 0;
   starting: Promise<EnsureResult> | null = null;
 
   constructor(readonly name: string) {}
@@ -239,34 +241,33 @@ export class SidecarManager {
     return starting;
   }
 
-  /** A proxied request to `name` began; it holds the sidecar up until {@link endRequest}. */
-  beginRequest(name: string): void {
-    const s = this.sidecars.get(name);
-    if (!s) return;
-    s.inflight++;
-    s.lastActivity = this.now();
+  /**
+   * A proxied request to `name` began; it holds the sidecar up until the
+   * returned release is called. A release counts once, and one from an
+   * instance the hub has since let go leaves its replacement's count alone.
+   */
+  beginRequest(name: string): () => void {
+    return this.hold(name, "inflight");
   }
 
-  endRequest(name: string): void {
-    const s = this.sidecars.get(name);
-    if (!s) return;
-    s.inflight = Math.max(0, s.inflight - 1);
-    s.lastActivity = this.now();
+  /** A WebSocket to `name` opened; while any is open the sidecar is never idle. Release it on close. */
+  openSocket(name: string): () => void {
+    return this.hold(name, "sockets");
   }
 
-  /** A WebSocket to `name` opened; while any is open the sidecar is never idle. */
-  openSocket(name: string): void {
+  private hold(name: string, count: "inflight" | "sockets"): () => void {
     const s = this.sidecars.get(name);
-    if (!s) return;
-    s.sockets++;
+    if (!s) return () => {};
+    const generation = s.generation;
+    s[count]++;
     s.lastActivity = this.now();
-  }
-
-  closeSocket(name: string): void {
-    const s = this.sidecars.get(name);
-    if (!s) return;
-    s.sockets = Math.max(0, s.sockets - 1);
-    s.lastActivity = this.now();
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      s.lastActivity = this.now();
+      if (s.generation === generation) s[count] = Math.max(0, s[count] - 1);
+    };
   }
 
   /** Stop every running sidecar idle for its `idleStopMinutes`. */
@@ -385,9 +386,7 @@ export class SidecarManager {
       exitCode = result.exitCode;
       // A handle the hub already let go of was stopped on purpose.
       if (s.handle !== handle) return;
-      s.handle = null;
-      s.port = null;
-      s.state = "stopped";
+      this.letGo(s);
       this.recordCrash(s, `exited with code ${result.exitCode ?? "null"}`);
     });
 
@@ -423,14 +422,20 @@ export class SidecarManager {
     }
   }
 
-  private async stopSidecar(s: Sidecar): Promise<void> {
-    const handle = s.handle;
-    // Let go first, so the exit is not read as a crash.
+  /** Forget the instance and every connection counted against it. */
+  private letGo(s: Sidecar): void {
     s.handle = null;
     s.port = null;
     s.state = "stopped";
     s.inflight = 0;
     s.sockets = 0;
+    s.generation++;
+  }
+
+  private async stopSidecar(s: Sidecar): Promise<void> {
+    const handle = s.handle;
+    // Let go first, so the exit is not read as a crash.
+    this.letGo(s);
     if (handle) await killWithFallback(handle, this.opts.stopGraceMs ?? 5_000);
   }
 }

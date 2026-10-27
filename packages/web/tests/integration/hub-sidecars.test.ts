@@ -138,16 +138,17 @@ describe("SidecarManager", () => {
     const pid = m.list()[0].pid!;
 
     now += 15 * 60_000;
-    m.openSocket("recon");
+    const closeSocket = m.openSocket("recon");
     await m.sweepIdle();
     expect(m.list()[0].state).toBe("running");
-    m.closeSocket("recon");
+    closeSocket();
 
-    m.beginRequest("recon");
+    const endRequest = m.beginRequest("recon");
     now += 15 * 60_000;
     await m.sweepIdle();
     expect(m.list()[0].state).toBe("running");
-    m.endRequest("recon");
+    endRequest();
+    endRequest(); // a second release does not count twice
 
     now += 14 * 60_000;
     await m.sweepIdle();
@@ -157,6 +158,26 @@ describe("SidecarManager", () => {
     expect(m.list()[0]).toMatchObject({ state: "stopped", recentCrashes: 0 });
     // sweepIdle resolves once the stop has waited for the exit.
     expect(isPidAlive(pid)).toBe(false);
+  });
+
+  it("never lets a stopped instance's connections close against its replacement's counts", async () => {
+    let now = 2_000_000;
+    const { m } = manager("ok", { now: () => now });
+    expect((await m.ensure("recon")).ok).toBe(true);
+    const closeOldSocket = m.openSocket("recon");
+    const endOldRequest = m.beginRequest("recon");
+    await m.stop("recon");
+
+    expect((await m.ensure("recon")).ok).toBe(true);
+    m.openSocket("recon");
+    m.beginRequest("recon");
+    closeOldSocket();
+    endOldRequest();
+    expect(m.list()[0].openSockets).toBe(1);
+
+    now += 60 * 60_000;
+    await m.sweepIdle();
+    expect(m.list()[0].state).toBe("running");
   });
 
   it("restarts a crashed sidecar on the next request", async () => {

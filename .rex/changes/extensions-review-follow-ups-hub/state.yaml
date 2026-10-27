@@ -43,7 +43,14 @@ items:
     lastModified: "2026-10-27T15:31:04.626Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "d3e8d81c-b5db-4094-ad90-f4df8fe06082":
-    lastModified: "2026-10-27T13:51:52.686Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:57:52.103Z"
+    completedAt: "2026-10-27T16:01:38.009Z"
+    endedAt: "2026-10-27T16:01:38.009Z"
+    activeIntervals: [{"end":"2026-10-27T16:01:38.009Z","start":"2026-10-27T15:57:52.103Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Counts tagged with a per-instance generation; releases from a let-go instance no longer touch the replacement. Commit 23994c46b."
+    lastModified: "2026-10-27T16:01:38.009Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "dc6d3692-a206-4348-ab5e-18cad96e97dc":
     lastModified: "2026-10-27T13:51:59.528Z"
