@@ -5948,6 +5948,35 @@
   border-color: var(--text-dim);
 }
 
+.prd-facet-inbox {
+  align-self: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: var(--font-xs);
+  padding: 2px var(--space-2);
+  cursor: pointer;
+}
+
+.prd-facet-inbox.active {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.prd-inbox-badge {
+  font-size: var(--font-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px var(--space-1);
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
+}
+
 .prd-facet-empty {
   font-size: var(--font-xs);
   color: var(--text-dim);

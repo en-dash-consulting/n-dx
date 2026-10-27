@@ -23,7 +23,14 @@ items:
     lastModified: "2026-10-27T22:49:17.113Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "480edc01-5573-43aa-b559-026a53513984":
-    lastModified: "2026-10-27T16:31:05.167Z"
+    status: "completed"
+    startedAt: "2026-10-27T22:51:28.943Z"
+    completedAt: "2026-10-27T22:58:02.260Z"
+    endedAt: "2026-10-27T22:58:02.260Z"
+    activeIntervals: [{"end":"2026-10-27T22:57:35.979Z","start":"2026-10-27T22:51:28.943Z"},{"end":"2026-10-27T22:58:02.260Z","start":"2026-10-27T22:58:02.260Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Tasks tree shows an Inbox badge on changes awaiting placement and an \"In the Inbox\" facet (URL-persisted, cleared by Clear facets). Work from run 876aeca3, whose commit was blocked; test gate passed in the run, verified and committed by hand."
+    lastModified: "2026-10-27T22:58:02.260Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6773438c-7c3f-4a98-8568-c8908c024270":
     lastModified: "2026-10-27T22:31:48.422Z"
