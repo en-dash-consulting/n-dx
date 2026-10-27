@@ -20,8 +20,15 @@ items:
     lastModified: "2026-10-27T19:21:08.605Z"
     lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "74391a2b-d0b6-405a-83d1-cbae47a1152d":
-    lastModified: "2026-10-13T19:10:21.974Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-27T23:45:43.691Z"
+    completedAt: "2026-10-27T23:45:43.691Z"
+    endedAt: "2026-10-27T23:45:43.691Z"
+    activeIntervals: [{"end":"2026-10-27T23:45:43.691Z","start":"2026-10-27T23:45:43.691Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Flow 2 waits for the POST /api/commands/sv-analyze response (and asserts it is OK) before navigating to /live/analyze, so the navigation can no longer cancel the start request. Typecheck and manual spec discovery pass."
+    lastModified: "2026-10-27T23:45:43.691Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "90612f02-b6e2-48be-bd17-97ab0541461f":
     lastModified: "2026-10-13T19:10:44.982Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
