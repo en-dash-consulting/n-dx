@@ -511,50 +511,62 @@ function ignoredSharedClaudePathNote(dir) {
 }
 
 /**
- * Persist a discovered claude CLI path as `hench.claudePath` in the
- * machine-local config (`.n-dx.local.json`), so subsequent hench invocations
- * reuse it without re-discovering. Machine-local because the path is this
- * machine's, and because hench honours a `claudePath` the repository ships
- * (`.hench/config.json`) only once the repository is trusted.
+ * Move a `claudePath` an older init wrote into `.hench/config.json` to
+ * `hench.claudePath` in the machine-local config (`.n-dx.local.json`).
  *
- * Older inits wrote the discovered path into `.hench/config.json`, where it
- * now reads as a repository-chosen binary and leaves the user's own checkout
- * untrusted. A `claudePath` there that is a discovery candidate is moved to
- * the local file; any other value was set by hand and is left alone.
+ * Older inits persisted a discovered path there, where it now reads as a
+ * repository-chosen binary (`vendor-cli-path`) and leaves the user's own
+ * checkout untrusted. Only a discovery candidate moves; any other value was
+ * set by hand and is left alone. A local `hench.claudePath` is never
+ * overridden. `ndx init` runs this whichever way it finds Claude, and with
+ * Claude integration off.
  *
- * The bare `claude` found on PATH is hench's default and is not written.
- * Skips when hench is not initialized or a config file is unreadable.
+ * Skips when either config file is missing, unreadable or not an object.
+ * @param {string} dir  Project root
+ */
+export function moveDiscoveredClaudePath(dir) {
+  const layout = resolveLayout(dir);
+  const henchConfigFile = join(layout.henchDir, "config.json");
+  const henchConfig = readJsonObject(henchConfigFile);
+  const stale = henchConfig?.claudePath;
+  if (typeof stale !== "string" || !isClaudeDiscoveryCandidate(stale)) return;
+  const local = existsSync(layout.localConfigFile) ? readJsonObject(layout.localConfigFile) : {};
+  if (!local) return;
+  try {
+    const hench = isPlainObject(local.hench) ? local.hench : {};
+    if (!hench.claudePath) {
+      local.hench = { ...hench, claudePath: stale };
+      writeFileSync(layout.localConfigFile, JSON.stringify(local, null, 2) + "\n", "utf-8");
+    }
+    // Removed only after the local write, so a failure there loses nothing.
+    delete henchConfig.claudePath;
+    writeFileSync(henchConfigFile, JSON.stringify(henchConfig, null, 2) + "\n", "utf-8");
+  } catch { /* skip — non-critical: `ndx trust accept .` or a manual move clears the finding */ }
+}
+
+/**
+ * Persist a claude CLI path found at a well-known location as
+ * `hench.claudePath` in the machine-local config (`.n-dx.local.json`), so
+ * subsequent hench invocations reuse it without re-discovering. Machine-local
+ * because the path is this machine's, and because hench honours a
+ * `claudePath` the repository ships (`.hench/config.json`) only once the
+ * repository is trusted. A path found now replaces a local one.
+ *
+ * Skips when hench is not initialized or the local config is unreadable.
  * @param {string|null} dir  Project root
  * @param {string} resolvedPath
  */
 function persistDiscoveredClaudePath(dir, resolvedPath) {
   if (!dir) return;
   const layout = resolveLayout(dir);
-  const henchConfigFile = join(layout.henchDir, "config.json");
-  if (!existsSync(henchConfigFile)) return;
+  if (!existsSync(join(layout.henchDir, "config.json"))) return;
+  const local = existsSync(layout.localConfigFile) ? readJsonObject(layout.localConfigFile) : {};
+  if (!local) return;
+  const hench = isPlainObject(local.hench) ? local.hench : {};
+  if (hench.claudePath === resolvedPath) return;
+  local.hench = { ...hench, claudePath: resolvedPath };
   try {
-    // Unreadable: nothing to move, but a path found now is still persisted.
-    const henchConfig = readJsonObject(henchConfigFile);
-    const stale = henchConfig && typeof henchConfig.claudePath === "string"
-      && isClaudeDiscoveryCandidate(henchConfig.claudePath)
-      ? henchConfig.claudePath
-      : undefined;
-
-    const local = existsSync(layout.localConfigFile) ? JSON.parse(readFileSync(layout.localConfigFile, "utf-8")) : {};
-    if (!isPlainObject(local)) return;
-    const hench = isPlainObject(local.hench) ? local.hench : {};
-    // A path found now wins; a moved one never overrides a local choice.
-    const target = resolvedPath !== "claude" ? resolvedPath : (hench.claudePath ? undefined : stale);
-    if (target && hench.claudePath !== target) {
-      local.hench = { ...hench, claudePath: target };
-      writeFileSync(layout.localConfigFile, JSON.stringify(local, null, 2) + "\n", "utf-8");
-    }
-
-    // Removed only after the local write, so a failure there loses nothing.
-    if (stale) {
-      delete henchConfig.claudePath;
-      writeFileSync(henchConfigFile, JSON.stringify(henchConfig, null, 2) + "\n", "utf-8");
-    }
+    writeFileSync(layout.localConfigFile, JSON.stringify(local, null, 2) + "\n", "utf-8");
   } catch { /* skip — non-critical: hench falls back to `claude` on PATH */ }
 }
 
@@ -636,7 +648,9 @@ function buildClaudeWellKnownCandidates() {
  *
  * When a path is found via (4) it is persisted as `hench.claudePath` in
  * .n-dx.local.json so subsequent hench invocations reuse it without
- * re-discovering (see {@link persistDiscoveredClaudePath}).
+ * re-discovering (see {@link persistDiscoveredClaudePath}). A path an older
+ * init wrote into `.hench/config.json` is moved by `ndx init` itself, not
+ * here (see {@link moveDiscoveredClaudePath}).
  *
  * @param {string|null} [dir=null]  Project root (used to read and write .n-dx.local.json)
  * @returns {{ found: true, path: string } | { found: false, searched: string[] }}
@@ -674,7 +688,6 @@ export function discoverClaudeCli(dir = null) {
   searched.push("claude (PATH)");
   try {
     execFileSyncCli("claude", ["--version"], { stdio: "ignore", timeout: 5_000 });
-    persistDiscoveredClaudePath(dir, "claude");
     return { found: true, path: "claude" };
   } catch { /* not in PATH */ }
 

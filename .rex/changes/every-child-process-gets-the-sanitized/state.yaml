@@ -54,8 +54,15 @@ items:
     lastModified: "2026-10-16T22:37:54.011Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5e036bd1-1cf3-4e5f-8a65-9ba191f429ce":
+    status: "completed"
+    startedAt: "2026-10-27T20:12:42.581Z"
+    completedAt: "2026-10-27T20:20:02.933Z"
+    endedAt: "2026-10-27T20:20:02.933Z"
+    activeIntervals: [{"end":"2026-10-27T20:20:02.933Z","start":"2026-10-27T20:12:42.581Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Split the .hench/config.json claudePath move into exported moveDiscoveredClaudePath; ndx init calls it before the TUI/static split, independent of Claude integration and discovery path."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T20:06:24.594Z"
+    lastModified: "2026-10-27T20:20:02.933Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "64e133c5-7ea1-462f-9a73-11fbd3b1658b":
     status: "completed"
@@ -69,8 +76,15 @@ items:
     lastModified: "2026-10-27T19:56:55.867Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82468601-c666-4943-a9ac-b11bb0149372":
+    status: "completed"
+    startedAt: "2026-10-27T20:20:02.933Z"
+    completedAt: "2026-10-27T20:20:02.933Z"
+    endedAt: "2026-10-27T20:20:02.933Z"
+    activeIntervals: [{"end":"2026-10-27T20:20:02.933Z","start":"2026-10-27T20:20:02.933Z"}]
+    appliedAt: "2026-10-27T20:20:02.933Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T20:02:06.816Z"
+    lastModified: "2026-10-27T20:20:02.933Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8b8fe23b-ee8b-4b82-8fb8-ddf64625c6cb":
     status: "completed"

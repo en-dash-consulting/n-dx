@@ -93,7 +93,7 @@ import {
   commitInitBaseline,
   formatGitInitCommitLines,
 } from "./git-preflight.js";
-import { formatClaudeCliNotFoundError } from "./claude-integration.js";
+import { formatClaudeCliNotFoundError, moveDiscoveredClaudePath } from "./claude-integration.js";
 import {
   formatInitBanner,
   formatRecap,
@@ -1661,6 +1661,10 @@ async function handleInit(rest) {
   ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
   ensureGitattributesRules(dir, layout);
   ensureMergeDriverRegistered(dir);
+  // Independent of the Claude integration and of how it finds Claude: a
+  // claudePath an older init discovered and wrote into .hench/config.json
+  // reads as a repository-chosen binary and leaves this checkout untrusted.
+  moveDiscoveredClaudePath(dir);
 
   // ── Ink animated UI (TTY, non-quiet) vs static fallback ───────────
   // Ink owns sub-package inits, LLM config writes, assistant integrations,

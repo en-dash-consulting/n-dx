@@ -4,8 +4,9 @@
  * Before the trust review gated hench's `claudePath`, discovery persisted a
  * well-known install it found outside PATH into `.hench/config.json`. There it
  * now reads as a repository-chosen binary (`vendor-cli-path`), so the user's
- * own checkout turns untrusted on upgrade. Re-running discovery moves it to
- * `.n-dx.local.json` and leaves a hand-set value alone.
+ * own checkout turns untrusted on upgrade. `ndx init` moves it to
+ * `.n-dx.local.json` whichever way it then finds Claude
+ * (tests/e2e/cli-init.test.js), and leaves a hand-set value alone.
  *
  * Real files under a temp project and a temp home; only the claude probe and
  * `homedir()` are stubbed.
@@ -27,7 +28,7 @@ vi.mock("../../packages/core/win-spawn.js", async (importOriginal) => {
 });
 
 import { execFileSyncCli } from "../../packages/core/win-spawn.js";
-import { discoverClaudeCli } from "../../packages/core/claude-integration.js";
+import { discoverClaudeCli, moveDiscoveredClaudePath } from "../../packages/core/claude-integration.js";
 import { evaluateRepoTrust } from "../../packages/llm-client/dist/public.js";
 
 const posix = process.platform !== "win32";
@@ -68,30 +69,23 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-describe.skipIf(!posix)("discoverClaudeCli — a claudePath an older init wrote into .hench/config.json", () => {
+describe.skipIf(!posix)("moveDiscoveredClaudePath — a claudePath an older init wrote into .hench/config.json", () => {
   it("moves it to .n-dx.local.json, and the checkout evaluates as baseline", () => {
     writeHench({ provider: "cli", claudePath: installed });
     expect(evaluateRepoTrust(dir).state).toBe("untrusted");
-    claudeOnPath(false);
 
-    expect(discoverClaudeCli(dir).path).toBe(installed);
+    moveDiscoveredClaudePath(dir);
 
     expect(readJson(localFile())).toEqual({ hench: { claudePath: installed } });
     expect(readJson(henchFile())).toEqual({ provider: "cli" });
     expect(evaluateRepoTrust(dir).state).toBe("baseline");
   });
 
-  it("moves it when claude is now on PATH, without overriding a local claudePath", () => {
-    writeHench({ claudePath: installed });
-    claudeOnPath(true);
-
-    discoverClaudeCli(dir);
-    expect(readJson(localFile())).toEqual({ hench: { claudePath: installed } });
-    expect(readJson(henchFile())).toEqual({});
-
+  it("never overrides a local claudePath", () => {
     writeHench({ claudePath: installed });
     writeFileSync(localFile(), JSON.stringify({ hench: { claudePath: "/mine/claude" } }));
-    discoverClaudeCli(dir);
+
+    moveDiscoveredClaudePath(dir);
     expect(readJson(localFile())).toEqual({ hench: { claudePath: "/mine/claude" } });
     expect(readJson(henchFile())).toEqual({});
   });
@@ -99,19 +93,41 @@ describe.skipIf(!posix)("discoverClaudeCli — a claudePath an older init wrote 
   it("matches an nvm install that has since been removed", () => {
     const gone = join(state.home, ".nvm", "versions", "node", "v18.0.0", "bin", "claude");
     writeHench({ claudePath: gone });
-    claudeOnPath(true);
 
-    discoverClaudeCli(dir);
+    moveDiscoveredClaudePath(dir);
     expect(readJson(localFile())).toEqual({ hench: { claudePath: gone } });
     expect(readJson(henchFile())).toEqual({});
   });
 
   it("leaves a hand-set claudePath that is not a discovery candidate", () => {
     writeHench({ claudePath: "/opt/tools/claude-wrapper" });
-    claudeOnPath(true);
 
-    discoverClaudeCli(dir);
+    moveDiscoveredClaudePath(dir);
     expect(readJson(henchFile())).toEqual({ claudePath: "/opt/tools/claude-wrapper" });
     expect(existsSync(localFile())).toBe(false);
+  });
+
+  it("leaves it in place when .n-dx.local.json is unreadable", () => {
+    writeHench({ claudePath: installed });
+    writeFileSync(localFile(), "{ not json");
+
+    moveDiscoveredClaudePath(dir);
+    expect(readJson(henchFile())).toEqual({ claudePath: installed });
+  });
+});
+
+describe.skipIf(!posix)("discoverClaudeCli — a well-known install found after the move", () => {
+  it("persists the found path locally, over the moved one", () => {
+    const found = join(state.home, ".npm-global", "bin", "claude");
+    mkdirSync(join(state.home, ".npm-global", "bin"), { recursive: true });
+    writeFileSync(found, "");
+    rmSync(installed);
+    writeHench({ claudePath: installed });
+    claudeOnPath(false);
+
+    moveDiscoveredClaudePath(dir);
+    expect(discoverClaudeCli(dir).path).toBe(found);
+    expect(readJson(localFile())).toEqual({ hench: { claudePath: found } });
+    expect(readJson(henchFile())).toEqual({});
   });
 });
