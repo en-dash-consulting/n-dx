@@ -155,15 +155,20 @@ export function InboxView({ rows, appliedUnplaced, limit, onOpenChange, onOpenAl
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
           `${hidden} more · Open ↗`)
       : null,
-    appliedUnplaced
-      ? h("details", { class: "inbox-applied" },
-          h("summary", null,
-            `${appliedUnplaced} applied change${appliedUnplaced === 1 ? " was" : "s were"} never placed (history, can't be placed)`),
-          h("p", { class: "section-sub" },
-            "They were applied before they were placed. Their work is done, so they stay as history."),
-        )
-      : null,
+    h(AppliedHistory, { count: appliedUnplaced }),
   );
+}
+
+/** IB2: applied changes never placed, as a collapsed count; nothing at zero. */
+export function AppliedHistory({ count }: { count: number | null }) {
+  return count
+    ? h("details", { class: "inbox-applied" },
+        h("summary", null,
+          `${count} applied change${count === 1 ? " was" : "s were"} never placed (history, can't be placed)`),
+        h("p", { class: "section-sub" },
+          "They were applied before they were placed. Their work is done, so they stay as history."),
+      )
+    : null;
 }
 
 // ── Page ─────────────────────────────────────────────────────────────
@@ -232,7 +237,10 @@ async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<strin
   return reads;
 }
 
-/** The routed Inbox; in a Plan section it shows `limit` rows. */
+/**
+ * The Inbox in its Plan section: `limit` rows, each opening its change in
+ * the Tasks tree. Its own page is `InboxTriagePage` (inbox-triage.ts).
+ */
 export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limit?: number }) {
   const { load, rows } = useInbox();
   const status = useProjectStatus();

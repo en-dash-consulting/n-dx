@@ -22,6 +22,7 @@ export { WorkflowOptimizationView } from "./workflow-optimization.js";
 export { MergeGraphView } from "./merge-graph.js";
 export { ProductPage, ChangesPage } from "./product-pages.js";
 export { InboxPage, INBOX_SECTION_ROWS } from "./inbox.js";
+export { InboxTriagePage } from "./inbox-triage.js";
 
 // TODO(ask-panel): a Rex-scoped Ask panel gets exported here once the
 // SourceVision one (PRD feature d339458a) is generalised. Note that the

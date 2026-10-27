@@ -56,6 +56,7 @@ import {
   ProductPage,
   ChangesPage,
   InboxPage,
+  InboxTriagePage,
   INBOX_SECTION_ROWS,
 } from "./domain-rex.js";
 
@@ -251,8 +252,11 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "changes": ({ navigateTo }) =>
     h(ChangesPage, { navigateTo }),
 
+  // The Plan section shows a few rows; the page is the triage queue.
   "inbox": ({ navigateTo, inSection }) =>
-    h(InboxPage, { navigateTo, limit: inSection ? INBOX_SECTION_ROWS : undefined }),
+    inSection
+      ? h(InboxPage, { navigateTo, limit: INBOX_SECTION_ROWS })
+      : h(InboxTriagePage, { navigateTo }),
 
   "analysis": ({ navigateTo }) =>
     h(AnalysisView, { navigateTo }),
