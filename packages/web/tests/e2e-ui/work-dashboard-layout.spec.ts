@@ -37,6 +37,8 @@ test.beforeAll(async () => {
   for (let i = 1; i <= EXTRA_EPICS; i += 1) {
     execFileSync("node", [REX_BIN, "add", "epic", `--title=Layout Epic ${i}`, fixture.dir], { stdio: "pipe" });
   }
+  // A prioritised task, so Priority Distribution shows beside the breakdown.
+  execFileSync("node", [REX_BIN, "add", "task", "--title=Layout Priority Task", "--priority=high", `--parent=${fixture.epicId}`, fixture.dir], { stdio: "pipe" });
   dashboard = await startDashboard(fixture.dir);
 });
 
@@ -73,6 +75,12 @@ for (const colorScheme of ["light", "dark"] as const) {
     const [first, second, third] = await Promise.all([0, 1, 2].map((i) => rows.nth(i).boundingBox()));
     expect(first && second && Math.abs(first.y - second.y) < 2, "first two epics on one row").toBe(true);
     expect(first && third && third.y > first.y + first.height - 1, "third epic on the next row").toBe(true);
+
+    // Three panels: priority over the status breakdown in one, then health
+    // and quick actions.
+    await expect(page.locator(".rex-dash-panel")).toHaveCount(3);
+    await expect(page.locator(".rex-dash-panel-breakdown .rex-dash-panel-title"))
+      .toHaveText(["Priority Distribution", "Status Breakdown"]);
 
     // The panels sit in one row at this width, all the same height.
     const panels = await page.locator(".rex-dash-panel").evaluateAll((els) =>

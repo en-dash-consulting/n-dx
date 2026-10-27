@@ -636,26 +636,62 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
       // ── Panels: a row of blocks under Up Next ─────────────────────
       h("div", { class: "rex-dash-sidebar" },
 
-        // Priority distribution
-        priorityEntries.length > 0
-          ? h("div", { class: "rex-dash-panel" },
-              h("h3", { class: "rex-dash-panel-title" }, "Priority Distribution"),
-              h("div", { class: "rex-dash-priority-bars" },
-                priorityEntries.map((p) =>
-                  h("div", { key: p.label, class: "rex-dash-priority-row" },
-                    h("span", { class: `rex-dash-priority-label rex-dash-priority-${p.cls}` }, p.label),
-                    h("div", { class: "rex-dash-priority-track" },
-                      h("div", {
-                        class: `rex-dash-priority-fill rex-dash-priority-fill-${p.cls}`,
-                        style: `width: ${totalPrioritized > 0 ? (p.count / totalPrioritized) * 100 : 0}%`,
-                      }),
+        // Priority distribution over the status breakdown, one panel
+        h("div", { class: "rex-dash-panel rex-dash-panel-breakdown" },
+          priorityEntries.length > 0
+            ? h("div", { class: "rex-dash-breakdown-part" },
+                h("h3", { class: "rex-dash-panel-title" }, "Priority Distribution"),
+                h("div", { class: "rex-dash-priority-bars" },
+                  priorityEntries.map((p) =>
+                    h("div", { key: p.label, class: "rex-dash-priority-row" },
+                      h("span", { class: `rex-dash-priority-label rex-dash-priority-${p.cls}` }, p.label),
+                      h("div", { class: "rex-dash-priority-track" },
+                        h("div", {
+                          class: `rex-dash-priority-fill rex-dash-priority-fill-${p.cls}`,
+                          style: `width: ${totalPrioritized > 0 ? (p.count / totalPrioritized) * 100 : 0}%`,
+                        }),
+                      ),
+                      h("span", { class: "rex-dash-priority-count" }, String(p.count)),
                     ),
-                    h("span", { class: "rex-dash-priority-count" }, String(p.count)),
                   ),
                 ),
+              )
+            : null,
+          h("div", { class: "rex-dash-breakdown-part" },
+            h("h3", { class: "rex-dash-panel-title" }, "Status Breakdown"),
+            h("div", { class: "rex-dash-status-grid" },
+              h("div", { class: "rex-dash-status-item" },
+                h("span", { class: "prd-status-dot prd-status-completed" }),
+                h("span", { class: "rex-dash-status-label" }, "Completed"),
+                h("span", { class: "rex-dash-status-count" }, String(stats.completed)),
               ),
-            )
-          : null,
+              h("div", { class: "rex-dash-status-item" },
+                h("span", { class: "prd-status-dot prd-status-in-progress" }),
+                h("span", { class: "rex-dash-status-label" }, "In Progress"),
+                h("span", { class: "rex-dash-status-count" }, String(stats.inProgress)),
+              ),
+              h("div", { class: "rex-dash-status-item" },
+                h("span", { class: "prd-status-dot prd-status-pending" }),
+                h("span", { class: "rex-dash-status-label" }, "Pending"),
+                h("span", { class: "rex-dash-status-count" }, String(stats.pending)),
+              ),
+              stats.blocked > 0
+                ? h("div", { class: "rex-dash-status-item" },
+                    h("span", { class: "prd-status-dot prd-status-blocked" }),
+                    h("span", { class: "rex-dash-status-label" }, "Blocked"),
+                    h("span", { class: "rex-dash-status-count" }, String(stats.blocked)),
+                  )
+                : null,
+              stats.deferred > 0
+                ? h("div", { class: "rex-dash-status-item" },
+                    h("span", { class: "prd-status-dot prd-status-deferred" }),
+                    h("span", { class: "rex-dash-status-label" }, "Deferred"),
+                    h("span", { class: "rex-dash-status-count" }, String(stats.deferred)),
+                  )
+                : null,
+            ),
+          ),
+        ),
 
         // Structure health card
         health
@@ -691,42 +727,6 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
               ),
             )
           : null,
-
-        // Status breakdown (small summary)
-        h("div", { class: "rex-dash-panel" },
-          h("h3", { class: "rex-dash-panel-title" }, "Status Breakdown"),
-          h("div", { class: "rex-dash-status-grid" },
-            h("div", { class: "rex-dash-status-item" },
-              h("span", { class: "prd-status-dot prd-status-completed" }),
-              h("span", { class: "rex-dash-status-label" }, "Completed"),
-              h("span", { class: "rex-dash-status-count" }, String(stats.completed)),
-            ),
-            h("div", { class: "rex-dash-status-item" },
-              h("span", { class: "prd-status-dot prd-status-in-progress" }),
-              h("span", { class: "rex-dash-status-label" }, "In Progress"),
-              h("span", { class: "rex-dash-status-count" }, String(stats.inProgress)),
-            ),
-            h("div", { class: "rex-dash-status-item" },
-              h("span", { class: "prd-status-dot prd-status-pending" }),
-              h("span", { class: "rex-dash-status-label" }, "Pending"),
-              h("span", { class: "rex-dash-status-count" }, String(stats.pending)),
-            ),
-            stats.blocked > 0
-              ? h("div", { class: "rex-dash-status-item" },
-                  h("span", { class: "prd-status-dot prd-status-blocked" }),
-                  h("span", { class: "rex-dash-status-label" }, "Blocked"),
-                  h("span", { class: "rex-dash-status-count" }, String(stats.blocked)),
-                )
-              : null,
-            stats.deferred > 0
-              ? h("div", { class: "rex-dash-status-item" },
-                  h("span", { class: "prd-status-dot prd-status-deferred" }),
-                  h("span", { class: "rex-dash-status-label" }, "Deferred"),
-                  h("span", { class: "rex-dash-status-count" }, String(stats.deferred)),
-                )
-              : null,
-          ),
-        ),
 
         // Quick nav to PRD tree
         navigateTo

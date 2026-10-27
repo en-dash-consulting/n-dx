@@ -583,6 +583,13 @@
   margin: 0 0 var(--space-3) 0;
 }
 
+/* Priority distribution over the status breakdown, in one panel. */
+.rex-dash-breakdown-part + .rex-dash-breakdown-part {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
 /* Priority distribution */
 .rex-dash-priority-bars {
   display: flex;
