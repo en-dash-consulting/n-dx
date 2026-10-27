@@ -741,6 +741,19 @@ describe("n-dx config", () => {
       expect(ndxConfig.claude).toBeUndefined();
     });
 
+    it("sets cli.claudePath in .n-dx.local.json, never in .n-dx.json", async () => {
+      // ndx init runs only the local value, so a shared one would be ignored
+      // and read as a trust finding against the user's own repository.
+      run(["cli.claudePath", "/opt/claude", tmpDir]);
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.cli.claudePath).toBe("/opt/claude");
+      let shared = {};
+      try {
+        shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      } catch { /* not created — fine */ }
+      expect(shared.cli?.claudePath).toBeUndefined();
+    });
+
     it("sets claude.api_key in .n-dx.local.json, never in .n-dx.json", async () => {
       const output = run(["claude.api_key", "sk-ant-test-key", tmpDir]);
       expect(output).toContain("claude.api_key = sk-ant-test-key");

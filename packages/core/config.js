@@ -98,7 +98,7 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *
  * Two kinds live here, for two different reasons:
  *
- * - **Machine-specific paths** (`*.cli_path`) differ per developer machine, so
+ * - **Machine-specific paths** (`*.cli_path`, `cli.claudePath`) differ per developer machine, so
  *   sharing them through git would break a teammate's checkout. The loaders
  *   also honour them from the shared file only once the repository is
  *   trusted, since they pick the binary that runs (llm-client
@@ -120,6 +120,7 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  * and `llm.google.api_key` all route without listing each vendor.
  */
 const LOCAL_ONLY_SETTINGS = {
+  cli: new Set(["claudePath"]),
   claude: new Set(["cli_path", "api_key", "api_endpoint"]),
   llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
 };
@@ -2450,8 +2451,9 @@ CLI settings (.n-dx.json):
                                      Homebrew, etc.). Set this when claude is installed
                                      in a non-standard location and ndx init cannot
                                      locate it automatically. The value is NOT validated
-                                     on set — use --force to skip validation on other
-                                     keys, or set directly in .n-dx.json.
+                                     on set. Stored in .n-dx.local.json; ndx init never
+                                     runs one from the shared .n-dx.json, which reads as
+                                     a trust finding.
                                      Example: n-dx config cli.claudePath /usr/local/bin/claude
   cli.timeoutMs            number    Global command timeout in milliseconds.
                                      Default: 1800000 (30 minutes). Commands that exceed

@@ -83,7 +83,18 @@ describe("discoverClaudeCli — step 1: CLAUDE_CLI_PATH env var", () => {
   });
 });
 
-describe("discoverClaudeCli — step 2: cli.claudePath from .n-dx.json", () => {
+describe("discoverClaudeCli — step 2: cli.claudePath from .n-dx.local.json", () => {
+  const dir = "/tmp/project";
+  const LOCAL = join(dir, ".n-dx.local.json");
+  const SHARED = join(dir, ".n-dx.json");
+
+  function files(map) {
+    readFileSync.mockImplementation((p) => {
+      if (p in map) return JSON.stringify(map[p]);
+      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+    });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.CLAUDE_CLI_PATH;
@@ -91,36 +102,29 @@ describe("discoverClaudeCli — step 2: cli.claudePath from .n-dx.json", () => {
   });
 
   it("returns configured path when file exists and runs", () => {
-    const dir = "/tmp/project";
-    readFileSync.mockImplementation((p) => {
-      if (p === join(dir, ".n-dx.json")) return JSON.stringify({ cli: { claudePath: "/cfg/claude" } });
-      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-    });
-    existsSync.mockImplementation((p) => p === join(dir, ".n-dx.json") || p === "/cfg/claude");
+    files({ [LOCAL]: { cli: { claudePath: "/cfg/claude" } } });
+    existsSync.mockImplementation((p) => p === LOCAL || p === "/cfg/claude");
     expect(discoverClaudeCli(dir)).toEqual({ found: true, path: "/cfg/claude" });
   });
 
   it("returns not-found with no fallback when configured path is missing", () => {
-    const dir = "/tmp/project";
-    readFileSync.mockImplementation((p) => {
-      if (p === join(dir, ".n-dx.json")) return JSON.stringify({ cli: { claudePath: "/missing/claude" } });
-      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-    });
-    existsSync.mockImplementation((p) => p === join(dir, ".n-dx.json"));
+    files({ [LOCAL]: { cli: { claudePath: "/missing/claude" } } });
+    existsSync.mockImplementation((p) => p === LOCAL);
     const r = discoverClaudeCli(dir);
     expect(r.found).toBe(false);
     expect(r.searched[0]).toContain("cli.claudePath");
   });
 
-  it("falls through to PATH when .n-dx.json has no cli.claudePath", () => {
-    const dir = "/tmp/project";
-    readFileSync.mockImplementation((p) => {
-      if (p === join(dir, ".n-dx.json")) return JSON.stringify({ web: { port: 3117 } });
-      throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-    });
-    existsSync.mockImplementation((p) => p === join(dir, ".n-dx.json"));
-    // PATH check succeeds
-    execFileSyncCli.mockImplementation(() => {});
+  it("never runs a cli.claudePath from the shared .n-dx.json, which the repository chooses", () => {
+    files({ [SHARED]: { cli: { claudePath: "/repo/tools/claude" } } });
+    existsSync.mockImplementation((p) => p === SHARED || p === "/repo/tools/claude");
+    expect(discoverClaudeCli(dir)).toEqual({ found: true, path: "claude" });
+    expect(execFileSyncCli.mock.calls.map(([bin]) => bin)).not.toContain("/repo/tools/claude");
+  });
+
+  it("falls through to PATH when no cli.claudePath is set", () => {
+    files({ [SHARED]: { web: { port: 3117 } } });
+    existsSync.mockImplementation((p) => p === SHARED);
     expect(discoverClaudeCli(dir)).toEqual({ found: true, path: "claude" });
   });
 });

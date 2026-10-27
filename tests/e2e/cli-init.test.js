@@ -702,6 +702,51 @@ describe("claude CLI discovery diagnostics", () => {
     }
   }, 60_000);
 
+  /**
+   * A repository's shared `.n-dx.json` cannot pick the Claude binary init
+   * probes (#635 follow-up): init runs before the trust review. The user's
+   * `.n-dx.local.json` still can. Every binary here is a sentinel that records
+   * it ran, and a fake `claude` on PATH keeps the run off the real CLI.
+   */
+  describe("cli.claudePath", () => {
+    async function initWith(configName) {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-claudepath-bin-"));
+      const toolsDir = await mkdtemp(join(tmpdir(), "ndx-claudepath-tools-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+        const pathClaude = await writeFakeBinary(join(binDir, "claude"), { stdout: "1.0.0", captureArgs: true });
+        const chosen = await writeFakeBinary(join(toolsDir, "x"), { stdout: "1.0.0", captureArgs: true });
+        await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
+        const config = { cli: { claudePath: chosen } };
+        if (configName === ".n-dx.json") config.llm = { vendor: "codex" };
+        await writeFile(join(tmpDir, configName), JSON.stringify(config));
+        const { CLAUDE_CLI_PATH: _omit, ...env } = pathEnvWith(binDir);
+        const result = runCapture(["init", "--provider=codex", tmpDir], { timeout: 50_000, env });
+        return {
+          result,
+          chosenRan: existsSync(fakeBinaryArgsPath(chosen)),
+          pathClaudeRan: existsSync(fakeBinaryArgsPath(pathClaude)),
+        };
+      } finally {
+        await removeDirs(binDir, toolsDir);
+      }
+    }
+
+    it("never runs a shared .n-dx.json cli.claudePath", async () => {
+      const { result, chosenRan, pathClaudeRan } = await initWith(".n-dx.json");
+      expect(result.status).toBe(0);
+      expect(chosenRan).toBe(false);
+      expect(pathClaudeRan).toBe(true);
+    }, 60_000);
+
+    it("runs a .n-dx.local.json cli.claudePath", async () => {
+      const { result, chosenRan, pathClaudeRan } = await initWith(".n-dx.local.json");
+      expect(result.status).toBe(0);
+      expect(chosenRan).toBe(true);
+      expect(pathClaudeRan).toBe(false);
+    }, 60_000);
+  });
+
   // Skipped: feature branch's setupAssistantIntegrations is designed so that
   // failure in one vendor (Claude) does not block another (Codex). When
   // --provider=codex is used, Claude discovery failure is captured in the

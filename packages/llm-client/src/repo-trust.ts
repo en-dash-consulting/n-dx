@@ -333,9 +333,12 @@ function fieldAt(root: Record<string, unknown>, path: readonly string[]): unknow
  * the next time `ndx auth` or `ndx work` starts the vendor CLI, so, like
  * {@link CREDENTIAL_ROUTING_FIELDS}, the project config's values apply only
  * once the user has trusted it. `cli_path` is machine-local; `ndx config`
- * writes it to `.n-dx.local.json`, which always applies.
+ * writes it to `.n-dx.local.json`, which always applies. `cli.claudePath` is
+ * the binary `ndx init` probes and registers MCP servers with; core's
+ * discovery reads it from `.n-dx.local.json` only.
  */
 export const VENDOR_CLI_PATH_FIELDS: readonly (readonly string[])[] = [
+  ["cli", "claudePath"],
   ["claude", "cli_path"],
   ["llm", "claude", "cli_path"],
   ["llm", "codex", "cli_path"],

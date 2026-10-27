@@ -472,7 +472,12 @@ function writeMcpJson(dir) {
 }
 
 /**
- * Read cli.claudePath from .n-dx.json in the given project root.
+ * Read cli.claudePath from the machine-local `.n-dx.local.json`.
+ *
+ * Never from the shared `.n-dx.json`: init probes this binary before the trust
+ * review, so a path the repository ships would run its own script with the
+ * user's environment. llm-client's trust review flags a shared one
+ * (`vendor-cli-path`), and `ndx config cli.claudePath` writes the local file.
  * Returns undefined if not set.
  * @param {string|null} dir
  * @returns {string|undefined}
@@ -480,7 +485,7 @@ function writeMcpJson(dir) {
 function readConfiguredClaudePath(dir) {
   if (!dir) return undefined;
   try {
-    const raw = readFileSync(resolveLayout(dir).configFile, "utf-8");
+    const raw = readFileSync(resolveLayout(dir).localConfigFile, "utf-8");
     const cfg = JSON.parse(raw);
     const p = cfg?.cli?.claudePath;
     return typeof p === "string" && p.length > 0 ? p : undefined;
@@ -554,7 +559,8 @@ function buildClaudeWellKnownCandidates() {
  *
  * Discovery order:
  *  1. CLAUDE_CLI_PATH env var (exclusive — no fallback when set)
- *  2. cli.claudePath in .n-dx.json (exclusive — no fallback when set)
+ *  2. cli.claudePath in .n-dx.local.json (exclusive — no fallback when set;
+ *     the shared .n-dx.json is not read, see {@link readConfiguredClaudePath})
  *  3. System PATH
  *  4. Well-known install locations (~/.claude/local/claude, nvm, Homebrew, etc.)
  *
@@ -562,7 +568,7 @@ function buildClaudeWellKnownCandidates() {
  * .n-dx.local.json so subsequent hench invocations reuse it without
  * re-discovering (see {@link persistDiscoveredClaudePath}).
  *
- * @param {string|null} [dir=null]  Project root (used to read .n-dx.json and write .n-dx.local.json)
+ * @param {string|null} [dir=null]  Project root (used to read and write .n-dx.local.json)
  * @returns {{ found: true, path: string } | { found: false, searched: string[] }}
  */
 export function discoverClaudeCli(dir = null) {
@@ -581,7 +587,7 @@ export function discoverClaudeCli(dir = null) {
     return { found: false, searched };
   }
 
-  // 2. cli.claudePath from .n-dx.json — exclusive if set
+  // 2. cli.claudePath from .n-dx.local.json — exclusive if set
   const configPath = readConfiguredClaudePath(dir);
   if (configPath) {
     searched.push(`${configPath} (cli.claudePath)`);

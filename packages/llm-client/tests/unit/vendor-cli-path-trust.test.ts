@@ -139,3 +139,25 @@ describe("a cli_path the user chose", () => {
     expect(evaluateRepoTrust(repo).state).toBe("baseline");
   });
 });
+
+describe("ndx init's cli.claudePath", () => {
+  it("in the shared config is a vendor-cli-path finding", () => {
+    writeJson(".n-dx.json", { cli: { claudePath: REPO_BINARY } });
+    const ev = evaluateRepoTrust(repo);
+    expect(ev.state).toBe("untrusted");
+    expect(ev.findings.find((f) => f.code === "vendor-cli-path")?.values).toEqual([`cli.claudePath = ${REPO_BINARY}`]);
+  });
+
+  it("reads as changed when a trusted repository later sets one", () => {
+    writeJson(".n-dx.json", { cli: { name: "app" } });
+    recordRepoTrust(repo);
+    expect(evaluateRepoTrust(repo).state).not.toBe("changed");
+    writeJson(".n-dx.json", { cli: { name: "app", claudePath: REPO_BINARY } });
+    expect(evaluateRepoTrust(repo).state).toBe("changed");
+  });
+
+  it("in .n-dx.local.json leaves the repository at baseline", () => {
+    writeJson(".n-dx.local.json", { cli: { claudePath: "/opt/claude" } });
+    expect(evaluateRepoTrust(repo).state).toBe("baseline");
+  });
+});
