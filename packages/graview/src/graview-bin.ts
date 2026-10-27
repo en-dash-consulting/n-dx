@@ -1,6 +1,7 @@
 /**
  * Where the `graview` binary is. In order: `graview.bin` in the project
- * config (shared, then machine-local), `NDX_GRAVIEW_BIN`, a `graview` on PATH,
+ * config (machine-local over shared; the repository's only once the checkout
+ * is trusted), `NDX_GRAVIEW_BIN`, a `graview` on PATH,
  * the product face's own `graview` (it pins the same release this package
  * checks against), then `npx -y graview@<pinned>`. A path ending in
  * `.js`/`.mjs`/`.cjs` is a CLI entry run under the current Node, so a sibling
@@ -12,7 +13,7 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
-import type { Layout } from "./llm-gateway.js";
+import { trustedLocalConfig, trustedProjectConfig, type Layout } from "./llm-gateway.js";
 import { GRAVIEW_VERSION } from "./document.js";
 
 export type GraviewBinSource = "config" | "env" | "path" | "face" | "npx";
@@ -64,11 +65,21 @@ function readConfigFile(path: string): Record<string, unknown> {
   }
 }
 
-/** The `graview` section of the project config, machine-local values over shared ones. */
+/**
+ * The `graview` section of the project config, machine-local values over
+ * shared ones. `bin` is a binary n-dx spawns, so both files pass the trust
+ * gate: the shared config's `bin`, and a git-tracked local config's, apply
+ * only once the user trusts the checkout; the user's own untracked local
+ * config always applies.
+ */
 export function readGraviewConfig(layout: Layout): GraviewConfig {
   const out: GraviewConfig = {};
-  for (const file of [layout.configFile, layout.localConfigFile]) {
-    const section = readConfigFile(file).graview;
+  const configs = [
+    trustedProjectConfig(layout.root, readConfigFile(layout.configFile)),
+    trustedLocalConfig(layout.root, readConfigFile(layout.localConfigFile)),
+  ];
+  for (const config of configs) {
+    const section = config?.graview;
     if (section === null || typeof section !== "object") continue;
     const { bin, includeFiles, app, mainRef, proposeProductLayer } = section as Record<string, unknown>;
     if (typeof bin === "string" && bin.trim().length > 0) out.bin = bin.trim();

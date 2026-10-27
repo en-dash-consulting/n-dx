@@ -18,8 +18,9 @@
  * {@link trustedProjectConfig} and the local one through
  * {@link trustedLocalConfig}.
  *
- * The vendor CLI binary (`*.cli_path`) follows the same rule: a repository
- * that chose it would run its own script with the user's environment.
+ * The vendor CLI binary (`*.cli_path`) and the graview binary (`graview.bin`)
+ * follow the same rule: a repository that chose one would run its own script
+ * with the user's environment.
  *
  * @module llm-client/credential-routing
  */
@@ -119,7 +120,7 @@ function gateConfig(
   if (!warned.has(key)) {
     warned.add(key);
     warn(
-      `[ndx] Ignoring the ${label}'s API endpoint / API key variable / vendor CLI path until you trust this repository (ndx trust accept .): ${gated.map((r) => r.split(" = ")[0]).join(", ")}. ` +
+      `[ndx] Ignoring the ${label}'s API endpoint / API key variable / CLI binary path until you trust this repository (ndx trust accept .): ${gated.map((r) => r.split(" = ")[0]).join(", ")}. ` +
         (repo.localConfigTracked
           ? "The repository commits .n-dx.local.json, so it is not your own config here."
           : "Set them in .n-dx.local.json to use them without trusting the repository."),

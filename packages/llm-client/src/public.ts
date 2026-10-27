@@ -449,6 +449,9 @@ export type {
   RepoTrustEvaluation,
   RepoTrustReportOptions,
 } from "./repo-trust.js";
+// Project and local config with the trust-gated fields (API endpoints, key
+// variables, binary paths) removed while the repository is untrusted
+export { trustedProjectConfig, trustedLocalConfig } from "./credential-routing.js";
 // Credential redaction for persisted or displayed text (run records, logs, live output)
 export {
   REDACTED_TOKEN,
