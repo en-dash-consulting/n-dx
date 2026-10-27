@@ -421,8 +421,13 @@ describe("request body size limit (integration)", () => {
    * inside a try/catch that answers 400. The chunked body carries no
    * Content-Length, so the guard waves it through and the streamed cap in
    * readBody is the only thing between it and memory.
+   *
+   * `sent[i]` is every byte the server handed to connection i's socket, in
+   * order. A test can then prove what the server answered before it closed
+   * even when the client never got to read it (#523).
    */
-  function startBodyReadingServer(): Promise<{ server: Server; port: number }> {
+  function startBodyReadingServer(): Promise<{ server: Server; port: number; sent: string[] }> {
+    const sent: string[] = [];
     return new Promise((resolve) => {
       const server = createServer(async (req, res) => {
         if (handleRequestSecurity(req, res)) return;
@@ -436,18 +441,46 @@ describe("request body size limit (integration)", () => {
           errorResponse(res, 400, (err as Error).message);
         }
       });
+      server.on("connection", (socket) => {
+        const index = sent.push("") - 1;
+        const write = socket.write.bind(socket) as (...args: unknown[]) => boolean;
+        socket.write = ((...args: unknown[]) => {
+          const data = args[0];
+          sent[index] += typeof data === "string" ? data : Buffer.from(data as Uint8Array).toString("utf-8");
+          return write(...args);
+        }) as typeof socket.write;
+      });
       server.listen(0, "127.0.0.1", () => {
         const addr = server.address();
         const port = typeof addr === "object" && addr ? addr.port : 0;
-        resolve({ server, port });
+        resolve({ server, port, sent });
       });
     });
   }
 
   it("answers 413 on an over-cap chunked body that declares no Content-Length", async () => {
-    const { server, port } = await startBodyReadingServer();
+    const { server, port, sent } = await startBodyReadingServer();
+    const limitMessage = `Request body exceeds the ${MAX_REQUEST_BODY_BYTES}-byte limit.`;
     try {
-      const { statusLine, body } = await new Promise<{ statusLine: string; body: string }>((resolve, reject) => {
+      const client = await new Promise<{ received: string; abort?: string }>((resolve, reject) => {
+        let received = "";
+        let abort: string | undefined;
+        const chunk = "a".repeat(64 * 1024);
+        const frame = `${chunk.length.toString(16)}\r\n${chunk}\r\n`;
+        // Enough chunks to pass the cap. Writing past it is the point: the
+        // client keeps sending while the server decides.
+        let remaining = Math.ceil(MAX_REQUEST_BODY_BYTES / chunk.length) + 2;
+        // Honour backpressure and stop once the answer arrives, so the client
+        // is not still racing a queued 10 MB into a socket the server closed.
+        const pump = (): void => {
+          while (remaining > 0 && !received && !socket.destroyed) {
+            remaining--;
+            if (!socket.write(frame)) {
+              socket.once("drain", pump);
+              return;
+            }
+          }
+        };
         const socket = connect({ host: "127.0.0.1", port }, () => {
           socket.write(
             `POST /api/anything HTTP/1.1\r\n` +
@@ -456,32 +489,45 @@ describe("request body size limit (integration)", () => {
             `Transfer-Encoding: chunked\r\n` +
             `\r\n`,
           );
-          // Chunks until the cap is passed. Writing past it is the point: the
-          // client keeps sending while the server decides.
-          const chunk = "a".repeat(64 * 1024);
-          const chunks = Math.ceil(MAX_REQUEST_BODY_BYTES / chunk.length) + 2;
-          for (let i = 0; i < chunks; i++) {
-            socket.write(`${chunk.length.toString(16)}\r\n${chunk}\r\n`);
-          }
+          pump();
         });
-
-        let buf = "";
-        socket.on("data", (part: Buffer) => { buf += part.toString("utf-8"); });
-        socket.on("close", () => resolve({ statusLine: buf.split("\r\n")[0], body: buf }));
-        // A destroyed socket surfaces here as ECONNRESET/EPIPE — which is
-        // exactly the bug: the client is entitled to a status line first.
-        socket.on("error", (err) => { if (!buf) reject(err); else resolve({ statusLine: buf.split("\r\n")[0], body: buf }); });
-        setTimeout(() => reject(new Error("timeout")), 5000);
+        const timer = setTimeout(() => reject(new Error("timeout")), 5000);
+        socket.on("data", (part: Buffer) => { received += part.toString("utf-8"); });
+        // The server answers 413 and hangs up while the body is still coming.
+        // A write or read that loses that race fails with EPIPE/ECONNRESET,
+        // possibly before the 413 is read (#523). That is the expected close,
+        // not a failure: what the server sent is checked from `sent` below.
+        socket.on("error", (err: NodeJS.ErrnoException) => {
+          if (err.code === "EPIPE" || err.code === "ECONNRESET") abort = err.code;
+          else reject(err);
+        });
+        socket.on("close", () => {
+          clearTimeout(timer);
+          resolve({ received, abort });
+        });
       });
-
-      expect(statusLine).toContain("413");
-      // The same body the Content-Length guard sends, so a client cannot tell
-      // which of the two refused it.
-      expect(body).toContain(`Request body exceeds the ${MAX_REQUEST_BODY_BYTES}-byte limit.`);
-      // And not the 400 the route's catch would have written.
-      expect(statusLine).not.toContain("400");
-    } finally {
       await new Promise<void>((r) => server.close(() => r()));
+
+      // Deterministic whatever the client managed to read: the server wrote a
+      // 413 before closing. A server that destroys the socket without
+      // answering — the original readBody bug — leaves this empty.
+      expect(sent).toHaveLength(1);
+      expect(sent[0].split("\r\n")[0]).toContain("413");
+      // The same body the Content-Length guard sends, so a client cannot tell
+      // which of the two refused it — and not the 400 the route's catch writes.
+      expect(sent[0]).toContain(limitMessage);
+      expect(sent[0]).not.toContain(" 400 ");
+
+      // Whatever reached the client is that same answer; nothing reached it
+      // only when the connection was cut under it.
+      if (client.received) {
+        expect(client.received.split("\r\n")[0]).toContain("413");
+        expect(client.received).toContain(limitMessage);
+      } else {
+        expect(client.abort).toMatch(/^(EPIPE|ECONNRESET)$/);
+      }
+    } finally {
+      if (server.listening) await new Promise<void>((r) => server.close(() => r()));
     }
   }, 20_000);
 
