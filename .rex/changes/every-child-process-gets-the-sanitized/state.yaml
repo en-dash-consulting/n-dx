@@ -92,8 +92,15 @@ items:
     lastModified: "2026-10-27T19:06:31.763Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d59b5373-56ca-4851-a8bf-7730188f52d2":
+    status: "completed"
+    startedAt: "2026-10-27T20:06:40.115Z"
+    completedAt: "2026-10-27T20:11:59.312Z"
+    endedAt: "2026-10-27T20:11:59.312Z"
+    activeIntervals: [{"end":"2026-10-27T20:11:59.312Z","start":"2026-10-27T20:06:40.115Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx init notes a skipped shared cli.claudePath (field + move to .n-dx.local.json, no value) in the init report and the not-found searched list."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T19:09:49.792Z"
+    lastModified: "2026-10-27T20:11:59.312Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d6282743-03be-43a4-b97c-e9f9e9b636b8":
     status: "completed"

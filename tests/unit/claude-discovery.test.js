@@ -122,6 +122,18 @@ describe("discoverClaudeCli — step 2: cli.claudePath from .n-dx.local.json", (
     expect(execFileSyncCli.mock.calls.map(([bin]) => bin)).not.toContain("/repo/tools/claude");
   });
 
+  it("names an ignored shared cli.claudePath, not its value, when nothing is found", () => {
+    files({ [SHARED]: { cli: { claudePath: "/repo/tools/claude" } } });
+    existsSync.mockImplementation((p) => p === SHARED);
+    execFileSyncCli.mockImplementation(() => { throw new Error("not found"); });
+    const r = discoverClaudeCli(dir);
+    expect(r.found).toBe(false);
+    const last = r.searched.at(-1);
+    expect(last).toContain("cli.claudePath in .n-dx.json");
+    expect(last).toContain(".n-dx.local.json");
+    expect(r.searched.join("\n")).not.toContain("/repo/tools/claude");
+  });
+
   it("falls through to PATH when no cli.claudePath is set", () => {
     files({ [SHARED]: { web: { port: 3117 } } });
     existsSync.mockImplementation((p) => p === SHARED);

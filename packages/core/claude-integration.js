@@ -18,7 +18,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync, readdirSync, realpathSync } from "fs";
 import { createRequire } from "module";
-import { basename, isAbsolute, join, resolve } from "path";
+import { basename, isAbsolute, join, relative, resolve } from "path";
 // execFileSyncCli, not execSync: every argument here is a filesystem path
 // (the claude binary, the resolved MCP entrypoint, the project dir). Building a
 // cmd.exe command line by hand around those broke on `&`, `^`, `(`, `)`, `!` and
@@ -493,6 +493,24 @@ function readConfiguredClaudePath(dir) {
 }
 
 /**
+ * The note for a shared cli.claudePath that {@link discoverClaudeCli} skips:
+ * set in the project config while neither CLAUDE_CLI_PATH nor a local one
+ * takes precedence. Older `ndx config` wrote it there. Reads the shared file
+ * for presence only; the value is never run and never echoed.
+ * @param {string|null} dir
+ * @returns {string|undefined}
+ */
+function ignoredSharedClaudePathNote(dir) {
+  if (!dir || process.env.CLAUDE_CLI_PATH || readConfiguredClaudePath(dir)) return undefined;
+  const layout = resolveLayout(dir);
+  const p = readJsonObject(layout.configFile)?.cli;
+  if (!isPlainObject(p) || typeof p.claudePath !== "string" || p.claudePath.length === 0) return undefined;
+  const shared = relative(layout.root, layout.configFile);
+  const local = relative(layout.root, layout.localConfigFile);
+  return `cli.claudePath in ${shared} is not run (a repository's config cannot choose the Claude binary); move it to ${local}`;
+}
+
+/**
  * Persist a discovered claude CLI path as `hench.claudePath` in the
  * machine-local config (`.n-dx.local.json`), so subsequent hench invocations
  * reuse it without re-discovering. Machine-local because the path is this
@@ -672,6 +690,8 @@ export function discoverClaudeCli(dir = null) {
     }
   }
 
+  const ignored = ignoredSharedClaudePathNote(dir);
+  if (ignored) searched.push(ignored);
   return { found: false, searched };
 }
 
@@ -716,8 +736,9 @@ export function setupClaudeIntegration(dir, opts = {}) {
   const mcp = registerMcpServers(absDir, opts);
   const mcpJson = writeMcpJson(absDir);
   const instructions = writeClaudeMd(absDir);
+  const claudePathNote = ignoredSharedClaudePathNote(absDir);
 
-  return { settings, skills, mcp, mcpJson, instructions };
+  return { settings, skills, mcp, mcpJson, instructions, ...(claudePathNote && { claudePathNote }) };
 }
 
 /**

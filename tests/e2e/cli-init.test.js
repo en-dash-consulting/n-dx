@@ -728,6 +728,7 @@ describe("claude CLI discovery diagnostics", () => {
         const result = runCapture(["init", "--provider=codex", tmpDir], { timeout: 50_000, env });
         return {
           result,
+          chosen,
           chosenRan: existsSync(fakeBinaryArgsPath(chosenBase)),
           pathClaudeRan: existsSync(fakeBinaryArgsPath(pathClaude)),
         };
@@ -743,11 +744,24 @@ describe("claude CLI discovery diagnostics", () => {
       expect(pathClaudeRan).toBe(true);
     }, 60_000);
 
+    // An older `ndx config cli.claudePath` wrote the shared file. Init says it
+    // no longer runs it and where it belongs, without echoing the path (the
+    // trust review's own finding line is what shows the value).
+    it("names an ignored shared cli.claudePath and the move to .n-dx.local.json", async () => {
+      const { result, chosen } = await initWith(".n-dx.json");
+      expect(result.status).toBe(0);
+      const note = result.stdout.split("\n").filter((l) => l.includes("cli.claudePath") && l.includes(".n-dx.local.json"));
+      expect(note).toHaveLength(1);
+      expect(note[0]).toContain(".n-dx.json ");
+      expect(note[0]).not.toContain(chosen);
+    }, 60_000);
+
     it("runs a .n-dx.local.json cli.claudePath", async () => {
       const { result, chosenRan, pathClaudeRan } = await initWith(".n-dx.local.json");
       expect(result.status).toBe(0);
       expect(chosenRan).toBe(true);
       expect(pathClaudeRan).toBe(false);
+      expect(result.stdout).not.toContain("cli.claudePath");
     }, 60_000);
   });
 
