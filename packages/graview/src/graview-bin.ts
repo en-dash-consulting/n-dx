@@ -48,7 +48,8 @@ export interface GraviewConfig {
    * A product face for this project: the checkout (or built site) of a Graview
    * app built from the emitted document. Unset, `@n-dx/graview-face` is found
    * beside this package or in node_modules. `ndx graview serve` runs the face
-   * on the fresh projection instead of the bare `graview serve`.
+   * on the fresh projection instead of the bare `graview serve`. The
+   * repository's value applies only once the checkout is trusted.
    */
   app?: string;
 }
@@ -67,8 +68,9 @@ function readConfigFile(path: string): Record<string, unknown> {
 
 /**
  * The `graview` section of the project config, machine-local values over
- * shared ones. `bin` is a binary n-dx spawns, so both files pass the trust
- * gate: the shared config's `bin`, and a git-tracked local config's, apply
+ * shared ones. `bin` is a binary n-dx spawns and `app` a face whose server it
+ * runs, so both files pass the trust gate: the shared config's `bin` and
+ * `app`, and a git-tracked local config's, apply
  * only once the user trusts the checkout; the user's own untracked local
  * config always applies.
  */

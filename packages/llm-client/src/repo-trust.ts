@@ -308,7 +308,7 @@ export interface RepoExecutionConfig {
   /**
    * The project config's {@link VENDOR_CLI_PATH_FIELDS} that are set, and a
    * hench `claudePath` other than the bare `claude`, as `path = value`,
-   * sorted: the vendor CLI or graview binary n-dx spawns.
+   * sorted: the vendor CLI, graview binary or graview face n-dx runs.
    */
   vendorCliPaths: string[];
   permissionMode: string | null;
@@ -366,12 +366,15 @@ function fieldAt(root: Record<string, unknown>, path: readonly string[]): unknow
  * writes it to `.n-dx.local.json`, which always applies. `cli.claudePath` is
  * the binary `ndx init` probes and registers MCP servers with; core's
  * discovery reads it from `.n-dx.local.json` only. `graview.bin` is the
- * binary `ndx graview <sub>` spawns; `@n-dx/graview` reads its config through
- * `trustedProjectConfig` and `trustedLocalConfig` (credential-routing).
+ * binary `ndx graview <sub>` spawns, and `graview.app` the product face whose
+ * `bin/serve.js` or `dev` script `ndx graview serve` runs; `@n-dx/graview`
+ * reads its config through `trustedProjectConfig` and `trustedLocalConfig`
+ * (credential-routing).
  */
 export const VENDOR_CLI_PATH_FIELDS: readonly (readonly string[])[] = [
   ["cli", "claudePath"],
   ["claude", "cli_path"],
+  ["graview", "app"],
   ["graview", "bin"],
   ["llm", "claude", "cli_path"],
   ["llm", "codex", "cli_path"],
@@ -794,7 +797,7 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
     findings.push({
       code: "vendor-cli-path",
       severity: "warning",
-      message: `Chooses a binary n-dx runs (vendor CLI, graview): ${config.vendorCliPaths.join(", ")}`,
+      message: `Chooses a program n-dx runs (vendor CLI, graview binary or face): ${config.vendorCliPaths.join(", ")}`,
       values: [...config.vendorCliPaths],
     });
   }

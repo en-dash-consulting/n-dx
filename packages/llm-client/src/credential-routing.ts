@@ -18,9 +18,10 @@
  * {@link trustedProjectConfig} and the local one through
  * {@link trustedLocalConfig}.
  *
- * The vendor CLI binary (`*.cli_path`) and the graview binary (`graview.bin`)
- * follow the same rule: a repository that chose one would run its own script
- * with the user's environment.
+ * The vendor CLI binary (`*.cli_path`), the graview binary (`graview.bin`)
+ * and the graview product face (`graview.app`) follow the same rule: a
+ * repository that chose one would run its own script with the user's
+ * environment.
  *
  * @module llm-client/credential-routing
  */

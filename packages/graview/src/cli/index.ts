@@ -130,7 +130,10 @@ async function runGraview(command: GraviewCommand, args: string[], cwd: string, 
  * Where the product face is, when nothing names one: `@n-dx/graview-face`
  * beside this package in the monorepo, or installed in node_modules. It is
  * never a dependency of this package — installing n-dx never pulls Graview —
- * so it is looked for, not imported.
+ * so it is looked for, not imported. Both lookups start from this package's
+ * own location, never the project dir or the cwd, so a checkout's own
+ * `node_modules` is reached only when the running n-dx is installed inside
+ * it — already the repository's code.
  */
 export function findProductFace(): string | undefined {
   const sibling = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "graview-face");

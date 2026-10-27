@@ -92,8 +92,9 @@ describe("resolveGraviewCommand", () => {
 
   it("resolves graview.app against the project root", () => {
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "../my-face" } }));
+    recordRepoTrust(root);
     expect(readGraviewConfig(resolveLayout(root)).app).toBe(join(root, "..", "my-face"));
-    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "/opt/face" } }));
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { app: "/opt/face" } }));
     expect(readGraviewConfig(resolveLayout(root)).app).toBe("/opt/face");
   });
 

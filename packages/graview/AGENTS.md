@@ -70,7 +70,9 @@ built from the emitted document (`@n-dx/graview-face`, published on its own and 
 it set, `ndx graview serve .` emits, then runs that product's dev server with
 `NDX_GRAVIEW_DIR` pointing at the fresh files, instead of the bare
 `graview serve` (which is the store's HTTP and WebSocket wire and draws
-nothing). The declaration's `views` (home, per-kind card/row/page blocks),
+nothing). Like `graview.bin`, a repository's `graview.app` is a trust finding
+and applies only once the checkout is trusted; the default lookup resolves
+from this package's own location, never the checkout. The declaration's `views` (home, per-kind card/row/page blocks),
 `glance`, `page` groups, `computed` fields, `brand` and titled `lenses` are
 what that face draws; keep the data there, and React only in the product.
 
