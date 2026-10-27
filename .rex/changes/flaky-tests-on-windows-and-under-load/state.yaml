@@ -31,8 +31,15 @@ items:
     lastModified: "2026-10-27T17:46:02.899Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd7b335d-310a-4700-86a8-0b064b689618":
+    status: "completed"
+    startedAt: "2026-10-27T18:58:41.199Z"
+    completedAt: "2026-10-27T19:07:17.750Z"
+    endedAt: "2026-10-27T19:07:17.750Z"
+    activeIntervals: [{"end":"2026-10-27T19:07:17.750Z","start":"2026-10-27T18:58:41.199Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added maxRetries:10/retryDelay:100 plus a Windows handle-release comment to the four named teardowns (commit 30fdbd94e)."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:49:31.026Z"
+    lastModified: "2026-10-27T19:07:17.750Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d2ae6bd7-a3b1-425f-957e-1e5654bd9b1c":
     assignee: "Ryan Keith <ryan.k@endash.us>"
