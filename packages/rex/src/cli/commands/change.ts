@@ -151,6 +151,8 @@ function placementRefusal(err: ChangePlacementError): CLIError {
   switch (err.kind) {
     case "not-a-target":
       return new CLIError(err.plain, "List the live capabilities and constraints with `rex product show`.");
+    case "not-an-area":
+      return new CLIError(err.plain, "List the live areas with `rex product show`.");
     case "content-needs-amends":
       return new CLIError("--proposed and capability criteria describe an amendment: pass --relation=amends with them.");
     case "nothing-to-modify":
@@ -163,6 +165,8 @@ function placementRefusal(err: ChangePlacementError): CLIError {
     case "apply-problems":
     case "no-such-change":
     case "change-not-open":
+    case "empty-title":
+    case "invalid-proposal":
       return new CLIError(err.plain);
   }
 }

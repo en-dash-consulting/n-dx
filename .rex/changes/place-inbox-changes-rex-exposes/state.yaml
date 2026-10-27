@@ -23,5 +23,12 @@ items:
     lastModified: "2026-10-27T16:28:32.133Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fc051e24-a900-4667-9d4e-7db3b1fcc377":
-    lastModified: "2026-10-27T16:27:55.759Z"
+    status: "completed"
+    startedAt: "2026-10-27T17:57:29.830Z"
+    completedAt: "2026-10-27T18:10:34.458Z"
+    endedAt: "2026-10-27T18:10:34.458Z"
+    activeIntervals: [{"end":"2026-10-27T18:10:34.458Z","start":"2026-10-27T17:57:29.830Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "recordProposal in core/change-place.ts, exported from public.ts; asProposal exported from core/placement.ts; unit + integration tests"
+    lastModified: "2026-10-27T18:10:34.458Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

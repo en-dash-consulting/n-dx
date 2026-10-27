@@ -243,8 +243,10 @@ export function rankPlacementCandidates(
 /**
  * The proposal when `value` is a valid amendment (shared schema) that is also an
  * added one with a type, an area and a title; otherwise why it was refused.
+ * The one definition of a well-formed proposal, for the model's and a caller's
+ * (`recordProposal` in `core/change-place.ts`).
  */
-function asProposal(value: unknown): { proposal: PlacementProposal } | { reason: string } {
+export function asProposal(value: unknown): { proposal: PlacementProposal } | { reason: string } {
   const parsed = AmendmentSchema.safeParse(value);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

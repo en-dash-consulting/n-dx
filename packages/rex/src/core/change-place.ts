@@ -17,6 +17,11 @@
  *   edits the amendment afterwards. Either clears `needsPlacement`, which moves
  *   the change out of the reserved `changes/inbox/` folder on the next write,
  *   keeping its id and its slug (`store/prd-model-writer.ts`).
+ * - {@link recordProposal} records a new node when nothing on the map fits: an
+ *   `added` capability or constraint under a live area, with a freshly minted
+ *   id as its `target`. It is a proposal only; the node reaches the product
+ *   layer when the change is applied. It clears `needsPlacement` too, and is
+ *   dry-run through apply the same way.
  *
  * Only an open change is placed. The result is checked against the v2 rules;
  * an error finding about the change refuses the placement.
@@ -26,10 +31,12 @@
  * @module rex/core/change-place
  */
 
-import type { Amendment, ChangeNode, CriteriaDelta } from "../schema/v2.js";
+import { randomUUID } from "node:crypto";
+import type { AddedNodeType, Amendment, ChangeNode, CriteriaDelta, Criterion } from "../schema/v2.js";
 import { applyAmendmentsProblems, NOTHING_TO_MODIFY, pendingWarnings } from "./apply-amendments.js";
 import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import {
+  asProposal,
   PLACEMENT_SHORTLIST_SIZE,
   placementRelation,
   placementStrength,
@@ -38,6 +45,7 @@ import {
   type PlacementStrength,
   type PlacementChange,
   type PlacementNode,
+  type PlacementProposal,
   type PlacementRelation,
   type PlacementTarget,
 } from "./placement.js";
@@ -51,7 +59,10 @@ export type ChangePlacementErrorKind =
   | "nothing-to-modify"
   | "apply-problems"
   | "no-such-change"
-  | "change-not-open";
+  | "change-not-open"
+  | "not-an-area"
+  | "empty-title"
+  | "invalid-proposal";
 
 export class ChangePlacementError extends Error {
   /**
@@ -174,32 +185,124 @@ export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPl
   }
   delete change.needsPlacement;
 
-  let pending: string[] = [];
-  let blockedBy: readonly string[] = [];
-  const errors = checkV2Rules(next, { now }).filter((f) => f.nodeId === change.id && f.severity === "error");
-  if (errors.length) throw new ChangePlacementError(`Cannot place change ${label}: ${errors.map((f) => f.message).join("; ")}`, "rule-errors");
-  if (relation === "amends") {
-    // Only what the new amendment brings: the change's earlier amendments were judged when they were stored.
-    const before = applyAmendmentsProblems(tree, change.id, now);
-    const after = applyAmendmentsProblems(next, change.id, now);
-    const novel = (all: readonly string[], known: readonly string[]): string[] => all.filter((p) => !known.includes(p));
-    const problems = novel(after.always, before.always);
-    // The pending branch is defensive: place writes only `modified` amendments, pending comes only from
-    // removals, and pending that existed before this placement is filtered out here. So it is empty today;
-    // the code goes live if place ever writes a removal. Pinned by the "recordPlacement pending and
-    // blockedBy" tests in tests/unit/core/change-place.test.ts (modify on a capability another change
-    // removes: no problems; modify under a pending removal: refused).
-    pending = novel(after.pending, before.pending);
-    blockedBy = after.blockedBy;
-    if (problems.length) {
-      const plain = `Cannot place change ${label}: ${problems.join("; ")}`;
-      if (problems.some((p) => p.endsWith(NOTHING_TO_MODIFY))) {
-        throw new ChangePlacementError(`${plain}${NOTHING_TO_MODIFY_PLACE_HINT}`, "nothing-to-modify", plain);
-      }
-      throw new ChangePlacementError(plain, "apply-problems");
-    }
+  refuseRuleErrors(next, change, now);
+  if (relation === "touches") {
+    return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: [], pending: [], blockedBy: [] };
   }
-  return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy), pending, blockedBy: [...blockedBy] };
+  // The pending branch is defensive here: place writes only `modified` amendments, pending comes only from
+  // removals, and pending that existed before this placement is filtered out. So it is empty today; the
+  // code goes live if place ever writes a removal. Pinned by the "recordPlacement pending and blockedBy"
+  // tests in tests/unit/core/change-place.test.ts (modify on a capability another change removes: no
+  // problems; modify under a pending removal: refused).
+  const { problems, pending, blockedBy } = novelApplyProblems(tree, next, change.id, now);
+  if (problems.length) {
+    const plain = `Cannot place change ${label}: ${problems.join("; ")}`;
+    if (problems.some((p) => p.endsWith(NOTHING_TO_MODIFY))) {
+      throw new ChangePlacementError(`${plain}${NOTHING_TO_MODIFY_PLACE_HINT}`, "nothing-to-modify", plain);
+    }
+    throw new ChangePlacementError(plain, "apply-problems");
+  }
+  return { tree: next, change: change.id, placement: { target: target.id, relation }, warnings: pendingWarnings(pending, blockedBy), pending, blockedBy };
+}
+
+export interface RecordProposalInput {
+  /** The kind of node proposed. */
+  type: AddedNodeType;
+  /** Id, display id or alias of the live area the new node goes under. */
+  under: string;
+  /** The new node's title. */
+  title: string;
+  /** The amendment's summary. Default: the change's title. */
+  summary?: string;
+  /** The new node's statement. */
+  proposed?: string;
+  /** The new node's capability criteria. A constraint has none; apply refuses them on one. */
+  criteria?: { add: Criterion[] };
+}
+
+export interface RecordProposalOptions {
+  /** Id for the proposed node. Default `randomUUID`, as for every node rex creates. */
+  newId?: () => string;
+}
+
+export interface RecordProposalResult {
+  /** The new tree; the input is not modified. */
+  tree: V2Tree;
+  change: string;
+  /** The `added` amendment appended to the change; `under` is the area's id, `target` the new node's. */
+  proposal: PlacementProposal;
+  /** Problems only other open changes cause: apply refuses until they close, and the proposal is stored anyway. */
+  warnings: string[];
+  /** The problems behind `warnings`, unworded. Empty when `warnings` is. */
+  pending: string[];
+  /** The open changes (display id or id) in the way of `pending`; empty when `pending` is. */
+  blockedBy: string[];
+}
+
+/**
+ * Record that the open change `changeRef` adds a new capability or constraint
+ * under a live area. Never auto-accepted: the node reaches the product layer
+ * only when the change is applied.
+ */
+export function recordProposal(
+  tree: V2Tree,
+  changeRef: string,
+  input: RecordProposalInput,
+  now: Date,
+  options: RecordProposalOptions = {},
+): RecordProposalResult {
+  const next = structuredClone(tree);
+  const index = indexTree(next);
+  const change = openChange(next, changeRef) as ChangeNode & RuleNode;
+  const label = change.displayId ?? change.id;
+  const area = index.resolve(input.under);
+  if (!area || area.type !== "area") {
+    const plain = `"${input.under}" is not a live area; a new capability or constraint is proposed under one`;
+    throw new ChangePlacementError(`${plain} (see get_product)`, "not-an-area", plain);
+  }
+  const title = input.title.trim();
+  if (!title) throw new ChangePlacementError("A proposed capability or constraint needs a title", "empty-title");
+
+  const checked = asProposal({
+    target: (options.newId ?? randomUUID)(),
+    delta: "added",
+    type: input.type,
+    under: area.id,
+    title,
+    summary: input.summary ?? change.title,
+    ...(input.proposed !== undefined ? { proposed: input.proposed } : {}),
+    ...(input.criteria !== undefined ? { criteria: input.criteria } : {}),
+  });
+  if ("reason" in checked) throw new ChangePlacementError(`The proposal ${checked.reason}`, "invalid-proposal");
+  const { proposal } = checked;
+  change.amends = [...(change.amends ?? []), proposal];
+  delete change.needsPlacement;
+
+  refuseRuleErrors(next, change, now);
+  const { problems, pending, blockedBy } = novelApplyProblems(tree, next, change.id, now);
+  if (problems.length) throw new ChangePlacementError(`Cannot propose for change ${label}: ${problems.join("; ")}`, "apply-problems");
+  return { tree: next, change: change.id, proposal, warnings: pendingWarnings(pending, blockedBy), pending, blockedBy };
+}
+
+/** Refuse when the v2 rules find an error on `change` in `tree`. */
+function refuseRuleErrors(tree: V2Tree, change: RuleNode, now: Date): void {
+  const errors = checkV2Rules(tree, { now }).filter((f) => f.nodeId === change.id && f.severity === "error");
+  if (errors.length) {
+    throw new ChangePlacementError(`Cannot place change ${change.displayId ?? change.id}: ${errors.map((f) => f.message).join("; ")}`, "rule-errors");
+  }
+}
+
+/**
+ * What apply would refuse `changeId` with in `after` that it did not in
+ * `before`: only what the new amendment brings, since the change's earlier
+ * amendments were judged when they were stored.
+ */
+function novelApplyProblems(before: V2Tree, after: V2Tree, changeId: string, now: Date): { problems: string[]; pending: string[]; blockedBy: string[] } {
+  const was = applyAmendmentsProblems(before, changeId, now);
+  const is = applyAmendmentsProblems(after, changeId, now);
+  const novel = (all: readonly string[], known: readonly string[]): string[] => all.filter((p) => !known.includes(p));
+  const pending = novel(is.pending, was.pending);
+  return { problems: novel(is.always, was.always), pending, blockedBy: pending.length ? [...is.blockedBy] : [] };
 }
 
 /** The open change `ref` names, or a refusal naming why it cannot be placed. */

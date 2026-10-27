@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
-import { ChangePlacementError, recordPlacement, suggestPlacement } from "../../../src/core/change-place.js";
+import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement } from "../../../src/core/change-place.js";
 import { placementStrength } from "../../../src/core/placement.js";
 import { indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 
@@ -229,5 +229,71 @@ describe("recordPlacement pending and blockedBy", () => {
     expect(applyAmendmentsProblems(t, "ch", NOW)).toMatchObject({ always: [], blockedBy: ["RM"] });
     expect(() => recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW)).toThrow(ChangePlacementError);
     expect(() => recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW)).toThrow(/Cannot place change CH-1/);
+  });
+});
+
+describe("recordProposal", () => {
+  const ID = "new-node";
+  const opts = { newId: () => ID };
+  const wallets = { type: "capability" as const, under: "pay", title: "Pay by wallet", proposed: "A shopper pays with a wallet" };
+  const refusal = (fn: () => unknown): ChangePlacementError | undefined => {
+    try {
+      fn();
+    } catch (e) {
+      return e as ChangePlacementError;
+    }
+    return undefined;
+  };
+
+  it("appends an added amendment under the area, clears needsPlacement and leaves the input tree alone", () => {
+    const input = tree();
+    const before = structuredClone(input);
+    const criteria = { add: [{ id: "c1", text: "Apple Pay is accepted" }] };
+    const result = recordProposal(input, "CH-1", { ...wallets, criteria }, NOW, opts);
+    const amendment = { target: ID, delta: "added", type: "capability", under: "pay", title: "Pay by wallet", summary: "Add wallets to card payment", proposed: "A shopper pays with a wallet", criteria };
+    expect(result).toMatchObject({ change: "ch", proposal: amendment, warnings: [], pending: [], blockedBy: [] });
+    expect(changeIn(result.tree).amends).toEqual([amendment]);
+    expect(changeIn(result.tree)).not.toHaveProperty("needsPlacement");
+    expect(input).toEqual(before);
+    // A proposal only: nothing reaches the product layer until the change is applied.
+    expect(result.tree.product).toEqual(input.product);
+  });
+
+  it("resolves the area by display id, keeps a given summary and mints a fresh id by default", () => {
+    const t = tree();
+    t.product[0].displayId = "A1";
+    const input = { type: "constraint" as const, under: "A1", title: " Wallet tokens stay server-side ", summary: "Guard tokens", proposed: "Tokens never reach the browser" };
+    const { proposal } = recordProposal(t, "ch", input, NOW);
+    expect(proposal).toMatchObject({ type: "constraint", under: "pay", title: "Wallet tokens stay server-side", summary: "Guard tokens" });
+    expect(proposal.target).toMatch(/^[0-9a-f-]{36}$/);
+    expect(recordProposal(t, "ch", wallets, NOW).proposal.target).not.toBe(proposal.target);
+  });
+
+  it("appends after the change's earlier amendments", () => {
+    const earlier = { amends: [{ target: "card", delta: "modified", summary: "s", proposed: "Cards" }] };
+    const { tree: next } = recordProposal(tree(earlier), "ch", wallets, NOW, opts);
+    expect(changeIn(next).amends!.map((a) => a.delta)).toEqual(["modified", "added"]);
+  });
+
+  it.each([
+    ["not-an-area", "a capability under", {}, { ...wallets, under: "card" }, /"card" is not a live area/],
+    ["not-an-area", "an unknown under", {}, { ...wallets, under: "nope" }, /"nope" is not a live area/],
+    ["empty-title", "a blank title", {}, { ...wallets, title: "  " }, /needs a title/],
+    ["change-not-open", "an applied change", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z" }, wallets, /is applied at 2026-10-01/],
+    ["change-not-open", "a cancelled change", { status: "cancelled" }, wallets, /is cancelled; only an open change is placed/],
+    ["invalid-proposal", "a type that is neither capability nor constraint", {}, { ...wallets, type: "area" as never }, /The proposal is not a valid amendment \(type: /],
+    ["rule-errors", "a new node on a fix change", { fix: true }, wallets, /Cannot place change CH-1/],
+    ["apply-problems", "a criterion added twice", {}, { ...wallets, criteria: { add: [{ id: "c1", text: "a" }, { id: "c1", text: "b" }] } }, /Cannot propose for change CH-1: .*criterion c1 is added twice/],
+    ["apply-problems", "capability criteria on a constraint", {}, { ...wallets, type: "constraint" as const, criteria: { add: [{ id: "c1", text: "a" }] } }, /Cannot propose for change CH-1: .*has no capability criteria/],
+  ])("refuses with %s: %s", (kind, _label, changeFields, input, message) => {
+    const err = refusal(() => recordProposal(tree(changeFields), "ch", input, NOW, opts));
+    expect(err).toBeInstanceOf(ChangePlacementError);
+    expect(err!.kind).toBe(kind);
+    expect(err!.plain).toMatch(message);
+    expect(err!.plain).not.toMatch(/get_product/);
+  });
+
+  it("names get_product only in the MCP wording of an under that is not an area", () => {
+    expect(refusal(() => recordProposal(tree(), "ch", { ...wallets, under: "nope" }, NOW))!.message).toMatch(/\(see get_product\)$/);
   });
 });
