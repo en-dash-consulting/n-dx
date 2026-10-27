@@ -149,10 +149,17 @@ export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePla
   };
 }
 
+/** `GET /api/rex/changes/placements`: every open change awaiting placement, keyed by change id. */
+export interface ChangePlacementsWire {
+  layout: "v2";
+  /** A change whose shortlist could not be built carries `{ error }` instead. */
+  placements: Record<string, ChangePlacementWire | { error: string }>;
+}
+
 /** The shortlist of every open change awaiting placement, keyed by change id. */
-export function buildAwaitingPlacements(tree: V2Tree): Record<string, ChangePlacementWire | { error: string }> {
+export function buildAwaitingPlacements(tree: V2Tree): ChangePlacementsWire["placements"] {
   const index = indexTree(tree);
-  const out: Record<string, ChangePlacementWire | { error: string }> = {};
+  const out: ChangePlacementsWire["placements"] = {};
   for (const { node } of index.entries) {
     if (node.type !== "change" || !isOpenChange(node) || !awaitsPlacement(index, node)) continue;
     try {
@@ -261,7 +268,8 @@ async function handlePlacementsRead(res: ServerResponse, ctx: ServerContext): Pr
   }
   try {
     const { tree } = await loadPrdModel(ctx.rexDir);
-    jsonResponse(res, 200, { layout: "v2", placements: buildAwaitingPlacements(tree) });
+    const body: ChangePlacementsWire = { layout: "v2", placements: buildAwaitingPlacements(tree) };
+    jsonResponse(res, 200, body);
   } catch (err) {
     refuse(res, err);
   }

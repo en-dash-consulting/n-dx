@@ -23,7 +23,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { useProjectStatus } from "../components/index.js";
 import type { NavigateTo } from "../types.js";
 import { Pending, StaleNotice, useRefetchableProductRead, type Load } from "./product-pages.js";
-import type { ChangePlacement, ChangeRow, PlacementCandidate, PlacementStrength } from "./product-model.js";
+import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate, PlacementStrength } from "./product-model.js";
 
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;
@@ -215,7 +215,7 @@ async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<strin
   const failAll = (error: string) => ids.forEach((id) => reads.set(id, { error }));
   try {
     const res = await fetch("/api/rex/changes/placements");
-    const body = await res.json() as { error?: unknown; placements?: Record<string, ChangePlacement | { error: string }> };
+    const body = await res.json() as Partial<ChangePlacements> & { error?: unknown };
     if (!res.ok || !body.placements) {
       failAll(typeof body.error === "string" ? body.error : `HTTP ${res.status}`);
       return reads;

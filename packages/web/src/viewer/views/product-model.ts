@@ -236,6 +236,13 @@ export interface ChangePlacement {
   shortlist: PlacementCandidate[];
 }
 
+/** `GET /api/rex/changes/placements` on a v2 project. */
+export interface ChangePlacements {
+  layout: "v2";
+  /** A change whose shortlist could not be built carries `{ error }` instead. */
+  placements: Record<string, ChangePlacement | { error: string }>;
+}
+
 /** Criterion edits an `amends` placement carries. */
 export interface PlacementCriteriaDelta {
   add?: Array<{ id: string; text: string }>;
