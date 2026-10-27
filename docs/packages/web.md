@@ -54,6 +54,30 @@ See [MCP Integration](/guide/mcp) for setup instructions.
 
 `PATCH /api/rex/items/:id` accepts only these fields: `status`, `failureReason`, `priority`, `tags`, `title`, `description`, `acceptanceCriteria` and `requirements`. Any other key (including `run`) is a `400` naming it. The update runs inside the PRD lock for the request's workspace and answers `409` when another process holds it. Saved run settings are written through `PUT /api/hench/prep/:taskId` (below), MCP `edit_item`, or `rex update --run` — not this route.
 
+## Inbox placement routes (v2)
+
+On a v2 project a change captured without a home waits in the Inbox. Three routes
+read and settle it. Rex decides everything (`suggestPlacement`, `recordPlacement`,
+`recordProposal`); the server enriches the shortlist and writes through rex's v2
+transaction, the execution log and the `rex:prd-changed` broadcast. A v1 tree
+answers `409`, an unknown change `404`, any other rex refusal `422 { error, kind }`,
+and a held PRD lock `409` naming its PID.
+
+| Route | Answers |
+|-------|---------|
+| `GET /api/rex/changes/:id/placement` | `{ layout: "v2", change, relation, tied, shortlist }`. Each shortlist entry carries `target`, `type`, `title`, `area`, `statement`, `criteria`, `score`, `strength` (`strong`/`possible`/`weak`) and `reasons`. |
+| `POST /api/rex/changes/:id/place` | Places the change on a capability or constraint (`touches` or `amends`): `{ change, target, relation, warnings? }`. |
+| `POST /api/rex/changes/:id/propose` | Records a new capability or constraint when nothing fits: `{ change, proposed: { target, under, title, type }, warnings? }`. |
+
+`POST /api/rex/items` on v2 also accepts `touches`, so a change captured with a
+home skips the Inbox.
+
+`GET /api/status` adds `rex.inbox: { open, appliedUnplaced }` on a v2 tree and
+omits it on v1. `open` counts open changes awaiting placement (the ones
+`ndx work` refuses); `appliedUnplaced` counts applied changes still flagged
+`needsPlacement`, which are history and never placeable. Change rows from
+`GET /api/rex/changes` carry `awaitsPlacement` for open held changes.
+
 ## Prepare task
 
 The Prepare task modal shows every per-task `ndx work` option before a run
