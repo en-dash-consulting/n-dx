@@ -274,30 +274,49 @@ describe("architecture policy: orchestration never imports extension code", () =
   /** A call's opening paren not followed by a plain string literal and its closing paren. */
   const NON_LITERAL_CALL = String.raw`\s*\(\s*(?!["'][^"'\`$]*["']\s*\))`;
 
+  const escapeName = (n) => n.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+
   /**
    * Whether `text` loads a module by computed specifier through `require`: a
    * bare `require(…)`, a `createRequire(…)` result called directly or through
-   * the name it is bound to (also via `.call` / `.apply`). `.resolve()` only
+   * any name it reaches by declaration, assignment or alias (also via `.call`
+   * / `.apply`), or `Module._load(…)` with any argument. `.resolve()` only
    * locates a file and runs nothing, so it does not count.
    */
   function hasComputedRequire(text) {
-    const names = ["require"];
-    for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[\w$]+\.)?createRequire\s*\(/g)) {
-      names.push(m[1]);
+    if (/\b_load\s*\(/.test(text)) return true;
+    const names = new Set(["require"]);
+    for (const m of text.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*=(?!=)\s*(?:[\w$]+\.)?createRequire\s*\(/g)) {
+      names.add(m[1]);
     }
-    const callee = names.map((n) => n.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")).join("|");
+    // Aliases: `const load = _require;`, followed until no new name appears.
+    for (let size = 0; size !== names.size; ) {
+      size = names.size;
+      const known = [...names].map(escapeName).join("|");
+      const alias = new RegExp(String.raw`(?<![\w$.])([A-Za-z_$][\w$]*)\s*=(?!=)\s*(?:${known})(?![\w$])(?!\s*[.(\[])`, "g");
+      for (const m of text.matchAll(alias)) names.add(m[1]);
+    }
+    const callee = [...names].map(escapeName).join("|");
     return [
       new RegExp(String.raw`(?<![\w$.])(?:${callee})(?:\s*\.\s*(?:call|apply))?` + NON_LITERAL_CALL),
       new RegExp(String.raw`\bcreateRequire\s*\([^()]*(?:\([^()]*\)[^()]*)*\)` + NON_LITERAL_CALL),
     ].some((pattern) => pattern.test(text));
   }
 
-  /** Core's own modules: its top-level .js files and bin/. */
+  /** A file core can run as a module. */
+  const MODULE_FILE = /\.[cm]?js$/;
+
+  /** Core's own modules: its top-level .js, .mjs and .cjs files and bin/. */
   function coreModules() {
     return [CORE, `${CORE}/bin`].flatMap((dir) =>
-      readdirSync(join(ROOT, dir)).filter((f) => f.endsWith(".js")).map((f) => `${dir}/${f}`),
+      readdirSync(join(ROOT, dir)).filter((f) => MODULE_FILE.test(f)).map((f) => `${dir}/${f}`),
     );
   }
+
+  it("scans every module extension core can run", () => {
+    expect(["a.js", "a.mjs", "a.cjs"].filter((f) => !MODULE_FILE.test(f))).toEqual([]);
+    expect(["a.json", "a.d.ts", "a.js.map"].filter((f) => MODULE_FILE.test(f))).toEqual([]);
+  });
 
   /** `rel`'s text with comment lines dropped, so JSDoc `import("…")` types do not count. */
   function code(rel) {
@@ -307,7 +326,7 @@ describe("architecture policy: orchestration never imports extension code", () =
       .join("\n");
   }
 
-  const extensionModules = () => coreModules().filter((rel) => /\/extensions?-[a-z-]+\.js$/.test(rel));
+  const extensionModules = () => coreModules().filter((rel) => /\/extensions?-[a-z-]+\.[cm]?js$/.test(rel));
 
   it("sees the extension modules", () => {
     expect(extensionModules()).toEqual(expect.arrayContaining([
@@ -376,10 +395,17 @@ describe("architecture policy: orchestration never imports extension code", () =
       "createRequire(pathToFileURL(dir))(spec);",
       "require(name);",
       "require(`./${name}`);",
+      "let r;\nr = createRequire(import.meta.url);\nr(bin);",
+      "const _require = createRequire(import.meta.url);\nconst load = _require;\nload(bin);",
+      "const _require = createRequire(import.meta.url);\nconst a = _require;\nlet b;\nb = a;\nb.apply(null, [bin]);",
+      'import Module from "module";\nModule._load(bin);',
+      'import Module from "module";\nModule._load("./x.js");',
     ];
     const allowed = [
       'const _require = createRequire(import.meta.url);\n_require.resolve(npmName + "/package.json");',
       'const _require = createRequire(import.meta.url);\n_require("./x.json");',
+      'const _require = createRequire(import.meta.url);\nconst where = _require.resolve;\nwhere(bin);',
+      "const _require = createRequire(import.meta.url);\nif (x == _require) f(bin);",
       'require("node:fs");',
       "foo.require(name);",
       "my_require(name);",

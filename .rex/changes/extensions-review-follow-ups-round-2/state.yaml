@@ -43,7 +43,14 @@ items:
     lastModified: "2026-10-27T17:23:17.346Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "b4ca7979-70ef-4f57-844f-d58ab2cec3d7":
-    lastModified: "2026-10-27T17:22:57.969Z"
+    status: "completed"
+    startedAt: "2026-10-27T17:59:12.652Z"
+    completedAt: "2026-10-27T18:03:17.700Z"
+    endedAt: "2026-10-27T18:03:17.700Z"
+    activeIntervals: [{"end":"2026-10-27T18:03:17.700Z","start":"2026-10-27T17:59:12.652Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hasComputedRequire follows createRequire names bound by assignment and aliases, flags _load(; coreModules scans .mjs/.cjs; fixtures for each evasion form (66ecac3dd)"
+    lastModified: "2026-10-27T18:03:17.700Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "d882ed86-4d9e-475e-a3f4-5546e59535d1":
     lastModified: "2026-10-27T17:23:02.717Z"
