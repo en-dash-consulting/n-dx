@@ -474,6 +474,19 @@ describe("ndx extensions enable and disable", () => {
     expect(await state(approvedRoot)).toMatchObject({ state: "unapproved", reason: expect.stringMatching(/^the approval is for another copy \(user: /) });
   });
 
+  it("an extension named constructor is not found in what every object inherits", async () => {
+    installInto(userFolder(), extensionPackage("constructor", "constructor"));
+    await ndx(["disable", "recon"]);
+    expect(await stateOf("constructor")).toMatchObject({ state: "unapproved", reason: "not approved yet" });
+
+    expect((await ndx(["enable", "constructor", "--yes"])).code).toBe(0);
+    expect((await stateOf("constructor")).state).toBe("enabled");
+    expect((await ndx(["disable", "constructor"])).code).toBe(0);
+    expect((await stateOf("constructor")).state).toBe("disabled");
+    expect((await ndx(["enable", "constructor"])).code).toBe(0);
+    expect((await stateOf("constructor")).state).toBe("enabled");
+  });
+
   it("refuses to enable an incompatible extension", async () => {
     installInto(userFolder(), extensionPackage("ndx-old", "old", { ndxVersion: "<0.10.0" }));
     const { code, err } = await ndx(["enable", "old", "--yes"]);

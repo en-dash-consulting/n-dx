@@ -80,5 +80,12 @@ items:
     lastModified: "2026-10-27T13:51:18.561Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "8327401a-6629-49c4-aa66-d2746d0ad07b":
-    lastModified: "2026-10-27T13:51:14.441Z"
+    status: "completed"
+    startedAt: "2026-10-27T15:34:34.367Z"
+    completedAt: "2026-10-27T15:38:48.973Z"
+    endedAt: "2026-10-27T15:38:48.973Z"
+    activeIntervals: [{"end":"2026-10-27T15:38:48.973Z","start":"2026-10-27T15:34:34.367Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "own() helper (Object.hasOwn) for approvals, projectApprovals and disabled lookups in extension-state.js; test for an extension named constructor."
+    lastModified: "2026-10-27T15:38:48.973Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

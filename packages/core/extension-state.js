@@ -133,9 +133,9 @@ export function updateExtensionsFile(home, mutate, fs = nodeFs) {
  */
 export function approvalFor(file, ext, projectDir) {
   const table = ext.source === "project"
-    ? (projectDir && isObject(file.projectApprovals) ? file.projectApprovals[resolve(projectDir)] : undefined)
+    ? (projectDir ? own(file.projectApprovals, resolve(projectDir)) : undefined)
     : file.approvals;
-  const record = isObject(table) ? table[ext.packageName] : undefined;
+  const record = own(table, ext.packageName);
   return isObject(record) ? /** @type {Approval} */ (record) : undefined;
 }
 
@@ -241,7 +241,7 @@ export function extensionState(ext, { file, ndxVersion, projectDir }) {
   if (range !== undefined && !satisfiesSemverRange(ndxVersion, range)) {
     return { state: "incompatible", reason: `needs n-dx ${range}; this is ${ndxVersion}` };
   }
-  if (isObject(file.disabled) && file.disabled[stateKey(ext)]) {
+  if (own(file.disabled, stateKey(ext))) {
     return { state: "disabled", reason: "disabled with 'ndx extensions disable'" };
   }
   const approval = approvalFor(file, ext, projectDir);
@@ -299,6 +299,18 @@ function canonicalJson(value) {
     return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(",")}}`;
   }
   return JSON.stringify(value) ?? "null";
+}
+
+/**
+ * `table[key]` when `table` is an object holding `key` itself. A name such as
+ * `constructor` must not find what every object inherits.
+ *
+ * @param {unknown} table
+ * @param {string} key
+ * @returns {any}
+ */
+function own(table, key) {
+  return isObject(table) && Object.hasOwn(table, key) ? table[key] : undefined;
 }
 
 /**
