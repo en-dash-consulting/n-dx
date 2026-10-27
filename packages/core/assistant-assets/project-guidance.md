@@ -9,7 +9,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 - **lang-kit and packs** — `@n-dx/lang-kit`: language facts and the pack contract (foundation, no dependencies). `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs: sourcevision loads them at run time. See each package's `AGENTS.md`.
 - **graview** — Graview projection: `ndx graview emit|check|describe|serve|mcp` writes a `graview-document` declaration and a `{nodes, edges}` snapshot of the PRD, the analysis and the runs under the layout's graview dir, then spawns the `graview` CLI on them. No `@graview/*` dependency; the binary is a peer tool.
-- **graview-face** — The product face on Graview: a Vite + React app, published on its own and depended on by no other package, that compiles the emitted document and lays a shell, home and record pages in n-dx's words over the derived ones. `ndx graview serve` runs it.
+- **graview-face** — The product face on Graview: a Vite + React app, published on its own, that lays n-dx's shell, home and record pages over the emitted document. `ndx graview serve` runs it as the `graview-face` extension.
 
 ### Architecture
 
@@ -170,6 +170,8 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 **Gotcha:** `ndx work` autonomous runs (`--auto`/`--loop`/`--epic-by-epic`) default `--permission-mode` to `acceptEdits` so the spawned Claude session won't stall in plan mode — override with `--permission-mode` or `hench.permissionMode`. This default is enforced repo-wide via the hench system prompt for all CLI-provider runs (see the `/no-plan-mode` skill).
 
 **Gotcha:** `ndx iso` renders a standalone isometric architecture map. Its portable `/iso-map` skill script is **generated** from `packages/sourcevision/src/export/` by `scripts/build-iso-skill.mjs` — edit the TypeScript and re-run it; hand-editing `.claude/skills/iso-map/scripts/iso-map.mjs` fails `tests/e2e/iso-skill-drift.test.js`. Injection seams and runtime infrastructure, which no import graph can show, are declared under `sourcevision.isoMap` in `.n-dx.json`; see [`docs/architecture/iso-map-data-flow.md`](docs/architecture/iso-map-data-flow.md).
+
+**Extensions:** `ndx.extension` packages add `ndx <name>` commands and `/x/<name>/` hub apps, spawned and never imported. Contract: [`docs/extensions/`](docs/extensions/index.md).
 
 ## MCP Servers
 

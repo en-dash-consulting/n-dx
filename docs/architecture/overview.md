@@ -59,6 +59,10 @@ packages/
 
 See [Gateway Modules](./gateways) for the full gateway pattern.
 
+### Extensions
+
+Extensions sit outside the tiers. An extension is a separately installed npm package that core discovers by reading its `package.json`. Core spawns the extension's commands, and the hub spawns and proxies its sidecar at `/x/<name>/`. No package imports extension code, and extensions reach n-dx only by spawning `ndx` or calling the hub and project endpoints. The design is in [Extensions](./extensions), and the author-facing contract is in the [extension guide](../extensions/).
+
 ## Shared State via Filesystem
 
 Packages share state through filesystem rather than runtime imports:

@@ -303,6 +303,18 @@ ndx sourcevision <command> [args] # or standalone: sv <command> [args]
 
 Both `n-dx` and `ndx` work identically. `sv` is an alias for `sourcevision`.
 
+### Extensions
+
+Separately installed npm packages can add `ndx <name>` commands and a web app that the hub mounts at `/x/<name>/`. n-dx runs them only as separate processes, and only after you approve them.
+
+```sh
+ndx extensions add <package>      # install into the n-dx home
+ndx extensions enable <name>      # approve it
+ndx extensions list               # state and reason for each installed extension
+```
+
+To write one, see the [extension authoring guide](docs/extensions/index.md).
+
 ## MCP Servers
 
 Rex and SourceVision expose MCP servers for any MCP-compatible assistant (Claude Code, Codex, etc.).

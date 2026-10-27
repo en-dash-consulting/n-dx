@@ -1,6 +1,6 @@
 # n-dx extensions: design and PRD capture
 
-Status: proposed, 2026-10-26. Imported from the design doc at https://claude.ai/artifact/B5hBBT5rS6rx6FWN23xS8z as the starting point for the extensions epic.
+Status: proposed, 2026-10-26. Imported from the design doc at https://claude.ai/artifact/B5hBBT5rS6rx6FWN23xS8z as the starting point for the extensions epic. The contract as built, for extension authors, is in [docs/extensions/](../extensions/index.md).
 
 ## Summary
 
@@ -133,7 +133,7 @@ When `ndx <name>` matches no built-in command, the dispatcher looks the name up 
 | --- | --- |
 | `NDX_EXTENSION_API` | The contract version n-dx speaks (`1`) |
 | `NDX_VERSION` | The running n-dx version |
-| `NDX_BIN` | Absolute command to spawn n-dx itself, so an extension calls the same install |
+| `NDX_BIN` | Absolute path to this install's `cli.js`, run with Node (`process.execPath`), so an extension calls the same install |
 | `NDX_HOME` | The resolved n-dx home |
 | `NDX_EXTENSION_NAME` | The manifest `name` |
 | `NDX_EXTENSION_STATE_DIR` | `<ndx home>/ext/<name>/`, created on first run; the only n-dx-owned place the extension may write |
