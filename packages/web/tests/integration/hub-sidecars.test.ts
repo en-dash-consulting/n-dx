@@ -421,6 +421,8 @@ describe("hub /x/<name>/", () => {
     // Built from X-Ndx-Base-Path, as docs/extensions/hub-api.md advises.
     expect(await redirect("/x/recon/done")).toBe("/x/recon/done");
     expect(await redirect("/x/recon")).toBe("/x/recon");
+    expect(await redirect("/x/recon?tab=2")).toBe("/x/recon?tab=2");
+    expect(await redirect("/x/recon#a")).toBe("/x/recon#a");
     // A path that only starts with the name is not under the mount.
     expect(await redirect("/x/recondite")).toBe("/x/recon/x/recondite");
   });

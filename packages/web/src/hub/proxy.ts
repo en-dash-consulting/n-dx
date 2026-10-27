@@ -397,7 +397,7 @@ export function proxyHttp(
       // of view; the client is under the prefix. A sidecar's may already be
       // under it, built from X-Ndx-Base-Path as the extension docs advise.
       const location = outHeaders.location;
-      const underMount = typeof location === "string" && (location === prefix || location.startsWith(`${prefix}/`));
+      const underMount = typeof location === "string" && location.startsWith(prefix) && (location.length === prefix.length || "/?#".includes(location[prefix.length]));
       if (prefix && typeof location === "string" && location.startsWith("/") && !location.startsWith("//") && !(sidecar && underMount)) {
         outHeaders.location = `${prefix}${location}`;
       }

@@ -48,7 +48,14 @@ items:
     lastModified: "2026-10-27T17:52:13.522Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "5eeaba10-0b5f-4d80-b786-e687846b5627":
-    lastModified: "2026-10-27T17:23:07.584Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:16:38.328Z"
+    completedAt: "2026-10-27T18:19:16.257Z"
+    endedAt: "2026-10-27T18:19:16.257Z"
+    activeIntervals: [{"end":"2026-10-27T18:19:16.257Z","start":"2026-10-27T18:16:38.328Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "proxy.ts underMount also accepts prefix followed by ? or #; hub-sidecars redirect test covers /x/recon?tab=2 and /x/recon#a."
+    lastModified: "2026-10-27T18:19:16.257Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "69051203-482f-47c2-985a-51565fcc89fe":
     lastModified: "2026-10-27T17:23:14.898Z"
