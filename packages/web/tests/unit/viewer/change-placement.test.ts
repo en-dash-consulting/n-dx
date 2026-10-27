@@ -157,6 +157,8 @@ const pick = (target: string) => click($(`.cp-target[data-target="${target}"] in
 const button = (label: string) => $$<HTMLButtonElement>("button").find((b) => b.textContent === label) ?? null;
 
 beforeEach(() => {
+  // A focus request is module state: no case may start with one pending.
+  for (const id of ["a", "b", "c"]) takeTitleFocus(id);
   clearProjectMetadataCache();
   root = document.createElement("div");
   document.body.appendChild(root);
@@ -475,6 +477,8 @@ describe("Nothing fits", () => {
     await click(button("Propose & next"));
     expect(posts[0].url).toBe("/api/rex/changes/a/propose");
     expect(spies.onOpenChange).toHaveBeenCalledWith("b");
+    // Consumed here, or it would satisfy a later test's focus check for "b".
+    expect(takeTitleFocus("b")).toBe(true);
   });
 
   it("waits for an area before Propose", async () => {

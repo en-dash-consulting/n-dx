@@ -1,10 +1,14 @@
 schema: "rex/v2"
 items:
   "083b030f-c63d-4f00-b27b-04921b763228":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-27T22:34:30.805Z"
-    activeIntervals: [{"start":"2026-10-27T22:34:30.805Z"}]
-    lastModified: "2026-10-27T22:34:31.356Z"
+    completedAt: "2026-10-27T22:51:04.227Z"
+    endedAt: "2026-10-27T22:51:04.227Z"
+    activeIntervals: [{"end":"2026-10-27T22:51:04.227Z","start":"2026-10-27T22:34:30.805Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New components/prd-tree/change-placement.ts rendered after the title in task-detail.ts for changes: Inbox note with N of M · Next ›, shortlist radios (strength, area, matched words, tied/weak warnings), grouped search over /api/rex/product, Touches/Amends with summary, criteria edit and replacement statement, Place / Place & next / Place & add another / Nothing fits → propose form. Writes via /place and /propose, refusals inline with kind hints; placed changes show one Placed line. 39 component tests."
+    lastModified: "2026-10-27T22:51:04.227Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "090e80c2-19af-4ac9-b9ea-663ab788c45b":
     lastModified: "2026-10-27T16:31:21.304Z"
@@ -13,7 +17,10 @@ items:
     lastModified: "2026-10-27T16:31:13.438Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "21a8d036-41d6-45fb-b10c-181f074f3e4f":
-    lastModified: "2026-10-27T22:31:48.422Z"
+    lastModified: "2026-10-27T22:49:17.113Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "43945df9-5aae-4bf6-a818-61ddc5cb259f":
+    lastModified: "2026-10-27T22:49:17.113Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "480edc01-5573-43aa-b559-026a53513984":
     lastModified: "2026-10-27T16:31:05.167Z"
