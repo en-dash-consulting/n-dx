@@ -29,6 +29,13 @@ items:
     lastModified: "2026-10-27T17:49:43.894Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f720598e-9179-40e1-87d7-ece32720ac81":
+    status: "completed"
+    startedAt: "2026-10-27T17:56:07.454Z"
+    completedAt: "2026-10-27T17:58:34.750Z"
+    endedAt: "2026-10-27T17:58:34.750Z"
+    activeIntervals: [{"end":"2026-10-27T17:58:34.750Z","start":"2026-10-27T17:56:07.454Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "afterAll rmSync in hub-auth-token.test.ts now uses maxRetries:10, retryDelay:100 with a Windows handle-release comment."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:45:24.794Z"
+    lastModified: "2026-10-27T17:58:34.750Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
