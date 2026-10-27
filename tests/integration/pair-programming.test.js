@@ -19,6 +19,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, chmodSync } from "node:fs";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 
 const { recordRepoTrust } = await import("../../packages/llm-client/dist/public.js");
@@ -199,15 +201,28 @@ describe("resolveReviewerVendor", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveVendorCliPath", () => {
-  // The trust store lives under NDX_HOME; keep it inside the fixture.
   beforeEach(() => {
-    vi.stubEnv("NDX_HOME", join(tmpDir, "ndx-home"));
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
+
+  /**
+   * resolveVendorCliPath in a child process whose NDX_HOME is the fixture's,
+   * so the trust store the code under test reads stays inside the fixture.
+   * Stubbing NDX_HOME onto this worker's env would leak into sibling e2e files
+   * that spawn CLIs with `{ ...process.env }` (tests/unit/color-env-neutralized.test.js).
+   */
+  function resolveVendorCliPathWithHome(dir, vendor, ndxHome) {
+    const moduleUrl = pathToFileURL(join(import.meta.dirname, "../../packages/core/pair-programming.js")).href;
+    const script = `const { resolveVendorCliPath } = await import(${JSON.stringify(moduleUrl)}); process.stdout.write(String(await resolveVendorCliPath(process.argv[1], process.argv[2])));`;
+    return execFileSync(process.execPath, ["--input-type=module", "-e", script, dir, vendor], {
+      env: { ...process.env, NDX_HOME: ndxHome },
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  }
 
   it("falls back to vendor name when no config exists", async () => {
     expect(await resolveVendorCliPath(tmpDir, "claude")).toBe("claude");
@@ -240,15 +255,17 @@ describe("resolveVendorCliPath", () => {
 
   it("uses a .n-dx.json cli_path once the repository is trusted", async () => {
     writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" } } });
-    recordRepoTrust(tmpDir);
-    expect(await resolveVendorCliPath(tmpDir, "claude")).toBe("/shared/claude");
+    const ndxHome = join(tmpDir, "ndx-home");
+    recordRepoTrust(tmpDir, { ndxHome });
+    expect(resolveVendorCliPathWithHome(tmpDir, "claude", ndxHome)).toBe("/shared/claude");
   });
 
   it("prefers .n-dx.local.json over a trusted .n-dx.json", async () => {
     writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" } } });
     writeLocalConfig(tmpDir, { llm: { claude: { cli_path: "/local/claude" } } });
-    recordRepoTrust(tmpDir);
-    expect(await resolveVendorCliPath(tmpDir, "claude")).toBe("/local/claude");
+    const ndxHome = join(tmpDir, "ndx-home");
+    recordRepoTrust(tmpDir, { ndxHome });
+    expect(resolveVendorCliPathWithHome(tmpDir, "claude", ndxHome)).toBe("/local/claude");
   });
 });
 
