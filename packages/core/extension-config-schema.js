@@ -20,6 +20,7 @@
 import * as nodeFs from "node:fs";
 import { join } from "node:path";
 import { discoverExtensions } from "./extension-discovery.js";
+import { RESERVED_EXTENSION_NAMES } from "./extension-manifest.js";
 
 /** Keywords that describe a value without constraining it. */
 const ANNOTATIONS = new Set([
@@ -97,13 +98,18 @@ export function configCheckerFor(ext, fs = nodeFs) {
 
 /**
  * The checker for the installed extension `name`, or why there is none: it is
- * not installed, or its manifest is not valid.
+ * not installed, or its manifest is not valid. A reserved name is `refused`
+ * rather than an `error`, since no extension can take it and `--force` must
+ * not write it: `extensions.paths` is discovery's list of dev paths.
  *
  * @param {string} name
  * @param {CheckerByNameOptions} options
- * @returns {{checker: ExtensionConfigChecker} | {error: string}}
+ * @returns {{checker: ExtensionConfigChecker} | {error: string} | {refused: string}}
  */
 export function configCheckerByName(name, options) {
+  if (RESERVED_EXTENSION_NAMES.includes(name)) {
+    return { refused: `"${name}" is reserved, so extensions.${name} is not an extension's config section` };
+  }
   const { extensions } = discoverExtensions(options);
   const named = extensions.filter((e) => e.name === name);
   const ext = named.find((e) => e.manifest);

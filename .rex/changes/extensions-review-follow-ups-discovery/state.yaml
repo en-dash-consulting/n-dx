@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "02ae881a-a188-44f9-a703-6118b07c1ed0":
-    lastModified: "2026-10-27T13:51:03.589Z"
+    status: "completed"
+    startedAt: "2026-10-27T14:20:50.417Z"
+    completedAt: "2026-10-27T14:26:36.390Z"
+    endedAt: "2026-10-27T14:26:36.390Z"
+    activeIntervals: [{"end":"2026-10-27T14:26:36.390Z","start":"2026-10-27T14:20:50.417Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "--user writes read the user config strictly (fail naming the path, file untouched) and write via tmp+rename; reserved names refused as config sections even with --force."
+    lastModified: "2026-10-27T14:26:36.390Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "0c1401b1-5398-41c9-bc05-98d172048518":
     lastModified: "2026-10-27T13:51:11.950Z"

@@ -26,4 +26,6 @@ n-dx checks the validation keywords a config section needs: `type`, `enum`, `con
 
 ## Reserved
 
-`extensions.paths` in the user config is discovery's list of development checkouts ([Manifest](./manifest.md#where-n-dx-looks)), which is why `paths` cannot be an extension name. Edit it in `<ndx home>/config.json` directly.
+`extensions.paths` in the user config is discovery's list of development checkouts ([Manifest](./manifest.md#where-n-dx-looks)), which is why `paths` cannot be an extension name. Edit it in `<ndx home>/config.json` directly. `ndx config extensions.paths.<key>` is refused, as is any other reserved name, even with `--force`.
+
+A `--user` write replaces the file through a temporary file and a rename. If the file is not valid JSON, the write fails naming it and leaves it as it was. Fix the file, then write again.

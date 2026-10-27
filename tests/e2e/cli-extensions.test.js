@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { CLI_PATH, createTmpDir, removeTmpDir, run, runResult } from "./e2e-helpers.js";
 
@@ -381,6 +381,42 @@ describe("ndx config extensions.<name>", () => {
     const result = spawnSync(process.execPath, [CLI_PATH, "config", "extensions.recon.mode", "deep", "--user"], { ...opts(), encoding: "utf-8", windowsHide: true });
     expect(result.status).toBe(0);
     expect(result.stderr).toContain('the project config also sets "extensions.recon.mode", and its value wins');
+  });
+
+  it("refuses a --user write over a malformed user config, naming it and leaving it byte-for-byte", () => {
+    installConfigReader("recon");
+    const path = join(home, "config.json");
+    const broken = '{\n  "extensions": { "paths": ["../dev/ndx-recon"], }\n}\n';
+    writeFileSync(path, broken);
+    const result = runResult(["config", "extensions.recon.mode", "deep", "--user", "--force"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(path);
+    expect(readFileSync(path, "utf-8")).toBe(broken);
+  });
+
+  it("writes the user config through a rename, keeping discovery's extensions.paths", () => {
+    installConfigReader("recon");
+    const path = join(home, "config.json");
+    writeFileSync(path, JSON.stringify({ extensions: { paths: ["../dev/ndx-recon"] } }));
+    run(["config", "extensions.recon.mode", "deep", "--user"], opts());
+    expect(readJson(path).extensions).toEqual({ paths: ["../dev/ndx-recon"], recon: { mode: "deep" } });
+    expect(readdirSync(home).filter((f) => f.startsWith("config.json."))).toEqual([]);
+  });
+
+  it("refuses extensions.paths and other reserved names as a section, even with --force", () => {
+    const path = join(home, "config.json");
+    const before = JSON.stringify({ extensions: { paths: ["../dev/ndx-recon"] } });
+    writeFileSync(path, before);
+    for (const args of [
+      ["config", "extensions.paths.x", "1", "--user", "--force"],
+      ["config", "extensions.hub.x", "1", "--force"],
+    ]) {
+      const result = runResult(args, opts());
+      expect(result.code).toBe(1);
+      expect(result.stderr).toMatch(/is reserved/);
+    }
+    expect(readFileSync(path, "utf-8")).toBe(before);
+    expect(existsSync(join(root, ".n-dx.json")) ? readJson(join(root, ".n-dx.json")).extensions : undefined).toBeUndefined();
   });
 });
 

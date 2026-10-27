@@ -15,6 +15,7 @@ import {
   constants,
   stat,
   mkdir,
+  rename,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { execFileSyncCli } from "./win-spawn.js";
@@ -3446,6 +3447,35 @@ async function loadUserConfig(home) {
   return loadOptionalJSON(userConfigPath(home));
 }
 
+/**
+ * The user config for a write: `{}` when there is none, and an error naming
+ * the file when it is not a JSON object. Users hand-edit it for
+ * `extensions.paths`, so writing over a typo would lose their settings.
+ */
+async function loadUserConfigForWrite(home) {
+  const path = userConfigPath(home);
+  if (!(await fileExists(path))) return {};
+  let config;
+  try {
+    config = await loadJSON(path);
+  } catch (err) {
+    throw new Error(`Cannot update ${path}: it is not valid JSON (${err.message}). Fix or remove it, then try again.`);
+  }
+  if (config === null || typeof config !== "object" || Array.isArray(config)) {
+    throw new Error(`Cannot update ${path}: it does not hold a JSON object. Fix or remove it, then try again.`);
+  }
+  return config;
+}
+
+/** Write the user config through a temporary file and a rename. */
+async function saveUserConfig(home, config) {
+  const path = userConfigPath(home);
+  const tmp = `${path}.${process.pid}.tmp`;
+  await mkdir(home, { recursive: true });
+  await saveJSON(tmp, config);
+  await rename(tmp, path);
+}
+
 /** `value` when it is a plain object, else `{}`. */
 function plainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -3523,13 +3553,23 @@ async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flag
   }
   const home = resolveNdxHome();
   const found = deps.extensionConfigChecker(name, dir, home);
+  if ("refused" in found) {
+    fail(found.refused);
+    return;
+  }
   if ("error" in found && !force) {
     fail(`${found.error}\n  Use --force to set this value anyway.`);
     return;
   }
   const checker = "checker" in found ? found.checker : undefined;
 
-  const user = await loadUserConfig(home);
+  let user;
+  try {
+    user = flags.user === "true" ? await loadUserConfigForWrite(home) : await loadUserConfig(home);
+  } catch (err) {
+    fail(err.message);
+    return;
+  }
   const shared = await loadProjectConfigFile(dir, PROJECT_CONFIG_FILE);
   const local = await loadLocalConfig(dir);
   const merged = () => deepMerge(extensionSection(user, name), extensionSection(deepMerge(shared, local), name));
@@ -3566,8 +3606,7 @@ async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flag
   }
 
   if (target === user) {
-    await mkdir(home, { recursive: true });
-    await saveJSON(userConfigPath(home), user);
+    await saveUserConfig(home, user);
   } else {
     await saveProjectJSON(projectConfigPath(dir, PROJECT_CONFIG_FILE), shared);
   }
@@ -3590,7 +3629,8 @@ async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flag
  * @param {string} name
  * @param {string} dir
  * @param {string} home
- * @returns {{checker: import("./extension-config-schema.js").ExtensionConfigChecker} | {error: string}}
+ * @returns {{checker: import("./extension-config-schema.js").ExtensionConfigChecker} | {error: string} | {refused: string}}
+ *   `refused` (a reserved name) holds even with `--force`.
  */
 
 /**
