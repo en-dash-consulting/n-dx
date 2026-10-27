@@ -1,8 +1,15 @@
 schema: "rex/v2"
 items:
   "11c9e658-ff8b-43a2-9d27-bd2d99155059":
+    status: "completed"
+    startedAt: "2026-10-27T18:41:23.203Z"
+    completedAt: "2026-10-27T18:43:39.191Z"
+    endedAt: "2026-10-27T18:43:39.191Z"
+    activeIntervals: [{"end":"2026-10-27T18:43:39.191Z","start":"2026-10-27T18:41:23.203Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Retry the between-runs .sourcevision rm in cli-analyze.test.ts; sv analyze --fast spawns no long-lived child."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:45:38.707Z"
+    lastModified: "2026-10-27T18:43:39.191Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3039164b-8369-450c-8745-9b133c345ae7":
     status: "completed"
