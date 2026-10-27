@@ -216,7 +216,9 @@ describe("GET /api/hub/extensions", () => {
     });
     expect(reg.status, JSON.stringify(reg.body)).toBe(201);
 
-    for (const path of ["/api/hub/extensions?project=alpha", "/p/alpha/api/hub/extensions"]) {
+    // The last is a worktree page under the single-project root alias: its
+    // `/w/<key>` names no project, so the viewer names it in the query.
+    for (const path of ["/api/hub/extensions?project=alpha", "/p/alpha/api/hub/extensions", "/w/feature/api/hub/extensions?project=alpha"]) {
       const { status, body } = await api(h, path);
       expect(status).toBe(200);
       const byName = Object.fromEntries(body.extensions.map((e: { name: string }) => [e.name, e]));

@@ -14,6 +14,7 @@
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { getBasePath } from "../base-path.js";
+import { detectBasePath } from "../external.js";
 import type { HubProjects } from "./project-switcher.js";
 
 /** One resolved project link. */
@@ -46,11 +47,12 @@ export function parseExtensionLinks(body: unknown): ExtensionLink[] | null {
 /**
  * Where to ask for this dashboard's links. Under `/p/<id>/` the prefix names
  * the project (the fetch is rewritten onto it); under the hub's single-project
- * root alias there is no prefix, so the sole project is named in the query.
+ * root alias it names none — there is no prefix, or only a worktree's
+ * `/w/<key>`, which the hub drops — so the sole project is named in the query.
  * Null when neither says which project this is.
  */
 export function extensionLinksPath(basePath: string, projects: HubProjects["projects"]): string | null {
-  if (basePath) return "/api/hub/extensions";
+  if (detectBasePath(basePath)) return "/api/hub/extensions";
   if (projects.length === 1) return `/api/hub/extensions?project=${encodeURIComponent(projects[0].id)}`;
   return null;
 }

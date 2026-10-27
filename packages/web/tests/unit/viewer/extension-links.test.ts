@@ -71,6 +71,13 @@ describe("parseExtensionLinks / extensionLinksPath", () => {
     expect(extensionLinksPath("", [{ id: "a b", name: "A", state: "healthy" }])).toBe("/api/hub/extensions?project=a%20b");
     expect(extensionLinksPath("", [])).toBeNull();
   });
+
+  it("names the sole project on a worktree page, whose /w/<key> prefix names none", () => {
+    const sole = [{ id: "alpha", name: "Alpha", state: "healthy" }];
+    expect(extensionLinksPath("/w/feature", sole)).toBe("/api/hub/extensions?project=alpha");
+    expect(extensionLinksPath("/w/feature", [])).toBeNull();
+    expect(extensionLinksPath("/p/alpha/w/feature", [])).toBe("/api/hub/extensions");
+  });
 });
 
 describe("top bar project context: extension links", () => {
@@ -110,6 +117,21 @@ describe("top bar project context: extension links", () => {
 
   it("names the sole project on the hub's root alias", async () => {
     setBasePathForTests("");
+    const asked: string[] = [];
+    root = renderToDiv(h(ProjectContext, {
+      view: "prd",
+      hubFetcher: hubFetch({
+        "/api/hub/projects": { ok: true, body: PROJECTS },
+        "/api/hub/extensions": { ok: true, body: EXTENSIONS },
+      }, asked),
+    }));
+    await flush();
+    expect(asked).toContain("/api/hub/extensions?project=alpha");
+    expect(root.querySelectorAll(".project-context-link")).toHaveLength(2);
+  });
+
+  it("names the sole project on a worktree page under the root alias", async () => {
+    setBasePathForTests("/w/feature");
     const asked: string[] = [];
     root = renderToDiv(h(ProjectContext, {
       view: "prd",
