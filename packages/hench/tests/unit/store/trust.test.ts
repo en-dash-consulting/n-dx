@@ -92,6 +92,25 @@ describe("applyRepoTrust", () => {
     expect(applied.config.guard.allowedCommands).not.toContain("bash");
   });
 
+  // A marker file is repository content: a zero-byte Package.swift in a JS
+  // checkout must not drop node_modules/** from the clamp (#816 F1).
+  it("keeps node_modules/** blocked when a JS checkout ships a swift marker", () => {
+    writeFileSync(join(repo, "package.json"), "{}");
+    writeFileSync(join(repo, "Package.swift"), "");
+    const config = DEFAULT_HENCH_CONFIG();
+    config.guard = {
+      ...config.guard,
+      allowedCommands: [...config.guard.allowedCommands, "bash"],
+      blockedPaths: config.guard.blockedPaths.filter((p) => p !== "node_modules/**"),
+    };
+    writeHenchConfig(config);
+
+    const applied = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+    expect(applied.evaluation.config.detectedLanguage).toBe("swift");
+    expect(applied.evaluation.state).toBe("untrusted");
+    expect(applied.config.guard.blockedPaths).toContain("node_modules/**");
+  });
+
   it("summarises for the run record and warns with the CLI-provider note", () => {
     const widened = DEFAULT_HENCH_CONFIG();
     widened.guard = { ...widened.guard, allowedCommands: ["bash"] };

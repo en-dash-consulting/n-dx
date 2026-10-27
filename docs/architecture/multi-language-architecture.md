@@ -162,12 +162,12 @@ Archetypes without language-scoped signals (utility, middleware, model, service,
 
 ## Hench Guard Templates
 
-Hench's security guard uses language-specific defaults for allowed commands and blocked paths:
+Hench's security guard uses language-specific allowed commands. Blocked paths are the same for every language — n-dx state, `.git/**`, credential files, and every ecosystem's dependency directories — because the language is detected from marker files the repository ships, and a marker must not loosen what an untrusted checkout is kept out of:
 
 | Setting | TypeScript/JS | Go |
 |---------|--------------|-----|
 | Allowed commands | `npm`, `npx`, `node`, `git`, `tsc`, `vitest` | `go`, `make`, `git`, `golangci-lint` |
-| Blocked paths | `.hench/**`, `.rex/**`, `.git/**`, `node_modules/**` | `.hench/**`, `.rex/**`, `.git/**`, `vendor/**` |
+| Blocked paths | `.hench/**`, `.rex/**`, `.ndx/**`, `.git/**`, `node_modules/**`, `vendor/**`, `.build/**`, `DerivedData/**`, `Pods/**`, `Carthage/**`, credential files | same |
 
 The `guardDefaultsForLanguage(language)` function returns the appropriate template. The resolved language from `manifest.language` drives the selection.
 
