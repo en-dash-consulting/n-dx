@@ -48,6 +48,29 @@ describe("loadVendorCliEnv repository trust", () => {
     expect(first[SECRET_NAME]).toBeUndefined();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain("env-allow-added");
+    expect(warn.mock.calls[0][0]).toContain("guard.env.allow (*)");
+  });
+
+  it("keeps the user's .n-dx.local.json allow entries in an untrusted checkout", async () => {
+    // Credential-shaped, so the default deny strips it unless an allow keeps it.
+    const LOCAL_NAME = "NDX_TEST_REVIEWER_LOCAL_TOKEN";
+    process.env[LOCAL_NAME] = "user-secret";
+    writeFileSync(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ hench: { guard: { env: { allow: [LOCAL_NAME] } } } }),
+      "utf-8",
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const env = await loadVendorCliEnv(projectDir, "codex", { trust: { ndxHome } });
+
+      expect(env[LOCAL_NAME]).toBeDefined();
+      expect(env[SECRET_NAME]).toBeUndefined();
+      for (const [message] of warn.mock.calls) expect(message).not.toContain(LOCAL_NAME);
+    } finally {
+      delete process.env[LOCAL_NAME];
+    }
   });
 
   it("applies the configured allow list once the checkout is trusted", async () => {

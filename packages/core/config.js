@@ -2741,7 +2741,9 @@ const warnedUntrustedEnvAllow = new Set();
 
 /**
  * Drop repository-supplied `guard.env.allow` entries unless the user trusts
- * this checkout. `deny` is kept: it only narrows. "Not trusted" is
+ * this checkout. The user's own `.n-dx.local.json` entries always apply, as in
+ * hench's agent shell (`applyRepoTrust`) and llm-client's `repoCommandEnv`.
+ * `deny` is kept: it only narrows. "Not trusted" is
  * `evaluateRepoTrust(...).restricted` (untrusted or changed), which is also
  * the state of any checkout with an unaccepted `env-allow-added` finding.
  * Loaded dynamically: config.js may not import packages statically.
@@ -2751,18 +2753,26 @@ async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust) {
   const { evaluateRepoTrust } = await import("@n-dx/llm-client");
   const evaluation = evaluateRepoTrust(dir, trust);
   if (!evaluation.restricted) return envPolicy;
-  if (!warnedUntrustedEnvAllow.has(dir)) {
+  const localAllow = await loadLocalEnvAllow(dir);
+  const dropped = envPolicy.allow.filter((entry) => !localAllow.includes(entry));
+  if (dropped.length && !warnedUntrustedEnvAllow.has(dir)) {
     warnedUntrustedEnvAllow.add(dir);
     const finding = evaluation.findings.find((f) => f.code === "env-allow-added");
     console.warn(
-      `Ignoring repository guard.env.allow (${envPolicy.allow.join(", ")}) for the reviewer CLI: ` +
+      `Ignoring repository guard.env.allow (${dropped.join(", ")}) for the reviewer CLI: ` +
       `this checkout is ${evaluation.state}` +
       (finding ? ` (finding: ${finding.code})` : "") +
       ". Run 'ndx trust accept .' to apply it.",
     );
   }
   const { allow: _ignored, ...rest } = envPolicy;
-  return rest;
+  return localAllow.length ? { ...rest, allow: localAllow } : rest;
+}
+
+/** `hench.guard.env.allow` from the user's git-ignored `.n-dx.local.json`, which the repository does not ship. */
+async function loadLocalEnvAllow(dir) {
+  const allow = (await loadLocalConfig(dir))?.hench?.guard?.env?.allow;
+  return Array.isArray(allow) ? allow.filter((entry) => typeof entry === "string") : [];
 }
 
 /** The project's `hench.guard.env` policy, `.hench/config.json` merged with `.n-dx.json`. */
