@@ -664,9 +664,9 @@ const GO_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("go", {
  * `swift` covers `swift build`, `swift test`, `swift package …`. `make` is
  * included because Swift app codebases very commonly wrap their full build +
  * test + lint gate in a Makefile target (e.g. `make validate`). `xcodebuild`
- * + `xcrun` cover Xcode-driven builds and CLI tools. `.build/` (SPM build
- * cache) and `DerivedData/` (Xcode build cache) are blocked so the agent
- * can't pollute or trip on them.
+ * + `xcrun` cover Xcode-driven builds and CLI tools. Blocked paths are the
+ * shared baseline, which keeps every ecosystem's dependency and build
+ * directories (`.build/`, `DerivedData/`, `node_modules/`, …) out of reach.
  */
 const SWIFT_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("swift", {
   commandTimeout: 60000,           // Swift builds are slower than `go test` — 60s.

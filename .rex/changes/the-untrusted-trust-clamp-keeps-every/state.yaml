@@ -1,8 +1,15 @@
 schema: "rex/v2"
 items:
   "034517a2-cf9f-4480-95ed-385ce76e17c5":
+    status: "completed"
+    startedAt: "2026-10-27T15:59:59.775Z"
+    completedAt: "2026-10-27T16:11:54.447Z"
+    endedAt: "2026-10-27T16:11:54.447Z"
+    activeIntervals: [{"end":"2026-10-27T16:11:54.447Z","start":"2026-10-27T15:59:59.775Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "guardBaselineForLanguage blockedPaths now include every language's dependency dirs (DEPENDENCY_BLOCKED); allowedCommands stay per-language. Tests for Package.swift / go.mod / polyglot clamp and pre-upgrade defaults staying baseline."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T15:17:35.845Z"
+    lastModified: "2026-10-27T16:11:54.447Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5d6f42fa-0b0a-4dfd-b87e-2dbe2f068a62":
     assignee: "Ryan Keith <ryan.k@endash.us>"

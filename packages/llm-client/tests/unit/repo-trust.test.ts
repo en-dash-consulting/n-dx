@@ -67,6 +67,64 @@ describe("guardBaselineForLanguage", () => {
       expect(blockedPaths, lang ?? "default").toContain(".ndx/**");
     }
   });
+
+  // The baseline is picked from marker files, which are repository content.
+  // Per-language dependency blocks let a zero-byte Package.swift drop
+  // node_modules/** from an untrusted JS checkout's clamp (#816 F1).
+  it("blocks every ecosystem's dependency directories whatever the language; commands stay per-language", () => {
+    const deps = ["node_modules/**", "vendor/**", ".build/**", "DerivedData/**", "Pods/**", "Carthage/**"];
+    for (const lang of ["typescript", "javascript", "go", "swift", undefined, "cobol"]) {
+      const { blockedPaths } = guardBaselineForLanguage(lang);
+      for (const p of deps) expect(blockedPaths, `${lang ?? "default"}: ${p}`).toContain(p);
+      expect(new Set(blockedPaths).size, lang ?? "default").toBe(blockedPaths.length);
+    }
+    expect(guardBaselineForLanguage("go").allowedCommands).not.toContain("npm");
+    expect(guardBaselineForLanguage("swift").allowedCommands).not.toContain("go");
+  });
+});
+
+describe("untrusted clamp and marker files", () => {
+  it.each([
+    ["a zero-byte Package.swift", { "Package.swift": "" }],
+    ["a go.mod", { "go.mod": "module x\n" }],
+    ["a polyglot layout (root go.mod, JS frontend)", { "go.mod": "module x\n", "web/package.json": "{}" }],
+  ])("keeps node_modules/** blocked in a JS/TS checkout carrying %s", (_label, files) => {
+    writeJson("package.json", { name: "x" });
+    for (const [rel, body] of Object.entries(files)) {
+      mkdirSync(join(repo, rel, ".."), { recursive: true });
+      writeFileSync(join(repo, rel), body);
+    }
+    // The repository's guard drops node_modules/** and widens a command, so it is untrusted.
+    const guard = { ...DEFAULT_GUARD, allowedCommands: [...DEFAULT_GUARD.allowedCommands, "bash"], blockedPaths: [".hench/**", ".rex/**", ".git/**"] };
+    writeJson(".hench/config.json", { guard });
+
+    const ev = evaluateRepoTrust(repo, { ndxHome: home });
+    expect(ev.state).toBe("untrusted");
+    expect(ev.config.detectedLanguage).not.toBe("typescript");
+    const clamped = clampGuardToBaseline(guard, guardBaselineForLanguage(ev.config.detectedLanguage));
+    expect(clamped.blockedPaths).toContain("node_modules/**");
+  });
+
+  // What hench init wrote before the baseline grew: CORE + its own language's
+  // dependency directories + secrets. Growing the baseline must not flip it.
+  it.each([
+    ["typescript", null, ["node_modules/**"]],
+    ["go", "go.mod", ["vendor/**"]],
+    ["swift", "Package.swift", [".build/**", "DerivedData/**", "Pods/**", "Carthage/**"]],
+  ])("still reads a %s project's pre-upgrade init defaults as baseline", (language, marker, deps) => {
+    if (marker) writeFileSync(join(repo, marker), "");
+    const current = guardBaselineForLanguage(language);
+    const previous = {
+      ...current,
+      blockedPaths: [".hench/**", ".rex/**", ".git/**", ".ndx/**", ...deps, ...SECRET_PATH_PATTERNS],
+    };
+    for (const guard of [previous, current]) {
+      writeJson(".hench/config.json", { language, guard });
+      const ev = evaluateRepoTrust(repo, { ndxHome: home });
+      expect(ev.findings, language).toEqual([]);
+      expect(ev.state, language).toBe("baseline");
+    }
+  });
 });
 
 describe("clampGuardToBaseline", () => {

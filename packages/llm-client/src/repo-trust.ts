@@ -159,14 +159,28 @@ const LANGUAGE_BASELINES: Record<string, Pick<GuardBaseline, "allowedCommands"> 
 };
 
 /**
+ * Every language's dependency directories, blocked by every baseline.
+ *
+ * The baseline is chosen from marker files, which are repository content, and
+ * the clamp unions blocked paths. Were these per-language, a zero-byte
+ * `Package.swift` in a JS checkout — or a polyglot's root `go.mod` — would
+ * drop `node_modules/**` from what an untrusted checkout is kept out of, and a
+ * payload written there runs at the operator's next `npm install`.
+ */
+const DEPENDENCY_BLOCKED: readonly string[] = [
+  ...new Set(Object.values(LANGUAGE_BASELINES).flatMap((b) => b.extraBlocked)),
+];
+
+/**
  * The guard baseline for a project language. Unknown or missing languages
- * get the JS/TS baseline, matching hench's own defaults.
+ * get the JS/TS baseline, matching hench's own defaults. Only the allowed
+ * commands depend on the language; blocked paths are the same for all.
  */
 export function guardBaselineForLanguage(language?: string | null): GuardBaseline {
   const entry = LANGUAGE_BASELINES[language ?? ""] ?? LANGUAGE_BASELINES.typescript;
   return {
     allowedCommands: [...entry.allowedCommands],
-    blockedPaths: [...CORE_BLOCKED, ...entry.extraBlocked, ...SECRET_PATH_PATTERNS],
+    blockedPaths: [...CORE_BLOCKED, ...DEPENDENCY_BLOCKED, ...SECRET_PATH_PATTERNS],
     allowedGitSubcommands: [...GIT_SUBCOMMAND_BASELINE],
   };
 }
