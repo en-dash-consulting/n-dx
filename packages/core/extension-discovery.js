@@ -242,6 +242,9 @@ function isInside(dir, path) {
 /**
  * A cached source: what was found, and the paths whose modification times
  * decide whether it is still current (`null` for a path that did not exist).
+ * Each found package's own `package.json` is among them: a linked package
+ * (`file:`, `link:`, a workspace, `ndx extensions add <folder>`) is a symlink,
+ * and editing its target changes no folder a scan watches.
  *
  * @typedef {object} SourceEntry
  * @property {Array<[string, number | null]>} watch
@@ -287,6 +290,7 @@ function listedScan(dir) {
         const pkg = readPackage(fs, join(modules, ...name.split("/")), null);
         if (pkg) packages.push(pkg);
       }
+      for (const pkg of packages) watched.add(join(pkg.dir, "package.json"));
       return { watch: stamp(fs, watched), packages, errors };
     },
   };
@@ -315,6 +319,7 @@ function globalScan(dir) {
           if (pkg) packages.push(pkg);
         }
       }
+      for (const pkg of packages) watched.add(join(pkg.dir, "package.json"));
       return { watch: stamp(fs, watched), packages, errors: [] };
     },
   };

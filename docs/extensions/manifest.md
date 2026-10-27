@@ -53,7 +53,7 @@ The n-dx home is `$NDX_HOME`, then `$N_DX_HOME`, then `~/.ndx`, then the legacy 
 - Two different packages that claim one extension or command name are both refused, and each is shown naming the other.
 - The hub serves sidecars from the `user`, `global` and `dev` sources only, because it serves no single project.
 
-Discovery is cached in `<ndx home>/extensions.json`. It is recomputed when a source folder's modification time changes, so a new install shows up on the next command.
+Discovery is cached in `<ndx home>/extensions.json`. It is recomputed when a source folder's modification time changes, or a found extension's own `package.json` does, so a new install, or an edit to a linked package's version or manifest, shows up on the next command.
 
 ## `ndx extensions`
 

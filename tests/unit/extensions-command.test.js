@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync, realpathSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync, realpathSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runExtensions } from "../../packages/core/extensions-command.js";
@@ -321,6 +321,30 @@ describe("ndx extensions enable and disable", () => {
 
     await ndx(["enable", "recon", "--yes"]);
     installInto(userFolder(), extensionPackage("@acme/ndx-recon", "recon", { version: "1.1.0" }));
+    expect(await stateOf("recon")).toMatchObject({ state: "unapproved", reason: "manifest changed since approval" });
+  });
+
+  it("asks again when a linked package's own package.json changes, with nothing else touched", async () => {
+    // `ndx extensions add <folder>` leaves a symlink: an edit to the folder
+    // moves no mtime in the user folder or its node_modules.
+    const target = join(root, "checkouts", "recon");
+    const link = join(userFolder(), "node_modules", "@acme", "ndx-recon");
+    writePackage(target, extensionPackage("@acme/ndx-recon", "recon"));
+    rmSync(link, { recursive: true, force: true });
+    symlinkSync(target, link, "junction");
+    await ndx(["enable", "recon", "--yes"]);
+    expect((await stateOf("recon")).state).toBe("enabled");
+    const edit = (pkg, seconds) => {
+      writeJson(join(target, "package.json"), pkg);
+      clock += seconds;
+      utimesSync(join(target, "package.json"), clock, clock);
+    };
+
+    edit(extensionPackage("@acme/ndx-recon", "recon", { version: "2.0.0" }), 10);
+    expect(await stateOf("recon")).toMatchObject({ state: "unapproved", reason: "version changed since approval (1.0.0 → 2.0.0)" });
+
+    await ndx(["enable", "recon", "--yes"]);
+    edit(extensionPackage("@acme/ndx-recon", "recon", { version: "2.0.0", extra: { commands: [{ name: "recon", bin: "bin/other.js", summary: "Moved" }] } }), 10);
     expect(await stateOf("recon")).toMatchObject({ state: "unapproved", reason: "manifest changed since approval" });
   });
 

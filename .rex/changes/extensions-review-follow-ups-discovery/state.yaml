@@ -7,7 +7,14 @@ items:
     lastModified: "2026-10-27T13:51:11.950Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "0cc63aed-a641-4bbc-9a43-b2b18713c668":
-    lastModified: "2026-10-27T13:51:01.529Z"
+    status: "completed"
+    startedAt: "2026-10-27T14:15:59.415Z"
+    completedAt: "2026-10-27T14:20:40.017Z"
+    endedAt: "2026-10-27T14:20:40.017Z"
+    activeIntervals: [{"end":"2026-10-27T14:20:40.017Z","start":"2026-10-27T14:15:59.415Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "listedScan and globalScan stamp each found extension's package.json; one stat per extension (42be44f3c)"
+    lastModified: "2026-10-27T14:20:40.017Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "143e479a-714f-44dd-8047-636012e9ee5b":
     lastModified: "2026-10-27T13:51:18.561Z"

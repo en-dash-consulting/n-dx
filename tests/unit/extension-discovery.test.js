@@ -4,15 +4,15 @@
  * that nothing but `package.json` is read.
  *
  * Cache cost is asserted by counting file-system calls, not by a clock
- * (TESTING.md, Flake Resistance → Family 2): a warm call must make the same
- * reads and stats with 20 extensions installed as with none.
+ * (TESTING.md, Flake Resistance → Family 2): a warm call with 20 extensions
+ * installed must make the same reads as with none, and one stat more for each.
  *
  * @see docs/architecture/extensions.md — "Where n-dx looks"
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, sep } from "node:path";
 import {
@@ -256,7 +256,7 @@ describe("cache", () => {
     expect(counting.counts.writeFileSync).toBe(0);
   });
 
-  it("makes the same reads and stats warm with 20 extensions as with none", () => {
+  it("costs one stat per extension warm, and no reads", () => {
     const warmCost = () => {
       discover();
       const counting = countingFs();
@@ -270,7 +270,7 @@ describe("cache", () => {
     const twenty = warmCost();
 
     expect(discover().extensions).toHaveLength(20);
-    expect(twenty).toEqual(none);
+    expect(twenty).toEqual({ ...none, statSync: none.statSync + 20 });
   });
 
   it("recomputes a source when a package is added to it", () => {
@@ -299,6 +299,27 @@ describe("cache", () => {
     bumpMtime(join(dir, "package.json"));
 
     expect(discover().extensions[0].version).toBe("1.1.0");
+  });
+
+  it.each([
+    ["the user folder", () => join(userFolder(), "node_modules", "ndx-linked"), () => install(userFolder(), manifest("ndx-linked", "linked"))],
+    ["the global source", () => join(globalRoot, "ndx-linked"), () => {}],
+  ])("recomputes a symlinked package in %s when its target's package.json changes", (_, linkPath, list) => {
+    const target = join(root, "checkouts", "linked");
+    list();
+    rmSync(linkPath(), { recursive: true, force: true });
+    writeJson(join(target, "package.json"), manifest("ndx-linked", "linked"));
+    mkdirSync(join(linkPath(), ".."), { recursive: true });
+    symlinkSync(target, linkPath(), "junction");
+    expect(discover().extensions[0]).toMatchObject({ version: "1.0.0", manifest: { commands: [{ bin: "bin/cli.js" }] } });
+
+    writeJson(join(target, "package.json"), manifest("ndx-linked", "linked", {
+      version: "2.0.0",
+      commands: [{ name: "linked", bin: "bin/other.js", summary: "Moved" }],
+    }));
+    bumpMtime(join(target, "package.json"));
+
+    expect(discover().extensions[0]).toMatchObject({ version: "2.0.0", manifest: { commands: [{ bin: "bin/other.js" }] } });
   });
 
   it("keeps the file's other keys, where approvals live", () => {
