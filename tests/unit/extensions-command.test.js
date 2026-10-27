@@ -13,6 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, utimesSync, realpathSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
+import { pathToFileURL } from "node:url";
 import { EXTENSIONS_SUBCOMMANDS, localSpecPath, runExtensions } from "../../packages/core/extensions-command.js";
 import { EXTENSION_STATES, manifestHash } from "../../packages/core/extension-state.js";
 
@@ -322,6 +323,12 @@ describe("localSpecPath", () => {
     expect(localSpecPath("pkg.tgz", cwd)).toBe(join(cwd, "pkg.tgz"));
     expect(localSpecPath("file:../folder", cwd)).toBe(join(root, "folder"));
     expect(localSpecPath(join(root, "abs"), cwd)).toBe(join(root, "abs"));
+    expect(localSpecPath(pathToFileURL(join(root, "abs")).href, cwd)).toBe(join(root, "abs"));
+    if (process.platform === "win32") {
+      expect(localSpecPath("file:///C:/x/y", cwd)).toBe("C:\\x\\y");
+    } else {
+      expect(localSpecPath("file:///x/y", cwd)).toBe("/x/y");
+    }
     for (const spec of ["@acme/ndx-recon", "ndx-recon@1.2.0", "github:acme/ndx-recon", "https://example.com/ndx-recon.tgz", "git+https://example.com/r.git"]) {
       expect(localSpecPath(spec, cwd), spec).toBeNull();
     }

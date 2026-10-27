@@ -24,7 +24,14 @@ items:
     lastModified: "2026-10-27T17:23:19.800Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "34624149-f10d-40ae-a334-fc1b4e533727":
-    lastModified: "2026-10-27T17:23:10.019Z"
+    status: "completed"
+    startedAt: "2026-10-27T18:19:26.733Z"
+    completedAt: "2026-10-27T18:23:34.918Z"
+    endedAt: "2026-10-27T18:23:34.918Z"
+    activeIntervals: [{"end":"2026-10-27T18:23:34.918Z","start":"2026-10-27T18:19:26.733Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "localSpecPath maps file:// specs with fileURLToPath; unit test covers pathToFileURL round-trip plus a platform literal."
+    lastModified: "2026-10-27T18:23:34.918Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "35e2dfd2-9f53-4753-8228-01b4128991b8":
     status: "completed"

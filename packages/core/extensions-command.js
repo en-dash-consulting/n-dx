@@ -624,13 +624,23 @@ function listedPackages(folder) {
  * The absolute path an npm spec names on disk, or `null` for a registry,
  * git or URL spec. npm reads a spec as a path when it starts with `.`, `/`,
  * `\`, `~/` or a drive letter, has a `file:` prefix, or ends in `.tgz`,
- * `.tar.gz` or `.tar`.
+ * `.tar.gz` or `.tar`. A `file://` spec is a URL, not a relative path:
+ * `file:///C:/x` is `C:\x`, never `C:\C:\x`.
  *
  * @param {string} spec
  * @param {string} cwd  Where the user ran the command.
  * @returns {string | null}
  */
 export function localSpecPath(spec, cwd) {
+  if (spec.startsWith("file://")) {
+    // A URL this platform cannot map to a path goes to npm as typed, so the
+    // user sees npm's own refusal.
+    try {
+      return fileURLToPath(spec);
+    } catch {
+      return null;
+    }
+  }
   const path = spec.startsWith("file:") ? spec.slice("file:".length) : spec;
   if (/^~[\\/]/.test(path)) return resolve(homedir(), path.slice(2));
   const isPath = spec.startsWith("file:")
