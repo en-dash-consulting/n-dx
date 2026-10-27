@@ -10,7 +10,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { cpSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import { ClaudeClientError, VERIFY_CREDENTIALS_STEP, authFailureGuidance } from "@n-dx/llm-client";
@@ -165,6 +166,8 @@ interface StubClient {
  * the last of which is how the timeout path is exercised without waiting on a
  * real provider.
  */
+const V2_FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
+
 function stubClient(respond: () => Promise<CompletionResult>): StubClient {
   const stub: StubClient = {
     requests: [],
@@ -894,6 +897,30 @@ describe("POST /api/sourcevision/ask", () => {
       expect(body.error).toContain("no PRD items to refine");
       // No tokens are spent asking a model to refine nothing.
       expect(stub.requests).toHaveLength(0);
+    });
+
+    // The route derives the change-layer flag from the store and hands it to
+    // parseAnswerRefinements. Unit tests of the parser pass the flag directly,
+    // so only a request through the route catches it being dropped — and then
+    // a v2 project is offered a merge that the apply route refuses.
+    it("on a v2 tree, offers no merge that absorbs an amending change and notes rex's reason", async () => {
+      const amending = "c0000000-0000-4000-8000-000000000001";
+      const sibling = "c0000000-0000-4000-8000-0000000000a1";
+      cpSync(V2_FIXTURE, ctx.rexDir, { recursive: true });
+      await mkdir(join(ctx.rexDir, "changes", "apple-pay-again"), { recursive: true });
+      await writeFile(
+        join(ctx.rexDir, "changes", "apple-pay-again", "index.md"),
+        `---\nid: "${sibling}"\ntype: "change"\ntitle: "Apple Pay, again"\nslug: "apple-pay-again"\n---\n`,
+      );
+      routeOptions = stubClient(answering(withProposals("Same work.", [
+        { op: "merge", itemId: amending, intoId: sibling, rationale: "Duplicate." },
+      ]))).options;
+
+      const res = await ask({ prompt: "Are any changes duplicates?", mode: "refine" });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.proposals).toEqual([]);
+      expect(body.refinementNotes.join(" ")).toMatch(/carries amendments/);
     });
 
     it("rejects a mode it does not implement", async () => {
