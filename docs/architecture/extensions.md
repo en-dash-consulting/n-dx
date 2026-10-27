@@ -137,7 +137,7 @@ When `ndx <name>` matches no built-in command, the dispatcher looks the name up 
 | `NDX_HOME` | The resolved n-dx home |
 | `NDX_EXTENSION_NAME` | The manifest `name` |
 | `NDX_EXTENSION_STATE_DIR` | `<ndx home>/ext/<name>/`, created on first run; the only n-dx-owned place the extension may write |
-| `NDX_EXTENSION_CONFIG` | Path to a JSON file holding the merged, schema-checked config section |
+| `NDX_EXTENSION_CONFIG` | Path to a JSON file holding the schema-checked config section: merged project over user for a command, the user section alone for a sidecar |
 | `NDX_HUB_URL`, `NDX_TOKEN_FILE` | Set when a hub is running; the token is read from the file, never passed in the environment |
 
 The environment is otherwise the user's own. Extensions talk to n-dx by spawning `NDX_BIN` or calling the hub and project endpoints, never by importing `@n-dx/*` internals. A small `@n-dx/extension-kit` package can wrap this contract later, but no extension should be required to use it.
@@ -184,13 +184,13 @@ The hub reads no manifest for these either: it runs `ndx extensions list --json`
 **Consent.** An extension runs only after the user approves it, the way Claude Code approves a project's MCP servers.
 
 - The first `ndx <name>` or `/x/<name>/` request shows the package, version, source, commands and sidecar, then asks. In a non-interactive shell it exits 2 and points at `ndx extensions enable <name>`.
-- The approval is stored in `<ndx home>/extensions.json` with a hash of the `ndx.extension` block and the package version. A changed manifest or version asks again.
+- The approval is stored in `<ndx home>/extensions.json` with a hash of the `ndx.extension` block, the package version, the source and the real path of the package directory. A change to any of them asks again, so a same-named, same-version copy installed elsewhere is not covered.
 - Approvals of project-source extensions are per project path, so cloning an untrusted repo never runs its extensions.
 - `ndx extensions enable <name> --yes` approves non-interactively, for CI and provisioning scripts.
 
 **Versioning.** Two numbers make compatibility checkable without running code. `apiVersion` is the contract this document defines; a breaking change to the environment, the proxy, the manifest or the versioned hub endpoints bumps it, and n-dx supports the current and previous version. `ndxVersion` is the extension's own range. Either mismatch leaves the extension listed but disabled, with the reason in `list`, `doctor` and the hub home.
 
-**Config.** Each extension owns one section, `extensions.<name>`, in `<ndx home>/config.json` (user) and `.n-dx.json` (project), merged project over user. `ndx config extensions.<name>.<key> <value>` reads and writes it, validated against `configSchema` when one is given. It writes `.n-dx.json`, or the user config with `--user`. A missing `required` key does not stop a write, since a section is filled one key at a time. n-dx checks the validation keywords a config section needs (types, `enum`, `const`, object properties, arrays, string and number bounds, `allOf`/`anyOf`/`oneOf`/`not`) and reads annotations such as `format` as information; a schema using any other keyword, `$ref` included, is reported as one it cannot check (`packages/core/extension-config-schema.js`). The merged result is what `NDX_EXTENSION_CONFIG` points at; a run whose merged section breaks the schema, `required` included, is refused with exit 2. `paths` is a reserved name because the user config's `extensions.paths` is discovery's list of dev paths. `config.js` keeps its role as the one orchestration script that touches config files directly.
+**Config.** Each extension owns one section, `extensions.<name>`, in `<ndx home>/config.json` (user) and `.n-dx.json` (project), merged project over user. `ndx config extensions.<name>.<key> <value>` reads and writes it, validated against `configSchema` when one is given. It writes `.n-dx.json`, or the user config with `--user`. A missing `required` key does not stop a write, since a section is filled one key at a time. n-dx checks the validation keywords a config section needs (types, `enum`, `const`, object properties, arrays, string and number bounds, `allOf`/`anyOf`/`oneOf`/`not`) and reads annotations such as `format` as information; a schema using any other keyword, `$ref` included, is reported as one it cannot check (`packages/core/extension-config-schema.js`). For a command, the merged result is what `NDX_EXTENSION_CONFIG` points at; a sidecar serves no single project, so its file (`sidecar-config.json`) holds the user section alone. A run whose section breaks the schema, `required` included, is refused with exit 2. `paths` is a reserved name because the user config's `extensions.paths` is discovery's list of dev paths. `config.js` keeps its role as the one orchestration script that touches config files directly.
 
 **Disable and remove.** `disable` keeps the approval and config, but hides the commands, links and hub card. `remove` uninstalls a user-source package and deletes its approval; `--purge` also deletes `ext/<name>/`, unless another installed copy or package with the same extension name still uses it. A disabled extension's state folder is never touched.
 
@@ -227,7 +227,7 @@ Let separately installed npm packages add `ndx <name>` commands, a hub-mounted w
 1. **Task: Dispatch unknown commands to extensions** (critical; blocked by 2)
     - An unknown `ndx <name>` spawns the matching command's `bin` with the remaining args, using the same Node as n-dx
     - Built-in commands always win; a test fails if an extension can shadow one
-    - stdio inherited, SIGINT and SIGTERM forwarded, exit code passed through (tested with codes 0, 1 and 7)
+    - stdio inherited and not detached, so Ctrl+C reaches the extension directly; SIGTERM, and on POSIX SIGHUP, forwarded; exit code passed through (tested with codes 0, 1 and 7)
     - No match: today's "Unknown command" error, plus a hint when a disabled or incompatible extension has the name
     - Orchestration still never imports extension code (`architecture-policy` test extended)
 2. **Task: Extension environment contract** (high; blocked by 4)
@@ -242,13 +242,13 @@ Let separately installed npm packages add `ndx <name>` commands, a hub-mounted w
 
 1. **Task: Approve extensions before first run** (critical; blocked by 4)
     - First run shows package, version, source, commands and sidecar, then asks; non-interactive runs exit 2 naming `ndx extensions enable <name>`
-    - The approval stores a hash of the manifest block and the version; a change to either asks again
+    - The approval stores a hash of the manifest block, the version, the source and the real path; a change to any of them asks again
     - Project-source approvals are per project path; a freshly cloned repo's extensions never run unapproved
     - `enable --yes` approves without a prompt
 2. **Task: Per-extension config sections** (medium; blocked by 1)
     - `extensions.<name>` in user config and `.n-dx.json`, merged project over user
     - `ndx config extensions.<name>.<key>` reads and writes, validated against `configSchema`
-    - The merged config is written to the file `NDX_EXTENSION_CONFIG` names
+    - The merged config is written to the file `NDX_EXTENSION_CONFIG` names; a sidecar gets the user section alone
 
 ### Feature F4: Hub sidecars
 

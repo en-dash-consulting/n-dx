@@ -1802,7 +1802,8 @@ const ORCHESTRATOR_HELP_DEFS = {
       "read from the current directory; npm flags are refused, so set the\n" +
       "registry through npm's config. An extension runs only once you\n" +
       "approve it: 'enable' shows the package, version, source, commands and\n" +
-      "sidecar, then asks. The approval is tied to that version and manifest.\n" +
+      "sidecar, then asks. The approval is tied to that manifest, version,\n" +
+      "source and install path; a change to any of them asks again.\n" +
       "'disable' hides an extension but keeps its approval, config and state\n" +
       "folder. 'remove' uninstalls what 'add' installed and forgets the\n" +
       "approval; --purge also deletes <ndx home>/ext/<name>/.\n\n" +
