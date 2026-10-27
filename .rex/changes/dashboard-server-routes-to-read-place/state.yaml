@@ -13,7 +13,14 @@ items:
     lastModified: "2026-10-27T16:29:37.611Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c3e3acd4-51c9-4886-8624-26afec3e1767":
-    lastModified: "2026-10-27T19:06:02.773Z"
+    status: "completed"
+    startedAt: "2026-10-27T21:31:48.461Z"
+    completedAt: "2026-10-27T21:46:25.365Z"
+    endedAt: "2026-10-27T21:46:25.365Z"
+    activeIntervals: [{"end":"2026-10-27T21:40:10.856Z","start":"2026-10-27T21:31:48.461Z"},{"end":"2026-10-27T21:46:25.365Z","start":"2026-10-27T21:46:25.365Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Placement re-exported through web's rex-gateway (run 811e98e9, commit 2575e538c); the test gate failed only on the cross-package contract list, which was updated by hand and the affected gate re-run green."
+    lastModified: "2026-10-27T21:46:25.365Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "db652118-ffa4-4b4d-afec-8a3b0dba43e4":
     status: "completed"

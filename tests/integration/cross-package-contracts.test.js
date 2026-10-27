@@ -539,6 +539,12 @@ describe("web → rex gateway contract", () => {
     // would silently fall back from.
     "parseApplyOn",
     "parsePlacementSettings",
+    // v2 placement — the Inbox section and the detail panel place and propose
+    "suggestPlacement",
+    "recordPlacement",
+    "recordProposal",
+    "ChangePlacementError",
+    "placementStrength",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -974,7 +980,8 @@ describe("gateway export auto-detection", () => {
         // rex-owned project settings the Workflow page edits, validated with
         // rex's own parsers so the chooser cannot offer a value the CLI would
         // silently fall back from.
-        "parseApplyOn", "parsePlacementSettings"],
+        "parseApplyOn", "parsePlacementSettings",
+        "suggestPlacement", "recordPlacement", "recordProposal", "ChangePlacementError", "placementStrength"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
         "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);
