@@ -163,7 +163,7 @@ The hub (`packages/web/src/hub/`) gains extension sidecars as a second kind of c
 **Where extensions show up**
 
 - **Hub home** (`home.ts`): an Extensions row with one card per enabled extension that declares `hub`, plus incompatible and unapproved ones greyed out with the reason. The page waits up to 3 s for the list and renders without the row when n-dx cannot answer.
-- **Project dashboards:** each `projectLinks` entry appears as a link in the project's dashboard header, resolved by the hub to `/x/<name>/<path>` with `{projectId}` filled in. The dashboard gets the list from a new `GET /api/hub/extensions?project=<id>`, so no extension code reaches the viewer bundle.
+- **Project dashboards** (`viewer/components/extension-links.ts`): each `projectLinks` entry appears as a link in the project's dashboard header, resolved by the hub to `/x/<name>/<path>` with `{projectId}` and `{repoRoot}` filled in. The dashboard gets the list from `GET /api/hub/extensions`: the `/p/<id>/` prefix names the project, and on the single-project root alias it sends `?project=<id>`. No extension code reaches the viewer bundle. It asks only once the hub has answered, so a standalone dashboard shows no links, and a failed list leaves the header without them.
 - **Hub API:** `GET /api/hub/extensions` (manifests, state, compatibility) and `POST /api/hub/extensions/:name/stop`. Both are part of the versioned extension API, as are `GET /api/hub/projects` and `POST /api/hub/projects`, which extensions use to list and register repos.
 
 With no hub running, extension commands still work; only sidecars and links need the hub.
