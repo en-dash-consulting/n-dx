@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "10c03aa1-046b-4eb9-ad6d-f5d128e5aad5":
-    lastModified: "2026-10-27T13:51:56.894Z"
+    status: "completed"
+    startedAt: "2026-10-27T16:06:47.482Z"
+    completedAt: "2026-10-27T16:10:27.814Z"
+    endedAt: "2026-10-27T16:10:27.814Z"
+    activeIntervals: [{"end":"2026-10-27T16:10:27.814Z","start":"2026-10-27T16:06:47.482Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "decideProxy strips ndx_token from sidecar paths (HTTP any method, WebSocket) and the trailing-slash redirect. Commit 11268a788."
+    lastModified: "2026-10-27T16:10:27.814Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "28b36086-bfff-4cc8-9ace-087fe2a03360":
     status: "completed"

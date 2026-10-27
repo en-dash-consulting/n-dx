@@ -46,6 +46,7 @@ import type { Duplex } from "node:stream";
 import {
   AUTH_COOKIE_NAME,
   AUTH_HEADER_NAME,
+  AUTH_QUERY_PARAM,
   HUB_ADMISSION_HEADER,
   HUB_PATH,
   checkRunOptions,
@@ -123,14 +124,15 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
   const sidecar = SIDECAR_PATH.exec(pathname);
   if (sidecar) {
     const name = sidecar[1];
+    const sidecarQuery = withoutTokenParam(query);
     if (!SidecarManager.isName(name)) {
       return { kind: "json", status: 404, body: { error: `No extension sidecar is named "${name}"`, reason: "none" } };
     }
     // A WebSocket has no page to resolve relative links in, so it is served as "/".
     if (sidecar[2] === undefined && !upgrade) {
-      return { kind: "redirect", location: `${SIDECAR_PATH_PREFIX}${name}/${query}` };
+      return { kind: "redirect", location: `${SIDECAR_PATH_PREFIX}${name}/${sidecarQuery}` };
     }
-    return { kind: "sidecar", name, path: (sidecar[2] || "/") + query, prefix: `${SIDECAR_PATH_PREFIX}${name}` };
+    return { kind: "sidecar", name, path: (sidecar[2] || "/") + sidecarQuery, prefix: `${SIDECAR_PATH_PREFIX}${name}` };
   }
 
   const prefix = detectBasePath(pathname);
@@ -181,6 +183,21 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
       projects: projects.map((p) => p.id),
     },
   };
+}
+
+/**
+ * `query` (empty or starting with `?`) without `ndx_token`. A safe-method
+ * navigation carrying it is redirected before routing, but a POST or a
+ * WebSocket upgrade is not, and a sidecar must never see the credential.
+ * Returned unchanged when the parameter is absent.
+ */
+function withoutTokenParam(query: string): string {
+  if (!query) return query;
+  const params = new URLSearchParams(query.slice(1));
+  if (!params.has(AUTH_QUERY_PARAM)) return query;
+  params.delete(AUTH_QUERY_PARAM);
+  const rest = params.toString();
+  return rest ? `?${rest}` : "";
 }
 
 function projectIds(hub: Hub): string[] {

@@ -63,3 +63,21 @@ describe("decideProxy: the hub chooser at /hub", () => {
     expect(decideProxy(several, HUB_PATH, true)).toMatchObject({ kind: "json", status: 404 });
   });
 });
+
+describe("decideProxy: a sidecar never sees ndx_token in the query", () => {
+  it("drops it for HTTP and for a WebSocket upgrade, keeping the other parameters", () => {
+    for (const upgrade of [false, true]) {
+      expect(decideProxy(one, "/x/recon/page?a=1&ndx_token=T&b=2", upgrade)).toMatchObject({ kind: "sidecar", path: "/page?a=1&b=2" });
+      expect(decideProxy(one, "/x/recon/?ndx_token=T", upgrade)).toMatchObject({ kind: "sidecar", path: "/" });
+    }
+    expect(decideProxy(one, "/x/recon?ndx_token=T", true)).toMatchObject({ kind: "sidecar", path: "/" });
+  });
+
+  it("drops it from the trailing-slash redirect", () => {
+    expect(decideProxy(one, "/x/recon?q=2&ndx_token=T")).toEqual({ kind: "redirect", location: "/x/recon/?q=2" });
+  });
+
+  it("leaves a query without it untouched", () => {
+    expect(decideProxy(one, "/x/recon/p?a=%20b&c")).toMatchObject({ kind: "sidecar", path: "/p?a=%20b&c" });
+  });
+});
