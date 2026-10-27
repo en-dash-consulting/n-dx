@@ -488,22 +488,29 @@ function readConfiguredClaudePath(dir) {
 }
 
 /**
- * Persist the discovered claude CLI path to .hench/config.json so
- * subsequent hench invocations reuse it without re-discovering.
- * Silently skips if the config file doesn't exist yet.
+ * Persist a discovered claude CLI path as `hench.claudePath` in the
+ * machine-local config (`.n-dx.local.json`), so subsequent hench invocations
+ * reuse it without re-discovering. Machine-local because the path is this
+ * machine's, and because hench honours a `claudePath` the repository ships
+ * (`.hench/config.json`) only once the repository is trusted.
+ *
+ * The bare `claude` found on PATH is hench's default and is not written.
+ * Skips when hench is not initialized or the local config is unreadable.
  * @param {string|null} dir  Project root
  * @param {string} resolvedPath
  */
 function persistDiscoveredClaudePath(dir, resolvedPath) {
-  if (!dir) return;
-  const configPath = join(resolveLayout(dir).henchDir, "config.json");
-  if (!existsSync(configPath)) return;
+  if (!dir || resolvedPath === "claude") return;
+  const layout = resolveLayout(dir);
+  if (!existsSync(join(layout.henchDir, "config.json"))) return;
   try {
-    const config = JSON.parse(readFileSync(configPath, "utf-8"));
-    if (config.claudePath === resolvedPath) return; // already correct
-    config.claudePath = resolvedPath;
-    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
-  } catch { /* skip — non-critical */ }
+    const local = existsSync(layout.localConfigFile) ? JSON.parse(readFileSync(layout.localConfigFile, "utf-8")) : {};
+    if (!local || typeof local !== "object" || Array.isArray(local)) return;
+    const hench = local.hench && typeof local.hench === "object" && !Array.isArray(local.hench) ? local.hench : {};
+    if (hench.claudePath === resolvedPath) return; // already correct
+    local.hench = { ...hench, claudePath: resolvedPath };
+    writeFileSync(layout.localConfigFile, JSON.stringify(local, null, 2) + "\n", "utf-8");
+  } catch { /* skip — non-critical: hench rediscovers nothing, it falls back to `claude` on PATH */ }
 }
 
 /**
@@ -551,10 +558,11 @@ function buildClaudeWellKnownCandidates() {
  *  3. System PATH
  *  4. Well-known install locations (~/.claude/local/claude, nvm, Homebrew, etc.)
  *
- * When a path is found via (3) or (4) it is persisted to .hench/config.json
- * so subsequent hench invocations reuse it without re-discovering.
+ * When a path is found via (4) it is persisted as `hench.claudePath` in
+ * .n-dx.local.json so subsequent hench invocations reuse it without
+ * re-discovering (see {@link persistDiscoveredClaudePath}).
  *
- * @param {string|null} [dir=null]  Project root (used to read .n-dx.json and write .hench/config.json)
+ * @param {string|null} [dir=null]  Project root (used to read .n-dx.json and write .n-dx.local.json)
  * @returns {{ found: true, path: string } | { found: false, searched: string[] }}
  */
 export function discoverClaudeCli(dir = null) {

@@ -2015,6 +2015,8 @@ Hench settings (.hench/config.json):
   hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY")
   hench.claudePath         string    Path to the Claude Code binary. Falls back to "claude" on
                                      PATH. Prefer claude.cli_path, which is shared across packages.
+                                     Outside .n-dx.local.json it applies only once the repository
+                                     is trusted (ndx trust accept .).
   hench.language           string    Project toolchain — "typescript", "javascript", "go" or
                                      "swift". Selects the hench.guard.* defaults.
   hench.loopPauseMs        number    Pause between consecutive runs in a loop (default: 2000)

@@ -289,8 +289,9 @@ export interface RepoExecutionConfig {
    */
   credentialRouting: string[];
   /**
-   * The project config's {@link VENDOR_CLI_PATH_FIELDS} that are set, as
-   * `path = value`, sorted: the vendor CLI binary n-dx spawns.
+   * The project config's {@link VENDOR_CLI_PATH_FIELDS} that are set, and a
+   * hench `claudePath` other than the bare `claude`, as `path = value`,
+   * sorted: the vendor CLI binary n-dx spawns.
    */
   vendorCliPaths: string[];
   permissionMode: string | null;
@@ -441,7 +442,14 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     : null;
   const projectTest = projectRex ? optionalString(projectRex.test) : null;
   const credentialRouting = credentialRoutingIn(projectConfig);
-  const vendorCliPaths = vendorCliPathsIn(projectConfig);
+  // Hench falls back to `claudePath` when no `cli_path` is set, so it chooses
+  // the Claude binary too. The bare PATH name chooses nothing, and leaving it
+  // out keeps the digest of every checkout `ndx init` wrote it into.
+  const henchClaudePath = optionalString(merged.claudePath);
+  const vendorCliPaths = [
+    ...vendorCliPathsIn(projectConfig),
+    ...(henchClaudePath && henchClaudePath !== "claude" ? [`hench.claudePath = ${henchClaudePath}`] : []),
+  ].sort();
   if ((projectTest || credentialRouting.length || vendorCliPaths.length) && !projectHench) {
     sources.push(relOf(root, layout.configFile));
   }

@@ -7,7 +7,8 @@
  * guard it declares is clamped to the baseline for the project's detected
  * language (marker files, not the config's `language`) —
  * allowlists intersect, blocked paths union — and a `bypassPermissions`
- * permission mode is lowered to `acceptEdits`. The repository's config can
+ * permission mode is lowered to `acceptEdits`, and a `claudePath` it ships
+ * gives way to the user's `.n-dx.local.json` one. The repository's config can
  * only ever tighten what the user's own defaults allow. At baseline, a
  * root-anchored blocked path the baseline lists at any depth (an older
  * `node_modules/**`) is widened to that form.
@@ -23,11 +24,13 @@
  * @module hench/store/trust
  */
 
+import { readFileSync } from "node:fs";
 import {
   clampGuardToBaseline,
   evaluateRepoTrust,
   formatRepoTrustReport,
   guardBaselineForLanguage,
+  resolveLayout,
   type RepoTrustEvaluation,
   type RepoTrustStoreOptions,
 } from "../prd/llm-gateway.js";
@@ -81,12 +84,30 @@ export function applyRepoTrust(
     guard.allowedCommands.length !== config.guard.allowedCommands.length
     || guard.allowedGitSubcommands.length !== config.guard.allowedGitSubcommands.length
     || guard.blockedPaths.length !== config.guard.blockedPaths.length;
+  // `claudePath` picks the binary a Claude run spawns, so only the user's own
+  // `.n-dx.local.json` may set it here; the repository's copy is dropped.
+  const { claudePath, ...rest } = config;
+  const localClaudePath = localHenchClaudePath(projectDir);
   return {
     evaluation,
-    config: { ...config, guard },
+    config: { ...rest, ...(localClaudePath ? { claudePath: localClaudePath } : {}), guard },
     permissionMode: lowered,
-    clamped: guardChanged || lowered !== permissionMode,
+    clamped: guardChanged || lowered !== permissionMode || claudePath !== localClaudePath,
   };
+}
+
+/** `hench.claudePath` from the machine-local config file, which the repository does not ship. */
+function localHenchClaudePath(projectDir: string): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(resolveLayout(projectDir).localConfigFile, "utf-8"));
+  } catch {
+    // Absent or unreadable: the user set nothing locally.
+    return undefined;
+  }
+  const hench = parsed && typeof parsed === "object" ? (parsed as { hench?: unknown }).hench : undefined;
+  const value = hench && typeof hench === "object" ? (hench as { claudePath?: unknown }).claudePath : undefined;
+  return typeof value === "string" && value ? value : undefined;
 }
 
 /** The summary a run record carries, from an evaluation. */

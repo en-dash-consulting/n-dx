@@ -34,7 +34,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82468601-c666-4943-a9ac-b11bb0149372":
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T15:44:49.280Z"
+    lastModified: "2026-10-27T17:32:39.047Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8b8fe23b-ee8b-4b82-8fb8-ddf64625c6cb":
     status: "completed"
@@ -58,9 +58,19 @@ items:
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-27T15:18:14.469Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d9008bb7-0b2b-4080-99a0-688e7cdc509f":
+    lastModified: "2026-10-27T17:32:39.047Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e1684072-9303-4706-821c-bcd524a1cada":
+    status: "completed"
+    startedAt: "2026-10-27T17:19:04.693Z"
+    completedAt: "2026-10-27T17:39:04.796Z"
+    endedAt: "2026-10-27T17:39:04.796Z"
+    activeIntervals: [{"end":"2026-10-27T17:39:04.796Z","start":"2026-10-27T17:19:04.693Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "A non-bare hench claudePath is now trust-gated (vendor-cli-path finding + digest); hench drops a repository's claudePath while restricted and keeps the .n-dx.local.json one; the web CLI probe resolves through trust-gated loadLLMConfig; ndx init persists a discovered path to .n-dx.local.json."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T15:19:00.957Z"
+    lastModified: "2026-10-27T17:39:04.796Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f055f7b5-b931-4092-9aa8-c98b4ed6cfdf":
     status: "completed"

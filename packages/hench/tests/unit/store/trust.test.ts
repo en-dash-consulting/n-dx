@@ -65,6 +65,30 @@ describe("applyRepoTrust", () => {
     expect(trusted.permissionMode).toBe("bypassPermissions");
   });
 
+  it("drops a claudePath the repository ships until it is trusted", () => {
+    const config = { ...DEFAULT_HENCH_CONFIG(), claudePath: "./tools/claude" };
+    writeHenchConfig(config);
+
+    const restricted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+    expect(restricted.evaluation.state).toBe("untrusted");
+    expect(restricted.config.claudePath).toBeUndefined();
+    expect(restricted.clamped).toBe(true);
+
+    recordRepoTrust(repo, { ndxHome: home });
+    expect(applyRepoTrust(config, repo, undefined, { ndxHome: home }).config.claudePath).toBe("./tools/claude");
+  });
+
+  it("keeps the user's .n-dx.local.json claudePath while the repository is untrusted", () => {
+    writeHenchConfig({ ...DEFAULT_HENCH_CONFIG(), claudePath: "./tools/claude" });
+    writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench: { claudePath: "/opt/claude" } }));
+    // As loadConfig merges it: the local overlay wins.
+    const config = { ...DEFAULT_HENCH_CONFIG(), claudePath: "/opt/claude" };
+
+    const restricted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+    expect(restricted.evaluation.state).toBe("untrusted");
+    expect(restricted.config.claudePath).toBe("/opt/claude");
+  });
+
   it("clamps to the detected baseline, not the language the repository declares", () => {
     writeFileSync(join(repo, "package.json"), "{}");
     const declaredSwift = DEFAULT_HENCH_CONFIG("swift");

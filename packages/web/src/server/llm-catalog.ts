@@ -12,16 +12,13 @@
  * clears it, because either can change which key or binary applies.
  */
 
-import { readFileSync } from "node:fs";
 import {
   LLM_VENDOR,
-  deepMerge,
   exec,
   listVendorModels,
   loadLLMConfig,
   resolveApiKey,
   resolveGoogleApiKey,
-  resolveLayout,
 } from "@n-dx/llm-client";
 import type { LLMConfig, ListableVendor } from "@n-dx/llm-client";
 
@@ -61,43 +58,18 @@ export function clearLlmCatalogCache(projectDir: string): void {
   }
 }
 
-function readJson(path: string): Record<string, unknown> {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-/** The project config merged with its gitignored local overlay (local wins), as runs read it. */
-function readProjectConfig(projectDir: string): Record<string, unknown> {
-  const { configFile, localConfigFile } = resolveLayout(projectDir);
-  return deepMerge(readJson(configFile), readJson(localConfigFile));
-}
-
-function stringAt(obj: unknown, ...keys: string[]): string | undefined {
-  let cur: unknown = obj;
-  for (const key of keys) {
-    if (!cur || typeof cur !== "object") return undefined;
-    cur = (cur as Record<string, unknown>)[key];
-  }
-  return typeof cur === "string" && cur ? cur : undefined;
-}
-
 /**
- * The binary a run would invoke for `vendor`: `CLAUDE_CLI_PATH`, then
- * `cli.claudePath` for Claude; `llm.codex.cli_path` for Codex; else the bare
- * name, resolved on PATH.
+ * The binary a run would invoke for `vendor`: `CLAUDE_CLI_PATH`, then the
+ * vendor's `cli_path`, else the bare name resolved on PATH. `config` is
+ * `loadLLMConfig`'s, which drops a `cli_path` the shared project config sets
+ * while the repository is untrusted, so the probe never spawns a binary the
+ * repository chose; the user's `.n-dx.local.json` always applies.
  */
-function resolveBinary(vendor: ListableVendor, projectDir: string): string {
-  const config = readProjectConfig(projectDir);
+function resolveBinary(vendor: ListableVendor, config: LLMConfig): string {
   if (vendor === LLM_VENDOR.CLAUDE) {
-    return process.env.CLAUDE_CLI_PATH || stringAt(config, "cli", "claudePath") || "claude";
+    return process.env.CLAUDE_CLI_PATH || config.claude?.cli_path || "claude";
   }
-  return stringAt(config, "llm", "codex", "cli_path") || "codex";
+  return config.codex?.cli_path || "codex";
 }
 
 /** First `1.2.3`-shaped token in `--version` output (`2.1.0 (Claude Code)`, `codex-cli 0.46.0`). */
@@ -105,8 +77,8 @@ function parseVersion(output: string): string | null {
   return /\d+\.\d+\.\d+(?:[-+][\w.]+)?/.exec(output)?.[0] ?? null;
 }
 
-async function probeCli(vendor: ListableVendor, projectDir: string): Promise<CliInfo> {
-  const binary = resolveBinary(vendor, projectDir);
+async function probeCli(vendor: ListableVendor, projectDir: string, config: LLMConfig): Promise<CliInfo> {
+  const binary = resolveBinary(vendor, config);
   const result = await exec(binary, ["--version"], { cwd: projectDir, timeout: CLI_PROBE_TIMEOUT_MS });
   if (!result.launched || result.exitCode !== 0) return { found: false, version: null, path: null };
   return { found: true, version: parseVersion(result.stdout) ?? parseVersion(result.stderr), path: binary };
@@ -119,7 +91,7 @@ async function probeVendor(
 ): Promise<LiveVendorProbe> {
   const [listing, cli] = await Promise.all([
     listVendorModels(vendor, config),
-    probeCli(vendor, projectDir),
+    probeCli(vendor, projectDir, config),
   ]);
   return { listing, checkedAt: new Date().toISOString(), cli };
 }

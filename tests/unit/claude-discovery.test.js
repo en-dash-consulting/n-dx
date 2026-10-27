@@ -217,30 +217,42 @@ describe("discoverClaudeCli — step 4: well-known install locations", () => {
   });
 });
 
-describe("discoverClaudeCli — persistence to .hench/config.json", () => {
+describe("discoverClaudeCli — persistence to .n-dx.local.json", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.CLAUDE_CLI_PATH;
     readFileSync.mockImplementation(() => { throw Object.assign(new Error("ENOENT"), { code: "ENOENT" }); });
   });
 
-  it("persists resolved PATH path to .hench/config.json", () => {
+  it("persists a well-known install path as hench.claudePath in the machine-local config, never .hench/config.json", () => {
+    if (process.platform === "win32") return;
     const dir = "/tmp/persist-test";
-    const henchConfig = { schema: "hench/v1", provider: "cli" };
-    existsSync.mockImplementation((p) => p === join(dir, ".hench", "config.json"));
+    const target = join(HOME, ".claude", "local", "claude");
+    const localFile = join(dir, ".n-dx.local.json");
+    existsSync.mockImplementation((p) => p === join(dir, ".hench", "config.json") || p === target || p === localFile);
     readFileSync.mockImplementation((p) => {
-      if (p === join(dir, ".hench", "config.json")) return JSON.stringify(henchConfig);
+      if (p === localFile) return JSON.stringify({ llm: { vendor: "claude" } });
       throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
     });
+    execFileSyncCli.mockImplementation((binary) => {
+      if (binary === "claude") throw new Error("not found");
+    });
+
+    expect(discoverClaudeCli(dir).path).toBe(target);
+
+    expect(writeFileSync).toHaveBeenCalledTimes(1);
+    const [path, body] = writeFileSync.mock.calls[0];
+    expect(path).toBe(localFile);
+    expect(JSON.parse(body)).toEqual({ llm: { vendor: "claude" }, hench: { claudePath: target } });
+  });
+
+  it("writes nothing for the bare claude found on PATH, hench's default", () => {
+    const dir = "/tmp/persist-test";
+    existsSync.mockImplementation((p) => p === join(dir, ".hench", "config.json"));
     execFileSyncCli.mockImplementation(() => {}); // PATH check succeeds
 
-    discoverClaudeCli(dir);
-
-    expect(writeFileSync).toHaveBeenCalledWith(
-      join(dir, ".hench", "config.json"),
-      expect.stringContaining('"claudePath"'),
-      "utf-8",
-    );
+    expect(discoverClaudeCli(dir).path).toBe("claude");
+    expect(writeFileSync).not.toHaveBeenCalled();
   });
 
   it("does not write .hench/config.json when env var is used (user-configured)", () => {

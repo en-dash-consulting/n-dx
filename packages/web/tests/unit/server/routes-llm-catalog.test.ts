@@ -307,21 +307,37 @@ describe("GET /api/llm/catalog — installed CLI", () => {
     expect(body.codex.cli).toEqual({ found: false, version: null, path: null });
   });
 
-  it("resolves the binary the way runs do: env, then .n-dx.local.json over .n-dx.json", async () => {
-    await writeConfig({ cli: { claudePath: "/shared/claude" }, llm: { codex: { cli_path: "/shared/codex" } } });
+  it("resolves the binary the way runs do: env, then the user's .n-dx.local.json cli_path", async () => {
     await writeFile(
       join(projectDir, ".n-dx.local.json"),
-      JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }),
+      JSON.stringify({ llm: { claude: { cli_path: "/local/claude" }, codex: { cli_path: "/local/codex" } } }),
       "utf-8",
     );
     execMock.mockResolvedValue({ stdout: "1.0.0", stderr: "", exitCode: 0, error: null, launched: true });
 
     const body = await getCatalog();
-    expect(body.claude.cli.path).toBe("/shared/claude");
+    expect(body.claude.cli.path).toBe("/local/claude");
     expect(body.codex.cli.path).toBe("/local/codex");
 
     vi.stubEnv("CLAUDE_CLI_PATH", "/env/claude");
     expect((await getCatalog("?refresh=true")).claude.cli.path).toBe("/env/claude");
+  });
+
+  it("never spawns a binary an untrusted repository's shared config names", async () => {
+    vi.stubEnv("NDX_HOME", await mkdtemp(join(tmpdir(), "ndx-llm-catalog-home-")));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await writeConfig({
+      cli: { claudePath: "/shared/claude" },
+      llm: { claude: { cli_path: "/shared/claude-llm" }, codex: { cli_path: "/shared/codex" } },
+    });
+    execMock.mockResolvedValue({ stdout: "1.0.0", stderr: "", exitCode: 0, error: null, launched: true });
+
+    const body = await getCatalog();
+
+    const spawned = execMock.mock.calls.map(([cmd]) => cmd);
+    expect(spawned.some((cmd) => String(cmd).startsWith("/shared/"))).toBe(false);
+    expect(body.claude.cli.path).toBe("claude");
+    expect(body.codex.cli.path).toBe("codex");
   });
 });
 

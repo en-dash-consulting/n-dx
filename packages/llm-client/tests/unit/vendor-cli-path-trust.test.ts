@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadLLMConfig } from "../../src/llm-config.js";
@@ -74,6 +74,38 @@ describe("a shared cli_path in an untrusted repository", () => {
     expect(printed).toContain("llm.codex.cli_path");
     expect(printed).not.toContain(REPO_BINARY);
     expect(printed).not.toContain(REPO_CODEX);
+  });
+});
+
+describe("hench's claudePath in the repository's hench config", () => {
+  function henchConfig(data: Record<string, unknown>): void {
+    mkdirSync(join(repo, ".hench"), { recursive: true });
+    writeFileSync(join(repo, ".hench", "config.json"), JSON.stringify(data));
+  }
+
+  it("is a vendor-cli-path finding from .hench/config.json", () => {
+    henchConfig({ claudePath: REPO_BINARY });
+    const ev = evaluateRepoTrust(repo);
+    expect(ev.state).toBe("untrusted");
+    expect(ev.findings.find((f) => f.code === "vendor-cli-path")?.values).toEqual([`hench.claudePath = ${REPO_BINARY}`]);
+  });
+
+  it("is a finding from the shared config's hench section, which wins over .hench/config.json", () => {
+    henchConfig({ claudePath: "claude" });
+    writeJson(".n-dx.json", { hench: { claudePath: REPO_BINARY } });
+    expect(evaluateRepoTrust(repo).config.vendorCliPaths).toEqual([`hench.claudePath = ${REPO_BINARY}`]);
+  });
+
+  it("is no finding as the bare PATH name, so a digest from before this check does not move", () => {
+    henchConfig({ claudePath: "claude" });
+    const ev = evaluateRepoTrust(repo);
+    expect(ev.state).toBe("baseline");
+    expect(ev.config.vendorCliPaths).toEqual([]);
+  });
+
+  it("from .n-dx.local.json is the user's own and leaves the repository at baseline", () => {
+    writeJson(".n-dx.local.json", { hench: { claudePath: "/opt/claude" } });
+    expect(evaluateRepoTrust(repo).state).toBe("baseline");
   });
 });
 
