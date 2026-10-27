@@ -3,7 +3,7 @@ id: "da20dc09-9f7e-46f1-8772-5da52fa6a927"
 type: "change"
 title: "Flaky tests on Windows and under load"
 slug: "flaky-tests-on-windows-and-under-load"
-intent: "Six test flakes that cost CI re-runs: four on Windows (EBUSY at temp-dir teardown in hub-auth-token, sv serve and sv analyze e2e; a 5 s grandchild ready wait in stop-orphan-children) and two under parallel load (request-security's chunked 413 test hitting write EPIPE; prompt-census's staleness probe tripping architecture-policy). Each red Windows job costs a 15–20 minute re-run. Fix the tests, not product code, unless a flake proves to be a real product bug. One PR: fix/flaky-tests-windows-load-2 (replaces #821, whose v1 capture predates the v2 migration). #783 (run-summary clock race) was already fixed by #786 and closed."
+intent: "Seven test flakes that cost CI re-runs: five on Windows (EBUSY at temp-dir teardown in hub-auth-token, sv serve and sv analyze e2e, and in four more child-spawning tests found by a CI scan (#875); a 5 s grandchild ready wait in stop-orphan-children) and two under parallel load (request-security's chunked 413 test hitting write EPIPE; prompt-census's staleness probe tripping architecture-policy). Each red Windows job costs a 15–20 minute re-run. Fix the tests, not product code, unless a flake proves to be a real product bug. One PR: fix/flaky-tests-windows-load-2 (replaces #821, whose v1 capture predates the v2 migration). #783 (run-summary clock race) was already fixed by #786 and closed."
 acceptanceCriteria:
   - "Every task below is complete and its issue is closed by the PR"
   - "Two CI runs on the final head pass every Windows job without a re-run"
