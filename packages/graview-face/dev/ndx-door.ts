@@ -201,8 +201,11 @@ export function ndxDoor(): Plugin {
     // The key reaches the page in its HTML, which only a reader of this origin sees.
     transformIndexHtml: () => [{ tag: "meta", attrs: { name: DOOR_KEY_META, content: key }, injectTo: "head" }],
     configureServer(server) {
+      // The door's routes sit under Vite's base: `/` at the root, `/x/<name>/` under the hub.
+      const base = server.config.base;
       server.middlewares.use(async (req, res, next) => {
-        const url = (req.url ?? "").split("?")[0] ?? "";
+        const asked = (req.url ?? "").split("?")[0] ?? "";
+        const url = asked.startsWith(base) ? asked.slice(base.length - 1) : asked;
         try {
           if (graviewDir && (url === "/data/document.json" || url === "/data/snapshot.json")) {
             const file = join(graviewDir, url.slice("/data/".length));

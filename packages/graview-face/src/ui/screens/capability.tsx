@@ -1,6 +1,7 @@
 import { recordFacts, recordPath, useStoreTick } from "@graview/pages";
 import { Link, useParams } from "react-router-dom";
 import type { App } from "../../app.js";
+import { BASE } from "../../base.js";
 import { computedValues } from "@graview/core/blocks";
 import { edgesOf, inward, label, nodeOf, said, toneOfStatus } from "../../model/graph.js";
 import { DeclaredBlocks, declaredPage, opening } from "../declared.js";
@@ -89,7 +90,7 @@ export function CapabilityScreen({ context, app }: { context: Ctx; app: App }) {
       </Section>
       <p className="ndx-small ndx-muted" style={{ margin: 0 }}>
         <KindIcon context={context} kind="capability" /> {label(store, node)} · <Link to={recordPath(store.schema, "capability", id)}>this page</Link> ·{" "}
-        <a href={`/scene#focus=${encodeURIComponent(id)}`}>see it on the map ↗</a>
+        <a href={`${BASE}/scene#focus=${encodeURIComponent(id)}`}>see it on the map ↗</a>
       </p>
     </Page>
   );

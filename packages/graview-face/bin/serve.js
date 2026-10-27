@@ -32,8 +32,14 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   process.exit(2);
 }
 
+// A port from `PORT` is the hub's: it probes 127.0.0.1 (where `localhost` may be ::1) and
+// serves us at `/x/<name>/`, so the page asks for everything under that mount
+// (dev/hub-mount.ts puts back the prefix the hub strips). By hand or with --port, the root.
+const hubbed = portFlag === -1 && Boolean(process.env.PORT);
+const base = hubbed ? `/x/${process.env.NDX_EXTENSION_NAME || "graview-face"}/` : "/";
+
 // Vite is loaded only once the arguments say we are serving: `--help` answers without it.
 const { createServer } = await import("vite");
-const server = await createServer({ root, configFile: resolve(root, "vite.config.ts"), server: { port, strictPort: true, host: "localhost" } });
+const server = await createServer({ root, base, configFile: resolve(root, "vite.config.ts"), server: { port, strictPort: true, host: hubbed ? "127.0.0.1" : "localhost" } });
 await server.listen();
 server.printUrls();
