@@ -34,7 +34,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82468601-c666-4943-a9ac-b11bb0149372":
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:32:39.047Z"
+    lastModified: "2026-10-27T18:01:04.844Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8b8fe23b-ee8b-4b82-8fb8-ddf64625c6cb":
     status: "completed"
@@ -49,6 +49,9 @@ items:
   "942e0619-903d-4343-b07f-91d95f337327":
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-17T01:22:03.023Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d59b5373-56ca-4851-a8bf-7730188f52d2":
+    lastModified: "2026-10-27T18:01:04.844Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d6282743-03be-43a4-b97c-e9f9e9b636b8":
     status: "completed"
@@ -94,9 +97,13 @@ items:
     lastModified: "2026-10-16T23:22:31.937Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd5f6116-6488-4515-a079-72c67b678c26":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-27T17:54:57.407Z"
-    activeIntervals: [{"start":"2026-10-27T17:54:57.407Z"}]
+    completedAt: "2026-10-27T18:11:51.989Z"
+    endedAt: "2026-10-27T18:11:51.989Z"
+    activeIntervals: [{"end":"2026-10-27T18:11:51.989Z","start":"2026-10-27T17:54:57.407Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx init's discoverClaudeCli reads cli.claudePath only from .n-dx.local.json; cli.claudePath joins llm-client VENDOR_CLI_PATH_FIELDS (vendor-cli-path finding, digest, stripped when untrusted); ndx config cli.claudePath writes the local file."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-27T17:54:57.955Z"
+    lastModified: "2026-10-27T18:11:51.989Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

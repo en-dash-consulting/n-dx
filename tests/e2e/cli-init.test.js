@@ -714,8 +714,12 @@ describe("claude CLI discovery diagnostics", () => {
       const toolsDir = await mkdtemp(join(tmpdir(), "ndx-claudepath-tools-"));
       try {
         await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
-        const pathClaude = await writeFakeBinary(join(binDir, "claude"), { stdout: "1.0.0", captureArgs: true });
-        const chosen = await writeFakeBinary(join(toolsDir, "x"), { stdout: "1.0.0", captureArgs: true });
+        // The shim records at its base path's `.args`; on Windows the returned
+        // path is `<base>.cmd`, so keep the base for the args check.
+        const pathClaude = join(binDir, "claude");
+        await writeFakeBinary(pathClaude, { stdout: "1.0.0", captureArgs: true });
+        const chosenBase = join(toolsDir, "x");
+        const chosen = await writeFakeBinary(chosenBase, { stdout: "1.0.0", captureArgs: true });
         await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
         const config = { cli: { claudePath: chosen } };
         if (configName === ".n-dx.json") config.llm = { vendor: "codex" };
@@ -724,7 +728,7 @@ describe("claude CLI discovery diagnostics", () => {
         const result = runCapture(["init", "--provider=codex", tmpDir], { timeout: 50_000, env });
         return {
           result,
-          chosenRan: existsSync(fakeBinaryArgsPath(chosen)),
+          chosenRan: existsSync(fakeBinaryArgsPath(chosenBase)),
           pathClaudeRan: existsSync(fakeBinaryArgsPath(pathClaude)),
         };
       } finally {
