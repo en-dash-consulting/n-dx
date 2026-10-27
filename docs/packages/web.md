@@ -73,6 +73,20 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 3. **Place** writes it. **Place & next** moves to the next Inbox change in the section's order. **Place & add another** adds a further touched place to the same change, for umbrella changes.
 4. If nothing fits, **Nothing fits** opens a form that proposes a new capability or constraint under an area.
 
+**Place at capture.** The capture Preview lists rex's shortlist for each new change as a choice, with strength, area and a Touches or Amends relation. The top pick is pre-selected only when it is strong and untied; otherwise the default is **Leave it in the Inbox**. The primary button names what Add will do: **Add to Inbox**, **Add 1 change & place it** (**Add N changes & place M** for several), or **Add & amend…**, which opens the change's placement form on Amends once it is added. Most new changes never enter the Inbox.
+
+**Clear a backlog.** **Open ↗** on the Inbox section, or the bottom-bar Inbox pill, opens the full Inbox page: the queue on the left in the section's order, the change's **Where it goes** section on the right. The breadcrumb counts changes still to place and changes placed this visit. **Place & next** is the default action. Shortcuts are inactive while typing in a field, with a modifier held, or while a dialog is open:
+
+| Key | Action |
+|-----|--------|
+| `J` / `K` | Next / previous change (wraps) |
+| `1`–`5` | Pick a candidate |
+| `T` / `A` | Relation: Touches / Amends |
+| `Enter` | Place & next (Place or Propose when the form is in that mode) |
+| `S` | Skip |
+| `N` | Nothing fits |
+| `/` | Search capabilities and constraints |
+
 Nothing is placed automatically. Every write goes through the placement routes below. Until a change is placed, the panel's **+ Add Task** carries a note that the task won't run.
 
 ## Inbox placement routes (v2)
