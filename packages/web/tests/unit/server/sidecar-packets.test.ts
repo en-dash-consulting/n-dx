@@ -5,7 +5,7 @@
  * reads are stubbed.
  */
 
-import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -141,6 +141,39 @@ describe("Explain", () => {
     expect(zones?.provenance).toEqual({ source: ".sourcevision/zones.json", generatedAt: "2026-10-21T00:00:00.000Z" });
   });
 
+  it("compares the analysis stamp and commit dates as instants, whatever the author's UTC offset", async () => {
+    const commit = (timestamp: string) => ({
+      evidence: async () => ({ commits: [{ hash: "c".repeat(40), subject: "s", timestamp, items: [CHANGE_TASK], files: ["src/pay/button.ts"] }] }),
+    });
+    // 01:00+02:00 is 23:00Z the day before: the analysis at 00:30Z came after it.
+    const before = await buildExplainPacket(await sourcesFor("v2", {
+      ...commit("2026-10-21T01:00:00+02:00"),
+      zones: async () => ({ analyzedAt: "2026-10-21T00:30:00.000Z", zones: [], unzoned: 1 }),
+    }), { ref: CAPABILITY }, NOW);
+    expect(before.sections.find((s) => s.id === "zones")?.staleness).toEqual({ state: "fresh" });
+    // 20:00-05:00 is 01:00Z the next day: the analysis at 00:30Z predates it.
+    const after = await buildExplainPacket(await sourcesFor("v2", {
+      ...commit("2026-10-20T20:00:00-05:00"),
+      zones: async () => ({ analyzedAt: "2026-10-21T00:30:00.000Z", zones: [], unzoned: 1 }),
+    }), { ref: CAPABILITY }, NOW);
+    expect(after.sections.find((s) => s.id === "zones")?.staleness.state).toBe("stale");
+  });
+
+  it("v2: reads evidence for the linked changes and their tasks", async () => {
+    const asked: string[][] = [];
+    const evidence = async (ids: string[]) => (asked.push(ids), { commits: [] });
+    await buildExplainPacket(await sourcesFor("v2", { evidence }), { ref: CAPABILITY }, NOW);
+    expect(asked).toEqual([["c0000000-0000-4000-8000-000000000001", CHANGE_TASK]]);
+  });
+
+  it("v1: reads evidence for the item's whole subtree", async () => {
+    const asked: string[][] = [];
+    const evidence = async (ids: string[]) => (asked.push(ids), { commits: [] });
+    await buildExplainPacket(await sourcesFor("v1", { evidence }), { ref: V1_EPIC }, NOW);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toEqual(expect.arrayContaining([V1_EPIC, "22222222-2222-2222-2222-222222222222", V1_TASK]));
+  });
+
   it("says so, rather than staying silent, when there is no analysis or no git history", async () => {
     const noZones = await buildExplainPacket(await sourcesFor("v2", { zones: async () => null }), { ref: CAPABILITY }, NOW);
     expect(noZones.text).toContain("Not available: no sourcevision analysis");
@@ -210,11 +243,30 @@ describe("caps", () => {
 });
 
 describe("lens registry", () => {
-  it("never calls the LLM-free builders with anything but sources: no network, no spawn", async () => {
-    const spawned = vi.fn();
-    const sources = await sourcesFor("v2", { resolve: async (id) => (spawned(id), null) });
-    await buildLensPacket("explain", { ref: CAPABILITY }, sources, NOW);
-    expect(spawned).not.toHaveBeenCalled();
+  it("builds packets in code that cannot reach a model, a spawn or the network", () => {
+    // The packet modules read only through PacketSources; the one LLM-client
+    // import allowed is resolveLayout (a path helper) in packet-sources.ts.
+    const SIDECAR = resolve(__dirname, "../../../src/server/sidecar");
+    for (const file of ["packet.ts", "packet-builders.ts", "lens-packets.ts", "packet-sources.ts"]) {
+      const source = readFileSync(join(SIDECAR, file), "utf-8");
+      const imports = [...source.matchAll(/^import[\s\S]*?from\s+"([^"]+)"/gm)].map((m) => m[0]);
+      for (const statement of imports) {
+        expect(statement, `${file}: ${statement}`).not.toMatch(/child_process|node:http|node:https|undici|vendor|session|routes-/);
+        if (statement.includes("@n-dx/llm-client")) {
+          expect(file).toBe("packet-sources.ts");
+          expect(statement).toMatch(/^import \{ resolveLayout \} from "@n-dx\/llm-client"$/);
+        }
+      }
+      expect(source, file).not.toMatch(/\bfetch\(/);
+    }
+  });
+
+  it("Describe reaches the spawned reads only through its injected sources", async () => {
+    const resolveRead = vi.fn(async () => null);
+    const previewRead = vi.fn(async () => null);
+    await buildLensPacket("describe", { ref: CHANGE_TASK }, await sourcesFor("v2", { resolve: resolveRead, preview: previewRead }), NOW);
+    expect(resolveRead).toHaveBeenCalledWith(CHANGE_TASK);
+    expect(previewRead).toHaveBeenCalledWith(CHANGE_TASK);
   });
 
   it("sends no packet for General and does not read anything", async () => {

@@ -146,8 +146,13 @@ async function evidenceSections(sources: PacketSources, ids: string[], now: stri
   if (!zones) {
     return [evidenceSection, gap("zones", "Sourcevision zones", "no sourcevision analysis (run `ndx analyze`)", now, zoneSource)];
   }
-  const newest = commits.reduce((max, c) => (c.timestamp > max ? c.timestamp : max), "");
-  const staleness: Staleness = zones.analyzedAt < newest
+  // Compare instants, not strings: git's author dates carry the author's UTC
+  // offset (`%aI`) while the analysis stamp is UTC, so text order is not time order.
+  const newest = commits.reduce<string | null>(
+    (max, c) => (max === null || Date.parse(c.timestamp) > Date.parse(max) ? c.timestamp : max),
+    null,
+  );
+  const staleness: Staleness = newest !== null && Date.parse(zones.analyzedAt) < Date.parse(newest)
     ? { state: "stale", reason: `analysis ${zones.analyzedAt.slice(0, 10)} predates the newest evidence commit ${newest.slice(0, 10)}` }
     : FRESH;
   const lines = zones.zones.map(

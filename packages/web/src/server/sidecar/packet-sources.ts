@@ -132,7 +132,8 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
         const all = await loadTrailerCommits({ repoDir: ctx.projectDir, cacheDir });
         const hits = all
           .filter((c) => c.items.some((id) => wanted.has(id)))
-          .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+          // Author dates carry their author's UTC offset, so order by instant, not text.
+          .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp) || a.hash.localeCompare(b.hash))
           .slice(0, MAX_EVIDENCE_COMMITS);
         const files = await loadCommitFiles(ctx.projectDir, cacheDir, hits.map((c) => c.hash));
         return {
