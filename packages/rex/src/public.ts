@@ -121,8 +121,8 @@ export type { PlacementCandidate, PlacementProposal, PlacementStrength } from ".
 // which constraints bind it, what it shares changes with, and (through the
 // N-DX-Item trailers) which commits, files and zones realize a capability.
 
-export { computeEdges, computeRealizedBy, deriveChangeKind, resolveNode, trailerIds, CHANGE_KINDS } from "./core/product-edges.js";
-export type { ProductEdges, CoChange, Realization, RealizedByOptions, ChangeKind } from "./core/product-edges.js";
+export { computeAreaLinks, computeEdges, computeRealizedBy, deriveChangeKind, resolveNode, trailerIds, CHANGE_KINDS } from "./core/product-edges.js";
+export type { AreaLink, ProductEdges, CoChange, Realization, RealizedByOptions, ChangeKind } from "./core/product-edges.js";
 export { loadTrailerCommits, loadCommitFiles } from "./core/change-commits.js";
 export type { ChangeCommitsOptions, TrailerCommit } from "./core/change-commits.js";
 export { computeLandings, listReleaseTags, releasesContaining } from "./core/change-landing.js";

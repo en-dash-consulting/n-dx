@@ -7,7 +7,9 @@
  * item. Then, in order: the text and Jev passes place the changes the rules
  * hold (`./placement-pass.ts`); the template specs are drafted again from the
  * settled placements; the text pass redrafts them (`./spec-pass.ts`); Jev
- * reviews the plan (`./jev-review-pass.ts`). The caller supplies the seams
+ * reviews the plan (`./jev-review-pass.ts`); last, each capability is proposed
+ * a `dependsOn` on every earlier capability it shares a linked test file with
+ * ({@link proposeDependsOn}). The caller supplies the seams
  * with `planSeams` (`./seams.ts`). The summary ends with the review queue.
  * `./apply.ts` applies a reviewed plan (`rex migrate-apply`).
  *
@@ -34,6 +36,7 @@ import {
 } from "./jev-review-pass.js";
 import { placementTextPass, type PlacementFields, type PlacementPassOptions } from "./placement-pass.js";
 import { specTextPass } from "./spec-pass.js";
+import { sharedFilePairs } from "../../core/product-edges.js";
 
 // Re-exported so the CLI reaches the digest and its hash through this module.
 export { contentHash, sourceDigest };
@@ -59,9 +62,19 @@ export function v1TreeSource(items: readonly PRDItem[]): MigrationSource<readonl
   return { kind: V1_TREE_SOURCE_KIND, read: () => ({ data: items, items: sourceItems(items, undefined, []) }) };
 }
 
+/** A `dependsOn` the plan proposes for review, and why. */
+export interface ProposedDependency {
+  /** v1 id of the capability depended on. */
+  capability: string;
+  /** Test files both capabilities' specs link, sorted. */
+  tests: string[];
+}
+
 export interface V1ToV2Entry extends PlanEntry, PlacementFields, JevReviewFields {
   data?: ItemPlanData;
   spec?: CapabilitySpecDraft;
+  /** Capabilities only: proposed `dependsOn`, one per earlier capability it shares a linked test with. Absent when it shares none. */
+  dependsOn?: ProposedDependency[];
 }
 
 /** A release epic that dissolved into its changes' `plannedRelease`; its id aliases no child. */
@@ -137,6 +150,32 @@ function draftSettledSpecs(
 }
 
 /**
+ * Propose `dependsOn` where two capabilities' settled specs link a test file
+ * in common: a shared test exercises both, so a change to one can break the
+ * other. Shared tests are symmetric and `dependsOn` is not, so the capability
+ * later in plan order depends on the earlier one; every edge points back in
+ * plan order, so the proposals cannot form a cycle. A proposal for review: the
+ * apply does not write it. Re-derived from scratch on every run.
+ */
+export function proposeDependsOn(entries: Readonly<Record<string, V1ToV2Entry>>): Record<string, V1ToV2Entry> {
+  const out: Record<string, V1ToV2Entry> = {};
+  for (const [id, entry] of Object.entries(entries)) {
+    const { dependsOn: _stale, ...rest } = entry;
+    out[id] = rest;
+  }
+  const tests = new Map(
+    Object.values(out)
+      .filter((e) => e.target === "capability" && e.spec !== undefined)
+      .map((e) => [e.id, e.spec!.tests] as const),
+  );
+  for (const { a, b, files } of sharedFilePairs(tests)) {
+    const entry = out[b]!;
+    out[b] = { ...entry, dependsOn: [...(entry.dependsOn ?? []), { capability: a, tests: files }] };
+  }
+  return out;
+}
+
+/**
  * Placement settles first, the text pass's then Jev's, so a spec is drafted
  * from every applied change placed on its capability; then the text pass
  * redrafts the specs and Jev reviews them. Each model's stages ask about
@@ -149,6 +188,7 @@ const stages: readonly PlanStage<readonly PRDItem[], V1ToV2Entry, V1ToV2Options>
   { derive: draftSettledSpecs },
   { model: "text", ...specTextPass },
   { model: "jev", ...jevReviewPass },
+  { derive: proposeDependsOn },
 ];
 
 export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Summary, V1ToV2Options>({
