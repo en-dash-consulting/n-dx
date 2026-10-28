@@ -16,6 +16,9 @@ items:
     resolutionDetail: "sidecar/carry-out.ts carries out approved broker calls: run_command as a sidecar-command job (tray + Live), start_work through the hench execute route under maxConcurrentProcesses with a --resolve preview on the card; other tools report recorded-not-carried-out with their batch."
     lastModified: "2026-10-28T22:16:08.341Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "30921544-26cb-49a6-bac2-cee4e10902f3":
+    lastModified: "2026-10-28T23:09:33.610Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "613fc6f0-e46a-4278-bf2e-9dbe2263ecf2":
     lastModified: "2026-10-28T21:45:56.161Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -27,5 +30,5 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b1ee136b-d88d-4f2f-848d-70db805df38b":
     issues: ["https://www.notion.so/3f7a80b7192481f8b679c82db62c39f5","https://www.notion.so/3f7a80b7192481a1ace0c96947b08d57","https://www.notion.so/3f7a80b71924816398f4d93e0d38edd2","https://www.notion.so/3f7a80b7192481f88060ea9e55cdbf00","https://www.notion.so/3f7a80b7192481ee9289c4d0f14f3609"]
-    lastModified: "2026-10-28T21:46:02.767Z"
+    lastModified: "2026-10-28T23:09:33.610Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
