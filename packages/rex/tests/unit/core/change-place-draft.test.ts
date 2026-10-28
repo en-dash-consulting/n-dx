@@ -67,6 +67,13 @@ describe("draftPlacement", () => {
     expect(d.warnings).toEqual([expect.stringContaining("remove")]);
   });
 
+  it("drops criteria from a constraint proposal, with a warning", async () => {
+    const d = await draftPlacement(tree(), "ch", proposing({ type: "constraint", under: "pay", criteria: { add: [{ id: "c1", text: "x" }] } }));
+    expect(d.proposal).toMatchObject({ type: "constraint", title: "Pay by wallet" });
+    expect(d.proposal).not.toHaveProperty("criteria");
+    expect(d.warnings).toEqual([expect.stringContaining("constraint")]);
+  });
+
   it("drops a proposal under an unknown area with a warning", async () => {
     const d = await draftPlacement(tree(), "ch", proposing({ under: "nope" }));
     expect(d.proposal).toBeUndefined();

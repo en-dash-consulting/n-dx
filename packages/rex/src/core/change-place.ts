@@ -381,13 +381,15 @@ export async function draftPlacement(tree: V2Tree, changeRef: string, model?: Pl
 function draftedProposal(proposal: PlacementProposal, warnings: string[]): DraftedProposal {
   const { added, rest } = splitCriteria(proposal.criteria);
   if (rest.length) warnings.push(`text model proposed criteria ${rest.join(", ")} for a new node; only add applies, ignoring the rest`);
+  const keepCriteria = added.length > 0 && proposal.type !== "constraint";
+  if (added.length && !keepCriteria) warnings.push("text model proposed criteria for a constraint; only a capability has them, dropping them");
   return {
     type: proposal.type,
     under: proposal.under,
     title: proposal.title,
     ...(proposal.summary !== undefined ? { summary: proposal.summary } : {}),
     ...(proposal.proposed !== undefined ? { proposed: proposal.proposed } : {}),
-    ...(added.length ? { criteria: { add: added } } : {}),
+    ...(keepCriteria ? { criteria: { add: added } } : {}),
   };
 }
 
