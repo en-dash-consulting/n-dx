@@ -1078,6 +1078,23 @@ describe("attachment and lens", () => {
     })]);
   });
 
+  it("a task picked in the tree after the page opened attaches, and re-targets the open session on each pick", async () => {
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("prd");
+    expect(itemChip()).toBeNull();
+    expect(lensChip().textContent).toBe("General");
+    for (const id of ["t2", "t3"]) {
+      await act(async () => { render(h(Shell, { view: "prd", page: { taskId: id } }), root); });
+      await settle();
+      expect(itemChip()?.textContent).toContain(id);
+      expect(lensChip().textContent).toBe("Describe");
+    }
+    expect(patches().map((r) => r.body)).toEqual([
+      { lens: "describe", target: { ref: "t2" } },
+      { target: { ref: "t3" } },
+    ]);
+  });
+
   it("leaves the session's lens alone until the registry answers", async () => {
     server.sessions = [{ session: session({ id: "s1", lens: "describe", target: { ref: "t1" } }), running: false }];
     let release!: () => void;
