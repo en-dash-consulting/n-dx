@@ -28,11 +28,15 @@ items:
     lastModified: "2026-10-28T15:28:13.241Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c4333256-6e2d-4c9f-aeaa-6a772e17fb88":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T18:33:16.324Z"
-    activeIntervals: [{"start":"2026-10-28T18:33:16.324Z"}]
+    completedAt: "2026-10-28T18:49:24.596Z"
+    endedAt: "2026-10-28T18:49:24.596Z"
+    activeIntervals: [{"end":"2026-10-28T18:49:24.596Z","start":"2026-10-28T18:33:16.324Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runVendorAuthPreflight and testCliPath (core config.js) pass loadVendorCliEnv(dir, vendor); web llm-catalog probeCli passes resolveVendorCliEnv({...config, vendor}). Sentinel tests in tests/e2e/cli-auth.test.js and web routes-llm-catalog.test.ts failed before the fix."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T18:33:18.709Z"
+    lastModified: "2026-10-28T18:49:24.596Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd98987d-aaed-4775-b013-f8146d569837":
     assignee: "Ryan Keith <ryan.k@endash.us>"

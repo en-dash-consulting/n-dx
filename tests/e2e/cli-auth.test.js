@@ -357,6 +357,35 @@ describe("ndx auth", () => {
       expectVendorEnv(await seen("local-claude"), "ANTHROPIC_API_KEY", "OPENAI_API_KEY");
     });
 
+    it.each([
+      [{ deny: 5 }],
+      [{ deny: [1] }],
+      [{ allow: "GITHUB_TOKEN" }],
+    ])("a malformed hench.guard.env %j is named and the default filter applies", async (policy) => {
+      await mkdir(join(tmpDir, ".hench"));
+      await writeFile(join(tmpDir, ".hench", "config.json"), JSON.stringify({ guard: { env: policy } }) + "\n");
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }) + "\n");
+
+      const { stdout, stderr, status } = runNdx(["auth", tmpDir], env);
+
+      expect(status).toBe(0);
+      expect(stdout).toMatch(/credentials valid/i);
+      expect(stderr).toContain("hench.guard.env is not a usable policy");
+      expectVendorEnv(await seen("claude"), "ANTHROPIC_API_KEY", "OPENAI_API_KEY");
+    });
+
+    it("the untrusted-allow warning names the CLI check, not the reviewer", async () => {
+      await mkdir(join(tmpDir, ".hench"));
+      await writeFile(join(tmpDir, ".hench", "config.json"), JSON.stringify({ guard: { env: { allow: ["GITHUB_TOKEN"] } } }) + "\n");
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }) + "\n");
+
+      const { stderr } = runNdx(["auth", tmpDir], env);
+
+      expect(stderr).toContain("for the claude CLI check");
+      expect(stderr).not.toContain("reviewer");
+      expectVendorEnv(await seen("claude"), "ANTHROPIC_API_KEY", "OPENAI_API_KEY");
+    });
+
     it("ndx config llm.codex.cli_path's command check", async () => {
       runNdx(["config", "llm.codex.cli_path", "codex", tmpDir], env);
 

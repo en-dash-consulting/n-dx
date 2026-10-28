@@ -1044,7 +1044,7 @@ function validateGoogleApiKeyEnv(value) {
  * Returns { ok, version?, error? }.
  */
 async function testCliPath(cliPath, dir, vendor) {
-  const env = await loadVendorCliEnv(dir, vendor);
+  const env = await loadVendorCheckEnv(dir, vendor);
   try {
     const output = execFileSyncCli(cliPath, ["--version"], {
       encoding: "utf-8",
@@ -1677,7 +1677,7 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig) {
   const binary = await loadVendorCliPath(dir, cliVendor);
   const args = vendorAuthPreflightArgs(vendor);
   // The agent loop's vendor environment: no credential outside the vendor's mode.
-  const env = await loadVendorCliEnv(dir, cliVendor);
+  const env = await loadVendorCheckEnv(dir, cliVendor);
   try {
     // Windows-safe: routes .cmd shims through cmd.exe with a self-quoted
     // verbatim command line (GH #37/#68/#69) — see execFileSyncCli.
@@ -2727,20 +2727,44 @@ async function loadAllConfigs(dir) {
 }
 
 /**
- * Resolve the same filtered environment as hench for cross-vendor reviewers.
+ * Resolve the same filtered environment as hench for a vendor CLI n-dx spawns
+ * outside the agent loop (the cross-vendor reviewer, the auth and cli_path checks).
  * Config I/O and foundation loading stay in the spawn-exempt config module.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
- * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions }} [options]
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions, subject?: string }} [options]
  *   `trust` relocates the repository-trust store (e.g. `{ ndxHome }`); callers
- *   that omit it use the user's real store.
+ *   that omit it use the user's real store. `subject` names the caller in the
+ *   untrusted-allow warning (default "the reviewer CLI").
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
 export async function loadVendorCliEnv(dir, vendor, options = {}) {
   const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
   const envPolicy = await loadProjectEnvPolicy(dir);
   const llmConfig = await loadLLMConfig(dir);
-  return resolveVendorCliEnv({ ...llmConfig, vendor }, await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust));
+  const policy = await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust, options.subject);
+  return resolveVendorCliEnv({ ...llmConfig, vendor }, policy);
+}
+
+/**
+ * {@link loadVendorCliEnv} for a vendor CLI check (auth preflight, cli_path
+ * test). A check must still report on the binary when `hench.guard.env` is
+ * malformed, so an unusable policy is named on stderr and the default filter
+ * applies, as {@link loadShellTestEnv} does — never the parent environment.
+ * @param {string} dir
+ * @param {"claude" | "codex"} vendor
+ * @returns {Promise<NodeJS.ProcessEnv>}
+ */
+async function loadVendorCheckEnv(dir, vendor) {
+  const subject = `the ${vendor} CLI check`;
+  try {
+    return await loadVendorCliEnv(dir, vendor, { subject });
+  } catch (err) {
+    const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(`hench.guard.env is not a usable policy (${reason}); ${subject} uses the default credential filter.`);
+    return resolveVendorCliEnv({ ...(await loadLLMConfig(dir)), vendor });
+  }
 }
 
 /** Directories already warned about, so a loop of reviews warns once. */
@@ -2756,7 +2780,7 @@ const warnedUntrustedEnvAllow = new Set();
  * the state of any checkout with an unaccepted `env-allow-added` finding.
  * Loaded dynamically: config.js may not import packages statically.
  */
-async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust) {
+async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust, subject = "the reviewer CLI") {
   if (!envPolicy?.allow?.length) return envPolicy;
   const { evaluateRepoTrust } = await import("@n-dx/llm-client");
   const evaluation = evaluateRepoTrust(dir, trust);
@@ -2768,7 +2792,7 @@ async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust) {
     warnedUntrustedEnvAllow.add(dir);
     const finding = evaluation.findings.find((f) => f.code === "env-allow-added");
     console.warn(
-      `Ignoring repository guard.env.allow (${dropped.join(", ")}) for the reviewer CLI: ` +
+      `Ignoring repository guard.env.allow (${dropped.join(", ")}) for ${subject}: ` +
       `this checkout is ${evaluation.state}` +
       (finding ? ` (finding: ${finding.code})` : "") +
       ". Run 'ndx trust accept .' to apply it.",
