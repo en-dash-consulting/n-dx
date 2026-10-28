@@ -23,6 +23,13 @@ import {
   type SidecarFrame,
   type SidecarSessionEntry,
 } from "../../../src/viewer/hooks/use-sidecar.js";
+import {
+  pageItemFor,
+  resolveLens,
+  wantedLensFor,
+  type SidecarLensInfo,
+  type SidecarPageSelection,
+} from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
 import { useFeatureToggle } from "../../../src/viewer/hooks/use-feature-toggle.js";
 import { buildValidViews } from "../../../src/shared/index.js";
@@ -53,6 +60,10 @@ interface Server {
   workspaces: Array<{ key: string; branch: string | null }>;
   /** Sessions the other worktrees hold, by workspace key, read through /w/<key>/api/sidecar/sessions. */
   otherSessions: Record<string, SidecarSessionEntry[]>;
+  /** GET /api/sidecar/lenses: the M1 registry. */
+  lenses: SidecarLensInfo[];
+  /** Status of the newest hench run of any task, per GET /api/hench/runs?taskId=; unset means no runs. */
+  lastRunStatus?: string;
 }
 
 /** A card as the server sends it; `n` orders its raisedAt. */
@@ -105,6 +116,10 @@ function stubServer(): void {
         google: { models: ["gemini-x"], defaultModel: "gemini-x" },
         local: { models: [], defaultModel: "" },
       });
+    }
+    if (url === "/api/sidecar/lenses") return json({ lenses: server.lenses });
+    if (url.startsWith("/api/hench/runs?")) {
+      return json(server.lastRunStatus ? [{ id: "r1", status: server.lastRunStatus }] : []);
     }
     if (url === "/api/workspaces") {
       return json({ anchor: "main", workspaces: server.workspaces.map((w) => ({ ...w, path: "/x", isAnchor: w.key === "main", active: true })) });
@@ -189,8 +204,8 @@ async function settle(): Promise<void> {
 
 // ── Harness: what main.ts renders for Sidecar ─────────────────────────────
 
-function Shell({ view }: { view: ViewId }) {
-  const shell = useSidecarShell(useFeatureToggle("web.sidecar", false));
+function Shell({ view, page }: { view: ViewId; page?: Partial<SidecarPageSelection> }) {
+  const shell = useSidecarShell(useFeatureToggle("web.sidecar", false), { view, zone: null, taskId: null, ...page });
   return h("div", null,
     h(TopNav, { view, validViews: VALID, onNavigate: vi.fn(), onOpenSearch: vi.fn(), sidecar: shell.button }),
     h(SidecarDock, { open: shell.drawer.open, sidecar: shell.sidecar, onClose: shell.drawer.close },
@@ -201,10 +216,10 @@ function Shell({ view }: { view: ViewId }) {
 
 let root: HTMLDivElement;
 
-async function mount(view: ViewId = "analyze"): Promise<void> {
+async function mount(view: ViewId = "analyze", page?: Partial<SidecarPageSelection>): Promise<void> {
   root = document.createElement("div");
   document.body.appendChild(root);
-  await act(async () => { render(h(Shell, { view }), root); });
+  await act(async () => { render(h(Shell, { view, page }), root); });
   await settle();
 }
 
@@ -232,6 +247,14 @@ beforeEach(() => {
     enabled: true, running: false, gate: null, sessions: [], frames: [], cards: [],
     heldCardReads: null, manifest: {}, catalogCli: {}, requests: [],
     workspaces: [{ key: "main", branch: "main" }, { key: "feat", branch: "feat/other" }], otherSessions: {},
+    lenses: [
+      { id: "general", available: true },
+      { id: "explain", available: true },
+      { id: "describe", available: true },
+      { id: "plan", available: true },
+      { id: "guide", available: false, needs: "the queue planner" },
+      { id: "diagnose-run", available: false, needs: "the run classifier" },
+    ],
   };
   FakeSocket.open.clear();
   stubServer();
@@ -999,5 +1022,117 @@ describe("sessions list", () => {
     expect(rowFor("o1").textContent).toContain("feat/other");
     expect(buttons(rowFor("o1"))).toEqual([]);
     expect(buttons(rowFor("s1"))).toEqual(["Resume", "Rename", "End"]);
+  });
+});
+
+// ── Attachment chip and lens (story 09) ────────────────────────────────────
+
+describe("attachment and lens", () => {
+  const click = async (el: Element | null) => { await act(async () => { (el as HTMLElement).click(); }); await settle(); };
+  const patches = () => server.requests.filter((r) => r.method === "PATCH");
+  const lensChip = () => root.querySelector(".sidecar-chip-lens")!;
+  const itemChip = () => root.querySelector(".sidecar-chip-item");
+  const open = async (view: ViewId, page?: Partial<SidecarPageSelection>) => {
+    await mount(view, page);
+    await pressCmdJ();
+  };
+
+  it("maps pages to lenses without a list of its own", () => {
+    expect(wantedLensFor(pageItemFor({ view: "prd", zone: null, taskId: "t1" }), false)).toBe("describe");
+    expect(wantedLensFor(pageItemFor({ view: "live-task", zone: null, taskId: "t1" }), true)).toBe("diagnose-run");
+    expect(wantedLensFor(pageItemFor({ view: "zones", zone: "z", taskId: null }), false)).toBe("explain");
+    expect(wantedLensFor(pageItemFor({ view: "product", zone: null, taskId: null, capabilityId: "c" }), false)).toBe("explain");
+    expect(wantedLensFor(pageItemFor({ view: "plan", zone: null, taskId: null }), false)).toBe("plan");
+    expect(wantedLensFor(pageItemFor({ view: "live", zone: null, taskId: null }), false)).toBe("guide");
+    expect(pageItemFor({ view: "files", zone: null, taskId: null })).toBeNull();
+    // A lens the registry does not list, or lists unavailable, runs General.
+    expect(resolveLens("guide", [{ id: "guide", available: false, needs: "x" }]).running).toBe("general");
+    expect(resolveLens("future", [])).toMatchObject({ running: "general", needs: expect.any(String) });
+    expect(resolveLens("plan", [{ id: "plan", available: true }])).toEqual({ wanted: "plan", running: "plan" });
+  });
+
+  it("a task gives Describe, and the session takes the lens and target through PATCH", async () => {
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("prd", { taskId: "t1" });
+    expect(lensChip().textContent).toBe("Describe");
+    expect(itemChip()?.textContent).toContain("t1");
+    expect(patches()).toEqual([expect.objectContaining({
+      url: "/api/sidecar/sessions/s1", body: { lens: "describe", target: { ref: "t1" } },
+    })]);
+  });
+
+  it("a task whose last run failed gives Diagnose run, shown as not available yet; the session runs General", async () => {
+    server.lastRunStatus = "failed";
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("prd", { taskId: "t1" });
+    expect(lensChip().textContent).toBe("Diagnose runnot available yet");
+    expect(patches().map((r) => r.body)).toEqual([{ target: { ref: "t1" } }]);
+  });
+
+  it.each([
+    ["zones", { zone: "api" }, "Explain"],
+    ["plan", {}, "Plan"],
+  ] as const)("the %s page gives %s", async (view, page, label) => {
+    await open(view, page);
+    expect(lensChip().textContent).toBe(label);
+  });
+
+  it("Live gives Guide, which the registry cannot run yet", async () => {
+    await open("live");
+    expect(lensChip().textContent).toBe("Guidenot available yet");
+  });
+
+  it("a new session starts on the attached lens and target, or on General when the lens is unavailable", async () => {
+    await open("zones", { zone: "api" });
+    await click(root.querySelector(".sidecar-send")); // nothing typed: no session yet
+    const input = root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+    await act(async () => { input.value = "hi"; input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await click(root.querySelector(".sidecar-send"));
+    expect(server.requests.find((r) => r.method === "POST" && r.url === "/api/sidecar/sessions")?.body)
+      .toMatchObject({ lens: "explain", target: { ref: "api" } });
+    await unmount();
+    server.requests = [];
+    server.sessions = [];
+    await open("live");
+    const live = root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+    await act(async () => { live.value = "hi"; live.dispatchEvent(new Event("input", { bubbles: true })); });
+    await click(root.querySelector(".sidecar-send"));
+    const created = server.requests.find((r) => r.method === "POST" && r.url === "/api/sidecar/sessions")?.body as Record<string, unknown>;
+    expect(created.lens).toBeUndefined();
+  });
+
+  it("the chip switches the lens through PATCH; a lens not available yet cannot be picked", async () => {
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("prd", { taskId: "t1" });
+    server.requests = [];
+    await click(lensChip());
+    const option = (id: string) => root.querySelector<HTMLButtonElement>(`.sidecar-lens-option[data-lens="${id}"]`)!;
+    expect(option("guide").disabled).toBe(true);
+    expect(option("guide").textContent).toContain("not available yet");
+    await click(option("explain"));
+    expect(patches().map((r) => r.body)).toEqual([{ lens: "explain" }]);
+    expect(lensChip().textContent).toBe("Explain");
+    expect(root.querySelector(".sidecar-lens-menu")).toBeNull();
+  });
+
+  it("/ in an empty composer opens the lens list; in a typed composer it types", async () => {
+    await open("plan");
+    const input = root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+    await act(async () => { input.value = "a"; input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { input.dispatchEvent(new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true })); });
+    expect(root.querySelector(".sidecar-lens-menu")).toBeNull();
+    await act(async () => { input.value = ""; input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { input.dispatchEvent(new KeyboardEvent("keydown", { key: "/", bubbles: true, cancelable: true })); });
+    expect(root.querySelector(".sidecar-lens-menu")).not.toBeNull();
+  });
+
+  it("the attachment chip shows the page item as the target and removing it clears the target", async () => {
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("zones", { zone: "api" });
+    expect(itemChip()?.textContent).toContain("api");
+    server.requests = [];
+    await click(root.querySelector(".sidecar-chip-remove"));
+    expect(itemChip()).toBeNull();
+    expect(patches().map((r) => r.body)).toEqual([{ target: {} }]);
   });
 });

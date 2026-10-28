@@ -28,6 +28,8 @@ import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useSidecarSessions } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
+import { GENERAL_LENS, useSidecarAttachment } from "./use-sidecar-attachment.js";
+import type { SidecarAttachment, SidecarPageSelection } from "./use-sidecar-attachment.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-sidecar.ts and server/sidecar/session-registry.ts
@@ -39,6 +41,8 @@ export interface SidecarSession {
   vendor: string;
   model?: string;
   lens?: string;
+  /** What the lens is pointed at; absent or `{}` means no target. */
+  target?: { ref?: string };
   cursor: number;
   turns: number;
   createdAt: string;
@@ -223,11 +227,18 @@ async function getJson<T>(url: string): Promise<T | null> {
   }
 }
 
-/** POST a JSON body; the parsed answer, or the server's error text. */
-async function postJson<T>(url: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+const postJson = <T>(url: string, body: unknown) => sendJson<T>("POST", url, body);
+const patchJson = <T>(url: string, body: unknown) => sendJson<T>("PATCH", url, body);
+
+/** Send a JSON body; the parsed answer, or the server's error text. */
+async function sendJson<T>(
+  method: "POST" | "PATCH",
+  url: string,
+  body: unknown,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   try {
     const res = await fetch(url, {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -358,6 +369,11 @@ export interface SidecarState {
   chooseAgent: (vendor: string, model?: string) => Promise<void>;
   send: (prompt: string) => Promise<boolean>;
   stop: () => Promise<void>;
+  /**
+   * The page item attached as the session's target, and the lens it asks
+   * with. The open session follows it through PATCH /api/sidecar/sessions/:id.
+   */
+  attachment: SidecarAttachment;
 }
 
 interface Tail {
@@ -374,7 +390,10 @@ interface Tail {
 
 const newTail = (sessionId: string | null): Tail => ({ sessionId, cursor: 0, inFlight: false, again: false });
 
-export function useSidecar(enabled: boolean, open: boolean): SidecarState {
+export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSelection): SidecarState {
+  const attachment = useSidecarAttachment(enabled, open, page);
+  const attachmentRef = useRef(attachment);
+  attachmentRef.current = attachment;
   const [session, setSession] = useState<SidecarSession | null>(null);
   const [frames, setFrames] = useState<SidecarFrame[]>([]);
   const [running, setRunning] = useState(false);
@@ -541,9 +560,12 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
 
   /** Create a session on `agent` and follow it; null, with the error set, when the server refuses. */
   const createSession = useCallback(async (agent: SidecarAgent): Promise<SidecarSession | null> => {
+    const { lens, item } = attachmentRef.current;
     const created = await postJson<SidecarSessionEntry>(SESSIONS, {
       vendor: agent.vendor,
       ...(agent.model && { model: agent.model }),
+      ...(lens.running !== GENERAL_LENS && { lens: lens.running }),
+      ...(item?.ref && { target: { ref: item.ref } }),
     });
     if (!created.ok) { setError(created.error); return null; }
     follow(created.data.session, created.data.running);
@@ -589,6 +611,31 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     const res = await postJson<{ interrupted: boolean }>(`${SESSIONS}/${encodeURIComponent(id)}/interrupt`, {});
     if (!res.ok) setError(res.error);
   }, []);
+
+  // The open session follows the attachment: the page item is its target and
+  // the lens it runs is the one the chip shows (General while that lens is not
+  // available yet). One PATCH per change; an ended session is left alone.
+  const { asks } = attachment;
+  const wantLens = attachment.lens.running;
+  const wantRef = attachment.item?.ref ?? "";
+  const heldLens = session?.lens ?? GENERAL_LENS;
+  const heldRef = session?.target?.ref ?? "";
+  const openId = session && !session.endedAt ? session.id : null;
+  const syncKey = `${openId}|${wantLens}|${wantRef}`;
+  const syncedRef = useRef("");
+  useEffect(() => {
+    if (!enabled || !open || !openId || !asks || syncedRef.current === syncKey) return;
+    syncedRef.current = syncKey;
+    const fields: { lens?: string; target?: { ref?: string } } = {};
+    if (wantLens !== heldLens) fields.lens = wantLens;
+    if (wantRef !== heldRef) fields.target = wantRef ? { ref: wantRef } : {};
+    if (Object.keys(fields).length === 0) return;
+    void patchJson<SidecarSessionEntry>(`${SESSIONS}/${encodeURIComponent(openId)}`, fields).then((res) => {
+      if (!mountedRef.current) return;
+      if (!res.ok) { setError(res.error); return; }
+      if (res.data.session.id === tailRef.current.sessionId) setSession(res.data.session);
+    });
+  }, [enabled, open, asks, syncKey, openId, wantLens, wantRef, heldLens, heldRef]);
 
   const decide = useCallback(async (cardId: string, decision: SidecarCardDecision) => {
     const id = tailRef.current.sessionId;
@@ -655,13 +702,15 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
   return {
     session, frames, running, sending, waiting, sessionWaiting, cards, commandManifest, decide,
     readOnly: session?.endedAt !== undefined, sessions, openSession,
-    lastTurn, error, agent, catalog, chooseAgent, send, stop,
+    lastTurn, error, agent, catalog, chooseAgent, send, stop, attachment,
   };
 }
 
 // ---------------------------------------------------------------------------
 // The shell's one entry point
 // ---------------------------------------------------------------------------
+
+const NO_PAGE: SidecarPageSelection = { view: "home", zone: null, taskId: null };
 
 export interface SidecarShell {
   drawer: SidecarDrawerState;
@@ -674,9 +723,9 @@ export interface SidecarShell {
  * `enabled`: `web.sidecar`, read by main.ts through `useFeatureToggle`, and a
  * server to hold a session (not a static export).
  */
-export function useSidecarShell(enabled: boolean): SidecarShell {
+export function useSidecarShell(enabled: boolean, page: SidecarPageSelection = NO_PAGE): SidecarShell {
   const drawer = useSidecarDrawerState(enabled);
-  const sidecar = useSidecar(enabled, drawer.open);
+  const sidecar = useSidecar(enabled, drawer.open, page);
   const button = enabled ? { open: drawer.open, waiting: sidecar.waiting, onToggle: drawer.toggle } : null;
   return { drawer, sidecar, button };
 }

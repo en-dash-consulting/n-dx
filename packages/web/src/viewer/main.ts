@@ -160,9 +160,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // enrichment gate before their hooks run.
   const askEnabled = useFeatureToggle("sourcevision.ask", false);
   useAutoCommitGenerated(gitStatus, useFeatureToggle("git.autoCommitGenerated", false), refetchGitStatus);
-  // Sidecar: the top-nav button, ⌘J and the drawer all read `web.sidecar` here.
-  // A static export has no server to hold a session.
-  const sidecarShell = useSidecarShell(useFeatureToggle("web.sidecar", false) && !isDeployedMode());
+  // The Product page reports its open capability, which Sidecar attaches.
+  const [openCapability, setOpenCapability] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -187,6 +186,12 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     fallbackPage(validViews),
   );
   const pageView: ViewId = page.view;
+  // Sidecar: the drawer attaches the page under any settings overlay. The top-nav button, ⌘J and the drawer all read `web.sidecar` here.
+  // A static export has no server to hold a session.
+  const sidecarShell = useSidecarShell(
+    useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
+    { view: pageView, zone: page.zone, taskId: page.taskId, capabilityId: openCapability },
+  );
   const stage = stageForView(pageView, validViews);
 
   // The commands sheet is UI state, not a route. Any navigation lowers it —
@@ -258,7 +263,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, setOpenCapability, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   return h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.

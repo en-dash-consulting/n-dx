@@ -19,7 +19,7 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import { SIDECAR_VENDORS, sidecarSetupNeed } from "../hooks/index.js";
+import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, sidecarSetupNeed } from "../hooks/index.js";
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
 import { SidecarCards } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
@@ -182,6 +182,63 @@ export function SidecarFrameRow({ frame, result }: { frame: SidecarFrame; result
 }
 
 // ---------------------------------------------------------------------------
+// Attachment and lens chips
+// ---------------------------------------------------------------------------
+
+/**
+ * The page item attached as the session's target (removable) and the lens
+ * chip. The chip names the lens the page asked for; while the registry cannot
+ * run it, it says "not available yet" and the session runs General. The chip
+ * opens the lens list, as does `/` in an empty composer.
+ */
+function SidecarAttachmentBar({ attachment, menuOpen, setMenuOpen }: {
+  attachment: SidecarState["attachment"];
+  menuOpen: boolean;
+  setMenuOpen: (open: boolean) => void;
+}) {
+  const { item, lens, lenses, chooseLens, removeItem } = attachment;
+  return h("div", { class: "sidecar-attachment" },
+    item
+      ? h("span", { class: "sidecar-chip sidecar-chip-item", "data-kind": item.kind },
+          h("span", { class: "sidecar-chip-label" }, `${item.kind === "plan" || item.kind === "live" ? "" : `${item.kind} `}${item.label}`),
+          h("button", {
+            type: "button",
+            class: "sidecar-chip-remove",
+            "aria-label": `Remove ${item.label} from this session`,
+            onClick: removeItem,
+          }, "×"))
+      : null,
+    h("span", { class: "sidecar-lens" },
+      h("button", {
+        type: "button",
+        class: "sidecar-chip sidecar-chip-lens",
+        "aria-haspopup": "listbox",
+        "aria-expanded": menuOpen ? "true" : "false",
+        "aria-label": `Lens: ${lensLabel(lens.wanted)}${lens.needs ? ", not available yet" : ""}`,
+        title: lens.needs ? `Waiting on ${lens.needs}; this session runs General` : "Switch lens (/)",
+        onClick: () => setMenuOpen(!menuOpen),
+      },
+        h("span", { class: "sidecar-chip-label" }, lensLabel(lens.wanted)),
+        lens.needs ? h("span", { class: "sidecar-chip-note" }, "not available yet") : null),
+      menuOpen
+        ? h("ul", { class: "sidecar-lens-menu", role: "listbox", "aria-label": "Lens" },
+            [{ id: GENERAL_LENS, available: true }, ...lenses.filter((l) => l.id !== GENERAL_LENS)].map((entry) =>
+              h("li", { key: entry.id, role: "presentation" },
+                h("button", {
+                  type: "button",
+                  role: "option",
+                  class: "sidecar-lens-option",
+                  "aria-selected": entry.id === lens.wanted ? "true" : "false",
+                  "aria-disabled": entry.available ? undefined : "true",
+                  "data-lens": entry.id,
+                  disabled: !entry.available,
+                  onClick: () => { if (chooseLens(entry.id)) setMenuOpen(false); },
+                }, lensLabel(entry.id), entry.available ? null : h("span", { class: "sidecar-chip-note" }, "not available yet")))))
+        : null),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Drawer
 // ---------------------------------------------------------------------------
 
@@ -194,6 +251,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [width, setWidth] = useState(storedWidth);
   const [draft, setDraft] = useState("");
   const [listing, setListing] = useState(false);
+  const [lensMenu, setLensMenu] = useState(false);
   const transcriptRef = useRef<HTMLOListElement>(null);
 
   const applyWidth = useCallback((next: number) => {
@@ -336,6 +394,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       class: "sidecar-composer",
       onSubmit: (e: Event) => { e.preventDefault(); void submit(); },
     },
+      h(SidecarAttachmentBar, { attachment: sidecar.attachment, menuOpen: lensMenu, setMenuOpen: setLensMenu }),
       h("textarea", {
         class: "sidecar-input",
         "aria-label": "Message Sidecar",
@@ -345,6 +404,13 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
         rows: 3,
         onInput: (e: Event) => setDraft((e.target as HTMLTextAreaElement).value),
         onKeyDown: (e: KeyboardEvent) => {
+          // `/` in an empty composer opens the lens list instead of typing.
+          if (e.key === "/" && draft === "" && !e.isComposing) {
+            e.preventDefault();
+            setLensMenu(true);
+            return;
+          }
+          if (e.key === "Escape" && lensMenu) { setLensMenu(false); return; }
           if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
             e.preventDefault();
             void submit();

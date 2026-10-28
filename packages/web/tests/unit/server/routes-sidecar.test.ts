@@ -28,6 +28,7 @@ import {
 } from "../../../src/server/routes-sidecar.js";
 import { readDashboardUsage } from "../../../src/server/dashboard-usage.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
+import { LENS_IDS } from "../../../src/server/sidecar/lens-packets.js";
 import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -222,6 +223,18 @@ describe("sessions", () => {
     const id = await createSession();
     expect((await api(`/${id}/turns`)).status).toBe(405);
     expect((await api(`/${id}/frames`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("lens registry", () => {
+  it("lists every lens M1 registers, with what an unavailable one waits on", async () => {
+    const res = await fetch(`${server.baseUrl}/api/sidecar/lenses`);
+    expect(res.status).toBe(200);
+    const { lenses } = await res.json() as { lenses: Array<{ id: string; available: boolean; needs?: string }> };
+    expect(lenses.map((l) => l.id)).toEqual([...LENS_IDS]);
+    expect(lenses.find((l) => l.id === "plan")).toEqual({ id: "plan", available: true });
+    expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: false, needs: "the queue planner" });
+    expect((await fetch(`${server.baseUrl}/api/sidecar/lenses`, { method: "POST" })).status).toBe(405);
   });
 });
 

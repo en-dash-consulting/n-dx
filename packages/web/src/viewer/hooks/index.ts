@@ -35,6 +35,7 @@ export * from "./use-project-metadata.js";
 export * from "./use-project-status.js";
 export * from "./use-refresh-throttle.js";
 export * from "./use-sidecar.js";
+export * from "./use-sidecar-attachment.js";
 export * from "./use-page-entry.js";
 export * from "./use-route-state.js";
 export * from "./use-subzone-edges.js";

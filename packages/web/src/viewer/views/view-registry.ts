@@ -93,6 +93,8 @@ export interface ViewRenderContext {
   selectedZone: string | null;
   selectedRunId: string | null;
   selectedTaskId: string | null;
+  /** The Product page reports the capability it has open, so Sidecar can attach it. */
+  setOpenCapability?: (id: string | null) => void;
   /**
    * Whether the detail panel (a file, zone or PRD item) is showing beside the
    * page, so a full-screen dashboard tile leaves room for it.
@@ -238,8 +240,8 @@ const REGISTRY: Record<string, ViewRenderer> = {
   "prd": ({ setDetail, setPrdDetailContent, selectedTaskId, navigateTo }) =>
     h(PRDView, { onSelectItem: setDetail, onDetailContent: setPrdDetailContent, initialTaskId: selectedTaskId, navigateTo }),
 
-  "product": () =>
-    h(ProductPage, null),
+  "product": ({ setOpenCapability }) =>
+    h(ProductPage, { onCapabilityChange: setOpenCapability }),
 
   "changes": ({ navigateTo }) =>
     h(ChangesPage, { navigateTo }),

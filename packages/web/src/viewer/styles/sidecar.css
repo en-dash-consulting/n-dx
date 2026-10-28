@@ -152,6 +152,57 @@
 .sidecar-agent select { min-width: 0; font-size: 12px; }
 .sidecar-model { flex: 1; }
 
+.sidecar-attachment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.sidecar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+}
+.sidecar-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidecar-chip-note { color: var(--text-muted); font-style: italic; }
+.sidecar-chip-remove { border: 0; background: none; color: var(--text-muted); cursor: pointer; padding: 0; }
+.sidecar-lens { position: relative; }
+.sidecar-lens-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 2;
+  margin: 0 0 var(--space-1);
+  padding: var(--space-1);
+  list-style: none;
+  min-width: 200px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated, var(--bg, #fff));
+}
+.sidecar-lens-option {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  padding: var(--space-1);
+  cursor: pointer;
+}
+.sidecar-lens-option[aria-selected="true"] { font-weight: 600; }
+.sidecar-lens-option:disabled { color: var(--text-muted); cursor: default; }
+
 .sidecar-divider {
   display: flex;
   align-items: center;

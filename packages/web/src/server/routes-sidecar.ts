@@ -16,6 +16,7 @@
  * | Method | Path | Does |
  * |--------|------|------|
  * | GET  | `/api/sidecar/sessions` | sessions in this worktree |
+ * | GET | `/api/sidecar/lenses` | the lens registry: each lens id, whether it can run, what it waits on |
  * | POST | `/api/sidecar/sessions` | create one (`{ vendor, model?, name?, lens?, target? }`) |
  * | GET  | `/api/sidecar/sessions/:id` | one session and whether a turn runs |
  * | PATCH | `/api/sidecar/sessions/:id` | rename, re-lens or re-target (`{ name?, lens?, target? }`) |
@@ -55,7 +56,7 @@ import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readLedger } from "./sidecar/ledger.js";
-import { buildLensPacket } from "./sidecar/lens-packets.js";
+import { buildLensPacket, LENS_IDS, LENS_PACKETS } from "./sidecar/lens-packets.js";
 import type { PacketTarget } from "./sidecar/packet-builders.js";
 import { createPacketSources } from "./sidecar/packet-sources.js";
 import {
@@ -73,6 +74,15 @@ import { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
+const LENSES_PATH = "/api/sidecar/lenses";
+
+/** The registry as the drawer reads it: every lens, and what an unavailable one waits on. */
+function sidecarLenses(): Array<{ id: string; available: boolean; needs?: string }> {
+  return LENS_IDS.map((id) => {
+    const plan = LENS_PACKETS[id];
+    return plan.kind === "unavailable" ? { id, available: false, needs: plan.needs } : { id, available: true };
+  });
+}
 
 /** Announces that a card was raised or settled; fetch `…/cards` for it. */
 export interface SidecarCardMessage {
@@ -340,10 +350,18 @@ export async function handleSidecarRoute(
   opts: SidecarRouteOptions = {},
 ): Promise<boolean> {
   const [pathname, search = ""] = (req.url || "/").split("?");
-  if (pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`) && pathname !== ALLOW_LIST_PATH) return false;
+  if (pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`) && pathname !== ALLOW_LIST_PATH && pathname !== LENSES_PATH) {
+    return false;
+  }
   const method = req.method || "GET";
   const registry = opts.registryFor ? opts.registryFor(ctx.projectDir) : defaultRegistryFor(ctx);
   const broker = opts.brokerFor ? opts.brokerFor(ctx.projectDir) : defaultBrokerFor(ctx.projectDir, broadcast);
+
+  if (pathname === LENSES_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${LENSES_PATH}`);
+    jsonResponse(res, 200, { lenses: sidecarLenses() });
+    return true;
+  }
 
   if (pathname === ALLOW_LIST_PATH) {
     if (method === "GET") {
