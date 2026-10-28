@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -18,7 +18,9 @@ import { resolveStore, findItem, detectReorganizations, type PRDItem } from "@n-
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
-const CHANGE_ID = "c0000000-0000-4000-8000-000000000001";
+const AREA_ID = "a0000000-0000-4000-8000-000000000001";
+const CAPABILITY_ID = "a0000000-0000-4000-8000-000000000002";
+const CHANGE_ID ="c0000000-0000-4000-8000-000000000001";
 const TASK_ID = "c0000000-0000-4000-8000-000000000002";
 
 describe("Rex item routes on a v2 project", () => {
@@ -67,6 +69,42 @@ describe("Rex item routes on a v2 project", () => {
     const store = await resolveStore(rexDir);
     const item = await store.getItem(created.id);
     expect(item).toMatchObject({ title: "Support gift cards", type: "change", needsPlacement: true, description: "Shoppers ask for them." });
+  });
+
+  it("POST /items with touches creates a placed change outside the Inbox and logs change_placed", async () => {
+    const res = await send("POST", "items", { title: "Apple Pay on card form", touches: [CAPABILITY_ID] });
+    expect(res.status).toBe(201);
+    const created = await res.json();
+    expect(created).toMatchObject({ ok: true, type: "change", needsPlacement: false });
+    expect(frames).toContainEqual(expect.objectContaining({ type: "rex:prd-changed" }));
+
+    const item = await (await resolveStore(rexDir)).getItem(created.id);
+    expect(item).toMatchObject({ type: "change", touches: [CAPABILITY_ID] });
+    expect(item).not.toHaveProperty("needsPlacement");
+    expect(existsSync(join(rexDir, "changes", "inbox", "apple-pay-on-card-form"))).toBe(false);
+
+    const log = readFileSync(join(rexDir, "execution-log.jsonl"), "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(log.filter((e) => e.itemId === created.id).map((e) => e.event)).toEqual(["item_added", "change_placed"]);
+  });
+
+  it.each([
+    ["an unknown id", "ffffffff-0000-4000-8000-000000000000"],
+    ["an area", AREA_ID],
+    ["a change", CHANGE_ID],
+  ])("POST /items refuses touches naming %s and writes nothing", async (_label, ref) => {
+    const before = JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items);
+    const res = await send("POST", "items", { title: "Bad target", touches: [ref] });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify((await (await resolveStore(rexDir)).loadDocument()).items)).toBe(before);
+  });
+
+  it("POST /items refuses touches that is not an array of ids", async () => {
+    expect((await send("POST", "items", { title: "Bad shape", touches: CAPABILITY_ID })).status).toBe(400);
+  });
+
+  it("POST /items with empty touches still lands in the Inbox", async () => {
+    const created = await (await send("POST", "items", { title: "No target", touches: [] })).json();
+    expect(created.needsPlacement).toBe(true);
   });
 
   it("POST /items ignores the v1 level the viewer sends", async () => {

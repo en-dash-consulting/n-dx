@@ -513,12 +513,92 @@ function relOf(root: string, path: string): string {
   return path.slice(root.length).replace(/^[\\/]/, "").split(sep).join("/");
 }
 
+// ── Override folding ────────────────────────────────────────────────────────
+//
+// hench deep-merges each project override layer over `.hench/config.json`,
+// validates the result against its schema, and reverts every top-level field
+// that fails to the layer below. The review must read the same way, or an
+// override of the wrong type reads as an empty allowlist here while hench
+// runs the wide one beneath it. These checks mirror hench's schema for the
+// top-level fields the review reads; hench's `trust.test.ts` holds them to
+// it field by field.
+
+type FieldCheck = (value: unknown) => boolean;
+
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const positive: FieldCheck = (v) => isNumber(v) && v > 0;
+const nonNegative: FieldCheck = (v) => isNumber(v) && v >= 0;
+// zod's int() also refuses integers past Number.MAX_SAFE_INTEGER, which
+// Number.isInteger accepts.
+const nonNegativeInt: FieldCheck = (v) => nonNegative(v) && Number.isSafeInteger(v);
+const percent: FieldCheck = (v) => nonNegative(v) && (v as number) <= 100;
+const strings: FieldCheck = (v) => stringArray(v) !== null;
+const optional = (check: FieldCheck): FieldCheck => (v) => v === undefined || check(v);
+const oneOf = (...values: string[]): FieldCheck => (v) => typeof v === "string" && values.includes(v);
+/** An object whose listed fields pass; unlisted keys are ignored, as hench's (non-strict) schema ignores them. */
+const shape = (fields: Record<string, FieldCheck>): FieldCheck =>
+  (v) => isRecord(v) && Object.entries(fields).every(([key, check]) => check(v[key]));
+
+// Fields hench requires are checked only when present. JSON cannot delete a
+// key, so one is missing after the merge only when `.hench/config.json` lacks
+// it, and hench refuses or salvages that file before any override applies.
+const HENCH_FIELD_CHECKS: Record<string, FieldCheck> = {
+  guard: shape({
+    blockedPaths: optional(strings),
+    allowedCommands: optional(strings),
+    commandTimeout: optional(positive),
+    maxFileSize: optional(positive),
+    spawnTimeout: optional(nonNegative),
+    maxConcurrentProcesses: optional((v) => positive(v) && Number.isSafeInteger(v)),
+    allowedGitSubcommands: optional(strings),
+    policy: optional(shape({
+      maxCommandsPerMinute: optional(nonNegativeInt),
+      maxWritesPerMinute: optional(nonNegativeInt),
+      maxTotalBytesWritten: optional(nonNegativeInt),
+      maxTotalCommands: optional(nonNegativeInt),
+    })),
+    memoryThrottle: optional(shape({
+      enabled: optional((v) => typeof v === "boolean"),
+      delayThreshold: optional(percent),
+      rejectThreshold: optional(percent),
+      baseDelayMs: optional(positive),
+      maxDelayMs: optional(positive),
+      maxRetries: optional(nonNegativeInt),
+    })),
+    memoryMonitor: optional(shape({
+      enabled: optional((v) => typeof v === "boolean"),
+      spawnThreshold: optional(percent),
+    })),
+    env: optional(shape({ deny: optional(strings), allow: optional(strings) })),
+  }),
+  permissionMode: optional(oneOf("default", "acceptEdits", "bypassPermissions", "plan")),
+  language: optional(oneOf("typescript", "javascript", "go", "swift")),
+  provider: optional(oneOf("cli", "api")),
+};
+
+/**
+ * Fold one override layer over `lower` as hench's loader does: deep-merge,
+ * then revert each field the review reads that came out invalid to its value
+ * in `lower`.
+ */
+function foldHenchOverride(lower: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {
+  const merged = deepMerge(lower, override);
+  for (const [key, valid] of Object.entries(HENCH_FIELD_CHECKS)) {
+    if (valid(merged[key])) continue;
+    if (key in lower) merged[key] = lower[key];
+    else delete merged[key];
+  }
+  return merged;
+}
+
 /**
  * Read the repository's execution-relevant configuration.
  *
  * Hench overrides in the project config file (`.n-dx.json`, or the `.ndx/`
- * container's `config.json`) are deep-merged over `.hench/config.json` the way
- * hench's own loader folds them, because that file is often tracked too. The
+ * container's `config.json`) are folded over `.hench/config.json` the way
+ * hench's own loader folds them, invalid fields reverting to the lower layer
+ * (see {@link foldHenchOverride}), because that file is often tracked too. The
  * user's `.n-dx.local.json` is read only when git tracks it
  * ({@link isLocalConfigTracked}): then the repository ships it, and its
  * sections fold in last, as every loader folds the local file. An untracked
@@ -541,10 +621,13 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   const localConfig = localConfigTracked ? readJson(layout.localConfigFile) : null;
   if (localConfigTracked) sources.push(relOf(root, layout.localConfigFile));
 
-  // Deep, as hench's loader and core's loadAllConfigs fold them: a shallow
-  // spread let a project-config `guard` without `env` drop the hench file's
-  // `guard.env.deny`, so repository commands kept a variable the user denied.
-  const merged = deepMerge(deepMerge(henchConfig ?? {}, projectHench ?? {}), sectionOf(localConfig, "hench") ?? {});
+  // Layer by layer, as hench's loader folds them: deep (a shallow spread let a
+  // project-config `guard` without `env` drop the hench file's
+  // `guard.env.deny`), and an invalid field reverts to the layer beneath it.
+  const merged = foldHenchOverride(
+    foldHenchOverride(henchConfig ?? {}, projectHench ?? {}),
+    sectionOf(localConfig, "hench") ?? {},
+  );
   const rawGuard = merged.guard && typeof merged.guard === "object" && !Array.isArray(merged.guard)
     ? (merged.guard as Record<string, unknown>)
     : null;

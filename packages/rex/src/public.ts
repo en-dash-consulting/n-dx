@@ -96,6 +96,26 @@ export type {
 export { indexTree, isAppliedChange, isOpenChange, isBuildingChange, awaitsPlacement, specHash, nodeSpec } from "./schema/v2-rules.js";
 export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOptions } from "./schema/v2-rules.js";
 
+// ---- Core: change placement --------------------------------------------------
+// Rank where an open change belongs and record the choice: the same core the
+// CLI (`rex change place`) and MCP (`place_change`) call. `placementStrength`
+// holds the strength bands, so no surface keeps its own thresholds.
+// `recordProposal` records a new capability or constraint when nothing fits.
+
+// `draftChangePlacement` asks the configured `prd.place` text model for a pick
+// or a proposal and writes nothing; a drafted proposal has no target, so
+// accepting it through `recordProposal` mints the new node's id.
+
+export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError } from "./core/change-place.js";
+export type {
+  ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate, RecordPlacementInput, RecordPlacementResult,
+  RecordProposalInput, RecordProposalOptions, RecordProposalResult, PlacementDraft, DraftedProposal,
+} from "./core/change-place.js";
+export { draftChangePlacement } from "./analyze/place-draft.js";
+export type { DraftChangePlacementOptions, ChangePlacementDraft } from "./analyze/place-draft.js";
+export { placementStrength, PLACEMENT_STRONG_SCORE, PLACEMENT_POSSIBLE_SCORE } from "./core/placement.js";
+export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "./core/placement.js";
+
 // ---- Core: product edges, status and realization -----------------------------
 // The derived relations a v2 tree implies: which changes touch a product node,
 // which constraints bind it, what it shares changes with, and (through the

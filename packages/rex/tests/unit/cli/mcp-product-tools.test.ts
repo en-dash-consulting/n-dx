@@ -20,7 +20,7 @@ import {
   handlePlaceChange,
   handleUpdateTaskStatus,
 } from "../../../src/cli/mcp-tools/index.js";
-import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture } from "../../helpers/v2-fixture.js";
+import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture, markChangeApplied } from "../../helpers/v2-fixture.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
@@ -187,7 +187,8 @@ describe("place_change", () => {
   it("returns the rules' shortlist without writing when no target is given", async () => {
     const id = await inboxChange("Support refunds when paying by card");
     const body = json(await handlePlaceChange(store(), rexDir, { id }));
-    expect(body).toMatchObject({ change: id, relation: "amends", shortlist: [{ target: CAPABILITY, relation: "amends" }] });
+    expect(body).toMatchObject({ change: id, relation: "amends", tied: false, shortlist: [{ target: CAPABILITY, relation: "amends" }] });
+    expect(body.shortlist[0].strength).toMatch(/^(strong|possible|weak)$/);
     expect(json(await handleGetItem(store(), rexDir, { id })).item.needsPlacement).toBe(true);
   });
 
@@ -204,12 +205,24 @@ describe("place_change", () => {
     expect((await log()).at(-1)).toMatchObject({ event: "change_placed", itemId: id, detail: `touches ${CAPABILITY}` });
   });
 
-  it("refuses relation or summary without a target, and a closed change", async () => {
+  it("refuses relation or summary without a target, and amends on an applied change", async () => {
     const id = await inboxChange("Tidy the card form");
     expect(error(await handlePlaceChange(store(), rexDir, { id, relation: "touches" }))).toMatch(/pass target/);
     await completeFixtureTask(rexDir);
     json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
-    expect(error(await handlePlaceChange(store(), rexDir, { id: "CH-1", target: "A1.1" }))).toMatch(/CH-1 is applied at/);
+    expect(error(await handlePlaceChange(store(), rexDir, { id: "CH-1", target: "A1.1", relation: "amends", proposed: "x" }))).toBe(
+      "Change CH-1 is applied; its amendments already reached the map. Place it with touches.",
+    );
+  });
+
+  it("places an applied Inbox change with touches, its default relation, and shortlists it touching", async () => {
+    const id = await inboxChange("Tidy the card form");
+    await markChangeApplied(rexDir, id);
+    expect(json(await handlePlaceChange(store(), rexDir, { id })).relation).toBe("touches");
+    expect(json(await handlePlaceChange(store(), rexDir, { id, target: "A1.1" }))).toEqual({ change: id, target: CAPABILITY, relation: "touches" });
+    const { item } = json(await handleGetItem(store(), rexDir, { id }));
+    expect(item).toMatchObject({ touches: [CAPABILITY], appliedAt: expect.any(String) });
+    expect(item).not.toHaveProperty("needsPlacement");
   });
 
   it("records proposed text and a criteria delta on the amendment, with the target's current base", async () => {
@@ -269,6 +282,56 @@ describe("place_change", () => {
     expect(error(await handlePlaceChange(store(), rexDir, { id, target: "A1.1", criteria: { remove: ["c1"] } }))).toMatch(/relation amends/);
     expect(error(await handlePlaceChange(store(), rexDir, { id, proposed: "x" }))).toMatch(/relation amends/);
     expect(json(await handleGetItem(store(), rexDir, { id })).item.needsPlacement).toBe(true);
+  });
+
+  describe("propose", () => {
+    const PROPOSE = { type: "capability" as const, under: "A1", title: "Refund by card" };
+
+    it("records a new capability under the area, clears needsPlacement and logs change_proposed", async () => {
+      const id = await inboxChange("Support refunds when paying by card");
+      const criteria = { add: [{ id: "c1", text: "A refund reaches the card" }] };
+      const body = json(await handlePlaceChange(store(), rexDir, { id, propose: { ...PROPOSE, proposed: "A shopper is refunded to the card", criteria } }));
+      expect(body).toEqual({ change: id, proposed: { target: expect.any(String), under: AREA, title: "Refund by card", type: "capability" } });
+      const { item } = json(await handleGetItem(store(), rexDir, { id }));
+      expect(item).not.toHaveProperty("needsPlacement");
+      expect(item.amends).toEqual([{
+        target: body.proposed.target,
+        delta: "added",
+        type: "capability",
+        under: AREA,
+        title: "Refund by card",
+        summary: "Support refunds when paying by card",
+        proposed: "A shopper is refunded to the card",
+        criteria,
+      }]);
+      expect((await log()).at(-1)).toMatchObject({ event: "change_proposed", itemId: id, detail: `capability under ${AREA}: Refund by card` });
+    });
+
+    it("refuses a repeat proposal on the same change, naming the title and area, and writes nothing", async () => {
+      const id = await inboxChange("Refunds by card");
+      const proposed = "A shopper is refunded to the card";
+      json(await handlePlaceChange(store(), rexDir, { id, propose: { ...PROPOSE, proposed } }));
+      const before = await files();
+      const message = error(await handlePlaceChange(store(), rexDir, { id, propose: { ...PROPOSE, proposed, title: " refund BY card" } }));
+      expect(message).toMatch(/already proposes capability "Refund by card" under "/);
+      expect(await files()).toEqual(before);
+      expect((await log()).filter((e) => e.event === "change_proposed")).toHaveLength(1);
+    });
+
+    it("refuses propose with target (or any placement field), writing nothing", async () => {
+      const id = await inboxChange("Refunds by card");
+      const before = await files();
+      for (const extra of [{ target: "A1.1" }, { target: "A1.1", relation: "touches" as const }, { relation: "amends" as const }, { summary: "x" }]) {
+        expect(error(await handlePlaceChange(store(), rexDir, { id, propose: PROPOSE, ...extra }))).toMatch(/pass target or propose, not both/);
+      }
+      expect(await files()).toEqual(before);
+    });
+
+    it("refuses an under that is not a live area, naming get_product", async () => {
+      const id = await inboxChange("Refunds by card");
+      expect(error(await handlePlaceChange(store(), rexDir, { id, propose: { ...PROPOSE, under: "A1.1" } }))).toMatch(/"A1\.1" is not a live area.*get_product/);
+      expect((await log()).filter((e) => e.event === "change_proposed")).toEqual([]);
+    });
   });
 });
 

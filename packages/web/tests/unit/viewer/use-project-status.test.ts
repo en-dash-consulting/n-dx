@@ -153,4 +153,33 @@ describe("useProjectStatus", () => {
       expect(hookResult).toBeNull();
     });
   });
+
+  describe("rex.inbox", () => {
+    const serve = (rex: Record<string, unknown>) => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ ...mockStatus, rex }),
+      });
+    };
+
+    it("accepts a body with rex.inbox", async () => {
+      serve({ ...mockStatus.rex, percentComplete: 61, inbox: { open: 19, appliedUnplaced: 156 } });
+      act(() => { render(h(TestHarness, null), root); });
+      await vi.waitFor(() => expect(hookResult?.rex.percentComplete).toBe(61));
+      expect(hookResult?.rex.inbox).toEqual({ open: 19, appliedUnplaced: 156 });
+    });
+
+    it("accepts a body without rex.inbox", async () => {
+      serve({ ...mockStatus.rex, percentComplete: 62 });
+      act(() => { render(h(TestHarness, null), root); });
+      await vi.waitFor(() => expect(hookResult?.rex.percentComplete).toBe(62));
+      expect(hookResult?.rex.inbox).toBeUndefined();
+    });
+
+    it("treats a malformed rex.inbox as an unavailable body", async () => {
+      serve({ ...mockStatus.rex, inbox: { open: "19" } });
+      act(() => { render(h(TestHarness, null), root); });
+      await vi.waitFor(() => expect(hookResult).toBeNull());
+    });
+  });
 });

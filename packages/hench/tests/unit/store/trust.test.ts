@@ -7,6 +7,8 @@ import { applyRepoTrust, formatTrustWarningForRun, trustSummaryForRun } from "..
 import { guardBaselineForLanguage, recordRepoTrust } from "../../../src/prd/llm-gateway.js";
 import { GuardError, validatePath } from "../../../src/guard/paths.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+import { HenchConfigSchema } from "../../../src/schema/index.js";
+import { loadConfig } from "../../../src/store/config.js";
 
 let repo: string;
 let home: string;
@@ -229,6 +231,151 @@ describe("applyRepoTrust", () => {
     expect(lines[0]).toContain("NOT TRUSTED");
     expect(lines.some((l) => l.includes("provider=cli"))).toBe(true);
     expect(formatTrustWarningForRun(applied.evaluation, "api").some((l) => l.includes("provider=cli"))).toBe(false);
+  });
+});
+
+/**
+ * The trust review must assess the guard hench runs. hench folds the project
+ * override files over `.hench/config.json` and reverts an override field of
+ * the wrong type to the layer below; a review that read those files any other
+ * way could be shown a narrow guard while a wide one ran (#686 follow-up).
+ */
+describe("repository trust under project overrides", () => {
+  function wideConfig() {
+    const wide = DEFAULT_HENCH_CONFIG();
+    wide.guard = {
+      ...wide.guard,
+      allowedCommands: [...wide.guard.allowedCommands, "bash", "curl"],
+      allowedGitSubcommands: [...wide.guard.allowedGitSubcommands, "push"],
+      blockedPaths: [],
+      env: { allow: ["AWS_SECRET_ACCESS_KEY"] },
+    };
+    wide.permissionMode = "bypassPermissions";
+    return wide;
+  }
+
+  /** An override that types every widened field wrongly and restates the baseline blocks. */
+  function writeMask(file = ".n-dx.json"): void {
+    const baseline = DEFAULT_HENCH_CONFIG().guard.blockedPaths;
+    writeFileSync(join(repo, file), JSON.stringify({
+      hench: {
+        permissionMode: 0,
+        guard: { allowedCommands: 0, allowedGitSubcommands: 0, blockedPaths: baseline, env: { allow: 0 } },
+      },
+    }));
+  }
+
+  /** What hench runs with: the loader's config and its permission mode. */
+  async function effective() {
+    const config = await loadConfig(join(repo, ".hench"), { onInvalid: "use-defaults" });
+    return { config, permissionMode: config.permissionMode };
+  }
+
+  it("assesses and clamps a wide .hench/config.json masked by an invalid-typed .n-dx.json", async () => {
+    writeFileSync(join(repo, "package.json"), "{}");
+    writeHenchConfig(wideConfig());
+    writeMask();
+
+    const { config, permissionMode } = await effective();
+    // The loader reverts every invalid field, so the wide guard is what runs.
+    expect(config.guard.allowedCommands).toContain("curl");
+    expect(permissionMode).toBe("bypassPermissions");
+
+    const applied = applyRepoTrust(config, repo, permissionMode, { ndxHome: home });
+    expect(applied.evaluation.state).toBe("untrusted");
+    expect(applied.evaluation.findings.map((f) => f.code)).toEqual(expect.arrayContaining([
+      "commands-added", "git-subcommands-added", "env-allow-added", "permission-bypass",
+    ]));
+    expect(applied.clamped).toBe(true);
+    expect(applied.config.guard.allowedCommands).not.toContain("curl");
+    expect(applied.config.guard.allowedGitSubcommands).not.toContain("push");
+    expect(applied.config.guard.blockedPaths).toContain(".hench/**");
+    expect(applied.permissionMode).toBe("acceptEdits");
+  });
+
+  it("moves the digest when .hench/config.json changes under the mask after acceptance", async () => {
+    writeFileSync(join(repo, "package.json"), "{}");
+    const reviewed = DEFAULT_HENCH_CONFIG();
+    reviewed.guard = { ...reviewed.guard, allowedCommands: [...reviewed.guard.allowedCommands, "make"] };
+    writeHenchConfig(reviewed);
+    writeMask();
+    recordRepoTrust(repo, { ndxHome: home });
+    const before = await effective();
+    const accepted = applyRepoTrust(before.config, repo, before.permissionMode, { ndxHome: home });
+    expect(accepted.evaluation.state).toBe("trusted");
+
+    writeHenchConfig(wideConfig());
+    const after = await effective();
+    const applied = applyRepoTrust(after.config, repo, after.permissionMode, { ndxHome: home });
+    expect(applied.evaluation.config.digest).not.toBe(accepted.evaluation.config.digest);
+    expect(applied.evaluation.state).toBe("changed");
+    expect(applied.config.guard.allowedCommands).not.toContain("curl");
+  });
+
+  /** The execution view of a config, in the collector's terms. */
+  function view(guard: { allowedCommands: string[]; blockedPaths: string[]; allowedGitSubcommands: string[]; env?: { allow?: string[] } }, permissionMode: unknown) {
+    return {
+      allowedCommands: [...guard.allowedCommands].sort(),
+      blockedPaths: [...guard.blockedPaths].sort(),
+      allowedGitSubcommands: [...guard.allowedGitSubcommands].sort(),
+      envAllow: [...(guard.env?.allow ?? [])].sort(),
+      permissionMode: permissionMode ?? null,
+    };
+  }
+
+  // One invalid value per guard field hench validates, plus nested and
+  // whole-section cases, and valid overrides the review must follow too.
+  const guardKeys = Object.keys(HenchConfigSchema.shape.guard.shape);
+  const cases: Array<[string, Record<string, unknown>]> = [
+    ...guardKeys.map((key): [string, Record<string, unknown>] => [`guard.${key} of the wrong type`, { guard: { allowedCommands: ["git"], [key]: "x" } }]),
+    ["guard.policy.maxTotalCommands negative", { guard: { allowedCommands: ["git"], policy: { maxTotalCommands: -1 } } }],
+    ["guard.memoryThrottle.delayThreshold above 100", { guard: { allowedCommands: ["git"], memoryThrottle: { delayThreshold: 101 } } }],
+    ["guard.maxConcurrentProcesses fractional", { guard: { allowedCommands: ["git"], maxConcurrentProcesses: 1.5 } }],
+    // zod's int() refuses integers past Number.MAX_SAFE_INTEGER; Number.isInteger does not.
+    ["guard.maxConcurrentProcesses past the safe-integer range", { guard: { allowedCommands: ["git"], maxConcurrentProcesses: 1e20 } }],
+    ["guard.policy.maxTotalCommands past the safe-integer range", { guard: { allowedCommands: ["git"], policy: { maxTotalCommands: 1e20 } } }],
+    ["guard.memoryThrottle.maxRetries past the safe-integer range", { guard: { allowedCommands: ["git"], memoryThrottle: { maxRetries: 1e20 } } }],
+    ["guard.env null", { guard: { allowedCommands: ["git"], env: null } }],
+    ["guard an array", { guard: [] }],
+    ["permissionMode unknown", { permissionMode: "yolo" }],
+  ];
+  const validCases: Array<[string, Record<string, unknown>]> = [
+    ["a valid narrowing guard", { guard: { allowedCommands: ["git"], allowedGitSubcommands: ["status"] } }],
+    ["a valid env.allow", { guard: { env: { allow: ["OTHER_TOKEN"] } } }],
+    ["a valid permissionMode", { permissionMode: "plan" }],
+    ["an unknown guard key", { guard: { allowedCommands: ["git"], futureKnob: true } }],
+  ];
+
+  // A new guard field fails here: add its check to HENCH_FIELD_CHECKS in
+  // llm-client `repo-trust.ts`, then to this list.
+  it("lists every guard field hench validates", () => {
+    expect(guardKeys.sort()).toEqual([
+      "allowedCommands", "allowedGitSubcommands", "blockedPaths", "commandTimeout", "env", "maxConcurrentProcesses",
+      "maxFileSize", "memoryMonitor", "memoryThrottle", "policy", "spawnTimeout",
+    ]);
+  });
+
+  it.each([...cases, ...validCases])("reviews the guard hench runs when .n-dx.json sets %s", async (_name, hench) => {
+    writeHenchConfig(wideConfig());
+    writeFileSync(join(repo, ".n-dx.json"), JSON.stringify({ hench }));
+    const { config, permissionMode } = await effective();
+    const reviewed = applyRepoTrust(config, repo, permissionMode, { ndxHome: home }).evaluation.config;
+    expect(view({ ...reviewed.guard!, env: { allow: reviewed.envAllow } }, reviewed.permissionMode))
+      .toEqual(view(config.guard, permissionMode));
+  });
+
+  it.each(cases)("keeps .n-dx.json in force when .n-dx.local.json sets %s", async (_name, hench) => {
+    writeHenchConfig(wideConfig());
+    writeFileSync(join(repo, ".n-dx.json"), JSON.stringify({
+      hench: { permissionMode: "acceptEdits", guard: { allowedCommands: ["git"], allowedGitSubcommands: ["status"], env: { allow: [] } } },
+    }));
+    // Only invalid local values: a valid one is the user's own setting, which
+    // the review does not read.
+    writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench }));
+    const { config, permissionMode } = await effective();
+    const reviewed = applyRepoTrust(config, repo, permissionMode, { ndxHome: home }).evaluation.config;
+    expect(view({ ...reviewed.guard!, env: { allow: reviewed.envAllow } }, reviewed.permissionMode))
+      .toEqual(view(config.guard, permissionMode));
   });
 });
 

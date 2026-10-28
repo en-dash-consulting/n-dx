@@ -398,9 +398,9 @@ const changeHasTarget: Rule = ({ entries }) =>
  * A change closed at or before the migration cut ({@link migrationCutAt}), or
  * one the cut lists as v1 work closed between plan and apply
  * ({@link migrationHeldIds}), is v1 work the migration held in the Inbox.
- * `rex change place` refuses a closed change, so it can never leave the
- * Inbox, and the finding is a warning (decision S2-Q2). Any other closed
- * Inbox change closed in v2, and is an error.
+ * It stays a record until a person places it (`rex change place` takes an
+ * applied change with touches), so the finding is a warning (decision
+ * S2-Q2). Any other closed Inbox change closed in v2, and is an error.
  */
 const changePlacedAtClose: Rule = (index) => {
   const cut = migrationCutAt(index);

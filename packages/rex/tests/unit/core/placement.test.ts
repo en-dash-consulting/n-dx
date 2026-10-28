@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   placeChange,
   placementRelation,
+  placementStrength,
   rankPlacementCandidates,
   type PlacementChange,
   type PlacementNode,
@@ -61,6 +62,12 @@ describe("rankPlacementCandidates (rules)", () => {
   it("breaks ties by id", () => {
     const tied: PlacementNode[] = [{ id: "b", title: "alpha" }, { id: "a", title: "alpha" }];
     expect(rankPlacementCandidates({ title: "alpha" }, tied).map((c) => c.target)).toEqual(["a", "b"]);
+  });
+});
+
+describe("placementStrength", () => {
+  it("is strong at 10 or more, possible from 6 to 9 and weak at 5 or less", () => {
+    expect([1, 5, 6, 9, 10, 14].map(placementStrength)).toEqual(["weak", "weak", "possible", "possible", "strong", "strong"]);
   });
 });
 
@@ -204,6 +211,22 @@ describe("placeChange (rules + text model)", () => {
     expect(dropped.warnings.join()).toMatch(/"area-nowhere", which is not a known area/);
     const noAreas = await placeChange(unmatched, caps, { model: async () => ({ propose: proposal }) });
     expect(noAreas.model).toEqual({ pick: null, agrees: false });
+  });
+
+  it("keeps the title and area of a proposal whose criteria.add are plain strings, dropping the criteria with a warning", async () => {
+    const malformed = { ...proposal, criteria: { add: ["Apple Pay"] } };
+    const result = await placeChange(change, caps, { model: async () => ({ propose: malformed as unknown as PlacementProposal }), areas });
+    expect(result.model).toEqual({ pick: null, agrees: false, proposal });
+    expect(result.model?.proposal).not.toHaveProperty("criteria");
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain("Apple Pay");
+  });
+
+  it("keeps well-formed criteria", async () => {
+    const withCriteria = { ...proposal, criteria: { add: [{ id: "c1", text: "Apple Pay works" }] } };
+    const result = await placeChange(change, caps, { model: async () => ({ propose: withCriteria }), areas });
+    expect(result.model?.proposal).toEqual(withCriteria);
+    expect(result.warnings).toEqual([]);
   });
 
   it.each([

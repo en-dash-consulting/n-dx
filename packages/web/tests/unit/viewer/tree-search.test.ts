@@ -512,3 +512,23 @@ describe("collectAllTags", () => {
     expect(collectAllTags(tree)).toEqual(["alpha", "mu", "zeta"]);
   });
 });
+
+describe("searchTree with the Inbox facet", () => {
+  const tree: PRDItemData[] = [
+    makeItem({ id: "c1", level: "task", status: "pending", title: "In the inbox" }),
+    makeItem({ id: "c2", level: "task", status: "pending", title: "Placed" }),
+  ];
+
+  it("keeps only the ids in the Inbox", () => {
+    const result = searchTree(tree, "", { inboxIds: new Set(["c1"]) });
+    expect([...result.matchIds]).toEqual(["c1"]);
+  });
+
+  it("matches nothing when the Inbox is empty", () => {
+    expect(searchTree(tree, "", { inboxIds: new Set() }).matchCount).toBe(0);
+  });
+
+  it("combines with the text query", () => {
+    expect(searchTree(tree, "placed", { inboxIds: new Set(["c1"]) }).matchCount).toBe(0);
+  });
+});

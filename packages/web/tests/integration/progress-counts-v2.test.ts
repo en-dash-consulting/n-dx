@@ -62,7 +62,7 @@ beforeAll(async () => {
 
   ctx = { projectDir: tmpDir, svDir, rexDir, dev: false };
   server = createServer(async (req, res) => {
-    if (handleStatusRoute(req, res, ctx)) return;
+    if (await handleStatusRoute(req, res, ctx)) return;
     if (await handleRexRoute(req, res, ctx)) return;
     res.writeHead(404);
     res.end();

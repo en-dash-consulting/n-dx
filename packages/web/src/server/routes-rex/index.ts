@@ -8,6 +8,7 @@
  *
  *   reads.ts        — PRD read routes (prd, stats, dashboard, next, log)
  *   product.ts      — v2 product reads (product, changes, capability) and the capability edit POST
+ *   placement.ts    — v2 Inbox placement: a change's shortlist, place and propose
  *   items.ts        — Item CRUD (add, get, patch, bulk, merge, delete)
  *   requirements.ts — Requirements CRUD, coverage, traceability
  *   prune.ts        — Prune preview and execution
@@ -25,6 +26,7 @@ import type { WebSocketBroadcaster } from "../websocket.js";
 
 import { routePrdReads } from "./reads.js";
 import { routeProductReads, routeProductEdit } from "./product.js";
+import { routePlacement } from "./placement.js";
 import { routeItems } from "./items.js";
 import { routeItemRequirements, routeRequirementsAnalytics } from "./requirements.js";
 import { routePrune } from "./prune.js";
@@ -74,6 +76,9 @@ export function handleRexRoute(
 
   const productEditResult = routeProductEdit(path, method, req, res, ctx, broadcast);
   if (productEditResult !== false) return productEditResult;
+
+  const placementResult = routePlacement(path, method, req, res, ctx, broadcast);
+  if (placementResult !== false) return placementResult;
 
   const itemsResult = routeItems(path, method, req, res, ctx, broadcast, routeItemRequirements);
   if (itemsResult !== false) return itemsResult;

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
-import { ChangePlacementError, recordPlacement, suggestPlacement } from "../../../src/core/change-place.js";
-import { indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement } from "../../../src/core/change-place.js";
+import { placementStrength } from "../../../src/core/placement.js";
+import { checkV2Rules, indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ slug: fields.id as string, ...fields }) as RuleNode;
 const NOW = new Date("2026-10-09T00:00:00.000Z");
@@ -32,6 +33,7 @@ const tree = (changeFields: Record<string, unknown> = {}): V2Tree => ({
 });
 
 const changeIn = (t: V2Tree) => indexTree(t).resolve("ch")!;
+const APPLIED = { status: "completed", completedAt: "2026-10-01T00:00:00.000Z", appliedAt: "2026-10-01T00:00:00.000Z" };
 
 describe("suggestPlacement", () => {
   it("ranks capabilities and constraints with the rules and names the relation", () => {
@@ -46,6 +48,43 @@ describe("suggestPlacement", () => {
     const s = suggestPlacement(tree({ title: "Split the store module", tags: ["code-health"] }), "ch");
     expect(s.relation).toBe("touches");
     expect(s.shortlist[0]).toMatchObject({ target: "arch", relation: "touches" });
+  });
+
+  const twins = (second: string): V2Tree => ({
+    product: [
+      node({
+        id: "area",
+        type: "area",
+        title: "Area",
+        children: [
+          node({ id: "zeta", type: "capability", title: "Ledger export" }),
+          node({ id: "alpha", type: "capability", title: second }),
+        ],
+      }),
+    ],
+    changes: [node({ id: "ch", type: "change", title: "Ledger export speed", needsPlacement: true })],
+  });
+
+  it("reports tied when the top two candidates share a score, even with a shortlist of one", () => {
+    const s = suggestPlacement(twins("Ledger export"), "ch");
+    expect(s.tied).toBe(true);
+    expect(s.shortlist.map((c) => c.target)).toEqual(["alpha", "zeta"]);
+    expect(suggestPlacement(twins("Ledger export"), "ch", 1)).toMatchObject({ tied: true, shortlist: [{ target: "alpha" }] });
+  });
+
+  it("reports not tied when one candidate leads, or only one matched", () => {
+    expect(suggestPlacement(twins("Ledger"), "ch").tied).toBe(false);
+    expect(suggestPlacement(twins("Unrelated"), "ch")).toMatchObject({ tied: false, shortlist: [{ target: "zeta" }] });
+    expect(suggestPlacement(twins("Unrelated"), "ch").shortlist).toHaveLength(1);
+  });
+
+  it("gives each candidate the strength band of its score", () => {
+    const s = suggestPlacement(twins("Ledger"), "ch");
+    expect(s.shortlist.map((c) => [c.target, c.score, c.strength])).toEqual([
+      ["zeta", 2, "weak"],
+      ["alpha", 1, "weak"],
+    ]);
+    for (const c of suggestPlacement(tree(), "ch").shortlist) expect(c.strength).toBe(placementStrength(c.score));
   });
 });
 
@@ -91,8 +130,10 @@ describe("recordPlacement", () => {
     ["an area target", {}, { target: "pay" }, /not a live capability or constraint/],
     ["an unknown target", {}, { target: "nope" }, /not a live capability or constraint/],
     ["a target it already amends", { amends: [{ target: "card", delta: "modified", summary: "s" }] }, { target: "A1.1", relation: "touches" as const }, /already amends "Pay by card"/],
-    ["an applied change", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z" }, { target: "card" }, /is applied at 2026-10-01/],
-    ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open change is placed/],
+    ["amends on an applied change", APPLIED, { target: "card", relation: "amends" as const, proposed: "x" }, /^Change CH-1 is applied; its amendments already reached the map\. Place it with touches\.$/],
+    ["proposed on an applied change", APPLIED, { target: "card", proposed: "x" }, /is applied; its amendments already reached the map/],
+    ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open or applied change is placed/],
+    ["a deleted change", { status: "deleted" }, { target: "card", relation: "touches" as const }, /No live change "ch"/],
     ["proposed on a touches placement", {}, { target: "card", relation: "touches" as const, proposed: "x" }, /relation amends/],
     // Apply refuses these (in these words), and no tool edits the amendment afterwards.
     ["a summary-only amends placement", {}, { target: "card", relation: "amends" as const }, /nothing to modify.*Pass proposed or criteria, or use relation touches/],
@@ -109,6 +150,8 @@ describe("recordPlacement", () => {
     ["not-a-target", {}, { target: "nope" }],
     ["already-amends", { amends: [{ target: "card", delta: "modified", summary: "s" }] }, { target: "A1.1", relation: "touches" as const }],
     ["change-not-open", { status: "cancelled" }, { target: "card" }],
+    ["change-not-open", { ...APPLIED, status: "cancelled" }, { target: "card", relation: "touches" as const }],
+    ["applied-change-amends", APPLIED, { target: "card", relation: "amends" as const, proposed: "x" }],
     ["content-needs-amends", {}, { target: "card", relation: "touches" as const, proposed: "x" }],
     ["nothing-to-modify", {}, { target: "card", relation: "amends" as const }],
     ["apply-problems", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }],
@@ -164,6 +207,38 @@ describe("recordPlacement", () => {
   });
 });
 
+describe("placing an applied change", () => {
+  it("touches the target and clears needsPlacement, with touches as the default relation", () => {
+    for (const relation of ["touches" as const, undefined]) {
+      const placed = recordPlacement(tree(APPLIED), "CH-1", { target: "A1.1", ...(relation ? { relation } : {}) }, NOW);
+      expect(placed).toMatchObject({ change: "ch", placement: { target: "card", relation: "touches" }, warnings: [] });
+      expect(changeIn(placed.tree)).toMatchObject({ touches: ["card"], appliedAt: APPLIED.appliedAt });
+      expect(changeIn(placed.tree)).not.toHaveProperty("needsPlacement");
+      expect(changeIn(placed.tree)).not.toHaveProperty("amends");
+    }
+  });
+
+  it("is shortlisted with every candidate touching", () => {
+    // The open change's rules say amends; applied, it can only touch.
+    expect(suggestPlacement(tree(), "ch").relation).toBe("amends");
+    const s = suggestPlacement(tree(APPLIED), "ch");
+    expect(s.relation).toBe("touches");
+    expect(s.shortlist[0]).toMatchObject({ target: "card", relation: "touches" });
+    expect(s.shortlist.every((c) => c.relation === "touches")).toBe(true);
+  });
+
+  it("leaves no rule finding once placed, where it had change-placed-at-close before", () => {
+    const findings = (t: V2Tree) => checkV2Rules(t, { now: NOW }).filter((f) => f.nodeId === "ch").map((f) => f.rule);
+    expect(findings(tree(APPLIED))).toContain("change-placed-at-close");
+    expect(findings(recordPlacement(tree(APPLIED), "ch", { target: "card" }, NOW).tree)).toEqual([]);
+  });
+
+  it("refuses a proposal with its own kind", () => {
+    const wallets = { type: "capability" as const, under: "pay", title: "Pay by wallet", proposed: "A shopper pays with a wallet" };
+    expect(() => recordProposal(tree(APPLIED), "ch", wallets, NOW)).toThrow(expect.objectContaining({ kind: "applied-change-amends" }));
+  });
+});
+
 // recordPlacement's pending/blockedBy branch is defensive: place writes only
 // modified amendments, pending comes only from removals, and pending that
 // existed before the placement is filtered. These pin why it is empty today.
@@ -191,5 +266,111 @@ describe("recordPlacement pending and blockedBy", () => {
     expect(applyAmendmentsProblems(t, "ch", NOW)).toMatchObject({ always: [], blockedBy: ["RM"] });
     expect(() => recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW)).toThrow(ChangePlacementError);
     expect(() => recordPlacement(t, "ch", { target: "card", proposed: "Cards and wallets" }, NOW)).toThrow(/Cannot place change CH-1/);
+  });
+});
+
+describe("recordProposal", () => {
+  const ID = "new-node";
+  const opts = { newId: () => ID };
+  const wallets = { type: "capability" as const, under: "pay", title: "Pay by wallet", proposed: "A shopper pays with a wallet" };
+  const refusal = (fn: () => unknown): ChangePlacementError | undefined => {
+    try {
+      fn();
+    } catch (e) {
+      return e as ChangePlacementError;
+    }
+    return undefined;
+  };
+
+  it("appends an added amendment under the area, clears needsPlacement and leaves the input tree alone", () => {
+    const input = tree();
+    const before = structuredClone(input);
+    const criteria = { add: [{ id: "c1", text: "Apple Pay is accepted" }] };
+    const result = recordProposal(input, "CH-1", { ...wallets, criteria }, NOW, opts);
+    const amendment = { target: ID, delta: "added", type: "capability", under: "pay", title: "Pay by wallet", summary: "Add wallets to card payment", proposed: "A shopper pays with a wallet", criteria };
+    expect(result).toMatchObject({ change: "ch", proposal: amendment, warnings: [], pending: [], blockedBy: [] });
+    expect(changeIn(result.tree).amends).toEqual([amendment]);
+    expect(changeIn(result.tree)).not.toHaveProperty("needsPlacement");
+    expect(input).toEqual(before);
+    // A proposal only: nothing reaches the product layer until the change is applied.
+    expect(result.tree.product).toEqual(input.product);
+  });
+
+  it("resolves the area by display id, keeps a given summary and mints a fresh id by default", () => {
+    const t = tree();
+    t.product[0].displayId = "A1";
+    const input = { type: "constraint" as const, under: "A1", title: " Wallet tokens stay server-side ", summary: "Guard tokens", proposed: "Tokens never reach the browser" };
+    const { proposal } = recordProposal(t, "ch", input, NOW);
+    expect(proposal).toMatchObject({ type: "constraint", under: "pay", title: "Wallet tokens stay server-side", summary: "Guard tokens" });
+    expect(proposal.target).toMatch(/^[0-9a-f-]{36}$/);
+    expect(recordProposal(t, "ch", wallets, NOW).proposal.target).not.toBe(proposal.target);
+  });
+
+  it("appends after the change's earlier amendments", () => {
+    const earlier = { amends: [{ target: "card", delta: "modified", summary: "s", proposed: "Cards" }] };
+    const { tree: next } = recordProposal(tree(earlier), "ch", wallets, NOW, opts);
+    expect(changeIn(next).amends!.map((a) => a.delta)).toEqual(["modified", "added"]);
+  });
+
+  it.each([
+    ["not-an-area", "a capability under", {}, { ...wallets, under: "card" }, /"card" is not a live area/],
+    ["not-an-area", "an unknown under", {}, { ...wallets, under: "nope" }, /"nope" is not a live area/],
+    ["empty-title", "a blank title", {}, { ...wallets, title: "  " }, /needs a title/],
+    ["applied-change-amends", "an applied change", APPLIED, wallets, /is applied; its amendments already reached the map/],
+    ["change-not-open", "a cancelled change", { status: "cancelled" }, wallets, /is cancelled; only an open or applied change is placed/],
+    ["invalid-proposal", "a type that is neither capability nor constraint", {}, { ...wallets, type: "area" as never }, /The proposal is not a valid amendment \(type: /],
+    ["rule-errors", "a new node on a fix change", { fix: true }, wallets, /Cannot place change CH-1/],
+    ["apply-problems", "a criterion added twice", {}, { ...wallets, criteria: { add: [{ id: "c1", text: "a" }, { id: "c1", text: "b" }] } }, /Cannot propose for change CH-1: .*criterion c1 is added twice/],
+    ["apply-problems", "capability criteria on a constraint", {}, { ...wallets, type: "constraint" as const, criteria: { add: [{ id: "c1", text: "a" }] } }, /Cannot propose for change CH-1: .*has no capability criteria/],
+  ])("refuses with %s: %s", (kind, _label, changeFields, input, message) => {
+    const err = refusal(() => recordProposal(tree(changeFields), "ch", input, NOW, opts));
+    expect(err).toBeInstanceOf(ChangePlacementError);
+    expect(err!.kind).toBe(kind);
+    expect(err!.plain).toMatch(message);
+    expect(err!.plain).not.toMatch(/get_product/);
+  });
+
+  describe("a repeat proposal", () => {
+    const first = () => recordProposal(tree(), "ch", wallets, NOW, opts).tree;
+    const repeat = (input: Record<string, unknown>) => refusal(() => recordProposal(first(), "ch", { ...wallets, ...input } as typeof wallets, NOW, { newId: () => "other" }));
+
+    it.each([
+      ["the same title", {}],
+      ["the title trimmed and in another case", { title: "  PAY BY WALLET " }],
+      ["the area given by alias or display id", { under: "A1" }],
+    ])("is refused for %s, naming the title and the area", (_label, input) => {
+      const t = first();
+      t.product[0].displayId = "A1";
+      const err = refusal(() => recordProposal(t, "ch", { ...wallets, ...input }, NOW, { newId: () => "other" }));
+      expect(err).toBeInstanceOf(ChangePlacementError);
+      expect(err!.kind).toBe("already-proposed");
+      expect(err!.plain).toContain('"Pay by wallet"');
+      expect(err!.plain).toContain('"Payments"');
+      expect(changeIn(t).amends).toHaveLength(1);
+    });
+
+    it("is refused when the stored amendment names the area by display id", () => {
+      const t = tree({ amends: [{ target: "x", delta: "added", type: "capability", under: "A1", title: "Pay by wallet", summary: "s" }] });
+      t.product[0].displayId = "A1";
+      expect(refusal(() => recordProposal(t, "ch", wallets, NOW))!.kind).toBe("already-proposed");
+    });
+
+    it.each([
+      ["a different title", { title: "Pay by bank transfer" }],
+      ["a different type", { type: "constraint" as const }],
+    ])("is allowed with %s", (_label, input) => {
+      expect(repeat(input)).toBeUndefined();
+    });
+
+    it("is allowed under a different area", () => {
+      const t = first();
+      t.product.push(node({ id: "ship", type: "area", title: "Shipping", children: [] }));
+      const { tree: next } = recordProposal(t, "ch", { ...wallets, under: "ship" }, NOW, { newId: () => "other" });
+      expect(changeIn(next).amends).toHaveLength(2);
+    });
+  });
+
+  it("names get_product only in the MCP wording of an under that is not an area", () => {
+    expect(refusal(() => recordProposal(tree(), "ch", { ...wallets, under: "nope" }, NOW))!.message).toMatch(/\(see get_product\)$/);
   });
 });

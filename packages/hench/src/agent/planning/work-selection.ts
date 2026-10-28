@@ -189,7 +189,8 @@ export function inboxRefusal(tree: V2Tree, ref: string, cliName = DEFAULT_CLI_NA
   if (!change || !awaitsPlacement(indexTree(tree), change)) return undefined;
   return new CLIError(
     `"${change.title}" (${change.id}) is in the Inbox and needs placement, so it cannot be worked on.`,
-    `Place it first with 'rex change place' (MCP: place_change), then run '${cliName} work --task=${ref}' again.`,
+    `Place it from the Inbox on the dashboard's Plan page, with 'rex change place', or with MCP place_change ` +
+      `(when nothing fits, 'rex change place ${change.id} --propose'), then run '${cliName} work --task=${ref}' again.`,
   );
 }
 

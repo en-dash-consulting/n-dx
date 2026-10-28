@@ -62,7 +62,8 @@ each write, so a route that wrote both fails.
 Most routes treat disk as read-only. The PRD is the exception: item CRUD, merge,
 prune, reorganize, restore, `apply-refinements` and `PUT /api/hench/prep/:taskId`
 resolve a store through `rex-gateway` and hold the file lock for the span of
-`withTransaction`. The server is therefore a first-class PRD writer alongside
+`withTransaction`; the v2 product edit and the Inbox place and propose routes
+hold it through `withPrdModelTransaction`. The server is therefore a first-class PRD writer alongside
 `ndx work` and the MCP tools — which is why a lock failure surfaces, naming the
 holder's PID, instead of retrying or writing anyway. A writing route also calls
 `refreshPRDCache`.

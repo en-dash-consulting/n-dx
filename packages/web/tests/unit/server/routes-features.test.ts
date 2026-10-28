@@ -62,3 +62,15 @@ describe("PUT /api/features", () => {
     expect(config.features.sourcevision.callGraph).toBe(true);
   });
 });
+
+describe("GET /api/features", () => {
+  it("lists rex.placementDraft as an off-by-default rex toggle, and reflects turning it on", async () => {
+    const read = async () => {
+      const body = await (await fetch(`${server.baseUrl}/api/features`)).json() as { toggles: Array<Record<string, unknown>> };
+      return body.toggles.find((t) => t.key === "rex.placementDraft");
+    };
+    expect(await read()).toMatchObject({ package: "rex", stability: "experimental", defaultValue: false, enabled: false });
+    expect((await put({ "rex.placementDraft": true })).status).toBe(200);
+    expect(await read()).toMatchObject({ enabled: true });
+  });
+});

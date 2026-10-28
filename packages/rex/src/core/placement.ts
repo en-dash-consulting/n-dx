@@ -122,6 +122,21 @@ const WEIGHT_PATH_MENTION = 3;
 const WEIGHT_PACKAGE_MENTION = 2;
 const WEIGHT_TOKEN = 1;
 
+/** How firmly the rules back a candidate, from its score. */
+export type PlacementStrength = "strong" | "possible" | "weak";
+
+/** Lowest score that reads as strong. */
+export const PLACEMENT_STRONG_SCORE = 10;
+/** Lowest score that reads as possible; anything below is weak. */
+export const PLACEMENT_POSSIBLE_SCORE = 6;
+
+/** The strength band of a candidate's score: the one definition every surface uses. */
+export function placementStrength(score: number): PlacementStrength {
+  if (score >= PLACEMENT_STRONG_SCORE) return "strong";
+  if (score >= PLACEMENT_POSSIBLE_SCORE) return "possible";
+  return "weak";
+}
+
 /** Leading verbs of a title that ask for behaviour the product does not have yet, or a different one. */
 const AMENDING_VERBS = new Set([
   "add", "introduce", "support", "allow", "enable", "implement", "expose", "offer", "provide",
@@ -228,8 +243,10 @@ export function rankPlacementCandidates(
 /**
  * The proposal when `value` is a valid amendment (shared schema) that is also an
  * added one with a type, an area and a title; otherwise why it was refused.
+ * The one definition of a well-formed proposal, for the model's and a caller's
+ * (`recordProposal` in `core/change-place.ts`).
  */
-function asProposal(value: unknown): { proposal: PlacementProposal } | { reason: string } {
+export function asProposal(value: unknown): { proposal: PlacementProposal } | { reason: string } {
   const parsed = AmendmentSchema.safeParse(value);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
@@ -246,6 +263,19 @@ function asProposal(value: unknown): { proposal: PlacementProposal } | { reason:
   return ok
     ? { proposal: p as PlacementProposal }
     : { reason: "is not an added amendment with type, under and title" };
+}
+
+/**
+ * The model's proposal without a `criteria` that fails the shared schema, so one
+ * malformed optional field (`add: ["Apple Pay"]`) does not cost the title and
+ * summary. Names the dropped criteria in `warnings`; any other value is returned as is.
+ */
+function withoutMalformedCriteria(value: unknown, warnings: string[]): unknown {
+  if (value === null || typeof value !== "object" || !("criteria" in value)) return value;
+  const { criteria, ...rest } = value as Record<string, unknown>;
+  if (criteria === undefined || AmendmentSchema.shape.criteria.safeParse(criteria).success) return value;
+  warnings.push(`text model proposed criteria that are not valid (${JSON.stringify(criteria)}); dropped them and kept the rest of the proposal`);
+  return rest;
 }
 
 /**
@@ -266,7 +296,7 @@ export async function placeChange(
   const areas = options.areas ?? [];
   const answer = await options.model({ change, shortlist, nodes, areas });
   if (answer !== null && typeof answer === "object") {
-    const checked = asProposal(answer.propose);
+    const checked = asProposal(withoutMalformedCriteria(answer.propose, warnings));
     let proposal: PlacementProposal | null = null;
     if ("reason" in checked) {
       warnings.push(`text model proposed a new node that ${checked.reason}; ignoring it`);

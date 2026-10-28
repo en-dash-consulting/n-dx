@@ -302,7 +302,7 @@ describe("rendered surfaces take their labels from the model", () => {
       for (const el of root.querySelectorAll(".stage-section[data-view]:not(.stage-section--plain)")) {
         const view = el.getAttribute("data-view") as ViewId;
         const expectedTitle = viewLabel(view);
-        const expectedBlurb = viewBlurb(view);
+        const expectedBlurb = resolveCliLabel(viewBlurb(view), "n-dx");
         const title = el.querySelector(".stage-section-title")?.textContent;
         const blurb = el.querySelector(".stage-section-blurb")?.textContent;
         if (title !== expectedTitle) wrong.push(`${stage}/${view}: titled "${title}"`);
@@ -460,13 +460,13 @@ describe("the Analysis stage is a tile dashboard", () => {
 
   it("marks the server-built views so static exports hide them", () => {
     // The isometric map is hidden by `hiddenWhenDeployed`; Ask, Product,
-    // Changes and Workspaces by `requiresServer` (Product and Changes read
-    // rex's v2 model per request).
+    // Changes, Inbox and Workspaces by `requiresServer` (Product, Changes and
+    // Inbox read rex's v2 model per request).
     const serverBuilt = STAGE_ORDER.flatMap((stage: StageId) => [
       ...STAGES[stage].sections.filter((s) => s.requiresServer).map((s) => s.view),
       ...(STAGES[stage].tiles ?? []).filter((t) => t.requiresServer).map((t) => t.view),
     ]);
-    expect(serverBuilt.sort()).toEqual(["ask", "changes", "product", "workspaces"]);
+    expect(serverBuilt.sort()).toEqual(["ask", "changes", "inbox", "product", "workspaces"]);
   });
 });
 

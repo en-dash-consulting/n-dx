@@ -1,0 +1,741 @@
+// @vitest-environment jsdom
+/**
+ * "Where it goes": the placement section at the top of an Inbox change's
+ * detail panel — its note, shortlist, search, relation and actions, the
+ * writes through `/place` and `/propose`, and every refusal kind.
+ *
+ * @see src/viewer/components/prd-tree/change-placement.ts
+ */
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { h, render } from "preact";
+import type { VNode } from "preact";
+import { act } from "preact/test-utils";
+import {
+  ChangePlacementSection,
+  PLACEMENT_DRAFT_FEATURE,
+  REFUSAL_HINTS,
+  criteriaDelta,
+  draftNoteText,
+  inboxPosition,
+  nextCriterionId,
+  placedLine,
+  requestPlacement,
+  takePlacementRequest,
+  takeTitleFocus,
+} from "../../../src/viewer/components/prd-tree/change-placement.js";
+import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
+import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
+import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
+import type {
+  ChangePlacement,
+  ChangeRow,
+  PlacementCandidate,
+  PlacementDraft,
+  PlacementRefusalKind,
+  ProductMap,
+} from "../../../src/viewer/views/product-model.js";
+
+vi.mock("../../../src/viewer/hooks/use-gateway.js", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  createWSPipeline: vi.fn(() => ({ push: vi.fn(), dispose: vi.fn() })),
+}));
+
+// ── Fixtures ─────────────────────────────────────────────────────────
+
+function change(id: string, extra: Partial<ChangeRow> = {}): ChangeRow {
+  return {
+    id, title: `Change ${id}`, stage: "proposed", awaitsPlacement: true, needsPlacement: true,
+    amends: [], touches: [], taskCount: 1, completedTaskCount: 0, ...extra,
+  };
+}
+
+function candidate(target: string, extra: Partial<PlacementCandidate> = {}): PlacementCandidate {
+  return {
+    target, type: "capability", title: `Home ${target}`, area: "Checkout",
+    criteria: [], score: 5, strength: "strong", reasons: ["words: gift, card"], ...extra,
+  };
+}
+
+function placement(id: string, shortlist: PlacementCandidate[], opts: { tied?: boolean; relation?: "touches" | "amends" } = {}): ChangePlacement {
+  return {
+    layout: "v2",
+    change: { id, title: `Change ${id}`, status: "pending", taskCount: 1 },
+    relation: opts.relation ?? "touches",
+    tied: opts.tied ?? false,
+    shortlist,
+  };
+}
+
+const MAP: ProductMap = {
+  areas: [
+    { id: "area-pay", title: "Payments", capabilities: [
+      { id: "cap-refund", title: "Refunds", statement: "Refund an order", status: "met", health: "ok", criteriaCount: 1, openChanges: [] },
+      { id: "cap-gift", title: "Gift cards", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
+    ] },
+    { id: "area-ship", title: "Shipping", capabilities: [
+      { id: "cap-label", title: "Shipping labels", status: "met", health: "ok", criteriaCount: 0, openChanges: [] },
+    ] },
+  ],
+  constraints: [{ id: "con-pci", title: "PCI scope", health: "ok", appliesTo: "all" }],
+};
+
+// ── Harness ──────────────────────────────────────────────────────────
+
+interface Post { url: string; body: Record<string, unknown> }
+
+let root: HTMLDivElement;
+let routes: Record<string, unknown>;
+let answers: Record<string, { status: number; body: unknown }>;
+let posts: Post[];
+
+function serve(changes: ChangeRow[], shortlists: ChangePlacement[], extra: Record<string, unknown> = {}): void {
+  routes = {
+    "/api/project": { cliName: "ndx" },
+    "/api/rex/changes": { layout: "v2", changes },
+    "/api/rex/product": { layout: "v2", map: MAP },
+    "/api/rex/changes/placements": { layout: "v2", placements: Object.fromEntries(shortlists.map((p) => [p.change.id, p])) },
+    ...Object.fromEntries(shortlists.map((p) => [`/api/rex/changes/${p.change.id}/placement`, p])),
+    ...extra,
+  };
+  answers = {};
+  posts = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.method === "POST") {
+      posts.push({ url, body: JSON.parse(String(init.body)) });
+      const answer = answers[url] ?? { status: 200, body: { change: "x", target: "t", relation: "touches" } };
+      return new Response(JSON.stringify(answer.body), { status: answer.status, headers: { "Content-Type": "application/json" } });
+    }
+    const body = routes[url];
+    return new Response(JSON.stringify(body ?? { error: "not found" }), {
+      status: body === undefined ? 404 : 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }));
+}
+
+/** Answer the next POST to `/api/rex/changes/<id>/<action>`. */
+function answer(id: string, action: "place" | "propose", status: number, body: unknown): void {
+  answers[`/api/rex/changes/${id}/${action}`] = { status, body };
+}
+
+async function settle(): Promise<void> {
+  for (let i = 0; i < 6; i += 1) {
+    await act(async () => { await new Promise<void>((r) => setTimeout(r, 0)); });
+  }
+}
+
+async function mount(vnode: VNode): Promise<void> {
+  await act(async () => { render(vnode, root); });
+  await settle();
+}
+
+interface Spies {
+  onOpenChange: ReturnType<typeof vi.fn>;
+  onWritten: ReturnType<typeof vi.fn>;
+  onInboxState: ReturnType<typeof vi.fn>;
+}
+
+async function mountSection(changeId: string): Promise<Spies> {
+  const spies = { onOpenChange: vi.fn(), onWritten: vi.fn(), onInboxState: vi.fn() };
+  await mount(h(ChangePlacementSection, { changeId, changeTitle: `Change ${changeId}`, ...spies }));
+  return spies;
+}
+
+const $ = <T extends Element = HTMLElement>(sel: string) => root.querySelector<T>(sel);
+const $$ = <T extends Element = HTMLElement>(sel: string) => [...root.querySelectorAll<T>(sel)];
+
+async function click(el: Element | null): Promise<void> {
+  if (!el) throw new Error("element missing");
+  await act(async () => { (el as HTMLElement).click(); });
+  await settle();
+}
+
+async function type(el: Element | null, value: string, event = "input"): Promise<void> {
+  if (!el) throw new Error("element missing");
+  await act(async () => {
+    (el as HTMLInputElement).value = value;
+    el.dispatchEvent(new Event(event, { bubbles: true }));
+  });
+  await settle();
+}
+
+const pick = (target: string) => click($(`.cp-target[data-target="${target}"] input`));
+const button = (label: string) => $$<HTMLButtonElement>("button").find((b) => b.textContent === label) ?? null;
+
+beforeEach(() => {
+  // A focus request is module state: no case may start with one pending.
+  for (const id of ["a", "b", "c"]) takeTitleFocus(id);
+  clearProjectMetadataCache();
+  root = document.createElement("div");
+  document.body.appendChild(root);
+});
+
+afterEach(() => {
+  act(() => { render(null, root); });
+  root.remove();
+  vi.unstubAllGlobals();
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+describe("placement helpers", () => {
+  it("criteriaDelta names added, replaced and removed criteria, and nothing when untouched", () => {
+    expect(criteriaDelta([{ id: "c1", text: "a", original: "a" }])).toBeUndefined();
+    expect(criteriaDelta([
+      { id: "c1", text: "a2", original: "a" },
+      { id: "c2", text: "b", original: "b", removed: true },
+      { id: "c3", text: "c" },
+    ])).toEqual({ add: [{ id: "c3", text: "c" }], replace: [{ id: "c1", text: "a2" }], remove: ["c2"] });
+  });
+
+  it("nextCriterionId follows the highest cN id", () => {
+    expect(nextCriterionId([])).toBe("c1");
+    expect(nextCriterionId(["c2", "c9", "x4"])).toBe("c10");
+  });
+
+  it("inboxPosition counts from one, follows the order, and wraps after the last", () => {
+    expect(inboxPosition(["a", "b", "c"], "b")).toEqual({ index: 1, total: 3, next: "c" });
+    expect(inboxPosition(["a", "b", "c"], "c")).toEqual({ index: 2, total: 3, next: "a" });
+    expect(inboxPosition(["a"], "a")).toEqual({ index: 0, total: 1, next: null });
+  });
+
+  it("placedLine names each place, or nothing for an unplaced change", () => {
+    expect(placedLine(change("a"))).toBeNull();
+    expect(placedLine(change("a", { touches: [{ id: "t", title: "Refunds" }] }))).toBe("Placed: touches Refunds");
+    expect(placedLine(change("a", { amends: [{ id: "m", title: "Gift cards", delta: "modified" }] }))).toBe("Placed: amends Gift cards");
+  });
+});
+
+// ── States ───────────────────────────────────────────────────────────
+
+describe("an Inbox change's panel", () => {
+  it("shows the note with its Inbox position, the shortlist with strength and area, search, relation and actions", async () => {
+    serve([change("a"), change("b")], [
+      placement("a", [candidate("cap-1"), candidate("cap-2", { strength: "possible", score: 3, area: "Billing", reasons: [] })]),
+      placement("b", [candidate("cap-3", { strength: "weak", score: 1 })]),
+    ]);
+    const spies = await mountSection("a");
+
+    expect($(".cp-note")?.textContent).toContain("In the Inbox. ndx work skips its tasks until it has a place on the product map.");
+    expect($(".cp-position")?.textContent).toBe("1 of 2 · Next ›");
+    const rows = $$(".cp-target");
+    expect(rows.map((r) => r.dataset.target)).toEqual(["cap-1", "cap-2"]);
+    expect(rows[0].querySelector(".cp-target-title")?.textContent).toBe("Home cap-1");
+    expect(rows[0].querySelector<HTMLElement>(".inbox-strength")?.dataset.strength).toBe("strong");
+    expect(rows[0].querySelector(".cp-target-detail")?.textContent).toBe("Checkout · matched gift, card");
+    expect(rows[1].querySelector(".cp-target-detail")?.textContent).toBe("Billing");
+    expect($(".cp-search-input")?.getAttribute("aria-label")).toBe("Search capabilities and constraints");
+    expect($$<HTMLInputElement>('.cp-relation input[type="radio"]').map((r) => r.value)).toEqual(["touches", "amends"]);
+    expect(["Place", "Place & next", "Place & add another", "Nothing fits"].map((l) => button(l) !== null)).toEqual([true, true, true, true]);
+    // Nothing is chosen for the person: Place waits for a pick.
+    expect(button("Place")?.disabled).toBe(true);
+    expect(spies.onInboxState).toHaveBeenLastCalledWith(true);
+  });
+
+  it("opens on Amends with the target Quick Add asked for, once", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1"), candidate("cap-2")], { relation: "touches" })]);
+    requestPlacement("a", { relation: "amends", target: { target: "cap-2", title: "A1.2 Home cap-2", area: "Checkout" } });
+    await mountSection("a");
+
+    expect($<HTMLInputElement>('.cp-relation input[value="amends"]')?.checked).toBe(true);
+    expect($<HTMLInputElement>('.cp-target[data-target="cap-2"] input')?.checked).toBe(true);
+    // The shortlist row replaced the request's target, so the Amends form has its type.
+    expect($(".cp-target.is-checked .cp-target-title")?.textContent).toBe("Home cap-2");
+    expect(takePlacementRequest("a")).toBeNull();
+  });
+
+  it("is a single Placed line for a change that has left the Inbox", async () => {
+    serve([change("a", { awaitsPlacement: false, needsPlacement: false, touches: [{ id: "cap-1", title: "Refunds" }] })], []);
+    const spies = await mountSection("a");
+    expect($('[data-change-placement="placed"]')?.textContent).toBe("Placed: touches Refunds");
+    expect($(".cp-note")).toBeNull();
+    expect($(".cp-target")).toBeNull();
+    expect(spies.onInboxState).toHaveBeenLastCalledWith(false);
+  });
+
+  it("renders nothing on a v1 project", async () => {
+    serve([], [], { "/api/rex/changes": { layout: "v1" } });
+    await mountSection("a");
+    expect(root.innerHTML).toBe("");
+  });
+
+  it("warns when the top matches are tied", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1"), candidate("cap-2")], { tied: true })]);
+    await mountSection("a");
+    expect($$(".cp-shortlist-warning").map((w) => w.dataset.warning)).toEqual(["tied"]);
+  });
+
+  it("warns when every match is weak", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1", { strength: "weak" }), candidate("cap-2", { strength: "weak" })])]);
+    await mountSection("a");
+    expect($$(".cp-shortlist-warning").map((w) => w.dataset.warning)).toEqual(["weak"]);
+  });
+
+  it("gives no warning for a clear shortlist", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1"), candidate("cap-2", { strength: "weak" })])]);
+    await mountSection("a");
+    expect($(".cp-shortlist-warning")).toBeNull();
+  });
+
+  it("searches every capability and constraint, grouped by area, and a pick joins the list checked", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    await type($(".cp-search-input"), "s");
+    const groups = $$(".cp-search-group").map((g) => [
+      g.querySelector(".cp-search-area")?.textContent,
+      [...g.querySelectorAll(".cp-search-result")].map((b) => b.textContent),
+    ]);
+    expect(groups).toEqual([
+      ["Payments", ["Refunds", "Gift cards"]],
+      ["Shipping", ["Shipping labels"]],
+      ["Constraints", ["PCI scope"]],
+    ]);
+    await click(button("Shipping labels"));
+    expect($<HTMLInputElement>('.cp-target[data-target="cap-label"] input')?.checked).toBe(true);
+    expect($(".cp-search-group")).toBeNull();
+    expect(button("Place")?.disabled).toBe(false);
+  });
+});
+
+describe("when the product map read fails", () => {
+  /** Serve a healthy project, then wrap fetch so only the product map read answers 500. Returns the healthy fetch. */
+  function failProductRead(message: string): typeof fetch {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    const good = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) =>
+      url === "/api/rex/product"
+        ? new Response(JSON.stringify({ error: message }), { status: 500 })
+        : good(url, init)));
+    return good;
+  }
+
+  it("shows the error in place of the search, and keeps the shortlist", async () => {
+    failProductRead("PRD is locked by pid 7");
+    await mountSection("a");
+    expect($(".cp-search-input")).toBeNull();
+    expect($(".cp-search")?.textContent).toContain("Could not load: PRD is locked by pid 7");
+    expect(root.textContent).not.toContain("Loading the product map");
+    expect($('.cp-target[data-target="cap-1"]')).not.toBeNull();
+    expect(button("Place")).not.toBeNull();
+  });
+
+  it("shows the error in the proposal form's area field, and a later good read restores both", async () => {
+    const good = failProductRead("HTTP boom");
+    await mountSection("a");
+    await click(button("Nothing fits"));
+    const area = $$<HTMLSelectElement>(".cp-propose select")[1];
+    expect(area.options[0].textContent).toBe("Could not load: HTTP boom");
+    expect(button("Propose")?.disabled).toBe(true);
+
+    // Remount against a healthy server: the read succeeds and the forms return.
+    vi.stubGlobal("fetch", good);
+    await act(async () => { render(null, root); });
+    await mountSection("a");
+    expect($(".cp-search-input")?.hasAttribute("disabled")).toBe(false);
+    await click(button("Nothing fits"));
+    expect($$<HTMLSelectElement>(".cp-propose select")[1].options[0].textContent).toBe("Choose an area");
+  });
+});
+
+// ── Writes ───────────────────────────────────────────────────────────
+
+describe("an applied change's panel", () => {
+  const applied = (id: string) => change(id, { stage: "applied", appliedAt: "2026-03-04T10:00:00.000Z", awaitsPlacement: undefined });
+
+  it("offers touches only, with the explanatory note", async () => {
+    serve([applied("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+
+    expect($('[data-change-placement="applied"]')).not.toBeNull();
+    expect($(".cp-note")?.textContent).toContain("Links this finished change to what it built; its tasks are done.");
+    expect($(".cp-note")?.textContent).not.toContain("In the Inbox");
+    expect($(".cp-relation")).toBeNull();
+    expect($(".cp-amends")).toBeNull();
+    expect(button("Nothing fits")).toBeNull();
+    expect($$(".cp-target").map((r) => r.dataset.target)).toEqual(["cap-1"]);
+  });
+
+  it("places with relation touches and shows the placed line", async () => {
+    serve([applied("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    await pick("cap-1");
+    await click(button("Place"));
+    expect(posts).toEqual([{ url: "/api/rex/changes/a/place", body: { target: "cap-1", relation: "touches" } }]);
+    expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Home cap-1");
+  });
+
+  it("walks the applied list on Place & next, not the open Inbox", async () => {
+    serve([change("open1"), applied("a"), applied("b")], [
+      placement("open1", [candidate("cap-o", { score: 9 })]),
+      placement("a", [candidate("cap-a", { strength: "strong", score: 9 })]),
+      placement("b", [candidate("cap-b", { strength: "weak", score: 1 })]),
+    ]);
+    const spies = await mountSection("a");
+    expect($(".cp-position")?.textContent).toBe("1 of 2 · Next ›");
+    await pick("cap-a");
+    await click(button("Place & next"));
+    expect(spies.onOpenChange).toHaveBeenCalledWith("b");
+  });
+});
+
+describe("placing", () => {
+  it("Place writes through /place, refreshes, and shows the placed line with rex's pending warnings", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    const spies = await mountSection("a");
+    answer("a", "place", 200, { change: "a", target: "cap-1", relation: "touches", warnings: ["Another change removes Home cap-1"] });
+    await pick("cap-1");
+    await click(button("Place"));
+
+    expect(posts).toEqual([{ url: "/api/rex/changes/a/place", body: { target: "cap-1", relation: "touches" } }]);
+    expect(spies.onWritten).toHaveBeenCalledTimes(1);
+    expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Home cap-1");
+    expect($(".cp-warnings")?.textContent).toContain("Another change removes Home cap-1");
+    expect($(".cp-target")).toBeNull();
+  });
+
+  it("Place & next opens the next change in the Inbox's order and asks for its title's focus", async () => {
+    // List order a, b, c; the Inbox orders strongest first: c, a, b.
+    serve([change("a"), change("b"), change("c")], [
+      placement("a", [candidate("cap-a", { strength: "possible", score: 3 })]),
+      placement("b", [candidate("cap-b", { strength: "weak", score: 1 })]),
+      placement("c", [candidate("cap-c", { strength: "strong", score: 9 })]),
+    ]);
+    const spies = await mountSection("a");
+    expect($(".cp-position")?.textContent).toBe("2 of 3 · Next ›");
+    await pick("cap-a");
+    await click(button("Place & next"));
+
+    expect(posts.map((p) => p.url)).toEqual(["/api/rex/changes/a/place"]);
+    expect(spies.onOpenChange).toHaveBeenCalledWith("b");
+    expect(takeTitleFocus("b")).toBe(true);
+  });
+
+  it("Next › moves on without writing", async () => {
+    serve([change("a"), change("b")], [placement("a", [candidate("cap-1")]), placement("b", [candidate("cap-2", { score: 1 })])]);
+    const spies = await mountSection("a");
+    await click($(".cp-next"));
+    expect(posts).toEqual([]);
+    expect(spies.onOpenChange).toHaveBeenCalledWith("b");
+    expect(takeTitleFocus("b")).toBe(true);
+  });
+
+  it("Place & add another keeps the shortlist open for an extra touches", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1"), candidate("cap-2")], { relation: "amends" })]);
+    await mountSection("a");
+    await pick("cap-1");
+    await click($('.cp-relation input[value="touches"]'));
+    await click(button("Place & add another"));
+
+    expect($('[data-change-placement="another"]')).not.toBeNull();
+    expect($(".cp-shortlist legend")?.textContent).toBe("Add another place");
+    expect($(".cp-relation")).toBeNull();
+    expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Home cap-1");
+
+    await pick("cap-2");
+    await click(button("Place"));
+    expect(posts.map((p) => p.body)).toEqual([
+      { target: "cap-1", relation: "touches" },
+      { target: "cap-2", relation: "touches" },
+    ]);
+    expect($('[data-change-placement="placed"]')).not.toBeNull();
+  });
+
+  it("Amends sends the summary, the replacement statement and the criteria delta", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1", {
+      criteria: [{ id: "c1", text: "Refunds post" }, { id: "c2", text: "Refunds email" }],
+    })])]);
+    await mountSection("a");
+    await pick("cap-1");
+    await click($('.cp-relation input[value="amends"]'));
+
+    expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refunds post", "Refunds email"]);
+    await type($(".cp-amends input.cp-input"), "Cover gift cards");
+    // Edit c1 in place, remove c2, add one.
+    await click($$(".cp-amends .task-criterion")[0]);
+    await type($(".cp-amends .task-criterion-input"), "Refunds post to the ledger");
+    await act(async () => { $(".cp-amends .task-criterion-input")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+    await click($$(".cp-amends .task-criterion-remove")[1]);
+    await click(button("+ criterion"));
+    await type($(".cp-amends .task-criterion-add-input"), "Gift cards refund");
+    await click($(".cp-amends .task-criterion-add-confirm"));
+    await type($(".cp-amends textarea.cp-input"), "Refund any tender");
+    await click(button("Place"));
+
+    expect(posts[0].body).toEqual({
+      target: "cap-1",
+      relation: "amends",
+      summary: "Cover gift cards",
+      proposed: "Refund any tender",
+      criteria: {
+        add: [{ id: "c3", text: "Gift cards refund" }],
+        replace: [{ id: "c1", text: "Refunds post to the ledger" }],
+        remove: ["c2"],
+      },
+    });
+  });
+
+  it("reads a search pick's own criteria when it is amended", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], {
+      "/api/rex/product/capability/cap-refund": { layout: "v2", capability: { criteria: [
+        { id: "c1", text: "Refund an order" }, { id: "c2", text: "Inherited", inheritedFrom: "Payments" },
+      ] } },
+    });
+    await mountSection("a");
+    await type($(".cp-search-input"), "refund");
+    await click(button("Refunds"));
+    await click($('.cp-relation input[value="amends"]'));
+    expect($$(".cp-amends .task-criterion-text").map((c) => c.textContent)).toEqual(["Refund an order"]);
+  });
+
+  it("Amends with neither statement nor criteria is refused inline in rex's words, pointing at the criteria", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1", { criteria: [{ id: "c1", text: "x" }] })])]);
+    await mountSection("a");
+    const message = "Cannot place change a: amendment of \"Home cap-1\" has nothing to modify";
+    answer("a", "place", 422, { error: message, kind: "nothing-to-modify" });
+    await pick("cap-1");
+    await click($('.cp-relation input[value="amends"]'));
+    await click(button("Place"));
+
+    expect(posts[0].body).toEqual({ target: "cap-1", relation: "amends" });
+    expect($('.cp-refusal[role="alert"] .cp-refusal-message')?.textContent).toBe(message);
+    expect($(".cp-refusal-hint")?.textContent).toBe(REFUSAL_HINTS["nothing-to-modify"]);
+    expect($(".cp-amends .task-acceptance-criteria")?.classList.contains("is-invalid")).toBe(true);
+    expect($(".cp-amends")?.contains(document.activeElement)).toBe(true);
+    expect($(".cp-placed-line")).toBeNull();
+  });
+
+  const KINDS = Object.keys(REFUSAL_HINTS) as PlacementRefusalKind[];
+
+  it.each(KINDS)("shows a %s refusal with rex's message and its hint", async (kind) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    answer("a", "place", 422, { error: `rex says ${kind}`, kind });
+    await pick("cap-1");
+    await click(button("Place"));
+    expect($(".cp-refusal-message")?.textContent).toBe(`rex says ${kind}`);
+    const hint = $(".cp-refusal-hint");
+    expect(hint?.dataset.kind).toBe(kind);
+    expect(hint?.textContent).toBe(REFUSAL_HINTS[kind]);
+  });
+
+  it("shows a refusal without a kind as its message alone", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    answer("a", "place", 409, { error: "Could not acquire PRD lock: held by PID 42" });
+    await pick("cap-1");
+    await click(button("Place"));
+    expect($(".cp-refusal-message")?.textContent).toBe("Could not acquire PRD lock: held by PID 42");
+    expect($(".cp-refusal-hint")).toBeNull();
+  });
+});
+
+describe("Nothing fits", () => {
+  it("swaps in the proposal form, and Propose writes through /propose", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    const spies = await mountSection("a");
+    answer("a", "propose", 200, { change: "a", proposed: { target: "n", under: "area-pay", title: "Store credit", type: "capability" } });
+    await click(button("Nothing fits"));
+
+    expect($(".cp-shortlist")).toBeNull();
+    const selects = $$<HTMLSelectElement>(".cp-propose select");
+    expect([...selects[1].options].map((o) => o.textContent)).toEqual(["Choose an area", "Payments", "Shipping"]);
+    await type(selects[1], "area-pay", "change");
+    const [title, statement, criteria] = [
+      $(".cp-propose input.cp-input"),
+      ...$$(".cp-propose textarea.cp-input"),
+    ];
+    await type(title, "Store credit");
+    await type(statement, "Pay with store credit");
+    await type(criteria, "Credit applies at checkout\n\nCredit expires");
+    await click(button("Propose"));
+
+    expect(posts).toEqual([{ url: "/api/rex/changes/a/propose", body: {
+      type: "capability", under: "area-pay", title: "Store credit", proposed: "Pay with store credit",
+      criteria: { add: [{ id: "c1", text: "Credit applies at checkout" }, { id: "c2", text: "Credit expires" }] },
+    } }]);
+    expect(spies.onWritten).toHaveBeenCalledTimes(1);
+    expect($(".cp-placed-line")?.textContent).toBe("Placed: proposes capability Store credit");
+  });
+
+  it("a constraint proposal carries no criteria field", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    await click(button("Nothing fits"));
+    await type($$<HTMLSelectElement>(".cp-propose select")[0], "constraint", "change");
+    expect($$(".cp-propose textarea.cp-input")).toHaveLength(1);
+  });
+
+  it("Propose & next opens the next Inbox change", async () => {
+    serve([change("a"), change("b")], [placement("a", [candidate("cap-1")]), placement("b", [candidate("cap-2", { score: 1 })])]);
+    const spies = await mountSection("a");
+    answer("a", "propose", 200, { change: "a", proposed: { target: "n", under: "area-pay", title: "X", type: "capability" } });
+    await click(button("Nothing fits"));
+    await type($$<HTMLSelectElement>(".cp-propose select")[1], "area-pay", "change");
+    await click(button("Propose & next"));
+    expect(posts[0].url).toBe("/api/rex/changes/a/propose");
+    expect(spies.onOpenChange).toHaveBeenCalledWith("b");
+    // Consumed here, or it would satisfy a later test's focus check for "b".
+    expect(takeTitleFocus("b")).toBe(true);
+  });
+
+  it("waits for an area before Propose", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    await click(button("Nothing fits"));
+    expect(button("Propose")?.disabled).toBe(true);
+    await type($$<HTMLSelectElement>(".cp-propose select")[1], "area-ship", "change");
+    expect(button("Propose")?.disabled).toBe(false);
+  });
+
+  it("shows a proposal refusal inline with its hint, and Back returns to the shortlist", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    answer("a", "propose", 422, { error: "A proposed capability or constraint needs a title", kind: "empty-title" });
+    await click(button("Nothing fits"));
+    await type($$<HTMLSelectElement>(".cp-propose select")[1], "area-pay", "change");
+    await click(button("Propose"));
+    expect(posts[0].body).toEqual({ type: "capability", under: "area-pay", title: "" });
+    expect($(".cp-refusal-message")?.textContent).toBe("A proposed capability or constraint needs a title");
+    expect($(".cp-refusal-hint")?.textContent).toBe(REFUSAL_HINTS["empty-title"]);
+    await click(button("Back to the shortlist"));
+    expect($(".cp-shortlist")).not.toBeNull();
+  });
+});
+
+describe("Draft with the model (rex.placementDraft)", () => {
+  const DRAFT_URL = "/api/rex/changes/a/placement/draft";
+  const toggle = (enabled: boolean) => ({ "/api/features": { toggles: [{ key: PLACEMENT_DRAFT_FEATURE, enabled }] } });
+  const drafts = () => posts.filter((p) => p.url === DRAFT_URL);
+  const answerDraft = (body: Partial<PlacementDraft>, status = 200) => {
+    answers[DRAFT_URL] = { status, body: { layout: "v2", change: "a", relation: "touches", tied: false, shortlist: [], warnings: [], ...body } };
+  };
+  const PROPOSAL = {
+    type: "capability" as const, under: "area-pay", title: "Store credit", summary: "Add store credit",
+    proposed: "Pay with store credit", criteria: { add: [{ id: "c1", text: "Credit applies" }, { id: "c2", text: "Credit expires" }] },
+  };
+
+  it.each([
+    ["off", toggle(false)],
+    ["absent", {}],
+  ])("is hidden from the shortlist and the proposal form with the toggle %s", async (_label, extra) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], extra);
+    await mountSection("a");
+    expect(button("Draft with the model")).toBeNull();
+    await click(button("Nothing fits"));
+    expect(button("Draft with the model")).toBeNull();
+  });
+
+  it("is hidden for an applied change, which takes touches only", async () => {
+    serve([change("a", { appliedAt: "2026-10-05T12:00:00.000Z", awaitsPlacement: undefined })], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountSection("a");
+    expect($("[data-change-placement]")?.getAttribute("data-change-placement")).toBe("applied");
+    expect(button("Draft with the model")).toBeNull();
+  });
+
+  it("selects the model's pick on the shortlist and says the model chose it, writing nothing", async () => {
+    const rows = [candidate("cap-1"), candidate("cap-2", { score: 3, strength: "possible" })];
+    serve([change("a")], [placement("a", rows)], toggle(true));
+    await mountSection("a");
+    answerDraft({ pick: "cap-2", shortlist: rows, model: "claude-haiku", warnings: ["rules and model disagree"] });
+    await click(button("Draft with the model"));
+
+    expect(drafts()).toHaveLength(1);
+    expect(posts.every((p) => p.url === DRAFT_URL)).toBe(true);
+    expect($<HTMLInputElement>('.cp-target[data-target="cap-2"] input')?.checked).toBe(true);
+    const note = $(".cp-draft-note");
+    expect(note?.dataset.draftSource).toBe("model");
+    expect(note?.textContent).toContain("Picked by the model (claude-haiku): Home cap-2.");
+    expect(note?.textContent).toContain("rules and model disagree");
+    expect(button("Place")?.disabled).toBe(false);
+  });
+
+  it("opens the proposal form filled with the model's proposal", async () => {
+    serve([change("a")], [placement("a", [])], toggle(true));
+    await mountSection("a");
+    answerDraft({ proposal: PROPOSAL });
+    await click(button("Draft with the model"));
+
+    expect($(".cp-shortlist")).toBeNull();
+    const selects = $$<HTMLSelectElement>(".cp-propose select");
+    expect(selects.map((s) => s.value)).toEqual(["capability", "area-pay"]);
+    expect($<HTMLInputElement>(".cp-propose input.cp-input")?.value).toBe("Store credit");
+    expect($$<HTMLTextAreaElement>(".cp-propose textarea.cp-input").map((t) => t.value)).toEqual(["Pay with store credit", "Credit applies\nCredit expires"]);
+    expect($(".cp-draft-note")?.textContent).toContain("Drafted by the model.");
+    expect(drafts()).toHaveLength(1);
+    expect(posts).toHaveLength(1);
+  });
+
+  it("fills the proposal form from its own button", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountSection("a");
+    await click(button("Nothing fits"));
+    answerDraft({ proposal: { ...PROPOSAL, type: "constraint", criteria: undefined } });
+    await click(button("Draft with the model"));
+
+    expect($$<HTMLSelectElement>(".cp-propose select").map((s) => s.value)).toEqual(["constraint", "area-pay"]);
+    expect($<HTMLInputElement>(".cp-propose input.cp-input")?.value).toBe("Store credit");
+    expect($(".cp-draft-note")?.textContent).toContain("Drafted by the model.");
+  });
+
+  it("says when the model drafted nothing, and shows the server's refusal", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountSection("a");
+    answerDraft({});
+    await click(button("Draft with the model"));
+    expect($(".cp-draft-note")?.textContent).toContain("No draft from the model");
+    expect($$<HTMLInputElement>(".cp-target input").some((i) => i.checked)).toBe(false);
+
+    answers[DRAFT_URL] = { status: 403, body: { error: `The feature "${PLACEMENT_DRAFT_FEATURE}" is turned off`, feature: PLACEMENT_DRAFT_FEATURE, kind: "feature_disabled" } };
+    await click(button("Draft with the model"));
+    expect($(".cp-refusal-message")?.textContent).toContain(PLACEMENT_DRAFT_FEATURE);
+    expect($(".cp-refusal-hint")).toBeNull();
+  });
+});
+
+describe("draftNoteText", () => {
+  const base: PlacementDraft = { layout: "v2", change: "a", relation: "touches", tied: false, shortlist: [], warnings: [] };
+  it("names who chose and what", () => {
+    expect(draftNoteText({ ...base, pick: "cap-1", model: "m" }, "Refunds")).toBe("Picked by the model (m): Refunds. Check it, then place.");
+    expect(draftNoteText({ ...base, proposal: { type: "capability", under: "x", title: "y" } })).toBe("Drafted by the model. Check it, then propose.");
+    expect(draftNoteText(base)).toBe("No draft from the model: nothing on the shortlist fit and it proposed nothing.");
+  });
+});
+
+// ── In the detail panel ──────────────────────────────────────────────
+
+describe("the change detail panel", () => {
+  const item = (id: string): PRDItemData => ({ id, title: `Change ${id}`, status: "pending", level: "epic", type: "change" } as PRDItemData);
+
+  it("puts the section right after the title, and notes on + Add Task that the tasks won't run", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])]);
+    await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn() }));
+    const title = $(".task-title-display")!.closest(".task-section")!;
+    expect(title.nextElementSibling?.classList.contains("cp-section")).toBe(true);
+    expect($(".task-add-child-note")?.textContent).toBe("Its tasks won't run until the change is placed.");
+  });
+
+  it("has no section and no note for a placed change", async () => {
+    serve([change("a", { awaitsPlacement: false, needsPlacement: false, touches: [{ id: "t", title: "Refunds" }] })], []);
+    await mount(h(TaskDetail, { item: item("a"), allItems: [item("a")], onUpdate: vi.fn(), onAddChild: vi.fn() }));
+    expect($(".cp-section")).toBeNull();
+    expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Refunds");
+    expect($(".task-add-child-note")).toBeNull();
+  });
+
+  it("lands focus on the next change's title after Place & next", async () => {
+    serve([change("a"), change("b")], [placement("a", [candidate("cap-1")]), placement("b", [candidate("cap-2", { score: 1 })])]);
+    const items = [item("a"), item("b")];
+    const onNavigateToItem = vi.fn();
+    const show = (id: string) => mount(h(TaskDetail, {
+      item: items.find((i) => i.id === id)!, allItems: items, onUpdate: vi.fn(), onNavigateToItem,
+    }));
+    await show("a");
+    await pick("cap-1");
+    await click(button("Place & next"));
+    // The host opens the item it was asked for, as the tree's selection does.
+    expect(onNavigateToItem).toHaveBeenCalledWith("b");
+    await show("b");
+    expect(document.activeElement?.classList.contains("task-title-display")).toBe(true);
+    expect(document.activeElement?.textContent).toContain("Change b");
+  });
+});

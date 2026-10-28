@@ -10,6 +10,13 @@ items:
     lastModified: "2026-10-28T14:31:10.610Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c2f9fcd8-7c27-4696-8f18-86254046e278":
+    status: "completed"
+    startedAt: "2026-10-28T15:01:51.745Z"
+    completedAt: "2026-10-28T15:17:24.546Z"
+    endedAt: "2026-10-28T15:17:24.546Z"
+    activeIntervals: [{"end":"2026-10-28T15:17:24.546Z","start":"2026-10-28T15:01:51.745Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Trust collector folds hench overrides as hench's loader does (deep merge, invalid field reverts to lower layer); hench loader reverts per layer so both readers agree."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T14:31:09.113Z"
+    lastModified: "2026-10-28T15:17:24.546Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
