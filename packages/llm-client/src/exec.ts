@@ -679,7 +679,8 @@ const PATHSPEC_MODE_VARS = ["GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_
 
 /** git's answer to "is this path in the index?", or why it gave none. */
 export type GitTrackAnswer =
-  | { state: "tracked" }
+  /** `paths`: the index entries git matched, as git spells them (its case; a symlink itself, not a path through it). */
+  | { state: "tracked"; paths: string[] }
   | { state: "untracked" }
   | { state: "unanswered"; reason: string };
 
@@ -704,7 +705,8 @@ export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCas
   const env = { ...process.env };
   for (const name of PATHSPEC_MODE_VARS) delete env[name];
   try {
-    execFileSync("git", ["ls-files", "--error-unmatch", "--", pathspec], {
+    // -z: raw names, not git's octal quoting of non-ASCII paths.
+    const out = execFileSync("git", ["ls-files", "-z", "--error-unmatch", "--", pathspec], {
       windowsHide: true,
       cwd,
       env,
@@ -714,7 +716,7 @@ export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCas
       // expected answer, so git's stderr is captured rather than printed.
       stdio: ["ignore", "pipe", "pipe"],
     });
-    return { state: "tracked" };
+    return { state: "tracked", paths: out.split("\0").filter(Boolean) };
   } catch (err) {
     const e = err as { status?: number | null; stderr?: string | Buffer; message?: string };
     if (e.status === 1) return { state: "untracked" };

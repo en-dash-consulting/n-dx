@@ -191,7 +191,19 @@ describe("a local config file the repository ships under another name or path", 
     git("add", "-f", ".N-DX.local.json");
     expectRepositoryConfig();
     await expectNoRouting();
+    expectNamed([".N-DX.local.json"]);
   });
+
+  /** The finding and the report's advice name what git tracks, so `git rm --cached` matches it. */
+  function expectNamed(paths: string[]): void {
+    const ev = evaluateRepoTrust(repo);
+    expect(ev.config.localConfigTrackedPaths).toEqual(paths);
+    const finding = ev.findings.find((f) => f.code === "local-config-tracked");
+    expect(finding?.values).toEqual(paths);
+    expect(finding?.message).toMatch(new RegExp(`^Commits ${paths.join(", ").replace(/\./g, "\\.")}`));
+    const report = formatRepoTrustReport(ev).join("\n");
+    expect(report).toContain(`git rm --cached -- ${paths.join(" ")}`);
+  }
 
   it.skipIf(process.platform === "win32")("config.local.json reached through a committed symlinked .ndx", async () => {
     mkdirSync(join(repo, "cfg"));
@@ -201,6 +213,9 @@ describe("a local config file the repository ships under another name or path", 
     git("add", "-f", "cfg", ".ndx");
     expectRepositoryConfig();
     await expectNoRouting();
+    // Both, because untracking only the symlink leaves the target committed.
+    expectNamed([".ndx", "cfg/config.local.json"]);
+    expect(formatRepoTrustReport(evaluateRepoTrust(repo)).join("\n")).not.toContain("git rm --cached -- .ndx/config.local.json");
   });
 
   it.skipIf(process.platform === "win32")("a user's own symlink to a committed file is still the committed file", () => {
@@ -210,6 +225,7 @@ describe("a local config file the repository ships under another name or path", 
     git("add", "-f", "cfg");
     symlinkSync(join("cfg", "shipped.json"), join(repo, ".n-dx.local.json"));
     expectRepositoryConfig();
+    expectNamed(["cfg/shipped.json"]);
   });
 
   it.skipIf(process.platform === "win32")("a user's own untracked symlink to a file outside the checkout stays theirs", () => {
@@ -292,7 +308,7 @@ describe("when git cannot answer", () => {
     const ev = evaluateRepoTrust(repo);
     const finding = ev.findings.find((f) => f.code === "local-config-tracked");
     expect(finding?.message).toMatch(/^Commits \.n-dx\.local\.json/);
-    expect(formatRepoTrustReport(ev).join("\n")).toContain("git rm --cached");
+    expect(formatRepoTrustReport(ev).join("\n")).toContain("git rm --cached -- .n-dx.local.json");
   });
 
   it("inside a work tree, a corrupt index counts the file as tracked", () => {

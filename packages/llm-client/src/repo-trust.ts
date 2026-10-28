@@ -364,6 +364,13 @@ export interface RepoExecutionConfig {
    * the digest.
    */
   localConfigUnanswered: string | null;
+  /**
+   * The index entries git matched for the local config file, as git spells
+   * them: a case variant as committed, or a committed symlinked directory and
+   * its target, rather than the path n-dx opens. Empty unless git said
+   * tracked. Not in the digest.
+   */
+  localConfigTrackedPaths: string[];
   /** sha256 over the canonical JSON of everything above except `sources`, `detectedLanguage` and `envDeny`. */
   digest: string;
 }
@@ -488,19 +495,23 @@ export function isLocalConfigTracked(projectDir: string): boolean {
 /**
  * {@link isLocalConfigTracked}, plus git's reason when the answer is "tracked"
  * only because git could not say (`unanswered`), so the review can tell the
- * user to fix git rather than untrack a file the repository may not commit.
+ * user to fix git rather than untrack a file the repository may not commit,
+ * and the index entries git matched (`paths`), which are what `git rm --cached`
+ * has to name: a case variant as committed, a symlinked directory and its target.
  */
-function localConfigTrackState(projectDir: string): { tracked: boolean; unanswered: string | null } {
+function localConfigTrackState(projectDir: string): { tracked: boolean; unanswered: string | null; paths: string[] } {
+  const untracked = { tracked: false, unanswered: null, paths: [] };
   const layout = resolveLayout(projectDir);
-  if (!existsSync(layout.localConfigFile)) return { tracked: false, unanswered: null };
+  if (!existsSync(layout.localConfigFile)) return untracked;
   const answers = shippedPathsOf(layout.root, layout.localConfigFile)
     .map((rel) => gitTracksPath(layout.root, rel, { ignoreCase: true }));
-  if (answers.some((a) => a.state === "tracked")) return { tracked: true, unanswered: null };
+  const paths = [...new Set(answers.flatMap((a) => (a.state === "tracked" ? a.paths : [])))];
+  if (paths.length) return { tracked: true, unanswered: null, paths };
   const failed = answers.find((a) => a.state === "unanswered");
-  if (!failed) return { tracked: false, unanswered: null };
+  if (!failed) return untracked;
   return insideGitWorkTree(layout.root)
-    ? { tracked: true, unanswered: failed.reason }
-    : { tracked: false, unanswered: null };
+    ? { tracked: true, unanswered: failed.reason, paths: [] }
+    : untracked;
 }
 
 /**
@@ -659,7 +670,11 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   const projectHench = sectionOf(projectConfig, "hench");
   if (projectHench) sources.push(relOf(root, layout.configFile));
 
-  const { tracked: localConfigTracked, unanswered: localConfigUnanswered } = localConfigTrackState(projectDir);
+  const {
+    tracked: localConfigTracked,
+    unanswered: localConfigUnanswered,
+    paths: localConfigTrackedPaths,
+  } = localConfigTrackState(projectDir);
   const localConfig = localConfigTracked ? readJson(layout.localConfigFile) : null;
   if (localConfigTracked) sources.push(relOf(root, layout.localConfigFile));
 
@@ -776,6 +791,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     vendorCliPaths,
     localConfigTracked,
     localConfigUnanswered,
+    localConfigTrackedPaths,
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
 }
@@ -830,6 +846,14 @@ export function escapeTerminalControls(text: string): string {
       ? `\\x${code.toString(16).padStart(2, "0")}`
       : `\\u${code.toString(16).padStart(4, "0")}`;
   });
+}
+
+/**
+ * A repository-chosen path as one POSIX shell word, so advice the user pastes
+ * (`git rm --cached -- …`) cannot run what a crafted file name spells.
+ */
+function shellArg(path: string): string {
+  return /^[\w./@+-]+$/.test(path) ? path : `'${path.replace(/'/g, `'\\''`)}'`;
 }
 
 /** The MCP server commands `ndx init` writes, which need no review. */
@@ -1010,13 +1034,17 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
     const legacy = resolveLayout(".", { mode: "legacy" });
     const file = config.sources.find((s) => s.endsWith("local.json"))
       ?? relativeToRoot(legacy, legacy.localConfigFile);
+    // What git tracks, which is what `git rm --cached` must name: a case
+    // variant, or a symlinked directory and its target, is not the path n-dx opens.
+    const committed = config.localConfigTrackedPaths.length ? config.localConfigTrackedPaths : [file];
+    const opened = committed.length === 1 && committed[0] === file ? "" : `, which n-dx opens as ${file}`;
     findings.push({
       code: "local-config-tracked",
       severity: "warning",
       message: config.localConfigUnanswered
         ? `git could not confirm ${file} is untracked (${config.localConfigUnanswered}), so it is treated as repository config; its settings apply only once trusted`
-        : `Commits ${file}, the machine-local config n-dx otherwise applies as yours; its settings apply only once trusted`,
-      values: [file],
+        : `Commits ${committed.join(", ")}${opened}, the machine-local config n-dx otherwise applies as yours; its settings apply only once trusted`,
+      values: config.localConfigUnanswered ? [file] : committed,
     });
   }
 
@@ -1325,8 +1353,8 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
       lines.push(`  ${tracked.values[0]} is ignored too, because git could not say whether the repository commits it.`);
       lines.push(`  Fix git (e.g. git config --global --add safe.directory <this checkout>), or accept the configuration.`);
     } else if (tracked) {
-      lines.push(`  The committed ${tracked.values[0]} is ignored too, as repository config. To keep settings of your own,`);
-      lines.push("  untrack it (git rm --cached) and keep it ignored, or accept the configuration.");
+      lines.push(`  The committed ${tracked.values.join(", ")} is ignored too, as repository config. To keep settings of your own,`);
+      lines.push(`  untrack it (git rm --cached -- ${tracked.values.map(shellArg).join(" ")}) and keep it ignored, or accept the configuration.`);
     } else if (ev.findings.some((f) => f.code === "env-allow-added")) {
       lines.push("  The repository's guard.env.allow is ignored too. If your own tests need one of those variables,");
       lines.push(`  add it to hench.guard.env.allow in .n-dx.local.json, or accept the configuration.`);

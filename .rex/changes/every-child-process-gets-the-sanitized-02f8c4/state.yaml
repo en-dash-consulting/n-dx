@@ -39,7 +39,14 @@ items:
     lastModified: "2026-10-28T15:38:44.319Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "47654649-c6f7-4277-a156-d5d606f9ed2c":
-    lastModified: "2026-10-28T15:28:13.241Z"
+    status: "completed"
+    startedAt: "2026-10-28T20:53:21.287Z"
+    completedAt: "2026-10-28T21:01:35.115Z"
+    endedAt: "2026-10-28T21:01:35.115Z"
+    activeIntervals: [{"end":"2026-10-28T21:01:35.115Z","start":"2026-10-28T20:53:21.287Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "local-config-tracked finding and report advice name the index paths git matched (case variant; symlink + target) instead of the path n-dx opens"
+    lastModified: "2026-10-28T21:01:35.115Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ac6b536a-c462-40a2-b5c1-bd2d425ab8a9":
     lastModified: "2026-10-28T20:48:05.147Z"
