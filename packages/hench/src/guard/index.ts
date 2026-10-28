@@ -40,6 +40,12 @@
  *    bytes written, operation frequency. Enforces rate limits and resource
  *    budgets to prevent runaway autonomous behavior.
  *
+ * 7. **Config backstop** (`config-backstop.ts`)
+ *    Layer 4 sees only hench's own file tools. An allowed command, `codex
+ *    exec` or another spelling of a name writes past it, so the run snapshots
+ *    n-dx's config files and puts back any that changed after every vendor
+ *    spawn and tool call, failing the run.
+ *
  * ## Configuration
  *
  * All policies are configurable via {@link GuardConfig} in `.hench/config.json`.

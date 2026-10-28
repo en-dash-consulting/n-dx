@@ -429,6 +429,11 @@ export const RunRecordSchema = z.object({
     restricted: z.boolean(),
     findings: z.array(z.string()),
   }).optional(),
+  protectedConfigWrites: z.array(z.object({
+    path: z.string(),
+    change: z.enum(["created", "modified", "deleted"]),
+    restored: z.boolean(),
+  })).optional(),
   // Where the run sits in a --iterations/--loop/--epic-by-epic invocation.
   // `mode` is a bare string rather than an enum so a record written by a build
   // that knows a fourth mode still loads with its position intact; the Live

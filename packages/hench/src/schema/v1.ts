@@ -1557,6 +1557,15 @@ export interface RunTrustRecord {
   findings: string[];
 }
 
+/** One of n-dx's own config files a run changed. See `RunRecord.protectedConfigWrites`. */
+export interface RunProtectedConfigWrite {
+  /** Project-relative path. */
+  path: string;
+  change: "created" | "modified" | "deleted";
+  /** False when the pre-run file could not be put back. */
+  restored: boolean;
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -1599,6 +1608,13 @@ export interface RunRecord {
    * `.hench/config.json` said. v1 additive field.
    */
   trust?: RunTrustRecord;
+  /**
+   * n-dx's own config files the run changed — by whichever vendor, provider or
+   * tool — and whether each was put back. Present only when there were any;
+   * the run is failed when it is. Paths only, never content.
+   * v1 additive field.
+   */
+  protectedConfigWrites?: RunProtectedConfigWrite[];
   /**
    * Where this run sits in a `--iterations`/`--loop`/`--epic-by-epic`
    * invocation. Absent for a run started on its own. Written at run start so

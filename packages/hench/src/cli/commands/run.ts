@@ -42,6 +42,7 @@ import { info, result as output, setQuiet, warn } from "../output.js";
 import { applyRepoTrust, formatTrustWarningForRun } from "../../store/trust.js";
 import { evaluateRepoTrust, isFailForwardEnabled } from "../../prd/llm-gateway.js";
 import { section, detail } from "../../types/output.js";
+import { ConfigBackstop, formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import { clearSessionCache } from "../../agent/lifecycle/session-cache.js";
 import {
   trimDocument,
@@ -1482,6 +1483,10 @@ async function runOne(
   // starting in another worktree.
   const claims = TaskClaims.forProject(dir, { readOnly: dryRun });
   claims.startRenewal();
+  // n-dx's own config as it is before any agent runs. The loop puts it back
+  // after every spawn and tool call and fails the run on a write; the
+  // `finally` below covers a loop that throws before it finalizes.
+  const configBackstop = dryRun ? undefined : ConfigBackstop.capture(dir);
   let result: Awaited<ReturnType<typeof cliLoop>> | Awaited<ReturnType<typeof agentLoop>>;
   try {
   // Settings a task saved on itself can change which loop runs it, so the task
@@ -1602,6 +1607,7 @@ async function runOne(
         permissionMode,
         claims,
         wouldResetIds,
+        configBackstop,
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -1629,8 +1635,11 @@ async function runOne(
         ...(loop ? { loop } : {}),
         claims,
         wouldResetIds,
+        configBackstop,
       });
   } finally {
+    const unreported = configBackstop?.restore() ?? [];
+    if (unreported.length > 0) warn(formatProtectedConfigFinding(unreported));
     await claims.releaseAll();
   }
 
