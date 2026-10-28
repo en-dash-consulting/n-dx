@@ -382,6 +382,35 @@ describe("groupChangesByRelease", () => {
       .toEqual(["2.0.0", "1.0.0", "1.0.0-rc.10", "1.0.0-rc.1", "1.0.0-beta", "0.9.0"]);
   });
 
+  it("orders v-prefixed labels by semver, not as text", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "v0.9.0" }),
+      change({ id: "b", plannedRelease: "v0.10.0" }),
+      change({ id: "c", plannedRelease: "v1.0.0" }),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["v1.0.0", "v0.10.0", "v0.9.0"]);
+  });
+
+  it("orders a v-prefixed prerelease below its release", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "v1.0.0-rc.1" }),
+      change({ id: "b", plannedRelease: "v1.0.0" }),
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(["v1.0.0", "v1.0.0-rc.1"]);
+  });
+
+  it("gives bare and v-prefixed labels of one version equal precedence, each its own group", () => {
+    const groups = groupChangesByRelease([
+      change({ id: "a", plannedRelease: "0.9.0" }),
+      change({ id: "b", plannedRelease: "v1.0.0" }),
+      change({ id: "c", plannedRelease: "1.0.0" }),
+    ]);
+    expect(groups.map((g) => g.label).sort()).toEqual(["0.9.0", "1.0.0", "v1.0.0"]);
+    // Both 1.0.0 spellings outrank 0.9.0 and neither outranks the other.
+    expect(groups.slice(0, 2).map((g) => g.label).sort()).toEqual(["1.0.0", "v1.0.0"]);
+    expect(groups[2]!.label).toBe("0.9.0");
+  });
+
   it("leads with unscheduled while it holds open work", () => {
     const groups = groupChangesByRelease([
       change({ id: "a", plannedRelease: "1.0.0" }),

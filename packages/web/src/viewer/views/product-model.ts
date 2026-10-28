@@ -450,9 +450,11 @@ const NUMERIC_SEGMENT = /^\d+$/;
 /**
  * A version label: dot-separated digits, optionally a `-` prerelease of
  * dot-separated alphanumeric identifiers (`1.0.0`, `0.10`, `1.0.0-rc.1`).
+ * A leading `v`/`V` (git-tag style, `v0.10.0`) is allowed and carries no
+ * precedence, so `1.0.0` and `v1.0.0` compare equal; each keeps its own label.
  * Build metadata (`+…`) is not accepted; it carries no precedence in semver.
  */
-const VERSION = /^(\d+(?:\.\d+)*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const VERSION = /^[vV]?(\d+(?:\.\d+)*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
 /** Semver prerelease precedence: numeric identifiers below alphanumeric ones. */
 function comparePrerelease(a: string, b: string): number {
