@@ -1,5 +1,11 @@
 schema: "rex/v2"
 items:
   "3b7c3a00-14b8-4e26-8252-15184632213a":
-    lastModified: "2026-10-28T15:11:24.309Z"
+    status: "completed"
+    startedAt: "2026-10-28T17:34:19.967Z"
+    completedAt: "2026-10-28T17:34:19.967Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Covered in layer 2 by 0681b775 (adb87b010, e6939ed41): a git-tracked .n-dx.local.json is repository config, gated until trusted and in the digest. Verified at c95177688: a committed local file adding curl and dropping blocked paths evaluates untrusted (local-config-tracked) and is clamped."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T17:34:24.377Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
