@@ -265,6 +265,10 @@ describe("repository trust under project overrides", () => {
     ["guard.policy.maxTotalCommands negative", { guard: { allowedCommands: ["git"], policy: { maxTotalCommands: -1 } } }],
     ["guard.memoryThrottle.delayThreshold above 100", { guard: { allowedCommands: ["git"], memoryThrottle: { delayThreshold: 101 } } }],
     ["guard.maxConcurrentProcesses fractional", { guard: { allowedCommands: ["git"], maxConcurrentProcesses: 1.5 } }],
+    // zod's int() refuses integers past Number.MAX_SAFE_INTEGER; Number.isInteger does not.
+    ["guard.maxConcurrentProcesses past the safe-integer range", { guard: { allowedCommands: ["git"], maxConcurrentProcesses: 1e20 } }],
+    ["guard.policy.maxTotalCommands past the safe-integer range", { guard: { allowedCommands: ["git"], policy: { maxTotalCommands: 1e20 } } }],
+    ["guard.memoryThrottle.maxRetries past the safe-integer range", { guard: { allowedCommands: ["git"], memoryThrottle: { maxRetries: 1e20 } } }],
     ["guard.env null", { guard: { allowedCommands: ["git"], env: null } }],
     ["guard an array", { guard: [] }],
     ["permissionMode unknown", { permissionMode: "yolo" }],

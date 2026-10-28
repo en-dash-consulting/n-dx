@@ -326,7 +326,9 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const positive: FieldCheck = (v) => isNumber(v) && v > 0;
 const nonNegative: FieldCheck = (v) => isNumber(v) && v >= 0;
-const nonNegativeInt: FieldCheck = (v) => nonNegative(v) && Number.isInteger(v);
+// zod's int() also refuses integers past Number.MAX_SAFE_INTEGER, which
+// Number.isInteger accepts.
+const nonNegativeInt: FieldCheck = (v) => nonNegative(v) && Number.isSafeInteger(v);
 const percent: FieldCheck = (v) => nonNegative(v) && (v as number) <= 100;
 const strings: FieldCheck = (v) => stringArray(v) !== null;
 const optional = (check: FieldCheck): FieldCheck => (v) => v === undefined || check(v);
@@ -345,7 +347,7 @@ const HENCH_FIELD_CHECKS: Record<string, FieldCheck> = {
     commandTimeout: optional(positive),
     maxFileSize: optional(positive),
     spawnTimeout: optional(nonNegative),
-    maxConcurrentProcesses: optional((v) => positive(v) && Number.isInteger(v)),
+    maxConcurrentProcesses: optional((v) => positive(v) && Number.isSafeInteger(v)),
     allowedGitSubcommands: optional(strings),
     policy: optional(shape({
       maxCommandsPerMinute: optional(nonNegativeInt),
