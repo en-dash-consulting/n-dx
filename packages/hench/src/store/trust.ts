@@ -101,9 +101,14 @@ export function applyRepoTrust(
     || guard.allowedGitSubcommands.length !== config.guard.allowedGitSubcommands.length
     || guard.blockedPaths.length !== config.guard.blockedPaths.length
     || envAllowChanged;
+  const withheld = withoutRepositoryTestCommands(config, evaluation);
+  const testCommandsWithheld =
+    withheld.fullTestCommand !== config.fullTestCommand
+    || withheld.testGate?.command !== config.testGate?.command
+    || withheld.testGate?.rerunCommand !== config.testGate?.rerunCommand;
   // `claudePath` picks the binary a Claude run spawns, so only the user's own
   // `.n-dx.local.json` may set it here; the repository's copy is dropped.
-  const { claudePath, ...rest } = config;
+  const { claudePath, ...rest } = withheld;
   const localClaudePath = typeof local?.claudePath === "string" && local.claudePath ? local.claudePath : undefined;
   // `apiKeyEnv` names the variable the API loop sends as the Anthropic key, so
   // the repository's choice gives way to the user's own or the default.
@@ -114,7 +119,37 @@ export function applyRepoTrust(
     evaluation,
     config: { ...rest, ...(localClaudePath ? { claudePath: localClaudePath } : {}), apiKeyEnv, guard },
     permissionMode: lowered,
-    clamped: guardChanged || lowered !== permissionMode || claudePath !== localClaudePath || apiKeyEnv !== config.apiKeyEnv,
+    clamped: guardChanged || lowered !== permissionMode || claudePath !== localClaudePath || apiKeyEnv !== config.apiKeyEnv
+      || testCommandsWithheld,
+  };
+}
+
+/**
+ * The config with the test commands the repository set removed, so the gate
+ * falls back to auto-detection as it would on a checkout that set none.
+ *
+ * Only a value the review read is removed: one that differs came from a layer
+ * the review treats as the user's own (`.n-dx.local.json`), and stays.
+ */
+function withoutRepositoryTestCommands(config: HenchConfig, evaluation: RepoTrustEvaluation): HenchConfig {
+  const reviewed = new Map<string, string>(evaluation.config.gateTestCommands.map((c) => [c.key, c.command]));
+  const keep = (key: string, value: string | undefined) =>
+    value !== undefined && reviewed.get(key) !== value ? value : undefined;
+  const { fullTestCommand, testGate, ...rest } = config;
+  const full = keep("fullTestCommand", fullTestCommand);
+  const command = keep("testGate.command", testGate?.command);
+  const rerunCommand = keep("testGate.rerunCommand", testGate?.rerunCommand);
+  const gateRest = { ...testGate };
+  delete gateRest.command;
+  delete gateRest.rerunCommand;
+  return {
+    ...rest,
+    ...(full !== undefined ? { fullTestCommand: full } : {}),
+    ...(testGate
+      ? { testGate: { ...gateRest, ...(command !== undefined ? { command } : {}), ...(rerunCommand !== undefined ? { rerunCommand } : {}) } }
+      : {}),
+    // The resolver's own `.n-dx.json` read returns only repository content.
+    repositoryTestCommandsWithheld: true,
   };
 }
 

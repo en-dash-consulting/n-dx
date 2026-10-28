@@ -491,6 +491,13 @@ export interface HenchConfig {
    */
   skipFullTestGate?: boolean;
   /**
+   * Set by `applyRepoTrust` (store/trust.ts) while the checkout is restricted:
+   * `fullTestCommand` and `testGate.command` / `rerunCommand` were removed, and
+   * the test-command resolver must not read them back from the project config.
+   * Never persisted; not in the schema.
+   */
+  repositoryTestCommandsWithheld?: boolean;
+  /**
    * Full test suite command for mandatory pre-commit gate.
    * Resolution precedence:
    * 1. .hench/config.json fullTestCommand field

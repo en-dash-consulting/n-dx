@@ -441,6 +441,7 @@ export type {
   GuardBaseline,
   DetectedRepoLanguage,
   RepoMcpServer,
+  RepoGateTestCommand,
   RepoExecutionConfig,
   RepoTrustFindingCode,
   RepoTrustFinding,

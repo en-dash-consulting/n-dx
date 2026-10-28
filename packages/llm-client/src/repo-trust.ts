@@ -305,6 +305,15 @@ export interface RepoMcpServer {
   url: string | null;
 }
 
+/** The hench config keys whose value hench's test gate runs as a shell command. */
+const GATE_TEST_COMMAND_KEYS = ["testGate.command", "testGate.rerunCommand", "fullTestCommand"] as const;
+
+/** A shell command hench's test gate runs, by the `hench.*` key that sets it. */
+export interface RepoGateTestCommand {
+  key: (typeof GATE_TEST_COMMAND_KEYS)[number];
+  command: string;
+}
+
 /** The execution-relevant subset of what the repository ships. */
 export interface RepoExecutionConfig {
   /** Which files were read, relative to the project root. Absent files are omitted. */
@@ -350,6 +359,8 @@ export interface RepoExecutionConfig {
   provider: string | null;
   /** The project config's `rex.test`, else `.rex/config.json` → `test`: the command rex runs. */
   testCommand: string | null;
+  /** The commands hench's test gate runs, as the folded hench config sets them, in gate order. */
+  gateTestCommands: RepoGateTestCommand[];
   mcpServers: RepoMcpServer[];
   /**
    * True when the machine-local config file (`.n-dx.local.json`) is in the
@@ -579,6 +590,7 @@ type FieldCheck = (value: unknown) => boolean;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const isString = (v: unknown): v is string => typeof v === "string";
 const positive: FieldCheck = (v) => isNumber(v) && v > 0;
 const nonNegative: FieldCheck = (v) => isNumber(v) && v >= 0;
 // zod's int() also refuses integers past Number.MAX_SAFE_INTEGER, which
@@ -631,6 +643,8 @@ const HENCH_FIELD_CHECKS = {
   permissionMode: optional(oneOf("default", "acceptEdits", "bypassPermissions", "plan")),
   language: optional(oneOf("typescript", "javascript", "go", "swift")),
   provider: optional(oneOf("cli", "api")),
+  fullTestCommand: optional(isString),
+  testGate: optional(shape({ command: optional(isString), rerunCommand: optional(isString) })),
 } satisfies Record<string, FieldCheck>;
 
 /**
@@ -714,6 +728,21 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   const envAllow = rawEnv ? stringArray(rawEnv.allow) ?? [] : [];
   const envDeny = rawEnv ? stringArray(rawEnv.deny) ?? [] : [];
 
+  // hench's gate runs `testGate.command`, else `fullTestCommand`, and
+  // `testGate.rerunCommand` after an unattended failure — each read from the
+  // folded config, so a repository that sets one is running a shell command
+  // exactly as it does with `rex.test`.
+  const testGate = isRecord(merged.testGate) ? merged.testGate : {};
+  const gateValues: Record<RepoGateTestCommand["key"], unknown> = {
+    "testGate.command": testGate.command,
+    "testGate.rerunCommand": testGate.rerunCommand,
+    fullTestCommand: merged.fullTestCommand,
+  };
+  const gateTestCommands: RepoGateTestCommand[] = GATE_TEST_COMMAND_KEYS.flatMap((key) => {
+    const command = optionalString(gateValues[key]);
+    return command ? [{ key, command }] : [];
+  });
+
   const rexConfigPath = join(layout.rexDir, "config.json");
   const rexConfig = readJson(rexConfigPath);
   if (rexConfig) sources.push(relOf(root, rexConfigPath));
@@ -787,6 +816,8 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
     testCommand: projectTest ?? optionalString(rexConfig?.test),
+    // Present only when set, for the same reason as `envAllow`.
+    ...(gateTestCommands.length ? { gateTestCommands } : {}),
     mcpServers,
     // Present only when tracked, so no untracked checkout's digest moves.
     ...(localConfigTracked ? { localConfigTracked: true } : {}),
@@ -804,6 +835,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     localConfigTracked,
     localConfigUnanswered,
     localConfigTrackedPaths,
+    gateTestCommands,
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
 }
@@ -1057,6 +1089,18 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
         ? `git could not confirm ${file} is untracked (${config.localConfigUnanswered}), so it is treated as repository config; its settings apply only once trusted`
         : `Commits ${committed.join(", ")}${opened}, the machine-local config n-dx otherwise applies as yours; its settings apply only once trusted`,
       values: config.localConfigUnanswered ? [file] : committed,
+    });
+  }
+
+  for (const { key, command } of config.gateTestCommands) {
+    const risky = SHELL_RISK.test(command);
+    findings.push({
+      code: "test-command",
+      severity: risky ? "warning" : "info",
+      message: risky
+        ? `Defines a command hench's test gate runs (hench.${key}) that chains or fetches: ${command}`
+        : `Defines a command hench's test gate runs (hench.${key}): ${command}`,
+      values: [command],
     });
   }
 
@@ -1359,6 +1403,9 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
     lines.push("  Until trusted, hench runs with the default guard (the repository's config can only tighten it),");
     lines.push("  bypassPermissions is lowered to acceptEdits, verify_criteria does not run the test command,");
     lines.push("  and the project config's API endpoints and API key variables are ignored.");
+    if (ev.config.gateTestCommands.length) {
+      lines.push("  hench's test gate ignores the repository's test commands and auto-detects one instead.");
+    }
     const tracked = ev.findings.find((f) => f.code === "local-config-tracked");
     if (tracked && ev.config.localConfigUnanswered) {
       // git rm --cached would fail with the same error, and the file may not be committed.
