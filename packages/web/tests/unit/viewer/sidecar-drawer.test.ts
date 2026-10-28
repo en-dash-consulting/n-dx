@@ -663,11 +663,29 @@ describe("vendor CLI setup (state A)", () => {
 // ── Tool calls ─────────────────────────────────────────────────────────────
 
 describe("tool calls", () => {
-  const call = (seq: number, tool: string, input: Record<string, unknown>): SidecarFrame => ({
-    seq, at: "t", type: "event", event: { type: "tool_use", toolCall: { tool, input } },
+  const call = (seq: number, tool: string, input: Record<string, unknown>, id?: string): SidecarFrame => ({
+    seq, at: "t", type: "event", event: { type: "tool_use", toolCall: { tool, input, ...(id ? { id } : {}) } },
   });
-  const result = (seq: number, tool: string, output: string): SidecarFrame => ({
-    seq, at: "t", type: "event", event: { type: "tool_result", toolResult: { tool, output, durationMs: 5 } },
+  const result = (seq: number, tool: string, output: string, callId?: string): SidecarFrame => ({
+    seq, at: "t", type: "event",
+    event: { type: "tool_result", toolResult: { tool, output, durationMs: 5, ...(callId ? { callId } : {}) } },
+  });
+
+  it("pairs a result naming its call by id with that call, whatever the order", () => {
+    const paired = pairToolResults([
+      call(1, "Read", { file_path: "a" }, "toolu_A"), call(2, "Read", { file_path: "b" }, "toolu_B"),
+      result(3, "unknown", "B", "toolu_B"), result(4, "unknown", "A", "toolu_A"),
+      result(5, "unknown", "stray", "toolu_gone"),
+    ]);
+    expect([...paired].map(([seq, r]) => [seq, r.output]).sort()).toEqual([[1, "A"], [2, "B"]]);
+  });
+
+  it("keeps the order rule for a result without an id beside calls that have one", () => {
+    const paired = pairToolResults([
+      call(1, "Read", { file_path: "a" }, "toolu_A"), call(2, "shell", { command: "ls" }),
+      result(3, "unknown", "A", "toolu_A"), result(4, "unknown", "files"),
+    ]);
+    expect([...paired].map(([seq, r]) => [seq, r.output]).sort()).toEqual([[1, "A"], [2, "files"]]);
   });
 
   it("summarizes a call to one line and pairs results with their calls in order", () => {

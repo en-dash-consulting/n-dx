@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "2cef4b2a-3b4b-4230-88f1-f7842ccdfd71":
-    lastModified: "2026-10-28T18:50:35.053Z"
+    status: "completed"
+    startedAt: "2026-10-28T18:51:11.671Z"
+    completedAt: "2026-10-28T19:06:27.771Z"
+    endedAt: "2026-10-28T19:06:27.771Z"
+    activeIntervals: [{"end":"2026-10-28T19:06:27.771Z","start":"2026-10-28T18:51:11.671Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Driver parseLineEvents yields one tool_result per Claude user-line block with callId; tool_use carries id; drawer, hench legacy path and accumulator pair by id."
+    lastModified: "2026-10-28T19:06:27.771Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3cf901ba-8119-4a0f-ad16-7941665cedbe":
     lastModified: "2026-10-28T18:50:37.315Z"

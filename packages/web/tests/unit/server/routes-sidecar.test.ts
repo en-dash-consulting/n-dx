@@ -82,6 +82,26 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
       setImmediate(() => exit(1, null));
       return;
     }
+    if (prompt.includes("TOOLS")) {
+      // Recorded Claude stream-json: a Read call, answered on a `user` line by
+      // a tool_result block naming the call's id.
+      out({
+        type: "assistant", session_id: id, parent_tool_use_id: null,
+        message: {
+          id: `m-${spawns}`, role: "assistant", model: "claude-sonnet-4-5",
+          content: [{ type: "tool_use", id: "toolu_01R", name: "Read", input: { file_path: "/repo/a.ts" } }],
+          usage: { input_tokens: 10, output_tokens: 4 },
+        },
+      });
+      out({
+        type: "user", session_id: id, parent_tool_use_id: null,
+        message: { role: "user", content: [{ tool_use_id: "toolu_01R", type: "tool_result", content: "     1\texport const a = 1;" }] },
+        tool_use_result: { type: "text", file: { filePath: "/repo/a.ts", numLines: 1 } },
+      });
+      out({ type: "result", session_id: id, result: "read it" });
+      setImmediate(() => exit(0, null));
+      return;
+    }
     if (prompt.includes("HANG")) {
       out({ type: "assistant", session_id: id, message: { content: [{ type: "text", text: "working" }] } });
       return;
@@ -305,6 +325,17 @@ describe("turns", () => {
     const events = (await frames(id, 0)).frames.flatMap((f) => (f.type === "event" ? [f.event] : []));
     expect(events.find((e) => e.type === "assistant")?.text).toBe(REPLY);
     expect(events.find((e) => e.type === "completion")?.completionSummary).toBe(REPLY);
+  });
+
+  it("keeps a Claude tool result in the transcript, naming the call it answers", async () => {
+    const id = await createSession();
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "TOOLS" } });
+    await turnClosed(id);
+    const events = (await frames(id, 0)).frames.flatMap((f) => (f.type === "event" ? [f.event] : []));
+    expect(events.find((e) => e.type === "tool_use")?.toolCall).toMatchObject({ tool: "Read", id: "toolu_01R" });
+    expect(events.filter((e) => e.type === "tool_result").map((e) => e.toolResult)).toEqual([
+      { tool: "unknown", output: "     1\texport const a = 1;", durationMs: 0, callId: "toolu_01R" },
+    ]);
   });
 
   it("marks a turn that failed on the vendor's sign-in error, and no other failure", async () => {

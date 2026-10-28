@@ -95,23 +95,26 @@ export function summarizeToolInput(input: Record<string, unknown>): string {
 }
 
 /**
- * The result of each tool call, by the call's `seq`. A result carries no call
- * id, and Claude's and Codex's function-call results carry no tool name
- * either (`"unknown"`), so a result belongs to the earliest still-unanswered
- * call to the same tool when it names one, else to the earliest
- * still-unanswered call — vendor CLIs answer calls in order.
+ * The result of each tool call, by the call's `seq`. A result that names its
+ * call (Claude's `tool_use_id`, as `callId`) belongs to the open call with that
+ * id, or to none. A result without one — Codex's — belongs to the earliest
+ * still-unanswered call to the same tool when it names one, else to the
+ * earliest still-unanswered call: vendor CLIs answer calls in order.
  */
 export function pairToolResults(frames: readonly SidecarFrame[]): Map<number, ToolResult> {
-  const open: Array<{ seq: number; tool: string }> = [];
+  const open: Array<{ seq: number; tool: string; id?: string }> = [];
   const paired = new Map<number, ToolResult>();
   for (const frame of frames) {
     if (frame.type !== "event" || frame.checkpoint) continue;
     const { event } = frame;
     if (event.type === "tool_use" && event.toolCall) {
-      open.push({ seq: frame.seq, tool: event.toolCall.tool });
+      open.push({ seq: frame.seq, tool: event.toolCall.tool, id: event.toolCall.id });
     } else if (event.type === "tool_result" && event.toolResult) {
-      const named = open.findIndex((c) => c.tool === event.toolResult!.tool);
-      const index = named >= 0 ? named : open.length > 0 ? 0 : -1;
+      const { callId, tool } = event.toolResult;
+      const named = open.findIndex((c) => c.tool === tool);
+      const index = callId
+        ? open.findIndex((c) => c.id === callId)
+        : named >= 0 ? named : open.length > 0 ? 0 : -1;
       if (index < 0) continue;
       const [call] = open.splice(index, 1);
       paired.set(call.seq, event.toolResult);

@@ -63,8 +63,8 @@ export interface SidecarSessionEntry {
 export interface SidecarRuntimeEvent {
   type: "assistant" | "tool_use" | "tool_result" | "completion" | "failure" | "token_usage";
   text?: string;
-  toolCall?: { tool: string; input: Record<string, unknown> };
-  toolResult?: { tool: string; output: string; durationMs: number };
+  toolCall?: { tool: string; input: Record<string, unknown>; id?: string };
+  toolResult?: { tool: string; output: string; durationMs: number; callId?: string };
   failure?: { message?: string };
 }
 

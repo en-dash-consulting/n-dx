@@ -240,6 +240,18 @@ export interface VendorAdapter {
   ): RuntimeEvent | null;
 
   /**
+   * Every event one output line carries, in order. Optional: an adapter whose
+   * lines never hold more than one event leaves it out and the run loop uses
+   * {@link parseEvent}. Claude implements it because one `user` line answers
+   * several tool calls.
+   */
+  parseEvents?(
+    line: string,
+    turn: number,
+    metadata: Record<string, unknown>,
+  ): RuntimeEvent[];
+
+  /**
    * Pull the vendor's session id out of one parsed JSONL line, or return
    * `undefined` when the line does not carry one.
    *
@@ -286,4 +298,11 @@ export interface VendorAdapter {
    * @returns The appropriate FailureCategory
    */
   classifyError(err: unknown): FailureCategory;
+}
+
+/** Every event one output line carries: {@link VendorAdapter.parseEvents}, else {@link VendorAdapter.parseEvent}. */
+export function parseLineEvents(adapter: VendorAdapter, line: string, turn: number): RuntimeEvent[] {
+  if (adapter.parseEvents) return adapter.parseEvents(line, turn, {});
+  const event = adapter.parseEvent(line, turn, {});
+  return event ? [event] : [];
 }

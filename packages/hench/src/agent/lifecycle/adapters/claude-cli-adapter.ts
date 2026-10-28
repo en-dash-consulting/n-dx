@@ -253,6 +253,11 @@ export const claudeCliAdapter: VendorAdapter = {
     return claudeSessionDriver.parseLine(line, turn);
   },
 
+  /** A `user` line answers several tool calls: one tool_result per block. */
+  parseEvents(line: string, turn: number): RuntimeEvent[] {
+    return claudeSessionDriver.parseLineEvents(line, turn);
+  },
+
   /**
    * The Claude CLI stamps `session_id` on many stream-json lines, so the
    * first one wins — see the run loop, which keeps only the first value.
