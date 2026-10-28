@@ -231,6 +231,42 @@ describe("rex on a v2 tree", () => {
     expect(titles).not.toContain("General");
   });
 
+  it("analyze --accept makes a decomposed task's proposed subtasks tasks under its change", async () => {
+    await writeFile(join(tmp, ".rex", "pending-proposals.json"), JSON.stringify([{
+      epic: { title: "Billing", source: "llm" },
+      features: [{
+        title: "Refunds",
+        source: "llm",
+        tasks: [{
+          title: "Refund to the card",
+          source: "llm",
+          sourceFile: "src/refund.ts",
+          priority: "high",
+          tags: ["billing"],
+          acceptanceCriteria: ["A refund reaches the card"],
+          decomposition: {
+            thresholdWeeks: 2,
+            children: [
+              { title: "Call the gateway's refund API", source: "llm", sourceFile: "src/refund.ts", acceptanceCriteria: ["The API answers ok"] },
+              { title: "Show the refund on the receipt", source: "llm", sourceFile: "src/receipt.ts" },
+            ],
+          },
+        }],
+      }],
+    }]));
+
+    const out = run(["analyze", "--accept", tmp], tmp);
+    expect(out).toMatch(/Added 1 change to the Inbox, with 2 proposed subtasks as their tasks\./);
+
+    const tree = JSON.parse(run(["tree", "--format=json", tmp], tmp)) as { items: Array<TreeItem & { type?: string; needsPlacement?: boolean; priority?: string; source?: string }> };
+    const change = flatten(tree.items).find((i) => i.title === "Refund to the card") as (typeof tree.items)[number];
+    expect(change).toMatchObject({ type: "change", needsPlacement: true, priority: "high", source: "llm" });
+    expect((change.children ?? []).map((c) => c.title)).toEqual([
+      "Call the gateway's refund API",
+      "Show the refund on the receipt",
+    ]);
+  });
+
   it("restore refuses, saying it is v1-only", async () => {
     const out = run(["restore", tmp], tmp, true);
     expect(out).toMatch(/v1/);

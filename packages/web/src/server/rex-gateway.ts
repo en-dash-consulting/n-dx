@@ -40,6 +40,11 @@ export { isChangeLayerStore, completeV2Work } from "@n-dx/rex";
 // A task added under a change from the detail panel: rex's own add rule (the
 // one MCP add_item runs), so a closed change, a split and the slug stay rex's.
 export { addChangeNode } from "@n-dx/rex";
+// Accepting analyze proposals on a v2 tree: rex's own mapping (one Inbox change
+// per proposed leaf, its proposed subtasks as tasks), the one `rex analyze
+// --accept` runs, so the dashboard and the CLI create the same changes.
+export { changeInputsFromProposals, addProposedChanges } from "@n-dx/rex";
+export type { ProposedWork } from "@n-dx/rex";
 export type { PRDStore } from "@n-dx/rex";
 // The Product, Changes and capability views on a v2 tree: rex's model and its
 // derived product status, never recomputed in web (routes-rex/product.ts).

@@ -713,6 +713,10 @@ export type { ApplyOn } from "./core/apply-policy.js";
 // Adding a node to the change layer: the rule MCP add_item and `rex add` run.
 export { addChangeNode, AddChangeNodeError } from "./core/change-add.js";
 export type { AddChangeNodeInput, AddChangeNodeResult } from "./core/change-add.js";
+// Accepted analyze proposals as changes: the mapping `rex analyze --accept`
+// runs on a v2 tree, so the dashboard's accept routes create the same changes.
+export { changeInputsFromProposals, addProposedChanges } from "./recommend/changes-from-proposals.js";
+export type { ProposedWork, ProposedChangeInput } from "./recommend/changes-from-proposals.js";
 export { completeV2Work } from "./cli/v2-completion.js";
 export type { V2Completion, V2CompletionOptions } from "./cli/v2-completion.js";
 export { ChangeLayerStore, isChangeLayerStore } from "./store/change-layer-store.js";

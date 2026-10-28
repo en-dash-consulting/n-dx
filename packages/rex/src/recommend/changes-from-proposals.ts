@@ -16,13 +16,19 @@
  * constraint it amends or touches — the one door sourcevision's findings enter
  * through.
  *
- * Pure: no I/O, no store, no tree.
+ * A leaf's proposed subtasks (an oversized task's LoE decomposition) become
+ * tasks under the change the leaf makes: a v2 change does carry tasks, so
+ * that breakdown has somewhere to go, unlike the grouping above it.
+ *
+ * Pure: no I/O and no store. {@link addProposedChanges} adds the result to a
+ * tree in memory, for the CLI's transaction and the dashboard's alike.
  *
  * @module rex/recommend/changes-from-proposals
  */
 
 import { withSelfHealTag } from "../store/self-heal-tag.js";
-import type { AddChangeNodeInput } from "../core/change-add.js";
+import { addChangeNode, type AddChangeNodeInput, type AddChangeNodeOptions } from "../core/change-add.js";
+import type { RuleNode, V2Tree } from "../schema/v2-rules.js";
 import type { Priority } from "./types.js";
 
 /** A proposed epic, feature or task, as the mapper needs it. */
@@ -43,7 +49,18 @@ export interface ProposedWork {
   status?: string;
   /** Proposed under this one. A node with children proposes no work of its own. */
   children?: readonly ProposedWork[];
+  /**
+   * A leaf's proposed subtasks — the LoE decomposition of an oversized task.
+   * Each open one becomes a task under the change this leaf makes.
+   */
+  subtasks?: readonly ProposedWork[];
 }
+
+/** A change to add, with the tasks to add under it once it exists. */
+export type ProposedChangeInput = AddChangeNodeInput & {
+  /** Tasks for this change; their `parentId` is filled with the new change's id. */
+  tasks?: AddChangeNodeInput[];
+};
 
 /**
  * A proposal in one of these states describes the codebase as it already is,
@@ -61,8 +78,8 @@ const CLOSED_STATUSES: ReadonlySet<string> = new Set(["completed", "cancelled", 
  * work — so an epic with features, or a feature with tasks, is not created.
  * A closed leaf contributes nothing either; see {@link CLOSED_STATUSES}.
  */
-export function changeInputsFromProposals(work: readonly ProposedWork[]): AddChangeNodeInput[] {
-  const inputs: AddChangeNodeInput[] = [];
+export function changeInputsFromProposals(work: readonly ProposedWork[]): ProposedChangeInput[] {
+  const inputs: ProposedChangeInput[] = [];
   for (const node of work) {
     if (node.children?.length) {
       inputs.push(...changeInputsFromProposals(node.children));
@@ -82,18 +99,62 @@ export function changeInputsFromProposals(work: readonly ProposedWork[]): AddCha
     // Stamped here rather than in the store: `addChangeNode` is shared by
     // every v2 writer, and only an accepted recommendation during a self-heal
     // run is self-heal work.
-    const input = withSelfHealTag({
-      type: "change" as const,
-      title,
-      ...(node.description ? { description: node.description } : {}),
-      ...(node.acceptanceCriteria?.length ? { acceptanceCriteria: node.acceptanceCriteria } : {}),
-      ...(node.priority ? { priority: node.priority } : {}),
-      ...(node.source ? { source: node.source } : {}),
-      ...(tags.length ? { tags } : {}),
-    });
-    inputs.push(input as AddChangeNodeInput);
+    const input = withSelfHealTag({ type: "change" as const, ...workFields(node, title, tags) });
+    const tasks = taskInputsFrom(node.subtasks ?? []);
+    inputs.push({ ...(input as AddChangeNodeInput), ...(tasks.length ? { tasks } : {}) });
   }
   return inputs;
+}
+
+/** The fields a proposed node carries onto the change or task made from it. */
+function workFields(node: ProposedWork, title: string, tags: readonly string[]) {
+  return {
+    title,
+    ...(node.description ? { description: node.description } : {}),
+    ...(node.acceptanceCriteria?.length ? { acceptanceCriteria: node.acceptanceCriteria } : {}),
+    ...(node.priority ? { priority: node.priority } : {}),
+    ...(node.source ? { source: node.source } : {}),
+    ...(tags.length ? { tags: [...tags] } : {}),
+  };
+}
+
+/** A task input per open, titled subtask; `parentId` is left for {@link addProposedChanges}. */
+function taskInputsFrom(subtasks: readonly ProposedWork[]): AddChangeNodeInput[] {
+  const tasks: AddChangeNodeInput[] = [];
+  for (const sub of subtasks) {
+    if (sub.status && CLOSED_STATUSES.has(sub.status)) continue;
+    const title = sub.title.trim();
+    if (!title) continue;
+    tasks.push(withSelfHealTag({ type: "task" as const, ...workFields(sub, title, sub.tags ?? []) }) as AddChangeNodeInput);
+  }
+  return tasks;
+}
+
+/**
+ * Add `inputs` to `tree` in memory: each change, then its tasks under it.
+ *
+ * Returns the new tree and every node added, a change before its tasks. Throws
+ * {@link AddChangeNodeError} as {@link addChangeNode} does; the caller's
+ * transaction then writes nothing.
+ */
+export function addProposedChanges(
+  start: V2Tree,
+  inputs: readonly ProposedChangeInput[],
+  options: AddChangeNodeOptions,
+): { tree: V2Tree; nodes: RuleNode[] } {
+  let tree = start;
+  const nodes: RuleNode[] = [];
+  for (const { tasks, ...input } of inputs) {
+    const out = addChangeNode(tree, input, options);
+    tree = out.tree;
+    nodes.push(out.node);
+    for (const task of tasks ?? []) {
+      const added = addChangeNode(tree, { ...task, parentId: out.node.id }, options);
+      tree = added.tree;
+      nodes.push(added.node);
+    }
+  }
+  return { tree, nodes };
 }
 
 /** A flat recommendation, linked to its parent by id — the shape `rex recommend` builds. */
@@ -107,7 +168,7 @@ export interface FlatRecommendation extends Omit<ProposedWork, "children"> {
  * `rex recommend` produces (one epic, a feature per zone+category, a task per
  * finding chunk). A recommendation with no id can have no children.
  */
-export function changeInputsFromRecommendations(recs: readonly FlatRecommendation[]): AddChangeNodeInput[] {
+export function changeInputsFromRecommendations(recs: readonly FlatRecommendation[]): ProposedChangeInput[] {
   const childrenOf = new Map<string, FlatRecommendation[]>();
   const roots: FlatRecommendation[] = [];
   for (const rec of recs) {
