@@ -451,6 +451,41 @@ describe("writePrdModel", () => {
     expect(Object.keys(await snapshot(rexDir))).toContain("changes/add-apple-pay/wire-the-button.md");
   });
 
+  describe("a non-tree file in a product folder whose node goes", () => {
+    const AREA = "a0000000-0000-4000-8000-000000000001";
+    async function withNotes(): Promise<{ rexDir: string; model: PrdModel }> {
+      const rexDir = await copyFixture();
+      await writeFile(join(rexDir, "product/checkout/notes.txt"), "keep me\n");
+      const model = await loadPrdModel(rexDir, quiet);
+      expect(find(all(model), AREA).children?.map((c) => c.id)).toEqual([CAPABILITY]);
+      return { rexDir, model };
+    }
+
+    it("refuses removing the last child of a folder that holds notes.txt, naming it, before anything is written", async () => {
+      const { rexDir, model } = await withNotes();
+      const before = await snapshot(rexDir);
+      find(all(model), AREA).children = [];
+      await expect(write(rexDir, model, { removed: new Set([CAPABILITY]) })).rejects.toThrow(/notes\.txt/);
+      expect(await snapshot(rexDir)).toEqual(before);
+    });
+
+    it("refuses removing the folder node itself while it holds notes.txt", async () => {
+      const { rexDir, model } = await withNotes();
+      const before = await snapshot(rexDir);
+      model.tree.product = model.tree.product.filter((n) => n.id !== AREA);
+      await expect(write(rexDir, model, { removed: new Set([AREA, CAPABILITY]) })).rejects.toThrow(/notes\.txt/);
+      expect(await snapshot(rexDir)).toEqual(before);
+    });
+
+    it("leaves no product folder without an index.md for the next read to warn about", async () => {
+      const { rexDir, model } = await withNotes();
+      find(all(model), AREA).children = [];
+      await write(rexDir, model, { removed: new Set([CAPABILITY]) }).catch(() => {});
+      const reread = await loadPrdModel(rexDir, quiet);
+      expect(reread.warnings.filter((w) => /no index\.md/.test(w.message))).toEqual([]);
+    });
+  });
+
   it("refuses to turn a folder into a leaf while its state.yaml holds keys this build does not know", async () => {
     const rexDir = await copyFixture();
     const model = await loadPrdModel(rexDir, quiet);
