@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { dirname, join, relative, resolve as resolvePath } from "node:path";
 import {
   SCHEMA_VERSION_V2,
   isV2Schema,
@@ -479,7 +479,15 @@ describe("isolation", () => {
     // (core/change-next-task.ts), and v2 completion and apply-on-complete
     // behind update_task_status and `rex update --status`
     // (cli/v2-completion.ts), and the v1 deprecation notice, which reads the
-    // product folder name (cli/legacy-layout-notice.ts).
+    // product folder name (cli/legacy-layout-notice.ts), and the callers that
+    // a name-matching check never saw: the analyzers and `rex recommend`,
+    // which tag code-health work with placement's CODE_HEALTH_TAG
+    // (analyze/propose.ts, analyze/scanners.ts, cli/commands/recommend.ts),
+    // the placement reason pass (analyze/place-reason.ts), the migration's
+    // placement passes and seams (migrations/v1-to-v2/placement-pass.ts,
+    // jev-review-pass.ts, seams.ts) and `rex migrate plan`, which reads the
+    // placement settings (cli/commands/migrate-plan.ts), and the claim tools,
+    // which skip a task whose change is claimed (cli/mcp-tools/claims.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -555,19 +563,52 @@ describe("isolation", () => {
         "cli/v2-completion.ts",
         "cli/legacy-layout-notice.ts",
         "analyze/place-draft.ts",
+        "analyze/propose.ts",
+        "analyze/scanners.ts",
+        "analyze/place-reason.ts",
+        "cli/commands/recommend.ts",
+        "cli/commands/migrate-plan.ts",
+        "migrations/v1-to-v2/placement-pass.ts",
+        "migrations/v1-to-v2/jev-review-pass.ts",
+        "migrations/v1-to-v2/seams.ts",
+        "cli/mcp-tools/claims.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),
     );
-    const v2Import =
-      /from\s+["'][^"']*(?:schema\/v2(?:-rules)?|\/state-writer|\/prd-model-(?:reader|writer|transaction))(?:\.js)?["']|from\s+["']\.\/v2(?:-rules)?(?:\.js)?["']/;
+    // The v2 modules themselves; the rest of v2Files are the callers wired to
+    // them. Every import of one of these, static, side-effect or dynamic,
+    // counts, resolved by path rather than matched by name.
+    const v2Modules = new Set(
+      [
+        "schema/v2.ts",
+        "schema/v2-rules.ts",
+        "store/state-writer.ts",
+        "store/prd-model-reader.ts",
+        "store/prd-model-writer.ts",
+        "store/prd-model-transaction.ts",
+        "core/apply-amendments.ts",
+        "core/apply-policy.ts",
+        "core/product-edit.ts",
+        "core/product-edges.ts",
+        "core/product-status.ts",
+        "core/change-landing.ts",
+        "core/placement.ts",
+        "core/placement-policy.ts",
+        "core/change-selection.ts",
+        "core/change-completion.ts",
+        "core/change-brief.ts",
+        "codeowners/plan.ts",
+      ].map((f) => join(srcRoot, f)),
+    );
+    for (const module of v2Modules) expect(v2Files.has(module), relative(srcRoot, module)).toBe(true);
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const p = join(dir, entry.name);
         if (entry.isDirectory()) walk(p);
         else if (entry.name.endsWith(".ts") && !v2Files.has(p)) {
-          if (v2Import.test(readFileSync(p, "utf8"))) {
+          if (v2ImportsIn(p, readFileSync(p, "utf8"), v2Modules).length > 0) {
             offenders.push(relative(srcRoot, p));
           }
         }
@@ -575,5 +616,44 @@ describe("isolation", () => {
     };
     walk(srcRoot);
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * The relative module specifiers in `source` (static `from`, side-effect
+ * `import "…"` and dynamic `import("…")`) that resolve, from `file`, to a
+ * module in `targets`. Derived from the set itself, so it cannot drift from it.
+ */
+function v2ImportsIn(file: string, source: string, targets: ReadonlySet<string>): string[] {
+  const specifier = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'](\.{1,2}\/[^"']+)["']/g;
+  const hits: string[] = [];
+  for (const [, spec] of source.matchAll(specifier)) {
+    const path = resolvePath(dirname(file), spec);
+    const candidates = [path.replace(/\.js$/, ".ts"), `${path}.ts`, join(path, "index.ts")];
+    if (candidates.some((c) => targets.has(c))) hits.push(spec);
+  }
+  return hits;
+}
+
+describe("the v2 isolation check", () => {
+  const srcRoot = join(import.meta.dirname, "../../../src");
+  const targets = new Set(["core/apply-amendments.ts", "store/prd-model-transaction.ts", "schema/v2.ts"].map((f) => join(srcRoot, f)));
+  const from = join(srcRoot, "core/some-v1-module.ts");
+
+  it("reports a static import of any module in the set, core modules included", () => {
+    expect(v2ImportsIn(from, `import { applyAmendments } from "./apply-amendments.js";`, targets)).toEqual(["./apply-amendments.js"]);
+    expect(v2ImportsIn(from, `import type { V2Node } from "../schema/v2.js";`, targets)).toEqual(["../schema/v2.js"]);
+    expect(v2ImportsIn(from, `export { applyAmendments } from "./apply-amendments.js";`, targets)).toHaveLength(1);
+    expect(v2ImportsIn(from, `import "./apply-amendments.js";`, targets)).toHaveLength(1);
+  });
+
+  it("reports a dynamic import() of a module in the set", () => {
+    expect(v2ImportsIn(from, `const tx = await import("../store/prd-model-transaction.js");`, targets)).toEqual([
+      "../store/prd-model-transaction.js",
+    ]);
+  });
+
+  it("ignores modules outside the set and package imports", () => {
+    expect(v2ImportsIn(from, `import { x } from "./tree.js";\nimport { z } from "zod";\nawait import("./move.js");`, targets)).toEqual([]);
   });
 });
