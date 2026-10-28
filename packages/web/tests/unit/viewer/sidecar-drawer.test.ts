@@ -94,7 +94,7 @@ function stubServer(): void {
     }
     if (url === "/api/project") return json({ name: "n-dx", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
     if (url === "/api/llm/config") return json({ vendor: "codex" });
-    if (url === "/api/llm/catalog") {
+    if (url === "/api/llm/catalog" || url === "/api/llm/catalog?refresh=true") {
       return json({
         claude: { models: ["claude-sonnet-5-5", "claude-haiku-4-5"], defaultModel: "claude-sonnet-5-5", ...cliProbe("claude") },
         codex: { models: ["gpt-5.5", "gpt-5.5-mini"], defaultModel: "gpt-5.5", ...cliProbe("codex") },
@@ -542,6 +542,22 @@ describe("vendor CLI setup (state A)", () => {
     expect(root.querySelector<HTMLButtonElement>(".sidecar-send")!.disabled).toBe(true);
   });
 
+  it("probes the CLI again on reopen, so installing it clears state A", async () => {
+    server.catalogCli = { claude: false };
+    server.sessions = [{ session: session(), running: false }];
+    await mount();
+    await pressCmdJ();
+    expect(setup()).not.toBeNull();
+    expect(server.requests.some((r) => r.url === "/api/llm/catalog?refresh=true")).toBe(false);
+
+    server.catalogCli = { claude: true };
+    await pressCmdJ();
+    await pressCmdJ();
+    expect(server.requests.some((r) => r.url === "/api/llm/catalog?refresh=true")).toBe(true);
+    expect(setup()).toBeNull();
+    expect(input().disabled).toBe(false);
+  });
+
   it("says nothing about a vendor whose CLI is installed", async () => {
     server.catalogCli = { claude: false, codex: true };
     await mount();
@@ -562,7 +578,19 @@ describe("vendor CLI setup (state A)", () => {
     });
     expect(setup()?.getAttribute("data-reason")).toBe("signed-out");
     expect(setup()?.querySelector("code")?.textContent).toBe("claude /login");
-    expect(input().disabled).toBe(true);
+
+    // After the login, sending again is the retry: the composer stays on, and the send clears state A.
+    expect(input().disabled).toBe(false);
+    await act(async () => {
+      input().value = "again";
+      input().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      root.querySelector("form.sidecar-composer")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await settle();
+    expect(server.requests.some((r) => r.url === "/api/sidecar/sessions/s1/turns")).toBe(true);
+    expect(setup()).toBeNull();
   });
 
   it("does not take another failed turn for a sign-in problem", async () => {

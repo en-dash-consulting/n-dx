@@ -236,7 +236,11 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   };
 
   const setupNeed = sidecarSetupNeed(sidecar.agent, sidecar.catalog, sidecar.lastTurn);
-  const busy = sidecar.running || sidecar.sending || setupNeed !== null;
+  // A missing CLI cannot run a turn, so the composer waits for it. A signed-out
+  // one leaves the composer on: sending again after the login is the retry,
+  // and the send clears the state.
+  const blocked = setupNeed?.reason === "missing-cli" ? setupNeed : null;
+  const busy = sidecar.running || sidecar.sending || blocked !== null;
   const submit = async () => {
     if (busy || !draft.trim()) return;
     if (await sidecar.send(draft)) setDraft("");
@@ -323,7 +327,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       h("textarea", {
         class: "sidecar-input",
         "aria-label": "Message Sidecar",
-        placeholder: setupNeed ? `Set up the ${setupNeed.cli} CLI first` : busy ? "A turn is running…" : "Message Sidecar",
+        placeholder: blocked ? `Install the ${blocked.cli} CLI first` : busy ? "A turn is running…" : "Message Sidecar",
         value: draft,
         disabled: busy,
         rows: 3,

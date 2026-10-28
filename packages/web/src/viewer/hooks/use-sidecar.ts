@@ -235,8 +235,10 @@ async function postJson<T>(url: string, body: unknown): Promise<{ ok: true; data
 }
 
 /** The picker's catalog from GET /api/llm/catalog; null when the route does not answer. */
-async function loadCatalog(): Promise<SidecarCatalog | null> {
-  const body = await getJson<Record<string, { models?: string[]; defaultModel?: string; cli?: { found?: boolean } } | undefined>>("/api/llm/catalog");
+async function loadCatalog(refresh = false): Promise<SidecarCatalog | null> {
+  const body = await getJson<Record<string, { models?: string[]; defaultModel?: string; cli?: { found?: boolean } } | undefined>>(
+    refresh ? "/api/llm/catalog?refresh=true" : "/api/llm/catalog",
+  );
   if (!body) return null;
   const catalog: SidecarCatalog = {};
   for (const vendor of SIDECAR_VENDORS) {
@@ -379,6 +381,8 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
   sessionRef.current = session;
   const pickedRef = useRef<SidecarAgent | null>(null);
   pickedRef.current = picked;
+  const catalogRef = useRef<SidecarCatalog | null>(null);
+  catalogRef.current = catalog;
   const openRef = useRef(open);
   openRef.current = open;
   const tailRef = useRef<Tail>(newTail(null));
@@ -511,7 +515,10 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     if (tailRef.current.sessionId) void fetchFrames();
     void loadSessions();
     void (async () => {
-      const [loaded, vendor] = await Promise.all([loadCatalog(), defaultVendor()]);
+      // The server caches the CLI probe for minutes; a CLI last seen missing is
+      // probed again, so installing it and reopening the drawer clears state A.
+      const cliMissing = Object.values(catalogRef.current ?? {}).some((entry) => entry.cliFound === false);
+      const [loaded, vendor] = await Promise.all([loadCatalog(cliMissing), defaultVendor()]);
       if (!mountedRef.current) return;
       if (loaded) setCatalog(loaded);
       setPicked((prev) => prev ?? { vendor, model: loaded?.[vendor]?.defaultModel ?? "" });
