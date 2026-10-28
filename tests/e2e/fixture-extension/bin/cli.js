@@ -10,6 +10,15 @@ const args = process.argv.slice(2);
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith("NDX_")));
 const config = env.NDX_EXTENSION_CONFIG ? JSON.parse(readFileSync(env.NDX_EXTENSION_CONFIG, "utf-8")) : null;
 
+// The report is the test's readiness signal: install signal handlers first.
+if (args[0] === "wait") {
+  process.on("SIGTERM", () => {
+    console.log("got SIGTERM");
+    process.exit(7);
+  });
+  setInterval(() => {}, 1000);
+}
+
 console.log(JSON.stringify({
   args,
   cwd: process.cwd(),
@@ -19,12 +28,6 @@ console.log(JSON.stringify({
   stateDirExists: Boolean(env.NDX_EXTENSION_STATE_DIR) && existsSync(env.NDX_EXTENSION_STATE_DIR),
 }));
 
-if (args[0] === "wait") {
-  process.on("SIGTERM", () => {
-    console.log("got SIGTERM");
-    process.exit(7);
-  });
-  setInterval(() => {}, 1000);
-} else if (args[0] === "exit") {
+if (args[0] === "exit") {
   process.exit(Number(args[1]));
 }
