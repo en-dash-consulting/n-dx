@@ -22,7 +22,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { compileEnvPolicy, sanitizeChildEnv } from "./child-env.js";
+import { compileEnvPolicy, sanitizeChildEnv, type EnvPolicyConfig } from "./child-env.js";
 import { resolveLayout } from "./layout.js";
 import {
   assessRepoExecutionConfig,
@@ -63,12 +63,16 @@ function localEnvPolicy(projectDir: string): { allow: string[]; deny: string[] }
 }
 
 /**
- * A copy of the parent environment for a repository-owned command, with the
- * credential-shaped variables the project's policy strips removed. Never
- * throws: an unreadable config yields the default policy, which is the
- * strictest one.
+ * The project's `guard.env` policy as a child process may use it: every valid
+ * `deny` list (the repository's and the user's local one), the repository's
+ * `allow` only while it is trusted, and the user's local `allow`. A field that
+ * is not a list of strings is dropped on its own, so a malformed repository
+ * field never discards the user's valid entries. Never throws.
  */
-export function repoCommandEnv(projectDir: string, options: RepoCommandEnvOptions = {}): NodeJS.ProcessEnv {
+export function repoEnvPolicy(
+  projectDir: string,
+  options: Pick<RepoCommandEnvOptions, "trust"> = {},
+): Required<EnvPolicyConfig> {
   const config = collectRepoExecutionConfig(projectDir);
   const state = repoTrustState(
     config,
@@ -79,9 +83,19 @@ export function repoCommandEnv(projectDir: string, options: RepoCommandEnvOption
   // A tracked local file is repository config: its `allow` is already folded
   // into `config.envAllow` and applies only while trusted. `deny` only removes.
   const localAllow = config.localConfigTracked ? [] : local.allow;
-  const policy = compileEnvPolicy({
+  return {
     deny: [...config.envDeny, ...local.deny],
     allow: [...(isRestrictedState(state) ? [] : config.envAllow), ...localAllow],
-  });
+  };
+}
+
+/**
+ * A copy of the parent environment for a repository-owned command, with the
+ * credential-shaped variables the project's policy strips removed. Never
+ * throws: an unreadable config yields the default policy, which is the
+ * strictest one.
+ */
+export function repoCommandEnv(projectDir: string, options: RepoCommandEnvOptions = {}): NodeJS.ProcessEnv {
+  const policy = compileEnvPolicy(repoEnvPolicy(projectDir, options));
   return sanitizeChildEnv(options.env ?? process.env, policy);
 }

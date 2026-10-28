@@ -12,9 +12,15 @@ items:
     lastModified: "2026-10-28T22:45:24.507Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "21837a0a-b748-49fe-8fc3-7128aac83b0c":
+    status: "completed"
+    startedAt: "2026-10-28T22:56:44.194Z"
+    completedAt: "2026-10-28T22:56:44.194Z"
+    endedAt: "2026-10-28T22:56:44.194Z"
+    activeIntervals: [{"end":"2026-10-28T22:56:44.194Z","start":"2026-10-28T22:56:44.194Z"}]
+    appliedAt: "2026-10-28T22:56:44.194Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    needsPlacement: false
-    lastModified: "2026-10-28T21:51:27.433Z"
+    lastModified: "2026-10-28T22:56:44.194Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6e3283a2-797a-4a60-973d-b04c268e09f2":
     status: "completed"
@@ -28,8 +34,15 @@ items:
     lastModified: "2026-10-28T22:38:39.553Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "755f5f63-86fc-473e-b46e-cdd654ec894a":
+    status: "completed"
+    startedAt: "2026-10-28T22:46:03.029Z"
+    completedAt: "2026-10-28T22:56:44.194Z"
+    endedAt: "2026-10-28T22:56:44.194Z"
+    activeIntervals: [{"end":"2026-10-28T22:56:44.194Z","start":"2026-10-28T22:46:03.029Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client repoEnvPolicy(dir) (the policy repoCommandEnv builds: repo + local deny, trust-gated repo allow, local allow; malformed fields dropped singly). Web CLI probe and core loadVendorCheckEnv fallback pass it to resolveVendorCliEnv. Tests in routes-llm-catalog.test.ts and cli-auth.test.js failed pre-fix."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T21:51:29.681Z"
+    lastModified: "2026-10-28T22:56:44.194Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8c2cd508-2e50-41a3-9350-8df138aec452":
     status: "completed"

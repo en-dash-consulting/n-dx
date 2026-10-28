@@ -17,6 +17,7 @@ import {
   exec,
   listVendorModels,
   loadLLMConfig,
+  repoEnvPolicy,
   resolveApiKey,
   resolveGoogleApiKey,
   resolveVendorCliEnv,
@@ -80,12 +81,14 @@ function parseVersion(output: string): string | null {
 
 /**
  * `<binary> --version`, with the vendor's filtered environment from
- * `resolveVendorCliEnv` (the agent loop's resolver), so no credential outside
- * the vendor's mode reaches the binary or anything it runs.
+ * `resolveVendorCliEnv` (the agent loop's resolver) under the project's
+ * `guard.env` policy from `repoEnvPolicy` (the user's own deny entries, the
+ * repository's allow only while trusted), so no credential outside the
+ * vendor's mode, and none the user denied, reaches the binary or anything it runs.
  */
 async function probeCli(vendor: ListableVendor, projectDir: string, config: LLMConfig): Promise<CliInfo> {
   const binary = resolveBinary(vendor, config);
-  const env = resolveVendorCliEnv({ ...config, vendor });
+  const env = resolveVendorCliEnv({ ...config, vendor }, repoEnvPolicy(projectDir));
   const result = await exec(binary, ["--version"], { cwd: projectDir, timeout: CLI_PROBE_TIMEOUT_MS, env });
   if (!result.launched || result.exitCode !== 0) return { found: false, version: null, path: null };
   return { found: true, version: parseVersion(result.stdout) ?? parseVersion(result.stderr), path: binary };

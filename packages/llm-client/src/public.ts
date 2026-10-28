@@ -759,7 +759,8 @@ export {
 export type { EnvPolicy, EnvPolicyConfig } from "./child-env.js";
 // The one environment every repository-owned command runs with (test gate,
 // post-task tests, audit, validation commands, rex verify).
-export { repoCommandEnv } from "./repo-command-env.js";
+// repoEnvPolicy is the same policy for a vendor CLI's resolveVendorCliEnv.
+export { repoCommandEnv, repoEnvPolicy } from "./repo-command-env.js";
 export type { RepoCommandEnvOptions } from "./repo-command-env.js";
 
 // ---- Vendor-CLI invocation log ----------------------------------------------

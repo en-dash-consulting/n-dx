@@ -320,6 +320,25 @@ describe("GET /api/llm/catalog — installed CLI", () => {
     expect(codexEnv?.CODEX_ACCESS_TOKEN).toBe("sentinel-codex");
   });
 
+  it("applies the user's own hench.guard.env.deny to each probed CLI", async () => {
+    vi.stubEnv("NDX_HOME", await mkdtemp(join(tmpdir(), "ndx-llm-catalog-home-")));
+    vi.stubEnv("NDX_USER_DENIED_PLAIN", "placeholder");
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ hench: { guard: { env: { deny: ["NDX_USER_DENIED_*"] } } } }),
+      "utf-8",
+    );
+
+    await getCatalog();
+
+    for (const cmd of ["claude", "codex"]) {
+      const env = execMock.mock.calls.find(([called]) => called === cmd)?.[2]?.env;
+      expect(env, cmd).toBeDefined();
+      expect(env?.PATH, cmd).toBeDefined();
+      expect(env?.NDX_USER_DENIED_PLAIN, cmd).toBeUndefined();
+    }
+  });
+
   it("reports a missing CLI as not found", async () => {
     const body = await getCatalog();
     expect(body.claude.cli).toEqual({ found: false, version: null, path: null });

@@ -374,6 +374,24 @@ describe("ndx auth", () => {
       expectVendorEnv(await seen("claude"), "ANTHROPIC_API_KEY", "OPENAI_API_KEY");
     });
 
+    it("a malformed repository hench.guard.env keeps the user's own deny entries", async () => {
+      await mkdir(join(tmpDir, ".hench"));
+      await writeFile(join(tmpDir, ".hench", "config.json"), JSON.stringify({ guard: { env: { allow: 7 } } }) + "\n");
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }) + "\n");
+      await writeFile(
+        join(tmpDir, ".n-dx.local.json"),
+        JSON.stringify({ hench: { guard: { env: { deny: ["NDX_USER_DENIED_*"] } } } }) + "\n",
+      );
+
+      const { stderr, status } = runNdx(["auth", tmpDir], { ...env, NDX_USER_DENIED_PLAIN: "placeholder" });
+
+      expect(status).toBe(0);
+      expect(stderr).toContain("hench.guard.env is not a usable policy");
+      const names = await seen("claude");
+      expectVendorEnv(names, "ANTHROPIC_API_KEY", "OPENAI_API_KEY");
+      expect(names.has("NDX_USER_DENIED_PLAIN")).toBe(false);
+    });
+
     it("the untrusted-allow warning names the CLI check, not the reviewer", async () => {
       await mkdir(join(tmpDir, ".hench"));
       await writeFile(join(tmpDir, ".hench", "config.json"), JSON.stringify({ guard: { env: { allow: ["GITHUB_TOKEN"] } } }) + "\n");

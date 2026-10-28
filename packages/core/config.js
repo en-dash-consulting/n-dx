@@ -2764,8 +2764,9 @@ export async function loadVendorCliEnv(dir, vendor, options = {}) {
 /**
  * {@link loadVendorCliEnv} for a vendor CLI check (auth preflight, cli_path
  * test). A check must still report on the binary when `hench.guard.env` is
- * malformed, so an unusable policy is named on stderr and the default filter
- * applies, as {@link loadShellTestEnv} does — never the parent environment.
+ * malformed, so an unusable policy is named on stderr and llm-client's
+ * `repoEnvPolicy` applies: it drops only the malformed field and keeps every
+ * valid deny list, the user's local one included — never the parent environment.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
  * @returns {Promise<NodeJS.ProcessEnv>}
@@ -2775,10 +2776,10 @@ async function loadVendorCheckEnv(dir, vendor) {
   try {
     return await loadVendorCliEnv(dir, vendor, { subject });
   } catch (err) {
-    const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
+    const { loadLLMConfig, repoEnvPolicy, resolveVendorCliEnv } = await import("@n-dx/llm-client");
     const reason = err instanceof Error ? err.message : String(err);
-    console.warn(`hench.guard.env is not a usable policy (${reason}); ${subject} uses the default credential filter.`);
-    return resolveVendorCliEnv({ ...(await loadLLMConfig(dir)), vendor });
+    console.warn(`hench.guard.env is not a usable policy (${reason}); ${subject} ignores the malformed field.`);
+    return resolveVendorCliEnv({ ...(await loadLLMConfig(dir)), vendor }, repoEnvPolicy(dir));
   }
 }
 
