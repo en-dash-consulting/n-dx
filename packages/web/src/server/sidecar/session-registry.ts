@@ -30,6 +30,7 @@ import { addTokenUsage, resolveLayout, resumeVendorSession, startVendorSession }
 import type {
   RuntimeEvent,
   SessionTurnResult,
+  SessionTurnStatus,
   TokenUsage,
   VendorSession,
   VendorSessionOptions,
@@ -128,7 +129,16 @@ export interface SidecarContextOptions {
   packet?: (record: SidecarSessionRecord) => Promise<string | undefined>;
 }
 
+/** What one finished turn spent, checkpoint included. */
+export interface SidecarTurnSpend {
+  record: SidecarSessionRecord;
+  status: SessionTurnStatus;
+  tokens: TokenUsage;
+}
+
 export interface SidecarRegistryOptions {
+  /** Called once per finished turn, after its tokens are added to the session. */
+  onTurnSpend?: (spend: SidecarTurnSpend) => void;
   /** Directory holding `index.json` and the transcripts. */
   dir: string;
   /** Per-session options; called each time a vendor session is opened. */
@@ -144,7 +154,7 @@ interface IndexFile {
   sessions: SidecarSessionRecord[];
 }
 
-export interface WorktreeSidecarRegistryOptions extends Pick<SidecarRegistryOptions, "ttlMs" | "now" | "context"> {
+export interface WorktreeSidecarRegistryOptions extends Pick<SidecarRegistryOptions, "ttlMs" | "now" | "context" | "onTurnSpend"> {
   /** Where a session reaches the `ndx-sidecar` broker; absent gives it no MCP server at all. */
   broker?: (sessionId: string) => SidecarBrokerEndpoint | undefined;
 }
@@ -208,6 +218,7 @@ export class SidecarSessionRegistry {
   private readonly ttlMs: number;
   private readonly now: () => number;
   private readonly context?: SidecarContextOptions;
+  private readonly onTurnSpend?: (spend: SidecarTurnSpend) => void;
   /** Sessions with a turn in progress, from the moment `sendTurn` is called until it settles. */
   private readonly turnOpen = new Set<string>();
   /** Open turns the operator stopped before their vendor call began (a cold turn building its packet). */
@@ -223,6 +234,7 @@ export class SidecarSessionRegistry {
     this.ttlMs = opts.ttlMs ?? DEFAULT_SIDECAR_TTL_MS;
     this.now = opts.now ?? Date.now;
     this.context = opts.context;
+    this.onTurnSpend = opts.onTurnSpend;
     for (const record of this.readIndex()) this.records.set(record.id, record);
   }
 
@@ -365,6 +377,7 @@ export class SidecarSessionRegistry {
         if (event.type === "token_usage" && event.tokenUsage) ended = contextTokens(event.tokenUsage);
         append({ seq: record.cursor + 1, at: this.iso(), type: "event", event });
       };
+      const before = record.tokens;
       const result = await live.session.sendTurn(vendorPrompt);
       record.turns += 1;
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
@@ -375,6 +388,7 @@ export class SidecarSessionRegistry {
         const ceiling = context.ceiling(record);
         if (ended > ceiling) await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append);
       }
+      this.onTurnSpend?.({ record: { ...record }, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
       return result;
     } finally {
       // An opening turn that failed or was stopped may never have reached
@@ -582,3 +596,13 @@ export class SidecarSessionRegistry {
   }
 }
 
+
+/** `after` minus `before`, field by field; both are running totals of the same session. */
+function subtractTokenUsage(after: TokenUsage, before: TokenUsage): TokenUsage {
+  const out: TokenUsage = { input: after.input - before.input, output: after.output - before.output };
+  const cacheCreationInput = (after.cacheCreationInput ?? 0) - (before.cacheCreationInput ?? 0);
+  const cacheReadInput = (after.cacheReadInput ?? 0) - (before.cacheReadInput ?? 0);
+  if (cacheCreationInput) out.cacheCreationInput = cacheCreationInput;
+  if (cacheReadInput) out.cacheReadInput = cacheReadInput;
+  return out;
+}

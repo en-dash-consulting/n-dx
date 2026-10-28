@@ -44,6 +44,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { isAuthError, vendorSessionDriver } from "@n-dx/llm-client";
 import type { SessionTurnStatus } from "@n-dx/llm-client";
+import { SIDECAR_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usage.js";
+import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { errorMessage, errorResponse, jsonResponse, readBody } from "./response-utils.js";
@@ -61,6 +63,7 @@ import {
   worktreeSidecarDir,
   type SidecarContextOptions,
   type SidecarFrame,
+  type SidecarRegistryOptions,
   type SidecarSessionRecord,
   type SidecarSessionRegistry,
 } from "./sidecar/session-registry.js";
@@ -100,6 +103,8 @@ export interface SidecarFramesMessage {
 export interface SidecarSessionResponse {
   session: SidecarSessionRecord;
   running: boolean;
+  /** What the session's tokens cost at the session model's rates. */
+  estimatedCost: CostEstimate;
 }
 
 export interface SidecarTurnStartedResponse extends SidecarSessionResponse {
@@ -158,6 +163,28 @@ export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions
   };
 }
 
+/**
+ * Appends each finished turn to the dashboard usage ledger as its own
+ * `sidecar` command, so the spend reaches LLM Utilization in a bucket apart
+ * from Ask. An interrupted turn that never reached the vendor spent nothing
+ * and is not recorded.
+ */
+export function sidecarTurnSpendRecorder(ctx: ServerContext): NonNullable<SidecarRegistryOptions["onTurnSpend"]> {
+  return ({ record, status, tokens }) => {
+    if (status === "interrupted" && tokens.input === 0 && tokens.output === 0) return;
+    recordDashboardUsage(ctx.projectDir, {
+      timestamp: new Date().toISOString(),
+      command: SIDECAR_COMMAND,
+      vendor: record.vendor,
+      model: record.model ?? "unknown",
+      ...tokenFields(tokens),
+      calls: 1,
+      outcome: status === "completed" ? "success" : "error",
+      ...(record.lens && { lens: record.lens }),
+    });
+  };
+}
+
 const registries = new Map<string, SidecarSessionRegistry>();
 const brokers = new Map<string, SidecarBroker>();
 
@@ -167,6 +194,7 @@ function defaultRegistryFor(ctx: ServerContext): SidecarSessionRegistry {
     registry = createWorktreeSidecarRegistry(ctx.projectDir, {
       broker: (id) => sidecarBrokerEndpoint(ctx, id),
       context: sidecarContextOptions(ctx),
+      onTurnSpend: sidecarTurnSpendRecorder(ctx),
     });
     registries.set(ctx.projectDir, registry);
   }
@@ -239,7 +267,12 @@ function readTarget(body: Record<string, unknown>): PacketTarget | undefined | E
 }
 
 function sessionResponse(registry: SidecarSessionRegistry, session: SidecarSessionRecord): SidecarSessionResponse {
-  return { session, running: registry.isRunning(session.id) };
+  const { input, output, cacheCreationInput = 0, cacheReadInput = 0 } = session.tokens;
+  const totals = { inputTokens: input, outputTokens: output, cacheCreationTokens: cacheCreationInput, cacheReadTokens: cacheReadInput };
+  // A session with no pinned model has none to price by: its tokens reach the
+  // estimate as the unattributed residual, at the labelled fallback rate.
+  const estimatedCost = estimateCostFromTotals(totals, session.model ? { [session.model]: totals } : undefined);
+  return { session, running: registry.isRunning(session.id), estimatedCost };
 }
 
 /**

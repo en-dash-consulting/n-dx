@@ -38,7 +38,9 @@ const ASK = pkg({
   calls: 1,
 });
 
-const BREAKDOWN = { hench: HENCH, rex: pkg(), sv: pkg(), web: ASK };
+const SIDECAR = pkg({ inputTokens: 300, outputTokens: 40, calls: 1 });
+
+const BREAKDOWN = { hench: HENCH, rex: pkg(), sv: pkg(), web: ASK, sidecar: SIDECAR };
 
 const COST = {
   total: "$0.05",
@@ -81,13 +83,14 @@ const UTILIZATION = {
       period: "2026-03-01",
       totalTokens: 19_060,
       byVendorModel: [],
-      toolBreakdown: BREAKDOWN,
+      toolBreakdown: { ...BREAKDOWN, sidecar: pkg() },
       estimatedCost: COST,
     },
   ],
   commands: [
     { command: "run", package: "hench", ...HENCH },
     { command: "ask", package: "web", ...ASK },
+    { command: "sidecar", package: "sidecar", ...SIDECAR },
   ],
   budget: { severity: "ok", warnings: [] },
   eventCount: 2,
@@ -154,10 +157,15 @@ describe("LLM Utilization view — dashboard spend", () => {
     expect(donutNames).toContain("Hench");
   });
 
+  it("shows Sidecar spend as a bucket of its own", () => {
+    expect(Array.from(root.querySelectorAll(".pkg-name")).map((n) => n.textContent)).toContain("Sidecar");
+    expect(commandRow("sidecar")[0]).toBe("Sidecar");
+  });
+
   it("offers the dashboard as its own package filter", () => {
     const options = Array.from(root.querySelectorAll<HTMLOptionElement>("select.filter-input option"))
       .map((o) => o.value);
-    expect(options).toEqual(["all", "hench", "rex", "sv", "web"]);
+    expect(options).toEqual(["all", "hench", "rex", "sv", "web", "sidecar"]);
   });
 
   it("keeps the ask row distinguishable from the hench run row", () => {

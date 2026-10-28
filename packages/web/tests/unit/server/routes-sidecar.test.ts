@@ -21,10 +21,12 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import {
   createAnnouncingBroker,
   handleSidecarRoute,
+  sidecarTurnSpendRecorder,
   type SidecarCardMessage,
   type SidecarFramesMessage,
   type SidecarFramesResponse,
 } from "../../../src/server/routes-sidecar.js";
+import { readDashboardUsage } from "../../../src/server/dashboard-usage.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
 import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
@@ -83,7 +85,10 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
       out({ type: "assistant", session_id: id, message: { content: [{ type: "text", text: "working" }] } });
       return;
     }
-    out({ type: "assistant", session_id: id, message: { id: `m-${spawns}`, content: [{ type: "text", text: REPLY }] } });
+    out({
+      type: "assistant", session_id: id,
+      message: { id: `m-${spawns}`, content: [{ type: "text", text: REPLY }], usage: { input_tokens: 10, output_tokens: 4 } },
+    });
     out({ type: "result", session_id: id, result: REPLY });
     setImmediate(() => exit(0, null));
   });
@@ -91,7 +96,11 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
 };
 
 function newRegistry(): SidecarSessionRegistry {
-  return new SidecarSessionRegistry({ dir: join(root, ".hench", "sidecar"), connect: () => ({ spawn: fakeSpawn }) });
+  return new SidecarSessionRegistry({
+    dir: join(root, ".hench", "sidecar"),
+    connect: () => ({ spawn: fakeSpawn }),
+    onTurnSpend: sidecarTurnSpendRecorder(ctx),
+  });
 }
 
 beforeEach(async () => {
@@ -213,6 +222,46 @@ describe("sessions", () => {
     const id = await createSession();
     expect((await api(`/${id}/turns`)).status).toBe(405);
     expect((await api(`/${id}/frames`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("spend", () => {
+  async function runTurn(id: string, prompt: string): Promise<void> {
+    const closed = turnClosed(id);
+    expect((await api(`/${id}/turns`, { method: "POST", body: { prompt } })).status).toBe(202);
+    await closed;
+  }
+
+  it("appends one ledger line per finished turn, with the lens when set", async () => {
+    const lensed = (await (await api("", { method: "POST", body: { vendor: "claude", model: "claude-opus-5", lens: "plan" } })).json()).session.id;
+    await runTurn(lensed, "one");
+    const plain = await createSession();
+    await runTurn(plain, "two");
+
+    const lines = readDashboardUsage(root);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({
+      command: "sidecar", vendor: "claude", model: "claude-opus-5", inputTokens: 10, outputTokens: 4, calls: 1, outcome: "success", lens: "plan",
+    });
+    expect(lines[1]).toMatchObject({ command: "sidecar", model: "unknown", outcome: "success" });
+    expect(lines[1]).not.toHaveProperty("lens");
+  });
+
+  it("records a failed turn as an error outcome", async () => {
+    const id = await createSession();
+    await runTurn(id, "SIGNEDOUT");
+    expect(readDashboardUsage(root)).toEqual([expect.objectContaining({ command: "sidecar", outcome: "error" })]);
+  });
+
+  it("carries each session's estimated cost in the sessions response", async () => {
+    const id = (await (await api("", { method: "POST", body: { vendor: "claude", model: "claude-opus-5" } })).json()).session.id;
+    const fresh = (await (await api(`/${id}`)).json()).estimatedCost;
+    expect(fresh.totalRaw).toBe(0);
+
+    await runTurn(id, "one");
+    const { sessions } = await (await api("")).json();
+    expect(sessions[0].estimatedCost.totalRaw).toBeGreaterThan(0);
+    expect(sessions[0].estimatedCost.byModel[0]).toMatchObject({ model: "claude-opus-5" });
   });
 });
 
