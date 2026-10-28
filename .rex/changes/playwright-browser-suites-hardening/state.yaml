@@ -10,8 +10,15 @@ items:
     lastModified: "2026-10-13T19:10:16.179Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "5db09032-fd81-4c9a-be03-e47787b62282":
-    lastModified: "2026-10-13T19:10:01.200Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-27T18:26:49.859Z"
+    completedAt: "2026-10-27T19:21:08.605Z"
+    endedAt: "2026-10-27T19:21:08.605Z"
+    activeIntervals: [{"end":"2026-10-27T19:21:08.605Z","start":"2026-10-27T18:26:49.859Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Shared manual-flow teardown stops and polls active runs/starting executions, falls back to process-tree termination, then waits for dashboard exit. 241 scoped tests, typecheck, Playwright discovery and real Codex interruption on macOS passed; all in-scope review findings fixed."
+    lastModified: "2026-10-27T19:21:08.605Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "74391a2b-d0b6-405a-83d1-cbae47a1152d":
     lastModified: "2026-10-13T19:10:21.974Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

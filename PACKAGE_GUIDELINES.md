@@ -303,13 +303,23 @@ Satellite zones that survive the merge (because they have strong internal cohesi
 - Orchestration scripts spawn CLIs via `execFile`; they never import packages directly.
 - The web package is an exception: it sits at coordination level, importing domain packages through its gateway for MCP servers, and reading domain data from the filesystem for everything else.
 
-## `.rex/` Write-Access Protocol
+## Rex Write-Access Protocol
 
-The `.rex/` directory is a **shared mutable data zone** — readable by rex, hench, and web without creating import-graph coupling. This is an intentional design: packages share state via filesystem rather than runtime imports. However, concurrent write safety depends on the following protocol.
+The resolved rex directory (`.ndx/rex/` or legacy `.rex/`) is a shared mutable
+data zone. Rex owns writes; hench and web read it and invoke rex APIs for
+mutations. Sharing files does not create an import-graph edge, but write
+safety still depends on the following protocol.
 
-**Folder-tree PRD invariant.** `.rex/prd_tree/` is the canonical PRD store: one slug-named directory per epic/feature/task, each holding an `index.md` whose YAML frontmatter carries the item's fields. Subtasks are sections inside their parent task's `index.md`, not directories of their own. Every reader and writer — rex CLI, hench, MCP, the web dashboard — observes that one tree.
+**PRD invariant.** On v2 the writable roots are `product/` and `changes/`.
+Markdown holds intent; the containing folder's committed `state.yaml` holds
+tool state. Changes always have folders with `index.md`; other nodes are
+folders with children and `<slug>.md` leaves otherwise. Subtasks are nodes,
+not body sections. On v1, the backend remains `prd_tree/` until migration.
 
-`.rex/prd.md` and `.rex/prd.json` are **legacy migration sources only**. A project predating the folder tree is migrated by `rex migrate-to-folder-tree` (or on first load), after which neither file exists and nothing writes to them. Branch-scoped `prd_{branch}_{date}.md` files are likewise gone. Any documentation or tooling that still treats `prd.md` or `prd.json` as authoritative for edits is stale.
+`prd.md`, `prd.json` and branch-scoped `prd_*.md` are legacy migration
+representations. Ordinary mutations never write them. Explicit legacy
+conversion commands remain the migration exception. A JSON export bundle
+is transport outside the resolved rex directory, never a PRD backend.
 
 `.rex/.cache/prd.json` is an **ephemeral derived artifact**, generated only while `ndx start` is running and refreshed by the server's tree watcher. It is not PRD state: no code outside the web server may read it, and nothing may write it as a way of mutating the PRD.
 
@@ -319,7 +329,8 @@ See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder
 
 | Path | Owner (writer) | Readers | Write pattern |
 |---|---|---|---|
-| `prd_tree/**/index.md` | **rex** (FolderTreeStore) | hench, web | Atomic read-modify-write under the PRD file lock (`saveDocument()`, or `withTransaction()` to hold it across the whole read-modify-write) |
+| `product/**`, `changes/**` | **rex** (v2 model/store) | hench, web | `withPrdModelTransaction` or the resolved store's `withTransaction`; one PRD lock spans both layers |
+| `prd_tree/**` | **rex** (v1 FolderTreeStore) | hench, web | `withTransaction` holds the lock across read-modify-write; `saveDocument` alone locks only the save |
 | `config.json` | **rex** (FileStore) | hench, web | Written at init; updated via `rex config` |
 | `execution-log.jsonl` | **rex** (FileStore) | web | Append-only via `appendLog()`; rotates to `.1.jsonl` at 1 MB |
 | `workflow.md` | **rex** (FileStore) | web | Overwritten on status transitions |
@@ -330,8 +341,8 @@ See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder
 
 ### Rules
 
-1. **Single writer per file** — only the owning package writes to each file. Hench and web read `.rex/` but never write PRD state directly; they mutate it by invoking rex (CLI or library). No consumer writes `index.md` files by hand — every mutation flows through the store so index files and parent rollups stay consistent.
-2. **Writes are locked, but not merged** — `saveDocument()` always takes the PRD file lock, so writes cannot interleave, and a writer that cannot acquire it within its timeout fails loudly naming the holder's PID rather than proceeding. The MCP write tools and the bulk restructurers (`reorganize`, `prune`, `reshape`) go further and hold the lock across the whole read-modify-write via `store.withTransaction()`, so a concurrent writer's item is not silently dropped. Other CLI write paths (`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`) still do their own load→mutate→save: the lock serializes them, but the last full-document writer still wins. Do not run two PRD writers concurrently — see the concurrency contract in the root `AGENTS.md` (and the `CLAUDE.md` generated beside it).
+1. **Single writer per file** — consumers mutate PRD intent and state through rex's store/API, not direct filesystem writes. Human intent edits remain supported; tools own `state.yaml`.
+2. **Lock the full mutation** — v2 uses `withPrdModelTransaction`; store clients use `withTransaction`. A refused lock names its holder. The lock is per rex directory, so separate worktrees have separate locks. On v1, snapshot-based CLI paths can still lose updates when only their final save is locked. Keep writer commands sequential; see [PRD write concurrency](docs/architecture/prd-write-concurrency.md).
 3. **Append-only logs** — `execution-log.jsonl` uses `appendFile()`, which is atomic for small writes on local filesystems. Rotation is numeric-suffix-based (`.1.jsonl`).
 4. **Graceful degradation** — readers (web, hench) treat missing or malformed `.rex/` files as non-fatal. The web cleanup scheduler skips its cycle if the PRD is unavailable.
 5. **Never write from the agent** — the hench agent prompt explicitly forbids direct modification of `.rex/` files. All PRD mutations go through rex's store layer.

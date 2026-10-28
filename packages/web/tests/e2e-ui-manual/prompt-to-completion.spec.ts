@@ -8,7 +8,8 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { type RunningDashboard, stopDashboard, cleanupFixtureProject } from "../e2e-ui/helpers/fixture-project.js";
+import { type RunningDashboard, cleanupFixtureProject } from "../e2e-ui/helpers/fixture-project.js";
+import { stopManualDashboard } from "./helpers/stop-dashboard.js";
 import { trackConsoleErrors } from "../e2e-ui/helpers/console-errors.js";
 import {
   createRealVendorProject,
@@ -39,8 +40,11 @@ test.beforeAll(async () => {
 
 test.afterAll(async ({}, testInfo) => {
   if (!dashboard) return;
-  await attachRunArtifacts(testInfo, project.dir);
-  stopDashboard(dashboard.proc);
+  try {
+    await stopManualDashboard(dashboard);
+  } finally {
+    await attachRunArtifacts(testInfo, project.dir);
+  }
   if (KEEP_FIXTURE) {
     console.log(`[e2e-manual] fixture kept at ${project.dir}`);
   } else {
