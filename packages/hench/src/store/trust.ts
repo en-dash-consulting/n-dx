@@ -18,7 +18,9 @@
  * does not govern the vendor CLI's own tool calls: when `provider` is `cli`,
  * Claude Code or Codex executes tools under its own permission system, and
  * hench's guard applies only to hench's own tool loop. The permission-mode
- * clamp is what reaches a CLI run.
+ * clamp is what reaches a CLI run, with one exception that holds whatever the
+ * trust state: n-dx's own config files (`NDX_CONFIG_BLOCKED_PATHS`) are
+ * refused by the guard and denied to the Claude CLI's edit tools.
  *
  * @module hench/store/trust
  */

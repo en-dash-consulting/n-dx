@@ -1,8 +1,11 @@
 schema: "rex/v2"
 items:
   "208cd8c3-6262-4cfd-8602-be4fa1e5bb45":
+    status: "in_progress"
+    startedAt: "2026-10-28T17:45:33.524Z"
+    activeIntervals: [{"start":"2026-10-28T17:45:33.524Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T14:31:12.810Z"
+    lastModified: "2026-10-28T17:45:39.910Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9141e7c2-c428-4dae-94f7-e356dac4e837":
     assignee: "Ryan Keith <ryan.k@endash.us>"

@@ -418,6 +418,7 @@ export { toCanonicalJSON } from "./json.js";
 // this user has accepted it (record kept in <ndx home>/trust/, never in the repo)
 export {
   SECRET_PATH_PATTERNS,
+  NDX_CONFIG_BLOCKED_PATHS,
   GIT_SUBCOMMAND_BASELINE,
   guardBaselineForLanguage,
   detectRepoLanguage,

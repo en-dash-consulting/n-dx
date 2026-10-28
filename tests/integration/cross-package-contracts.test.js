@@ -402,7 +402,7 @@ describe("hench → llm-client gateway contract", () => {
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
-  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"];
+  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "NDX_CONFIG_BLOCKED_PATHS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"];
   const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME", "CLI_LOG_FILENAME"];
 
   for (const name of GATEWAY_FUNCTIONS) {
@@ -928,6 +928,8 @@ describe("gateway export auto-detection", () => {
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
         "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
         "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS",
+        // n-dx's own config files: the guard and the Claude CLI deny writes.
+        "NDX_CONFIG_BLOCKED_PATHS",
         "isFailForwardEnabled",
         "NDX_CONTAINER_DIRNAME",
         // The vendor-CLI invocation log's file name: the uncommitted-work gate

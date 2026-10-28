@@ -83,6 +83,9 @@ import { deepMerge } from "./project-config.js";
  */
 const LEGACY_LAYOUT = resolveLayout(".", { mode: "legacy" });
 
+/** The `.ndx/` layout's paths, resolved the same way, for {@link NDX_CONFIG_BLOCKED_PATHS}. */
+const NDX_LAYOUT = resolveLayout(".", { mode: "ndx" });
+
 // ── Baseline ────────────────────────────────────────────────────────────────
 
 /** The parts of a hench guard that widen or narrow what an agent may do. */
@@ -140,6 +143,34 @@ const CORE_BLOCKED = [
   `${NDX_CONTAINER_DIRNAME}/**`,
 ];
 
+/** The project MCP registration file `ndx init` writes and the trust review reads. */
+const PROJECT_MCP_CONFIG = ".mcp.json";
+
+/**
+ * n-dx's own config files and the assistant config it hands the vendor CLIs.
+ * Blocked by every baseline, and enforced by hench's guard whatever the
+ * configured guard says (#686).
+ *
+ * The local config file is read as the user's own and applies with no trust
+ * review, so an agent steered into writing it would hand itself a guard that
+ * passes every credential through, a `cli_path` or an endpoint. The tracked
+ * config, `.mcp.json` and the `.claude/` and `.codex/` directories configure
+ * what the next run executes in the same way.
+ *
+ * Both layouts' names, from the layout resolver: hench enforces this list
+ * apart from the baseline, so the `.ndx/` container's own block in
+ * {@link CORE_BLOCKED} does not cover a guard that dropped it.
+ */
+export const NDX_CONFIG_BLOCKED_PATHS: readonly string[] = [
+  ...[LEGACY_LAYOUT, NDX_LAYOUT].flatMap((layout) => [
+    relativeToRoot(layout, layout.configFile),
+    relativeToRoot(layout, layout.localConfigFile),
+  ]),
+  PROJECT_MCP_CONFIG,
+  ".claude/**",
+  ".codex/**",
+];
+
 const LANGUAGE_BASELINES: Record<string, Pick<GuardBaseline, "allowedCommands"> & { extraBlocked: string[] }> = {
   typescript: {
     allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"],
@@ -187,7 +218,7 @@ export function guardBaselineForLanguage(language?: string | null): GuardBaselin
   const entry = LANGUAGE_BASELINES[language ?? ""] ?? LANGUAGE_BASELINES.typescript;
   return {
     allowedCommands: [...entry.allowedCommands],
-    blockedPaths: [...CORE_BLOCKED, ...DEPENDENCY_BLOCKED, ...SECRET_PATH_PATTERNS],
+    blockedPaths: [...CORE_BLOCKED, ...NDX_CONFIG_BLOCKED_PATHS, ...DEPENDENCY_BLOCKED, ...SECRET_PATH_PATTERNS],
     allowedGitSubcommands: [...GIT_SUBCOMMAND_BASELINE],
   };
 }
@@ -443,11 +474,11 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   const projectTest = projectRex ? optionalString(projectRex.test) : null;
   if (projectTest && !projectHench) sources.push(relOf(root, layout.configFile));
 
-  const mcpPath = join(root, ".mcp.json");
+  const mcpPath = join(root, PROJECT_MCP_CONFIG);
   const mcpConfig = readJson(mcpPath);
   const mcpServers: RepoMcpServer[] = [];
   if (mcpConfig) {
-    sources.push(".mcp.json");
+    sources.push(PROJECT_MCP_CONFIG);
     const servers = mcpConfig.mcpServers;
     if (servers && typeof servers === "object" && !Array.isArray(servers)) {
       for (const [name, raw] of Object.entries(servers as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) {
