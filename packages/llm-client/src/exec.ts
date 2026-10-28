@@ -674,6 +674,9 @@ export function getCurrentHead(cwd: string): string | undefined {
   }
 }
 
+/** Environment variables that change how git reads every pathspec. */
+const PATHSPEC_MODE_VARS = ["GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const;
+
 /** git's answer to "is this path in the index?", or why it gave none. */
 export type GitTrackAnswer =
   | { state: "tracked" }
@@ -692,14 +695,19 @@ export type GitTrackAnswer =
  * `ignoreCase` matches the path in any case (`:(icase)`): git compares a
  * pathspec by exact case even under `core.ignorecase`, so on a case-insensitive
  * filesystem a file committed as `.N-DX.local.json` would otherwise read as
- * untracked under the name n-dx opens.
+ * untracked under the name n-dx opens. The path is always matched literally,
+ * and git runs without the `GIT_*_PATHSPECS` variables: `GIT_LITERAL_PATHSPECS`
+ * turns the magic off, so a committed file would read as untracked.
  */
 export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitTrackAnswer {
-  const pathspec = options.ignoreCase ? `:(icase)${relPath}` : relPath;
+  const pathspec = `:(literal${options.ignoreCase ? ",icase" : ""})${relPath}`;
+  const env = { ...process.env };
+  for (const name of PATHSPEC_MODE_VARS) delete env[name];
   try {
     execFileSync("git", ["ls-files", "--error-unmatch", "--", pathspec], {
       windowsHide: true,
       cwd,
+      env,
       encoding: "utf-8",
       timeout: 5000,
       // See getCurrentHead — an untracked file or a non-repository is an

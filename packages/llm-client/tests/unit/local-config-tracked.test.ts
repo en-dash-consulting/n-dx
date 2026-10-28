@@ -99,6 +99,17 @@ describe("isLocalConfigTracked", () => {
     trackLocal();
     expect(isLocalConfigTracked(repo)).toBe(true);
   });
+
+  /** Each turns pathspec magic off or changes matching; none may make a committed file read as the user's. */
+  it.each(["GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"])(
+    "stays true with %s=1 in the environment",
+    (name) => {
+      writeLocal();
+      trackLocal();
+      vi.stubEnv(name, "1");
+      expect(isLocalConfigTracked(repo)).toBe(true);
+    },
+  );
 });
 
 describe("a tracked .n-dx.local.json in an untrusted checkout", () => {

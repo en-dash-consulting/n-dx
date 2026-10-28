@@ -3,7 +3,7 @@ items:
   "02f8c4c2-20f3-462e-a061-5fd05b50f9d1":
     assignee: "Ryan Keith <ryan.k@endash.us>"
     needsPlacement: false
-    lastModified: "2026-10-28T14:34:34.455Z"
+    lastModified: "2026-10-28T15:28:13.241Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0a3bfa7b-3b67-4500-b0a1-0602445f46fc":
     assignee: "Ryan Keith <ryan.k@endash.us>"
@@ -14,11 +14,18 @@ items:
     lastModified: "2026-10-28T14:34:50.561Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3e9eafaa-ceae-4a1c-a5a3-9dd121698c14":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T15:17:53.856Z"
-    activeIntervals: [{"start":"2026-10-28T15:17:53.856Z"}]
+    completedAt: "2026-10-28T15:38:44.319Z"
+    endedAt: "2026-10-28T15:38:44.319Z"
+    activeIntervals: [{"end":"2026-10-28T15:38:44.319Z","start":"2026-10-28T15:17:53.856Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client's local-config tracked check asks git case-insensitively about the file, every symlinked directory on its path, and its in-checkout real path; core's duplicate removed, readConfiguredClaudePath asks via hench trust status --format=json (fails closed)."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T15:17:54.397Z"
+    lastModified: "2026-10-28T15:38:44.319Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "47654649-c6f7-4277-a156-d5d606f9ed2c":
+    lastModified: "2026-10-28T15:28:13.241Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c4333256-6e2d-4c9f-aeaa-6a772e17fb88":
     assignee: "Ryan Keith <ryan.k@endash.us>"
