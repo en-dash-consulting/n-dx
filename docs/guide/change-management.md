@@ -52,6 +52,8 @@ rex change place <change> --propose --type=capability \
 
 `--propose` (MCP: `place_change` with `propose: {type, under, title}`) records a new capability or constraint under any live area as an `added` amendment on the change, and clears `needsPlacement`. It is not accepted yet: the node reaches the map only when the change is [applied](./concepts/changes-and-apply). `--summary`, `--proposed` (the statement) and, for a capability, `--capability-criterion` describe it; `--target` and `--relation` cannot be combined with it.
 
+An **applied** change that was never placed (migrated history) can be placed too, with `--relation=touches` only. The CLI, `place_change` and the dashboard's Inbox applied list all accept it. That gives the record a target and clears `needsPlacement` without a new rule finding. `amends`, `--propose` and amendment content are refused (`applied-change-amends`): an applied change's amendments have already reached the map, so amending again would rewrite settled spec. Nothing is bulk-accepted; you pick each target.
+
 A change that only *touches* a capability is a fix or a refactor: it writes nothing to the product layer and needs no steward. A change that *amends* one carries the new statement or capability criteria, and [apply](./concepts/changes-and-apply) writes them when it completes.
 
 ### 2. Close finished work, cancel dropped work

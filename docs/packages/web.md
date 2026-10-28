@@ -71,7 +71,7 @@ On a v2 project a change with no place on the product map waits in the Inbox, an
 
 - **Plan.** An Inbox section sits right after the capture bar and is always present. It lists open changes awaiting placement, strongest rex match first, weak and tied guesses last. It shows five rows and links to the rest (`N more · Open ↗`). At zero it is collapsed and reads "Inbox is empty".
 - **Counts.** The open count shows on the Plan tab and the bottom bar. It counts only open changes that need placement.
-- **Applied history.** Changes applied before they were placed cannot be placed. They appear only as a collapsed line ("N applied changes were never placed") under the list.
+- **Applied history.** Changes applied before they were placed (migrated history) show as a collapsed line ("N applied changes were never placed") under the list. Expanding it lists each with its title, applied date and best guess. Open one to place it: the panel offers **touches** only, with a note, and Place & next walks that list. Amends is not offered, because the change's amendments have already reached the map.
 - **Tasks tree.** An Inbox change carries an **Inbox** badge, and the **In the Inbox** facet filters the tree to them.
 - **Changes page.** An open change awaiting placement is tagged **Needs placement**; selecting the tag opens it.
 
