@@ -72,6 +72,7 @@ exercised.
 | `tests/e2e/cli-init.test.js:116` | Selects `isWin ? "cmd.exe" : "sh"` — already platform-branched |
 | `tests/e2e/pair-programming-timeout-tree-kill.test.js`, `tests/integration/pair-programming.test.js` | Go through `runShellTestCommand`, which uses `shell: true` — Node picks `ComSpec`/cmd.exe on Windows, so PATH is not consulted for `sh` |
 | `tests/e2e/published-imports-resolved.test.js:60` | `shell: true`, as above |
+| `tests/integration/ci-docs-build-env.test.js` (`ndx ci`'s `pnpm docs:build`, `packages/core/ci.js`) | Production uses `shell: true` only on win32, so PATH is not consulted for `sh`. The repository owns the script, so the spawn gets `loadShellTestEnv` — the repository-command environment. The test sends that spawn to `node -e` with the options ci.js chose, so no shell is involved |
 | `packages/hench/tests/unit/tools/go-test-runner.test.ts` | Passes from PowerShell — verified, no shell-dependent assertion |
 | `runTestGate` cases in `test-runner.test.ts` | Assert shape only (`typeof passed === "boolean"`, `duration >= 0`), so they neither fail nor pass *because of* the shell. Weak, but not shell-dependent |
 | `packages/hench/tests/integration/test-gate.test.ts` | Same shape-only rationale as the `runTestGate` cases above — asserts result structure, never shell output |

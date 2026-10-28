@@ -39,6 +39,13 @@ items:
     lastModified: "2026-10-28T18:49:24.596Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd98987d-aaed-4775-b013-f8146d569837":
+    status: "completed"
+    startedAt: "2026-10-28T20:30:10.412Z"
+    completedAt: "2026-10-28T20:35:26.338Z"
+    endedAt: "2026-10-28T20:35:26.338Z"
+    activeIntervals: [{"end":"2026-10-28T20:35:26.338Z","start":"2026-10-28T20:30:10.412Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ci.js passes loadShellTestEnv(dir).env to the pnpm docs:build spawn; inventory row, allowlist reason, changeset updated; regression test tests/integration/ci-docs-build-env.test.js fails before the fix."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T14:34:13.236Z"
+    lastModified: "2026-10-28T20:35:26.338Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
