@@ -1,16 +1,26 @@
 schema: "rex/v2"
 items:
   "208cd8c3-6262-4cfd-8602-be4fa1e5bb45":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T17:45:33.524Z"
-    activeIntervals: [{"start":"2026-10-28T17:45:33.524Z"}]
+    completedAt: "2026-10-28T18:29:48.629Z"
+    endedAt: "2026-10-28T18:29:48.629Z"
+    activeIntervals: [{"end":"2026-10-28T18:29:48.629Z","start":"2026-10-28T17:45:33.524Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "NDX_CONFIG_BLOCKED_PATHS (both layouts' config files from resolveLayout, .mcp.json, .claude/**, .codex/**) in every guard baseline; hench GuardRails enforces it whatever the configured guard; Claude CLI spawned with --disallowed-tools Edit(...) rules. Codex CLI and shell-command writes split to follow-up 3741f9ad."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T17:45:39.910Z"
+    lastModified: "2026-10-28T18:29:48.629Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9141e7c2-c428-4dae-94f7-e356dac4e837":
+    status: "completed"
+    startedAt: "2026-10-28T18:29:48.629Z"
+    completedAt: "2026-10-28T18:29:48.629Z"
+    endedAt: "2026-10-28T18:29:48.629Z"
+    activeIntervals: [{"end":"2026-10-28T18:29:48.629Z","start":"2026-10-28T18:29:48.629Z"}]
+    appliedAt: "2026-10-28T18:29:48.629Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    needsPlacement: false
-    lastModified: "2026-10-28T14:31:10.610Z"
+    lastModified: "2026-10-28T18:29:48.629Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c2f9fcd8-7c27-4696-8f18-86254046e278":
     status: "completed"

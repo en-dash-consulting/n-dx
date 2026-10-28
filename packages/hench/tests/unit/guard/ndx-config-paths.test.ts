@@ -68,6 +68,13 @@ describe("n-dx config files are outside what the agent may write", () => {
     expect(() => guard.checkPath("src/index.ts")).not.toThrow();
   });
 
+  it("refuses them under another spelling, which opens the same file on macOS and Windows", () => {
+    const guard = new GuardRails(repo, DEFAULT_HENCH_CONFIG().guard, { shellKind: "posix" });
+    for (const p of [".N-DX.local.json", ".N-dx.json", ".MCP.json", ".Claude/settings.json", ".CODEX/config.toml", ".NDX/config.local.json"]) {
+      expect(() => guard.checkPath(p), p).toThrow(GuardError);
+    }
+  });
+
   it.each(["darwin", "win32"] as const)("the Claude CLI is denied edits to them (%s)", (platform) => {
     const config = claudeCliAdapter.buildSpawnConfig(createPromptEnvelope([]), DEFAULT_EXECUTION_POLICY, {});
     const flag = config.args.indexOf("--disallowed-tools");
