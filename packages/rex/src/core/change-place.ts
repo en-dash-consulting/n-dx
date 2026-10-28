@@ -337,7 +337,9 @@ function novelApplyProblems(before: V2Tree, after: V2Tree, changeId: string, now
 function placeableChange(tree: V2Tree, ref: string): RuleNode {
   const node = indexTree(tree).resolve(ref);
   if (!node || node.type !== "change") throw new ChangePlacementError(`No live change "${ref}"`, "no-such-change");
-  if (!isOpenChange(node) && !isAppliedChange(node)) {
+  // A change cancelled after it was applied stays refused: abandoned, whatever appliedAt says.
+  const abandoned = node.status === "cancelled" || node.status === "deleted";
+  if (abandoned || (!isOpenChange(node) && !isAppliedChange(node))) {
     throw new ChangePlacementError(`Change ${node.displayId ?? node.id} is ${node.status}; only an open or applied change is placed`, "change-not-open");
   }
   return node;

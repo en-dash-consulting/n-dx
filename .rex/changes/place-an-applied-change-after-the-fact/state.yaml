@@ -7,7 +7,14 @@ items:
     lastModified: "2026-10-27T17:19:41.242Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5c301895-2beb-4613-b873-7807f771d47d":
-    lastModified: "2026-10-27T17:19:38.775Z"
+    status: "completed"
+    startedAt: "2026-10-28T00:05:18.483Z"
+    completedAt: "2026-10-28T00:17:57.358Z"
+    endedAt: "2026-10-28T00:17:57.358Z"
+    activeIntervals: [{"end":"2026-10-28T00:17:57.358Z","start":"2026-10-28T00:05:18.483Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "recordPlacement/suggestPlacement admit applied changes with touches; new applied-change-amends kind refuses amends and proposals; CLI, MCP, web route and viewer hint updated with tests."
+    lastModified: "2026-10-28T00:17:57.358Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fe7b26c2-a61f-4ab2-9c0b-247d237d83d1":
     lastModified: "2026-10-27T17:19:40.025Z"

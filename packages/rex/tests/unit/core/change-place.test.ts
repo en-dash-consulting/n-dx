@@ -150,6 +150,7 @@ describe("recordPlacement", () => {
     ["not-a-target", {}, { target: "nope" }],
     ["already-amends", { amends: [{ target: "card", delta: "modified", summary: "s" }] }, { target: "A1.1", relation: "touches" as const }],
     ["change-not-open", { status: "cancelled" }, { target: "card" }],
+    ["change-not-open", { ...APPLIED, status: "cancelled" }, { target: "card", relation: "touches" as const }],
     ["applied-change-amends", APPLIED, { target: "card", relation: "amends" as const, proposed: "x" }],
     ["content-needs-amends", {}, { target: "card", relation: "touches" as const, proposed: "x" }],
     ["nothing-to-modify", {}, { target: "card", relation: "amends" as const }],
