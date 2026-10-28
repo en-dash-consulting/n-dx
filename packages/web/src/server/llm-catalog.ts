@@ -19,6 +19,7 @@ import {
   loadLLMConfig,
   resolveApiKey,
   resolveGoogleApiKey,
+  resolveVendorCliEnv,
 } from "@n-dx/llm-client";
 import type { LLMConfig, ListableVendor } from "@n-dx/llm-client";
 
@@ -77,9 +78,15 @@ function parseVersion(output: string): string | null {
   return /\d+\.\d+\.\d+(?:[-+][\w.]+)?/.exec(output)?.[0] ?? null;
 }
 
+/**
+ * `<binary> --version`, with the vendor's filtered environment from
+ * `resolveVendorCliEnv` (the agent loop's resolver), so no credential outside
+ * the vendor's mode reaches the binary or anything it runs.
+ */
 async function probeCli(vendor: ListableVendor, projectDir: string, config: LLMConfig): Promise<CliInfo> {
   const binary = resolveBinary(vendor, config);
-  const result = await exec(binary, ["--version"], { cwd: projectDir, timeout: CLI_PROBE_TIMEOUT_MS });
+  const env = resolveVendorCliEnv({ ...config, vendor });
+  const result = await exec(binary, ["--version"], { cwd: projectDir, timeout: CLI_PROBE_TIMEOUT_MS, env });
   if (!result.launched || result.exitCode !== 0) return { found: false, version: null, path: null };
   return { found: true, version: parseVersion(result.stdout) ?? parseVersion(result.stderr), path: binary };
 }

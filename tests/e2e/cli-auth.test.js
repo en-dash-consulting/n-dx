@@ -283,6 +283,87 @@ describe("ndx auth", () => {
     });
   });
 
+  describe("vendor CLI probes get the vendor's filtered environment (#686)", () => {
+    // Each stub CLI writes the environment it received to `<name>.env`. The
+    // parent exports an unrelated credential and the other vendor's key; the
+    // probe must hand the stub only what the agent loop's vendor CLI gets.
+    const UNRELATED = { GITHUB_TOKEN: "sentinel-github", NDX_TEST_SECRET_TOKEN: "sentinel-secret" };
+    const KEYS = { ANTHROPIC_API_KEY: "sentinel-anthropic", OPENAI_API_KEY: "sentinel-openai" };
+    let env;
+    let pathDir;
+
+    async function writeEnvDumpBinary(filePath, dump) {
+      if (isWin) {
+        const cmdPath = filePath + ".cmd";
+        await writeFile(cmdPath, `@echo off\r\nset > "${dump}"\r\necho {"result":"ok"}\r\n`);
+        return cmdPath;
+      }
+      await writeFile(filePath, `#!/bin/sh\nenv > '${dump}'\necho '{"result":"ok"}'\n`);
+      await chmod(filePath, 0o755);
+      return filePath;
+    }
+
+    /** The names the stub `name` saw, upper-cased; null when it never ran. */
+    async function seen(name) {
+      const raw = await readFile(join(tmpDir, `${name}.env`), "utf-8").catch(() => null);
+      if (raw === null) return null;
+      return new Set(raw.split(/\r?\n/).map((line) => line.split("=")[0].toUpperCase()).filter(Boolean));
+    }
+
+    beforeEach(async () => {
+      pathDir = join(tmpDir, "path-bin");
+      await mkdir(pathDir);
+      await writeEnvDumpBinary(join(pathDir, "claude"), join(tmpDir, "claude.env"));
+      await writeEnvDumpBinary(join(pathDir, "codex"), join(tmpDir, "codex.env"));
+      env = {
+        ...process.env,
+        ...UNRELATED,
+        ...KEYS,
+        NDX_HOME: join(tmpDir, "ndx-home"),
+        PATH: `${pathDir}${delimiter}${process.env.PATH ?? ""}`,
+      };
+    });
+
+    function expectVendorEnv(names, own, other) {
+      expect(names).not.toBeNull();
+      for (const name of Object.keys(UNRELATED)) expect(names.has(name)).toBe(false);
+      expect(names.has(other)).toBe(false);
+      expect(names.has(own)).toBe(true);
+    }
+
+    it.each([
+      ["claude", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
+      ["codex", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"],
+    ])("ndx auth's %s preflight", async (vendor, own, other) => {
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor } }) + "\n");
+
+      runNdx(["auth", tmpDir], env);
+
+      expectVendorEnv(await seen(vendor), own, other);
+    });
+
+    it("ndx config llm.vendor's soft preflight", async () => {
+      runNdx(["config", "llm.vendor", "codex", tmpDir, "--soft-preflight"], env);
+
+      expectVendorEnv(await seen("codex"), "OPENAI_API_KEY", "ANTHROPIC_API_KEY");
+    });
+
+    it("ndx config --test-connection's cli_path test", async () => {
+      const bin = await writeEnvDumpBinary(join(tmpDir, "local-claude"), join(tmpDir, "local-claude.env"));
+      await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { cli_path: bin } } }) + "\n");
+
+      runNdx(["config", "--test-connection", tmpDir], env);
+
+      expectVendorEnv(await seen("local-claude"), "ANTHROPIC_API_KEY", "OPENAI_API_KEY");
+    });
+
+    it("ndx config llm.codex.cli_path's command check", async () => {
+      runNdx(["config", "llm.codex.cli_path", "codex", tmpDir], env);
+
+      expectVendorEnv(await seen("codex"), "OPENAI_API_KEY", "ANTHROPIC_API_KEY");
+    });
+  });
+
   it("appears in 'ndx --help' output", () => {
     const { stdout, status } = runNdx(["--help"]);
     expect(status).toBe(0);

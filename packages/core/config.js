@@ -687,13 +687,13 @@ async function validateCliPath(value) {
  * Validate llm.codex.cli_path.
  * Accepts either an absolute/relative file path or a binary name on PATH.
  */
-async function validateCodexCliPath(value) {
+async function validateCodexCliPath(value, dir) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error("CLI path must be a non-empty string.");
   }
 
   if (!value.includes("/") && !value.includes("\\")) {
-    const probe = testCliPath(value);
+    const probe = await testCliPath(value, dir, LLM_VENDOR.CODEX);
     if (!probe.ok) {
       throw new Error(
         `Command not found or not runnable: ${value}\n` +
@@ -1039,15 +1039,18 @@ function validateGoogleApiKeyEnv(value) {
 
 
 /**
- * Validate CLI path by trying to run `<binary> --version`.
+ * Validate CLI path by trying to run `<binary> --version`, with the vendor's
+ * filtered environment ({@link loadVendorCliEnv}), never the whole parent one.
  * Returns { ok, version?, error? }.
  */
-function testCliPath(cliPath) {
+async function testCliPath(cliPath, dir, vendor) {
+  const env = await loadVendorCliEnv(dir, vendor);
   try {
     const output = execFileSyncCli(cliPath, ["--version"], {
       encoding: "utf-8",
       timeout: 10000,
       stdio: "pipe",
+      env,
     });
     return { ok: true, version: output.trim() };
   } catch (err) {
@@ -1670,8 +1673,11 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig) {
     return runLocalApiPreflight(llmConfig);
   }
 
-  const binary = await loadVendorCliPath(dir, vendor === LLM_VENDOR.CODEX ? LLM_VENDOR.CODEX : LLM_VENDOR.CLAUDE);
+  const cliVendor = vendor === LLM_VENDOR.CODEX ? LLM_VENDOR.CODEX : LLM_VENDOR.CLAUDE;
+  const binary = await loadVendorCliPath(dir, cliVendor);
   const args = vendorAuthPreflightArgs(vendor);
+  // The agent loop's vendor environment: no credential outside the vendor's mode.
+  const env = await loadVendorCliEnv(dir, cliVendor);
   try {
     // Windows-safe: routes .cmd shims through cmd.exe with a self-quoted
     // verbatim command line (GH #37/#68/#69) — see execFileSyncCli.
@@ -1679,6 +1685,7 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig) {
       encoding: "utf-8",
       timeout: 15000,
       stdio: "pipe",
+      env,
     });
     return { ok: true, binary, args };
   } catch (err) {
@@ -2879,7 +2886,7 @@ async function handleTestConnection(dir) {
 
   if (claudeConfig.cli_path) {
     tested = true;
-    const result = testCliPath(claudeConfig.cli_path);
+    const result = await testCliPath(claudeConfig.cli_path, dir, LLM_VENDOR.CLAUDE);
     if (result.ok) {
       console.log(
         "Testing CLI path... ✓ " + (result.version || "CLI is available."),
@@ -2903,6 +2910,7 @@ async function handleTestConnection(dir) {
 
 /** Coerce and validate a value for a project-level section key. */
 async function coerceAndValidateProjectValue(
+  dir,
   pkg,
   settingPath,
   valueArg,
@@ -2935,7 +2943,7 @@ async function coerceAndValidateProjectValue(
     const validator = getValidator(pkg, settingPath);
     if (validator) {
       try {
-        await validator(coerced);
+        await validator(coerced, dir);
       } catch (err) {
         console.error(`Invalid value for "${keyArg}": ${err.message}`);
         console.error("  Use --force to set this value anyway.");
@@ -3056,6 +3064,7 @@ async function handleSetProjectSection(
   if (!configs[storagePkg]) configs[storagePkg] = {};
 
   const coerced = await coerceAndValidateProjectValue(
+    dir,
     pkg,
     settingPath,
     valueArg,
@@ -3266,7 +3275,7 @@ async function handleSetPackageConfig(
     const validator = getValidator(pkg, settingPath);
     if (validator) {
       try {
-        await validator(coerced);
+        await validator(coerced, dir);
       } catch (err) {
         console.error(`Invalid value for "${keyArg}": ${err.message}`);
         console.error("  Use --force to set this value anyway.");

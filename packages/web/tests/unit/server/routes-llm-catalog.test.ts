@@ -301,6 +301,25 @@ describe("GET /api/llm/catalog — installed CLI", () => {
     expect(execMock).toHaveBeenCalledWith("claude", ["--version"], expect.objectContaining({ timeout: 5000 }));
   });
 
+  it("hands each probed CLI the vendor's filtered environment, not the parent's (#686)", async () => {
+    vi.stubEnv("GITHUB_TOKEN", "sentinel-github");
+    vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "sentinel-anthropic");
+    vi.stubEnv("CODEX_ACCESS_TOKEN", "sentinel-codex");
+
+    await getCatalog();
+
+    const envFor = (cmd: string): NodeJS.ProcessEnv | undefined =>
+      execMock.mock.calls.find(([called]) => called === cmd)?.[2]?.env;
+    const claudeEnv = envFor("claude");
+    const codexEnv = envFor("codex");
+    expect(claudeEnv?.GITHUB_TOKEN).toBeUndefined();
+    expect(claudeEnv?.CODEX_ACCESS_TOKEN).toBeUndefined();
+    expect(claudeEnv?.ANTHROPIC_AUTH_TOKEN).toBe("sentinel-anthropic");
+    expect(codexEnv?.GITHUB_TOKEN).toBeUndefined();
+    expect(codexEnv?.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    expect(codexEnv?.CODEX_ACCESS_TOKEN).toBe("sentinel-codex");
+  });
+
   it("reports a missing CLI as not found", async () => {
     const body = await getCatalog();
     expect(body.claude.cli).toEqual({ found: false, version: null, path: null });
