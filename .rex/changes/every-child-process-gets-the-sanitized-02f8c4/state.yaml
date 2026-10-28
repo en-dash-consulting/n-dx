@@ -6,11 +6,15 @@ items:
     lastModified: "2026-10-28T15:28:13.241Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0a3bfa7b-3b67-4500-b0a1-0602445f46fc":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T20:35:54.922Z"
-    activeIntervals: [{"start":"2026-10-28T20:35:54.922Z"}]
+    completedAt: "2026-10-28T20:41:52.992Z"
+    endedAt: "2026-10-28T20:41:52.992Z"
+    activeIntervals: [{"end":"2026-10-28T20:41:52.992Z","start":"2026-10-28T20:35:54.922Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "npx fallback runs in <ndx home>/graview/npx (own package.json) instead of the project root; integration test with a planted node_modules/graview fails before, passes after."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T20:35:55.480Z"
+    lastModified: "2026-10-28T20:41:52.992Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "22fb3f27-2ae8-43b2-928e-649f1da131d0":
     assignee: "Ryan Keith <ryan.k@endash.us>"

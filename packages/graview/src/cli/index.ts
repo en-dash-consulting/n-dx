@@ -122,10 +122,30 @@ function run(cmd: string, args: string[], options: { cwd: string; env?: NodeJS.P
   });
 }
 
+/** graview's flags whose value is a path. */
+const PATH_FLAGS = ["--data", "--sqlite"];
+
+/**
+ * A relative path given to a path flag, made absolute against the project
+ * root, which is where it resolved when graview always ran there. The npx
+ * fallback runs elsewhere.
+ */
+export function absolutePathFlags(args: string[], root: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    const eq = arg.indexOf("=");
+    if (eq > 0 && PATH_FLAGS.includes(arg.slice(0, eq))) out.push(`${arg.slice(0, eq + 1)}${resolve(root, arg.slice(eq + 1))}`);
+    else if (PATH_FLAGS.includes(arg) && i + 1 < args.length) out.push(arg, resolve(root, args[++i]!));
+    else out.push(arg);
+  }
+  return out;
+}
+
 /** Runs in the project root unless the command names its own directory (the npx fallback). */
 async function runGraview(command: GraviewCommand, args: string[], root: string, options: { stdoutToStderr?: boolean } = {}): Promise<number> {
   prepareCommandCwd(command);
-  return run(command.cmd, [...command.prefix, ...args], { cwd: command.cwd ?? root, ...options });
+  return run(command.cmd, [...command.prefix, ...absolutePathFlags(args, root)], { cwd: command.cwd ?? root, ...options });
 }
 
 /**

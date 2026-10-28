@@ -19,6 +19,7 @@ let stubs: string;
 
 const plantedMarker = () => join(root, "planted.ran");
 const npxCwdFile = () => join(stubs, "npx.cwd");
+const npxArgsFile = () => join(stubs, "npx.args");
 
 function executable(path: string, body: string): void {
   writeFileSync(path, body);
@@ -42,7 +43,7 @@ beforeEach(() => {
   // npx: run the local install when the cwd has one, as npx does; otherwise succeed quietly.
   executable(
     join(stubs, "npx"),
-    `#!/bin/sh\npwd > ${JSON.stringify(npxCwdFile())}\nif [ -x node_modules/.bin/graview ]; then exec node_modules/.bin/graview; fi\nexit 0\n`,
+    `#!/bin/sh\npwd > ${JSON.stringify(npxCwdFile())}\nprintf '%s\\n' "$@" > ${JSON.stringify(npxArgsFile())}\nif [ -x node_modules/.bin/graview ]; then exec node_modules/.bin/graview; fi\nexit 0\n`,
   );
 
   vi.stubEnv("NDX_HOME", home);
@@ -66,5 +67,12 @@ describe.skipIf(process.platform === "win32")("the npx fallback", () => {
     const cwd = readFileSync(npxCwdFile(), "utf-8").trim();
     expect(`${cwd}${sep}`.startsWith(`${realpathSync(root)}${sep}`)).toBe(false);
     expect(`${cwd}${sep}`.startsWith(`${realpathSync(home)}${sep}`)).toBe(true);
+  });
+
+  it("still resolves a relative path flag against the project, not its own directory", async () => {
+    expect(await main(["check", root, "--quiet", "--sqlite", "store.db", "--data=data"])).toBe(0);
+    const args = readFileSync(npxArgsFile(), "utf-8").trim().split("\n");
+    expect(args).toContain(join(root, "store.db"));
+    expect(args).toContain(`--data=${join(root, "data")}`);
   });
 });
