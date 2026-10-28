@@ -1,0 +1,20 @@
+---
+id: "e700e599-a431-4059-b920-017492dccea8"
+type: "task"
+title: "Sidecar drawer docks beside every stage page with transcript and composer"
+slug: "sidecar-drawer-docks-beside-every"
+description: "Story 07, part 1 of 2: the drawer shell (UX1, UX2', UX10), the transcript and the composer. Mock: Anatomy and Top nav boards. CAOS story: https://www.notion.so/3f7a80b719248143a3cfefa1734efe22."
+acceptanceCriteria:
+  - "The top nav ends with a Sidecar button behind a divider, with ⌘J in its tooltip, and ⌘J toggles the drawer on Analysis, Plan, Work and Live (tested)"
+  - "With web.sidecar off the Sidecar button does not render, read through useFeatureToggle (tested)"
+  - "Opening the drawer adds no ViewId and does not change the route (tested)"
+  - "The drawer docks in the page flow at 440 px, resizable 360-640 px; the page narrows instead of being covered, and the NEXT stage rail and status dock sit left of the drawer (UX1, UX10; inspected at 1440, 1100 and 900 px)"
+  - "The top nav follows the UX2' width tiers (>=1440, 1200-1439, 961-1199, <=960), and at 960 px and below the button is a glyph with its badge (inspected)"
+  - "Each sidecar:frames message for the open session makes the transcript fetch frames after its cursor; a reload resumes with no duplicate frames (tested)"
+  - "A context-refreshed frame draws as a divider naming the notes carried over (tested)"
+  - "The composer posts the prompt to the turns route and is disabled while a turn runs, and Stop calls the interrupt route (tested)"
+  - "The orange badge counts waiting cards across this worktree sessions and updates on sidecar:card (tested)"
+  - "Viewer code reaches messaging and shared code only through src/viewer/external.ts and src/viewer/api.ts, and boundary-check passes"
+priority: "high"
+source: "caos"
+---
