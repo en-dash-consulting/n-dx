@@ -6,7 +6,8 @@
  * optional note that reaches the agent as the decision's reason, and
  * "Always allow" when the card carries an allow-list key. ⌘↵ (Ctrl+Enter)
  * approves it and ⌘⌫ (Ctrl+Backspace) denies it, except while focus is in
- * a text field, where those keys keep their editing meaning.
+ * a text field, where those keys keep their editing meaning, or when a page
+ * control has already handled the key.
  *
  * Bodies are generic: a title from the card's input and the input itself.
  * A command card adds the effects line its ndx command declares in the
@@ -206,7 +207,10 @@ export function SidecarCards({ cards, manifest, decide }: SidecarCardsProps) {
     if (!firstId) return;
     const handler = (e: KeyboardEvent) => {
       const action = cardShortcut(e);
-      if (!action || isTextField(e.target)) return;
+      // A page control that already took the key (the PRD forms submit on
+      // ⌘↵ from any of their fields, selects included) must not also decide
+      // the agent's card.
+      if (!action || e.defaultPrevented || isTextField(e.target)) return;
       e.preventDefault();
       void answerRef.current(action === "approve" ? { approve: true } : { approve: false, reason: noteRef.current });
     };

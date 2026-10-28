@@ -544,9 +544,10 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     );
     if (!mountedRef.current) return;
     setError(res.ok ? null : res.error);
-    // The settle is also announced on the socket; reading now keeps the card
-    // from looking undecided until that arrives.
-    void fetchWaiting();
+    // The settle is also announced on the socket; reading before returning
+    // keeps the card from looking undecided until that arrives, so a second
+    // ⌘↵ in the meantime cannot answer the same card again.
+    await fetchWaiting();
   }, [fetchWaiting]);
 
   const waiting = Object.values(cardsBySession).reduce((sum, list) => sum + waitingCards(list), 0);

@@ -671,6 +671,28 @@ describe("permission cards", () => {
     expect(decisions().at(-1)).toEqual({ method: "POST", url: "/api/sidecar/sessions/s1/cards/c2", body: { decision: "deny" } });
   });
 
+  it("leaves ⌘↵ to a page control that already handled it", async () => {
+    await openWith([card("c1", 1)]);
+    // As the PRD add form does: it submits on ⌘↵ from any field, a select included.
+    const select = document.createElement("select");
+    select.addEventListener("keydown", (e) => e.preventDefault());
+    root.appendChild(select);
+    await key(select, { key: "Enter", metaKey: true });
+    expect(decisions()).toHaveLength(0);
+  });
+
+  it("does not answer the same card twice while its decision is still being read back", async () => {
+    await openWith([card("c1", 1), card("c2", 2)]);
+    server.heldCardReads = [];
+    await key(document.body, { key: "Enter", metaKey: true });
+    await key(document.body, { key: "Enter", metaKey: true });
+    expect(decisions().map((r) => r.url)).toEqual(["/api/sidecar/sessions/s1/cards/c1"]);
+    const held = server.heldCardReads;
+    server.heldCardReads = null;
+    await act(async () => { for (const release of held) release(); });
+    await settle();
+  });
+
   it("sends a deny's note as the decision reason", async () => {
     await openWith([card("c1", 1)]);
     const note = root.querySelector<HTMLInputElement>(".sidecar-card-reason")!;
