@@ -45,7 +45,14 @@ items:
     lastModified: "2026-10-26T22:26:18.906Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3c9bb178-cf51-4543-9c90-61036b4d4f6f":
-    lastModified: "2026-10-28T04:31:12.985Z"
+    status: "completed"
+    startedAt: "2026-10-28T04:56:27.100Z"
+    completedAt: "2026-10-28T04:58:30.981Z"
+    endedAt: "2026-10-28T04:58:30.981Z"
+    activeIntervals: [{"end":"2026-10-28T04:58:30.981Z","start":"2026-10-28T04:56:27.100Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added sidecar-packet-sources.test.ts asserting createPacketSources sourcePaths on legacy and .ndx layouts."
+    lastModified: "2026-10-28T04:58:30.981Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "425819f5-821e-41ce-aaca-56fb84c3427e":
     status: "completed"
