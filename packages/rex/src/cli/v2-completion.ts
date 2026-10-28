@@ -18,6 +18,7 @@ import { loadApplyOn } from "../core/apply-policy.js";
 import { completeWork, type CompleteWorkResult } from "../core/change-completion.js";
 import { findItem } from "../core/tree.js";
 import type { PRDItem, ResolutionType } from "../schema/index.js";
+import { indexTree } from "../schema/v2-rules.js";
 import type { ChangeLayerStore } from "../store/change-layer-store.js";
 
 export interface V2CompletionOptions {
@@ -59,7 +60,9 @@ export async function completeV2Work(store: ChangeLayerStore, id: string, option
         resolutionType: options.resolutionType,
         resolutionDetail: options.resolutionDetail,
       });
-      return { tree: result.tree, result };
+      // A node completed with `id` (its task, its change) is a cascade: it keeps its author, as v1 (#368).
+      const own = indexTree(model.tree).resolve(id)?.id;
+      return { tree: result.tree, result, preserveAuthorFor: new Set(result.completed.filter((done) => done !== own)) };
     },
     { now: () => now },
   );
