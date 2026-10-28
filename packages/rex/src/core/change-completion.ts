@@ -53,7 +53,7 @@ import type { ResolutionType } from "../schema/index.js";
 import { AUTO_COMPLETABLE_STATUSES, SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
 import { computeTimestampUpdates } from "./timestamps.js";
 import { applyOnTrigger, type ApplyOnTriggerOptions, type ApplyOnTriggerResult } from "./apply-policy.js";
-import { ApplyAmendmentsError, describeWork, unfinishedWork } from "./apply-amendments.js";
+import { ApplyAmendmentsError, NESTED_FIRST, describeWork, unappliedNestedChanges, unfinishedWork } from "./apply-amendments.js";
 
 export type ChangeCompletionOptions = ApplyOnTriggerOptions;
 
@@ -316,13 +316,12 @@ function closeChange(result: ChangeCompletionResult, change: RuleNode, options: 
   }
   markCompleted(change, options.now);
   result.completed.push(change.id);
-  const unapplied = (change.children ?? []).filter((c) => c.type === "change" && c.status !== "deleted" && isOpenChange(c));
+  const unapplied = unappliedNestedChanges(change);
   let apply: CompletionApplyResult;
   if (isAppliedChange(change)) {
     apply = { applied: false, reason: `already applied at ${change.appliedAt}` };
   } else if (unapplied.length > 0) {
-    const named = unapplied.map((c) => `change ${c.displayId ?? c.id}`).join(", ");
-    apply = { applied: false, reason: `${named} ${unapplied.length > 1 ? "are" : "is"} not applied; a change applies after the changes nested in it` };
+    apply = { applied: false, reason: `${describeWork(unapplied)} not applied; ${NESTED_FIRST}` };
   } else {
     try {
       apply = applyOnTrigger(result.tree, change.id, "complete", options);

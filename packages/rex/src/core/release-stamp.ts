@@ -22,7 +22,7 @@
 import { indexTree, type V2Tree } from "../schema/v2-rules.js";
 import { applyOnTrigger, changesAwaitingApply, type ApplyOn } from "./apply-policy.js";
 import type { ChangeCommitsOptions } from "./change-commits.js";
-import { computeLandings, firstReleaseContaining, type ChangeLanding } from "./change-landing.js";
+import { computeLandings, listReleaseTags, releasesContaining, type ChangeLanding } from "./change-landing.js";
 
 const RELEASE_VERSION = /^v?(\d+\.\d+\.\d+)$/;
 
@@ -99,7 +99,9 @@ export function planReleaseStamp(input: V2Tree, inputs: ReleaseStampInputs): Rel
 /**
  * The git inputs for {@link planReleaseStamp}: every live change's landing,
  * and which of the landing commits that could be stamped a release tag already
- * contains. Reads git only when some change is finished.
+ * contains. Reads git only when some change is finished. The released check
+ * is two git commands (the tag list and one walk of their history), however
+ * many unstamped changes have landed.
  */
 export async function gatherReleaseInputs(
   tree: V2Tree,
@@ -113,9 +115,7 @@ export async function gatherReleaseInputs(
   for (const [id, landing] of Object.entries(landings)) {
     if (landing.landed && unstamped.has(id)) candidates.add(landing.commit);
   }
-  const released = new Set<string>();
-  for (const commit of candidates) {
-    if ((await firstReleaseContaining(options.repoDir, commit)) !== undefined) released.add(commit);
-  }
-  return { landings, released };
+  if (candidates.size === 0) return { landings, released: new Set() };
+  const releases = await releasesContaining(options.repoDir, await listReleaseTags(options.repoDir), candidates);
+  return { landings, released: new Set(releases.keys()) };
 }
