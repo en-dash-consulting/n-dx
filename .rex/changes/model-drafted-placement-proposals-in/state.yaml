@@ -17,7 +17,14 @@ items:
     lastModified: "2026-10-28T01:05:57.547Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "35245f99-1235-4515-a5c1-376ddf8329da":
-    lastModified: "2026-10-28T01:05:52.028Z"
+    status: "completed"
+    startedAt: "2026-10-28T01:09:12.169Z"
+    completedAt: "2026-10-28T01:12:47.488Z"
+    endedAt: "2026-10-28T01:12:47.488Z"
+    activeIntervals: [{"end":"2026-10-28T01:12:47.488Z","start":"2026-10-28T01:09:12.169Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Prompt says criteria are for a capability only; draftedProposal drops criteria from a constraint with a warning; new test in change-place-draft.test.ts; census baseline re-recorded."
+    lastModified: "2026-10-28T01:12:47.488Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "43951e89-3957-4fa2-bac3-80d0a4767fe5":
     lastModified: "2026-10-28T01:05:57.547Z"
