@@ -7,7 +7,8 @@
  * holds the hub registry and the auth token) and how to spawn the graview
  * binary without importing `node:child_process` here. The project config is
  * read through the trust gate, so a repository's `graview.bin` is not spawned
- * until the user trusts the checkout.
+ * until the user trusts the checkout, and every child gets `repoCommandEnv`'s
+ * sanitized environment, never the whole of `process.env`.
  *
  * @module graview/llm-gateway
  * @see ./rex-gateway.ts — the rex PRD model
@@ -19,6 +20,7 @@ export {
   relativeToRoot,
   resolveNdxHome,
   spawnCli,
+  repoCommandEnv,
   execStdout,
   trustedProjectConfig,
   trustedLocalConfig,

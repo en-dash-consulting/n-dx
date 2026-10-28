@@ -17,7 +17,7 @@
  */
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { relativeToRoot, spawnCli } from "../llm-gateway.js";
+import { relativeToRoot, repoCommandEnv, spawnCli } from "../llm-gateway.js";
 import { emitProjection, type EmitResult } from "../emit.js";
 import { prepareCommandCwd, readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from "../graview-bin.js";
 import { loadDocument } from "../document.js";
@@ -108,12 +108,20 @@ function describeEmit(result: EmitResult): string {
  * the binary may be an `npx.cmd`/`graview.cmd` shim, which Node refuses to
  * spawn without a shell; it routes those through cmd.exe and is a plain
  * spawn everywhere else.
+ *
+ * `env` is required: graview, its npx fallback (a binary fetched from the
+ * registry) and the face server are peer tools, like the vendor CLIs, so each
+ * gets the project's sanitized environment ({@link repoCommandEnv}: the
+ * user's local denies always apply, a repository's allows only once trusted),
+ * never the credentials in the operator's shell. PATH, HOME and npm's own
+ * config pass the default filter; npm auth tokens do not, and the pinned
+ * graview comes from the public registry.
  */
-function run(cmd: string, args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv; stdoutToStderr?: boolean }): Promise<number> {
+function run(cmd: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; stdoutToStderr?: boolean }): Promise<number> {
   return new Promise((resolve) => {
     // Under `mcp`, stdout is the JSON-RPC stream: a helper child's chatter goes to stderr instead.
     const stdio = options.stdoutToStderr ? [0, 2, 2] : "inherit";
-    const child = spawnCli(cmd, args, { cwd: options.cwd, ...(options.env ? { env: options.env } : {}), stdio });
+    const child = spawnCli(cmd, args, { cwd: options.cwd, env: options.env, stdio });
     child.on("error", (error) => {
       console.error(`Error: could not run ${cmd}: ${error.message}`);
       resolve(1);
@@ -145,7 +153,7 @@ export function absolutePathFlags(args: string[], root: string): string[] {
 /** Runs in the project root unless the command names its own directory (the npx fallback). */
 async function runGraview(command: GraviewCommand, args: string[], root: string, options: { stdoutToStderr?: boolean } = {}): Promise<number> {
   prepareCommandCwd(command);
-  return run(command.cmd, [...command.prefix, ...absolutePathFlags(args, root)], { cwd: command.cwd ?? root, ...options });
+  return run(command.cmd, [...command.prefix, ...absolutePathFlags(args, root)], { cwd: command.cwd ?? root, env: repoCommandEnv(root), ...options });
 }
 
 /**
@@ -185,8 +193,9 @@ async function serveProductApp(appDir: string, emitted: EmitResult, passthrough:
   const args = existsSync(ownBin) ? [ownBin, ...passthrough] : pm === "pnpm" ? ["dev", ...(passthrough.length ? ["--", ...passthrough] : [])] : ["run", "dev", ...(passthrough.length ? ["--", ...passthrough] : [])];
   const rex = rexMcpEndpoint(emitted.layout);
   say(`product face: ${appDir}${rex ? `; writes back through ${rex.url}${rex.worktree ? " (as this worktree's workspace)" : ""}` : "; sync off (run ndx start . to register with the hub)"}`);
+  // The face's own variables go on after the filter: NDX_TOKEN_FILE names a file, not a token.
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...repoCommandEnv(emitted.layout.root),
     NDX_GRAVIEW_DIR: emitted.graviewDir,
     NDX_PROJECT_ROOT: emitted.layout.root,
     // This CLI's own entry, so the face's dev door can re-emit without `ndx` on its PATH.
