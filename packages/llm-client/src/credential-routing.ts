@@ -18,6 +18,10 @@
  * {@link trustedProjectConfig} and the local one through
  * {@link trustedLocalConfig}.
  *
+ * hench's `apiKeyEnv` (the variable its API loop sends as the Anthropic key)
+ * is credential routing too. It lives in hench's config rather than the LLM
+ * loaders', so the review lists it and hench's `applyRepoTrust` drops it.
+ *
  * The vendor CLI binary (`*.cli_path`), the graview binary (`graview.bin`)
  * and the graview product face (`graview.app`) follow the same rule: a
  * repository that chose one would run its own script with the user's

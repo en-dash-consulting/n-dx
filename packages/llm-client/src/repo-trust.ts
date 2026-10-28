@@ -334,7 +334,8 @@ export interface RepoExecutionConfig {
    */
   envDeny: string[];
   /**
-   * The project config's {@link CREDENTIAL_ROUTING_FIELDS} that are set, as
+   * The project config's {@link CREDENTIAL_ROUTING_FIELDS} that are set, and a
+   * hench `apiKeyEnv` other than {@link DEFAULT_HENCH_API_KEY_ENV}, as
    * `path = value`, sorted: where an API key is sent, and which variable is
    * sent as one.
    */
@@ -381,6 +382,15 @@ export const CREDENTIAL_ROUTING_FIELDS: readonly (readonly string[])[] = [
   ["llm", "google", "api_endpoint"],
   ["llm", "google", "apiKeyEnv"],
 ];
+
+/**
+ * The variable hench's API loop sends as the Anthropic key when nothing
+ * chooses another. A different hench `apiKeyEnv` from the repository is
+ * credential routing: hench applies it only once the repository is trusted.
+ * Mirrors hench's `DEFAULT_HENCH_CONFIG().apiKeyEnv`; hench's `trust.test.ts`
+ * fails if the two drift (a default config would stop reading as baseline).
+ */
+const DEFAULT_HENCH_API_KEY_ENV = "ANTHROPIC_API_KEY";
 
 function fieldAt(root: Record<string, unknown>, path: readonly string[]): unknown {
   let node: unknown = root;
@@ -603,6 +613,7 @@ const HENCH_FIELD_CHECKS: Record<string, FieldCheck> = {
     })),
     env: optional(shape({ deny: optional(strings), allow: optional(strings) })),
   }),
+  apiKeyEnv: optional((v) => typeof v === "string"),
   permissionMode: optional(oneOf("default", "acceptEdits", "bypassPermissions", "plan")),
   language: optional(oneOf("typescript", "javascript", "go", "swift")),
   provider: optional(oneOf("cli", "api")),
@@ -688,7 +699,14 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   // A field the tracked local file sets wins over the project config's, as
   // in every loader's merge, so the effective value is what is listed.
   const effective = localConfig ? deepMerge(projectConfig ?? {}, localConfig) : projectConfig;
-  const credentialRouting = credentialRoutingIn(effective);
+  // Hench's API loop sends the variable `apiKeyEnv` names as the Anthropic
+  // key. The default names nothing new, and leaving it out keeps the digest
+  // of every checkout `hench init` wrote it into.
+  const henchApiKeyEnv = optionalString(merged.apiKeyEnv);
+  const credentialRouting = [
+    ...credentialRoutingIn(effective),
+    ...(henchApiKeyEnv && henchApiKeyEnv !== DEFAULT_HENCH_API_KEY_ENV ? [`hench.apiKeyEnv = ${henchApiKeyEnv}`] : []),
+  ].sort();
   // Hench falls back to `claudePath` when no `cli_path` is set, so it chooses
   // the Claude binary too. The bare PATH name chooses nothing, and leaving it
   // out keeps the digest of every checkout `ndx init` wrote it into.

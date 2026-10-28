@@ -9,6 +9,7 @@ import { GuardError, validatePath } from "../../../src/guard/paths.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
 import { HenchConfigSchema } from "../../../src/schema/index.js";
 import { loadConfig } from "../../../src/store/config.js";
+import { resolveApiKey } from "../../../src/store/project-config.js";
 
 let repo: string;
 let home: string;
@@ -79,6 +80,92 @@ describe("applyRepoTrust", () => {
 
     recordRepoTrust(repo, { ndxHome: home });
     expect(applyRepoTrust(config, repo, undefined, { ndxHome: home }).config.claudePath).toBe("./tools/claude");
+  });
+
+  describe("apiKeyEnv", () => {
+    const SENTINEL = "HENCH_TRUST_SENTINEL_TOKEN";
+    let saved: Record<string, string | undefined>;
+
+    beforeEach(() => {
+      saved = { [SENTINEL]: process.env[SENTINEL], ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY };
+      process.env[SENTINEL] = "sentinel-secret";
+      process.env.ANTHROPIC_API_KEY = "default-key";
+    });
+
+    afterEach(() => {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+
+    /** The key the API loop sends: `resolveApiKey(claudeConfig, config.apiKeyEnv)` in loop.ts. */
+    function sentKey(config: { apiKeyEnv: string }): string | undefined {
+      return resolveApiKey({}, config.apiKeyEnv);
+    }
+
+    it("sends the default variable, not the repository's choice, until the repository is trusted", () => {
+      const config = { ...DEFAULT_HENCH_CONFIG(), apiKeyEnv: SENTINEL };
+      writeHenchConfig(config);
+
+      const restricted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+      expect(restricted.evaluation.state).toBe("untrusted");
+      const finding = restricted.evaluation.findings.find((f) => f.code === "credential-routing");
+      expect(finding?.values).toContain(`hench.apiKeyEnv = ${SENTINEL}`);
+      expect(restricted.config.apiKeyEnv).toBe("ANTHROPIC_API_KEY");
+      expect(restricted.clamped).toBe(true);
+      expect(sentKey(restricted.config)).toBe("default-key");
+
+      recordRepoTrust(repo, { ndxHome: home });
+      const trusted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+      expect(trusted.evaluation.state).toBe("trusted");
+      expect(sentKey(trusted.config)).toBe("sentinel-secret");
+    });
+
+    it("moves the digest when the repository changes apiKeyEnv after acceptance", () => {
+      // Accepted with a reviewed variable; the repository then swaps it.
+      const reviewed = { ...DEFAULT_HENCH_CONFIG(), apiKeyEnv: "REVIEWED_KEY" };
+      writeHenchConfig(reviewed);
+      recordRepoTrust(repo, { ndxHome: home });
+      const before = applyRepoTrust(reviewed, repo, undefined, { ndxHome: home });
+      expect(before.evaluation.state).toBe("trusted");
+
+      writeFileSync(join(repo, ".n-dx.json"), JSON.stringify({ hench: { apiKeyEnv: SENTINEL } }));
+      const config = { ...DEFAULT_HENCH_CONFIG(), apiKeyEnv: SENTINEL };
+      const after = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+      expect(after.evaluation.config.digest).not.toBe(before.evaluation.config.digest);
+      expect(after.evaluation.state).toBe("changed");
+      expect(sentKey(after.config)).toBe("default-key");
+    });
+
+    it("keeps the user's .n-dx.local.json apiKeyEnv while the repository is untrusted", () => {
+      writeHenchConfig({ ...DEFAULT_HENCH_CONFIG(), apiKeyEnv: "REPO_KEY" });
+      writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench: { apiKeyEnv: SENTINEL } }));
+      // As loadConfig merges it: the local overlay wins.
+      const config = { ...DEFAULT_HENCH_CONFIG(), apiKeyEnv: SENTINEL };
+
+      const restricted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+      expect(restricted.evaluation.state).toBe("untrusted");
+      expect(sentKey(restricted.config)).toBe("sentinel-secret");
+    });
+
+    it("does not apply the apiKeyEnv of a .n-dx.local.json the repository commits", () => {
+      writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench: { apiKeyEnv: SENTINEL } }));
+      execFileSync("git", ["init", "-q"], { cwd: repo, stdio: "ignore" });
+      execFileSync("git", ["add", "-f", ".n-dx.local.json"], { cwd: repo, stdio: "ignore" });
+      const config = { ...DEFAULT_HENCH_CONFIG(), apiKeyEnv: SENTINEL };
+
+      const restricted = applyRepoTrust(config, repo, undefined, { ndxHome: home });
+      expect(restricted.evaluation.findings.find((f) => f.code === "credential-routing")?.values)
+        .toContain(`hench.apiKeyEnv = ${SENTINEL}`);
+      expect(sentKey(restricted.config)).toBe("default-key");
+    });
+
+    it("leaves a checkout whose config names the default variable at baseline", () => {
+      writeHenchConfig(DEFAULT_HENCH_CONFIG());
+      const applied = applyRepoTrust(DEFAULT_HENCH_CONFIG(), repo, undefined, { ndxHome: home });
+      expect(applied.evaluation.state).toBe("baseline");
+    });
   });
 
   it("keeps the user's .n-dx.local.json claudePath while the repository is untrusted", () => {

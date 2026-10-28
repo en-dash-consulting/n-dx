@@ -7,8 +7,9 @@
  * guard it declares is clamped to the baseline for the project's detected
  * language (marker files, not the config's `language`) —
  * allowlists intersect, blocked paths union — and a `bypassPermissions`
- * permission mode is lowered to `acceptEdits`, a `claudePath` it ships
- * gives way to the user's `.n-dx.local.json` one, and the `guard.env.allow`
+ * permission mode is lowered to `acceptEdits`, a `claudePath` or `apiKeyEnv`
+ * it ships gives way to the user's `.n-dx.local.json` one (`apiKeyEnv` else
+ * to the default `ANTHROPIC_API_KEY`), and the `guard.env.allow`
  * entries it ships are dropped (the user's `.n-dx.local.json` entries and
  * every `deny` entry stay). A `.n-dx.local.json` git tracks is the
  * repository's, so neither its `claudePath` nor its `allow` entries survive
@@ -40,7 +41,7 @@ import {
   type RepoTrustEvaluation,
   type RepoTrustStoreOptions,
 } from "../prd/llm-gateway.js";
-import type { HenchConfig, PermissionMode, RunTrustRecord } from "../schema/index.js";
+import { DEFAULT_HENCH_CONFIG, type HenchConfig, type PermissionMode, type RunTrustRecord } from "../schema/index.js";
 
 export interface RepoTrustApplied {
   evaluation: RepoTrustEvaluation;
@@ -104,16 +105,22 @@ export function applyRepoTrust(
   // `.n-dx.local.json` may set it here; the repository's copy is dropped.
   const { claudePath, ...rest } = config;
   const localClaudePath = typeof local?.claudePath === "string" && local.claudePath ? local.claudePath : undefined;
+  // `apiKeyEnv` names the variable the API loop sends as the Anthropic key, so
+  // the repository's choice gives way to the user's own or the default.
+  const apiKeyEnv = typeof local?.apiKeyEnv === "string" && local.apiKeyEnv
+    ? local.apiKeyEnv
+    : DEFAULT_HENCH_CONFIG().apiKeyEnv;
   return {
     evaluation,
-    config: { ...rest, ...(localClaudePath ? { claudePath: localClaudePath } : {}), guard },
+    config: { ...rest, ...(localClaudePath ? { claudePath: localClaudePath } : {}), apiKeyEnv, guard },
     permissionMode: lowered,
-    clamped: guardChanged || lowered !== permissionMode || claudePath !== localClaudePath,
+    clamped: guardChanged || lowered !== permissionMode || claudePath !== localClaudePath || apiKeyEnv !== config.apiKeyEnv,
   };
 }
 
 interface LocalHenchSection {
   claudePath?: unknown;
+  apiKeyEnv?: unknown;
   guard?: { env?: { allow?: unknown } };
 }
 
