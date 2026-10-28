@@ -60,7 +60,7 @@ import { z } from "zod";
 import type { Requirement } from "../schema/v1.js";
 import { RequirementSchema } from "../schema/validate.js";
 import { isDisplayId, type Amendment, type ChangeNode, type CriteriaDelta, type Criterion } from "../schema/v2.js";
-import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { checkV2Rules, dependsOnCycles, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { isUsableFrozenSlug, slugifyTitle } from "../store/folder-tree-serializer.js";
 import { SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
 
@@ -357,7 +357,18 @@ export function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding
   const key = (f: RuleFinding): string => `${f.rule}\0${f.nodeId}\0${f.message}`;
   const errors = (t: V2Tree): RuleFinding[] => checkV2Rules(t, { now }).filter((f) => f.severity === "error");
   const had = new Set(errors(before).map(key));
-  return errors(after).filter((f) => !had.has(key(f)));
+  const fresh = errors(after).filter((f) => !had.has(key(f)));
+  if (!fresh.some((f) => f.rule === "depends-on-acyclic")) return fresh;
+  // Retiring a member only shrinks or splits a dependsOn knot, which renames
+  // its finding. A cycle whose members were all in one cycle before is that
+  // knot, not a new one; anything else (a new dependsOn edge) is new.
+  const beforeCycles = dependsOnCycles(before).map((ids) => new Set(ids));
+  const afterCycles = new Map(dependsOnCycles(after).map((ids) => [ids[0], ids]));
+  const preexisting = (f: RuleFinding): boolean => {
+    const members = afterCycles.get(f.nodeId);
+    return members !== undefined && beforeCycles.some((cycle) => members.every((id) => cycle.has(id)));
+  };
+  return fresh.filter((f) => f.rule !== "depends-on-acyclic" || !preexisting(f));
 }
 
 // ── Deltas ───────────────────────────────────────────────────────
