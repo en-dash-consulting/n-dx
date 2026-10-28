@@ -33,11 +33,11 @@
     "prepare": "pnpm run build"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0"
+    "@anthropic-ai/sdk": "^0.137.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.4"
+    "vitest": "^5.0.5"
   }
 }

@@ -28,7 +28,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { checkArchitecturePolicy, checkRestrictedImports, isNdxMonorepo } from "../../packages/core/ci.js";
@@ -1812,8 +1812,53 @@ describe("intra-package dependency direction", () => {
 });
 
 // ---------------------------------------------------------------------------
-// PRD storage invariant: prd.md only in migration helper
+// PRD storage invariant: v2 has two writable roots; v1 reads stay in migration
 // ---------------------------------------------------------------------------
+
+describe("architecture policy: v2 PRD intent and state stay in the two roots", () => {
+  for (const rexPath of [".rex", ".ndx/rex"]) {
+    it(`completion and apply write only product/ and changes/ under ${rexPath}`, async () => {
+      const { resolveStore, completeV2Work, loadPrdModel } = await import("../../packages/rex/dist/public.js");
+      const dir = mkdtempSync(join(tmpdir(), "ndx-v2-write-policy-"));
+      const rexDir = join(dir, rexPath);
+      // Snapshot every byte, not only selected filenames: a legacy sidecar
+      // created anywhere in rexDir, or a status rewrite of intent, must fail.
+      const snapshot = () => new Map(readdirSync(rexDir, { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => {
+          const file = join(entry.parentPath, entry.name);
+          return [relative(rexDir, file).replace(/\\/g, "/"), readFileSync(file, "utf8")];
+        }));
+      try {
+        cpSync(join(ROOT, "packages/rex/tests/fixtures/v2-tree"), rexDir, { recursive: true });
+        writeFileSync(join(rexDir, "config.json"), JSON.stringify({ schema: "rex/v1", project: "policy", adapter: "file" }));
+        const before = snapshot();
+        const store = await resolveStore(rexDir);
+        const task = "c0000000-0000-4000-8000-000000000002";
+        const change = "c0000000-0000-4000-8000-000000000001";
+        await completeV2Work(store, task, { applyOn: "review" });
+        const taskDone = snapshot();
+        expect((await store.getItem(task)).status).toBe("completed");
+        const taskWrites = [...taskDone].filter(([path, content]) => before.get(path) !== content).map(([path]) => path);
+        expect(taskWrites).toContain("changes/add-apple-pay/state.yaml");
+        expect(taskWrites.filter((path) => path.endsWith(".md"))).toEqual([]);
+
+        await completeV2Work(store, change, { applyOn: "complete" });
+        const model = await loadPrdModel(rexDir, { env: {}, warn: () => {} });
+        expect(model.tree.changes.find((node) => node.id === change).appliedAt).toBeTruthy();
+        const after = snapshot();
+        const writes = [...after].filter(([path, content]) => before.get(path) !== content).map(([path]) => path);
+        expect(writes.some((path) => path.startsWith("product/"))).toBe(true);
+        expect(writes.some((path) => path.startsWith("changes/"))).toBe(true);
+        // The execution log is deliberately outside the PRD backend.
+        expect(writes.filter((path) => !/^(?:product|changes)\//.test(path) && path !== "execution-log.jsonl")).toEqual([]);
+        expect([...after.keys()].filter((path) => /^(?:prd_tree\/|prd(?:_[^/]*)?\.(?:md|json)$)/.test(path))).toEqual([]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      }
+    });
+  }
+});
 
 /**
  * Enforces the PRD storage invariant: `.rex/prd.md` is read and written ONLY
