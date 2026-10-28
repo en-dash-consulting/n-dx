@@ -3,7 +3,7 @@ items:
   "02f8c4c2-20f3-462e-a061-5fd05b50f9d1":
     assignee: "Ryan Keith <ryan.k@endash.us>"
     needsPlacement: false
-    lastModified: "2026-10-28T15:28:13.241Z"
+    lastModified: "2026-10-28T20:48:05.147Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0a3bfa7b-3b67-4500-b0a1-0602445f46fc":
     status: "completed"
@@ -17,11 +17,15 @@ items:
     lastModified: "2026-10-28T20:41:52.992Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "22fb3f27-2ae8-43b2-928e-649f1da131d0":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T20:42:31.480Z"
-    activeIntervals: [{"start":"2026-10-28T20:42:31.480Z"}]
+    completedAt: "2026-10-28T20:52:31.042Z"
+    endedAt: "2026-10-28T20:52:31.042Z"
+    activeIntervals: [{"end":"2026-10-28T20:52:31.042Z","start":"2026-10-28T20:42:31.480Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench.apiKeyEnv (non-default) is credential routing: listed by the trust review, in the digest, dropped by applyRepoTrust while restricted; local untracked value still applies."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T20:42:32.041Z"
+    lastModified: "2026-10-28T20:52:31.042Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3e9eafaa-ceae-4a1c-a5a3-9dd121698c14":
     status: "completed"
@@ -36,6 +40,9 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "47654649-c6f7-4277-a156-d5d606f9ed2c":
     lastModified: "2026-10-28T15:28:13.241Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ac6b536a-c462-40a2-b5c1-bd2d425ab8a9":
+    lastModified: "2026-10-28T20:48:05.147Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c4333256-6e2d-4c9f-aeaa-6a772e17fb88":
     status: "completed"

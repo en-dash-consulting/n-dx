@@ -399,6 +399,20 @@ describe("repository trust under project overrides", () => {
     expect(applied.config.guard.allowedCommands).not.toContain("curl");
   });
 
+  it("reviews the apiKeyEnv hench runs when .n-dx.json masks it with an invalid type", async () => {
+    writeHenchConfig({ ...DEFAULT_HENCH_CONFIG(), apiKeyEnv: "REPO_CHOSEN_TOKEN" });
+    writeFileSync(join(repo, ".n-dx.json"), JSON.stringify({ hench: { apiKeyEnv: 0 } }));
+
+    const { config, permissionMode } = await effective();
+    // The loader reverts the invalid override, so the hench file's choice is what runs.
+    expect(config.apiKeyEnv).toBe("REPO_CHOSEN_TOKEN");
+
+    const applied = applyRepoTrust(config, repo, permissionMode, { ndxHome: home });
+    expect(applied.evaluation.findings.find((f) => f.code === "credential-routing")?.values)
+      .toContain("hench.apiKeyEnv = REPO_CHOSEN_TOKEN");
+    expect(applied.config.apiKeyEnv).toBe("ANTHROPIC_API_KEY");
+  });
+
   /** The execution view of a config, in the collector's terms. */
   function view(guard: { allowedCommands: string[]; blockedPaths: string[]; allowedGitSubcommands: string[]; env?: { allow?: string[] } }, permissionMode: unknown) {
     return {
