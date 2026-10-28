@@ -207,6 +207,7 @@ describe("the fixture extension through the CLI", () => {
     let stdout = "";
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
+      // The fixture installs its handler before publishing this report.
       if (stdout.includes("\n") && !child.killed) child.kill("SIGTERM");
     });
     const code = await new Promise((resolve) => child.on("close", resolve));
