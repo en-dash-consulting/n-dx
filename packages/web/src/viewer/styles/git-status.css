@@ -11,10 +11,12 @@
   align-items: center;
 }
 
+/* Right-anchored: the chip sits just left of the bar's controls, so a
+   left-anchored 420px panel would run off the viewport's right edge. */
 .git-status-chip .git-status-panel {
   position: absolute;
   bottom: calc(100% + 0.5rem);
-  left: 0;
+  right: 0;
 }
 
 .git-status-toggle {
