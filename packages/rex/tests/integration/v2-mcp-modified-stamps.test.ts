@@ -105,6 +105,37 @@ describe("MCP writes on a v2 tree stamp lastModified and lastModifiedBy", () => 
     expectFresh(await node(other), since);
   });
 
+  it("completing a change's last task keeps the auto-completed change's author and moves its timestamp", async () => {
+    // Only a pending change closes with its last task.
+    const statePath = join(rexDir, "changes", "add-apple-pay", "state.yaml");
+    await writeFile(statePath, (await readFile(statePath, "utf-8")).replace('status: "in_progress"', 'status: "pending"'));
+    expect(await node(CHANGE)).toMatchObject({ status: "pending", lastModifiedBy: OLD_AUTHOR });
+    const since = new Date().toISOString();
+    await call("update_task_status", { id: TASK, status: "completed" });
+    expectFresh(await node(TASK), since);
+    const change = (await node(CHANGE)) as { status?: string; lastModified?: string; lastModifiedBy?: string };
+    expect(change.status).toBe("completed");
+    expect(change.lastModifiedBy).toBe(OLD_AUTHOR);
+    expect(change.lastModified !== undefined && change.lastModified >= since, `lastModified ${change.lastModified}`).toBe(true);
+  });
+
+  it("ChangeLayerStore.updateItem with preserveModifiedBy keeps the node's existing author", async () => {
+    const since = new Date().toISOString();
+    await ws.store.updateItem(CHANGE, { priority: "critical" }, { preserveModifiedBy: true });
+    const change = (await node(CHANGE)) as { priority?: string; lastModified?: string; lastModifiedBy?: string };
+    expect(change.priority).toBe("critical");
+    expect(change.lastModifiedBy).toBe(OLD_AUTHOR);
+    expect(change.lastModified !== undefined && change.lastModified >= since).toBe(true);
+  });
+
+  it("ChangeLayerStore.updateItem with preserveModifiedBy stamps the actor on a node with no author", async () => {
+    const { id } = await call("add_item", { type: "change", title: "Add Google Pay", touches: [CAPABILITY] });
+    await clearAuthor(id);
+    const since = new Date().toISOString();
+    await ws.store.updateItem(id, { priority: "critical" }, { preserveModifiedBy: true });
+    expectFresh(await node(id), since);
+  });
+
   it("a write that changes nothing stamps nothing", async () => {
     const before = (await loadPrdModel(rexDir, quiet)).tree;
     const { title } = (await node(CHANGE))!;
@@ -123,4 +154,17 @@ async function stampOldOn(id: string): Promise<void> {
     await writeFile(path, text.replace(/lastModified: "[^"]*"/, `lastModified: "${OLD_STAMP}"`).replace(/lastModifiedBy: "[^"]*"/, `lastModifiedBy: "${OLD_AUTHOR}"`));
   }
   expect(await node(id)).toMatchObject({ lastModified: OLD_STAMP, lastModifiedBy: OLD_AUTHOR });
+}
+
+/** Drop `lastModified` / `lastModifiedBy` from node `id`'s row in whichever state.yaml holds it. */
+async function clearAuthor(id: string): Promise<void> {
+  for (const entry of await readdir(join(rexDir, "changes"), { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || entry.name !== "state.yaml") continue;
+    const path = join(entry.parentPath, entry.name);
+    const text = await readFile(path, "utf-8");
+    if (!text.includes(`"${id}":`)) continue;
+    await writeFile(path, text.replace(/ *lastModified: "[^"]*"\r?\n/, "").replace(/ *lastModifiedBy: "[^"]*"\r?\n/, ""));
+  }
+  const n = (await node(id)) as { lastModifiedBy?: string };
+  expect(n.lastModifiedBy).toBeUndefined();
 }
