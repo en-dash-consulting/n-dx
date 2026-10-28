@@ -4,9 +4,10 @@
  * so Sidecar can attach it (main.ts folds it into the page selection).
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { h, render } from "preact";
+import { h, render, type VNode } from "preact";
 import { act } from "preact/test-utils";
-import { PRDView } from "../../../src/viewer/views/prd.js";
+import { PRDView, type PRDViewProps } from "../../../src/viewer/views/prd.js";
+import { renderActiveView, type ViewRenderContext } from "../../../src/viewer/views/view-registry.js";
 import type { PRDDocumentData } from "../../../src/viewer/components/prd-tree/types.js";
 
 const doc: PRDDocumentData = {
@@ -54,5 +55,12 @@ describe("PRDView selection report", () => {
 
     await act(async () => { render(null, root!); });
     expect(seen.at(-1)).toBeNull();
+  });
+
+  it("the prd view renderer hands main.ts's setOpenTask to PRDView", () => {
+    const setOpenTask = vi.fn();
+    const vnode = renderActiveView("prd", { selectedTaskId: null, setOpenTask } as unknown as ViewRenderContext) as VNode<PRDViewProps>;
+    expect(vnode.type).toBe(PRDView);
+    expect(vnode.props.onSelectedItemChange).toBe(setOpenTask);
   });
 });
