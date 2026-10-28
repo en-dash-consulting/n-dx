@@ -102,11 +102,17 @@ export type { V2Tree, RuleNode, TreeIndex, TreeEntry as V2TreeEntry, IndexOption
 // holds the strength bands, so no surface keeps its own thresholds.
 // `recordProposal` records a new capability or constraint when nothing fits.
 
+// `draftChangePlacement` asks the configured `prd.place` text model for a pick
+// or a proposal and writes nothing; a drafted proposal has no target, so
+// accepting it through `recordProposal` mints the new node's id.
+
 export { suggestPlacement, recordPlacement, recordProposal, ChangePlacementError } from "./core/change-place.js";
 export type {
   ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementCandidate, RecordPlacementInput, RecordPlacementResult,
-  RecordProposalInput, RecordProposalOptions, RecordProposalResult,
+  RecordProposalInput, RecordProposalOptions, RecordProposalResult, PlacementDraft, DraftedProposal,
 } from "./core/change-place.js";
+export { draftChangePlacement } from "./analyze/place-draft.js";
+export type { DraftChangePlacementOptions, ChangePlacementDraft } from "./analyze/place-draft.js";
 export { placementStrength, PLACEMENT_STRONG_SCORE, PLACEMENT_POSSIBLE_SCORE } from "./core/placement.js";
 export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "./core/placement.js";
 

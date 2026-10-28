@@ -22,6 +22,9 @@
  *   id as its `target`. It is a proposal only; the node reaches the product
  *   layer when the change is applied. It clears `needsPlacement` too, and is
  *   dry-run through apply the same way.
+ * - {@link draftPlacement} asks an injected text model (`prd.place`) for a
+ *   pick or a proposal and returns it unwritten, for a person to accept
+ *   through the two above.
  *
  * An open change is placed either way. An applied change (migrated history
  * still in the Inbox) is placed with `touches` only: its amendments already
@@ -42,10 +45,13 @@ import { checkV2Rules, indexTree, isAppliedChange, isOpenChange, nodeSpec, specH
 import {
   asProposal,
   PLACEMENT_SHORTLIST_SIZE,
+  placeChange,
   placementRelation,
   placementStrength,
   rankPlacementCandidates,
+  type PlacementArea,
   type PlacementCandidate,
+  type PlacementModel,
   type PlacementStrength,
   type PlacementChange,
   type PlacementNode,
@@ -310,6 +316,94 @@ export function recordProposal(
   const { problems, pending, blockedBy } = novelApplyProblems(tree, next, change.id, now);
   if (problems.length) throw new ChangePlacementError(`Cannot propose for change ${label}: ${problems.join("; ")}`, "apply-problems");
   return { tree: next, change: change.id, proposal, warnings: pendingWarnings(pending, blockedBy), pending, blockedBy };
+}
+
+/**
+ * A new node the text model drafted, in the shape {@link recordProposal} takes.
+ * It has no `target`: the model's slug is not a node id, and accepting the draft
+ * through `recordProposal` mints one.
+ */
+export type DraftedProposal = RecordProposalInput;
+
+export interface PlacementDraft {
+  /** Id of the change drafted for. */
+  change: string;
+  /** The rules' relation for this change; every candidate carries it. */
+  relation: PlacementRelation;
+  /** The top two candidates share a score (see {@link PlacementSuggestion}). */
+  tied: boolean;
+  /** Rules ranking, best first. Empty when no rule fired. */
+  shortlist: SuggestedPlacementCandidate[];
+  /** The shortlist target the model picked. */
+  pick?: string;
+  /** A new node the model proposed under a live area. */
+  proposal?: DraftedProposal;
+  warnings: string[];
+}
+
+/**
+ * Ask the text model where the open change `changeRef` belongs, over the
+ * tree's live capabilities, constraints and areas. Writes nothing: a person
+ * accepts the draft through {@link recordPlacement} or {@link recordProposal}.
+ * A pick off the shortlist, a malformed proposal and one under an unknown area
+ * are dropped with a warning. A model error propagates. Without a model the
+ * draft is the rules shortlist alone.
+ */
+export async function draftPlacement(tree: V2Tree, changeRef: string, model?: PlacementModel): Promise<PlacementDraft> {
+  const change = placeableChange(tree, changeRef);
+  // A pick could only touch, and a proposal is refused outright: drafting is for open changes.
+  if (isAppliedChange(change)) throw appliedChangeAmends(change);
+  const input = placementInput(change);
+  const result = await placeChange(input, placementNodes(tree), { model, areas: placementAreas(tree) });
+  const warnings = [...result.warnings];
+  const { shortlist } = result;
+  const [top, next] = shortlist;
+
+  let pick: string | undefined;
+  const picked = result.model?.pick;
+  if (picked != null) {
+    if (shortlist.some((c) => c.target === picked)) pick = picked;
+    else warnings.push(`text model picked "${picked}", which is not on the shortlist; ignoring it`);
+  }
+
+  return {
+    change: change.id,
+    relation: placementRelation(input),
+    tied: top !== undefined && next !== undefined && top.score === next.score,
+    shortlist: shortlist.map((c) => ({ ...c, strength: placementStrength(c.score) })),
+    ...(pick !== undefined ? { pick } : {}),
+    ...(result.model?.proposal ? { proposal: draftedProposal(result.model.proposal, warnings) } : {}),
+    warnings,
+  };
+}
+
+/** The fields of a model proposal a person may accept; the model's target is dropped. */
+function draftedProposal(proposal: PlacementProposal, warnings: string[]): DraftedProposal {
+  const { added, rest } = splitCriteria(proposal.criteria);
+  if (rest.length) warnings.push(`text model proposed criteria ${rest.join(", ")} for a new node; only add applies, ignoring the rest`);
+  return {
+    type: proposal.type,
+    under: proposal.under,
+    title: proposal.title,
+    ...(proposal.summary !== undefined ? { summary: proposal.summary } : {}),
+    ...(proposal.proposed !== undefined ? { proposed: proposal.proposed } : {}),
+    ...(added.length ? { criteria: { add: added } } : {}),
+  };
+}
+
+function splitCriteria(criteria: CriteriaDelta | undefined): { added: Criterion[]; rest: string[] } {
+  if (!criteria) return { added: [], rest: [] };
+  const { add, ...others } = criteria;
+  return { added: add ?? [], rest: Object.keys(others) };
+}
+
+/** Every live area, as the placement model sees it. */
+function placementAreas(tree: V2Tree): PlacementArea[] {
+  return indexTree(tree).entries.flatMap(({ node, root }): PlacementArea[] =>
+    root === "product" && node.type === "area"
+      ? [{ id: node.id, title: node.title, ...(typeof node.statement === "string" ? { statement: node.statement } : {}) }]
+      : [],
+  );
 }
 
 /** Refuse when the v2 rules find an error on `change` in `tree`. */
