@@ -12,6 +12,7 @@ acceptanceCriteria:
   - "\"Always allow\" is offered only when the card allowListKey is set (tested)"
   - "Every SidecarCardKind draws with a title and its input in the pending, approved, denied, allow-listed and withdrawn states (tested)"
   - "A card withdrawn because the session ended draws as denied with the note \"session ended\", and a route test covers POST /api/sidecar/sessions/:id/end withdrawing waiting cards (tested)"
+  - "The waiting-card badge ignores a card read that a later read has overtaken (fetchWaiting in use-sidecar.ts), so it never shows a stale count; a test resolves two card reads in reverse order (tested)"
 priority: "high"
 source: "caos"
 ---
