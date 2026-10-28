@@ -10,7 +10,14 @@ items:
     lastModified: "2026-10-28T00:35:05.412Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a5de1b6c-7c3a-4a92-b7b1-d244cf3ca0ff":
-    lastModified: "2026-10-27T16:32:27.834Z"
+    status: "completed"
+    startedAt: "2026-10-28T00:43:41.750Z"
+    completedAt: "2026-10-28T01:03:00.591Z"
+    endedAt: "2026-10-28T01:03:00.591Z"
+    activeIntervals: [{"end":"2026-10-28T00:59:49.450Z","start":"2026-10-28T00:43:41.750Z"},{"end":"2026-10-28T01:03:00.591Z","start":"2026-10-28T01:03:00.591Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Draft with the model in the placement form and POST /api/rex/changes/:id/placement/draft, behind rex.placementDraft (default off, server-gated). Run commit debfe0865; the gate failed only on the gateway contract list, updated by hand; affected gate re-run green."
+    lastModified: "2026-10-28T01:03:00.591Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c4fbfee6-6191-43d7-ade2-bee8a9df2a63":
     status: "completed"

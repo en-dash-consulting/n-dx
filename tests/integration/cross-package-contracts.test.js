@@ -545,6 +545,7 @@ describe("web → rex gateway contract", () => {
     "recordProposal",
     "ChangePlacementError",
     "placementStrength",
+    "draftChangePlacement",
   ];
 
   const GATEWAY_CONSTANTS = [
@@ -981,7 +982,7 @@ describe("gateway export auto-detection", () => {
         // rex's own parsers so the chooser cannot offer a value the CLI would
         // silently fall back from.
         "parseApplyOn", "parsePlacementSettings",
-        "suggestPlacement", "recordPlacement", "recordProposal", "ChangePlacementError", "placementStrength"],
+        "suggestPlacement", "recordPlacement", "recordProposal", "ChangePlacementError", "placementStrength", "draftChangePlacement"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
         "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);
