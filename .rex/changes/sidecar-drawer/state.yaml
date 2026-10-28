@@ -4,10 +4,14 @@ items:
     lastModified: "2026-10-28T17:55:50.706Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0c8f67c5-719b-4570-9e5a-5296f7c19129":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T18:24:20.845Z"
-    activeIntervals: [{"start":"2026-10-28T18:24:20.845Z"}]
-    lastModified: "2026-10-28T18:24:23.683Z"
+    completedAt: "2026-10-28T18:32:13.640Z"
+    endedAt: "2026-10-28T18:32:13.640Z"
+    activeIntervals: [{"end":"2026-10-28T18:32:13.640Z","start":"2026-10-28T18:24:20.845Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Session record keeps lastTurn (status, error, signedOut); cleared when next turn starts; drawer seeds lastTurn from session on load."
+    lastModified: "2026-10-28T18:32:13.640Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1eb1ed53-df39-458d-b30d-45484de50a2c":
     issues: ["https://www.notion.so/3f7a80b719248143a3cfefa1734efe22","https://www.notion.so/3f7a80b7192481d0bad3fee78325cc7c","https://www.notion.so/3f7a80b7192481018bb3f0fed756c4f0","https://www.notion.so/3f7a80b71924816682dccb222aadb6f3","https://www.notion.so/3f7a80b719248161bde1f381bd30e8ee","https://www.notion.so/3f7a80b7192481fea2d1d0effbc05cec"]

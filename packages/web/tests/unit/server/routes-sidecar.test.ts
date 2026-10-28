@@ -334,6 +334,13 @@ describe("turns", () => {
     expect((await (await api(`/${id}`)).json()).session.lastTurn).toEqual({ status: "completed" });
   });
 
+  it("still closes the turn when saving its outcome fails", async () => {
+    const id = await createSession();
+    registry.recordTurnEnd = () => { throw new Error("ENOSPC: no space left on device"); };
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "SIGNEDOUT" } });
+    expect(await turnClosed(id)).toMatchObject({ running: false, status: "failed", signedOut: true });
+  });
+
   it("refuses a second turn while one runs, and an empty prompt", async () => {
     const id = await createSession();
     expect((await api(`/${id}/turns`, { method: "POST", body: { prompt: " " } })).status).toBe(400);

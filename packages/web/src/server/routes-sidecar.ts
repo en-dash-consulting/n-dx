@@ -306,31 +306,32 @@ function startTurn(
     };
     broadcast(message);
   };
+  // Close the turn on the socket first: a failed save of the outcome (a full
+  // or read-only disk) must not leave the drawer running or reject unhandled.
+  const close = (status: SessionTurnStatus, error?: string): void => {
+    const outcome: SidecarTurnOutcome = {
+      status,
+      ...(error && { error }),
+      ...(status === "failed" && error && isAuthError(error) && { signedOut: true as const }),
+    };
+    announce({ cursor: registry.get(id)?.cursor ?? 0, running: false, ...outcome, status });
+    try {
+      registry.recordTurnEnd(id, outcome);
+    } catch (err) {
+      console.error(`[sidecar] could not save how the turn in session ${id} ended: ${errorMessage(err)}`);
+    }
+  };
   // The user frame is appended synchronously inside sendTurn, before it
   // first awaits, so it is on disk by the time the POST answers.
   registry.sendTurn(id, prompt, (frame) => announce({ cursor: frame.seq, running: true })).finally(() => {
     // Nothing waits on a card once its turn is over.
     broker.withdraw(id, "The turn ended");
   }).then(
-    (result) => {
-      const outcome: SidecarTurnOutcome = {
-        status: result.status,
-        ...(result.error && { error: result.error }),
-        ...(result.status === "failed" && result.error && isAuthError(result.error) && { signedOut: true as const }),
-      };
-      registry.recordTurnEnd(id, outcome);
-      announce({ cursor: registry.get(id)?.cursor ?? 0, running: false, ...outcome, status: result.status });
-    },
+    (result) => close(result.status, result.error),
     (err: unknown) => {
       const error = errorMessage(err);
       console.error(`[sidecar] turn in session ${id} failed: ${error}`);
-      const outcome: SidecarTurnOutcome = {
-        status: "failed",
-        error,
-        ...(isAuthError(error) && { signedOut: true as const }),
-      };
-      registry.recordTurnEnd(id, outcome);
-      announce({ cursor: registry.get(id)?.cursor ?? 0, running: false, ...outcome, status: "failed" });
+      close("failed", error);
     },
   );
 }
