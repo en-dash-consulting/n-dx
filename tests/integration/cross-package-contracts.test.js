@@ -345,6 +345,7 @@ describe("hench → llm-client gateway contract", () => {
     "clearRepoTrust",
     "formatRepoTrustReport",
     "escapeTerminalControls",
+    "writeHenchLocalSetting",
     "redactDeep",
     "redactSecrets",
     "createLineRedactor",
@@ -873,6 +874,9 @@ describe("gateway export auto-detection", () => {
         // are one evaluation shared by hench, the dashboard and ndx init.
         "guardBaselineForLanguage", "clampGuardToBaseline", "evaluateRepoTrust",
         "recordRepoTrust", "clearRepoTrust", "formatRepoTrustReport", "escapeTerminalControls",
+        // `hench config` writes these keys to .n-dx.local.json, where the
+        // trust review does not read them as the repository's routing.
+        "HENCH_LOCAL_ONLY_SETTINGS", "writeHenchLocalSetting",
         "redactDeep", "redactSecrets", "createLineRedactor",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",

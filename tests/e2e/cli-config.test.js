@@ -754,6 +754,26 @@ describe("n-dx config", () => {
       expect(shared.cli?.claudePath).toBeUndefined();
     });
 
+    it("sets hench.apiKeyEnv in .n-dx.local.json, so the checkout stays at baseline", async () => {
+      // The trust review reads a non-default apiKeyEnv in .hench/config.json
+      // or .n-dx.json as the repository's credential routing: written there,
+      // the user's own choice would be ignored until `ndx trust accept .`.
+      await writeFile(SHARED_CONFIG_PATH(tmpDir), JSON.stringify({ hench: { apiKeyEnv: "OLD_KEY" } }) + "\n");
+      const output = run(["hench.apiKeyEnv", "MY_ANTHROPIC_KEY", tmpDir]);
+      expect(output).toContain("hench.apiKeyEnv = MY_ANTHROPIC_KEY");
+
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.hench.apiKeyEnv).toBe("MY_ANTHROPIC_KEY");
+      const hench = JSON.parse(await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"));
+      expect(hench.apiKeyEnv).toBe("ANTHROPIC_API_KEY");
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.hench).toBeUndefined();
+
+      const { evaluateRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+      expect(evaluateRepoTrust(tmpDir).state).toBe("baseline");
+      expect(run(["hench.apiKeyEnv", tmpDir]).trim()).toBe("MY_ANTHROPIC_KEY");
+    });
+
     it("sets claude.api_key in .n-dx.local.json, never in .n-dx.json", async () => {
       const output = run(["claude.api_key", "sk-ant-test-key", tmpDir]);
       expect(output).toContain("claude.api_key = sk-ant-test-key");

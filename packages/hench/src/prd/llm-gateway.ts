@@ -92,6 +92,9 @@ export {
   formatRepoTrustReport,
   escapeTerminalControls,
 } from "@n-dx/llm-client";
+// The hench keys `hench config` writes to .n-dx.local.json, since the review
+// reads them from .hench/config.json as the repository's credential routing.
+export { HENCH_LOCAL_ONLY_SETTINGS, writeHenchLocalSetting } from "@n-dx/llm-client";
 export type {
   GuardBaseline,
   RepoTrustEvaluation,

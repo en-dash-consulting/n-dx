@@ -7,10 +7,13 @@
  *   hench config <key> <value> [dir] — set a single value
  *   hench config --interactive [dir] — interactive menu
  *
- * All changes are validated before writing and persist to .hench/config.json.
+ * All changes are validated before writing and persist to .hench/config.json,
+ * except `apiKeyEnv`, which goes to .n-dx.local.json (see persistConfigChange).
  */
 
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join, relative } from "node:path";
+import { HENCH_LOCAL_ONLY_SETTINGS, writeHenchLocalSetting } from "../../prd/llm-gateway.js";
 import { loadConfig, saveConfig } from "../../store/config.js";
 import { resolveHenchPaths } from "../../store/paths.js";
 import { validateConfig, formatValidationErrors } from "../../schema/index.js";
@@ -872,7 +875,36 @@ async function promptUser(question: string): Promise<string> {
   return answer.trim();
 }
 
-async function runInteractiveMenu(henchDir: string): Promise<void> {
+/**
+ * Persist `config`, in which `path` was just set to `value`, and return the
+ * file that now holds the value. A key in `HENCH_LOCAL_ONLY_SETTINGS` goes to
+ * `.n-dx.local.json`: the trust review reads `.hench/config.json` as the
+ * repository's credential routing, so the user's own choice there would be
+ * ignored until the checkout is trusted. `.hench/config.json` keeps those
+ * keys at the value the file itself holds (the loaded config carries the
+ * local override, which must not be copied back), or the neutral one when
+ * the key just moved out.
+ */
+async function persistConfigChange(
+  projectDir: string,
+  henchDir: string,
+  config: HenchConfig,
+  path: string,
+  value: unknown,
+): Promise<string> {
+  const onDisk = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8")) as Record<string, unknown>;
+  const toSave: Record<string, unknown> = { ...config };
+  for (const [key, neutral] of Object.entries(HENCH_LOCAL_ONLY_SETTINGS)) {
+    toSave[key] = key === path || onDisk[key] === undefined ? neutral : onDisk[key];
+  }
+  const target = Object.hasOwn(HENCH_LOCAL_ONLY_SETTINGS, path)
+    ? writeHenchLocalSetting(projectDir, path, value).localFile
+    : join(henchDir, "config.json");
+  await saveConfig(henchDir, toSave as unknown as HenchConfig);
+  return target;
+}
+
+async function runInteractiveMenu(projectDir: string, henchDir: string): Promise<void> {
   let config = await loadConfig(henchDir);
   let done = false;
 
@@ -969,8 +1001,8 @@ async function runInteractiveMenu(henchDir: string): Promise<void> {
             info("  Change reverted.");
             config = await loadConfig(henchDir);
           } else {
-            await saveConfig(henchDir, config);
-            info("  Saved.");
+            const savedTo = await persistConfigChange(projectDir, henchDir, config, field.path, newValue);
+            info(`  Saved to ${relative(projectDir, savedTo)}.`);
           }
         } else {
           info("  Change cancelled.");
@@ -1006,7 +1038,7 @@ export async function cmdConfig(
         "Use 'hench config <key> <value>' for non-interactive configuration.",
       );
     }
-    await runInteractiveMenu(henchDir);
+    await runInteractiveMenu(dir, henchDir);
     return;
   }
 
@@ -1081,11 +1113,11 @@ export async function cmdConfig(
     );
   }
 
-  await saveConfig(henchDir, newConfig);
+  const savedTo = await persistConfigChange(dir, henchDir, newConfig, key, coerced);
 
   info(`${field.label}: ${formatValue(getConfigValue(config, key))} → ${formatValue(coerced)}`);
   if (preview) {
     info(`Impact: ${preview.impact}`);
   }
-  info("Saved to .hench/config.json");
+  info(`Saved to ${relative(dir, savedTo)}`);
 }

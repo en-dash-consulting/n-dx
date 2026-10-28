@@ -3,6 +3,7 @@ import { mkdtemp, writeFile, mkdir, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
+import { detectRepoLanguage, evaluateRepoTrust, guardBaselineForLanguage } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleHenchRoute } from "../../../src/server/routes-hench.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -178,6 +179,42 @@ describe("Hench Config API routes", () => {
     const raw = await readFile(join(henchDir, "config.json"), "utf-8");
     const saved = JSON.parse(raw);
     expect(saved.model).toBe("opus");
+  });
+
+  it("PUT /api/hench/config writes apiKeyEnv to .n-dx.local.json, leaving the checkout at baseline", async () => {
+    // The trust review reads a non-default apiKeyEnv in .hench/config.json or
+    // .n-dx.json as the repository's credential routing, which would leave the
+    // user's own choice ignored until the checkout is trusted.
+    const guard = { ...guardBaselineForLanguage(detectRepoLanguage(tmpDir)), commandTimeout: 30000, maxFileSize: 1048576 };
+    await writeFile(join(henchDir, "config.json"), JSON.stringify(makeConfig({ guard }), null, 2) + "\n");
+    await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ hench: { apiKeyEnv: "OLD_KEY" } }));
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { apiKeyEnv: "MY_ANTHROPIC_KEY" } }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.config.apiKeyEnv).toBe("MY_ANTHROPIC_KEY");
+
+    const local = JSON.parse(await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"));
+    expect(local.hench.apiKeyEnv).toBe("MY_ANTHROPIC_KEY");
+    const saved = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(saved.apiKeyEnv).toBe("ANTHROPIC_API_KEY");
+    const shared = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+    expect(shared.hench).toBeUndefined();
+
+    const home = await mkdtemp(join(tmpdir(), "hench-config-api-home-"));
+    try {
+      const evaluation = evaluateRepoTrust(tmpDir, { ndxHome: home });
+      expect(evaluation.findings.map((f) => f.message)).toEqual([]);
+      expect(evaluation.state).toBe("baseline");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+
+    const get = await (await fetch(`http://127.0.0.1:${port}/api/hench/config`)).json();
+    expect(get.config.apiKeyEnv).toBe("MY_ANTHROPIC_KEY");
   });
 
   it("PUT /api/hench/config updates multiple fields", async () => {

@@ -397,7 +397,7 @@ export const CREDENTIAL_ROUTING_FIELDS: readonly (readonly string[])[] = [
  * Mirrors hench's `DEFAULT_HENCH_CONFIG().apiKeyEnv`; hench's `trust.test.ts`
  * fails if the two drift (a default config would stop reading as baseline).
  */
-const DEFAULT_HENCH_API_KEY_ENV = "ANTHROPIC_API_KEY";
+export const DEFAULT_HENCH_API_KEY_ENV = "ANTHROPIC_API_KEY";
 
 function fieldAt(root: Record<string, unknown>, path: readonly string[]): unknown {
   let node: unknown = root;

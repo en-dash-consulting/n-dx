@@ -453,6 +453,10 @@ export type {
 // Project and local config with the trust-gated fields (API endpoints, key
 // variables, binary paths) removed while the repository is untrusted
 export { trustedProjectConfig, trustedLocalConfig } from "./credential-routing.js";
+// Hench settings every writer stores in .n-dx.local.json, since the trust
+// review reads them from the repository's config as credential routing
+export { HENCH_LOCAL_ONLY_SETTINGS, isHenchLocalOnlySetting, writeHenchLocalSetting } from "./hench-local-settings.js";
+export type { HenchLocalSettingWrite } from "./hench-local-settings.js";
 // Credential redaction for persisted or displayed text (run records, logs, live output)
 export {
   REDACTED_TOKEN,

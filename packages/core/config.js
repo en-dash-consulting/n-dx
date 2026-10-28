@@ -109,21 +109,34 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *   remote. `.n-dx.local.json` is gitignored by init and by the shipped
  *   template, and every reader already merges it over the shared file.
  *
- * - **Credential routing** (`*.api_endpoint`, `llm.google.apiKeyEnv`): where
- *   a key is sent and which variable is sent as one. The loaders honour these
- *   from the shared file only once the repository is trusted (llm-client
- *   `credential-routing.ts`), so writing the user's own choice there would
- *   have it ignored and mark their repository untrusted.
+ * - **Credential routing** (`*.api_endpoint`, `llm.google.apiKeyEnv`,
+ *   `hench.apiKeyEnv`): where a key is sent and which variable is sent as
+ *   one. The loaders honour these from the shared file only once the
+ *   repository is trusted (llm-client `credential-routing.ts`, hench
+ *   `applyRepoTrust`), so writing the user's own choice there would have it
+ *   ignored and mark their repository untrusted.
  *
  * Keyed by section, then by the setting path within that section. `llm`
  * entries are matched by suffix so `llm.claude.api_key`, `llm.codex.api_key`
- * and `llm.google.api_key` all route without listing each vendor.
+ * and `llm.google.api_key` all route without listing each vendor. `hench` is
+ * a package, not a project section: {@link handleSetPackageConfig} routes it,
+ * and its entries match llm-client's `HENCH_LOCAL_ONLY_SETTINGS`, which
+ * `hench config` and the dashboard use.
  */
 const LOCAL_ONLY_SETTINGS = {
   cli: new Set(["claudePath"]),
   claude: new Set(["cli_path", "api_key", "api_endpoint"]),
   llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
+  hench: new Set(["apiKeyEnv"]),
 };
+
+/**
+ * The value a package config file keeps for each of its settings in
+ * {@link LOCAL_ONLY_SETTINGS}, so the checkout's own config names nothing the
+ * trust review reads as credential routing. Mirrors hench's
+ * `DEFAULT_HENCH_CONFIG()`; core imports no package.
+ */
+const PACKAGE_LOCAL_ONLY_VALUES = { hench: { apiKeyEnv: "ANTHROPIC_API_KEY" } };
 
 /** Setting-path leaf that marks a secret, for the shared-file scan. */
 const SECRET_SETTING_LEAF = "api_key";
@@ -2020,7 +2033,8 @@ Hench settings (.hench/config.json):
                                      unlimited). A run stops once it crosses this.
   hench.rexDir             string    Path to the rex PRD directory (default: the project's
                                      resolved rex directory — .rex, or .ndx/rex on the new layout)
-  hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY")
+  hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY").
+                                     Written to .n-dx.local.json.
   hench.claudePath         string    Path to the Claude Code binary. Falls back to "claude" on
                                      PATH. Prefer claude.cli_path, which is shared across packages.
                                      Outside .n-dx.local.json it applies only once the repository
@@ -3308,6 +3322,11 @@ async function handleSetPackageConfig(
     }
   }
 
+  if (isLocalProjectSetting(pkg, settingPath)) {
+    await setPackageSettingLocally(dir, pkg, settingPath, keyArg, coerced, rawConfigs);
+    return;
+  }
+
   // Write to raw (un-merged) config so project overrides don't leak
   setByPath(rawConfigs[pkg], settingPath, coerced, pkg);
 
@@ -3315,6 +3334,36 @@ async function handleSetPackageConfig(
   await saveJSON(configPath, rawConfigs[pkg]);
 
   console.log(`${keyArg} = ${formatValue(coerced)}`);
+}
+
+/**
+ * Write a package setting listed in {@link LOCAL_ONLY_SETTINGS} to the
+ * `<pkg>` section of `.n-dx.local.json`. The package file keeps its neutral
+ * value and a shared `.n-dx.json` copy is removed: either would otherwise
+ * stay the repository's credential routing and keep the checkout untrusted.
+ */
+async function setPackageSettingLocally(dir, pkg, settingPath, keyArg, coerced, rawConfigs) {
+  const localPath = projectConfigPath(dir, LOCAL_CONFIG_FILE);
+  const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
+  if (!local[pkg] || typeof local[pkg] !== "object") local[pkg] = {};
+  setByPath(local[pkg], settingPath, coerced, pkg);
+  await saveProjectJSON(localPath, local);
+  console.log(`${keyArg} = ${formatValue(coerced)}  (in ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)})`);
+
+  const neutral = PACKAGE_LOCAL_ONLY_VALUES[pkg][settingPath];
+  const current = getByPath(rawConfigs[pkg], settingPath, pkg);
+  if (current !== undefined && current !== neutral) {
+    setByPath(rawConfigs[pkg], settingPath, neutral, pkg);
+    await saveJSON(packageConfigPath(dir, pkg), rawConfigs[pkg]);
+  }
+
+  const removed = await removeFromSharedConfig(dir, [[pkg, settingPath]]);
+  if (removed.length > 0) {
+    console.log(
+      `  → moved ${removed.join(", ")} out of ${projectConfigLabel(dir, PROJECT_CONFIG_FILE)}`
+      + ` into ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)}`,
+    );
+  }
 }
 
 // ── GET mode handler ─────────────────────────────────────────────────────────
