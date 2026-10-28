@@ -44,6 +44,9 @@ items:
     resolutionDetail: "Option (a): scanTimeoutMs on TerminateTreeOptions; vendor-session passes INTERRUPT_SCAN_MS (1 s) with the 500 ms grace."
     lastModified: "2026-10-26T22:26:18.906Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3c9bb178-cf51-4543-9c90-61036b4d4f6f":
+    lastModified: "2026-10-28T04:31:12.985Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "425819f5-821e-41ce-aaca-56fb84c3427e":
     status: "completed"
     startedAt: "2026-10-26T18:31:04.702Z"
@@ -95,7 +98,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9753d37a-2e7e-4950-8eba-3015eee08734":
     issues: ["https://www.notion.so/3f7a80b71924810fb66ac7fbdc9bc4db","https://www.notion.so/3f7a80b719248165891cff1c8f0d0ace","https://www.notion.so/3f7a80b7192481c5a8fef7faf77e11e0","https://www.notion.so/3f7a80b7192481e0a645e0c1b1b7f2b7","https://www.notion.so/3f7a80b71924810492a8ca3948c3f474","https://www.notion.so/3f7a80b71924810499c9f380e11f53fd"]
-    lastModified: "2026-10-28T04:29:03.975Z"
+    lastModified: "2026-10-28T04:31:12.985Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9e47fb80-238b-4cff-a0df-254bce7a8da1":
     lastModified: "2026-10-27T16:33:13.187Z"
@@ -112,7 +115,14 @@ items:
     lastModified: "2026-10-26T21:35:56.603Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aed63f9f-0142-49fa-8ba0-be62b6b5ada9":
-    lastModified: "2026-10-28T04:29:03.975Z"
+    status: "completed"
+    startedAt: "2026-10-28T04:29:15.604Z"
+    completedAt: "2026-10-28T04:34:14.699Z"
+    endedAt: "2026-10-28T04:34:14.699Z"
+    activeIntervals: [{"end":"2026-10-28T04:34:14.699Z","start":"2026-10-28T04:29:15.604Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Packet provenance paths come from resolveLayout via PacketSources.sourcePaths; cache dir uses PRD_CACHE_DIRNAME; contract test names loadTrailerCommits/loadCommitFiles. Commit ab850174c."
+    lastModified: "2026-10-28T04:34:14.699Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "afc0a661-2cf4-42a6-9bc6-72cfc3e6d3ce":
     startedAt: "2026-10-28T04:14:29.686Z"

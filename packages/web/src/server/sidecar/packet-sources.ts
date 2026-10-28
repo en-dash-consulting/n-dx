@@ -12,10 +12,10 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { resolveLayout } from "@n-dx/llm-client";
 import { DATA_FILES } from "../../shared/index.js";
-import { loadCommitFiles, loadPrdModel, loadTrailerCommits } from "../rex-gateway.js";
+import { loadCommitFiles, loadPrdModel, loadTrailerCommits, PRD_CACHE_DIRNAME } from "../rex-gateway.js";
 import type { V2Tree } from "../rex-gateway.js";
 import type { Manifest, Zones } from "../domain-gateway.js";
 import type { ServerContext } from "../types.js";
@@ -81,6 +81,8 @@ export interface RunStatusRead {
 }
 
 export interface PacketSources {
+  /** Where the zone and run reads look, project-relative, for section provenance. */
+  sourcePaths: { zones: string; runs: string };
   prd(): Promise<PrdRead | null>;
   evidence(itemIds: string[]): Promise<EvidenceRead | null>;
   zones(files: string[]): Promise<ZoneRead | null>;
@@ -113,7 +115,12 @@ function readJson<T>(path: string): T | null {
 /** The production reads for `ctx`'s workspace. */
 export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): PacketSources {
   const layout = resolveLayout(ctx.projectDir);
+  const display = (path: string) => relative(ctx.projectDir, path).split("\\").join("/");
   return {
+    sourcePaths: {
+      zones: display(join(layout.sourcevisionDir, DATA_FILES.zones)),
+      runs: `${display(join(layout.henchDir, "runs"))}/`,
+    },
     async prd() {
       try {
         const model = await loadPrdModel(ctx.rexDir);
@@ -127,7 +134,7 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
     async evidence(itemIds) {
       const wanted = new Set(itemIds);
       if (wanted.size === 0) return { commits: [] };
-      const cacheDir = join(ctx.rexDir, ".cache");
+      const cacheDir = join(ctx.rexDir, PRD_CACHE_DIRNAME);
       try {
         const all = await loadTrailerCommits({ repoDir: ctx.projectDir, cacheDir });
         const hits = all

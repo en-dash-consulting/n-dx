@@ -510,6 +510,9 @@ describe("web → rex gateway contract", () => {
     "isAppliedChange",
     "specHash",
     "nodeSpec",
+    // trailer-commit evidence — the commits and files a Sidecar lens packet quotes
+    "loadTrailerCommits",
+    "loadCommitFiles",
     "countSubtree",
     "computeEpicStats",
     "computePriorityDistribution",
@@ -965,6 +968,7 @@ describe("gateway export auto-detection", () => {
         "validateChangesMerge", "mergeChanges",
         "loadPrdModel", "productReport", "capabilityReport", "indexTree",
         "isOpenChange", "isAppliedChange", "specHash", "nodeSpec",
+        "loadTrailerCommits", "loadCommitFiles",
         "handleProductEdit", "ProductEditError", "withPrdModelTransaction",
         "countSubtree", "computeEpicStats", "computePriorityDistribution",
         "computeRequirementsSummary", "computeHealthScore",

@@ -122,7 +122,7 @@ async function evidenceSections(sources: PacketSources, ids: string[], now: stri
   if (!evidence) {
     return [
       gap("evidence", "Trailer-commit evidence", "no readable git history", now, source),
-      gap("zones", "Sourcevision zones", "no commits to name the touched files", now, ".sourcevision/zones.json"),
+      gap("zones", "Sourcevision zones", "no commits to name the touched files", now, sources.sourcePaths.zones),
     ];
   }
   const commits = evidence.commits;
@@ -139,7 +139,7 @@ async function evidenceSections(sources: PacketSources, ids: string[], now: stri
 
   const files = [...new Set(commits.flatMap((c) => c.files))].sort();
   const zones = files.length > 0 ? await sources.zones(files) : null;
-  const zoneSource = ".sourcevision/zones.json";
+  const zoneSource = sources.sourcePaths.zones;
   if (files.length === 0) {
     return [evidenceSection, gap("zones", "Sourcevision zones", "no touched files to place in a zone", now, zoneSource)];
   }
@@ -328,7 +328,7 @@ export async function buildDescribePacket(sources: PacketSources, target: Packet
   );
 
   const runs = await sources.runs(node.id);
-  const runSource = ".hench/runs/";
+  const runSource = sources.sourcePaths.runs;
   sections.push(
     runs
       ? {

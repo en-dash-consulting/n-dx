@@ -44,6 +44,7 @@ async function sourcesFor(layout: "v1" | "v2", overrides: Partial<PacketSources>
   cpSync(join(FIXTURES, layout === "v2" ? "v2-tree" : "folder-tree/known-prd"), layout === "v2" ? rexDir : join(rexDir, "prd_tree"), { recursive: true });
   const model = await loadPrdModel(rexDir);
   return {
+    sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },
     prd: async () => ({ layout: model.layout, tree: model.tree }),
     evidence: async () => ({
       commits: [
