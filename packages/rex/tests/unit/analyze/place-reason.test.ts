@@ -34,6 +34,14 @@ describe("text placement model", () => {
     expect(prompt).toContain("Planning");
   });
 
+  it("asks a proposal for an optional statement and criteria", async () => {
+    reply('{"pick": null}');
+    await createTextPlacementModel("model-x").place(input);
+    const [prompt] = mockSpawnClaude.mock.calls[0]!;
+    expect(prompt).toContain('"proposed"');
+    expect(prompt).toContain('"criteria": {"add"');
+  });
+
   it("returns a decline and a proposal as placeChange expects them", async () => {
     const { place } = createTextPlacementModel("model-x");
     reply("```json\n{\"pick\": null}\n```");
