@@ -107,6 +107,11 @@ export interface SidecarAttachment {
    * target. On a page about nothing (Home, Files) a session keeps what it has.
    */
   asks: boolean;
+  /**
+   * The registry has answered. Until it has, `lens` reads every lens but
+   * General as unavailable, so nothing may act on it yet.
+   */
+  ready: boolean;
   /** The registry's lenses, in its order; empty until it answers. */
   lenses: SidecarLensInfo[];
   lens: ResolvedLens;
@@ -179,5 +184,5 @@ export function useSidecarAttachment(enabled: boolean, open: boolean, page: Side
   }, [registry, key]);
   const removeItem = useCallback(() => setRemovedKey(key), [key]);
 
-  return { item, asks: pageItem !== null, lenses: registry ?? [], lens, chooseLens, removeItem };
+  return { item, asks: pageItem !== null, ready: registry !== null, lenses: registry ?? [], lens, chooseLens, removeItem };
 }

@@ -615,7 +615,9 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   // The open session follows the attachment: the page item is its target and
   // the lens it runs is the one the chip shows (General while that lens is not
   // available yet). One PATCH per change; an ended session is left alone.
-  const { asks } = attachment;
+  // Not before the registry answers: until then every lens reads as
+  // unavailable, and the session would be re-lensed to General and back.
+  const asks = attachment.asks && attachment.ready;
   const wantLens = attachment.lens.running;
   const wantRef = attachment.item?.ref ?? "";
   const heldLens = session?.lens ?? GENERAL_LENS;

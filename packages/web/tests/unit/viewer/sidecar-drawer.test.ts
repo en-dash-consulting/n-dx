@@ -62,6 +62,8 @@ interface Server {
   otherSessions: Record<string, SidecarSessionEntry[]>;
   /** GET /api/sidecar/lenses: the M1 registry. */
   lenses: SidecarLensInfo[];
+  /** While set, a lenses read waits on it — the registry has not answered yet. */
+  lensesGate?: Promise<void>;
   /** Status of the newest hench run of any task, per GET /api/hench/runs?taskId=; unset means no runs. */
   lastRunStatus?: string;
 }
@@ -117,9 +119,13 @@ function stubServer(): void {
         local: { models: [], defaultModel: "" },
       });
     }
-    if (url === "/api/sidecar/lenses") return json({ lenses: server.lenses });
+    if (url === "/api/sidecar/lenses") {
+      if (server.lensesGate) await server.lensesGate;
+      return json({ lenses: server.lenses });
+    }
     if (url.startsWith("/api/hench/runs?")) {
-      return json(server.lastRunStatus ? [{ id: "r1", status: server.lastRunStatus }] : []);
+      // The shape routes-hench.ts answers with.
+      return json({ runs: server.lastRunStatus ? [{ id: "r1", status: server.lastRunStatus }] : [], total: 0 });
     }
     if (url === "/api/workspaces") {
       return json({ anchor: "main", workspaces: server.workspaces.map((w) => ({ ...w, path: "/x", isAnchor: w.key === "main", active: true })) });
@@ -1059,6 +1065,18 @@ describe("attachment and lens", () => {
     expect(patches()).toEqual([expect.objectContaining({
       url: "/api/sidecar/sessions/s1", body: { lens: "describe", target: { ref: "t1" } },
     })]);
+  });
+
+  it("leaves the session's lens alone until the registry answers", async () => {
+    server.sessions = [{ session: session({ id: "s1", lens: "describe", target: { ref: "t1" } }), running: false }];
+    let release!: () => void;
+    server.lensesGate = new Promise<void>((r) => { release = r; });
+    await open("prd", { taskId: "t1" });
+    expect(patches()).toEqual([]);
+    await act(async () => { release(); });
+    await settle();
+    expect(lensChip().textContent).toBe("Describe");
+    expect(patches()).toEqual([]);
   });
 
   it("a task whose last run failed gives Diagnose run, shown as not available yet; the session runs General", async () => {
