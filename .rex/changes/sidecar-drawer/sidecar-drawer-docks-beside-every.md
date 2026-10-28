@@ -3,7 +3,7 @@ id: "e700e599-a431-4059-b920-017492dccea8"
 type: "task"
 title: "Sidecar drawer docks beside every stage page with transcript and composer"
 slug: "sidecar-drawer-docks-beside-every"
-description: "Story 07, part 1 of 2: the drawer shell (UX1, UX2', UX10), the transcript and the composer. Mock: Anatomy and Top nav boards. CAOS story: https://www.notion.so/3f7a80b719248143a3cfefa1734efe22."
+description: "Story 07, part 1 of 2: the drawer shell (UX1, UX2', UX10), the transcript and the composer. Mock: Anatomy and Top nav boards. CAOS story: https://www.notion.so/3f7a80b719248143a3cfefa1734efe22. Design facts (the mock is outside the repo): use the shipped --orange token for the badge and the paused bar; drawer default 440 px with a left border and shadow; the status dock is the .status-dock row in main.ts."
 acceptanceCriteria:
   - "The top nav ends with a Sidecar button behind a divider, with ⌘J in its tooltip, and ⌘J toggles the drawer on Analysis, Plan, Work and Live (tested)"
   - "With web.sidecar off the Sidecar button does not render, read through useFeatureToggle (tested)"
