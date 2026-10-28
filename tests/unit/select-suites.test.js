@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import {
@@ -19,6 +19,65 @@ import {
 } from "../../scripts/lib/select-suites.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+/** Every root test file, root-relative: what `root` runs. */
+function rootTestFiles() {
+  const files = [];
+  (function walk(rel) {
+    for (const entry of readdirSync(resolve(ROOT, rel), { withFileTypes: true })) {
+      if (entry.name === "fixtures" || entry.name === "node_modules") continue;
+      const child = `${rel}/${entry.name}`;
+      if (entry.isDirectory()) walk(child);
+      else if (/\.test\.(?:m?js|ts)$/.test(entry.name)) files.push(child);
+    }
+  })("tests");
+  return files.sort();
+}
+
+/** A quoted or bare `*.md` path anywhere in a source: what a test mentions. */
+const MD_PATH = /(?<![\w./-])((?:[\w.-]+\/)*[\w.-]+\.md)(?![\w/-])/g;
+
+/** A docs page or directory, or the root README: what the doc groups map. */
+const DOCS_PATH = /^(?:README\.md|docs(?:\/.+)?)$/;
+
+/** A page inside `path` when it is a directory a test walks; the path itself otherwise. */
+const pageIn = (path) => (path.endsWith(".md") ? path : `${path}/any-page.md`);
+
+/**
+ * The docs pages and directories a test reads from the repository root,
+ * root-relative and sorted. A read is `join`/`resolve` of a root anchor (a
+ * `const *ROOT*` built from `import.meta` or `process.cwd()`), or of a `const`
+ * built that way, with literal segments; or `new URL("<relative>",
+ * import.meta.url)`. A directory that is only the base of another read (as
+ * `DOCS` in `join(DOCS, "guide")`) is dropped. Comment lines are skipped; a
+ * path under any other base (a temp fixture's `README.md`) is not a read.
+ */
+function docsReads(source, testFile) {
+  const code = source
+    .split("\n")
+    .filter((line) => !/^\s*(?:\*|\/\/|\/\*)/.test(line))
+    .join("\n");
+  const SEGMENTS = String.raw`((?:\s*,\s*["'\x60][^"'\x60$]+["'\x60])+)\s*\)`;
+  const segments = (list) => [...list.matchAll(/["'`]([^"'`]+)["'`]/g)].map((m) => m[1]);
+  const bases = new Map();
+  for (const [, name, init] of code.matchAll(/\bconst\s+(\w*ROOT\w*)\s*=\s*([^;\n]+)/g)) {
+    if (/import\.meta|process\.cwd\(\)/.test(init)) bases.set(name, "");
+  }
+  for (const [, name, base, list] of code.matchAll(
+    new RegExp(String.raw`\bconst\s+(\w+)\s*=\s*(?:join|resolve)\(\s*(\w+)` + SEGMENTS, "g"),
+  )) {
+    if (bases.has(base)) bases.set(name, posix.join(bases.get(base), ...segments(list)));
+  }
+  const paths = new Set();
+  for (const [, base, list] of code.matchAll(new RegExp(String.raw`\b(?:join|resolve)\(\s*(\w+)` + SEGMENTS, "g"))) {
+    if (bases.has(base)) paths.add(posix.join(bases.get(base), ...segments(list)));
+  }
+  for (const [, rel] of code.matchAll(/new URL\(\s*["'`]([^"'`]+)["'`]\s*,\s*import\.meta\.url\s*\)/g)) {
+    paths.add(posix.normalize(posix.join(posix.dirname(testFile), rel)));
+  }
+  const docs = [...paths].filter((p) => DOCS_PATH.test(p));
+  return docs.filter((p) => p.endsWith(".md") || !docs.some((other) => other.startsWith(`${p}/`))).sort();
+}
 
 const pkg = (dir, deps = [], hasTest = true) => ({
   dir,
@@ -386,6 +445,7 @@ describe("validated docs pages", () => {
     ["docs/packages/rex.md", "tests/e2e/docs-command-refs.test.js"],
     ["docs/index.md", "tests/e2e/docs-command-refs.test.js"],
     ["docs/guide/troubleshooting.md", "tests/e2e/assistant-parity-smoke.test.js"],
+    ["docs/contributing/cli-smoke-parity.md", "tests/unit/cli-smoke-parity.test.js"],
   ])("%s selects a subset that runs %s, and nothing else", (page, test) => {
     const { suites } = select(page);
     expect(suites).toHaveLength(suites.filter((s) => ROOT_SUBSET_LABELS.includes(s)).length);
@@ -407,13 +467,73 @@ describe("validated docs pages", () => {
     expect(select("README.md", "scripts/a.mjs").suites).toEqual(["root"]);
   });
 
-  it("maps each group to a subset that runs tests which exist and read a page it matches", () => {
+  it("maps each group to a subset that runs tests which exist", () => {
     for (const { label, tests } of VALIDATED_DOC_PAGES) {
       for (const test of tests) {
         expect(ROOT_SUBSET_TEST_FILES[label], `${label} should run ${test}`).toContain(test);
         expect(existsSync(resolve(ROOT, test)), test).toBe(true);
       }
     }
+  });
+
+  it("maps each group only to tests whose source mentions a path it matches", () => {
+    const unmentioned = [];
+    for (const [i, { tests, match }] of VALIDATED_DOC_PAGES.entries()) {
+      for (const test of tests) {
+        const source = readFileSync(resolve(ROOT, test), "utf8");
+        const mentions = [...docsReads(source, test), ...source.matchAll(MD_PATH)].map((m) =>
+          typeof m === "string" ? m : m[1],
+        );
+        if (!mentions.some((m) => match(pageIn(m)))) unmentioned.push(`group ${i}: ${test}`);
+      }
+    }
+    expect(unmentioned).toEqual([]);
+  });
+
+  // The groups above are hand-written: a root test that starts reading another
+  // docs page, or a new docs test, would select nothing on a docs-only edit
+  // while CI fails. Derived from the test sources instead (docsReads below).
+  it("maps every docs page a root test reads to a subset that runs that test", () => {
+    // This file is skipped: its docsReads fixtures are sources, not reads.
+    const self = "tests/unit/select-suites.test.js";
+    const reads = rootTestFiles()
+      .filter((test) => test !== self)
+      .flatMap((test) =>
+      docsReads(readFileSync(resolve(ROOT, test), "utf8"), test).map((path) => ({ test, path })),
+    );
+    // Guards the scan itself: file reads, directory walks and URL reads it must see today.
+    expect(reads).toEqual(
+      expect.arrayContaining([
+        { test: "tests/e2e/command-docs-parity.test.js", path: "README.md" },
+        { test: "tests/e2e/command-docs-parity.test.js", path: "docs/guide/commands.md" },
+        { test: "tests/e2e/docs-skill-refs.test.js", path: "docs/guide" },
+        { test: "tests/e2e/docs-command-refs.test.js", path: "docs/index.md" },
+        { test: "tests/e2e/docs-command-refs.test.js", path: "docs/packages" },
+        { test: "tests/unit/cli-smoke-parity.test.js", path: "docs/contributing/cli-smoke-parity.md" },
+      ]),
+    );
+    const unmapped = reads.filter(
+      ({ test, path }) =>
+        VALIDATED_ARTIFACTS[path]?.test !== test &&
+        !VALIDATED_DOC_PAGES.some((g) => g.tests.includes(test) && g.match(pageIn(path))),
+    );
+    expect(unmapped).toEqual([]);
+  });
+
+  describe("docsReads", () => {
+    it("resolves root-anchored joins, derived bases, URL reads, and drops a walked dir's parent", () => {
+      const source = [
+        'const ROOT = join(import.meta.dirname, "../..");',
+        'const DOCS = join(ROOT, "docs");',
+        'readFileSync(join(ROOT, "README.md"));',
+        'walk(join(DOCS, "guide"));',
+        'readFileSync(new URL("../../docs/a/b.md", import.meta.url));',
+        '// readFileSync(join(ROOT, "docs/commented.md"));',
+        'writeFileSync(join(tmpDir, "README.md"), "");',
+        'readFileSync(join(ROOT, "packages/web/x.md"));',
+      ].join("\n");
+      expect(docsReads(source, "tests/unit/x.test.js")).toEqual(["README.md", "docs/a/b.md", "docs/guide"]);
+    });
   });
 
   // A `tests/*.md` file that a root-policy test reads must be mapped, or editing
