@@ -303,6 +303,7 @@ export type PlacementRefusalKind =
   | "apply-problems"
   | "no-such-change"
   | "change-not-open"
+  | "applied-change-amends"
   | "not-an-area"
   | "empty-title"
   | "invalid-proposal";

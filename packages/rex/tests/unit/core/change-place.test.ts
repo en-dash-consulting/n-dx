@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { applyAmendmentsProblems } from "../../../src/core/apply-amendments.js";
 import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement } from "../../../src/core/change-place.js";
 import { placementStrength } from "../../../src/core/placement.js";
-import { indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
+import { checkV2Rules, indexTree, nodeSpec, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ slug: fields.id as string, ...fields }) as RuleNode;
 const NOW = new Date("2026-10-09T00:00:00.000Z");
@@ -33,6 +33,7 @@ const tree = (changeFields: Record<string, unknown> = {}): V2Tree => ({
 });
 
 const changeIn = (t: V2Tree) => indexTree(t).resolve("ch")!;
+const APPLIED = { status: "completed", completedAt: "2026-10-01T00:00:00.000Z", appliedAt: "2026-10-01T00:00:00.000Z" };
 
 describe("suggestPlacement", () => {
   it("ranks capabilities and constraints with the rules and names the relation", () => {
@@ -129,8 +130,10 @@ describe("recordPlacement", () => {
     ["an area target", {}, { target: "pay" }, /not a live capability or constraint/],
     ["an unknown target", {}, { target: "nope" }, /not a live capability or constraint/],
     ["a target it already amends", { amends: [{ target: "card", delta: "modified", summary: "s" }] }, { target: "A1.1", relation: "touches" as const }, /already amends "Pay by card"/],
-    ["an applied change", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z" }, { target: "card" }, /is applied at 2026-10-01/],
-    ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open change is placed/],
+    ["amends on an applied change", APPLIED, { target: "card", relation: "amends" as const, proposed: "x" }, /^Change CH-1 is applied; its amendments already reached the map\. Place it with touches\.$/],
+    ["proposed on an applied change", APPLIED, { target: "card", proposed: "x" }, /is applied; its amendments already reached the map/],
+    ["a cancelled change", { status: "cancelled" }, { target: "card" }, /is cancelled; only an open or applied change is placed/],
+    ["a deleted change", { status: "deleted" }, { target: "card", relation: "touches" as const }, /No live change "ch"/],
     ["proposed on a touches placement", {}, { target: "card", relation: "touches" as const, proposed: "x" }, /relation amends/],
     // Apply refuses these (in these words), and no tool edits the amendment afterwards.
     ["a summary-only amends placement", {}, { target: "card", relation: "amends" as const }, /nothing to modify.*Pass proposed or criteria, or use relation touches/],
@@ -147,6 +150,7 @@ describe("recordPlacement", () => {
     ["not-a-target", {}, { target: "nope" }],
     ["already-amends", { amends: [{ target: "card", delta: "modified", summary: "s" }] }, { target: "A1.1", relation: "touches" as const }],
     ["change-not-open", { status: "cancelled" }, { target: "card" }],
+    ["applied-change-amends", APPLIED, { target: "card", relation: "amends" as const, proposed: "x" }],
     ["content-needs-amends", {}, { target: "card", relation: "touches" as const, proposed: "x" }],
     ["nothing-to-modify", {}, { target: "card", relation: "amends" as const }],
     ["apply-problems", {}, { target: "A1.1", relation: "amends" as const, criteria: { remove: ["c7"] } }],
@@ -199,6 +203,38 @@ describe("recordPlacement", () => {
 
   it("refuses a ref that is not a change", () => {
     expect(() => suggestPlacement(tree(), "card")).toThrow(/No live change "card"/);
+  });
+});
+
+describe("placing an applied change", () => {
+  it("touches the target and clears needsPlacement, with touches as the default relation", () => {
+    for (const relation of ["touches" as const, undefined]) {
+      const placed = recordPlacement(tree(APPLIED), "CH-1", { target: "A1.1", ...(relation ? { relation } : {}) }, NOW);
+      expect(placed).toMatchObject({ change: "ch", placement: { target: "card", relation: "touches" }, warnings: [] });
+      expect(changeIn(placed.tree)).toMatchObject({ touches: ["card"], appliedAt: APPLIED.appliedAt });
+      expect(changeIn(placed.tree)).not.toHaveProperty("needsPlacement");
+      expect(changeIn(placed.tree)).not.toHaveProperty("amends");
+    }
+  });
+
+  it("is shortlisted with every candidate touching", () => {
+    // The open change's rules say amends; applied, it can only touch.
+    expect(suggestPlacement(tree(), "ch").relation).toBe("amends");
+    const s = suggestPlacement(tree(APPLIED), "ch");
+    expect(s.relation).toBe("touches");
+    expect(s.shortlist[0]).toMatchObject({ target: "card", relation: "touches" });
+    expect(s.shortlist.every((c) => c.relation === "touches")).toBe(true);
+  });
+
+  it("leaves no rule finding once placed, where it had change-placed-at-close before", () => {
+    const findings = (t: V2Tree) => checkV2Rules(t, { now: NOW }).filter((f) => f.nodeId === "ch").map((f) => f.rule);
+    expect(findings(tree(APPLIED))).toContain("change-placed-at-close");
+    expect(findings(recordPlacement(tree(APPLIED), "ch", { target: "card" }, NOW).tree)).toEqual([]);
+  });
+
+  it("refuses a proposal with its own kind", () => {
+    const wallets = { type: "capability" as const, under: "pay", title: "Pay by wallet", proposed: "A shopper pays with a wallet" };
+    expect(() => recordProposal(tree(APPLIED), "ch", wallets, NOW)).toThrow(expect.objectContaining({ kind: "applied-change-amends" }));
   });
 });
 
@@ -279,8 +315,8 @@ describe("recordProposal", () => {
     ["not-an-area", "a capability under", {}, { ...wallets, under: "card" }, /"card" is not a live area/],
     ["not-an-area", "an unknown under", {}, { ...wallets, under: "nope" }, /"nope" is not a live area/],
     ["empty-title", "a blank title", {}, { ...wallets, title: "  " }, /needs a title/],
-    ["change-not-open", "an applied change", { status: "completed", appliedAt: "2026-10-01T00:00:00.000Z" }, wallets, /is applied at 2026-10-01/],
-    ["change-not-open", "a cancelled change", { status: "cancelled" }, wallets, /is cancelled; only an open change is placed/],
+    ["applied-change-amends", "an applied change", APPLIED, wallets, /is applied; its amendments already reached the map/],
+    ["change-not-open", "a cancelled change", { status: "cancelled" }, wallets, /is cancelled; only an open or applied change is placed/],
     ["invalid-proposal", "a type that is neither capability nor constraint", {}, { ...wallets, type: "area" as never }, /The proposal is not a valid amendment \(type: /],
     ["rule-errors", "a new node on a fix change", { fix: true }, wallets, /Cannot place change CH-1/],
     ["apply-problems", "a criterion added twice", {}, { ...wallets, criteria: { add: [{ id: "c1", text: "a" }, { id: "c1", text: "b" }] } }, /Cannot propose for change CH-1: .*criterion c1 is added twice/],

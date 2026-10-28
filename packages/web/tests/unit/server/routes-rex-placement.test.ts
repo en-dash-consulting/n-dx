@@ -11,7 +11,7 @@ import { createServer, type Server } from "node:http";
 import type { ServerContext } from "../../../src/server/types.js";
 import { handleRexRoute } from "../../../src/server/routes-rex/index.js";
 import type { ChangePlacement } from "../../../src/viewer/views/product-model.js";
-import { resolveStore } from "@n-dx/rex";
+import { indexTree, loadPrdModel as loadModel, resolveStore, withPrdModelTransaction } from "@n-dx/rex";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const modelLoads = vi.hoisted(() => vi.fn());
@@ -208,12 +208,33 @@ describe("placement routes on a v2 project", () => {
     expect(res).toMatchObject({ status: 422, body: { kind: "already-proposed" } });
   });
 
-  it("POST place answers change-not-open for an applied change", async () => {
+  /** Mark `id` completed and applied, keeping needsPlacement: migrated history. */
+  const markApplied = (id: string) =>
+    withPrdModelTransaction(rexDir, ({ tree }) => {
+      Object.assign(indexTree(tree).resolve(id)!, { status: "completed", completedAt: "2026-10-05T12:00:00.000Z", appliedAt: "2026-10-05T12:00:00.000Z" });
+      return { tree, result: undefined };
+    });
+
+  it("POST place touches an applied Inbox change: clears needsPlacement and leaves the Inbox", async () => {
+    await markApplied(inboxId);
+    expect(folderOf(inboxId)?.split(sep)[0]).toBe("inbox");
+    const res = await json(await send(`changes/${inboxId}/place`, { target: CAPABILITY_ID, relation: "touches" }));
+    expect(res).toEqual({ status: 200, body: { change: inboxId, target: CAPABILITY_ID, relation: "touches" } });
+    expect(folderOf(inboxId)?.split(sep)[0]).not.toBe("inbox");
+    const placed = indexTree((await loadModel(rexDir)).tree).resolve(inboxId)!;
+    expect(placed).toMatchObject({ touches: [CAPABILITY_ID], appliedAt: "2026-10-05T12:00:00.000Z" });
+    expect(placed).not.toHaveProperty("needsPlacement");
+  });
+
+  it("POST place answers applied-change-amends for amends on an applied change", async () => {
+    await markApplied(inboxId);
+    const res = await json(await send(`changes/${inboxId}/place`, { target: CAPABILITY_ID, relation: "amends", proposed: "x" }));
+    expect(res).toMatchObject({ status: 422, body: { kind: "applied-change-amends", error: expect.stringContaining("Place it with touches.") } });
+  });
+
+  it("POST place answers change-not-open for a cancelled change", async () => {
     const statePath = join(rexDir, "changes", "add-apple-pay", "state.yaml");
-    writeFileSync(statePath, readFileSync(statePath, "utf-8").replace(
-      '    status: "in_progress"\n',
-      '    status: "completed"\n    appliedAt: "2026-10-05T12:00:00.000Z"\n',
-    ));
+    writeFileSync(statePath, readFileSync(statePath, "utf-8").replace('    status: "in_progress"\n', '    status: "cancelled"\n'));
     const res = await json(await send(`changes/${PLACED_CHANGE_ID}/place`, { target: CAPABILITY_ID, relation: "touches" }));
     expect(res).toMatchObject({ status: 422, body: { kind: "change-not-open" } });
   });

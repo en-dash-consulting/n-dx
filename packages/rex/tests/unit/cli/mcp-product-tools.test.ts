@@ -20,7 +20,7 @@ import {
   handlePlaceChange,
   handleUpdateTaskStatus,
 } from "../../../src/cli/mcp-tools/index.js";
-import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture } from "../../helpers/v2-fixture.js";
+import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture, markChangeApplied } from "../../helpers/v2-fixture.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
@@ -205,12 +205,24 @@ describe("place_change", () => {
     expect((await log()).at(-1)).toMatchObject({ event: "change_placed", itemId: id, detail: `touches ${CAPABILITY}` });
   });
 
-  it("refuses relation or summary without a target, and a closed change", async () => {
+  it("refuses relation or summary without a target, and amends on an applied change", async () => {
     const id = await inboxChange("Tidy the card form");
     expect(error(await handlePlaceChange(store(), rexDir, { id, relation: "touches" }))).toMatch(/pass target/);
     await completeFixtureTask(rexDir);
     json(await handleApplyChange(store(), rexDir, { id: "CH-1" }));
-    expect(error(await handlePlaceChange(store(), rexDir, { id: "CH-1", target: "A1.1" }))).toMatch(/CH-1 is applied at/);
+    expect(error(await handlePlaceChange(store(), rexDir, { id: "CH-1", target: "A1.1", relation: "amends", proposed: "x" }))).toBe(
+      "Change CH-1 is applied; its amendments already reached the map. Place it with touches.",
+    );
+  });
+
+  it("places an applied Inbox change with touches, its default relation, and shortlists it touching", async () => {
+    const id = await inboxChange("Tidy the card form");
+    await markChangeApplied(rexDir, id);
+    expect(json(await handlePlaceChange(store(), rexDir, { id })).relation).toBe("touches");
+    expect(json(await handlePlaceChange(store(), rexDir, { id, target: "A1.1" }))).toEqual({ change: id, target: CAPABILITY, relation: "touches" });
+    const { item } = json(await handleGetItem(store(), rexDir, { id }));
+    expect(item).toMatchObject({ touches: [CAPABILITY], appliedAt: expect.any(String) });
+    expect(item).not.toHaveProperty("needsPlacement");
   });
 
   it("records proposed text and a criteria delta on the amendment, with the target's current base", async () => {

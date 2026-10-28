@@ -205,7 +205,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       "When nothing on the shortlist fits, --propose records a new capability or\n" +
       "constraint under a live area instead (not with --target or --relation); it\n" +
       "joins the product layer when the change is applied.\n" +
-      "Each clears needsPlacement. Only an open change is placed.\n\n" +
+      "Each clears needsPlacement. An applied change (history left in the Inbox)\n" +
+      "is placed with touches only: its amendments already reached the map, so\n" +
+      "amends and --propose are refused. A cancelled or deleted change is not placed.\n\n" +
       "apply: apply the change's amendments to the product layer as a steward,\n" +
       "whatever rex.applyOn says, and stamp the change applied. Refused whole,\n" +
       "listing every problem, when an amendment does not fit or its target's spec\n" +

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdProduct } from "../../../../src/cli/commands/product.js";
@@ -14,11 +14,11 @@ import { cmdAddChange, cmdAddChangesFromDescriptions, titleFrom } from "../../..
 import { CLIError } from "../../../../src/cli/errors.js";
 import { getCommandHelp } from "../../../../src/cli/help.js";
 import { loadPrdModel } from "../../../../src/store/prd-model-reader.js";
-import { indexTree, type RuleNode } from "../../../../src/schema/v2-rules.js";
+import { checkV2Rules, indexTree, type RuleNode } from "../../../../src/schema/v2-rules.js";
 import { ensureRexDir, createStore } from "../../../../src/store/index.js";
 import { SCHEMA_VERSION } from "../../../../src/schema/index.js";
 import { cmdUpdate } from "../../../../src/cli/commands/update.js";
-import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture } from "../../../helpers/v2-fixture.js";
+import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture, markChangeApplied } from "../../../helpers/v2-fixture.js";
 
 const AREA = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
@@ -151,6 +151,33 @@ describe("rex change place", () => {
       add: [{ id: "c9", text: "A refund reaches the card" }],
       replace: [{ id: "c2", text: "A declined card names the reason" }],
     });
+  });
+
+  it("places an applied Inbox change with touches: it leaves changes/inbox/ and health finds nothing new", async () => {
+    const id = await addInbox("Tidy the card form");
+    await markChangeApplied(rexDir, id);
+    // The writer drops changes/inbox/ once it holds nothing.
+    const inboxDirs = async () => (await readdir(join(rexDir, "changes", "inbox")).catch(() => [])).length;
+    const before = await inboxDirs();
+    expect(before).toBe(1);
+    out.length = 0;
+    await cmdChange(tmp, "place", id, { target: "A1.1" });
+    expect(text()).toMatch(/touches A1\.1 Pay by card/);
+    const placed = await node(id);
+    expect(placed).toMatchObject({ touches: [CAPABILITY], appliedAt: expect.any(String) });
+    expect(placed.needsPlacement).toBeUndefined();
+    expect(await inboxDirs()).toBe(before - 1);
+    expect(checkV2Rules((await loadPrdModel(rexDir)).tree, { now: new Date() }).filter((f) => f.nodeId === id)).toEqual([]);
+  });
+
+  it("refuses amends on an applied change with its own message", async () => {
+    const id = await addInbox("Refunds by card");
+    await markChangeApplied(rexDir, id);
+    const err = (await cmdChange(tmp, "place", id, { target: "A1.1", relation: "amends", proposed: "x" }).catch((e: Error) => e)) as CLIError;
+    expect(err).toBeInstanceOf(CLIError);
+    expect(err.message).toMatch(/is applied; its amendments already reached the map\. Place it with touches\./);
+    expect(err.suggestion).toContain("--relation=touches");
+    expect((await node(id)).needsPlacement).toBe(true);
   });
 
   it("refuses --criterion and amendment content without --relation=amends", async () => {

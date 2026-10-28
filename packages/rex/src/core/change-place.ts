@@ -23,8 +23,12 @@
  *   layer when the change is applied. It clears `needsPlacement` too, and is
  *   dry-run through apply the same way.
  *
- * Only an open change is placed. The result is checked against the v2 rules;
- * an error finding about the change refuses the placement.
+ * An open change is placed either way. An applied change (migrated history
+ * still in the Inbox) is placed with `touches` only: its amendments already
+ * reached the map, so amends and proposals are refused
+ * (`applied-change-amends`). A cancelled or deleted change is not placed. The
+ * result is checked against the v2 rules; an error finding about the change
+ * refuses the placement.
  *
  * Pure: works on a copy and leaves writing to the caller.
  *
@@ -34,7 +38,7 @@
 import { randomUUID } from "node:crypto";
 import type { AddedNodeType, Amendment, ChangeNode, CriteriaDelta, Criterion } from "../schema/v2.js";
 import { applyAmendmentsProblems, NOTHING_TO_MODIFY, pendingWarnings } from "./apply-amendments.js";
-import { checkV2Rules, indexTree, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { checkV2Rules, indexTree, isAppliedChange, isOpenChange, nodeSpec, specHash, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import {
   asProposal,
   PLACEMENT_SHORTLIST_SIZE,
@@ -61,6 +65,7 @@ export type ChangePlacementErrorKind =
   | "apply-problems"
   | "no-such-change"
   | "change-not-open"
+  | "applied-change-amends"
   | "not-an-area"
   | "empty-title"
   | "invalid-proposal";
@@ -106,16 +111,21 @@ export interface PlacementSuggestion {
   shortlist: SuggestedPlacementCandidate[];
 }
 
-/** Rank the live capabilities and constraints the open change `changeRef` could amend or touch. */
+/**
+ * Rank the live capabilities and constraints the change `changeRef` could
+ * amend or touch. An applied change only touches, so every candidate carries
+ * touches for one.
+ */
 export function suggestPlacement(tree: V2Tree, changeRef: string, shortlistSize = PLACEMENT_SHORTLIST_SIZE): PlacementSuggestion {
-  const change = openChange(tree, changeRef);
+  const change = placeableChange(tree, changeRef);
   const input = placementInput(change);
+  const relation = defaultRelation(change);
   // Rank at least two, so a tie shows even when the caller asks for one.
-  const ranked = rankPlacementCandidates(input, placementNodes(tree), Math.max(shortlistSize, 2));
+  const ranked = rankPlacementCandidates(input, placementNodes(tree), Math.max(shortlistSize, 2)).map((c) => ({ ...c, relation }));
   const [top, next] = ranked;
   return {
     change: change.id,
-    relation: placementRelation(input),
+    relation,
     tied: top !== undefined && next !== undefined && top.score === next.score,
     shortlist: ranked.slice(0, shortlistSize).map((c) => ({ ...c, strength: placementStrength(c.score) })),
   };
@@ -147,17 +157,20 @@ export interface RecordPlacementResult {
   blockedBy: string[];
 }
 
-/** Record that the open change `changeRef` amends or touches `input.target`. */
+/** Record that the change `changeRef` amends or touches `input.target`; an applied change only touches. */
 export function recordPlacement(tree: V2Tree, changeRef: string, input: RecordPlacementInput, now: Date): RecordPlacementResult {
   const next = structuredClone(tree);
   const index = indexTree(next);
-  const change = openChange(next, changeRef) as ChangeNode & RuleNode;
+  const change = placeableChange(next, changeRef) as ChangeNode & RuleNode;
+  if (isAppliedChange(change) && (input.relation === "amends" || input.proposed !== undefined || input.criteria !== undefined)) {
+    throw appliedChangeAmends(change);
+  }
   const target = index.resolve(input.target);
   if (!target || (target.type !== "capability" && target.type !== "constraint")) {
     const plain = `"${input.target}" is not a live capability or constraint; a change is placed on one`;
     throw new ChangePlacementError(`${plain} (see get_product)`, "not-a-target", plain);
   }
-  const relation = input.relation ?? placementRelation(placementInput(change));
+  const relation = input.relation ?? defaultRelation(change);
   if (relation !== "amends" && (input.proposed !== undefined || input.criteria !== undefined)) {
     throw new ChangePlacementError(PLACEMENT_CONTENT_NEEDS_AMENDS, "content-needs-amends");
   }
@@ -254,7 +267,9 @@ export function recordProposal(
 ): RecordProposalResult {
   const next = structuredClone(tree);
   const index = indexTree(next);
-  const change = openChange(next, changeRef) as ChangeNode & RuleNode;
+  const change = placeableChange(next, changeRef) as ChangeNode & RuleNode;
+  // An added amendment on an applied change would never be applied.
+  if (isAppliedChange(change)) throw appliedChangeAmends(change);
   const label = change.displayId ?? change.id;
   const area = index.resolve(input.under);
   if (!area || area.type !== "area") {
@@ -318,15 +333,27 @@ function novelApplyProblems(before: V2Tree, after: V2Tree, changeId: string, now
   return { problems: novel(is.always, was.always), pending, blockedBy: pending.length ? [...is.blockedBy] : [] };
 }
 
-/** The open change `ref` names, or a refusal naming why it cannot be placed. */
-function openChange(tree: V2Tree, ref: string): RuleNode {
+/** The open or applied change `ref` names, or a refusal naming why it cannot be placed. */
+function placeableChange(tree: V2Tree, ref: string): RuleNode {
   const node = indexTree(tree).resolve(ref);
   if (!node || node.type !== "change") throw new ChangePlacementError(`No live change "${ref}"`, "no-such-change");
-  if (!isOpenChange(node)) {
-    const state = node.appliedAt ? `applied at ${node.appliedAt}` : node.status;
-    throw new ChangePlacementError(`Change ${node.displayId ?? node.id} is ${state}; only an open change is placed`, "change-not-open");
+  if (!isOpenChange(node) && !isAppliedChange(node)) {
+    throw new ChangePlacementError(`Change ${node.displayId ?? node.id} is ${node.status}; only an open or applied change is placed`, "change-not-open");
   }
   return node;
+}
+
+/** Refusal for an amendment or a proposal on an applied change. */
+function appliedChangeAmends(change: RuleNode): ChangePlacementError {
+  return new ChangePlacementError(
+    `Change ${change.displayId ?? change.id} is applied; its amendments already reached the map. Place it with touches.`,
+    "applied-change-amends",
+  );
+}
+
+/** The rules' relation for an open change; touches for an applied one. */
+function defaultRelation(change: RuleNode): PlacementRelation {
+  return isAppliedChange(change) ? "touches" : placementRelation(placementInput(change));
 }
 
 function placementInput(node: RuleNode): PlacementChange {

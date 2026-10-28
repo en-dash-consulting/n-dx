@@ -111,11 +111,12 @@ export const placeChangeTool = defineTool({
     "amends adds a modified amendment and needs proposed text or a criteria delta, or it is refused as apply_change would) and clears needsPlacement. " +
     "When nothing on the shortlist fits, pass propose instead of target to record a new capability or constraint under a live area " +
     "(an added amendment; it joins the product layer only when the change is applied), which also clears needsPlacement. " +
-    "Only an open change is placed.",
+    "An applied change (history left in the Inbox) is placed with relation touches only (the default for one): its amendments " +
+    "already reached the map, so amends and propose are refused. A cancelled or deleted change is not placed.",
   schema: {
     id: z.string().describe("Change id, display id (e.g. CH-12) or alias"),
     target: z.string().optional().describe("Capability or constraint to place the change on. Omit to get the shortlist without writing"),
-    relation: z.enum(["touches", "amends"]).optional().describe("With target: touches (works on it) or amends (edits its requirements). Default: the rules' relation"),
+    relation: z.enum(["touches", "amends"]).optional().describe("With target: touches (works on it) or amends (edits its requirements). Default: the rules' relation; touches for an applied change"),
     summary: z.string().optional().describe("With target and relation amends: the amendment's summary. Default: the change's title"),
     proposed: z.string().optional().describe("With target and relation amends: the target's replacement statement. Required with amends unless criteria is given"),
     criteria: AmendmentSchema.shape.criteria.describe(
