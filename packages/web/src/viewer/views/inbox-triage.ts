@@ -132,7 +132,7 @@ function QueueItem({ row, selected, onSelect }: { row: InboxRow; selected: boole
 // ── Page ─────────────────────────────────────────────────────────────
 
 export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
-  const { load, rows, refetch } = useInbox();
+  const { load, rows, applied, refetch } = useInbox();
   const status = useProjectStatus();
   const [selected, setSelected] = useState<string | null>(null);
   const [placed, setPlaced] = useState<ReadonlySet<string>>(new Set());
@@ -237,7 +237,11 @@ export function InboxTriagePage({ navigateTo }: { navigateTo?: NavigateTo }) {
               "aria-activedescendant": index >= 0 ? optionId(order[index]) : undefined,
             }, rows.map((row) => h(QueueItem, { key: row.change.id, row, selected: row.change.id === selected, onSelect: select })))
           : h("div", { class: "empty-state inbox-empty", role: "status" }, "Inbox is empty"),
-        h(AppliedHistory, { count: status?.rex.inbox?.appliedUnplaced ?? null }),
+        h(AppliedHistory, {
+          count: status?.rex.inbox?.appliedUnplaced ?? null,
+          rows: applied,
+          onOpen: navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined,
+        }),
       ),
       h("div", { class: "inbox-detail", ref: detailRef },
         current

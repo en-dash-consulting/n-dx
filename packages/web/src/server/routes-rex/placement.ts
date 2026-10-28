@@ -28,6 +28,7 @@ import {
   loadPrdModel,
   indexTree,
   isOpenChange,
+  isAppliedChange,
   awaitsPlacement,
   resolveStore,
   suggestPlacement,
@@ -211,19 +212,21 @@ export function completePreviewPlacement(placement: unknown, tree: V2Tree | null
   };
 }
 
-/** `GET /api/rex/changes/placements`: every open change awaiting placement, keyed by change id. */
+/** `GET /api/rex/changes/placements`: every open change awaiting placement and every applied change never placed, keyed by change id. */
 export interface ChangePlacementsWire {
   layout: "v2";
   /** A change whose shortlist could not be built carries `{ error }` instead. */
   placements: Record<string, ChangePlacementWire | { error: string }>;
 }
 
-/** The shortlist of every open change awaiting placement, keyed by change id. */
+/** The shortlist of every open change awaiting placement and every applied change never placed, keyed by change id. */
 export function buildAwaitingPlacements(tree: V2Tree): ChangePlacementsWire["placements"] {
   const index = indexTree(tree);
   const out: ChangePlacementsWire["placements"] = {};
   for (const { node } of index.entries) {
-    if (node.type !== "change" || !isOpenChange(node) || !awaitsPlacement(index, node)) continue;
+    if (node.type !== "change") continue;
+    const waiting = isOpenChange(node) ? awaitsPlacement(index, node) : isAppliedChange(node) && !!node.needsPlacement;
+    if (!waiting) continue;
     try {
       out[node.id] = buildChangePlacement(tree, node.id);
     } catch (err) {

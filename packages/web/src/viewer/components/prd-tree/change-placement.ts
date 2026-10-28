@@ -24,7 +24,7 @@
 import { h, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { useCliName } from "../../hooks/index.js";
-import { StrengthChip, useInbox, type ShortlistRead } from "../../views/inbox.js";
+import { StrengthChip, isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox.js";
 import { Pending, useProductRead } from "../../views/product-pages.js";
 import type {
   CapabilityDetail,
@@ -307,6 +307,8 @@ interface PlaceFormProps {
   read: ShortlistRead | undefined;
   map: ProductMap | null;
   mapError?: string;
+  /** An applied change: touches only, and no proposing a new home. */
+  touchesOnly: boolean;
   /** Placing an extra touches after a first place (IB3). */
   another: boolean;
   hasNext: boolean;
@@ -315,7 +317,7 @@ interface PlaceFormProps {
   onDone: () => void;
 }
 
-function PlaceForm({ changeId, changeTitle, read, map, mapError, another, hasNext, onPlaced, onNothingFits, onDone }: PlaceFormProps) {
+function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touchesOnly, hasNext, onPlaced, onNothingFits, onDone }: PlaceFormProps) {
   const placement = read && "placement" in read ? read.placement : null;
   const shortlist = placement?.shortlist ?? [];
   // A caller's request (Quick Add's "Amends…") outranks the rules' relation.
@@ -336,7 +338,7 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, hasNex
     const row = requested?.target && shortlist.find((c) => c.target === requested.target!.target);
     if (row && chosen?.target === row.target) setChosen(row);
   }, [shortlist.length]);
-  const effectiveRelation: PlacementRelation = another ? "touches" : relation;
+  const effectiveRelation: PlacementRelation = another || touchesOnly ? "touches" : relation;
 
   // The target's criteria seed the Amends form; a search pick reads them.
   useEffect(() => {
@@ -412,7 +414,7 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, hasNex
 
     h(TargetSearch, { map, mapError, onChoose: setChosen }),
 
-    another
+    another || touchesOnly
       ? null
       : h("fieldset", { class: "cp-relation" },
           h("legend", { class: "task-section-label" }, "Relation"),
@@ -469,7 +471,10 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, hasNex
               ? h("button", { key: "next", type: "button", class: "btn btn-sm cp-place-next", disabled: !chosen || busy, onClick: () => submit("next") }, "Place & next")
               : null,
             h("button", { key: "another", type: "button", class: "btn btn-sm cp-place-another", disabled: !chosen || busy, onClick: () => submit("another") }, "Place & add another"),
-            h("button", { key: "none", type: "button", class: "ch-change-link cp-nothing-fits", onClick: onNothingFits }, "Nothing fits"),
+            // An applied change's amendments have already reached the map: nothing new to propose.
+            touchesOnly
+              ? null
+              : h("button", { key: "none", type: "button", class: "ch-change-link cp-nothing-fits", onClick: onNothingFits }, "Nothing fits"),
           ],
     ),
   );
@@ -586,18 +591,23 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
 
   const row = inbox.load.state === "ready" ? inbox.load.data.find((c) => c.id === changeId) : undefined;
   const inInbox = !!row?.awaitsPlacement && !written;
-  const order = useMemo(() => inbox.rows.map((r) => r.change.id), [inbox.rows]);
+  // An applied change never placed takes a touches only; Place & next walks
+  // that list, not the open Inbox.
+  const appliedUnplaced = !!row && isAppliedUnplaced(row) && !written;
+  const queue = appliedUnplaced ? inbox.applied : inbox.rows;
+  const order = useMemo(() => queue.map((r) => r.change.id), [queue]);
   const position = inboxPosition(order, changeId);
 
   // The shortlist is kept once read: after a first place the change leaves
   // the Inbox, and "add another" still offers it.
-  const live = inbox.rows.find((r) => r.change.id === changeId)?.shortlist;
+  const live = [...inbox.rows, ...inbox.applied].find((r) => r.change.id === changeId)?.shortlist;
   const [read, setRead] = useState<ShortlistRead | undefined>(live);
   useEffect(() => { if (live) setRead(live); }, [live]);
 
   useEffect(() => { onInboxState?.(!!row?.awaitsPlacement); }, [row?.awaitsPlacement]);
 
-  const showForm = inInbox || another;
+  const showForm = inInbox || appliedUnplaced || another;
+  const touchesOnly = !!row?.appliedAt;
 
   const openNext = (next: string | null) => {
     if (!next) return;
@@ -641,14 +651,16 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
     if (next) openNext(position.next);
   };
 
-  return h("section", { class: "task-section cp-section", "aria-label": "Placement", "data-change-placement": another ? "another" : "inbox" },
+  return h("section", { class: "task-section cp-section", "aria-label": "Placement", "data-change-placement": another ? "another" : appliedUnplaced ? "applied" : "inbox" },
     another
       ? h("div", { class: "cp-placed" },
           written ? h("div", { class: "cp-placed-line" }, written.line) : null,
           h(Warnings, { warnings: written?.warnings }),
         )
       : h("div", { class: "cp-note", role: "note" },
-          h("span", null, `In the Inbox. ${cliName} work skips its tasks until it has a place on the product map.`),
+          h("span", null, appliedUnplaced
+            ? "Links this finished change to what it built; its tasks are done."
+            : `In the Inbox. ${cliName} work skips its tasks until it has a place on the product map.`),
           position.index >= 0
             ? h("span", { class: "cp-position" },
                 `${position.index + 1} of ${position.total}`,
@@ -664,7 +676,7 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
     h(PlacementForms, {
       proposing: proposing && !another,
       place: {
-        changeId, changeTitle, read, another, hasNext: position.next !== null,
+        changeId, changeTitle, read, another, touchesOnly, hasNext: position.next !== null,
         onPlaced,
         onNothingFits: () => setProposing(true),
         onDone: () => setAnother(false),

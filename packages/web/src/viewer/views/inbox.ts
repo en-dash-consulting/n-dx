@@ -6,9 +6,10 @@
  * those are the quickest to confirm. A row opens the change's detail panel in
  * the Tasks tree, where placement happens; nothing here writes.
  *
- * Applied changes still flagged for placement are history and cannot be
- * placed, so they appear only as a collapsed count (IB2). At zero the section
- * says so (IB9). On a v1 project there is no Inbox, and the view renders
+ * Applied changes still flagged for placement are history: they stay out of
+ * the open count and appear as a collapsed line that expands to a list (IB2).
+ * Each opens its detail panel, which offers a touches only. At zero the
+ * section says so (IB9). On a v1 project there is no Inbox, and the view renders
  * nothing.
  *
  * Reads `GET /api/rex/changes` (rows with `awaitsPlacement`), each row's
@@ -133,6 +134,8 @@ export interface InboxViewProps {
   rows: readonly InboxRow[];
   /** Applied changes still flagged for placement; null while unknown. */
   appliedUnplaced: number | null;
+  /** Those applied changes, with their shortlists; empty until read. */
+  appliedRows?: readonly InboxRow[];
   /** Show at most this many rows, then a link to the rest. Absent, show all. */
   limit?: number;
   onOpenChange: (id: string) => void;
@@ -140,7 +143,7 @@ export interface InboxViewProps {
   onOpenAll?: () => void;
 }
 
-export function InboxView({ rows, appliedUnplaced, limit, onOpenChange, onOpenAll }: InboxViewProps) {
+export function InboxView({ rows, appliedUnplaced, appliedRows, limit, onOpenChange, onOpenAll }: InboxViewProps) {
   const sorted = sortInbox(rows);
   const shown = limit === undefined ? sorted : sorted.slice(0, limit);
   const hidden = sorted.length - shown.length;
@@ -155,18 +158,54 @@ export function InboxView({ rows, appliedUnplaced, limit, onOpenChange, onOpenAl
       ? h("button", { type: "button", class: "ch-change-link inbox-more", onClick: onOpenAll },
           `${hidden} more · Open ↗`)
       : null,
-    h(AppliedHistory, { count: appliedUnplaced }),
+    h(AppliedHistory, { count: appliedUnplaced, rows: appliedRows, onOpen: onOpenChange }),
   );
 }
 
-/** IB2: applied changes never placed, as a collapsed count; nothing at zero. */
-export function AppliedHistory({ count }: { count: number | null }) {
-  return count
+/** An applied change still flagged for placement: history that can take a touches. */
+export function isAppliedUnplaced(change: Pick<ChangeRow, "appliedAt" | "needsPlacement">): boolean {
+  return !!change.appliedAt && !!change.needsPlacement;
+}
+
+/** The day of an ISO timestamp, or the text itself when it is not a date. */
+function appliedDay(at: string | undefined): string {
+  return at && /^\d{4}-\d{2}-\d{2}/.test(at) ? at.slice(0, 10) : at ?? "";
+}
+
+function AppliedRow({ row, onOpen }: { row: InboxRow; onOpen: (id: string) => void }) {
+  const { change } = row;
+  return h("li", { class: "inbox-row inbox-applied-row", "data-change-id": change.id, onClick: () => onOpen(change.id) },
+    h("div", { class: "inbox-row-head" },
+      h("span", { class: "ch-display-id" }, shortId(change)),
+      h("button", { type: "button", class: "ch-change-link inbox-row-title" }, change.title),
+      change.appliedAt ? h("span", { class: "tag inbox-applied-at" }, `applied ${appliedDay(change.appliedAt)}`) : null,
+    ),
+    h("div", { class: "inbox-row-foot" }, h(GuessLine, { row })),
+  );
+}
+
+/**
+ * IB2: applied changes never placed, collapsed to a count; nothing at zero.
+ * Expanded, each opens its detail panel, where a touches links it to what it
+ * built. `rows` is the strongest-guess-first list; the count is the status
+ * poll's, so it shows before the list has loaded.
+ */
+export function AppliedHistory({ count, rows = [], onOpen }: {
+  count: number | null;
+  rows?: readonly InboxRow[];
+  onOpen?: (id: string) => void;
+}) {
+  const total = rows.length || count || 0;
+  return total
     ? h("details", { class: "inbox-applied" },
         h("summary", null,
-          `${count} applied change${count === 1 ? " was" : "s were"} never placed (history, can't be placed)`),
+          `${total} applied change${total === 1 ? " was" : "s were"} never placed`),
         h("p", { class: "section-sub" },
-          "They were applied before they were placed. Their work is done, so they stay as history."),
+          "They were applied before they were placed. Placing one links it to what it built; its tasks are done."),
+        rows.length && onOpen
+          ? h("ul", { class: "inbox-list inbox-applied-list" },
+              rows.map((row) => h(AppliedRow, { key: row.change.id, row, onOpen })))
+          : null,
       )
     : null;
 }
@@ -178,6 +217,8 @@ export interface InboxRead {
   load: Load<ChangeRow[]>;
   /** Open changes awaiting placement, with their shortlists, in the section's order. */
   rows: InboxRow[];
+  /** Applied changes never placed, with their shortlists, strongest guess first. */
+  applied: InboxRow[];
   /** Read again now, rather than on the next `rex:prd-changed`. */
   refetch: () => void;
 }
@@ -189,15 +230,18 @@ export interface InboxRead {
 export function useInbox(): InboxRead {
   const { load, refetch } = useRefetchableProductRead("/api/rex/changes", (body) => body.changes as ChangeRow[]);
   const waiting = useMemo(
-    () => (load.state === "ready" ? load.data.filter((c) => c.awaitsPlacement) : null),
+    () => (load.state === "ready" ? load.data.filter((c) => c.awaitsPlacement || isAppliedUnplaced(c)) : null),
     [load],
   );
   const shortlists = useShortlists(waiting);
-  const rows = useMemo(
-    () => sortInbox((waiting ?? []).map((change) => ({ change, shortlist: shortlists.get(change.id) }))),
-    [waiting, shortlists],
-  );
-  return { load, rows, refetch };
+  const { rows, applied } = useMemo(() => {
+    const all = (waiting ?? []).map((change) => ({ change, shortlist: shortlists.get(change.id) }));
+    return {
+      rows: sortInbox(all.filter((r) => !isAppliedUnplaced(r.change))),
+      applied: sortInbox(all.filter((r) => isAppliedUnplaced(r.change))),
+    };
+  }, [waiting, shortlists]);
+  return { load, rows, applied, refetch };
 }
 
 /** Read every row's shortlist in one request, each time the change list is read. */
@@ -242,7 +286,7 @@ async function readShortlists(ids: readonly string[]): Promise<ReadonlyMap<strin
  * the Tasks tree. Its own page is `InboxTriagePage` (inbox-triage.ts).
  */
 export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limit?: number }) {
-  const { load, rows } = useInbox();
+  const { load, rows, applied } = useInbox();
   const status = useProjectStatus();
   if (load.state === "v1") return null;
   if (load.state !== "ready") return h(Pending, { load });
@@ -251,6 +295,7 @@ export function InboxPage({ navigateTo, limit }: { navigateTo?: NavigateTo; limi
     h(InboxView, {
       rows,
       appliedUnplaced: status?.rex.inbox?.appliedUnplaced ?? null,
+      appliedRows: applied,
       limit,
       onOpenChange: (id) => navigateTo?.("prd", { taskId: id }),
       onOpenAll: navigateTo ? () => navigateTo("inbox") : undefined,

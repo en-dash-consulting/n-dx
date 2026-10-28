@@ -237,14 +237,63 @@ describe("InboxPage on a v2 project", () => {
     expect(rowIds()).toEqual([]);
   });
 
-  it("shows applied-but-unplaced history as a collapsed count with no action", async () => {
+  it("shows applied-but-unplaced history as a collapsed count until its list is read", async () => {
     serveInbox([], [], { open: 0, appliedUnplaced: 156 });
     await mount(h(InboxPage, { navigateTo: vi.fn() }));
     const applied = root.querySelector<HTMLDetailsElement>(".inbox-applied")!;
     expect(applied.open).toBe(false);
-    expect(applied.querySelector("summary")?.textContent)
-      .toBe("156 applied changes were never placed (history, can't be placed)");
+    expect(applied.querySelector("summary")?.textContent).toBe("156 applied changes were never placed");
     expect(applied.querySelector("button, a")).toBeNull();
+  });
+});
+
+describe("applied changes never placed", () => {
+  const applied = (id: string, appliedAt: string) =>
+    change(id, { awaitsPlacement: undefined, stage: "applied", appliedAt });
+
+  it("expand to a list with title, applied date, best guess and strength, strongest first", async () => {
+    const changes = [
+      change("open1"),
+      applied("old", "2026-03-04T10:00:00.000Z"),
+      applied("new", "2026-09-30T08:00:00.000Z"),
+    ];
+    serveInbox(changes, [placement("open1", "weak"), placement("old", "possible"), placement("new", "strong")],
+      { open: 1, appliedUnplaced: 2 });
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+
+    const section = root.querySelector<HTMLDetailsElement>(".inbox-applied")!;
+    expect(section.open).toBe(false);
+    expect(section.querySelector("summary")?.textContent).toBe("2 applied changes were never placed");
+    const rows = [...section.querySelectorAll<HTMLElement>(".inbox-applied-row")];
+    expect(rows.map((r) => r.dataset.changeId)).toEqual(["new", "old"]);
+    expect(rows[0].querySelector(".inbox-row-title")?.textContent).toBe("Change new");
+    expect(rows[0].querySelector(".inbox-applied-at")?.textContent).toBe("applied 2026-09-30");
+    expect(rows[0].querySelector(".inbox-guess-title")?.textContent).toBe("Home for new");
+    expect(rows[0].querySelector<HTMLElement>(".inbox-strength")?.dataset.strength).toBe("strong");
+    expect(rows[1].querySelector<HTMLElement>(".inbox-strength")?.dataset.strength).toBe("possible");
+    // The open Inbox lists only the open change.
+    expect(rowIds().filter((id) => id === "open1")).toEqual(["open1"]);
+    expect(root.querySelectorAll(".inbox-list:not(.inbox-applied-list) > .inbox-row")).toHaveLength(1);
+  });
+
+  it("open the change's detail panel when clicked", async () => {
+    const navigateTo = vi.fn();
+    serveInbox([applied("old", "2026-03-04T10:00:00.000Z")], [placement("old", "strong")], { open: 0, appliedUnplaced: 1 });
+    await mount(h(InboxPage, { navigateTo }));
+    await act(async () => { root.querySelector<HTMLElement>(".inbox-applied-row")!.click(); });
+    expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: "old" });
+  });
+
+  it("leave the list once placed, and the count drops", async () => {
+    serveInbox([applied("old", "2026-03-04T10:00:00.000Z")], [placement("old", "strong")], { open: 0, appliedUnplaced: 1 });
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(root.querySelectorAll(".inbox-applied-row")).toHaveLength(1);
+
+    serveInbox([change("old", { awaitsPlacement: undefined, needsPlacement: undefined, stage: "applied", appliedAt: "2026-03-04T10:00:00.000Z" })],
+      [], { open: 0, appliedUnplaced: 0 });
+    await act(async () => { render(null, root); });
+    await mount(h(InboxPage, { navigateTo: vi.fn() }));
+    expect(root.querySelector(".inbox-applied")).toBeNull();
   });
 });
 

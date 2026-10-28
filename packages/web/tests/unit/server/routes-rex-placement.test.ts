@@ -215,6 +215,23 @@ describe("placement routes on a v2 project", () => {
       return { tree, result: undefined };
     });
 
+  it("lists an applied unplaced change with its appliedAt and a shortlist, until it is placed", async () => {
+    await markApplied(inboxId);
+    const read = async () => ({
+      rows: (await json(await fetch(`${base}/changes`))).body.changes as Array<Record<string, unknown>>,
+      placements: (await json(await fetch(`${base}/changes/placements`))).body.placements as Record<string, unknown>,
+    });
+    let { rows, placements } = await read();
+    expect(rows.find((r) => r.id === inboxId)).toMatchObject({ appliedAt: "2026-10-05T12:00:00.000Z", needsPlacement: true });
+    expect(rows.find((r) => r.id === inboxId)).not.toHaveProperty("awaitsPlacement");
+    expect(Object.keys(placements)).toEqual([inboxId]);
+
+    await send(`changes/${inboxId}/place`, { target: CAPABILITY_ID, relation: "touches" });
+    ({ rows, placements } = await read());
+    expect(rows.find((r) => r.id === inboxId)).not.toHaveProperty("needsPlacement");
+    expect(placements).toEqual({});
+  });
+
   it("POST place touches an applied Inbox change: clears needsPlacement and leaves the Inbox", async () => {
     await markApplied(inboxId);
     expect(folderOf(inboxId)?.split(sep)[0]).toBe("inbox");

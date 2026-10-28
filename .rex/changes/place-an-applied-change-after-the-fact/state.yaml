@@ -17,5 +17,12 @@ items:
     lastModified: "2026-10-28T00:17:57.358Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fe7b26c2-a61f-4ab2-9c0b-247d237d83d1":
-    lastModified: "2026-10-27T17:19:40.025Z"
+    status: "completed"
+    startedAt: "2026-10-28T00:18:19.227Z"
+    completedAt: "2026-10-28T00:28:22.440Z"
+    endedAt: "2026-10-28T00:28:22.440Z"
+    activeIntervals: [{"end":"2026-10-28T00:28:22.440Z","start":"2026-10-28T00:18:19.227Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Applied-unplaced list in Inbox, touches-only detail panel with note, placements read covers applied changes; tests added (b0b806765)."
+    lastModified: "2026-10-28T00:28:22.440Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

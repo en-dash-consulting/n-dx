@@ -336,6 +336,45 @@ describe("when the product map read fails", () => {
 
 // ── Writes ───────────────────────────────────────────────────────────
 
+describe("an applied change's panel", () => {
+  const applied = (id: string) => change(id, { stage: "applied", appliedAt: "2026-03-04T10:00:00.000Z", awaitsPlacement: undefined });
+
+  it("offers touches only, with the explanatory note", async () => {
+    serve([applied("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+
+    expect($('[data-change-placement="applied"]')).not.toBeNull();
+    expect($(".cp-note")?.textContent).toContain("Links this finished change to what it built; its tasks are done.");
+    expect($(".cp-note")?.textContent).not.toContain("In the Inbox");
+    expect($(".cp-relation")).toBeNull();
+    expect($(".cp-amends")).toBeNull();
+    expect(button("Nothing fits")).toBeNull();
+    expect($$(".cp-target").map((r) => r.dataset.target)).toEqual(["cap-1"]);
+  });
+
+  it("places with relation touches and shows the placed line", async () => {
+    serve([applied("a")], [placement("a", [candidate("cap-1")])]);
+    await mountSection("a");
+    await pick("cap-1");
+    await click(button("Place"));
+    expect(posts).toEqual([{ url: "/api/rex/changes/a/place", body: { target: "cap-1", relation: "touches" } }]);
+    expect($(".cp-placed-line")?.textContent).toBe("Placed: touches Home cap-1");
+  });
+
+  it("walks the applied list on Place & next, not the open Inbox", async () => {
+    serve([change("open1"), applied("a"), applied("b")], [
+      placement("open1", [candidate("cap-o", { score: 9 })]),
+      placement("a", [candidate("cap-a", { strength: "strong", score: 9 })]),
+      placement("b", [candidate("cap-b", { strength: "weak", score: 1 })]),
+    ]);
+    const spies = await mountSection("a");
+    expect($(".cp-position")?.textContent).toBe("1 of 2 · Next ›");
+    await pick("cap-a");
+    await click(button("Place & next"));
+    expect(spies.onOpenChange).toHaveBeenCalledWith("b");
+  });
+});
+
 describe("placing", () => {
   it("Place writes through /place, refreshes, and shows the placed line with rex's pending warnings", async () => {
     serve([change("a")], [placement("a", [candidate("cap-1")])]);

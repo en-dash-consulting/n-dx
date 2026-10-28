@@ -105,6 +105,8 @@ export interface ChangeRowWire {
   assignee?: string;
   plannedRelease?: string;
   shippedIn?: string;
+  /** When the change was applied; set on applied history. */
+  appliedAt?: string;
   needsPlacement?: boolean;
   /** Open and held for placement by rex: `ndx work` refuses it. Absent on applied history. */
   awaitsPlacement?: boolean;
@@ -278,6 +280,7 @@ export function buildChangeRows(tree: V2Tree): ChangeRowWire[] {
         ...(change.assignee ? { assignee: change.assignee } : {}),
         ...(change.plannedRelease ? { plannedRelease: change.plannedRelease } : {}),
         ...(change.shippedIn ? { shippedIn: change.shippedIn } : {}),
+        ...(change.appliedAt ? { appliedAt: change.appliedAt } : {}),
         ...(change.needsPlacement ? { needsPlacement: true } : {}),
         ...(isOpenChange(change) && awaitsPlacement(index, change) ? { awaitsPlacement: true } : {}),
         amends: (change.amends ?? []).map((a) => {

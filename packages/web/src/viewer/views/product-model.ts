@@ -201,6 +201,8 @@ export interface ChangeRow {
   assignee?: string;
   plannedRelease?: string;
   shippedIn?: string;
+  /** When the change was applied; set on applied history. */
+  appliedAt?: string;
   /** Placement on the map still needs a decision. */
   needsPlacement?: boolean;
   /** Open and held for placement by rex: `ndx work` refuses it. Absent on applied history. */
