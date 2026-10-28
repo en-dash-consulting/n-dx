@@ -27,6 +27,9 @@
  *    - Null-byte rejection (defense against poison-null-byte attacks)
  *    - Directory escape prevention (no `..` traversal outside project)
  *    - Glob-based blocked path patterns (e.g., `.git/**`, `node_modules/**`)
+ *    - n-dx's own config files (`NDX_CONFIG_BLOCKED_PATHS`), blocked whatever
+ *      the configured patterns say: an agent that wrote `.n-dx.local.json`
+ *      would hand itself an unreviewed guard for every later command
  *
  * 5. **Git subcommand allowlisting** (centralized in guard config)
  *    Only explicitly permitted git subcommands can run. Dangerous operations
@@ -55,6 +58,7 @@ import type { ShellKind } from "./commands.js";
 import { PolicyEngine } from "./policy.js";
 import type { AuditEntry, SessionCounters } from "./policy.js";
 import { compileEnvPolicy, sanitizeChildEnv } from "./env.js";
+import { NDX_CONFIG_BLOCKED_PATHS } from "../prd/llm-gateway.js";
 
 export { GuardError, validatePath, simpleGlobMatch } from "./paths.js";
 export { validateCommand, resolveShellKind } from "./commands.js";
@@ -106,6 +110,8 @@ export interface GuardRailsOptions {
 export class GuardRails {
   private projectDir: string;
   private config: GuardConfig;
+  /** The configured blocked paths plus n-dx's own config files. */
+  private blockedPaths: string[];
   /** Resolved once: the probe behind it costs a subprocess on win32. */
   readonly shellKind: ShellKind;
   readonly policy: PolicyEngine;
@@ -119,13 +125,14 @@ export class GuardRails {
   constructor(projectDir: string, config: GuardConfig, options: GuardRailsOptions = {}) {
     this.projectDir = projectDir;
     this.config = config;
+    this.blockedPaths = [...new Set([...config.blockedPaths, ...NDX_CONFIG_BLOCKED_PATHS])];
     this.shellKind = options.shellKind ?? resolveShellKind();
     this.policy = new PolicyEngine(config.policy);
     this.childEnv = sanitizeChildEnv(options.env ?? process.env, compileEnvPolicy(config.env));
   }
 
   checkPath(filepath: string): string {
-    return validatePath(filepath, this.projectDir, this.config.blockedPaths);
+    return validatePath(filepath, this.projectDir, this.blockedPaths);
   }
 
   checkCommand(command: string): void {

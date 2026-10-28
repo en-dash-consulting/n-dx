@@ -83,6 +83,7 @@ export { toCanonicalJSON } from "@n-dx/llm-client";
 // lives in the per-user ndx home, never in the repository.
 export {
   SECRET_PATH_PATTERNS,
+  NDX_CONFIG_BLOCKED_PATHS,
   guardBaselineForLanguage,
   clampGuardToBaseline,
   evaluateRepoTrust,
