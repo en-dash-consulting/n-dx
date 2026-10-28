@@ -87,10 +87,31 @@ describe("classifyRun — one fixture per class", () => {
     expect(d.actions.map((a) => a.kind)).toEqual(["verify-on-main", "close-verified"]);
   });
 
-  it("completion-held: completionHold is set", () => {
+  it("completion-held: completionHold outcome is not-applied", () => {
     const d = classify(run({ completionHold: { outcome: "not-applied", requestedAt: "2026-10-28T10:05:00.000Z" } }));
     expect(d.class).toBe("completion-held");
     expect(d.actions.map((a) => a.kind)).toEqual(["fresh", "hand-fix"]);
+  });
+
+  it("a completionHold that was applied or bypassed is not a hold; the other rules classify the run", () => {
+    for (const outcome of ["applied", "bypassed"] as const) {
+      expect(classify(run({ completionHold: { outcome } })).class).toBe("unclassified");
+      expect(classify(run({ completionHold: { outcome }, status: "timeout" })).class).toBe("budget-timeout");
+    }
+  });
+
+  it("test-gate-new: an absolute digest path under worktreeRoot matches the changed file", () => {
+    const digest = ` FAIL  ${ROOT}/packages/web/tests/unit/viewer/add-item-form.test.ts > adds`;
+    const d = classify(run({
+      testGate: failedGate(digest),
+      structuredSummary: {
+        filesChanged: ["packages/web/tests/unit/viewer/add-item-form.test.ts"],
+        filesRead: [], commandsExecuted: [], testsRun: [],
+        counts: { filesRead: 0, filesChanged: 1, commandsExecuted: 0, testsRun: 0, toolCallsTotal: 0 },
+      },
+    }));
+    expect(d.class).toBe("test-gate-new");
+    expect(d.summary).toContain(": packages/web/tests/unit/viewer/add-item-form.test.ts.");
   });
 
   it("completion-held: gateOnlyRetry is set", () => {
@@ -129,15 +150,23 @@ describe("classifyRun — one fixture per class", () => {
     expect(classify(run({ readOnlyRefusal: { reason: "no edits" } })).class).toBe("claim-lost");
   });
 
-  it("claim-lost: both uncommitted-work refusals the completion gate writes are recognised", () => {
+  it("completion-held: both uncommitted-work refusals the completion gate writes are recognised", () => {
     for (const error of [
       formatUncommittedWorkRefusal(["src/a.ts"]),
       formatReviewRepairsUncommittedRefusal(["src/a.ts"], "commit failed", "task-1"),
     ]) {
       const d = classify(run({ error, uncommittedPaths: ["src/a.ts"] }));
-      expect(d.class).toBe("claim-lost");
-      expect(d.actions[0]!.kind).toBe("clean-tree");
+      expect(d.class).toBe("completion-held");
+      expect(d.evidence).toContain("Uncommitted: src/a.ts");
+      expect(d.actions[0]).toEqual({ kind: "clean-tree", label: "Commit or discard the uncommitted paths, then verify" });
     }
+  });
+
+  it("an uncommitted-work refusal still wins over the rules after a lost claim", () => {
+    const error = formatUncommittedWorkRefusal(["src/a.ts"]);
+    const d = classify(run({ error, uncommittedPaths: ["src/a.ts"], status: "timeout", testGate: failedGate(DIGEST) }));
+    expect(d.class).toBe("completion-held");
+    expect(d.actions[0]!.kind).toBe("clean-tree");
   });
 
   it("budget-timeout: status timeout or budget_exceeded", () => {

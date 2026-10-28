@@ -230,11 +230,12 @@ with no model call. `hench runs diagnose <run-id> [--format=json]` prints it.
 
 | Class | Signal | First action |
 |-------|--------|--------------|
-| `test-gate-new` | The gate's failure digest names a file the run changed | Follow-up run with the digest, then re-run |
+| `test-gate-new` | The gate's failure digest names a file the run changed; an absolute digest path under the run's worktree is read repo-relative | Follow-up run with the digest, then re-run |
 | `test-gate-preexisting` | The digest names only files the run did not change | Verify on main, then close as verified |
-| `completion-held` | `completionHold` or `gateOnlyRetry` is set | `--fresh`, or fix by hand and verify |
+| `completion-held` | `completionHold` with outcome `not-applied` (`applied` and `bypassed` are not holds), or `gateOnlyRetry` | `--fresh`, or fix by hand and verify |
+| `completion-held` | The completion gate refused on uncommitted work; outranks every rule but `claim-lost` | Commit or discard the uncommitted paths, then verify |
 | `review-blocked` | The review left a must-fix finding unrepaired | Follow-up run with the findings |
-| `claim-lost` | `claimLost`, `readOnlyRefusal`, or an uncommitted-work refusal | Release the claim or clean the tree, then re-run |
+| `claim-lost` | `claimLost` or `readOnlyRefusal` | Release the claim or clean the tree, then re-run |
 | `budget-timeout` | `budget_exceeded`, `timeout`, or a brief too large for the context window | Split the task, or raise its tier |
 | `vendor-transient` | `error_transient`, or an auth or rate-limit failure | Retry later |
 | `no-changes` | No commits, or only PRD files changed | Tighten the done-when |

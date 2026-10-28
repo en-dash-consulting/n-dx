@@ -71,8 +71,12 @@ const OVERSIZED = /Brief too large for configured context window/;
 /** Vendor failure categories that mean "the vendor, not the task". */
 const VENDOR_CATEGORIES = new Set(["auth", "rate_limit"]);
 
-/** File-like tokens in a failure digest: a path segment ending in a source extension. */
-const DIGEST_FILE = /[\w@.+-]+(?:\/[\w@.+-]+)*\.(?:[cm]?[jt]sx?|py|go|java|kt|rs|rb|php|cs|swift|vue|svelte)\b/g;
+/**
+ * File-like tokens in a failure digest: a path ending in a source extension.
+ * The leading slash of an absolute path is kept so `normalizePath` can strip
+ * the worktree root.
+ */
+const DIGEST_FILE = /\/?[\w@.+-]+(?:\/[\w@.+-]+)*\.(?:[cm]?[jt]sx?|py|go|java|kt|rs|rb|php|cs|swift|vue|svelte)\b/g;
 
 function normalizePath(path: string, root: string | undefined): string {
   let p = path.replace(/\\/g, "/");
@@ -150,22 +154,25 @@ const claimLost: Rule = ({ run }) => {
       ],
     };
   }
-  if (run.error && DIRTY_TREE_REFUSAL.test(run.error)) {
-    const paths = run.uncommittedPaths ?? [];
-    return {
-      class: "claim-lost",
-      summary: "The completion was refused: the run left work uncommitted.",
-      evidence: [
-        "Completion gate refused on uncommitted work",
-        ...(paths.length > 0 ? [`Uncommitted: ${list(paths)}`] : []),
-      ],
-      actions: [
-        { kind: "clean-tree", label: "Commit or discard the uncommitted paths" },
-        { kind: "re-run", label: "Re-run the task" },
-      ],
-    };
-  }
   return null;
+};
+
+/** The completion gate refused on uncommitted work: a held completion, not a lost claim. */
+const uncommittedRefusal: Rule = ({ run }) => {
+  if (!run.error || !DIRTY_TREE_REFUSAL.test(run.error)) return null;
+  const paths = run.uncommittedPaths ?? [];
+  return {
+    class: "completion-held",
+    summary: "The completion was refused: the run left work uncommitted.",
+    evidence: [
+      "Completion gate refused on uncommitted work",
+      ...(paths.length > 0 ? [`Uncommitted: ${list(paths)}`] : []),
+    ],
+    actions: [
+      { kind: "clean-tree", label: "Commit or discard the uncommitted paths, then verify" },
+      { kind: "re-run", label: "Re-run the task" },
+    ],
+  };
 };
 
 const vendorTransient: Rule = ({ run }) => {
@@ -261,12 +268,14 @@ const testGate: Rule = ({ run }, changed) => {
 };
 
 const completionHeld: Rule = ({ run }) => {
-  if (!run.completionHold && !run.gateOnlyRetry) return null;
+  // Only `not-applied` is a hold; `applied` and `bypassed` mean the completion went through.
+  const held = run.completionHold?.outcome === "not-applied";
+  if (!held && !run.gateOnlyRetry) return null;
   return {
     class: "completion-held",
     summary: "The agent's completion is held: the run did not finish its gates.",
     evidence: [
-      ...(run.completionHold ? [`completionHold: ${run.completionHold.outcome}`] : []),
+      ...(held ? ["completionHold: not-applied"] : []),
       ...(run.gateOnlyRetry ? [`gateOnlyRetry of run ${run.gateOnlyRetry.sourceRunId}`] : []),
     ],
     actions: [
@@ -300,7 +309,7 @@ const noChanges: Rule = ({ run, rexDir }, changed) => {
 };
 
 /** Most specific first: a lost claim or a vendor outage makes the rest moot. */
-const RULES: readonly Rule[] = [claimLost, vendorTransient, budgetTimeout, reviewBlocked, testGate, completionHeld, noChanges];
+const RULES: readonly Rule[] = [claimLost, uncommittedRefusal, vendorTransient, budgetTimeout, reviewBlocked, testGate, completionHeld, noChanges];
 
 const RERUN_KINDS = new Set(["re-run", "fresh", "retry-later"]);
 
