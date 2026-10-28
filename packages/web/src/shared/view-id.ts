@@ -35,6 +35,8 @@ export type ViewId =
   // The v2 product layer and change layer; on v1 they say to run `ndx migrate`.
   | "product"
   | "changes"
+  // Open changes awaiting placement on the map; on v1 it renders nothing.
+  | "inbox"
   | "token-usage"
   | "validation"
   | "requirements"

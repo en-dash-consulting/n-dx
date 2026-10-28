@@ -124,6 +124,15 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     stability: "stable",
     defaultValue: false,
   },
+  {
+    key: "rex.placementDraft",
+    label: "Draft Placement with the Model",
+    description: "Show \"Draft with the model\" in an Inbox change's placement form: the text model picks a shortlist target or drafts a new capability or constraint. The draft fills the form; nothing is placed until you press Place or Propose.",
+    impact: "Each draft spends tokens on an LLM call. When disabled, the button is hidden and the draft endpoint refuses.",
+    package: "rex",
+    stability: "experimental",
+    defaultValue: false,
+  },
   // ── Hench ─────────────────────────────────────────────────────────
   {
     key: "hench.autoRetry",

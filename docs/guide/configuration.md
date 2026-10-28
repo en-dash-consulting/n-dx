@@ -272,6 +272,20 @@ Stored in `.n-dx.json` at the project root.
 
 Those are the defaults. A value that is not a positive integer is ignored.
 
+## Feature Toggles
+
+Experimental dashboard features are switched in the dashboard's Features settings page or under `features` in `.n-dx.json`. All default off.
+
+| Key | What it does | Cost |
+|-----|--------------|------|
+| `rex.placementDraft` | Shows **Draft with the model** in an Inbox change's placement form | Each draft is one LLM call on the `prd.place` model class |
+
+```json
+{ "features": { "rex.placementDraft": true } }
+```
+
+The server enforces the toggle: with it off, the draft endpoint refuses. A draft never writes. It fills the form, and nothing is placed or proposed until you press **Place** or **Propose**.
+
 ## CI: Restricted Imports
 
 `ndx ci` can hold a module to the files allowed to import it — for example, all

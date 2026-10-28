@@ -43,6 +43,7 @@ export const DENY_NAME: RegExp[] = [
   /^refresh models/i,
   /^preview & apply/i,
   /^rebuild$/i,
+  /^draft with the model/i,
   // Writes that are destructive or irreversible inside one spec.
   /^apply/i,
   /^restore/i,
@@ -113,6 +114,10 @@ export const DENY_CLASS: string[] = [
   // Sidecar sessions list: End closes a session for good.
   "sidecar-session-end",
   "sidecar-session-end-confirm",
+  // Placing or proposing takes a change out of the Inbox; nothing puts it back.
+  "cp-place",
+  "cp-propose-btn",
+  "cp-propose-next",
 ];
 
 export interface ControlIdentity {

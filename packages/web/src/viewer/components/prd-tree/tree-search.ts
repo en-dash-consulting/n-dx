@@ -45,6 +45,9 @@ function itemPassesFacets(item: SearchablePRDItem, facets: SearchFacets): boolea
     if (!facets.statuses.has(item.status)) return false;
   }
 
+  // Inbox facet: only the changes rex holds for placement
+  if (facets.inboxIds && !facets.inboxIds.has(item.id)) return false;
+
   // Tag facet: AND logic — item must have ALL selected tags
   if (facets.tags && facets.tags.size > 0) {
     const itemTags = item.tags ?? [];
@@ -78,7 +81,8 @@ export function searchTree(
   const hasTextQuery = trimmed.length > 0;
   const hasFacets = facets != null && (
     (facets.tags != null && facets.tags.size > 0) ||
-    (facets.statuses != null && facets.statuses.size > 0)
+    (facets.statuses != null && facets.statuses.size > 0) ||
+    facets.inboxIds != null
   );
 
   if (!hasTextQuery && !hasFacets) {

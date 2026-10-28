@@ -31,4 +31,6 @@ export interface SearchFacets {
   tags?: Set<string>;
   /** Active status facets — item must match ONE of these statuses (OR within group). */
   statuses?: Set<SearchItemStatus>;
+  /** Inbox facet — item id must be in this set (the changes rex holds for placement). */
+  inboxIds?: ReadonlySet<string>;
 }

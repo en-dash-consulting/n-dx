@@ -543,3 +543,36 @@ describe("PRDTree", () => {
     expect(root.textContent).toContain("Deferred Epic");
   });
 });
+
+describe("PRDTree Inbox badge", () => {
+  const changeDoc: PRDDocumentData = {
+    schema: "rex/v2",
+    title: "v2",
+    items: [
+      { id: "c-inbox", title: "Call graph covers C#", status: "pending", type: "change" },
+      { id: "c-placed", title: "Placed change", status: "pending", type: "change" },
+    ],
+  };
+
+  const badges = (root: HTMLElement) => root.querySelectorAll(".prd-inbox-badge");
+
+  it("marks a change in the Inbox, with an accessible label", () => {
+    const root = renderToDiv(h(PRDTree, { document: changeDoc, inboxIds: new Set(["c-inbox"]) }));
+    const found = badges(root);
+    expect(found).toHaveLength(1);
+    expect(found[0].textContent).toBe("Inbox");
+    expect(found[0].getAttribute("aria-label")).toBe("In the Inbox, waiting for a place");
+    expect(found[0].closest(".prd-node-row")?.textContent).toContain("Call graph covers C#");
+  });
+
+  it("leaves placed changes unmarked", () => {
+    const root = renderToDiv(h(PRDTree, { document: changeDoc, inboxIds: new Set(["c-inbox"]) }));
+    const placedRow = [...root.querySelectorAll(".prd-node-row")].find((r) => r.textContent?.includes("Placed change"));
+    expect(placedRow).toBeDefined();
+    expect(placedRow!.querySelector(".prd-inbox-badge")).toBeNull();
+  });
+
+  it("shows no badge without an Inbox", () => {
+    expect(badges(renderToDiv(h(PRDTree, { document: changeDoc })))).toHaveLength(0);
+  });
+});

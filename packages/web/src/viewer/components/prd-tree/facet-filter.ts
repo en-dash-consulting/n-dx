@@ -54,6 +54,12 @@ export interface FacetFilterProps {
   onTagsChange: (tags: Set<string>) => void;
   /** Called when the set of active statuses changes. */
   onStatusesChange: (statuses: Set<ItemStatus>) => void;
+  /** Whether the "In the Inbox" facet is on. */
+  inboxOnly: boolean;
+  /** How many open changes rex holds for placement. */
+  inboxCount: number;
+  /** Called when the "In the Inbox" facet is toggled. */
+  onInboxOnlyChange: (on: boolean) => void;
   /** Called to clear all facets. */
   onClearAll: () => void;
 }
@@ -65,9 +71,12 @@ export function FacetFilter({
   statusCounts,
   onTagsChange,
   onStatusesChange,
+  inboxOnly,
+  inboxCount,
+  onInboxOnlyChange,
   onClearAll,
 }: FacetFilterProps) {
-  const hasActiveFacets = activeTags.size > 0 || activeStatuses.size > 0;
+  const hasActiveFacets = activeTags.size > 0 || activeStatuses.size > 0 || inboxOnly;
 
   // ── Status dropdown state ────────────────────────────────────────────
   const [statusOpen, setStatusOpen] = useState(false);
@@ -365,6 +374,21 @@ export function FacetFilter({
           )
         : h("span", { class: "prd-facet-empty" }, "No tags in current PRD"),
     ),
+
+    // ── Inbox facet ───────────────────────────────────────────────────
+    inboxCount > 0 || inboxOnly
+      ? h(
+          "button",
+          {
+            class: `prd-facet-inbox${inboxOnly ? " active" : ""}`,
+            type: "button",
+            "aria-pressed": String(inboxOnly),
+            title: "Show only changes waiting for a place",
+            onClick: () => onInboxOnlyChange(!inboxOnly),
+          },
+          `In the Inbox (${inboxCount})`,
+        )
+      : null,
 
     // ── Clear all facets button ──────────────────────────────────────
     hasActiveFacets

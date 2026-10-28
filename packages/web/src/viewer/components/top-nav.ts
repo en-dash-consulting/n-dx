@@ -17,7 +17,7 @@
 
 import { h } from "preact";
 import type { ViewId, NavigateTo } from "../api.js";
-import { stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, isLiveView } from "../api.js";
+import { useProjectStatus, openInboxCount, inboxCountLabel, stageForView, visibleStages, stageProduct, viewLabel, viewGlyph, isLiveView } from "../api.js";
 import { isDeployedMode } from "../deployed-mode.js";
 import { NdxLogoPng, ProductLogoPng } from "./logos.js";
 import { LiveTab } from "./live-tab.js";
@@ -40,6 +40,7 @@ export interface TopNavProps {
 }
 
 export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch, scope = null, sidecar = null }: TopNavProps) {
+  const inboxOpen = openInboxCount(useProjectStatus()?.rex);
   const active = stageForView(view, validViews);
   const stages = visibleStages(validViews);
   const scoped = !!scope && scope !== "all";
@@ -82,6 +83,11 @@ export function TopNav({ view, validViews, onNavigate, navigateTo, onOpenSearch,
           h("span", { class: "topnav-tab-glyph", "aria-hidden": "true" }, viewGlyph(id)),
           h("span", { class: "topnav-tab-label" }, label),
           h("span", { class: "topnav-tab-hint" }, product),
+          id === "plan" && inboxOpen > 0
+            ? h("span", { class: "topnav-tab-count", "data-count": String(inboxOpen) },
+                h("span", { "aria-hidden": "true" }, inboxOpen.toLocaleString()),
+                h("span", { class: "sr-only" }, inboxCountLabel(inboxOpen)))
+            : null,
         );
       }),
       // Live is not a stage: it sits after a divider, outside the loop, and

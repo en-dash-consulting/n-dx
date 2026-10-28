@@ -26,7 +26,7 @@ import type { CapabilityDetail, ChangeRow, ProductEdit, ProductMap } from "./pro
 /** What every product read answers on a v1 tree. */
 interface V1Answer { layout: "v1" }
 
-type Load<T> =
+export type Load<T> =
   | { state: "loading" }
   | { state: "error"; message: string }
   | { state: "v1" }
@@ -52,12 +52,12 @@ function failed<T>(prev: Load<T>, message: string): Load<T> {
  * until the new answer arrives, so the view follows the Tasks tree. A refetch
  * that fails keeps that data and reports through `refreshError`.
  */
-function useProductRead<T>(url: string, pick: (body: Record<string, unknown>) => T): Load<T> {
+export function useProductRead<T>(url: string, pick: (body: Record<string, unknown>) => T): Load<T> {
   return useRefetchableProductRead(url, pick).load;
 }
 
 /** `useProductRead` plus a `refetch` for a page that writes and must show the result. */
-function useRefetchableProductRead<T>(
+export function useRefetchableProductRead<T>(
   url: string,
   pick: (body: Record<string, unknown>) => T,
 ): { load: Load<T>; refetch: () => void } {
@@ -108,14 +108,14 @@ export function NoProductLayer({ title }: { title: string }) {
   );
 }
 
-function Pending<T>({ load }: { load: Exclude<Load<T>, { state: "ready" | "v1" }> }) {
+export function Pending<T>({ load }: { load: Exclude<Load<T>, { state: "ready" | "v1" }> }) {
   return load.state === "loading"
     ? h("div", { class: "loading", role: "status", "aria-live": "polite" }, "Loading...")
     : h("div", { class: "empty-state", role: "alert" }, `Could not load: ${load.message}`);
 }
 
 /** Shown above a page whose latest refetch failed; the page is the last good read. */
-function StaleNotice({ message }: { message?: string }) {
+export function StaleNotice({ message }: { message?: string }) {
   return message
     ? h("div", { class: "empty-state pm-stale", role: "alert" }, `Could not refresh: ${message}. Showing the last loaded data.`)
     : null;

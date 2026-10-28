@@ -8,7 +8,7 @@
 
 import { h, Fragment } from "preact";
 import { ActionIcon } from "../action-icon.js";
-import { useState, useCallback, useEffect } from "preact/hooks";
+import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import type { PRDItemData, ItemStatus, Priority, RequirementData, RequirementCategory, RequirementValidationType, TaskUsageSummary, WeeklyBudgetResolution } from "./types.js";
 import type { NavigateTo } from "../../types.js";
 import { formatTimestamp } from "./compute.js";
@@ -20,6 +20,8 @@ import { resolveTaskUtilization } from "./task-utilization.js";
 import { type ItemType, canAddChildType, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { useIndexMd } from "../../hooks/index.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
+import { CriteriaEditor } from "./criteria-editor.js";
+import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -394,116 +396,13 @@ function EditableAcceptanceCriteria({
   criteria: string[];
   onUpdate?: (criteria: string[]) => void;
 }) {
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [addDraft, setAddDraft] = useState("");
-
-  const handleStartEdit = useCallback((i: number) => {
-    setEditingIndex(i);
-    setEditDraft(criteria[i]);
-  }, [criteria]);
-
-  const handleSaveEdit = useCallback(() => {
-    if (editingIndex === null || !onUpdate) return;
-    const trimmed = editDraft.trim();
-    if (!trimmed) {
-      // Empty means remove
-      onUpdate(criteria.filter((_, i) => i !== editingIndex));
-    } else if (trimmed !== criteria[editingIndex]) {
-      const updated = [...criteria];
-      updated[editingIndex] = trimmed;
-      onUpdate(updated);
-    }
-    setEditingIndex(null);
-    setEditDraft("");
-  }, [editingIndex, editDraft, criteria, onUpdate]);
-
-  const handleRemove = useCallback((i: number) => {
-    if (!onUpdate) return;
-    onUpdate(criteria.filter((_, idx) => idx !== i));
-  }, [criteria, onUpdate]);
-
-  const handleAdd = useCallback(() => {
-    const trimmed = addDraft.trim();
-    if (trimmed && onUpdate) {
-      onUpdate([...criteria, trimmed]);
-    }
-    setAddDraft("");
-    setAdding(false);
-  }, [addDraft, criteria, onUpdate]);
-
-  if (criteria.length === 0 && !onUpdate) return null;
-
-  return h(
-    "div",
-    { class: "task-acceptance-criteria" },
-    h("div", { class: "task-section-label" }, criteriaLabel("task")),
-    criteria.length > 0
-      ? h(
-          "ul",
-          { class: "task-criteria-list" },
-          criteria.map((criterion, i) =>
-            editingIndex === i
-              ? h("li", { key: i, class: "task-criterion editing" },
-                  h("input", {
-                    class: "task-criterion-input",
-                    type: "text",
-                    value: editDraft,
-                    onInput: (e: Event) => setEditDraft((e.target as HTMLInputElement).value),
-                    onKeyDown: (e: KeyboardEvent) => {
-                      if (e.key === "Enter") { e.preventDefault(); handleSaveEdit(); }
-                      if (e.key === "Escape") { setEditingIndex(null); setEditDraft(""); }
-                    },
-                    onBlur: handleSaveEdit,
-                    ref: (el: HTMLInputElement | null) => el?.focus(),
-                  }),
-                )
-              : h("li", {
-                  key: i,
-                  class: `task-criterion${onUpdate ? " editable" : ""}`,
-                  onClick: onUpdate ? () => handleStartEdit(i) : undefined,
-                  role: onUpdate ? "button" : undefined,
-                  tabIndex: onUpdate ? 0 : undefined,
-                  onKeyDown: onUpdate
-                    ? (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleStartEdit(i); } }
-                    : undefined,
-                },
-                  h("span", { class: "task-criterion-text" }, criterion),
-                  onUpdate
-                    ? h("button", {
-                        class: "task-criterion-remove",
-                        onClick: (e: Event) => { e.stopPropagation(); handleRemove(i); },
-                        "aria-label": `Remove criterion ${i + 1}`,
-                        title: "Remove",
-                      }, h(ActionIcon, { name: "close" }))
-                    : null,
-                ),
-          ),
-        )
-      : null,
-    // Add new criterion
-    onUpdate
-      ? adding
-        ? h("div", { class: "task-criterion-add-form" },
-            h("input", {
-              class: "task-criterion-add-input",
-              type: "text",
-              value: addDraft,
-              placeholder: "New acceptance criterion...",
-              onInput: (e: Event) => setAddDraft((e.target as HTMLInputElement).value),
-              onKeyDown: (e: KeyboardEvent) => {
-                if (e.key === "Enter" && addDraft.trim()) { e.preventDefault(); handleAdd(); }
-                if (e.key === "Escape") { setAdding(false); setAddDraft(""); }
-              },
-              ref: (el: HTMLInputElement | null) => el?.focus(),
-            }),
-            h("button", { class: "task-criterion-add-confirm", onClick: handleAdd, disabled: !addDraft.trim(), "aria-label": "Confirm add criterion", title: "Confirm" }, "\u2713"),
-            h("button", { class: "task-criterion-add-cancel", onClick: () => { setAdding(false); setAddDraft(""); }, "aria-label": "Cancel add criterion", title: "Cancel" }, h(ActionIcon, { name: "close" })),
-          )
-        : h("button", { class: "task-criterion-add-btn", onClick: () => setAdding(true) }, "+ criterion")
-      : null,
-  );
+  return h(CriteriaEditor, {
+    label: criteriaLabel("task"),
+    criteria,
+    onEdit: onUpdate ? (i: number, text: string) => onUpdate(criteria.map((c, idx) => (idx === i ? text : c))) : undefined,
+    onRemove: onUpdate ? (i: number) => onUpdate(criteria.filter((_, idx) => idx !== i)) : undefined,
+    onAdd: onUpdate ? (text: string) => onUpdate([...criteria, text]) : undefined,
+  });
 }
 
 /** Children summary — shows direct children with their status. */
@@ -1222,11 +1121,20 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
   // Determine if this item can have children added
   const canAddChild = onAddChild != null && canAddChildType(itemType);
 
+  // A change in the Inbox: its tasks won't run until it is placed. The
+  // placement section reports it, on mount and whenever it changes.
+  const [inInbox, setInInbox] = useState(false);
+  const isChange = itemType === "change";
+  const awaitingPlacement = isChange && inInbox;
+  const titleRef = useRef<HTMLDivElement>(null);
+
   // Reset add-child form and remove confirmation when item changes
   useEffect(() => {
     setShowAddChild(false);
     setConfirmingRemove(false);
     setRemoving(false);
+    // Place & next lands focus on the next change's title.
+    if (takeTitleFocus(item.id)) titleRef.current?.querySelector<HTMLElement>(".task-title-display, .task-title-input")?.focus();
   }, [item.id]);
 
   const handleStatusChange = useCallback(
@@ -1302,7 +1210,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
     // Editable title
     h(
       "div",
-      { class: "task-section" },
+      { class: "task-section", ref: titleRef },
       h(EditableTitle, {
         title: item.title,
         onUpdate: onUpdate
@@ -1310,6 +1218,18 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
           : undefined,
       }),
     ),
+
+    // Placement: where an Inbox change goes, or where a placed one went
+    isChange
+      ? h(ChangePlacementSection, {
+          key: item.id,
+          changeId: item.id,
+          changeTitle: item.title,
+          onOpenChange: (id: string) => onNavigateToItem?.(id),
+          onWritten: onPrdChanged,
+          onInboxState: setInInbox,
+        })
+      : null,
 
     // Status selector
     h(
@@ -1537,6 +1457,9 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
                   },
                   `+ Add ${itemTypeLabel(childTypeOf(itemType) ?? "child")}`,
                 )
+            : null,
+          canAddChild && awaitingPlacement
+            ? h("div", { class: "task-add-child-note", role: "note" }, "Its tasks won't run until the change is placed.")
             : null,
         )
       : null,

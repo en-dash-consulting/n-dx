@@ -1,0 +1,96 @@
+schema: "rex/v2"
+items:
+  "083b030f-c63d-4f00-b27b-04921b763228":
+    status: "completed"
+    startedAt: "2026-10-27T22:34:30.805Z"
+    completedAt: "2026-10-27T22:51:04.227Z"
+    endedAt: "2026-10-27T22:51:04.227Z"
+    activeIntervals: [{"end":"2026-10-27T22:51:04.227Z","start":"2026-10-27T22:34:30.805Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New components/prd-tree/change-placement.ts rendered after the title in task-detail.ts for changes: Inbox note with N of M · Next ›, shortlist radios (strength, area, matched words, tied/weak warnings), grouped search over /api/rex/product, Touches/Amends with summary, criteria edit and replacement statement, Place / Place & next / Place & add another / Nothing fits → propose form. Writes via /place and /propose, refusals inline with kind hints; placed changes show one Placed line. 39 component tests."
+    lastModified: "2026-10-27T22:51:04.227Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "090e80c2-19af-4ac9-b9ea-663ab788c45b":
+    status: "completed"
+    startedAt: "2026-10-27T23:12:16.416Z"
+    completedAt: "2026-10-27T23:13:05.915Z"
+    endedAt: "2026-10-27T23:13:05.915Z"
+    activeIntervals: [{"end":"2026-10-27T23:13:05.915Z","start":"2026-10-27T23:12:16.416Z"}]
+    lastModified: "2026-10-27T23:13:05.915Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1591411c-4f94-4956-bcb7-cb7935677015":
+    status: "completed"
+    startedAt: "2026-10-27T22:58:17.007Z"
+    completedAt: "2026-10-27T23:02:14.322Z"
+    endedAt: "2026-10-27T23:02:14.322Z"
+    activeIntervals: [{"end":"2026-10-27T23:02:14.322Z","start":"2026-10-27T22:58:17.007Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Orange Inbox count on Plan tab, \"Inbox N\" bottom-bar pill (opens inbox view), hidden at 0/v1; Changes shows Needs placement only on awaitsPlacement rows and opens the detail panel. Tests added."
+    lastModified: "2026-10-27T23:02:14.322Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "21a8d036-41d6-45fb-b10c-181f074f3e4f":
+    status: "completed"
+    startedAt: "2026-10-27T23:13:05.915Z"
+    completedAt: "2026-10-27T23:13:05.915Z"
+    endedAt: "2026-10-27T23:13:05.915Z"
+    activeIntervals: [{"end":"2026-10-27T23:13:05.915Z","start":"2026-10-27T23:13:05.915Z"}]
+    appliedAt: "2026-10-27T23:13:05.915Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T23:13:05.915Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4069b051-1e05-4867-aa2c-7df245ea7e6a":
+    status: "completed"
+    startedAt: "2026-10-27T23:09:59.490Z"
+    completedAt: "2026-10-27T23:12:03.049Z"
+    endedAt: "2026-10-27T23:12:03.049Z"
+    activeIntervals: [{"end":"2026-10-27T23:12:03.049Z","start":"2026-10-27T23:09:59.490Z"}]
+    lastModified: "2026-10-27T23:12:03.049Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "43945df9-5aae-4bf6-a818-61ddc5cb259f":
+    status: "completed"
+    startedAt: "2026-10-27T23:07:01.908Z"
+    completedAt: "2026-10-27T23:09:46.233Z"
+    endedAt: "2026-10-27T23:09:46.233Z"
+    activeIntervals: [{"end":"2026-10-27T23:09:46.233Z","start":"2026-10-27T23:07:01.908Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Placement search and propose area show \"Could not load: …\" when the product read errors; tests added."
+    lastModified: "2026-10-27T23:09:46.233Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "480edc01-5573-43aa-b559-026a53513984":
+    status: "completed"
+    startedAt: "2026-10-27T22:51:28.943Z"
+    completedAt: "2026-10-27T22:58:02.260Z"
+    endedAt: "2026-10-27T22:58:02.260Z"
+    activeIntervals: [{"end":"2026-10-27T22:57:35.979Z","start":"2026-10-27T22:51:28.943Z"},{"end":"2026-10-27T22:58:02.260Z","start":"2026-10-27T22:58:02.260Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Tasks tree shows an Inbox badge on changes awaiting placement and an \"In the Inbox\" facet (URL-persisted, cleared by Clear facets). Work from run 876aeca3, whose commit was blocked; test gate passed in the run, verified and committed by hand."
+    lastModified: "2026-10-27T22:58:02.260Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6773438c-7c3f-4a98-8568-c8908c024270":
+    status: "completed"
+    startedAt: "2026-10-27T23:02:29.349Z"
+    completedAt: "2026-10-27T23:06:41.150Z"
+    endedAt: "2026-10-27T23:06:41.150Z"
+    activeIntervals: [{"end":"2026-10-27T23:06:41.150Z","start":"2026-10-27T23:02:29.349Z"}]
+    lastModified: "2026-10-27T23:06:41.150Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b140b377-b5af-4498-9b38-eb70ddf13947":
+    status: "completed"
+    startedAt: "2026-10-27T22:15:21.887Z"
+    completedAt: "2026-10-27T22:21:47.336Z"
+    endedAt: "2026-10-27T22:21:47.336Z"
+    activeIntervals: [{"end":"2026-10-27T22:21:47.336Z","start":"2026-10-27T22:15:21.887Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "StageSection.badge + openWhenNonEmpty; BadgedSection reads useProjectStatus (refetch on rex:prd-changed); orange pill with sr-only label. Commit 5407025c2."
+    lastModified: "2026-10-27T22:21:47.336Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ecac94e1-42b4-4b61-829b-6a801dc94ee6":
+    status: "completed"
+    startedAt: "2026-10-27T22:22:33.798Z"
+    completedAt: "2026-10-27T22:34:09.788Z"
+    endedAt: "2026-10-27T22:34:09.788Z"
+    activeIntervals: [{"end":"2026-10-27T22:34:09.788Z","start":"2026-10-27T22:22:33.798Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New views/inbox.ts (InboxPage + InboxView, sortInbox/bestGuess); `inbox` view id, meta, route, registry renderer; Plan section after analysis/before prd with badge \"inbox\", openWhenNonEmpty, requiresServer. 12 unit tests."
+    lastModified: "2026-10-27T22:34:09.788Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
