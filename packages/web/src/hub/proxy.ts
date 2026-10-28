@@ -317,6 +317,8 @@ async function handleReloadSignal(req: IncomingMessage, res: ServerResponse, hub
  * the per-user credential stays at the hub, and the app is told its mount.
  */
 export interface SidecarForward {
+  /** Per-launch credential, independent of the user token. */
+  secret: string;
   /** `/x/<name>/`, sent as `X-Ndx-Base-Path`. */
   basePath: string;
   /** The hub's token; an `Authorization: Bearer` carrying it is dropped. */
@@ -330,7 +332,7 @@ export interface SidecarForward {
  * bearer for the extension's own scheme passes through.
  */
 export function sidecarHeaderValue(lowerName: string, value: string, forward: SidecarForward): string | null {
-  if (lowerName === AUTH_HEADER_NAME || lowerName === SIDECAR_BASE_PATH_HEADER) return null;
+  if (lowerName === "x-ndx-sidecar-secret" || lowerName === AUTH_HEADER_NAME || lowerName === SIDECAR_BASE_PATH_HEADER) return null;
   if (lowerName === "cookie") {
     const kept = value
       .split(";")
@@ -373,6 +375,7 @@ export function proxyHttp(
       else headers[name] = kept;
     }
     headers[SIDECAR_BASE_PATH_HEADER] = sidecar.basePath;
+    headers["x-ndx-sidecar-secret"] = sidecar.secret;
   }
   Object.assign(headers, extraHeaders);
   if (prefix) headers[FORWARDED_PREFIX_HEADER] = prefix;
@@ -459,7 +462,10 @@ export function proxyUpgrade(
       }
     }
     if (prefix) lines.push(`X-Forwarded-Prefix: ${prefix}`);
-    if (sidecar) lines.push(`X-Ndx-Base-Path: ${sidecar.basePath}`);
+    if (sidecar) {
+      lines.push(`X-Ndx-Base-Path: ${sidecar.basePath}`);
+      if (sidecar.secret) lines.push(`X-Ndx-Sidecar-Secret: ${sidecar.secret}`);
+    }
     upstream.write(`${lines.join("\r\n")}\r\n\r\n`);
     if (head.length > 0) upstream.write(head);
     upstream.pipe(socket);
@@ -709,7 +715,7 @@ async function handleExecuteAdmission(
 }
 
 function sidecarForward(hub: Hub, decision: Extract<ProxyDecision, { kind: "sidecar" }>): SidecarForward {
-  return { basePath: `${decision.prefix}/`, token: hub.token };
+  return { basePath: `${decision.prefix}/`, token: hub.token, secret: hub.sidecars.secret(decision.name) ?? "" };
 }
 
 /** The JSON a refused `/x/<name>/` answers with: the message, core's reason, and the log file when there is one. */

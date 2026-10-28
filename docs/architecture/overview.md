@@ -86,6 +86,7 @@ Single writer per file. Hench and web read `.rex/` files but modify PRD state by
 | `plan` + `work` | No | Both write PRD roots |
 | `refresh` + any writer | No | Refresh can rewrite analysis and PRD state |
 | `config` + `config` | No | Both merge shared config files |
+| `extensions add\|remove` + another extension writer | No | Both run npm in the shared per-user extensions folder and rewrite `extensions.json`; serialize them across worktrees. |
 | `sv pack add\|remove` + another `sv pack add\|remove` | No | Both write the per-user pack directory, shared by every worktree and project on one ndx home; the second fails naming the holder's PID |
 
 **General rule:** Commands that write to PRD roots, analysis output, or hench

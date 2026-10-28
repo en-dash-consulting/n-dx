@@ -66,7 +66,7 @@ describe("the mount the hub serves the face at", () => {
 /** Starts serve.js with `env` and resolves with its origin once it listens on `host`. */
 async function startServe(env: NodeJS.ProcessEnv, host: string): Promise<{ child: ChildProcess; origin: string }> {
   const port = await freePort();
-  const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(process.execPath, [BIN], { env: { ...env, PORT: String(port) }, stdio: ["pipe", "pipe", "pipe"] });
   await listening(child, `${host}:${port}`);
   return { child, origin: `http://${host}:${port}` };
 }
@@ -96,7 +96,13 @@ describe("bin/serve.js by hand, with an ambient PORT", () => {
   });
 });
 
-describe("bin/serve.js under the hub", () => {
+const sidecarFetch: typeof fetch = (input, init) => {
+  const headers = new Headers(init?.headers);
+  headers.set("X-Ndx-Sidecar-Secret", "test-launch-secret");
+  return fetch(input, { ...init, headers });
+};
+
+describe("bin/serve.js with an explicitly injected project projection", () => {
   let child: ChildProcess;
   let origin: string;
   let scratch: string;
@@ -104,7 +110,7 @@ describe("bin/serve.js under the hub", () => {
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), "graview-face-serve-"));
     writeFileSync(join(scratch, "document.json"), JSON.stringify({ name: "hub-mounted" }));
-    const env: NodeJS.ProcessEnv = { ...process.env, NDX_EXTENSION_NAME: "graview-face", NDX_GRAVIEW_DIR: scratch };
+    const env: NodeJS.ProcessEnv = { ...process.env, NDX_EXTENSION_NAME: "graview-face", NDX_SIDECAR_SECRET: "test-launch-secret", NDX_GRAVIEW_DIR: scratch };
     delete env["NDX_REX_MCP_URL"];
     ({ child, origin } = await startServe(env, "127.0.0.1"));
   }, 90_000);
@@ -115,54 +121,54 @@ describe("bin/serve.js under the hub", () => {
   });
 
   it("listens on 127.0.0.1, where the hub probes, and answers the bare mount with the page", async () => {
-    const response = await fetch(`${origin}/`);
+    const response = await sidecarFetch(`${origin}/`);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
   });
 
   it("writes every script the page loads under the mount", async () => {
-    const html = await (await fetch(`${origin}/`)).text();
+    const html = await (await sidecarFetch(`${origin}/`)).text();
     expect(html).toContain(`src="${MOUNT}@vite/client"`);
     expect(html).toContain(`src="${MOUNT}src/main.tsx"`);
     expect(html).not.toMatch(/src="\/(?!x\/graview-face\/)/);
   });
 
   it("answers those scripts, stripped as the hub forwards them, and the modules they import ask under the mount too", async () => {
-    const main = await fetch(`${origin}/src/main.tsx`);
+    const main = await sidecarFetch(`${origin}/src/main.tsx`);
     expect(main.status).toBe(200);
     const code = await main.text();
     expect(code).toContain(`from "${MOUNT}src/app.ts"`);
     expect(code).toContain(`from "${MOUNT}src/base.ts"`);
-    expect((await fetch(`${origin}/@vite/client`)).status).toBe(200);
-    const base = await (await fetch(`${origin}/src/base.ts`)).text();
+    expect((await sidecarFetch(`${origin}/@vite/client`)).status).toBe(200);
+    const base = await (await sidecarFetch(`${origin}/src/base.ts`)).text();
     expect(base).toContain(JSON.stringify(MOUNT));
   });
 
   it("answers requests that already carry the mount, as the URL it prints sends them", async () => {
-    const page = await fetch(`${origin}${MOUNT}`);
+    const page = await sidecarFetch(`${origin}${MOUNT}`);
     expect(await page.text()).toContain(`src="${MOUNT}src/main.tsx"`);
-    const main = await fetch(`${origin}${MOUNT}src/main.tsx`);
+    const main = await sidecarFetch(`${origin}${MOUNT}src/main.tsx`);
     expect(main.status).toBe(200);
     expect(main.headers.get("content-type")).not.toContain("text/html");
-    const client = await fetch(`${origin}${MOUNT}@vite/client`);
+    const client = await sidecarFetch(`${origin}${MOUNT}@vite/client`);
     expect(client.status).toBe(200);
     expect(client.headers.get("content-type")).not.toContain("text/html");
   });
 
   it("serves the door's data and sync routes under the mount", async () => {
-    const document = await fetch(`${origin}/data/document.json`);
+    const document = await sidecarFetch(`${origin}/data/document.json`);
     expect(document.status).toBe(200);
     expect(await document.json()).toEqual({ name: "hub-mounted" });
-    const info = (await (await fetch(`${origin}/ndx/sync-info`)).json()) as { live: boolean };
+    const info = (await (await sidecarFetch(`${origin}/ndx/sync-info`)).json()) as { live: boolean };
     expect(info.live).toBe(true);
   });
 
   it("hands POST /ndx/mcp to the MCP door, stripped or under the mount", async () => {
-    const html = await (await fetch(`${origin}/`)).text();
+    const html = await (await sidecarFetch(`${origin}/`)).text();
     const key = /<meta name="ndx-door" content="([0-9a-f]+)"/.exec(html)?.[1];
     expect(key).toBeTruthy();
     for (const path of ["/ndx/mcp", `${MOUNT}ndx/mcp`]) {
-      const response = await fetch(`${origin}${path}`, {
+      const response = await sidecarFetch(`${origin}${path}`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-ndx-door": key! },
         body: JSON.stringify({ name: "get_item", arguments: { id: "x" } }),
@@ -173,5 +179,31 @@ describe("bin/serve.js under the hub", () => {
       expect(body).toMatchObject({ ok: false });
       expect(body.error).toContain("sync is off");
     }
+  });
+});
+
+
+describe("the projectless environment supplied by the hub", () => {
+  let child: ChildProcess;
+  let origin: string;
+  beforeAll(async () => {
+    const env: NodeJS.ProcessEnv = { ...process.env, NDX_EXTENSION_NAME: "graview-face", NDX_SIDECAR_SECRET: "test-launch-secret" };
+    delete env["NDX_GRAVIEW_DIR"];
+    delete env["NDX_REX_MCP_URL"];
+    ({ child, origin } = await startServe(env, "127.0.0.1"));
+  });
+  afterAll(() => child?.kill());
+  it("rejects direct access and explains the project command through an authenticated request", async () => {
+    expect((await fetch(origin)).status).toBe(403);
+    const page = await sidecarFetch(origin);
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain("ndx graview serve &lt;project-directory&gt;");
+    expect((await sidecarFetch(`${origin}/data/document.json`)).status).toBe(404);
+  });
+  it("exits when its hub lifetime pipe closes", async () => {
+    const exited = new Promise((resolve) => child.once("exit", resolve));
+    child.stdin!.end();
+    await exited;
+    expect(child.exitCode).toBe(0);
   });
 });

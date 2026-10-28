@@ -6,10 +6,17 @@ import { createServer } from "node:http";
 import { recordLoad } from "../loaded.js";
 
 recordLoad("serve");
+const secret = process.env.NDX_SIDECAR_SECRET;
+if (!secret) throw new Error("The hub must provide NDX_SIDECAR_SECRET");
+process.stdin.resume();
+process.stdin.on("end", () => process.exit(0));
+const admitted = (req) => req.headers["x-ndx-sidecar-secret"] === secret;
+
 
 const env = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => key.startsWith("NDX_")));
 
 const server = createServer((req, res) => {
+  if (!admitted(req)) { res.writeHead(403).end("Forbidden"); return; }
   if (req.url === "/healthz") {
     res.writeHead(200);
     res.end("ok");
@@ -25,6 +32,7 @@ const server = createServer((req, res) => {
 });
 
 server.on("upgrade", (req, socket) => {
+  if (!admitted(req)) { socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n"); return; }
   const echo = JSON.stringify({ path: req.url, headers: req.headers });
   socket.end(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n${echo}`);
 });

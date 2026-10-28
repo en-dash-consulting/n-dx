@@ -3492,13 +3492,16 @@ function extensionSection(config, name) {
  * the schema declares wins over the guess: a `string` setting stays a string
  * however numeric it looks.
  */
-function coerceExtensionValue(newValue, existingValue, schemaType) {
-  switch (schemaType) {
+function coerceExtensionValue(newValue, existingValue, schemaType, itemType) {
+  const types = Array.isArray(schemaType) ? schemaType : [schemaType];
+  if (types.includes("string")) return newValue;
+  if (types.includes("null") && newValue === "null") return null;
+  switch (types.find((type) => type !== "null")) {
     case "string": return newValue;
     case "number":
     case "integer": return coerceValue(newValue, 0);
     case "boolean": return coerceValue(newValue, false);
-    case "array": return coerceValue(newValue, []);
+    case "array": return coerceValue(newValue, []).map((value) => coerceExtensionValue(value, undefined, itemType));
     default: return coerceValue(newValue, existingValue);
   }
 }
@@ -3581,7 +3584,7 @@ async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flag
   }
   let coerced;
   try {
-    coerced = coerceExtensionValue(valueArg, existing, checker?.typeAt(keyParts));
+    coerced = coerceExtensionValue(valueArg, existing, checker?.typeAt(keyParts), checker?.typeAt([...keyParts, "0"]));
   } catch (err) {
     fail(`Invalid value for "${keyArg}": ${err.message}`);
     return;

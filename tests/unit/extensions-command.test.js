@@ -645,3 +645,16 @@ it.each(["constructor", "toString", "__proto__"])("rejects the inherited name %s
   expect(code).toBe(1);
   expect(err).toMatch(new RegExp(`Unknown 'ndx extensions' subcommand: ${sub}`));
 });
+
+
+describe("doctor with a broken user listing", () => {
+  it("prints the discovery problem and other extension problems instead of throwing", async () => {
+    writeJson(join(userFolder(), "package.json"), {});
+    writeFileSync(join(userFolder(), "package.json"), "{ not json");
+    installInto(project, extensionPackage("ndx-broken", "broken"), { withBin: false });
+    const result = await ndx(["doctor"]);
+    expect(result.code).toBe(1);
+    expect(result.out).toContain("correct the JSON");
+    expect(result.out).toContain("bin/cli.js");
+  });
+});

@@ -32,6 +32,7 @@
  * @module web/hub/sidecars
  */
 
+import { randomBytes } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname } from "node:path";
@@ -178,6 +179,7 @@ class Sidecar {
   state: SidecarState = "stopped";
   handle: ManagedChild | null = null;
   port: number | null = null;
+  secret: string | null = null;
   logFile: string | null = null;
   idleStopMs = 0;
   crashes: number[] = [];
@@ -229,7 +231,7 @@ export class SidecarManager {
    * The port of `name`'s running sidecar, starting it first when it is not.
    * Concurrent first requests share one start.
    */
-  ensure(name: string): Promise<EnsureResult> {
+  ensure(name: string, touchActivity = true): Promise<EnsureResult> {
     if (!SidecarManager.isName(name)) {
       return Promise.resolve({ ok: false, status: 404, error: `No extension sidecar is named "${name}"`, logFile: null, reason: "none" });
     }
@@ -238,17 +240,32 @@ export class SidecarManager {
       s = new Sidecar(name);
       this.sidecars.set(name, s);
     }
-    if (s.state === "running" && s.port !== null) {
-      s.lastActivity = this.now();
-      return Promise.resolve({ ok: true, port: s.port });
-    }
     if (s.starting) return s.starting;
     const sidecar = s;
-    const starting = this.start(sidecar).finally(() => {
+    const starting = (sidecar.state === "running" ? this.revalidate(sidecar, touchActivity) : this.start(sidecar)).finally(() => {
       sidecar.starting = null;
     });
     sidecar.starting = starting;
     return starting;
+  }
+
+  /** Only the proxy receives this launch credential; it is never part of status JSON. */
+  secret(name: string): string | null {
+    return this.sidecars.get(name)?.secret ?? null;
+  }
+
+  private async revalidate(s: Sidecar, touchActivity: boolean): Promise<EnsureResult> {
+    const handle = s.handle;
+    let planned: PlanResult;
+    try { planned = await this.opts.plan!(s.name); }
+    catch { planned = { ok: false, reason: "error", error: "Could not revalidate the extension launch plan" }; }
+    if (!planned.ok) {
+      if (s.handle === handle) await this.stopSidecar(s);
+      return this.refuse(s, statusForReason(planned.reason), planned.error, undefined, planned.reason);
+    }
+    if (this.closed || s.handle !== handle || s.port === null) return this.refuseClosed(s);
+    if (touchActivity) s.lastActivity = this.now();
+    return { ok: true, port: s.port };
   }
 
   /**
@@ -282,6 +299,11 @@ export class SidecarManager {
 
   /** Stop every running sidecar idle for its `idleStopMinutes`. */
   async sweepIdle(): Promise<void> {
+    // Check even busy sidecars: an open socket cannot preserve revoked approval.
+    for (const s of this.sidecars.values()) {
+      if (s.state !== "running" || s.starting) continue;
+      await this.ensure(s.name, false);
+    }
     const now = this.now();
     const idle = Array.from(this.sidecars.values()).filter((s) =>
       s.state === "running" && s.inflight === 0 && s.sockets === 0 && now - s.lastActivity >= s.idleStopMs,
@@ -295,7 +317,7 @@ export class SidecarManager {
   /** Stop one sidecar. False when it was not running. */
   async stop(name: string): Promise<boolean> {
     const s = this.sidecars.get(name);
-    if (!s || !s.handle) return false;
+    if (!s || (!s.handle && !s.starting)) return false;
     await this.stopSidecar(s);
     return true;
   }
@@ -337,6 +359,7 @@ export class SidecarManager {
   }
 
   private async start(s: Sidecar): Promise<EnsureResult> {
+    const generation = s.generation;
     if (this.closed) return this.refuseClosed(s);
     const limit = this.opts.crashLimit ?? SIDECAR_CRASH_LIMIT;
     const crashes = this.recentCrashes(s);
@@ -371,14 +394,17 @@ export class SidecarManager {
     // stopAll may have run while the plan or the port was awaited; it saw no
     // handle to stop, so spawning now would orphan the process.
     if (this.closed) return this.refuseClosed(s);
+    if (generation !== s.generation) return this.refuse(s, 404, "The sidecar was stopped while planning its launch", undefined, "refused");
     s.logFile = plan.logFile;
     s.idleStopMs = plan.idleStopMinutes * 60_000;
 
     mkdirSync(dirname(plan.logFile), { recursive: true });
     appendFileSync(plan.logFile, `\n[hub] ${new Date().toISOString()} starting ${plan.bin} on port ${port}\n`);
+    s.secret = randomBytes(32).toString("hex");
     const handle = spawnManaged(plan.execPath, [plan.bin], {
       cwd: plan.cwd,
-      env: { ...plan.env, PORT: String(port) },
+      env: { ...plan.env, PORT: String(port), NDX_SIDECAR_SECRET: s.secret },
+      keepStdinOpen: true,
       logFile: plan.logFile,
       windowsHide: true,
     });
@@ -408,7 +434,7 @@ export class SidecarManager {
     };
     while (Date.now() < deadline) {
       if (s.handle !== handle) return gone("before answering");
-      if (await this.healthy(url)) {
+      if (await this.healthy(url, s.secret!)) {
         // The port was free when asked, not when the bin bound it: another
         // server may have taken it and answered, while ours dies of EADDRINUSE.
         await this.settle(handle);
@@ -438,9 +464,9 @@ export class SidecarManager {
     clearTimeout(timer);
   }
 
-  private async healthy(url: string): Promise<boolean> {
+  private async healthy(url: string, secret: string): Promise<boolean> {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(this.opts.healthTimeoutMs ?? 2_000) });
+      const res = await fetch(url, { headers: { "X-Ndx-Sidecar-Secret": secret }, signal: AbortSignal.timeout(this.opts.healthTimeoutMs ?? 2_000) });
       await res.body?.cancel();
       return res.status === 200;
     } catch {
@@ -452,6 +478,7 @@ export class SidecarManager {
   private letGo(s: Sidecar): void {
     s.handle = null;
     s.port = null;
+    s.secret = null;
     s.state = "stopped";
     s.inflight = 0;
     s.sockets = 0;

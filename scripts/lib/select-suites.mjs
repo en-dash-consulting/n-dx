@@ -409,9 +409,11 @@ export function selectAffected(changedFiles, manifests) {
       if (dir === "core") {
         // core has no suite of its own; its tests are the root suite.
         if (!isMarkdown(file)) mark(ROOT_LABEL, file);
+        if (file === "packages/core/cli.js" || /^packages\/core\/extensions?[^/]*\.js$/.test(file)) mark("graview", file);
       } else if (rest === "package.json") {
         markPackage(dir, file);
         mark(ROOT_LABEL, file);
+        if (dir === "graview-face") mark("graview", file);
       } else if (rest.startsWith("tests/")) {
         mark(dir, file);
         // Policy only: a test file is policed (shell/wall-clock inventories),
@@ -428,7 +430,7 @@ export function selectAffected(changedFiles, manifests) {
           mark(ROOT_DRIFT_LABEL, file);
         }
         if (rest.startsWith("src/cli/")) mark(ROOT_LABEL, file);
-        if (EXTENSION_HUB_FILES.includes(file)) mark(ROOT_EXTENSIONS_LABEL, file);
+        if (file.startsWith("packages/web/src/hub/")) mark(ROOT_EXTENSIONS_LABEL, file);
       }
       continue;
     }

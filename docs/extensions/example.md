@@ -55,7 +55,16 @@ execFileSync(process.execPath, [process.env.NDX_BIN, "status", "."], { stdio: "i
 ```js
 import { createServer } from "node:http";
 
+const secret = process.env.NDX_SIDECAR_SECRET;
+if (!secret) throw new Error("Expected a hub launch secret");
+process.stdin.resume();
+process.stdin.on("end", () => process.exit(0));
+
 createServer((req, res) => {
+  if (req.headers["x-ndx-sidecar-secret"] !== secret) {
+    res.writeHead(403).end("Forbidden");
+    return;
+  }
   if (req.url === "/healthz") {
     res.writeHead(200).end("ok");
     return;

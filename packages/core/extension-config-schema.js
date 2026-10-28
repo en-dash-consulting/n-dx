@@ -125,15 +125,23 @@ function brokenChecker(message) {
   return { typeAt: () => undefined, check: () => [{ keyword: "schema", message }] };
 }
 
-/** The `type` declared for `parts`, walking `properties`. */
+/** Declared types along properties, map values, array items and combinators. */
 function schemaTypeAt(schema, parts) {
-  let node = schema;
-  for (const part of parts) {
-    const properties = isPlainObject(node) && isPlainObject(node.properties) ? node.properties : {};
-    if (!Object.hasOwn(properties, part)) return undefined;
-    node = properties[part];
+  if (!isPlainObject(schema)) return undefined;
+  const types = new Set();
+  const add = (value) => { for (const type of Array.isArray(value) ? value : value ? [value] : []) types.add(type); };
+  if (parts.length === 0) add(schema.type);
+  else {
+    const [part, ...rest] = parts;
+    const properties = isPlainObject(schema.properties) ? schema.properties : {};
+    if (Object.hasOwn(properties, part)) add(schemaTypeAt(properties[part], rest));
+    else if (/^(0|[1-9][0-9]*)$/.test(part) && schema.items) add(schemaTypeAt(schema.items, rest));
+    else add(schemaTypeAt(schema.additionalProperties, rest));
   }
-  return isPlainObject(node) ? node.type : undefined;
+  for (const key of ["allOf", "anyOf", "oneOf"]) {
+    for (const branch of schema[key] ?? []) add(schemaTypeAt(branch, parts));
+  }
+  return types.size === 0 ? undefined : types.size === 1 ? [...types][0] : [...types];
 }
 
 /**

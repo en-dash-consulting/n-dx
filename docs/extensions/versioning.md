@@ -4,18 +4,18 @@ Two numbers let n-dx check compatibility without running any extension code.
 
 | Number | Owned by | Meaning |
 | --- | --- | --- |
-| `apiVersion` | n-dx | The extension contract: the manifest, the [environment](./environment.md), the `/x/<name>/` proxy and the [versioned hub endpoints](./hub-api.md#versioned-api). A breaking change to any of them bumps it. n-dx supports the current version and the one before it. Today that is `1` only |
+| `apiVersion` | n-dx | The extension contract: the manifest, the [environment](./environment.md), the `/x/<name>/` proxy and the [versioned hub endpoints](./hub-api.md#versioned-api). It identifies the current contract, not a stability promise while extensions remain experimental. After promotion, a breaking change bumps it. n-dx supports the current version and the one before it. Today that is `1` only |
 | `ndxVersion` | The extension | The semver range of n-dx releases the extension supports |
 
 A mismatch on either leaves the extension listed but `incompatible`, with the reason shown in `ndx extensions list`, `ndx extensions doctor` and on the hub home. Its commands answer "Unknown command" with a hint, and its sidecar is not mounted.
 
-## What is stable
+## Current experimental contract
 
-Under `apiVersion` 1, an extension may rely on:
+Extensions are **experimental until promoted** in the [public surface policy](../architecture/public-surface). `apiVersion: 1` is the current compatibility signal. The current contract covers:
 
 - the manifest fields in [Manifest](./manifest.md);
 - the variables in [Environment](./environment.md) and the command process rules (stdio, signals, exit code, working directory);
-- the sidecar's `PORT`, `X-Ndx-Base-Path`, the stripped prefix, and the token never reaching it;
+- the sidecar's `PORT`, `X-Ndx-Base-Path`, the stripped prefix, and hub credentials stripped from forwarded requests;
 - the four endpoints in [Versioned API](./hub-api.md#versioned-api), whose listed fields only gain siblings;
 - the `ndx` CLI commands it spawns through `NDX_BIN`, which follow n-dx's own release notes.
 

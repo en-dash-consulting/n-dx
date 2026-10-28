@@ -1,6 +1,6 @@
 # n-dx extensions: design and PRD capture
 
-Status: proposed, 2026-10-26. Imported from the design doc at https://claude.ai/artifact/B5hBBT5rS6rx6FWN23xS8z as the starting point for the extensions epic. The contract as built, for extension authors, is in [docs/extensions/](../extensions/index.md).
+Status: implemented, 2026-10-28; experimental until promoted. Imported from the design doc at https://claude.ai/artifact/B5hBBT5rS6rx6FWN23xS8z as the starting point for the extensions epic. The contract as built, for extension authors, is in [docs/extensions/](../extensions/index.md).
 
 ## Summary
 
@@ -99,7 +99,7 @@ Any publisher can ship an extension; nothing in the contract is specific to one 
 | --- | --- |
 | `apiVersion` | Integer contract version. An unknown version is listed as incompatible, never run |
 | `name` | Lowercase slug, unique across installed extensions, not a built-in command, bin alias or reserved word (`ext`, `x`, `hub`, `extensions`, `paths`) |
-| `ndxVersion` | Semver range the extension supports; outside it, the extension is disabled with the reason shown |
+| `ndxVersion` | Semver range the extension supports; outside it, the extension is incompatible with the reason shown |
 | `commands[]` | Each `name` becomes `ndx <name>`; `bin` is a path inside the package, run with the same Node as n-dx |
 | `sidecar` | Optional web server the hub mounts at `/x/<name>/` |
 | `hub`, `projectLinks` | Optional entries on the hub home and on each project's dashboard; `{projectId}` and `{repoRoot}` are the only placeholders |
@@ -157,7 +157,7 @@ The hub (`packages/web/src/hub/`) gains extension sidecars as a second kind of c
 **Proxy and auth**
 
 - `proxy.ts` forwards `/x/<name>/...` to the sidecar with the prefix stripped, streaming HTTP and piping WebSockets as it does for `/p/<id>/`.
-- The hub checks the per-user token before proxying, so a sidecar never sees an unauthenticated request. It adds `X-Ndx-Base-Path: /x/<name>/` so the app builds correct links, and drops the token cookie and header from the forwarded request.
+- The hub checks the per-user token before proxying, so a sidecar authenticates every request with its per-launch secret. It adds `X-Ndx-Base-Path: /x/<name>/` so the app builds correct links, and drops the token cookie and header from the forwarded request. It sends a per-launch `X-Ndx-Sidecar-Secret` on every request, upgrade and health probe; sidecars must reject missing or incorrect secrets. Loopback alone is not authentication. The hub keeps stdin open as a lifetime channel; sidecars must exit when it closes. Running sidecars revalidate approval on requests and periodic sweeps, and stop on disable or removal.
 - `/x/` is a reserved prefix: no project id or route may start with it.
 
 **Where extensions show up**
@@ -168,7 +168,7 @@ The hub (`packages/web/src/hub/`) gains extension sidecars as a second kind of c
 
 With no hub running, extension commands still work; only sidecars and links need the hub.
 
-**Versioned hub API.** These four endpoints are stable under `apiVersion` 1. Every answer carries `apiVersion`; a field listed here is removed or retyped only with a bump, and new fields may be added. Errors are `{ "error": "…" }`. Like every hub request, they need the per-user token, and a mutating one a loopback `Origin` or none. Contract tests: `packages/web/tests/integration/hub-extension-api.test.ts`.
+**Versioned hub API.** These four endpoints are experimental under the current `apiVersion` 1 contract (not a stability promise). Every answer carries `apiVersion`; a field listed here is removed or retyped only with a bump, and new fields may be added. Errors are `{ "error": "…" }`. Like every hub request, they need the per-user token, and a mutating one a loopback `Origin` or none. Contract tests: `packages/web/tests/integration/hub-extension-api.test.ts`.
 
 | Endpoint | Answer |
 | --- | --- |
@@ -183,12 +183,12 @@ The hub reads no manifest for these either: it runs `ndx extensions list --json`
 
 **Consent.** An extension runs only after the user approves it, the way Claude Code approves a project's MCP servers.
 
-- The first `ndx <name>` or `/x/<name>/` request shows the package, version, source, commands and sidecar, then asks. In a non-interactive shell it exits 2 and points at `ndx extensions enable <name>`.
+- The first `ndx <name>` request shows the package, version, source, commands and sidecar, then asks. In a non-interactive shell it exits 2 and points at `ndx extensions enable <name>`.
 - The approval is stored in `<ndx home>/extensions.json` with a hash of the `ndx.extension` block, the package version, the source and the real path of the package directory. A change to any of them asks again, so a same-named, same-version copy installed elsewhere is not covered.
 - Approvals of project-source extensions are per project path, so cloning an untrusted repo never runs its extensions.
 - `ndx extensions enable <name> --yes` approves non-interactively, for CI and provisioning scripts.
 
-**Versioning.** Two numbers make compatibility checkable without running code. `apiVersion` is the contract this document defines; a breaking change to the environment, the proxy, the manifest or the versioned hub endpoints bumps it, and n-dx supports the current and previous version. `ndxVersion` is the extension's own range. Either mismatch leaves the extension listed but disabled, with the reason in `list`, `doctor` and the hub home.
+**Versioning.** Two numbers make compatibility checkable without running code. `apiVersion` is the contract this document defines; a breaking change to the environment, the proxy, the manifest or the versioned hub endpoints bumps it, and n-dx supports the current and previous version. `ndxVersion` is the extension's own range. Either mismatch leaves the extension listed but incompatible, with the reason in `list`, `doctor` and the hub home.
 
 **Config.** Each extension owns one section, `extensions.<name>`, in `<ndx home>/config.json` (user) and `.n-dx.json` (project), merged project over user. `ndx config extensions.<name>.<key> <value>` reads and writes it, validated against `configSchema` when one is given. It writes `.n-dx.json`, or the user config with `--user`. A missing `required` key does not stop a write, since a section is filled one key at a time. n-dx checks the validation keywords a config section needs (types, `enum`, `const`, object properties, arrays, string and number bounds, `allOf`/`anyOf`/`oneOf`/`not`) and reads annotations such as `format` as information; a schema using any other keyword, `$ref` included, is reported as one it cannot check (`packages/core/extension-config-schema.js`). For a command, the merged result is what `NDX_EXTENSION_CONFIG` points at; a sidecar serves no single project, so its file (`sidecar-config.json`) holds the user section alone. A run whose section breaks the schema, `required` included, is refused with exit 2. `paths` is a reserved name because the user config's `extensions.paths` is discovery's list of dev paths. `config.js` keeps its role as the one orchestration script that touches config files directly.
 
@@ -196,7 +196,7 @@ The hub reads no manifest for these either: it runs `ndx extensions list --json`
 
 ## PRD capture
 
-Ready to enter in the n-dx PRD with `ndx rex add` or the rex `add_item` tool. Each task's criteria go in `acceptanceCriteria`, one per entry. Set `source: ndx-capture`. "Blocked by" names tasks in this list, to wire as `blockedBy` once ids exist. Priorities: F1 and F2 ship first and are useful without the hub.
+Implemented and captured in `.rex/changes/extensions-f1-*` through `.rex/changes/extensions-f6-*`, with follow-ups in `.rex/changes/extensions-review-*`. Each task's criteria go in `acceptanceCriteria`, one per entry. Set `source: ndx-capture`. "Blocked by" names tasks in this list, to wire as `blockedBy` once ids exist. Priorities: F1 and F2 ship first and are useful without the hub.
 
 **Epic: Extensions: out-of-process add-ons for the CLI and hub** (priority high)
 
@@ -267,7 +267,7 @@ Let separately installed npm packages add `ndx <name>` commands, a hub-mounted w
 
 1. **Task: Versioned hub extension API** (high; blocked by 2)
     - `GET /api/hub/extensions[?project=<id>]` and `POST /api/hub/extensions/:name/stop`
-    - `GET /api/hub/projects` and `POST /api/hub/projects` documented as stable under `apiVersion` 1, with contract tests
+    - `GET /api/hub/projects` and `POST /api/hub/projects` documented as experimental under the current `apiVersion` 1 contract (not a stability promise), with contract tests
 2. **Task: Extensions on the hub home** (medium; blocked by 10, 11)
     - One card per enabled extension with a `hub` block, linking to `/x/<name>/`
     - Incompatible and unapproved extensions show greyed out with their reason

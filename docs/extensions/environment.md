@@ -24,12 +24,14 @@ Every extension process, command or sidecar, gets the user's own environment plu
 | `NDX_BIN` | Absolute path to this install's `cli.js`. Run it with Node: `execFile(process.execPath, [process.env.NDX_BIN, ...args])` |
 | `NDX_HOME` | The resolved n-dx home |
 | `NDX_EXTENSION_NAME` | The manifest `name` |
-| `NDX_EXTENSION_STATE_DIR` | `<ndx home>/ext/<name>/`, created before the process starts. The only n-dx-owned place the extension may write |
+| `NDX_EXTENSION_STATE_DIR` | `<ndx home>/ext/<name>/`, created before the process starts. Persistent extension storage. Reserved n-dx names are listed below |
 | `NDX_EXTENSION_CONFIG` | A JSON file holding the config section ([Config](./config.md)). A command gets a file of its own, removed when it exits; a sidecar gets `sidecar-config.json` |
 | `NDX_HUB_URL` | The running hub's base URL, such as `http://localhost:3117`. Unset when no hub runs |
 | `NDX_TOKEN_FILE` | The per-user token file. Set only with `NDX_HUB_URL`, and only when the file exists |
 
-A sidecar also gets `PORT`, the loopback port it must listen on.
+A hub sidecar also gets `PORT`, the loopback port it must listen on, and `NDX_SIDECAR_SECRET`, a random launch credential. Require the matching `X-Ndx-Sidecar-Secret` header on every HTTP request and WebSocket upgrade, including health probes. Never return the secret to a browser. Exit when the hub's stdin lifetime pipe closes.
+
+Within `NDX_EXTENSION_STATE_DIR`, n-dx reserves `ndx-config-<pid>-*.json`, `ndx-config.json`, `sidecar-config.json`, `*.json.<pid>-<hex>.tmp`, and `logs/`. Extensions must use other names; n-dx writes and sweeps the reserved files.
 
 The token value itself is never in the environment. To call the hub, read `NDX_TOKEN_FILE` and send its contents as `X-Ndx-Token` (or `Authorization: Bearer`). If an extension runs `ndx` and that run starts another extension, these variables are replaced rather than inherited, so a stale hub URL never carries over.
 
@@ -40,6 +42,6 @@ Use these, and nothing else:
 - **Spawn `NDX_BIN`** for any CLI command, such as `status`, `rex add` or `sv`. This always runs the same install that started the extension.
 - **Call the hub** at `NDX_HUB_URL` for the [versioned endpoints](./hub-api.md#versioned-api).
 - **Call a project** at `NDX_HUB_URL` + `/p/<id>/`, which serves its dashboard API and its MCP endpoints, `/mcp/rex` and `/mcp/sourcevision`.
-- **Read documented files**, such as the PRD folder tree under `.rex/prd_tree/`.
+- **Read PRD data through `NDX_BIN rex …` or the rex MCP tools** (`get_prd_status`, `get_item`). Projects may use v1 or v2 and either directory layout; do not hard-code `.rex/prd_tree/`. See the [PRD schema](../architecture/prd-folder-tree-schema.md).
 
 Do not import `@n-dx/*` packages. Their internals are not part of the contract and change without notice.

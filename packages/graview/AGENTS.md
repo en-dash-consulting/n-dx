@@ -87,3 +87,9 @@ what that face draws; keep the data there, and React only in the product.
 home), and the hand-off (`ndx graview serve` sets `NDX_REX_MCP_URL`,
 `NDX_TOKEN_FILE`, `NDX_PROJECT_ROOT`, `NDX_GRAVIEW_CLI`). Rex stays the
 single writer: a face pushes through rex's MCP tools, never the tree.
+
+For this checkout, register the face once before using it: add the absolute
+`packages/graview-face` path to `extensions.paths` in `<ndx home>/config.json`,
+then run `ndx extensions enable graview-face --yes`. This enables the face and
+its pinned Graview binary offline. Without this setup, resolution may fall
+back to `npx`, which needs network access. `graview.app` no longer discovers it.

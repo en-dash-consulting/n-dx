@@ -71,6 +71,7 @@ export const EXTENSION_ENV_VARS = Object.freeze([
   "NDX_EXTENSION_CONFIG",
   "NDX_HUB_URL",
   "NDX_TOKEN_FILE",
+  "NDX_SIDECAR_SECRET",
 ]);
 
 /** This install's CLI entry: what `NDX_BIN` re-enters. */
@@ -225,4 +226,19 @@ function isPidAlive(pid) {
     // EPERM: the process exists but belongs to someone else.
     return /** @type {NodeJS.ErrnoException} */ (err).code === "EPERM";
   }
+}
+
+/** Stop this home's running sidecar before a management command reports success. */
+export async function stopExtensionSidecar(home, name) {
+  if (!name) return;
+  const hub = runningHub(home, nodeFs, isPidAlive);
+  if (!hub) return;
+  const token = hub.tokenFile ? nodeFs.readFileSync(hub.tokenFile, "utf8").trim() : "";
+  const response = await fetch(`${hub.url}/api/hub/extensions/${encodeURIComponent(name)}/stop`, {
+    method: "POST",
+    headers: { "X-Ndx-Token": token },
+    signal: AbortSignal.timeout(5_000),
+  });
+  await response.body?.cancel();
+  if (!response.ok) throw new Error(`Could not stop the ${name} sidecar (HTTP ${response.status}); restart the hub with ndx hub stop`);
 }

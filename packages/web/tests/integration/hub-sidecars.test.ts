@@ -21,6 +21,8 @@ import { removeTempDir } from "../helpers/temp-dir.js";
 const FIXTURE = [
   `const http = require("node:http");`,
   `const mode = process.env.SIDECAR_MODE;`,
+  `process.stdin.resume(); process.stdin.on("end", () => process.exit(0));`,
+  `const admitted = (req) => req.headers["x-ndx-sidecar-secret"] === process.env.NDX_SIDECAR_SECRET;`,
   `if (mode === "crash") { console.log("crashing"); process.exit(3); }`,
   `if (mode === "never-healthy") { console.log("hanging"); setInterval(() => {}, 1000); }`,
   // Loses the port: binds only once another server holds it, then exits a moment after EADDRINUSE.
@@ -41,6 +43,7 @@ const FIXTURE = [
   `}`,
   `else {`,
   `  const server = http.createServer((req, res) => {`,
+  `    if (!admitted(req)) { res.writeHead(403).end("Forbidden"); return; }`,
   `    if (req.url === "/healthz") { res.writeHead(200); res.end("ok"); return; }`,
   `    if (req.url === "/die") { res.writeHead(200); res.end("bye", () => process.exit(1)); return; }`,
   `    console.log("request " + req.url);`,
@@ -50,6 +53,7 @@ const FIXTURE = [
   `    res.end(JSON.stringify({ path: req.url, port: process.env.PORT, name: process.env.NDX_EXTENSION_NAME, headers: req.headers }));`,
   `  });`,
   `  server.on("upgrade", (req, socket) => {`,
+  `    if (!admitted(req)) { socket.end("HTTP/1.1 403 Forbidden\\r\\nConnection: close\\r\\n\\r\\n"); return; }`,
   `    console.log("upgrade " + req.url);`,
   `    if (req.url === "/ws-hold") { socket.write("HTTP/1.1 101 Switching Protocols\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\n\\r\\n"); socket.on("end", () => socket.end()); return; }`,
   `    socket.end("HTTP/1.1 101 Switching Protocols\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\n\\r\\n" + JSON.stringify({ path: req.url, headers: req.headers }));`,
@@ -132,7 +136,7 @@ describe("SidecarManager", () => {
     expect(asked()).toBe(1);
 
     const port = (a as { port: number }).port;
-    const body = await (await fetch(`http://127.0.0.1:${port}/anything`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${port}/anything`, { headers: { "X-Ndx-Sidecar-Secret": m.secret("recon")! } })).json();
     expect(body).toMatchObject({ path: "/anything", port: String(port), name: "recon" });
 
     const [status] = m.list();
@@ -142,6 +146,33 @@ describe("SidecarManager", () => {
     const log = readFileSync(planFor("recon").logFile, "utf-8");
     expect(log).toContain(`starting ${bin} on port ${port}`);
     expect(log).toContain(`listening on ${port}`);
+  });
+
+  it("rejects direct loopback requests and replaces a spoofed secret at the proxy", async () => {
+    const { m } = manager();
+    const started = await m.ensure("recon");
+    expect(started.ok).toBe(true);
+    const port = (started as { port: number }).port;
+    expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(403);
+    expect((await fetch(`http://127.0.0.1:${port}/healthz`, { headers: { "X-Ndx-Sidecar-Secret": "wrong" } })).status).toBe(403);
+    expect(m.secret("recon")).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(m.list())).not.toContain(m.secret("recon"));
+  });
+
+  it.each(["request", "sweep"])("stops revoked sidecars with open sockets on %s", async (mode) => {
+    let enabled = true;
+    const { m } = manager("ok", { plan: async (name) => enabled
+      ? { ok: true, plan: planFor(name) }
+      : { ok: false, reason: "refused", error: "disabled or approval no longer matches" } });
+    expect((await m.ensure("recon")).ok).toBe(true);
+    const pid = m.list()[0].pid!;
+    m.openSocket("recon");
+    enabled = false;
+    if (mode === "request") expect(await m.ensure("recon")).toMatchObject({ ok: false, status: 404 });
+    else await m.sweepIdle();
+    expect(m.list()[0].state).toBe("stopped");
+    expect(isPidAlive(pid)).toBe(false);
+    expect(await m.ensure("recon")).toMatchObject({ ok: false, status: 404 });
   });
 
   it("answers 503 naming the log file when health never answers, and stops the process", async () => {
@@ -240,7 +271,7 @@ describe("SidecarManager", () => {
     const { m, asked } = manager("ok", { log: exited.log });
     const first = await m.ensure("recon");
     const pid = m.list()[0].pid!;
-    await fetch(`http://127.0.0.1:${(first as { port: number }).port}/die`).then((r) => r.text());
+    await fetch(`http://127.0.0.1:${(first as { port: number }).port}/die`, { headers: { "X-Ndx-Sidecar-Secret": m.secret("recon")! } }).then((r) => r.text());
     await exited.seen;
     expect(m.list()[0].state).toBe("stopped");
     expect(m.list()[0]).toMatchObject({ recentCrashes: 1, lastError: "exited with code 1" });
@@ -302,6 +333,18 @@ describe("SidecarManager", () => {
     const blind = new SidecarManager({ plan: null, memoryFloorBytes: 0, freeMemory: () => null });
     expect(await blind.ensure("recon")).toMatchObject({ ok: false, status: 503, error: expect.stringMatching(/without an n-dx CLI/) });
     expect(await blind.ensure("Not_A_Name")).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("cancels a pending launch when stopped before its plan resolves", async () => {
+    const gate = gatedPlan();
+    const { m } = manager("ok", { plan: gate.plan });
+    const starting = m.ensure("recon");
+    await gate.asked;
+    expect(await m.stop("recon")).toBe(true);
+    gate.release();
+    expect(await starting).toMatchObject({ ok: false, status: 404 });
+    expect(m.list()[0].pid).toBeNull();
+    expect(existsSync(planFor("recon").logFile)).toBe(false);
   });
 
   it("spawns nothing once stopAll has begun, including a start whose plan was in flight", async () => {
@@ -381,7 +424,7 @@ describe("hub /x/<name>/", () => {
     });
     hubs.push(hub);
 
-    const res = await fetch(`http://127.0.0.1:${hub.port}/x/recon/page?q=1`);
+    const res = await fetch(`http://127.0.0.1:${hub.port}/x/recon/page?q=1`, { headers: { "X-Ndx-Sidecar-Secret": "spoofed" } });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ path: "/page?q=1", name: "recon" });
     // The bare mount redirects to its trailing slash, so the app's relative links resolve under it.
@@ -389,7 +432,7 @@ describe("hub /x/<name>/", () => {
     expect(bare.status).toBe(308);
     expect(bare.headers.get("location")).toBe("/x/recon/?q=2");
     expect((await (await fetch(`http://127.0.0.1:${hub.port}/x/recon`)).json()).path).toBe("/");
-    expect(asked).toBe(1);
+    expect(asked).toBe(2);
 
     const bad = await fetch(`http://127.0.0.1:${hub.port}/x/Bad_Name/`);
     expect(bad.status).toBe(404);

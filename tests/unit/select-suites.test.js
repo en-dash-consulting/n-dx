@@ -149,8 +149,8 @@ describe("selectAffected", () => {
     }
   });
 
-  it("selects only web and the static subsets for a hub file that serves no extension", () => {
-    expect(select("packages/web/src/hub/registry.ts").suites).toEqual(["root-policy", "root-drift", "web"]);
+  it("selects the extension fixture for every hub source", () => {
+    expect(select("packages/web/src/hub/registry.ts").suites).toEqual(["root-policy", "root-drift", "root-extensions", "web"]);
   });
 
   // The three selections measured in the #546 review that went green at the
@@ -451,5 +451,16 @@ describe("parsePorcelainZ", () => {
 
   it("returns nothing for empty output", () => {
     expect(parsePorcelainZ("")).toEqual([]);
+  });
+});
+
+
+describe("the real Graview process boundaries", () => {
+  const manifests = [...MANIFESTS, pkg("graview"), pkg("graview-face")];
+  it.each(["packages/core/cli.js", "packages/core/extension-env.js", "packages/core/extensions-command.js", "packages/graview-face/package.json"])("selects the real CLI handoff for %s", (file) => {
+    expect(selectAffected([file], manifests).suites).toContain("graview");
+  });
+  it.each(["hub.ts", "home.ts", "routes.ts", "request-guard.ts", "exec-gateway.ts"])("selects the fixture for hub/%s", (file) => {
+    expect(selectAffected([`packages/web/src/hub/${file}`], manifests).suites).toContain("root-extensions");
   });
 });

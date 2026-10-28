@@ -334,6 +334,23 @@ describe("ndx config extensions.<name>", () => {
     expect(JSON.parse(run(["recon"], opts()))).toEqual(merged);
   });
 
+  it("coerces nullable strings, map values, array items and composed schemas", () => {
+    installConfigReader("recon", { properties: {
+      token: { type: ["string", "null"] },
+      env: { type: "object", additionalProperties: { type: "string" } },
+      ids: { type: "array", items: { type: "integer" } },
+      all: { allOf: [{ type: "string" }] },
+      any: { anyOf: [{ type: "string" }, { type: "null" }] },
+      one: { oneOf: [{ type: "string" }, { type: "boolean" }] },
+    } });
+    for (const [key, value] of [["token", "12345"], ["env.PORT", "8080"], ["ids", "1,2"], ["all", "123"], ["any", "456"], ["one", "true"]]) {
+      run(["config", `extensions.recon.${key}`, value], opts());
+    }
+    const expected = { token: "12345", env: { PORT: "8080" }, ids: [1, 2], all: "123", any: "456", one: "true" };
+    expect(readJson(join(root, ".n-dx.json")).extensions.recon).toEqual(expected);
+    expect(JSON.parse(run(["recon"], opts()))).toEqual(expected);
+  });
+
   it("refuses a value the configSchema rejects, unless --force", () => {
     installConfigReader("recon", RECON_SCHEMA);
     const bad = runResult(["config", "extensions.recon.mode", "slow"], opts());

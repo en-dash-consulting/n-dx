@@ -471,14 +471,29 @@ describe("the fixture extension behind the hub", { timeout: 180_000 }, () => {
     expect(unknown.status).toBe(404);
     expect(JSON.parse(unknown.text).error).toMatch(/ghost/);
 
-    await hubRequest(port, "/api/hub/extensions/fixture/stop", { method: "POST", headers: auth() });
+    const runningPid = (await echo()).pid;
     ndxOk(["extensions", "disable", "fixture"]);
+    expect(await waitForPidExit(runningPid, 15_000)).toBe(true);
     try {
       const disabled = await get("/x/fixture/");
       expect(disabled.status).toBe(404);
       expect(JSON.parse(disabled.text).error).toMatch(/disabled/);
       expect((await fixtureView(`?project=${PROJECT_ID}`)).links).toEqual([]);
       expect((await get("/hub")).text).not.toContain('href="/x/fixture/"');
+    } finally {
+      ndxOk(["extensions", "enable", "fixture", "--yes"]);
+    }
+  });
+
+  it("stops a removed user extension before purging or revealing another copy", async () => {
+    if (!canBindPorts) return;
+    ndxOk(["extensions", "add", extensionDir]);
+    ndxOk(["extensions", "enable", "fixture", "--yes"]);
+    const running = (await echo()).pid;
+    try {
+      ndxOk(["extensions", "remove", "fixture", "--purge"]);
+      expect(await waitForPidExit(running, 15_000)).toBe(true);
+      expect((await get("/x/fixture/")).status).toBe(404);
     } finally {
       ndxOk(["extensions", "enable", "fixture", "--yes"]);
     }
@@ -501,6 +516,32 @@ describe("the fixture extension behind the hub", { timeout: 180_000 }, () => {
     expect(out.env.NDX_HUB_URL).toContain(String(port));
     expect(out.env.NDX_TOKEN_FILE).toBe(join(home, "auth.token"));
     expect(JSON.stringify(out)).not.toContain(token);
+  });
+
+  it("revokes a running sidecar when its manifest version changes", async () => {
+    if (!canBindPorts) return;
+    const runningPid = (await echo()).pid;
+    const path = join(extensionDir, "package.json");
+    const pkg = readJson(path);
+    writeJson(path, { ...pkg, version: "1.0.1" });
+    try {
+      expect((await get("/x/fixture/")).status).toBe(404);
+      expect(await waitForPidExit(runningPid, 15_000)).toBe(true);
+    } finally {
+      writeJson(path, pkg);
+      ndxOk(["extensions", "enable", "fixture", "--yes"]);
+    }
+  });
+
+  it("exits its sidecar after an abrupt hub death and restarts without an orphan", async () => {
+    if (!canBindPorts) return;
+    const sidecar = (await echo()).pid;
+    const hubPid = readJson(join(home, "hub.pid")).pid;
+    process.kill(hubPid, "SIGKILL");
+    expect(await waitForPidExit(hubPid, 15_000)).toBe(true);
+    expect(await waitForPidExit(sidecar, 15_000)).toBe(true);
+    ndxOk(["start", "--hub", `--port=${port}`, repo], { cwd: repo });
+    expect((await echo()).pid).not.toBe(sidecar);
   });
 
   it("ndx hub stop stops the sidecar with the hub", async () => {

@@ -36,6 +36,7 @@ import {
   stateKey,
   updateExtensionsFile,
 } from "./extension-state.js";
+import { stopExtensionSidecar } from "./extension-env.js";
 import { spawnCli } from "./win-spawn.js";
 
 /** Subcommands, in the order help lists them. */
@@ -351,6 +352,7 @@ async function add(ctx, spec) {
     const { state, reason } = stateOf(d, ext, ctx.ndxVersion);
     ctx.out(`Added ${ext.packageName}@${ext.version ?? "?"} as '${label}' (${state}${reason ? `: ${reason}` : ""}).`);
     if (ext.source !== "user") ctx.out(`Note: the ${ext.source} copy at ${ext.dir} takes precedence over it.`);
+    if (state !== "enabled") await stopExtensionSidecar(d.home, ext.name);
     if (state === "unapproved") ctx.out(`Approve it with 'ndx extensions enable ${label}'.`);
     else if (state !== "enabled") ctx.out("Run 'ndx extensions doctor' to see what to fix.");
   }
@@ -387,6 +389,7 @@ async function remove(ctx, name, purge) {
     return 1;
   }
   // The user copy won over another copy, which takes over now that it is gone.
+  if (ext?.source === "user") await stopExtensionSidecar(d.home, ext.name);
   const successor = ext?.source === "user" ? ext.shadowed.find((s) => s.source !== "user") : undefined;
   if (!ext || ext.source === "user") {
     updateExtensionsFile(d.home, (file) => {
@@ -487,6 +490,7 @@ async function enable(ctx, name, yes) {
       }
     }
   }
+  if (approve) await stopExtensionSidecar(d.home, ext.name);
   updateExtensionsFile(d.home, (file) => {
     if (wasDisabled) setDisabled(file, label, false);
     if (approve) recordApproval(file, ext, { projectDir: d.projectDir });
@@ -499,12 +503,13 @@ async function enable(ctx, name, yes) {
  * @param {Context} ctx
  * @param {string | undefined} name
  */
-function disable(ctx, name) {
+async function disable(ctx, name) {
   const d = ctx.discover(undefined);
   const ext = name === undefined ? undefined : find(d, name);
   if (!ext) return notFound(ctx, "disable", name);
   const label = stateKey(ext);
   updateExtensionsFile(d.home, (file) => setDisabled(file, label, true));
+  await stopExtensionSidecar(d.home, ext.name);
   ctx.out(`Disabled '${label}'. Its approval, config and state folder are kept; 'ndx extensions enable ${label}' turns it back on.`);
   return 0;
 }
@@ -544,7 +549,9 @@ export function doctorProblems(d, ndxVersion) {
   for (const error of d.errors) lines.push(`${error.path}: ${error.message} — fix: ${discoveryErrorFix(error, d.home)}`);
 
   const folder = userFolder(d.home);
-  for (const packageName of listedPackages(folder).keys()) {
+  let listed = new Map();
+  try { listed = listedPackages(folder); } catch { /* Discovery already reports the unreadable listing. */ }
+  for (const packageName of listed.keys()) {
     if (!nodeFs.existsSync(join(folder, "node_modules", ...packageName.split("/"), "package.json"))) {
       lines.push(`${packageName}: listed in ${join(folder, "package.json")} but not installed — fix: run 'ndx extensions add ${packageName}', or 'ndx extensions remove ${packageName}'`);
     }
@@ -583,6 +590,7 @@ export function doctorProblems(d, ndxVersion) {
  */
 function discoveryErrorFix(error, home) {
   if (error.path === join(home, EXTENSIONS_CACHE_FILE)) return `fix or delete ${error.path}; deleting it forgets every extension approval`;
+  if (error.path === join(home, USER_EXTENSIONS_DIRNAME, "package.json")) return `correct the JSON in ${error.path}, then run ndx extensions doctor`;
   if (error.path === join(home, "config.json")) return `correct extensions.paths in ${error.path}`;
   return `remove the path from extensions.paths in ${join(home, "config.json")}, or give its package.json an ndx.extension block`;
 }

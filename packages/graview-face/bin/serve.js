@@ -21,7 +21,7 @@ if (args.includes("--help") || args.includes("-h")) {
   Serves n-dx's face on Graview at the root, on --port, else PORT, else 5188.
   Under \`ndx graview serve .\` the projection and the rex endpoint arrive in
   the environment; by hand it serves public/data (see \`pnpm sync\`), read-only.
-  Started by the hub (PORT with NDX_EXTENSION_NAME), it serves under /x/<name>/.`);
+  Started by the hub, /x/<name>/ explains how to open a project with ndx graview serve.`);
   process.exit(0);
 }
 
@@ -42,8 +42,30 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 const hubbed = portFlag === -1 && Boolean(process.env.PORT) && Boolean(process.env.NDX_EXTENSION_NAME);
 const base = hubbed ? `/x/${process.env.NDX_EXTENSION_NAME}/` : "/";
 
-// Vite is loaded only once the arguments say we are serving: `--help` answers without it.
-const { createServer } = await import("vite");
-const server = await createServer({ root, base, configFile: resolve(root, "vite.config.ts"), server: { port, strictPort: true, host: hubbed ? "127.0.0.1" : "localhost" } });
-await server.listen();
-server.printUrls();
+// A hub launch has no project binding. Give a useful instruction page instead
+// of starting a face against missing or stale public/data from a checkout.
+if (hubbed) {
+  const secret = process.env.NDX_SIDECAR_SECRET;
+  if (!secret) throw new Error("The hub must provide NDX_SIDECAR_SECRET");
+  process.stdin.resume();
+  process.stdin.on("end", () => process.exit(0));
+}
+if (hubbed && !process.env.NDX_GRAVIEW_DIR) {
+  const { createServer } = await import("node:http");
+  createServer((req, res) => {
+    if (req.headers["x-ndx-sidecar-secret"] !== process.env.NDX_SIDECAR_SECRET) {
+      res.writeHead(403).end("Forbidden");
+      return;
+    }
+    if (req.url === "/" || req.url === base) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end("<!doctype html><title>Open a project on Graview</title><h1>Open a project on Graview</h1><p>Run <code>ndx graview serve &lt;project-directory&gt;</code> to view that project's current data. This hub mount has no project selected.</p>");
+    } else res.writeHead(404).end("No project selected. Run ndx graview serve <project-directory>.");
+  }).listen(port, "127.0.0.1", () => console.log(`http://127.0.0.1:${port}${base}`));
+} else {
+  // --help and a projectless hub mount need no Vite dependency at runtime.
+  const { createServer } = await import("vite");
+  const server = await createServer({ root, base, configFile: resolve(root, "vite.config.ts"), server: { port, strictPort: true, host: hubbed ? "127.0.0.1" : "localhost" } });
+  await server.listen();
+  server.printUrls();
+}

@@ -57,7 +57,7 @@ export const EXTENSIONS_CACHE_FILE = "extensions.json";
 export const USER_EXTENSIONS_DIRNAME = "extensions";
 
 /** Bumped when the shape of a cached source entry changes; older entries are recomputed. */
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 
 /** Most project sources the cache keeps; older ones are rescanned when next used. */
 export const MAX_PROJECT_ENTRIES = 20;
@@ -127,7 +127,7 @@ const DEPENDENCY_FIELDS = ["dependencies", "devDependencies", "optionalDependenc
 /**
  * The file-system calls discovery makes; injectable so tests can count them.
  *
- * @typedef {Pick<typeof nodeFs, "statSync" | "readFileSync" | "readdirSync" | "writeFileSync" | "renameSync" | "mkdirSync" | "rmSync">} DiscoveryFs
+ * @typedef {Pick<typeof nodeFs, "statSync" | "lstatSync" | "readFileSync" | "readdirSync" | "writeFileSync" | "renameSync" | "mkdirSync" | "rmSync">} DiscoveryFs
  */
 
 /**
@@ -232,7 +232,7 @@ export function findGlobalRoot(coreDir = dirname(fileURLToPath(import.meta.url))
   if (root === null) return null;
   if (!fs.statSync(join(dirname(root), "package.json"), { throwIfNoEntry: false })) return root;
   const found = root;
-  return knownGlobalDirs(env, home, platform).some((dir) => isInside(dir, found) || isInside(realPath(fs, dir), found)) ? root : null;
+  return knownGlobalDirs(env, home, platform).some((dir) => isInside(dir, found) || isInside(realPath(fs, dir), realPath(fs, found))) ? root : null;
 }
 
 /**
@@ -338,7 +338,9 @@ function listedScan(dir) {
       const packages = [];
       for (const name of names) {
         if (name.startsWith("@")) watched.add(join(modules, name.split("/")[0]));
-        const pkg = readPackage(fs, join(modules, ...name.split("/")), null);
+        const path = join(modules, ...name.split("/"));
+        if (fs.lstatSync(path, { throwIfNoEntry: false })?.isSymbolicLink()) watched.add(join(path, "package.json"));
+        const pkg = readPackage(fs, path, null);
         if (pkg) packages.push(pkg);
       }
       for (const pkg of packages) watched.add(join(pkg.dir, "package.json"));
@@ -366,6 +368,7 @@ function globalScan(dir) {
         const children = entry.startsWith("@") ? listDir(fs, path).map((child) => join(path, child)) : [path];
         if (entry.startsWith("@")) watched.add(path);
         for (const child of children) {
+          if (fs.lstatSync(child, { throwIfNoEntry: false })?.isSymbolicLink()) watched.add(join(child, "package.json"));
           const pkg = readPackage(fs, child, null);
           if (pkg) packages.push(pkg);
         }

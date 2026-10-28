@@ -334,7 +334,7 @@ describe("cache", () => {
 
     const file = JSON.parse(readFileSync(join(home, EXTENSIONS_CACHE_FILE), "utf8"));
     expect(file.approvals).toEqual({ a: { hash: "h" } });
-    expect(file.discovery.version).toBe(1);
+    expect(file.discovery.version).toBe(2);
   });
 
   it("keeps a disable, approval and removal written while discovery was scanning", () => {
@@ -640,3 +640,20 @@ function bumpMtime(path) {
   const later = new Date(Date.now() + 5_000);
   utimesSync(path, later, later);
 }
+
+
+describe("a linked dependency becoming an extension", () => {
+  it.each(["project", "user", "global"])("invalidates a warm %s cache when the linked manifest gains a block", (source) => {
+    const linked = join(root, "linked-checkout");
+    writeJson(join(linked, "package.json"), { name: "ndx-linked", version: "1.0.0" });
+    const folder = source === "project" ? project : userFolder();
+    const modules = source === "global" ? globalRoot : join(folder, "node_modules");
+    mkdirSync(modules, { recursive: true });
+    if (source !== "global") writeJson(join(folder, "package.json"), { dependencies: { "ndx-linked": "file:../linked-checkout" } });
+    symlinkSync(linked, join(modules, "ndx-linked"), "junction");
+    expect(discover().extensions).toEqual([]);
+    writeJson(join(linked, "package.json"), manifest("ndx-linked", "linked"));
+    bumpMtime(join(linked, "package.json"));
+    expect(discover().extensions).toMatchObject([{ name: "linked", source }]);
+  });
+});

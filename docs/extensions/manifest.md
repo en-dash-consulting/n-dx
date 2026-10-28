@@ -65,6 +65,6 @@ Discovery is cached in `<ndx home>/extensions.json`. It is recomputed when a sou
 | `enable <name> [--yes]` | Approves (asks first, unless `--yes`) and clears `disable` |
 | `disable <name>` | Hides the commands, card and links. Keeps the approval, config and state folder |
 | `info <name> [--json]` | The manifest, its source, and any shadowed copies |
-| `doctor [name]` | Checks every manifest, range, bin path and name clash. Prints one line per problem with its fix, and exits 1 on any problem |
+| `doctor [dir]` | Checks every manifest, range, bin path and name clash. Prints one line per problem with its fix, and exits 1 on any problem |
 
 A state is one of `enabled`, `disabled`, `unapproved`, `incompatible`, `invalid` or `conflict`. Only `enabled` runs.

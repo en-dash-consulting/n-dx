@@ -1118,6 +1118,8 @@ export interface SpawnToolOptions {
    * - `"pipe"` — capture stdout and stderr; return them in the result.
    */
   stdio?: "inherit" | "pipe";
+  /** Managed children only: keep a stdin pipe open as a parent-lifetime channel. */
+  keepStdinOpen?: boolean;
   /**
    * When true, spawn the process detached and un-ref it so the parent
    * can exit without waiting. Implies `stdio: "ignore"` (overrides
@@ -1323,7 +1325,7 @@ export function spawnManaged(
     child = spawn(cmd, args, {
       cwd,
       env,
-      stdio: logFd !== undefined ? ["ignore", logFd, logFd] : stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+      stdio: logFd !== undefined ? [opts.keepStdinOpen ? "pipe" : "ignore", logFd, logFd] : stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
       windowsHide: opts.windowsHide ?? true,
     });
   } finally {

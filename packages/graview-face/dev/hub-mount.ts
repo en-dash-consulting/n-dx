@@ -24,12 +24,19 @@ export function hubMount(): Plugin {
     configureServer(server) {
       const base = server.config.base;
       if (base === "/") return;
+      const secret = process.env["NDX_SIDECAR_SECRET"];
+      if (!secret) throw new Error("The hub must provide NDX_SIDECAR_SECRET");
+      const admitted = (req: IncomingMessage) => req.headers["x-ndx-sidecar-secret"] === secret;
       const restore = (req: IncomingMessage) => {
         req.url = underMount(base, req.url ?? "/");
       };
       // Before Vite's own listener, which matches the HMR socket's path against the base.
-      server.httpServer?.prependListener("upgrade", restore);
-      server.middlewares.use((req, _res, next) => {
+      server.httpServer?.prependListener("upgrade", (req, socket) => {
+        if (!admitted(req)) { socket.destroy(); return; }
+        restore(req);
+      });
+      server.middlewares.use((req, res, next) => {
+        if (!admitted(req)) { res.writeHead(403).end("Forbidden"); return; }
         restore(req);
         next();
       });

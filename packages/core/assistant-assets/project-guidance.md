@@ -113,8 +113,6 @@ with any write command, or two `ndx config` runs. The full table is in
 
 **General rule:** Commands that write to the PRD backend (`product/` and `changes/` under the resolved rex directory on v2, `prd_tree/` on v1), sourcevision output, or hench config must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
-**MCP write operations** write PRD intent and state only under those layout-specific roots. Configuration and execution logs are separate from the PRD backend.
-
 **Lock scope.** V2 writes use `withPrdModelTransaction`; store consumers use
 `store.withTransaction`. The PRD lock covers read-modify-write and a refused
 writer names its holder. It is per workspace (`rexDir`), so it does not
@@ -188,8 +186,6 @@ Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx star
 **Migrating from stdio to HTTP (Claude):** register with the hub (`ndx start .`), read the project id from the URL it prints (or `ndx hub status`), remove the stdio registrations (`claude mcp remove rex && claude mcp remove sourcevision`), then add the HTTP ones (`claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex`, same for sourcevision).
 
 ### Rex MCP tools
-
-Rex mutations use the layout-specific PRD roots described by the PRD invariant.
 
 - `get_prd_status` — PRD title and layout-specific progress; on v2, changes, Inbox and product status
 - `get_next_task` — next actionable task based on priority and dependencies (skips tasks another worktree has claimed)
