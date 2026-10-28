@@ -161,6 +161,15 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     stability: "experimental",
     defaultValue: false,
   },
+  {
+    key: "hench.runVerdict",
+    label: "Run verdict banner",
+    description: "Show a verdict banner on a task's detail panel when its latest run did not complete: why it failed, the first thing to do next, and which attempt it was.",
+    impact: "Read-only. The verdict comes from fixed rules over the run record (hench runs diagnose), with no model call.",
+    package: "hench",
+    stability: "experimental",
+    defaultValue: false,
+  },
   // ── Git ───────────────────────────────────────────────────────────
   {
     key: FAIL_FORWARD_FEATURE,

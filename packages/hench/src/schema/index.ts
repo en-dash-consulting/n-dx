@@ -14,6 +14,7 @@ export {
   DEFAULT_REVIEW_ROUNDS,
   MIN_REVIEW_ROUNDS,
   MAX_REVIEW_ROUNDS,
+  RUN_VERDICT_CLASSES,
 } from "./v1.js";
 
 export type {
@@ -60,6 +61,10 @@ export type {
   RunCommitItemMismatch,
   RunCompletionHold,
   RunGateOnlyRetry,
+  RunDiagnosis,
+  RunVerdictClass,
+  RunVerdictAction,
+  RunVerdictActionKind,
   RunSessionRecord,
   TaskBrief,
   TaskBriefChangeSection,

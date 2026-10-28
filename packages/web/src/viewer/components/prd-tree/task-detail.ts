@@ -18,7 +18,8 @@ import { CopyLinkButton } from "../copy-link-button.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
 import { type ItemType, canAddChildType, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
-import { useIndexMd } from "../../hooks/index.js";
+import { useFeatureToggle, useIndexMd } from "../../hooks/index.js";
+import { RUN_VERDICT_FEATURE, RunVerdictBanner, type RunVerdict } from "./run-verdict-banner.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
 import { CriteriaEditor } from "./criteria-editor.js";
 import { ChangePlacementSection, takeTitleFocus } from "./change-placement.js";
@@ -945,6 +946,7 @@ interface RunEntry {
     cacheCreationInput?: number;
     cacheReadInput?: number;
   };
+  diagnosis?: RunVerdict;
 }
 
 function runTotalTokens(r: RunEntry): number {
@@ -991,6 +993,7 @@ function HenchRunsList({
   const [runs, setRuns] = useState<RunEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const verdictEnabled = useFeatureToggle(RUN_VERDICT_FEATURE, false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1027,6 +1030,7 @@ function HenchRunsList({
     "div",
     { class: "task-section task-runs-section" },
     h("div", { class: "task-section-label" }, `Hench Runs (${runs.length})`),
+    h(RunVerdictBanner, { runs, enabled: verdictEnabled }),
     h(
       "div",
       { class: "task-runs-list" },

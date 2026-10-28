@@ -516,6 +516,18 @@ export const RunRecordSchema = z.object({
   gateOnlyRetry: z
     .object({ sourceRunId: z.string(), base: z.string(), commits: z.array(RunCommitRecordSchema) })
     .optional(),
+  // Passthrough with a bare-string class: a verdict written by a build that
+  // knows a tenth class must not cost the whole run.
+  diagnosis: z
+    .object({
+      class: z.string(),
+      summary: z.string(),
+      evidence: z.array(z.string()),
+      actions: z.array(z.object({ kind: z.string(), label: z.string() }).passthrough()),
+      attempt: z.object({ n: z.number(), of: z.number() }),
+    })
+    .passthrough()
+    .optional(),
 });
 
 export function validateConfig(

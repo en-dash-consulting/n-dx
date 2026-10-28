@@ -350,6 +350,30 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     ],
     related: ["show", "status"],
   },
+  runs: {
+    tool: "hench",
+    command: "runs",
+    summary: "classify why a run did not complete and rank the next action",
+    usage: "hench runs diagnose <run-id> [options] [dir]",
+    description:
+      "Classifies a run that did not complete from its record, its events\n" +
+      "and its review report, with fixed rules and no model call. Classes:\n" +
+      "test-gate-new, test-gate-preexisting, completion-held, review-blocked,\n" +
+      "claim-lost, budget-timeout, vendor-transient, no-changes, unclassified.\n" +
+      "\n" +
+      "Prints the evidence the class rests on and the ranked next actions.\n" +
+      "On a task's second failed attempt it stops recommending a re-run and\n" +
+      "leads with a follow-up fix or a split. Read-only; the run-end path\n" +
+      "stores the same verdict on the record as `diagnosis`.",
+    options: [
+      { flag: "--format=json", description: "Output as JSON: runId, taskId, class, summary, evidence, actions, attempt" },
+    ],
+    examples: [
+      { command: "hench runs diagnose abc123", description: "Explain why a run failed" },
+      { command: "hench runs diagnose abc123 --format=json", description: "Machine-readable output" },
+    ],
+    related: ["show", "status"],
+  },
   config: {
     tool: "hench",
     command: "config",
@@ -584,6 +608,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   usage: ["record"],
   status: ["show", "run", "check-runs", "validate-tokens"],
   show: ["status"],
+  runs: ["show", "status"],
   config: ["template"],
   template: ["config"],
   cache: ["run", "config"],

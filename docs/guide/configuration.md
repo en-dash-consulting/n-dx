@@ -279,6 +279,7 @@ Experimental dashboard features are switched in the dashboard's Features setting
 | Key | What it does | Cost |
 |-----|--------------|------|
 | `rex.placementDraft` | Shows **Draft with the model** in an Inbox change's placement form | Each draft is one LLM call on the `prd.place` model class |
+| `hench.runVerdict` | Shows a verdict banner on a task's detail panel when its latest run did not complete: class, summary, first next action, attempt n of 2 | None: the verdict is the run record's `diagnosis`, from fixed rules (`hench runs diagnose`) |
 
 ```json
 { "features": { "rex.placementDraft": true } }

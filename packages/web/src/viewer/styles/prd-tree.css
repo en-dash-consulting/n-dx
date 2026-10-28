@@ -981,6 +981,23 @@
   padding-top: var(--space-2);
 }
 
+.task-run-verdict {
+  border-left: 3px solid var(--red);
+  padding-left: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.task-run-verdict-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.task-run-verdict-class { font-weight: 600; }
+.task-run-verdict-attempt { color: var(--text-dim); }
+.task-run-verdict-summary,
+.task-run-verdict-action { margin: var(--space-1) 0 0; }
+
 .task-runs-list {
   display: flex;
   flex-direction: column;

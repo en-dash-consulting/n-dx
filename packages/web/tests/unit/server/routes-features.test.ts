@@ -73,4 +73,10 @@ describe("GET /api/features", () => {
     expect((await put({ "rex.placementDraft": true })).status).toBe(200);
     expect(await read()).toMatchObject({ enabled: true });
   });
+
+  it("lists hench.runVerdict as an off-by-default experimental hench toggle", async () => {
+    const body = await (await fetch(`${server.baseUrl}/api/features`)).json() as { toggles: Array<Record<string, unknown>> };
+    expect(body.toggles.find((t) => t.key === "hench.runVerdict"))
+      .toMatchObject({ package: "hench", stability: "experimental", defaultValue: false, enabled: false });
+  });
 });

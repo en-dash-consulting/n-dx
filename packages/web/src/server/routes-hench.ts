@@ -226,11 +226,47 @@ interface RunSummary {
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
   /**
+   * The run classifier's verdict, copied from the run file as hench wrote it
+   * (`RunRecord.diagnosis`). Absent on completed runs and older records.
+   * Read from the file like every other field here: web never imports hench.
+   */
+  diagnosis?: RunDiagnosisSummary;
+  /**
    * The worktree whose `.hench/runs/` this run was read from. Present only
    * for `?scope=repo` responses; the default (served-directory) listing is
    * unchanged and carries no worktree field.
    */
   worktree?: RunWorktree;
+}
+
+/** The verdict fields the dashboard shows. Mirrors hench's `RunDiagnosis`. */
+interface RunDiagnosisSummary {
+  class: string;
+  summary: string;
+  evidence: string[];
+  actions: Array<{ kind: string; label: string }>;
+  attempt: { n: number; of: number };
+}
+
+/** The run file's `diagnosis`, when it has the shape hench writes; otherwise absent. */
+function readDiagnosis(value: unknown): RunDiagnosisSummary | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const d = value as Record<string, unknown>;
+  const attempt = d.attempt as Record<string, unknown> | undefined;
+  if (typeof d.class !== "string" || typeof d.summary !== "string" || !Array.isArray(d.actions)
+    || typeof attempt?.n !== "number" || typeof attempt?.of !== "number") {
+    return undefined;
+  }
+  return {
+    class: d.class,
+    summary: d.summary,
+    evidence: Array.isArray(d.evidence) ? d.evidence.filter((e): e is string => typeof e === "string") : [],
+    actions: d.actions
+      .filter((a): a is { kind: string; label: string } =>
+        !!a && typeof (a as { kind?: unknown }).kind === "string" && typeof (a as { label?: unknown }).label === "string")
+      .map((a) => ({ kind: a.kind, label: a.label })),
+    attempt: { n: attempt.n, of: attempt.of },
+  };
 }
 
 /** Where a run file lives, for a dashboard serving one worktree of a repository. */
@@ -335,6 +371,7 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
     vendor: diagnostics?.vendor as string | undefined,
     tokenDiagnosticStatus: diagnostics?.tokenDiagnosticStatus as RunSummary["tokenDiagnosticStatus"],
     invocationContext: run.invocationContext as RunSummary["invocationContext"],
+    diagnosis: readDiagnosis(run.diagnosis),
   };
 }
 
