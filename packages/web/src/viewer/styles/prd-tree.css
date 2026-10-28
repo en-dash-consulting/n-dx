@@ -1668,6 +1668,7 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+  font-size: var(--font-base);
 }
 
 .cp-note {
@@ -1698,6 +1699,7 @@
 }
 
 .cp-relation {
+  font-size: var(--font-base);
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
@@ -1709,6 +1711,7 @@
 }
 
 .cp-target {
+  font-size: var(--font-base);
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
