@@ -77,9 +77,17 @@ Single writer per file. Hench and web read `.rex/` files but modify PRD state by
 |-------------|-------|-------|
 | `start` + `status` | Yes | Status is read-only |
 | `start` + `work` | Yes | Different write targets |
-| `start` + `plan` | Warning | Plan writes `.rex/prd.json`; restart server after |
-| `ci` + `work` | No | Both write `.sourcevision/` and `.rex/prd.json` |
-| `plan` + `work` | No | Both write `.rex/prd.json` |
+| `start` + `plan` | Warning | Plan writes PRD roots; restart server to flush in-process caches |
+| `ci` + `work` | No | Both write analysis and PRD roots |
+| `plan` + `work` | No | Both write PRD roots |
+| `refresh` + any writer | No | Refresh can rewrite analysis and PRD state |
+| `config` + `config` | No | Both merge shared config files |
 | `sv pack add\|remove` + another `sv pack add\|remove` | No | Both write the per-user pack directory, shared by every worktree and project on one ndx home; the second fails naming the holder's PID |
 
-**General rule:** Commands that write to `.rex/prd.json`, `.sourcevision/`, or `.hench/config.json` must not run concurrently.
+**General rule:** Commands that write to PRD roots, analysis output, or hench
+config must not run concurrently. On v2 the PRD roots are `product/` and
+`changes/` under the resolved rex directory (`.ndx/rex/` or legacy `.rex/`);
+on v1 it is `prd_tree/`. A PRD lock is per workspace, so separate worktrees
+can each write their own tree. A lock around a save alone cannot repair a
+stale snapshot. See [PRD write concurrency](./prd-write-concurrency) and the
+[public contract and merge requirements](./public-surface).
