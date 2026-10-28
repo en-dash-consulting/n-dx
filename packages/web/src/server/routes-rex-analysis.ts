@@ -23,12 +23,17 @@ import type { AsyncJobStatus } from "./routes-commands.js";
 
 import {
   type PRDItem,
+  type PRDStore,
+  type ProposedWork,
   isPriority,
   resolveStore,
   collectAllIds,
   cascadeParentReset,
   prdLayout,
   loadPrdModel,
+  isChangeLayerStore,
+  changeInputsFromProposals,
+  addProposedChanges,
 } from "./rex-gateway.js";
 import type { V2Tree } from "./rex-gateway.js";
 import { completePreviewPlacement } from "./routes-rex/placement.js";
@@ -187,6 +192,10 @@ function resolveParentId(ctx: ServerContext, requested: unknown): string | null 
 /** Edited proposal shape sent from the proposal editor. */
 interface EditedProposalTask {
   title: string;
+  /** The proposal's own source, carried through unedited; absent from older editors. */
+  source?: string;
+  /** The proposal's LoE decomposition, carried through unedited. */
+  decomposition?: ProposalDecomposition;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: string;
@@ -219,8 +228,22 @@ function pickLoEFields(task: ProposalLoEFields): Partial<PRDItem> {
   return out;
 }
 
+/** An oversized proposal task's breakdown: its proposed subtasks. */
+interface ProposalDecomposition {
+  children: Array<{
+    title: string;
+    source?: string;
+    description?: string;
+    acceptanceCriteria?: string[];
+    priority?: string;
+    tags?: string[];
+    status?: string;
+  }>;
+}
+
 interface EditedProposalFeature {
   title: string;
+  source?: string;
   description?: string;
   /** If set, nest tasks under this existing feature instead of creating a new one. */
   existingId?: string;
@@ -229,7 +252,7 @@ interface EditedProposalFeature {
 }
 
 interface EditedProposal {
-  epic: { title: string; description?: string; existingId?: string };
+  epic: { title: string; source?: string; description?: string; existingId?: string };
   features: EditedProposalFeature[];
   selected: boolean;
 }
@@ -744,6 +767,85 @@ function handleGetProposals(
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Accepting proposals on a v2 tree
+// ---------------------------------------------------------------------------
+
+/** A proposed task as either accept route reads it. */
+interface ProposalTaskFields {
+  title: string;
+  source?: string;
+  description?: string;
+  acceptanceCriteria?: string[];
+  priority?: string;
+  tags?: string[];
+  status?: string;
+  decomposition?: ProposalDecomposition;
+}
+
+/** A proposal task as rex's mapper reads it, its decomposition as proposed subtasks. */
+function proposedTask(t: ProposalTaskFields, source?: string): ProposedWork {
+  const subtasks = t.decomposition?.children?.map((c) => proposedTask(c, c.source ?? source));
+  return {
+    title: t.title,
+    ...(t.description ? { description: t.description } : {}),
+    ...(t.acceptanceCriteria?.length ? { acceptanceCriteria: t.acceptanceCriteria } : {}),
+    ...(t.priority && isPriority(t.priority) ? { priority: t.priority } : {}),
+    ...(t.tags?.length ? { tags: t.tags } : {}),
+    ...(t.status ? { status: t.status } : {}),
+    ...((t.source ?? source) ? { source: t.source ?? source } : {}),
+    ...(subtasks?.length ? { subtasks } : {}),
+  };
+}
+
+/** What a v2 accept created: the changes, the tasks under them, and the baseline it skipped. */
+interface V2AcceptOutcome {
+  changeCount: number;
+  taskCount: number;
+  /** Proposals describing code that already exists: on v2 that is the product layer, not a change. */
+  skippedCount: number;
+}
+
+/**
+ * Accept proposals into a v2 tree the way `rex analyze --accept` does.
+ *
+ * rex's own mapping makes one Inbox change per proposed leaf — the epic and
+ * feature above it are containers the change layer has none of — with its
+ * criteria, tags, priority and source, and the leaf's proposed subtasks as
+ * tasks under it. The adds run in one model transaction, so rex's add rule
+ * refusing any of them writes none.
+ */
+async function acceptAsChanges(
+  ctx: ServerContext,
+  store: PRDStore,
+  work: ProposedWork[],
+): Promise<V2AcceptOutcome> {
+  const inputs = changeInputsFromProposals(work);
+  const taskCount = inputs.reduce((n, input) => n + (input.tasks?.length ?? 0), 0);
+  const skippedCount = countLeaves(work) - inputs.length;
+  if (inputs.length > 0 && isChangeLayerStore(store)) {
+    await store.withModelTransaction((model) => {
+      const out = addProposedChanges(model.tree, inputs, { now: new Date() });
+      return { tree: out.tree, result: out.nodes };
+    });
+    refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  }
+  return { changeCount: inputs.length, taskCount, skippedCount };
+}
+
+/** Every leaf of `work`, closed ones included — the denominator for what was skipped. */
+function countLeaves(work: readonly ProposedWork[]): number {
+  return work.reduce((n, node) => n + (node.children?.length ? countLeaves(node.children) : 1), 0);
+}
+
+/** The log line and response fields of a v2 accept. */
+function v2AcceptSummary(outcome: V2AcceptOutcome): string {
+  const { changeCount, taskCount, skippedCount } = outcome;
+  return `${changeCount} change${changeCount === 1 ? "" : "s"} to the Inbox` +
+    (taskCount ? `, ${taskCount} proposed subtask${taskCount === 1 ? "" : "s"} as their tasks` : "") +
+    (skippedCount ? `; ${skippedCount} describing existing code not created` : "");
+}
+
 /** Handle POST /api/rex/proposals/accept — accept pending proposals */
 async function handleAcceptProposals(
   req: IncomingMessage,
@@ -772,11 +874,12 @@ async function handleAcceptProposals(
 
     const raw = readFileSync(pendingPath, "utf-8");
     const allProposals = JSON.parse(raw) as Array<{
-      epic: { title: string; source: string; description?: string };
+      epic: { title: string; source: string; description?: string; status?: string };
       features: Array<{
         title: string;
         source: string;
         description?: string;
+        status?: string;
         tasks: Array<{
           title: string;
           source: string;
@@ -785,9 +888,11 @@ async function handleAcceptProposals(
           acceptanceCriteria?: string[];
           priority?: string;
           tags?: string[];
+          status?: string;
           loe?: number;
           loeRationale?: string;
           loeConfidence?: string;
+          decomposition?: ProposalDecomposition;
         }>;
       }>;
     }>;
@@ -808,48 +913,63 @@ async function handleAcceptProposals(
     const store = await resolveStore(ctx.rexDir);
     let addedCount = 0;
 
-    for (const p of toAccept) {
-      const epicId = randomUUID();
-      const epicItem: PRDItem = {
-        id: epicId,
+    if (isChangeLayerStore(store)) {
+      const outcome = await acceptAsChanges(ctx, store, toAccept.map((p) => ({
         title: p.epic.title,
-        level: "epic",
-        status: "pending",
         source: p.epic.source,
-      };
-      if (p.epic.description) epicItem.description = p.epic.description;
-      await store.addItem(epicItem);
-      addedCount++;
-
-      for (const f of p.features) {
-        const featureId = randomUUID();
-        const featureItem: PRDItem = {
-          id: featureId,
+        status: p.epic.status,
+        children: p.features.map((f) => ({
           title: f.title,
-          level: "feature",
-          status: "pending",
           source: f.source,
+          status: f.status,
+          children: f.tasks.map((t) => proposedTask(t)),
+        })),
+      })));
+      addedCount = outcome.changeCount + outcome.taskCount;
+    } else {
+      for (const p of toAccept) {
+        const epicId = randomUUID();
+        const epicItem: PRDItem = {
+          id: epicId,
+          title: p.epic.title,
+          level: "epic",
+          status: "pending",
+          source: p.epic.source,
         };
-        if (f.description) featureItem.description = f.description;
-        await store.addItem(featureItem, epicId);
+        if (p.epic.description) epicItem.description = p.epic.description;
+        await store.addItem(epicItem);
         addedCount++;
 
-        for (const t of f.tasks) {
-          const taskId = randomUUID();
-          const taskItem: PRDItem = {
-            id: taskId,
-            title: t.title,
-            level: "task",
+        for (const f of p.features) {
+          const featureId = randomUUID();
+          const featureItem: PRDItem = {
+            id: featureId,
+            title: f.title,
+            level: "feature",
             status: "pending",
-            source: t.source,
+            source: f.source,
           };
-          if (t.description) taskItem.description = t.description;
-          if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
-          if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
-          if (t.tags) taskItem.tags = t.tags;
-          Object.assign(taskItem, pickLoEFields(t));
-          await store.addItem(taskItem, featureId);
+          if (f.description) featureItem.description = f.description;
+          await store.addItem(featureItem, epicId);
           addedCount++;
+
+          for (const t of f.tasks) {
+            const taskId = randomUUID();
+            const taskItem: PRDItem = {
+              id: taskId,
+              title: t.title,
+              level: "task",
+              status: "pending",
+              source: t.source,
+            };
+            if (t.description) taskItem.description = t.description;
+            if (t.acceptanceCriteria) taskItem.acceptanceCriteria = t.acceptanceCriteria;
+            if (t.priority && isPriority(t.priority)) taskItem.priority = t.priority;
+            if (t.tags) taskItem.tags = t.tags;
+            Object.assign(taskItem, pickLoEFields(t));
+            await store.addItem(taskItem, featureId);
+            addedCount++;
+          }
         }
       }
     }
@@ -933,6 +1053,9 @@ async function handleAcceptEditedProposals(
     // `existingId` on epic/feature so smart-placement nests under the
     // matched container instead of creating a duplicate.
     const store = await resolveStore(ctx.rexDir);
+    if (isChangeLayerStore(store)) {
+      return await acceptEditedAsChanges(res, ctx, store, input.proposals, broadcast);
+    }
     const knownIds = new Set(collectAllIds((await store.loadDocument()).items));
     // Parents whose status may need reverting from `completed` to `pending`
     // after we nest a new task underneath them. Deduped so we only cascade
@@ -1054,6 +1177,64 @@ async function handleAcceptEditedProposals(
   } catch (err) {
     errorResponse(res, 400, errorMessage(err));
   }
+  return true;
+}
+
+/**
+ * accept-edited on a v2 tree: the selected proposals as Inbox changes.
+ *
+ * `existingId` names a v1 epic or feature to nest under; the change layer has
+ * no containers, so it means nothing here and is ignored. The proposal's own
+ * source is kept when the editor sent it; an editor that did not falls back
+ * to the v1 path's `web-proposal-editor`.
+ */
+async function acceptEditedAsChanges(
+  res: ServerResponse,
+  ctx: ServerContext,
+  store: PRDStore,
+  proposals: EditedProposal[],
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  const selected = proposals.filter((p) => p.selected);
+  const work: ProposedWork[] = selected.map((p) => ({
+    title: p.epic.title.trim(),
+    children: p.features.filter((f) => f.selected).map((f) => ({
+      title: f.title.trim(),
+      children: f.tasks.filter((t) => t.selected).map((t) => proposedTask({
+        ...t,
+        title: t.title.trim(),
+        description: t.description?.trim() || undefined,
+      }, t.source ?? f.source ?? p.epic.source ?? "web-proposal-editor")),
+    })),
+  }));
+  // A feature whose tasks were all deselected proposes no work of its own here:
+  // the editor's unit of acceptance is the task.
+  for (const epic of work) {
+    epic.children = epic.children?.filter((f) => f.children?.length);
+  }
+  const outcome = await acceptAsChanges(ctx, store, work.filter((e) => e.children?.length));
+  if (outcome.changeCount === 0) {
+    errorResponse(res, 400, "No items selected for acceptance");
+    return true;
+  }
+
+  const pendingPath = join(ctx.rexDir, "pending-proposals.json");
+  if (existsSync(pendingPath)) {
+    try { writeFileSync(pendingPath, "[]"); } catch { /* ignore */ }
+  }
+  appendLog(ctx, {
+    timestamp: new Date().toISOString(),
+    event: "proposals_edited_accept",
+    detail: `Accepted ${selected.length} edited proposals via proposal editor: ${v2AcceptSummary(outcome)}`,
+  });
+  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
+  jsonResponse(res, 200, {
+    ok: true,
+    acceptedCount: selected.length,
+    addedCount: outcome.changeCount + outcome.taskCount,
+    changeCount: outcome.changeCount,
+    taskCount: outcome.taskCount,
+  });
   return true;
 }
 

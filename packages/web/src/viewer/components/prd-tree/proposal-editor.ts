@@ -47,11 +47,17 @@ interface RawProposalTask {
   loe?: number;
   loeRationale?: string;
   loeConfidence?: string;
+  /** An oversized task's proposed subtasks; on v2 they become tasks under its change. */
+  decomposition?: { children: unknown[]; thresholdWeeks?: number };
 }
 
 /** Internal editable state for a task. */
 interface EditableTask {
   title: string;
+  /** Where the proposal came from, carried verbatim so the accepted item keeps it. */
+  source?: string;
+  /** Carried verbatim from the proposal; not shown or edited here. */
+  decomposition?: RawProposalTask["decomposition"];
   description: string;
   priority: string;
   tags: string;
@@ -110,6 +116,8 @@ function toEditable(proposals: RawProposal[]): EditableProposal[] {
       expanded: false,
       tasks: f.tasks.map((t) => ({
         title: t.title,
+        ...(t.source ? { source: t.source } : {}),
+        ...(t.decomposition ? { decomposition: t.decomposition } : {}),
         description: t.description ?? "",
         priority: t.priority ?? "",
         tags: (t.tags ?? []).join(", "),
@@ -315,6 +323,8 @@ export function ProposalEditor({ proposals: rawProposals, onAccepted, onCancel }
             ...(f.existingId ? { existingId: f.existingId } : {}),
             tasks: f.tasks.map((t) => ({
               title: t.title,
+              source: t.source,
+              decomposition: t.decomposition,
               description: t.description || undefined,
               acceptanceCriteria: t.acceptanceCriteria.length > 0 ? t.acceptanceCriteria : undefined,
               priority: t.priority || undefined,

@@ -523,6 +523,8 @@ describe("isolation", () => {
         "cli/commands/product.ts",
         "cli/commands/change.ts",
         "cli/commands/add-change.ts",
+        // The analyze accept mapping adds proposed changes and their tasks to the tree.
+        "recommend/changes-from-proposals.ts",
         "cli/commands/remove-change.ts",
         "cli/commands/v2-cli.ts",
         "store/change-layer-store.ts",
