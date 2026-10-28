@@ -289,6 +289,10 @@
   font-size: var(--font-xs);
 }
 
+.ch-map-none {
+  margin: var(--space-2) 0 0;
+}
+
 .ch-map-none,
 .ch-progress-empty {
   font-size: var(--font-xs);

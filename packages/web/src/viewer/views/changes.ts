@@ -34,7 +34,7 @@ function TaskProgress({ change }: { change: ChangeRow }) {
 /** What the change does to the map: amendments first, then plain touches. */
 function MapLinks({ change }: { change: ChangeRow }) {
   if (change.amends.length === 0 && change.touches.length === 0) {
-    return h("span", { class: "ch-map-none" }, "Unplaced");
+    return h("p", { class: "ch-map-none" }, "Unplaced");
   }
   return h("ul", { class: "ch-map-links" },
     change.amends.map((node) =>
@@ -87,12 +87,14 @@ function Intent({ intent }: { intent: string }) {
       class: expanded ? "ch-intent" : "ch-intent ch-intent-clamped",
       "data-expanded": expanded ? "true" : "false",
     }, intent),
-    h("button", {
-      type: "button",
-      class: "ch-intent-toggle",
-      "aria-expanded": expanded ? "true" : "false",
-      onClick: () => setExpanded(!expanded),
-    }, expanded ? "less" : "more"),
+    h("div", { class: "ch-intent-more" },
+      h("button", {
+        type: "button",
+        class: "ch-intent-toggle",
+        "aria-expanded": expanded ? "true" : "false",
+        onClick: () => setExpanded(!expanded),
+      }, expanded ? "less" : "more"),
+    ),
   );
 }
 

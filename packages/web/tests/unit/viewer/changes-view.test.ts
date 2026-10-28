@@ -135,6 +135,19 @@ describe("ChangesView", () => {
     expect(more.getAttribute("aria-expanded")).toBe("true");
   });
 
+  it("keeps the more control and the Unplaced line in separate blocks", () => {
+    const long = { ...CHANGES_FIXTURE[0], id: "long", intent: "word ".repeat(40).trim(), amends: [], touches: [] } as ChangeRow;
+    const el = mount(h(ChangesView, { changes: [long] }));
+    const row = el.querySelector('[data-change-id="long"]')!;
+    const more = row.querySelector(".ch-intent-toggle")!;
+    const none = row.querySelector(".ch-map-none")!;
+
+    expect(more.parentElement!.tagName).toBe("DIV");
+    expect(none.tagName).toBe("P");
+    expect(more.parentElement!.contains(none)).toBe(false);
+    expect(none.contains(more)).toBe(false);
+  });
+
   it("clamps an intent past the length limit even on one line", () => {
     const long = { ...CHANGES_FIXTURE[0], id: "long", intent: "word ".repeat(40).trim() } as ChangeRow;
     const el = mount(h(ChangesView, { changes: [long] }));
