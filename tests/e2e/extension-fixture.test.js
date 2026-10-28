@@ -540,7 +540,17 @@ describe("the fixture extension behind the hub", { timeout: 180_000 }, () => {
     process.kill(hubPid, "SIGKILL");
     expect(await waitForPidExit(hubPid, 15_000)).toBe(true);
     expect(await waitForPidExit(sidecar, 15_000)).toBe(true);
-    ndxOk(["start", "--hub", `--port=${port}`, repo], { cwd: repo });
+    const restarted = ndx(["start", "--hub", `--port=${port}`, repo], { cwd: repo });
+    // The hub can be healthy before its reattached project server is ready,
+    // notably after a Windows job-object teardown. Assert that exact state,
+    // then await readiness before requiring a successful registration.
+    if (restarted.code !== 0) {
+      expect(restarted.code, restarted.stderr).toBe(1);
+      expect(restarted.stderr).toContain('registered but its server is starting');
+      await expect.poll(async () => (await get(`/p/${PROJECT_ID}/api/status`)).status, { timeout: 15_000 }).toBe(200);
+      ndxOk(["start", "--hub", `--port=${port}`, repo], { cwd: repo });
+    }
+    expect(readJson(join(home, "hub.pid")).pid).not.toBe(hubPid);
     expect((await echo()).pid).not.toBe(sidecar);
   });
 
