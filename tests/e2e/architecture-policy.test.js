@@ -285,7 +285,7 @@ describe("architecture policy: orchestration never imports extension code", () =
     for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:[\w$]+\.)?createRequire\s*\(/g)) {
       names.push(m[1]);
     }
-    const callee = names.map((n) => n.replace(/\$/g, "\\$")).join("|");
+    const callee = names.map((n) => n.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")).join("|");
     return [
       new RegExp(String.raw`(?<![\w$.])(?:${callee})(?:\s*\.\s*(?:call|apply))?` + NON_LITERAL_CALL),
       new RegExp(String.raw`\bcreateRequire\s*\([^()]*(?:\([^()]*\)[^()]*)*\)` + NON_LITERAL_CALL),
