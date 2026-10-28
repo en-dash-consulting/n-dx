@@ -327,6 +327,14 @@ describe("formatProtectedConfigFinding", () => {
     expect(finding).not.toContain("allow");
   });
 
+  it("says the file changed during the run without blaming the agent, and how to re-apply a change of your own", () => {
+    const finding = formatProtectedConfigFinding([{ path: ".n-dx.json", change: "modified", restored: true }]);
+    expect(finding).toContain(".n-dx.json (modified, restored)");
+    expect(finding).toMatch(/changed during the run/);
+    expect(finding).not.toMatch(/the agent changed/i);
+    expect(finding).toMatch(/save it again after the run/);
+  });
+
   it("tells the operator when a file could not be put back", () => {
     const finding = formatProtectedConfigFinding([{ path: ".mcp.json", change: "modified", restored: false }]);
     expect(finding).toContain(".mcp.json (modified, NOT restored)");

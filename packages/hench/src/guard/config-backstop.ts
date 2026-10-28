@@ -463,14 +463,20 @@ function readOrRefuse<T>(rel: string, read: () => T): T {
 /**
  * The finding a run reports for protected-config writes: each path and what
  * happened to it, never the content.
+ *
+ * It does not say who wrote the file. The backstop sees only that the file
+ * changed while the run held it; a dashboard settings save or another `ndx`
+ * command writes the same files, so the user may have been the writer.
  */
 export function formatProtectedConfigFinding(writes: readonly ProtectedConfigWrite[]): string {
   const parts = writes.map((w) => `${w.path} (${w.change}, ${w.restored ? "restored" : "NOT restored"})`);
   const unrestored = writes.some((w) => !w.restored);
   return (
-    `The agent changed n-dx's own config, which no run may write: ${parts.join(", ")}. ` +
+    `n-dx's own config changed during the run, which no run may write: ${parts.join(", ")}. ` +
+    "The agent, a command it ran, or another writer such as a dashboard settings save made the change. " +
     (unrestored
       ? "Inspect the files not restored before running n-dx again."
-      : "The files were put back as they were before the run.")
+      : "The files were put back as they were before the run.") +
+    " If the change was yours, save it again after the run."
   );
 }

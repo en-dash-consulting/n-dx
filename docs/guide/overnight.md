@@ -99,7 +99,7 @@ While the agent is running, some operations are safe and some will corrupt your 
 
 **Safe alongside `ndx work`:**
 - `ndx status .` — read-only, always safe
-- `ndx start .` / `ndx start --background .` — dashboard reads `.rex/prd.json`; small hench updates self-correct within seconds
+- `ndx start .` / `ndx start --background .` — dashboard reads `.rex/prd.json`; small hench updates self-correct within seconds. Its settings pages are the exception: a setting saved while a run is active is put back at the run's next restore point, and the run fails reporting the changed file. Save the setting again after the run.
 - `hench status .` — read-only status check
 - `ndx usage .` — read-only analytics
 
