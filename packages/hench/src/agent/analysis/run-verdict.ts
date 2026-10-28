@@ -277,8 +277,10 @@ const completionHeld: Rule = ({ run }) => {
 };
 
 const noChanges: Rule = ({ run, rexDir }, changed) => {
-  // A record written before `commits` existed says nothing about them.
-  if (!run.commits) return null;
+  // A record written before `commits` existed says nothing about them, and a
+  // run the operator cancelled made no commits because it was stopped — not
+  // because the task was too vague to act on.
+  if (!run.commits || run.status === "cancelled") return null;
   const isPrd = (p: string): boolean => isUnder(normalizePath(p, run.worktreeRoot), rexDir);
   const commits = run.commits;
   const leftBehind = (run.uncommittedPaths ?? []).filter((p) => !isPrd(p));
@@ -318,7 +320,9 @@ export function classifyRun(input: RunVerdictInput): RunDiagnosis {
   const changed = changedPaths(input.run, input.events ?? []);
   const verdict: Verdict = RULES.reduce<Verdict | null>((found, rule) => found ?? rule(input, changed), null) ?? {
     class: "unclassified",
-    summary: "No recorded signal explains this run's failure.",
+    summary: input.run.status === "cancelled"
+      ? "The run was cancelled before it finished."
+      : "No recorded signal explains this run's failure.",
     evidence: [`status: ${input.run.status}`, ...(input.run.error ? [`error: ${input.run.error.split("\n")[0]}`] : [])],
     actions: [{ kind: "hand-fix", label: "Read the run log and decide by hand" }],
   };

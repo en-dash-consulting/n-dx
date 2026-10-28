@@ -200,6 +200,13 @@ describe("classifyRun — one fixture per class", () => {
     expect(d.evidence).toContain("error: something odd");
   });
 
+  it("a cancelled run with no commits is not read as no-changes, and says it was cancelled", () => {
+    const d = classify(run({ status: "cancelled", commits: [] }));
+    expect(d.class).toBe("unclassified");
+    expect(d.summary).toBe("The run was cancelled before it finished.");
+    expect(d.actions.map((a) => a.kind)).not.toContain("tighten-done-when");
+  });
+
   it("a record written before commits were recorded is not read as no-changes", () => {
     expect(classify(run({ commits: undefined })).class).toBe("unclassified");
   });

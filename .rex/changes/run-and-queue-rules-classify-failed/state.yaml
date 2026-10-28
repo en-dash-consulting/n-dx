@@ -4,10 +4,14 @@ items:
     lastModified: "2026-10-28T22:05:22.691Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c816a1a3-5786-4e25-aad2-5a432be1e7de":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T23:28:51.313Z"
-    activeIntervals: [{"start":"2026-10-28T23:28:51.313Z"}]
-    lastModified: "2026-10-28T23:28:51.870Z"
+    completedAt: "2026-10-28T23:52:42.082Z"
+    endedAt: "2026-10-28T23:52:42.082Z"
+    activeIntervals: [{"end":"2026-10-28T23:52:42.082Z","start":"2026-10-28T23:28:51.313Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Pure rule-based run classifier (agent/analysis/run-verdict.ts), hench runs diagnose CLI, optional RunRecord.diagnosis stored at run end with failureReason fill, hench.runVerdict toggle and task-page verdict banner; tests per class, attempts, purity, CLI, server and viewer."
+    lastModified: "2026-10-28T23:52:42.082Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eef3d129-ffc2-4598-bfce-a30c88faf4ef":
     issues: ["https://www.notion.so/3f7a80b7192481cab29eea95b9d8b8c8","https://www.notion.so/3f7a80b719248118bf40ee8742778786"]
