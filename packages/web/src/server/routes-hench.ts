@@ -1383,11 +1383,18 @@ async function handleTemplateCreate(
     return true;
   }
 
-  const overlay = (body.config as Record<string, unknown>) || {};
-  if (!overlay || typeof overlay !== "object" || Array.isArray(overlay)) {
+  const rawOverlay = (body.config as Record<string, unknown>) || {};
+  if (!rawOverlay || typeof rawOverlay !== "object" || Array.isArray(rawOverlay)) {
     errorResponse(res, 400, "Template config must be an object");
     return true;
   }
+  // The settings page saves the GET config as the overlay, and that carries
+  // the user's `HENCH_LOCAL_ONLY_SETTINGS` from .n-dx.local.json. Applying the
+  // template would write them into .hench/config.json, where the trust review
+  // reads them as the repository's and the checkout turns untrusted.
+  const overlay = Object.fromEntries(
+    Object.entries(rawOverlay).filter(([key]) => !isHenchLocalOnlySetting(key)),
+  );
   const overlayProblem = validateTemplateOverlay(overlay);
   if (overlayProblem) {
     errorResponse(res, 400, overlayProblem);
