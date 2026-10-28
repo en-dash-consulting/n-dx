@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { relativeToRoot, spawnCli } from "../llm-gateway.js";
 import { emitProjection, type EmitResult } from "../emit.js";
-import { readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from "../graview-bin.js";
+import { prepareCommandCwd, readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from "../graview-bin.js";
 import { loadDocument } from "../document.js";
 import { rexMcpEndpoint } from "../hub.js";
 import { fileURLToPath } from "node:url";
@@ -122,8 +122,10 @@ function run(cmd: string, args: string[], options: { cwd: string; env?: NodeJS.P
   });
 }
 
-async function runGraview(command: GraviewCommand, args: string[], cwd: string, options: { stdoutToStderr?: boolean } = {}): Promise<number> {
-  return run(command.cmd, [...command.prefix, ...args], { cwd, ...options });
+/** Runs in the project root unless the command names its own directory (the npx fallback). */
+async function runGraview(command: GraviewCommand, args: string[], root: string, options: { stdoutToStderr?: boolean } = {}): Promise<number> {
+  prepareCommandCwd(command);
+  return run(command.cmd, [...command.prefix, ...args], { cwd: command.cwd ?? root, ...options });
 }
 
 /**

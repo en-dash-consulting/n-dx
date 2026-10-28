@@ -3,7 +3,10 @@
  * config (machine-local over shared; the repository's only once the checkout
  * is trusted), `NDX_GRAVIEW_BIN`, a `graview` on PATH,
  * the product face's own `graview` (it pins the same release this package
- * checks against), then `npx -y graview@<pinned>`. A path ending in
+ * checks against), then `npx -y graview@<pinned>`. npx resolves a local
+ * install and the project `.npmrc` from its working directory, so the
+ * fallback runs in a directory n-dx owns under the ndx home, never the
+ * checkout: a graview the repository installs is not run. A path ending in
  * `.js`/`.mjs`/`.cjs` is a CLI entry run under the current Node, so a sibling
  * framework checkout (`../graview/packages/graview/dist/cli.js`) works without
  * a global install.
@@ -11,9 +14,9 @@
  * No `@graview/*` package is ever imported or installed by this package; the
  * binary is a peer tool the way the claude and codex CLIs are to hench.
  */
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
-import { trustedLocalConfig, trustedProjectConfig, type Layout } from "./llm-gateway.js";
+import { resolveNdxHome, trustedLocalConfig, trustedProjectConfig, type Layout } from "./llm-gateway.js";
 import { GRAVIEW_VERSION } from "./document.js";
 
 export type GraviewBinSource = "config" | "env" | "path" | "face" | "npx";
@@ -25,6 +28,12 @@ export interface GraviewCommand {
   source: GraviewBinSource;
   /** What was configured or found, for the operator. */
   detail: string;
+  /**
+   * Where it must run, when the project root will not do. Set for npx: a
+   * directory under the ndx home holding its own `package.json`, so npm's
+   * project prefix stops there. graview's arguments are absolute paths.
+   */
+  cwd?: string;
 }
 
 export interface GraviewConfig {
@@ -159,5 +168,23 @@ export function resolveGraviewCommand(layout: Layout, options: ResolveGraviewOpt
   if (fromFace) return { cmd: fromFace, prefix: [], source: "face", detail: fromFace };
 
   const npx = platform === "win32" ? "npx.cmd" : "npx";
-  return { cmd: npx, prefix: ["-y", `graview@${GRAVIEW_VERSION}`], source: "npx", detail: `npx -y graview@${GRAVIEW_VERSION}` };
+  return {
+    cmd: npx,
+    prefix: ["-y", `graview@${GRAVIEW_VERSION}`],
+    source: "npx",
+    detail: `npx -y graview@${GRAVIEW_VERSION}`,
+    cwd: join(resolveNdxHome({ env }), "graview", "npx"),
+  };
+}
+
+/**
+ * Create the command's own working directory, when it has one: an empty
+ * private package, so npm takes it as the project and looks no further up for
+ * a `node_modules` or an `.npmrc`.
+ */
+export function prepareCommandCwd(command: GraviewCommand): void {
+  if (!command.cwd) return;
+  mkdirSync(command.cwd, { recursive: true });
+  const manifest = join(command.cwd, "package.json");
+  if (!existsSync(manifest)) writeFileSync(manifest, `${JSON.stringify({ name: "ndx-graview-npx", private: true })}\n`);
 }
