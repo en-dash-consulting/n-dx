@@ -67,8 +67,9 @@ export interface SidecarSessionRecord {
   /** What the lens is pointed at (an item id, display id or alias); absent means no target. */
   target?: PacketTarget;
   /**
-   * Set when the lens or target changed after a turn: the next turn carries
-   * the new packet. Cleared once a turn completes. The first turn always does.
+   * The next turn carries the packet even though it resumes: the lens or
+   * target changed, or the turn that carried it did not complete. A turn
+   * that opens a vendor session always carries it.
    */
   packetDue?: true;
   /** Vendor session id the next turn resumes; absent before the first turn and after the TTL. */
@@ -249,7 +250,7 @@ export class SidecarSessionRegistry {
 
   /**
    * Rename a session, point it at another lens or target, or both. A new lens
-   * or target after the first turn makes the next turn carry its packet.
+   * or target makes the next turn carry its packet, even one made mid-turn.
    * Returns undefined for an unknown session.
    */
   update(id: string, input: UpdateSidecarSessionInput): SidecarSessionRecord | undefined {
@@ -260,7 +261,7 @@ export class SidecarSessionRegistry {
     const targetChanged = input.target !== undefined && input.target.ref !== record.target?.ref;
     if (input.lens !== undefined) record.lens = input.lens;
     if (input.target !== undefined) record.target = { ...input.target };
-    if ((lensChanged || targetChanged) && record.turns > 0) record.packetDue = true;
+    if (lensChanged || targetChanged) record.packetDue = true;
     this.persist();
     return this.view(record);
   }
@@ -308,11 +309,19 @@ export class SidecarSessionRegistry {
       this.live.delete(record.id);
       delete record.resumeId;
     }
+    // A turn that opens a vendor session (the first, or after a restart without
+    // a resume id or the TTL) knows nothing yet, so it carries the packet.
+    const fresh = !this.live.has(record.id) && !record.resumeId;
     const live = this.liveSession(record);
 
     this.reconcileCursor(record);
-    // The packet opens the first turn, a refreshed turn and the turn after a lens or target change.
-    const opening = !cold && !!context?.packet && (record.turns === 0 || record.packetDue === true);
+    // The packet opens a fresh vendor session and the turn after a lens or
+    // target change; a refreshed turn carries it in its cold prompt.
+    const opening = !cold && !!context?.packet && (fresh || record.packetDue === true);
+    // Consumed now, so a lens or target change made while this turn runs
+    // stays due for the next one; restored below unless the turn completes.
+    let delivered = false;
+    if (opening || cold) delete record.packetDue;
     const exchanges = cold ? this.lastExchanges(record.id) : [];
     const append = (frame: SidecarFrame): void => {
       this.appendFrame(record, frame);
@@ -361,13 +370,16 @@ export class SidecarSessionRegistry {
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
       if (result.sessionId) record.resumeId = result.sessionId;
       if (cold && result.status === "completed") delete record.refresh;
-      if (result.status === "completed") delete record.packetDue;
+      delivered = result.status === "completed";
       if (context && result.status === "completed") {
         const ceiling = context.ceiling(record);
         if (ended > ceiling) await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append);
       }
       return result;
     } finally {
+      // An opening turn that failed or was stopped may never have reached
+      // the model: the next turn carries the packet again.
+      if (opening && !delivered) record.packetDue = true;
       live.sink = undefined;
       record.lastActivityAt = this.iso();
       this.persist();
