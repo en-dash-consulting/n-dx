@@ -1,10 +1,10 @@
 # n-dx extensions: design and PRD capture
 
-Status: proposed, 2026-10-26. Imported from the design doc at https://claude.ai/artifact/B5hBBT5rS6rx6FWN23xS8z as the starting point for the extensions epic.
+Status: accepted and implemented by the extension stack, 2026-10-28; experimental until promoted. Imported from the design doc at https://claude.ai/artifact/B5hBBT5rS6rx6FWN23xS8z as the starting point for the extensions epic.
 
 ## Summary
 
-n-dx should let separately installed packages add `ndx <name>` commands and a hub-mounted web page, through a declared manifest and spawned processes only. Today it can't: commands are a fixed map in `packages/core/cli.js` (`COMMAND_DISPATCH`), viewer panels are statically imported, and the hub only proxies registered projects.
+The extension stack lets separately installed packages add `ndx <name>` commands and a hub-mounted web page, through a declared manifest and spawned processes only. Built-in commands retain precedence, dashboard bundles contain no extension code, and the hub runs sidecars as separate processes.
 
 - **Out-of-process only.** An extension is a CLI and, optionally, a web server n-dx spawns. n-dx never imports extension code, so the tier rules, spawn-only orchestration and failure isolation all hold.
 - **Many at once.** Each extension has its own name, mount (`/x/<name>/`), state folder, config section and logs. Names can't shadow built-in commands or each other.
@@ -99,7 +99,7 @@ Any publisher can ship an extension; nothing in the contract is specific to one 
 | --- | --- |
 | `apiVersion` | Integer contract version. An unknown version is listed as incompatible, never run |
 | `name` | Lowercase slug, unique across installed extensions, not a built-in command, bin alias or reserved word (`ext`, `x`, `hub`, `extensions`, `paths`) |
-| `ndxVersion` | Semver range the extension supports; outside it, the extension is disabled with the reason shown |
+| `ndxVersion` | Semver range the extension supports; outside it, the extension is incompatible with the reason shown |
 | `commands[]` | Each `name` becomes `ndx <name>`; `bin` is a path inside the package, run with the same Node as n-dx |
 | `sidecar` | Optional web server the hub mounts at `/x/<name>/` |
 | `hub`, `projectLinks` | Optional entries on the hub home and on each project's dashboard; `{projectId}` and `{repoRoot}` are the only placeholders |
@@ -171,12 +171,12 @@ With no hub running, extension commands still work; only sidecars and links need
 
 **Consent.** An extension runs only after the user approves it, the way Claude Code approves a project's MCP servers.
 
-- The first `ndx <name>` or `/x/<name>/` request shows the package, version, source, commands and sidecar, then asks. In a non-interactive shell it exits 2 and points at `ndx extensions enable <name>`.
+- The first `ndx <name>` request shows the package, version, source, commands and sidecar, then asks. In a non-interactive shell it exits 2 and points at `ndx extensions enable <name>`. The hub never prompts: an unapproved `/x/<name>/` request answers 404.
 - The approval is stored in `<ndx home>/extensions.json` with a hash of the `ndx.extension` block and the package version. A changed manifest or version asks again.
 - Approvals of project-source extensions are per project path, so cloning an untrusted repo never runs its extensions.
 - `ndx extensions enable <name> --yes` approves non-interactively, for CI and provisioning scripts.
 
-**Versioning.** Two numbers make compatibility checkable without running code. `apiVersion` is the contract this document defines; a breaking change to the environment, the proxy, the manifest or the versioned hub endpoints bumps it, and n-dx supports the current and previous version. `ndxVersion` is the extension's own range. Either mismatch leaves the extension listed but disabled, with the reason in `list`, `doctor` and the hub home.
+**Versioning.** Two numbers make compatibility checkable without running code. `apiVersion` identifies the current experimental contract, not a stability promise; after explicit promotion in the public-surface policy, a breaking change to the environment, the proxy, the manifest or the versioned hub endpoints bumps it, and n-dx supports the current and previous version. `ndxVersion` is the extension's own range. Either mismatch leaves the extension listed but incompatible, with the reason in `list`, `doctor` and the hub home.
 
 **Config.** Each extension owns one section, `extensions.<name>`, in `<ndx home>/config.json` (user) and `.n-dx.json` (project), merged project over user. `ndx config extensions.<name>.<key> <value>` reads and writes it, validated against `configSchema` when one is given. It writes `.n-dx.json`, or the user config with `--user`. A missing `required` key does not stop a write, since a section is filled one key at a time. n-dx checks the validation keywords a config section needs (types, `enum`, `const`, object properties, arrays, string and number bounds, `allOf`/`anyOf`/`oneOf`/`not`) and reads annotations such as `format` as information; a schema using any other keyword, `$ref` included, is reported as one it cannot check (`packages/core/extension-config-schema.js`). The merged result is what `NDX_EXTENSION_CONFIG` points at; a run whose merged section breaks the schema, `required` included, is refused with exit 2. `paths` is a reserved name because the user config's `extensions.paths` is discovery's list of dev paths. `config.js` keeps its role as the one orchestration script that touches config files directly.
 
@@ -184,7 +184,7 @@ With no hub running, extension commands still work; only sidecars and links need
 
 ## PRD capture
 
-Ready to enter in the n-dx PRD with `ndx rex add` or the rex `add_item` tool. Each task's criteria go in `acceptanceCriteria`, one per entry. Set `source: ndx-capture`. "Blocked by" names tasks in this list, to wire as `blockedBy` once ids exist. Priorities: F1 and F2 ship first and are useful without the hub.
+Captured in the `.rex/changes/inbox/extensions-f1-*` through `extensions-f6-*` records (moved to `.rex/changes/extensions-*` as the stack places them). The extension stack implements this contract. Each task's criteria go in `acceptanceCriteria`, one per entry. Set `source: ndx-capture`. "Blocked by" names tasks in this list, to wire as `blockedBy` once ids exist. Priorities: F1 and F2 ship first and are useful without the hub.
 
 **Epic: Extensions: out-of-process add-ons for the CLI and hub** (priority high)
 
