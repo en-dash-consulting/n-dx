@@ -21,7 +21,7 @@ import { createServer } from "node:net";
 // packages/web/tests/e2e-ui/helpers -> repo root is 5 levels up.
 const REPO_ROOT = resolve(import.meta.dirname, "../../../../..");
 const CORE_CLI = join(REPO_ROOT, "packages/core/cli.js");
-const REX_BIN = join(REPO_ROOT, "packages/core/bin/rex.js");
+export const REX_BIN = join(REPO_ROOT, "packages/core/bin/rex.js");
 const WEB_CLI = join(REPO_ROOT, "packages/web/dist/cli/index.js");
 
 export interface FixtureProject {

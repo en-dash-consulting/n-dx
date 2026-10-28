@@ -39,6 +39,9 @@ interface EpicStats {
   type?: "change";
   /** Set when `stats` count the change itself because it has no tasks. */
   selfCounted?: true;
+  tags?: string[];
+  /** The item's own assignee first, then its descendants'. */
+  assignees?: string[];
 }
 
 interface PriorityDistribution {
@@ -184,6 +187,7 @@ function StatChip({ value, label, color, accent }: {
 
 /** Epic card with enhanced progress and status display */
 const EPICS_EXPANDED_KEY = "ndx.rex-dash.epics-expanded";
+const EPICS_OPEN_KEY = "ndx.rex-dash.epics-open";
 
 function EpicCard({ epic, navigateTo }: { epic: EpicStats; navigateTo?: NavigateTo }) {
   const { stats } = epic;
@@ -241,6 +245,165 @@ function EpicCard({ epic, navigateTo }: { epic: EpicStats; navigateTo?: Navigate
   );
 }
 
+/** Status filter values: one status, every status, or everything not yet done. */
+const STATUS_OPEN = "open";
+const STATUS_ALL = "all";
+const ANY = "";
+const UNASSIGNED = "\0unassigned";
+
+/** "Name <email>" reads as its name. */
+function ownerName(identity: string): string {
+  return identity.replace(/\s*<[^>]*>\s*$/, "") || identity;
+}
+
+interface EpicProgressProps {
+  /** Already sorted: in progress first. */
+  epics: EpicStats[];
+  rootLabel: string;
+  rootPlural: string;
+  navigateTo?: NavigateTo;
+}
+
+/**
+ * Epic (v1) or change (v2) progress — a dropdown of blocks, closed by default,
+ * with filters by name, status, tag and owner. Completed rows are hidden
+ * until the status filter asks for them. Rows mount only while it is open, so
+ * a PRD of a thousand changes costs nothing on the page until it is.
+ */
+function EpicProgress({ epics, rootLabel, rootPlural, navigateTo }: EpicProgressProps) {
+  // Bounded and scrollable by default; Expand shows every row. Remembered.
+  const [expanded, setExpanded] = useState<boolean>(() => {
+    try { return localStorage.getItem(EPICS_EXPANDED_KEY) === "true"; } catch { return false; }
+  });
+  const toggleExpanded = useCallback(() => {
+    setExpanded((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(EPICS_EXPANDED_KEY, String(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
+  // A dropdown like the stage sections below it: closed until opened. Remembered.
+  const [open, setOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem(EPICS_OPEN_KEY) === "true"; } catch { return false; }
+  });
+  const toggleOpen = useCallback(() => {
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(EPICS_OPEN_KEY, String(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+  }, []);
+
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState(STATUS_OPEN);
+  const [tag, setTag] = useState(ANY);
+  const [owner, setOwner] = useState(ANY);
+
+  const tags = useMemo(() =>
+    [...new Set(epics.flatMap((e) => e.tags ?? []))].sort((a, b) => a.localeCompare(b)), [epics]);
+  const owners = useMemo(() =>
+    [...new Set(epics.flatMap((e) => e.assignees ?? []))].sort((a, b) => ownerName(a).localeCompare(ownerName(b))), [epics]);
+  const hasUnassigned = useMemo(() => epics.some((e) => !e.assignees?.length), [epics]);
+
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return epics.filter((e) =>
+      (!needle || e.title.toLowerCase().includes(needle))
+      && (status === STATUS_ALL || (status === STATUS_OPEN ? e.status !== "completed" : e.status === status))
+      && (tag === ANY || (e.tags ?? []).includes(tag))
+      && (owner === ANY || (owner === UNASSIGNED ? !e.assignees?.length : (e.assignees ?? []).includes(owner))),
+    );
+  }, [epics, query, status, tag, owner]);
+
+  const filtered = query !== "" || status !== STATUS_OPEN || tag !== ANY || owner !== ANY;
+  const clear = () => { setQuery(""); setStatus(STATUS_OPEN); setTag(ANY); setOwner(ANY); };
+  const plural = (n: number) => (n === 1 ? rootLabel : rootPlural).toLowerCase();
+  const select = (label: string, value: string, onChange: (v: string) => void, options: [string, string][]) =>
+    h("select", {
+      class: "rex-dash-epics-filter",
+      "aria-label": label,
+      value,
+      onChange: (e: Event) => onChange((e.target as HTMLSelectElement).value),
+    }, options.map(([v, text]) => h("option", { key: v, value: v }, text)));
+
+  return h("div", { class: `rex-dash-epics${open ? " rex-dash-epics--open" : ""}` },
+    h("div", { class: "rex-dash-section-header" },
+      h("button", {
+        type: "button",
+        class: "rex-dash-epics-head",
+        onClick: toggleOpen,
+        "aria-expanded": String(open),
+        "aria-controls": "rex-dash-epic-body",
+      },
+        h("span", { class: "rex-dash-epics-caret", "aria-hidden": "true" }, open ? "▾" : "▸"),
+        h("h3", null, `${rootLabel} Progress`),
+      ),
+      h("span", { class: "rex-dash-section-meta" },
+        open && epics.length > 0 && shown.length !== epics.length
+          ? `${shown.length} of ${epics.length} ${plural(epics.length)}`
+          : `${epics.length} ${plural(epics.length)}`,
+      ),
+      open && shown.length > 0
+        ? h("button", {
+            type: "button",
+            class: "rex-dash-epics-toggle",
+            onClick: toggleExpanded,
+            "aria-expanded": String(expanded),
+            "aria-controls": "rex-dash-epic-list",
+            title: expanded ? "Show as a scrollable list" : `Show every ${rootLabel.toLowerCase()}`,
+          }, expanded ? "Collapse ▴" : "Expand ▾")
+        : null,
+    ),
+    !open
+      ? null
+      : epics.length === 0
+        ? h("div", { class: "rex-dash-empty-hint" }, `No ${rootPlural.toLowerCase()} defined yet.`)
+        : h("div", { id: "rex-dash-epic-body" },
+            h("div", { class: "rex-dash-epics-filters", role: "search" },
+              h("input", {
+                type: "search",
+                class: "rex-dash-epics-search",
+                placeholder: `Search ${rootPlural.toLowerCase()} by name`,
+                "aria-label": `Search ${rootPlural.toLowerCase()} by name`,
+                value: query,
+                onInput: (e: Event) => setQuery((e.target as HTMLInputElement).value),
+              }),
+              select("Status", status, setStatus, [
+                [STATUS_OPEN, "Not completed"],
+                [STATUS_ALL, "All statuses"],
+                ...(["in_progress", "pending", "blocked", "deferred", "completed"] as const)
+                  .map((s): [string, string] => [s, STATUS_LABELS[s]]),
+              ]),
+              tags.length > 0
+                ? select("Tag", tag, setTag, [[ANY, "Any tag"], ...tags.map((t): [string, string] => [t, t])])
+                : null,
+              owners.length > 0
+                ? select("Owner", owner, setOwner, [
+                    [ANY, "Anyone"],
+                    ...owners.map((o): [string, string] => [o, ownerName(o)]),
+                    ...(hasUnassigned ? [[UNASSIGNED, "Unassigned"] as [string, string]] : []),
+                  ])
+                : null,
+              filtered
+                ? h("button", { type: "button", class: "rex-dash-epics-toggle", onClick: clear }, "Clear")
+                : null,
+            ),
+            shown.length > 0
+              ? h("div", {
+                  id: "rex-dash-epic-list",
+                  class: `rex-dash-epic-list${expanded ? " rex-dash-epic-list--expanded" : " rex-dash-epic-list--scroll"}`,
+                  // A scroll region must be reachable by keyboard.
+                  tabIndex: expanded ? undefined : 0,
+                  role: "region",
+                  "aria-label": `${rootLabel} progress`,
+                },
+                  shown.map((epic) => h(EpicCard, { key: epic.id, epic, navigateTo })),
+                )
+              : h("div", { class: "rex-dash-empty-hint" }, `No ${rootPlural.toLowerCase()} match these filters.`),
+          ),
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function RexDashboard({ navigateTo }: RexDashboardProps) {
@@ -251,20 +414,6 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
   const [reorgOpen, setReorgOpen] = useState(false);
   const [reorgCount, setReorgCount] = useState(0);
   const [restoreOpen, setRestoreOpen] = useState(false);
-  // Epic Progress is a bounded, scrollable list by default — a PRD with dozens
-  // of epics otherwise pushes everything below it off the page. Expand shows
-  // the full list; the choice is remembered.
-  const [epicsExpanded, setEpicsExpanded] = useState<boolean>(() => {
-    try { return localStorage.getItem(EPICS_EXPANDED_KEY) === "true"; } catch { return false; }
-  });
-  const toggleEpicsExpanded = useCallback(() => {
-    setEpicsExpanded((prev) => {
-      const next = !prev;
-      try { localStorage.setItem(EPICS_EXPANDED_KEY, String(next)); } catch { /* storage unavailable */ }
-      return next;
-    });
-  }, []);
-
   const fetchDashboard = useCallback(async () => {
     try {
       const res = await fetch("/api/rex/dashboard");
@@ -410,7 +559,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
     // ── Main content grid ───────────────────────────────────────────
     h("div", { class: "rex-dash-grid" },
 
-      // ── Left column: Next task + Epics ──────────────────────────
+      // ── Up Next ───────────────────────────────────────────────────
       h("div", { class: "rex-dash-main" },
 
         // Next task highlight — prominent card
@@ -479,68 +628,70 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
               ),
         ),
 
-        // Epic (v1) or change (v2) progress list
-        h("div", { class: "rex-dash-epics" },
-          h("div", { class: "rex-dash-section-header" },
-            h("h3", null, `${rootLabel} Progress`),
-            h("span", { class: "rex-dash-section-meta" },
-              `${epics.length} ${(epics.length === 1 ? rootLabel : rootPlural).toLowerCase()}`,
-            ),
-            sortedEpics.length > 0
-              ? h("button", {
-                  type: "button",
-                  class: "rex-dash-epics-toggle",
-                  onClick: toggleEpicsExpanded,
-                  "aria-expanded": String(epicsExpanded),
-                  "aria-controls": "rex-dash-epic-list",
-                  title: epicsExpanded ? "Show as a scrollable list" : `Show every ${rootLabel.toLowerCase()}`,
-                }, epicsExpanded ? "Collapse ▴" : "Expand ▾")
-              : null,
-          ),
-          sortedEpics.length > 0
-            ? h("div", {
-                id: "rex-dash-epic-list",
-                class: `rex-dash-epic-list${epicsExpanded ? " rex-dash-epic-list--expanded" : " rex-dash-epic-list--scroll"}`,
-                // A scroll region must be reachable by keyboard.
-                tabIndex: epicsExpanded ? undefined : 0,
-                role: "region",
-                "aria-label": `${rootLabel} progress`,
-              },
-                sortedEpics.map((epic) =>
-                  h(EpicCard, { key: epic.id, epic, navigateTo }),
-                ),
-              )
-            : h("div", { class: "rex-dash-empty-hint" }, `No ${rootPlural.toLowerCase()} defined yet.`),
-        ),
-
         // No Epic-by-Epic panel: it ran `hench run` from the project's own build,
         // outside the hub queue and the throttle, and Live could not stop it.
         // Runs start from Ready to run (stage-pages.ts) and the Prepare modal.
       ),
 
-      // ── Right sidebar ─────────────────────────────────────────────
+      // ── Panels: a row of blocks under Up Next ─────────────────────
       h("div", { class: "rex-dash-sidebar" },
 
-        // Priority distribution
-        priorityEntries.length > 0
-          ? h("div", { class: "rex-dash-panel" },
-              h("h3", { class: "rex-dash-panel-title" }, "Priority Distribution"),
-              h("div", { class: "rex-dash-priority-bars" },
-                priorityEntries.map((p) =>
-                  h("div", { key: p.label, class: "rex-dash-priority-row" },
-                    h("span", { class: `rex-dash-priority-label rex-dash-priority-${p.cls}` }, p.label),
-                    h("div", { class: "rex-dash-priority-track" },
-                      h("div", {
-                        class: `rex-dash-priority-fill rex-dash-priority-fill-${p.cls}`,
-                        style: `width: ${totalPrioritized > 0 ? (p.count / totalPrioritized) * 100 : 0}%`,
-                      }),
+        // Priority distribution over the status breakdown, one panel
+        h("div", { class: "rex-dash-panel rex-dash-panel-breakdown" },
+          priorityEntries.length > 0
+            ? h("div", { class: "rex-dash-breakdown-part" },
+                h("h3", { class: "rex-dash-panel-title" }, "Priority Distribution"),
+                h("div", { class: "rex-dash-priority-bars" },
+                  priorityEntries.map((p) =>
+                    h("div", { key: p.label, class: "rex-dash-priority-row" },
+                      h("span", { class: `rex-dash-priority-label rex-dash-priority-${p.cls}` }, p.label),
+                      h("div", { class: "rex-dash-priority-track" },
+                        h("div", {
+                          class: `rex-dash-priority-fill rex-dash-priority-fill-${p.cls}`,
+                          style: `width: ${totalPrioritized > 0 ? (p.count / totalPrioritized) * 100 : 0}%`,
+                        }),
+                      ),
+                      h("span", { class: "rex-dash-priority-count" }, String(p.count)),
                     ),
-                    h("span", { class: "rex-dash-priority-count" }, String(p.count)),
                   ),
                 ),
+              )
+            : null,
+          h("div", { class: "rex-dash-breakdown-part" },
+            h("h3", { class: "rex-dash-panel-title" }, "Status Breakdown"),
+            h("div", { class: "rex-dash-status-grid" },
+              h("div", { class: "rex-dash-status-item" },
+                h("span", { class: "prd-status-dot prd-status-completed" }),
+                h("span", { class: "rex-dash-status-label" }, "Completed"),
+                h("span", { class: "rex-dash-status-count" }, String(stats.completed)),
               ),
-            )
-          : null,
+              h("div", { class: "rex-dash-status-item" },
+                h("span", { class: "prd-status-dot prd-status-in-progress" }),
+                h("span", { class: "rex-dash-status-label" }, "In Progress"),
+                h("span", { class: "rex-dash-status-count" }, String(stats.inProgress)),
+              ),
+              h("div", { class: "rex-dash-status-item" },
+                h("span", { class: "prd-status-dot prd-status-pending" }),
+                h("span", { class: "rex-dash-status-label" }, "Pending"),
+                h("span", { class: "rex-dash-status-count" }, String(stats.pending)),
+              ),
+              stats.blocked > 0
+                ? h("div", { class: "rex-dash-status-item" },
+                    h("span", { class: "prd-status-dot prd-status-blocked" }),
+                    h("span", { class: "rex-dash-status-label" }, "Blocked"),
+                    h("span", { class: "rex-dash-status-count" }, String(stats.blocked)),
+                  )
+                : null,
+              stats.deferred > 0
+                ? h("div", { class: "rex-dash-status-item" },
+                    h("span", { class: "prd-status-dot prd-status-deferred" }),
+                    h("span", { class: "rex-dash-status-label" }, "Deferred"),
+                    h("span", { class: "rex-dash-status-count" }, String(stats.deferred)),
+                  )
+                : null,
+            ),
+          ),
+        ),
 
         // Structure health card
         health
@@ -577,42 +728,6 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
             )
           : null,
 
-        // Status breakdown (small summary)
-        h("div", { class: "rex-dash-panel" },
-          h("h3", { class: "rex-dash-panel-title" }, "Status Breakdown"),
-          h("div", { class: "rex-dash-status-grid" },
-            h("div", { class: "rex-dash-status-item" },
-              h("span", { class: "prd-status-dot prd-status-completed" }),
-              h("span", { class: "rex-dash-status-label" }, "Completed"),
-              h("span", { class: "rex-dash-status-count" }, String(stats.completed)),
-            ),
-            h("div", { class: "rex-dash-status-item" },
-              h("span", { class: "prd-status-dot prd-status-in-progress" }),
-              h("span", { class: "rex-dash-status-label" }, "In Progress"),
-              h("span", { class: "rex-dash-status-count" }, String(stats.inProgress)),
-            ),
-            h("div", { class: "rex-dash-status-item" },
-              h("span", { class: "prd-status-dot prd-status-pending" }),
-              h("span", { class: "rex-dash-status-label" }, "Pending"),
-              h("span", { class: "rex-dash-status-count" }, String(stats.pending)),
-            ),
-            stats.blocked > 0
-              ? h("div", { class: "rex-dash-status-item" },
-                  h("span", { class: "prd-status-dot prd-status-blocked" }),
-                  h("span", { class: "rex-dash-status-label" }, "Blocked"),
-                  h("span", { class: "rex-dash-status-count" }, String(stats.blocked)),
-                )
-              : null,
-            stats.deferred > 0
-              ? h("div", { class: "rex-dash-status-item" },
-                  h("span", { class: "prd-status-dot prd-status-deferred" }),
-                  h("span", { class: "rex-dash-status-label" }, "Deferred"),
-                  h("span", { class: "rex-dash-status-count" }, String(stats.deferred)),
-                )
-              : null,
-          ),
-        ),
-
         // Quick nav to PRD tree
         navigateTo
           ? h("div", { class: "rex-dash-panel rex-dash-panel-actions" },
@@ -639,6 +754,9 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
             )
           : null,
       ),
+
+      // Full width under the panels, so no column runs on past the other.
+      h(EpicProgress, { epics: sortedEpics, rootLabel, rootPlural, navigateTo }),
     ),
 
     // Reorganize slide-out panel

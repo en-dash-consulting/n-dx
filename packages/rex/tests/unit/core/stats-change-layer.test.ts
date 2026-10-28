@@ -54,5 +54,21 @@ describe("stats over a projected v2 change layer", () => {
     expect(e1.stats.total).toBe(0);
     expect(e1).not.toHaveProperty("type");
     expect(e1).not.toHaveProperty("selfCounted");
+    expect(e1).not.toHaveProperty("tags");
+    expect(e1).not.toHaveProperty("assignees");
+  });
+
+  it("carries the item's tags and every assignee under it, its own first", () => {
+    const v1 = [{
+      id: "e1", title: "E", level: "epic", status: "pending", tags: ["web"], assignee: "Ada <a@x>",
+      children: [
+        { id: "t1", title: "T1", level: "task", status: "pending", assignee: "Bo <b@x>" },
+        { id: "t2", title: "T2", level: "task", status: "pending", assignee: "Ada <a@x>",
+          children: [{ id: "s1", title: "S1", level: "subtask", status: "pending", assignee: "Cy <c@x>" }] },
+      ],
+    }] as PRDItem[];
+    const [e1] = computeEpicStats(v1);
+    expect(e1.tags).toEqual(["web"]);
+    expect(e1.assignees).toEqual(["Ada <a@x>", "Bo <b@x>", "Cy <c@x>"]);
   });
 });

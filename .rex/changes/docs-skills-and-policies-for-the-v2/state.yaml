@@ -10,9 +10,16 @@ items:
     lastModified: "2026-10-10T05:35:28.417Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "447187d5-7baf-4dda-b1d7-c0827a155cac":
+    status: "completed"
+    startedAt: "2026-10-27T18:09:53.757Z"
+    completedAt: "2026-10-27T18:09:53.757Z"
+    endedAt: "2026-10-27T18:09:53.757Z"
+    activeIntervals: [{"end":"2026-10-27T18:09:53.757Z","start":"2026-10-27T18:09:53.757Z"}]
+    appliedAt: "2026-10-27T18:09:53.757Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-06T15:51:36.831Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T18:09:53.757Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "4e4bec55-c0db-4d0b-a255-ca23bade7672":
     status: "completed"
     startedAt: "2026-10-15T04:33:54.740Z"
@@ -43,8 +50,15 @@ items:
     lastModified: "2026-10-10T19:36:07.037Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a1107d3c-20b9-4966-ac86-bed72046c93d":
-    lastModified: "2026-10-08T18:56:29.737Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-27T17:57:32.083Z"
+    completedAt: "2026-10-27T18:09:53.757Z"
+    endedAt: "2026-10-27T18:09:53.757Z"
+    activeIntervals: [{"end":"2026-10-27T18:09:53.757Z","start":"2026-10-27T17:57:32.083Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "V2 guidance, schema/public contract and host-neutral merge rules updated; executable two-root and MCP inventory guards. 378 root and 90 scoped Rex tests pass; docs build passes; adversarial must/should fixes resolved. Prepared on work/a1107d3c-v2-guidance-policy for PR approval."
+    lastModified: "2026-10-27T18:09:53.757Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "a5a70901-38b5-47d0-99ab-07599c18f4c9":
     status: "completed"
     startedAt: "2026-10-16T21:26:03.731Z"

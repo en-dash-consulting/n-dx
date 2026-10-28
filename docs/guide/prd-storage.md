@@ -108,7 +108,7 @@ The v2 reader reads a v1 tree as changes, tasks and subtasks: epics and
 features read as changes.
 
 The normative serializer and parser contract for this layout is
-[PRD Folder-Tree Schema](../architecture/prd-folder-tree-schema).
+[v1 Folder-Tree Schema](../architecture/prd-v1-folder-tree-schema).
 
 ### Folder per branch, file per leaf
 
@@ -143,13 +143,14 @@ it leaves ambiguous files in place rather than guessing.
 
 ### Worked example: n-dx's own PRD
 
-n-dx manages its own work with ndx, and this repository is still a v1
-project, so its PRD is a live example of the v1 layout:
+n-dx manages its own work with ndx. This repository uses the v2 schema
+under the legacy `.rex/` directory layout:
 
 | Artifact | What it is |
 |----------|-----------|
 | [`prd.md`](https://github.com/en-dash-consulting/n-dx/blob/main/prd.md) | The hand-written product spec ndx started from: the input `ndx add --file=` and `ndx plan --file=` accept |
-| [`.rex/prd_tree/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/prd_tree) | The tree ndx manages: slug-named folders, YAML frontmatter, generated child tables |
+| [`.rex/product/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/product) | Standing requirements: areas, capabilities and constraints |
+| [`.rex/changes/`](https://github.com/en-dash-consulting/n-dx/tree/main/.rex/changes) | Work: changes, tasks and subtasks, with committed state apart from intent |
 
 ## Working with the PRD
 
@@ -172,6 +173,7 @@ From an assistant session the same operations are MCP tools (`get_product`,
 ## Related references
 
 - The model: [The PRD](./concepts/) · [Changes and apply](./concepts/changes-and-apply)
-- v1 schema: [PRD Folder-Tree Schema](../architecture/prd-folder-tree-schema)
+- v2 schema: [PRD Schema v2](../architecture/prd-folder-tree-schema)
+- v1 schema: [v1 Folder-Tree Schema](../architecture/prd-v1-folder-tree-schema)
 - Concurrency: [PRD Write Concurrency](../architecture/prd-write-concurrency)
 - Source: `packages/rex/src/store/prd-model-reader.ts` and `prd-model-writer.ts` (v2), `folder-tree-serializer.ts` and `folder-tree-parser.ts` (v1)

@@ -7,7 +7,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 ## Packages
 
 - **sourcevision** — Static analysis: file inventory, import graph, zone detection (Louvain community detection), React component catalog. Produces `.sourcevision/CONTEXT.md` and `llms.txt` for AI consumption.
-- **rex** — PRD management: hierarchical epics/features/tasks/subtasks, `analyze` scans project + sourcevision output to generate proposals, `status` shows completion tree. Stores all PRD state in a slug-based folder tree at `.rex/prd_tree/`: one directory per item with an `index.md` file. No JSON files are written by PRD mutations.
+- **rex** — PRD management: the v2 product layer holds areas, capabilities and constraints; the change layer holds changes, tasks and subtasks. Capability criteria describe standing requirements; acceptance criteria describe when work is done. `analyze` proposes changes, `status` shows progress. Intent is Markdown; tool state is committed `state.yaml`.
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 - **lang-kit and packs** — `@n-dx/lang-kit`: language facts and the pack contract (foundation, no dependencies). `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs: sourcevision loads them at run time. See each package's `AGENTS.md`.
 - **graview** — Graview projection: `ndx graview emit|check|describe|serve|mcp` writes a `graview-document` declaration and a `{nodes, edges}` snapshot of the PRD, the analysis and the runs under the layout's graview dir, then spawns the `graview` CLI on them. No `@graview/*` dependency; the binary is a peer tool.
@@ -113,28 +113,31 @@ two writers: `ndx ci` with `ndx work`, `ndx plan` with `ndx work`, `ndx refresh`
 with any write command, or two `ndx config` runs. The full table is in
 [docs/architecture/overview.md](docs/architecture/overview.md#concurrency).
 
-**General rule:** Commands that write to the PRD backend (`.rex/prd_tree/`), `.sourcevision/`, or `.hench/config.json` must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
+**General rule:** Commands that write to the PRD backend (`product/` and `changes/` under the resolved rex directory on v2, `prd_tree/` on v1), sourcevision output, or hench config must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
-**MCP write operations** (`add_item`, `edit_item`, `update_task_status`, `merge_items`, `move_item`) write only to the folder tree (`.rex/prd_tree/`). No JSON files are produced.
+**MCP write operations** write PRD intent and state only under those layout-specific roots. Configuration and execution logs are separate from the PRD backend.
 
-**What the code enforces, and what does not.** PRD-writing MCP tools, dashboard
-routes and bulk restructurers read-modify-write inside `store.withTransaction`,
-which holds the PRD file lock for the whole span; a writer that cannot take the
-lock fails loudly naming the holder's PID. The lock is per workspace, one per
-`rexDir`, so it does not serialize two worktrees. Other CLI write paths
-(`analyze`/`plan` imports, `update`, `move`, `remove`, `fix`) still
-load→mutate→save, so the last full-document writer wins — do not run them
-alongside another PRD writer. Reasoning and the export carve-outs:
+**Lock scope.** V2 writes use `withPrdModelTransaction`; store consumers use
+`store.withTransaction`. The PRD lock covers read-modify-write and a refused
+writer names its holder. It is per workspace (`rexDir`), so it does not
+serialize two worktrees. A lock around a save alone cannot refresh an older
+snapshot; keep writers sequential. Reasoning and the export carve-outs:
 [docs/architecture/prd-write-concurrency.md](docs/architecture/prd-write-concurrency.md).
 
-**PRD invariant.** The sole writable PRD surface is the folder tree: `.rex/prd_tree/` (slug-named directories, each with `index.md`). No PRD mutation (CLI, MCP, or `rex update`) writes to `prd.md`, branch-scoped `.rex/prd_{branch}_{date}.md` files, or `prd.json`. Avoid parallel writers.
+**PRD invariant.** On v2 the only writable PRD roots are `product/` and `changes/` under the resolved rex directory (`.ndx/rex/`, or `.rex/` on the legacy directory layout): Markdown intent plus committed `state.yaml`. On v1 the writable backend remains `prd_tree/` until migration. Ordinary PRD mutations never write `prd.md`, branch-scoped `prd_*.md`, or `prd.json`; legacy conversion commands are explicit migration exceptions. Avoid parallel writers.
 
 **Export carve-outs.** `ndx prd export` writes a JSON bundle, and
 `--format=narrative` writes prose Markdown; both go to an operator-chosen
 path outside `.rex/`, enforced in code, and neither is a PRD backend. The
 bundle round-trips through `rex import-bundle`; the narrative is one-way and
 lossy by construction — do not add a parser for it. (`ndx export` is a
-different command: it publishes the static dashboard.)
+different command: it publishes the static dashboard.) The export path must be
+outside the resolved rex directory, including `.ndx/rex/` on the current layout.
+
+**Public contract.** The [public surface](docs/architecture/public-surface.md)
+declares the 0.9.0 soft freeze, 1.0.0 freeze and host-neutral merge requirements:
+scoped tests, patch changesets, atomic code/PRD commits and final `N-DX-Item`
+trailers. Experimental surfaces stay changeable until promoted.
 
 
 ### Package conventions
@@ -153,19 +156,13 @@ workflow, skills and MCP sections and `codex-troubleshooting.md`. `CLAUDE.md`
 is the same guidance plus `claude-addendum.md`. `.codex/config.toml` carries
 the MCP server descriptors.
 
-**Design invariant:** both instruction files take their project documentation
-from `project-guidance.md`, and vendor-specific material layers on top rather
-than being inlined — that is what stops the two surfaces drifting. The addendum
-is for Claude Code's own behaviour alone: anything describing the *codebase*
-belongs in the shared guidance, because a section in the addendum never reaches
-`AGENTS.md`. `tests/e2e/instruction-alignment.test.js` enforces both halves.
+**Design invariant:** codebase documentation belongs in `project-guidance.md`;
+only Claude Code's own behaviour belongs in `claude-addendum.md`, which never
+reaches `AGENTS.md`. `tests/e2e/instruction-alignment.test.js` enforces this.
 
-Re-run `ndx init` after changing anything under
-`packages/core/assistant-assets/`. The root `AGENTS.md` has a byte budget —
-Codex reads the root and a package's file as one chain and silently drops the
-tail past `project_doc_max_bytes`, so `tests/e2e/agents-md-size-budget.test.js`
-fails a pull request that grows it too far. Put reasoning in `docs/` and link
-it.
+Re-run `ndx init` after editing `packages/core/assistant-assets/`.
+`tests/e2e/agents-md-size-budget.test.js` limits root + nested instructions:
+Codex drops their tail past `project_doc_max_bytes`. Put detail in `docs/`.
 
 ## n-dx Orchestration Commands
 
@@ -184,7 +181,8 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 
 | Path | Purpose |
 |------|---------|
-| `.rex/prd_tree/` | PRD storage root — slug-based folder tree; one directory per item (epic/feature/task) containing `index.md` |
+| `.ndx/rex/product/`, `.ndx/rex/changes/` | v2 PRD roots; `.rex/product/` and `.rex/changes/` on the legacy directory layout |
+| `.rex/prd_tree/` | v1 backend, retained only for projects not yet migrated |
 | `.rex/prd.md` | (Legacy) flat Markdown PRD; migration source for `rex migrate-to-folder-tree`. Absent after migration. |
 | `.rex/prd.json` | (Legacy) JSON PRD; migration source when neither `prd.md` nor the tree exists. |
 | `.rex/execution-log.jsonl` | Append-only structured activity log (rotates to `.rex/execution-log.1.jsonl` at 1 MB) |
@@ -203,7 +201,7 @@ usage cursors, the archive and the dashboard spend ledger — are described in
 [docs/architecture/generated-files.md](docs/architecture/generated-files.md).
 All of them are machine-local and safe to delete.
 
-> **PRD file layout.** Subtasks are encoded as sections within the parent task's `index.md` (not separate directories). `.rex/.cache/prd.json` is an ephemeral derived file generated only while `ndx start` is running — do not read it from code outside the web server, and never commit it (`rex init` gitignores it; hench's completion gate discounts it, so a run made while the dashboard is up is not refused over the watcher's rewrite). See [`docs/architecture/prd-folder-tree-schema.md`](docs/architecture/prd-folder-tree-schema.md) for the full naming-convention, field schema, and serializer/parser contracts.
+> **PRD layout.** V2 changes always have `index.md` folders; other nodes use folders with children and `<slug>.md` leaves. `state.yaml` keeps tool state apart. Never commit the rex directory's dashboard-derived `.cache/prd.json` or use it as a backend. See the [v2 schema](docs/architecture/prd-folder-tree-schema.md).
 
 ## Workflow
 

@@ -53,7 +53,24 @@ async function mount(): Promise<void> {
 }
 
 const list = () => root.querySelector<HTMLElement>("#rex-dash-epic-list");
-const toggle = () => root.querySelector<HTMLButtonElement>(".rex-dash-epics-toggle");
+const toggle = () => root.querySelector<HTMLButtonElement>("button.rex-dash-epics-toggle[aria-controls]");
+const head = () => root.querySelector<HTMLButtonElement>(".rex-dash-epics-head");
+const titles = () => [...root.querySelectorAll(".rex-dash-epic .rex-task-link-title")].map((el) => el.textContent);
+
+/** Closed by default: open it, as a reader would. */
+function openSection(): void {
+  if (head()?.getAttribute("aria-expanded") !== "true") act(() => { head()!.click(); });
+}
+
+function change(id: string, status: string, extra: object = {}) {
+  return { id, title: id, status, stats: STATS, percentComplete: 25, ...extra };
+}
+
+async function setInput(selector: string, value: string, event: "input" | "change"): Promise<void> {
+  const el = root.querySelector<HTMLInputElement | HTMLSelectElement>(selector)!;
+  el.value = value;
+  await act(async () => { el.dispatchEvent(new Event(event, { bubbles: true })); });
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -71,6 +88,7 @@ describe("Epic Progress", () => {
   it("starts as a bounded scroll region holding every epic", async () => {
     stub(30);
     await mount();
+    openSection();
     expect(list()?.classList.contains("rex-dash-epic-list--scroll")).toBe(true);
     // Scrollable, not truncated: every epic is in the list.
     expect(list()?.querySelectorAll(".rex-dash-epic")).toHaveLength(30);
@@ -83,6 +101,7 @@ describe("Epic Progress", () => {
   it("expands to full height and back, remembering the choice", async () => {
     stub(30);
     await mount();
+    openSection();
     act(() => { toggle()!.click(); });
     expect(list()?.classList.contains("rex-dash-epic-list--expanded")).toBe(true);
     expect(toggle()?.getAttribute("aria-expanded")).toBe("true");
@@ -91,6 +110,7 @@ describe("Epic Progress", () => {
     render(null, root);
     root.remove();
     await mount();
+    openSection();
     expect(list()?.classList.contains("rex-dash-epic-list--expanded")).toBe(true);
 
     act(() => { toggle()!.click(); });
@@ -101,6 +121,7 @@ describe("Epic Progress", () => {
   it("offers no toggle when there are no epics", async () => {
     stub(0);
     await mount();
+    openSection();
     expect(toggle()).toBeNull();
     expect(root.textContent).toContain("No epics defined yet.");
   });
@@ -108,6 +129,7 @@ describe("Epic Progress", () => {
   it("labels a v1 PRD's rows epics and counts each by its tasks", async () => {
     stub(1);
     await mount();
+    openSection();
     expect(root.querySelector(".rex-dash-epics h3")?.textContent).toBe("Epic Progress");
     expect(root.querySelector(".rex-dash-epics .rex-dash-section-meta")?.textContent).toBe("1 epic");
     expect(list()?.getAttribute("aria-label")).toBe("Epic progress");
@@ -125,6 +147,7 @@ describe("Change Progress (v2)", () => {
       { id: "tasks", title: "With tasks", status: "in_progress", type: "change", stats: STATS, percentComplete: 25 },
     ]));
     await mount();
+    openSection();
     expect(root.querySelector(".rex-dash-epics h3")?.textContent).toBe("Change Progress");
     expect(root.querySelector(".rex-dash-epics .rex-dash-section-meta")?.textContent).toBe("2 changes");
     expect(list()?.getAttribute("aria-label")).toBe("Change progress");
@@ -136,6 +159,91 @@ describe("Change Progress (v2)", () => {
   it("says no changes when there are none", async () => {
     stub(0, v2([]));
     await mount();
+    openSection();
     expect(root.textContent).toContain("No changes defined yet.");
+  });
+});
+
+describe("Change Progress dropdown and filters", () => {
+  const withEpics = (epics: object[]) => ({ ...dashboard(0), layout: "v2", epics });
+  const ROWS = [
+    change("alpha-done", "completed", { tags: ["web"], assignees: ["Ada <a@x>"] }),
+    change("bravo-pending", "pending", { tags: ["rex"], assignees: ["Bo <b@x>"] }),
+    change("charlie-active", "in_progress", { tags: ["web", "rex"], assignees: ["Bo <b@x>", "Ada <a@x>"] }),
+    change("delta-blocked", "blocked"),
+  ];
+
+  it("is closed by default and mounts no rows until opened, then remembers", async () => {
+    stub(0, withEpics(ROWS));
+    await mount();
+    expect(head()?.getAttribute("aria-expanded")).toBe("false");
+    expect(list()).toBeNull();
+    expect(root.querySelector(".rex-dash-epic")).toBeNull();
+    // The count reads while closed.
+    expect(root.querySelector(".rex-dash-epics .rex-dash-section-meta")?.textContent).toBe("4 changes");
+
+    openSection();
+    expect(head()?.getAttribute("aria-expanded")).toBe("true");
+    expect(localStorage.getItem("ndx.rex-dash.epics-open")).toBe("true");
+    render(null, root);
+    root.remove();
+    await mount();
+    expect(list()).not.toBeNull();
+  });
+
+  it("hides completed rows by default and lists in progress first", async () => {
+    stub(0, withEpics(ROWS));
+    await mount();
+    openSection();
+    expect(titles()).toEqual(["charlie-active", "bravo-pending", "delta-blocked"]);
+    expect(root.querySelector(".rex-dash-epics .rex-dash-section-meta")?.textContent).toBe("3 of 4 changes");
+
+    await setInput('select[aria-label="Status"]', "all", "change");
+    expect(titles()).toContain("alpha-done");
+    await setInput('select[aria-label="Status"]', "completed", "change");
+    expect(titles()).toEqual(["alpha-done"]);
+  });
+
+  it("searches by name", async () => {
+    stub(0, withEpics(ROWS));
+    await mount();
+    openSection();
+    await setInput('input[type="search"]', "BRAVO", "input");
+    expect(titles()).toEqual(["bravo-pending"]);
+    await setInput('input[type="search"]', "nothing like it", "input");
+    expect(titles()).toEqual([]);
+    expect(root.textContent).toContain("No changes match these filters.");
+  });
+
+  it("filters by tag and by owner, with an Unassigned choice, and clears", async () => {
+    stub(0, withEpics(ROWS));
+    await mount();
+    openSection();
+    const options = (label: string) =>
+      [...root.querySelectorAll(`select[aria-label="${label}"] option`)].map((o) => o.textContent);
+    expect(options("Tag")).toEqual(["Any tag", "rex", "web"]);
+    // Owners read by name, not the "Name <email>" identity.
+    expect(options("Owner")).toEqual(["Anyone", "Ada", "Bo", "Unassigned"]);
+
+    await setInput('select[aria-label="Tag"]', "web", "change");
+    expect(titles()).toEqual(["charlie-active"]);
+    await setInput('select[aria-label="Tag"]', "", "change");
+
+    await setInput('select[aria-label="Owner"]', "Bo <b@x>", "change");
+    expect(titles()).toEqual(["charlie-active", "bravo-pending"]);
+    await setInput('select[aria-label="Owner"]', "\0unassigned", "change");
+    expect(titles()).toEqual(["delta-blocked"]);
+
+    const clear = [...root.querySelectorAll<HTMLButtonElement>("button.rex-dash-epics-toggle")].find((b) => b.textContent === "Clear")!;
+    act(() => { clear.click(); });
+    expect(titles()).toEqual(["charlie-active", "bravo-pending", "delta-blocked"]);
+  });
+
+  it("offers no tag or owner filter when no row has one", async () => {
+    stub(0, withEpics([change("plain", "pending")]));
+    await mount();
+    openSection();
+    expect(root.querySelector('select[aria-label="Tag"]')).toBeNull();
+    expect(root.querySelector('select[aria-label="Owner"]')).toBeNull();
   });
 });
