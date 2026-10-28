@@ -10,6 +10,7 @@ import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
 import { HenchConfigSchema } from "../../../src/schema/index.js";
 import { loadConfig } from "../../../src/store/config.js";
 import { resolveApiKey } from "../../../src/store/project-config.js";
+import { HENCH_OVERRIDE_FIELD_CHECKS } from "@n-dx/llm-client";
 
 let repo: string;
 let home: string;
@@ -411,6 +412,67 @@ describe("repository trust under project overrides", () => {
     expect(applied.evaluation.findings.find((f) => f.code === "credential-routing")?.values)
       .toContain("hench.apiKeyEnv = REPO_CHOSEN_TOKEN");
     expect(applied.config.apiKeyEnv).toBe("ANTHROPIC_API_KEY");
+  });
+
+  // hench falls back to claudePath when no cli_path is set, so a masked one
+  // picks the Claude binary while the review reads none.
+  it.each([
+    ["a number", 1], ["null", null], ["an object", {}], ["an array", []],
+  ])("reviews the claudePath hench runs when .n-dx.json masks it with %s", async (_name, mask) => {
+    writeHenchConfig({ ...DEFAULT_HENCH_CONFIG(), claudePath: "/tmp/FAKE_evil_claude" });
+    writeFileSync(join(repo, ".n-dx.json"), JSON.stringify({ hench: { claudePath: mask } }));
+
+    const { config, permissionMode } = await effective();
+    // The loader reverts the invalid override, so the hench file's binary is what runs.
+    expect(config.claudePath).toBe("/tmp/FAKE_evil_claude");
+
+    const applied = applyRepoTrust(config, repo, permissionMode, { ndxHome: home });
+    expect(applied.evaluation.state).toBe("untrusted");
+    expect(applied.evaluation.findings.find((f) => f.code === "vendor-cli-path")?.values)
+      .toContain("hench.claudePath = /tmp/FAKE_evil_claude");
+    expect(applied.clamped).toBe(true);
+    expect(applied.config.claudePath).toBeUndefined();
+  });
+
+  it("reviews the claudePath hench runs when a tracked .n-dx.local.json masks it", async () => {
+    writeHenchConfig({ ...DEFAULT_HENCH_CONFIG(), claudePath: "/tmp/FAKE_evil_claude" });
+    writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench: { claudePath: 1 } }));
+    execFileSync("git", ["init", "-q"], { cwd: repo, stdio: "ignore" });
+    execFileSync("git", ["add", "-f", ".n-dx.local.json"], { cwd: repo, stdio: "ignore" });
+
+    const { config, permissionMode } = await effective();
+    expect(config.claudePath).toBe("/tmp/FAKE_evil_claude");
+
+    const applied = applyRepoTrust(config, repo, permissionMode, { ndxHome: home });
+    expect(applied.evaluation.findings.find((f) => f.code === "vendor-cli-path")?.values)
+      .toContain("hench.claudePath = /tmp/FAKE_evil_claude");
+    expect(applied.config.claudePath).toBeUndefined();
+  });
+
+  // Every hench field the review reads goes through a field check (the
+  // collector's types refuse any other read); each check must agree with
+  // hench's schema on what is valid, or an override hench reverts reads as
+  // the review's value.
+  describe("field checks agree with hench's schema", () => {
+    const schemaShape = HenchConfigSchema.shape as Record<string, { safeParse(v: unknown): { success: boolean } }>;
+    const defaults = DEFAULT_HENCH_CONFIG() as unknown as Record<string, unknown>;
+    const samples: unknown[] = [
+      0, 1, -1, 1.5, true, null, "", "x", "claude", "/opt/claude", [], ["x"], {}, { futureKnob: true },
+      "default", "acceptEdits", "bypassPermissions", "plan", "cli", "api", "typescript", "javascript", "go", "swift",
+    ];
+
+    it.each(Object.keys(HENCH_OVERRIDE_FIELD_CHECKS))("%s", (field) => {
+      expect(schemaShape[field], `${field} is not a hench config field`).toBeDefined();
+      const check = HENCH_OVERRIDE_FIELD_CHECKS[field];
+      for (const sample of samples) {
+        // An object override deep-merges over the lower layer before either side validates it.
+        const base = defaults[field];
+        const value = sample && typeof sample === "object" && !Array.isArray(sample) && base && typeof base === "object"
+          ? { ...(base as object), ...sample }
+          : sample;
+        expect(check(value), `${field} = ${JSON.stringify(value)}`).toBe(schemaShape[field].safeParse(value).success);
+      }
+    });
   });
 
   /** The execution view of a config, in the collector's terms. */

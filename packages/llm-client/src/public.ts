@@ -435,6 +435,7 @@ export {
   formatRepoTrustReport,
   escapeTerminalControls,
   isLocalConfigTracked,
+  HENCH_OVERRIDE_FIELD_CHECKS,
 } from "./repo-trust.js";
 export type {
   GuardBaseline,

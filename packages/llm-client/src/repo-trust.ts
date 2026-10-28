@@ -572,8 +572,8 @@ function relOf(root: string, path: string): string {
 // that fails to the layer below. The review must read the same way, or an
 // override of the wrong type reads as an empty allowlist here while hench
 // runs the wide one beneath it. These checks mirror hench's schema for the
-// top-level fields the review reads; hench's `trust.test.ts` holds them to
-// it field by field.
+// top-level fields the review reads (the collector's types refuse a read of
+// any other field), and hench's `trust.test.ts` holds each to that schema.
 
 type FieldCheck = (value: unknown) => boolean;
 
@@ -595,7 +595,7 @@ const shape = (fields: Record<string, FieldCheck>): FieldCheck =>
 // Fields hench requires are checked only when present. JSON cannot delete a
 // key, so one is missing after the merge only when `.hench/config.json` lacks
 // it, and hench refuses or salvages that file before any override applies.
-const HENCH_FIELD_CHECKS: Record<string, FieldCheck> = {
+const HENCH_FIELD_CHECKS = {
   guard: shape({
     blockedPaths: optional(strings),
     allowedCommands: optional(strings),
@@ -625,10 +625,22 @@ const HENCH_FIELD_CHECKS: Record<string, FieldCheck> = {
     env: optional(shape({ deny: optional(strings), allow: optional(strings) })),
   }),
   apiKeyEnv: optional((v) => typeof v === "string"),
+  // hench falls back to it when no cli_path is set: an invalid override must
+  // not hide the binary the layer below names.
+  claudePath: optional((v) => typeof v === "string"),
   permissionMode: optional(oneOf("default", "acceptEdits", "bypassPermissions", "plan")),
   language: optional(oneOf("typescript", "javascript", "go", "swift")),
   provider: optional(oneOf("cli", "api")),
-};
+} satisfies Record<string, FieldCheck>;
+
+/**
+ * The checks the review folds hench override layers with, one per top-level
+ * hench field it reads. Exported so hench's tests can hold each to its schema.
+ */
+export const HENCH_OVERRIDE_FIELD_CHECKS: Readonly<Record<string, FieldCheck>> = HENCH_FIELD_CHECKS;
+
+/** The folded hench section, readable only through fields that have a check. */
+type ReviewedHench = { readonly [K in keyof typeof HENCH_FIELD_CHECKS]?: unknown };
 
 /**
  * Fold one override layer over `lower` as hench's loader does: deep-merge,
@@ -681,7 +693,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   // Layer by layer, as hench's loader folds them: deep (a shallow spread let a
   // project-config `guard` without `env` drop the hench file's
   // `guard.env.deny`), and an invalid field reverts to the layer beneath it.
-  const merged = foldHenchOverride(
+  const merged: ReviewedHench = foldHenchOverride(
     foldHenchOverride(henchConfig ?? {}, projectHench ?? {}),
     sectionOf(localConfig, "hench") ?? {},
   );

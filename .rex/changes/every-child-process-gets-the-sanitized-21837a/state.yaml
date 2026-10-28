@@ -18,8 +18,15 @@ items:
     lastModified: "2026-10-28T21:51:29.681Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8c2cd508-2e50-41a3-9350-8df138aec452":
+    status: "completed"
+    startedAt: "2026-10-28T22:08:20.316Z"
+    completedAt: "2026-10-28T22:17:05.608Z"
+    endedAt: "2026-10-28T22:17:05.608Z"
+    activeIntervals: [{"end":"2026-10-28T22:17:05.608Z","start":"2026-10-28T22:08:20.316Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "claudePath added to the trust review's hench field checks; collector can only read checked fields (type); hench test holds each check to the schema."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T21:51:14.715Z"
+    lastModified: "2026-10-28T22:17:05.608Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9adf1968-3c40-41eb-824a-212092764847":
     assignee: "Ryan Keith <ryan.k@endash.us>"
