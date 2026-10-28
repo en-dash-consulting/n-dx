@@ -17,10 +17,14 @@ items:
     lastModified: "2026-10-28T15:04:15.145Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4f37d5e4-3cb0-4947-a9df-5c50fc322829":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T16:11:48.176Z"
-    activeIntervals: [{"start":"2026-10-28T16:11:48.176Z"}]
-    lastModified: "2026-10-28T16:11:49.073Z"
+    completedAt: "2026-10-28T16:21:06.614Z"
+    endedAt: "2026-10-28T16:21:06.614Z"
+    activeIntervals: [{"end":"2026-10-28T16:21:06.614Z","start":"2026-10-28T16:11:48.176Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Agent picker (vendor/model from /api/llm/catalog; change on open session starts a new session, old stays resumable) and expandable tool calls with paired results. Commit a16eb803f."
+    lastModified: "2026-10-28T16:21:06.614Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a6f9250c-903e-43c0-af9a-bbeb0692d5b9":
     lastModified: "2026-10-28T15:04:13.162Z"

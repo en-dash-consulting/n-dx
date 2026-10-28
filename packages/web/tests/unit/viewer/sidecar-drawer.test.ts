@@ -503,6 +503,16 @@ describe("tool calls", () => {
     expect([...paired].map(([seq, r]) => [seq, r.output])).toEqual([[1, "A"], [2, "B"]]);
   });
 
+  it("pairs results that name no tool, as Claude's and Codex's function-call results do, with the earliest open call", () => {
+    const paired = pairToolResults([
+      call(1, "Read", { file_path: "a" }), result(2, "unknown", "A"),
+      call(3, "Bash", { command: "ls" }), call(4, "shell", { command: "pwd" }),
+      result(5, "shell", "/repo"), result(6, "unknown", "files"),
+      result(7, "unknown", "stray"),
+    ]);
+    expect([...paired].map(([seq, r]) => [seq, r.output]).sort()).toEqual([[1, "A"], [3, "files"], [4, "/repo"]]);
+  });
+
   it("draws collapsed with name and summary, expands to the raw input and the matching result", async () => {
     server.sessions = [{ session: session(), running: false }];
     server.frames = [
