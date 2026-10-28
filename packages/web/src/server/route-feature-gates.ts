@@ -96,10 +96,11 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
   },
   {
     feature: "web.sidecar",
-    exact: [],
+    exact: ["/api/commands/sidecar-command/status", "/api/commands/sidecar-command/stop"],
     prefix: "/api/sidecar",
     reason:
-      "Every Sidecar session route, reads included: a turn spends tokens through the vendor CLI, and the session ids are in the path.",
+      "Every Sidecar session route, reads included: a turn spends tokens through the vendor CLI, and the session ids are in the path. " +
+      "The Sidecar command job's status and stop routes too: only an approved Sidecar call starts that job, and the job tray skips a refused status.",
   },
   {
     feature: "rex.placementDraft",

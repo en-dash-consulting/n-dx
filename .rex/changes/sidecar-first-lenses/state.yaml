@@ -7,10 +7,14 @@ items:
     lastModified: "2026-10-28T21:45:58.175Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2f15d421-fa29-4464-9ab1-6131e80728a3":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T21:57:23.949Z"
-    activeIntervals: [{"start":"2026-10-28T21:57:23.949Z"}]
-    lastModified: "2026-10-28T21:57:24.549Z"
+    completedAt: "2026-10-28T22:16:08.341Z"
+    endedAt: "2026-10-28T22:16:08.341Z"
+    activeIntervals: [{"end":"2026-10-28T22:16:08.341Z","start":"2026-10-28T21:57:23.949Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sidecar/carry-out.ts carries out approved broker calls: run_command as a sidecar-command job (tray + Live), start_work through the hench execute route under maxConcurrentProcesses with a --resolve preview on the card; other tools report recorded-not-carried-out with their batch."
+    lastModified: "2026-10-28T22:16:08.341Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "613fc6f0-e46a-4278-bf2e-9dbe2263ecf2":
     lastModified: "2026-10-28T21:45:56.161Z"

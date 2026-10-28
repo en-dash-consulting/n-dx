@@ -1390,17 +1390,6 @@ function launchAsyncJob<S extends AsyncJobStatus>(
   // is JSON.parse'd from it, and a payload larger than the display slice
   // would otherwise be truncated into a parse failure.
   let streamed = "";
-  const child = spawnManaged(bin, cmdArgs, {
-    cwd: ctx.projectDir,
-    timeout,
-    stdio: "pipe",
-    onStdout: (chunk) => {
-      streamed = (streamed + chunk).slice(-1_000_000);
-      status.output = streamed.trim().slice(-5000);
-    },
-  });
-  job.child = child;
-
   const settle = (error: string | null) => {
     const wasStopped = job.stopRequested;
     status.running = false;
@@ -1411,6 +1400,25 @@ function launchAsyncJob<S extends AsyncJobStatus>(
     job.stopRequested = false;
     onSettled?.(status);
   };
+
+  // `spawn` throws synchronously on an argument it rejects (a NUL byte); the
+  // job must then end failed rather than stay "running" with no child to stop.
+  let child: ManagedChild;
+  try {
+    child = spawnManaged(bin, cmdArgs, {
+      cwd: ctx.projectDir,
+      timeout,
+      stdio: "pipe",
+      onStdout: (chunk) => {
+        streamed = (streamed + chunk).slice(-1_000_000);
+        status.output = streamed.trim().slice(-5000);
+      },
+    });
+  } catch (err) {
+    settle(errorMessage(err));
+    throw err;
+  }
+  job.child = child;
 
   child.done.then((result) => {
     status.output = outputTail((result.stdout || "").trim(), 5000);
@@ -1487,10 +1495,14 @@ export function startSidecarCommand(
   const jobId = `sidecar-command-${randomUUID().slice(0, 8)}`;
   job.status.jobId = jobId;
   job.status.command = command;
-  const startedAt = launchAsyncJob(job, bin, args, ctx, timeout, (status) => {
-    broadcast?.({ type: "commands:sidecar-command-finished", jobId, ok: !status.error, timestamp: status.finishedAt });
-  });
-  return { started: true, jobId, command, startedAt };
+  try {
+    const startedAt = launchAsyncJob(job, bin, args, ctx, timeout, (status) => {
+      broadcast?.({ type: "commands:sidecar-command-finished", jobId, ok: !status.error, timestamp: status.finishedAt });
+    });
+    return { started: true, jobId, command, startedAt };
+  } catch (err) {
+    return { started: false, reason: `the command could not be started: ${errorMessage(err)}` };
+  }
 }
 
 /** The dashboard-started background jobs the job tray and the Live overview list. */

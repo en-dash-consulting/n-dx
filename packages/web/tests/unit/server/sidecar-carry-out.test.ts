@@ -208,6 +208,26 @@ describe("run_command", () => {
     await client.close();
   });
 
+  it("ends the job failed when the spawn throws, so the next command can run", async () => {
+    spawnManagedMock.mockImplementationOnce(() => {
+      throw new TypeError("The argument 'args[1]' must be a string without null bytes");
+    });
+    const client = await brokerClient();
+    const bad = client.callTool({ name: "run_command", arguments: { argv: ["git", "log", "a\u0000b"] } });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
+    const result = await bad;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/Nothing ran: the command could not be started: .*null bytes/);
+    const status = await (await fetch(`${server.baseUrl}/api/commands/sidecar-command/status`)).json();
+    expect(status).toMatchObject({ running: false, error: expect.stringMatching(/null bytes/) });
+
+    cardMessages = [];
+    const next = client.callTool({ name: "run_command", arguments: { argv: ["git", "status"] } });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
+    expect(resultText(await next)).toMatch(/Started `git status` as job/);
+    await client.close();
+  });
+
   it("refuses a program other than ndx and git, running nothing", async () => {
     const client = await brokerClient();
     const call = client.callTool({ name: "run_command", arguments: { argv: ["rm", "-rf", "."] } });

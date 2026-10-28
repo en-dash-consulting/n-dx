@@ -69,6 +69,8 @@ const GATED: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/sidecar/sessions", "web.sidecar"],
   ["/api/sidecar/sessions/abc/turns", "web.sidecar"],
   ["/api/sidecar/sessions/abc/frames", "web.sidecar"],
+  ["/api/commands/sidecar-command/status", "web.sidecar"],
+  ["/api/commands/sidecar-command/stop", "web.sidecar"],
 ];
 
 /** A server that answers 200 "reached" for anything the gate lets past. */
