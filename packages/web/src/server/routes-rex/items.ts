@@ -371,6 +371,8 @@ async function handleItemAdd(
       priority?: string;
       tags?: string[];
       acceptanceCriteria?: string[];
+      /** v2 change only: capability or constraint ids it touches, so it skips the Inbox. */
+      touches?: string[];
     };
 
     if (!input.title || input.title.trim().length === 0) {
@@ -508,16 +510,25 @@ async function handleItemAdd(
 
 /**
  * Add an Inbox change to a v2 tree: a root change that neither amends nor
- * touches anything carries `needsPlacement`, as rex's `add_item` makes it.
+ * touches anything carries `needsPlacement`, as rex's `add_item` makes it. A
+ * non-empty `touches` takes {@link addPlacedChange} instead.
  * Slug and rule checks are the change-layer store's.
  */
 async function addInboxChange(
   res: ServerResponse,
   ctx: ServerContext,
   store: Parameters<typeof completeV2Work>[0],
-  input: { title: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[] },
+  input: { title: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[]; touches?: unknown },
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
+  if (input.touches !== undefined) {
+    const { touches } = input;
+    if (!Array.isArray(touches) || touches.some((t) => typeof t !== "string" || !t.trim())) {
+      errorResponse(res, 400, "touches must be an array of capability or constraint ids");
+      return true;
+    }
+    if (touches.length > 0) return await addPlacedChange(res, ctx, store, { ...input, touches: touches as string[] }, broadcast);
+  }
   const id = randomUUID();
   const item = { id, title: input.title, status: "pending", level: "epic", type: "change", needsPlacement: true } as PRDItem;
   if (input.description) item.description = input.description;
@@ -535,6 +546,57 @@ async function addInboxChange(
   });
   if (broadcast) broadcast({ type: "rex:prd-changed", timestamp: new Date().toISOString() });
   jsonResponse(res, 201, { ok: true, id, type: "change", title: input.title, needsPlacement: true });
+  return true;
+}
+
+/**
+ * Add a root change that already touches product nodes, so it skips the Inbox.
+ * Rex's add rule resolves each id to a live capability or constraint and refuses
+ * otherwise; it sets `needsPlacement` only for a change with no target.
+ */
+async function addPlacedChange(
+  res: ServerResponse,
+  ctx: ServerContext,
+  store: Parameters<typeof completeV2Work>[0],
+  input: { title: string; description?: string; priority?: string; tags?: string[]; acceptanceCriteria?: string[]; touches: string[] },
+  broadcast?: WebSocketBroadcaster,
+): Promise<boolean> {
+  let node: { id: string; title: string };
+  try {
+    ({ result: node } = await store.withModelTransaction((model) => {
+      const added = addChangeNode(
+        model.tree,
+        {
+          type: "change",
+          title: input.title,
+          touches: input.touches.map((t) => t.trim()),
+          description: input.description || undefined,
+          acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
+          tags: Array.isArray(input.tags) ? input.tags : undefined,
+          priority: input.priority && isPriority(input.priority) ? input.priority : undefined,
+        },
+        { now: new Date() },
+      );
+      return { tree: added.tree, result: added.node };
+    }));
+  } catch (err) {
+    const message = errorMessage(err);
+    if (message.includes("Could not acquire PRD lock")) {
+      errorResponse(res, 409, message);
+    } else if (err instanceof Error && (V2_ADD_REFUSALS.has(err.name) || message.includes(" has invalid intent: "))) {
+      errorResponse(res, 400, message);
+    } else {
+      errorResponse(res, 500, message);
+    }
+    return true;
+  }
+
+  refreshPRDCache(ctx.rexDir, await store.loadDocument());
+  const timestamp = new Date().toISOString();
+  appendLog(ctx, { timestamp, event: "item_added", itemId: node.id, detail: `Added change: ${node.title} (via web)` });
+  appendLog(ctx, { timestamp, event: "change_placed", itemId: node.id, detail: `touches ${input.touches.join(", ")} (via web)` });
+  if (broadcast) broadcast({ type: "rex:prd-changed", timestamp });
+  jsonResponse(res, 201, { ok: true, id: node.id, type: "change", title: node.title, needsPlacement: false });
   return true;
 }
 

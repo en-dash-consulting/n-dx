@@ -41,7 +41,10 @@ export interface ViewMeta {
    */
   pixelIcon?: PixelIconName;
   product: ViewProduct;
-  /** One line saying what the view is for. */
+  /**
+   * One line saying what the view is for. May contain `{cli}`; the page title
+   * and stage sections resolve it.
+   */
   blurb: string;
 }
 
@@ -200,6 +203,12 @@ export const VIEW_META = {
     glyph: "⇄",
     product: "rex",
     blurb: "Work grouped by planned release and stage (v2).",
+  },
+  inbox: {
+    label: "Inbox",
+    glyph: "⇲",
+    product: "rex",
+    blurb: "Changes with no place on the product map yet. {cli} work skips their tasks until each is placed.",
   },
   "rex-dashboard": {
     label: "Up Next",

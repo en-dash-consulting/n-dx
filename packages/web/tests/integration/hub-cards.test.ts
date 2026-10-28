@@ -44,8 +44,8 @@ let port: number;
 /** A project server answering only the status route — all a card is built from. */
 function startChild(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolveStart) => {
-    const s = createServer((req, res) => {
-      if (handleStatusRoute(req, res, ctx)) return;
+    const s = createServer(async (req, res) => {
+      if (await handleStatusRoute(req, res, ctx)) return;
       // `/api/git/status` is the softer of the two calls the snapshot makes;
       // 404 here exercises the path where git could not be asked.
       res.writeHead(404);

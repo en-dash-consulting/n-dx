@@ -857,7 +857,7 @@ async function handleApiRoutes(
   if (await handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
   if (isInScope(ctx.scope, "hench") && await handleLiveTaskRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && (await handleLiveAnalyzeRoute(req, res, ctx, liveSourcesOf(registry)))) return true;
-  if (handleStatusRoute(req, res, ctx)) return true;
+  if (await handleStatusRoute(req, res, ctx)) return true;
   if (handleHubAbsentRoute(req, res)) return true;
   if (await handleConfigRoute(req, res, ctx)) return true;
   if (await handleTrustRoute(req, res, ctx)) return true;

@@ -1,0 +1,66 @@
+schema: "rex/v2"
+items:
+  "49203e99-d443-4c3d-be61-a3da08043504":
+    status: "completed"
+    startedAt: "2026-10-27T22:07:59.170Z"
+    completedAt: "2026-10-27T22:13:39.469Z"
+    endedAt: "2026-10-27T22:13:39.469Z"
+    activeIntervals: [{"end":"2026-10-27T22:13:39.469Z","start":"2026-10-27T22:07:59.170Z"}]
+    lastModified: "2026-10-27T22:13:39.469Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "77b3224f-68b0-4bd0-9d08-20c42819a9f1":
+    status: "completed"
+    startedAt: "2026-10-27T22:14:52.361Z"
+    completedAt: "2026-10-27T22:14:52.361Z"
+    endedAt: "2026-10-27T22:14:52.361Z"
+    activeIntervals: [{"end":"2026-10-27T22:14:52.361Z","start":"2026-10-27T22:14:52.361Z"}]
+    appliedAt: "2026-10-27T22:14:52.361Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T22:14:52.361Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ac340adb-639b-40c7-a4fc-84c6e21e7a16":
+    status: "completed"
+    startedAt: "2026-10-27T22:14:10.596Z"
+    completedAt: "2026-10-27T22:14:52.361Z"
+    endedAt: "2026-10-27T22:14:52.361Z"
+    activeIntervals: [{"end":"2026-10-27T22:14:52.361Z","start":"2026-10-27T22:14:10.596Z"}]
+    lastModified: "2026-10-27T22:14:52.361Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "af3b3ee8-bbe5-43df-b37f-3f272de73084":
+    status: "completed"
+    startedAt: "2026-10-27T21:57:03.965Z"
+    completedAt: "2026-10-27T22:07:38.215Z"
+    endedAt: "2026-10-27T22:07:38.215Z"
+    activeIntervals: [{"end":"2026-10-27T22:07:38.215Z","start":"2026-10-27T21:57:03.965Z"}]
+    lastModified: "2026-10-27T22:07:38.215Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c3e3acd4-51c9-4886-8624-26afec3e1767":
+    status: "completed"
+    startedAt: "2026-10-27T21:31:48.461Z"
+    completedAt: "2026-10-27T21:46:25.365Z"
+    endedAt: "2026-10-27T21:46:25.365Z"
+    activeIntervals: [{"end":"2026-10-27T21:40:10.856Z","start":"2026-10-27T21:31:48.461Z"},{"end":"2026-10-27T21:46:25.365Z","start":"2026-10-27T21:46:25.365Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Placement re-exported through web's rex-gateway (run 811e98e9, commit 2575e538c); the test gate failed only on the cross-package contract list, which was updated by hand and the affected gate re-run green."
+    lastModified: "2026-10-27T21:46:25.365Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "db652118-ffa4-4b4d-afec-8a3b0dba43e4":
+    status: "completed"
+    startedAt: "2026-10-27T19:16:57.669Z"
+    completedAt: "2026-10-27T19:38:02.901Z"
+    endedAt: "2026-10-27T19:38:02.901Z"
+    activeIntervals: [{"end":"2026-10-27T19:29:19.863Z","start":"2026-10-27T19:16:57.669Z"},{"end":"2026-10-27T19:38:02.901Z","start":"2026-10-27T19:38:02.901Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "recordProposal refuses a repeat added amendment (same type, resolved area, trimmed case-insensitive title) with kind already-proposed; CLI maps it, MCP returns it; unit, CLI and MCP tests. Work from run 40e9449b, committed by hand after the agent's commit was blocked."
+    lastModified: "2026-10-27T19:38:02.901Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ed64adff-ca54-4b02-8adb-67616ff02c2b":
+    status: "completed"
+    startedAt: "2026-10-27T21:46:49.461Z"
+    completedAt: "2026-10-27T21:56:50.432Z"
+    endedAt: "2026-10-27T21:56:50.432Z"
+    activeIntervals: [{"end":"2026-10-27T21:56:50.432Z","start":"2026-10-27T21:46:49.461Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "routes-rex/placement.ts: GET placement, POST place, POST propose via rex; 422/404/409 mapping; wire types mirrored with drift check; routes-rex-placement.test.ts (24 tests)."
+    lastModified: "2026-10-27T21:56:50.432Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

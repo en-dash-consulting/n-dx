@@ -42,6 +42,7 @@ import {
 } from "../hooks/index.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
+import { useProductRead } from "./product-pages.js";
 
 export interface PRDViewProps {
   /** Pre-loaded PRD data. If not provided, fetches from /data/prd.json. */
@@ -56,6 +57,14 @@ export interface PRDViewProps {
   /** Navigation callback for URL updates. */
   navigateTo?: NavigateTo;
 }
+
+/** The ids of changes rex holds for placement, out of `GET /api/rex/changes`. */
+function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string> {
+  const rows = body.changes as Array<{ id: string; awaitsPlacement?: boolean }>;
+  return new Set(rows.filter((c) => c.awaitsPlacement).map((c) => c.id));
+}
+
+const NO_INBOX: ReadonlySet<string> = new Set();
 
 export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId, navigateTo }: PRDViewProps) {
   // ── Toast notifications ────────────────────────────────────────
@@ -123,13 +132,19 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Facet filters (tags + status + branch, URL-persisted) ────
+  // Changes rex holds for placement: the tree's Inbox badge and facet. A v1
+  // tree or a failed read has none.
+  const inboxRead = useProductRead("/api/rex/changes", pickInboxIds);
+  const inboxIds = inboxRead.state === "ready" ? inboxRead.data : NO_INBOX;
+
+  // ── Facet filters (tags + status + branch + Inbox, URL-persisted) ────
   const {
     activeTags, activeSearchStatuses, searchFacets,
     activeBranch, setActiveBranch,
     setActiveTags, setActiveSearchStatuses,
     clearFacets, hasFacets,
-  } = useFacetState();
+    inboxOnly, setInboxOnly,
+  } = useFacetState(inboxIds);
 
   // Collect all unique tags from the PRD for facet chip rendering
   const availableTags = useMemo(
@@ -316,6 +331,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       availableBranches,
       activeBranch,
       onBranchChange: setActiveBranch,
+      inboxIds,
       titleInfo: h(InfoTip, { term: "epic / feature / task" }),
       // Search, facets and item actions — one wrapping row beneath the summary.
       controls: h("div", { class: "prd-filter-bar" },
@@ -352,6 +368,9 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
           statusCounts,
           onTagsChange: setActiveTags,
           onStatusesChange: setActiveStatuses,
+          inboxOnly,
+          inboxCount: inboxIds.size,
+          onInboxOnlyChange: setInboxOnly,
           onClearAll: () => { clearFacets(); setActiveStatuses(new Set(ALL_STATUSES)); },
         }),
         // Item actions, last so they wrap together on a narrow screen

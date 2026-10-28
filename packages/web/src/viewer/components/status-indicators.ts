@@ -127,6 +127,39 @@ export function SvFreshnessIndicator({ status, onNavigate, tabIndex, analysis = 
 }
 
 // ---------------------------------------------------------------------------
+// Inbox count
+// ---------------------------------------------------------------------------
+
+/** Open Inbox changes, or 0 when unknown, empty or on a v1 tree (no `inbox`). */
+export function openInboxCount(status: Pick<RexStatus, "inbox"> | null | undefined): number {
+  return status?.inbox?.open ?? 0;
+}
+
+/** Accessible name for an Inbox count: "3 changes in the Inbox". */
+export function inboxCountLabel(count: number): string {
+  return `${count} change${count === 1 ? "" : "s"} in the Inbox`;
+}
+
+/** The "Inbox N" pill: opens the Inbox view. Renders nothing at zero. */
+export function InboxIndicator({ count, onNavigate, tabIndex }: {
+  count: number;
+  onNavigate: (view: ViewId) => void;
+  tabIndex: number;
+}) {
+  if (count <= 0) return null;
+  return h("button", {
+    class: "sidebar-indicator sidebar-indicator-inbox",
+    type: "button",
+    tabIndex,
+    "aria-label": `${inboxCountLabel(count)} — click to view`,
+    onClick: () => onNavigate("inbox"),
+  },
+    h("span", { class: "indicator-text", "aria-hidden": "true" }, "Inbox"),
+    h("span", { class: "indicator-badge indicator-badge-inbox", "aria-hidden": "true" }, count.toLocaleString()),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Rex PRD completion indicator
 // ---------------------------------------------------------------------------
 

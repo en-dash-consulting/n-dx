@@ -10,6 +10,8 @@ import {
   useProjectStatus,
   SvFreshnessIndicator,
   RexCompletionIndicator,
+  InboxIndicator,
+  openInboxCount,
   HenchActivityIndicator,
   INDICATOR_VIEWS,
   LIVE_INDICATOR_VIEWS,
@@ -77,6 +79,8 @@ export function BottomBar({
         ? h(SvFreshnessIndicator, { status: status.sv, onNavigate, tabIndex: 0, analysis }) : null,
       status?.rex && validViews.has(INDICATOR_VIEWS.rex)
         ? h(RexCompletionIndicator, { status: status.rex, onNavigate, tabIndex: 0 }) : null,
+      status?.rex && validViews.has("inbox")
+        ? h(InboxIndicator, { count: openInboxCount(status.rex), onNavigate, tabIndex: 0 }) : null,
       status?.hench && validViews.has(INDICATOR_VIEWS.hench)
         ? h(HenchActivityIndicator, {
           status: status.hench,

@@ -27,7 +27,11 @@ import {
   resolveStore,
   collectAllIds,
   cascadeParentReset,
+  prdLayout,
+  loadPrdModel,
 } from "./rex-gateway.js";
+import type { V2Tree } from "./rex-gateway.js";
+import { completePreviewPlacement } from "./routes-rex/placement.js";
 import { isRootType, itemTypeOf, levelOf } from "../shared/index.js";
 
 /**
@@ -108,6 +112,33 @@ interface RexChangeRow {
 function v2PreviewChanges(parsed: unknown): unknown[] | null {
   const out = parsed as RexAddOutput | null;
   return out?.preview === true && Array.isArray(out.changes) ? out.changes : null;
+}
+
+/**
+ * Preview rows with each placement completed for a choice: strength, reasons,
+ * the target's area and whether the top pick is tied. The area is read from
+ * the project's v2 tree; without one it is left blank rather than failing
+ * the preview. A read failure is logged and degrades the areas only: the
+ * caller's catch would otherwise read it as unparseable output and show an
+ * empty preview for a change rex did report.
+ */
+async function withPreviewPlacements(ctx: ServerContext, changes: unknown[]): Promise<unknown[]> {
+  if (!changes.some((c) => (c as RexChangeRow | null)?.placement)) return changes;
+  const tree = await previewTree(ctx);
+  return changes.map((c) => {
+    const row = c as RexChangeRow;
+    return row?.placement ? { ...row, placement: completePreviewPlacement(row.placement, tree) } : c;
+  });
+}
+
+/** The project's v2 tree for preview areas, or null on v1 or when it cannot be read. */
+async function previewTree(ctx: ServerContext): Promise<V2Tree | null> {
+  try {
+    return (await prdLayout(ctx.rexDir)) === "v2" ? (await loadPrdModel(ctx.rexDir)).tree as V2Tree : null;
+  } catch (err) {
+    console.warn(`[smart-add-preview] placement areas left blank: ${errorMessage(err)}`);
+    return null;
+  }
 }
 
 /**
@@ -1121,7 +1152,7 @@ async function handleSmartAddPreview(
       if (changes) {
         jsonResponse(res, 200, {
           preview: true,
-          changes,
+          changes: await withPreviewPlacements(ctx, changes),
           proposals: [],
           confidence: 0,
           qualityIssues: (parsed as RexAddOutput).qualityIssues ?? [],
