@@ -930,7 +930,7 @@ describe("permission cards", () => {
       await act(async () => {
         render(h(SidecarCards, {
           cards: [card("x", 1, { kind, tool, input, ...over })],
-          manifest: { cliNames: ["ndx"], effects: {} },
+          manifest: { cliNames: ["ndx"], effects: {}, layoutPaths: {} },
           decide: vi.fn(async () => {}),
         }), host);
       });
@@ -942,6 +942,40 @@ describe("permission cards", () => {
       if (note) expect(el.querySelector(".sidecar-card-note")?.textContent).toMatch(note);
       await act(async () => { render(null, host); });
     }
+  });
+
+  describe("effects line layout tokens", () => {
+    const effectsLine = async (layoutPaths: Record<string, string>, reads: string[], writes: string[]): Promise<string> => {
+      const host = document.createElement("div");
+      await act(async () => {
+        render(h(SidecarCards, {
+          cards: [card("x", 1)],
+          manifest: {
+            cliNames: ["ndx"],
+            effects: { status: { reads, writes: writes.map((path) => ({ path })), llm: [], duration: "fast" } },
+            layoutPaths,
+          },
+          decide: vi.fn(async () => {}),
+        }), host);
+      });
+      const text = host.querySelector(".sidecar-card-effects")!.textContent!;
+      await act(async () => { render(null, host); });
+      return text;
+    };
+
+    it("replaces every token with the manifest's layoutPaths value", async () => {
+      const line = await effectsLine(
+        { prdRead: ".rex/product/ and .rex/changes/", hench: ".hench" },
+        ["{prdRead}", "{hench}/runs/"],
+        ["{hench}/runs/{hench}/"],
+      );
+      expect(line).toBe("reads .rex/product/ and .rex/changes/ + .hench/runs/ · writes .hench/runs/.hench/ · no LLM · fast");
+    });
+
+    it("leaves a token the manifest does not name as written", async () => {
+      const line = await effectsLine({ hench: ".hench" }, ["{prdRead}", "{hench}/runs/"], ["{unknown}"]);
+      expect(line).toBe("reads {prdRead} + .hench/runs/ · writes {unknown} · no LLM · fast");
+    });
   });
 
   it("draws a card withdrawn because the session ended as denied with the note \"session ended\"", async () => {

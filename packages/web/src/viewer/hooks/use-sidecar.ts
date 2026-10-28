@@ -129,6 +129,8 @@ export interface SidecarCommandEffects {
 export interface SidecarCommandManifest {
   cliNames: string[];
   effects: Record<string, SidecarCommandEffects | null>;
+  /** This project's path for each `{token}` the declarations use. */
+  layoutPaths: Record<string, string>;
 }
 
 /** How the last turn ended, from the announcement that closed it. */
@@ -275,6 +277,7 @@ async function loadCatalog(refresh = false): Promise<SidecarCatalog | null> {
 async function loadCommandManifest(): Promise<SidecarCommandManifest | null> {
   const body = await getJson<{
     cliName?: string;
+    layoutPaths?: Record<string, string>;
     groups?: Array<{ commands?: Array<{ name: string; effects?: SidecarCommandEffects | null }> }>;
   }>("/api/commands/manifest");
   if (!body) return null;
@@ -283,7 +286,7 @@ async function loadCommandManifest(): Promise<SidecarCommandManifest | null> {
     for (const cmd of group.commands ?? []) effects[cmd.name] = cmd.effects ?? null;
   }
   const cliNames = [...new Set(["ndx", "n-dx", ...(body.cliName ? [body.cliName] : [])])];
-  return { cliNames, effects };
+  return { cliNames, effects, layoutPaths: body.layoutPaths ?? {} };
 }
 
 /** The configured vendor when it has a resumable session, else Claude. */

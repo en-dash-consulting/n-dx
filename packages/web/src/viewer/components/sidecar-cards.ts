@@ -78,6 +78,8 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
  * The effects line of a command card: what its ndx command reads, writes,
  * whether it calls a model and how long it takes, from GET
  * /api/commands/manifest; "no declared effects" when the manifest has none.
+ * `{token}` layout paths expand to the manifest's layoutPaths; a token it
+ * does not name stays as written.
  */
 export function sidecarCommandEffectsLine(card: SidecarCard, manifest: SidecarState["commandManifest"]): string {
   if (manifest === null || manifest === "loading") return "reading effects…";
@@ -85,8 +87,10 @@ export function sidecarCommandEffectsLine(card: SidecarCard, manifest: SidecarSt
   const argv = Array.isArray(card.input.argv) ? card.input.argv.map(String) : [];
   const effects = manifest.cliNames.includes(argv[0] ?? "") ? manifest.effects[argv[1] ?? ""] : undefined;
   if (!effects) return "no declared effects";
-  const reads = effects.reads.length > 0 ? effects.reads.join(" + ") : "nothing";
-  const writes = effects.writes.length > 0 ? effects.writes.map((w) => w.path).join(", ") : "nothing";
+  const expand = (text: string): string =>
+    text.replace(/\{(\w+)\}/g, (token, name: string) => manifest.layoutPaths[name] ?? token);
+  const reads = effects.reads.length > 0 ? expand(effects.reads.join(" + ")) : "nothing";
+  const writes = effects.writes.length > 0 ? expand(effects.writes.map((w) => w.path).join(", ")) : "nothing";
   const llm = effects.llm.length > 0 ? `${effects.llm.length === 1 ? "1 LLM phase" : `${effects.llm.length} LLM phases`}` : "no LLM";
   return `reads ${reads} · writes ${writes} · ${llm} · ${effects.duration}`;
 }
