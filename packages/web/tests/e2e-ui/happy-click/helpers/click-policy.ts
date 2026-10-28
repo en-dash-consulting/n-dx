@@ -110,6 +110,9 @@ export const DENY_CLASS: string[] = [
   // Sidecar cards: approving lets the agent act; "always allow" writes the allow-list.
   "sidecar-card-approve",
   "sidecar-card-always",
+  // Sidecar sessions list: End closes a session for good.
+  "sidecar-session-end",
+  "sidecar-session-end-confirm",
 ];
 
 export interface ControlIdentity {

@@ -22,6 +22,7 @@ import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { SIDECAR_VENDORS, sidecarSetupNeed } from "../hooks/index.js";
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
 import { SidecarCards } from "./sidecar-cards.js";
+import { SidecarSessions } from "./sidecar-sessions.js";
 
 export const SIDECAR_WIDTH_DEFAULT = 440;
 export const SIDECAR_WIDTH_MIN = 360;
@@ -192,6 +193,7 @@ export interface SidecarDrawerProps {
 export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [width, setWidth] = useState(storedWidth);
   const [draft, setDraft] = useState("");
+  const [listing, setListing] = useState(false);
   const transcriptRef = useRef<HTMLOListElement>(null);
 
   const applyWidth = useCallback((next: number) => {
@@ -277,8 +279,16 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     h("header", { class: "sidecar-head" },
       h("span", { class: "sidecar-title" }, "Sidecar"),
       sidecar.session ? h("span", { class: "sidecar-session-name" }, sidecar.session.name) : null,
+      h("button", {
+        type: "button",
+        class: `sidecar-sessions-toggle${listing ? " active" : ""}`,
+        "aria-pressed": listing ? "true" : "false",
+        onClick: () => setListing((v) => !v),
+      }, "Sessions"),
       h("button", { type: "button", class: "sidecar-close", onClick: onClose, "aria-label": "Close Sidecar", title: "Close (⌘J)" }, "×"),
     ),
+    listing ? h(SidecarSessions, { sidecar, onOpened: () => setListing(false) }) : null,
+    ...(listing ? [] : [
     agent
       ? h("div", { class: "sidecar-agent" },
           h("select", {
@@ -320,7 +330,9 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       ? h("div", { class: "sidecar-paused", role: "status" },
           `Agent paused · waiting on ${sidecar.sessionWaiting === 1 ? "your decision" : `${sidecar.sessionWaiting} decisions`}`)
       : null,
-    h("form", {
+    sidecar.readOnly
+      ? h("p", { class: "sidecar-readonly", role: "status" }, "This session has ended. Its transcript is read-only.")
+      : h("form", {
       class: "sidecar-composer",
       onSubmit: (e: Event) => { e.preventDefault(); void submit(); },
     },
@@ -346,6 +358,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
         h("button", { type: "submit", class: "sidecar-send", disabled: busy || !draft.trim() }, "Send"),
       ),
     ),
+    ]),
   );
 }
 

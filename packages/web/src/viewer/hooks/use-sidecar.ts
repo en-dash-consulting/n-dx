@@ -26,6 +26,8 @@
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { createWSPipeline } from "./use-gateway.js";
+import { useSidecarSessions } from "./use-sidecar-sessions.js";
+import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-sidecar.ts and server/sidecar/session-registry.ts
@@ -47,6 +49,8 @@ export interface SidecarSession {
 export interface SidecarSessionEntry {
   session: SidecarSession;
   running: boolean;
+  /** What the session's tokens cost at its model's rates; `total` is formatted. */
+  estimatedCost?: { total: string };
 }
 
 /** The parts of a vendor runtime event the transcript draws. */
@@ -325,6 +329,12 @@ export interface SidecarState {
   sending: boolean;
   /** Cards waiting across this worktree's sessions. */
   waiting: number;
+  /** The open session has ended: its transcript reads, nothing more. */
+  readOnly: boolean;
+  /** The sessions list. */
+  sessions: SidecarSessionsState;
+  /** Open one of this worktree's sessions, ended or not; false, with the error set, when it is gone. */
+  openSession: (id: string) => Promise<boolean>;
   /** Cards waiting in the open session. */
   sessionWaiting: number;
   /** The open session's cards, oldest first. */
@@ -389,6 +399,8 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
   /** Card reads: the number of the last one started, and of the last one applied. */
   const cardReadsRef = useRef({ started: 0, applied: 0 });
   const manifestRequestedRef = useRef(false);
+  /** A session the operator opened by hand stays open after it ends, so its transcript can be read. */
+  const pinnedRef = useRef<string | null>(null);
 
   const fetchFrames = useCallback(async () => {
     const tail = tailRef.current;
@@ -451,7 +463,9 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     if (!list || !mountedRef.current) return;
     // Keep the open session while it is still open; otherwise take the latest.
     const current = tailRef.current.sessionId;
-    const kept = current ? list.sessions.find((e) => e.session.id === current && !e.session.endedAt) : undefined;
+    const kept = current
+      ? list.sessions.find((e) => e.session.id === current && (!e.session.endedAt || pinnedRef.current === current))
+      : undefined;
     const entry = kept ?? pickOpenSession(list.sessions);
     follow(entry?.session ?? null, entry?.running ?? false);
     void fetchWaiting();
@@ -596,6 +610,28 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     await fetchWaiting();
   }, [fetchWaiting]);
 
+  const openSession = useCallback(async (id: string): Promise<boolean> => {
+    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(SESSIONS);
+    if (!mountedRef.current) return false;
+    const entry = list?.sessions.find((e) => e.session.id === id);
+    if (!entry) { setError(`Session ${id} is no longer available`); return false; }
+    setError(null);
+    pinnedRef.current = id;
+    follow(entry.session, entry.running);
+    void fetchWaiting();
+    return true;
+  }, [follow, fetchWaiting]);
+
+  /** A rename or end answered: the drawer's own copy of the session follows. */
+  const sessionChanged = useCallback((entry: SidecarSessionEntry) => {
+    if (entry.session.id === tailRef.current.sessionId) setSession(entry.session);
+  }, []);
+
+  const sessions = useSidecarSessions({
+    waitingBySession: Object.fromEntries(Object.entries(cardsBySession).map(([id, list]) => [id, waitingCards(list)])),
+    onChanged: sessionChanged,
+  });
+
   const waiting = Object.values(cardsBySession).reduce((sum, list) => sum + waitingCards(list), 0);
   const cards = session ? cardsBySession[session.id] ?? [] : [];
   const sessionWaiting = waitingCards(cards);
@@ -618,6 +654,7 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
 
   return {
     session, frames, running, sending, waiting, sessionWaiting, cards, commandManifest, decide,
+    readOnly: session?.endedAt !== undefined, sessions, openSession,
     lastTurn, error, agent, catalog, chooseAgent, send, stop,
   };
 }

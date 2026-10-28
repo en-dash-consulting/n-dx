@@ -49,6 +49,10 @@ interface Server {
   /** Whether each vendor's CLI is installed, per GET /api/llm/catalog; unset vendors report nothing. */
   catalogCli: Record<string, boolean>;
   requests: Array<{ method: string; url: string; body?: unknown }>;
+  /** GET /api/workspaces; the anchor is "main". */
+  workspaces: Array<{ key: string; branch: string | null }>;
+  /** Sessions the other worktrees hold, by workspace key, read through /w/<key>/api/sidecar/sessions. */
+  otherSessions: Record<string, SidecarSessionEntry[]>;
 }
 
 /** A card as the server sends it; `n` orders its raisedAt. */
@@ -101,6 +105,18 @@ function stubServer(): void {
         google: { models: ["gemini-x"], defaultModel: "gemini-x" },
         local: { models: [], defaultModel: "" },
       });
+    }
+    if (url === "/api/workspaces") {
+      return json({ anchor: "main", workspaces: server.workspaces.map((w) => ({ ...w, path: "/x", isAnchor: w.key === "main", active: true })) });
+    }
+    const other = /^\/w\/([\w-]+)\/api\/sidecar\/sessions(?:\/([\w-]+)\/cards)?$/.exec(url);
+    if (other) return json(other[2] ? { cards: [] } : { sessions: server.otherSessions[other[1]] ?? [] });
+    const own = /^\/api\/sidecar\/sessions\/([\w-]+)(\/end)?$/.exec(url);
+    if (own && (method === "PATCH" || own[2])) {
+      const entry = server.sessions.find((e) => e.session.id === own[1])!;
+      if (own[2]) entry.session.endedAt = "2026-10-28T12:00:00.000Z";
+      else Object.assign(entry.session, body);
+      return json(entry);
     }
     if (url === "/api/sidecar/sessions" && method === "GET") return json({ sessions: server.sessions });
     if (url === "/api/sidecar/sessions" && method === "POST") {
@@ -215,6 +231,7 @@ beforeEach(() => {
   server = {
     enabled: true, running: false, gate: null, sessions: [], frames: [], cards: [],
     heldCardReads: null, manifest: {}, catalogCli: {}, requests: [],
+    workspaces: [{ key: "main", branch: "main" }, { key: "feat", branch: "feat/other" }], otherSessions: {},
   };
   FakeSocket.open.clear();
   stubServer();
@@ -882,5 +899,102 @@ describe("permission cards", () => {
     expect(el.classList.contains("sidecar-card--denied")).toBe(true);
     expect(el.querySelector(".sidecar-card-note")?.textContent).toBe("Denied · session ended");
     await act(async () => { render(null, host); });
+  });
+});
+
+// ── Sessions list (story 10) ───────────────────────────────────────────────
+
+describe("sessions list", () => {
+  const entry = (id: string, over: Partial<SidecarSessionEntry["session"]> = {}, cost = "$0.42"): SidecarSessionEntry => ({
+    session: session({ id, name: `Name ${id}`, model: "claude-sonnet-5-5", lens: "plan", turns: 3, ...over }),
+    running: false,
+    estimatedCost: { total: cost },
+  });
+  const rowsEl = () => [...root.querySelectorAll<HTMLElement>(".sidecar-session")];
+  const rowFor = (id: string) => root.querySelector<HTMLElement>(`.sidecar-session[data-session="${id}"]`)!;
+  const click = async (el: Element | null) => { await act(async () => { (el as HTMLElement).click(); }); await settle(); };
+  const buttons = (row: HTMLElement) => [...row.querySelectorAll("button")].map((b) => b.textContent);
+
+  async function openList(): Promise<void> {
+    await mount();
+    await pressCmdJ();
+    await click(root.querySelector(".sidecar-sessions-toggle"));
+  }
+
+  it("draws name, branch, lens, agent, turns, cost and waiting cards, with the branch from /api/workspaces", async () => {
+    server.sessions = [entry("s1")];
+    server.cards = [card("c1", 1), card("c2", 2)];
+    // A branch no other endpoint serves: only /api/workspaces can be its source.
+    server.workspaces[0].branch = "feat/from-workspaces";
+    await openList();
+    const text = rowFor("s1").textContent!;
+    for (const part of ["Name s1", "feat/from-workspaces", "plan", "claude · claude-sonnet-5-5", "3 turns", "$0.42", "2 waiting"]) {
+      expect(text).toContain(part);
+    }
+    expect(server.requests.some((r) => r.url === "/api/workspaces")).toBe(true);
+  });
+
+  it("Resume opens the session in the drawer", async () => {
+    server.sessions = [entry("s1"), entry("s2", { lastActivityAt: "2026-10-28T11:00:00.000Z" })];
+    server.frames = [user(1, "earlier question")];
+    await openList();
+    await click(buttons(rowFor("s1")).includes("Resume") ? [...rowFor("s1").querySelectorAll("button")].find((b) => b.textContent === "Resume")! : null);
+    expect(root.querySelector(".sidecar-sessions")).toBeNull();
+    expect(root.querySelector(".sidecar-session-name")?.textContent).toBe("Name s1");
+    expect(rows()).toEqual(["earlier question"]);
+  });
+
+  it("Rename sends PATCH /api/sidecar/sessions/:id and shows the new name", async () => {
+    server.sessions = [entry("s1")];
+    await openList();
+    await click([...rowFor("s1").querySelectorAll("button")].find((b) => b.textContent === "Rename")!);
+    const input = root.querySelector<HTMLInputElement>(".sidecar-session-name-input")!;
+    await act(async () => { input.value = "Zone review"; input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await click(root.querySelector(".sidecar-session-save"));
+    expect(server.requests.find((r) => r.method === "PATCH")).toMatchObject({
+      url: "/api/sidecar/sessions/s1", body: { name: "Zone review" },
+    });
+    expect(rowFor("s1").textContent).toContain("Zone review");
+  });
+
+  it("End asks first: Keep calls nothing, End session calls the end route", async () => {
+    server.sessions = [entry("s1")];
+    await openList();
+    const endRequests = () => server.requests.filter((r) => r.url.endsWith("/end"));
+    await click(rowFor("s1").querySelector(".sidecar-session-end"));
+    expect(endRequests()).toHaveLength(0);
+    expect(rowFor("s1").textContent).toContain("End this session?");
+    await click([...rowFor("s1").querySelectorAll("button")].find((b) => b.textContent === "Keep")!);
+    expect(endRequests()).toHaveLength(0);
+    await click(rowFor("s1").querySelector(".sidecar-session-end"));
+    await click(rowFor("s1").querySelector(".sidecar-session-end-confirm"));
+    expect(endRequests()).toEqual([expect.objectContaining({ method: "POST", url: "/api/sidecar/sessions/s1/end" })]);
+    expect(rowFor("s1").textContent).toContain("ended");
+  });
+
+  it("an ended session offers its transcript, read-only, with no composer", async () => {
+    server.sessions = [entry("s1", { endedAt: "2026-10-28T11:30:00.000Z" })];
+    server.frames = [user(1, "old question"), said(2, "old answer")];
+    await openList();
+    expect(buttons(rowFor("s1"))).not.toContain("End");
+    expect(buttons(rowFor("s1"))).not.toContain("Resume");
+    await click([...rowFor("s1").querySelectorAll("button")].find((b) => b.textContent === "Transcript")!);
+    expect(rows()).toEqual(["old question", "old answer"]);
+    expect(root.querySelector(".sidecar-readonly")).not.toBeNull();
+    expect(root.querySelector(".sidecar-composer")).toBeNull();
+  });
+
+  it("All worktrees adds the other worktrees' sessions, read-only", async () => {
+    server.sessions = [entry("s1")];
+    server.otherSessions = { feat: [entry("o1", { lastActivityAt: "2026-10-28T09:00:00.000Z" })] };
+    await openList();
+    expect(rowsEl()).toHaveLength(1);
+    expect(server.requests.some((r) => r.url.startsWith("/w/"))).toBe(false);
+    await click([...root.querySelectorAll(".sidecar-sessions-filter-btn")].find((b) => b.textContent === "All worktrees")!);
+    expect(server.requests.some((r) => r.url === "/w/feat/api/sidecar/sessions")).toBe(true);
+    expect(rowsEl()).toHaveLength(2);
+    expect(rowFor("o1").textContent).toContain("feat/other");
+    expect(buttons(rowFor("o1"))).toEqual([]);
+    expect(buttons(rowFor("s1"))).toEqual(["Resume", "Rename", "End"]);
   });
 });
