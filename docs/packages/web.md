@@ -5,7 +5,7 @@
 ## Features
 
 - **SourceVision zone maps** — interactive visualization of architectural zones
-- **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage. Both pages are built and land in the navigation with the v2 store. Until then, and on a v1 project (one that has not yet run `ndx migrate`), the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
+- **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage (see [The Changes page](#the-changes-page-v2)). Both pages are built and land in the navigation with the v2 store. Until then, and on a v1 project (one that has not yet run `ndx migrate`), the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
 - **Unified MCP server** — single HTTP endpoint serving both Rex and SourceVision MCP tools
 - **Live reload** — updates automatically when data changes (via `ndx refresh`)
 
@@ -53,6 +53,15 @@ See [MCP Integration](/guide/mcp) for setup instructions.
 ## PRD item routes
 
 `PATCH /api/rex/items/:id` accepts only these fields: `status`, `failureReason`, `priority`, `tags`, `title`, `description`, `acceptanceCriteria` and `requirements`. Any other key (including `run`) is a `400` naming it. The update runs inside the PRD lock for the request's workspace and answers `409` when another process holds it. Saved run settings are written through `PUT /api/hench/prep/:taskId` (below), MCP `edit_item`, or `rex update --run` — not this route.
+
+## The Changes page (v2)
+
+The page is a planning view: open work leads and applied history stays folded away.
+
+- **Order.** Releases run newest first by semver, so `0.10.0` sits above `0.9.0` and a prerelease such as `1.0.0-rc.1` sits below `1.0.0`. A leading `v` is ignored when comparing. The **Unscheduled** group (changes with no planned release, or a blank one) leads while it holds open work, and drops to the bottom once everything in it is applied. Within a release, open stages come first in lifecycle order and applied or shipped stages last.
+- **Filters.** Chips along the top show a count each: **Open** (the default), **Applied**, and one per release. Open lists only open changes. Applied lists only groups that hold applied changes. A release chip shows that release's changes, open and applied. The choice is kept in the browser (`ndx.changes.filter`); a release that no longer exists falls back to Open.
+- **Applied history.** Each group folds its applied changes behind an "N applied" toggle. No rows are rendered until it is expanded, so a group with over a thousand applied changes costs one button.
+- **Descriptions.** A change's description shows two lines. **more** expands it and **less** folds it back.
 
 ## Finding and placing an Inbox change (v2)
 
