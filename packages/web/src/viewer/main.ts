@@ -30,6 +30,7 @@ import {
   initDensity,
   RepoTrustStrip,
   ServerUnavailableNotice,
+  SidecarDock,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -48,6 +49,7 @@ import {
   isAnalysisJob,
   liveRunCount,
   useFeatureToggle,
+  useSidecarShell,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
@@ -158,6 +160,9 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // enrichment gate before their hooks run.
   const askEnabled = useFeatureToggle("sourcevision.ask", false);
   useAutoCommitGenerated(gitStatus, useFeatureToggle("git.autoCommitGenerated", false), refetchGitStatus);
+  // Sidecar: the top-nav button, ⌘J and the drawer all read `web.sidecar` here.
+  // A static export has no server to hold a session.
+  const sidecarShell = useSidecarShell(useFeatureToggle("web.sidecar", false) && !isDeployedMode());
   const {
     showRecovery,
     crashLoop,
@@ -261,7 +266,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope }),
+    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope, sidecar: sidecarShell.button }),
     isLiveView(pageView) && validViews.has("live") && !isDeployedMode()
       ? h(LiveBar, { view: pageView, taskId: page.taskId, navigateTo })
       : null,
@@ -269,23 +274,27 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     // trusted. Server-backed; renders nothing in a standalone viewer. Below
     // LiveBar so the nav chrome stays contiguous — both sit above main content.
     h(RepoTrustStrip, null),
-    h("div", { class: "app-body" },
-      h("main", {
-        id: "main-content",
-        // The Tasks (prd) view manages its own internal scroll region, so the
-        // main column becomes a non-scrolling flex container for it.
-        class: `main${pageView === "prd" ? " main--fill" : ""}${stage && pageView !== "home" ? " main--staged" : ""}`,
-        role: "main",
-        "aria-label": "Main content",
-        onClick: handleTripleClick,
-      },
-        h(PageTitle, { view: pageView }),
-        renderViewContent(pageView, loading, viewCtx),
+    // The Sidecar drawer docks beside the page body, never over it: the body
+    // (and the stage links inside it) narrows by the drawer's width.
+    h(SidecarDock, { open: sidecarShell.drawer.open, sidecar: sidecarShell.sidecar, onClose: sidecarShell.drawer.close },
+      h("div", { class: "app-body" },
+        h("main", {
+          id: "main-content",
+          // The Tasks (prd) view manages its own internal scroll region, so the
+          // main column becomes a non-scrolling flex container for it.
+          class: `main${pageView === "prd" ? " main--fill" : ""}${stage && pageView !== "home" ? " main--staged" : ""}`,
+          role: "main",
+          "aria-label": "Main content",
+          onClick: handleTripleClick,
+        },
+          h(PageTitle, { view: pageView }),
+          renderViewContent(pageView, loading, viewCtx),
+        ),
+        h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),
+        !isFeatureDisabled("detailPanel")
+          ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
+          : null,
       ),
-      h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),
-      !isFeatureDisabled("detailPanel")
-        ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
-        : null,
     ),
     h(BottomBar, {
       server,

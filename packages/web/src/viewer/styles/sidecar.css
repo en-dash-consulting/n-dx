@@ -1,0 +1,204 @@
+/* Sidecar — the drawer that docks beside the page body (UX1, UX10) and its
+ * top-nav button (UX2'). See components/sidecar-drawer.ts.
+ *
+ * The dock is the row between the top nav and the bottom bar. The page body
+ * takes what the drawer leaves, so the page narrows rather than being
+ * covered, and the stage links (absolute inside .app-body) stay on the
+ * page's own edges, left of the drawer. The status dock is fixed to the
+ * viewport, so it steps left by --sidecar-w, which the open drawer sets.
+ */
+
+.app-dock {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.app-dock > .app-body { min-width: 0; }
+
+.status-dock { right: calc(1rem + var(--sidecar-w, 0px)); }
+
+/* ── Drawer ──────────────────────────────────────────────────────────── */
+
+.sidecar-drawer {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, .18);
+  z-index: 16; /* above the stage links' 15, below the top nav */
+}
+
+.sidecar-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidecar-resize:hover, .sidecar-resize:focus-visible {
+  outline: none;
+  background: var(--accent);
+}
+
+.sidecar-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.sidecar-title { font-weight: 600; }
+.sidecar-session-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.sidecar-close {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sidecar-close:hover { color: var(--text); }
+
+.sidecar-paused {
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  background: var(--orange);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Transcript ──────────────────────────────────────────────────────── */
+
+.sidecar-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-3);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.sidecar-empty { color: var(--text-muted); font-size: 12px; }
+.sidecar-msg {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+.sidecar-msg-user { align-self: flex-end; max-width: 85%; background: var(--bg-active, var(--bg-hover)); }
+.sidecar-msg-assistant { background: var(--bg); border: 1px solid var(--border); }
+.sidecar-msg-failure { color: var(--red, var(--text)); border: 1px solid var(--red, var(--border)); }
+.sidecar-tool {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sidecar-tool::before { content: "⚙ "; }
+
+.sidecar-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.sidecar-divider::before, .sidecar-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.sidecar-turn-end, .sidecar-error {
+  flex: none;
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sidecar-error { color: var(--red, var(--text)); }
+
+/* ── Composer ────────────────────────────────────────────────────────── */
+
+.sidecar-composer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.sidecar-input {
+  resize: vertical;
+  min-height: 3.5em;
+  font: inherit;
+  font-size: 13px;
+}
+.sidecar-composer-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+/* ── Top-nav button ──────────────────────────────────────────────────── */
+
+.topnav-sidecar {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.topnav-sidecar:hover { color: var(--text); border-color: var(--border-strong, var(--border)); }
+.topnav-sidecar.active { color: var(--text); border-color: var(--accent); }
+.topnav-sidecar:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.topnav-sidecar-badge {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--orange);
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ── Width tiers (UX2'): ≥1440 full · 1200–1439 · 961–1199 · ≤960 ───── */
+
+@media (max-width: 1439px) {
+  .topnav-tab-hint { display: none; }
+}
+@media (max-width: 1199px) {
+  .topnav-search-label { display: none; }
+  .topnav-search { min-width: 0; }
+}
+@media (max-width: 960px) {
+  .topnav-sidecar { padding: 5px var(--space-2); }
+  .topnav-sidecar-label { display: none; }
+  /* The badge rides the glyph's corner. */
+  .topnav-sidecar-badge { position: absolute; top: -6px; right: -6px; }
+}

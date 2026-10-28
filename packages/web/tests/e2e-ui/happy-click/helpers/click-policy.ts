@@ -105,6 +105,8 @@ export const DENY_CLASS: string[] = [
   "prep-btn",
   "workspace-card-stop",
   "iso-hero-btn",
+  // Sidecar: a turn runs the vendor CLI and spends tokens.
+  "sidecar-send",
 ];
 
 export interface ControlIdentity {

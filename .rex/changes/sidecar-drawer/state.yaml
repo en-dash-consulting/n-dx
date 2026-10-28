@@ -23,7 +23,14 @@ items:
     lastModified: "2026-10-28T15:04:13.162Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e700e599-a431-4059-b920-017492dccea8":
-    lastModified: "2026-10-28T15:08:54.437Z"
+    status: "completed"
+    startedAt: "2026-10-28T15:11:25.374Z"
+    completedAt: "2026-10-28T15:33:49.878Z"
+    endedAt: "2026-10-28T15:33:49.878Z"
+    activeIntervals: [{"end":"2026-10-28T15:33:49.878Z","start":"2026-10-28T15:11:25.374Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Sidecar drawer shell, transcript and composer behind web.sidecar (useSidecar/useSidecarShell hooks, SidecarDock/SidecarDrawer/SidecarButton, sidecar.css with UX2' tiers); 21 jsdom tests. Browser inspection at 1440/1100/900 not done: Playwright Chromium not installed."
+    lastModified: "2026-10-28T15:33:49.878Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eed38806-62c2-4dbc-8d1c-791aa350c0be":
     lastModified: "2026-10-28T15:04:17.131Z"
