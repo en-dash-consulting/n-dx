@@ -28,6 +28,7 @@ import {
 } from "../../../src/server/routes-sidecar.js";
 import { readDashboardUsage } from "../../../src/server/dashboard-usage.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
+import type { SidecarActions } from "../../../src/server/sidecar/carry-out.js";
 import { LENS_IDS } from "../../../src/server/sidecar/lens-packets.js";
 import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
@@ -116,6 +117,13 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
   return child as unknown as ChildProcess;
 };
 
+/** Approved calls spawn nothing here; sidecar-carry-out.test.ts covers their effects. */
+const noEffects: SidecarActions = {
+  previewWork: async () => "preview",
+  runCommand: () => ({ ok: true, text: "Ran it." }),
+  startWork: async () => ({ ok: true, text: "Started it." }),
+};
+
 function newRegistry(): SidecarSessionRegistry {
   return new SidecarSessionRegistry({
     dir: join(root, ".hench", "sidecar"),
@@ -133,7 +141,7 @@ beforeEach(async () => {
   registry = newRegistry();
   broker = createAnnouncingBroker(join(root, ".hench", "sidecar"), broadcast);
   server = await startRouteTestServer((req, res) =>
-    handleSidecarRoute(req, res, ctx, broadcast, { registryFor: () => registry, brokerFor: () => broker }));
+    handleSidecarRoute(req, res, ctx, broadcast, { registryFor: () => registry, brokerFor: () => broker, actionsFor: () => noEffects }));
 });
 
 afterEach(async () => {

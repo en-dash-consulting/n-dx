@@ -37,7 +37,8 @@
  * `sidecar/broker.ts`): a raised or settled card is announced as
  * `sidecar:card`, and the client fetches `…/cards`. The session's vendor CLI
  * reaches the broker at this server's own loopback port, with the dashboard
- * token and the workspace in headers (`sidecar/spawn-policy.ts`).
+ * token and the workspace in headers (`sidecar/spawn-policy.ts`). An approved
+ * call is carried out by {@link sidecarActions} (`sidecar/carry-out.ts`).
  *
  * @module web/server/routes-sidecar
  */
@@ -54,6 +55,10 @@ import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/br
 import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
+import { renderWorkPreview, type SidecarActions } from "./sidecar/carry-out.js";
+import { startSidecarCommand } from "./routes-commands.js";
+import { runSlotUsage, startTaskExecution } from "./routes-hench.js";
+import { resolveTaskRun } from "./routes-hench-prep.js";
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readLedger } from "./sidecar/ledger.js";
 import { buildLensPacket, LENS_IDS, LENS_PACKETS } from "./sidecar/lens-packets.js";
@@ -135,6 +140,8 @@ export interface SidecarRouteOptions {
   registryFor?: (projectDir: string) => SidecarSessionRegistry;
   /** The broker for a project directory. Defaults to one per directory, kept for the server's life. */
   brokerFor?: (projectDir: string) => SidecarBroker;
+  /** What an approved broker call does. Defaults to {@link sidecarActions}. */
+  actionsFor?: (ctx: ServerContext) => SidecarActions;
 }
 
 /**
@@ -170,6 +177,36 @@ export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions
       const sources = createPacketSources(ctx, { resolve: async () => null, preview: async () => null });
       const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString());
       return built.status === "ready" ? built.packet.text : undefined;
+    },
+  };
+}
+
+/**
+ * The effects of an approved broker call in `ctx`'s workspace: a command
+ * runs as the workspace's Sidecar command job (job tray, Live), work starts
+ * through the hench execute route under `guard.maxConcurrentProcesses`, and
+ * a work card's preview is the Prepare route's `ndx work --resolve`.
+ */
+export function sidecarActions(ctx: ServerContext, broadcast: WebSocketBroadcaster): SidecarActions {
+  return {
+    async previewWork(taskId, options) {
+      const read = await resolveTaskRun(ctx, taskId, options);
+      return read.ok ? renderWorkPreview(read.resolution) : `ndx work --resolve did not answer: ${read.failure}`;
+    },
+    runCommand(argv) {
+      const started = startSidecarCommand(ctx, argv, broadcast);
+      return started.started
+        ? { ok: true, text: `Started \`${started.command}\` as job ${started.jobId}; it shows in the dashboard's job tray and on Live.` }
+        : { ok: false, text: `Nothing ran: ${started.reason}.` };
+    },
+    async startWork(taskId, options) {
+      const { inUse, max } = runSlotUsage(ctx);
+      if (inUse >= max) {
+        return { ok: false, text: `Nothing started: the concurrent run limit is reached (${inUse} of ${max} runs, guard.maxConcurrentProcesses).` };
+      }
+      const answer = await startTaskExecution(ctx, { taskId, ...(options && { options }) }, broadcast);
+      if (answer.status !== 202) return { ok: false, text: `Nothing started: ${String(answer.body.error ?? `the execute route answered ${answer.status}`)}.` };
+      return { ok: true, text: `Started run ${String(answer.body.runId)} on task ${taskId} (${String(answer.body.taskTitle)}); follow it on Live.` };
     },
   };
 }
@@ -526,7 +563,7 @@ export async function handleSidecarRoute(
       if (session.endedAt || !registry.isRunning(id)) {
         return refuse(res, 409, `Sidecar session ${id} has no running turn`);
       }
-      await handleBrokerMcpRequest(req, res, broker, id);
+      await handleBrokerMcpRequest(req, res, broker, id, opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast));
       return true;
   }
   return false;

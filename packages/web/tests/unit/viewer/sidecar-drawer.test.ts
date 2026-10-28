@@ -894,6 +894,13 @@ describe("permission cards", () => {
     expect(server.requests.filter((r) => r.url === "/api/commands/manifest")).toHaveLength(1);
   });
 
+  it("shows a work card's ndx work --resolve preview before it is decided", async () => {
+    const preview = "ndx work --task=t1 .\nTask: Carry it out (pending)\nmodel = \"m\" (from default)";
+    await openWith([card("c1", 1, { kind: "work", tool: "start_work", input: { taskId: "t1" }, preview })]);
+    expect(root.querySelector(".sidecar-card-preview")?.textContent).toBe(preview);
+    expect(root.querySelector(".sidecar-card-approve")).not.toBeNull();
+  });
+
   it("offers \"Always allow\" only when the card has an allow-list key, and remembers the approval", async () => {
     await openWith([card("c1", 1, { allowListKey: JSON.stringify(["ndx", "status", "."]) })]);
     await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-always")!.click(); });
@@ -908,7 +915,7 @@ describe("permission cards", () => {
 
   const INPUTS: Record<SidecarCardKind, { tool: string; input: Record<string, unknown>; title: string }> = {
     command: { tool: "run_command", input: { argv: ["ndx", "status", "."] }, title: "ndx status ." },
-    work: { tool: "start_work", input: { taskId: "425819f5", flags: ["--review"] }, title: "n-dx work --task=425819f5 --review" },
+    work: { tool: "start_work", input: { taskId: "425819f5", options: { review: true } }, title: "n-dx work --task=425819f5 --auto --review ." },
     "change-set": { tool: "propose_prd_change", input: { items: [{ title: "a" }, { title: "b" }] }, title: "2 items" },
     placement: { tool: "place_change_card", input: { change: "CH-212", target: "A3.2", relation: "amends" }, title: "CH-212 → A3.2" },
     edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },

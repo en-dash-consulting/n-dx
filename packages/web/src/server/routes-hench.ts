@@ -2116,24 +2116,53 @@ async function handleExecute(
   ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): Promise<boolean> {
-  const { startingTasks } = stateForCtx(ctx);
   const body = await readExecuteBody(req, res);
   if (!body) return true;
+  const outcome = await reserveAndStart(ctx, body, broadcast);
+  if (outcome.kind === "migrate") return await runTreeMigration(res, ctx);
+  jsonResponse(res, outcome.status, outcome.body);
+  return true;
+}
 
-  // Reserve the task before the first await below: the checks await claims,
-  // the run holder and the context file, and a second request for the same
-  // task arriving meanwhile would otherwise pass them too and spawn a second
-  // run. Released on every exit; once spawned, activeExecutions holds it.
+/** What an execute request came to: an answer for the client, or the consented slug migration. */
+type ExecuteOutcome = { kind: "migrate" } | { kind: "answer"; status: number; body: Record<string, unknown> };
+
+/**
+ * Start a run on `taskId` exactly as `POST /api/hench/execute` would, for a
+ * caller inside this server: an approved Sidecar `start_work` card. Answers
+ * what the route would have answered — 202 with the run, or the refusal.
+ * Never migrates the tree: that consent belongs to the operator's button.
+ */
+export async function startTaskExecution(
+  ctx: ServerContext,
+  request: { taskId: string; options?: unknown },
+  broadcast?: WebSocketBroadcaster,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const outcome = await reserveAndStart(ctx, { taskId: request.taskId, options: request.options }, broadcast);
+  // Unreachable without `migrateSlugs` in the body, which this request never carries.
+  if (outcome.kind === "migrate") throw new Error("startTaskExecution never migrates the PRD tree");
+  return { status: outcome.status, body: outcome.body };
+}
+
+/**
+ * Reserve the task before the first await: the checks await claims, the run
+ * holder and the context file, and a second request for the same task
+ * arriving meanwhile would otherwise pass them too and spawn a second run.
+ * Released on every exit; once spawned, activeExecutions holds it.
+ */
+async function reserveAndStart(
+  ctx: ServerContext,
+  body: Record<string, unknown>,
+  broadcast?: WebSocketBroadcaster,
+): Promise<ExecuteOutcome> {
+  const { startingTasks } = stateForCtx(ctx);
   const taskId = typeof body.taskId === "string" && body.taskId ? body.taskId : null;
   if (taskId) {
-    if (startingTasks.has(taskId)) {
-      jsonResponse(res, 409, alreadyStarting(taskId));
-      return true;
-    }
+    if (startingTasks.has(taskId)) return { kind: "answer", status: 409, body: alreadyStarting(taskId) };
     startingTasks.add(taskId);
   }
   try {
-    return await startExecution(res, ctx, body, broadcast);
+    return await startExecution(ctx, body, broadcast);
   } finally {
     if (taskId) startingTasks.delete(taskId);
   }
@@ -2141,18 +2170,14 @@ async function handleExecute(
 
 /** The checks and spawn behind `POST /api/hench/execute`, run while the task is reserved. */
 async function startExecution(
-  res: ServerResponse,
   ctx: ServerContext,
   body: Record<string, unknown>,
   broadcast?: WebSocketBroadcaster,
-): Promise<boolean> {
+): Promise<ExecuteOutcome> {
   const { activeExecutions, executionMetrics, processMemoryTracker } = stateForCtx(ctx);
   const verdict = await judgeExecuteRequest(ctx, body, { holdsReservation: true });
-  if (verdict.kind === "refused") {
-    jsonResponse(res, verdict.status, verdict.body);
-    return true;
-  }
-  if (verdict.kind === "migrate") return await runTreeMigration(res, ctx);
+  if (verdict.kind === "refused") return { kind: "answer", status: verdict.status, body: verdict.body };
+  if (verdict.kind === "migrate") return verdict;
   // How many tasks this one request works through, judged above with the rest
   // of the request so `execute/check` answers for it too. Every mode starts on
   // this task; the modes that continue past it autoselect from there.
@@ -2253,8 +2278,11 @@ async function startExecution(
     contextFile?.remove().catch((err: unknown) => {
       console.warn(`[hench] could not remove context file ${contextFile.path}: ${(err as Error).message}`);
     });
-    errorResponse(res, 500, `Could not start '${readCliName(ctx.projectDir)} work': ${spawned.error.message}`);
-    return true;
+    return {
+      kind: "answer",
+      status: 500,
+      body: { error: `Could not start '${readCliName(ctx.projectDir)} work': ${spawned.error.message}` },
+    };
   }
   const handle = spawned.value;
 
@@ -2349,16 +2377,19 @@ async function startExecution(
     });
 
   // Return immediately with tracking info, echoing the options the run got.
-  jsonResponse(res, 202, {
-    runId,
-    taskId,
-    taskTitle,
-    status: "started",
-    options,
-    mode,
-    ...(iterations !== undefined ? { iterations } : {}),
-  });
-  return true;
+  return {
+    kind: "answer",
+    status: 202,
+    body: {
+      runId,
+      taskId,
+      taskTitle,
+      status: "started",
+      options,
+      mode,
+      ...(iterations !== undefined ? { iterations } : {}),
+    },
+  };
 }
 
 /**
@@ -3413,6 +3444,22 @@ export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
     utilization: Math.min(1, utilization),
     locks,
   };
+}
+
+/**
+ * Runs that count against `guard.maxConcurrentProcesses` now: live lock
+ * holders, plus runs this server spawned that hold no lock yet (a run takes
+ * its lock a moment after the spawn). An untagged lock cannot be matched to
+ * its run, so the count errs toward full.
+ */
+export function runSlotUsage(ctx: ServerContext): { inUse: number; max: number } {
+  const slots = readConcurrencySlots(ctx);
+  const locked = new Set(slots.locks.map((lock) => lock.taskId).filter(Boolean));
+  let unlocked = 0;
+  for (const taskId of stateForCtx(ctx).activeExecutions.keys()) {
+    if (!locked.has(taskId)) unlocked++;
+  }
+  return { inUse: slots.processCount + unlocked, max: slots.maxConcurrent };
 }
 
 /** How full `inUse` of `max` slots is. */

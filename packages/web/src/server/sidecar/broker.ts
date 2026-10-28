@@ -42,6 +42,8 @@ export interface SidecarCard {
   input: Record<string, unknown>;
   /** The rule "always allow" would add; `null` when the call can never be allow-listed. */
   allowListKey: string | null;
+  /** What the call would do, read before the card was raised: a work card's `ndx work --resolve`. */
+  preview?: string;
   status: SidecarCardStatus;
   raisedAt: string;
   decidedAt?: string;
@@ -103,13 +105,15 @@ export class SidecarBroker {
   /**
    * Settle a write tool's call: at once when the allow-list covers it, else
    * when the operator decides its card, or when the card is withdrawn
-   * (the turn stopped, or `signal` aborted).
+   * (the turn stopped, or `signal` aborted). `preview` goes on the card for
+   * the operator to read before deciding.
    */
   request(
     sessionId: string,
     tool: BrokerToolName,
     input: Record<string, unknown>,
     signal?: AbortSignal,
+    preview?: string,
   ): Promise<BrokerOutcome> {
     const kind = BROKER_TOOL_POLICY[tool].card;
     if (!kind) throw new Error(`${tool} raises no card`);
@@ -124,6 +128,7 @@ export class SidecarBroker {
       kind,
       input,
       allowListKey: key,
+      ...(preview !== undefined && { preview }),
       status: "pending",
       raisedAt: this.iso(),
     };

@@ -295,6 +295,15 @@
   font-weight: 600;
 }
 .sidecar-card-effects { color: var(--text-muted); }
+.sidecar-card-preview {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+}
 .sidecar-card-input {
   margin: 0;
   padding: var(--space-1) var(--space-2);

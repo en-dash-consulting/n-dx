@@ -16,6 +16,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { SIDECAR_BROKER_NAME, type BrokerToolName } from "./broker-policy.js";
 import type { SidecarBroker } from "./broker.js";
+import { carryOutDecision, workOptions, type SidecarActions } from "./carry-out.js";
 import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES } from "./ledger.js";
 
 const BROKER_VERSION = "1.0.0";
@@ -29,8 +30,12 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
     input: { argv: z.array(z.string()).min(1).describe("The command and its arguments, one token each") },
   },
   start_work: {
-    description: "Propose starting `ndx work` on a task. Always waits for the operator's work card.",
-    input: { taskId: z.string().min(1), flags: z.array(z.string()).optional() },
+    description: "Propose starting `ndx work` on a task. Always waits for the operator's work card, which shows the run's `ndx work --resolve` settings.",
+    input: {
+      taskId: z.string().min(1),
+      options: z.record(z.string(), z.unknown()).optional()
+        .describe("Run options as the dashboard's execute route takes them (model, review, maxTurns, …)"),
+    },
   },
   propose_prd_change: {
     description: "Propose PRD items to add or change. Always waits for the operator's change-set card.",
@@ -62,21 +67,24 @@ function text(message: string, isError = false): CallToolResult {
   return { content: [{ type: "text", text: message }], ...(isError && { isError: true }) };
 }
 
-/** The broker MCP server for one Sidecar session. */
-export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string): McpServer {
+/**
+ * The broker MCP server for one Sidecar session. `actions` carries out an
+ * approved call (see `carry-out.ts`); without it an approved call that has
+ * an effect reports that nothing ran.
+ */
+export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, actions?: SidecarActions): McpServer {
   const server = new McpServer({ name: SIDECAR_BROKER_NAME, version: BROKER_VERSION });
 
   for (const [name, tool] of Object.entries(CARD_TOOLS) as Array<[keyof typeof CARD_TOOLS, (typeof CARD_TOOLS)[keyof typeof CARD_TOOLS]]>) {
     server.registerTool(name, { description: tool.description, inputSchema: tool.input }, async (args, extra) => {
-      const outcome = await broker.request(sessionId, name, args as Record<string, unknown>, extra.signal);
-      if (outcome.decidedBy === "allow-list") {
-        return text(`Allowed by the Sidecar allow-list. The dashboard carries out ${name} calls; nothing has run yet.`);
-      }
-      const { card } = outcome;
-      const note = card.reason ? ` Operator's note: ${card.reason}` : "";
-      if (outcome.decidedBy === "withdrawn") return text(`Card ${card.id} was withdrawn: ${card.reason ?? "the turn stopped"}.`, true);
-      if (!outcome.approved) return text(`The operator denied card ${card.id}.${note}`, true);
-      return text(`The operator approved card ${card.id}. The dashboard carries out ${name} calls; nothing has run yet.${note}`);
+      const input = args as Record<string, unknown>;
+      // A work card shows what the run would be before the operator decides it.
+      const preview = name === "start_work" && actions
+        ? await actions.previewWork(String(input.taskId), workOptions(input))
+        : undefined;
+      const outcome = await broker.request(sessionId, name, input, extra.signal, preview);
+      const result = await carryOutDecision(name, input, outcome, actions);
+      return text(result.text, !result.ok);
     });
   }
 
@@ -101,8 +109,9 @@ export async function handleBrokerMcpRequest(
   res: ServerResponse,
   broker: SidecarBroker,
   sessionId: string,
+  actions?: SidecarActions,
 ): Promise<void> {
-  const server = createBrokerMcpServer(broker, sessionId);
+  const server = createBrokerMcpServer(broker, sessionId, actions);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on("close", () => {
     void transport.close();

@@ -539,6 +539,34 @@ async function handlePrep(req: IncomingMessage, res: ServerResponse, ctx: Server
   return true;
 }
 
+/**
+ * `ndx work --task=<id> --resolve` for the run `options` would start, for a
+ * caller inside this server that renders it: a Sidecar work card. Options are
+ * checked as the execute route checks them; a refusal is the failure.
+ */
+export async function resolveTaskRun(
+  ctx: ServerContext,
+  taskId: string,
+  options: unknown,
+): Promise<{ ok: true; resolution: Record<string, unknown> } | { ok: false; failure: string }> {
+  const checked = await validateRunOptions(ctx.projectDir, options);
+  if (!checked.ok) return { ok: false, failure: `the run options are refused: ${checked.error}` };
+  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
+  const run = await runNdx(
+    ctx,
+    ["work", `--task=${taskId}`, "--resolve", ...resetDeferredArgs(prdEntryOf(ctx, taskId)), ...runOptionArgs(checked.options), ctx.projectDir],
+    PREP_RESOLVE_TIMEOUT_MS,
+  );
+  if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
+  try {
+    const parsed: unknown = JSON.parse(run.stdout);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    return { ok: true, resolution: parsed as Record<string, unknown> };
+  } catch {
+    return { ok: false, failure: "the resolve output was not JSON" };
+  }
+}
+
 /** POST /api/hench/prep/:taskId/preview */
 async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
   let body: Record<string, unknown>;

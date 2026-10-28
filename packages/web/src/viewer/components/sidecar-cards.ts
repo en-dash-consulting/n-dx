@@ -11,7 +11,9 @@
  *
  * Bodies are generic: a title from the card's input and the input itself.
  * A command card adds the effects line its ndx command declares in the
- * command manifest. Rich change-set and edit bodies come later (M3).
+ * command manifest; a work card shows the run's `ndx work --resolve`
+ * preview, read before the card was raised. Rich change-set and edit bodies
+ * come later (M3).
  *
  * A card withdrawn because its session ended draws as denied with the note
  * "session ended" (UX8); one withdrawn because the turn stopped draws as
@@ -20,7 +22,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
-import { SIDECAR_SESSION_ENDED_REASON } from "../external.js";
+import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, workCommandArgs } from "../external.js";
 import { useCliName } from "../hooks/index.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/index.js";
 
@@ -60,8 +62,11 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
     switch (card.kind) {
       case "command": return Array.isArray(input.argv) ? input.argv.map(String).join(" ") : "";
       case "work": {
-        const flags = Array.isArray(input.flags) ? input.flags.map(String) : [];
-        return str(input.taskId) ? [cliName, "work", `--task=${str(input.taskId)}`, ...flags].join(" ") : "";
+        // The execute route's own argv builder, so the title is the command approval spawns.
+        // Options that fail the shape check would be refused there; the title then leaves them out.
+        const checked = checkRunOptions(input.options);
+        const options = checked.ok ? checked.options : {};
+        return str(input.taskId) ? [cliName, ...workCommandArgs({ taskId: str(input.taskId), options, dir: "." })].join(" ") : "";
       }
       case "change-set": return count(input.items, "item", "items");
       case "placement": return str(input.change) && str(input.target) ? `${str(input.change)} → ${str(input.target)}` : "";
@@ -144,6 +149,9 @@ function SidecarCardView({ card, cliName, first, manifest, note, onNote, decidin
       h("span", { class: "sidecar-card-title" }, sidecarCardTitle(card, cliName)),
     ),
     card.kind === "command" ? h("div", { class: "sidecar-card-effects" }, sidecarCommandEffectsLine(card, manifest)) : null,
+    card.preview !== undefined
+      ? h("pre", { class: "sidecar-card-preview", "aria-label": "What this would run" }, card.preview)
+      : null,
     state === "pending"
       ? input
       : h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),

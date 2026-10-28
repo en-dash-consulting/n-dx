@@ -39,7 +39,7 @@ import { useCliName, resolveCliLabel } from "./use-project-metadata.js";
 import type { ViewId } from "../types.js";
 
 export type ActiveOperationKind =
-  | "hench" | "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "analyze" | "recommend";
+  | "hench" | "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "analyze" | "recommend" | "sidecar-command";
 
 export interface ActiveOperation {
   /** Stable key: `${kind}:${taskId ?? "singleton"}`. */
@@ -158,6 +158,14 @@ const SINGLETON_SOURCES: SingletonSource[] = [
     label: "Refresh recommendations",
     result: { view: "suggestions", label: "View suggestions" },
     detail: recommendDetail,
+  },
+  {
+    kind: "sidecar-command",
+    url: "/api/commands/sidecar-command/status",
+    stopUrl: "/api/commands/sidecar-command/stop",
+    label: "Sidecar command",
+    result: { view: "live", label: "View Live" },
+    detail: (w) => lastLine(w.output as string | undefined) ?? (typeof w.command === "string" ? w.command : undefined),
   },
   {
     kind: "analyze",

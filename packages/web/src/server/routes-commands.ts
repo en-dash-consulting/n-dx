@@ -30,6 +30,8 @@
  * GET  /api/commands/auth            — verify LLM provider credentials (read-only)
  * POST /api/commands/validate-tokens — hench vendor token-accuracy check
  * POST /api/commands/export-pdf      — sourcevision PDF report (returns the written path)
+ * GET  /api/commands/sidecar-command/status — the command a Sidecar session last ran (see startSidecarCommand)
+ * POST /api/commands/sidecar-command/stop   — interrupt it
  *
  * Every async trigger above is a {@link JobSlot}: a pollable status plus the
  * child handle its `/stop` needs. The dashboard's shared job tray polls those
@@ -38,6 +40,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, dirname, relative, resolve, sep } from "node:path";
 import { createRequire } from "node:module";
@@ -1338,29 +1341,50 @@ export function startAsyncJob(
   /** Set when the job writes .sourcevision/ — takes the shared writer lock. */
   svWriteLockLabel?: string,
 ): boolean {
-  const status = job.status;
-  if (status.running) {
-    jsonResponse(res, 409, { error: `${label} is already running`, startedAt: status.startedAt });
+  if (job.status.running) {
+    jsonResponse(res, 409, { error: `${label} is already running`, startedAt: job.status.startedAt });
     return true;
   }
   if (svWriteLockLabel && !acquireSvWriteLock(res, ctx, svWriteLockLabel)) {
     return true;
   }
+  const startedAt = launchAsyncJob(job, bin, cmdArgs, ctx, timeout, (status) => {
+    if (svWriteLockLabel) releaseSvWriteLock(ctx);
+    if (broadcast && broadcastType) {
+      broadcast({ type: broadcastType, ok: !status.error, timestamp: status.finishedAt });
+    }
+  });
+  jsonResponse(res, 202, {
+    ok: true,
+    startedAt,
+    message: `${label} started. Poll the status endpoint for progress.`,
+  });
+  return true;
+}
 
+/**
+ * Spawn `bin` into an idle `job` and return its start time; `onSettled` runs
+ * once the job has ended, with its status final. The caller has checked that
+ * the job is not running.
+ */
+function launchAsyncJob<S extends AsyncJobStatus>(
+  job: JobSlot<S>,
+  bin: string,
+  cmdArgs: string[],
+  ctx: ServerContext,
+  timeout: number,
+  onSettled?: (status: S) => void,
+): string {
+  const status = job.status;
+  const startedAt = new Date().toISOString();
   status.running = true;
-  status.startedAt = new Date().toISOString();
+  status.startedAt = startedAt;
   status.finishedAt = null;
   status.report = null;
   status.output = "";
   status.error = null;
   status.stopped = false;
   job.stopRequested = false;
-
-  jsonResponse(res, 202, {
-    ok: true,
-    startedAt: status.startedAt,
-    message: `${label} started. Poll the status endpoint for progress.`,
-  });
 
   // The whole stream is accumulated, not just the displayed tail: `report`
   // is JSON.parse'd from it, and a payload larger than the display slice
@@ -1385,7 +1409,7 @@ export function startAsyncJob(
     status.error = wasStopped ? null : error;
     job.child = null;
     job.stopRequested = false;
-    if (svWriteLockLabel) releaseSvWriteLock(ctx);
+    onSettled?.(status);
   };
 
   child.done.then((result) => {
@@ -1396,15 +1420,11 @@ export function startAsyncJob(
       status.report = null; // not JSON — `output` carries the text
     }
     settle(managedChildError(result, timeout));
-
-    if (broadcast && broadcastType) {
-      broadcast({ type: broadcastType, ok: !status.error, timestamp: status.finishedAt });
-    }
   }).catch((err: unknown) => {
     settle(errorMessage(err));
   });
 
-  return true;
+  return startedAt;
 }
 
 /** Interrupt a report-producing job started by {@link startAsyncJob}. */
@@ -1412,8 +1432,69 @@ export function stopAsyncJob(res: ServerResponse, job: AsyncJob, label: string):
   return stopJob(res, job, label);
 }
 
+// ── Sidecar commands ──────────────────────────────────────────────────
+
+/** A command a Sidecar session ran once its card was approved, or the allow-list covered it. */
+export interface SidecarCommandStatus extends AsyncJobStatus {
+  /** Names this run in the session's tool result; null before the first run. */
+  jobId: string | null;
+  /** The argv as the agent asked for it, space-joined. */
+  command: string | null;
+}
+
+const sidecarCommandJobs = new WorkspaceScoped<JobSlot<SidecarCommandStatus>>(() => ({
+  status: { ...newJobStatus(), jobId: null, command: null },
+  child: null,
+  stopRequested: false,
+}));
+
+export type SidecarCommandStart =
+  | { started: true; jobId: string; command: string; startedAt: string }
+  | { started: false; reason: string };
+
+/**
+ * Run an approved Sidecar `run_command` as the workspace's `sidecar-command`
+ * job, so it shows in the job tray and on Live with Stop like any dashboard
+ * job. Only `ndx` (or the project's CLI name) and `git` run: argv, never a
+ * shell. One at a time per workspace; a second while one runs is refused.
+ */
+export function startSidecarCommand(
+  ctx: ServerContext,
+  argv: readonly string[],
+  broadcast?: WebSocketBroadcaster,
+): SidecarCommandStart {
+  const job = sidecarCommandJobs.get(ctx);
+  const command = argv.join(" ");
+  if (job.status.running) {
+    return { started: false, reason: `Sidecar command ${job.status.jobId} (${job.status.command}) is still running` };
+  }
+  const [program = "", ...rest] = argv;
+  let bin: string;
+  let args: string[];
+  let timeout: number;
+  if (program === "ndx" || program === readCliName(ctx.projectDir)) {
+    const ndx = resolveNdxBin(ctx);
+    bin = ndx.bin;
+    args = [...ndx.args, ...rest];
+    timeout = resolveEffectiveCliTimeoutMs(ctx.projectDir, rest[0] ?? "");
+  } else if (program === "git") {
+    bin = "git";
+    args = rest;
+    timeout = resolveEffectiveCliTimeoutMs(ctx.projectDir, "git");
+  } else {
+    return { started: false, reason: `Sidecar runs ndx and git commands only, not "${program}"` };
+  }
+  const jobId = `sidecar-command-${randomUUID().slice(0, 8)}`;
+  job.status.jobId = jobId;
+  job.status.command = command;
+  const startedAt = launchAsyncJob(job, bin, args, ctx, timeout, (status) => {
+    broadcast?.({ type: "commands:sidecar-command-finished", jobId, ok: !status.error, timestamp: status.finishedAt });
+  });
+  return { started: true, jobId, command, startedAt };
+}
+
 /** The dashboard-started background jobs the job tray and the Live overview list. */
-export type CommandJobKind = "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "recommend";
+export type CommandJobKind = "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "recommend" | "sidecar-command";
 
 /** One job's status, reduced to what every kind shares. */
 export interface CommandJobSnapshot {
@@ -1445,6 +1526,7 @@ export function commandJobsOf(workspaceKey: string): CommandJobSnapshot[] {
     snapshotJob("reshape", reshapeJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
     snapshotJob("refresh", refreshSlots.peekByKey(workspaceKey)?.status, (s) => s.phases.at(-1) ?? lastOutputLine(s.output)),
     snapshotJob("recommend", recommendJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output)),
+    snapshotJob("sidecar-command", sidecarCommandJobs.peekByKey(workspaceKey)?.status, (s) => lastOutputLine(s.output) ?? s.command),
   ].filter((job): job is CommandJobSnapshot => job !== null);
 }
 
@@ -1492,6 +1574,7 @@ export function getCommandJobStatusesForTests(ctx: ServerContext): {
   refresh: RefreshStatus;
   selfHeal: SelfHealStatus;
   init: InitStatus;
+  sidecarCommand: SidecarCommandStatus;
 } {
   return {
     ci: ciJobs.get(ctx).status,
@@ -1500,6 +1583,7 @@ export function getCommandJobStatusesForTests(ctx: ServerContext): {
     refresh: refreshSlots.get(ctx).status,
     selfHeal: selfHealSlots.get(ctx).status,
     init: initStatuses.get(ctx),
+    sidecarCommand: sidecarCommandJobs.get(ctx).status,
   };
 }
 
@@ -2171,6 +2255,13 @@ export function handleCommandsRoute(
   }
   if (path === "reshape/stop" && method === "POST") {
     return stopAsyncJob(res, reshapeJobs.get(ctx), "Reshape");
+  }
+  if (path === "sidecar-command/status" && method === "GET") {
+    jsonResponse(res, 200, { ...sidecarCommandJobs.get(ctx).status });
+    return true;
+  }
+  if (path === "sidecar-command/stop" && method === "POST") {
+    return stopJob(res, sidecarCommandJobs.get(ctx), "Sidecar command");
   }
 
   return false;

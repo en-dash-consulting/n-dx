@@ -93,6 +93,8 @@ export interface SidecarCard {
   input: Record<string, unknown>;
   /** Set when "always allow" may be offered. */
   allowListKey: string | null;
+  /** What the call would do, read before the card was raised: a work card's `ndx work --resolve`. */
+  preview?: string;
   status: "pending" | "approved" | "denied" | "withdrawn";
   raisedAt: string;
   decidedAt?: string;
