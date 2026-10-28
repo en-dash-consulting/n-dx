@@ -92,4 +92,35 @@ describe("migration registry", () => {
   it("has no apply yet", () => {
     expect(v1ToV2.apply).toBeUndefined();
   });
+
+  describe("proposed dependsOn", () => {
+    const SHARED = "packages/rex/tests/unit/core/blocked-tasks-skipped.test.ts";
+    const OTHER = "packages/rex/tests/unit/core/release-claims-exit.test.ts";
+    const capabilities = (criteria: [string, string, string]): PRDItem[] => [
+      item("ea", "epic", "Plan work", [item("fa", "feature", "Task selection", [], "completed", { acceptanceCriteria: [criteria[0]] })]),
+      item("eb", "epic", "Run work", [
+        item("fb", "feature", "Blocked handling", [], "completed", { acceptanceCriteria: [criteria[1]] }),
+        item("fc", "feature", "Claims", [], "completed", { acceptanceCriteria: [criteria[2]] }),
+      ]),
+    ];
+
+    it("proposes dependsOn from the later capability to the earlier one when both link a test file", async () => {
+      const items = capabilities(["Blocked tasks are skipped", "Blocked tasks stay skipped", "Claims release on exit"]);
+      const plan = await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT, options: { testFiles: [SHARED, OTHER] } });
+      expect(plan.entries.fa?.spec?.tests).toEqual([SHARED]);
+      expect(plan.entries.fb?.spec?.tests).toEqual([SHARED]);
+      expect(plan.entries.fb?.dependsOn).toEqual([{ capability: "fa", tests: [SHARED] }]);
+      expect(plan.entries.fa?.dependsOn).toBeUndefined();
+      expect(plan.entries.fc?.dependsOn).toBeUndefined();
+      expect(parsePlanFile(formatPlanFile(plan))).toEqual(JSON.parse(formatPlanFile(plan)));
+    });
+
+    it("proposes no dependsOn for capabilities that share no test", async () => {
+      const items = capabilities(["Blocked tasks are skipped", "Claims release on exit", "Something unrelated entirely"]);
+      const plan = await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT, options: { testFiles: [SHARED, OTHER] } });
+      expect(plan.entries.fa?.spec?.tests).toEqual([SHARED]);
+      expect(plan.entries.fb?.spec?.tests).toEqual([OTHER]);
+      expect(Object.values(plan.entries).some((e) => e.dependsOn !== undefined)).toBe(false);
+    });
+  });
 });

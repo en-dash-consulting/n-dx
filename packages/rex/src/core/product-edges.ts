@@ -11,6 +11,8 @@
  *   changes, with how many changes they share.
  * - `realizedBy`: capability → the commits, files and zones of the changes that
  *   amended it. Commits are found by `N-DX-Item` trailer (`change-commits.ts`).
+ * - {@link computeAreaLinks}: area → the other areas its capabilities share
+ *   changes (`coChanges`) or test files with. A roll-up, so no schema field.
  * - {@link deriveChangeKind}: a change's kind, read from how it relates to the map.
  *
  * Cancelled and deleted changes contribute no edge of any kind: a change that
@@ -159,6 +161,126 @@ export function computeEdges(tree: V2Tree): ProductEdges {
     edges.coChanges[id] = [...row].map(([other, changes]) => ({ id: other, changes })).sort((x, y) => y.changes - x.changes || x.id.localeCompare(y.id));
   }
   return edges;
+}
+
+// ── Shared files ─────────────────────────────────────────────────
+
+const TEST_FILE = /[._](?:test|spec)\.[cm]?[jt]sx?$/;
+
+/**
+ * The test files a capability's requirements run: the test paths in each
+ * requirement's `validationCommand`, and in a `Linked to: a, b` description
+ * (how the migration records a requirement's linked tests). Sorted, unique.
+ */
+export function capabilityTestFiles(node: Pick<RuleNode, "requirements">): string[] {
+  const files = new Set<string>();
+  for (const req of (node.requirements as { description?: string; validationCommand?: string }[] | undefined) ?? []) {
+    const linked = /^Linked to:\s*(.*)$/s.exec(req.description ?? "")?.[1]?.split(",") ?? [];
+    for (const word of [...linked, ...(req.validationCommand ?? "").split(/\s+/)]) {
+      const file = word.trim();
+      if (TEST_FILE.test(file)) files.add(file);
+    }
+  }
+  return [...files].sort();
+}
+
+export interface SharedFiles {
+  /** The earlier of the two ids in the order the map was given. */
+  a: string;
+  /** The later id. */
+  b: string;
+  /** Files both list, sorted. */
+  files: string[];
+}
+
+/**
+ * Every pair of ids whose file lists overlap, with the files they share. Pairs
+ * come in the map's order: `a` is always the id listed first, so a caller that
+ * turns a pair into a direction gets one that cannot cycle.
+ */
+export function sharedFilePairs(filesById: ReadonlyMap<string, readonly string[]>): SharedFiles[] {
+  const ids = [...filesById.keys()];
+  const order = new Map(ids.map((id, i) => [id, i]));
+  const holders = new Map<string, string[]>();
+  for (const [id, files] of filesById) for (const file of new Set(files)) (holders.get(file) ?? holders.set(file, []).get(file)!).push(id);
+
+  const pairs = new Map<string, SharedFiles>();
+  for (const [file, owners] of holders) {
+    for (let i = 0; i < owners.length; i++) {
+      for (let j = i + 1; j < owners.length; j++) {
+        const key = `${owners[i]}\u0000${owners[j]}`;
+        const pair = pairs.get(key) ?? { a: owners[i]!, b: owners[j]!, files: [] };
+        pair.files.push(file);
+        pairs.set(key, pair);
+      }
+    }
+  }
+  return [...pairs.values()]
+    .map((p) => ({ ...p, files: p.files.sort() }))
+    .sort((x, y) => order.get(x.a)! - order.get(y.a)! || order.get(x.b)! - order.get(y.b)!);
+}
+
+// ── Area links ───────────────────────────────────────────────────
+
+export interface AreaLink {
+  /** The other area's id. */
+  id: string;
+  /** Summed over capability pairs across the two areas: how many changes amend or touch both. */
+  coChanges: number;
+  /** Test files run by a capability in each area, sorted. */
+  sharedTests: string[];
+}
+
+/**
+ * Area → the other areas its capabilities are tied to, rolled up from
+ * capability `coChanges` and from test files capabilities in both areas run
+ * ({@link capabilityTestFiles}). Computed, never stored: no schema field holds
+ * it. Live capabilities only; a capability's area is its nearest area
+ * ancestor, and pairs inside one area add nothing. Strongest link first (more
+ * shared changes, then more shared tests), then by id. Areas tied to nothing
+ * are absent.
+ */
+export function computeAreaLinks(tree: V2Tree, edges: ProductEdges = computeEdges(tree)): Record<string, AreaLink[]> {
+  const index = productIndex(tree);
+  const parentOf = new Map(index.entries.map((e) => [e.node, e.parent]));
+  const areaOf = new Map<string, string>();
+  const tests = new Map<string, string[]>();
+  for (const { node, root, retired } of index.entries) {
+    if (root !== "product" || retired || node.type !== "capability") continue;
+    let up = parentOf.get(node);
+    while (up && up.type !== "area") up = parentOf.get(up);
+    if (!up) continue;
+    areaOf.set(node.id, up.id);
+    tests.set(node.id, capabilityTestFiles(node));
+  }
+
+  const links = new Map<string, Map<string, { coChanges: number; tests: Set<string> }>>();
+  const link = (a: string, b: string) => {
+    const row = links.get(a) ?? links.set(a, new Map()).get(a)!;
+    return row.get(b) ?? row.set(b, { coChanges: 0, tests: new Set() }).get(b)!;
+  };
+  for (const [capability, area] of areaOf) {
+    for (const { id, changes } of edges.coChanges[capability] ?? []) {
+      const other = areaOf.get(id);
+      if (other !== undefined && other !== area) link(area, other).coChanges += changes;
+    }
+  }
+  for (const { a, b, files } of sharedFilePairs(tests)) {
+    const [areaA, areaB] = [areaOf.get(a)!, areaOf.get(b)!];
+    if (areaA === areaB) continue;
+    for (const file of files) {
+      link(areaA, areaB).tests.add(file);
+      link(areaB, areaA).tests.add(file);
+    }
+  }
+
+  const out: Record<string, AreaLink[]> = {};
+  for (const [area, row] of links) {
+    out[area] = [...row]
+      .map(([id, { coChanges, tests: shared }]) => ({ id, coChanges, sharedTests: [...shared].sort() }))
+      .sort((x, y) => y.coChanges - x.coChanges || y.sharedTests.length - x.sharedTests.length || x.id.localeCompare(y.id));
+  }
+  return out;
 }
 
 // ── Realized by ──────────────────────────────────────────────────
