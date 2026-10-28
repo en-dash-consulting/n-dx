@@ -217,6 +217,20 @@ describe("Hench Config API routes", () => {
     expect(get.config.apiKeyEnv).toBe("MY_ANTHROPIC_KEY");
   });
 
+  it("PUT /api/hench/config leaves .hench/config.json untouched when .n-dx.local.json cannot be written", async () => {
+    await writeFile(join(henchDir, "config.json"), JSON.stringify(makeConfig({ apiKeyEnv: "TRUSTED_KEY" }), null, 2) + "\n");
+    await writeFile(join(tmpDir, ".n-dx.local.json"), "{ not json");
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { apiKeyEnv: "MY_ANTHROPIC_KEY" } }),
+    });
+    expect(res.status).toBe(500);
+    const saved = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(saved.apiKeyEnv).toBe("TRUSTED_KEY");
+    expect(await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8")).toBe("{ not json");
+  });
+
   it("PUT /api/hench/config updates multiple fields", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
       method: "PUT",

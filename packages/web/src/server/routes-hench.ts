@@ -1124,12 +1124,14 @@ async function handleConfigUpdate(
     return true;
   }
 
-  // Write back
+  // Write back. The local file first: it refuses an unparseable file, and
+  // the hench file must not lose its value to the neutral one when the value
+  // never reached the local file.
   try {
-    writeFileSync(configPath, JSON.stringify(current, null, 2) + "\n", "utf-8");
     for (const [key, value] of Object.entries(localChanges)) {
       writeHenchLocalSetting(ctx.projectDir, key, value);
     }
+    writeFileSync(configPath, JSON.stringify(current, null, 2) + "\n", "utf-8");
   } catch (err) {
     errorResponse(res, 500, `Failed to write config: ${errorMessage(err)}`);
     return true;

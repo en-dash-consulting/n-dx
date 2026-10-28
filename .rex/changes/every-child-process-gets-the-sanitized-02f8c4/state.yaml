@@ -1,9 +1,15 @@
 schema: "rex/v2"
 items:
   "02f8c4c2-20f3-462e-a061-5fd05b50f9d1":
+    status: "completed"
+    startedAt: "2026-10-28T21:22:01.340Z"
+    completedAt: "2026-10-28T21:22:01.340Z"
+    endedAt: "2026-10-28T21:22:01.340Z"
+    activeIntervals: [{"end":"2026-10-28T21:22:01.340Z","start":"2026-10-28T21:22:01.340Z"}]
+    appliedAt: "2026-10-28T21:22:01.340Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    needsPlacement: false
-    lastModified: "2026-10-28T20:48:05.147Z"
+    lastModified: "2026-10-28T21:22:01.340Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0a3bfa7b-3b67-4500-b0a1-0602445f46fc":
     status: "completed"
@@ -49,10 +55,14 @@ items:
     lastModified: "2026-10-28T21:01:35.115Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ac6b536a-c462-40a2-b5c1-bd2d425ab8a9":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T21:02:40.731Z"
-    activeIntervals: [{"start":"2026-10-28T21:02:40.731Z"}]
-    lastModified: "2026-10-28T21:02:41.356Z"
+    completedAt: "2026-10-28T21:22:01.340Z"
+    endedAt: "2026-10-28T21:22:01.340Z"
+    activeIntervals: [{"end":"2026-10-28T21:22:01.340Z","start":"2026-10-28T21:02:40.731Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench.apiKeyEnv is written to .n-dx.local.json by all three writers. core: LOCAL_ONLY_SETTINGS.hench routes handleSetPackageConfig. hench config and the dashboard PUT use llm-client's new HENCH_LOCAL_ONLY_SETTINGS / writeHenchLocalSetting. Each writer keeps ANTHROPIC_API_KEY in .hench/config.json and removes a shared .n-dx.json copy. A test per writer checks evaluateRepoTrust stays at baseline."
+    lastModified: "2026-10-28T21:22:01.340Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c4333256-6e2d-4c9f-aeaa-6a772e17fb88":
     status: "completed"
