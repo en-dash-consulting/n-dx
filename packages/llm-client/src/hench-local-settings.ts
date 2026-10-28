@@ -1,9 +1,10 @@
 /**
  * Hench settings a writer stores in the user's `.n-dx.local.json`.
  *
- * The trust review reads hench's `apiKeyEnv` from `.hench/config.json` and the
- * `.n-dx.json` `hench` section as the repository's credential routing
- * (`repo-trust.ts`), so a user's own choice written there would be ignored
+ * The trust review reads hench's `apiKeyEnv` and `claudePath` from
+ * `.hench/config.json` and the `.n-dx.json` `hench` section as the
+ * repository's credential routing and binary choice (`repo-trust.ts`), so a
+ * user's own choice written there would be ignored
  * until `ndx trust accept .` and would mark the checkout untrusted. Every
  * writer — `ndx config`, `hench config`, the dashboard — puts these keys in
  * the git-ignored local file instead, as `ndx config` already does for
@@ -19,9 +20,12 @@ import { DEFAULT_HENCH_API_KEY_ENV } from "./repo-trust.js";
 /**
  * Top-level hench keys stored in `.n-dx.local.json`, each with the value
  * `.hench/config.json` keeps so the checkout's own config names nothing new.
+ * `undefined` means the key is absent there: `claudePath` is optional, and
+ * any non-bare value in the repository's config is a `vendor-cli-path` finding.
  */
-export const HENCH_LOCAL_ONLY_SETTINGS: Readonly<Record<string, string>> = Object.freeze({
+export const HENCH_LOCAL_ONLY_SETTINGS: Readonly<Record<string, string | undefined>> = Object.freeze({
   apiKeyEnv: DEFAULT_HENCH_API_KEY_ENV,
+  claudePath: undefined,
 });
 
 /** Whether `key` (a top-level hench key) belongs in `.n-dx.local.json`. */
@@ -60,7 +64,8 @@ function sectionOf(data: Record<string, unknown>, key: string): Record<string, u
  * Set `hench.<key>` in the project's `.n-dx.local.json`, and remove the same
  * key from the shared `.n-dx.json` `hench` section, which would otherwise keep
  * the checkout untrusted. Leaves `.hench/config.json` to the caller, which
- * owns that write: it should hold {@link HENCH_LOCAL_ONLY_SETTINGS}`[key]`.
+ * owns that write: it should hold {@link HENCH_LOCAL_ONLY_SETTINGS}`[key]`,
+ * or omit the key when that is `undefined`.
  * Throws when `key` is not local-only or a config file does not parse.
  */
 export function writeHenchLocalSetting(projectDir: string, key: string, value: unknown): HenchLocalSettingWrite {

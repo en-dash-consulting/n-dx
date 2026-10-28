@@ -8,7 +8,8 @@
  *   hench config --interactive [dir] — interactive menu
  *
  * All changes are validated before writing and persist to .hench/config.json,
- * except `apiKeyEnv`, which goes to .n-dx.local.json (see persistConfigChange).
+ * except `apiKeyEnv` and `claudePath`, which go to .n-dx.local.json (see
+ * persistConfigChange).
  */
 
 import { readFile } from "node:fs/promises";
@@ -883,7 +884,7 @@ async function promptUser(question: string): Promise<string> {
  * ignored until the checkout is trusted. `.hench/config.json` keeps those
  * keys at the value the file itself holds (the loaded config carries the
  * local override, which must not be copied back), or the neutral one when
- * the key just moved out.
+ * the key just moved out. An `undefined` neutral removes the key.
  */
 async function persistConfigChange(
   projectDir: string,
@@ -895,7 +896,10 @@ async function persistConfigChange(
   const onDisk = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8")) as Record<string, unknown>;
   const toSave: Record<string, unknown> = { ...config };
   for (const [key, neutral] of Object.entries(HENCH_LOCAL_ONLY_SETTINGS)) {
-    toSave[key] = key === path || onDisk[key] === undefined ? neutral : onDisk[key];
+    const kept = key === path || onDisk[key] === undefined ? neutral : onDisk[key];
+    // An `undefined` neutral (optional claudePath) means the key is left out.
+    if (kept === undefined) delete toSave[key];
+    else toSave[key] = kept;
   }
   const target = Object.hasOwn(HENCH_LOCAL_ONLY_SETTINGS, path)
     ? writeHenchLocalSetting(projectDir, path, value).localFile

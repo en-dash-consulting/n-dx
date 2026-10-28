@@ -217,6 +217,37 @@ describe("Hench Config API routes", () => {
     expect(get.config.apiKeyEnv).toBe("MY_ANTHROPIC_KEY");
   });
 
+  it("PUT /api/hench/config writes claudePath to .n-dx.local.json and removes it from .hench/config.json", async () => {
+    // A non-bare claudePath in .hench/config.json is a vendor-cli-path
+    // finding; claudePath is optional, so the hench file keeps no value.
+    const guard = { ...guardBaselineForLanguage(detectRepoLanguage(tmpDir)), commandTimeout: 30000, maxFileSize: 1048576 };
+    await writeFile(join(henchDir, "config.json"), JSON.stringify(makeConfig({ guard, claudePath: "/old/claude" }), null, 2) + "\n");
+    const res = await fetch(`http://127.0.0.1:${port}/api/hench/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ changes: { claudePath: "/x/claude" } }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).config.claudePath).toBe("/x/claude");
+
+    const local = JSON.parse(await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"));
+    expect(local.hench.claudePath).toBe("/x/claude");
+    const saved = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(Object.hasOwn(saved, "claudePath")).toBe(false);
+
+    const home = await mkdtemp(join(tmpdir(), "hench-config-api-home-"));
+    try {
+      const evaluation = evaluateRepoTrust(tmpDir, { ndxHome: home });
+      expect(evaluation.findings.map((f) => f.message)).toEqual([]);
+      expect(evaluation.state).toBe("baseline");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+
+    const get = await (await fetch(`http://127.0.0.1:${port}/api/hench/config`)).json();
+    expect(get.config.claudePath).toBe("/x/claude");
+  });
+
   it("PUT /api/hench/config leaves .hench/config.json untouched when .n-dx.local.json cannot be written", async () => {
     await writeFile(join(henchDir, "config.json"), JSON.stringify(makeConfig({ apiKeyEnv: "TRUSTED_KEY" }), null, 2) + "\n");
     await writeFile(join(tmpDir, ".n-dx.local.json"), "{ not json");

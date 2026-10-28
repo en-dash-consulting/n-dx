@@ -98,7 +98,7 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *
  * Two kinds live here, for two different reasons:
  *
- * - **Machine-specific paths** (`*.cli_path`, `cli.claudePath`) differ per developer machine, so
+ * - **Machine-specific paths** (`*.cli_path`, `cli.claudePath`, `hench.claudePath`) differ per developer machine, so
  *   sharing them through git would break a teammate's checkout. The loaders
  *   also honour them from the shared file only once the repository is
  *   trusted, since they pick the binary that runs (llm-client
@@ -127,16 +127,17 @@ const LOCAL_ONLY_SETTINGS = {
   cli: new Set(["claudePath"]),
   claude: new Set(["cli_path", "api_key", "api_endpoint"]),
   llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
-  hench: new Set(["apiKeyEnv"]),
+  hench: new Set(["apiKeyEnv", "claudePath"]),
 };
 
 /**
  * The value a package config file keeps for each of its settings in
  * {@link LOCAL_ONLY_SETTINGS}, so the checkout's own config names nothing the
- * trust review reads as credential routing. Mirrors hench's
- * `DEFAULT_HENCH_CONFIG()`; core imports no package.
+ * trust review reads as credential routing or a binary to run. `undefined`
+ * means the key is removed from the file (claudePath is optional). Mirrors
+ * hench's `DEFAULT_HENCH_CONFIG()`; core imports no package.
  */
-const PACKAGE_LOCAL_ONLY_VALUES = { hench: { apiKeyEnv: "ANTHROPIC_API_KEY" } };
+const PACKAGE_LOCAL_ONLY_VALUES = { hench: { apiKeyEnv: "ANTHROPIC_API_KEY", claudePath: undefined } };
 
 /** Setting-path leaf that marks a secret, for the shared-file scan. */
 const SECRET_SETTING_LEAF = "api_key";
@@ -2037,8 +2038,8 @@ Hench settings (.hench/config.json):
                                      Written to .n-dx.local.json.
   hench.claudePath         string    Path to the Claude Code binary. Falls back to "claude" on
                                      PATH. Prefer claude.cli_path, which is shared across packages.
-                                     Outside .n-dx.local.json it applies only once the repository
-                                     is trusted (ndx trust accept .).
+                                     Written to .n-dx.local.json; outside it the value applies
+                                     only once the repository is trusted (ndx trust accept .).
   hench.language           string    Project toolchain — "typescript", "javascript", "go" or
                                      "swift". Selects the hench.guard.* defaults.
   hench.loopPauseMs        number    Pause between consecutive runs in a loop (default: 2000)
@@ -3353,7 +3354,9 @@ async function setPackageSettingLocally(dir, pkg, settingPath, keyArg, coerced, 
   const neutral = PACKAGE_LOCAL_ONLY_VALUES[pkg][settingPath];
   const current = getByPath(rawConfigs[pkg], settingPath, pkg);
   if (current !== undefined && current !== neutral) {
-    setByPath(rawConfigs[pkg], settingPath, neutral, pkg);
+    // Local-only package settings are top-level keys, so delete needs no path walk.
+    if (neutral === undefined) delete rawConfigs[pkg][settingPath];
+    else setByPath(rawConfigs[pkg], settingPath, neutral, pkg);
     await saveJSON(packageConfigPath(dir, pkg), rawConfigs[pkg]);
   }
 

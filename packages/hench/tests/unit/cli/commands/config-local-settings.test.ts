@@ -51,3 +51,48 @@ describe("hench config apiKeyEnv", () => {
     expect(evaluateRepoTrust(dir, { ndxHome: home }).state).toBe("baseline");
   });
 });
+
+// A non-bare claudePath in .hench/config.json is a vendor-cli-path finding, so
+// `hench config claudePath` writes .n-dx.local.json. claudePath is optional:
+// the hench file keeps no value rather than a placeholder.
+describe("hench config claudePath", () => {
+  let dir: string;
+  let home: string;
+
+  beforeEach(async () => {
+    dir = mkdtempSync(join(tmpdir(), "hench-config-local-"));
+    home = mkdtempSync(join(tmpdir(), "hench-config-home-"));
+    await initConfig(join(dir, ".hench"));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  const readJson = (path: string) => JSON.parse(readFileSync(path, "utf-8"));
+
+  it("writes .n-dx.local.json, removes it from .hench/config.json, and the value applies untrusted", async () => {
+    const henchPath = join(dir, ".hench", "config.json");
+    writeFileSync(henchPath, JSON.stringify({ ...readJson(henchPath), claudePath: "/old/claude" }));
+
+    await cmdConfig(dir, ["claudePath", "/x/claude"], {});
+
+    expect(readJson(join(dir, ".n-dx.local.json")).hench.claudePath).toBe("/x/claude");
+    expect(Object.hasOwn(readJson(henchPath), "claudePath")).toBe(false);
+
+    expect(evaluateRepoTrust(dir, { ndxHome: home }).state).toBe("baseline");
+    const config = await loadConfig(join(dir, ".hench"));
+    expect(applyRepoTrust(config, dir, undefined, { ndxHome: home }).config.claudePath).toBe("/x/claude");
+  });
+
+  it("does not copy the local value into .hench/config.json on a later write", async () => {
+    await cmdConfig(dir, ["claudePath", "/x/claude"], {});
+    await cmdConfig(dir, ["maxTurns", "10"], {});
+
+    const henchFile = readJson(join(dir, ".hench", "config.json"));
+    expect(henchFile.maxTurns).toBe(10);
+    expect(Object.hasOwn(henchFile, "claudePath")).toBe(false);
+    expect(evaluateRepoTrust(dir, { ndxHome: home }).state).toBe("baseline");
+  });
+});

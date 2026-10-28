@@ -1091,7 +1091,11 @@ async function handleConfigUpdate(
     const oldValue = localBefore[fieldPath] ?? getNestedValue(current, fieldPath);
     if (isHenchLocalOnlySetting(fieldPath)) {
       localChanges[fieldPath] = newValue;
-      setNestedValue(current, fieldPath, HENCH_LOCAL_ONLY_SETTINGS[fieldPath]);
+      // Local-only keys are top-level; an `undefined` neutral (optional
+      // claudePath) leaves the key out of .hench/config.json.
+      const neutral = HENCH_LOCAL_ONLY_SETTINGS[fieldPath];
+      if (neutral === undefined) delete current[fieldPath];
+      else current[fieldPath] = neutral;
     } else {
       setNestedValue(current, fieldPath, newValue);
     }

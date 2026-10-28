@@ -774,6 +774,26 @@ describe("n-dx config", () => {
       expect(run(["hench.apiKeyEnv", tmpDir]).trim()).toBe("MY_ANTHROPIC_KEY");
     });
 
+    it("sets hench.claudePath in .n-dx.local.json and removes it from .hench/config.json", async () => {
+      // A non-bare claudePath in .hench/config.json is a vendor-cli-path
+      // finding, so the user's own binary would be ignored until trusted.
+      // claudePath is optional: the hench file keeps no value at all.
+      const henchPath = join(tmpDir, ".hench", "config.json");
+      const before = JSON.parse(await readFile(henchPath, "utf-8"));
+      await writeFile(henchPath, JSON.stringify({ ...before, claudePath: "/old/claude" }, null, 2) + "\n");
+
+      const output = run(["hench.claudePath", "/x/claude", tmpDir]);
+      expect(output).toContain("hench.claudePath = /x/claude");
+
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.hench.claudePath).toBe("/x/claude");
+      const hench = JSON.parse(await readFile(henchPath, "utf-8"));
+      expect(Object.hasOwn(hench, "claudePath")).toBe(false);
+
+      const { evaluateRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+      expect(evaluateRepoTrust(tmpDir).state).toBe("baseline");
+    });
+
     it("sets claude.api_key in .n-dx.local.json, never in .n-dx.json", async () => {
       const output = run(["claude.api_key", "sk-ant-test-key", tmpDir]);
       expect(output).toContain("claude.api_key = sk-ant-test-key");
