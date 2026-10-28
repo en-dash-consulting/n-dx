@@ -177,6 +177,71 @@
 }
 .sidecar-error { color: var(--red, var(--text)); }
 
+/* ── Permission cards (UX4: waiting cards in the orange "needs you" colour) ── */
+
+.sidecar-cards {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+.sidecar-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.sidecar-card--pending { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 8%, transparent); }
+.sidecar-card--approved, .sidecar-card--allow-listed { border-left-color: var(--green); }
+.sidecar-card--denied { border-left-color: var(--red); }
+.sidecar-card--withdrawn { border-left-color: var(--text-muted); }
+.sidecar-card-head { display: flex; gap: var(--space-2); align-items: baseline; min-width: 0; }
+.sidecar-card-kind {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+}
+.sidecar-card--pending .sidecar-card-kind { color: var(--orange); }
+.sidecar-card-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-weight: 600;
+}
+.sidecar-card-effects { color: var(--text-muted); }
+.sidecar-card-input {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+}
+.sidecar-card-details summary { cursor: pointer; color: var(--text-muted); font-size: 11px; }
+.sidecar-card-note, .sidecar-card-queued { margin: 0; color: var(--text-muted); }
+.sidecar-card-decide { display: flex; flex-direction: column; gap: var(--space-1); }
+.sidecar-card-reason { font: inherit; font-size: 12px; }
+.sidecar-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.sidecar-card-keys { margin-left: auto; color: var(--text-muted); font-size: 11px; }
+
 /* ── Composer ────────────────────────────────────────────────────────── */
 
 .sidecar-composer {

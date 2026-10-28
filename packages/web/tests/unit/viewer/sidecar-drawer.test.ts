@@ -18,9 +18,12 @@ import {
   mergeFrames,
   pickOpenSession,
   useSidecarShell,
+  type SidecarCard,
+  type SidecarCardKind,
   type SidecarFrame,
   type SidecarSessionEntry,
 } from "../../../src/viewer/hooks/use-sidecar.js";
+import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
 import { useFeatureToggle } from "../../../src/viewer/hooks/use-feature-toggle.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -38,8 +41,20 @@ interface Server {
   gate: Promise<void> | null;
   sessions: SidecarSessionEntry[];
   frames: SidecarFrame[];
-  cards: Array<{ id: string; sessionId: string; status: string }>;
+  cards: SidecarCard[];
+  /** While set, each cards read snapshots its answer and waits here until released. */
+  heldCardReads: Array<() => void> | null;
+  /** GET /api/commands/manifest's command effects, by name. */
+  manifest: Record<string, unknown>;
   requests: Array<{ method: string; url: string; body?: unknown }>;
+}
+
+/** A card as the server sends it; `n` orders its raisedAt. */
+function card(id: string, n: number, over: Partial<SidecarCard> = {}): SidecarCard {
+  return {
+    id, sessionId: "s1", tool: "run_command", kind: "command", input: { argv: ["ndx", "status", "."] },
+    allowListKey: null, status: "pending", raisedAt: `2026-10-28T10:00:0${n}.000Z`, ...over,
+  };
 }
 
 let server: Server;
@@ -85,9 +100,25 @@ function stubServer(): void {
       server.sessions.push(created);
       return json(created, 201);
     }
-    const m = /^\/api\/sidecar\/sessions\/([\w-]+)\/(frames|cards|turns|interrupt)(?:\?after=(\d+))?$/.exec(url);
+    if (url === "/api/commands/manifest") {
+      return json({
+        cliName: "ndx",
+        groups: [{ id: "g", label: "G", commands: Object.entries(server.manifest).map(([name, effects]) => ({ name, effects })) }],
+      });
+    }
+    const m = /^\/api\/sidecar\/sessions\/([\w-]+)\/(frames|cards|turns|interrupt)(?:\/([\w-]+))?(?:\?after=(\d+))?$/.exec(url);
     if (m) {
-      const [, id, action, after] = m;
+      const [, id, action, cardId, after] = m;
+      if (action === "cards" && cardId) {
+        const decided = server.cards.find((c) => c.id === cardId)!;
+        decided.status = body.decision === "approve" ? "approved" : "denied";
+        return json({ card: decided });
+      }
+      if (action === "cards" && server.heldCardReads) {
+        const answer = json({ cards: server.cards.filter((c) => c.sessionId === id).map((c) => ({ ...c })) });
+        await new Promise<void>((r) => server.heldCardReads!.push(r));
+        return answer;
+      }
       if (action === "frames") {
         const running = server.running;
         if (server.gate) await server.gate;
@@ -173,7 +204,10 @@ const frameFetches = () => server.requests.filter((r) => r.url.includes("/frames
 beforeEach(() => {
   clearProjectMetadataCache();
   localStorage.clear();
-  server = { enabled: true, running: false, gate: null, sessions: [], frames: [], cards: [], requests: [] };
+  server = {
+    enabled: true, running: false, gate: null, sessions: [], frames: [], cards: [],
+    heldCardReads: null, manifest: {}, requests: [],
+  };
   FakeSocket.open.clear();
   stubServer();
   vi.stubGlobal("WebSocket", FakeSocket);
@@ -549,20 +583,195 @@ describe("the waiting-card badge", () => {
       { session: session({ id: "s2" }), running: true },
       { session: session({ id: "s3", endedAt: "x" }), running: false },
     ];
-    server.cards = [
-      { id: "c1", sessionId: "s1", status: "pending" },
-      { id: "c2", sessionId: "s1", status: "approved" },
-    ];
+    server.cards = [card("c1", 1), card("c2", 2, { status: "approved" })];
     await mount();
     expect(root.querySelector(".topnav-sidecar-badge")?.textContent).toBe("1");
     expect(button()?.getAttribute("aria-label")).toBe("Sidecar, 1 waiting");
 
-    server.cards.push({ id: "c3", sessionId: "s2", status: "pending" });
+    server.cards.push(card("c3", 3, { sessionId: "s2" }));
     await announce({ type: "sidecar:card", sessionId: "s2", cardId: "c3", status: "pending", timestamp: "t" });
     expect(root.querySelector(".topnav-sidecar-badge")?.textContent).toBe("2");
 
     server.cards = server.cards.map((c) => ({ ...c, status: "approved" }));
     await announce({ type: "sidecar:card", sessionId: "s2", cardId: "c3", status: "approved", timestamp: "t" });
     expect(root.querySelector(".topnav-sidecar-badge")).toBeNull();
+  });
+
+  it("ignores a card read that a later read has overtaken", async () => {
+    server.sessions = [{ session: session(), running: true }];
+    server.cards = [card("c1", 1)];
+    await mount();
+    expect(root.querySelector(".topnav-sidecar-badge")?.textContent).toBe("1");
+
+    // Read A answers "1 waiting"; the card is then approved and read B answers "none".
+    server.heldCardReads = [];
+    await announce({ type: "sidecar:card", sessionId: "s1", cardId: "c1", status: "pending", timestamp: "t" });
+    server.cards[0].status = "approved";
+    await announce({ type: "sidecar:card", sessionId: "s1", cardId: "c1", status: "approved", timestamp: "t" });
+    expect(server.heldCardReads).toHaveLength(2);
+    const [releaseA, releaseB] = server.heldCardReads;
+    server.heldCardReads = null;
+
+    // B lands first, then A: A was overtaken and must not bring the badge back.
+    await act(async () => { releaseB(); });
+    await settle();
+    expect(root.querySelector(".topnav-sidecar-badge")).toBeNull();
+    await act(async () => { releaseA(); });
+    await settle();
+    expect(root.querySelector(".topnav-sidecar-badge")).toBeNull();
+  });
+});
+
+// ── Permission cards ───────────────────────────────────────────────────────
+
+describe("permission cards", () => {
+  const cardEls = () => [...root.querySelectorAll<HTMLElement>(".sidecar-card")];
+  const decisions = () => server.requests.filter((r) => r.method === "POST" && /\/cards\/[\w-]+$/.test(r.url));
+
+  async function key(target: EventTarget, init: KeyboardEventInit): Promise<void> {
+    await act(async () => { target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init })); });
+    await settle();
+  }
+
+  async function openWith(cards: SidecarCard[]): Promise<void> {
+    server.sessions = [{ session: session(), running: true }];
+    server.running = true;
+    server.cards = cards;
+    await mount();
+    await pressCmdJ();
+  }
+
+  it("draws waiting cards oldest first, lets only the first be decided, and pauses the agent above the composer", async () => {
+    await openWith([card("later", 2, { input: { argv: ["ndx", "ci", "."] } }), card("first", 1)]);
+    expect(cardEls().map((el) => el.dataset.card)).toEqual(["first", "later"]);
+    expect(cardEls()[0].querySelector(".sidecar-card-approve")).not.toBeNull();
+    expect(cardEls()[1].querySelector("button")).toBeNull();
+    expect(cardEls()[1].querySelector(".sidecar-card-queued")?.textContent).toBe("Decided after the card above");
+
+    const paused = root.querySelector(".sidecar-paused");
+    expect(paused?.textContent).toBe("Agent paused · waiting on 2 decisions");
+    expect(root.querySelector("form.sidecar-composer")?.previousElementSibling).toBe(paused);
+  });
+
+  it("approves the first waiting card on ⌘↵ and denies it on ⌘⌫, but not while focus is in a text field", async () => {
+    await openWith([card("c1", 1), card("c2", 2)]);
+    const composer = root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+    const note = root.querySelector<HTMLInputElement>(".sidecar-card-reason")!;
+    for (const field of [composer, note]) {
+      await key(field, { key: "Enter", metaKey: true });
+      await key(field, { key: "Backspace", metaKey: true });
+    }
+    expect(decisions()).toHaveLength(0);
+
+    await key(document.body, { key: "Enter", metaKey: true });
+    expect(decisions()).toEqual([{ method: "POST", url: "/api/sidecar/sessions/s1/cards/c1", body: { decision: "approve" } }]);
+
+    await announce({ type: "sidecar:card", sessionId: "s1", cardId: "c1", status: "approved", timestamp: "t" });
+    await key(document.body, { key: "Backspace", ctrlKey: true });
+    expect(decisions().at(-1)).toEqual({ method: "POST", url: "/api/sidecar/sessions/s1/cards/c2", body: { decision: "deny" } });
+  });
+
+  it("sends a deny's note as the decision reason", async () => {
+    await openWith([card("c1", 1)]);
+    const note = root.querySelector<HTMLInputElement>(".sidecar-card-reason")!;
+    await act(async () => {
+      note.value = "after the loop finishes";
+      note.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-deny")!.click(); });
+    await settle();
+    expect(decisions()).toEqual([{
+      method: "POST", url: "/api/sidecar/sessions/s1/cards/c1", body: { decision: "deny", reason: "after the loop finishes" },
+    }]);
+  });
+
+  it("shows a command card's effects from the command manifest, or that it declares none", async () => {
+    server.manifest = {
+      status: { reads: ["repo", ".rex/"], writes: [], llm: [], duration: "~1 s" },
+      ci: { reads: ["repo"], writes: [{ path: "ci-report.json", what: "report" }], llm: [{ phase: "x" }], duration: "~6 min" },
+      noisy: null,
+    };
+    await openWith([
+      card("a", 1),
+      card("b", 2, { input: { argv: ["ndx", "ci", "--format=json", "."] } }),
+      card("c", 3, { input: { argv: ["ndx", "bogus"] } }),
+      card("d", 4, { input: { argv: ["git", "status"] } }),
+      card("e", 5, { input: { argv: ["ndx", "noisy"] } }),
+    ]);
+    const lines = cardEls().map((el) => el.querySelector(".sidecar-card-effects")?.textContent);
+    expect(lines).toEqual([
+      "reads repo + .rex/ · writes nothing · no LLM · ~1 s",
+      "reads repo · writes ci-report.json · 1 LLM phase · ~6 min",
+      "no declared effects",
+      "no declared effects",
+      "no declared effects",
+    ]);
+    expect(server.requests.filter((r) => r.url === "/api/commands/manifest")).toHaveLength(1);
+  });
+
+  it("offers \"Always allow\" only when the card has an allow-list key, and remembers the approval", async () => {
+    await openWith([card("c1", 1, { allowListKey: JSON.stringify(["ndx", "status", "."]) })]);
+    await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-always")!.click(); });
+    await settle();
+    expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve", remember: true }]);
+    await unmount();
+
+    await openWith([card("c2", 1, { kind: "work", tool: "start_work", input: { taskId: "t1" } })]);
+    expect(root.querySelector(".sidecar-card-approve")).not.toBeNull();
+    expect(root.querySelector(".sidecar-card-always")).toBeNull();
+  });
+
+  const INPUTS: Record<SidecarCardKind, { tool: string; input: Record<string, unknown>; title: string }> = {
+    command: { tool: "run_command", input: { argv: ["ndx", "status", "."] }, title: "ndx status ." },
+    work: { tool: "start_work", input: { taskId: "425819f5", flags: ["--review"] }, title: "n-dx work --task=425819f5 --review" },
+    "change-set": { tool: "propose_prd_change", input: { items: [{ title: "a" }, { title: "b" }] }, title: "2 items" },
+    placement: { tool: "place_change_card", input: { change: "CH-212", target: "A3.2", relation: "amends" }, title: "CH-212 → A3.2" },
+    edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },
+    "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
+    "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
+    "migration-decision": { tool: "migration_decision", input: { entries: [{ id: "x" }] }, title: "1 decision" },
+  };
+  const STATES: Array<[string, Partial<SidecarCard>, RegExp | null]> = [
+    ["pending", { status: "pending" }, null],
+    ["approved", { status: "approved" }, /^Approved$/],
+    ["denied", { status: "denied", reason: "not now" }, /^Denied · note sent to the agent: "not now"$/],
+    ["allow-listed", { status: "approved", remembered: true }, /allow-listed/],
+    ["withdrawn", { status: "withdrawn", reason: "The turn stopped before the card was decided" }, /^Withdrawn · The turn stopped/],
+  ];
+
+  it.each(Object.keys(INPUTS) as SidecarCardKind[])("draws a %s card with its title and input in every state", async (kind) => {
+    const { tool, input, title } = INPUTS[kind];
+    for (const [state, over, note] of STATES) {
+      const host = document.createElement("div");
+      await act(async () => {
+        render(h(SidecarCards, {
+          cards: [card("x", 1, { kind, tool, input, ...over })],
+          manifest: { cliNames: ["ndx"], effects: {} },
+          decide: vi.fn(async () => {}),
+        }), host);
+      });
+      const el = host.querySelector<HTMLElement>(".sidecar-card")!;
+      expect(el.classList.contains(`sidecar-card--${state}`), `${kind} ${state}`).toBe(true);
+      expect(el.querySelector(".sidecar-card-title")?.textContent).toBe(title);
+      expect(el.querySelector(".sidecar-card-kind")?.textContent).not.toBe("");
+      expect(JSON.parse(el.querySelector(".sidecar-card-input")!.textContent!)).toEqual(input);
+      if (note) expect(el.querySelector(".sidecar-card-note")?.textContent).toMatch(note);
+      await act(async () => { render(null, host); });
+    }
+  });
+
+  it("draws a card withdrawn because the session ended as denied with the note \"session ended\"", async () => {
+    const host = document.createElement("div");
+    await act(async () => {
+      render(h(SidecarCards, {
+        cards: [card("x", 1, { status: "withdrawn", reason: "session ended" })],
+        manifest: null,
+        decide: vi.fn(async () => {}),
+      }), host);
+    });
+    const el = host.querySelector(".sidecar-card")!;
+    expect(el.classList.contains("sidecar-card--denied")).toBe(true);
+    expect(el.querySelector(".sidecar-card-note")?.textContent).toBe("Denied · session ended");
+    await act(async () => { render(null, host); });
   });
 });

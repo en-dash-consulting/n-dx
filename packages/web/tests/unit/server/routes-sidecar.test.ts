@@ -374,4 +374,18 @@ describe("broker", () => {
     expect((await call).isError).toBe(true);
     await client.close();
   });
+
+  it("withdraws waiting cards with the note \"session ended\" when the session ends", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const call = client.callTool({ name: "run_command", arguments: { argv: ["ndx", "ci", "."] } });
+    await cardAnnounced(id, "pending");
+    const ended = await api(`/${id}/end`, { method: "POST" });
+    expect(ended.status).toBe(200);
+    await cardAnnounced(id, "withdrawn");
+    const { cards } = await (await api(`/${id}/cards`)).json();
+    expect(cards).toEqual([expect.objectContaining({ status: "withdrawn", reason: "session ended" })]);
+    expect((await call).isError).toBe(true);
+    await client.close();
+  });
 });

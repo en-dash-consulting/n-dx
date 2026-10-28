@@ -8,8 +8,9 @@
  * the frames it has not drawn. Frames merge by `seq`, so a fetch that overlaps
  * another, or a reload that starts again from 0, never draws a frame twice.
  *
- * A `sidecar:card` message refetches the waiting-card count, which is summed
- * across every open session in this worktree.
+ * A `sidecar:card` message refetches the cards: the open session's draw in the
+ * drawer, and the waiting ones, summed across every open session in this
+ * worktree, are the badge count. `decide` answers the first waiting card.
  *
  * One socket serves both; the hook lives in `main.ts` so the top-nav badge
  * counts while the drawer is closed. The transcript is only read while open.
@@ -62,10 +63,62 @@ export type SidecarFrame =
   | { seq: number; at: string; type: "event"; event: SidecarRuntimeEvent; checkpoint?: true }
   | { seq: number; at: string; type: "context-refreshed"; notes: number; contextTokens: number };
 
+/** Mirrors `SidecarCardKind` in server/sidecar/broker-policy.ts. */
+export type SidecarCardKind =
+  | "command"
+  | "work"
+  | "change-set"
+  | "placement"
+  | "edit"
+  | "network-read"
+  | "draft-post"
+  | "migration-decision";
+
+/** A permission card; mirrors `SidecarCard` in server/sidecar/broker.ts. */
 export interface SidecarCard {
   id: string;
   sessionId: string;
+  tool: string;
+  kind: SidecarCardKind;
+  input: Record<string, unknown>;
+  /** Set when "always allow" may be offered. */
+  allowListKey: string | null;
   status: "pending" | "approved" | "denied" | "withdrawn";
+  raisedAt: string;
+  decidedAt?: string;
+  reason?: string;
+  /** Approved with "always allow". */
+  remembered?: true;
+}
+
+/** The operator's answer to the first waiting card. */
+export interface SidecarCardDecision {
+  approve: boolean;
+  /** A deny's note, sent to the agent as the reason. */
+  reason?: string;
+  /** "Always allow": only when the card has an allowListKey. */
+  remember?: boolean;
+}
+
+/**
+ * The parts of a command's effects declaration a command card draws; core
+ * owns the full shape (`packages/core/command-effects.js`), served by
+ * GET /api/commands/manifest.
+ */
+export interface SidecarCommandEffects {
+  reads: string[];
+  writes: Array<{ path: string }>;
+  llm: unknown[];
+  duration: string;
+}
+
+/**
+ * Each ndx command's declared effects, by command name (null where the CLI
+ * declared none), and the CLI names an argv may start with.
+ */
+export interface SidecarCommandManifest {
+  cliNames: string[];
+  effects: Record<string, SidecarCommandEffects | null>;
 }
 
 /** How the last turn ended, from the announcement that closed it. */
@@ -120,6 +173,11 @@ export function waitingCards(cards: readonly SidecarCard[]): number {
   return cards.filter((c) => c.status === "pending").length;
 }
 
+/** Cards oldest first, the order the agent waits on them. */
+export function orderCards(cards: readonly SidecarCard[]): SidecarCard[] {
+  return [...cards].sort((a, b) => (a.raisedAt < b.raisedAt ? -1 : a.raisedAt > b.raisedAt ? 1 : 0));
+}
+
 async function getJson<T>(url: string): Promise<T | null> {
   try {
     const res = await fetch(url);
@@ -154,6 +212,21 @@ async function loadCatalog(): Promise<SidecarCatalog | null> {
     if (entry?.models) catalog[vendor] = { models: entry.models, defaultModel: entry.defaultModel ?? entry.models[0] ?? "" };
   }
   return catalog;
+}
+
+/** Command effects from GET /api/commands/manifest; null when the route does not answer. */
+async function loadCommandManifest(): Promise<SidecarCommandManifest | null> {
+  const body = await getJson<{
+    cliName?: string;
+    groups?: Array<{ commands?: Array<{ name: string; effects?: SidecarCommandEffects | null }> }>;
+  }>("/api/commands/manifest");
+  if (!body) return null;
+  const effects: SidecarCommandManifest["effects"] = {};
+  for (const group of body.groups ?? []) {
+    for (const cmd of group.commands ?? []) effects[cmd.name] = cmd.effects ?? null;
+  }
+  const cliNames = [...new Set(["ndx", "n-dx", ...(body.cliName ? [body.cliName] : [])])];
+  return { cliNames, effects };
 }
 
 /** The configured vendor when it has a resumable session, else Claude. */
@@ -214,6 +287,15 @@ export interface SidecarState {
   waiting: number;
   /** Cards waiting in the open session. */
   sessionWaiting: number;
+  /** The open session's cards, oldest first. */
+  cards: SidecarCard[];
+  /**
+   * Command effects for command cards: null until the open session has one;
+   * `unavailable` when the manifest could not be read (read once per page load).
+   */
+  commandManifest: SidecarCommandManifest | "loading" | "unavailable" | null;
+  /** Decide the open session's first waiting card. */
+  decide: (cardId: string, decision: SidecarCardDecision) => Promise<void>;
   lastTurn: SidecarTurnEnd | null;
   error: string | null;
   /** The agent the picker shows: the open session's, else the one the first prompt will create. */
@@ -247,7 +329,8 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
   const [frames, setFrames] = useState<SidecarFrame[]>([]);
   const [running, setRunning] = useState(false);
   const [sending, setSending] = useState(false);
-  const [waitingBySession, setWaitingBySession] = useState<Record<string, number>>({});
+  const [cardsBySession, setCardsBySession] = useState<Record<string, SidecarCard[]>>({});
+  const [commandManifest, setCommandManifest] = useState<SidecarState["commandManifest"]>(null);
   const [lastTurn, setLastTurn] = useState<SidecarTurnEnd | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<SidecarCatalog | null>(null);
@@ -261,6 +344,9 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
   const openRef = useRef(open);
   openRef.current = open;
   const tailRef = useRef<Tail>(newTail(null));
+  /** Card reads: the number of the last one started, and of the last one applied. */
+  const cardReadsRef = useRef({ started: 0, applied: 0 });
+  const manifestRequestedRef = useRef(false);
 
   const fetchFrames = useCallback(async () => {
     const tail = tailRef.current;
@@ -296,15 +382,26 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     void fetchFrames();
   }, [fetchFrames]);
 
+  /**
+   * Read the cards of every live session, and of the open one even if it has
+   * ended. Reads overlap when cards settle quickly; a read that lands after a
+   * later-started read has already applied is dropped, so the badge never
+   * goes back to a stale count.
+   */
   const fetchWaiting = useCallback(async () => {
+    const reads = cardReadsRef.current;
+    const read = ++reads.started;
     const list = await getJson<{ sessions: SidecarSessionEntry[] }>(SESSIONS);
     if (!list || !mountedRef.current) return;
-    const live = list.sessions.filter((e) => !e.session.endedAt);
-    const counts = await Promise.all(live.map(async (e) => {
-      const body = await getJson<{ cards: SidecarCard[] }>(`${SESSIONS}/${encodeURIComponent(e.session.id)}/cards`);
-      return [e.session.id, body ? waitingCards(body.cards) : 0] as const;
+    const open = tailRef.current.sessionId;
+    const ids = list.sessions.filter((e) => !e.session.endedAt || e.session.id === open).map((e) => e.session.id);
+    const cards = await Promise.all(ids.map(async (id) => {
+      const body = await getJson<{ cards: SidecarCard[] }>(`${SESSIONS}/${encodeURIComponent(id)}/cards`);
+      return [id, body ? orderCards(body.cards) : []] as const;
     }));
-    if (mountedRef.current) setWaitingBySession(Object.fromEntries(counts));
+    if (!mountedRef.current || read < reads.applied) return;
+    reads.applied = read;
+    setCardsBySession(Object.fromEntries(cards));
   }, []);
 
   const loadSessions = useCallback(async () => {
@@ -315,7 +412,8 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     const kept = current ? list.sessions.find((e) => e.session.id === current && !e.session.endedAt) : undefined;
     const entry = kept ?? pickOpenSession(list.sessions);
     follow(entry?.session ?? null, entry?.running ?? false);
-  }, [follow]);
+    void fetchWaiting();
+  }, [follow, fetchWaiting]);
 
   // The socket: badge on cards, tail on frames.
   useEffect(() => {
@@ -432,14 +530,49 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     if (!res.ok) setError(res.error);
   }, []);
 
-  const waiting = Object.values(waitingBySession).reduce((sum, n) => sum + n, 0);
-  const sessionWaiting = session ? waitingBySession[session.id] ?? 0 : 0;
+  const decide = useCallback(async (cardId: string, decision: SidecarCardDecision) => {
+    const id = tailRef.current.sessionId;
+    if (!id) return;
+    const reason = decision.reason?.trim();
+    const res = await postJson<{ card: SidecarCard }>(
+      `${SESSIONS}/${encodeURIComponent(id)}/cards/${encodeURIComponent(cardId)}`,
+      {
+        decision: decision.approve ? "approve" : "deny",
+        ...(reason && { reason }),
+        ...(decision.remember && { remember: true }),
+      },
+    );
+    if (!mountedRef.current) return;
+    setError(res.ok ? null : res.error);
+    // The settle is also announced on the socket; reading now keeps the card
+    // from looking undecided until that arrives.
+    void fetchWaiting();
+  }, [fetchWaiting]);
+
+  const waiting = Object.values(cardsBySession).reduce((sum, list) => sum + waitingCards(list), 0);
+  const cards = session ? cardsBySession[session.id] ?? [] : [];
+  const sessionWaiting = waitingCards(cards);
+
+  // A command card draws the effects its ndx command declares; read the
+  // manifest once, the first time the open session shows one.
+  const hasCommandCard = open && cards.some((c) => c.kind === "command");
+  useEffect(() => {
+    if (!hasCommandCard || manifestRequestedRef.current) return;
+    manifestRequestedRef.current = true;
+    setCommandManifest("loading");
+    void loadCommandManifest().then((loaded) => {
+      if (mountedRef.current) setCommandManifest(loaded ?? "unavailable");
+    });
+  }, [hasCommandCard]);
 
   const agent: SidecarAgent | null = session
     ? { vendor: session.vendor, model: session.model ?? catalog?.[session.vendor]?.defaultModel ?? "" }
     : picked;
 
-  return { session, frames, running, sending, waiting, sessionWaiting, lastTurn, error, agent, catalog, chooseAgent, send, stop };
+  return {
+    session, frames, running, sending, waiting, sessionWaiting, cards, commandManifest, decide,
+    lastTurn, error, agent, catalog, chooseAgent, send, stop,
+  };
 }
 
 // ---------------------------------------------------------------------------

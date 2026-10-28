@@ -107,6 +107,9 @@ export const DENY_CLASS: string[] = [
   "iso-hero-btn",
   // Sidecar: a turn runs the vendor CLI and spends tokens.
   "sidecar-send",
+  // Sidecar cards: approving lets the agent act; "always allow" writes the allow-list.
+  "sidecar-card-approve",
+  "sidecar-card-always",
 ];
 
 export interface ControlIdentity {

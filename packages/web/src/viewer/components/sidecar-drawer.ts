@@ -8,8 +8,9 @@
  * Default 440 px, resizable 360–640 px by dragging or arrowing its left edge;
  * the width is remembered.
  *
- * Inside: the head, a paused bar while the turn waits on a card, the
- * transcript, and the composer. Enter sends, Shift+Enter breaks the line; the
+ * Inside: the head, the transcript, the session's permission cards
+ * (sidecar-cards.ts), an orange paused bar above the composer while the turn
+ * waits on a card, and the composer. Enter sends, Shift+Enter breaks the line; the
  * composer is disabled while a turn runs, and Stop interrupts it.
  *
  * All data comes from `useSidecar` in main.ts; this file only draws it.
@@ -20,6 +21,7 @@ import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { SIDECAR_VENDORS } from "../hooks/index.js";
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
+import { SidecarCards } from "./sidecar-cards.js";
 
 export const SIDECAR_WIDTH_DEFAULT = 440;
 export const SIDECAR_WIDTH_MIN = 360;
@@ -290,18 +292,19 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
           }, modelOptions.map((m) => h("option", { key: m, value: m, selected: m === agent.model }, m))),
         )
       : null,
-    paused
-      ? h("div", { class: "sidecar-paused", role: "status" },
-          `Paused · waiting on ${sidecar.sessionWaiting === 1 ? "1 decision" : `${sidecar.sessionWaiting} decisions`}`)
-      : null,
     h("ol", { class: "sidecar-transcript", ref: transcriptRef, "aria-live": "polite", "aria-label": "Transcript" },
       rows.length > 0 ? rows : h("li", { class: "sidecar-empty" }, "Ask about this project. Each turn runs your vendor CLI."),
     ),
+    h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide }),
     turnFailed
       ? h("p", { class: "sidecar-turn-end", role: "status" },
           `Turn ${turnFailed.status}${turnFailed.error ? `: ${turnFailed.error}` : ""}`)
       : null,
     sidecar.error ? h("p", { class: "sidecar-error", role: "alert" }, sidecar.error) : null,
+    paused
+      ? h("div", { class: "sidecar-paused", role: "status" },
+          `Agent paused · waiting on ${sidecar.sessionWaiting === 1 ? "your decision" : `${sidecar.sessionWaiting} decisions`}`)
+      : null,
     h("form", {
       class: "sidecar-composer",
       onSubmit: (e: Event) => { e.preventDefault(); void submit(); },

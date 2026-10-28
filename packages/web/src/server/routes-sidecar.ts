@@ -64,6 +64,7 @@ import {
 } from "./sidecar/session-registry.js";
 import type { SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
 import { WORKSPACE_HEADER } from "./workspaces.js";
+import { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
@@ -389,7 +390,7 @@ export async function handleSidecarRoute(
       return true;
 
     case "end":
-      broker.withdraw(id, "The session ended");
+      broker.withdraw(id, SIDECAR_SESSION_ENDED_REASON);
       await registry.end(id);
       jsonResponse(res, 200, sessionResponse(registry, registry.get(id) ?? session));
       return true;

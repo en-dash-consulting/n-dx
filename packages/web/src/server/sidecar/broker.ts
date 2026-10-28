@@ -47,6 +47,8 @@ export interface SidecarCard {
   decidedAt?: string;
   /** The operator's note on a decision, or why a card was withdrawn. */
   reason?: string;
+  /** Approved with "always allow": its rule went onto the allow-list. */
+  remembered?: true;
 }
 
 /** How a broker call was settled. */
@@ -168,6 +170,7 @@ export class SidecarBroker {
         throw new BrokerDecisionError(409, `A ${card.tool} call can never be allow-listed`);
       }
       this.addRule({ tool: card.tool, key: card.allowListKey });
+      card.remembered = true;
     }
     this.settle(cardId, decision.approve ? "approved" : "denied", decision.reason);
     return { ...card };
