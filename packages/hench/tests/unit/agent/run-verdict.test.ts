@@ -114,6 +114,20 @@ describe("classifyRun — one fixture per class", () => {
     expect(d.summary).toContain(": packages/web/tests/unit/viewer/add-item-form.test.ts.");
   });
 
+  it("an absolute Windows digest path under worktreeRoot is reported repo-relative", () => {
+    const d = classify(run({
+      worktreeRoot: "C:\\repo",
+      testGate: failedGate(" FAIL  C:/repo/tests/unit/widget.test.ts > renders"),
+      structuredSummary: {
+        filesChanged: ["src/other.ts"],
+        filesRead: [], commandsExecuted: [], testsRun: [],
+        counts: { filesRead: 0, filesChanged: 1, commandsExecuted: 0, testsRun: 0, toolCallsTotal: 0 },
+      },
+    }));
+    expect(d.class).toBe("test-gate-preexisting");
+    expect(d.summary).toContain(": tests/unit/widget.test.ts.");
+  });
+
   it("completion-held: gateOnlyRetry is set", () => {
     const d = classify(run({ gateOnlyRetry: { sourceRunId: "run-0", base: "b".repeat(40), commits: [] } }));
     expect(d.class).toBe("completion-held");

@@ -4,10 +4,14 @@ items:
     lastModified: "2026-10-28T22:05:22.691Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b571fb36-583c-450c-9e1a-1b5474a253de":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T23:55:47.248Z"
-    activeIntervals: [{"start":"2026-10-28T23:55:47.248Z"}]
-    lastModified: "2026-10-28T23:55:47.813Z"
+    completedAt: "2026-10-28T23:59:55.083Z"
+    endedAt: "2026-10-28T23:59:55.083Z"
+    activeIntervals: [{"end":"2026-10-28T23:59:55.083Z","start":"2026-10-28T23:55:47.248Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "run-verdict.ts: completion-held only on completionHold not-applied or gateOnlyRetry; uncommitted-work refusal moved to its own completion-held rule right after claimLost; DIGEST_FILE keeps a leading slash so absolute paths under worktreeRoot normalize repo-relative. Tests, docs and changeset updated."
+    lastModified: "2026-10-28T23:59:55.083Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c816a1a3-5786-4e25-aad2-5a432be1e7de":
     status: "completed"

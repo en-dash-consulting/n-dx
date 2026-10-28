@@ -73,10 +73,10 @@ const VENDOR_CATEGORIES = new Set(["auth", "rate_limit"]);
 
 /**
  * File-like tokens in a failure digest: a path ending in a source extension.
- * The leading slash of an absolute path is kept so `normalizePath` can strip
- * the worktree root.
+ * The leading slash (and Windows drive letter) of an absolute path is kept so
+ * `normalizePath` can strip the worktree root.
  */
-const DIGEST_FILE = /\/?[\w@.+-]+(?:\/[\w@.+-]+)*\.(?:[cm]?[jt]sx?|py|go|java|kt|rs|rb|php|cs|swift|vue|svelte)\b/g;
+const DIGEST_FILE = /(?:[A-Za-z]:\/|\/)?[\w@.+-]+(?:\/[\w@.+-]+)*\.(?:[cm]?[jt]sx?|py|go|java|kt|rs|rb|php|cs|swift|vue|svelte)\b/g;
 
 function normalizePath(path: string, root: string | undefined): string {
   let p = path.replace(/\\/g, "/");
