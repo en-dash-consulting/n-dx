@@ -5,7 +5,7 @@
 ## Features
 
 - **SourceVision zone maps** — interactive visualization of architectural zones
-- **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage. Both pages are built and land in the navigation with the v2 store. Until then, and on a v1 project (one that has not yet run `ndx migrate`), the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
+- **PRD** — the product's requirements and the changes being made to them (see [The PRD](/guide/concepts/)). The **Product** page lists each capability with its computed status and health and the open changes against it, highlighting *revised* and *defective* rows; the **Changes** page groups changes by planned release and stage (see [The Changes page](#the-changes-page-v2)). Both pages are built and land in the navigation with the v2 store. Until then, and on a v1 project (one that has not yet run `ndx migrate`), the PRD page shows the v1 item tree (epics, features, tasks) with completion stats
 - **Unified MCP server** — single HTTP endpoint serving both Rex and SourceVision MCP tools
 - **Live reload** — updates automatically when data changes (via `ndx refresh`)
 
@@ -53,6 +53,77 @@ See [MCP Integration](/guide/mcp) for setup instructions.
 ## PRD item routes
 
 `PATCH /api/rex/items/:id` accepts only these fields: `status`, `failureReason`, `priority`, `tags`, `title`, `description`, `acceptanceCriteria` and `requirements`. Any other key (including `run`) is a `400` naming it. The update runs inside the PRD lock for the request's workspace and answers `409` when another process holds it. Saved run settings are written through `PUT /api/hench/prep/:taskId` (below), MCP `edit_item`, or `rex update --run` — not this route.
+
+## The Changes page (v2)
+
+The page is a planning view: open work leads and applied history stays folded away.
+
+- **Order.** Releases run newest first by semver, so `0.10.0` sits above `0.9.0` and a prerelease such as `1.0.0-rc.1` sits below `1.0.0`. A leading `v` is ignored when comparing. The **Unscheduled** group (changes with no planned release, or a blank one) leads while it holds open work, and drops to the bottom once everything in it is applied. Within a release, open stages come first in lifecycle order and applied or shipped stages last.
+- **Filters.** Chips along the top show a count each: **Open** (the default), **Applied**, and one per release. Open lists only open changes. Applied lists only groups that hold applied changes. A release chip shows that release's changes, open and applied. The choice is kept in the browser (`ndx.changes.filter`); a release that no longer exists falls back to Open.
+- **Applied history.** Each group folds its applied changes behind an "N applied" toggle. No rows are rendered until it is expanded, so a group with over a thousand applied changes costs one button.
+- **Descriptions.** A change's description shows two lines. **more** expands it and **less** folds it back.
+
+## Finding and placing an Inbox change (v2)
+
+On a v2 project a change with no place on the product map waits in the Inbox, and `ndx work` skips its tasks until it is placed. The dashboard lists these changes and places them without leaving the page.
+
+**Find them.**
+
+- **Plan.** An Inbox section sits right after the capture bar and is always present. It lists open changes awaiting placement, strongest rex match first, weak and tied guesses last. It shows five rows and links to the rest (`N more · Open ↗`). At zero it is collapsed and reads "Inbox is empty".
+- **Counts.** The open count shows on the Plan tab and the bottom bar. It counts only open changes that need placement.
+- **Applied history.** Changes applied before they were placed (migrated history) show as a collapsed line ("N applied changes were never placed") under the list. Expanding it lists each with its title, applied date and best guess. Open one to place it: the panel offers **touches** only, with a note, and Place & next walks that list. Amends is not offered, because the change's amendments have already reached the map.
+- **Tasks tree.** An Inbox change carries an **Inbox** badge, and the **In the Inbox** facet filters the tree to them.
+- **Changes page.** An open change awaiting placement is tagged **Needs placement**; selecting the tag opens it.
+
+**Place one.** A row, badge or tag opens the change's detail panel. Its **Where it goes** section shows rex's shortlist, each entry with a strength and its reasons.
+
+1. Pick a candidate, or search capabilities and constraints.
+2. Choose the relation: **Touches**, or **Amends** with a criteria edit or a replacement statement.
+3. **Place** writes it. **Place & next** moves to the next Inbox change in the section's order. **Place & add another** adds a further touched place to the same change, for umbrella changes.
+4. If nothing fits, **Nothing fits** opens a form that proposes a new capability or constraint under an area.
+
+**Draft with the model.** When the `rex.placementDraft` feature toggle is on (default off), the placement form shows **Draft with the model**. It asks the `prd.place` model to pick a shortlist target, or to draft a new capability or constraint (title, area, statement and, for a capability only, criteria) and fills the form with the result. Each press spends tokens on one LLM call, so the toggle is enforced on the server too: with it off the draft route refuses. A draft never writes. Review the form, then press **Place** or **Propose**. See [Feature Toggles](/guide/configuration#feature-toggles).
+
+**Place at capture.** The capture Preview lists rex's shortlist for each new change as a choice, with strength, area and a Touches or Amends relation. The top pick is pre-selected only when it is strong and untied; otherwise the default is **Leave it in the Inbox**. The primary button names what Add will do: **Add to Inbox**, **Add 1 change & place it** (**Add N changes & place M** for several), or **Add & amend…**, which opens the change's placement form on Amends once it is added. Most new changes never enter the Inbox.
+
+**Clear a backlog.** **Open ↗** on the Inbox section, or the bottom-bar Inbox pill, opens the full Inbox page: the queue on the left in the section's order, the change's **Where it goes** section on the right. The breadcrumb counts changes still to place and changes placed this visit. **Place & next** is the default action. Shortcuts are inactive while typing in a field, with a modifier held, or while a dialog is open:
+
+| Key | Action |
+|-----|--------|
+| `J` / `K` | Next / previous change (wraps) |
+| `1`–`5` | Pick a candidate |
+| `T` / `A` | Relation: Touches / Amends |
+| `Enter` | Place & next (Place or Propose when the form is in that mode) |
+| `S` | Skip |
+| `N` | Nothing fits |
+| `/` | Search capabilities and constraints |
+
+Nothing is placed automatically. Every write goes through the placement routes below. Until a change is placed, the panel's **+ Add Task** carries a note that the task won't run.
+
+## Inbox placement routes (v2)
+
+On a v2 project a change captured without a home waits in the Inbox. Three routes
+read and settle it. Rex decides everything (`suggestPlacement`, `recordPlacement`,
+`recordProposal`); the server enriches the shortlist and writes through rex's v2
+transaction, the execution log and the `rex:prd-changed` broadcast. A v1 tree
+answers `409`, an unknown change `404`, any other rex refusal `422 { error, kind }`,
+and a held PRD lock `409` naming its PID.
+
+| Route | Answers |
+|-------|---------|
+| `GET /api/rex/changes/:id/placement` | `{ layout: "v2", change, relation, tied, shortlist }`. Each shortlist entry carries `target`, `type`, `title`, `area`, `statement`, `criteria`, `score`, `strength` (`strong`/`possible`/`weak`) and `reasons`. |
+| `POST /api/rex/changes/:id/place` | Places the change on a capability or constraint (`touches` or `amends`): `{ change, target, relation, warnings? }`. |
+| `POST /api/rex/changes/:id/propose` | Records a new capability or constraint when nothing fits: `{ change, proposed: { target, under, title, type }, warnings? }`. |
+
+`POST /api/rex/items` on v2 also accepts `touches`, so a change captured with a
+home skips the Inbox.
+
+`GET /api/status` adds `rex.inbox: { open, appliedUnplaced }` on a v2 tree and
+omits it on v1. `open` counts open changes awaiting placement (the ones
+`ndx work` refuses); `appliedUnplaced` counts applied changes still flagged
+`needsPlacement`, which are history and never placeable. Change rows from
+`GET /api/rex/changes` carry `awaitsPlacement` for open held changes.
+`GET /api/rex/changes/placements` returns every awaiting change's shortlist in one request, keyed by change id; a change whose shortlist cannot be built gets `{ error }`.
 
 ## Prepare task
 

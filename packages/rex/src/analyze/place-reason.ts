@@ -54,6 +54,7 @@ export function buildPlacementEnvelope(input: PlacementInput): PromptEnvelope {
         '{"pick": null}  nothing on the shortlist fits and no new node is warranted',
         '{"propose": {"delta": "added", "type": "capability" | "constraint", "target": "<new-slug>", "under": "<area id>", "title": "<title>", "summary": "<one line>"}}',
         "  only when nothing on the shortlist fits and the change adds a standing part of the product.",
+        '  A propose may also carry "proposed": "<one-sentence statement of the new node>". A capability propose may also carry "criteria": {"add": [{"id": "c1", "text": "<testable criterion>"}]}; a constraint has no criteria, so never add them to one.',
       ].join("\n"),
     ),
   ]);

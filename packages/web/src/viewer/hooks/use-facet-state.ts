@@ -12,7 +12,7 @@
  * @see ../components/prd-tree/search-types.ts — SearchFacets type
  */
 
-import { useState, useCallback, useEffect, useRef } from "preact/hooks";
+import { useState, useCallback, useEffect, useMemo, useRef } from "preact/hooks";
 import type {
   SearchFacets,
   SearchItemStatus,
@@ -23,18 +23,19 @@ import type {
 const FACET_PARAM = "facets";
 
 /** Parse facet state from the URL hash. */
-function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<SearchItemStatus>; branch: string | null } {
+function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<SearchItemStatus>; branch: string | null; inbox: boolean } {
   const tags = new Set<string>();
   const statuses = new Set<SearchItemStatus>();
   let branch: string | null = null;
+  let inbox = false;
 
   try {
     const hash = window.location.hash.slice(1); // remove leading #
-    if (!hash) return { tags, statuses, branch };
+    if (!hash) return { tags, statuses, branch, inbox };
 
     const params = new URLSearchParams(hash);
     const facetStr = params.get(FACET_PARAM);
-    if (!facetStr) return { tags, statuses, branch };
+    if (!facetStr) return { tags, statuses, branch, inbox };
 
     for (const part of facetStr.split(",")) {
       const colonIdx = part.indexOf(":");
@@ -47,17 +48,19 @@ function parseFacetsFromHash(): { tags: Set<string>; statuses: Set<SearchItemSta
         statuses.add(value as SearchItemStatus);
       } else if (type === "branch" && value) {
         branch = value;
+      } else if (type === "inbox") {
+        inbox = value === "1";
       }
     }
   } catch {
     // Ignore malformed hashes
   }
 
-  return { tags, statuses, branch };
+  return { tags, statuses, branch, inbox };
 }
 
 /** Write facet state to the URL hash, preserving other hash params. */
-function writeFacetsToHash(tags: Set<string>, statuses: Set<SearchItemStatus>, branch: string | null): void {
+function writeFacetsToHash(tags: Set<string>, statuses: Set<SearchItemStatus>, branch: string | null, inbox: boolean): void {
   try {
     const hash = window.location.hash.slice(1);
     const params = new URLSearchParams(hash);
@@ -68,6 +71,9 @@ function writeFacetsToHash(tags: Set<string>, statuses: Set<SearchItemStatus>, b
     }
     for (const status of [...statuses].sort()) {
       parts.push(`status:${encodeURIComponent(status)}`);
+    }
+    if (inbox) {
+      parts.push("inbox:1");
     }
     if (branch) {
       parts.push(`branch:${encodeURIComponent(branch)}`);
@@ -95,7 +101,11 @@ export interface FacetState {
   activeTags: Set<string>;
   /** Currently active status facets (for search narrowing, not the tree-level filter). */
   activeSearchStatuses: Set<SearchItemStatus>;
-  /** Combined facets object for searchTree(). null when no facets are active. */
+  /** Whether the "In the Inbox" facet is on. */
+  inboxOnly: boolean;
+  /** Turn the "In the Inbox" facet on or off. */
+  setInboxOnly: (on: boolean) => void;
+  /** Combined facets object for searchTree(). undefined when no facets are active. */
   searchFacets: SearchFacets | undefined;
   /** Currently active branch filter. null means "All branches". */
   activeBranch: string | null;
@@ -111,12 +121,20 @@ export interface FacetState {
   hasFacets: boolean;
 }
 
-export function useFacetState(): FacetState {
+const EMPTY_IDS: ReadonlySet<string> = new Set();
+
+/**
+ * @param inboxIds ids of the changes rex holds for placement; the Inbox facet
+ *   keeps only these. Keep the set referentially stable while it is unchanged.
+ */
+export function useFacetState(inboxIds: ReadonlySet<string> = EMPTY_IDS): FacetState {
   // Initialize from URL hash — parse once and share across all three fields
   const initialParsed = parseFacetsFromHash();
   const [activeTags, setActiveTagsRaw] = useState<Set<string>>(() => initialParsed.tags);
   const [activeSearchStatuses, setActiveSearchStatusesRaw] = useState<Set<SearchItemStatus>>(() => initialParsed.statuses);
   const [activeBranch, setActiveBranchRaw] = useState<string | null>(() => initialParsed.branch);
+
+  const [inboxOnly, setInboxOnlyRaw] = useState<boolean>(() => initialParsed.inbox);
 
   // Track whether we've initialized (skip first URL write)
   const initialized = useRef(false);
@@ -127,8 +145,8 @@ export function useFacetState(): FacetState {
       initialized.current = true;
       return;
     }
-    writeFacetsToHash(activeTags, activeSearchStatuses, activeBranch);
-  }, [activeTags, activeSearchStatuses, activeBranch]);
+    writeFacetsToHash(activeTags, activeSearchStatuses, activeBranch, inboxOnly);
+  }, [activeTags, activeSearchStatuses, activeBranch, inboxOnly]);
 
   const setActiveTags = useCallback((tags: Set<string>) => {
     setActiveTagsRaw(tags);
@@ -142,21 +160,29 @@ export function useFacetState(): FacetState {
     setActiveBranchRaw(branch);
   }, []);
 
+  const setInboxOnly = useCallback((on: boolean) => setInboxOnlyRaw(on), []);
+
   const clearFacets = useCallback(() => {
+    setInboxOnlyRaw(false);
     setActiveTagsRaw(new Set());
     setActiveSearchStatusesRaw(new Set());
     setActiveBranchRaw(null);
   }, []);
 
-  const hasFacets = activeTags.size > 0 || activeSearchStatuses.size > 0;
+  const hasFacets = activeTags.size > 0 || activeSearchStatuses.size > 0 || inboxOnly;
 
-  const searchFacets: SearchFacets | undefined = hasFacets
-    ? { tags: activeTags, statuses: activeSearchStatuses }
-    : undefined;
+  const searchFacets: SearchFacets | undefined = useMemo(
+    () => hasFacets
+      ? { tags: activeTags, statuses: activeSearchStatuses, ...(inboxOnly ? { inboxIds } : {}) }
+      : undefined,
+    [hasFacets, activeTags, activeSearchStatuses, inboxOnly, inboxIds],
+  );
 
   return {
     activeTags,
     activeSearchStatuses,
+    inboxOnly,
+    setInboxOnly,
     searchFacets,
     activeBranch,
     setActiveTags,

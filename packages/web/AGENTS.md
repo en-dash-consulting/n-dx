@@ -60,8 +60,8 @@ to `false`.
 
 **Server-side enforcement is per-toggle, not universal.** Use
 `isFeatureEnabled(projectDir, key)` when a route must not act with its feature
-off; it reads `.n-dx.json` per call and fails closed. Only `sourcevision.ask` is
-gated that way today, because each call spends tokens — `sourcevision.prMarkdown`
+off; it reads `.n-dx.json` per call and fails closed. `sourcevision.ask` and
+`rex.placementDraft` are gated that way, because each call spends tokens — `sourcevision.prMarkdown`
 renders from analysis already on disk, so a direct request costs nothing. Decide
 a new toggle on that basis, not by copying its nearest neighbour.
 

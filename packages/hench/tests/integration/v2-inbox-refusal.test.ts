@@ -58,7 +58,11 @@ describe("explicit --task on a v2 tree", () => {
         const err = await select(ref).catch((e) => e);
         expect(err).toBeInstanceOf(Error);
         expect(err.message).toContain("needs placement");
-        expect(err.suggestion).toContain("place_change");
+        expect(err.suggestion).toContain("Inbox on the dashboard's Plan page");
+        expect(err.suggestion).toContain("'rex change place'");
+        expect(err.suggestion).toContain("MCP place_change");
+        expect(err.suggestion).toContain(`rex change place ${CHANGE_ID} --propose`);
+        expect(err.suggestion).toContain(`work --task=${ref}' again`);
       },
     );
 

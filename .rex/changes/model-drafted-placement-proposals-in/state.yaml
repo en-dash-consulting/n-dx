@@ -1,0 +1,68 @@
+schema: "rex/v2"
+items:
+  "0f0c5c41-b23c-4161-a8f4-c31bebd193be":
+    status: "completed"
+    startedAt: "2026-10-28T01:16:55.223Z"
+    completedAt: "2026-10-28T01:17:34.348Z"
+    endedAt: "2026-10-28T01:17:34.348Z"
+    activeIntervals: [{"end":"2026-10-28T01:17:34.348Z","start":"2026-10-28T01:16:55.223Z"}]
+    lastModified: "2026-10-28T01:17:34.348Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1d16648d-6745-4a48-a0fe-3f413c47f19e":
+    status: "completed"
+    startedAt: "2026-10-28T01:03:13.517Z"
+    completedAt: "2026-10-28T01:08:55.425Z"
+    endedAt: "2026-10-28T01:08:55.425Z"
+    activeIntervals: [{"end":"2026-10-28T01:08:55.425Z","start":"2026-10-28T01:03:13.517Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "prd.place prompt now names optional proposed and criteria.add on propose; place-reason test asserts it; census baseline re-recorded. Existing draftPlacement test already covers proposed+criteria on the drafted proposal."
+    lastModified: "2026-10-28T01:08:55.425Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "31ef3101-bfde-437f-bd0e-3da6f29bc9f4":
+    status: "completed"
+    startedAt: "2026-10-28T01:13:00.748Z"
+    completedAt: "2026-10-28T01:16:20.517Z"
+    endedAt: "2026-10-28T01:16:20.517Z"
+    activeIntervals: [{"end":"2026-10-28T01:16:20.517Z","start":"2026-10-28T01:13:00.748Z"}]
+    lastModified: "2026-10-28T01:16:20.517Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "35245f99-1235-4515-a5c1-376ddf8329da":
+    status: "completed"
+    startedAt: "2026-10-28T01:09:12.169Z"
+    completedAt: "2026-10-28T01:12:47.488Z"
+    endedAt: "2026-10-28T01:12:47.488Z"
+    activeIntervals: [{"end":"2026-10-28T01:12:47.488Z","start":"2026-10-28T01:09:12.169Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Prompt says criteria are for a capability only; draftedProposal drops criteria from a constraint with a warning; new test in change-place-draft.test.ts; census baseline re-recorded."
+    lastModified: "2026-10-28T01:12:47.488Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "43951e89-3957-4fa2-bac3-80d0a4767fe5":
+    status: "completed"
+    startedAt: "2026-10-28T01:17:34.348Z"
+    completedAt: "2026-10-28T01:17:34.348Z"
+    endedAt: "2026-10-28T01:17:34.348Z"
+    activeIntervals: [{"end":"2026-10-28T01:17:34.348Z","start":"2026-10-28T01:17:34.348Z"}]
+    appliedAt: "2026-10-28T01:17:34.348Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-28T01:17:34.348Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a5de1b6c-7c3a-4a92-b7b1-d244cf3ca0ff":
+    status: "completed"
+    startedAt: "2026-10-28T00:43:41.750Z"
+    completedAt: "2026-10-28T01:03:00.591Z"
+    endedAt: "2026-10-28T01:03:00.591Z"
+    activeIntervals: [{"end":"2026-10-28T00:59:49.450Z","start":"2026-10-28T00:43:41.750Z"},{"end":"2026-10-28T01:03:00.591Z","start":"2026-10-28T01:03:00.591Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Draft with the model in the placement form and POST /api/rex/changes/:id/placement/draft, behind rex.placementDraft (default off, server-gated). Run commit debfe0865; the gate failed only on the gateway contract list, updated by hand; affected gate re-run green."
+    lastModified: "2026-10-28T01:03:00.591Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c4fbfee6-6191-43d7-ade2-bee8a9df2a63":
+    status: "completed"
+    startedAt: "2026-10-28T00:30:03.055Z"
+    completedAt: "2026-10-28T00:43:17.694Z"
+    endedAt: "2026-10-28T00:43:17.694Z"
+    activeIntervals: [{"end":"2026-10-28T00:39:48.844Z","start":"2026-10-28T00:30:03.055Z"},{"end":"2026-10-28T00:43:17.694Z","start":"2026-10-28T00:43:17.694Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "draftChangePlacement exported from @n-dx/rex (run 23067806, commit 2f96a5eeb); the gate failed only on the v2 isolation allowlist in tests/unit/schema/v2.test.ts, which now lists analyze/place-draft.ts; affected gate re-run green (6/6)."
+    lastModified: "2026-10-28T00:43:17.694Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

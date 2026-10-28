@@ -115,7 +115,8 @@ export function formatPlacementSuggestion(
   const [best] = suggestion.shortlist;
   return [
     "  Placement: Inbox (needs placement). Suggested, best first:",
-    ...suggestion.shortlist.map((c) => `    ${label(c.target)} ${targetOf(c.target)?.title ?? ""} (${c.relation})`),
+    ...suggestion.shortlist.map((c) => `    ${label(c.target)} ${targetOf(c.target)?.title ?? ""} (${c.relation}, ${c.strength})`),
+    ...(suggestion.tied ? ["  Tied: the top two score the same, so the first is not the rules' pick. Choose between them."] : []),
     `  Place it: rex change place ${changeLabel} --target=${label(best.target)} --relation=${best.relation}`,
   ];
 }

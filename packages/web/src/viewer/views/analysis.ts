@@ -15,6 +15,7 @@ import {h} from "preact";import { useState, useEffect, useCallback } from "preac
 import { AnalyzePanel } from "../components/prd-tree/analyze-panel.js";
 import { SmartAddInput, BatchImportPanel } from "../components/prd-tree/index.js";
 import { BrandedHeader } from "../components/index.js";
+import type { NavigateTo } from "../types.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -30,7 +31,9 @@ type AnalysisTab = "smart-add" | "batch-import" | "scan";
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function AnalysisView() {
+/** `navigateTo` opens an added change's detail panel (Quick Add's "Amends…"). */
+export function AnalysisView({ navigateTo }: { navigateTo?: NavigateTo } = {}) {
+  const openChange = navigateTo ? (id: string) => navigateTo("prd", { taskId: id }) : undefined;
   const [activeTab, setActiveTab] = useState<AnalysisTab>("smart-add");
   const [expanded, setExpanded] = useState(false);
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
@@ -131,7 +134,7 @@ export function AnalysisView() {
 
     // Tab content — collapsed, always the Smart Add row
     !expanded || activeTab === "smart-add"
-      ? h(SmartAddInput, { onPrdChanged: handlePrdChanged, bar: !expanded, barAction: expanded ? null : moreToggle, layout })
+      ? h(SmartAddInput, { onPrdChanged: handlePrdChanged, bar: !expanded, barAction: expanded ? null : moreToggle, layout, onOpenChange: openChange })
       : activeTab === "batch-import"
         ? h(BatchImportPanel, { onPrdChanged: handlePrdChanged })
         : h(AnalyzePanel, { onPrdChanged: handlePrdChanged }),
