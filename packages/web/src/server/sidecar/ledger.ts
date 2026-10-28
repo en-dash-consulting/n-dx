@@ -9,7 +9,7 @@
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.4.
  */
 
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, truncateSync } from "node:fs";
 import { join } from "node:path";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 
@@ -37,7 +37,23 @@ export function appendLedgerEntry(dir: string, sessionId: string, entry: LedgerE
     throw new Error(`A ledger entry is at most ${LEDGER_ENTRY_MAX_CHARS} characters (got ${entry.text.length})`);
   }
   ensureSidecarDir(dir);
-  appendFileSync(ledgerPath(dir, sessionId), JSON.stringify(entry) + "\n", "utf-8");
+  const path = ledgerPath(dir, sessionId);
+  dropPartialTail(path);
+  appendFileSync(path, JSON.stringify(entry) + "\n", "utf-8");
+}
+
+/**
+ * A server killed mid-append leaves a last line without its newline; the next
+ * append would glue an entry onto it and leave a malformed line mid-file. Move
+ * the fragment to `<file>.corrupt` and cut it from the ledger.
+ */
+function dropPartialTail(path: string): void {
+  if (!existsSync(path)) return;
+  const bytes = readFileSync(path);
+  if (bytes.length === 0 || bytes[bytes.length - 1] === 0x0a) return;
+  const keep = bytes.lastIndexOf(0x0a) + 1;
+  appendFileSync(`${path}.corrupt`, Buffer.concat([bytes.subarray(keep), Buffer.from("\n")]));
+  truncateSync(path, keep);
 }
 
 /**

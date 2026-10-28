@@ -9,7 +9,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -167,6 +167,25 @@ describe("checkpoint at the ceiling", () => {
     expect(cold.stdin).not.toContain("ckpt-reply-marker");
     expect(cold.stdin).not.toContain("Your context is full");
     expect(reg.get(id)?.refresh).toBeUndefined();
+  });
+
+  it("starts the cold turn with the notes of a checkpoint that followed a crash mid-append", async () => {
+    const reg = registry(1000);
+    const id = open(reg);
+    // A server killed mid ledger_append left a fragment with no newline.
+    mkdirSync(dir, { recursive: true });
+    const ledgerFile = join(dir, `${id}.ledger.jsonl`);
+    const fragment = '{"at":"2026-10-28T00:00:00.000Z","type":"deci';
+    writeFileSync(ledgerFile, fragment);
+    await turn(reg, id, "big", 5000); // the checkpoint appends two entries
+    await turn(reg, id, "after the crash", 10);
+
+    expect(readLedger(dir, id).map((e) => e.type)).toEqual(["decision", "unfinished"]);
+    expect(readFileSync(`${ledgerFile}.corrupt`, "utf-8")).toBe(`${fragment}\n`);
+    const cold = spawns.at(-1)!;
+    expect(cold.args).not.toContain("--resume");
+    expect(cold.stdin).toContain("- [decision] keep the cursor in the index");
+    expect(cold.stdin).toContain("- [unfinished] the drawer divider is M2");
   });
 
   it("records the refresh as a transcript frame with the notes carried", async () => {
