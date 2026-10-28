@@ -18,8 +18,6 @@ import {
   RefreshQueueStatus,
   PollingSuspensionIndicator,
   ActiveOperationsTray,
-  GitStatusBanner,
-  SessionsPanel,
   type ServerIdentity,
   SearchOverlay,
   useSearchOverlay,
@@ -43,11 +41,6 @@ import {
   useActiveOperations,
   useGitStatus,
   useAutoCommitGenerated,
-  useWorktrees,
-  useClaims,
-  useLive,
-  isAnalysisJob,
-  liveRunCount,
   useFeatureToggle,
   useSidecarShell,
 } from "./hooks/index.js";
@@ -140,12 +133,6 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // again — a second caller would mean a second poller and a second socket.
   const jobs = useActiveOperations();
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
-  const { worktrees } = useWorktrees();
-  const { claims } = useClaims();
-  const liveAvailable = validViews.has("live") && !isDeployedMode();
-  const live = useLive(liveAvailable);
-  const analyses = live?.jobs.filter(isAnalysisJob).length ?? 0;
-  const liveRuns = live ? liveRunCount(live) : null;
   const [searchOpen, openSearch, closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -311,6 +298,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       settingsOpen,
       onToggleCommands: toggleCommands,
       commandsOpen,
+      gitStatus,
+      onGitCommitted: refetchGitStatus,
     }),
     h(CommandsSheet, { open: commandsOpen, onClose: closeCommands },
       renderActiveView("command-reference", viewCtx),
@@ -326,8 +315,6 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     // One bottom-right row for every floating status pill (styles/status-dock.css).
     h("div", { class: "status-dock" },
-      h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveRuns, liveAvailable }),
-      h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
       h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
       h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     ),

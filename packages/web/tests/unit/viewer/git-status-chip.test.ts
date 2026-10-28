@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 /**
- * Tests for GitStatusBanner: hidden state, collapsed→expanded toggle, file
+ * Tests for GitStatusChip: hidden state, collapsed→expanded toggle, file
  * list rendering, on-demand diff fetching, and the commit flow.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { h, render } from "preact";
-import { GitStatusBanner } from "../../../src/viewer/components/git-status-banner.js";
+import { GitStatusChip } from "../../../src/viewer/components/git-status-chip.js";
 import type { GitStatus } from "../../../src/viewer/hooks/use-git-status.js";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -24,7 +24,7 @@ const DIRTY: GitStatus = {
   scope: null,
 };
 
-describe("GitStatusBanner", () => {
+describe("GitStatusChip", () => {
   let root: HTMLDivElement;
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -42,12 +42,12 @@ describe("GitStatusBanner", () => {
   });
 
   it("renders nothing when status is null", () => {
-    render(h(GitStatusBanner, { status: null, onCommitted: vi.fn() }), root);
+    render(h(GitStatusChip, { status: null, onCommitted: vi.fn() }), root);
     expect(root.children.length).toBe(0);
   });
 
   it("renders nothing when the tree is clean", () => {
-    render(h(GitStatusBanner, {
+    render(h(GitStatusChip, {
       status: { isRepo: true, branch: "main", dirty: false, files: [], scope: null },
       onCommitted: vi.fn(),
     }), root);
@@ -55,24 +55,24 @@ describe("GitStatusBanner", () => {
   });
 
   it("renders nothing outside a git repository", () => {
-    render(h(GitStatusBanner, {
+    render(h(GitStatusChip, {
       status: { isRepo: false, branch: null, dirty: false, files: [], scope: null },
       onCommitted: vi.fn(),
     }), root);
     expect(root.children.length).toBe(0);
   });
 
-  it("shows the collapsed pill with the dirty file count", () => {
-    render(h(GitStatusBanner, { status: DIRTY, onCommitted: vi.fn() }), root);
+  it("shows the collapsed chip with the dirty file count", () => {
+    render(h(GitStatusChip, { status: DIRTY, onCommitted: vi.fn() }), root);
     const toggle = root.querySelector(".git-status-toggle");
     expect(toggle).not.toBeNull();
-    expect(toggle!.textContent).toContain("2 uncommitted files");
+    expect(toggle!.textContent).toBe("⚠2 uncommitted");
   });
 
   it("expands to show the file list and commit form on click", () => {
-    render(h(GitStatusBanner, { status: DIRTY, onCommitted: vi.fn() }), root);
+    render(h(GitStatusChip, { status: DIRTY, onCommitted: vi.fn() }), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, { status: DIRTY, onCommitted: vi.fn() }), root);
+    render(h(GitStatusChip, { status: DIRTY, onCommitted: vi.fn() }), root);
 
     expect(root.querySelectorAll(".git-file-row").length).toBe(2);
     expect(root.querySelector(".git-commit-message")).not.toBeNull();
@@ -86,13 +86,13 @@ describe("GitStatusBanner", () => {
     }));
 
     const props = { status: DIRTY, onCommitted: vi.fn() };
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     (root.querySelector(".git-file-toggle") as HTMLButtonElement).click();
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/api/git/diff?file=${encodeURIComponent("a.txt")}`));
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     await vi.waitFor(() => expect(root.querySelector(".git-diff-view")).not.toBeNull());
 
     const diffText = root.querySelector(".git-diff-view")!.textContent;
@@ -105,14 +105,14 @@ describe("GitStatusBanner", () => {
     const onCommitted = vi.fn();
     const props = { status: DIRTY, onCommitted };
 
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     const textarea = root.querySelector(".git-commit-message") as HTMLTextAreaElement;
     textarea.value = "Fix the thing";
     textarea.dispatchEvent(new Event("input"));
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     const commitBtn = root.querySelector(".git-commit-btn") as HTMLButtonElement;
     expect(commitBtn.disabled).toBe(false);
@@ -126,9 +126,9 @@ describe("GitStatusBanner", () => {
   });
 
   it("disables the commit button while the message is empty", () => {
-    render(h(GitStatusBanner, { status: DIRTY, onCommitted: vi.fn() }), root);
+    render(h(GitStatusChip, { status: DIRTY, onCommitted: vi.fn() }), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, { status: DIRTY, onCommitted: vi.fn() }), root);
+    render(h(GitStatusChip, { status: DIRTY, onCommitted: vi.fn() }), root);
 
     const commitBtn = root.querySelector(".git-commit-btn") as HTMLButtonElement;
     expect(commitBtn.disabled).toBe(true);
@@ -139,30 +139,30 @@ describe("GitStatusBanner", () => {
     const onCommitted = vi.fn();
     const props = { status: DIRTY, onCommitted };
 
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     const textarea = root.querySelector(".git-commit-message") as HTMLTextAreaElement;
     textarea.value = "Fix the thing";
     textarea.dispatchEvent(new Event("input"));
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-commit-btn") as HTMLButtonElement).click();
 
     await vi.waitFor(() => expect(root.querySelector(".git-commit-error")).not.toBeNull());
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     expect(root.querySelector(".git-commit-error")!.textContent).toContain("nothing to commit");
     expect(onCommitted).not.toHaveBeenCalled();
   });
 
   it("shows a confirmation before discarding, and does not call the API until confirmed", () => {
-    render(h(GitStatusBanner, { status: DIRTY, onCommitted: vi.fn() }), root);
+    render(h(GitStatusChip, { status: DIRTY, onCommitted: vi.fn() }), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, { status: DIRTY, onCommitted: vi.fn() }), root);
+    render(h(GitStatusChip, { status: DIRTY, onCommitted: vi.fn() }), root);
 
     (root.querySelector(".git-discard-btn") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, { status: DIRTY, onCommitted: vi.fn() }), root);
+    render(h(GitStatusChip, { status: DIRTY, onCommitted: vi.fn() }), root);
 
     expect(fetchMock).not.toHaveBeenCalled();
     const warning = root.querySelector(".prune-confirmation-warning");
@@ -175,14 +175,14 @@ describe("GitStatusBanner", () => {
 
   it("cancels the discard confirmation without calling the API", () => {
     const props = { status: DIRTY, onCommitted: vi.fn() };
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-discard-btn") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     (root.querySelector(".git-discard-cancel-btn") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(root.querySelector(".prune-confirmation-warning")).toBeNull();
@@ -194,11 +194,11 @@ describe("GitStatusBanner", () => {
     const onCommitted = vi.fn();
     const props = { status: DIRTY, onCommitted };
 
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-discard-btn") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-discard-confirm-btn") as HTMLButtonElement).click();
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/git/discard", expect.objectContaining({
@@ -213,15 +213,15 @@ describe("GitStatusBanner", () => {
     const onCommitted = vi.fn();
     const props = { status: DIRTY, onCommitted };
 
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-discard-btn") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-discard-confirm-btn") as HTMLButtonElement).click();
 
     await vi.waitFor(() => expect(root.querySelector(".git-commit-error")).not.toBeNull());
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     expect(root.querySelector(".git-commit-error")!.textContent).toContain("Stale discard request");
     expect(root.querySelector(".prune-confirmation-warning")).toBeNull();
@@ -230,9 +230,9 @@ describe("GitStatusBanner", () => {
 
   it("offers Ignore on untracked rows only", () => {
     const props = { status: DIRTY, onCommitted: vi.fn() };
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     const ignoreButtons = root.querySelectorAll(".git-file-ignore-btn");
     expect(ignoreButtons.length).toBe(1);
@@ -245,9 +245,9 @@ describe("GitStatusBanner", () => {
     const onCommitted = vi.fn();
     const props = { status: DIRTY, onCommitted };
 
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     (root.querySelector(".git-file-ignore-btn") as HTMLButtonElement).click();
 
@@ -257,7 +257,7 @@ describe("GitStatusBanner", () => {
     })));
     await vi.waitFor(() => expect(onCommitted).toHaveBeenCalledTimes(1));
 
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     expect(root.querySelector(".git-status-panel")).not.toBeNull();
     // No diff was requested — the ignore click is not a row toggle.
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -268,13 +268,13 @@ describe("GitStatusBanner", () => {
     const onCommitted = vi.fn();
     const props = { status: DIRTY, onCommitted };
 
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-file-ignore-btn") as HTMLButtonElement).click();
 
     await vi.waitFor(() => expect(root.querySelector(".git-file-ignore-error")).not.toBeNull());
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
 
     expect(root.querySelector(".git-file-ignore-error")!.textContent).toContain("not untracked");
     expect(onCommitted).not.toHaveBeenCalled();
@@ -282,13 +282,13 @@ describe("GitStatusBanner", () => {
 
   it("collapses back to the pill when the close button is clicked", () => {
     const props = { status: DIRTY, onCommitted: vi.fn() };
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     (root.querySelector(".git-status-toggle") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     expect(root.querySelector(".git-status-panel")).not.toBeNull();
 
     (root.querySelector(".git-status-close") as HTMLButtonElement).click();
-    render(h(GitStatusBanner, props), root);
+    render(h(GitStatusChip, props), root);
     expect(root.querySelector(".git-status-panel")).toBeNull();
     expect(root.querySelector(".git-status-toggle")).not.toBeNull();
   });

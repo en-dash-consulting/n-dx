@@ -7,7 +7,7 @@
  * a constant chosen by the server for the scope.
  *
  * This is policy, not presentation, so it lives beside the toggle read in
- * `main.ts` rather than inside `GitStatusBanner`, which stays a component that
+ * `main.ts` rather than inside `GitStatusChip`, which stays a component that
  * renders what it is given and issues no requests on mount.
  *
  * The server re-reads the toggle and re-derives the paths from its own `git

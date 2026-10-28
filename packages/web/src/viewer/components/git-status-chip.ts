@@ -1,8 +1,7 @@
 /**
- * Working-tree status indicator — a persistent bottom-right pill (same
- * interaction pattern as ActiveOperationsTray) that appears only when the
- * git working tree is dirty, and expands into a panel to review per-file
- * diffs and commit everything without leaving the browser.
+ * Working-tree status indicator — an orange chip in the bottom bar that
+ * appears only when the git working tree is dirty, and opens a panel above it
+ * to review per-file diffs and commit everything without leaving the browser.
  *
  * Exists specifically because hench's autonomous-run pre-flight check
  * (performPreRunCommitGateIfNeeded, packages/hench) refuses to start against
@@ -19,7 +18,7 @@ import { ActionIcon } from "./action-icon.js";
 import { useState, useCallback } from "preact/hooks";
 import type { GitStatus, GitStatusFile } from "../hooks/index.js";
 
-export interface GitStatusBannerProps {
+export interface GitStatusChipProps {
   status: GitStatus | null;
   onCommitted: () => void;
 }
@@ -316,14 +315,13 @@ function GitStatusPanel({
   );
 }
 
-export function GitStatusBanner({ status, onCommitted }: GitStatusBannerProps) {
+export function GitStatusChip({ status, onCommitted }: GitStatusChipProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!status || !status.isRepo || !status.dirty) return null;
 
-  // The pill stays in place and the panel opens above it, like the other
-  // pills in the status dock.
-  return h("div", { class: "git-status-banner", role: "status" },
+  // The chip stays in the bar and the panel opens above it.
+  return h("div", { class: "git-status-chip", role: "status" },
     h("button", {
       class: "git-status-toggle",
       type: "button",
@@ -331,7 +329,7 @@ export function GitStatusBanner({ status, onCommitted }: GitStatusBannerProps) {
       onClick: () => setExpanded((v) => !v),
     },
       h("span", { class: "git-status-badge-icon", "aria-hidden": "true" }, "⚠"),
-      h("span", null, `${status.files.length} uncommitted file${status.files.length === 1 ? "" : "s"}`),
+      h("span", null, `${status.files.length} uncommitted`),
     ),
     expanded
       ? h(GitStatusPanel, {

@@ -22,6 +22,8 @@ import { identityLine, identityTooltip, type ServerIdentity } from "./config-foo
 import { PixelIcon } from "./pixel-icons.js";
 import { ThemeToggle } from "./theme-toggle.js";
 import { GlobalFAQ } from "./faq.js";
+import { GitStatusChip } from "./git-status-chip.js";
+import type { GitStatus } from "../hooks/index.js";
 
 export interface BottomBarProps {
   server?: ServerIdentity | null;
@@ -36,6 +38,9 @@ export interface BottomBarProps {
   settingsOpen: boolean;
   onToggleCommands: () => void;
   commandsOpen: boolean;
+  /** Working-tree status; a dirty tree shows the uncommitted chip. */
+  gitStatus?: GitStatus | null;
+  onGitCommitted?: () => void;
 }
 
 export function BottomBar({
@@ -46,6 +51,8 @@ export function BottomBar({
   settingsOpen,
   onToggleCommands,
   commandsOpen,
+  gitStatus = null,
+  onGitCommitted = () => {},
 }: BottomBarProps) {
   const status = useProjectStatus();
   const analysisLive = validViews.has(LIVE_INDICATOR_VIEWS.analysis) && !isDeployedMode();
@@ -85,6 +92,8 @@ export function BottomBar({
           liveAvailable: validViews.has(LIVE_INDICATOR_VIEWS.stuck),
         }) : null,
     ),
+
+    h(GitStatusChip, { status: gitStatus, onCommitted: onGitCommitted }),
 
     h("div", { class: "bottombar-controls" },
       h(ThemeToggle, null),

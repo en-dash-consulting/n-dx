@@ -1,38 +1,35 @@
-/* Working-tree git status indicator — a pill in the bottom-right
- * .status-dock (status-dock.css), same interaction pattern as
- * .active-operations-tray. Only rendered when the tree is dirty.
+/* Working-tree git status indicator — a chip in the bottom bar. Only
+ * rendered when the tree is dirty; its panel opens upward from the bar.
  *
  * Uses CSS variables from tokens.css for theme compatibility.
  */
 
-.git-status-banner {
+.git-status-chip {
   position: relative;
   z-index: var(--z-tray);
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  max-width: 440px;
+  align-items: center;
+}
+
+.git-status-chip .git-status-panel {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
 }
 
 .git-status-toggle {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.75rem;
+  gap: 0.4rem;
+  padding: 0.1rem 0.6rem;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.4;
   cursor: pointer;
   background: var(--bg-surface);
   border: 1px solid var(--orange);
   color: var(--orange);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-[data-theme="light"] .git-status-toggle,
-:root:not([data-theme="dark"]) .git-status-toggle {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .git-status-toggle:hover {
