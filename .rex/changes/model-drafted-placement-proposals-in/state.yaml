@@ -14,7 +14,12 @@ items:
     lastModified: "2026-10-28T01:08:55.425Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "31ef3101-bfde-437f-bd0e-3da6f29bc9f4":
-    lastModified: "2026-10-28T01:05:57.547Z"
+    status: "completed"
+    startedAt: "2026-10-28T01:13:00.748Z"
+    completedAt: "2026-10-28T01:16:20.517Z"
+    endedAt: "2026-10-28T01:16:20.517Z"
+    activeIntervals: [{"end":"2026-10-28T01:16:20.517Z","start":"2026-10-28T01:13:00.748Z"}]
+    lastModified: "2026-10-28T01:16:20.517Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "35245f99-1235-4515-a5c1-376ddf8329da":
     status: "completed"

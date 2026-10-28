@@ -266,6 +266,19 @@ export function asProposal(value: unknown): { proposal: PlacementProposal } | { 
 }
 
 /**
+ * The model's proposal without a `criteria` that fails the shared schema, so one
+ * malformed optional field (`add: ["Apple Pay"]`) does not cost the title and
+ * summary. Names the dropped criteria in `warnings`; any other value is returned as is.
+ */
+function withoutMalformedCriteria(value: unknown, warnings: string[]): unknown {
+  if (value === null || typeof value !== "object" || !("criteria" in value)) return value;
+  const { criteria, ...rest } = value as Record<string, unknown>;
+  if (criteria === undefined || AmendmentSchema.shape.criteria.safeParse(criteria).success) return value;
+  warnings.push(`text model proposed criteria that are not valid (${JSON.stringify(criteria)}); dropped them and kept the rest of the proposal`);
+  return rest;
+}
+
+/**
  * Rank with rules, then ask the text model when one is supplied, even on an
  * empty shortlist: with nothing to pick it may still propose a new node under
  * one of `areas`. A proposal under an unknown area is dropped. A model error
@@ -283,7 +296,7 @@ export async function placeChange(
   const areas = options.areas ?? [];
   const answer = await options.model({ change, shortlist, nodes, areas });
   if (answer !== null && typeof answer === "object") {
-    const checked = asProposal(answer.propose);
+    const checked = asProposal(withoutMalformedCriteria(answer.propose, warnings));
     let proposal: PlacementProposal | null = null;
     if ("reason" in checked) {
       warnings.push(`text model proposed a new node that ${checked.reason}; ignoring it`);

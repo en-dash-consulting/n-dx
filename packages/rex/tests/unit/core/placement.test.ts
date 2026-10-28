@@ -213,6 +213,22 @@ describe("placeChange (rules + text model)", () => {
     expect(noAreas.model).toEqual({ pick: null, agrees: false });
   });
 
+  it("keeps the title and area of a proposal whose criteria.add are plain strings, dropping the criteria with a warning", async () => {
+    const malformed = { ...proposal, criteria: { add: ["Apple Pay"] } };
+    const result = await placeChange(change, caps, { model: async () => ({ propose: malformed as unknown as PlacementProposal }), areas });
+    expect(result.model).toEqual({ pick: null, agrees: false, proposal });
+    expect(result.model?.proposal).not.toHaveProperty("criteria");
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain("Apple Pay");
+  });
+
+  it("keeps well-formed criteria", async () => {
+    const withCriteria = { ...proposal, criteria: { add: [{ id: "c1", text: "Apple Pay works" }] } };
+    const result = await placeChange(change, caps, { model: async () => ({ propose: withCriteria }), areas });
+    expect(result.model?.proposal).toEqual(withCriteria);
+    expect(result.warnings).toEqual([]);
+  });
+
   it.each([
     ["a modified delta", { ...proposal, delta: "modified" }],
     ["no type", { ...proposal, type: undefined }],
