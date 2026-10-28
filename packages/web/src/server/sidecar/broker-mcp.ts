@@ -15,7 +15,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { SIDECAR_BROKER_NAME, type BrokerToolName } from "./broker-policy.js";
-import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES, type SidecarBroker } from "./broker.js";
+import type { SidecarBroker } from "./broker.js";
+import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES } from "./ledger.js";
 
 const BROKER_VERSION = "1.0.0";
 

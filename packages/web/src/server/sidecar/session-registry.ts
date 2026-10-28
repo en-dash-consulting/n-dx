@@ -35,6 +35,15 @@ import type {
   VendorSessionOptions,
 } from "@n-dx/llm-client";
 import { writeRunFileAtomic } from "../run-end.js";
+import {
+  CHECKPOINT_PROMPT,
+  COLD_EXCHANGES,
+  composeColdPrompt,
+  contextTokens,
+  type Exchange,
+  type SidecarScope,
+} from "./context-refresh.js";
+import { renderLedger, type LedgerEntry } from "./ledger.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 import { sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
@@ -42,7 +51,7 @@ import { sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } f
 /** Idle time after which a session forgets its resume id. */
 export const DEFAULT_SIDECAR_TTL_MS = 2 * 60 * 60 * 1000;
 
-export type SidecarScope = "worktree" | "hub";
+export type { SidecarScope };
 
 export interface SidecarSessionRecord {
   id: string;
@@ -62,12 +71,20 @@ export interface SidecarSessionRecord {
   createdAt: string;
   lastActivityAt: string;
   endedAt?: string;
+  /**
+   * Set when a turn ended above the context ceiling: the next turn starts a
+   * cold vendor session instead of resuming. Cleared once that turn completes.
+   */
+  refresh?: { contextTokens: number; ceiling: number };
 }
 
 /** One transcript line. */
 export type SidecarFrame =
   | { seq: number; at: string; type: "user"; text: string }
-  | { seq: number; at: string; type: "event"; event: RuntimeEvent };
+  /** `checkpoint` marks an event of the ledger-writing turn, which is not part of the conversation. */
+  | { seq: number; at: string; type: "event"; event: RuntimeEvent; checkpoint?: true }
+  /** A cold session began: the context was refreshed, carrying `notes` ledger entries. */
+  | { seq: number; at: string; type: "context-refreshed"; notes: number; contextTokens: number };
 
 export interface CreateSidecarSessionInput {
   scope: SidecarScope;
@@ -83,11 +100,23 @@ export type SidecarSessionConnect = (
   record: SidecarSessionRecord,
 ) => Omit<VendorSessionOptions, "vendor" | "cwd" | "model">;
 
+/** What a session needs to checkpoint at its context ceiling and start cold. */
+export interface SidecarContextOptions {
+  /** Tokens of context above which a turn checkpoints. */
+  ceiling: (record: SidecarSessionRecord) => number;
+  /** The session's ledger, oldest first. */
+  ledger: (record: SidecarSessionRecord) => LedgerEntry[];
+  /** The lens packet rebuilt fresh; `undefined` for a lens that sends none. */
+  packet?: (record: SidecarSessionRecord) => Promise<string | undefined>;
+}
+
 export interface SidecarRegistryOptions {
   /** Directory holding `index.json` and the transcripts. */
   dir: string;
   /** Per-session options; called each time a vendor session is opened. */
   connect: SidecarSessionConnect;
+  /** Without it a session never checkpoints. */
+  context?: SidecarContextOptions;
   ttlMs?: number;
   now?: () => number;
 }
@@ -97,7 +126,7 @@ interface IndexFile {
   sessions: SidecarSessionRecord[];
 }
 
-export interface WorktreeSidecarRegistryOptions extends Pick<SidecarRegistryOptions, "ttlMs" | "now"> {
+export interface WorktreeSidecarRegistryOptions extends Pick<SidecarRegistryOptions, "ttlMs" | "now" | "context"> {
   /** Where a session reaches the `ndx-sidecar` broker; absent gives it no MCP server at all. */
   broker?: (sessionId: string) => SidecarBrokerEndpoint | undefined;
 }
@@ -160,6 +189,9 @@ export class SidecarSessionRegistry {
   private readonly connect: SidecarSessionConnect;
   private readonly ttlMs: number;
   private readonly now: () => number;
+  private readonly context?: SidecarContextOptions;
+  /** Sessions with a turn in progress, from the moment `sendTurn` is called until it settles. */
+  private readonly turnOpen = new Set<string>();
   private readonly records = new Map<string, SidecarSessionRecord>();
   private readonly live = new Map<string, LiveSession>();
   /** Sessions whose cursor has been checked against the transcript; see {@link reconcileCursor}. */
@@ -170,6 +202,7 @@ export class SidecarSessionRegistry {
     this.connect = opts.connect;
     this.ttlMs = opts.ttlMs ?? DEFAULT_SIDECAR_TTL_MS;
     this.now = opts.now ?? Date.now;
+    this.context = opts.context;
     for (const record of this.readIndex()) this.records.set(record.id, record);
   }
 
@@ -215,11 +248,31 @@ export class SidecarSessionRegistry {
     const record = this.records.get(id);
     if (!record) throw new Error(`No Sidecar session ${id}`);
     if (record.endedAt) throw new Error(`Sidecar session ${id} has ended`);
+    if (this.turnOpen.has(id)) throw new Error(`A turn is already running in Sidecar session ${id}`);
+    this.turnOpen.add(id);
+    try {
+      return await this.runTurn(record, prompt, onFrame);
+    } finally {
+      this.turnOpen.delete(id);
+    }
+  }
 
+  private async runTurn(
+    record: SidecarSessionRecord,
+    prompt: string,
+    onFrame?: (frame: SidecarFrame) => void,
+  ): Promise<SessionTurnResult> {
+    // A checkpointed session never resumes: its next turn is a new vendor session.
+    const context = this.context;
+    const cold = !!context && record.refresh !== undefined;
+    if (cold) {
+      this.live.delete(record.id);
+      delete record.resumeId;
+    }
     const live = this.liveSession(record);
-    if (live.session.state === "running") throw new Error(`A turn is already running in Sidecar session ${id}`);
 
     this.reconcileCursor(record);
+    const exchanges = cold ? this.lastExchanges(record.id) : [];
     const append = (frame: SidecarFrame): void => {
       this.appendFrame(record, frame);
       onFrame?.(frame);
@@ -228,18 +281,78 @@ export class SidecarSessionRegistry {
     append({ seq: record.cursor + 1, at: record.lastActivityAt, type: "user", text: prompt });
     this.persist();
 
-    live.sink = (event) => append({ seq: record.cursor + 1, at: this.iso(), type: "event", event });
     try {
-      const result = await live.session.sendTurn(prompt);
+      let vendorPrompt = prompt;
+      if (cold && context && record.refresh) {
+        const packet = await context.packet?.(record);
+        const ledger = renderLedger(context.ledger(record));
+        append({
+          seq: record.cursor + 1,
+          at: this.iso(),
+          type: "context-refreshed",
+          notes: ledger.carried,
+          contextTokens: record.refresh.contextTokens,
+        });
+        vendorPrompt = composeColdPrompt({ packet, ledger: ledger.text, exchanges, prompt });
+      }
+
+      // The context the turn ended with: what its last call sent in.
+      let ended = 0;
+      live.sink = (event) => {
+        if (event.type === "token_usage" && event.tokenUsage) ended = contextTokens(event.tokenUsage);
+        append({ seq: record.cursor + 1, at: this.iso(), type: "event", event });
+      };
+      const result = await live.session.sendTurn(vendorPrompt);
       record.turns += 1;
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
       if (result.sessionId) record.resumeId = result.sessionId;
+      if (cold && result.status === "completed") delete record.refresh;
+      if (context && result.status === "completed") {
+        const ceiling = context.ceiling(record);
+        if (ended > ceiling) await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append);
+      }
       return result;
     } finally {
       live.sink = undefined;
       record.lastActivityAt = this.iso();
       this.persist();
     }
+  }
+
+  /**
+   * Ask the agent to write its ledger, and mark the session so its next turn
+   * starts cold. The mark comes first: a server that stops mid-checkpoint
+   * still refreshes the context instead of resuming an oversized one.
+   */
+  private async checkpoint(
+    record: SidecarSessionRecord,
+    live: LiveSession,
+    measured: { contextTokens: number; ceiling: number },
+    append: (frame: SidecarFrame) => void,
+  ): Promise<void> {
+    record.refresh = measured;
+    this.persist();
+    live.sink = (event) => append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
+    const result = await live.session.sendTurn(CHECKPOINT_PROMPT);
+    record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
+  }
+
+  /**
+   * The last {@link COLD_EXCHANGES} exchanges of the transcript, verbatim: each
+   * user message with the assistant text that answered it. The checkpoint
+   * turn's events are not part of the conversation.
+   */
+  private lastExchanges(id: string): Exchange[] {
+    const exchanges: Exchange[] = [];
+    for (const frame of this.readFrames(id)) {
+      if (frame.type === "user") {
+        exchanges.push({ user: frame.text, assistant: "" });
+      } else if (frame.type === "event" && !frame.checkpoint && frame.event.type === "assistant" && frame.event.text) {
+        const current = exchanges.at(-1);
+        if (current) current.assistant = current.assistant ? `${current.assistant}\n\n${frame.event.text}` : frame.event.text;
+      }
+    }
+    return exchanges.slice(-COLD_EXCHANGES);
   }
 
   /**
@@ -267,7 +380,7 @@ export class SidecarSessionRegistry {
 
   /** Whether a turn is running in the session now. */
   isRunning(id: string): boolean {
-    return this.live.get(id)?.session.state === "running";
+    return this.turnOpen.has(id);
   }
 
   /**

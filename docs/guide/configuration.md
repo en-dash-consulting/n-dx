@@ -264,6 +264,14 @@ ndx config web.port 8080 .         # dashboard port (default: 3117)
 
 Stored in `.n-dx.json` at the project root.
 
+**Sidecar context ceiling.** A Sidecar turn that ends above its session's ceiling checkpoints: the agent writes typed notes to the session ledger, and the next turn starts a fresh vendor session from the lens packet, the ledger and the last two exchanges. The ceiling is in tokens, per session scope:
+
+```json
+{ "web": { "sidecarContextCeiling": { "worktree": 100000, "hub": 40000 } } }
+```
+
+Those are the defaults. A value that is not a positive integer is ignored.
+
 ## CI: Restricted Imports
 
 `ndx ci` can hold a module to the files allowed to import it — for example, all

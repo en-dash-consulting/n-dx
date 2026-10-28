@@ -50,9 +50,14 @@ import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/br
 import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
+import { resolveContextCeiling } from "./sidecar/context-refresh.js";
+import { readLedger } from "./sidecar/ledger.js";
+import { buildLensPacket } from "./sidecar/lens-packets.js";
+import { createPacketSources } from "./sidecar/packet-sources.js";
 import {
   createWorktreeSidecarRegistry,
   worktreeSidecarDir,
+  type SidecarContextOptions,
   type SidecarFrame,
   type SidecarSessionRecord,
   type SidecarSessionRegistry,
@@ -128,13 +133,36 @@ export function sidecarBrokerEndpoint(ctx: ServerContext, sessionId: string): Si
   };
 }
 
+/**
+ * Checkpoint wiring for `ctx`'s workspace: the project's ceiling for the
+ * session's scope (read per turn), its ledger, and its lens's packet rebuilt
+ * from disk. The two reads that spawn `ndx` answer nothing here — the Prepare
+ * route that owns that spawn is not part of Sidecar — so a Plan packet says
+ * those sections are missing rather than leaving a gap unmarked.
+ */
+export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions {
+  const dir = worktreeSidecarDir(ctx.projectDir);
+  return {
+    ceiling: (record) => resolveContextCeiling(ctx.projectDir, record.scope),
+    ledger: (record) => readLedger(dir, record.id),
+    packet: async (record) => {
+      const sources = createPacketSources(ctx, { resolve: async () => null, preview: async () => null });
+      const built = await buildLensPacket(record.lens ?? "general", {}, sources, new Date().toISOString());
+      return built.status === "ready" ? built.packet.text : undefined;
+    },
+  };
+}
+
 const registries = new Map<string, SidecarSessionRegistry>();
 const brokers = new Map<string, SidecarBroker>();
 
 function defaultRegistryFor(ctx: ServerContext): SidecarSessionRegistry {
   let registry = registries.get(ctx.projectDir);
   if (!registry) {
-    registry = createWorktreeSidecarRegistry(ctx.projectDir, { broker: (id) => sidecarBrokerEndpoint(ctx, id) });
+    registry = createWorktreeSidecarRegistry(ctx.projectDir, {
+      broker: (id) => sidecarBrokerEndpoint(ctx, id),
+      context: sidecarContextOptions(ctx),
+    });
     registries.set(ctx.projectDir, registry);
   }
   return registry;

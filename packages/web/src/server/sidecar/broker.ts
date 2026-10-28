@@ -29,6 +29,7 @@ import {
   type BrokerToolName,
   type SidecarCardKind,
 } from "./broker-policy.js";
+import { appendLedgerEntry, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 
 export type SidecarCardStatus = "pending" | "approved" | "denied" | "withdrawn";
@@ -58,17 +59,6 @@ export interface CardDecision {
   reason?: string;
   /** Also add the call's rule to the allow-list. Refused for a call that can never be allow-listed. */
   remember?: boolean;
-}
-
-export const LEDGER_ENTRY_TYPES = ["decision", "gotcha", "verified", "unfinished", "changed"] as const;
-export type LedgerEntryType = (typeof LEDGER_ENTRY_TYPES)[number];
-/** Longest ledger entry, the `handoff-notes.md` format's cap. */
-export const LEDGER_ENTRY_MAX_CHARS = 240;
-
-export interface LedgerEntry {
-  at: string;
-  type: LedgerEntryType;
-  text: string;
 }
 
 /** A refused decision; `status` is the HTTP status a route answers with. */
@@ -222,13 +212,8 @@ export class SidecarBroker {
 
   /** Append a typed entry to the session's ledger. Raises no card: the ledger is session-local. */
   appendLedger(sessionId: string, type: LedgerEntryType, text: string): LedgerEntry {
-    if (!LEDGER_ENTRY_TYPES.includes(type)) throw new Error(`Unknown ledger entry type "${type}"`);
-    if (text.length > LEDGER_ENTRY_MAX_CHARS) {
-      throw new Error(`A ledger entry is at most ${LEDGER_ENTRY_MAX_CHARS} characters (got ${text.length})`);
-    }
     const entry: LedgerEntry = { at: this.iso(), type, text };
-    ensureSidecarDir(this.dir);
-    appendFileSync(join(this.dir, `${sessionId}.ledger.jsonl`), JSON.stringify(entry) + "\n", "utf-8");
+    appendLedgerEntry(this.dir, sessionId, entry);
     return entry;
   }
 
