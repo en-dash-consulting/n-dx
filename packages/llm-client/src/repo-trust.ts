@@ -91,7 +91,7 @@ import {
   resolveNdxHome,
   type ResolveNdxHomeOptions,
 } from "./layout.js";
-import { gitTracksPath, insideGitWorkTree } from "./exec.js";
+import { gitlinkAt, gitTracksPath, insideGitWorkTree } from "./exec.js";
 import { toCanonicalJSON } from "./json.js";
 import { deepMerge } from "./project-config.js";
 
@@ -382,6 +382,12 @@ export interface RepoExecutionConfig {
    * tracked. Not in the digest.
    */
   localConfigTrackedPaths: string[];
+  /**
+   * Set when {@link localConfigTracked} holds because the file lies inside a
+   * submodule or another nested work tree: that directory, relative to the
+   * root. git rm --cached cannot untrack such a file. Not in the digest.
+   */
+  localConfigNestedIn: string | null;
   /** sha256 over the canonical JSON of everything above except `sources`, `detectedLanguage` and `envDeny`. */
   digest: string;
 }
@@ -510,19 +516,52 @@ export function isLocalConfigTracked(projectDir: string): boolean {
  * and the index entries git matched (`paths`), which are what `git rm --cached`
  * has to name: a case variant as committed, a symlinked directory and its target.
  */
-function localConfigTrackState(projectDir: string): { tracked: boolean; unanswered: string | null; paths: string[] } {
-  const untracked = { tracked: false, unanswered: null, paths: [] };
+function localConfigTrackState(
+  projectDir: string,
+): { tracked: boolean; unanswered: string | null; paths: string[]; nestedIn: string | null } {
+  const untracked = { tracked: false, unanswered: null, paths: [], nestedIn: null };
   const layout = resolveLayout(projectDir);
   if (!existsSync(layout.localConfigFile)) return untracked;
-  const answers = shippedPathsOf(layout.root, layout.localConfigFile)
-    .map((rel) => gitTracksPath(layout.root, rel, { ignoreCase: true }));
+  const shipped = shippedPathsOf(layout.root, layout.localConfigFile);
+  const answers = shipped.map((rel) => gitTracksPath(layout.root, rel, { ignoreCase: true }));
   const paths = [...new Set(answers.flatMap((a) => (a.state === "tracked" ? a.paths : [])))];
-  if (paths.length) return { tracked: true, unanswered: null, paths };
-  const failed = answers.find((a) => a.state === "unanswered");
+  if (paths.length) return { tracked: true, unanswered: null, paths, nestedIn: null };
+  const nested = nestedRepositoryAbove(layout.root, shipped);
+  if (nested.dir) return { tracked: true, unanswered: null, paths: [], nestedIn: nested.dir };
+  const failed = answers.find((a) => a.state === "unanswered")?.reason ?? nested.unanswered;
   if (!failed) return untracked;
   return insideGitWorkTree(layout.root)
-    ? { tracked: true, unanswered: failed.reason, paths: [] }
+    ? { tracked: true, unanswered: failed, paths: [], nestedIn: null }
     : untracked;
+}
+
+/**
+ * The first directory, strictly between `root` and one of `paths`, that is
+ * another repository's: the top of a nested work tree (a `.git` entry, which
+ * every checked-out submodule has) or a gitlink in the index. git lists
+ * nothing inside either, so a file the submodule commits reads as untracked
+ * to {@link gitTracksPath}, yet `git clone --recursive` delivers it.
+ * The walk stops at a symlink: what lies beyond it is the real path's walk,
+ * so a user's own `.ndx` linked into a repository of their dotfiles stays theirs.
+ * `unanswered` carries git's reason when a gitlink query failed.
+ */
+function nestedRepositoryAbove(root: string, paths: string[]): { dir: string | null; unanswered: string | null } {
+  let unanswered: string | null = null;
+  const seen = new Set<string>();
+  for (const rel of paths) {
+    const parts = rel.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      const dir = parts.slice(0, i).join("/");
+      if (isSymlink(join(root, dir))) break;
+      if (seen.has(dir)) continue;
+      seen.add(dir);
+      if (existsSync(join(root, dir, ".git"))) return { dir, unanswered: null };
+      const answer = gitlinkAt(root, dir, { ignoreCase: true });
+      if (answer.state === "unanswered") unanswered ??= answer.reason;
+      else if (answer.gitlink) return { dir, unanswered: null };
+    }
+  }
+  return { dir: null, unanswered };
 }
 
 /**
@@ -700,6 +739,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     tracked: localConfigTracked,
     unanswered: localConfigUnanswered,
     paths: localConfigTrackedPaths,
+    nestedIn: localConfigNestedIn,
   } = localConfigTrackState(projectDir);
   const localConfig = localConfigTracked ? readJson(layout.localConfigFile) : null;
   if (localConfigTracked) sources.push(relOf(root, layout.localConfigFile));
@@ -835,6 +875,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     localConfigTracked,
     localConfigUnanswered,
     localConfigTrackedPaths,
+    localConfigNestedIn,
     gateTestCommands,
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
@@ -1087,8 +1128,10 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
       severity: "warning",
       message: config.localConfigUnanswered
         ? `git could not confirm ${file} is untracked (${config.localConfigUnanswered}), so it is treated as repository config; its settings apply only once trusted`
-        : `Commits ${committed.join(", ")}${opened}, the machine-local config n-dx otherwise applies as yours; its settings apply only once trusted`,
-      values: config.localConfigUnanswered ? [file] : committed,
+        : config.localConfigNestedIn
+          ? `Ships ${file} inside ${config.localConfigNestedIn}, a submodule or nested repository, so it is repository config rather than yours; its settings apply only once trusted`
+          : `Commits ${committed.join(", ")}${opened}, the machine-local config n-dx otherwise applies as yours; its settings apply only once trusted`,
+      values: config.localConfigUnanswered || config.localConfigNestedIn ? [file] : committed,
     });
   }
 
@@ -1411,6 +1454,10 @@ export function formatRepoTrustReport(ev: RepoTrustEvaluation, options: RepoTrus
       // git rm --cached would fail with the same error, and the file may not be committed.
       lines.push(`  ${tracked.values[0]} is ignored too, because git could not say whether the repository commits it.`);
       lines.push(`  Fix git (e.g. git config --global --add safe.directory <this checkout>), or accept the configuration.`);
+    } else if (tracked && ev.config.localConfigNestedIn) {
+      // git rm --cached in this checkout cannot untrack a file another repository ships.
+      lines.push(`  ${tracked.values[0]} is ignored too: it comes from ${ev.config.localConfigNestedIn}, a submodule or nested repository,`);
+      lines.push(`  so git rm --cached here cannot untrack it. Accept the configuration to apply it.`);
     } else if (tracked) {
       lines.push(`  The committed ${tracked.values.join(", ")} is ignored too, as repository config. To keep settings of your own,`);
       lines.push(`  untrack it (git rm --cached -- ${tracked.values.map(shellArg).join(" ")}) and keep it ignored, or accept the configuration.`);

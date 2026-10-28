@@ -725,6 +725,43 @@ export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCas
   }
 }
 
+/** git's answer to "is this path a gitlink (a submodule) in the index?", or why it gave none. */
+export type GitlinkAnswer = { state: "answered"; gitlink: boolean } | { state: "unanswered"; reason: string };
+
+/**
+ * Synchronous git helper — is `relPath` (relative to `cwd`) a gitlink, an
+ * index entry of mode 160000? git lists nothing inside a submodule, so
+ * {@link gitTracksPath} reads a file the submodule ships as untracked; this
+ * asks about the directory instead. Matched literally, `ignoreCase` as there.
+ * Any git failure is unanswered, with git's first stderr line as the reason.
+ */
+export function gitlinkAt(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitlinkAnswer {
+  const pathspec = `:(literal${options.ignoreCase ? ",icase" : ""})${relPath}`;
+  const env = { ...process.env };
+  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  const same = (a: string) => (options.ignoreCase ? a.toLowerCase() === relPath.toLowerCase() : a === relPath);
+  try {
+    // -s: `<mode> <object> <stage>\t<path>`; -z: raw names, NUL-terminated.
+    const out = execFileSync("git", ["ls-files", "-s", "-z", "--", pathspec], {
+      windowsHide: true,
+      cwd,
+      env,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const gitlink = out.split("\0").some((entry) => {
+      const tab = entry.indexOf("\t");
+      return tab > 0 && entry.startsWith("160000 ") && same(entry.slice(tab + 1));
+    });
+    return { state: "answered", gitlink };
+  } catch (err) {
+    const e = err as { stderr?: string | Buffer; message?: string };
+    const stderrLine = String(e.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+    return { state: "unanswered", reason: stderrLine ?? e.message ?? "git failed" };
+  }
+}
+
 /** Is `dir`, or a directory above it, the top of a git work tree (has a `.git` entry)? */
 export function insideGitWorkTree(dir: string): boolean {
   for (let d = resolvePath(dir); ; d = dirname(d)) {

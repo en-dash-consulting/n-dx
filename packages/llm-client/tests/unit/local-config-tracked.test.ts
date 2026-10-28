@@ -238,6 +238,99 @@ describe("a local config file the repository ships under another name or path", 
   });
 });
 
+/**
+ * git lists nothing inside a submodule or a nested work tree, so a local
+ * config another repository ships reads as untracked in the superproject.
+ * `git clone --recursive` delivers it all the same: repository config.
+ */
+describe("a local config inside a submodule or nested work tree", () => {
+  /** A repository holding `.ndx/config.local.json` (and a committed config), added as the `.ndx` submodule. */
+  function addNdxSubmodule(): void {
+    const upstream = mkdtempSync(join(tmpdir(), "ndx-local-tracked-sub-"));
+    try {
+      const sub = (...args: string[]) => execFileSync("git", args, { cwd: upstream, stdio: "ignore" });
+      sub("init", "-q");
+      writeFileSync(join(upstream, "config.local.json"), JSON.stringify(LOCAL));
+      mkdirSync(join(upstream, "hench"));
+      writeFileSync(join(upstream, "hench", "config.json"), JSON.stringify({ claudePath: REPO_BINARY }));
+      sub("add", "-f", ".");
+      sub("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "ship");
+      git("init", "-q");
+      git("-c", "protocol.file.allow=always", "submodule", "add", "-q", upstream, ".ndx");
+    } finally {
+      rmSync(upstream, { recursive: true, force: true });
+    }
+  }
+
+  function expectNested(dir: string, file: string): void {
+    expect(isLocalConfigTracked(repo)).toBe(true);
+    const ev = evaluateRepoTrust(repo);
+    expect(ev.state).toBe("untrusted");
+    expect(ev.config.localConfigTracked).toBe(true);
+    expect(ev.config.localConfigNestedIn).toBe(dir);
+    expect(ev.findings.find((f) => f.code === "env-allow-added")?.values).toEqual([SENTINEL]);
+    const finding = ev.findings.find((f) => f.code === "local-config-tracked");
+    expect(finding?.values).toEqual([file]);
+    expect(finding?.message).toContain(`inside ${dir}`);
+    const report = formatRepoTrustReport(ev).join("\n");
+    expect(report).not.toContain("git rm --cached --");
+    expect(trustedLocalConfig(repo, LOCAL)).not.toEqual(LOCAL);
+    expect(passes(repoCommandEnv(repo, { env: parent() }))).toBe(false);
+  }
+
+  it("config.local.json in a .ndx submodule is repository config", async () => {
+    addNdxSubmodule();
+    expectNested(".ndx", ".ndx/config.local.json");
+    expect((await loadLLMConfig(repo)).claude?.cli_path).toBeUndefined();
+  });
+
+  it("a submodule directory whose .git entry is gone is still a gitlink", () => {
+    addNdxSubmodule();
+    rmSync(join(repo, ".ndx", ".git"), { recursive: true, force: true });
+    expectNested(".ndx", ".ndx/config.local.json");
+  });
+
+  it("a .ndx that is the top of another work tree is repository config", () => {
+    mkdirSync(join(repo, ".ndx"));
+    writeFileSync(join(repo, ".ndx", "config.local.json"), JSON.stringify(LOCAL));
+    git("init", "-q");
+    execFileSync("git", ["init", "-q"], { cwd: join(repo, ".ndx"), stdio: "ignore" });
+    expectNested(".ndx", ".ndx/config.local.json");
+  });
+
+  it.skipIf(process.platform === "win32")(".n-dx.local.json reached through a symlink into a nested work tree", () => {
+    mkdirSync(join(repo, "vendor"));
+    writeFileSync(join(repo, "vendor", "shipped.json"), JSON.stringify(LOCAL));
+    git("init", "-q");
+    execFileSync("git", ["init", "-q"], { cwd: join(repo, "vendor"), stdio: "ignore" });
+    symlinkSync(join("vendor", "shipped.json"), join(repo, ".n-dx.local.json"));
+    expectNested("vendor", ".n-dx.local.json");
+  });
+
+  it("the user's own untracked config.local.json in a plain .ndx keeps applying", async () => {
+    mkdirSync(join(repo, ".ndx"));
+    writeFileSync(join(repo, ".ndx", "config.json"), "{}");
+    git("init", "-q");
+    git("add", "-f", ".ndx/config.json");
+    writeFileSync(join(repo, ".ndx", "config.local.json"), JSON.stringify(LOCAL));
+    expect(isLocalConfigTracked(repo)).toBe(false);
+    expect(evaluateRepoTrust(repo).state).toBe("baseline");
+    expect(passes(repoCommandEnv(repo, { env: parent() }))).toBe(true);
+    expect((await loadLLMConfig(repo)).claude?.cli_path).toBe(REPO_BINARY);
+  });
+
+  it.skipIf(process.platform === "win32")("the user's own .ndx linked into a repository outside the checkout stays theirs", () => {
+    const own = join(home, "dotfiles");
+    mkdirSync(own);
+    execFileSync("git", ["init", "-q"], { cwd: own, stdio: "ignore" });
+    writeFileSync(join(own, "config.local.json"), JSON.stringify(LOCAL));
+    git("init", "-q");
+    symlinkSync(own, join(repo, ".ndx"));
+    expect(isLocalConfigTracked(repo)).toBe(false);
+    expect(evaluateRepoTrust(repo).state).toBe("baseline");
+  });
+});
+
 describe("an untracked .n-dx.local.json", () => {
   it("stays out of the digest and keeps applying, in a git repository or not", async () => {
     const before = collectRepoExecutionConfig(repo).digest;

@@ -29,8 +29,15 @@ items:
     lastModified: "2026-10-28T22:17:05.608Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9adf1968-3c40-41eb-824a-212092764847":
+    status: "completed"
+    startedAt: "2026-10-28T22:23:47.516Z"
+    completedAt: "2026-10-28T22:32:40.669Z"
+    endedAt: "2026-10-28T22:32:40.669Z"
+    activeIntervals: [{"end":"2026-10-28T22:32:40.669Z","start":"2026-10-28T22:23:47.516Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "localConfigTrackState treats the local config as tracked when a directory between root and file is a nested work tree (.git entry) or a gitlink (ls-files -s mode 160000); fails closed when git cannot answer."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T21:51:18.462Z"
+    lastModified: "2026-10-28T22:32:40.669Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd3930fb-0d47-4414-8327-c7f2a7dd2eee":
     status: "completed"
