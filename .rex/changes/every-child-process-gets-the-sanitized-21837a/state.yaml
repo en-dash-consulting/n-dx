@@ -1,11 +1,15 @@
 schema: "rex/v2"
 items:
   "13723ac9-aac4-489a-abbd-4cc56f518ece":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T22:39:14.792Z"
-    activeIntervals: [{"start":"2026-10-28T22:39:14.792Z"}]
+    completedAt: "2026-10-28T22:45:24.507Z"
+    endedAt: "2026-10-28T22:45:24.507Z"
+    activeIntervals: [{"end":"2026-10-28T22:45:24.507Z","start":"2026-10-28T22:39:14.792Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Backstop finding no longer blames the agent: says the file changed during the run, names possible writers, tells the user to save their own change again. Concurrency docs (overview table, project-guidance → regenerated AGENTS.md/CLAUDE.md, guide/overnight) say a config save during ndx work is reverted."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T22:39:15.343Z"
+    lastModified: "2026-10-28T22:45:24.507Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "21837a0a-b748-49fe-8fc3-7128aac83b0c":
     assignee: "Ryan Keith <ryan.k@endash.us>"
