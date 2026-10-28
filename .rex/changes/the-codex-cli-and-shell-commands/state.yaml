@@ -1,12 +1,23 @@
 schema: "rex/v2"
 items:
   "3741f9ad-9493-4699-ac48-a16bda3a1ebe":
-    lastModified: "2026-10-28T19:18:35.113Z"
+    status: "completed"
+    startedAt: "2026-10-28T19:39:13.174Z"
+    completedAt: "2026-10-28T19:39:13.174Z"
+    endedAt: "2026-10-28T19:39:13.174Z"
+    activeIntervals: [{"end":"2026-10-28T19:39:13.174Z","start":"2026-10-28T19:39:13.174Z"}]
+    appliedAt: "2026-10-28T19:39:13.174Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-28T19:39:13.174Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bfb205e4-24e7-4d4e-b77a-ed3190d428e9":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T19:21:38.415Z"
-    activeIntervals: [{"start":"2026-10-28T19:21:38.415Z"}]
+    completedAt: "2026-10-28T19:39:13.174Z"
+    endedAt: "2026-10-28T19:39:13.174Z"
+    activeIntervals: [{"end":"2026-10-28T19:39:13.174Z","start":"2026-10-28T19:21:38.415Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New hench guard/config-backstop.ts (ConfigBackstop): snapshots n-dx config files (non-glob NDX_CONFIG_BLOCKED_PATHS + .claude/settings{,.local}.json + .codex/config.toml) at run start in run.ts; restores after every vendor CLI spawn (spawnWithAdapter: executor, orientation, reviewer, fix), after every API-loop tool call (dispatchTool), and in finalizeRun before the test gate, which fails the run and records protectedConfigWrites (path/change/restored, no content). run.ts finally restores if a loop throws. Tests: unit + integration (codex and claude spawns, run_command node writer, case variant, finalize); all 5 route tests fail with the seams removed."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T19:21:39.098Z"
+    lastModified: "2026-10-28T19:39:13.174Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

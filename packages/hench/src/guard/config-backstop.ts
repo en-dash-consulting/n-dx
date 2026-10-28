@@ -28,6 +28,7 @@ import {
   readlinkSync,
   rmdirSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -75,7 +76,22 @@ type Entry =
   | { kind: "absent" }
   | { kind: "file"; content: Buffer; mode: number }
   | { kind: "symlink"; target: string; content: Buffer | null }
-  | { kind: "directory" };
+  | { kind: "directory" }
+  /** A FIFO, socket or device: compared by kind only, never read. */
+  | { kind: "special" };
+
+/**
+ * The content behind a symlink, when it leads to a regular file. Anything
+ * else is not read: a link to `/dev/zero` or a FIFO would never finish.
+ */
+function linkedFileContent(abs: string): Buffer | null {
+  try {
+    return statSync(abs).isFile() ? readFileSync(abs) : null;
+  } catch {
+    // Dangling, or pointing at something unreadable: only the link itself is compared.
+    return null;
+  }
+}
 
 function readEntry(abs: string): Entry {
   let stat;
@@ -86,17 +102,10 @@ function readEntry(abs: string): Entry {
     if (code === "ENOENT" || code === "ENOTDIR") return { kind: "absent" };
     throw err;
   }
-  if (stat.isSymbolicLink()) {
-    let content: Buffer | null;
-    try {
-      content = readFileSync(abs);
-    } catch {
-      // Dangling, or pointing at something unreadable: only the link itself is compared.
-      content = null;
-    }
-    return { kind: "symlink", target: readlinkSync(abs), content };
-  }
+  if (stat.isSymbolicLink()) return { kind: "symlink", target: readlinkSync(abs), content: linkedFileContent(abs) };
   if (stat.isDirectory()) return { kind: "directory" };
+  // Only a regular file is read; reading a FIFO an agent left here would hang the run.
+  if (!stat.isFile()) return { kind: "special" };
   return { kind: "file", content: readFileSync(abs), mode: stat.mode & 0o777 };
 }
 
@@ -105,6 +114,7 @@ function sameEntry(a: Entry, b: Entry): boolean {
   switch (a.kind) {
     case "absent":
     case "directory":
+    case "special":
       return true;
     case "file":
       return a.content.equals((b as typeof a).content);
@@ -146,6 +156,8 @@ function putBack(abs: string, before: Entry, after: Entry): void {
       mkdirSync(dirname(abs), { recursive: true });
       symlinkSync(before.target, abs);
       return;
+    case "special":
+      throw new Error("a special file cannot be recreated");
   }
 }
 

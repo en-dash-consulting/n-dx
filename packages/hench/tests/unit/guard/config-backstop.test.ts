@@ -119,6 +119,15 @@ describe("ConfigBackstop", () => {
     expect(readFileSync(own, "utf-8")).toBe("{}");
   });
 
+  // A link to a device never reaches end of file; reading it would hang the run.
+  it.skipIf(process.platform === "win32")("removes a symlink the agent pointed at a device without reading it", () => {
+    const backstop = ConfigBackstop.capture(dir);
+    symlinkSync("/dev/zero", join(dir, ".n-dx.local.json"));
+
+    expect(backstop.restore()).toEqual([{ path: ".n-dx.local.json", change: "created", restored: true }]);
+    expect(existsSync(join(dir, ".n-dx.local.json"))).toBe(false);
+  }, 5_000);
+
   it.runIf(caseInsensitiveFs())("catches a write under another spelling of the name", () => {
     const backstop = ConfigBackstop.capture(dir);
     writeFileSync(join(dir, ".N-DX.local.json"), WIDENING);
