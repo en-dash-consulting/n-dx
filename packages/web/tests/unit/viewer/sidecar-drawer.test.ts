@@ -148,6 +148,7 @@ function stubServer(): void {
     if (url === "/api/commands/manifest") {
       return json({
         cliName: "ndx",
+        layoutPaths: { rex: ".rex", prdRead: ".rex/product/ and .rex/changes/" },
         groups: [{ id: "g", label: "G", commands: Object.entries(server.manifest).map(([name, effects]) => ({ name, effects })) }],
       });
     }
@@ -871,7 +872,7 @@ describe("permission cards", () => {
 
   it("shows a command card's effects from the command manifest, or that it declares none", async () => {
     server.manifest = {
-      status: { reads: ["repo", ".rex/"], writes: [], llm: [], duration: "~1 s" },
+      status: { reads: ["repo", "{prdRead}"], writes: [], llm: [], duration: "~1 s" },
       ci: { reads: ["repo"], writes: [{ path: "ci-report.json", what: "report" }], llm: [{ phase: "x" }], duration: "~6 min" },
       noisy: null,
     };
@@ -884,7 +885,7 @@ describe("permission cards", () => {
     ]);
     const lines = cardEls().map((el) => el.querySelector(".sidecar-card-effects")?.textContent);
     expect(lines).toEqual([
-      "reads repo + .rex/ · writes nothing · no LLM · ~1 s",
+      "reads repo + .rex/product/ and .rex/changes/ · writes nothing · no LLM · ~1 s",
       "reads repo · writes ci-report.json · 1 LLM phase · ~6 min",
       "no declared effects",
       "no declared effects",
