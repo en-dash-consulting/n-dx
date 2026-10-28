@@ -9,9 +9,9 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { recordRepoTrust } from "@n-dx/llm-client";
@@ -29,6 +29,9 @@ import {
   renderLedger,
   type LedgerEntry,
 } from "../../../src/server/sidecar/ledger.js";
+import { loadPrdModel } from "../../../src/server/rex-gateway.js";
+import { buildLensPacket } from "../../../src/server/sidecar/lens-packets.js";
+import type { PacketSources } from "../../../src/server/sidecar/packet-sources.js";
 import {
   SidecarSessionRegistry,
   type SidecarFrame,
@@ -225,15 +228,15 @@ describe("checkpoint at the ceiling", () => {
 
   it("honours an interrupt that arrives while the cold turn builds its packet", async () => {
     let release: ((text: string) => void) | undefined;
-    let builds = 0;
+    let held = false;
     const reg = new SidecarSessionRegistry({
       dir,
       connect: () => ({ spawn: fakeSpawn }),
       context: {
         ceiling: () => 1000,
         ledger: (record) => readLedger(dir, record.id),
-        // The first build waits for the test; later ones answer at once.
-        packet: () => (builds++ === 0
+        // The first cold build waits for the test; every other build answers at once.
+        packet: (record) => (record.refresh && !held && (held = true)
           ? new Promise<string>((resolve) => { release = resolve; })
           : Promise.resolve("## PACKET")),
       },
@@ -330,5 +333,87 @@ describe("cold prompt", () => {
     expect(text).toContain("(no notes were left)");
     expect(text).toContain("## Operator's message\ngo");
     expect(text).not.toContain("exchange");
+  });
+});
+
+describe("the packet opens the first turn", () => {
+  it("sends the packet with turn one only, in front of the operator's message", async () => {
+    const reg = registry(1000, "## PACKET-MARKER");
+    const id = open(reg);
+    await turn(reg, id, "first question", 10);
+    await turn(reg, id, "second question", 10);
+
+    expect(spawns[0]!.stdin).toContain("## PACKET-MARKER");
+    expect(spawns[0]!.stdin.indexOf("## PACKET-MARKER")).toBeLessThan(spawns[0]!.stdin.indexOf("first question"));
+    expect(spawns[1]!.stdin).toBe("second question");
+  });
+
+  it("sends nothing extra when the lens has no packet", async () => {
+    const reg = registry(1000);
+    const id = open(reg);
+    await turn(reg, id, "first question", 10);
+    expect(spawns[0]!.stdin).toBe("first question");
+  });
+
+  it("carries the new packet on the next turn after a re-lens or a new target, once", async () => {
+    const reg = new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      context: {
+        ceiling: () => 1000,
+        ledger: () => [],
+        packet: async (record) => `## PACKET ${record.lens} ${record.target?.ref ?? "-"}`,
+      },
+    });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "explain" });
+    await reg.sendTurn(id, "one");
+    await reg.sendTurn(id, "two");
+    reg.update(id, { name: "Renamed" });
+    await reg.sendTurn(id, "three");
+    reg.update(id, { lens: "describe", target: { ref: "T-1" } });
+    await reg.sendTurn(id, "four");
+    await reg.sendTurn(id, "five");
+
+    expect(spawns.map((s) => s.stdin.split("\n")[0])).toEqual([
+      "## PACKET explain -", "two", "three", "## PACKET describe T-1", "five",
+    ]);
+    expect(reg.get(id)).toMatchObject({ name: "Renamed", lens: "describe", target: { ref: "T-1" } });
+    expect(reg.get(id)?.packetDue).toBeUndefined();
+  });
+
+  it("sends the task packet on turn one of a Describe session on that task", async () => {
+    const rexDir = join(root, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    cpSync(resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree"), rexDir, { recursive: true });
+    const model = await loadPrdModel(rexDir);
+    const sources: PacketSources = {
+      sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },
+      prd: async () => ({ layout: model.layout, tree: model.tree }),
+      evidence: async () => null,
+      zones: async () => null,
+      resolve: async () => null,
+      preview: async () => null,
+      runs: async () => [],
+    };
+    const task = "c0000000-0000-4000-8000-000000000002";
+    const reg = new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      context: {
+        ceiling: () => 1000,
+        ledger: () => [],
+        packet: async (record) => {
+          const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, "2026-10-28T12:00:00.000Z");
+          return built.status === "ready" ? built.packet.text : undefined;
+        },
+      },
+    });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "describe", target: { ref: task } });
+    await reg.sendTurn(id, "what is this?");
+
+    expect(spawns[0]!.stdin).toContain(`# Sidecar context packet: describe · ${task}`);
+    expect(spawns[0]!.stdin).toContain("what is this?");
   });
 });

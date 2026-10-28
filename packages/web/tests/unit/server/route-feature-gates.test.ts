@@ -136,6 +136,16 @@ describe("route feature gates", () => {
     expect(body.suggestion).toContain(feature);
   });
 
+  it("refuses PATCH on a Sidecar session with 403 while web.sidecar is off, and passes it once on", async () => {
+    const url = `http://127.0.0.1:${port}/api/sidecar/sessions/abc`;
+    const refused = await fetch(url, { method: "PATCH", body: "{}" });
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).feature).toBe("web.sidecar");
+
+    await setFeatures({ "web.sidecar": true });
+    expect((await fetch(url, { method: "PATCH", body: "{}" })).status).toBe(200);
+  });
+
   // ── Per route: passed through once the flag is on ───────────────────────
 
   it.each(GATED)("lets %s through once %s is enabled", async (path, feature) => {

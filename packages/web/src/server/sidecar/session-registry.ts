@@ -39,11 +39,13 @@ import {
   CHECKPOINT_PROMPT,
   COLD_EXCHANGES,
   composeColdPrompt,
+  composeOpeningPrompt,
   contextTokens,
   type Exchange,
   type SidecarScope,
 } from "./context-refresh.js";
 import { renderLedger, type LedgerEntry } from "./ledger.js";
+import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 import { sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
@@ -62,6 +64,13 @@ export interface SidecarSessionRecord {
   vendor: string;
   model?: string;
   lens?: string;
+  /** What the lens is pointed at (an item id, display id or alias); absent means no target. */
+  target?: PacketTarget;
+  /**
+   * Set when the lens or target changed after a turn: the next turn carries
+   * the new packet. Cleared once a turn completes. The first turn always does.
+   */
+  packetDue?: true;
   /** Vendor session id the next turn resumes; absent before the first turn and after the TTL. */
   resumeId?: string;
   /** Sequence number of the last transcript frame. */
@@ -93,6 +102,14 @@ export interface CreateSidecarSessionInput {
   model?: string;
   name?: string;
   lens?: string;
+  target?: PacketTarget;
+}
+
+/** The fields {@link SidecarSessionRegistry.update} can change. */
+export interface UpdateSidecarSessionInput {
+  name?: string;
+  lens?: string;
+  target?: PacketTarget;
 }
 
 /** Session options the registry does not own: env policy, LLM config, binary. */
@@ -218,6 +235,7 @@ export class SidecarSessionRegistry {
       vendor: input.vendor,
       ...(input.model && { model: input.model }),
       ...(input.lens && { lens: input.lens }),
+      ...(input.target && { target: { ...input.target } }),
       cursor: 0,
       turns: 0,
       tokens: { input: 0, output: 0 },
@@ -227,6 +245,24 @@ export class SidecarSessionRegistry {
     this.records.set(record.id, record);
     this.persist();
     return { ...record };
+  }
+
+  /**
+   * Rename a session, point it at another lens or target, or both. A new lens
+   * or target after the first turn makes the next turn carry its packet.
+   * Returns undefined for an unknown session.
+   */
+  update(id: string, input: UpdateSidecarSessionInput): SidecarSessionRecord | undefined {
+    const record = this.records.get(id);
+    if (!record) return undefined;
+    if (input.name !== undefined) record.name = input.name;
+    const lensChanged = input.lens !== undefined && input.lens !== record.lens;
+    const targetChanged = input.target !== undefined && input.target.ref !== record.target?.ref;
+    if (input.lens !== undefined) record.lens = input.lens;
+    if (input.target !== undefined) record.target = { ...input.target };
+    if ((lensChanged || targetChanged) && record.turns > 0) record.packetDue = true;
+    this.persist();
+    return this.view(record);
   }
 
   list(filter: { scope?: SidecarScope; worktree?: string } = {}): SidecarSessionRecord[] {
@@ -275,6 +311,8 @@ export class SidecarSessionRegistry {
     const live = this.liveSession(record);
 
     this.reconcileCursor(record);
+    // The packet opens the first turn, a refreshed turn and the turn after a lens or target change.
+    const opening = !cold && !!context?.packet && (record.turns === 0 || record.packetDue === true);
     const exchanges = cold ? this.lastExchanges(record.id) : [];
     const append = (frame: SidecarFrame): void => {
       this.appendFrame(record, frame);
@@ -304,6 +342,14 @@ export class SidecarSessionRegistry {
         }
       }
 
+      if (opening) {
+        const packet = await context?.packet?.(record);
+        if (packet) vendorPrompt = composeOpeningPrompt({ packet, prompt });
+        if (this.stopRequested.has(record.id)) {
+          return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
+        }
+      }
+
       // The context the turn ended with: what its last call sent in.
       let ended = 0;
       live.sink = (event) => {
@@ -315,6 +361,7 @@ export class SidecarSessionRegistry {
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
       if (result.sessionId) record.resumeId = result.sessionId;
       if (cold && result.status === "completed") delete record.refresh;
+      if (result.status === "completed") delete record.packetDue;
       if (context && result.status === "completed") {
         const ceiling = context.ceiling(record);
         if (ended > ceiling) await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append);

@@ -168,6 +168,46 @@ describe("sessions", () => {
     expect((await api("", { method: "POST", body: {} })).status).toBe(400);
   });
 
+  it("accepts a target on create and keeps it across a server restart", async () => {
+    const res = await api("", { method: "POST", body: { vendor: "claude", lens: "describe", target: { ref: "T-1" } } });
+    expect(res.status).toBe(201);
+    const { session } = await res.json();
+    expect(session.target).toEqual({ ref: "T-1" });
+
+    const restarted = newRegistry();
+    expect(restarted.get(session.id)).toMatchObject({ lens: "describe", target: { ref: "T-1" } });
+  });
+
+  it("refuses a target that is not an object with a string ref", async () => {
+    for (const target of ["T-1", null, [], { ref: 3 }, { ref: " " }]) {
+      expect((await api("", { method: "POST", body: { vendor: "claude", target } })).status).toBe(400);
+    }
+  });
+
+  it("renames, re-lenses and re-targets with PATCH, each field optional, and persists it", async () => {
+    const id = await createSession();
+    const renamed = await api(`/${id}`, { method: "PATCH", body: { name: "Review" } });
+    expect(renamed.status).toBe(200);
+    expect((await renamed.json()).session).toMatchObject({ name: "Review" });
+
+    const moved = await api(`/${id}`, { method: "PATCH", body: { lens: "describe", target: { ref: "T-2" } } });
+    expect((await moved.json()).session).toMatchObject({ name: "Review", lens: "describe", target: { ref: "T-2" } });
+    expect(newRegistry().get(id)).toMatchObject({ name: "Review", lens: "describe", target: { ref: "T-2" } });
+
+    expect((await api(`/${id}`, { method: "PATCH", body: {} })).status).toBe(200);
+  });
+
+  it("refuses a bad PATCH body, an unknown session, and a lens or target change once ended", async () => {
+    const id = await createSession();
+    expect((await api(`/${id}`, { method: "PATCH", body: { name: "" } })).status).toBe(400);
+    expect((await api(`/${id}`, { method: "PATCH", body: { target: "T-1" } })).status).toBe(400);
+    expect((await api("/nope", { method: "PATCH", body: { name: "x" } })).status).toBe(404);
+
+    await api(`/${id}/end`, { method: "POST" });
+    expect((await api(`/${id}`, { method: "PATCH", body: { lens: "plan" } })).status).toBe(409);
+    expect((await api(`/${id}`, { method: "PATCH", body: { name: "Done" } })).status).toBe(200);
+  });
+
   it("answers 404 for a session it does not hold and 405 for a wrong method", async () => {
     expect((await api("/nope/frames")).status).toBe(404);
     const id = await createSession();

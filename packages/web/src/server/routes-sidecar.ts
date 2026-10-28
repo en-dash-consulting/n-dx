@@ -16,8 +16,9 @@
  * | Method | Path | Does |
  * |--------|------|------|
  * | GET  | `/api/sidecar/sessions` | sessions in this worktree |
- * | POST | `/api/sidecar/sessions` | create one (`{ vendor, model?, name?, lens? }`) |
+ * | POST | `/api/sidecar/sessions` | create one (`{ vendor, model?, name?, lens?, target? }`) |
  * | GET  | `/api/sidecar/sessions/:id` | one session and whether a turn runs |
+ * | PATCH | `/api/sidecar/sessions/:id` | rename, re-lens or re-target (`{ name?, lens?, target? }`) |
  * | POST | `/api/sidecar/sessions/:id/turns` | start a turn (`{ prompt }`) |
  * | GET  | `/api/sidecar/sessions/:id/frames?after=N` | transcript frames after N |
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
@@ -53,6 +54,7 @@ import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardS
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readLedger } from "./sidecar/ledger.js";
 import { buildLensPacket } from "./sidecar/lens-packets.js";
+import type { PacketTarget } from "./sidecar/packet-builders.js";
 import { createPacketSources } from "./sidecar/packet-sources.js";
 import {
   createWorktreeSidecarRegistry,
@@ -150,7 +152,7 @@ export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions
     ledger: (record) => readLedger(dir, record.id),
     packet: async (record) => {
       const sources = createPacketSources(ctx, { resolve: async () => null, preview: async () => null });
-      const built = await buildLensPacket(record.lens ?? "general", {}, sources, new Date().toISOString());
+      const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString());
       return built.status === "ready" ? built.packet.text : undefined;
     },
   };
@@ -225,6 +227,15 @@ function optionalString(body: Record<string, unknown>, key: string): string | un
   const value = body[key];
   if (value === undefined) return undefined;
   return typeof value === "string" && value.trim() ? value.trim() : new Error(`"${key}" must be a non-empty string`);
+}
+
+/** `target` as `{ ref: string }`; absent is undefined. */
+function readTarget(body: Record<string, unknown>): PacketTarget | undefined | Error {
+  const value = body.target;
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return new Error(`"target" must be an object`);
+  const ref = optionalString(value as Record<string, unknown>, "ref");
+  return ref instanceof Error ? ref : ref === undefined ? {} : { ref };
 }
 
 function sessionResponse(registry: SidecarSessionRegistry, session: SidecarSessionRecord): SidecarSessionResponse {
@@ -339,7 +350,11 @@ export async function handleSidecarRoute(
         if (value instanceof Error) return refuse(res, 400, value.message);
         fields[key] = value;
       }
-      const session = registry.create({ scope: "worktree", worktree: ctx.projectDir, vendor, ...fields });
+      const target = readTarget(body);
+      if (target instanceof Error) return refuse(res, 400, target.message);
+      const session = registry.create({
+        scope: "worktree", worktree: ctx.projectDir, vendor, ...fields, ...(target && { target }),
+      });
       jsonResponse(res, 201, sessionResponse(registry, session));
       return true;
     }
@@ -355,6 +370,25 @@ export async function handleSidecarRoute(
   // One answer for a session this worktree does not hold, whether it does not
   // exist or belongs to another worktree's checkout.
   if (!session || session.worktree !== ctx.projectDir) return refuse(res, 404, `No Sidecar session ${id}`);
+
+  if (action === undefined && method === "PATCH") {
+    const body = await readJsonObject(req, res);
+    if (typeof body === "string") return refuse(res, 400, body);
+    const fields: { name?: string; lens?: string } = {};
+    for (const key of ["name", "lens"] as const) {
+      const value = optionalString(body, key);
+      if (value instanceof Error) return refuse(res, 400, value.message);
+      if (value !== undefined) fields[key] = value;
+    }
+    const target = readTarget(body);
+    if (target instanceof Error) return refuse(res, 400, target.message);
+    if ((fields.lens !== undefined || target) && session.endedAt) {
+      return refuse(res, 409, `Sidecar session ${id} has ended`);
+    }
+    const updated = registry.update(id, { ...fields, ...(target && { target }) }) ?? session;
+    jsonResponse(res, 200, sessionResponse(registry, updated));
+    return true;
+  }
 
   const reads = action === "frames" || action === undefined || (action === "cards" && cardId === undefined);
   const allowed = reads ? "GET" : "POST";
