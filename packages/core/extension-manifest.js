@@ -293,7 +293,8 @@ export function validateExtensionManifest(packageJson, options) {
         if (link.path === undefined) report(`${path}.path`, "required", "is missing");
         else if (checkString(link.path, `${path}.path`, report)) {
           if (!link.path.startsWith("/")) report(`${path}.path`, "url-path", `"${link.path}" does not start with /`);
-          for (const [, placeholder] of link.path.matchAll(/\{([^}]*)\}/g)) {
+          // `[^{}]`, not `[^}]`: a run of `{` would otherwise rescan to the end from each one.
+          for (const [, placeholder] of link.path.matchAll(/\{([^{}]*)\}/g)) {
             if (!PROJECT_LINK_PLACEHOLDERS.includes(placeholder)) {
               report(`${path}.path`, "link-placeholder", `{${placeholder}} is not a placeholder the hub fills`);
             }

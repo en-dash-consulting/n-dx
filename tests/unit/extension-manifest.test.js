@@ -165,6 +165,20 @@ describe("validateExtensionManifest", () => {
     expect(() => validateExtensionManifest(pkg(), {})).toThrow(/builtinCommands/);
   });
 
+  it("checks link placeholders in linear time, so a run of '{' cannot stall discovery", () => {
+    // Quadratic before: each '{' restarted a scan to the end (CodeQL js/polynomial-redos).
+    // At 2M characters the old regex blocks the worker for over ten minutes, so a regression
+    // stalls this file until the run's own timeout; linear, it takes milliseconds.
+    const result = validate(pkg((m) => { m.projectLinks[0].path = `/${"{".repeat(2_000_000)}`; }));
+    expect(result.status).toBe("valid");
+  });
+
+  it("still reads the placeholder inside nested braces", () => {
+    const result = validate(pkg((m) => { m.projectLinks[0].path = "/p/{{projectName}}"; }));
+    expect(result.problems.map((p) => p.rule)).toEqual(["link-placeholder"]);
+    expect(result.problems[0].message).toContain("{projectName}");
+  });
+
   it("rejects package paths that escape the package on either platform", () => {
     for (const bin of ["/etc/cli.js", "C:\\tools\\cli.js", "..\\cli.js", "bin/../../cli.js", ".."]) {
       const result = validate(pkg((m) => { m.commands[0].bin = bin; }));
