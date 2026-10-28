@@ -54,6 +54,8 @@ export interface RexStatus {
   hasInProgress: boolean;
   hasPending: boolean;
   nextTaskTitle: string | null;
+  /** Inbox counts; the server omits them on a v1 tree. */
+  inbox?: { open: number; appliedUnplaced: number };
 }
 
 export interface HenchStatus {
@@ -104,6 +106,10 @@ function isValidProjectStatus(data: unknown): data is ProjectStatus {
   if (!d.rex || typeof d.rex.exists !== "boolean") return false;
   if (d.rex.stats !== null && d.rex.stats !== undefined) {
     if (typeof d.rex.stats !== "object" || typeof d.rex.stats.total !== "number") return false;
+  }
+  const inbox = d.rex.inbox;
+  if (inbox !== undefined) {
+    if (!inbox || typeof inbox.open !== "number" || typeof inbox.appliedUnplaced !== "number") return false;
   }
   if (!d.hench || typeof d.hench.configured !== "boolean") return false;
   if (typeof d.initialized !== "boolean") return false;

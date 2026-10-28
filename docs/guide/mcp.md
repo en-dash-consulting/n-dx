@@ -94,7 +94,7 @@ Rex reads the PRD's layout from disk. A v2 PRD is the product layer (`.ndx/rex/p
 |------|-------------|
 | `get_product` | The product layer. By default each area with its counts by computed status, defective nodes and open changes; `area` returns one area's capabilities and constraints with status and health; `full: true` returns every area that way. v2 only |
 | `get_capability` | One capability or constraint: statement, capability criteria, parent chain, status, health, and the changes that amend or touch it. v2 only |
-| `place_change` | Without a target, the shortlist of capabilities and constraints a change could amend or touch; with one, record it (`touches` or `amends`). v2 only |
+| `place_change` | Without a target, the shortlist of capabilities and constraints a change could amend or touch; with one, record it (`touches` or `amends`; an applied change takes `touches` only, since its amendments already reached the map); with `propose` (`type`, `under`, `title`) instead, record a new capability or constraint when nothing fits. v2 only |
 | `apply_change` | Apply a change's amendments to the product layer, as a steward. Refused whole, listing every problem, when an amendment does not fit. v2 only |
 
 ### Work items

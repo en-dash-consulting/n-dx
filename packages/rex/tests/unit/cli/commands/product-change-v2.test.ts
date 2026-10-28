@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cmdProduct } from "../../../../src/cli/commands/product.js";
@@ -14,12 +14,13 @@ import { cmdAddChange, cmdAddChangesFromDescriptions, titleFrom } from "../../..
 import { CLIError } from "../../../../src/cli/errors.js";
 import { getCommandHelp } from "../../../../src/cli/help.js";
 import { loadPrdModel } from "../../../../src/store/prd-model-reader.js";
-import { indexTree, type RuleNode } from "../../../../src/schema/v2-rules.js";
+import { checkV2Rules, indexTree, type RuleNode } from "../../../../src/schema/v2-rules.js";
 import { ensureRexDir, createStore } from "../../../../src/store/index.js";
 import { SCHEMA_VERSION } from "../../../../src/schema/index.js";
 import { cmdUpdate } from "../../../../src/cli/commands/update.js";
-import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture } from "../../../helpers/v2-fixture.js";
+import { FIXTURE_TASK, completeFixtureTask, copyV2Fixture, markChangeApplied } from "../../../helpers/v2-fixture.js";
 
+const AREA = "a0000000-0000-4000-8000-000000000001";
 const CAPABILITY = "a0000000-0000-4000-8000-000000000002";
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
 
@@ -126,7 +127,7 @@ describe("rex change place", () => {
     const id = await addInbox("Support refunds when paying by card");
     out.length = 0;
     await cmdChange(tmp, "place", id, {});
-    expect(text()).toMatch(/A1\.1 Pay by card \(amends\)/);
+    expect(text()).toMatch(/A1\.1 Pay by card \(amends, weak\)/);
     expect(text()).toContain(`rex change place ${id} --target=A1.1 --relation=amends`);
     expect((await node(id)).needsPlacement).toBe(true);
   });
@@ -152,11 +153,110 @@ describe("rex change place", () => {
     });
   });
 
+  it("places an applied Inbox change with touches: it leaves changes/inbox/ and health finds nothing new", async () => {
+    const id = await addInbox("Tidy the card form");
+    await markChangeApplied(rexDir, id);
+    // The writer drops changes/inbox/ once it holds nothing.
+    const inboxDirs = async () => (await readdir(join(rexDir, "changes", "inbox")).catch(() => [])).length;
+    const before = await inboxDirs();
+    expect(before).toBe(1);
+    out.length = 0;
+    await cmdChange(tmp, "place", id, { target: "A1.1" });
+    expect(text()).toMatch(/touches A1\.1 Pay by card/);
+    const placed = await node(id);
+    expect(placed).toMatchObject({ touches: [CAPABILITY], appliedAt: expect.any(String) });
+    expect(placed.needsPlacement).toBeUndefined();
+    expect(await inboxDirs()).toBe(before - 1);
+    expect(checkV2Rules((await loadPrdModel(rexDir)).tree, { now: new Date() }).filter((f) => f.nodeId === id)).toEqual([]);
+  });
+
+  it("refuses amends on an applied change with its own message", async () => {
+    const id = await addInbox("Refunds by card");
+    await markChangeApplied(rexDir, id);
+    const err = (await cmdChange(tmp, "place", id, { target: "A1.1", relation: "amends", proposed: "x" }).catch((e: Error) => e)) as CLIError;
+    expect(err).toBeInstanceOf(CLIError);
+    expect(err.message).toMatch(/is applied; its amendments already reached the map\. Place it with touches\./);
+    expect(err.suggestion).toContain("--relation=touches");
+    expect((await node(id)).needsPlacement).toBe(true);
+  });
+
   it("refuses --criterion and amendment content without --relation=amends", async () => {
     const id = await addInbox("Refunds by card");
     await expect(cmdChange(tmp, "place", id, { target: "A1.1" }, { criterion: ["x"] })).rejects.toThrow(/acceptance criteria/);
     await expect(cmdChange(tmp, "place", id, { target: "A1.1", relation: "touches", proposed: "x" })).rejects.toThrow(/--relation=amends/);
     await expect(cmdChange(tmp, "place", id, { relation: "touches" })).rejects.toThrow(/pass --target/);
+  });
+});
+
+describe("rex change place --propose", () => {
+  const PROPOSE = { propose: "true", type: "capability", under: "A1", title: "Refund by card" };
+  const log = async () => (await readFile(join(rexDir, "execution-log.jsonl"), "utf-8")).trim().split("\n").map((l) => JSON.parse(l));
+
+  it("records a new capability under the area, clears needsPlacement, logs change_proposed and prints it", async () => {
+    const id = await addInbox("Support refunds when paying by card");
+    out.length = 0;
+    await cmdChange(tmp, "place", id, { ...PROPOSE, proposed: "A shopper is refunded to the card" }, { "capability-criterion": ["c1: A refund reaches the card"] });
+    expect(text()).toMatch(/Proposed for .*Support refunds when paying by card: new capability "Refund by card" under A1 Checkout/);
+    const placed = await node(id);
+    expect(placed.needsPlacement).toBeUndefined();
+    expect(placed.amends).toEqual([{
+      target: expect.any(String),
+      delta: "added",
+      type: "capability",
+      under: AREA,
+      title: "Refund by card",
+      summary: "Support refunds when paying by card",
+      proposed: "A shopper is refunded to the card",
+      criteria: { add: [{ id: "c1", text: "A refund reaches the card" }] },
+    }]);
+    expect((await log()).at(-1)).toMatchObject({ event: "change_proposed", itemId: id, detail: `capability under ${AREA}: Refund by card` });
+  });
+
+  it("returns change and proposed with --format=json", async () => {
+    const id = await addInbox("Wallet tokens");
+    out.length = 0;
+    await cmdChange(tmp, "place", id, { ...PROPOSE, type: "constraint", title: "Tokens stay server-side", format: "json" });
+    const body = JSON.parse(text());
+    expect(body).toEqual({ change: id, proposed: { target: expect.any(String), under: AREA, title: "Tokens stay server-side", type: "constraint" } });
+    expect((await node(id)).amends[0].target).toBe(body.proposed.target);
+  });
+
+  it("refuses a repeat proposal on the same change, in plain wording, and writes nothing", async () => {
+    const id = await addInbox("Refunds by card");
+    const proposed = "A shopper is refunded to the card";
+    await cmdChange(tmp, "place", id, { ...PROPOSE, proposed });
+    const before = await loadPrdModel(rexDir);
+    const err = (await cmdChange(tmp, "place", id, { ...PROPOSE, proposed, title: " REFUND BY CARD " }).catch((e: Error) => e)) as CLIError;
+    expect(err).toBeInstanceOf(CLIError);
+    expect(err.message).toMatch(/already proposes capability "Refund by card" under "Checkout"/);
+    expect(await loadPrdModel(rexDir)).toEqual(before);
+    expect((await node(id)).amends).toHaveLength(1);
+  });
+
+  it("refuses --propose with --target or --relation, with a hint, and writes nothing", async () => {
+    const id = await addInbox("Refunds by card");
+    const before = await loadPrdModel(rexDir);
+    for (const extra of [{ target: "A1.1" }, { relation: "touches" }]) {
+      const err = (await cmdChange(tmp, "place", id, { ...PROPOSE, ...extra }).catch((e: Error) => e)) as CLIError;
+      expect(err).toBeInstanceOf(CLIError);
+      expect(err.message).toMatch(/--propose .*--target and --relation/);
+      expect(err.suggestion).toMatch(/--type, --under and --title/);
+    }
+    expect(await loadPrdModel(rexDir)).toEqual(before);
+  });
+
+  it("refuses a missing or invalid --type, missing --under or --title, an area that is not one, and criteria removals", async () => {
+    const id = await addInbox("Refunds by card");
+    const { type: _type, ...noType } = PROPOSE;
+    await expect(cmdChange(tmp, "place", id, noType)).rejects.toThrow(/needs --type/);
+    await expect(cmdChange(tmp, "place", id, { ...PROPOSE, type: "area" })).rejects.toThrow(/Invalid --type "area"/);
+    const { under: _under, ...noUnder } = PROPOSE;
+    await expect(cmdChange(tmp, "place", id, noUnder)).rejects.toThrow(/--under=<area> and --title/);
+    const err = (await cmdChange(tmp, "place", id, { ...PROPOSE, under: "A1.1" }).catch((e: Error) => e)) as CLIError;
+    expect(err.message).toMatch(/"A1\.1" is not a live area/);
+    expect(err.suggestion).toContain("rex product show");
+    await expect(cmdChange(tmp, "place", id, PROPOSE, { "remove-capability-criterion": ["c1"] })).rejects.toThrow(/no capability criteria to remove/);
+    expect((await node(id)).needsPlacement).toBe(true);
   });
 });
 
@@ -238,7 +338,7 @@ describe("rex add on a v2 tree", () => {
     await cmdAddChange(tmp, undefined, { title: "Support refunds when paying by card" }, { criterion: ["A refund reaches the card"] });
     expect(text()).toContain("Created change: Support refunds when paying by card");
     expect(text()).toContain("Placement: Inbox (needs placement)");
-    expect(text()).toMatch(/A1\.1 Pay by card \(amends\)/);
+    expect(text()).toMatch(/A1\.1 Pay by card \(amends, weak\)/);
     const created = (await changes()).find((c) => c.title === "Support refunds when paying by card")!;
     expect(created).toMatchObject({ needsPlacement: true, acceptanceCriteria: ["A refund reaches the card"] });
   });
@@ -336,6 +436,7 @@ describe("help", () => {
     expect(product).toMatch(/rex product edit/);
     expect(change).toMatch(/rex change place/);
     expect(change).toMatch(/rex change apply/);
+    expect(change).toMatch(/--propose --type=capability\|constraint --under=<area>/);
     for (const help of [product, change]) {
       expect(help).toContain("--capability-criterion");
       expect(help).toMatch(/not .*acceptance criteria|They are not acceptance criteria/s);

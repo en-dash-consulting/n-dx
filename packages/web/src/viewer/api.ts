@@ -46,6 +46,9 @@ export { useLive, isAnalysisJob } from "./hooks/index.js";
 export {
   SvFreshnessIndicator,
   RexCompletionIndicator,
+  InboxIndicator,
+  openInboxCount,
+  inboxCountLabel,
   HenchActivityIndicator,
   INDICATOR_VIEWS,
   LIVE_INDICATOR_VIEWS,

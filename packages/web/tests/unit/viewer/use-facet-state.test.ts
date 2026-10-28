@@ -20,9 +20,10 @@ import {
 // ── Test harness ─────────────────────────────────────────────────────────────
 
 let state: FacetState;
+const INBOX_IDS: ReadonlySet<string> = new Set(["c-inbox"]);
 
 function Harness() {
-  state = useFacetState();
+  state = useFacetState(INBOX_IDS);
   return h("div", null);
 }
 
@@ -219,6 +220,36 @@ describe("useFacetState", () => {
       expect(state.searchFacets).toBeDefined();
       expect(state.searchFacets!.tags).toEqual(new Set(["frontend"]));
       expect(state.searchFacets!.statuses).toEqual(new Set(["in_progress"]));
+    });
+  });
+
+  // ── Inbox facet ──────────────────────────────────────────────────────────
+
+  describe("Inbox facet", () => {
+    it("is off at first and adds the Inbox ids to searchFacets when on", () => {
+      renderHarness(root);
+      expect(state.inboxOnly).toBe(false);
+      act(() => { state.setInboxOnly(true); });
+      expect(state.hasFacets).toBe(true);
+      expect(state.searchFacets!.inboxIds).toEqual(new Set(["c-inbox"]));
+    });
+
+    it("persists to the URL hash and restores from it", () => {
+      renderHarness(root);
+      act(() => { state.setInboxOnly(true); });
+      expect(decodeURIComponent(window.location.hash)).toContain("inbox:1");
+      act(() => { render(null, root); });
+      renderHarness(root);
+      expect(state.inboxOnly).toBe(true);
+    });
+
+    it("clears with clearFacets", () => {
+      renderHarness(root);
+      act(() => { state.setInboxOnly(true); });
+      act(() => { state.clearFacets(); });
+      expect(state.inboxOnly).toBe(false);
+      expect(state.hasFacets).toBe(false);
+      expect(window.location.hash).not.toContain("inbox");
     });
   });
 });
