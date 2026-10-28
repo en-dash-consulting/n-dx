@@ -131,6 +131,7 @@ export interface SidecarContextOptions {
 
 /** What one finished turn spent, checkpoint included. */
 export interface SidecarTurnSpend {
+  /** The session as the turn started, so a lens changed mid-turn is not credited with its spend. */
   record: SidecarSessionRecord;
   status: SessionTurnStatus;
   tokens: TokenUsage;
@@ -378,6 +379,8 @@ export class SidecarSessionRegistry {
         append({ seq: record.cursor + 1, at: this.iso(), type: "event", event });
       };
       const before = record.tokens;
+      // The session as the turn ran: a lens changed mid-turn applies to the next one.
+      const ranAs = { ...record };
       const result = await live.session.sendTurn(vendorPrompt);
       record.turns += 1;
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
@@ -388,7 +391,7 @@ export class SidecarSessionRegistry {
         const ceiling = context.ceiling(record);
         if (ended > ceiling) await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append);
       }
-      this.onTurnSpend?.({ record: { ...record }, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
+      this.onTurnSpend?.({ record: ranAs, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
       return result;
     } finally {
       // An opening turn that failed or was stopped may never have reached

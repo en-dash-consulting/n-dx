@@ -29,10 +29,14 @@ items:
     lastModified: "2026-10-28T17:02:17.524Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4dd0f364-a55c-462d-88c6-f2437a05ed17":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T17:15:09.586Z"
-    activeIntervals: [{"start":"2026-10-28T17:15:09.586Z"}]
-    lastModified: "2026-10-28T17:15:10.164Z"
+    completedAt: "2026-10-28T17:21:25.284Z"
+    endedAt: "2026-10-28T17:21:25.284Z"
+    activeIntervals: [{"end":"2026-10-28T17:21:25.284Z","start":"2026-10-28T17:15:09.586Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "onTurnSpend hook on the Sidecar registry writes a sidecar ledger line per finished turn; sidecar package bucket in utilization; estimatedCost on session responses."
+    lastModified: "2026-10-28T17:21:25.284Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4f37d5e4-3cb0-4947-a9df-5c50fc322829":
     status: "completed"
