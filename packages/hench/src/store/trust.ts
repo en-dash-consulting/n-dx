@@ -83,11 +83,26 @@ export function applyRepoTrust(
     guard.allowedCommands.length !== config.guard.allowedCommands.length
     || guard.allowedGitSubcommands.length !== config.guard.allowedGitSubcommands.length
     || guard.blockedPaths.length !== config.guard.blockedPaths.length;
+  const testCommandsWithheld = evaluation.config.gateTestCommands.length > 0;
   return {
     evaluation,
-    config: { ...config, guard },
+    config: { ...withoutRepositoryTestCommands(config), guard },
     permissionMode: lowered,
-    clamped: guardChanged || lowered !== permissionMode,
+    clamped: guardChanged || lowered !== permissionMode || testCommandsWithheld,
+  };
+}
+
+/**
+ * The config with the test commands the repository set removed, so the gate
+ * falls back to auto-detection as it would on a checkout that set none.
+ */
+function withoutRepositoryTestCommands(config: HenchConfig): HenchConfig {
+  const { fullTestCommand: _full, testGate, ...rest } = config;
+  const { command: _command, rerunCommand: _rerun, ...gateRest } = testGate ?? {};
+  return {
+    ...rest,
+    ...(testGate ? { testGate: gateRest } : {}),
+    repositoryTestCommandsWithheld: true,
   };
 }
 
