@@ -639,6 +639,17 @@ describe("vendor CLI setup (state A)", () => {
     expect(setup()).toBeNull();
   });
 
+  it("shows the login command after a reload, from the outcome the session kept", async () => {
+    server.sessions = [{
+      session: session({ lastTurn: { status: "failed", error: "Not logged in · Please run /login", signedOut: true } }),
+      running: false,
+    }];
+    await mount();
+    await pressCmdJ();
+    expect(setup()?.getAttribute("data-reason")).toBe("signed-out");
+    expect(setup()?.querySelector("code")?.textContent).toBe("claude /login");
+  });
+
   it("does not take another failed turn for a sign-in problem", async () => {
     server.sessions = [{ session: session(), running: false }];
     await mount();

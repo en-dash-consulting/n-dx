@@ -48,6 +48,8 @@ export interface SidecarSession {
   createdAt: string;
   lastActivityAt: string;
   endedAt?: string;
+  /** How the last finished turn ended; absent before one ends and once the next starts. */
+  lastTurn?: SidecarTurnEnd;
 }
 
 export interface SidecarSessionEntry {
@@ -451,7 +453,8 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     if (tailRef.current.sessionId === (next?.id ?? null)) return;
     tailRef.current = newTail(next?.id ?? null);
     setFrames([]);
-    setLastTurn(null);
+    // The server keeps how the last turn ended, so a reload or second tab sees it.
+    setLastTurn(next?.lastTurn ?? null);
     void fetchFrames();
   }, [fetchFrames]);
 

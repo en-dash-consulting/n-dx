@@ -66,6 +66,7 @@ import {
   type SidecarFrame,
   type SidecarRegistryOptions,
   type SidecarSessionRecord,
+  type SidecarTurnOutcome,
   type SidecarSessionRegistry,
 } from "./sidecar/session-registry.js";
 import type { SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
@@ -312,24 +313,24 @@ function startTurn(
     broker.withdraw(id, "The turn ended");
   }).then(
     (result) => {
-      announce({
-        cursor: registry.get(id)?.cursor ?? 0,
-        running: false,
+      const outcome: SidecarTurnOutcome = {
         status: result.status,
         ...(result.error && { error: result.error }),
         ...(result.status === "failed" && result.error && isAuthError(result.error) && { signedOut: true as const }),
-      });
+      };
+      registry.recordTurnEnd(id, outcome);
+      announce({ cursor: registry.get(id)?.cursor ?? 0, running: false, ...outcome, status: result.status });
     },
     (err: unknown) => {
       const error = errorMessage(err);
       console.error(`[sidecar] turn in session ${id} failed: ${error}`);
-      announce({
-        cursor: registry.get(id)?.cursor ?? 0,
-        running: false,
+      const outcome: SidecarTurnOutcome = {
         status: "failed",
         error,
         ...(isAuthError(error) && { signedOut: true as const }),
-      });
+      };
+      registry.recordTurnEnd(id, outcome);
+      announce({ cursor: registry.get(id)?.cursor ?? 0, running: false, ...outcome, status: "failed" });
     },
   );
 }

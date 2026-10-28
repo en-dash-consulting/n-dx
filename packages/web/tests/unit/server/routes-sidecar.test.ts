@@ -319,6 +319,21 @@ describe("turns", () => {
     expect((await turnClosed(ok)).signedOut).toBeUndefined();
   });
 
+  it("keeps the signed-out outcome on the session until a later turn clears it", async () => {
+    const id = await createSession();
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "SIGNEDOUT" } });
+    await turnClosed(id);
+    const kept = (await (await api(`/${id}`)).json()).session.lastTurn;
+    expect(kept).toMatchObject({ status: "failed", signedOut: true });
+    expect(kept.error).toContain("Not logged in");
+    expect((await (await api("")).json()).sessions[0].session.lastTurn).toEqual(kept);
+
+    messages.length = 0;
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "hello" } });
+    await turnClosed(id);
+    expect((await (await api(`/${id}`)).json()).session.lastTurn).toEqual({ status: "completed" });
+  });
+
   it("refuses a second turn while one runs, and an empty prompt", async () => {
     const id = await createSession();
     expect((await api(`/${id}/turns`, { method: "POST", body: { prompt: " " } })).status).toBe(400);

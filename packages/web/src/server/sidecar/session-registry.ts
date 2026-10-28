@@ -87,6 +87,19 @@ export interface SidecarSessionRecord {
    * cold vendor session instead of resuming. Cleared once that turn completes.
    */
   refresh?: { contextTokens: number; ceiling: number };
+  /**
+   * How the last finished turn ended, kept so a reload or a second tab still
+   * shows a signed-out vendor CLI. Cleared when the next turn starts.
+   */
+  lastTurn?: SidecarTurnOutcome;
+}
+
+/** The outcome of a finished turn, as the drawer reads it. */
+export interface SidecarTurnOutcome {
+  status: string;
+  error?: string;
+  /** The failure was the vendor CLI's sign-in error. */
+  signedOut?: true;
 }
 
 /** One transcript line. */
@@ -279,6 +292,14 @@ export class SidecarSessionRegistry {
     return this.view(record);
   }
 
+  /** Keep how a turn ended on the session. No-op for an unknown session. */
+  recordTurnEnd(id: string, outcome: SidecarTurnOutcome): void {
+    const record = this.records.get(id);
+    if (!record) return;
+    record.lastTurn = outcome;
+    this.persist();
+  }
+
   list(filter: { scope?: SidecarScope; worktree?: string } = {}): SidecarSessionRecord[] {
     return [...this.records.values()]
       .filter((r) => (!filter.scope || r.scope === filter.scope)
@@ -341,6 +362,7 @@ export class SidecarSessionRegistry {
       onFrame?.(frame);
     };
     record.lastActivityAt = this.iso();
+    delete record.lastTurn;
     append({ seq: record.cursor + 1, at: record.lastActivityAt, type: "user", text: prompt });
     this.persist();
 
