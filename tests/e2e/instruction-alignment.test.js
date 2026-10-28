@@ -24,7 +24,8 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { existsSync, mkdtempSync, rmSync, readFileSync, readdirSync } from "fs";
+import { cpSync, existsSync, mkdtempSync, rmSync, readFileSync, readdirSync } from "fs";
+import { createRequire } from "node:module";
 import { join } from "path";
 import { tmpdir } from "os";
 import {
@@ -91,6 +92,22 @@ describe("shared guidance equivalence", () => {
     expect(agentsContent).toContain(archMarker);
   });
 
+  it("both files carry the same v2 write invariant and distinguish v1 storage", () => {
+    const invariant = (content) => content.match(/\*\*PRD invariant\.\*\*[^\n]*(?:\n(?!\n)[^\n]*)*/)?.[0];
+    expect(invariant(agentsContent)).toBeTruthy();
+    expect(invariant(agentsContent)).toBe(invariant(claudeContent));
+    expect(invariant(agentsContent)).toContain("product/");
+    expect(invariant(agentsContent)).toContain("changes/");
+    expect(invariant(agentsContent)).toContain("state.yaml");
+    expect(invariant(agentsContent)).toContain("v1");
+    for (const content of [agentsContent, claudeContent]) {
+      expect(content).toMatch(/capability criteria/i);
+      expect(content).toContain("acceptance criteria");
+      expect(content).toContain("docs/architecture/public-surface.md");
+      expect(content).not.toContain("Subtasks are encoded as sections");
+    }
+  });
+
   it("both files include the web zone layering", () => {
     const zoneMarker = "web-server";
     expect(claudeContent).toContain(zoneMarker);
@@ -122,6 +139,45 @@ describe("shared guidance equivalence", () => {
       expect(agentsContent, `AGENTS.md missing: ${file}`).toContain(file);
     }
   });
+});
+
+describe("public surface MCP inventory", () => {
+  const document = () => readFileSync(join(ROOT, "docs/architecture/public-surface.md"), "utf8");
+  const documented = (server, text) => {
+    // Documentation may be checked out with CRLF on Windows. Heading
+    // boundaries describe Markdown structure, independent of checkout EOL.
+    text = text.replace(/\r\n/g, "\n");
+    const section = text.split(`## ${server} MCP inventory\n`)[1]?.split("\n## ")[0] ?? "";
+    return [...section.matchAll(/^\| `([^`]+)` \|/gm)].map((match) => match[1]).sort();
+  };
+
+  for (const name of ["Rex", "Sourcevision"]) {
+    it.each(["LF", "CRLF"])(`lists exactly the ${name} tools returned over MCP (%s document)`, async (eol) => {
+      const require = createRequire(join(ROOT, "packages/rex/package.json"));
+      const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
+      const { InMemoryTransport } = require("@modelcontextprotocol/sdk/inMemory.js");
+      const dir = mkdtempSync(join(tmpdir(), "ndx-public-surface-"));
+      const client = new Client({ name: "public-contract-test", version: "1.0.0" });
+      let server;
+      try {
+        cpSync(join(ROOT, "packages/rex/tests/fixtures/v2-tree"), join(dir, ".rex"), { recursive: true });
+        server = name === "Rex"
+          ? await (await import("../../packages/rex/dist/public.js")).createRexMcpServer(dir)
+          : (await import("../../packages/sourcevision/dist/public.js")).createSourcevisionMcpServer(dir);
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await server.connect(serverTransport);
+        await client.connect(clientTransport);
+        const { tools } = await client.listTools();
+        expect(tools.length).toBeGreaterThan(0);
+        const text = document().replace(/\r?\n/g, eol === "CRLF" ? "\r\n" : "\n");
+        expect(documented(name, text)).toEqual(tools.map((tool) => tool.name).sort());
+      } finally {
+        await client.close();
+        await server?.close();
+        rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      }
+    });
+  }
 });
 
 // ── Vendor-specific content ──────────────────────────────────────────────────
@@ -235,7 +291,7 @@ describe("vendor-neutral sections reach every assistant", () => {
   it("AGENTS.md carries the PRD write invariant", () => {
     expect(agentsContent).toContain("**PRD invariant.**");
     expect(agentsContent).toContain(
-      "The sole writable PRD surface is the folder tree",
+      "On v2 the only writable PRD roots are `product/` and `changes/`",
     );
     expect(agentsContent).toContain("Avoid parallel writers.");
   });
