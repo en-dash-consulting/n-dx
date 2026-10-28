@@ -68,6 +68,17 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
   stdin.on("data", (chunk: Buffer) => { prompt += chunk.toString(); });
   stdin.on("end", () => {
     out({ type: "system", subtype: "init", session_id: id });
+    if (prompt.includes("SIGNEDOUT")) {
+      // Claude CLI 2.1.309 -p stream-json with an empty config dir: exit 1, and a
+      // result frame whose subtype says "success" although is_error is true.
+      out({
+        type: "assistant", session_id: id, error: "authentication_failed",
+        message: { id: `m-${spawns}`, model: "<synthetic>", content: [{ type: "text", text: "Not logged in · Please run /login" }] },
+      });
+      out({ type: "result", subtype: "success", is_error: true, terminal_reason: "api_error", session_id: id, result: "Not logged in · Please run /login" });
+      setImmediate(() => exit(1, null));
+      return;
+    }
     if (prompt.includes("HANG")) {
       out({ type: "assistant", session_id: id, message: { content: [{ type: "text", text: "working" }] } });
       return;
@@ -192,6 +203,18 @@ describe("turns", () => {
     const events = (await frames(id, 0)).frames.flatMap((f) => (f.type === "event" ? [f.event] : []));
     expect(events.find((e) => e.type === "assistant")?.text).toBe(REPLY);
     expect(events.find((e) => e.type === "completion")?.completionSummary).toBe(REPLY);
+  });
+
+  it("marks a turn that failed on the vendor's sign-in error, and no other failure", async () => {
+    const id = await createSession();
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "SIGNEDOUT" } });
+    const closing = await turnClosed(id);
+    expect(closing).toMatchObject({ running: false, status: "failed", signedOut: true });
+    expect(closing.error).toContain("Not logged in");
+
+    const ok = await createSession();
+    await api(`/${ok}/turns`, { method: "POST", body: { prompt: "hello" } });
+    expect((await turnClosed(ok)).signedOut).toBeUndefined();
   });
 
   it("refuses a second turn while one runs, and an empty prompt", async () => {

@@ -125,6 +125,38 @@ export interface SidecarCommandManifest {
 export interface SidecarTurnEnd {
   status: string;
   error?: string;
+  /** The failure was the vendor CLI's sign-in error (the server classifies it). */
+  signedOut?: true;
+}
+
+/** What the operator runs to get a vendor CLI working; the CLI is the binary's name. */
+const VENDOR_SETUP: Record<string, { cli: string; install: string; login: string }> = {
+  claude: { cli: "claude", install: "npm install -g @anthropic-ai/claude-code", login: "claude /login" },
+  codex: { cli: "codex", install: "npm install -g @openai/codex", login: "codex login" },
+};
+
+/** Drawer state A: the session's vendor CLI cannot run until the operator does `command`. */
+export interface SidecarSetupNeed {
+  reason: "missing-cli" | "signed-out";
+  cli: string;
+  command: string;
+}
+
+/**
+ * Whether `agent` cannot run yet: its CLI is not installed (`/api/llm/catalog`
+ * probed it), or the last turn failed on the vendor's sign-in error. A missing
+ * CLI wins, since it cannot be signed in.
+ */
+export function sidecarSetupNeed(
+  agent: SidecarAgent | null,
+  catalog: SidecarCatalog | null,
+  lastTurn: SidecarTurnEnd | null,
+): SidecarSetupNeed | null {
+  const setup = agent ? VENDOR_SETUP[agent.vendor] : undefined;
+  if (!agent || !setup) return null;
+  if (catalog?.[agent.vendor]?.cliFound === false) return { reason: "missing-cli", cli: setup.cli, command: setup.install };
+  if (lastTurn?.signedOut) return { reason: "signed-out", cli: setup.cli, command: setup.login };
+  return null;
 }
 
 const SESSIONS = "/api/sidecar/sessions";
@@ -143,7 +175,7 @@ export interface SidecarAgent {
 }
 
 /** What the picker offers: each resumable vendor's models, from GET /api/llm/catalog. */
-export type SidecarCatalog = Record<string, { models: string[]; defaultModel: string }>;
+export type SidecarCatalog = Record<string, { models: string[]; defaultModel: string; cliFound?: boolean }>;
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -204,12 +236,18 @@ async function postJson<T>(url: string, body: unknown): Promise<{ ok: true; data
 
 /** The picker's catalog from GET /api/llm/catalog; null when the route does not answer. */
 async function loadCatalog(): Promise<SidecarCatalog | null> {
-  const body = await getJson<Record<string, { models?: string[]; defaultModel?: string } | undefined>>("/api/llm/catalog");
+  const body = await getJson<Record<string, { models?: string[]; defaultModel?: string; cli?: { found?: boolean } } | undefined>>("/api/llm/catalog");
   if (!body) return null;
   const catalog: SidecarCatalog = {};
   for (const vendor of SIDECAR_VENDORS) {
     const entry = body[vendor];
-    if (entry?.models) catalog[vendor] = { models: entry.models, defaultModel: entry.defaultModel ?? entry.models[0] ?? "" };
+    if (entry?.models) {
+      catalog[vendor] = {
+        models: entry.models,
+        defaultModel: entry.defaultModel ?? entry.models[0] ?? "",
+        ...(typeof entry.cli?.found === "boolean" && { cliFound: entry.cli.found }),
+      };
+    }
   }
   return catalog;
 }
@@ -437,6 +475,7 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
             setLastTurn({
               status: typeof msg.status === "string" ? msg.status : "completed",
               ...(typeof msg.error === "string" && { error: msg.error }),
+              ...(msg.signedOut === true && { signedOut: true as const }),
             });
           }
         }

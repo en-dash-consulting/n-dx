@@ -177,6 +177,26 @@
 }
 .sidecar-error { color: var(--red, var(--text)); }
 
+/* Drawer state A: the vendor CLI is missing or signed out. */
+.sidecar-setup {
+  flex: none;
+  margin: 0 var(--space-3) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.sidecar-setup p { margin: 0; }
+.sidecar-setup-title { font-weight: 600; color: var(--text); }
+.sidecar-setup-hint { color: var(--text-muted); margin: 2px 0 var(--space-1); }
+.sidecar-setup-command {
+  display: block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 4px;
+  background: var(--bg-subtle, var(--border));
+  user-select: all;
+}
+
 /* ── Permission cards (UX4: waiting cards in the orange "needs you" colour) ── */
 
 .sidecar-cards {

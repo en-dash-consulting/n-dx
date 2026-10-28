@@ -41,7 +41,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { vendorSessionDriver } from "@n-dx/llm-client";
+import { isAuthError, vendorSessionDriver } from "@n-dx/llm-client";
 import type { SessionTurnStatus } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -90,6 +90,8 @@ export interface SidecarFramesMessage {
   status?: SessionTurnStatus;
   /** Why the turn failed; only on a failed closing announcement. */
   error?: string;
+  /** The failure is the vendor CLI's sign-in error, so the drawer can name the login command. */
+  signedOut?: true;
   timestamp: string;
 }
 
@@ -261,12 +263,19 @@ function startTurn(
         running: false,
         status: result.status,
         ...(result.error && { error: result.error }),
+        ...(result.status === "failed" && result.error && isAuthError(result.error) && { signedOut: true as const }),
       });
     },
     (err: unknown) => {
       const error = errorMessage(err);
       console.error(`[sidecar] turn in session ${id} failed: ${error}`);
-      announce({ cursor: registry.get(id)?.cursor ?? 0, running: false, status: "failed", error });
+      announce({
+        cursor: registry.get(id)?.cursor ?? 0,
+        running: false,
+        status: "failed",
+        error,
+        ...(isAuthError(error) && { signedOut: true as const }),
+      });
     },
   );
 }

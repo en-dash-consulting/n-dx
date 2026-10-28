@@ -19,7 +19,7 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import { SIDECAR_VENDORS } from "../hooks/index.js";
+import { SIDECAR_VENDORS, sidecarSetupNeed } from "../hooks/index.js";
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
 import { SidecarCards } from "./sidecar-cards.js";
 
@@ -235,7 +235,8 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     e.preventDefault();
   };
 
-  const busy = sidecar.running || sidecar.sending;
+  const setupNeed = sidecarSetupNeed(sidecar.agent, sidecar.catalog, sidecar.lastTurn);
+  const busy = sidecar.running || sidecar.sending || setupNeed !== null;
   const submit = async () => {
     if (busy || !draft.trim()) return;
     if (await sidecar.send(draft)) setDraft("");
@@ -296,7 +297,17 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       rows.length > 0 ? rows : h("li", { class: "sidecar-empty" }, "Ask about this project. Each turn runs your vendor CLI."),
     ),
     h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide }),
-    turnFailed
+    setupNeed
+      ? h("div", { class: "sidecar-setup", role: "alert", "data-reason": setupNeed.reason },
+          h("p", { class: "sidecar-setup-title" },
+            setupNeed.reason === "missing-cli"
+              ? `The ${setupNeed.cli} CLI is not installed`
+              : `The ${setupNeed.cli} CLI is not signed in`),
+          h("p", { class: "sidecar-setup-hint" },
+            setupNeed.reason === "missing-cli" ? "Install it, then reopen Sidecar:" : "Sign in, then send your message again:"),
+          h("code", { class: "sidecar-setup-command" }, setupNeed.command))
+      : null,
+    turnFailed && !setupNeed
       ? h("p", { class: "sidecar-turn-end", role: "status" },
           `Turn ${turnFailed.status}${turnFailed.error ? `: ${turnFailed.error}` : ""}`)
       : null,
@@ -312,7 +323,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       h("textarea", {
         class: "sidecar-input",
         "aria-label": "Message Sidecar",
-        placeholder: busy ? "A turn is running…" : "Message Sidecar",
+        placeholder: setupNeed ? `Set up the ${setupNeed.cli} CLI first` : busy ? "A turn is running…" : "Message Sidecar",
         value: draft,
         disabled: busy,
         rows: 3,

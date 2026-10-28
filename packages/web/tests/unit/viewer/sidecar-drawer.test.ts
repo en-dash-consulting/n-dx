@@ -46,6 +46,8 @@ interface Server {
   heldCardReads: Array<() => void> | null;
   /** GET /api/commands/manifest's command effects, by name. */
   manifest: Record<string, unknown>;
+  /** Whether each vendor's CLI is installed, per GET /api/llm/catalog; unset vendors report nothing. */
+  catalogCli: Record<string, boolean>;
   requests: Array<{ method: string; url: string; body?: unknown }>;
 }
 
@@ -75,6 +77,12 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
+/** The catalog's `cli` probe for `vendor`; absent unless the test set it. */
+function cliProbe(vendor: string): { cli?: { found: boolean; version: null; path: null } } {
+  const found = server.catalogCli[vendor];
+  return found === undefined ? {} : { cli: { found, version: null, path: null } };
+}
+
 function stubServer(): void {
   vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
     const url = String(input);
@@ -88,8 +96,8 @@ function stubServer(): void {
     if (url === "/api/llm/config") return json({ vendor: "codex" });
     if (url === "/api/llm/catalog") {
       return json({
-        claude: { models: ["claude-sonnet-5-5", "claude-haiku-4-5"], defaultModel: "claude-sonnet-5-5" },
-        codex: { models: ["gpt-5.5", "gpt-5.5-mini"], defaultModel: "gpt-5.5" },
+        claude: { models: ["claude-sonnet-5-5", "claude-haiku-4-5"], defaultModel: "claude-sonnet-5-5", ...cliProbe("claude") },
+        codex: { models: ["gpt-5.5", "gpt-5.5-mini"], defaultModel: "gpt-5.5", ...cliProbe("codex") },
         google: { models: ["gemini-x"], defaultModel: "gemini-x" },
         local: { models: [], defaultModel: "" },
       });
@@ -206,7 +214,7 @@ beforeEach(() => {
   localStorage.clear();
   server = {
     enabled: true, running: false, gate: null, sessions: [], frames: [], cards: [],
-    heldCardReads: null, manifest: {}, requests: [],
+    heldCardReads: null, manifest: {}, catalogCli: {}, requests: [],
   };
   FakeSocket.open.clear();
   stubServer();
@@ -513,6 +521,57 @@ describe("the agent picker", () => {
     // Picking what is already open creates nothing.
     await pick(".sidecar-model", "gpt-5.5");
     expect(created()).toHaveLength(2);
+  });
+});
+
+// ── Drawer state A: the vendor CLI is missing or signed out ───────────────
+
+describe("vendor CLI setup (state A)", () => {
+  const setup = () => root.querySelector(".sidecar-setup");
+  const input = () => root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+
+  it("names the CLI and its install command and disables the composer when the catalog says it is not installed", async () => {
+    server.catalogCli = { claude: false };
+    server.sessions = [{ session: session(), running: false }];
+    await mount();
+    await pressCmdJ();
+    expect(setup()?.getAttribute("data-reason")).toBe("missing-cli");
+    expect(setup()?.textContent).toContain("claude");
+    expect(setup()?.querySelector("code")?.textContent).toBe("npm install -g @anthropic-ai/claude-code");
+    expect(input().disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>(".sidecar-send")!.disabled).toBe(true);
+  });
+
+  it("says nothing about a vendor whose CLI is installed", async () => {
+    server.catalogCli = { claude: false, codex: true };
+    await mount();
+    await pressCmdJ();
+    expect(setup()).toBeNull();
+    expect(input().disabled).toBe(false);
+  });
+
+  it("names the vendor's login command when a turn fails with the recorded sign-in error", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    await mount();
+    await pressCmdJ();
+    expect(setup()).toBeNull();
+
+    await announce({
+      type: "sidecar:frames", sessionId: "s1", cursor: 2, running: false, status: "failed",
+      error: "Not logged in · Please run /login", signedOut: true, timestamp: "t",
+    });
+    expect(setup()?.getAttribute("data-reason")).toBe("signed-out");
+    expect(setup()?.querySelector("code")?.textContent).toBe("claude /login");
+    expect(input().disabled).toBe(true);
+  });
+
+  it("does not take another failed turn for a sign-in problem", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    await mount();
+    await pressCmdJ();
+    await announce({ type: "sidecar:frames", sessionId: "s1", cursor: 2, running: false, status: "failed", error: "rate limited", timestamp: "t" });
+    expect(setup()).toBeNull();
+    expect(root.querySelector(".sidecar-turn-end")?.textContent).toContain("rate limited");
   });
 });
 
