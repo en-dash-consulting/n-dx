@@ -26,14 +26,16 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmdirSync,
   rmSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { NDX_CONFIG_BLOCKED_PATHS } from "../prd/llm-gateway.js";
+import { NDX_CONFIG_BLOCKED_PATHS, NDX_CONTAINER_DIRNAME } from "../prd/llm-gateway.js";
 
 /**
  * The files under `.claude/` and `.codex/` that configure what the vendor CLI
@@ -60,8 +62,20 @@ export const PROTECTED_CONFIG_FILES: readonly string[] = [
   ...ASSISTANT_SETTINGS_FILES,
 ];
 
-/** How a protected file differed from the snapshot. */
-export type ProtectedConfigChange = "created" | "modified" | "deleted";
+/**
+ * The directories holding {@link PROTECTED_CONFIG_FILES}: `.claude`, `.codex`
+ * and `.ndx`. Each is checked before any file under it is restored, since a
+ * directory swapped for a link would carry the restore out of the project.
+ */
+export const PROTECTED_CONFIG_PARENTS: readonly string[] = [
+  ...new Set(PROTECTED_CONFIG_FILES.map((rel) => dirname(rel)).filter((parent) => parent !== ".")),
+];
+
+/**
+ * How a protected path differed from the snapshot. `replaced` is a protected
+ * directory swapped for something else, most often a link out of the project.
+ */
+export type ProtectedConfigChange = "created" | "modified" | "deleted" | "replaced";
 
 /** One protected file a run changed. Names the path, never the content. */
 export interface ProtectedConfigWrite {
@@ -107,6 +121,70 @@ function readEntry(abs: string): Entry {
   // Only a regular file is read; reading a FIFO an agent left here would hang the run.
   if (!stat.isFile()) return { kind: "special" };
   return { kind: "file", content: readFileSync(abs), mode: stat.mode & 0o777 };
+}
+
+/**
+ * What a protected directory is: its kind without following a link, and where
+ * it really is. Two readings that agree mean a write under it lands where it
+ * landed at the snapshot.
+ */
+type Parent =
+  | { kind: "absent" }
+  | { kind: "directory"; real: string }
+  /** `real` is null for a link that resolves nowhere: dangling, or a loop. */
+  | { kind: "symlink"; target: string; real: string | null }
+  | { kind: "other" };
+
+function readParent(abs: string): Parent {
+  let stat;
+  try {
+    stat = lstatSync(abs);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return { kind: "absent" };
+    throw err;
+  }
+  if (stat.isDirectory()) return { kind: "directory", real: realpathSync.native(abs) };
+  if (!stat.isSymbolicLink()) return { kind: "other" };
+  return { kind: "symlink", target: readlinkSync(abs), real: resolvedOrNull(abs) };
+}
+
+/** Where a link leads, or null when it leads nowhere (dangling, or a loop). */
+function resolvedOrNull(abs: string): string | null {
+  try {
+    return realpathSync.native(abs);
+  } catch {
+    // Nothing under such a link can be read or written; the files' own reads say so.
+    return null;
+  }
+}
+
+function sameParent(a: Parent, b: Parent): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "directory") return a.real === (b as typeof a).real;
+  if (a.kind === "symlink") {
+    const other = b as typeof a;
+    return a.target === other.target && a.real === other.real;
+  }
+  return true;
+}
+
+/** Remove whatever is at `abs` without following it: a link goes, never what it points at. */
+function removeInPlace(abs: string, now: Parent): void {
+  if (now.kind === "directory") rmSync(abs, { recursive: true, force: true });
+  else if (now.kind !== "absent") unlinkSync(abs);
+}
+
+/** The snapshot could not be taken; the run must not start without it. */
+export class ConfigBackstopError extends Error {
+  constructor(readonly path: string, cause: unknown) {
+    const code = (cause as NodeJS.ErrnoException | undefined)?.code;
+    super(
+      `Cannot snapshot n-dx's own config before the run: ${path} could not be read` +
+      `${code ? ` (${code})` : ""}. Fix or remove it, then run again.`,
+    );
+    this.name = "ConfigBackstopError";
+  }
 }
 
 function sameEntry(a: Entry, b: Entry): boolean {
@@ -184,6 +262,11 @@ function tryPutBack(abs: string, before: Entry, after: Entry): boolean {
  * {@link restore} is safe to call at every seam: it reads a handful of small
  * files and writes only what changed. Every write found is kept in
  * {@link writes} for the run to report when it finalizes.
+ *
+ * The backstop runs outside any sandbox, so it never writes or deletes through
+ * a protected directory that is no longer the one it snapshotted: a `.claude/`
+ * swapped for a link to the user's `~/.claude` is replaced by a directory
+ * before anything under it is restored, and the link's target is left alone.
  */
 export class ConfigBackstop {
   private readonly found = new Map<string, ProtectedConfigWrite>();
@@ -191,33 +274,27 @@ export class ConfigBackstop {
   private constructor(
     private readonly projectDir: string,
     private readonly snapshot: ReadonlyMap<string, Entry>,
-    /** The protected files' parent directories that did not exist at the snapshot. */
-    private readonly absentParents: ReadonlySet<string>,
+    /** Each of {@link PROTECTED_CONFIG_PARENTS} as it was at the snapshot. */
+    private readonly parents: ReadonlyMap<string, Parent>,
   ) {}
 
-  /** Snapshot {@link PROTECTED_CONFIG_FILES} under `projectDir` as they are now. */
-  static capture(projectDir: string): ConfigBackstop {
-    const snapshot = new Map<string, Entry>();
-    const absentParents = new Set<string>();
-    for (const rel of PROTECTED_CONFIG_FILES) {
-      snapshot.set(rel, readEntry(join(projectDir, rel)));
-      const parent = dirname(rel);
-      if (parent !== "." && readEntry(join(projectDir, parent)).kind === "absent") absentParents.add(parent);
-    }
-    return new ConfigBackstop(projectDir, snapshot, absentParents);
-  }
-
   /**
-   * Remove the directory a created file was written into when it did not
-   * exist at the snapshot and is empty now. An empty `.ndx/` left behind would
-   * switch every later command to the `.ndx/` layout. A directory still
-   * holding something is left: what else is in it is not config.
+   * Snapshot {@link PROTECTED_CONFIG_FILES} under `projectDir` as they are now.
+   *
+   * @throws {ConfigBackstopError} when a protected path cannot be read, such
+   *   as a directory that is a link loop or unreadable. Restoring would be
+   *   blind, so the run must not start.
    */
-  private removeCreatedParent(rel: string): void {
-    const parent = dirname(rel);
-    if (!this.absentParents.has(parent)) return;
-    const abs = join(this.projectDir, parent);
-    if (readEntry(abs).kind === "directory" && readdirSync(abs).length === 0) rmdirSync(abs);
+  static capture(projectDir: string): ConfigBackstop {
+    const parents = new Map<string, Parent>();
+    for (const rel of PROTECTED_CONFIG_PARENTS) {
+      parents.set(rel, readOrRefuse(rel, () => readParent(join(projectDir, rel))));
+    }
+    const snapshot = new Map<string, Entry>();
+    for (const rel of PROTECTED_CONFIG_FILES) {
+      snapshot.set(rel, readOrRefuse(rel, () => readEntry(join(projectDir, rel))));
+    }
+    return new ConfigBackstop(projectDir, snapshot, parents);
   }
 
   /**
@@ -229,7 +306,25 @@ export class ConfigBackstop {
    */
   restore(): ProtectedConfigWrite[] {
     const now: ProtectedConfigWrite[] = [];
+    const record = (write: ProtectedConfigWrite): void => {
+      now.push(write);
+      // The first change decides the kind; a later failure to put it back sticks.
+      const earlier = this.found.get(write.path);
+      this.found.set(write.path, earlier ? { ...earlier, restored: earlier.restored && write.restored } : write);
+    };
+
+    // Directories first: a file is restored only under the directory it was
+    // snapshotted in, never through whatever replaced it.
+    const settled = new Map<string, Parent>();
+    for (const rel of PROTECTED_CONFIG_PARENTS) {
+      const parent = this.settleParent(rel, record);
+      if (parent) settled.set(rel, parent);
+    }
+
     for (const [rel, before] of this.snapshot) {
+      const parent = dirname(rel);
+      // A directory that could not be settled is reported; nothing under it is touched.
+      if (parent !== "." && !settled.has(parent)) continue;
       const abs = join(this.projectDir, rel);
       let after: Entry | null;
       try {
@@ -239,23 +334,119 @@ export class ConfigBackstop {
         after = null;
       }
       if (after && sameEntry(before, after)) continue;
-      const write: ProtectedConfigWrite = after
+      // Checked again just before writing: the directory must still be the one
+      // settled above, or the write could leave the project.
+      const write: ProtectedConfigWrite = after && this.parentStill(parent, settled)
         ? { path: rel, change: changeOf(before, after), restored: tryPutBack(abs, before, after) }
-        : { path: rel, change: "modified", restored: false };
+        : { path: rel, change: after ? changeOf(before, after) : "modified", restored: false };
       if (write.restored && write.change === "created") {
         write.restored = attempt(() => this.removeCreatedParent(rel));
       }
-      now.push(write);
-      // The first change decides the kind; a later failure to put it back sticks.
-      const earlier = this.found.get(rel);
-      this.found.set(rel, earlier ? { ...earlier, restored: earlier.restored && write.restored } : write);
+      record(write);
     }
+
+    this.settleLayout(record);
     return now;
   }
 
   /** Every write found since the snapshot, one per path. */
   get writes(): ProtectedConfigWrite[] {
     return [...this.found.values()];
+  }
+
+  /**
+   * Bring a protected directory back to what it was at the snapshot when it
+   * was swapped for something else. Returns what it is now, for the files
+   * under it to be restored into, or null when they must not be: it could not
+   * be read or put back, which is reported instead.
+   */
+  private settleParent(rel: string, record: (w: ProtectedConfigWrite) => void): Parent | null {
+    const abs = join(this.projectDir, rel);
+    const before = this.parents.get(rel)!;
+    let now: Parent;
+    try {
+      now = readParent(abs);
+    } catch {
+      record({ path: rel, change: "modified", restored: false });
+      return null;
+    }
+    if (sameParent(before, now)) return now;
+    // Created or deleted as a real directory inside the project: the files
+    // under it are put back or removed the ordinary way.
+    const inProject = now.kind === "directory" && now.real === join(realpathSync.native(this.projectDir), rel);
+    if (before.kind === "absent" && inProject) return now;
+    if (before.kind === "directory" && (inProject || now.kind === "absent")) return now;
+
+    const restored = attempt(() => {
+      removeInPlace(abs, now);
+      if (before.kind === "directory") mkdirSync(abs);
+      else if (before.kind === "symlink") symlinkSync(before.target, abs);
+      else if (before.kind === "other") throw new Error("a special file cannot be recreated");
+    });
+    const after = restored ? readParent(abs) : now;
+    // A directory comes back holding only the config files: whatever else was
+    // in it went wherever the agent moved it.
+    const back = restored && (before.kind === "directory" ? after.kind === "directory" : sameParent(before, after));
+    record({ path: rel, change: before.kind === "absent" ? "created" : "replaced", restored: back });
+    return back ? after : null;
+  }
+
+  /** True when `parent` is still what {@link settleParent} left it as. */
+  private parentStill(parent: string, settled: ReadonlyMap<string, Parent>): boolean {
+    if (parent === ".") return true;
+    try {
+      return sameParent(settled.get(parent)!, readParent(join(this.projectDir, parent)));
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Keep the layout the run started in. Every n-dx command picks the `.ndx/`
+   * or the legacy layout by whether `.ndx/` exists, so a `.ndx/` created during
+   * the run would make the next command skip the user's `.n-dx.local.json` and
+   * read what the agent put there instead. It holds nothing of the user's, so
+   * it is removed whole. A `.ndx/` that went missing cannot be rebuilt (the PRD
+   * in it is gone), so that is reported as not restored.
+   */
+  private settleLayout(record: (w: ProtectedConfigWrite) => void): void {
+    const rel = NDX_CONTAINER_DIRNAME;
+    const before = this.parents.get(rel);
+    if (!before) return;
+    const abs = join(this.projectDir, rel);
+    let now: Parent;
+    try {
+      now = readParent(abs);
+    } catch {
+      record({ path: rel, change: "modified", restored: false });
+      return;
+    }
+    if (before.kind === "absent" && now.kind !== "absent") {
+      record({ path: rel, change: "created", restored: attempt(() => removeInPlace(abs, now)) });
+    } else if (before.kind === "directory" && now.kind === "absent") {
+      record({ path: rel, change: "deleted", restored: false });
+    }
+  }
+
+  /**
+   * Remove the directory a created file was written into when it did not
+   * exist at the snapshot and is empty now. A directory still holding
+   * something is left: what else is in it is not config.
+   */
+  private removeCreatedParent(rel: string): void {
+    const parent = dirname(rel);
+    if (this.parents.get(parent)?.kind !== "absent") return;
+    const abs = join(this.projectDir, parent);
+    if (readEntry(abs).kind === "directory" && readdirSync(abs).length === 0) rmdirSync(abs);
+  }
+}
+
+/** Read one protected path for the snapshot, refusing the run when it cannot be read. */
+function readOrRefuse<T>(rel: string, read: () => T): T {
+  try {
+    return read();
+  } catch (err) {
+    throw new ConfigBackstopError(rel, err);
   }
 }
 

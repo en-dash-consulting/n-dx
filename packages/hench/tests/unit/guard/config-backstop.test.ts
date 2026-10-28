@@ -8,6 +8,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -23,10 +24,11 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   ConfigBackstop,
+  ConfigBackstopError,
   PROTECTED_CONFIG_FILES,
   formatProtectedConfigFinding,
 } from "../../../src/guard/config-backstop.js";
-import { NDX_CONFIG_BLOCKED_PATHS } from "../../../src/prd/llm-gateway.js";
+import { NDX_CONFIG_BLOCKED_PATHS, detectLayoutMode } from "../../../src/prd/llm-gateway.js";
 
 const WIDENING = JSON.stringify({ hench: { guard: { env: { allow: ["*"] } } }, secret: "sk-agent-wrote-this" });
 
@@ -154,6 +156,145 @@ describe("ConfigBackstop", () => {
 
     expect(backstop.writes).toEqual([{ path: ".mcp.json", change: "created", restored: true }]);
     expect(backstop.restore()).toEqual([]);
+  });
+});
+
+/**
+ * The backstop runs unsandboxed, so a protected directory the agent swapped
+ * for a link must never carry a restore out of the project. `home` stands in
+ * for the user's home directory: its files must come through untouched.
+ */
+describe.skipIf(process.platform === "win32")("ConfigBackstop with a swapped protected directory", () => {
+  const USER_CLAUDE = "{\"hooks\":{\"user\":true}}";
+  const USER_CODEX = "model = \"user\"\n";
+  const USER_LOCAL = "{\"permissions\":{\"user\":true}}";
+  let home: string;
+
+  beforeEach(() => {
+    home = realpathSync.native(mkdtempSync(join(tmpdir(), "hench-config-backstop-home-")));
+    mkdirSync(join(home, ".claude"));
+    writeFileSync(join(home, ".claude", "settings.json"), USER_CLAUDE);
+    writeFileSync(join(home, ".claude", "settings.local.json"), USER_LOCAL);
+    mkdirSync(join(home, ".codex"));
+    writeFileSync(join(home, ".codex", "config.toml"), USER_CODEX);
+  });
+
+  afterEach(() => {
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  function expectHomeUntouched(): void {
+    expect(readFileSync(join(home, ".claude", "settings.json"), "utf-8")).toBe(USER_CLAUDE);
+    expect(readFileSync(join(home, ".claude", "settings.local.json"), "utf-8")).toBe(USER_LOCAL);
+    expect(readFileSync(join(home, ".codex", "config.toml"), "utf-8")).toBe(USER_CODEX);
+  }
+
+  it("never writes or deletes through .claude and .codex swapped for links out of the project", () => {
+    mkdirSync(join(dir, ".claude"));
+    writeFileSync(join(dir, ".claude", "settings.json"), "{\"repo\":true}");
+    mkdirSync(join(dir, ".codex"));
+    writeFileSync(join(dir, ".codex", "config.toml"), "model = \"repo\"\n");
+    const backstop = ConfigBackstop.capture(dir);
+    rmSync(join(dir, ".claude"), { recursive: true });
+    rmSync(join(dir, ".codex"), { recursive: true });
+    symlinkSync(join(home, ".claude"), join(dir, ".claude"));
+    symlinkSync(join(home, ".codex"), join(dir, ".codex"));
+
+    const writes = backstop.restore();
+
+    expectHomeUntouched();
+    expect(writes).toEqual(expect.arrayContaining([
+      { path: ".claude", change: "replaced", restored: true },
+      { path: ".codex", change: "replaced", restored: true },
+    ]));
+    expect(lstatSync(join(dir, ".claude")).isDirectory()).toBe(true);
+    expect(readFileSync(join(dir, ".claude", "settings.json"), "utf-8")).toBe("{\"repo\":true}");
+    expect(existsSync(join(dir, ".claude", "settings.local.json"))).toBe(false);
+    expect(readFileSync(join(dir, ".codex", "config.toml"), "utf-8")).toBe("model = \"repo\"\n");
+    expect(formatProtectedConfigFinding(backstop.writes)).toContain(".claude (replaced, restored)");
+  });
+
+  it("removes a link created where no protected directory was, leaving its target alone", () => {
+    const backstop = ConfigBackstop.capture(dir);
+    symlinkSync(join(home, ".claude"), join(dir, ".claude"));
+
+    expect(backstop.restore()).toEqual([{ path: ".claude", change: "created", restored: true }]);
+    expectHomeUntouched();
+    expect(existsSync(join(dir, ".claude"))).toBe(false);
+  });
+
+  it("replaces a protected directory swapped for a link loop", () => {
+    mkdirSync(join(dir, ".claude"));
+    writeFileSync(join(dir, ".claude", "settings.json"), "{}");
+    const backstop = ConfigBackstop.capture(dir);
+    rmSync(join(dir, ".claude"), { recursive: true });
+    symlinkSync(".claude", join(dir, ".claude"));
+
+    expect(backstop.restore()).toEqual(expect.arrayContaining([{ path: ".claude", change: "replaced", restored: true }]));
+    expect(readFileSync(join(dir, ".claude", "settings.json"), "utf-8")).toBe("{}");
+  });
+
+  it("removes a .ndx link out of the project, so the layout stays legacy", () => {
+    mkdirSync(join(home, "planted"));
+    writeFileSync(join(home, "planted", "config.local.json"), USER_LOCAL);
+    writeFileSync(join(dir, ".n-dx.local.json"), "{}");
+    const backstop = ConfigBackstop.capture(dir);
+    symlinkSync(join(home, "planted"), join(dir, ".ndx"));
+
+    expect(backstop.restore()).toEqual([{ path: ".ndx", change: "created", restored: true }]);
+    expect(existsSync(join(dir, ".ndx"))).toBe(false);
+    expect(readFileSync(join(home, "planted", "config.local.json"), "utf-8")).toBe(USER_LOCAL);
+    expect(detectLayoutMode(dir)).toBe("legacy");
+  });
+});
+
+describe("ConfigBackstop and the layout", () => {
+  it("removes a .ndx/ created on a legacy project with no config file in it", () => {
+    writeFileSync(join(dir, ".n-dx.local.json"), "{}");
+    const backstop = ConfigBackstop.capture(dir);
+    mkdirSync(join(dir, ".ndx", "hench"), { recursive: true });
+    writeFileSync(join(dir, ".ndx", "hench", "config.json"), WIDENING);
+    expect(detectLayoutMode(dir)).toBe("ndx");
+
+    expect(backstop.restore()).toEqual([{ path: ".ndx", change: "created", restored: true }]);
+    expect(existsSync(join(dir, ".ndx"))).toBe(false);
+    expect(detectLayoutMode(dir)).toBe("legacy");
+  });
+
+  it("reports a .ndx/ that vanished from an .ndx-layout project as not restored", () => {
+    mkdirSync(join(dir, ".ndx", "rex"), { recursive: true });
+    const backstop = ConfigBackstop.capture(dir);
+    rmSync(join(dir, ".ndx"), { recursive: true });
+
+    expect(backstop.restore()).toEqual([{ path: ".ndx", change: "deleted", restored: false }]);
+  });
+
+  it("leaves an .ndx-layout project's own .ndx/ alone", () => {
+    mkdirSync(join(dir, ".ndx", "rex"), { recursive: true });
+    const backstop = ConfigBackstop.capture(dir);
+    mkdirSync(join(dir, ".ndx", "hench"));
+
+    expect(backstop.restore()).toEqual([]);
+    expect(existsSync(join(dir, ".ndx", "hench"))).toBe(true);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("ConfigBackstop.capture on a protected path it cannot read", () => {
+  it("refuses with a ConfigBackstopError naming a protected directory that is a link loop", () => {
+    symlinkSync(".claude", join(dir, ".claude"));
+
+    expect(() => ConfigBackstop.capture(dir)).toThrow(ConfigBackstopError);
+    expect(() => ConfigBackstop.capture(dir)).toThrow(/\.claude\/settings\.json could not be read \(ELOOP\)/);
+  });
+
+  it.skipIf(process.getuid?.() === 0)("refuses with a ConfigBackstopError naming an unreadable protected directory", () => {
+    mkdirSync(join(dir, ".codex"));
+    chmodSync(join(dir, ".codex"), 0o000);
+    try {
+      expect(() => ConfigBackstop.capture(dir)).toThrow(/\.codex\/config\.toml could not be read \(EACCES\)/);
+    } finally {
+      chmodSync(join(dir, ".codex"), 0o755);
+    }
   });
 });
 

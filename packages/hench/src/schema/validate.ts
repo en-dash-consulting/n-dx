@@ -431,7 +431,7 @@ export const RunRecordSchema = z.object({
   }).optional(),
   protectedConfigWrites: z.array(z.object({
     path: z.string(),
-    change: z.enum(["created", "modified", "deleted"]),
+    change: z.enum(["created", "modified", "deleted", "replaced"]),
     restored: z.boolean(),
   })).optional(),
   // Where the run sits in a --iterations/--loop/--epic-by-epic invocation.

@@ -1561,7 +1561,8 @@ export interface RunTrustRecord {
 export interface RunProtectedConfigWrite {
   /** Project-relative path. */
   path: string;
-  change: "created" | "modified" | "deleted";
+  /** `replaced`: a protected directory swapped for something else, such as a link out of the project. */
+  change: "created" | "modified" | "deleted" | "replaced";
   /** False when the pre-run file could not be put back. */
   restored: boolean;
 }
