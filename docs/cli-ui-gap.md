@@ -65,7 +65,7 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx web` | `{webPid} and {webPort}`<br>`~/.ndx/hub.json`<br>`~/.ndx/auth.token` | none | localhost | long-running server; hub mode returns once registered |
 | `ndx ci` | `{sourcevision}/` | none | none | minutes |
 | `ndx which` | nothing (read-only) | none | none | seconds |
-| `ndx config` | `{config}, {localConfig}, {rex}/config.json, {hench}/config.json` (only when setting a value)<br>`~/.ndx/config.json` (only when setting an extensions.<name> value with --user) | auth probe ~0-1 | llm-provider (only when setting llm.vendor, or with --test-connection) | seconds |
+| `ndx config` | `{config}, {localConfig}, {rex}/config.json, {hench}/config.json` (only when setting a value)<br>`~/.ndx/config.json` (only when setting an extensions.&lt;name&gt; value with --user) | auth probe ~0-1 | llm-provider (only when setting llm.vendor, or with --test-connection) | seconds |
 | `ndx auth` | nothing (read-only) | auth probe ~1 | llm-provider | seconds |
 | `ndx export` | `ndx-export/`<br>`.gitignore`<br>the n-dx-dashboard branch (only with --deploy=github) | none | remote (only with --deploy=github) | seconds to a minute |
 | `ndx prd` | the --out file (only on export)<br>`{prd}` (only on import)<br>`{rex}/.backups/` (only on import, without --no-snapshot) | none | none | seconds |
