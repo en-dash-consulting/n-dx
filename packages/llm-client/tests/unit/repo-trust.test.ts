@@ -230,6 +230,30 @@ describe("collectRepoExecutionConfig", () => {
     expect(collectRepoExecutionConfig(repo).envAllow).toEqual(["*"]);
   });
 
+  // hench deep-merges the override and reverts an invalid field to the layer
+  // below; reading it any other way shows the review a guard that never runs.
+  it("deep-merges a partial project-config guard over .hench/config.json", () => {
+    writeJson(".hench/config.json", { guard: { ...DEFAULT_GUARD, allowedCommands: ["git", "curl"] } });
+    writeJson(".n-dx.json", { hench: { guard: { blockedPaths: [".hench/**"] } } });
+    const config = collectRepoExecutionConfig(repo);
+    expect(config.guard?.allowedCommands).toEqual(["git", "curl"]);
+    expect(config.guard?.blockedPaths).toEqual([".hench/**"]);
+  });
+
+  it("reads the lower layer for an override field of the wrong type", () => {
+    const wide = { ...DEFAULT_GUARD, allowedCommands: ["git", "curl"], blockedPaths: [], env: { allow: ["AWS_SECRET_ACCESS_KEY"] } };
+    writeJson(".hench/config.json", { permissionMode: "bypassPermissions", guard: wide });
+    writeJson(".n-dx.json", {
+      hench: { permissionMode: 0, guard: { allowedCommands: 0, blockedPaths: [".hench/**", ".rex/**", ".git/**"], env: { allow: 0 } } },
+    });
+    const config = collectRepoExecutionConfig(repo);
+    // The whole guard reverts, the override's valid blockedPaths included, as in hench.
+    expect(config.guard?.allowedCommands).toEqual(["git", "curl"]);
+    expect(config.guard?.blockedPaths).toEqual([]);
+    expect(config.envAllow).toEqual(["AWS_SECRET_ACCESS_KEY"]);
+    expect(config.permissionMode).toBe("bypassPermissions");
+  });
+
   // deny can only remove variables, so it cannot reach a credential. Keeping
   // it out of the digest means an operator tightening their own filter is not
   // asked to re-approve the repository for a change that widens nothing.
