@@ -112,15 +112,18 @@ export const ROOT_DRIFT_TEST_FILES = [
  * The root tests that read a documentation page and fail when it is stale or
  * incomplete: every command documented in the README and the guide, every guide
  * page linking the skills reference, every command a user doc names existing,
- * the generated section of the CLI/UI gap page. A docs-only change selects this label and nothing else, so it stays
- * cheap; {@link VALIDATED_DOC_PAGES} says which pages select it. A unit test
- * fails if a listed file is missing.
+ * the generated section of the CLI/UI gap page, the CLI error codes the smoke
+ * parity contract documents. A docs-only change selects this label and nothing
+ * else, so it stays cheap; {@link VALIDATED_DOC_PAGES} says which pages select
+ * it. A unit test fails if a listed file is missing, and another fails when a
+ * root test reads a docs page that no group maps to a subset running it.
  */
 export const ROOT_DOCS_TEST_FILES = [
   "tests/e2e/command-docs-parity.test.js",
   "tests/e2e/docs-skill-refs.test.js",
   "tests/e2e/docs-command-refs.test.js",
   "tests/e2e/cli-ui-gap-drift.test.js",
+  "tests/unit/cli-smoke-parity.test.js",
 ];
 
 /**
@@ -224,9 +227,21 @@ export const VALIDATED_ARTIFACTS = {
  * - `docs-command-refs` reads `docs/index.md` and every page under
  *   `docs/guide/` and `docs/packages/`, nested ones and `skills.md` included.
  * - `cli-ui-gap-drift` reads `docs/cli-ui-gap.md`.
+ * - `cli-smoke-parity` reads the error-code table in
+ *   `docs/contributing/cli-smoke-parity.md`.
  * - `assistant-parity-smoke` is a root-drift file that also reads two pages.
+ *
+ * Hand-written, but checked: tests/unit/select-suites.test.js scans every root
+ * test for the docs pages and directories it reads from the repository root
+ * and fails on one no group maps to a subset running that test, and fails a
+ * group whose tests never mention a path it matches.
  */
 export const VALIDATED_DOC_PAGES = [
+  {
+    label: ROOT_DRIFT_LABEL,
+    tests: ["tests/e2e/instruction-alignment.test.js"],
+    match: (file) => file === "docs/architecture/public-surface.md",
+  },
   {
     label: ROOT_DOCS_LABEL,
     tests: ["tests/e2e/command-docs-parity.test.js"],
@@ -246,6 +261,11 @@ export const VALIDATED_DOC_PAGES = [
     label: ROOT_DOCS_LABEL,
     tests: ["tests/e2e/cli-ui-gap-drift.test.js"],
     match: (file) => file === "docs/cli-ui-gap.md",
+  },
+  {
+    label: ROOT_DOCS_LABEL,
+    tests: ["tests/unit/cli-smoke-parity.test.js"],
+    match: (file) => file === "docs/contributing/cli-smoke-parity.md",
   },
   {
     label: ROOT_DRIFT_LABEL,
