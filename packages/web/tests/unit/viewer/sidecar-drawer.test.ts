@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { TopNav } from "../../../src/viewer/components/top-nav.js";
-import { SidecarDock, SidecarFrameRow, clampSidecarWidth } from "../../../src/viewer/components/sidecar-drawer.js";
+import { SidecarDock, SidecarFrameRow, clampSidecarWidth, pairToolResults, summarizeToolInput } from "../../../src/viewer/components/sidecar-drawer.js";
 import {
   isSidecarShortcut,
   mergeFrames,
@@ -71,9 +71,17 @@ function stubServer(): void {
     }
     if (url === "/api/project") return json({ name: "n-dx", description: null, version: null, git: null, nameSource: "directory", cliName: "n-dx" });
     if (url === "/api/llm/config") return json({ vendor: "codex" });
+    if (url === "/api/llm/catalog") {
+      return json({
+        claude: { models: ["claude-sonnet-5-5", "claude-haiku-4-5"], defaultModel: "claude-sonnet-5-5" },
+        codex: { models: ["gpt-5.5", "gpt-5.5-mini"], defaultModel: "gpt-5.5" },
+        google: { models: ["gemini-x"], defaultModel: "gemini-x" },
+        local: { models: [], defaultModel: "" },
+      });
+    }
     if (url === "/api/sidecar/sessions" && method === "GET") return json({ sessions: server.sessions });
     if (url === "/api/sidecar/sessions" && method === "POST") {
-      const created = { session: session({ id: "new", vendor: body.vendor }), running: false };
+      const created = { session: session({ id: "new", vendor: body.vendor, model: body.model }), running: false };
       server.sessions.push(created);
       return json(created, 201);
     }
@@ -409,8 +417,116 @@ describe("the composer", () => {
     await pressCmdJ();
     await type("Hello");
     await submit();
-    expect(server.requests.find((r) => r.method === "POST" && r.url === "/api/sidecar/sessions")?.body).toEqual({ vendor: "codex" });
+    expect(server.requests.find((r) => r.method === "POST" && r.url === "/api/sidecar/sessions")?.body)
+      .toEqual({ vendor: "codex", model: "gpt-5.5" });
     expect(server.requests.some((r) => r.url === "/api/sidecar/sessions/new/turns")).toBe(true);
+  });
+});
+
+// ── Agent picker ───────────────────────────────────────────────────────────
+
+describe("the agent picker", () => {
+  const created = () => server.requests.filter((r) => r.method === "POST" && r.url === "/api/sidecar/sessions");
+
+  async function pick(selector: string, value: string): Promise<void> {
+    const el = root.querySelector<HTMLSelectElement>(selector)!;
+    await act(async () => {
+      el.value = value;
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await settle();
+  }
+
+  it("lists the resumable vendors and the chosen vendor's models from /api/llm/catalog", async () => {
+    await mount();
+    await pressCmdJ();
+    expect(server.requests.some((r) => r.url === "/api/llm/catalog")).toBe(true);
+    const options = (sel: string) => [...root.querySelectorAll(`${sel} option`)].map((o) => o.textContent);
+    expect(options(".sidecar-vendor")).toEqual(["claude", "codex"]);
+    expect(options(".sidecar-model")).toEqual(["gpt-5.5", "gpt-5.5-mini"]);
+  });
+
+  it("creates the first session with the chosen vendor and model", async () => {
+    await mount();
+    await pressCmdJ();
+    await pick(".sidecar-vendor", "claude");
+    await pick(".sidecar-model", "claude-haiku-4-5");
+    expect(created()).toHaveLength(0);
+    root.querySelector<HTMLTextAreaElement>(".sidecar-input")!.value = "Hi";
+    await act(async () => { root.querySelector<HTMLTextAreaElement>(".sidecar-input")!.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { root.querySelector("form.sidecar-composer")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+    await settle();
+    expect(created().map((r) => r.body)).toEqual([{ vendor: "claude", model: "claude-haiku-4-5" }]);
+  });
+
+  it("starts a new session when the vendor or model changes, leaving the old one resumable", async () => {
+    server.sessions = [{ session: session({ model: "claude-sonnet-5-5" }), running: false }];
+    await mount();
+    await pressCmdJ();
+    expect(root.querySelector<HTMLSelectElement>(".sidecar-vendor")!.value).toBe("claude");
+
+    await pick(".sidecar-model", "claude-haiku-4-5");
+    expect(created().map((r) => r.body)).toEqual([{ vendor: "claude", model: "claude-haiku-4-5" }]);
+
+    await pick(".sidecar-vendor", "codex");
+    expect(created().map((r) => r.body)).toEqual([
+      { vendor: "claude", model: "claude-haiku-4-5" },
+      { vendor: "codex", model: "gpt-5.5" },
+    ]);
+    // Nothing ended the first session; it is still on the server, not ended.
+    expect(server.requests.some((r) => r.url.endsWith("/end"))).toBe(false);
+    expect(server.sessions.find((e) => e.session.id === "s1")?.session.endedAt).toBeUndefined();
+    // Picking what is already open creates nothing.
+    await pick(".sidecar-model", "gpt-5.5");
+    expect(created()).toHaveLength(2);
+  });
+});
+
+// ── Tool calls ─────────────────────────────────────────────────────────────
+
+describe("tool calls", () => {
+  const call = (seq: number, tool: string, input: Record<string, unknown>): SidecarFrame => ({
+    seq, at: "t", type: "event", event: { type: "tool_use", toolCall: { tool, input } },
+  });
+  const result = (seq: number, tool: string, output: string): SidecarFrame => ({
+    seq, at: "t", type: "event", event: { type: "tool_result", toolResult: { tool, output, durationMs: 5 } },
+  });
+
+  it("summarizes a call to one line and pairs results with their calls in order", () => {
+    expect(summarizeToolInput({ command: "ls\n  -la", cwd: "/" })).toBe("ls -la");
+    expect(summarizeToolInput({ a: 1 })).toBe('{"a":1}');
+    expect(summarizeToolInput({ command: "x".repeat(200) })).toHaveLength(80);
+    const paired = pairToolResults([
+      call(1, "Read", { file_path: "a" }), call(2, "Read", { file_path: "b" }),
+      result(3, "Read", "A"), result(4, "Read", "B"),
+    ]);
+    expect([...paired].map(([seq, r]) => [seq, r.output])).toEqual([[1, "A"], [2, "B"]]);
+  });
+
+  it("draws collapsed with name and summary, expands to the raw input and the matching result", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    server.frames = [
+      call(1, "Bash", { command: "pnpm test" }),
+      call(2, "Read", { file_path: "src/a.ts" }),
+      result(3, "Read", "file body"),
+      result(4, "Bash", "all green"),
+    ];
+    await mount();
+    await pressCmdJ();
+
+    const tools = [...root.querySelectorAll<HTMLElement>(".sidecar-tool")];
+    expect(tools.map((t) => t.querySelector(".sidecar-tool-name")!.textContent)).toEqual(["Bash", "Read"]);
+    expect(tools[0].querySelector(".sidecar-tool-summary")!.textContent).toBe("pnpm test");
+    expect(tools[0].querySelector(".sidecar-tool-body")).toBeNull();
+
+    await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
+    expect(tools[0].querySelector(".sidecar-tool-toggle")!.getAttribute("aria-expanded")).toBe("true");
+    expect(JSON.parse(tools[0].querySelector(".sidecar-tool-input")!.textContent!)).toEqual({ command: "pnpm test" });
+    expect(tools[0].querySelector(".sidecar-tool-output")!.textContent).toBe("all green");
+    expect(tools[1].querySelector(".sidecar-tool-body")).toBeNull();
+
+    await act(async () => { tools[0].querySelector<HTMLButtonElement>(".sidecar-tool-toggle")!.click(); });
+    expect(tools[0].querySelector(".sidecar-tool-body")).toBeNull();
   });
 });
 

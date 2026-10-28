@@ -18,7 +18,8 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import type { SidecarFrame, SidecarState } from "../hooks/index.js";
+import { SIDECAR_VENDORS } from "../hooks/index.js";
+import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
 
 export const SIDECAR_WIDTH_DEFAULT = 440;
 export const SIDECAR_WIDTH_MIN = 360;
@@ -77,8 +78,76 @@ function notesLabel(notes: number): string {
   return notes === 1 ? "1 note carried over" : `${notes} notes carried over`;
 }
 
+type ToolResult = NonNullable<SidecarRuntimeEvent["toolResult"]>;
+
+const SUMMARY_KEYS = ["command", "file_path", "path", "pattern", "query", "url", "description", "prompt"];
+const SUMMARY_MAX = 80;
+
+/** One line naming what a tool call does: its most telling string argument, else its JSON. */
+export function summarizeToolInput(input: Record<string, unknown>): string {
+  const key = SUMMARY_KEYS.find((k) => typeof input[k] === "string" && (input[k] as string).trim() !== "");
+  const raw = key ? (input[key] as string) : Object.keys(input).length > 0 ? JSON.stringify(input) : "";
+  const line = raw.replace(/\s+/g, " ").trim();
+  return line.length > SUMMARY_MAX ? `${line.slice(0, SUMMARY_MAX - 1)}…` : line;
+}
+
+/**
+ * The result of each tool call, by the call's `seq`. A result carries no call
+ * id, so it belongs to the earliest still-unanswered call to the same tool
+ * that precedes it — vendor CLIs answer calls in order.
+ */
+export function pairToolResults(frames: readonly SidecarFrame[]): Map<number, ToolResult> {
+  const open = new Map<string, number[]>();
+  const paired = new Map<number, ToolResult>();
+  for (const frame of frames) {
+    if (frame.type !== "event" || frame.checkpoint) continue;
+    const { event } = frame;
+    if (event.type === "tool_use" && event.toolCall) {
+      const queue = open.get(event.toolCall.tool) ?? [];
+      queue.push(frame.seq);
+      open.set(event.toolCall.tool, queue);
+    } else if (event.type === "tool_result" && event.toolResult) {
+      const callSeq = open.get(event.toolResult.tool)?.shift();
+      if (callSeq !== undefined) paired.set(callSeq, event.toolResult);
+    }
+  }
+  return paired;
+}
+
+/** A tool call: collapsed to its name and a one-line summary, expanded to the raw input and result. */
+function SidecarToolRow({ seq, call, result }: {
+  seq: number;
+  call: NonNullable<SidecarRuntimeEvent["toolCall"]>;
+  result: ToolResult | undefined;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const bodyId = `sidecar-tool-${seq}`;
+  return h("li", { class: "sidecar-tool", "data-seq": seq },
+    h("button", {
+      type: "button",
+      class: "sidecar-tool-toggle",
+      "aria-expanded": expanded ? "true" : "false",
+      "aria-controls": bodyId,
+      onClick: () => setExpanded((v) => !v),
+    },
+      h("span", { class: "sidecar-tool-name" }, call.tool),
+      h("span", { class: "sidecar-tool-summary" }, summarizeToolInput(call.input)),
+    ),
+    expanded
+      ? h("div", { class: "sidecar-tool-body", id: bodyId },
+          h("div", { class: "sidecar-tool-label" }, "Input"),
+          h("pre", { class: "sidecar-tool-input" }, JSON.stringify(call.input, null, 2)),
+          h("div", { class: "sidecar-tool-label" }, "Result"),
+          result
+            ? h("pre", { class: "sidecar-tool-output" }, result.output)
+            : h("p", { class: "sidecar-tool-pending" }, "No result yet"),
+        )
+      : null,
+  );
+}
+
 /** One frame as a transcript row; null for frames the conversation does not show. */
-export function SidecarFrameRow({ frame }: { frame: SidecarFrame }) {
+export function SidecarFrameRow({ frame, result }: { frame: SidecarFrame; result?: ToolResult }) {
   switch (frame.type) {
     case "user":
       return h("li", { class: "sidecar-msg sidecar-msg-user", "data-seq": frame.seq }, frame.text);
@@ -94,9 +163,7 @@ export function SidecarFrameRow({ frame }: { frame: SidecarFrame }) {
         return h("li", { class: "sidecar-msg sidecar-msg-assistant", "data-seq": frame.seq }, event.text);
       }
       if (event.type === "tool_use" && event.toolCall) {
-        return h("li", { class: "sidecar-tool", "data-seq": frame.seq },
-          h("span", { class: "sidecar-tool-name" }, event.toolCall.tool),
-        );
+        return h(SidecarToolRow, { seq: frame.seq, call: event.toolCall, result });
       }
       if (event.type === "failure") {
         return h("li", { class: "sidecar-msg sidecar-msg-failure", role: "alert", "data-seq": frame.seq },
@@ -169,7 +236,13 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     if (await sidecar.send(draft)) setDraft("");
   };
 
-  const rows: ComponentChildren[] = sidecar.frames.map((frame) => h(SidecarFrameRow, { key: frame.seq, frame }));
+  const results = pairToolResults(sidecar.frames);
+  const rows: ComponentChildren[] = sidecar.frames.map((frame) =>
+    h(SidecarFrameRow, { key: frame.seq, frame, result: results.get(frame.seq) }));
+  const { agent, catalog } = sidecar;
+  const models = agent ? catalog?.[agent.vendor]?.models ?? [] : [];
+  // A session's own model may not be in the live list; keep it selectable.
+  const modelOptions = agent?.model && !models.includes(agent.model) ? [agent.model, ...models] : models;
   const paused = sidecar.running && sidecar.sessionWaiting > 0;
   const turnFailed = sidecar.lastTurn && sidecar.lastTurn.status !== "completed" ? sidecar.lastTurn : null;
 
@@ -196,6 +269,24 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       sidecar.session ? h("span", { class: "sidecar-session-name" }, sidecar.session.name) : null,
       h("button", { type: "button", class: "sidecar-close", onClick: onClose, "aria-label": "Close Sidecar", title: "Close (⌘J)" }, "×"),
     ),
+    agent
+      ? h("div", { class: "sidecar-agent" },
+          h("select", {
+            class: "sidecar-vendor",
+            "aria-label": "Vendor",
+            value: agent.vendor,
+            onChange: (e: Event) => { void sidecar.chooseAgent((e.target as HTMLSelectElement).value); },
+          }, SIDECAR_VENDORS.filter((v) => catalog?.[v] || v === agent.vendor).map((v) =>
+            h("option", { key: v, value: v, selected: v === agent.vendor }, v))),
+          h("select", {
+            class: "sidecar-model",
+            "aria-label": "Model",
+            value: agent.model,
+            disabled: modelOptions.length === 0,
+            onChange: (e: Event) => { void sidecar.chooseAgent(agent.vendor, (e.target as HTMLSelectElement).value); },
+          }, modelOptions.map((m) => h("option", { key: m, value: m, selected: m === agent.model }, m))),
+        )
+      : null,
     paused
       ? h("div", { class: "sidecar-paused", role: "status" },
           `Paused · waiting on ${sidecar.sessionWaiting === 1 ? "1 decision" : `${sidecar.sessionWaiting} decisions`}`)

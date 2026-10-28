@@ -75,9 +75,22 @@ export interface SidecarTurnEnd {
 }
 
 const SESSIONS = "/api/sidecar/sessions";
-/** Vendors with a resumable CLI session; the agent picker comes later. */
-const SESSION_VENDORS = new Set(["claude", "codex"]);
+/**
+ * Vendors with a resumable CLI session, in picker order. A resume id belongs
+ * to one vendor CLI, so these are the only vendors Sidecar can offer.
+ */
+export const SIDECAR_VENDORS = ["claude", "codex"] as const;
+const SESSION_VENDORS = new Set<string>(SIDECAR_VENDORS);
 const DEFAULT_VENDOR = "claude";
+
+/** The vendor and model a session runs on, or will run on once created. */
+export interface SidecarAgent {
+  vendor: string;
+  model: string;
+}
+
+/** What the picker offers: each resumable vendor's models, from GET /api/llm/catalog. */
+export type SidecarCatalog = Record<string, { models: string[]; defaultModel: string }>;
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -129,6 +142,18 @@ async function postJson<T>(url: string, body: unknown): Promise<{ ok: true; data
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/** The picker's catalog from GET /api/llm/catalog; null when the route does not answer. */
+async function loadCatalog(): Promise<SidecarCatalog | null> {
+  const body = await getJson<Record<string, { models?: string[]; defaultModel?: string } | undefined>>("/api/llm/catalog");
+  if (!body) return null;
+  const catalog: SidecarCatalog = {};
+  for (const vendor of SIDECAR_VENDORS) {
+    const entry = body[vendor];
+    if (entry?.models) catalog[vendor] = { models: entry.models, defaultModel: entry.defaultModel ?? entry.models[0] ?? "" };
+  }
+  return catalog;
 }
 
 /** The configured vendor when it has a resumable session, else Claude. */
@@ -191,6 +216,14 @@ export interface SidecarState {
   sessionWaiting: number;
   lastTurn: SidecarTurnEnd | null;
   error: string | null;
+  /** The agent the picker shows: the open session's, else the one the first prompt will create. */
+  agent: SidecarAgent | null;
+  catalog: SidecarCatalog | null;
+  /**
+   * Pick a vendor and model. With a session open and a different agent this
+   * starts a new session on it; the old one is left as it was, resumable.
+   */
+  chooseAgent: (vendor: string, model?: string) => Promise<void>;
   send: (prompt: string) => Promise<boolean>;
   stop: () => Promise<void>;
 }
@@ -217,8 +250,14 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
   const [waitingBySession, setWaitingBySession] = useState<Record<string, number>>({});
   const [lastTurn, setLastTurn] = useState<SidecarTurnEnd | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<SidecarCatalog | null>(null);
+  const [picked, setPicked] = useState<SidecarAgent | null>(null);
 
   const mountedRef = useRef(true);
+  const sessionRef = useRef<SidecarSession | null>(null);
+  sessionRef.current = session;
+  const pickedRef = useRef<SidecarAgent | null>(null);
+  pickedRef.current = picked;
   const openRef = useRef(open);
   openRef.current = open;
   const tailRef = useRef<Tail>(newTail(null));
@@ -334,7 +373,33 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     if (!enabled || !open) return;
     if (tailRef.current.sessionId) void fetchFrames();
     void loadSessions();
+    void (async () => {
+      const [loaded, vendor] = await Promise.all([loadCatalog(), defaultVendor()]);
+      if (!mountedRef.current) return;
+      if (loaded) setCatalog(loaded);
+      setPicked((prev) => prev ?? { vendor, model: loaded?.[vendor]?.defaultModel ?? "" });
+    })();
   }, [enabled, open, loadSessions, fetchFrames]);
+
+  /** Create a session on `agent` and follow it; null, with the error set, when the server refuses. */
+  const createSession = useCallback(async (agent: SidecarAgent): Promise<SidecarSession | null> => {
+    const created = await postJson<SidecarSessionEntry>(SESSIONS, {
+      vendor: agent.vendor,
+      ...(agent.model && { model: agent.model }),
+    });
+    if (!created.ok) { setError(created.error); return null; }
+    follow(created.data.session, created.data.running);
+    return created.data.session;
+  }, [follow]);
+
+  const chooseAgent = useCallback(async (vendor: string, model?: string) => {
+    const next: SidecarAgent = { vendor, model: model ?? catalog?.[vendor]?.defaultModel ?? "" };
+    setPicked(next);
+    setError(null);
+    const open = sessionRef.current;
+    if (!open || (open.vendor === next.vendor && (open.model ?? "") === next.model)) return;
+    await createSession(next);
+  }, [catalog, createSession]);
 
   const send = useCallback(async (prompt: string): Promise<boolean> => {
     const text = prompt.trim();
@@ -344,10 +409,9 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     try {
       let id = tailRef.current.sessionId;
       if (!id) {
-        const created = await postJson<SidecarSessionEntry>(SESSIONS, { vendor: await defaultVendor() });
-        if (!created.ok) { setError(created.error); return false; }
-        follow(created.data.session, created.data.running);
-        id = created.data.session.id;
+        const created = await createSession(pickedRef.current ?? { vendor: await defaultVendor(), model: "" });
+        if (!created) return false;
+        id = created.id;
       }
       const started = await postJson<SidecarSessionEntry>(`${SESSIONS}/${encodeURIComponent(id)}/turns`, { prompt: text });
       if (!started.ok) { setError(started.error); return false; }
@@ -359,7 +423,7 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
     } finally {
       if (mountedRef.current) setSending(false);
     }
-  }, [follow, fetchFrames]);
+  }, [createSession, fetchFrames]);
 
   const stop = useCallback(async () => {
     const id = tailRef.current.sessionId;
@@ -371,7 +435,11 @@ export function useSidecar(enabled: boolean, open: boolean): SidecarState {
   const waiting = Object.values(waitingBySession).reduce((sum, n) => sum + n, 0);
   const sessionWaiting = session ? waitingBySession[session.id] ?? 0 : 0;
 
-  return { session, frames, running, sending, waiting, sessionWaiting, lastTurn, error, send, stop };
+  const agent: SidecarAgent | null = session
+    ? { vendor: session.vendor, model: session.model ?? catalog?.[session.vendor]?.defaultModel ?? "" }
+    : picked;
+
+  return { session, frames, running, sending, waiting, sessionWaiting, lastTurn, error, agent, catalog, chooseAgent, send, stop };
 }
 
 // ---------------------------------------------------------------------------

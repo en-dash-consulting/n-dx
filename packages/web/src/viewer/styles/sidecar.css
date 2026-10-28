@@ -110,7 +110,47 @@
   font-size: 11px;
   color: var(--text-muted);
 }
-.sidecar-tool::before { content: "⚙ "; }
+.sidecar-tool-toggle {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sidecar-tool-toggle::before { content: "▸"; }
+.sidecar-tool-toggle[aria-expanded="true"]::before { content: "▾"; }
+.sidecar-tool-name { font-weight: 600; flex: none; }
+.sidecar-tool-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidecar-tool-body { margin-top: var(--space-1); }
+.sidecar-tool-label { margin-top: var(--space-1); text-transform: uppercase; font-size: 10px; }
+.sidecar-tool-input,
+.sidecar-tool-output {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+}
+.sidecar-tool-pending { margin: 0; font-style: italic; }
+
+.sidecar-agent {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.sidecar-agent select { min-width: 0; font-size: 12px; }
+.sidecar-model { flex: 1; }
 
 .sidecar-divider {
   display: flex;
