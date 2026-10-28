@@ -291,6 +291,25 @@ export interface ProposeChangeRequest {
 }
 
 /**
+ * Answer of `POST /api/rex/changes/:id/placement/draft` (behind `rex.placementDraft`):
+ * the model's pick or proposal, which fills the form. Nothing is written.
+ */
+export interface PlacementDraft {
+  layout: "v2";
+  change: string;
+  relation: PlacementRelation;
+  tied: boolean;
+  shortlist: PlacementCandidate[];
+  /** The shortlist target the model picked. */
+  pick?: string;
+  /** A new node the model drafted; the body `/propose` takes. */
+  proposal?: ProposeChangeRequest;
+  /** The model asked; absent when `rex.placement.models` turns the text model off. */
+  model?: string;
+  warnings: string[];
+}
+
+/**
  * Why rex refused a placement or a proposal: the `kind` of a 422 answer from
  * `/place` or `/propose`, mirroring rex's `ChangePlacementErrorKind`.
  * `no-such-change` arrives as a 404 instead.

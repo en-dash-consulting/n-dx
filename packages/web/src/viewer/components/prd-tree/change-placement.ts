@@ -15,6 +15,10 @@
  * `POST /api/rex/changes/:id/place` or `/propose`. Rex decides; its refusals
  * show inline in its words, with a hint picked by their `kind`.
  *
+ * With `rex.placementDraft` on, "Draft with the model" asks
+ * `/placement/draft`: a pick selects its shortlist row, a proposal fills the
+ * proposal form, and a note says the model chose. The draft writes nothing.
+ *
  * Once the change leaves the Inbox the section shrinks to one line naming
  * where it was placed.
  *
@@ -23,7 +27,7 @@
 
 import { h, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { useCliName } from "../../hooks/index.js";
+import { useCliName, useFeatureToggle } from "../../hooks/index.js";
 import { StrengthChip, isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox.js";
 import { Pending, useProductRead } from "../../views/product-pages.js";
 import type {
@@ -32,6 +36,7 @@ import type {
   PlaceChangeRequest,
   PlaceChangeResult,
   PlacementCriteriaDelta,
+  PlacementDraft,
   PlacementRefusalKind,
   PlacementRelation,
   PlacementStrength,
@@ -200,9 +205,62 @@ async function readCriteria(target: string): Promise<Array<{ id: string; text: s
 // ── Pieces ───────────────────────────────────────────────────────────
 
 function RefusalNote({ refusal }: { refusal: Refusal }) {
+  // A draft's 403 carries `feature_disabled`, which has no placement hint.
+  const hint = refusal.kind ? REFUSAL_HINTS[refusal.kind] : undefined;
   return h("div", { class: "cp-refusal", role: "alert" },
     h("div", { class: "cp-refusal-message" }, refusal.message),
-    refusal.kind ? h("div", { class: "cp-refusal-hint", "data-kind": refusal.kind }, REFUSAL_HINTS[refusal.kind]) : null,
+    hint ? h("div", { class: "cp-refusal-hint", "data-kind": refusal.kind }, hint) : null,
+  );
+}
+
+// ── Draft with the model ─────────────────────────────────────────────
+
+/** The toggle every "Draft with the model" entry point reads; the route enforces the same key. */
+export const PLACEMENT_DRAFT_FEATURE = "rex.placementDraft";
+
+/** What the model said, as the form notes it. */
+export interface DraftNote {
+  text: string;
+  warnings: string[];
+}
+
+/** The note for a draft: who chose, and what. */
+export function draftNoteText(draft: PlacementDraft, pickTitle?: string): string {
+  const by = draft.model ? `the model (${draft.model})` : "the model";
+  if (draft.pick !== undefined) return `Picked by ${by}: ${pickTitle ?? draft.pick}. Check it, then place.`;
+  if (draft.proposal) return `Drafted by ${by}. Check it, then propose.`;
+  return `No draft from ${by}: nothing on the shortlist fit and it proposed nothing.`;
+}
+
+function useDraft(changeId: string) {
+  const [busy, setBusy] = useState(false);
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
+  const run = async (): Promise<PlacementDraft | null> => {
+    setBusy(true);
+    setRefusal(null);
+    const answer = await post<PlacementDraft>(`/api/rex/changes/${encodeURIComponent(changeId)}/placement/draft`, {});
+    setBusy(false);
+    if (answer.ok) return answer.result;
+    setRefusal(answer.refusal);
+    return null;
+  };
+  return { busy, refusal, run };
+}
+
+/** A drafted proposal's criteria as the proposal form's one-per-line text. */
+function criteriaLines(proposal: ProposeChangeRequest | undefined): string {
+  return (proposal?.criteria?.add ?? []).map((c) => c.text).join("\n");
+}
+
+function DraftButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+  return h("button", { type: "button", class: "btn btn-sm cp-draft", disabled: busy, onClick },
+    busy ? "Drafting…" : "Draft with the model");
+}
+
+function DraftNoteView({ note }: { note: DraftNote }) {
+  return h("div", { class: "cp-draft-note", role: "status", "data-draft-source": "model" },
+    h("div", null, note.text),
+    note.warnings.length ? h("ul", null, note.warnings.map((w) => h("li", { key: w }, w))) : null,
   );
 }
 
@@ -315,9 +373,13 @@ interface PlaceFormProps {
   onPlaced: (result: PlaceChangeResult, target: PlacementTarget, mode: PlaceMode) => void;
   onNothingFits: () => void;
   onDone: () => void;
+  /** `rex.placementDraft` is on: offer "Draft with the model". */
+  draftEnabled: boolean;
+  /** The model drafted a new node: open the proposal form filled with it. */
+  onDraftProposal: (draft: PlacementDraft) => void;
 }
 
-function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touchesOnly, hasNext, onPlaced, onNothingFits, onDone }: PlaceFormProps) {
+function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touchesOnly, hasNext, onPlaced, onNothingFits, onDone, draftEnabled, onDraftProposal }: PlaceFormProps) {
   const placement = read && "placement" in read ? read.placement : null;
   const shortlist = placement?.shortlist ?? [];
   // A caller's request (Quick Add's "Amends…") outranks the rules' relation.
@@ -329,7 +391,23 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
   const [drafts, setDrafts] = useState<CriterionDraft[]>([]);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
+  const [draftNote, setDraftNote] = useState<DraftNote | null>(null);
+  const draft = useDraft(changeId);
   const criteriaRef = useRef<HTMLDivElement>(null);
+  // Drafting is for open changes: rex refuses an applied one, and an extra place only touches.
+  const canDraft = draftEnabled && !touchesOnly && !another;
+
+  const askModel = async () => {
+    setDraftNote(null);
+    const answer = await draft.run();
+    if (!answer) return;
+    if (answer.proposal) { onDraftProposal(answer); return; }
+    const row = answer.pick !== undefined
+      ? answer.shortlist.find((c) => c.target === answer.pick) ?? shortlist.find((c) => c.target === answer.pick)
+      : undefined;
+    if (row) setChosen(row);
+    setDraftNote({ text: draftNoteText(answer, row?.title), warnings: answer.warnings });
+  };
 
   // The rules' relation arrives with the shortlist; an extra place only touches.
   useEffect(() => { if (placement && !requested) setRelation(placement.relation); }, [placement?.relation]);
@@ -410,6 +488,9 @@ function PlaceForm({ changeId, changeTitle, read, map, mapError, another, touche
         : null,
       shortlist.map((c) => h(TargetRow, { key: c.target, name, target: c, checked: chosen?.target === c.target, onChoose: setChosen })),
       searchPick ? h(TargetRow, { key: searchPick.target, name, target: searchPick, checked: true, onChoose: setChosen }) : null,
+      canDraft ? h(DraftButton, { busy: draft.busy, onClick: askModel }) : null,
+      canDraft && draftNote ? h(DraftNoteView, { note: draftNote }) : null,
+      canDraft && draft.refusal ? h(RefusalNote, { refusal: draft.refusal }) : null,
     ),
 
     h(TargetSearch, { map, mapError, onChoose: setChosen }),
@@ -490,17 +571,42 @@ interface ProposeFormProps {
   hasNext: boolean;
   onProposed: (result: ProposeChangeResult, next: boolean) => void;
   onBack: () => void;
+  /** `rex.placementDraft` is on: offer "Draft with the model". */
+  draftEnabled: boolean;
+  /** A draft the shortlist's "Draft with the model" brought here: the form opens filled with it. */
+  drafted?: PlacementDraft | null;
 }
 
-function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack }: ProposeFormProps) {
-  const [type, setType] = useState<"capability" | "constraint">("capability");
-  const [under, setUnder] = useState("");
-  const [title, setTitle] = useState("");
-  const [statement, setStatement] = useState("");
-  const [criteria, setCriteria] = useState("");
+function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed, onBack, draftEnabled, drafted }: ProposeFormProps) {
+  const initial = drafted?.proposal;
+  const [type, setType] = useState<"capability" | "constraint">(initial?.type ?? "capability");
+  const [under, setUnder] = useState(initial?.under ?? "");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [statement, setStatement] = useState(initial?.proposed ?? "");
+  const [criteria, setCriteria] = useState(criteriaLines(initial));
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
+  const [draftNote, setDraftNote] = useState<DraftNote | null>(
+    drafted ? { text: draftNoteText(drafted), warnings: drafted.warnings } : null,
+  );
+  const draft = useDraft(changeId);
   const areas = map?.areas ?? [];
+
+  const askModel = async () => {
+    setDraftNote(null);
+    const answer = await draft.run();
+    if (!answer) return;
+    const p = answer.proposal;
+    if (p) {
+      setType(p.type);
+      setUnder(p.under);
+      setTitle(p.title);
+      setStatement(p.proposed ?? "");
+      setCriteria(criteriaLines(p));
+    }
+    const pickTitle = answer.shortlist.find((c) => c.target === answer.pick)?.title;
+    setDraftNote({ text: draftNoteText(answer, pickTitle), warnings: answer.warnings });
+  };
 
   const submit = async (next: boolean) => {
     const lines = criteria.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -522,6 +628,9 @@ function ProposeForm({ changeId, changeTitle, map, mapError, hasNext, onProposed
 
   return h("div", { class: "cp-form cp-propose" },
     h("div", { class: "task-section-label" }, "Propose a new home"),
+    draftEnabled ? h(DraftButton, { busy: draft.busy, onClick: askModel }) : null,
+    draftEnabled && draftNote ? h(DraftNoteView, { note: draftNote }) : null,
+    draftEnabled && draft.refusal ? h(RefusalNote, { refusal: draft.refusal }) : null,
     field("Type", h("select", {
       class: "cp-input", value: type,
       onChange: (e: Event) => setType((e.target as HTMLSelectElement).value as "capability" | "constraint"),
@@ -588,6 +697,8 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
   const [proposing, setProposing] = useState(false);
   const [another, setAnother] = useState(false);
   const [written, setWritten] = useState<Written | null>(null);
+  const [drafted, setDrafted] = useState<PlacementDraft | null>(null);
+  const draftEnabled = useFeatureToggle(PLACEMENT_DRAFT_FEATURE, false);
 
   const row = inbox.load.state === "ready" ? inbox.load.data.find((c) => c.id === changeId) : undefined;
   const inInbox = !!row?.awaitsPlacement && !written;
@@ -678,12 +789,15 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
       place: {
         changeId, changeTitle, read, another, touchesOnly, hasNext: position.next !== null,
         onPlaced,
-        onNothingFits: () => setProposing(true),
+        onNothingFits: () => { setDrafted(null); setProposing(true); },
         onDone: () => setAnother(false),
+        draftEnabled,
+        onDraftProposal: (draft) => { setDrafted(draft); setProposing(true); },
       },
       propose: {
         changeId, changeTitle, hasNext: position.next !== null,
         onProposed, onBack: () => setProposing(false),
+        draftEnabled, drafted,
       },
     }),
   );

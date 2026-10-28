@@ -7,6 +7,10 @@
  *                                         every open change awaiting placement, from one model load
  *   POST /api/rex/changes/:id/place     → { change, target, relation, warnings? }
  *   POST /api/rex/changes/:id/propose   → { change, proposed: { target, under, title, type }, warnings? }
+ *   POST /api/rex/changes/:id/placement/draft
+ *                                       → { layout: "v2", change, relation, tied, shortlist, pick?, proposal?, model?, warnings }
+ *                                         the `prd.place` model's draft; writes nothing. Spends tokens, so it
+ *                                         answers 403 unless `rex.placementDraft` is on, read per call.
  *
  * Rex decides everything (`suggestPlacement`, `recordPlacement`,
  * `recordProposal`); this module enriches the shortlist with what the viewer
@@ -23,7 +27,10 @@ import type { WebSocketBroadcaster } from "../websocket.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import { refreshPRDCache } from "../prd-io.js";
 import { appendLog } from "./rex-route-helpers.js";
+import { isFeatureEnabled } from "../routes-features.js";
+import { featureDisabledBody } from "../route-feature-gates.js";
 import {
+  draftChangePlacement,
   prdLayout,
   loadPrdModel,
   indexTree,
@@ -101,6 +108,22 @@ export interface ProposeChangeResultWire {
   warnings?: string[];
 }
 
+/** `POST /api/rex/changes/:id/placement/draft`: the model's draft, which fills the form and writes nothing. */
+export interface PlacementDraftWire {
+  layout: "v2";
+  change: string;
+  relation: PlacementRelationWire;
+  tied: boolean;
+  shortlist: PlacementCandidateWire[];
+  /** The shortlist target the model picked. */
+  pick?: string;
+  /** A new node the model drafted; the body `/propose` takes. */
+  proposal?: ProposeChangeRequestWire;
+  /** The model asked; absent when `rex.placement.models` turns the text model off. */
+  model?: string;
+  warnings: string[];
+}
+
 // ── Shortlist ────────────────────────────────────────────────────────
 
 /** The title of the area a node sits under, or "" when it sits under none or is unknown. */
@@ -114,15 +137,13 @@ function areaTitles(index: ReturnType<typeof indexTree>): (id: string) => string
   };
 }
 
-/** The shortlist for `changeRef`, with each candidate's title, area, statement and criteria. */
-export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePlacementWire {
-  const suggestion = suggestPlacement(tree, changeRef);
-  const index = indexTree(tree);
+/** Rex's shortlist rows, each with the target's title, area, statement and criteria. */
+function enrichShortlist(
+  index: ReturnType<typeof indexTree>,
+  candidates: ReadonlyArray<{ target: string; score: number; strength: PlacementStrengthWire; reasons: string[] }>,
+): PlacementCandidateWire[] {
   const areaOf = areaTitles(index);
-
-  const change = index.resolve(suggestion.change)!;
-  const tasks = (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
-  const shortlist = suggestion.shortlist.flatMap((candidate): PlacementCandidateWire[] => {
+  return candidates.flatMap((candidate): PlacementCandidateWire[] => {
     const node = index.resolve(candidate.target);
     if (!node || (node.type !== "capability" && node.type !== "constraint")) return [];
     const criteria = node.type === "capability" ? node.criteria ?? [] : [];
@@ -138,6 +159,15 @@ export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePla
       reasons: candidate.reasons,
     }];
   });
+}
+
+/** The shortlist for `changeRef`, with each candidate's title, area, statement and criteria. */
+export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePlacementWire {
+  const suggestion = suggestPlacement(tree, changeRef);
+  const index = indexTree(tree);
+  const change = index.resolve(suggestion.change)!;
+  const tasks = (change.children ?? []).filter((c) => c.type === "task" && c.status !== "deleted");
+  const shortlist = enrichShortlist(index, suggestion.shortlist);
 
   return {
     layout: "v2",
@@ -400,9 +430,43 @@ async function handlePlacementWrite(
   return true;
 }
 
+/** The toggle "Draft with the model" sits behind, here and in the detail panel. */
+export const PLACEMENT_DRAFT_FEATURE = "rex.placementDraft";
+
+async function handlePlacementDraft(changeRef: string, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  // Read per call and fail closed: each draft spends tokens.
+  if (!isFeatureEnabled(ctx.projectDir, PLACEMENT_DRAFT_FEATURE)) {
+    jsonResponse(res, 403, featureDisabledBody(PLACEMENT_DRAFT_FEATURE, `/api/rex/changes/${encodeURIComponent(changeRef)}/placement/draft`));
+    return true;
+  }
+  if ((await prdLayout(ctx.rexDir)) !== "v2") {
+    errorResponse(res, 409, V1_REFUSAL);
+    return true;
+  }
+  try {
+    const { tree } = await loadPrdModel(ctx.rexDir);
+    const draft = await draftChangePlacement(tree, changeRef, { rexDir: ctx.rexDir, projectDir: ctx.projectDir });
+    const body: PlacementDraftWire = {
+      layout: "v2",
+      change: draft.change,
+      relation: draft.relation,
+      tied: draft.tied,
+      shortlist: enrichShortlist(indexTree(tree), draft.shortlist),
+      ...(draft.pick !== undefined ? { pick: draft.pick } : {}),
+      ...(draft.proposal ? { proposal: draft.proposal } : {}),
+      ...(draft.model ? { model: draft.model } : {}),
+      warnings: draft.warnings,
+    };
+    jsonResponse(res, 200, body);
+  } catch (err) {
+    refuse(res, err);
+  }
+  return true;
+}
+
 // ── Router ───────────────────────────────────────────────────────────
 
-const PLACEMENT_PATH = /^changes\/([^/]+)\/(placement|place|propose)$/;
+const PLACEMENT_PATH = /^changes\/([^/]+)\/(placement|place|propose|placement\/draft)$/;
 
 /** Handle the placement routes. Returns false when the path is not one of them. */
 export function routePlacement(
@@ -420,5 +484,6 @@ export function routePlacement(
   const action = match[2];
   if (action === "placement") return method === "GET" ? handlePlacementRead(changeRef, res, ctx) : false;
   if (method !== "POST") return false;
+  if (action === "placement/draft") return handlePlacementDraft(changeRef, res, ctx);
   return handlePlacementWrite(action as "place" | "propose", changeRef, req, res, ctx, broadcast);
 }

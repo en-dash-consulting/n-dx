@@ -12,8 +12,10 @@ import type { VNode } from "preact";
 import { act } from "preact/test-utils";
 import {
   ChangePlacementSection,
+  PLACEMENT_DRAFT_FEATURE,
   REFUSAL_HINTS,
   criteriaDelta,
+  draftNoteText,
   inboxPosition,
   nextCriterionId,
   placedLine,
@@ -28,6 +30,7 @@ import type {
   ChangePlacement,
   ChangeRow,
   PlacementCandidate,
+  PlacementDraft,
   PlacementRefusalKind,
   ProductMap,
 } from "../../../src/viewer/views/product-model.js";
@@ -596,6 +599,105 @@ describe("Nothing fits", () => {
     expect($(".cp-refusal-hint")?.textContent).toBe(REFUSAL_HINTS["empty-title"]);
     await click(button("Back to the shortlist"));
     expect($(".cp-shortlist")).not.toBeNull();
+  });
+});
+
+describe("Draft with the model (rex.placementDraft)", () => {
+  const DRAFT_URL = "/api/rex/changes/a/placement/draft";
+  const toggle = (enabled: boolean) => ({ "/api/features": { toggles: [{ key: PLACEMENT_DRAFT_FEATURE, enabled }] } });
+  const drafts = () => posts.filter((p) => p.url === DRAFT_URL);
+  const answerDraft = (body: Partial<PlacementDraft>, status = 200) => {
+    answers[DRAFT_URL] = { status, body: { layout: "v2", change: "a", relation: "touches", tied: false, shortlist: [], warnings: [], ...body } };
+  };
+  const PROPOSAL = {
+    type: "capability" as const, under: "area-pay", title: "Store credit", summary: "Add store credit",
+    proposed: "Pay with store credit", criteria: { add: [{ id: "c1", text: "Credit applies" }, { id: "c2", text: "Credit expires" }] },
+  };
+
+  it.each([
+    ["off", toggle(false)],
+    ["absent", {}],
+  ])("is hidden from the shortlist and the proposal form with the toggle %s", async (_label, extra) => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], extra);
+    await mountSection("a");
+    expect(button("Draft with the model")).toBeNull();
+    await click(button("Nothing fits"));
+    expect(button("Draft with the model")).toBeNull();
+  });
+
+  it("is hidden for an applied change, which takes touches only", async () => {
+    serve([change("a", { appliedAt: "2026-10-05T12:00:00.000Z", awaitsPlacement: undefined })], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountSection("a");
+    expect($("[data-change-placement]")?.getAttribute("data-change-placement")).toBe("applied");
+    expect(button("Draft with the model")).toBeNull();
+  });
+
+  it("selects the model's pick on the shortlist and says the model chose it, writing nothing", async () => {
+    const rows = [candidate("cap-1"), candidate("cap-2", { score: 3, strength: "possible" })];
+    serve([change("a")], [placement("a", rows)], toggle(true));
+    await mountSection("a");
+    answerDraft({ pick: "cap-2", shortlist: rows, model: "claude-haiku", warnings: ["rules and model disagree"] });
+    await click(button("Draft with the model"));
+
+    expect(drafts()).toHaveLength(1);
+    expect(posts.every((p) => p.url === DRAFT_URL)).toBe(true);
+    expect($<HTMLInputElement>('.cp-target[data-target="cap-2"] input')?.checked).toBe(true);
+    const note = $(".cp-draft-note");
+    expect(note?.dataset.draftSource).toBe("model");
+    expect(note?.textContent).toContain("Picked by the model (claude-haiku): Home cap-2.");
+    expect(note?.textContent).toContain("rules and model disagree");
+    expect(button("Place")?.disabled).toBe(false);
+  });
+
+  it("opens the proposal form filled with the model's proposal", async () => {
+    serve([change("a")], [placement("a", [])], toggle(true));
+    await mountSection("a");
+    answerDraft({ proposal: PROPOSAL });
+    await click(button("Draft with the model"));
+
+    expect($(".cp-shortlist")).toBeNull();
+    const selects = $$<HTMLSelectElement>(".cp-propose select");
+    expect(selects.map((s) => s.value)).toEqual(["capability", "area-pay"]);
+    expect($<HTMLInputElement>(".cp-propose input.cp-input")?.value).toBe("Store credit");
+    expect($$<HTMLTextAreaElement>(".cp-propose textarea.cp-input").map((t) => t.value)).toEqual(["Pay with store credit", "Credit applies\nCredit expires"]);
+    expect($(".cp-draft-note")?.textContent).toContain("Drafted by the model.");
+    expect(drafts()).toHaveLength(1);
+    expect(posts).toHaveLength(1);
+  });
+
+  it("fills the proposal form from its own button", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountSection("a");
+    await click(button("Nothing fits"));
+    answerDraft({ proposal: { ...PROPOSAL, type: "constraint", criteria: undefined } });
+    await click(button("Draft with the model"));
+
+    expect($$<HTMLSelectElement>(".cp-propose select").map((s) => s.value)).toEqual(["constraint", "area-pay"]);
+    expect($<HTMLInputElement>(".cp-propose input.cp-input")?.value).toBe("Store credit");
+    expect($(".cp-draft-note")?.textContent).toContain("Drafted by the model.");
+  });
+
+  it("says when the model drafted nothing, and shows the server's refusal", async () => {
+    serve([change("a")], [placement("a", [candidate("cap-1")])], toggle(true));
+    await mountSection("a");
+    answerDraft({});
+    await click(button("Draft with the model"));
+    expect($(".cp-draft-note")?.textContent).toContain("No draft from the model");
+    expect($$<HTMLInputElement>(".cp-target input").some((i) => i.checked)).toBe(false);
+
+    answers[DRAFT_URL] = { status: 403, body: { error: `The feature "${PLACEMENT_DRAFT_FEATURE}" is turned off`, feature: PLACEMENT_DRAFT_FEATURE, kind: "feature_disabled" } };
+    await click(button("Draft with the model"));
+    expect($(".cp-refusal-message")?.textContent).toContain(PLACEMENT_DRAFT_FEATURE);
+    expect($(".cp-refusal-hint")).toBeNull();
+  });
+});
+
+describe("draftNoteText", () => {
+  const base: PlacementDraft = { layout: "v2", change: "a", relation: "touches", tied: false, shortlist: [], warnings: [] };
+  it("names who chose and what", () => {
+    expect(draftNoteText({ ...base, pick: "cap-1", model: "m" }, "Refunds")).toBe("Picked by the model (m): Refunds. Check it, then place.");
+    expect(draftNoteText({ ...base, proposal: { type: "capability", under: "x", title: "y" } })).toBe("Drafted by the model. Check it, then propose.");
+    expect(draftNoteText(base)).toBe("No draft from the model: nothing on the shortlist fit and it proposed nothing.");
   });
 });
 

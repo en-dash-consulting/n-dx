@@ -15,6 +15,8 @@ import { indexTree, loadPrdModel as loadModel, resolveStore, withPrdModelTransac
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
 const modelLoads = vi.hoisted(() => vi.fn());
+// The text model behind "Draft with the model": rex's real draft, with this answer in place of the vendor.
+const placeModel = vi.hoisted(() => vi.fn());
 vi.mock("../../../src/server/rex-gateway.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/server/rex-gateway.js")>();
   return {
@@ -23,6 +25,8 @@ vi.mock("../../../src/server/rex-gateway.js", async (importOriginal) => {
       modelLoads();
       return actual.loadPrdModel(...args);
     },
+    draftChangePlacement: (...[tree, ref, options]: Parameters<typeof actual.draftChangePlacement>) =>
+      actual.draftChangePlacement(tree, ref, { ...options, place: placeModel }),
   };
 });
 
@@ -277,6 +281,82 @@ describe("placement routes on a v2 project", () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toContain(field);
     expect(frames).toEqual([]);
+  });
+
+  describe("POST placement/draft (rex.placementDraft)", () => {
+    /** Every file under .rex, by path: a draft must leave all of them as they were. */
+    const snapshot = (): Record<string, string> => {
+      const out: Record<string, string> = {};
+      const walk = (dir: string): void => {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const path = join(dir, entry.name);
+          if (entry.isDirectory()) walk(path);
+          else out[relative(rexDir, path)] = readFileSync(path, "utf-8");
+        }
+      };
+      walk(rexDir);
+      return out;
+    };
+    const enable = (on: boolean) =>
+      writeFileSync(join(tmpDir, ".n-dx.json"), JSON.stringify({ features: { rex: { placementDraft: on } } }));
+    const draft = (id = inboxId) => send(`changes/${id}/placement/draft`, {});
+
+    beforeEach(() => { placeModel.mockReset(); });
+
+    it.each([
+      ["absent from .n-dx.json", () => {}],
+      ["off", () => enable(false)],
+      ["unreadable", () => writeFileSync(join(tmpDir, ".n-dx.json"), "{ not json")],
+    ])("refuses 403 naming the toggle when it is %s, and asks no model", async (_label, arrange) => {
+      arrange();
+      const before = snapshot();
+      const res = await json(await draft());
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({ feature: "rex.placementDraft", kind: "feature_disabled" });
+      expect(res.body.error).toContain("rex.placementDraft");
+      expect(placeModel).not.toHaveBeenCalled();
+      expect(snapshot()).toEqual(before);
+    });
+
+    it("answers the model's pick with the enriched shortlist when on, writing nothing", async () => {
+      enable(true);
+      placeModel.mockResolvedValue(CAPABILITY_ID);
+      const before = snapshot();
+      const { status, body } = await json(await draft());
+      expect(status).toBe(200);
+      expect(body).toMatchObject({ layout: "v2", change: inboxId, pick: CAPABILITY_ID, warnings: [] });
+      expect(body.shortlist[0]).toMatchObject({ target: CAPABILITY_ID, title: "Pay by card", area: "Checkout" });
+      expect(body).not.toHaveProperty("proposal");
+      expect(placeModel).toHaveBeenCalledTimes(1);
+      expect(snapshot()).toEqual(before);
+      expect(frames).toEqual([]);
+    });
+
+    it("answers the model's proposal as the body /propose takes, writing nothing", async () => {
+      enable(true);
+      placeModel.mockResolvedValue({ propose: {
+        target: "ignored", delta: "added", type: "capability", under: AREA_ID, title: "Retry a declined card",
+        summary: "Add declined-card retry",
+        proposed: "A shopper can retry a declined card.", criteria: { add: [{ id: "c1", text: "A retry charges once" }] },
+      } });
+      const before = snapshot();
+      const { status, body } = await json(await draft());
+      expect(status).toBe(200);
+      expect(body.warnings).toEqual([]);
+      expect(body.proposal).toEqual({
+        type: "capability", under: AREA_ID, title: "Retry a declined card", summary: "Add declined-card retry",
+        proposed: "A shopper can retry a declined card.", criteria: { add: [{ id: "c1", text: "A retry charges once" }] },
+      });
+      expect(body).not.toHaveProperty("pick");
+      expect(snapshot()).toEqual(before);
+    });
+
+    it("answers 404 for an unknown change and 422 for an applied one when on", async () => {
+      enable(true);
+      expect((await draft("no-such-change")).status).toBe(404);
+      await markApplied(inboxId);
+      expect(await json(await draft())).toMatchObject({ status: 422, body: { kind: "applied-change-amends" } });
+    });
   });
 });
 

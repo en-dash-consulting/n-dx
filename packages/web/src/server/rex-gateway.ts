@@ -58,6 +58,9 @@ export type { ChangePlacementErrorKind, PlacementSuggestion, SuggestedPlacementC
 export type { RecordPlacementInput, RecordPlacementResult } from "@n-dx/rex";
 export type { RecordProposalInput, RecordProposalOptions, RecordProposalResult } from "@n-dx/rex";
 export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@n-dx/rex";
+// "Draft with the model" (behind rex.placementDraft): the `prd.place` text
+// model drafts a pick or a proposal and writes nothing.
+export { draftChangePlacement } from "@n-dx/rex";
 
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it

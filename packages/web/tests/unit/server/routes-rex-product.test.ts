@@ -22,6 +22,7 @@ import type {
   PlaceChangeResultWire,
   ProposeChangeRequestWire,
   ProposeChangeResultWire,
+  PlacementDraftWire,
 } from "../../../src/server/routes-rex/placement.js";
 import type { ChangePlacementErrorKind } from "../../../src/server/rex-gateway.js";
 import type {
@@ -31,6 +32,7 @@ import type {
   ChangeRow,
   PlaceChangeRequest,
   PlaceChangeResult,
+  PlacementDraft,
   PlacementRefusalKind,
   ProductMap,
   ProposeChangeRequest,
@@ -51,9 +53,10 @@ const samePlace:Same<PlaceChangeRequestWire, PlaceChangeRequest> = true;
 const samePlaced: Same<PlaceChangeResultWire, PlaceChangeResult> = true;
 const samePropose: Same<ProposeChangeRequestWire, ProposeChangeRequest> = true;
 const sameProposed: Same<ProposeChangeResultWire, ProposeChangeResult> = true;
+const sameDraft: Same<PlacementDraftWire, PlacementDraft> = true;
 // The refusal kinds the viewer words a hint for are rex's, which the 422 answer carries.
 const sameRefusalKind: Same<ChangePlacementErrorKind, PlacementRefusalKind> = true;
-void [sameMap, sameChange, sameCapability, samePlacement, samePlacements, samePlace, samePlaced, samePropose, sameProposed, sameRefusalKind];
+void [sameMap, sameChange, sameCapability, samePlacement, samePlacements, samePlace, samePlaced, samePropose, sameProposed, sameDraft, sameRefusalKind];
 
 const FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
 const AREA_ID = "a0000000-0000-4000-8000-000000000001";

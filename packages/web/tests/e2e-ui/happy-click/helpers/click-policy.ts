@@ -43,6 +43,7 @@ export const DENY_NAME: RegExp[] = [
   /^refresh models/i,
   /^preview & apply/i,
   /^rebuild$/i,
+  /^draft with the model/i,
   // Writes that are destructive or irreversible inside one spec.
   /^apply/i,
   /^restore/i,
