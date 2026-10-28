@@ -45,7 +45,7 @@ function SessionRow({ row, sidecar, onOpened }: { row: SidecarSessionRow; sideca
           h("button", { type: "button", onClick: () => { setRenaming(false); setDraft(session.name); } }, "Cancel"),
         )
       : h("div", { class: "sidecar-session-title" },
-          h("span", { class: "sidecar-session-name" }, session.name),
+          h("span", { class: "sidecar-session-label" }, session.name),
           ended ? h("span", { class: "sidecar-session-state" }, "ended") : null,
           row.waiting > 0 ? h("span", { class: "sidecar-session-waiting", title: "Cards waiting" }, `${row.waiting} waiting`) : null,
         ),

@@ -932,6 +932,9 @@ describe("sessions list", () => {
       expect(text).toContain(part);
     }
     expect(server.requests.some((r) => r.url === "/api/workspaces")).toBe(true);
+    // The header's open-session name owns .sidecar-session-name; a row must not take its styling.
+    expect(rowFor("s1").querySelector(".sidecar-session-name")).toBeNull();
+    expect(rowFor("s1").querySelector(".sidecar-session-label")?.textContent).toBe("Name s1");
   });
 
   it("Resume opens the session in the drawer", async () => {

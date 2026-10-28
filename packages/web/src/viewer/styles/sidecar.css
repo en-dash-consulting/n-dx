@@ -337,7 +337,7 @@
 .sidecar-session { padding: var(--space-2); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
 .sidecar-session--ended { opacity: 0.8; }
 .sidecar-session-title { display: flex; gap: var(--space-2); align-items: baseline; }
-.sidecar-session-name { font-weight: 600; }
+.sidecar-session-label { font-weight: 600; }
 .sidecar-session-state { color: var(--text-muted); }
 .sidecar-session-waiting { color: var(--orange, #d9822b); }
 .sidecar-session-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--text-muted); margin-top: var(--space-1); }
