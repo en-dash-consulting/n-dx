@@ -688,10 +688,16 @@ export type GitTrackAnswer =
  * missing, `detected dubious ownership`, a corrupt index, the timeout — is
  * unanswered, with git's first stderr line (else the spawn error) as the
  * reason, so the caller decides what it means and can say why.
+ *
+ * `ignoreCase` matches the path in any case (`:(icase)`): git compares a
+ * pathspec by exact case even under `core.ignorecase`, so on a case-insensitive
+ * filesystem a file committed as `.N-DX.local.json` would otherwise read as
+ * untracked under the name n-dx opens.
  */
-export function gitTracksPath(cwd: string, relPath: string): GitTrackAnswer {
+export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitTrackAnswer {
+  const pathspec = options.ignoreCase ? `:(icase)${relPath}` : relPath;
   try {
-    execFileSync("git", ["ls-files", "--error-unmatch", "--", relPath], {
+    execFileSync("git", ["ls-files", "--error-unmatch", "--", pathspec], {
       windowsHide: true,
       cwd,
       encoding: "utf-8",

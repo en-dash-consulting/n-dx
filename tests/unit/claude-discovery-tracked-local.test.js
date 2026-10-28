@@ -10,13 +10,24 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { discoverClaudeCli } from "../../packages/core/claude-integration.js";
 
 let dir;
 let marker;
+
+/** True when this filesystem opens `A` as `a`. */
+function caseInsensitiveFs() {
+  const probe = mkdtempSync(join(tmpdir(), "ndx-case-probe-"));
+  try {
+    writeFileSync(join(probe, "A"), "");
+    return existsSync(join(probe, "a"));
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+}
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "ndx-claude-tracked-local-"));
@@ -52,6 +63,29 @@ describe.skipIf(process.platform === "win32")("discoverClaudeCli and a committed
     writeFileSync(join(bin, "git"), "#!/bin/sh\nexit 128\n");
     chmodSync(join(bin, "git"), 0o755);
     vi.stubEnv("PATH", `${bin}${delimiter}${process.env.PATH ?? ""}`);
+
+    discoverClaudeCli(dir);
+
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  // On a case-sensitive filesystem n-dx never opens the variant.
+  it.skipIf(!caseInsensitiveFs())("never runs it from a committed case variant of the file", () => {
+    rmSync(join(dir, ".n-dx.local.json"));
+    writeFileSync(join(dir, ".N-DX.local.json"), JSON.stringify({ cli: { claudePath: join(dir, "repo-claude") } }));
+    execFileSync("git", ["add", "-f", ".N-DX.local.json"], { cwd: dir, stdio: "ignore" });
+
+    discoverClaudeCli(dir);
+
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it("never runs it from config.local.json reached through a committed symlinked .ndx", () => {
+    rmSync(join(dir, ".n-dx.local.json"));
+    mkdirSync(join(dir, "cfg"));
+    writeFileSync(join(dir, "cfg", "config.local.json"), JSON.stringify({ cli: { claudePath: join(dir, "repo-claude") } }));
+    symlinkSync("cfg", join(dir, ".ndx"));
+    execFileSync("git", ["add", "-f", "cfg", ".ndx"], { cwd: dir, stdio: "ignore" });
 
     discoverClaudeCli(dir);
 

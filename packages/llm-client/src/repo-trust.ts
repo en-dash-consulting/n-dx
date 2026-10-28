@@ -52,9 +52,11 @@
  * `applyRepoTrustToEnvPolicy`) read `localConfigTracked` from the
  * {@link RepoExecutionConfig} they already hold, and the LLM config loaders
  * pass the file through `trustedLocalConfig` (credential-routing), which asks
- * {@link isLocalConfigTracked}. Core, which spawns rather than imports, mirrors
- * that check for `cli.claudePath` (`isGitTrackedOrUnanswered` in
- * `packages/core/gitignore.js`). A tracked local file is repository
+ * {@link isLocalConfigTracked}. Core, which spawns rather than imports, asks
+ * the same check for `cli.claudePath` through `hench trust status`
+ * (`packages/core/claude-integration.js`). "Tracked" covers a case variant
+ * of the file name and a file reached through a symlink: git matches neither
+ * under the path n-dx opens. A tracked local file is repository
  * config: it is collected here, raises `local-config-tracked`, and applies
  * only once the checkout is trusted. Outside a git work tree nothing is
  * tracked, so the local file is the user's, as before; inside one, a git that
@@ -72,6 +74,7 @@ import { createHash } from "node:crypto";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -449,11 +452,55 @@ export function isLocalConfigTracked(projectDir: string): boolean {
 function localConfigTrackState(projectDir: string): { tracked: boolean; unanswered: string | null } {
   const layout = resolveLayout(projectDir);
   if (!existsSync(layout.localConfigFile)) return { tracked: false, unanswered: null };
-  const answer = gitTracksPath(layout.root, relOf(layout.root, layout.localConfigFile));
-  if (answer.state !== "unanswered") return { tracked: answer.state === "tracked", unanswered: null };
+  const answers = shippedPathsOf(layout.root, layout.localConfigFile)
+    .map((rel) => gitTracksPath(layout.root, rel, { ignoreCase: true }));
+  if (answers.some((a) => a.state === "tracked")) return { tracked: true, unanswered: null };
+  const failed = answers.find((a) => a.state === "unanswered");
+  if (!failed) return { tracked: false, unanswered: null };
   return insideGitWorkTree(layout.root)
-    ? { tracked: true, unanswered: answer.reason }
+    ? { tracked: true, unanswered: failed.reason }
     : { tracked: false, unanswered: null };
+}
+
+/**
+ * Every path, relative to `root`, through which the repository could ship
+ * `file`; the file is the repository's when git tracks any of them. git lists
+ * nothing beyond a symlink, so asking only about the path n-dx opens misses a
+ * file reached through a committed symlink (`.ndx -> cfg`). Hence also each
+ * symlinked directory on the way, and the file's real path when it lies in the
+ * checkout. A real path outside the checkout is the user's, unless a committed
+ * symlink led there.
+ */
+function shippedPathsOf(root: string, file: string): string[] {
+  const rel = relOf(root, file);
+  const paths = new Set([rel]);
+  const parts = rel.split("/");
+  for (let i = 1; i < parts.length; i++) {
+    const dir = parts.slice(0, i).join("/");
+    if (isSymlink(join(root, dir))) paths.add(dir);
+  }
+  const real = realPathIn(root, file);
+  if (real) paths.add(real);
+  return [...paths];
+}
+
+function isSymlink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/** `file`'s on-disk path relative to `root`'s, or null when it lies outside (or cannot be resolved). */
+function realPathIn(root: string, file: string): string | null {
+  try {
+    const realRoot = realpathSync.native(root);
+    const realFile = realpathSync.native(file);
+    return realFile.startsWith(realRoot + sep) ? relOf(realRoot, realFile) : null;
+  } catch {
+    return null;
+  }
 }
 
 function relOf(root: string, path: string): string {

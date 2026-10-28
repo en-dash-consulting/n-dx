@@ -15,8 +15,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Is `relPath` tracked by git in `cwd`? False outside a repo or without git.
@@ -40,42 +40,6 @@ export function isGitTracked(relPath, cwd) {
     return result.status === 0;
   } catch {
     return false;
-  }
-}
-
-/**
- * Is `relPath` repository content, for a trust decision? Like
- * {@link isGitTracked}, except that a git failure other than its own "not in
- * the index" (exit 1) — dubious ownership, git missing, a corrupt index, the
- * timeout — counts as tracked while `cwd` sits inside a git work tree (a
- * `.git` entry walking up). A committed file must not read as the user's own
- * just because git could not answer. Outside a work tree it is false.
- *
- * Mirrors llm-client's `isLocalConfigTracked`; core spawns rather than
- * importing it.
- *
- * @param {string} relPath  Path relative to `cwd`
- * @param {string} cwd
- * @returns {boolean}
- */
-export function isGitTrackedOrUnanswered(relPath, cwd) {
-  const result = spawnSync("git", ["ls-files", "--error-unmatch", "--", relPath], {
-    windowsHide: true,
-    cwd,
-    encoding: "utf-8",
-    timeout: 5000,
-    stdio: "pipe",
-  });
-  if (result.status === 0) return true;
-  if (result.status === 1) return false;
-  return insideGitWorkTree(cwd);
-}
-
-/** Is `dir`, or a directory above it, the top of a git work tree (has a `.git` entry)? */
-function insideGitWorkTree(dir) {
-  for (let d = resolve(dir); ; d = dirname(d)) {
-    if (existsSync(join(d, ".git"))) return true;
-    if (dirname(d) === d) return false;
   }
 }
 

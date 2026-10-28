@@ -95,10 +95,27 @@ describe("discoverClaudeCli — step 2: cli.claudePath from .n-dx.local.json", (
     });
   }
 
+  /** `hench trust status --format=json` reports the local file as the user's (untracked). */
+  function untrackedLocal(binary, args) {
+    return binary === process.execPath && args.includes("trust")
+      ? JSON.stringify({ config: { localConfigTracked: false } })
+      : "";
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.CLAUDE_CLI_PATH;
-    execFileSyncCli.mockImplementation(() => {});
+    execFileSyncCli.mockImplementation(untrackedLocal);
+  });
+
+  it("does not read a local file the trust evaluation reports as tracked, or cannot answer for", () => {
+    files({ [LOCAL]: { cli: { claudePath: "/cfg/claude" } } });
+    existsSync.mockImplementation((p) => p === LOCAL || p === "/cfg/claude");
+    for (const answer of [JSON.stringify({ config: { localConfigTracked: true } }), "not json"]) {
+      execFileSyncCli.mockImplementation((binary, args) => (args.includes("trust") ? answer : ""));
+      expect(discoverClaudeCli(dir)).toEqual({ found: true, path: "claude" });
+      expect(execFileSyncCli.mock.calls.map(([bin]) => bin)).not.toContain("/cfg/claude");
+    }
   });
 
   it("returns configured path when file exists and runs", () => {

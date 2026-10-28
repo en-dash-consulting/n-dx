@@ -37,7 +37,6 @@ import {
 } from "./assistant-assets.js";
 import { getCliName } from "./cli-identity.js";
 import { resolveLayout } from "./layout.js";
-import { isGitTrackedOrUnanswered } from "./gitignore.js";
 import { homedir } from "os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -479,9 +478,9 @@ function writeMcpJson(dir) {
  * review, so a path the repository ships would run its own script with the
  * user's environment. llm-client's trust review flags a shared one
  * (`vendor-cli-path`), and `ndx config cli.claudePath` writes the local file.
- * A local file git tracks is the repository's too (`local-config-tracked`),
- * so it is not read either — nor is one git cannot answer for inside a work
- * tree, since a committed file would look the same.
+ * A local file the repository ships is the repository's too
+ * (`local-config-tracked`), so it is not read either — see
+ * {@link localConfigIsRepositoryConfig}.
  * Returns undefined if not set.
  * @param {string|null} dir
  * @returns {string|undefined}
@@ -489,7 +488,7 @@ function writeMcpJson(dir) {
 function readConfiguredClaudePath(dir) {
   if (!dir) return undefined;
   const layout = resolveLayout(dir);
-  if (!existsSync(layout.localConfigFile) || isGitTrackedOrUnanswered(relative(layout.root, layout.localConfigFile), layout.root)) {
+  if (!existsSync(layout.localConfigFile) || localConfigIsRepositoryConfig(layout.root)) {
     return undefined;
   }
   try {
@@ -498,6 +497,29 @@ function readConfiguredClaudePath(dir) {
     const p = cfg?.cli?.claudePath;
     return typeof p === "string" && p.length > 0 ? p : undefined;
   } catch { return undefined; }
+}
+
+/**
+ * Does the repository ship the machine-local config file? llm-client's
+ * `isLocalConfigTracked` decides (a case variant, a symlinked `.ndx`, git
+ * unable to answer inside a work tree); core spawns rather than imports, so
+ * it asks through `hench trust status`, the route `ndx init`'s trust review
+ * already takes. No answer counts as shipped: the file then waits for trust
+ * rather than choosing a binary.
+ * @param {string} root
+ * @returns {boolean}
+ */
+function localConfigIsRepositoryConfig(root) {
+  try {
+    const out = execFileSyncCli(
+      process.execPath,
+      [resolveSubPackageCli("packages/hench", "@n-dx/hench"), "trust", "status", "--format=json", root],
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 15_000 },
+    );
+    return JSON.parse(String(out))?.config?.localConfigTracked !== false;
+  } catch {
+    return true;
+  }
 }
 
 /**

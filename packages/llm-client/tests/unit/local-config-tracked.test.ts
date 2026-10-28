@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadLLMConfig } from "../../src/llm-config.js";
@@ -139,6 +139,75 @@ describe("a tracked .n-dx.local.json in an untrusted checkout", () => {
     writeLocal({ ...LOCAL, hench: { guard: { env: { allow: [SENTINEL, "OTHER_TOKEN"] } } } });
     expect(evaluateRepoTrust(repo).state).toBe("changed");
     expect(passes(repoCommandEnv(repo, { env: parent() }))).toBe(false);
+  });
+});
+
+/**
+ * git matches a pathspec by exact case and lists nothing beyond a symlink, so
+ * asking it about the path n-dx opens misses a file the repository ships under
+ * another case or behind a committed symlink. Both are repository config.
+ */
+describe("a local config file the repository ships under another name or path", () => {
+  function expectRepositoryConfig(): void {
+    expect(isLocalConfigTracked(repo)).toBe(true);
+    const ev = evaluateRepoTrust(repo);
+    expect(ev.state).toBe("untrusted");
+    expect(ev.config.localConfigTracked).toBe(true);
+    expect(ev.findings.find((f) => f.code === "env-allow-added")?.values).toEqual([SENTINEL]);
+    expect(passes(repoCommandEnv(repo, { env: parent() }))).toBe(false);
+  }
+
+  async function expectNoRouting(): Promise<void> {
+    const llm = await loadLLMConfig(repo);
+    expect(llm.claude?.cli_path).toBeUndefined();
+    expect(llm.claude?.api_endpoint).toBeUndefined();
+  }
+
+  /** True when this filesystem opens `.N-DX.local.json` as `.n-dx.local.json`. */
+  function caseInsensitiveFs(): boolean {
+    const probe = mkdtempSync(join(tmpdir(), "ndx-case-probe-"));
+    try {
+      writeFileSync(join(probe, "A"), "");
+      return existsSync(join(probe, "a"));
+    } finally {
+      rmSync(probe, { recursive: true, force: true });
+    }
+  }
+
+  it.skipIf(!caseInsensitiveFs())("a committed case variant of .n-dx.local.json", async () => {
+    writeFileSync(join(repo, ".N-DX.local.json"), JSON.stringify(LOCAL));
+    git("init", "-q");
+    git("add", "-f", ".N-DX.local.json");
+    expectRepositoryConfig();
+    await expectNoRouting();
+  });
+
+  it.skipIf(process.platform === "win32")("config.local.json reached through a committed symlinked .ndx", async () => {
+    mkdirSync(join(repo, "cfg"));
+    writeFileSync(join(repo, "cfg", "config.local.json"), JSON.stringify(LOCAL));
+    symlinkSync("cfg", join(repo, ".ndx"));
+    git("init", "-q");
+    git("add", "-f", "cfg", ".ndx");
+    expectRepositoryConfig();
+    await expectNoRouting();
+  });
+
+  it.skipIf(process.platform === "win32")("a user's own symlink to a committed file is still the committed file", () => {
+    mkdirSync(join(repo, "cfg"));
+    writeFileSync(join(repo, "cfg", "shipped.json"), JSON.stringify(LOCAL));
+    git("init", "-q");
+    git("add", "-f", "cfg");
+    symlinkSync(join("cfg", "shipped.json"), join(repo, ".n-dx.local.json"));
+    expectRepositoryConfig();
+  });
+
+  it.skipIf(process.platform === "win32")("a user's own untracked symlink to a file outside the checkout stays theirs", () => {
+    const own = join(home, "own.json");
+    writeFileSync(own, JSON.stringify(LOCAL));
+    git("init", "-q");
+    symlinkSync(own, join(repo, ".n-dx.local.json"));
+    expect(isLocalConfigTracked(repo)).toBe(false);
+    expect(evaluateRepoTrust(repo).state).toBe("baseline");
   });
 });
 
