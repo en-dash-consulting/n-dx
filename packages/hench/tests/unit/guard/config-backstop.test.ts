@@ -94,6 +94,23 @@ describe("ConfigBackstop", () => {
     expect(readFileSync(join(dir, ".claude", "settings.local.json"), "utf-8")).toBe("{\"permissions\":{}}");
   });
 
+  // The first file put back recreates the directory; the second must still be
+  // written into it rather than read as a swapped parent.
+  it("puts back every config file of a directory the agent deleted", () => {
+    mkdirSync(join(dir, ".claude"));
+    writeFileSync(join(dir, ".claude", "settings.json"), "{\"hooks\":{}}");
+    writeFileSync(join(dir, ".claude", "settings.local.json"), "{\"permissions\":{}}");
+    const backstop = ConfigBackstop.capture(dir);
+    rmSync(join(dir, ".claude"), { recursive: true });
+
+    expect(backstop.restore()).toEqual([
+      { path: ".claude/settings.json", change: "deleted", restored: true },
+      { path: ".claude/settings.local.json", change: "deleted", restored: true },
+    ]);
+    expect(readFileSync(join(dir, ".claude", "settings.json"), "utf-8")).toBe("{\"hooks\":{}}");
+    expect(readFileSync(join(dir, ".claude", "settings.local.json"), "utf-8")).toBe("{\"permissions\":{}}");
+  });
+
   // File symlinks need elevated rights on Windows.
   it.skipIf(process.platform === "win32")("replaces a symlink the agent put in a file's place without writing through it", () => {
     writeFileSync(join(dir, ".n-dx.json"), "{\"web\":{}}");

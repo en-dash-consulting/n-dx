@@ -373,7 +373,7 @@ export class ConfigBackstop {
     if (sameParent(before, now)) return now;
     // Created or deleted as a real directory inside the project: the files
     // under it are put back or removed the ordinary way.
-    const inProject = now.kind === "directory" && now.real === join(realpathSync.native(this.projectDir), rel);
+    const inProject = this.isInProject(rel, now);
     if (before.kind === "absent" && inProject) return now;
     if (before.kind === "directory" && (inProject || now.kind === "absent")) return now;
 
@@ -391,14 +391,24 @@ export class ConfigBackstop {
     return back ? after : null;
   }
 
-  /** True when `parent` is still what {@link settleParent} left it as. */
+  /**
+   * True when a write under `parent` stays where {@link settleParent} meant it
+   * to go: the parent is unchanged since then, or is a real directory inside
+   * the project, as putting back an earlier file under a deleted one makes it.
+   */
   private parentStill(parent: string, settled: ReadonlyMap<string, Parent>): boolean {
     if (parent === ".") return true;
     try {
-      return sameParent(settled.get(parent)!, readParent(join(this.projectDir, parent)));
+      const now = readParent(join(this.projectDir, parent));
+      return sameParent(settled.get(parent)!, now) || this.isInProject(parent, now);
     } catch {
       return false;
     }
+  }
+
+  /** A real directory at `rel` itself, not a link: anything written under it stays in the project. */
+  private isInProject(rel: string, now: Parent): boolean {
+    return now.kind === "directory" && now.real === join(realpathSync.native(this.projectDir), rel);
   }
 
   /**

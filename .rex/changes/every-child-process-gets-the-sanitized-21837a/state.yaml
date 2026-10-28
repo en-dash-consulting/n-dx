@@ -26,9 +26,13 @@ items:
     lastModified: "2026-10-28T21:51:18.462Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "cd3930fb-0d47-4414-8327-c7f2a7dd2eee":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-28T21:52:12.227Z"
-    activeIntervals: [{"start":"2026-10-28T21:52:12.227Z"}]
+    completedAt: "2026-10-28T22:07:16.792Z"
+    endedAt: "2026-10-28T22:07:16.792Z"
+    activeIntervals: [{"end":"2026-10-28T22:07:16.792Z","start":"2026-10-28T21:52:12.227Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ConfigBackstop snapshots .claude/.codex/.ndx identity (lstat kind, link target, realpath); restore replaces a swapped parent before restoring under it and re-checks it before each write; removes a .ndx/ created on a legacy project; capture throws ConfigBackstopError, which run.ts turns into a CLIError before claims start."
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-28T21:52:12.851Z"
+    lastModified: "2026-10-28T22:07:16.792Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
