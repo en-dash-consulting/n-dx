@@ -355,6 +355,21 @@ describe("repository test gate commands", () => {
     expect((await resolveTestCommand({ projectDir: repo, henchDir: join(repo, ".hench"), config: trusted.config }, true)).command).toBe(FETCH);
   });
 
+  it("keeps the user's own .n-dx.local.json test command while withholding the repository's", async () => {
+    writeFileSync(join(repo, "package.json"), JSON.stringify({ scripts: { test: "vitest run" } }));
+    writeHenchConfig({ ...DEFAULT_HENCH_CONFIG(), testGate: { command: FETCH, rerunCommand: "wget x" } });
+    writeFileSync(join(repo, ".n-dx.local.json"), JSON.stringify({ hench: { fullTestCommand: "pnpm test:ci" } }));
+    const { config, permissionMode } = await effective();
+
+    const applied = applyRepoTrust(config, repo, permissionMode, { ndxHome: home });
+    expect(applied.evaluation.state).toBe("untrusted");
+    expect(applied.config.testGate?.command).toBeUndefined();
+    expect(applied.config.testGate?.rerunCommand).toBeUndefined();
+    expect(applied.config.fullTestCommand).toBe("pnpm test:ci");
+    const resolved = await resolveTestCommand({ projectDir: repo, henchDir: join(repo, ".hench"), config: applied.config }, true);
+    expect(resolved.command).toBe("pnpm test:ci");
+  });
+
   const masks: Array<[string, Record<string, unknown>]> = [
     ["testGate.command of the wrong type", { testGate: { command: 0 } }],
     ["testGate.rerunCommand of the wrong type", { testGate: { rerunCommand: [] } }],

@@ -83,10 +83,14 @@ export function applyRepoTrust(
     guard.allowedCommands.length !== config.guard.allowedCommands.length
     || guard.allowedGitSubcommands.length !== config.guard.allowedGitSubcommands.length
     || guard.blockedPaths.length !== config.guard.blockedPaths.length;
-  const testCommandsWithheld = evaluation.config.gateTestCommands.length > 0;
+  const withheld = withoutRepositoryTestCommands(config, evaluation);
+  const testCommandsWithheld =
+    withheld.fullTestCommand !== config.fullTestCommand
+    || withheld.testGate?.command !== config.testGate?.command
+    || withheld.testGate?.rerunCommand !== config.testGate?.rerunCommand;
   return {
     evaluation,
-    config: { ...withoutRepositoryTestCommands(config), guard },
+    config: { ...withheld, guard },
     permissionMode: lowered,
     clamped: guardChanged || lowered !== permissionMode || testCommandsWithheld,
   };
@@ -95,13 +99,28 @@ export function applyRepoTrust(
 /**
  * The config with the test commands the repository set removed, so the gate
  * falls back to auto-detection as it would on a checkout that set none.
+ *
+ * Only a value the review read is removed: one that differs came from a layer
+ * the review treats as the user's own (`.n-dx.local.json`), and stays.
  */
-function withoutRepositoryTestCommands(config: HenchConfig): HenchConfig {
-  const { fullTestCommand: _full, testGate, ...rest } = config;
-  const { command: _command, rerunCommand: _rerun, ...gateRest } = testGate ?? {};
+function withoutRepositoryTestCommands(config: HenchConfig, evaluation: RepoTrustEvaluation): HenchConfig {
+  const reviewed = new Map<string, string>(evaluation.config.gateTestCommands.map((c) => [c.key, c.command]));
+  const keep = (key: string, value: string | undefined) =>
+    value !== undefined && reviewed.get(key) !== value ? value : undefined;
+  const { fullTestCommand, testGate, ...rest } = config;
+  const full = keep("fullTestCommand", fullTestCommand);
+  const command = keep("testGate.command", testGate?.command);
+  const rerunCommand = keep("testGate.rerunCommand", testGate?.rerunCommand);
+  const gateRest = { ...testGate };
+  delete gateRest.command;
+  delete gateRest.rerunCommand;
   return {
     ...rest,
-    ...(testGate ? { testGate: gateRest } : {}),
+    ...(full !== undefined ? { fullTestCommand: full } : {}),
+    ...(testGate
+      ? { testGate: { ...gateRest, ...(command !== undefined ? { command } : {}), ...(rerunCommand !== undefined ? { rerunCommand } : {}) } }
+      : {}),
+    // The resolver's own `.n-dx.json` read returns only repository content.
     repositoryTestCommandsWithheld: true,
   };
 }
