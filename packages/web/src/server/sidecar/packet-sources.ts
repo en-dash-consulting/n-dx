@@ -11,8 +11,9 @@
  * than leaving the gap unmarked.
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { resolveLayout } from "@n-dx/llm-client";
 import { DATA_FILES } from "../../shared/index.js";
 import { loadCommitFiles, loadPrdModel, loadTrailerCommits, PRD_CACHE_DIRNAME } from "../rex-gateway.js";
@@ -102,10 +103,16 @@ export interface SpawnedReads {
 /** Most commits read for one packet; evidence is a sample, and the packet caps it again. */
 const MAX_EVIDENCE_COMMITS = 40;
 
+/** Most run records parsed for one packet, newest file first; older runs are not read. */
+const MAX_RUN_FILES = 200;
+
+const RUN_FILE = /^[^.].*\.json(\.gz)?$/;
+
 function readJson<T>(path: string): T | null {
   if (!existsSync(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, "utf-8")) as T;
+    const raw = readFileSync(path);
+    return JSON.parse((path.endsWith(".gz") ? gunzipSync(raw) : raw).toString("utf-8")) as T;
   } catch {
     // An unreadable artifact reads as absent: the packet says the data is missing.
     return null;
@@ -189,11 +196,24 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
     async runs(taskId) {
       const dir = join(layout.henchDir, "runs");
       if (!existsSync(dir)) return [];
+      // Hench retention gzips older records to `<id>.json.gz`; skipping them would
+      // report a task whose runs were all archived as never run.
+      // The archiver writes `<id>.json.gz` before unlinking `<id>.json`, so a file
+      // can vanish between the listing and its stat, and one run can briefly have both.
+      const files = readdirSync(dir)
+        .filter((name) => RUN_FILE.test(name))
+        .flatMap((name) => {
+          const stat = statSync(join(dir, name), { throwIfNoEntry: false });
+          return stat ? [{ path: join(dir, name), mtime: stat.mtimeMs }] : [];
+        })
+        .sort((a, b) => b.mtime - a.mtime)
+        .slice(0, MAX_RUN_FILES);
       const out: RunStatusRead[] = [];
-      for (const name of readdirSync(dir)) {
-        if (!name.endsWith(".json") || name.startsWith(".")) continue;
-        const run = readJson<{ id?: unknown; taskId?: unknown; status?: unknown; startedAt?: unknown }>(join(dir, name));
-        if (run?.taskId === taskId && typeof run.id === "string" && typeof run.startedAt === "string") {
+      const seen = new Set<string>();
+      for (const file of files) {
+        const run = readJson<{ id?: unknown; taskId?: unknown; status?: unknown; startedAt?: unknown }>(file.path);
+        if (run?.taskId === taskId && typeof run.id === "string" && typeof run.startedAt === "string" && !seen.has(run.id)) {
+          seen.add(run.id);
           out.push({ id: run.id, status: typeof run.status === "string" ? run.status : "unknown", startedAt: run.startedAt });
         }
       }

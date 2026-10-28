@@ -64,6 +64,9 @@ items:
     resolutionDetail: "llm-client startVendorSession/resumeVendorSession (start, sendTurn, interrupt, end, resume; Claude + Codex CLIs; RuntimeEvents with token usage) built on new vendor session drivers lifted from hench's adapters; hench adapters and fork-strategy capability check delegate to the drivers; existing hench adapter tests pass unchanged; createLLMClient untouched."
     lastModified: "2026-10-26T18:54:22.139Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "44762a96-1caa-4c16-92a3-cd356b5801d1":
+    lastModified: "2026-10-28T05:00:48.680Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5845d911-1724-41f8-8376-267f917a0fa0":
     status: "completed"
     startedAt: "2026-10-27T16:26:39.443Z"
@@ -112,7 +115,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9753d37a-2e7e-4950-8eba-3015eee08734":
     issues: ["https://www.notion.so/3f7a80b71924810fb66ac7fbdc9bc4db","https://www.notion.so/3f7a80b719248165891cff1c8f0d0ace","https://www.notion.so/3f7a80b7192481c5a8fef7faf77e11e0","https://www.notion.so/3f7a80b7192481e0a645e0c1b1b7f2b7","https://www.notion.so/3f7a80b71924810492a8ca3948c3f474","https://www.notion.so/3f7a80b71924810499c9f380e11f53fd"]
-    lastModified: "2026-10-28T04:45:43.696Z"
+    lastModified: "2026-10-28T05:00:48.680Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9e47fb80-238b-4cff-a0df-254bce7a8da1":
     status: "completed"
@@ -125,7 +128,12 @@ items:
     lastModified: "2026-10-28T04:56:21.941Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9faecb67-51f5-4a01-b68f-4088716bd0f0":
-    lastModified: "2026-10-28T04:23:06.663Z"
+    status: "completed"
+    startedAt: "2026-10-28T04:58:36.197Z"
+    completedAt: "2026-10-28T05:02:18.806Z"
+    endedAt: "2026-10-28T05:02:18.806Z"
+    activeIntervals: [{"end":"2026-10-28T05:02:18.806Z","start":"2026-10-28T04:58:36.197Z"}]
+    lastModified: "2026-10-28T05:02:18.806Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adba5290-d3e8-4d4c-89e0-bfcf456f0c85":
     status: "completed"
