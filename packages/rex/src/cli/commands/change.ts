@@ -3,16 +3,17 @@
  * layer of a v2 PRD.
  *
  * `place` without `--target` prints the placement rules' shortlist; with it,
- * records the placement (`core/change-place.ts`). An amendment's capability
+ * records the placement (`core/change-place.ts`); with `--propose`, records a
+ * new capability or constraint under an area when nothing on the map fits. An amendment's capability
  * criteria are edited with `--capability-criterion`, never `--criterion`,
  * which is a work item's acceptance criteria. `apply` applies the change's
  * amendments to the product layer as a steward (`core/apply-amendments.ts`).
  */
 
 import { applyAmendments, ApplyAmendmentsError, NOTHING_TO_MODIFY } from "../../core/apply-amendments.js";
-import { ChangePlacementError, recordPlacement, suggestPlacement } from "../../core/change-place.js";
+import { ChangePlacementError, recordPlacement, recordProposal, suggestPlacement } from "../../core/change-place.js";
 import { indexTree, type RuleNode } from "../../schema/v2-rules.js";
-import type { Criterion } from "../../schema/v2.js";
+import { ADDED_NODE_TYPES, type AddedNodeType, type Criterion } from "../../schema/v2.js";
 import { resolveRexPaths, resolveStore } from "../../store/index.js";
 import { loadPrdModel } from "../../store/prd-model-reader.js";
 import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
@@ -60,6 +61,7 @@ async function placeChange(rexDir: string, ref: string, flags: Record<string, st
       `An amendment edits its target's capability criteria with --${CAPABILITY_CRITERION_FLAG}="<id>: <text>" and --${REMOVE_CAPABILITY_CRITERION_FLAG}=<id>.`,
     );
   }
+  if (flags.propose !== undefined) return proposeChange(rexDir, ref, flags, multiFlags);
   const relation = flags.relation;
   if (relation !== undefined && !RELATIONS.has(relation)) throw new CLIError(`Invalid --relation "${relation}".`, "Use touches or amends.");
   const set = parseCapabilityCriteria(multiFlags[CAPABILITY_CRITERION_FLAG]);
@@ -120,6 +122,68 @@ async function placeChange(rexDir: string, ref: string, flags: Record<string, st
   for (const w of warnings) warn(w);
 }
 
+/** `--propose`: a new capability or constraint under an area, as an `added` amendment on the change. */
+async function proposeChange(rexDir: string, ref: string, flags: Record<string, string>, multiFlags: Record<string, string[]>): Promise<void> {
+  if (flags.target !== undefined || flags.relation !== undefined) {
+    throw new CLIError(
+      "--propose records a new capability or constraint; --target and --relation place the change on an existing one.",
+      "Pass --propose with --type, --under and --title, or --target without --propose.",
+    );
+  }
+  if (multiFlags[REMOVE_CAPABILITY_CRITERION_FLAG]?.length) {
+    throw new CLIError(`--${REMOVE_CAPABILITY_CRITERION_FLAG} edits an existing node; a proposed one has no capability criteria to remove.`);
+  }
+  const { type, under, title, summary, proposed } = flags;
+  if (type === undefined || !ADDED_NODE_TYPES.has(type as AddedNodeType)) {
+    throw new CLIError(type === undefined ? "--propose needs --type." : `Invalid --type "${type}".`, "Use --type=capability or --type=constraint.");
+  }
+  if (under === undefined || title === undefined) {
+    throw new CLIError("--propose needs --under=<area> and --title=<text>.", "List the live areas with `rex product show`.");
+  }
+  const added = parseCapabilityCriteria(multiFlags[CAPABILITY_CRITERION_FLAG]);
+
+  let now!: Date;
+  const { result: out } = await withPrdModelTransaction(rexDir, (model) => {
+    now = new Date();
+    const recorded = placeOrExplain(() =>
+      recordProposal(
+        model.tree,
+        ref,
+        {
+          type: type as AddedNodeType,
+          under,
+          title,
+          ...(summary !== undefined ? { summary } : {}),
+          ...(proposed !== undefined ? { proposed } : {}),
+          ...(added.length ? { criteria: { add: added } } : {}),
+        },
+        now,
+      ),
+    );
+    const index = indexTree(recorded.tree);
+    return { tree: recorded.tree, result: { ...recorded, changeNode: index.resolve(recorded.change)!, areaNode: index.resolve(recorded.proposal.under)! } };
+  });
+
+  const { change, proposal } = out;
+  const store = await resolveStore(rexDir);
+  await store.appendLog({
+    timestamp: now.toISOString(),
+    event: "change_proposed",
+    itemId: change,
+    detail: `${proposal.type} under ${proposal.under}: ${proposal.title}`,
+  });
+  const warnings = pendingPlacementWarnings(out.pending, out.blockedBy);
+  if (flags.format === "json") {
+    const node = { target: proposal.target, under: proposal.under, title: proposal.title, type: proposal.type };
+    return result(JSON.stringify({ change, proposed: node, ...(warnings.length ? { warnings } : {}) }, null, 2));
+  }
+  result(
+    `Proposed for ${nodeLabel(out.changeNode)} ${out.changeNode.title}: new ${proposal.type} "${proposal.title}" under ${describe(out.areaNode)}. ` +
+      "It joins the product layer when the change is applied.",
+  );
+  for (const w of warnings) warn(w);
+}
+
 async function applyChange(rexDir: string, ref: string, flags: Record<string, string>): Promise<void> {
   let appliedAt!: string;
   const { result: out } = await withPrdModelTransaction(rexDir, (model) => {
@@ -151,6 +215,8 @@ function placementRefusal(err: ChangePlacementError): CLIError {
   switch (err.kind) {
     case "not-a-target":
       return new CLIError(err.plain, "List the live capabilities and constraints with `rex product show`.");
+    case "not-an-area":
+      return new CLIError(err.plain, "List the live areas with `rex product show`.");
     case "content-needs-amends":
       return new CLIError("--proposed and capability criteria describe an amendment: pass --relation=amends with them.");
     case "nothing-to-modify":
@@ -158,11 +224,16 @@ function placementRefusal(err: ChangePlacementError): CLIError {
         err.plain,
         `Pass --proposed="...", --${CAPABILITY_CRITERION_FLAG}="<id>: <text>" or --${REMOVE_CAPABILITY_CRITERION_FLAG}=<id>, or use --relation=touches.`,
       );
+    case "applied-change-amends":
+      return new CLIError(err.plain, "Pass --relation=touches with --target, and no --proposed or capability criteria.");
     case "already-amends":
+    case "already-proposed":
     case "rule-errors":
     case "apply-problems":
     case "no-such-change":
     case "change-not-open":
+    case "empty-title":
+    case "invalid-proposal":
       return new CLIError(err.plain);
   }
 }

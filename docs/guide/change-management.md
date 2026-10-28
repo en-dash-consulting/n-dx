@@ -39,14 +39,20 @@ From an assistant, the same views are the `get_product`, `get_capability` and `g
 
 ### 1. Empty the Inbox
 
-Every new input lands as a change in the Inbox. A change that cannot be placed confidently waits with `needsPlacement`; autonomous runs skip it until someone places it.
+Every new input lands as a change in the Inbox. In the dashboard it is the Inbox section on Plan, and each change opens a placement panel ([Finding and placing an Inbox change](/packages/web#finding-and-placing-an-inbox-change-v2)). A change that cannot be placed confidently waits with `needsPlacement`; autonomous runs skip it until someone places it.
 
 ```sh
 rex change place <change> .                                   # the shortlist, best first
 rex change place <change> --target=<node> --relation=touches . # it works on the capability
 rex change place <change> --target=<node> --relation=amends \
   --capability-criterion="c3: A refund reaches the card" .    # it changes the requirement
+rex change place <change> --propose --type=capability \
+  --under=<area> --title="Refund by card" .                   # nothing fits: propose a new one
 ```
+
+`--propose` (MCP: `place_change` with `propose: {type, under, title}`) records a new capability or constraint under any live area as an `added` amendment on the change, and clears `needsPlacement`. It is not accepted yet: the node reaches the map only when the change is [applied](./concepts/changes-and-apply). `--summary`, `--proposed` (the statement) and, for a capability, `--capability-criterion` describe it; `--target` and `--relation` cannot be combined with it.
+
+An **applied** change that was never placed (migrated history) can be placed too, with `--relation=touches` only. The CLI, `place_change` and the dashboard's Inbox applied list all accept it. That gives the record a target and clears `needsPlacement` without a new rule finding. `amends`, `--propose` and amendment content are refused (`applied-change-amends`): an applied change's amendments have already reached the map, so amending again would rewrite settled spec. Nothing is bulk-accepted; you pick each target.
 
 A change that only *touches* a capability is a fix or a refactor: it writes nothing to the product layer and needs no steward. A change that *amends* one carries the new statement or capability criteria, and [apply](./concepts/changes-and-apply) writes them when it completes.
 

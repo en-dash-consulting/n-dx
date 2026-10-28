@@ -10,6 +10,7 @@ import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { ProductPage, ChangesPage } from "../../../src/viewer/views/product-pages.js";
 import { STAGES } from "../../../src/viewer/views/index.js";
+import { isAppliedStage } from "../../../src/viewer/views/product-model.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache, getProjectMetadata } from "../../../src/viewer/hooks/use-project-metadata.js";
 import {
@@ -133,7 +134,9 @@ describe("on a v2 project", () => {
     stubRoutes({ "/api/rex/changes": { layout: "v2", changes: CHANGES_FIXTURE } });
     const navigateTo = vi.fn();
     await mount(h(ChangesPage, { navigateTo }));
-    expect(root.querySelectorAll("[data-change-id]")).toHaveLength(CHANGES_FIXTURE.length);
+    // Applied and shipped changes start collapsed behind their release's count.
+    const open = CHANGES_FIXTURE.filter((c) => !isAppliedStage(c.stage));
+    expect(root.querySelectorAll("[data-change-id]")).toHaveLength(open.length);
 
     act(() => { root.querySelector<HTMLButtonElement>(".ch-change-link")!.click(); });
     expect(navigateTo).toHaveBeenCalledWith("prd", { taskId: expect.any(String) });

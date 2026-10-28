@@ -21,9 +21,9 @@ const webPackageVersion = (
 /** Start a test server that only runs status routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
   return new Promise((resolve) => {
-    const server = createServer((req, res) => {
+    const server = createServer(async (req, res) => {
       res.setHeader("Access-Control-Allow-Origin", "*");
-      if (handleStatusRoute(req, res, ctx)) return;
+      if (await handleStatusRoute(req, res, ctx)) return;
       res.writeHead(404);
       res.end("Not found");
     });

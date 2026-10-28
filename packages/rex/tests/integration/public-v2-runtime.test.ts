@@ -30,6 +30,15 @@ import {
   PRD_TREE_DIRNAME,
   ChangeLayerStore,
   isChangeLayerStore,
+  suggestPlacement,
+  recordPlacement,
+  placementStrength,
+  ChangePlacementError,
+  type ChangePlacementErrorKind,
+  type PlacementCandidate,
+  type PlacementSuggestion,
+  type RecordPlacementInput,
+  type RecordPlacementResult,
   type PrdModel,
   type WorkUnit,
   type V2Tree,
@@ -63,6 +72,30 @@ describe("v2 runtime exported from public.ts", () => {
     const model: PrdModel = await loadPrdModel(rexDir, quiet);
     expect(model.layout).toBe("v2");
     expect(model.tree.changes.length).toBeGreaterThan(0);
+  });
+
+  it("suggestPlacement, recordPlacement and placementStrength rank and record a placement", async () => {
+    const t = await tree();
+    const suggestion: PlacementSuggestion = suggestPlacement(t, CHANGE);
+    expect(typeof suggestion.tied).toBe("boolean");
+    expect(suggestion.shortlist.length).toBeGreaterThan(0);
+    for (const c of suggestion.shortlist) {
+      const scored: PlacementCandidate = c;
+      expect(c.strength).toBe(placementStrength(scored.score));
+    }
+    const record: (tree: V2Tree, ref: string, input: RecordPlacementInput, now: Date) => RecordPlacementResult = recordPlacement;
+    const kindOf = (input: RecordPlacementInput): ChangePlacementErrorKind | undefined => {
+      try {
+        record(t, CHANGE, input, NOW);
+      } catch (err) {
+        expect(err).toBeInstanceOf(ChangePlacementError);
+        return (err as ChangePlacementError).kind;
+      }
+      return undefined;
+    };
+    // The fixture's change already amends its only capability; the area is no target.
+    expect(kindOf({ target: "A1.1", relation: "touches" })).toBe("already-amends");
+    expect(kindOf({ target: "A1" })).toBe("not-a-target");
   });
 
   it("findNextWork, findActionableWork and resolveWorkById select the fixture's task", async () => {

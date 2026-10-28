@@ -9,6 +9,8 @@
 
 import { cp, readFile, readdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { indexTree } from "../../src/schema/v2-rules.js";
+import { withPrdModelTransaction } from "../../src/store/prd-model-transaction.js";
 
 export const V2_FIXTURE = resolve(import.meta.dirname, "../fixtures/v2-tree");
 
@@ -38,6 +40,19 @@ export async function completeFixtureTask(rexDir: string): Promise<void> {
   await editText(join(rexDir, "changes", "add-apple-pay", "state.yaml"), (text) =>
     `${text.trimEnd()}\n  "${FIXTURE_TASK}":\n    status: "completed"\n    startedAt: "2026-10-01T09:00:00.000Z"\n    completedAt: "2026-10-02T09:00:00.000Z"\n`,
   );
+}
+
+/**
+ * Mark the change `ref` completed and applied at `at`, leaving its
+ * `needsPlacement` alone: the shape the v1 migration leaves history in.
+ */
+export async function markChangeApplied(rexDir: string, ref: string, at = "2026-10-01T00:00:00.000Z"): Promise<void> {
+  await withPrdModelTransaction(rexDir, ({ tree }) => {
+    const change = indexTree(tree).resolve(ref);
+    if (change?.type !== "change") throw new Error(`No change "${ref}"`);
+    Object.assign(change, { status: "completed", completedAt: at, appliedAt: at });
+    return { tree, result: undefined };
+  });
 }
 
 /** Rewrite `path` through `edit`, which sees and returns LF text; the file keeps its line ending. */

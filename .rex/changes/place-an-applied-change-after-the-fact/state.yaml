@@ -1,0 +1,40 @@
+schema: "rex/v2"
+items:
+  "1d8142d1-4a0d-4447-a212-821cc5fcbd3c":
+    status: "completed"
+    startedAt: "2026-10-28T00:28:44.049Z"
+    completedAt: "2026-10-28T00:29:19.642Z"
+    endedAt: "2026-10-28T00:29:19.642Z"
+    activeIntervals: [{"end":"2026-10-28T00:29:19.642Z","start":"2026-10-28T00:28:44.049Z"}]
+    lastModified: "2026-10-28T00:29:19.642Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2ae3fbcd-895e-40a2-8a3b-c0d419dd0331":
+    status: "completed"
+    startedAt: "2026-10-28T00:29:19.642Z"
+    completedAt: "2026-10-28T00:29:19.642Z"
+    endedAt: "2026-10-28T00:29:19.642Z"
+    activeIntervals: [{"end":"2026-10-28T00:29:19.642Z","start":"2026-10-28T00:29:19.642Z"}]
+    appliedAt: "2026-10-28T00:29:19.642Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-28T00:29:19.642Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5c301895-2beb-4613-b873-7807f771d47d":
+    status: "completed"
+    startedAt: "2026-10-28T00:05:18.483Z"
+    completedAt: "2026-10-28T00:17:57.358Z"
+    endedAt: "2026-10-28T00:17:57.358Z"
+    activeIntervals: [{"end":"2026-10-28T00:17:57.358Z","start":"2026-10-28T00:05:18.483Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "recordPlacement/suggestPlacement admit applied changes with touches; new applied-change-amends kind refuses amends and proposals; CLI, MCP, web route and viewer hint updated with tests."
+    lastModified: "2026-10-28T00:17:57.358Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fe7b26c2-a61f-4ab2-9c0b-247d237d83d1":
+    status: "completed"
+    startedAt: "2026-10-28T00:18:19.227Z"
+    completedAt: "2026-10-28T00:28:22.440Z"
+    endedAt: "2026-10-28T00:28:22.440Z"
+    activeIntervals: [{"end":"2026-10-28T00:28:22.440Z","start":"2026-10-28T00:18:19.227Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Applied-unplaced list in Inbox, touches-only detail panel with note, placements read covers applied changes; tests added (b0b806765)."
+    lastModified: "2026-10-28T00:28:22.440Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

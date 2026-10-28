@@ -19,7 +19,7 @@
  *
  * Every endpoint governed by a key in `FEATURE_REGISTRY` (routes-features.ts),
  * including the endpoints a feature reaches through a side door. The Ask panel
- * is the worked example: `sourcevision.ask` is the only toggle over a
+ * is the worked example: `sourcevision.ask` was the first toggle over a
  * token-spending endpoint, and turning it off used to leave the panel's two
  * write endpoints (`capture-ask`, `apply-refinements`) reachable, because the
  * only thing that had ever hidden them was the sidebar.
@@ -74,7 +74,7 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     feature: "sourcevision.ask",
     exact: ["/api/sourcevision/ask"],
     reason:
-      "The question itself — the only endpoint in the dashboard that spends tokens per call behind a toggle.",
+      "The question itself, which spends tokens per call.",
     selfEnforced: true,
   },
   {
@@ -87,6 +87,14 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     feature: "sourcevision.prMarkdown",
     exact: ["/api/sv/pr-markdown", "/api/sv/pr-markdown/state"],
     reason: "Reads for the PR Markdown page. Listed exactly so an unrelated subpath is still a 404, not a 403.",
+  },
+  {
+    feature: "rex.placementDraft",
+    // Documents the endpoint; it carries a change id, so no exact path matches
+    // it here and routes-rex/placement.ts refuses with this module's body.
+    exact: ["/api/rex/changes/:id/placement/draft"],
+    reason: "Draft with the model: each call spends tokens on the prd.place model. Writes nothing.",
+    selfEnforced: true,
   },
 ];
 

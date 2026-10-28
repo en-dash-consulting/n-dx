@@ -55,7 +55,12 @@ describe("on a v2 tree", () => {
   it("rex product show and rex change place take an id and an optional dir", () => {
     expect(run(["product", "show", tmp], tmp)).toMatch(/A1\.1 Pay by card \(capability\)/);
     expect(run(["product", "show", "A1.1", tmp], tmp)).toContain("Capability criteria:");
-    expect(run(["change", "place", "CH-1"], tmp)).toContain("CH-1 Add Apple Pay");
+    const place = run(["change", "place", "CH-1"], tmp);
+    expect(place).toContain("CH-1 Add Apple Pay");
+    expect(place).toMatch(/A1\.1 Pay by card \(amends, (strong|possible|weak)\)/);
+    const placeJson = JSON.parse(run(["change", "place", "CH-1", "--format=json", tmp], tmp));
+    expect(placeJson.tied).toBe(false);
+    expect(placeJson.shortlist[0]).toMatchObject({ target: "a0000000-0000-4000-8000-000000000002", strength: expect.stringMatching(/^(strong|possible|weak)$/) });
     expect(run(["change", "apply", "CH-1", tmp], tmp, true)).toMatch(/Cannot apply change CH-1: task \S+ is not completed/);
     run(["update", FIXTURE_TASK, "--status=completed", tmp], tmp);
     expect(run(["change", "apply", "CH-1", tmp], tmp)).toContain("Applied CH-1 Add Apple Pay.");

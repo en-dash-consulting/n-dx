@@ -554,6 +554,7 @@ describe("isolation", () => {
         "core/change-next-task.ts",
         "cli/v2-completion.ts",
         "cli/legacy-layout-notice.ts",
+        "analyze/place-draft.ts",
       ].map(
         (f) => join(srcRoot, f),
       ),

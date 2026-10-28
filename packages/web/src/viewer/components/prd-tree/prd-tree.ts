@@ -453,6 +453,8 @@ interface NodeRowProps {
    * every row.
    */
   showLevelLabel?: boolean;
+  /** Whether rex holds this change for placement (it sits in the Inbox). */
+  inInbox?: boolean;
 }
 
 /**
@@ -488,6 +490,7 @@ class NodeRow extends Component<NodeRowProps> {
     if (p.canDelete !== nextProps.canDelete) return true;
     if (p.showTokenBudget !== nextProps.showTokenBudget) return true;
     if (p.showLevelLabel !== nextProps.showLevelLabel) return true;
+    if (p.inInbox !== nextProps.inInbox) return true;
     // taskUsage / usageRollup are objects — reference check
     // (new object ⇒ re-render)
     if (p.taskUsage !== nextProps.taskUsage) return true;
@@ -503,7 +506,7 @@ class NodeRow extends Component<NodeRowProps> {
   }
 
   render() {
-    const { item, claim, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel } = this.props;
+    const { item, claim, taskUsage, usageRollup, weeklyBudget, showTokenBudget, tickMs, depth, isExpanded, hasChildren, isSelected, isBulkSelected, canInlineAdd, isInlineAddActive, isHighlighted, nodeRef, canDelete, isDeleting, searchQuery, isSearchMatch, showLevelLabel, inInbox } = this.props;
     const children = item.children ?? [];
     const stats = hasChildren ? computeBranchStats(children) : null;
     const ratio = stats ? completionRatio(stats) : 0;
@@ -557,6 +560,14 @@ class NodeRow extends Component<NodeRowProps> {
       // instead of a repeating badge on every row.
       showLevelLabel
         ? h("span", { class: `prd-level-badge prd-level-${itemType}` }, itemTypeLabel(itemType))
+        : null,
+      // Inbox badge — on every change rex holds for placement
+      inInbox
+        ? h("span", {
+            class: "prd-inbox-badge",
+            title: "In the Inbox, waiting for a place",
+            "aria-label": "In the Inbox, waiting for a place",
+          }, "Inbox")
         : null,
       // Branch badge (only when attribution is present)
       item.branch
@@ -826,6 +837,8 @@ export interface PRDTreeProps {
   activeBranch?: string | null;
   /** Called when the user selects a different branch in the toolbar dropdown. */
   onBranchChange?: (branch: string | null) => void;
+  /** Ids of the changes rex holds for placement; each gets an Inbox badge. */
+  inboxIds?: ReadonlySet<string>;
   /** Rendered beside the title — the Tasks view's glossary ⓘ. */
   titleInfo?: ComponentChild;
   /**
@@ -850,7 +863,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange, titleInfo, controls }: PRDTreeProps) {
+export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange, inboxIds, titleInfo, controls }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
@@ -1192,6 +1205,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
             searchQuery,
             isSearchMatch: searchMatchIds?.has(item.id),
             showLevelLabel,
+            inInbox: inboxIds?.has(item.id),
           }),
           // Inline add form — rendered below the parent node
           isInlineAddActive && onInlineAddSubmit

@@ -2,8 +2,8 @@
   "model": "claude-sonnet-5",
   "totals": {
     "surfaces": 38,
-    "perCallTokens": 23454,
-    "uniqueTokens": 14949,
+    "perCallTokens": 23515,
+    "uniqueTokens": 15010,
     "skills": 13,
     "skillTokens": 22952
   },
@@ -103,8 +103,8 @@
   "byPackage": {
     "rex": {
       "surfaces": 21,
-      "perCallTokens": 15743,
-      "uniqueTokens": 7721
+      "perCallTokens": 15804,
+      "uniqueTokens": 7782
     },
     "sourcevision": {
       "surfaces": 7,
@@ -621,11 +621,11 @@
       "builder": "buildPlacementEnvelope",
       "purpose": "Place a change on a shortlisted capability or constraint, or propose a new node.",
       "inline": false,
-      "literals": 15,
+      "literals": 16,
       "constants": {},
-      "ownTokens": 172,
-      "fixedChars": 687,
-      "fixedTokens": 172
+      "ownTokens": 233,
+      "fixedChars": 931,
+      "fixedTokens": 233
     },
     {
       "pkg": "rex",
@@ -1067,8 +1067,8 @@
       }
     ]
   },
-  "contentHash": "2d0fda542614f9b2",
-  "recordedAt": "2026-10-16T22:30:15.623Z",
-  "commit": "c7b10d223337",
+  "contentHash": "ba595d4edf6728b4",
+  "recordedAt": "2026-10-28T01:09:48.358Z",
+  "commit": "3205a763fbe2",
   "dirty": false
 }
