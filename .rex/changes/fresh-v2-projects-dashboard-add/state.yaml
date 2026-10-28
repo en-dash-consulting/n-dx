@@ -2,8 +2,8 @@ schema: "rex/v2"
 items:
   "1a63946a-eb94-46ec-ba08-3aee7bb7a869":
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-23T03:03:07.731Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T00:10:32.400Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "4e91343d-e1bc-449a-8a85-40d4d7fae389":
     status: "completed"
     startedAt: "2026-10-23T02:56:29.775Z"
@@ -22,9 +22,14 @@ items:
     lastModified: "2026-10-23T03:19:38.433Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b5a89672-4d03-4f4e-9a79-f529ba7ffe0a":
+    status: "completed"
+    startedAt: "2026-10-28T00:10:58.874Z"
+    completedAt: "2026-10-28T00:10:58.874Z"
+    endedAt: "2026-10-28T00:10:58.874Z"
+    activeIntervals: [{"end":"2026-10-28T00:10:58.874Z","start":"2026-10-28T00:10:58.874Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-23T03:19:40.739Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T00:10:58.874Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "cf1f496d-ae11-47f0-bba9-9393ab776c06":
     status: "completed"
     startedAt: "2026-10-23T02:41:14.081Z"
