@@ -16,6 +16,7 @@ until promoted; an exported symbol alone does not make it frozen.
 | Directory layout | `.ndx/rex/`, `.ndx/hench/`, `.ndx/sourcevision/`, `.ndx/graview/`; legacy directories remain resolvable | Soft-frozen; frozen at 1.0.0 |
 | Attribution | Final git trailer block with bare `N-DX-Item: <id>` and `N-DX` provenance | Soft-frozen; frozen at 1.0.0 |
 | Rex TypeScript helpers | Library exports in `packages/rex/src/public.ts` beyond the schema contract | Outside this declared freeze |
+| Extensions | `ndx.extension` manifest, process environment, `/x/<name>/` proxy, and the four versioned hub project/extension endpoints; [contract](./extensions) | Experimental until explicitly promoted |
 | Graview projection and product face | Declaration, snapshot names, face and its feature flags | Outside this declared freeze; flags marked experimental stay experimental |
 
 The package `./dist/*` export is an internal escape hatch with no stability
