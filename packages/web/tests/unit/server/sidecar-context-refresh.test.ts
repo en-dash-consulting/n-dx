@@ -204,6 +204,41 @@ describe("checkpoint at the ceiling", () => {
     expect(spawns.at(-1)!.stdin).toContain("after restart");
   });
 
+  it("honours an interrupt that arrives while the cold turn builds its packet", async () => {
+    let release: ((text: string) => void) | undefined;
+    let builds = 0;
+    const reg = new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      context: {
+        ceiling: () => 1000,
+        ledger: (record) => readLedger(dir, record.id),
+        // The first build waits for the test; later ones answer at once.
+        packet: () => (builds++ === 0
+          ? new Promise<string>((resolve) => { release = resolve; })
+          : Promise.resolve("## PACKET")),
+      },
+    });
+    const id = open(reg);
+    await turn(reg, id, "big", 5000); // checkpoints
+    const before = spawns.length;
+
+    const cold = reg.sendTurn(id, "stopped before it began");
+    await new Promise((r) => setImmediate(r));
+    expect(await reg.interrupt(id)).toBe(true);
+    release!("## PACKET");
+    const result = await cold;
+
+    expect(result.status).toBe("interrupted");
+    expect(spawns).toHaveLength(before);
+    expect(reg.isRunning(id)).toBe(false);
+    // Still marked, so the next turn starts cold rather than resuming the oversized session.
+    expect(reg.get(id)?.refresh).toBeDefined();
+    contextSize = 10;
+    await reg.sendTurn(id, "again");
+    expect(spawns.at(-1)!.args).not.toContain("--resume");
+  });
+
   it("never checkpoints without context options", async () => {
     const reg = new SidecarSessionRegistry({ dir, connect: () => ({ spawn: fakeSpawn }) });
     const id = open(reg);

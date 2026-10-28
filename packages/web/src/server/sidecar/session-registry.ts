@@ -192,6 +192,8 @@ export class SidecarSessionRegistry {
   private readonly context?: SidecarContextOptions;
   /** Sessions with a turn in progress, from the moment `sendTurn` is called until it settles. */
   private readonly turnOpen = new Set<string>();
+  /** Open turns the operator stopped before their vendor call began (a cold turn building its packet). */
+  private readonly stopRequested = new Set<string>();
   private readonly records = new Map<string, SidecarSessionRecord>();
   private readonly live = new Map<string, LiveSession>();
   /** Sessions whose cursor has been checked against the transcript; see {@link reconcileCursor}. */
@@ -254,6 +256,7 @@ export class SidecarSessionRegistry {
       return await this.runTurn(record, prompt, onFrame);
     } finally {
       this.turnOpen.delete(id);
+      this.stopRequested.delete(id);
     }
   }
 
@@ -294,6 +297,11 @@ export class SidecarSessionRegistry {
           contextTokens: record.refresh.contextTokens,
         });
         vendorPrompt = composeColdPrompt({ packet, ledger: ledger.text, exchanges, prompt });
+        // Stopped while the packet was built: settle without spawning. The
+        // session stays marked, so its next turn starts cold again.
+        if (this.stopRequested.has(record.id)) {
+          return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
+        }
       }
 
       // The context the turn ended with: what its last call sent in.
@@ -391,7 +399,10 @@ export class SidecarSessionRegistry {
    */
   async interrupt(id: string): Promise<boolean> {
     if (!this.isRunning(id)) return false;
-    await this.live.get(id)?.session.interrupt();
+    const session = this.live.get(id)?.session;
+    // A turn still before its vendor call has nothing to signal yet; it checks this before spawning.
+    if (session?.state === "running") await session.interrupt();
+    else this.stopRequested.add(id);
     return true;
   }
 

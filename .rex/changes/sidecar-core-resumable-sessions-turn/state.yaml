@@ -74,7 +74,14 @@ items:
     lastModified: "2026-10-27T16:22:17.381Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "777869b8-d76a-4cc1-8906-65f2d7d327aa":
-    lastModified: "2026-10-28T04:10:48.546Z"
+    status: "completed"
+    startedAt: "2026-10-28T04:37:07.044Z"
+    completedAt: "2026-10-28T04:47:17.821Z"
+    endedAt: "2026-10-28T04:47:17.821Z"
+    activeIntervals: [{"end":"2026-10-28T04:47:17.821Z","start":"2026-10-28T04:37:07.044Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Context ceiling per scope, checkpoint ledger turn, cold start from packet+ledger(3k)+last two exchanges, context-refreshed frame; commit edc89ea16"
+    lastModified: "2026-10-28T04:47:17.821Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7961018b-a81d-4b39-9bdb-fe54d0b81c28":
     status: "completed"
@@ -98,7 +105,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9753d37a-2e7e-4950-8eba-3015eee08734":
     issues: ["https://www.notion.so/3f7a80b71924810fb66ac7fbdc9bc4db","https://www.notion.so/3f7a80b719248165891cff1c8f0d0ace","https://www.notion.so/3f7a80b7192481c5a8fef7faf77e11e0","https://www.notion.so/3f7a80b7192481e0a645e0c1b1b7f2b7","https://www.notion.so/3f7a80b71924810492a8ca3948c3f474","https://www.notion.so/3f7a80b71924810499c9f380e11f53fd"]
-    lastModified: "2026-10-28T04:31:12.985Z"
+    lastModified: "2026-10-28T04:45:43.696Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9e47fb80-238b-4cff-a0df-254bce7a8da1":
     lastModified: "2026-10-27T16:33:13.187Z"
@@ -131,6 +138,9 @@ items:
     endedAt: "2026-10-28T04:34:54.908Z"
     activeIntervals: [{"end":"2026-10-28T04:28:15.354Z","start":"2026-10-28T04:14:29.686Z"},{"end":"2026-10-28T04:34:54.908Z","start":"2026-10-28T04:34:54.908Z"}]
     lastModified: "2026-10-28T04:34:54.908Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e18b93c0-a4b0-4f46-b4d9-9ce2d4ef0d6c":
+    lastModified: "2026-10-28T04:45:43.696Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fc4ad798-1565-4492-98dc-0d9be53d57d5":
     status: "completed"
