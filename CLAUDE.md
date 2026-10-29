@@ -10,7 +10,7 @@ AI-powered development toolkit. Three packages that chain together: analyze a co
 - **hench** — Autonomous agent: picks next rex task, builds a brief, drives an LLM in a tool-use loop, records runs in `.hench/runs/`.
 - **lang-kit and packs** — `@n-dx/lang-kit`: language facts and the pack contract (foundation, no dependencies). `@n-dx/lang-runtime` and the `@n-dx/lang-*` packs: sourcevision loads them at run time. See each package's `AGENTS.md`.
 - **graview** — Graview projection: `ndx graview emit|check|describe|serve|mcp` writes a `graview-document` declaration and a `{nodes, edges}` snapshot of the PRD, the analysis and the runs under the layout's graview dir, then spawns the `graview` CLI on them. No `@graview/*` dependency; the binary is a peer tool.
-- **graview-face** — The product face on Graview: a Vite + React app, published on its own and depended on by no other package, that compiles the emitted document and lays a shell, home and record pages in n-dx's words over the derived ones. `ndx graview serve` runs it.
+- **graview-face** — The product face on Graview: a Vite + React app, published on its own, that lays n-dx's shell, home and record pages over the emitted document. `ndx graview serve` runs it as the `graview-face` extension.
 
 ### Architecture
 
@@ -114,8 +114,6 @@ with any write command, or two `ndx config` runs. The full table is in
 
 **General rule:** Commands that write to the PRD backend (`product/` and `changes/` under the resolved rex directory on v2, `prd_tree/` on v1), sourcevision output, or hench config must not run concurrently. Read-only commands (`status`, `usage`) are always safe.
 
-**MCP write operations** write PRD intent and state only under those layout-specific roots. Configuration and execution logs are separate from the PRD backend.
-
 **Lock scope.** V2 writes use `withPrdModelTransaction`; store consumers use
 `store.withTransaction`. The PRD lock covers read-modify-write and a refused
 writer names its holder. It is per workspace (`rexDir`), so it does not
@@ -177,6 +175,8 @@ Run `ndx <command> --help` for full usage, or see `README.md` for the command re
 
 **Gotcha:** `ndx iso` renders a standalone isometric architecture map. Its portable `/iso-map` skill script is **generated** from `packages/sourcevision/src/export/` by `scripts/build-iso-skill.mjs` — edit the TypeScript and re-run it; hand-editing `.claude/skills/iso-map/scripts/iso-map.mjs` fails `tests/e2e/iso-skill-drift.test.js`. Injection seams and runtime infrastructure, which no import graph can show, are declared under `sourcevision.isoMap` in `.n-dx.json`; see [`docs/architecture/iso-map-data-flow.md`](docs/architecture/iso-map-data-flow.md).
 
+**Extensions:** `ndx.extension` packages add `ndx <name>` commands and `/x/<name>/` hub apps, spawned and never imported. Contract: [`docs/extensions/`](docs/extensions/index.md).
+
 ## MCP Servers
 
 Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx start`, which registers the repository with the per-user hub on port 3117). See `README.md` for full registration commands.
@@ -192,8 +192,6 @@ Rex and sourcevision expose MCP servers over stdio (default) and HTTP (`ndx star
 **Migrating from stdio to HTTP (Claude):** register with the hub (`ndx start .`), read the project id from the URL it prints (or `ndx hub status`), remove the stdio registrations (`claude mcp remove rex && claude mcp remove sourcevision`), then add the HTTP ones (`claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex`, same for sourcevision).
 
 ### Rex MCP tools
-
-Rex mutations use the layout-specific PRD roots described by the PRD invariant.
 
 - `get_prd_status` — PRD title and layout-specific progress; on v2, changes, Inbox and product status
 - `get_next_task` — next actionable task based on priority and dependencies (skips tasks another worktree has claimed)

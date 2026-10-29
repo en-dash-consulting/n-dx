@@ -35,6 +35,7 @@ export {
   validateProjectName,
   slugifyProjectId,
   deriveProjectId,
+  isReservedProjectId,
   defaultParentDir,
 } from "./new-project.js";
 export type { NewProjectInput, NewProjectPlan } from "./new-project.js";
@@ -58,8 +59,36 @@ export type {
   QueueSnapshot,
   StartOutcome,
 } from "./admission.js";
-export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
-export type { ProxyDecision } from "./proxy.js";
+export {
+  SidecarManager,
+  ndxCliPlanner,
+  SIDECAR_START_TIMEOUT_MS,
+  SIDECAR_CRASH_LIMIT,
+  SIDECAR_CRASH_WINDOW_MS,
+} from "./sidecars.js";
+export type {
+  SidecarPlan,
+  PlanResult,
+  PlanSidecar,
+  EnsureResult,
+  SidecarState,
+  SidecarStatus,
+  SidecarManagerOptions,
+} from "./sidecars.js";
+export { EXTENSION_API_VERSION, ndxCliLister, buildExtensionsAnswer, resolveProjectLink } from "./extensions.js";
+export type {
+  ExtensionStateName,
+  ExtensionManifest,
+  ExtensionListing,
+  ListResult,
+  ListExtensions,
+  ExtensionSidecarView,
+  ExtensionLinkView,
+  ExtensionView,
+  ExtensionsAnswer,
+} from "./extensions.js";
+export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER } from "./proxy.js";
+export type { ProxyDecision, SidecarForward } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";
 export type { HubOverview, ProjectCard, ChildSnapshot } from "./overview.js";
 export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel, readinessLabel, infrastructureLabel } from "./home.js";

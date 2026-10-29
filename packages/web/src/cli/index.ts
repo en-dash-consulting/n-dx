@@ -27,9 +27,12 @@ let port = command === "preview" ? DEFAULT_PREVIEW_PORT : DEFAULT_HUB_PORT;
 let scope: ViewerScope | undefined;
 let previewFile: string | undefined;
 let tokenFile: string | undefined;
+let ndxCli: string | undefined;
 
 for (const a of args.slice(1)) {
-  if (a.startsWith("--file=")) {
+  if (a.startsWith("--ndx-cli=")) {
+    ndxCli = a.slice("--ndx-cli=".length);
+  } else if (a.startsWith("--file=")) {
     previewFile = a.slice("--file=".length);
   } else if (a.startsWith("--token-file=")) {
     tokenFile = a.slice("--token-file=".length);
@@ -71,7 +74,7 @@ if (command === "serve") {
   // per project, all of which would otherwise inherit NDX_DEBUG.
   delete process.env.NDX_DEBUG;
 
-  const hub = await startHub({ port, tokenFile, log: (message) => console.log(message) });
+  const hub = await startHub({ port, tokenFile, ndxCli, log: (message) => console.log(message) });
   console.log(`n-dx hub listening on http://127.0.0.1:${hub.port} (registry: ${hub.registryPath})`);
 
   let shuttingDown = false;

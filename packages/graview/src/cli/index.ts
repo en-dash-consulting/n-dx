@@ -5,10 +5,10 @@
  *   emit      write document.json and snapshot.json under the layout's graview dir
  *   check     emit, then `graview check` on the declaration
  *   describe  emit, then `graview describe` over the snapshot (`--place <slug>`, `--as <role>`)
- *   serve     emit, then the product face (`@n-dx/graview-face`, found beside this package or
- *             installed, or `graview.app` in the config) on the fresh projection; with `--no-face`
- *             or no face, refresh graview's store and run `graview serve` (the store's HTTP and
- *             WebSocket wire, which draws nothing)
+ *   serve     emit, then the product face (the `graview-face` extension, `@n-dx/graview-face`,
+ *             run from the launch plan n-dx gives for its sidecar) on the fresh projection; with
+ *             `--no-face` or no face, refresh graview's store and run `graview serve` (the
+ *             store's HTTP and WebSocket wire, which draws nothing)
  *   mcp       emit, refresh the store, then `graview mcp --read-only` over stdio
  *   info      the graview dir, the binary, and the hub's rex MCP endpoint for a face's two-way sync
  *
@@ -23,9 +23,8 @@ import { readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from ".
 import { loadDocument } from "../document.js";
 import { rexMcpEndpoint } from "../hub.js";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
-import { dirname } from "node:path";
 import { resolveLayout } from "../llm-gateway.js";
+import { FACE_EXTENSION, faceEnvironment, findInstalledFace, planProductFace, type FacePlan, type InstalledFace } from "../face.js";
 
 const SUBCOMMANDS = ["emit", "check", "describe", "serve", "mcp", "info"] as const;
 type Subcommand = (typeof SUBCOMMANDS)[number];
@@ -35,8 +34,8 @@ const USAGE = `ndx graview <command> [dir] [flags]
   emit [dir] [--no-files]         write document.json and snapshot.json under the graview dir
   check [dir] [--json]            graview check on the emitted declaration
   describe [dir] [--place <slug>] graview describe over the emitted snapshot
-  serve [dir] [--port <n>]        the product face (@n-dx/graview-face, or graview.app in the config) on the
-                                  fresh projection; --no-face, or no face found: graview serve, the bare store
+  serve [dir] [--port <n>]        the product face (the graview-face extension, @n-dx/graview-face) on the
+                                  fresh projection; --no-face, or no face enabled: graview serve, the bare store
                                   over HTTP + WebSocket that a Graview face connects to
   mcp [dir] [--list]              graview mcp --read-only over stdio on the same store
   info [dir] [--json]             where the projection lands, which graview binary, and the hub's rex
@@ -127,41 +126,15 @@ async function runGraview(command: GraviewCommand, args: string[], cwd: string, 
 }
 
 /**
- * Where the product face is, when nothing names one: `@n-dx/graview-face`
- * beside this package in the monorepo, or installed in node_modules. It is
- * never a dependency of this package — installing n-dx never pulls Graview —
- * so it is looked for, not imported.
+ * The product face over the projection, from the launch plan n-dx gives for
+ * the `graview-face` extension's sidecar (`../face.ts`): its own server, told
+ * where the fresh document and snapshot are through `NDX_GRAVIEW_DIR`, in the
+ * foreground. A `--port` goes to it.
  */
-export function findProductFace(): string | undefined {
-  const sibling = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "graview-face");
-  if (existsSync(resolve(sibling, "bin", "serve.js"))) return sibling;
-  try {
-    return dirname(createRequire(import.meta.url).resolve("@n-dx/graview-face/package.json"));
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * A product face over the projection (`graview.app` in the config, or
- * `@n-dx/graview-face` where it is found): its own server, told where the
- * fresh document and snapshot are through `NDX_GRAVIEW_DIR`. A `--port` goes
- * to it. A face with a `bin/serve.js` is run under this Node, which works
- * installed as well as in the monorepo; any other app gets its `dev` script.
- */
-async function serveProductApp(appDir: string, emitted: EmitResult, passthrough: string[], say: (line: string) => void): Promise<number> {
-  if (!existsSync(appDir)) {
-    console.error(`Error: graview.app names ${appDir}, which does not exist.`);
-    return 1;
-  }
-  const ownBin = resolve(appDir, "bin", "serve.js");
-  const pm = existsSync(resolve(appDir, "pnpm-lock.yaml")) ? "pnpm" : "npm";
-  const cmd = existsSync(ownBin) ? process.execPath : process.platform === "win32" ? `${pm}.cmd` : pm;
-  const args = existsSync(ownBin) ? [ownBin, ...passthrough] : pm === "pnpm" ? ["dev", ...(passthrough.length ? ["--", ...passthrough] : [])] : ["run", "dev", ...(passthrough.length ? ["--", ...passthrough] : [])];
+async function serveProductFace(plan: FacePlan, emitted: EmitResult, passthrough: string[], say: (line: string) => void): Promise<number> {
   const rex = rexMcpEndpoint(emitted.layout);
-  say(`product face: ${appDir}${rex ? `; writes back through ${rex.url}${rex.worktree ? " (as this worktree's workspace)" : ""}` : "; sync off (run ndx start . to register with the hub)"}`);
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
+  say(`product face: ${plan.dir}${rex ? `; writes back through ${rex.url}${rex.worktree ? " (as this worktree's workspace)" : ""}` : "; sync off (run ndx start . to register with the hub)"}`);
+  const env = faceEnvironment(plan, {
     NDX_GRAVIEW_DIR: emitted.graviewDir,
     NDX_PROJECT_ROOT: emitted.layout.root,
     // This CLI's own entry, so the face's dev door can re-emit without `ndx` on its PATH.
@@ -169,8 +142,26 @@ async function serveProductApp(appDir: string, emitted: EmitResult, passthrough:
     ...(rex ? { NDX_REX_MCP_URL: rex.url, ...(rex.tokenFile ? { NDX_TOKEN_FILE: rex.tokenFile } : {}) } : {}),
     // A worktree writes its own workspace, never the main checkout's: the face resolves the key from this listing.
     ...(rex?.worktree && rex.workspacesUrl ? { NDX_WORKTREE: rex.worktree, NDX_WORKSPACES_URL: rex.workspacesUrl } : {}),
-  };
-  return run(cmd, args, { cwd: appDir, env });
+  });
+  return run(plan.execPath, [plan.bin, ...passthrough], { cwd: plan.cwd, env });
+}
+
+/** `graview.app` named a face checkout before the face became an extension; say where that moved. */
+function warnRetiredApp(app: string | undefined): void {
+  if (app === undefined) return;
+  console.error(`warning: graview.app (${app}) is no longer read: the product face is the ${FACE_EXTENSION} extension. To run a checkout, list it under extensions.paths in <ndx home>/config.json, then run ndx extensions enable ${FACE_EXTENSION}.`);
+}
+
+/** How `info` names the face. */
+function describeFace(face: InstalledFace | undefined): string {
+  if (!face) return `none (install @n-dx/graview-face, then ndx extensions enable ${FACE_EXTENSION})`;
+  if (face.state === "enabled") return face.dir;
+  return `${face.dir} (${face.state}${face.reason ? `: ${face.reason}` : ""}; ndx extensions enable ${FACE_EXTENSION})`;
+}
+
+/** The face's directory, for its pinned `graview` binary: only an enabled face's, since that runs its code. */
+function enabledFaceDir(face: InstalledFace | undefined): string | undefined {
+  return face?.state === "enabled" ? face.dir : undefined;
 }
 
 /** `graview sync-seed --apply --prune` when a store exists, so it mirrors the fresh snapshot. */
@@ -210,21 +201,24 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     else console.log(line);
   };
 
+  warnRetiredApp(config.app);
+
   if (parsed.sub === "info") {
-    const command = resolveGraviewCommand(layout, { face: config.app ?? findProductFace() });
+    const face = await findInstalledFace(layout.root);
+    const command = resolveGraviewCommand(layout, { face: enabledFaceDir(face) });
     const rex = rexMcpEndpoint(layout);
     const info = {
       projectRoot: layout.root,
       graviewDir: layout.graviewDir,
       graview: { source: command.source, detail: command.detail },
-      app: config.app ?? findProductFace() ?? null,
+      app: face ? { dir: face.dir, state: face.state, reason: face.reason } : null,
       rex: rex ? { url: rex.url, projectId: rex.projectId, tokenFile: rex.tokenFile ?? null, registered: rex.registered, worktree: rex.worktree ?? null } : null,
     };
     if (parsed.passthrough.includes("--json")) console.log(JSON.stringify(info, null, 2));
     else {
       console.log(`projection: ${relativeToRoot(layout, layout.graviewDir)}/`);
       console.log(`graview:    ${command.detail} (${command.source})`);
-      console.log(`face:       ${config.app ?? findProductFace() ?? "none (install @n-dx/graview-face, or set graview.app)"}`);
+      console.log(`face:       ${describeFace(face)}`);
       console.log(rex ? `rex:        ${rex.url}${rex.worktree ? " (as this worktree's workspace)" : ""}${rex.registered ? "" : " (hub not serving it; run ndx start .)"}` : "rex:        not registered with the hub (run ndx start .)");
     }
     return 0;
@@ -239,9 +233,20 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   say(describeEmit(emitted));
   if (parsed.sub === "emit") return 0;
 
-  const command = resolveGraviewCommand(layout, { face: config.app ?? findProductFace() });
-  say(`graview: ${command.detail} (${command.source})`);
   const root = emitted.layout.root;
+  if (parsed.sub === "serve" && parsed.face) {
+    const face = await planProductFace(root);
+    if (face.kind === "run") return serveProductFace(face.plan, emitted, parsed.passthrough, say);
+    if (face.kind === "refused") {
+      console.error(face.error);
+      console.error("Hint: pass --no-face for the bare graview store.");
+      return 2;
+    }
+    say(`product face: ${face.detail}`);
+  }
+
+  const command = resolveGraviewCommand(layout, { face: enabledFaceDir(await findInstalledFace(root)) });
+  say(`graview: ${command.detail} (${command.source})`);
 
   switch (parsed.sub) {
     case "check":
@@ -249,8 +254,6 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     case "describe":
       return runGraview(command, ["describe", emitted.documentPath, "--seed", emitted.snapshotPath, ...parsed.passthrough], root);
     case "serve": {
-      const face = parsed.face ? (config.app ?? findProductFace()) : undefined;
-      if (face) return serveProductApp(face, emitted, parsed.passthrough, say);
       const refreshed = await refreshStore(command, emitted);
       if (refreshed !== 0) return refreshed;
       return runGraview(command, ["serve", emitted.documentPath, "--data", emitted.dataDir, "--seed", emitted.snapshotPath, ...parsed.passthrough], root);

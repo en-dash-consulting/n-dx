@@ -157,6 +157,10 @@ describe("project ids", () => {
     const id = deriveProjectId(join("/other", "alpha"), taken);
     expect(id).toMatch(/^alpha-[0-9a-f]{6}$/);
   });
+
+  it("hashes a folder named x, which the hub reserves for /x/", () => {
+    expect(deriveProjectId(join("/repos", "X"), new Map())).toMatch(/^x-[0-9a-f]{6}$/);
+  });
 });
 
 describe("defaultParentDir", () => {
