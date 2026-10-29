@@ -1,0 +1,79 @@
+schema: "rex/v2"
+items:
+  "13723ac9-aac4-489a-abbd-4cc56f518ece":
+    status: "completed"
+    startedAt: "2026-10-28T22:39:14.792Z"
+    completedAt: "2026-10-28T22:45:24.507Z"
+    endedAt: "2026-10-28T22:45:24.507Z"
+    activeIntervals: [{"end":"2026-10-28T22:45:24.507Z","start":"2026-10-28T22:39:14.792Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Backstop finding no longer blames the agent: says the file changed during the run, names possible writers, tells the user to save their own change again. Concurrency docs (overview table, project-guidance → regenerated AGENTS.md/CLAUDE.md, guide/overnight) say a config save during ndx work is reverted."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T22:45:24.507Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "21837a0a-b748-49fe-8fc3-7128aac83b0c":
+    status: "completed"
+    startedAt: "2026-10-28T22:56:44.194Z"
+    completedAt: "2026-10-28T22:56:44.194Z"
+    endedAt: "2026-10-28T22:56:44.194Z"
+    activeIntervals: [{"end":"2026-10-28T22:56:44.194Z","start":"2026-10-28T22:56:44.194Z"}]
+    appliedAt: "2026-10-28T22:56:44.194Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T22:56:44.194Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6e3283a2-797a-4a60-973d-b04c268e09f2":
+    status: "completed"
+    startedAt: "2026-10-28T22:33:19.828Z"
+    completedAt: "2026-10-28T22:38:39.553Z"
+    endedAt: "2026-10-28T22:38:39.553Z"
+    activeIntervals: [{"end":"2026-10-28T22:38:39.553Z","start":"2026-10-28T22:33:19.828Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "graview CLI passes repoCommandEnv(root) to every graview/npx spawn and as the face server's base env; run() now requires env."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T22:38:39.553Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "755f5f63-86fc-473e-b46e-cdd654ec894a":
+    status: "completed"
+    startedAt: "2026-10-28T22:46:03.029Z"
+    completedAt: "2026-10-28T22:56:44.194Z"
+    endedAt: "2026-10-28T22:56:44.194Z"
+    activeIntervals: [{"end":"2026-10-28T22:56:44.194Z","start":"2026-10-28T22:46:03.029Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client repoEnvPolicy(dir) (the policy repoCommandEnv builds: repo + local deny, trust-gated repo allow, local allow; malformed fields dropped singly). Web CLI probe and core loadVendorCheckEnv fallback pass it to resolveVendorCliEnv. Tests in routes-llm-catalog.test.ts and cli-auth.test.js failed pre-fix."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T22:56:44.194Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8c2cd508-2e50-41a3-9350-8df138aec452":
+    status: "completed"
+    startedAt: "2026-10-28T22:08:20.316Z"
+    completedAt: "2026-10-28T22:17:05.608Z"
+    endedAt: "2026-10-28T22:17:05.608Z"
+    activeIntervals: [{"end":"2026-10-28T22:17:05.608Z","start":"2026-10-28T22:08:20.316Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "claudePath added to the trust review's hench field checks; collector can only read checked fields (type); hench test holds each check to the schema."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T22:17:05.608Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9adf1968-3c40-41eb-824a-212092764847":
+    status: "completed"
+    startedAt: "2026-10-28T22:23:47.516Z"
+    completedAt: "2026-10-28T22:32:40.669Z"
+    endedAt: "2026-10-28T22:32:40.669Z"
+    activeIntervals: [{"end":"2026-10-28T22:32:40.669Z","start":"2026-10-28T22:23:47.516Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "localConfigTrackState treats the local config as tracked when a directory between root and file is a nested work tree (.git entry) or a gitlink (ls-files -s mode 160000); fails closed when git cannot answer."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T22:32:40.669Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cd3930fb-0d47-4414-8327-c7f2a7dd2eee":
+    status: "completed"
+    startedAt: "2026-10-28T21:52:12.227Z"
+    completedAt: "2026-10-28T22:07:16.792Z"
+    endedAt: "2026-10-28T22:07:16.792Z"
+    activeIntervals: [{"end":"2026-10-28T22:07:16.792Z","start":"2026-10-28T21:52:12.227Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ConfigBackstop snapshots .claude/.codex/.ndx identity (lstat kind, link target, realpath); restore replaces a swapped parent before restoring under it and re-checks it before each write; removes a .ndx/ created on a legacy project; capture throws ConfigBackstopError, which run.ts turns into a CLIError before claims start."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T22:07:16.792Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

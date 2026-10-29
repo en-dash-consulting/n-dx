@@ -645,27 +645,48 @@ describe("prompt census: baseline", () => {
 
   it("--check exits non-zero when a registered builder disappears", () => {
     // Proves the staleness guard is load-bearing rather than vacuous.
+    //
+    // The broken copy lives in an os tmpdir, never in scripts/: the root suite
+    // runs files in parallel, and architecture-policy would find a copy there
+    // and fail on its child_process import (#632). PROMPT_CENSUS_ROOT points
+    // the copy back at the repository.
     const src = readFileSync(CENSUS, "utf-8");
-    const broken = join(ROOT, "scripts", ".prompt-census-staleness-probe.mjs");
-    writeFileSync(
-      broken,
-      src.replace('builder: "buildReviewerPrompt"', 'builder: "buildReviewerPromptXX"'),
+    const sabotaged = src.replace(
+      'builder: "buildReviewerPrompt"',
+      'builder: "buildReviewerPromptXX"',
     );
+    expect(sabotaged, "the probe must actually break a registered builder").not.toBe(src);
+    const dir = mkdtempSync(join(tmpdir(), "prompt-census-staleness-"));
+    const broken = join(dir, "prompt-census-staleness-probe.mjs");
+    writeFileSync(broken, sabotaged);
 
-    try {
-      let exitCode = 0;
+    const runCheck = (script) => {
       try {
-        execFileSync(process.execPath, [broken, "--check"], {
+        execFileSync(process.execPath, [script, "--check"], {
           cwd: ROOT,
           encoding: "utf-8",
           stdio: "pipe",
+          env: { ...process.env, PROMPT_CENSUS_ROOT: ROOT },
         });
+        return { status: 0, stderr: "" };
       } catch (err) {
-        exitCode = err.status;
+        return { status: err.status, stderr: String(err.stderr ?? "") };
       }
-      expect(exitCode).toBe(1);
+    };
+
+    try {
+      // Control: an unmodified copy from the same place passes, so the exit 1
+      // below comes from the missing builder, not from the relocation.
+      const control = join(dir, "prompt-census-control.mjs");
+      writeFileSync(control, src);
+      const ok = runCheck(control);
+      expect(ok.status, `unmodified copy should pass --check:\n${ok.stderr}`).toBe(0);
+
+      const bad = runCheck(broken);
+      expect(bad.status).toBe(1);
+      expect(bad.stderr).toMatch(/buildReviewerPromptXX/);
     } finally {
-      rmSync(broken, { force: true });
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
   });
 });

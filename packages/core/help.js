@@ -259,6 +259,13 @@ const COMMAND_REGISTRY = [
     related: ["init", "work", "start"],
   },
   {
+    name: "extensions",
+    category: "Orchestration",
+    summary: "List, add, remove, enable, disable and check n-dx extensions",
+    keywords: ["extensions", "extension", "plugin", "add-on", "install", "approve", "enable", "disable", "doctor", "manifest"],
+    related: ["config", "hub"],
+  },
+  {
     name: "self-heal",
     category: "Orchestration",
     summary: "Iterative codebase improvement loop",
@@ -1782,6 +1789,55 @@ const ORCHESTRATOR_HELP_DEFS = {
       { command: "ndx trust revoke .", description: "Forget the decision" },
     ],
   },
+  extensions: {
+    summary: "list, add, remove, enable, disable and check n-dx extensions",
+    description:
+      "An extension is an npm package whose package.json has an ndx.extension\n" +
+      "block; it adds 'ndx <name>' commands and, through the hub, a web app.\n" +
+      "n-dx finds extensions in the project's dependencies, in your ndx home\n" +
+      "(installed by 'add'), in the global install n-dx came from, and in the\n" +
+      "paths listed under extensions.paths in <ndx home>/config.json.\n\n" +
+      "'add' installs into <ndx home>/extensions with npm, never into a\n" +
+      "project, and with install scripts off. A relative path or tarball is\n" +
+      "read from the current directory; npm flags are refused, so set the\n" +
+      "registry through npm's config. An extension runs only once you\n" +
+      "approve it: 'enable' shows the package, version, source, commands and\n" +
+      "sidecar, then asks. The approval is tied to that manifest, version,\n" +
+      "source and install path; a change to any of them asks again.\n" +
+      "'disable' hides an extension but keeps its approval, config and state\n" +
+      "folder. 'remove' uninstalls what 'add' installed and forgets the\n" +
+      "approval; --purge also deletes <ndx home>/ext/<name>/.\n\n" +
+      "States: enabled, disabled, unapproved, incompatible (unsupported\n" +
+      "apiVersion, or this n-dx is outside its ndxVersion), invalid (the\n" +
+      "manifest breaks the contract) and conflict (two packages claim a name).\n" +
+      "'doctor' checks every manifest, version range, declared path and name\n" +
+      "clash, prints one line per problem with its fix, and exits 1 if any.\n" +
+      "'sidecar' prints how the hub starts an enabled extension's web app at\n" +
+      "/x/<name>/ (bin, health path, idle limit, log file); the hub runs it.\n" +
+      "See docs/architecture/extensions.md.",
+    usage: [
+      "ndx extensions [list] [--json] [dir]",
+      "ndx extensions add <package | path | tarball>",
+      "ndx extensions remove <name> [--purge]",
+      "ndx extensions enable <name> [--yes]",
+      "ndx extensions disable <name>",
+      "ndx extensions info <name> [--json]",
+      "ndx extensions doctor [dir]",
+      "ndx extensions sidecar <name> [--json]",
+    ],
+    options: [
+      { flag: "--json", description: "list, info, sidecar: print JSON (name, version, source, state, reason)" },
+      { flag: "--yes", description: "enable: approve without a prompt (CI, provisioning)" },
+      { flag: "--purge", description: "remove: also delete the extension's state folder" },
+    ],
+    examples: [
+      { command: "ndx extensions add @acme/ndx-recon", description: "Install an extension for your user" },
+      { command: "ndx extensions enable recon", description: "Review and approve it" },
+      { command: "ndx extensions list --json", description: "Every extension with its state and reason" },
+      { command: "ndx extensions doctor", description: "One line per problem, with its fix" },
+    ],
+    related: ["config", "hub"],
+  },
   "self-heal": {
     summary: "iterative codebase improvement loop",
     description:
@@ -1916,10 +1972,12 @@ export function formatOrchestratorCommandHelp(command) {
 }
 
 /**
- * Format the main ndx help page with workflow-based grouping.
+ * Format the main ndx help page with workflow-based grouping, then the enabled
+ * extension commands under their own heading when there are any.
+ * @param {{extensions?: {name: string, summary: string}[]}} [options]
  * @returns {string}
  */
-export function formatMainHelp() {
+export function formatMainHelp({ extensions = [] } = {}) {
   const lines = [];
 
   lines.push(`${bold("n-dx")} ${dim("—")} AI-powered development toolkit`);
@@ -1951,6 +2009,7 @@ export function formatMainHelp() {
     ["which [dir]", "Show which n-dx is running (version, path, install, git)"],
     ["config [key] [value]", "View or edit settings"],
     ["auth [dir]", "Verify LLM provider credentials"],
+    ["extensions <sub>", "Manage extensions (list|add|remove|enable|disable|info|doctor)"],
     ["install-sample [dir]", "Install a safe, destroyable sample webapp"],
     ["destroy-sample [dir]", "Remove the sample webapp and its PRD items"],
   ], pad);
@@ -2004,6 +2063,10 @@ export function formatMainHelp() {
     ["usage [dir]", "Token usage analytics (--group=day|week|month)"],
     ["ci [dir]", "Run analysis pipeline and validate PRD health"],
   ], pad);
+
+  if (extensions.length > 0) {
+    section("EXTENSIONS", extensions.map(({ name, summary }) => [name, summary]), pad);
+  }
 
   // ── Options ──
   lines.push(bold("OPTIONS"));

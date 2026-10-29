@@ -40,9 +40,10 @@ describe("Claude config integration (sourcevision)", () => {
       expect(config).toEqual({});
     });
 
-    it("loads cli_path from .n-dx.json claude section", async () => {
+    // From the shared file only once the repository is trusted (llm-client credential-routing.ts).
+    it("loads cli_path from the user's .n-dx.local.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx.local.json"),
         JSON.stringify({ claude: { cli_path: "/usr/local/bin/claude" } }),
       );
       const config = await loadClaudeConfig(tmpDir);
@@ -58,9 +59,10 @@ describe("Claude config integration (sourcevision)", () => {
       expect(config.api_key).toBe("sk-ant-test-key");
     });
 
-    it("loads api_endpoint from .n-dx.json claude section", async () => {
+    // From the project file only once the repository is trusted (llm-client credential-routing.ts).
+    it("loads api_endpoint from the user's .n-dx.local.json claude section", async () => {
       await writeFile(
-        join(tmpDir, ".n-dx.json"),
+        join(tmpDir, ".n-dx.local.json"),
         JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com" } }),
       );
       const config = await loadClaudeConfig(tmpDir);
