@@ -109,9 +109,17 @@ export function queueInputFromTree(
   return { tasks, changes };
 }
 
-/** The command a lane runs: its tasks one after another, in this worktree. */
-export function laneCommand(cliName: string, taskIds: readonly string[]): string {
-  return taskIds.map((id) => `${cliName} work --task=${id} --auto .`).join(" && ");
+/**
+ * The command a lane runs: its tasks one after another, in this worktree.
+ * `&&` alone does not keep dependency order — an explicit `--task` ignores
+ * blockers, and a run can exit 0 without completing its task (a transient
+ * vendor error) — so a step for a task in `blocked` also passes
+ * `--require-unblocked`, which refuses it while a blocker is open.
+ */
+export function laneCommand(cliName: string, taskIds: readonly string[], blocked: ReadonlySet<string> = new Set()): string {
+  return taskIds
+    .map((id) => `${cliName} work --task=${id}${blocked.has(id) ? " --require-unblocked" : ""} --auto .`)
+    .join(" && ");
 }
 
 export function formatPlan(plan: QueuePlan): string[] {
@@ -145,12 +153,13 @@ export async function cmdPlanQueue(dir: string, flags: Record<string, string>): 
   const claimed = await TaskClaims.forProject(dir, { readOnly: true }).liveClaims();
   const { tasks, changes } = queueInputFromTree(tree, { excludeIds: new Set(claimed.keys()), defaultTier: tier });
   const cliName = resolveProjectCliName(dir);
+  const blocked = new Set(tasks.filter((t) => t.blockedBy.length > 0).map((t) => t.id));
   const plan = planQueue({
     tasks,
     changes,
     activeRuns: await countActiveLocksReadOnly(henchDir),
     runLimit: config.guard.maxConcurrentProcesses,
-    command: (ids) => laneCommand(cliName, ids),
+    command: (ids) => laneCommand(cliName, ids, blocked),
   });
 
   if (flags.format === "json") {

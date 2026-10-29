@@ -64,3 +64,49 @@ describe("ndx work --plan-queue", () => {
     expect(await snapshot(dir)).toEqual(before);
   });
 });
+
+// A lane chains its steps with `&&`, but a run can exit 0 without completing
+// its task (a transient vendor error). The step for a blocked task therefore
+// refuses, through the real CLI, while its blocker is still open.
+describe("a --plan-queue lane step for a blocked task", () => {
+  const WIRE = "c0000000-0000-4000-8000-000000000002";
+  const SHIP = "c0000000-0000-4000-8000-000000000003";
+  let dir;
+
+  beforeAll(async () => {
+    dir = await createTmpDir("ndx-work-plan-queue-lane-");
+    await setupHenchDir(dir);
+    await mkdir(join(dir, ".hench", "runs"), { recursive: true });
+    await cp(V2_FIXTURE, join(dir, ".rex"), { recursive: true });
+    await writeFile(
+      join(dir, ".rex", "config.json"),
+      JSON.stringify({ schema: "rex/v1", project: "v2-project", adapter: "file" }) + "\n",
+    );
+    await writeFile(
+      join(dir, ".rex", "changes", "add-apple-pay", "ship-it.md"),
+      `---\nid: "${SHIP}"\ntype: "task"\ntitle: "Ship it"\nslug: "ship-it"\nblockedBy: ["${WIRE}"]\n---\n`,
+    );
+  });
+
+  afterAll(async () => {
+    if (dir) await removeTmpDir(dir);
+  });
+
+  it("does not start while its blocker is unfinished, though the step before exited 0", async () => {
+    const result = runResult(["work", "--plan-queue", "--format=json", dir]);
+    expect(result.code, result.stderr).toBe(0);
+    const [lane] = JSON.parse(result.stdout).lanes;
+    const steps = lane.command.split(" && ");
+    expect(steps).toEqual([
+      `n-dx work --task=${WIRE} --auto .`,
+      `n-dx work --task=${SHIP} --require-unblocked --auto .`,
+    ]);
+
+    // WIRE is still pending, as after a run that exited 0 without completing it.
+    // --dry-run stands in for a vendor; selection refuses before either matters.
+    const args = steps[1].split(" ").slice(1, -1);
+    const step = runResult([...args, "--dry-run", dir]);
+    expect(step.code).not.toBe(0);
+    expect(step.stdout + step.stderr).toContain(`blocked by unfinished work: ${WIRE} (pending)`);
+  });
+});

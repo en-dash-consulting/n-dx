@@ -21,7 +21,7 @@ function plan(changes: Node[], opts: { activeRuns?: number; runLimit?: number; d
     ...input,
     activeRuns: opts.activeRuns ?? 0,
     runLimit: opts.runLimit ?? 3,
-    command: (ids) => laneCommand("ndx", ids),
+    command: (ids) => laneCommand("ndx", ids, new Set(input.tasks.filter((t) => t.blockedBy.length > 0).map((t) => t.id))),
   });
 }
 
@@ -89,6 +89,13 @@ describe("planQueue", () => {
     ]);
     expect(laneIds(p)).toEqual([["t-a3", "t-a2", "t-a1"]]);
     expect(p.lanes[0].tasks[1].reason).toContain("after t-a3");
+    // A step can exit 0 without completing its task, so each blocked step
+    // refuses to start while its blocker is open; the unblocked head is unchanged.
+    expect(p.lanes[0].command).toBe(
+      "ndx work --task=t-a3 --auto . && " +
+        "ndx work --task=t-a2 --require-unblocked --auto . && " +
+        "ndx work --task=t-a1 --require-unblocked --auto .",
+    );
     expectEachOnce(p, ["t-a1", "t-a2", "t-a3"]);
   });
 

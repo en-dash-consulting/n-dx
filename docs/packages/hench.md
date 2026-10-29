@@ -266,7 +266,11 @@ no run, takes no claim and writes no file.
 - At most `guard.maxConcurrentProcesses` minus the runs active now are offered.
 
 A lane's command runs its tasks one after another in this worktree
-(`ndx work --task=a --auto . && ndx work --task=b --auto .`). The JSON has
+(`ndx work --task=a --auto . && ndx work --task=b --auto .`). An explicit
+`--task` ignores blockers, and a run can exit 0 without completing its task (a
+transient vendor error), so the step for a blocked task adds
+`--require-unblocked`: it refuses to start while any blocker is not completed.
+The JSON has
 `lanes [{command, changeId, tasks [{id, title, reason}]}]`, `excluded
 [{id, title, reason}]`, `activeRuns`, `runLimit` and `summary`; every ready task
 appears once, with its reason. Live shows the plan as Ready next behind the

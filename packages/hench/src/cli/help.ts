@@ -54,6 +54,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--resolve", description: "With --task: print the settings the run would use, where each came from, and why it would refuse, as JSON. Runs nothing (see below)" },
       { flag: "--plan-queue", description: "Print lanes of ready tasks that can run side by side, each with its command, and why every other ready task is left out. Advisory: runs nothing (see below)" },
+      { flag: "--require-unblocked", description: "With --task: refuse to start the task while any of its blockers is not completed (an explicit --task otherwise ignores blockers). --plan-queue lane commands pass it on each blocked step" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-mode=<off|self|pair>", description: "Who reviews: self (this vendor), pair (another vendor reviews, the executor fixes) or off. --review is self, --no-review is off; overrides a task's saved reviewMode" },
       { flag: "--reviewer=<claude|codex>", description: "The pair reviewer's vendor, over the task's saved reviewVendor and hench.review.vendor. Must differ from the executor's vendor; refused with --review or --no-review" },
@@ -193,7 +194,10 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "At most guard.maxConcurrentProcesses minus the runs active now are\n" +
           "offered. JSON: lanes [{command, changeId, tasks [{id, title, reason}]}],\n" +
           "excluded [{id, title, reason}], activeRuns, runLimit, summary.\n" +
-          "Starts no run, takes no claim and writes no file.",
+          "Starts no run, takes no claim and writes no file. A lane's command\n" +
+          "chains its steps with &&; the step for a blocked task passes\n" +
+          "--require-unblocked, so it refuses to start while a blocker is open\n" +
+          "even when the step before exited 0 without completing.",
       },
     ],
     examples: [

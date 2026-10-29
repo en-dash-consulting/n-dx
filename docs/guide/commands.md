@@ -205,6 +205,7 @@ By default on an interactive terminal, `ndx work` presents a menu to choose whic
 | _(none, TTY)_ | Interactive menu — pick a task from the list |
 | `--auto` | Auto-select highest-priority pending task |
 | `--task=<id>` | Run a specific task by ID |
+| `--task=<id> --require-unblocked` | Run it only if every task it is blocked by is completed; otherwise refuse and exit non-zero |
 
 #### Running multiple tasks
 

@@ -163,3 +163,47 @@ describe("explicit --task naming a v2 change with open tasks", () => {
     expect(claimed).toEqual([CHANGE_ID]);
   });
 });
+
+// A queue-plan lane step (`ndx work --task=b --require-unblocked --auto .`)
+// must not start b while its blocker is unfinished, even when the step before
+// it exited 0: an explicit --task otherwise ignores blockers.
+describe("explicit --task with requireUnblocked", () => {
+  async function selectShip(claims: TaskClaims, requireUnblocked: boolean) {
+    const s = await resolveStore(rexDir);
+    const tree = (await loadV2Tree(s))!;
+    return selectTaskEntry((await s.loadDocument()).items, { tree, taskId: SHIP_ID, claims, requireUnblocked });
+  }
+
+  async function completeWire(): Promise<void> {
+    await appendFile(join(CHANGE_DIR(), "state.yaml"), `  "${WIRE_ID}":\n    status: "completed"\n`);
+  }
+
+  it("refuses a task whose blocker is not completed, claiming nothing", async () => {
+    await addShipTask(`blockedBy: ["${WIRE_ID}"]\n`);
+    const { claims, claimed } = claimsWith([]);
+    const err = await selectShip(claims, true).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toContain(`blocked by unfinished work: ${WIRE_ID} (pending)`);
+    expect(claimed).toEqual([]);
+  });
+
+  it("runs the task once its blocker is completed", async () => {
+    await addShipTask(`blockedBy: ["${WIRE_ID}"]\n`);
+    await completeWire();
+    const { claims, claimed } = claimsWith([]);
+    expect((await selectShip(claims, true)).item.id).toBe(SHIP_ID);
+    expect(claimed).toEqual([SHIP_ID]);
+  });
+
+  it("leaves an explicit --task without the flag unchanged: blockers are not checked", async () => {
+    await addShipTask(`blockedBy: ["${WIRE_ID}"]\n`);
+    const { claims } = claimsWith([]);
+    expect((await selectShip(claims, false)).item.id).toBe(SHIP_ID);
+  });
+
+  it("runs an unblocked task with the flag", async () => {
+    await addShipTask();
+    const { claims } = claimsWith([]);
+    expect((await selectShip(claims, true)).item.id).toBe(SHIP_ID);
+  });
+});
