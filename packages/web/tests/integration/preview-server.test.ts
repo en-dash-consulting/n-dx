@@ -194,27 +194,53 @@ describe("preview layout endpoint", () => {
     expect((await fetch(base + "/")).status).toBe(200);
   });
 
-  it("requires the per-user token when started with a token file, and sets the cookie from the URL", async () => {
+  it("requires a credential when started with a token file: a nonce-signed session, then a capability path for the document", async () => {
     const dir = await scratch();
     const doc = join(dir, "mock.html");
-    await writeFile(doc, "<html><body>doc</body></html>", "utf-8");
+    await writeFile(doc, "<html><head></head><body>secret-doc</body></html>", "utf-8");
+    await writeFile(join(dir, "style.css"), "body{color:red}", "utf-8");
     const tokenFile = join(dir, "home", "auth.token");
     handle = await startPreviewServer(dir, 0, { file: doc, tokenFile });
     const token = (await readFile(tokenFile, "utf-8")).trim();
     const base = `http://127.0.0.1:${handle.port}`;
 
-    expect((await fetch(base + "/")).status).toBe(401);
-    expect((await fetch(base + "/", { headers: { "X-Ndx-Token": token } })).status).toBe(200);
+    // Without a credential: the sign-in page, never the document or a sibling.
+    const shell = await fetch(base + "/");
+    expect(shell.status).toBe(200);
+    const shellHtml = await shell.text();
+    expect(shellHtml).not.toContain("secret-doc");
+    expect(shellHtml).toContain("ndxAuth");
+    expect((await fetch(base + "/style.css")).status).toBe(401);
+    expect((await fetch(base + "/__preview/state")).status).toBe(401);
+    // The old cookie is no credential.
+    expect((await fetch(base + "/__preview/state", { headers: { Cookie: `ndx_token=${token}` } })).status).toBe(401);
+    expect((await fetch(`${base}/?ndx_token=${encodeURIComponent(token)}`, { redirect: "manual" })).headers.get("set-cookie")).toBeNull();
 
-    const redirect = await fetch(`${base}/?ndx_token=${encodeURIComponent(token)}`, { redirect: "manual" });
-    expect(redirect.status).toBe(302);
-    expect(redirect.headers.get("location")).toBe("/");
-    expect(redirect.headers.get("set-cookie")).toContain("ndx_token=");
+    // The token header still reads the document directly (scripts, tests).
+    expect(await (await fetch(base + "/", { headers: { "X-Ndx-Token": token } })).text()).toContain("secret-doc");
 
-    // A save needs the token too, cookie included.
-    const saved = await fetch(base + "/__preview/layout", {
+    // A browser: nonce → session → capability path.
+    const { nonce } = await (await fetch(base + "/api/auth/nonce", { method: "POST", headers: { "X-Ndx-Token": token } })).json();
+    const { credential } = await (await fetch(base + "/api/auth/session", { method: "POST", headers: { "X-Ndx-Nonce": nonce } })).json();
+    const { path } = await (await fetch(base + "/__preview/session-path", { method: "POST", headers: { "X-Ndx-Token": credential } })).json();
+    expect(path).toMatch(/^\/__preview\/s\/[A-Za-z0-9_-]+\/$/);
+    expect(path).not.toContain(credential);
+    expect(await (await fetch(base + path)).text()).toContain("secret-doc");
+    expect(await (await fetch(base + path + "style.css")).text()).toBe("body{color:red}");
+    expect((await fetch(base + "/__preview/s/forged/style.css", { redirect: "manual" })).status).toBe(302);
+    // The capability path reads files; it is not a credential for anything else.
+    expect((await fetch(base + "/__preview/state", { headers: { "X-Ndx-Token": path.split("/")[3] } })).status).toBe(401);
+
+    // A save needs a credential in a header.
+    const refused = await fetch(base + "/__preview/layout", {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: `ndx_token=${token}` },
+      body: JSON.stringify({ nav: [] }),
+    });
+    expect(refused.status).toBe(401);
+    const saved = await fetch(base + "/__preview/layout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Ndx-Token": credential },
       body: JSON.stringify({ nav: [] }),
     });
     expect(saved.status).toBe(200);

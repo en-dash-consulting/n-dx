@@ -34,7 +34,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { getMcpServers } from "./assistant-assets.js";
-import { hubHome, hubRequest, isHubMarker, loadHubPort, readAuthTokenFile, readHubRegistry, readPidFile, resolveRepo } from "./web.js";
+import { hubHome, hubRequest, identifyTokenTarget, isHubMarker, loadHubPort, readAuthTokenFile, readHubRegistry, readPidFile, resolveRepo } from "./web.js";
 
 /** How long a single JSON-RPC round trip may take before it is abandoned. */
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -544,6 +544,17 @@ export async function resolveHubTarget(server, dir) {
   if (health.status !== 200 || health.body?.ok !== true) {
     if (marker) logStderr(`no hub answering on port ${port} — serving MCP in-process`);
     return null;
+  }
+
+  // Every bridged request carries the per-user token, and the port may come
+  // from a marker file inside the repository: bridge only to a listener
+  // identified as this user's hub.
+  if (readAuthTokenFile()) {
+    const target = await identifyTokenTarget(port, null, { home });
+    if (!target.ok) {
+      logStderr(`port ${port} is not this user's n-dx hub (${target.reason}) — serving MCP in-process`);
+      return null;
+    }
   }
 
   const id = marker?.projectId ?? findRegisteredProject(await readHubRegistry(home), repo.repoRoot);

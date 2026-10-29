@@ -169,7 +169,7 @@ describe("the resolution report", () => {
       reviewModel: { value: REVIEW_MODELS.claude, source: "vendor-default", vendorDefault: REVIEW_MODELS.claude },
       reviewOptional: { value: false, source: "built-in" },
       skipTestGate: { value: false, source: "built-in" },
-      maxTurns: { value: 50, source: "hench.maxTurns" },
+      maxTurns: { value: 200, source: "hench.maxTurns" },
       tokenBudget: { value: 0, source: "hench.tokenBudget" },
       fresh: { value: false, source: "built-in" },
       allowDirty: { value: false, source: "built-in" },
@@ -488,7 +488,15 @@ describe("refusals are reported, not thrown", () => {
   });
 
   it("vendor-cli-missing", async () => {
-    await projectConfig({ llm: { vendor: "claude", claude: { cli_path: "/nonexistent/claude" } } });
+    // The operator's own local file names the binary; the tracked file's
+    // cli_path would be ignored until the checkout is trusted.
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { claude: { cli_path: "/nonexistent/claude" } } }),
+      "utf-8",
+    );
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "local config", "--allow-empty");
     expect(codes(await resolve({ task: "t-pending" }))).toEqual(["vendor-cli-missing"]);
   });
 

@@ -4,6 +4,7 @@ import {
   REDACTED_PASSWORD,
   REDACTED_TOKEN,
   REDACTED_VALUE,
+  createLineRedactor,
   redactDeep,
   redactSecrets,
   redactSecretsDetailed,
@@ -304,5 +305,312 @@ describe("redactSecretsDetailed and redactDeep", () => {
     expect(out.nested.n).toBeNull();
     // The input is not mutated.
     expect(run.toolCalls[0].output).toContain(GITHUB);
+  });
+});
+
+// ── Probe table ─────────────────────────────────────────────────────────
+//
+// Every case the redaction probe exercises, as a table. Each row says what
+// the redactor must do with it: `redacted` rows must change and must not keep
+// the secret; `untouched` rows must come back byte-for-byte, with the reason
+// beside them. Both kinds are re-run through the redactor to prove the first
+// pass is idempotent.
+
+/** A 62-character alphabet, so every body char class is exercised. */
+const K = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+type ProbeCase = {
+  name: string;
+  input: string;
+  /** The text the secret must not survive as; defaults to the whole input. */
+  secret?: string;
+  /** Exact expected output, when its shape matters. */
+  output?: string;
+  /** Present when the row is left alone on purpose. */
+  untouched?: string;
+};
+
+const PROBE: ProbeCase[] = [
+  { name: "anthropic key", input: "x-api-key: sk-ant-api03-" + K.slice(0, 40) + "AA", output: `x-api-key: ${REDACTED_TOKEN}` },
+  { name: "openai legacy", input: "export OPENAI_API_KEY=sk-" + K.slice(0, 48), output: `export OPENAI_API_KEY=${REDACTED_TOKEN}` },
+  { name: "openai proj bare", input: "sk-proj-" + K.slice(0, 30) + "_-" + K.slice(0, 20), output: REDACTED_TOKEN },
+  { name: "github ghp", input: "ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8", output: REDACTED_TOKEN },
+  { name: "github pat", input: "github_pat_11ABCDEFG0" + K.slice(0, 59), output: REDACTED_TOKEN },
+  { name: "aws akid bare", input: "AKIAIOSFODNN7EXAMPLE", output: REDACTED_TOKEN },
+  {
+    name: "aws secret assignment",
+    input: "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    output: `AWS_SECRET_ACCESS_KEY=${REDACTED_TOKEN}`,
+  },
+  {
+    name: "aws secret bare",
+    input: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    untouched: "forty base64 characters alone are also a content hash; the shape is only a secret beside an access key id or an aws_secret… name (see the next two rows)",
+  },
+  {
+    name: "aws secret bare, beside its access key id",
+    input: "AKIAIOSFODNN7EXAMPLE\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    secret: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    output: `${REDACTED_TOKEN}\n${REDACTED_TOKEN}`,
+  },
+  {
+    name: "aws secret bare, beside an aws_secret name",
+    input: "$ echo $AWS_SECRET_ACCESS_KEY\nwJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    secret: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    output: `$ echo $AWS_SECRET_ACCESS_KEY\n${REDACTED_TOKEN}`,
+  },
+  {
+    name: "jwt",
+    input: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4ifQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+    output: REDACTED_TOKEN,
+  },
+  { name: "bearer", input: "Authorization: Bearer " + K.slice(0, 40), output: `Authorization: Bearer ${REDACTED_TOKEN}` },
+  { name: "bearer short 12", input: "Authorization: Bearer abcd1234efgh", output: `Authorization: Bearer ${REDACTED_TOKEN}` },
+  {
+    name: "token header DRF",
+    input: "Authorization: Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b",
+    output: `Authorization: Token ${REDACTED_TOKEN}`,
+  },
+  { name: "url ?token=", input: "https://example.com/api?token=" + K.slice(0, 24) + "&x=1", secret: K.slice(0, 24) },
+  { name: "url ?access_token=", input: "GET https://example.com/cb?access_token=" + K.slice(0, 24), secret: K.slice(0, 24) },
+  {
+    name: "url ?key= (google style)",
+    input: "https://generativelanguage.googleapis.com/v1/models?key=AIza" + K.slice(0, 35),
+    output: `https://generativelanguage.googleapis.com/v1/models?key=${REDACTED_TOKEN}`,
+  },
+  {
+    name: "url ?sig= azure SAS",
+    input: "https://acct.blob.core.windows.net/c/b?sv=2020&sig=" + K.slice(0, 43) + "%3D",
+    output: `https://acct.blob.core.windows.net/c/b?sv=2020&sig=${REDACTED_TOKEN}`,
+  },
+  {
+    name: "url ?X-Amz-Signature",
+    input: "https://b.s3.amazonaws.com/o?X-Amz-Signature=" + "a".repeat(64),
+    output: `https://b.s3.amazonaws.com/o?X-Amz-Signature=${REDACTED_TOKEN}`,
+  },
+  {
+    name: "url X-Amz-Credential",
+    input: "https://b.s3.amazonaws.com/o?X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20260101%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=1",
+    secret: "AKIAIOSFODNN7EXAMPLE",
+    output: `https://b.s3.amazonaws.com/o?X-Amz-Credential=${REDACTED_TOKEN}&X-Amz-Date=1`,
+  },
+  {
+    name: "url userinfo",
+    input: "https://user:p4ssw0rd123@github.com/org/repo.git",
+    output: `https://user:${REDACTED_PASSWORD}@github.com/org/repo.git`,
+  },
+  {
+    // Used to come out as `[redacted:[redacted:password]@` — the URL rule
+    // took the already-written marker for a user:password pair.
+    name: "url userinfo token-only",
+    input: "https://ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8@github.com/org/repo.git",
+    output: `https://${REDACTED_TOKEN}@github.com/org/repo.git`,
+  },
+  {
+    name: "url userinfo x-access-token",
+    input: "https://x-access-token:" + "abcd".repeat(10) + "@github.com/o/r.git",
+    output: `https://x-access-token:${REDACTED_PASSWORD}@github.com/o/r.git`,
+  },
+  { name: "pem rsa", input: "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nABCD\n-----END RSA PRIVATE KEY-----", output: REDACTED_KEY_BLOCK },
+  { name: "pem openssh", input: "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXkt\n-----END OPENSSH PRIVATE KEY-----", output: REDACTED_KEY_BLOCK },
+  { name: "pgp private block", input: "-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQdGBF\n-----END PGP PRIVATE KEY BLOCK-----", output: REDACTED_KEY_BLOCK },
+  { name: "env SECRET_KEY", input: "SECRET_KEY=django-insecure-abc123xyz", output: `SECRET_KEY=${REDACTED_VALUE}` },
+  { name: "env DB_PASS", input: "DB_PASS=hunter2hunter2", output: `DB_PASS=${REDACTED_VALUE}` },
+  { name: "env PGPASSWORD", input: "PGPASSWORD=hunter2hunter2", output: `PGPASSWORD=${REDACTED_VALUE}` },
+  {
+    name: "env DATABASE_URL",
+    input: "DATABASE_URL=postgres://app:s3cretpass@db:5432/app",
+    output: `DATABASE_URL=postgres://app:${REDACTED_PASSWORD}@db:5432/app`,
+  },
+  { name: "env STRIPE_KEY sk_live", input: "STRIPE_KEY=sk_live_" + K.slice(0, 24), output: `STRIPE_KEY=${REDACTED_TOKEN}` },
+  { name: "stripe bare sk_live", input: "sk_live_" + K.slice(0, 24), output: REDACTED_TOKEN },
+  { name: "stripe bare rk_live", input: "rk_live_" + K.slice(0, 24), output: REDACTED_TOKEN },
+  { name: "env ENCRYPTION_KEY", input: "ENCRYPTION_KEY=" + K.slice(0, 32), output: `ENCRYPTION_KEY=${REDACTED_VALUE}` },
+  { name: "env SIGNING_KEY", input: "SIGNING_KEY=" + K.slice(0, 32), output: `SIGNING_KEY=${REDACTED_VALUE}` },
+  { name: "env JWT_SECRET", input: "JWT_SECRET=" + K.slice(0, 32), output: `JWT_SECRET=${REDACTED_VALUE}` },
+  { name: "env SENTRY_DSN", input: "SENTRY_DSN=https://abc123def456@o1.ingest.sentry.io/1", output: `SENTRY_DSN=${REDACTED_VALUE}` },
+  { name: "env short password 6", input: "PASSWORD=abc123", output: `PASSWORD=${REDACTED_VALUE}` },
+  { name: "env numeric PIN", input: "PASSWORD=1234", output: `PASSWORD=${REDACTED_VALUE}` },
+  { name: "env numeric secret", input: "API_SECRET=12345678901234567890", output: `API_SECRET=${REDACTED_VALUE}` },
+  {
+    name: "env SLACK_WEBHOOK",
+    input: "SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T000/B000/" + K.slice(0, 24),
+    output: `SLACK_WEBHOOK_URL=https://hooks.slack.com/services/${REDACTED_TOKEN}`,
+  },
+  {
+    name: "discord webhook",
+    input: "https://discord.com/api/webhooks/123456789012345678/" + K.slice(0, 40),
+    output: `https://discord.com/api/webhooks/123456789012345678/${REDACTED_TOKEN}`,
+  },
+  { name: "slack xoxb", input: "xoxb-1234567890-" + K.slice(0, 24), output: REDACTED_TOKEN },
+  { name: "google AIza", input: "AIza" + K.slice(0, 35), output: REDACTED_TOKEN },
+  { name: "npm token", input: "//registry.npmjs.org/:_authToken=npm_" + K.slice(0, 36), output: `//registry.npmjs.org/:_authToken=${REDACTED_TOKEN}` },
+  { name: "npm _authToken no prefix", input: "//registry.npmjs.org/:_authToken=" + K.slice(0, 36), output: `//registry.npmjs.org/:_authToken=${REDACTED_VALUE}` },
+  {
+    name: "cookie session",
+    input: "Cookie: session=" + K.slice(0, 40) + "; other=1",
+    output: `Cookie: session=${REDACTED_VALUE}; other=${REDACTED_VALUE}`,
+  },
+  {
+    name: "set-cookie",
+    input: "Set-Cookie: sessionid=" + K.slice(0, 40) + "; Path=/",
+    output: `Set-Cookie: sessionid=${REDACTED_VALUE}; Path=/`,
+  },
+  {
+    name: "cookie header in a JSON headers object",
+    input: '{"Cookie": "a=' + K.slice(0, 20) + '; b=' + K.slice(20, 40) + '"}',
+    output: `{"Cookie": "a=${REDACTED_VALUE}; b=${REDACTED_VALUE}"}`,
+  },
+  { name: "curl -u", input: "curl -u admin:S3cretPassw0rd https://api", output: `curl -u admin:${REDACTED_PASSWORD} https://api` },
+  { name: "curl -H api-key", input: "curl -H 'X-API-Key: " + K.slice(0, 32) + "' https://x", secret: K.slice(0, 32) },
+  { name: "json password", input: '{"password": "correct horse battery"}', output: `{"password": "${REDACTED_VALUE}"}` },
+  { name: "json apiKey camel", input: '{"apiKey": "' + K.slice(0, 32) + '"}', output: `{"apiKey": "${REDACTED_VALUE}"}` },
+  { name: "json accessToken camel", input: '{"accessToken": "' + K.slice(0, 32) + '"}', output: `{"accessToken": "${REDACTED_VALUE}"}` },
+  { name: "json clientSecret camel", input: '{"clientSecret": "' + K.slice(0, 32) + '"}', output: `{"clientSecret": "${REDACTED_VALUE}"}` },
+  { name: "yaml password", input: "password: hunter2hunter2", output: `password: ${REDACTED_VALUE}` },
+  { name: "sendgrid", input: "SG." + K.slice(0, 22) + "." + K.slice(0, 43), output: REDACTED_TOKEN },
+  { name: "twilio SK", input: "SK" + "0123456789abcdef".repeat(2), output: REDACTED_TOKEN },
+  { name: "discord bot token", input: ["MTIzNDU2Nzg5MDEyMzQ1Njc4", "GhIjKl", "MnOpQrStUvWxYz0123456789abcdefghijk"].join("."), output: REDACTED_TOKEN },
+  {
+    name: "azure client secret bare",
+    input: "Q~abcdefghijklmnopqrstuvwxyz0123456789ABC",
+    untouched: "a bare `Q~` is not the published shape — gitleaks azure-ad-client-secret has three characters and a digit before the `Q~` (next row)",
+  },
+  { name: "azure client secret, published shape", input: "secret is abc1Q~" + K.slice(0, 32), output: `secret is ${REDACTED_TOKEN}` },
+  {
+    name: "hex 64 bare (generic)",
+    input: "a".repeat(32) + "0123456789abcdef0123456789abcdef",
+    untouched: "a bare 64-hex run is a SHA-256 or a content hash far more often than a credential",
+  },
+  {
+    name: "ssh private line split (per-line call)",
+    input: "AAAAB3NzaC1yc2EAAAADAQABAAABAQ",
+    untouched: "one base64 line of a key body has no shape; a line-at-a-time caller uses createLineRedactor, which holds the block until its END marker",
+  },
+  { name: "unicode key split", input: "ANTHROPIC_API_KEY=sk-ant-api03-ABCDEF", output: `ANTHROPIC_API_KEY=${REDACTED_VALUE}` },
+  { name: "key via --api-key flag", input: "cmd --api-key " + K.slice(0, 32), output: `cmd --api-key ${REDACTED_VALUE}` },
+  { name: "key via --token flag", input: "cmd --token " + K.slice(0, 32), output: `cmd --token ${REDACTED_VALUE}` },
+  { name: "key via --password= flag", input: "mysql --password=hunter2 -h db", output: `mysql --password=${REDACTED_VALUE} -h db` },
+  {
+    name: "env with export and quotes",
+    input: "export GITHUB_TOKEN='ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8'",
+    output: `export GITHUB_TOKEN='${REDACTED_TOKEN}'`,
+  },
+  {
+    name: "key in markdown backticks",
+    input: "`ANTHROPIC_API_KEY`=`sk-ant-api03-" + K.slice(0, 40) + "`",
+    output: "`ANTHROPIC_API_KEY`=`" + REDACTED_TOKEN + "`",
+  },
+  {
+    name: "base64 'Basic'",
+    input: "Authorization: Basic " + Buffer.from("user:p4ssw0rd123").toString("base64"),
+    output: `Authorization: Basic ${REDACTED_TOKEN}`,
+  },
+  { name: "gitlab glpat", input: "glpat-" + K.slice(0, 20), output: REDACTED_TOKEN },
+  { name: "heroku api key uuid", input: "HEROKU_API_KEY=12345678-1234-1234-1234-123456789abc", output: `HEROKU_API_KEY=${REDACTED_VALUE}` },
+  {
+    name: "kubernetes token",
+    input: "token: eyJhbGciOiJSUzI1NiIsImtpZCI6IjEyMyJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50In0.abcdefghijklmnop",
+    output: `token: ${REDACTED_TOKEN}`,
+  },
+  { name: "vault token", input: "VAULT_TOKEN=hvs." + K.slice(0, 24), output: `VAULT_TOKEN=${REDACTED_TOKEN}` },
+  { name: "vault bare", input: "hvs." + K.slice(0, 24), output: REDACTED_TOKEN },
+  { name: "shopify shpat", input: "shpat_" + "0123456789abcdef".repeat(2), output: REDACTED_TOKEN },
+  { name: "shopify shpss", input: "shpss_" + "0123456789abcdef".repeat(2), output: REDACTED_TOKEN },
+  {
+    name: "age/ssh key value no name",
+    input: "secret=abc",
+    untouched: "three characters behind a non-password key are under the floor that keeps `token=abc` style identifiers readable",
+  },
+];
+
+describe("redactSecrets — probe table", () => {
+  for (const c of PROBE) {
+    if (c.untouched !== undefined) {
+      it(`leaves alone: ${c.name} (${c.untouched})`, () => {
+        expect(redactSecrets(c.input)).toBe(c.input);
+      });
+      continue;
+    }
+    it(`redacts: ${c.name}`, () => {
+      const out = redactSecrets(c.input);
+      expect(out).not.toBe(c.input);
+      expect(out).not.toContain(c.secret ?? c.input);
+      expect(out).toContain("[redacted:");
+      if (c.output !== undefined) expect(out).toBe(c.output);
+      // Idempotent, and never a marker inside a marker.
+      expect(redactSecrets(out)).toBe(out);
+      expect(out).not.toMatch(/\[redacted:[^\]]*\[redacted:/);
+    });
+  }
+
+  it("runs every probe row", () => {
+    // The probe script has 68 rows; the table carries them all plus the
+    // contextual and published-shape companions of its untouched rows.
+    expect(PROBE.length).toBeGreaterThanOrEqual(68);
+  });
+});
+
+describe("redactSecrets — prose and lookalikes stay readable", () => {
+  const PROSE = [
+    "Enter your password and press return",
+    "The password reset email was sent",
+    "Password required",
+    "token expired, refreshing",
+    "the secret sauce is caching",
+    "Bearer tokens are passed in the Authorization header",
+    "Bearer authentication is used by this API",
+    "Basic internationalization support landed",
+    "Cookie consent banner added",
+    "Cookie: none",
+    "pass the test suite before merging",
+    "PASS src/redact.test.ts",
+    "--- PASS: TestRedact (0.00s)",
+    "PWD=/Users/someone/project",
+    "OLDPWD=/Users/someone",
+    "auth: true",
+    '"auth": null',
+    '"oauth": {"client_id": "abc"}',
+    "ndx start --no-auth",
+    "docker run -u 1000:1000 image",
+    "git push -u origin main",
+    "token=abc",
+    "secret: 12345678",
+    "sig: ok",
+    "Session: 42",
+    '"sessionId": "0b6e4e6a-5d2f-4a8c-9f1e-2c3d4e5f6a7b"',
+    "--token-file ./token.txt",
+    "--password-stdin",
+    "The Twilio SKU is SK-200 and ships Monday",
+    "SG. Smith reviewed the pull request.",
+    "hvs. is a prefix, not a token",
+  ];
+  for (const line of PROSE) {
+    it(`leaves "${line}"`, () => {
+      expect(redactSecrets(line)).toBe(line);
+    });
+  }
+
+  it("keeps a run record's session id so a resume can find it", () => {
+    const record = JSON.stringify({
+      session: { sessionId: "0b6e4e6a-5d2f-4a8c-9f1e-2c3d4e5f6a7b", resumedSession: true },
+      tasksPerSession: 3,
+    });
+    expect(redactSecrets(record)).toBe(record);
+  });
+
+  it("does not take a JSON object as a value when the key is sensitive", () => {
+    const text = '{"auth": {"token": "' + K.slice(0, 20) + '"}, "next": 1}';
+    expect(redactSecrets(text)).toBe(`{"auth": {"token": "${REDACTED_VALUE}"}, "next": 1}`);
+  });
+});
+
+describe("createLineRedactor — PGP blocks", () => {
+  it("holds a PGP private key block until its END line", () => {
+    const r = createLineRedactor();
+    expect(r.push("-----BEGIN PGP PRIVATE KEY BLOCK-----")).toEqual([]);
+    expect(r.push("lQdGBF")).toEqual([]);
+    expect(r.push("-----END PGP PRIVATE KEY BLOCK-----")).toEqual([REDACTED_KEY_BLOCK]);
+    expect(r.flush()).toEqual([]);
   });
 });

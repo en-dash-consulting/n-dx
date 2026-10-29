@@ -29,6 +29,8 @@ import {
   AGENT_REX_MCP_TOOLS,
   buildAgentMcpServers,
 } from "../../../src/process/agent-mcp-config.js";
+import { effectiveGitSubcommands } from "../../../src/agent/lifecycle/git-subcommands.js";
+import { guardBaselineForLanguage } from "../../../src/prd/llm-gateway.js";
 import {
   DEFAULT_EXECUTION_POLICY,
   createPromptEnvelope,
@@ -134,7 +136,8 @@ describe("ClaudeCliAdapter: buildSpawnConfig", () => {
       expect(toolsIdx).toBeGreaterThan(-1);
       const toolsToken = config.args[toolsIdx + 1];
       expect(toolsToken).toContain("Bash(npm:*)");
-      expect(toolsToken).toContain("Bash(git:*)");
+      expect(toolsToken).toContain("Bash(git commit:*)");
+      expect(toolsToken).not.toContain("Bash(git:*)");
       expect(toolsToken).toContain("Bash(node:*)");
       expect(toolsToken).toContain("Bash(tsc:*)");
       expect(toolsToken).toContain("Read");
@@ -144,7 +147,8 @@ describe("ClaudeCliAdapter: buildSpawnConfig", () => {
       expect(toolsToken).toContain("Grep");
     } else {
       expect(config.args).toContain("Bash(npm:*)");
-      expect(config.args).toContain("Bash(git:*)");
+      expect(config.args).toContain("Bash(git commit:*)");
+      expect(config.args).not.toContain("Bash(git:*)");
       expect(config.args).toContain("Bash(node:*)");
       expect(config.args).toContain("Bash(tsc:*)");
       // File tools always included
@@ -711,10 +715,11 @@ describe("ClaudeCliAdapter: classifyError", () => {
 // ── 6. buildAllowedTools ─────────────────────────────────────────────────
 
 describe("ClaudeCliAdapter: buildAllowedTools", () => {
-  it("maps commands to Bash(cmd:*) patterns", () => {
+  it("maps commands to Bash(cmd:*) patterns, git at subcommand granularity", () => {
     const tools = buildAllowedTools(["npm", "git"]);
     expect(tools).toContain("Bash(npm:*)");
-    expect(tools).toContain("Bash(git:*)");
+    expect(tools).toContain("Bash(git status:*)");
+    expect(tools).not.toContain("Bash(git:*)");
   });
 
   it("always includes CLI_FILE_TOOLS", () => {
@@ -730,15 +735,25 @@ describe("ClaudeCliAdapter: buildAllowedTools", () => {
   });
 
   it("handles many commands", () => {
-    const tools = buildAllowedTools(["npm", "git", "node", "tsc", "pnpm"]);
-    // 5 bash + 5 file tools + the rex MCP grants.
-    expect(tools).toHaveLength(10 + AGENT_REX_MCP_TOOLS.length);
+    const tools = buildAllowedTools(["npm", "node", "tsc", "pnpm"]);
+    // 4 bash + 5 file tools + the rex MCP grants.
+    expect(tools).toHaveLength(9 + AGENT_REX_MCP_TOOLS.length);
   });
 
-  it("falls back to blanket Bash(git:*) when no subcommand allowlist is given", () => {
-    // Backward-compatible: absent/empty list preserves the legacy blanket grant.
-    expect(buildAllowedTools(["git"])).toContain("Bash(git:*)");
-    expect(buildAllowedTools(["git"], [])).toContain("Bash(git:*)");
+  it("grants the language baseline, never blanket Bash(git:*), when the subcommand allowlist is absent or empty", () => {
+    // An empty list used to read as "legacy blanket grant", so a guard that
+    // named no subcommands got push, reset and clean auto-approved.
+    const baseline = guardBaselineForLanguage().allowedGitSubcommands;
+    for (const tools of [buildAllowedTools(["git"]), buildAllowedTools(["git"], [])]) {
+      expect(tools).not.toContain("Bash(git:*)");
+      for (const sub of baseline) expect(tools).toContain(`Bash(git ${sub}:*)`);
+      for (const destructive of ["reset", "clean", "revert", "push"]) {
+        expect(tools).not.toContain(`Bash(git ${destructive}:*)`);
+      }
+    }
+    expect(effectiveGitSubcommands([])).toEqual(baseline);
+    expect(effectiveGitSubcommands(undefined)).toEqual(baseline);
+    expect(effectiveGitSubcommands(["status"])).toEqual(["status"]);
   });
 });
 
@@ -1246,5 +1261,76 @@ describe("ClaudeCliAdapter: rex MCP write tools", () => {
       .slice(config.args.indexOf("--allowed-tools") + 1)
       .flatMap((a) => a.split(","));
     for (const tool of rexTools) expect(granted).toContain(tool);
+  });
+});
+
+// ── Session bounds: --max-turns and tool results ─────────────────────────
+
+describe("claudeCliAdapter session bounds", () => {
+  const envelopeInput: ClaudeCliInput = {
+    systemPrompt: "sys",
+    promptText: "do it",
+    allowedTools: ["Read"],
+  };
+
+  it("passes --max-turns from the resolved maxTurns, and declares that it enforces the cap", () => {
+    const { args } = buildClaudeCliArgs({ ...envelopeInput, maxTurns: 25 }, "darwin");
+    const at = args.indexOf("--max-turns");
+    expect(at).toBeGreaterThan(-1);
+    expect(args[at + 1]).toBe("25");
+    expect(claudeCliAdapter.enforcesTurnCap).toBe(true);
+  });
+
+  it("omits --max-turns when no cap was asked for", () => {
+    for (const maxTurns of [undefined, 0, -1, 2.5]) {
+      expect(buildClaudeCliArgs({ ...envelopeInput, maxTurns }, "darwin").args).not.toContain("--max-turns");
+    }
+  });
+
+  it("maps a stream-json tool_result (a user message) to a tool_result event naming its call", () => {
+    const event = claudeCliAdapter.parseEvent(
+      JSON.stringify({
+        type: "user",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "toolu_1", content: [{ type: "text", text: "file body" }] }],
+        },
+      }),
+      3,
+      {},
+    );
+    expect(event?.type).toBe("tool_result");
+    expect(event?.toolResult).toEqual({ tool: "", output: "file body", durationMs: 0, id: "toolu_1" });
+  });
+
+  it("marks an errored tool result and truncates long output", () => {
+    const event = claudeCliAdapter.parseEvent(
+      JSON.stringify({
+        type: "user",
+        message: { content: [{ type: "tool_result", tool_use_id: "t", is_error: true, content: "y".repeat(9000) }] },
+      }),
+      1,
+      {},
+    );
+    expect(event?.toolResult?.output.startsWith("[error] y")).toBe(true);
+    expect(event?.toolResult?.output.length).toBe("[error] ".length + 2000);
+  });
+
+  it("carries the tool_use id on the invocation", () => {
+    const event = claudeCliAdapter.parseEvent(
+      JSON.stringify({
+        type: "assistant",
+        message: { content: [{ type: "tool_use", id: "toolu_9", name: "Read", input: { file_path: "a" } }] },
+      }),
+      1,
+      {},
+    );
+    expect(event?.toolCall).toEqual({ tool: "Read", input: { file_path: "a" }, id: "toolu_9" });
+  });
+
+  it("ignores a user message without tool results (the prompt echo)", () => {
+    expect(
+      claudeCliAdapter.parseEvent(JSON.stringify({ type: "user", message: { content: "hello" } }), 1, {}),
+    ).toBeNull();
   });
 });

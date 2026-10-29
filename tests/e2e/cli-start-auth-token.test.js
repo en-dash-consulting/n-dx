@@ -4,14 +4,16 @@
  * Loopback is shared by every account on a host, so the hub and the project
  * servers must tell this user's browser and CLI apart from another account's
  * process. Driven through the real CLI against a real hub: `ndx start`
- * creates `<ndx home>/auth.token`, prints a URL that carries it once, and
- * the hub answers 401 to anything that does not present it. `ndx start stop`
+ * creates `<ndx home>/auth.token`, prints a URL that carries a single-use
+ * landing nonce (never the token), and the hub answers 401 to anything that
+ * presents neither the token nor a session credential. `ndx start stop`
  * must still work, because the CLI sends the token on its own probes.
  *
  * The hub's home is redirected with $N_DX_HOME so nothing touches ~/.ndx.
  *
  * @see packages/core/web.js — resolveStartToken, hubRequest
- * @see packages/web/src/hub/request-guard.ts — enforceHubToken
+ * @see packages/web/src/hub/request-guard.ts — guardHubRequest
+ * @see packages/web/src/shared/auth.ts — CredentialStore
  * @see tests/e2e/cli-start-hub.test.js — the same harness, with --no-auth
  */
 
@@ -112,7 +114,7 @@ describe("ndx start — per-user token (e2e)", { timeout: 180_000 }, () => {
     for (const dir of [home, tmpRoot]) if (dir) await removeTmpDir(dir);
   }, 60_000);
 
-  it("creates the token, prints a URL that carries it, and the hub refuses requests without it", async () => {
+  it("creates the token, prints a one-time nonce URL rather than the token, and the hub refuses requests without a credential", async () => {
     if (!canBindPorts) return;
     const result = runStart([`--port=${hubPort}`, repo]);
     expect(result.code, result.stderr + result.stdout).toBe(0);
@@ -122,25 +124,32 @@ describe("ndx start — per-user token (e2e)", { timeout: 180_000 }, () => {
     expect(token.length).toBeGreaterThanOrEqual(32);
     if (process.platform !== "win32") expect((await stat(tokenFile)).mode & 0o777).toBe(0o600);
 
-    // The printed URL carries the token once; the MCP lines carry the header.
-    expect(result.stdout).toContain(`http://localhost:${hubPort}/p/gamma-app/?ndx_token=${encodeURIComponent(token)}`);
+    // The printed URL carries a nonce and never the token; the MCP lines carry the header.
+    expect(result.stdout).not.toContain(token);
+    expect(result.stdout).not.toContain("ndx_token=");
+    const match = new RegExp(`http://localhost:${hubPort}/p/gamma-app/\\?ndx_nonce=([A-Za-z0-9_%-]+)`).exec(result.stdout);
+    expect(match, result.stdout).not.toBeNull();
+    const nonce = decodeURIComponent(match[1]);
     expect(result.stdout).toContain(`--header "X-Ndx-Token: $(cat ${tokenFile})"`);
 
     const base = `http://127.0.0.1:${hubPort}`;
     expect((await fetch(`${base}/api/hub/health`)).status).toBe(401);
     expect((await fetch(`${base}/p/gamma-app/api/status`)).status).toBe(401);
     expect((await fetch(`${base}/api/hub/health`, { headers: { "X-Ndx-Token": token } })).status).toBe(200);
+    // The old cookie, as a server on another loopback port could receive it, is refused.
+    expect((await fetch(`${base}/p/gamma-app/api/status`, { headers: { Cookie: `ndx_token=${token}` } })).status).toBe(401);
+
+    // The printed nonce signs one browser in, once.
+    const exchange = () => fetch(`${base}/p/gamma-app/api/auth/session`, { method: "POST", headers: { "X-Ndx-Nonce": nonce } });
+    const first = await exchange();
+    expect(first.status).toBe(200);
+    const { credential } = await first.json();
+    expect((await exchange()).status).toBe(401);
 
     // Through the proxy to the project server, which was started with the same token.
-    const served = await fetch(`${base}/p/gamma-app/api/status`, { headers: { Cookie: `ndx_token=${token}` } });
+    const served = await fetch(`${base}/p/gamma-app/api/status`, { headers: { "X-Ndx-Token": credential } });
     expect(served.status).toBe(200);
     expect((await served.json()).projectDir).toBe(repo);
-
-    // The one-time URL sets the cookie and redirects to the clean URL.
-    const redirect = await fetch(`${base}/p/gamma-app/?ndx_token=${encodeURIComponent(token)}`, { redirect: "manual" });
-    expect(redirect.status).toBe(302);
-    expect(redirect.headers.get("location")).toBe("/p/gamma-app/");
-    expect(redirect.headers.get("set-cookie")).toContain("ndx_token=");
   });
 
   it("ndx start status and stop still work: the CLI sends the token itself", async () => {

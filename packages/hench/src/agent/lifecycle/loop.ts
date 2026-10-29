@@ -1,10 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
-import { GuardRails } from "../../guard/index.js";
+import { GuardRails, createToolSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
+import { RUN_GUARD_AUDIT_MAX_DENIALS } from "../../schema/index.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
 import { recordFileWork } from "../../store/run-events.js";
@@ -326,7 +327,7 @@ async function initApiResources(
   }
   const client = new Anthropic(anthropicOpts as ConstructorParameters<typeof Anthropic>[0]);
 
-  const guard = new GuardRails(projectDir, config.guard);
+  const guard = new GuardRails(projectDir, config.guard, { sandbox: createToolSandbox(projectDir) });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
   const toolCtx: ToolContext = {
@@ -516,7 +517,7 @@ function initGoogleApiResources(
   startingHead: string | undefined,
   configBackstop: ConfigBackstop | undefined,
 ): ToolContext {
-  const guard = new GuardRails(projectDir, config.guard);
+  const guard = new GuardRails(projectDir, config.guard, { sandbox: createToolSandbox(projectDir) });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
   return {
@@ -801,6 +802,9 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   };
   process.on("SIGINT", handleSignal);
 
+  // The guard the tool loop ran under, for the record's audit summary.
+  let auditedGuard: ToolContext["guard"] | undefined;
+
   try {
     if (!hasToolCalling) {
       // Graceful degradation: single-turn completion when the provider does
@@ -817,6 +821,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       const toolCtx = initGoogleApiResources(
         config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop,
       );
+      auditedGuard = toolCtx.guard;
       const tools = [{ functionDeclarations: TOOL_DEFINITIONS_GEMINI }];
       const contents: GeminiContent[] = [
         { role: "user", parts: [{ text: briefText }] },
@@ -948,6 +953,10 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       baselineUntracked,
     });
   }
+
+  // The guard's decisions outlive the process only if they are on the record.
+  const auditedPolicy = auditedGuard?.policy;
+  if (auditedPolicy) run.guardAudit = auditedPolicy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
 
   await finalizeRun({
     claims: opts.claims,
@@ -1785,6 +1794,9 @@ async function runLocalToolLoop(params: {
     });
   }
 
+  // The guard's decisions outlive the process only if they are on the record.
+  if (toolCtx.guard.policy) run.guardAudit = toolCtx.guard.policy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
+
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,
@@ -1844,6 +1856,13 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     });
     return { run };
   }
+
+  // Confinement: an autonomous run never executes agent commands unconfined
+  // by accident. Checked before the task is claimed, so a refusal leaves the
+  // PRD untouched; the posture line says what every later command runs under.
+  const sandboxPosture = resolveSandboxPosture(projectDir).posture;
+  assertSandboxReady(sandboxPosture, opts.autonomous === true || config.autonomous === true);
+  stream("Guard", formatSandboxPosture(sandboxPosture));
 
   // Shared: transition task to in_progress
   await transitionToInProgress(store, taskId, brief.task.status);
@@ -2251,6 +2270,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   }
 
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
+  // The guard's decisions outlive the process only if they are on the record.
+  if (toolCtx.guard.policy) run.guardAudit = toolCtx.guard.policy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
+
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,

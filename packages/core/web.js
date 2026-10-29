@@ -785,7 +785,7 @@ export function isProcessRunning(pid) {
  * @param {number} [gracePeriodMs]  Grace period before SIGKILL. Default: 2 000 ms.
  * @param {{pid: string, port: string}} [files]  State-file names. Preview mode passes its own pair.
  */
-async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000), files = DASHBOARD_FILES) {
+async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(process.env.N_DX_STOP_GRACE_MS ?? 2_000), files = DASHBOARD_FILES, hubPortFlag = null) {
   const info = await readPidFile(dir, files);
   if (!info) {
     log("No background server found.");
@@ -797,7 +797,7 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
   // means "unregister this worktree" — the hub decides what that implies for
   // the project's server and for itself.
   if (isHubMarker(info)) {
-    return unregisterFromHub(dir, info, label);
+    return unregisterFromHub(dir, info, label, hubPortFlag);
   }
 
   if (!isProcessRunning(info.pid)) {
@@ -839,7 +839,7 @@ async function stopServer(dir, label = "n-dx server", gracePeriodMs = Number(pro
  * @param {boolean} [showMcp]  Print the MCP endpoint URLs. False for the preview
  *                             server, which serves one HTML document and no MCP.
  */
-async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FILES, showMcp = true) {
+async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FILES, showMcp = true, hubPortFlag = null) {
   const info = await readPidFile(dir, files);
   if (!info) {
     log("No background server recorded.");
@@ -851,9 +851,10 @@ async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FI
   }
 
   if (isHubMarker(info)) {
-    const health = await hubRequest(info.port, "GET", "/api/hub/health");
+    const hubPorts = await knownHubPorts(hubHome(), hubPortFlag);
+    const health = await markerHubRequest(info, hubPorts, "GET", "/api/hub/health");
     const project = health.status === 200
-      ? await hubRequest(info.port, "GET", `/api/hub/projects/${encodeURIComponent(info.projectId)}`)
+      ? await markerHubRequest(info, hubPorts, "GET", `/api/hub/projects/${encodeURIComponent(info.projectId)}`)
       : { status: 0, body: null };
     for (const line of formatHubStatus({ label, marker: info, health, project })) log(line);
     return;
@@ -910,7 +911,15 @@ export function hubHome() {
 // than imports, so the few lines are repeated here, as layout.js repeats the
 // home resolver. `ndx start` creates it, passes `--token-file` to whatever it
 // spawns, sends it on its own probes, and prints a URL that carries it once.
-// `--no-auth`, or `web.auth: false` in .n-dx.json, turns it off.
+// `--no-auth`, `web.auth: false` in the machine-local config file
+// (.n-dx.local.json), or `web.auth: false` in `<ndx home>/config.json` turns
+// it off. The shared project config file is meant to be committed, so a
+// `false` there is reported and ignored — see resolveAuthEnabled.
+//
+// The token is only ever sent to a listener identified as this user's own hub
+// (identifyOwnHub): the hub's pid from the 0700 ndx home, alive, owned by this
+// uid, and the sole listener on the port. A port held by anything else gets no
+// credentialed request at all.
 
 export const AUTH_TOKEN_FILENAME = "auth.token";
 
@@ -967,33 +976,123 @@ function resolveStartToken(enabled, home) {
   try {
     return { tokenFile, token: ensureAuthTokenFile(tokenFile) };
   } catch (err) {
-    console.error(`Warning: could not create the dashboard token at ${tokenFile} (${err.code ?? err.message}); starting without it. Pass --no-auth or set web.auth=false to silence this.`);
+    console.error(`Warning: could not create the dashboard token at ${tokenFile} (${err.code ?? err.message}); starting without it. Pass --no-auth or set web.auth=false in .n-dx.local.json to silence this.`);
     return { tokenFile: null, token: null };
   }
 }
 
-/** A dashboard URL that sets the browser's cookie on first open. */
-export function urlWithAuthToken(base, token) {
-  if (!token) return base;
-  return `${base}${base.includes("?") ? "&" : "?"}ndx_token=${encodeURIComponent(token)}`;
+/**
+ * A dashboard URL carrying a single-use landing nonce (`?ndx_nonce=`), which
+ * the page exchanges for a session credential of its own. Never the per-user
+ * token: a printed or opened URL lands in `ps` output, the browser history and
+ * terminal scrollback. See packages/web/src/shared/auth.ts.
+ */
+export function urlWithNonce(base, nonce) {
+  if (!nonce) return base;
+  return `${base}${base.includes("?") ? "&" : "?"}ndx_nonce=${encodeURIComponent(nonce)}`;
 }
 
 /**
  * A hub-served project's dashboard URL: what `ndx start` prints, and what
  * `--open` hands the browser.
  *
- * One function for both because they must not differ. The clean URL answers
- * 401 when the hub requires a token, and a browser has no other way to be
- * given one — so `--open` on the untokenized URL opened a dead page while the
- * terminal showed a working link.
+ * One function for both because they must not differ: the nonce in it is
+ * what signs the browser in, so `--open` on a URL without one opened a page
+ * that could only show its sign-in notice while the terminal showed a working
+ * link.
  */
-export function hubDashboardUrl(hubPort, projectId, token) {
-  return urlWithAuthToken(`http://localhost:${hubPort}/p/${encodeURIComponent(projectId)}/`, token);
+export function hubDashboardUrl(hubPort, projectId, nonce) {
+  return urlWithNonce(`http://localhost:${hubPort}/p/${encodeURIComponent(projectId)}/`, nonce);
 }
 
-/** `web.auth` from the project's config file; anything but `false` means on. */
-async function loadAuthEnabled(dir) {
-  return (await loadWebConfig(dir)).auth !== false;
+/**
+ * Ask a server this process has identified as this user's own for a landing
+ * nonce (`POST /api/auth/nonce`, with the per-user token). `request` is
+ * {@link credentialedHubRequest} for the hub, or a direct request to a
+ * single-project server whose listener was checked first. Null when it
+ * cannot be had — an older server without the route, or an error.
+ */
+async function mintLandingNonce(request) {
+  const { status, body } = await request("POST", "/api/auth/nonce");
+  return status === 200 && typeof body?.nonce === "string" ? body.nonce : null;
+}
+
+/**
+ * A single-project or preview server's landing nonce, asked of `port` only
+ * once its one listener is `pid` — the process `ndx start` itself spawned —
+ * so the per-user token goes nowhere else.
+ */
+async function mintNonceFromSpawnedServer(port, pid) {
+  const listeners = listenerPidsOnPort(port);
+  if (listeners.length !== 1 || listeners[0] !== pid) return null;
+  return mintLandingNonce((method, path) => serverRequest(port, method, path));
+}
+
+/** One JSON request to a local server, carrying the per-user token. `{status: 0}` when unreachable. */
+function serverRequest(port, method, path, timeoutMs = PROBE_TIMEOUT_MS) {
+  return hubRequest(port, method, path, undefined, timeoutMs, { sendToken: true });
+}
+
+/** What to print beside a URL that could not be given a nonce while a token is required. */
+const NO_NONCE_NOTE = "  (could not get a sign-in link from the server; run 'ndx start' again, or restart the server if it predates this ndx)";
+
+/**
+ * Whether the per-user token is required, from the three places that may turn
+ * it off and the one that may not. Pure, so the rule is unit-tested.
+ *
+ * `--no-auth`, `web.auth: false` in the machine-local config file, and
+ * `web.auth: false` in the user's own `<ndx home>/config.json` each turn the
+ * token off. The shared project config file is the one a repository ships, so
+ * a `false` there is ignored and reported: a checkout must not be able to
+ * serve itself without the token to whoever clones it.
+ *
+ * @param {object} args
+ * @param {unknown} args.shared     `web.auth` from the shared project config file
+ * @param {unknown} args.local      `web.auth` from the machine-local config file
+ * @param {unknown} args.user       `web.auth` from `<ndx home>/config.json`
+ * @param {boolean} args.noAuthFlag `--no-auth` on the command line
+ * @param {string}  args.sharedFile Path of the shared config file, for the warning
+ * @param {string}  args.localFile  Path of the machine-local config file, for the warning
+ * @param {string}  args.userFile   Path of the user config file, for the warning
+ * @returns {{ enabled: boolean, warning: string | null }}
+ */
+export function resolveAuthEnabled({ shared, local, user, noAuthFlag, sharedFile, localFile, userFile }) {
+  if (noAuthFlag || local === false || user === false) return { enabled: false, warning: null };
+  if (shared === false) {
+    return {
+      enabled: true,
+      warning:
+        `Warning: web.auth=false in ${sharedFile} was ignored — that file is shared with the repository. ` +
+        `Set it in ${localFile} or ${userFile}, or pass --no-auth.`,
+    };
+  }
+  return { enabled: true, warning: null };
+}
+
+/** The `web` block of `<ndx home>/config.json`, or `{}`. */
+async function loadUserWebConfig(home = hubHome()) {
+  try {
+    const web = JSON.parse(await readFile(join(home, HUB_CONFIG_FILE), "utf-8"))?.web;
+    return web && typeof web === "object" ? web : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Apply {@link resolveAuthEnabled} to the project's config files, printing its warning. */
+export async function loadAuthEnabled(dir, noAuthFlag = false, home = hubHome()) {
+  const layout = resolveLayout(dir);
+  const { enabled, warning } = resolveAuthEnabled({
+    shared: (await loadWebConfig(dir)).auth,
+    local: (await loadWebConfigFrom(layout.localConfigFile)).auth,
+    user: (await loadUserWebConfig(home)).auth,
+    noAuthFlag,
+    sharedFile: layout.configFile,
+    localFile: layout.localConfigFile,
+    userFile: join(home, HUB_CONFIG_FILE),
+  });
+  if (warning) console.error(warning);
+  return enabled;
 }
 
 /** Hub port: `<hub home>/config.json` → `{ "hub": { "port": N } }`, default 3117. */
@@ -1027,7 +1126,11 @@ export async function readHubRegistry(home = hubHome()) {
  * that had turned it off, and ignoring its port and mode besides.
  */
 async function loadWebConfig(dir) {
-  const configPath = resolveLayout(dir).configFile;
+  return loadWebConfigFrom(resolveLayout(dir).configFile);
+}
+
+/** The `web` block of one config file, or `{}` when absent or unreadable. */
+async function loadWebConfigFrom(configPath) {
   if (!(await fileExists(configPath))) return {};
   try {
     const web = JSON.parse(await readFile(configPath, "utf-8"))?.web;
@@ -1157,11 +1260,12 @@ export function deriveProjectId(name, { repoRoot, remoteUrl, registryProjects })
  * One JSON request to the hub. Resolves `{ status, body }`; status 0 when
  * unreachable.
  *
- * `sendToken: false` deliberately omits the credential: a 401 from a hub that
- * was asked anonymously is the only way to tell a hub that *requires* a token
- * from one that merely tolerated the one we sent.
+ * Anonymous unless `sendToken: true`, and callers do not pass that themselves:
+ * {@link credentialedHubRequest} does, after {@link identifyOwnHub} has shown
+ * the listener to be this user's hub. An anonymous probe is also how a hub
+ * that *requires* a token is told apart from one that merely tolerated it.
  */
-export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_MS, { sendToken = true } = {}) {
+export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_MS, { sendToken = false } = {}) {
   return new Promise((res) => {
     const payload = body === undefined ? null : JSON.stringify(body);
     const req = httpRequest(
@@ -1172,8 +1276,6 @@ export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_M
         path,
         headers: {
           ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {}),
-          // The hub may be running with the per-user token; sending it when
-          // the file exists costs nothing against a hub that is not.
           ...(() => { const t = sendToken ? readAuthTokenFile() : null; return t ? { "X-Ndx-Token": t } : {}; })(),
         },
       },
@@ -1195,27 +1297,180 @@ export function hubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_M
   });
 }
 
-/** Whether a hub answers on `port`. */
-async function hubIsHealthy(port) {
-  const { status, body } = await hubRequest(port, "GET", "/api/hub/health");
+/**
+ * Whether `pid` is a process this user may signal: "ours" when a null signal
+ * is accepted, "foreign" when the process exists but refuses it (EPERM —
+ * another account's process), "gone" when there is no such process.
+ *
+ * The null signal is POSIX's own ownership test, so it needs no `ps`; where
+ * `ps` is available {@link readProcessIdentity} corroborates it.
+ *
+ * @param {number} pid
+ * @returns {"ours" | "foreign" | "gone"}
+ */
+export function probeProcessOwnership(pid) {
+  try {
+    process.kill(pid, 0);
+    return "ours";
+  } catch (err) {
+    return err?.code === "EPERM" ? "foreign" : "gone";
+  }
+}
+
+/**
+ * Judge whether the listener on `port` is this user's own hub, from facts
+ * already gathered. Pure, so every refusal is assertable without a socket.
+ *
+ * The hub records its pid in `hub.pid` inside the per-user ndx home (0700,
+ * so another account cannot plant it). That pid must be alive and this
+ * user's own (the null signal is accepted), must be the only process
+ * listening on the port, and where `ps` can report an owner it must agree.
+ * Anything less means the port is held by something that is not this user's
+ * hub, and nothing credentialed is sent.
+ *
+ * @param {object} args
+ * @param {number | null} args.recordedPid  Pid from `hub.pid`, or null when absent
+ * @param {"ours" | "foreign" | "gone"} args.ownership  {@link probeProcessOwnership} of that pid
+ * @param {number[]} args.listeners         Pids listening on the port ({@link listenerPidsOnPort})
+ * @param {number | null} args.uid          Owner uid of the recorded pid from `ps`, or null when unreadable
+ * @param {number | null} args.ownUid       This process's uid, or null where the platform has none
+ * @returns {{ ok: true, pid: number } | { ok: false, reason: string }}
+ */
+export function judgeHubIdentity({ recordedPid, ownership, listeners, uid, ownUid }) {
+  if (!recordedPid) return { ok: false, reason: "no hub is recorded in this user's ndx home" };
+  if (ownership === "gone") return { ok: false, reason: `the recorded hub (PID ${recordedPid}) is not running` };
+  if (ownership !== "ours") return { ok: false, reason: `the recorded hub pid (${recordedPid}) belongs to another user` };
+  if (listeners.length === 0) {
+    return { ok: false, reason: "no listener could be identified on the port (is lsof installed?)" };
+  }
+  const others = listeners.filter((pid) => pid !== recordedPid);
+  if (others.length > 0 || listeners.length !== 1) {
+    return { ok: false, reason: `port held by another process (PID ${others.join(", ") || listeners.join(", ")})` };
+  }
+  // `ps` is corroboration where it answers: an owner it reports must be us.
+  if (uid !== null && ownUid !== null && uid !== ownUid) {
+    return { ok: false, reason: `the listener (PID ${recordedPid}) is not owned by this user` };
+  }
+  return { ok: true, pid: recordedPid };
+}
+
+/**
+ * Is the listener on `port` this user's own n-dx hub? Gathers the inputs for
+ * {@link judgeHubIdentity} from the ndx home and the process table.
+ *
+ * @param {number} port
+ * @param {string} [home]
+ * @returns {Promise<{ ok: true, pid: number } | { ok: false, reason: string }>}
+ */
+export async function identifyOwnHub(port, home = hubHome()) {
+  const recordedPid = await readHubPid(home);
+  const identity = recordedPid ? readProcessIdentity(recordedPid) : null;
+  return judgeHubIdentity({
+    recordedPid,
+    ownership: recordedPid ? probeProcessOwnership(recordedPid) : "gone",
+    listeners: listenerPidsOnPort(port),
+    uid: identity?.uid ?? null,
+    ownUid: process.getuid?.() ?? null,
+  });
+}
+
+/**
+ * A hub request that carries the per-user token — once the listener has been
+ * identified as this user's hub. Resolves `{status: 0, body: null, foreign}`
+ * without sending anything when it has not. With no token file there is
+ * nothing to protect, and the request goes out anonymously.
+ */
+export async function credentialedHubRequest(port, method, path, body, timeoutMs = PROBE_TIMEOUT_MS, { home = hubHome() } = {}) {
+  if (!readAuthTokenFile(authTokenPath(home))) return hubRequest(port, method, path, body, timeoutMs);
+  const own = await identifyOwnHub(port, home);
+  if (!own.ok) return { status: 0, body: null, foreign: own.reason };
+  return hubRequest(port, method, path, body, timeoutMs, { sendToken: true });
+}
+
+/**
+ * The ports this user's hub may be on, from the user's own side only: the
+ * `--port` given on this command line, the port recorded in `hub.pid` by the
+ * running hub, and `hub.port` from `<ndx home>/config.json` (default 3117).
+ *
+ * @param {string} home
+ * @param {number | null} [flagPort]
+ * @returns {Promise<Set<number>>}
+ */
+async function knownHubPorts(home, flagPort = null) {
+  const ports = new Set([await loadHubPort(home)]);
+  if (flagPort) ports.add(flagPort);
+  const recorded = await readHubPidFile(home);
+  if (recorded?.port) ports.add(recorded.port);
+  return ports;
+}
+
+/**
+ * A request addressed by a project's hub marker file. The marker is inside
+ * the repository, so the port it names is not trusted to be the hub's: a
+ * marker naming a port that is not one of {@link knownHubPorts} gets nothing
+ * at all, and one that is still has its listener identified first.
+ */
+async function markerHubRequest(marker, hubPorts, method, path, body, timeoutMs = PROBE_TIMEOUT_MS, { home = hubHome() } = {}) {
+  if (!hubPorts.has(marker.port)) {
+    return { status: 0, body: null, foreign: `the marker names port ${marker.port}, which is not this user's hub port` };
+  }
+  return credentialedHubRequest(marker.port, method, path, body, timeoutMs, { home });
+}
+
+/**
+ * May a request carrying the per-user token go to `port`? Only when the
+ * listener there is identified as this user's own n-dx server: the hub, on one
+ * of {@link knownHubPorts}, or the single-project dashboard serving `absDir`
+ * ({@link findOwnDashboardOnPort}). For callers that read the port from a
+ * project marker file (`ndx refresh`'s live reload, the MCP shim).
+ *
+ * @param {number} port
+ * @param {string | null} absDir  The directory a single-project server would serve, or null.
+ * @param {{ home?: string, flagPort?: number | null }} [opts]
+ * @returns {Promise<{ ok: true, pid: number } | { ok: false, reason: string }>}
+ */
+export async function identifyTokenTarget(port, absDir, { home = hubHome(), flagPort = null } = {}) {
+  const hubPorts = await knownHubPorts(home, flagPort);
+  let hubReason = null;
+  if (hubPorts.has(port)) {
+    const own = await identifyOwnHub(port, home);
+    if (own.ok) return own;
+    hubReason = own.reason;
+  }
+  if (absDir) {
+    const dashboard = findOwnDashboardOnPort(port, absDir);
+    if (dashboard) return { ok: true, pid: dashboard.pid };
+  }
+  return { ok: false, reason: hubReason ?? `port ${port} is not identified as this user's n-dx server` };
+}
+
+/** Whether this user's hub answers on `port`. */
+async function hubIsHealthy(port, home) {
+  const { status, body } = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
   return status === 200 && body?.ok === true;
 }
 
 /**
- * How the hub on `port` is authenticated — "absent", "open", "token" or
- * "mismatch" (it wants a token, but not the one in this user's file).
+ * How the hub on `port` is authenticated — "absent", "open", "token",
+ * "mismatch" (it wants a token, but not the one in this user's file) or
+ * "foreign" (something answers 401 there, but it is not this user's hub).
  *
  * One hub serves every registered project, so authentication is a property of
  * the *hub*, not of the project that happens to start it. Judging it from two
  * probes is what makes that so: an anonymous `/api/hub/health` is refused with
  * 401 by a hub that requires the token and answered by one that does not, and
  * the second probe then says whether the token we hold is the one it wants.
+ * The second probe carries the token, so it is only made once the listener
+ * has been identified as this user's hub; a 401 from anything else is
+ * "foreign" and gets no credentialed request.
  */
-export async function hubAuthState(port, probe = hubRequest) {
+export async function hubAuthState(port, probe = hubRequest, identify = identifyOwnHub) {
   const anonymous = await probe(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: false });
   if (anonymous.status === 200 && anonymous.body?.ok === true) return "open";
   if (anonymous.status !== 401) return "absent";
-  const credentialed = await probe(port, "GET", "/api/hub/health");
+  const own = await identify(port);
+  if (!own.ok) return "foreign";
+  const credentialed = await probe(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { sendToken: true });
   return credentialed.status === 200 && credentialed.body?.ok === true ? "token" : "mismatch";
 }
 
@@ -1228,10 +1483,15 @@ export function hubAuthMismatchMessage(state, wanted, port, tokenFile) {
   if (state === "open" && wanted === "token") {
     // The dangerous direction, and the reason this check exists: reusing the
     // open hub would serve *this* project with no token at all.
-    return `The n-dx hub already running on port ${port} was started without authentication, so registering this project would serve it unauthenticated too.\n${stop}\nTo join the open hub as it is, pass --no-auth or set web.auth=false.`;
+    return `The n-dx hub already running on port ${port} was started without authentication, so registering this project would serve it unauthenticated too.\n${stop}\nTo join the open hub as it is, pass --no-auth or set web.auth=false in .n-dx.local.json.`;
   }
   if (state === "token" && wanted === "open") {
-    return `The n-dx hub already running on port ${port} requires the per-user token, so --no-auth (or web.auth=false) cannot apply to it.\n${stop}`;
+    return `The n-dx hub already running on port ${port} requires the per-user token, so --no-auth (or web.auth=false in .n-dx.local.json) cannot apply to it.\n${stop}`;
+  }
+  if (state === "foreign") {
+    // Not identified as this user's hub, so the token was never sent to it.
+    return `Port ${port} is held by another process that is not this user's n-dx hub; nothing was sent to it.\n` +
+      `Stop that process, or choose another hub port with --port=N or hub.port in ${join(hubHome(), HUB_CONFIG_FILE)}.`;
   }
   return `The n-dx hub already running on port ${port} was started with a different token than ${tokenFile ?? "this user's"}.\n${stop}`;
 }
@@ -1247,7 +1507,7 @@ export function hubAuthMismatchMessage(state, wanted, port, tokenFile) {
  */
 async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
   const wanted = tokenFile ? "token" : "open";
-  const state = await hubAuthState(port);
+  const state = await hubAuthState(port, hubRequest, (p) => identifyOwnHub(p, home));
   if (state !== "absent") {
     if (state === wanted) return { spawned: false, pid: null };
     throw new Error(hubAuthMismatchMessage(state, wanted, port, tokenFile));
@@ -1272,7 +1532,7 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
 
   const deadline = Date.now() + HUB_START_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    if (await hubIsHealthy(port)) return { spawned: true, pid: child.pid };
+    if (await hubIsHealthy(port, home)) return { spawned: true, pid: child.pid };
     if (!isProcessRunning(child.pid)) break;
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -1327,6 +1587,12 @@ export function formatHubStatus({ label, marker, health, project, now = Date.now
   const base = `http://localhost:${marker.port}/p/${encodeURIComponent(marker.projectId)}`;
 
   if (health.status !== 200) {
+    if (health.foreign) {
+      return [
+        `${label}: this directory is registered with the n-dx hub on port ${marker.port}, but ${health.foreign}.`,
+        `  Nothing was sent to it. Run 'ndx start .' to register this directory again.`,
+      ];
+    }
     return [
       `${label}: this directory is registered with the n-dx hub on port ${marker.port}, but the hub is not answering.`,
       `  Start it again with 'ndx start .' — the registration is remembered.`,
@@ -1380,6 +1646,12 @@ export function formatHubStatus({ label, marker, health, project, now = Date.now
  */
 export function formatHubOverview({ port, health, projects, now = Date.now() }) {
   if (health.status !== 200) {
+    if (health.foreign) {
+      return [
+        `n-dx hub: port ${port} is in use, but ${health.foreign}; nothing was sent to it.`,
+        `  Stop that process, or choose another hub port with --port=N or hub.port in <ndx home>/config.json.`,
+      ];
+    }
     return [
       `n-dx hub: not running (nothing answers on port ${port}).`,
       `  'ndx start .' starts one and registers the current repository.`,
@@ -1441,14 +1713,17 @@ export function formatUnregister({ label, projectId, port, worktree, result }) {
  * either way: whatever the hub decided, this directory is no longer pointing
  * at a server of its own.
  */
-async function unregisterFromHub(dir, marker, label) {
+async function unregisterFromHub(dir, marker, label, hubPortFlag = null) {
   const worktree = resolveRepo(dir).worktree;
   const path =
     `/api/hub/projects/${encodeURIComponent(marker.projectId)}` +
     `/worktrees/${encodeURIComponent(worktree)}`;
-  const { status, body } = await hubRequest(marker.port, "DELETE", path, undefined, HUB_UNREGISTER_TIMEOUT_MS);
+  const hubPorts = await knownHubPorts(hubHome(), hubPortFlag);
+  const { status, body, foreign } = await markerHubRequest(marker, hubPorts, "DELETE", path, undefined, HUB_UNREGISTER_TIMEOUT_MS);
 
-  if (status === 200) {
+  if (foreign) {
+    log(`${label}: port ${marker.port} is not this user's n-dx hub (${foreign}) — nothing was sent; clearing this directory's registration.`);
+  } else if (status === 200) {
     for (const line of formatUnregister({ label, projectId: marker.projectId, port: marker.port, worktree, result: body ?? {} })) {
       log(line);
     }
@@ -1502,16 +1777,16 @@ export async function runHub(rest, { commandName = "hub" } = {}) {
   }
 
   if (subcommand === "status" || subcommand === undefined || subcommand === null) {
-    const health = await hubRequest(port, "GET", "/api/hub/health");
+    const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
     const projects = health.status === 200
-      ? await hubRequest(port, "GET", "/api/hub/projects")
+      ? await credentialedHubRequest(port, "GET", "/api/hub/projects", undefined, PROBE_TIMEOUT_MS, { home })
       : { status: 0, body: null };
     for (const line of formatHubOverview({ port, health, projects })) log(line);
     return 0;
   }
 
   if (subcommand === "stop") {
-    const health = await hubRequest(port, "GET", "/api/hub/health");
+    const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
     const pid = typeof health.body?.pid === "number" ? health.body.pid : (await readHubPid(home));
     if (health.status !== 200 && !pid) {
       log(`No n-dx hub is running on port ${port}.`);
@@ -1533,14 +1808,22 @@ export async function runHub(rest, { commandName = "hub" } = {}) {
   return 1;
 }
 
-/** The hub's recorded pid from the per-user `hub.pid`, or null. */
-async function readHubPid(home = hubHome()) {
+/** The per-user `hub.pid` record — the running hub's pid and port — or null. */
+async function readHubPidFile(home = hubHome()) {
   try {
-    const pid = JSON.parse(await readFile(join(home, HUB_PID_FILE), "utf-8"))?.pid;
-    return Number.isInteger(pid) && pid > 0 ? pid : null;
+    const parsed = JSON.parse(await readFile(join(home, HUB_PID_FILE), "utf-8"));
+    const pid = parsed?.pid;
+    if (!Number.isInteger(pid) || pid <= 0) return null;
+    const port = Number.isInteger(parsed?.port) && parsed.port > 0 ? parsed.port : null;
+    return { pid, port };
   } catch {
     return null;
   }
+}
+
+/** The hub's recorded pid from the per-user `hub.pid`, or null. */
+async function readHubPid(home = hubHome()) {
+  return (await readHubPidFile(home))?.pid ?? null;
 }
 
 /**
@@ -1548,7 +1831,8 @@ async function readHubPid(home = hubHome()) {
  *
  * No platform goes through a shell: the URL is always its own argv entry, so
  * nothing in it (quotes, `&`, or a `%NAME%` that cmd.exe would expand inside
- * the ndx_token or the encoded project id) is interpreted. On win32 that means
+ * the encoded project id) is interpreted. The URL carries a single-use nonce,
+ * never the per-user token, because an opener's argv is visible in `ps`. On win32 that means
  * rundll32's URL handler rather than `cmd /c start`.
  *
  * @param {string} url
@@ -1608,7 +1892,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   let hub;
   // The token is created before the hub so this process and the hub agree on
   // it from the first probe; an existing file is reused, never rotated.
-  const authEnabled = !flags["no-auth"] && (await loadAuthEnabled(absDir));
+  const authEnabled = await loadAuthEnabled(absDir, !!flags["no-auth"], home);
   const { tokenFile, token } = resolveStartToken(authEnabled, home);
   try {
     hub = await ensureHub(hubPort, { tools, __dir, home, tokenFile });
@@ -1618,12 +1902,15 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   }
   if (hub.spawned) log(`n-dx hub started on http://localhost:${hubPort} (PID ${hub.pid}).`);
 
-  const { status, body } = await hubRequest(
+  // `ndxBin` is still sent for older hubs; a current hub ignores it and
+  // spawns its own CLI entry point.
+  const { status, body } = await credentialedHubRequest(
     hubPort,
     "POST",
     "/api/hub/projects",
     { id, name, repoRoot: repo.repoRoot, worktree: repo.worktree, ndxBin: resolve(__dir, tools.web) },
     HUB_REGISTER_TIMEOUT_MS,
+    { home },
   );
   if (status !== 200 && status !== 201) {
     console.error(`Registering with the n-dx hub failed (${status || "unreachable"})${body?.error ? `: ${body.error}` : ""}`);
@@ -1637,7 +1924,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
 
   // Marker files: the port file points refresh --live-server at the hub, and
   // the pid file lets stop/status/refresh recognise a hub registration.
-  const health = await hubRequest(hubPort, "GET", "/api/hub/health");
+  const health = await credentialedHubRequest(hubPort, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
   const hubPid = typeof health.body?.pid === "number" ? health.body.pid : (hub.pid ?? process.pid);
   try {
     await writeHubMarkerFiles(absDir, { hubPid, hubPort, projectId: id });
@@ -1646,10 +1933,16 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   }
 
   const base = `http://localhost:${hubPort}/p/${encodeURIComponent(id)}`;
-  const dashboardUrl = hubDashboardUrl(hubPort, id, token);
+  // The printed and opened URL carries a single-use nonce the hub minted for
+  // this run — never the token itself.
+  const nonce = token
+    ? await mintLandingNonce((method, path) => credentialedHubRequest(hubPort, method, path, undefined, PROBE_TIMEOUT_MS, { home }))
+    : null;
+  const dashboardUrl = hubDashboardUrl(hubPort, id, nonce);
   log(`${label}: project "${id}" registered with the hub${status === 200 ? " (already known)" : ""}.`);
   log(`  Repository: ${repo.repoRoot}${repo.worktree !== repo.repoRoot ? `\n  Worktree:   ${repo.worktree}` : ""}${repo.branch ? ` (${repo.branch})` : ""}`);
   log(`  URL: ${dashboardUrl}`);
+  if (token && !nonce) log(NO_NONCE_NOTE);
   log(`  MCP (rex):          ${base}/mcp/rex`);
   log(`  MCP (sourcevision): ${base}/mcp/sourcevision`);
   log("");
@@ -1658,7 +1951,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   log(`  Claude:  claude mcp add --transport http rex ${base}/mcp/rex${headerFlag}`);
   log(`           claude mcp add --transport http sourcevision ${base}/mcp/sourcevision${headerFlag}`);
   if (token) {
-    log(`  Token:   ${tokenFile} (the dashboard URL above sets it as a cookie once; disable with --no-auth or web.auth=false)`);
+    log(`  Token:   ${tokenFile} (for MCP and scripts; the dashboard URL above is a one-time sign-in link valid for about a minute — run 'ndx start' again for a fresh one; disable with --no-auth or web.auth=false in .n-dx.local.json)`);
   }
   log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   log("");
@@ -1739,14 +2032,17 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   const stopCmd = isPreview ? `ndx ${commandName} --preview stop` : `ndx ${commandName} stop`;
 
   // --- Subcommand: stop ---
+  // `--port` names the hub port for a hub-registered directory, as it did
+  // for the `ndx start` that registered it.
+  const hubPortFlag = flags.port ? port : null;
   if (subcommand === "stop") {
-    const ok = await stopServer(absDir, label, undefined, files);
+    const ok = await stopServer(absDir, label, undefined, files, hubPortFlag);
     return ok ? 0 : 1;
   }
 
   // --- Subcommand: status ---
   if (subcommand === "status") {
-    await showStatus(absDir, port, label, files, !isPreview);
+    await showStatus(absDir, port, label, files, !isPreview, hubPortFlag);
     return 0;
   }
 
@@ -1880,8 +2176,9 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
   const serveArgs = [isPreview ? "preview" : "serve", `--port=${port}`, absDir];
   if (isPreview && typeof flags.file === "string") serveArgs.push(`--file=${flags.file}`);
   // Single-project and preview servers take the same per-user token the hub
-  // would. Created here so a background start can print a URL that carries it.
-  const hereAuthEnabled = !flags["no-auth"] && (await loadAuthEnabled(absDir));
+  // would. Created here so a background start can ask its server for a
+  // landing nonce to print.
+  const hereAuthEnabled = await loadAuthEnabled(absDir, !!flags["no-auth"]);
   const { tokenFile: hereTokenFile, token: hereToken } = resolveStartToken(hereAuthEnabled, hubHome());
   if (hereTokenFile) serveArgs.push(`--token-file=${hereTokenFile}`);
   if (flags.debug) serveArgs.push("--debug");
@@ -1929,7 +2226,9 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       // Process is alive but port file not written yet — use requested port as fallback
       await writePidFile(absDir, child.pid, port, files);
       log(`${label} started in background (PID ${child.pid}).`);
-      log(`  URL: ${urlWithAuthToken(`http://localhost:${port}/`, hereToken)}`);
+      const fallbackNonce = hereToken ? await mintNonceFromSpawnedServer(port, child.pid) : null;
+      log(`  URL: ${urlWithNonce(`http://localhost:${port}/`, fallbackNonce)}`);
+      if (hereToken && !fallbackNonce) log(NO_NONCE_NOTE);
       log(`Use '${stopCmd}' to stop it.`);
       return 0;
     }
@@ -1942,7 +2241,10 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     }
 
     log(`${label} started in background (PID ${child.pid}).`);
-    log(`  URL: ${urlWithAuthToken(`http://localhost:${actualPort}/`, hereToken)}`);
+    // Asked of the server just spawned, once its listener is that process.
+    const hereNonce = hereToken ? await mintNonceFromSpawnedServer(actualPort, child.pid) : null;
+    log(`  URL: ${urlWithNonce(`http://localhost:${actualPort}/`, hereNonce)}`);
+    if (hereToken && !hereNonce) log(NO_NONCE_NOTE);
 
     // The preview serves one HTML document — no MCP endpoints to advertise.
     if (isPreview) {
@@ -1958,7 +2260,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
     log(`  Claude:  claude mcp add --transport http rex http://localhost:${actualPort}/mcp/rex${hereHeaderFlag}`);
     log(`           claude mcp add --transport http sourcevision http://localhost:${actualPort}/mcp/sourcevision${hereHeaderFlag}`);
     log("  Codex:   configured automatically via .codex/config.toml (stdio)");
-    if (hereToken) log(`  Token:   ${hereTokenFile} (disable with --no-auth or web.auth=false)`);
+    if (hereToken) log(`  Token:   ${hereTokenFile} (for MCP and scripts; the URL above is a one-time sign-in link; disable with --no-auth or web.auth=false in .n-dx.local.json)`);
     log("");
     log(`Use '${stopCmd}' to stop it.`);
     return 0;

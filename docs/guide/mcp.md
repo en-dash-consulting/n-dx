@@ -70,7 +70,7 @@ HTTP transport uses [Streamable HTTP](https://modelcontextprotocol.io/) with ses
 
 **Bare aliases.** While exactly one project is registered, `http://localhost:3117/mcp/rex` and `/mcp/sourcevision` still alias to it. With several projects registered, root MCP calls answer `409` listing the ids, so register the `/p/<id>/` form.
 
-**Per-user token.** `ndx start` creates `<ndx home>/auth.token` (mode 0600), normally `~/.ndx/auth.token`. Every hub, dashboard and preview request must present it as an `X-Ndx-Token` header, an `Authorization: Bearer` header, or the `ndx_token` cookie that the printed URL sets once. Without it a request is refused with `401`. Disable the check with `ndx start --no-auth` or `web.auth: false` in `.n-dx.json`; the `--header` flags above are then unnecessary.
+**Per-user token.** `ndx start` creates `<ndx home>/auth.token` (mode 0600), normally `~/.ndx/auth.token`. Every hub, dashboard and preview request must present it as an `X-Ndx-Token` header or an `Authorization: Bearer` header (a browser presents a session credential obtained from the one-time link `ndx start` prints instead; no cookie is involved). Without it a request is refused with `401`. Disable the check with `ndx start --no-auth` or `web.auth: false` in `.n-dx.local.json` (a tracked `.n-dx.json` cannot turn it off); the `--header` flags above are then unnecessary.
 
 ## Tool Name Prefixes
 

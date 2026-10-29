@@ -26,7 +26,7 @@ import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { relativeToRoot, resolveLayout } from "./layout.js";
-import { loadShellTestEnv, loadVendorCliEnv, loadVendorCliPath } from "./config.js";
+import { isRepoRestricted, loadShellTestEnv, loadVendorCliEnv, loadVendorCliPath } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
@@ -253,22 +253,39 @@ export function writeNdxContextFile(text) {
 
 /**
  * Read the test command from .rex/config.json → `test` field.
- * Returns undefined when the file is absent, malformed, or the field unset.
+ * Returns undefined when the file is absent, malformed, or the field unset —
+ * and while the repository is not trusted: the command is repository content
+ * run through a shell, so like `verify_criteria` this does not run it until
+ * the user has accepted the checkout's execution config.
  *
  * @param {string} dir  Project root directory.
- * @returns {string | undefined}
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions; onRestricted?: (message: string) => void }} [options]
+ *   `trust` relocates the repository-trust store (tests); `onRestricted`
+ *   receives the one-line reason when the command is withheld.
+ * @returns {Promise<string | undefined>}
  */
-export function readRexTestCommand(dir) {
+export async function readRexTestCommand(dir, options = {}) {
   const configPath = join(resolveLayout(dir).rexDir, "config.json");
   if (!existsSync(configPath)) return undefined;
+  let cmd;
   try {
     const data = JSON.parse(readFileSync(configPath, "utf-8"));
-    const cmd = data?.test;
-    return typeof cmd === "string" && cmd.trim().length > 0 ? cmd.trim() : undefined;
+    const raw = data?.test;
+    cmd = typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : undefined;
   } catch {
     return undefined;
   }
+  if (cmd === undefined) return undefined;
+  if (await isRepoRestricted(dir, options.trust)) {
+    options.onRestricted?.(UNTRUSTED_TEST_COMMAND_NOTE);
+    return undefined;
+  }
+  return cmd;
 }
+
+/** Why the test command is withheld; the same note `verify_criteria` prints. */
+export const UNTRUSTED_TEST_COMMAND_NOTE =
+  "The repository's execution config is not trusted, so its test command was not run. Review with `ndx trust .` and accept with `ndx trust accept .`.";
 
 /**
  * Determine which vendor should act as reviewer given the primary vendor.

@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { resolve } from "node:path";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { join, resolve } from "node:path";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { symlinksSupported } from "../../helpers/symlinks.js";
 import { validatePath, simpleGlobMatch, GuardError } from "../../../src/guard/paths.js";
 
 describe("simpleGlobMatch", () => {
@@ -163,5 +166,77 @@ describe("validatePath", () => {
   it("allows absolute paths within the project directory", () => {
     const resolved = validatePath("/project/src/file.ts", projectDir, blockedPaths);
     expect(resolved).toBe(resolve(projectDir, "src/file.ts"));
+  });
+});
+
+describe("validatePath real-path resolution", () => {
+  const blockedPaths = [".hench/**", ".git/**"];
+  let base: string;
+  let projectDir: string;
+  let outside: string;
+  let realProject: string;
+
+  beforeEach(() => {
+    base = mkdtempSync(join(tmpdir(), "hench-guard-realpath-"));
+    projectDir = join(base, "project");
+    outside = join(base, "outside");
+    mkdirSync(join(projectDir, "src"), { recursive: true });
+    mkdirSync(join(projectDir, ".hench"), { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(projectDir, "src", "main.ts"), "export const x = 1;\n");
+    writeFileSync(join(outside, "secret.txt"), "outside\n");
+    realProject = realpathSync.native(projectDir);
+  });
+
+  afterEach(() => {
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  it("returns the real path of an existing file", () => {
+    expect(validatePath("src/main.ts", projectDir, blockedPaths)).toBe(join(realProject, "src", "main.ts"));
+  });
+
+  it("accepts the project directory as given and in its real spelling", () => {
+    const expected = join(realProject, "src", "main.ts");
+    expect(validatePath(expected, projectDir, blockedPaths)).toBe(expected);
+    expect(validatePath("src/main.ts", realProject, blockedPaths)).toBe(expected);
+    expect(validatePath(".", projectDir, blockedPaths)).toBe(realProject);
+  });
+
+  it("checks a path that does not exist yet at its nearest existing ancestor", () => {
+    expect(validatePath("src/deep/new.ts", projectDir, blockedPaths)).toBe(join(realProject, "src", "deep", "new.ts"));
+  });
+
+  describe.skipIf(!symlinksSupported())("through symbolic links", () => {
+    beforeEach(() => {
+      symlinkSync(outside, join(projectDir, "link-out"), "dir");
+      symlinkSync(join(outside, "secret.txt"), join(projectDir, "link-file"), "file");
+      symlinkSync(join(projectDir, "src"), join(projectDir, "link-in"), "dir");
+      symlinkSync(join(projectDir, ".hench"), join(projectDir, "link-state"), "dir");
+    });
+
+    it("refuses a link to a directory outside the project, and anything under it", () => {
+      expect(() => validatePath("link-out", projectDir, blockedPaths)).toThrow(GuardError);
+      expect(() => validatePath("link-out/secret.txt", projectDir, blockedPaths)).toThrow(GuardError);
+      // Not created yet: resolved through the link's target all the same.
+      expect(() => validatePath("link-out/new/file.txt", projectDir, blockedPaths)).toThrow(GuardError);
+    });
+
+    it("refuses a link to a file outside the project", () => {
+      expect(() => validatePath("link-file", projectDir, blockedPaths)).toThrow(GuardError);
+    });
+
+    it("follows a link that stays inside the project and returns the real path", () => {
+      expect(validatePath("link-in/main.ts", projectDir, blockedPaths)).toBe(join(realProject, "src", "main.ts"));
+    });
+
+    it("applies blocked patterns to the real location", () => {
+      expect(() => validatePath("link-state/config.json", projectDir, blockedPaths)).toThrow(/blocked pattern/);
+    });
+
+    it("applies blocked patterns to the path as given", () => {
+      symlinkSync(join(projectDir, "src"), join(projectDir, ".git"), "dir");
+      expect(() => validatePath(".git/main.ts", projectDir, blockedPaths)).toThrow(/blocked pattern/);
+    });
   });
 });

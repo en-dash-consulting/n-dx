@@ -47,6 +47,25 @@ function trackLocal(): void {
   git("add", "-f", ".n-dx.local.json");
 }
 
+describe("committed local endpoint changes", () => {
+  it.each([
+    ["host", { host: "localhost", port: 1234 }, { host: "other.example", port: 1234 }],
+    ["port", { host: "localhost", port: 1234 }, { host: "localhost", port: 4321 }],
+    ["verifier host", { verifier: { host: "localhost", port: 1234 } }, { verifier: { host: "other.example", port: 1234 } }],
+    ["verifier port", { verifier: { host: "localhost", port: 1234 } }, { verifier: { host: "localhost", port: 4321 } }],
+  ])("invalidates acceptance when the %s changes", async (_name, before, after) => {
+    writeLocal({ llm: { vendor: "local", local: before } });
+    trackLocal();
+    recordRepoTrust(repo, { ndxHome: home });
+    expect(evaluateRepoTrust(repo, { ndxHome: home }).state).toBe("trusted");
+    writeLocal({ llm: { vendor: "local", local: after } });
+    expect(evaluateRepoTrust(repo, { ndxHome: home }).state).toBe("changed");
+    const loaded = await loadLLMConfig(repo);
+    expect(loaded.local?.host).toBeUndefined();
+    expect(loaded.local?.verifier?.host).toBeUndefined();
+  });
+});
+
 function parent(): NodeJS.ProcessEnv {
   return { PATH: process.env.PATH, [SENTINEL]: "sentinel" };
 }

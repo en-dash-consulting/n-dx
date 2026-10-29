@@ -15,7 +15,8 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { isTrustedBrowserOrigin, isTrustedHost, isAuthenticatedRequest } from "./request-security.js";
+import { isTrustedBrowserOrigin, isTrustedHost, authorizeUpgrade } from "./request-security.js";
+import type { CredentialStore } from "../shared/index.js";
 
 // ── Health tracking types ──────────────────────────────────────────────────
 
@@ -339,8 +340,10 @@ export function tagBroadcaster(broadcast: WebSocketBroadcaster, workspace: strin
 export interface WebSocketManagerOptions {
   /** Optional health tracker for connection lifecycle metrics. */
   healthTracker?: WsHealthTracker;
-  /** The per-user token a handshake must present (cookie or header); absent means none is required. */
+  /** The per-user token a handshake must present in a header, unless it carries a ticket; absent means none is required. */
   token?: string | null;
+  /** Where the tickets a browser handshake carries were issued (`POST /api/auth/ws-ticket`). */
+  credentials?: CredentialStore | null;
 }
 
 /** A connected WebSocket client. */
@@ -530,10 +533,11 @@ export function createWebSocketManager(opts?: WebSocketManagerOptions): {
       socket.destroy();
       return;
     }
-    // The browser sends the ndx_token cookie on a same-origin handshake and a
-    // CLI client sends the header. A handshake has no redirect path, so the
-    // cookie must already have been set by the page that opened the socket.
-    if (opts?.token && !isAuthenticatedRequest(req, opts.token)) {
+    // A browser cannot set headers on a handshake, so the page that opens the
+    // socket first trades its session credential for a single-use ticket and
+    // puts it in the URL; a CLI client (and the hub, forwarding) sends the
+    // per-user token as a header. No cookie is read.
+    if (opts?.token && !authorizeUpgrade(req, opts.token, opts.credentials).ok) {
       socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
       socket.destroy();
       return;
