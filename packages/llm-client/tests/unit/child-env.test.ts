@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveVendorCliEnv } from "../../src/child-env.js";
+import { compileEnvPolicy, sanitizeChildEnv, resolveVendorCliEnv } from "../../src/child-env.js";
 import type { LLMConfig } from "../../src/llm-types.js";
 
 const source: NodeJS.ProcessEnv = Object.freeze({
@@ -400,5 +400,24 @@ describe("vendor modes", () => {
         process.chdir(cwd);
       }
     });
+  });
+});
+
+
+describe("default credential name coverage", () => {
+  const credentials = ["SERVICE_PAT", "SERVICE_KEY", "SERVICE_KEYS", "SERVICE_PASS", "APP_PWD_VALUE", "APP_JWT", "DATABASE_DSN", "OP_SESSION", "SERVICE_WEBHOOK_URL", "DATABASE_URL", "api_key", "SUPABASE_SERVICE_ROLE"];
+  it.each(credentials)("withholds %s from a real child", (name) => {
+    const env = sanitizeChildEnv({ ...process.env, [name]: "sentinel" }, compileEnvPolicy(undefined));
+    const seen = execFileSync(process.execPath, ["-e", "process.stdout.write(String(process.argv[1] in process.env))", name], { env, encoding: "utf8" });
+    expect(seen).toBe("false");
+  });
+  it("retains named directory and desktop plumbing exceptions", () => {
+    const names = ["PWD", "OLDPWD", "TERM_SESSION_ID", "XDG_SESSION_ID", "XDG_SESSION_TYPE", "XDG_SESSION_CLASS", "XDG_SESSION_DESKTOP", "XDG_SESSION_PATH", "DBUS_SESSION_BUS_ADDRESS", "DESKTOP_SESSION"];
+    const source = Object.fromEntries(names.map((n) => [n, "plumbing"]));
+    expect(sanitizeChildEnv(source, compileEnvPolicy(undefined))).toEqual(source);
+  });
+  it("honours exact user denies of default plumbing, case-insensitively", () => {
+    const source = { SSH_AUTH_SOCK: "/socket", GIT_ASKPASS: "/helper", PWD: "/project" };
+    expect(sanitizeChildEnv(source, compileEnvPolicy({ deny: ["ssh_auth_sock", "GIT_ASKPASS"] }))).toEqual({ PWD: "/project" });
   });
 });
