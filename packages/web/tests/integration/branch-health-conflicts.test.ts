@@ -302,7 +302,9 @@ describe("source conflicts and other worktrees", () => {
     const [conflict] = await predict();
     expect(conflict.class).toBe("source");
     expect(conflict.fix).toBeNull();
-    expect(conflict.otherWorktrees).toEqual([{ path: join(root, "side"), branch: "side" }]);
+    // The path as git reports it: on Windows that is C:/… with long names, not tmpdir()'s RUNNER~1 form.
+    const sidePath = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: join(root, "side"), encoding: "utf-8" }).trim();
+    expect(conflict.otherWorktrees).toEqual([{ path: sidePath, branch: "side" }]);
   });
 });
 
