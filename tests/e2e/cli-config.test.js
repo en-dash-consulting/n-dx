@@ -1989,9 +1989,15 @@ describe("n-dx config", () => {
       expect(config.language).toBe("auto");
     });
 
+    it.each(["swift", "python", "java", "csharp"])("sets language to %s", async (language) => {
+      run(["language", language, tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.language).toBe(language);
+    });
+
     it("rejects invalid language values", async () => {
-      const stderr = runFail(["language", "python", tmpDir]);
-      expect(stderr).toContain('Invalid language "python"');
+      const stderr = runFail(["language", "not-a-language", tmpDir]);
+      expect(stderr).toContain('Invalid language "not-a-language"');
       expect(stderr).toContain("typescript");
       expect(stderr).toContain("javascript");
       expect(stderr).toContain("go");

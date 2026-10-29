@@ -45,3 +45,6 @@
 ; of the aliased import @flask.aliased, whose name the imports query captures.
 (aliased_import
   alias: (identifier) @flask.alias) @flask.aliased
+
+; Rebindings outside def/class also count under module-level if/try blocks.
+(assignment left: (identifier) @flask.binding right: (_))

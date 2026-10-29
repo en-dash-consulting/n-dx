@@ -138,6 +138,21 @@ describe("detectMigrationTools", () => {
 });
 
 describe("sqlcPaths", () => {
+  it("reads keys inside a flow-mapping sql entry", () => {
+    const yaml = 'version: "2"\nsql:\n  - {engine: postgresql, schema: schema.sql, queries: [one.sql, two.sql]}\n';
+    expect(sqlcPaths("cfg/sqlc.yaml", yaml, "schema")).toEqual(["cfg/schema.sql"]);
+    expect(sqlcPaths("cfg/sqlc.yaml", yaml, "queries")).toEqual(["cfg/one.sql", "cfg/two.sql"]);
+  });
+
+  it("stops a dash-line key's block list at the next sql entry", () => {
+    const yaml = 'sql:\n  - queries:\n      - one.sql\n  - engine: mysql\n    queries: two.sql\n';
+    expect(sqlcPaths("sqlc.yaml", yaml, "queries")).toEqual(["one.sql", "two.sql"]);
+  });
+
+  it("reads CRLF block lists", () => {
+    expect(sqlcPaths("cfg/sqlc.yaml", "sql:\r\n  - queries:\r\n      - one.sql\r\n      - two.sql\r\n", "queries")).toEqual(["cfg/one.sql", "cfg/two.sql"]);
+  });
+
   it("reads scalar, flow-list and block-list forms relative to the config", () => {
     expect(sqlcPaths("a/sqlc.yaml", 'queries: "./q"', "queries")).toEqual(["a/q"]);
     expect(sqlcPaths("sqlc.yaml", "queries: [q1, 'q2']", "queries")).toEqual(["q1", "q2"]);

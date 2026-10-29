@@ -84,6 +84,7 @@ export const ROOT_POLICY_TEST_FILES = [
  * the package suite's job, and running them all here would be running `root`.
  */
 export const ROOT_DRIFT_TEST_FILES = [
+  "tests/e2e/open-source-scope.test.js",
   // A checked-in artifact generated from a package source.
   "tests/e2e/prompt-census.test.js",
   "tests/e2e/iso-skill-drift.test.js",
@@ -187,6 +188,10 @@ export const ROOT_SUBSET_LABELS = Object.keys(ROOT_SUBSET_TEST_FILES);
  * inventory does not cost the whole root suite.
  */
 export const VALIDATED_ARTIFACTS = {
+  "OPEN_SOURCE_SCOPE.md": {
+    label: ROOT_DRIFT_LABEL,
+    test: "tests/e2e/open-source-scope.test.js",
+  },
   "tests/shell-spawn-inventory.md": {
     label: ROOT_POLICY_LABEL,
     test: "tests/e2e/shell-spawn-inventory-policy.test.js",

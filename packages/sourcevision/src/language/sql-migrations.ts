@@ -9,6 +9,8 @@
  * @module sourcevision/language/sql-migrations
  */
 
+import { parseYamlSubset } from "@n-dx/lang-kit";
+
 export type MigrationTool = "flyway" | "liquibase" | "golang-migrate" | "goose" | "atlas" | "prisma" | "sqlc";
 
 export interface MigrationToolFinding {
@@ -132,9 +134,24 @@ export function sqlcPaths(configPath: string, content: string, key: "queries" | 
   }
   const keyPattern = new RegExp(`^(\\s*)-?\\s*"?${key}"?\\s*:\\s*(.*)$`);
   const found: string[] = [];
-  const lines = content.split("\n");
+  const lines = content.split(/\r?\n/);
   const unquote = (raw: string): string => raw.trim().replace(/,$/, "").replace(/^["']|["']$/g, "");
   for (let i = 0; i < lines.length; i++) {
+    const flow = /^\s*-\s*(\{.*\})\s*$/.exec(stripYamlComment(lines[i] ?? ""));
+    if (flow) {
+      try {
+        const parsed = parseYamlSubset(`entry: ${flow[1]}`);
+        const value = isRecord(parsed) && isRecord(parsed.entry) ? parsed.entry[key] : undefined;
+        const list = typeof value === "string" && value.startsWith("[") ? parseYamlSubset(`paths: ${value}`) : undefined;
+        const paths = isRecord(list) ? list.paths : value;
+        for (const path of Array.isArray(paths) ? paths : [paths]) {
+          if (typeof path === "string" && path.trim() !== "") found.push(resolveConfigPath(configDir, path.trim()));
+        }
+      } catch {
+        // An unsupported flow entry names no paths; the remaining entries still read.
+      }
+      continue;
+    }
     const entry = keyPattern.exec(lines[i] ?? "");
     if (!entry) continue;
     let value = stripYamlComment(entry[2] ?? "");
@@ -152,7 +169,7 @@ export function sqlcPaths(configPath: string, content: string, key: "queries" | 
       }
       continue;
     }
-    const indent = (entry[1] ?? "").length;
+    const indent = (entry[1] ?? "").length + ((lines[i] ?? "").trimStart().startsWith("-") ? 2 : 0);
     for (let j = i + 1; j < lines.length; j++) {
       const line = (lines[j] ?? "").trim();
       if (line === "" || line.startsWith("#")) continue;

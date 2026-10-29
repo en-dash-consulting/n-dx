@@ -187,12 +187,13 @@ function buildScope(project: GoProject, module: GoModuleBuild): Scope {
       requires.set(path, { path, ...(dep.version.resolved && { version: dep.version.value }) });
     }
   }
+  const originalVersions = new Map([...requires].map(([path, required]) => [path, required.version]));
   // A versioned replace supplies the code: report its version. Applied lowest
   // precedence first so the workspace's replace is the one that sticks.
   for (const { replace } of [...replaces].reverse()) {
     const required = requires.get(replace.old.path);
     if (replace.local || !required) continue;
-    if (replace.old.version !== undefined && replace.old.version !== required.version) continue;
+    if (replace.old.version !== undefined && replace.old.version !== originalVersions.get(replace.old.path)) continue;
     requires.set(required.path, { path: required.path, ...(replace.new.version !== undefined && { version: replace.new.version }) });
   }
 
