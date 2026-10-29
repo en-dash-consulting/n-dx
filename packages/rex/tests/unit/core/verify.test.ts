@@ -411,7 +411,8 @@ describe("verify --run-tests and hostile test paths", () => {
   });
 
   afterEach(() => {
-    rmSync(tmp, { recursive: true, force: true });
+    // Windows may not have released the exited child's handles on the dir yet (EBUSY).
+    rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   /**
