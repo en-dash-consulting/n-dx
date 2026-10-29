@@ -68,7 +68,7 @@ import { resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readSidecarSettings, resolveSidecarIdleMs, saveSidecarSettings } from "./sidecar/settings.js";
 import { commitSettingsChange } from "./settings-commit.js";
 import { readLedger } from "./sidecar/ledger.js";
-import { buildLensPacket, LENS_IDS, LENS_PACKETS } from "./sidecar/lens-packets.js";
+import { buildLensPacket, LENS_IDS, LENS_PACKETS, type LensTarget } from "./sidecar/lens-packets.js";
 import type { PacketTarget } from "./sidecar/packet-builders.js";
 import { createPacketSources, readResolution, type SpawnedReads } from "./sidecar/packet-sources.js";
 import {
@@ -91,11 +91,15 @@ const SETTINGS_PATH = "/api/sidecar/settings";
 const LENSES_PATH = "/api/sidecar/lenses";
 const PROPOSALS_PATH = "/api/sidecar/proposals";
 
-/** The registry as the drawer reads it: every lens, and what an unavailable one waits on. */
-function sidecarLenses(): Array<{ id: string; available: boolean; needs?: string }> {
+/**
+ * The registry as the drawer reads it: every lens, what an unavailable one
+ * waits on, and the item kind a lens needs attached.
+ */
+function sidecarLenses(): Array<{ id: string; available: boolean; needs?: string; target?: LensTarget }> {
   return LENS_IDS.map((id) => {
     const plan = LENS_PACKETS[id];
-    return plan.kind === "unavailable" ? { id, available: false, needs: plan.needs } : { id, available: true };
+    if (plan.kind === "unavailable") return { id, available: false, needs: plan.needs };
+    return plan.kind === "packet" && plan.target ? { id, available: true, target: plan.target } : { id, available: true };
   });
 }
 

@@ -1126,6 +1126,11 @@ describe("attachment and lens", () => {
     expect(resolveLens("guide", [{ id: "guide", available: false, needs: "x" }]).running).toBe("general");
     expect(resolveLens("future", [])).toMatchObject({ running: "general", needs: expect.any(String) });
     expect(resolveLens("plan", [{ id: "plan", available: true }])).toEqual({ wanted: "plan", running: "plan" });
+    // A lens that needs a task runs General, naming what it needs, until one is attached.
+    const diagnose = [{ id: "diagnose-run", available: true, target: { kind: "task", needs: "a task to diagnose" } }];
+    expect(resolveLens("diagnose-run", diagnose, null)).toEqual({ wanted: "diagnose-run", running: "general", needs: "a task to diagnose" });
+    expect(resolveLens("diagnose-run", diagnose, { kind: "live", label: "Live" }).needs).toBe("a task to diagnose");
+    expect(resolveLens("diagnose-run", diagnose, { kind: "task", ref: "t1", label: "t1" })).toEqual({ wanted: "diagnose-run", running: "diagnose-run" });
   });
 
   it("a task gives Describe, and the session takes the lens and target through PATCH", async () => {

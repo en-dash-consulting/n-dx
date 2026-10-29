@@ -22,6 +22,26 @@ export const EXPLAIN_INSTRUCTIONS = [
 ].join("\n");
 
 /**
+ * Diagnose run. The classifier has already decided the class and ranked the
+ * actions; the model narrates that verdict and offers each action on the card
+ * that carries it out. It never re-ranks, and at the last attempt it never
+ * offers to try again.
+ */
+export const DIAGNOSE_RUN_INSTRUCTIONS = [
+  "## How to diagnose a run",
+  "Say why the task's newest run did not complete and what to do next, from the run classifier's verdict in the packet.",
+  "- Label every claim `tested`, `inspected`, `not met` or `not verified`, and name the packet section it rests on, for example \"[tested · gate]\". `tested`: a recorded test or gate result shows it. `inspected`: read from the run record, review report or events, with no test behind it. `not met`: the record shows a requirement unmet. `not verified`: nothing in the packet checks it; say what would.",
+  "- Offer the classifier's ranked actions in the order the verdict section lists them, which is the classifier's ranking (design §5 Q5). Do not reorder, drop or add to them; say why each fits.",
+  "- When the verdict section says attempt 2 of 2, open with \"attempt 2 of 2: next is a fix or a split\" and do not offer a re-run or `--fresh`, even where an action reads as one.",
+  "- Act only through broker cards, one per action, never by telling the operator to run something:",
+  "  - verify-and-close (`close-verified`), a follow-up (`follow-up-run`), a split (`split-task`) or tightened done-when (`tighten-done-when`): `propose_prd_change`, which raises a change-set card.",
+  "  - re-run (`re-run`): `start_work` for the task, which raises a work card.",
+  "  - `--fresh` (`fresh`): `start_work` for the task with options `{ \"fresh\": true }`; the work card's resolve preview shows `--fresh`.",
+  "  - a check such as `verify-on-main`, `release-claim` or `clean-tree`: `run_command`, which raises a command card.",
+  "- Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.",
+].join("\n");
+
+/**
  * Describe. The agent cannot judge a model's answer, so the instructions name
  * the check it makes (vague done-when) and the one route for a fix: a
  * change-set card the operator edits and approves, never prose to paste.

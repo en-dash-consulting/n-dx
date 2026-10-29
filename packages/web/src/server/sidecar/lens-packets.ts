@@ -1,11 +1,15 @@
 /**
  * Which packet each Sidecar lens opens a turn with.
  *
- * Three lenses have a builder today. General sends no packet. The rest need a
+ * Four lenses have a builder today. General sends no packet. The rest need a
  * data source that does not exist yet, so they register as unavailable and
  * name it: a lens never sends a partial packet in place of the real one, and
  * the drawer can say why it is greyed out. When a source lands, its lens
  * changes from `unavailable` to `packet` here and nowhere else.
+ *
+ * A lens that only means something about one kind of item names it as its
+ * `target`: with no item attached, the lens is unavailable and names what it
+ * needs attached, rather than building a packet about nothing.
  *
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §3.
  */
@@ -13,9 +17,11 @@
 import type { Packet } from "./packet.js";
 import {
   buildDescribePacket,
+  buildDiagnoseRunPacket,
   buildExplainPacket,
   buildPlanPacket,
   DESCRIBE_CAP,
+  DIAGNOSE_RUN_CAP,
   EXPLAIN_CAP,
   PLAN_CAP,
   type PacketTarget,
@@ -36,9 +42,20 @@ export const LENS_IDS = [
 ] as const;
 export type LensId = (typeof LENS_IDS)[number];
 
+/** The item a lens must have attached: its kind as the drawer names it, and what to say when there is none. */
+export interface LensTarget {
+  kind: "task";
+  needs: string;
+}
+
 export type LensPacketPlan =
   | { kind: "none" }
-  | { kind: "packet"; cap: number; build: (sources: PacketSources, target: PacketTarget, now: string, signal?: AbortSignal) => Promise<Packet> }
+  | {
+      kind: "packet";
+      cap: number;
+      build: (sources: PacketSources, target: PacketTarget, now: string, signal?: AbortSignal) => Promise<Packet>;
+      target?: LensTarget;
+    }
   | { kind: "unavailable"; needs: string };
 
 export const LENS_PACKETS: Readonly<Record<LensId, LensPacketPlan>> = {
@@ -47,7 +64,12 @@ export const LENS_PACKETS: Readonly<Record<LensId, LensPacketPlan>> = {
   describe: { kind: "packet", cap: DESCRIBE_CAP, build: buildDescribePacket },
   plan: { kind: "packet", cap: PLAN_CAP, build: buildPlanPacket },
   guide: { kind: "unavailable", needs: "the queue planner" },
-  "diagnose-run": { kind: "unavailable", needs: "the run classifier" },
+  "diagnose-run": {
+    kind: "packet",
+    cap: DIAGNOSE_RUN_CAP,
+    build: buildDiagnoseRunPacket,
+    target: { kind: "task", needs: "a task to diagnose" },
+  },
   "diagnose-branch": { kind: "unavailable", needs: "the branch status collector" },
   place: { kind: "unavailable", needs: "the Inbox list read" },
   migrate: { kind: "unavailable", needs: "the migration plan reads" },
@@ -79,5 +101,6 @@ export async function buildLensPacket(
   const plan = LENS_PACKETS[lens];
   if (plan.kind === "none") return { status: "none", lens };
   if (plan.kind === "unavailable") return { status: "unavailable", lens, needs: plan.needs };
+  if (plan.target && !target.ref) return { status: "unavailable", lens, needs: plan.target.needs };
   return { status: "ready", lens, packet: await plan.build(sources, target, now, signal) };
 }

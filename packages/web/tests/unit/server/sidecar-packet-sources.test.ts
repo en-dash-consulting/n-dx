@@ -102,6 +102,91 @@ describe("createPacketSources runs", () => {
   });
 });
 
+describe("createPacketSources taskRun", () => {
+  const TASK = "c0000000-0000-4000-8000-000000000002";
+  const SECRET = "ghp_abcdefghijklmnopqrstuvwxyz0123456789";
+  const diagnosis = {
+    class: "review-blocked",
+    summary: "The review left 1 must-fix finding(s) unrepaired.",
+    evidence: ["review.unrepairedMustFixCount: 1"],
+    actions: [{ kind: "follow-up-run", label: "Follow-up run with the review findings in the brief" }],
+    attempt: { n: 1, of: 2 },
+  };
+
+  function seed(newest: Record<string, unknown>): ServerContext {
+    const hench = join(dir, ".hench");
+    mkdirSync(join(hench, "runs"), { recursive: true });
+    mkdirSync(join(hench, "reviews"), { recursive: true });
+    writeFileSync(join(hench, "runs", "older.json"), JSON.stringify({ id: "older", taskId: TASK, status: "failed", startedAt: "2026-10-01T08:00:00.000Z" }));
+    writeFileSync(join(hench, "runs", "newest.json"), JSON.stringify({ id: "newest", taskId: TASK, startedAt: "2026-10-20T08:00:00.000Z", ...newest }));
+    return contextFor(dir, (name) => join(dir, `.${name}`));
+  }
+
+  it("reads the task's newest run: verdict, gate digest, unrepaired findings and last events, redacted", async () => {
+    const ctx = seed({
+      status: "failed",
+      finishedAt: "2026-10-20T08:30:00.000Z",
+      error: `Gate failed\nsecond line`,
+      diagnosis,
+      testGate: { ran: true, passed: false, command: "pnpm test", failureDigest: `FAIL a.test.ts\ntoken ${SECRET}`, outputTail: "tail only" },
+    });
+    writeFileSync(join(dir, ".hench", "reviews", "newest.json"), JSON.stringify({
+      taskId: TASK,
+      summary: "Attacked it.",
+      fixesApplied: false,
+      findings: [
+        { title: "Open must-fix", verdict: "must-fix", action: "captured", severity: "high", location: "a.ts:1" },
+        { title: "Fixed must-fix", verdict: "must-fix", action: "fixed" },
+        { title: "Failed should-fix", verdict: "should-fix", action: "failed" },
+        { title: "Dropped nit", verdict: "not-worth-fixing", action: "dropped" },
+      ],
+    }));
+    const events = Array.from({ length: 30 }, (_, i) => JSON.stringify({ kind: "tests_run", at: `2026-10-20T08:${String(i).padStart(2, "0")}:00.000Z`, summary: `event ${i}` }));
+    writeFileSync(join(dir, ".hench", "runs", "newest.events.jsonl"), `${events.join("\n")}\n`);
+
+    const read = await createPacketSources(ctx, spawned).taskRun(TASK);
+    expect(read?.run).toEqual({
+      id: "newest",
+      status: "failed",
+      startedAt: "2026-10-20T08:00:00.000Z",
+      finishedAt: "2026-10-20T08:30:00.000Z",
+      error: "Gate failed",
+      path: ".hench/runs/newest.json",
+    });
+    expect(read?.diagnosis).toEqual(diagnosis);
+    expect(read?.gate).toMatchObject({ ran: true, passed: false, command: "pnpm test", textKind: "failure digest", cutChars: 0 });
+    expect(read?.gate?.text).toContain("FAIL a.test.ts");
+    expect(read?.gate?.text).not.toContain(SECRET);
+    expect(read?.review?.path).toBe(".hench/reviews/newest.json");
+    expect(read?.review?.total).toBe(4);
+    expect(read?.review?.unrepaired.map((f) => f.title)).toEqual(["Open must-fix", "Failed should-fix"]);
+    expect(read?.events?.path).toBe(".hench/runs/newest.events.jsonl");
+    expect(read?.events?.last.map((e) => e.summary)).toEqual(Array.from({ length: 12 }, (_, i) => `event ${i + 18}`));
+  });
+
+  it("keeps only the end of a long gate text, from a line start, and says how much was cut", async () => {
+    const long = Array.from({ length: 400 }, (_, i) => `line ${i} ${"x".repeat(20)}`).join("\n");
+    const read = await createPacketSources(seed({ status: "failed", testGate: { ran: true, passed: false, outputTail: long } }), spawned).taskRun(TASK);
+    expect(read?.gate?.textKind).toBe("output tail");
+    expect(read!.gate!.text!.length).toBeLessThanOrEqual(2_400);
+    expect(read!.gate!.text!.startsWith("line ")).toBe(true);
+    expect(read!.gate!.text!.endsWith("line 399 " + "x".repeat(20))).toBe(true);
+    expect(read!.gate!.cutChars).toBe(long.length - read!.gate!.text!.length);
+  });
+
+  it("carries no gate text for a gate that passed, and nulls for what the run did not record", async () => {
+    const read = await createPacketSources(seed({ status: "completed", testGate: { ran: true, passed: true, outputTail: "ok" } }), spawned).taskRun(TASK);
+    expect(read?.diagnosis).toBeNull();
+    expect(read?.gate).toMatchObject({ passed: true, text: null, textKind: null });
+    expect(read?.review).toBeNull();
+    expect(read?.events).toBeNull();
+  });
+
+  it("reads null when no run of the task is recorded", async () => {
+    expect(await createPacketSources(contextFor(dir, (name) => join(dir, `.${name}`)), spawned).taskRun(TASK)).toBeNull();
+  });
+});
+
 describe("createPacketSources zone", () => {
   function withAnalysis(): ServerContext {
     const ctx = contextFor(dir, (name) => join(dir, `.${name}`));

@@ -128,6 +128,7 @@ import {
 } from "./run-liveness.js";
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
+import { readDiagnosis, type RunDiagnosisSummary } from "./run-diagnosis.js";
 import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type RunOptions, type RunMode } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
@@ -237,36 +238,6 @@ interface RunSummary {
    * unchanged and carries no worktree field.
    */
   worktree?: RunWorktree;
-}
-
-/** The verdict fields the dashboard shows. Mirrors hench's `RunDiagnosis`. */
-interface RunDiagnosisSummary {
-  class: string;
-  summary: string;
-  evidence: string[];
-  actions: Array<{ kind: string; label: string }>;
-  attempt: { n: number; of: number };
-}
-
-/** The run file's `diagnosis`, when it has the shape hench writes; otherwise absent. */
-function readDiagnosis(value: unknown): RunDiagnosisSummary | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const d = value as Record<string, unknown>;
-  const attempt = d.attempt as Record<string, unknown> | undefined;
-  if (typeof d.class !== "string" || typeof d.summary !== "string" || !Array.isArray(d.actions)
-    || typeof attempt?.n !== "number" || typeof attempt?.of !== "number") {
-    return undefined;
-  }
-  return {
-    class: d.class,
-    summary: d.summary,
-    evidence: Array.isArray(d.evidence) ? d.evidence.filter((e): e is string => typeof e === "string") : [],
-    actions: d.actions
-      .filter((a): a is { kind: string; label: string } =>
-        !!a && typeof (a as { kind?: unknown }).kind === "string" && typeof (a as { label?: unknown }).label === "string")
-      .map((a) => ({ kind: a.kind, label: a.label })),
-    attempt: { n: attempt.n, of: attempt.of },
-  };
 }
 
 /** Where a run file lives, for a dashboard serving one worktree of a repository. */

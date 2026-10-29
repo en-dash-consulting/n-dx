@@ -264,6 +264,11 @@ describe("lens registry", () => {
     expect(lenses.map((l) => l.id)).toEqual([...LENS_IDS]);
     expect(lenses.find((l) => l.id === "plan")).toEqual({ id: "plan", available: true });
     expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: false, needs: "the queue planner" });
+    expect(lenses.find((l) => l.id === "diagnose-run")).toEqual({
+      id: "diagnose-run",
+      available: true,
+      target: { kind: "task", needs: "a task to diagnose" },
+    });
     expect((await fetch(`${server.baseUrl}/api/sidecar/lenses`, { method: "POST" })).status).toBe(405);
   });
 });

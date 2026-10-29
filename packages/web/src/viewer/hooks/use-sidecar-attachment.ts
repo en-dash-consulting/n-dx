@@ -19,6 +19,8 @@ export interface SidecarLensInfo {
   id: string;
   available: boolean;
   needs?: string;
+  /** The item kind the lens needs attached, and what it says while none is. */
+  target?: { kind: string; needs: string };
 }
 
 export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live";
@@ -78,15 +80,23 @@ export interface ResolvedLens {
 }
 
 /**
- * Settle `wanted` against the registry. A lens the registry does not list is
- * unavailable too, and so is every lens until the registry has answered —
- * except General, which sends no packet.
+ * Settle `wanted` against the registry and the attached `item`. A lens the
+ * registry does not list is unavailable too, and so is every lens until the
+ * registry has answered — except General, which sends no packet. A lens that
+ * needs an item of a kind (Diagnose run: a task) is unavailable without one.
  */
-export function resolveLens(wanted: string, registry: readonly SidecarLensInfo[] | null): ResolvedLens {
+export function resolveLens(
+  wanted: string,
+  registry: readonly SidecarLensInfo[] | null,
+  item: SidecarPageItem | null = null,
+): ResolvedLens {
   if (wanted === GENERAL_LENS) return { wanted, running: GENERAL_LENS };
   const entry = registry?.find((l) => l.id === wanted);
-  if (entry?.available) return { wanted, running: wanted };
-  return { wanted, running: GENERAL_LENS, needs: entry?.needs ?? "a lens this build knows" };
+  if (!entry?.available) return { wanted, running: GENERAL_LENS, needs: entry?.needs ?? "a lens this build knows" };
+  if (entry.target && (item?.kind !== entry.target.kind || !item.ref)) {
+    return { wanted, running: GENERAL_LENS, needs: entry.target.needs };
+  }
+  return { wanted, running: wanted };
 }
 
 /** `diagnose-run` → `Diagnose run`. */
@@ -175,13 +185,13 @@ export function useSidecarAttachment(enabled: boolean, open: boolean, page: Side
   const wanted = choice && choice.key === key
     ? choice.lens
     : wantedLensFor(pageItem, taskRef !== null && failedTask === taskRef);
-  const lens = useMemo(() => resolveLens(wanted, registry), [wanted, registry]);
+  const lens = useMemo(() => resolveLens(wanted, registry, item), [wanted, registry, item?.kind, item?.ref]);
 
   const chooseLens = useCallback((id: string): boolean => {
-    if (resolveLens(id, registry).running !== id) return false;
+    if (resolveLens(id, registry, item).running !== id) return false;
     setChoice({ key, lens: id });
     return true;
-  }, [registry, key]);
+  }, [registry, key, item?.kind, item?.ref]);
   const removeItem = useCallback(() => setRemovedKey(key), [key]);
 
   return { item, asks: pageItem !== null, ready: registry !== null, lenses: registry ?? [], lens, chooseLens, removeItem };

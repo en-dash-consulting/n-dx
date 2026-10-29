@@ -14,11 +14,14 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { resolveLayout } from "@n-dx/llm-client";
+import { redactDeep, resolveLayout } from "@n-dx/llm-client";
 import { DATA_FILES } from "../../shared/index.js";
 import { loadCommitFiles, loadPrdModel, loadTrailerCommits, PRD_CACHE_DIRNAME } from "../rex-gateway.js";
 import type { V2Tree } from "../rex-gateway.js";
 import type { Manifest, Zones } from "../domain-gateway.js";
+import { readLiveReviewReport } from "../live-review-report.js";
+import { readDiagnosis, type RunDiagnosisSummary } from "../run-diagnosis.js";
+import { readLogTailLines, resolveRunEventsFile } from "../run-tail.js";
 import type { ServerContext } from "../types.js";
 
 export interface PrdRead {
@@ -118,6 +121,72 @@ export interface RunStatusRead {
   startedAt: string;
 }
 
+/** The run classifier's verdict as hench wrote it (`RunRecord.diagnosis`); actions in its rank order. */
+export type RunVerdictRead = RunDiagnosisSummary;
+
+/** The test gate's result on the run, with the text that says what failed. */
+export interface RunGateRead {
+  ran: boolean;
+  passed: boolean;
+  command: string | null;
+  /** Why the gate gave no verdict, or was skipped. */
+  note: string | null;
+  /** Which recorded text {@link text} is; null when the run recorded none. */
+  textKind: "failure digest" | "output tail" | null;
+  /** The end of that text, capped at {@link GATE_TEXT_MAX_CHARS}. */
+  text: string | null;
+  /** Characters cut from the front of the recorded text to fit. */
+  cutChars: number;
+}
+
+/** One review finding the review left unrepaired. */
+export interface RunFindingRead {
+  title: string;
+  location: string | null;
+  verdict: string;
+  action: string;
+  severity: string | null;
+}
+
+export interface RunReviewRead {
+  /** Project-relative path of the report. */
+  path: string;
+  summary: string | null;
+  /** Must-fix findings not fixed, then any other finding whose action failed. */
+  unrepaired: RunFindingRead[];
+  /** Every finding in the report. */
+  total: number;
+}
+
+export interface RunEventRead {
+  at: string;
+  kind: string;
+  summary: string;
+  detail: string | null;
+}
+
+/** The newest run of a task, read for the Diagnose run lens. */
+export interface TaskRunRead {
+  run: {
+    id: string;
+    status: string;
+    startedAt: string;
+    finishedAt: string | null;
+    /** First line of the run's recorded error. */
+    error: string | null;
+    /** Project-relative path of the run record. */
+    path: string;
+  };
+  /** Null when the run carries no verdict: it completed, is running, or predates the classifier. */
+  diagnosis: RunVerdictRead | null;
+  /** Null when the run recorded no gate. */
+  gate: RunGateRead | null;
+  /** Null when the run has no readable review report. */
+  review: RunReviewRead | null;
+  /** Null when the run has no event stream; otherwise its last {@link RUN_EVENTS_SHOWN} events. */
+  events: { path: string; last: RunEventRead[] } | null;
+}
+
 export interface PacketSources {
   /** Where the zone and run reads look, project-relative, for section provenance. */
   sourcePaths: { zones: string; runs: string };
@@ -131,7 +200,15 @@ export interface PacketSources {
   /** `ndx work --task=<id> --dry-run` output: the brief hench would send. */
   preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
   runs(taskId: string): Promise<RunStatusRead[] | null>;
+  /** The task's newest run with its verdict, gate, review and last events; `null` when no run of it is recorded. */
+  taskRun(taskId: string): Promise<TaskRunRead | null>;
 }
+
+/** Most characters of gate text a {@link TaskRunRead} carries, kept from the end. */
+export const GATE_TEXT_MAX_CHARS = 2_400;
+
+/** How many of the run's last events a {@link TaskRunRead} carries. */
+export const RUN_EVENTS_SHOWN = 12;
 
 /** The two reads that spawn `ndx`; the Prepare route owns that spawn, so it is injected. */
 export interface SpawnedReads {
@@ -160,6 +237,114 @@ function readJson<T>(path: string): T | null {
     // An unreadable artifact reads as absent: the packet says the data is missing.
     return null;
   }
+}
+
+/**
+ * The run records of `taskId` under `dir`, newest start first, one per run id.
+ *
+ * Hench retention gzips older records to `<id>.json.gz`; skipping them would
+ * report a task whose runs were all archived as never run. The archiver writes
+ * `<id>.json.gz` before unlinking `<id>.json`, so a file can vanish between the
+ * listing and its stat, and one run can briefly have both.
+ */
+function taskRunRecords(dir: string, taskId: string): Array<{ record: Record<string, unknown>; path: string }> {
+  if (!existsSync(dir)) return [];
+  const files = readdirSync(dir)
+    .filter((name) => RUN_FILE.test(name))
+    .flatMap((name) => {
+      const stat = statSync(join(dir, name), { throwIfNoEntry: false });
+      return stat ? [{ path: join(dir, name), mtime: stat.mtimeMs }] : [];
+    })
+    .sort((a, b) => b.mtime - a.mtime)
+    .slice(0, MAX_RUN_FILES);
+  const out: Array<{ record: Record<string, unknown>; path: string }> = [];
+  const seen = new Set<string>();
+  for (const file of files) {
+    const record = readJson<Record<string, unknown>>(file.path);
+    if (record?.taskId === taskId && typeof record.id === "string" && typeof record.startedAt === "string" && !seen.has(record.id)) {
+      seen.add(record.id);
+      out.push({ record, path: file.path });
+    }
+  }
+  return out.sort((a, b) => String(b.record.startedAt).localeCompare(String(a.record.startedAt)));
+}
+
+function str(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+/** The end of `text` within `max` characters, starting at a line where one starts inside it. */
+function tailOf(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const from = text.length - max;
+  const line = text.indexOf("\n", from);
+  return line === -1 ? text.slice(from) : text.slice(line + 1);
+}
+
+/**
+ * The run's gate, with the text that says what failed: the failure digest
+ * hench extracted from the whole output, else the output's tail. Text is kept
+ * only for a gate that did not pass, and only its end, to {@link GATE_TEXT_MAX_CHARS}.
+ */
+function readGate(run: Record<string, unknown>): RunGateRead | null {
+  const gate = run.testGate as Record<string, unknown> | undefined;
+  if (!gate || typeof gate !== "object") return null;
+  const ran = gate.ran === true;
+  const passed = ran && gate.passed === true;
+  const diagnostics = run.diagnostics as Record<string, unknown> | undefined;
+  const digest = str(gate.failureDigest) ?? str(diagnostics?.testGateFailureDigest);
+  const tail = str(gate.outputTail);
+  const full = passed ? null : digest ?? tail;
+  const text = full === null ? null : tailOf(full, GATE_TEXT_MAX_CHARS);
+  return {
+    ran,
+    passed,
+    command: str(gate.command),
+    note: str(gate.error) ?? str(gate.skipReason),
+    textKind: full === null ? null : digest !== null ? "failure digest" : "output tail",
+    text,
+    cutChars: full === null || text === null ? 0 : full.length - text.length,
+  };
+}
+
+/** The unrepaired findings of the run's review report: hench's `classifyUnresolved`, read from the file. */
+function readReview(henchDir: string, runId: string, display: (path: string) => string): RunReviewRead | null {
+  const report = readLiveReviewReport(henchDir, runId);
+  if (!report) return null;
+  const mustFixOpen = (f: (typeof report.findings)[number]): boolean => f.verdict === "must-fix" && f.action !== "fixed";
+  const unrepaired = [
+    ...report.findings.filter(mustFixOpen),
+    ...report.findings.filter((f) => !mustFixOpen(f) && f.action === "failed"),
+  ];
+  return {
+    path: display(join(henchDir, "reviews", `${runId}.json`)),
+    summary: report.summary,
+    unrepaired: unrepaired.map((f) => ({
+      title: f.title ?? "(untitled finding)",
+      location: f.location,
+      verdict: f.verdict ?? "unknown",
+      action: f.action ?? "unknown",
+      severity: f.severity,
+    })),
+    total: report.findings.length,
+  };
+}
+
+/** The last {@link RUN_EVENTS_SHOWN} events of the run's stream; a line that is not an event is skipped. */
+function readLastEvents(path: string): RunEventRead[] {
+  return readLogTailLines(path, RUN_EVENTS_SHOWN * 2)
+    .flatMap((line) => {
+      try {
+        const e = JSON.parse(line) as Record<string, unknown>;
+        return typeof e.kind === "string" && typeof e.summary === "string"
+          ? [{ at: typeof e.at === "string" ? e.at : "", kind: e.kind, summary: e.summary, detail: str(e.detail) }]
+          : [];
+      } catch {
+        // The window's first line can be a fragment of a longer one.
+        return [];
+      }
+    })
+    .slice(-RUN_EVENTS_SHOWN);
 }
 
 /** The production reads for `ctx`'s workspace. */
@@ -261,30 +446,42 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
     preview: (taskId, signal) => spawned.preview(taskId, signal),
 
     async runs(taskId) {
-      const dir = join(layout.henchDir, "runs");
-      if (!existsSync(dir)) return [];
-      // Hench retention gzips older records to `<id>.json.gz`; skipping them would
-      // report a task whose runs were all archived as never run.
-      // The archiver writes `<id>.json.gz` before unlinking `<id>.json`, so a file
-      // can vanish between the listing and its stat, and one run can briefly have both.
-      const files = readdirSync(dir)
-        .filter((name) => RUN_FILE.test(name))
-        .flatMap((name) => {
-          const stat = statSync(join(dir, name), { throwIfNoEntry: false });
-          return stat ? [{ path: join(dir, name), mtime: stat.mtimeMs }] : [];
-        })
-        .sort((a, b) => b.mtime - a.mtime)
-        .slice(0, MAX_RUN_FILES);
-      const out: RunStatusRead[] = [];
-      const seen = new Set<string>();
-      for (const file of files) {
-        const run = readJson<{ id?: unknown; taskId?: unknown; status?: unknown; startedAt?: unknown }>(file.path);
-        if (run?.taskId === taskId && typeof run.id === "string" && typeof run.startedAt === "string" && !seen.has(run.id)) {
-          seen.add(run.id);
-          out.push({ id: run.id, status: typeof run.status === "string" ? run.status : "unknown", startedAt: run.startedAt });
-        }
-      }
-      return out.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+      return taskRunRecords(join(layout.henchDir, "runs"), taskId).map(({ record }) => ({
+        id: record.id as string,
+        status: typeof record.status === "string" ? record.status : "unknown",
+        startedAt: record.startedAt as string,
+      }));
+    },
+
+    async taskRun(taskId) {
+      const runsDir = join(layout.henchDir, "runs");
+      const newest = taskRunRecords(runsDir, taskId)[0];
+      if (!newest) return null;
+      // A record written before hench scrubbed at save time may still hold a
+      // secret a tool printed, and this text goes to the vendor.
+      const run = redactDeep(newest.record);
+      const id = run.id as string;
+      const events = resolveRunEventsFile({ run, runsDir, worktreeRoot: ctx.projectDir }, [ctx.projectDir]);
+      return {
+        run: {
+          id,
+          status: str(run.status) ?? "unknown",
+          startedAt: run.startedAt as string,
+          finishedAt: str(run.finishedAt),
+          error: str(run.error)?.split("\n")[0] ?? null,
+          path: display(newest.path),
+        },
+        diagnosis: readDiagnosis(run.diagnosis) ?? null,
+        gate: readGate(run),
+        review: redactDeep(readReview(layout.henchDir, id, display)),
+        events: events.kind === "file"
+          ? {
+              // The recorded path, not the resolved real one, which may sit under a symlinked temp root.
+              path: display(typeof run.eventsPath === "string" ? run.eventsPath : join(runsDir, `${id}.events.jsonl`)),
+              last: redactDeep(readLastEvents(events.path)),
+            }
+          : null,
+      };
     },
   };
 }

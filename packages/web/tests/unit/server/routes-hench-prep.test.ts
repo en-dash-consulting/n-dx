@@ -44,6 +44,7 @@ import {
   previewTaskRun,
   resolveTaskRun,
 } from "../../../src/server/routes-hench-prep.js";
+import { renderWorkPreview, workOptions } from "../../../src/server/sidecar/carry-out.js";
 import { HUB_ADMISSION_HEADER, formatHubAdmissionHeader } from "../../../src/shared/index.js";
 import { startRouteTestServer, closeRouteTestServer } from "../../helpers/server-route-test-support.js";
 
@@ -136,6 +137,24 @@ describe("hench prep routes", () => {
       const [resolved, previewed] = await reads;
       expect(resolved.ok).toBe(false);
       expect(previewed.ok).toBe(false);
+    });
+
+    it("resolve a Sidecar --fresh start with --fresh, so the work card's preview shows it", async () => {
+      // hench prints the command its flags make; echo the spawned flags the same way.
+      execMock.mockImplementation(async (_cmd: string, args: string[]) => ({
+        stdout: JSON.stringify({ ...RESOLVE_JSON, command: `ndx work --task=task-1 --auto${args.includes("--fresh") ? " --fresh" : ""} .` }),
+        stderr: "",
+        exitCode: 0,
+        error: null,
+        started: true,
+      }));
+      const fresh = await resolveTaskRun(ctx, "task-1", workOptions({ taskId: "task-1", options: { fresh: true } }));
+      expect(execMock.mock.calls[0]![1]).toContain("--fresh");
+      expect(fresh.ok && renderWorkPreview(fresh.resolution).split("\n")[0]).toBe("ndx work --task=task-1 --auto --fresh .");
+
+      const plain = await resolveTaskRun(ctx, "task-1", workOptions({ taskId: "task-1" }));
+      expect(execMock.mock.calls[1]![1]).not.toContain("--fresh");
+      expect(plain.ok && renderWorkPreview(plain.resolution)).not.toContain("--fresh");
     });
   });
 

@@ -50,6 +50,18 @@ only on a `POST` to that session's raw `/api/sidecar/sessions/<id>/mcp` target;
 every other route, method or session answers 401. The session can read its own
 MCP config file, so that file never carries the token.
 
+## Sidecar Diagnose run packet
+
+Knowledge packets omit error text (PK4). The Diagnose run packet is a
+deliberate exception: it carries the end of the newest run's gate failure
+digest (or output tail when hench extracted no digest), capped at 2,400
+characters, because the diagnosis is about that error. The text is local,
+passes through `redactDeep`, and goes only to the vendor the project is
+configured with. The packet's other sections are the run classifier's
+verdict (`RunRecord.diagnosis`), the review's unrepaired findings and the
+run's last events, each read from disk in `sidecar/packet-sources.ts`; web
+still imports nothing from hench.
+
 ## HTTP-request concurrency
 
 When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:

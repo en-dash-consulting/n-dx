@@ -1,7 +1,10 @@
 schema: "rex/v2"
 items:
   "2914d715-6f3b-4183-95f2-5ce8f6acd8c0":
-    lastModified: "2026-10-29T18:42:06.983Z"
+    status: "in_progress"
+    startedAt: "2026-10-29T18:45:47.835Z"
+    activeIntervals: [{"start":"2026-10-29T18:45:47.835Z"}]
+    lastModified: "2026-10-29T18:45:48.403Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "55faa034-3df0-41a1-9aef-67d1dc896340":
     lastModified: "2026-10-29T18:42:10.223Z"

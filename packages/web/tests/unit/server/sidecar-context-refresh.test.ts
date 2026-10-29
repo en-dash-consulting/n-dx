@@ -486,6 +486,7 @@ describe("the packet opens the first turn", () => {
       resolve: async () => ({ savedTier: "deep", settings: [{ key: "model", value: "opus", source: "task.run.tier" }], refusals: [], warnings: [] }),
       preview: async () => "# Task brief\n## Acceptance\n",
       runs: async () => [],
+      taskRun: async () => null,
     };
     const task = "c0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
@@ -541,6 +542,7 @@ describe("the packet opens the first turn", () => {
       resolve: (id, signal) => spawned.resolve(id, signal),
       preview: (id, signal) => spawned.preview(id, signal),
       runs: async () => [],
+      taskRun: async () => null,
     };
     const task = "c0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
@@ -583,6 +585,7 @@ describe("the packet opens the first turn", () => {
       resolve: async () => null,
       preview: async () => null,
       runs: async () => [],
+      taskRun: async () => null,
     };
     const capability = "a0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
