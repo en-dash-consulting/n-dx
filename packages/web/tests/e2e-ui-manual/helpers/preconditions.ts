@@ -3,15 +3,15 @@
  * dashboard's own credential probe (`ndx auth`) says it can answer.
  */
 
-import { execFileSync } from "node:child_process";
+import { isExecutableOnPath } from "@n-dx/llm-client";
 
+/**
+ * Resolve through `where`/`which` without a shell: passing args with
+ * `shell: true` trips DEP0190, and a `.cmd` shim cannot run without one. A
+ * broken install still fails the credential probe that follows.
+ */
 export function hasCli(name: "claude" | "codex"): boolean {
-  try {
-    execFileSync(name, ["--version"], { stdio: "ignore", shell: process.platform === "win32" });
-    return true;
-  } catch {
-    return false;
-  }
+  return isExecutableOnPath(name);
 }
 
 export interface AuthProbe {

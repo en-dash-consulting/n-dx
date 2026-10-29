@@ -4,8 +4,15 @@ items:
     lastModified: "2026-10-13T19:10:08.961Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "3367feeb-2a9f-4b7f-8b25-6feb7ea4d7eb":
-    lastModified: "2026-10-13T19:10:40.125Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-27T23:48:37.518Z"
+    completedAt: "2026-10-27T23:48:37.518Z"
+    endedAt: "2026-10-27T23:48:37.518Z"
+    activeIntervals: [{"end":"2026-10-27T23:48:37.518Z","start":"2026-10-27T23:48:37.518Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hasCli delegates to llm-client's isExecutableOnPath (where/which, no shell), removing the shell:true+args call that trips DEP0190. Verified on macOS (present true, absent false), typecheck passes; Windows not run."
+    lastModified: "2026-10-27T23:48:37.518Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "4d41b19c-5597-482a-986e-c28b08ff2e08":
     lastModified: "2026-10-13T19:10:16.179Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
