@@ -133,9 +133,13 @@ export interface RunGateRead {
   note: string | null;
   /** Which recorded text {@link text} is; null when the run recorded none. */
   textKind: "failure digest" | "output tail" | null;
-  /** The end of that text, capped at {@link GATE_TEXT_MAX_CHARS}. */
+  /**
+   * That text, capped at {@link GATE_TEXT_MAX_CHARS} at a line boundary. A
+   * digest leads with its failing tests, so its start is kept; an output tail
+   * ends with the verdict, so its end is kept.
+   */
   text: string | null;
-  /** Characters cut from the front of the recorded text to fit. */
+  /** Characters cut to fit, from the end of a digest or the front of an output tail. */
   cutChars: number;
 }
 
@@ -281,10 +285,18 @@ function tailOf(text: string, max: number): string {
   return line === -1 ? text.slice(from) : text.slice(line + 1);
 }
 
+/** The start of `text` within `max` characters, ending at a line break where one falls inside it. */
+function headOf(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const line = text.lastIndexOf("\n", max);
+  return line > 0 ? text.slice(0, line) : text.slice(0, max);
+}
+
 /**
  * The run's gate, with the text that says what failed: the failure digest
  * hench extracted from the whole output, else the output's tail. Text is kept
- * only for a gate that did not pass, and only its end, to {@link GATE_TEXT_MAX_CHARS}.
+ * only for a gate that did not pass, to {@link GATE_TEXT_MAX_CHARS}: a
+ * digest's start (its failing-test list comes first), a tail's end.
  */
 function readGate(run: Record<string, unknown>): RunGateRead | null {
   const gate = run.testGate as Record<string, unknown> | undefined;
@@ -295,7 +307,7 @@ function readGate(run: Record<string, unknown>): RunGateRead | null {
   const digest = str(gate.failureDigest) ?? str(diagnostics?.testGateFailureDigest);
   const tail = str(gate.outputTail);
   const full = passed ? null : digest ?? tail;
-  const text = full === null ? null : tailOf(full, GATE_TEXT_MAX_CHARS);
+  const text = full === null ? null : digest !== null ? headOf(full, GATE_TEXT_MAX_CHARS) : tailOf(full, GATE_TEXT_MAX_CHARS);
   return {
     ran,
     passed,

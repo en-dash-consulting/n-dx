@@ -573,7 +573,13 @@ function gateBody(gate: RunGateRead): string {
     ...(gate.command ? [`Command: ${oneLine(gate.command, 300)}`] : []),
     ...(gate.text !== null
       ? [
-          `Recorded ${gate.textKind}${gate.cutChars > 0 ? `, last ${gate.text.length} characters (${gate.cutChars} cut from the front)` : ""}:`,
+          `Recorded ${gate.textKind}${
+            gate.cutChars === 0
+              ? ""
+              : gate.textKind === "failure digest"
+                ? `, first ${gate.text.length} characters (${gate.cutChars} cut from the end)`
+                : `, last ${gate.text.length} characters (${gate.cutChars} cut from the front)`
+          }:`,
           gate.text,
         ]
       : [gate.passed ? "Nothing failed." : "The run recorded no gate output."]),

@@ -174,6 +174,21 @@ describe("createPacketSources taskRun", () => {
     expect(read!.gate!.cutChars).toBe(long.length - read!.gate!.text!.length);
   });
 
+  it("keeps the start of a long failure digest, where its failing tests are listed, at a line end", async () => {
+    const digest = [
+      "Failing tests:",
+      "  FAIL src/pay/button.test.ts > renders",
+      ...Array.from({ length: 200 }, (_, i) => `  assertion line ${i} ${"x".repeat(20)}`),
+      "Suite summary:",
+    ].join("\n");
+    const read = await createPacketSources(seed({ status: "failed", testGate: { ran: true, passed: false, failureDigest: digest, outputTail: "tail" } }), spawned).taskRun(TASK);
+    expect(read?.gate?.textKind).toBe("failure digest");
+    expect(read!.gate!.text!.length).toBeLessThanOrEqual(2_400);
+    expect(read!.gate!.text!.startsWith("Failing tests:\n  FAIL src/pay/button.test.ts > renders")).toBe(true);
+    expect(digest.startsWith(`${read!.gate!.text!}\n`)).toBe(true);
+    expect(read!.gate!.cutChars).toBe(digest.length - read!.gate!.text!.length);
+  });
+
   it("carries no gate text for a gate that passed, and nulls for what the run did not record", async () => {
     const read = await createPacketSources(seed({ status: "completed", testGate: { ran: true, passed: true, outputTail: "ok" } }), spawned).taskRun(TASK);
     expect(read?.diagnosis).toBeNull();

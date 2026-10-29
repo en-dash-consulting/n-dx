@@ -53,9 +53,10 @@ MCP config file, so that file never carries the token.
 ## Sidecar Diagnose run packet
 
 Knowledge packets omit error text (PK4). The Diagnose run packet is a
-deliberate exception: it carries the end of the newest run's gate failure
-digest (or output tail when hench extracted no digest), capped at 2,400
-characters, because the diagnosis is about that error. The text is local,
+deliberate exception: it carries the newest run's gate failure digest (or
+output tail when hench extracted no digest), capped at 2,400 characters —
+the digest's start, which lists the failing tests, or the tail's end —
+because the diagnosis is about that error. The text is local,
 passes through `redactDeep`, and goes only to the vendor the project is
 configured with. The packet's other sections are the run classifier's
 verdict (`RunRecord.diagnosis`), the review's unrepaired findings and the

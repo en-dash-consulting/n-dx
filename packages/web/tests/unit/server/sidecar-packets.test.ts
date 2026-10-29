@@ -605,6 +605,21 @@ describe("Diagnose run", () => {
     expect(source).toMatch(/Knowledge packets omit error text \(PK4\)\. This one deliberately carries the\s+\* gate digest tail/);
   });
 
+  it("says which end of a cut gate text was dropped", async () => {
+    const digest = await buildDiagnoseRunPacket(
+      await sourcesFor("v2", { taskRun: async () => failedRun({ gate: { ...FAILED_GATE, cutChars: 500 } }) }),
+      { ref: CHANGE_TASK },
+      NOW,
+    );
+    expect(digest.text).toContain(`Recorded failure digest, first ${FAILED_GATE.text!.length} characters (500 cut from the end):`);
+    const tail = await buildDiagnoseRunPacket(
+      await sourcesFor("v2", { taskRun: async () => failedRun({ gate: { ...FAILED_GATE, textKind: "output tail", cutChars: 500 } }) }),
+      { ref: CHANGE_TASK },
+      NOW,
+    );
+    expect(tail.text).toContain(`Recorded output tail, last ${FAILED_GATE.text!.length} characters (500 cut from the front):`);
+  });
+
   it("keeps a long gate digest within the cap, cutting the last sections first", async () => {
     const long = { ...FAILED_GATE, text: Array.from({ length: 200 }, (_, i) => `FAIL src/pay/case-${i}.test.ts > case ${i}`).join("\n") };
     const packet = await buildDiagnoseRunPacket(
