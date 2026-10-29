@@ -25,9 +25,13 @@ let projectDir: string;
 let bin: string;
 let home: string;
 
-/** A shell script that appends `name` to its marker file and fails. */
+/**
+ * A shell script that appends `name` to its marker file and fails. It drains
+ * stdin first: hench pipes the prompt in, and a stand-in that exits before
+ * reading it races that write into EPIPE.
+ */
 async function standIn(path: string, name: string): Promise<void> {
-  await writeFile(path, `#!/bin/sh\necho ${name} >> "${join(bin, "ran.log")}"\nexit 1\n`);
+  await writeFile(path, `#!/bin/sh\ncat > /dev/null\necho ${name} >> "${join(bin, "ran.log")}"\nexit 1\n`);
   await chmod(path, 0o755);
 }
 
