@@ -53,6 +53,7 @@ const LAYOUTS = {
     rex: [".rex"],
     hench: [".hench"],
     config: [".n-dx.json"],
+    localConfig: [".n-dx.local.json"],
     webPid: [".n-dx-web.pid"],
     webPort: [".n-dx-web.port"],
   },
@@ -61,6 +62,7 @@ const LAYOUTS = {
     rex: [".ndx", "rex"],
     hench: [".ndx", "hench"],
     config: [".ndx", "config.json"],
+    localConfig: [".ndx", "config.local.json"],
     webPid: [".ndx", "web.pid"],
     webPort: [".ndx", "web.port"],
   },
@@ -92,10 +94,9 @@ beforeAll(() => {
     mkdirSync(join(root, ...at.rex, "prd_tree", "epic-one"), { recursive: true });
     write(root, [...at.rex, "prd_tree", "epic-one", "index.md"], "# Epic\n");
     write(root, [...at.hench, "runs", "run-1", "record.json"], "{}");
-    write(root, at.config, JSON.stringify({
-      selfHeal: { autoConfirm: true },
-      llm: { claude: { cli_path: `/bin/claude-${name}` } },
-    }));
+    write(root, at.config, JSON.stringify({ selfHeal: { autoConfirm: true } }));
+    // cli_path is machine-local; the shared file's applies only once trusted.
+    write(root, at.localConfig, JSON.stringify({ llm: { claude: { cli_path: `/bin/claude-${name}` } } }));
     write(root, at.webPid, JSON.stringify({ pid: 4242, port: 3117 }));
     write(root, at.webPort, "3117\n");
   }
@@ -157,10 +158,10 @@ describe("project-config reads", () => {
     });
   });
 
-  it("find a configured vendor CLI path under either layout", () => {
-    forEachLayout((root, name) => {
-      expect(resolveVendorCliPath(root, "claude"), name).toBe(`/bin/claude-${name}`);
-    });
+  it("find a configured vendor CLI path under either layout", async () => {
+    for (const [name, root] of Object.entries(roots)) {
+      expect(await resolveVendorCliPath(root, "claude"), name).toBe(`/bin/claude-${name}`);
+    }
   });
 });
 

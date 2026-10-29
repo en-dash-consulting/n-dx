@@ -467,15 +467,26 @@ Two limits to know. With `provider: cli`, the vendor CLI (Claude Code, Codex) ex
 
 ### Child-process environment
 
-Commands the agent runs (shell, git, the test runner) receive `process.env` minus variables whose names look like credentials — `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*_API_KEY`, `AWS_*`, and so on. Values are never inspected. A project whose tests need one of them lists it under `guard.env.allow` in `.hench/config.json`; `guard.env.deny` strips more. The default blocked paths also cover credential files (`.env`, `.env.*`, `*.pem`, `*.key`, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`).
+Commands the agent runs (shell, git, the test runner) receive `process.env` minus variables whose names look like credentials — `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*_API_KEY`, `AWS_*`, and so on. Values are never inspected. A project whose tests need one of them lists it under `guard.env.allow` in `.hench/config.json`; `guard.env.deny` strips more. An allow entry the repository ships (`.hench/config.json` or `.n-dx.json`) applies only once you trust the repository; one under `hench.guard.env.allow` in your git-ignored `.n-dx.local.json` always applies. The default blocked paths also cover credential files (`.env`, `.env.*`, `*.pem`, `*.key`, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`).
 
 Every vendor CLI n-dx launches gets the same filter, plus that vendor's own
 authentication. Claude retains `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
 `CLAUDE_CODE_OAUTH_TOKEN`, and `CLAUDE_CONFIG_DIR`, and with
 `CLAUDE_CODE_USE_BEDROCK` or `CLAUDE_CODE_USE_VERTEX` on, that mode's AWS or
 Google credentials; Codex retains `OPENAI_API_KEY`, `CODEX_API_KEY`,
-`CODEX_ACCESS_TOKEN`, and `CODEX_HOME`. Configured API keys override exported
-keys. Google retains its configured `apiKeyEnv` (default `GEMINI_API_KEY`).
+`CODEX_ACCESS_TOKEN`, and `CODEX_HOME`, and the `env_key` of the model provider
+(Azure OpenAI, for example) that your own `$CODEX_HOME/config.toml` or
+`~/.codex/config.toml` selects; a repository's `.codex/config.toml` is never
+read for it. Configured API keys override exported keys. Google retains its
+configured `apiKeyEnv` (default `GEMINI_API_KEY`), and with
+`GOOGLE_GENAI_USE_VERTEXAI` on, `GOOGLE_API_KEY`,
+`GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` and
+`GOOGLE_CLOUD_LOCATION`.
+Which variable is sent as the key (`llm.google.apiKeyEnv`) and where a key is
+sent (`api_endpoint` for any vendor) are honoured from your git-ignored
+`.n-dx.local.json` always, and from the shared `.n-dx.json` only after you
+trust the repository (`ndx trust accept .`), so a cloned repository cannot
+send `GITHUB_TOKEN` to a host it chose.
 Home, PATH, proxy and CA plumbing still passes unless explicitly denied.
 Other tokens must be explicitly allowed.
 

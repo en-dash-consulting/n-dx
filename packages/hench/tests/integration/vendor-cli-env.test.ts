@@ -89,16 +89,16 @@ describe("cliLoop credential filtering across orientation and recovery", () => {
     expect(reports[0]).not.toContain("TYPESAFE_API_KEY");
     expect(log).not.toContain("fixture-secret-value");
     expect(log).not.toContain("fixture-github-value");
-    expect(log).not.toContain("cloud mode is on");
+    expect(log).not.toContain("a vendor mode is on");
   });
 
-  it("says once that Vertex mode falls back to default credentials when none is set", async () => {
+  it("says once that Vertex mode is on without its credentials, claiming no fallback", async () => {
     vi.stubEnv("CLAUDE_CODE_USE_VERTEX", "1");
     vi.stubEnv("GOOGLE_APPLICATION_CREDENTIALS", undefined);
     const { log } = await runFixture(false);
-    const reports = log.split("\n").filter((line) => line.includes("cloud mode is on"));
+    const reports = log.split("\n").filter((line) => line.includes("a vendor mode is on"));
     expect(reports).toHaveLength(1);
     expect(reports[0]).toContain("GOOGLE_APPLICATION_CREDENTIALS");
-    expect(reports[0]).toContain("falls back to default credential files");
+    expect(reports[0]).not.toContain("falls back");
   });
 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { evaluateRepoTrust } from "@n-dx/llm-client";
 import { verify } from "../../core/verify.js";
+import { gateRepoTestCommand } from "../../core/test-command-trust.js";
 import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
@@ -13,27 +13,17 @@ export async function handleVerifyCriteria(
   try {
     const doc = await store.loadDocument();
     const config = await store.loadConfig();
-    // The test command comes from the repository's own `.rex/config.json`, so
-    // running it on a checkout the user has not trusted would execute whatever
-    // that checkout chose. Default off; and even when asked for, tests run
-    // only once the repository's execution config is trusted (`ndx trust`).
-    const requested = args.runTests === true;
-    const trust = requested ? evaluateRepoTrust(dir) : null;
-    const runTests = requested && trust !== null && !trust.restricted;
+    // Tests are off by default, and a repository test command runs only once
+    // the user has accepted it; see gateRepoTestCommand (#686).
+    const gate = gateRepoTestCommand(dir, config.test, args.runTests === true);
     const result = await verify({
       projectDir: dir,
       items: doc.items,
       taskId: args.taskId,
-      testCommand: config.test,
-      runTests,
+      testCommand: gate.testCommand,
+      runTests: gate.runTests,
     });
-    const payload = requested && !runTests
-      ? {
-          ...result,
-          testsSkipped: "The repository's execution config is not trusted, so its test command was not run. Review with `ndx trust .` and accept with `ndx trust accept .`.",
-          trust: { state: trust?.state, findings: trust?.findings.filter((f) => f.severity === "warning").map((f) => f.message) ?? [] },
-        }
-      : result;
+    const payload = gate.refusal ? { ...result, ...gate.refusal } : result;
     return textResult(JSON.stringify(payload, null, 2));
   } catch (err) {
     return textResult(`Error: ${(err as Error).message}`, true);

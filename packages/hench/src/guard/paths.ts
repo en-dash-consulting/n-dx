@@ -114,9 +114,13 @@ export function validatePath(
     );
   }
 
-  // Check blocked path patterns
+  // Check blocked path patterns, ignoring case: on macOS and Windows
+  // `.N-DX.local.json` and `.ENV` open the files the blocks name, so a
+  // case-sensitive match let any blocked file be written under another
+  // spelling. Stricter on a case-sensitive filesystem, never looser.
+  const relLower = rel.toLowerCase();
   for (const pattern of blockedPaths) {
-    if (simpleGlobMatch(pattern, rel)) {
+    if (simpleGlobMatch(pattern.toLowerCase(), relLower)) {
       throw new GuardError(
         `Path matches blocked pattern "${pattern}": ${filepath}`,
       );

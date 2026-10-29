@@ -1,0 +1,24 @@
+schema: "rex/v2"
+items:
+  "dfa630df-b202-408d-b4a5-0017fcbcdecf":
+    status: "completed"
+    startedAt: "2026-10-27T21:54:06.537Z"
+    completedAt: "2026-10-27T21:54:06.537Z"
+    endedAt: "2026-10-27T21:54:06.537Z"
+    activeIntervals: [{"end":"2026-10-27T21:54:06.537Z","start":"2026-10-27T21:54:06.537Z"}]
+    appliedAt: "2026-10-27T21:54:06.537Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T21:54:06.537Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f11618dd-4fb2-4b52-b78d-ac3eb326dfb8":
+    status: "completed"
+    startedAt: "2026-10-27T21:47:06.724Z"
+    completedAt: "2026-10-27T21:54:06.537Z"
+    endedAt: "2026-10-27T21:54:06.537Z"
+    activeIntervals: [{"end":"2026-10-27T21:54:06.537Z","start":"2026-10-27T21:47:06.724Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Removed userLocalConfigApplies from repo-trust.ts and public.ts; module doc now names localConfigTracked (hench applyRepoTrust, repoCommandEnv, core applyRepoTrustToEnvPolicy) and trustedLocalConfig. Test asserts the export is absent (failed before); former assertions now use trustedLocalConfig. Hench gateway never re-exported it, so no ceiling change."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T21:54:06.537Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
