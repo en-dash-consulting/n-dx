@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { computeEdges, deriveChangeKind, productIndex, resolveNode, type ChangeKind } from "../../../src/core/product-edges.js";
+import { capabilityTestFiles, computeAreaLinks, computeEdges, deriveChangeKind, productIndex, resolveNode, type ChangeKind } from "../../../src/core/product-edges.js";
 import type { RuleNode, V2Tree } from "../../../src/schema/v2-rules.js";
-import type { Amendment, ChangeNode } from "../../../src/schema/v2.js";
+import { AreaIntentSchema, CapabilityIntentSchema, type Amendment, type ChangeNode } from "../../../src/schema/v2.js";
 
 const node = (fields: Record<string, unknown>): RuleNode => ({ title: fields.id as string, slug: fields.id as string, ...fields }) as RuleNode;
 const cap = (id: string, extra: Record<string, unknown> = {}) => node({ id, type: "capability", ...extra });
@@ -175,5 +175,66 @@ describe("resolveNode", () => {
     expect(resolveNode(t, "A4.1")?.id).toBe("cap-a");
     expect(resolveNode(t, "cap-a")?.id).toBe("cap-a");
     expect(resolveNode(t, "unknown")).toBeUndefined();
+  });
+});
+
+describe("computeAreaLinks", () => {
+  const linked = (...tests: string[]) => ({
+    requirements: [{ id: "r", title: "t", category: "technical", validationType: "automated", acceptanceCriteria: [], description: `Linked to: ${tests.join(", ")}`, validationCommand: `pnpm vitest run ${tests.join(" ")}` }],
+  });
+  const area = (id: string, children: RuleNode[]) => node({ id, type: "area", children });
+
+  it("links two areas whose capabilities share changes and test files, both ways, with no stored field", () => {
+    const t = tree(
+      [
+        area("plan", [cap("cap-a", linked("tests/shared.test.ts", "tests/a.test.ts")), cap("cap-a2")]),
+        area("run", [node({ id: "group", type: "capability", children: [cap("cap-b", linked("tests/shared.test.ts"))] })]),
+      ],
+      [change("c1", { touches: ["cap-a", "cap-b"] }), change("c2", { amends: [amend("cap-a", "modified")], touches: ["cap-b"] })],
+    );
+    const before = JSON.stringify(t);
+    const links = computeAreaLinks(t);
+    expect(links).toEqual({
+      plan: [{ id: "run", coChanges: 2, sharedTests: ["tests/shared.test.ts"] }],
+      run: [{ id: "plan", coChanges: 2, sharedTests: ["tests/shared.test.ts"] }],
+    });
+    // Computed only: the tree is untouched and neither schema has a field for it.
+    expect(JSON.stringify(t)).toBe(before);
+    for (const schema of [AreaIntentSchema, CapabilityIntentSchema]) {
+      const keys = Object.keys(schema.shape);
+      expect(keys).toContain("type");
+      expect(keys.filter((k) => /link/i.test(k))).toEqual([]);
+    }
+  });
+
+  it("links on shared tests alone, and on shared changes alone", () => {
+    const tests = computeAreaLinks(tree([area("x", [cap("cx", linked("t/s.test.ts"))]), area("y", [cap("cy", linked("t/s.test.ts"))])], []));
+    expect(tests.x).toEqual([{ id: "y", coChanges: 0, sharedTests: ["t/s.test.ts"] }]);
+    const changes = computeAreaLinks(tree([area("x", [cap("cx")]), area("y", [cap("cy")])], [change("c", { touches: ["cx", "cy"] })]));
+    expect(changes.y).toEqual([{ id: "x", coChanges: 1, sharedTests: [] }]);
+  });
+
+  it("gives no link to areas whose capabilities share nothing, or share only within one area", () => {
+    const t = tree(
+      [
+        area("x", [cap("cx", linked("t/x.test.ts")), cap("cx2", linked("t/x.test.ts"))]),
+        area("y", [cap("cy", linked("t/y.test.ts"))]),
+      ],
+      [change("c", { touches: ["cx", "cx2"] }), change("d", { touches: ["cy"] })],
+    );
+    expect(computeAreaLinks(t)).toEqual({});
+  });
+
+  it("ignores a cancelled change and a retired capability", () => {
+    const t = tree(
+      [area("x", [cap("cx")]), area("y", [cap("cy", { status: "deleted", ...linked("t/s.test.ts") })]), area("z", [cap("cz", linked("t/s.test.ts"))])],
+      [change("c", { status: "cancelled", touches: ["cx", "cz"] })],
+    );
+    expect(computeAreaLinks(t)).toEqual({});
+  });
+
+  it("reads test paths from a requirement's command and its Linked to list, not other words", () => {
+    expect(capabilityTestFiles(linked("b/two.spec.tsx", "a/one.test.ts") as never)).toEqual(["a/one.test.ts", "b/two.spec.tsx"]);
+    expect(capabilityTestFiles({ requirements: [{ validationCommand: "pnpm test src/index.ts" }] } as never)).toEqual([]);
   });
 });
