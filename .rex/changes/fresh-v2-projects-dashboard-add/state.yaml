@@ -37,9 +37,14 @@ items:
     lastModified: "2026-10-23T02:52:07.507Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fdeb0c2c-d796-403f-b43d-63885c61a085":
+    status: "completed"
+    startedAt: "2026-10-28T00:05:01.482Z"
+    completedAt: "2026-10-28T00:05:01.482Z"
+    endedAt: "2026-10-28T00:05:01.482Z"
+    activeIntervals: [{"end":"2026-10-28T00:05:01.482Z","start":"2026-10-28T00:05:01.482Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-22T17:14:34.374Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T00:05:01.482Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "fe4ea50b-08ee-4636-ace3-1d60aeb0d4f4":
     status: "completed"
     startedAt: "2026-10-23T03:22:41.649Z"
