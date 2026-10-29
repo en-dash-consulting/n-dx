@@ -14,7 +14,7 @@
  * the plan is a proposal for review, every product node the projection draws
  * from it says `proposed`, and the PRD's migration makes it real.
  */
-import { classifyV1Tree, draftCapabilitySpecs, nodeSpec, specHash, type MigrationPlan, type PRDItem, type PrdModel, type RuleNode, type V2Tree } from "../rex-gateway.js";
+import { capabilityCodeFiles, classifyV1Tree, draftCapabilitySpecs, nodeSpec, specHash, type MigrationPlan, type PRDItem, type PrdModel, type RuleNode, type V2Tree } from "../rex-gateway.js";
 
 export interface ProposedLayer {
   tree: V2Tree;
@@ -24,13 +24,14 @@ export interface ProposedLayer {
 const PRODUCT_TARGETS = new Set(["area", "capability", "constraint"]);
 
 /** The tree the plan proposes for a v1 model, or undefined for a v2 one. */
-export function proposeProductLayer(model: PrdModel): ProposedLayer | undefined {
+export function proposeProductLayer(model: PrdModel, codeFiles: Readonly<Record<string, readonly string[]>> = {}): ProposedLayer | undefined {
   if (model.layout !== "v1") return undefined;
   // The v1 reader keeps every item field (level included) on its node, so the
   // tree reads back as the v1 items the plan classifies.
   const items = model.tree.changes as unknown as readonly PRDItem[];
-  const plan = classifyV1Tree(items);
-  const specs = new Map(draftCapabilitySpecs(plan, items, { testFiles: [] }).map((spec) => [spec.capability, spec]));
+  const filesOf = (id: string) => codeFiles[id] ?? [];
+  const plan = classifyV1Tree(items, { filesOf });
+  const specs = new Map(draftCapabilitySpecs(plan, items, { testFiles: [], codeFiles: capabilityCodeFiles(plan, filesOf) }).map((spec) => [spec.capability, spec]));
   const constraints = new Map(plan.constraints.map((c) => [c.source, c.appliesTo]));
 
   const source = new Map<string, RuleNode>();

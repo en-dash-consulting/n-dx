@@ -259,7 +259,7 @@ describe("the rendered page", () => {
   });
 
   it("starts the next task through the execute route from the Start now menu item", async () => {
-    await mount();
+    const navigateTo = await mount();
     const caret = root.querySelector<HTMLButtonElement>(".start-task-caret")!;
     await act(async () => { caret.click(); await flush(); });
     const start = [...root.querySelectorAll("button")].find((b) => b.textContent === "Start now")!;
@@ -267,6 +267,7 @@ describe("the rendered page", () => {
     const post = calls.find((c) => c.url.includes("/api/hench/execute"));
     expect(post?.init?.method).toBe("POST");
     expect(JSON.parse(String(post?.init?.body))).toMatchObject({ taskId: "n1" });
+    expect(navigateTo).toHaveBeenCalledWith("live-task", { taskId: "n1" });
   });
 
   it("runs a fast analysis and a deep one", async () => {

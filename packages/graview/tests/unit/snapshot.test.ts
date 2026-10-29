@@ -205,6 +205,25 @@ describe("buildSnapshot", () => {
     expect(snapshot.edges.some((e) => e.from === work!.id && e.to === signup!.id && (e.kind === "amends" || e.kind === "touches"))).toBe(true);
   });
 
+  it("places a held v1 change using trailer and run files where words alone would hold it", async () => {
+    const root = project({ prd: "v1", layout: "ndx", runs: false });
+    const layout = resolveLayout(root);
+    const feature = join(layout.rexDir, "prd_tree", "auth-platform-11111111", "signup-flow-77777777");
+    mkdirSync(join(feature, "delivered-88888888"), { recursive: true });
+    writeFileSync(join(feature, "index.md"), '---\nid: "77777777-7777-4777-8777-777777777777"\nlevel: feature\ntitle: Invoice storage\nstatus: completed\n---\n');
+    writeFileSync(join(feature, "delivered-88888888/index.md"), '---\nid: "88888888-8888-4888-8888-888888888888"\nlevel: task\ntitle: Delivered service\nstatus: completed\n---\n');
+    writeFileSync(join(layout.rexDir, "prd_tree", "polish-99999999.md"), '---\nid: "99999999-9999-4999-8999-999999999999"\nlevel: task\ntitle: Polish zebra\nstatus: pending\n---\n');
+    const without = await buildSnapshot(layout, quiet);
+    expect(without.snapshot.nodes.find((node) => node.title === "Polish zebra")?.inbox).toBe(true);
+    const { commit } = repo(root);
+    const sha = commit("src/checkout/pay.ts", "Deliver service\n\nN-DX-Item: 88888888-8888-4888-8888-888888888888");
+    mkdirSync(join(layout.henchDir, "runs"), { recursive: true });
+    writeFileSync(join(layout.henchDir, "runs", "run-held.json"), JSON.stringify(runRecord("run-held", "99999999-9999-4999-8999-999999999999", { commits: [{ sha }] })));
+    const withEvidence = await buildSnapshot(layout, quiet);
+    expect(withEvidence.snapshot.nodes.find((node) => node.title === "Polish zebra")?.inbox).toBe(false);
+    expect(withEvidence.snapshot.edges).toContainEqual({ kind: "touches", from: "99999999-9999-4999-8999-999999999999", to: "77777777-7777-4777-8777-777777777777" });
+  });
+
   it("reads a v1 tree as changes only when told not to propose", async () => {
     const root = project({ prd: "v1", layout: "ndx" });
     const { snapshot, layout, counts, productLayer } = await buildSnapshot(resolveLayout(root), { ...quiet, proposeProductLayer: false });

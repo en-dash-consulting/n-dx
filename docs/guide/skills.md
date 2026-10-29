@@ -183,7 +183,7 @@ they all share:
 **What it does (v1 PRD):**
 1. Calls `get_prd_status` (rex MCP) to assess the current epic/feature structure
 2. Detects problems: too many epics, wrong levels, overlapping areas, orphaned items
-3. Proposes a target structure (7-12 top-level epics, 3-15 features each)
+3. Proposes a target structure for the change layer; on a v1 PRD this groups epics and features
 4. After user approval, executes via `add_item`, `move_item`, `edit_item`, `merge_items`
 5. Verifies with `reorganize` (rex MCP)
 
@@ -220,7 +220,7 @@ they all share:
 3. **Pass 1 — attack.** Works a fixed rubric (unimagined inputs, failure paths, concurrency, platform, contract drift, test quality, the claim itself). Every finding needs a constructed trigger and a genuine attempt to refute it, or it is dropped
 4. **Pass 2 — necessity.** Judges each survivor on reachability, existing coverage, fix cost, and scope, landing on must-fix / should-fix / not-worth-fixing / out-of-scope
 5. Reports findings with severity, verdict, and proposed solutions — then **stops and asks** which to capture
-6. **Checks what the PRD already tracks** by enumerating `.rex/prd_tree/`, matching on the defect rather than the wording. An already-tracked finding is never re-added: if the review has something new to say about it, the skill offers to extend the existing item via `edit_item`; if it does not, it says so and skips
+6. **Checks what the PRD already tracks** by reading the PRD (the product and change layers on v2, `.rex/prd_tree/` on v1), matching on the defect rather than the wording. An already-tracked finding is never re-added: if the review has something new to say about it, the skill offers to extend the existing item via `edit_item`; if it does not, it says so and skips
 7. Creates one PRD item per genuinely new approved finding, carrying the failure scenario, the candidate solutions, and acceptance criteria that fail today
 
 **What it will not do:** edit source, apply a fix, or write a PRD item you did not approve. Steps 1–5 write nothing at all. A green test suite bounds the review but never ends it — "checks pass, no findings" is treated as a review that was not performed.

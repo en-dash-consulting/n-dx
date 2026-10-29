@@ -1,3 +1,4 @@
+import { TOAST_DURATION_MS } from "../utils/notifications.js";
 /**
  * Simple toast notification state hook.
  *
@@ -6,7 +7,7 @@
  * across views that need lightweight user feedback.
  */
 
-import { useState, useCallback } from "preact/hooks";
+import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 
 export type ToastType = "success" | "error";
 
@@ -29,12 +30,15 @@ export interface ToastState {
 export function useToast(): ToastState {
   const [toast, setToast] = useState<string | null>(null);
   const [toastType, setToastType] = useState<ToastType>("success");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const showToast = useCallback(
-    (message: string, type: ToastType = "success", duration = 3000) => {
+    (message: string, type: ToastType = "success", duration = TOAST_DURATION_MS) => {
       setToast(message);
       setToastType(type);
-      setTimeout(() => setToast(null), duration);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setToast(null), duration);
     },
     [],
   );

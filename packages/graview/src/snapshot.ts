@@ -84,10 +84,31 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
     options.warn?.(message);
   };
 
-  const requirements = await readRequirements(layout.rexDir, warn, { proposeProductLayer: options.proposeProductLayer });
   const files = options.files ?? true;
   const code = readCode(layout.sourcevisionDir, { files }, warn);
   const runs = readRuns(layout.henchDir, warn);
+  const gitOptions = { repoDir: layout.root, cacheDir: options.cacheDir ?? join(graviewDirOf(layout), "cache"), ref: options.ref };
+  let trailers: ReturnType<typeof loadTrailerCommits> | undefined;
+  const trailerCommits = () => trailers ??= loadTrailerCommits(gitOptions);
+  const requirements = await readRequirements(layout.rexDir, warn, {
+    proposeProductLayer: options.proposeProductLayer,
+    codeFiles: async () => {
+      try {
+        const commitsFor = new Map([...runs.commitsFor].map(([id, commits]) => [id, [...commits]]));
+        for (const commit of await trailerCommits()) {
+          for (const id of commit.items) commitsFor.set(id, [...(commitsFor.get(id) ?? []), commit.hash]);
+        }
+        const candidates = new Map([...new Set([...commitsFor.values()].flat())].map((sha) => [sha, { id: sha, kind: "commit" } as SnapshotNode]));
+        const knownCommits = await describeCommits(layout.root, candidates);
+        const changed = await loadCommitFiles(layout.root, gitOptions.cacheDir, knownCommits);
+        return Object.fromEntries([...commitsFor].map(([id, commits]) => [id, [...new Set(commits.flatMap((sha) => changed.get(sha) ?? []))].sort()]));
+      } catch {
+        // The existing git diagnostics below explain missing or shallow history.
+        // An absent signal keeps the rules-only proposal available.
+        return {};
+      }
+    },
+  });
 
   const nodes = new Map<string, SnapshotNode>();
   const add = (node: SnapshotNode): void => {
@@ -98,7 +119,6 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
   for (const node of runs.nodes) add(node);
 
   const edges: SnapshotEdge[] = [...requirements.edges, ...code.edges, ...runs.edges];
-  const gitOptions = { repoDir: layout.root, cacheDir: options.cacheDir ?? join(graviewDirOf(layout), "cache"), ref: options.ref };
 
   // What git alone says about the work, through the N-DX-Item trailers on
   // main: every trailer commit naming a change or task is a commit node that
@@ -117,7 +137,7 @@ export async function buildSnapshot(layout: Layout, options: BuildSnapshotOption
   let known: Set<string> | undefined;
   if (requirements.nodes.some((n) => n.kind === "change" || n.kind === "task")) {
     try {
-      for (const commit of await loadTrailerCommits(gitOptions)) {
+      for (const commit of await trailerCommits()) {
         const items = commit.items.filter((id) => requirements.ids.has(id));
         if (items.length === 0) continue;
         // A run record may already name this commit: the trailer is the stronger tie, and git knows the author and date.

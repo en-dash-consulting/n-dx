@@ -177,13 +177,15 @@ export function StartTaskButton({ taskId, onStarted, label = "Start Task", works
         return;
       }
       onStarted();
+      if (liveHref) window.location.assign(liveHref(taskId));
+      else if (navigateTo) navigateTo("live-task", { taskId });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start task");
       setTimeout(() => setError(null), 4000);
     } finally {
       setLoading(false);
     }
-  }, [post, onStarted, taskId, mode, iterations]);
+  }, [post, onStarted, taskId, mode, iterations, liveHref, navigateTo]);
 
   const handleMigrate = useCallback(async (e: Event) => {
     e.stopPropagation();

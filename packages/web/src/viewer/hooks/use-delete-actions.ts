@@ -143,7 +143,7 @@ export function useDeleteActions({
         await handleRemoveItem(id);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Delete failed";
-        showToast(`Failed to delete item: ${msg}`, "error", 4000);
+        showToast(`Failed to delete item: ${msg}`, "error");
       }
       setDeleteTarget(null);
     },
@@ -158,7 +158,7 @@ export function useDeleteActions({
         await handleRemoveItem(id);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Delete failed";
-        showToast(`Failed to delete item: ${msg}`, "error", 4000);
+        showToast(`Failed to delete item: ${msg}`, "error");
         throw err; // Re-throw so TaskDetail can reset its confirming state
       }
     },

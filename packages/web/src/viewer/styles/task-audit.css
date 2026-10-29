@@ -596,10 +596,6 @@
 /* ── Toast ───────────────────────────────────────────────────────── */
 
 .audit-toast {
-  position: fixed;
-  bottom: calc(var(--space-5) + var(--bottombar-h, 0px));
-  left: 50%;
-  transform: translateX(-50%);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -608,7 +604,6 @@
   color: var(--text);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: var(--z-toast);
-  animation: audit-toast-in 0.2s ease-out;
 }
 
 @keyframes audit-toast-in {

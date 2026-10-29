@@ -16,6 +16,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 
+import { handleReorganize } from "../../src/cli/mcp-tools/reorganize.js";
+import { resolveStore } from "../../src/store/index.js";
 import { cmdReshape } from "../../src/cli/commands/reshape.js";
 import { cmdReorganize } from "../../src/cli/commands/reorganize.js";
 import { cmdPrune } from "../../src/cli/commands/prune.js";
@@ -62,6 +64,25 @@ describe("branch guard: whole-tree rewrite commands", () => {
 
   afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
+  });
+
+  it("guards MCP applies, accepts an explicit opt-in, and permits previews", async () => {
+    initRepoOnMain(dir);
+    git(dir, "checkout", "-b", FEATURE_BRANCH);
+    const store = await resolveStore(join(dir, ".rex"));
+    const refused = await handleReorganize(store, dir, { accept: "all", mode: "fast" });
+    expect(refused.isError).toBe(true);
+    expect(JSON.stringify(refused)).toContain(FEATURE_BRANCH);
+    expect(JSON.stringify(refused)).toContain("allowOnBranch");
+    expect((await handleReorganize(store, dir, { mode: "fast" })).isError).not.toBe(true);
+    expect((await handleReorganize(store, dir, { accept: "all", mode: "fast", allowOnBranch: true })).isError).not.toBe(true);
+  });
+
+  it("accepts --allow-on-branch before the directory in the built CLI argv", () => {
+    initRepoOnMain(dir);
+    git(dir, "checkout", "-b", FEATURE_BRANCH);
+    const out = execFileSync(process.execPath, [join(import.meta.dirname, "../../dist/cli/index.js"), "prune", "--allow-on-branch", dir], { encoding: "utf-8" });
+    expect(out).not.toContain("not the default branch");
   });
 
   it("reshape refuses on a feature branch, names the branch and flag, and proceeds with --allow-on-branch", async () => {

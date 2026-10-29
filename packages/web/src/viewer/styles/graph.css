@@ -185,10 +185,6 @@
 
 /* Refresh toast */
 .refresh-toast {
-  position: fixed;
-  bottom: calc(24px + var(--bottombar-h, 0px));
-  left: 50%;
-  transform: translateX(-50%);
   background: var(--accent-dim);
   color: #fff;
   padding: 8px 20px;
@@ -196,7 +192,6 @@
   font-size: 13px;
   font-weight: 500;
   z-index: var(--z-toast);
-  animation: toast-fade 3s ease-in-out forwards;
 }
 
 @keyframes toast-fade {
@@ -365,6 +360,6 @@
   .refresh-toast {
     animation: none;
     opacity: 1;
-    transform: translateX(-50%);
+    transform: none;
   }
 }

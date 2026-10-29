@@ -1,3 +1,4 @@
+import { FloatingNotice } from "../components/index.js";
 /**
  * PRD view — displays Rex PRD hierarchy with interactive tree.
  *
@@ -412,11 +413,11 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
     // Toast notification (success = green, error = red)
     toast
-      ? h("div", {
+      ? h(FloatingNotice, null, h("div", {
           class: `rex-toast${toastType === "error" ? " rex-toast-error" : ""}`,
           role: toastType === "error" ? "alert" : "status",
           "aria-live": toastType === "error" ? "assertive" : "polite",
-        }, toast)
+        }, toast))
       : null,
 
     // Delete confirmation modal
