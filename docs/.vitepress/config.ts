@@ -31,6 +31,7 @@ export default defineConfig({
 
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
+      { text: "0.10.0", link: "/releases/0.10.0" },
       { text: "Architecture", link: "/architecture/overview" },
       { text: "Packages", link: "/packages/overview" },
       { text: "Extensions", link: "/extensions/" },

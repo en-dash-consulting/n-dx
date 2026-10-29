@@ -34,10 +34,13 @@
  * @module migrations/v1-to-v2/code-files
  */
 
+import { gunzipSync } from "node:zlib";
+import { readdir } from "node:fs/promises";
+import { loadTrailerCommits, loadCommitFiles } from "../../core/change-commits.js";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { resolveLayout } from "@n-dx/llm-client";
+import { execStdout, resolveLayout } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/v1.js";
 import { extractKeywords, scoreMatch } from "../../core/keywords.js";
 import { DEFAULT_MIN_TEST_SCORE, indexItems, isTestFile, linkedTests } from "./capability-spec.js";
@@ -282,4 +285,44 @@ export async function readCapabilityCodeFiles(
   options: CodeFilesOptions = {},
 ): Promise<Record<string, string[]>> {
   return (await readCodeEvidence(dir, items, options)).files;
+}
+
+
+/** Commit evidence collected by the CLI before running the pure migration. */
+export async function readCommitCodeFiles(dir: string): Promise<Record<string, string[]>> {
+  const layout = resolveLayout(dir);
+  const commitsFor = new Map<string, Set<string>>();
+  const add = (id: string, sha: string) => {
+    const commits = commitsFor.get(id) ?? new Set<string>();
+    commits.add(sha);
+    commitsFor.set(id, commits);
+  };
+  const cacheDir = join(layout.rexDir, ".cache");
+  try {
+    for (const commit of await loadTrailerCommits({ repoDir: dir, cacheDir })) {
+      for (const id of commit.items) add(id, commit.hash);
+    }
+  } catch { /* A missing or shallow git history contributes no trailer signal. */ }
+  try {
+    const runsDir = join(layout.henchDir, "runs");
+    for (const name of await readdir(runsDir)) {
+      if (name.startsWith(".") || !/\.json(?:\.gz)?$/.test(name)) continue;
+      try {
+        const raw = await readFile(join(runsDir, name));
+        const run = JSON.parse(name.endsWith(".gz") ? gunzipSync(raw).toString("utf-8") : raw.toString("utf-8")) as { taskId?: unknown; commits?: Array<{ sha?: unknown }> };
+        if (typeof run.taskId !== "string" || !Array.isArray(run.commits)) continue;
+        for (const commit of run.commits) if (typeof commit?.sha === "string") add(run.taskId, commit.sha);
+      } catch { /* A damaged run must not prevent planning. */ }
+    }
+  } catch { /* Projects without runs have no run evidence. */ }
+  try {
+    const candidates = [...new Set([...commitsFor.values()].flatMap((commits) => [...commits]))].filter((sha) => /^[a-f0-9]{40}$/i.test(sha));
+    const known: string[] = [];
+    for (let offset = 0; offset < candidates.length; offset += 256) {
+      const output = await execStdout("git", ["log", "--no-walk=unsorted", "--ignore-missing", "--format=%H", ...candidates.slice(offset, offset + 256), "--"], { cwd: dir, timeout: 60_000 });
+      known.push(...output.trim().split("\n").filter(Boolean));
+    }
+    const changed = await loadCommitFiles(dir, cacheDir, known);
+    return Object.fromEntries([...commitsFor].map(([id, commits]) => [id, [...new Set([...commits].flatMap((sha) => changed.get(sha) ?? []))].sort()]));
+  } catch { return {}; }
 }

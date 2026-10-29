@@ -51,7 +51,7 @@ import { findTestFiles } from "../../core/verify.js";
 import { findMigration, MIGRATIONS } from "../../migrations/registry.js";
 import { formatPlanFile, readPlanFile, writePlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { contentHash, sourceDigest, v1TreeSource, V1_TREE_SOURCE_KIND, type V1ToV2Options } from "../../migrations/v1-to-v2/index.js";
-import { readCodeEvidence, readCodeEvidenceProvenance } from "../../migrations/v1-to-v2/code-files.js";
+import { readCommitCodeFiles, readCodeEvidence, readCodeEvidenceProvenance } from "../../migrations/v1-to-v2/code-files.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
 import { describeSkippedV1Items, skippedV1Items } from "../../migrations/v1-to-v2/v1-tree-read.js";
 import { renderPlanSummary, type V1ToV2Plan } from "../../migrations/v1-to-v2/plan-summary.js";
@@ -261,7 +261,9 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   // never touches the filesystem. Without an analysis the code evidence is
   // empty and the plan is what it was before the reader existed.
   const testFiles = await findTestFiles(dir);
-  const { files: codeFiles, analysisPresent } = await readCodeEvidence(dir, doc.items, { testFiles });
+  const { files: analysisFiles, analysisPresent } = await readCodeEvidence(dir, doc.items, { testFiles });
+  const commitFiles = await readCommitCodeFiles(dir);
+  const codeFiles = Object.fromEntries([...new Set([...Object.keys(analysisFiles), ...Object.keys(commitFiles)])].map((id) => [id, [...new Set([...(analysisFiles[id] ?? []), ...(commitFiles[id] ?? [])])].sort()]));
   // A stale .sourcevision reads exactly like a fresh one — every file parses,
   // every zone has files — so the specs come out looking equally authoritative.
   // Say when the evidence was taken; the operator reviewing the plan cannot

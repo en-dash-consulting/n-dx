@@ -1,3 +1,4 @@
+import { checkBranchGuard, branchGuardRefusal } from "../rex-gateway.js";
 /**
  * Health and reorganize routes: structure health score, reorganization proposals.
  */
@@ -92,6 +93,11 @@ export function routeHealthReorganize(
   // Body: { proposalIds?: number[], llmProposalIds?: string[] }
   if (path === "reorganize/apply" && method === "POST") {
     return (async () => {
+      const guard = checkBranchGuard(ctx.projectDir, {});
+      if (guard.blocked) {
+        errorResponse(res, 409, branchGuardRefusal("reorganize", guard.branch).message);
+        return true;
+      }
       const body = await readBody(req, res);
       let proposalIds: number[];
       let llmProposalIds: string[];

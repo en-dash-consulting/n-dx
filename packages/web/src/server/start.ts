@@ -21,7 +21,7 @@ import { settleContextNotesRemovals, sweepStaleContextNotes } from "./run-option
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME } from "./prd-io.js";
-import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION, prdLayout, resolveStore } from "./rex-gateway.js";
+import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION, prdLayout, resolveStore, loadPrdModel, type V2Tree } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
@@ -331,12 +331,12 @@ export async function refreshPRDCache(rexDir: string): Promise<void> {
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const prdMdPath = join(rexDir, "prd.md");
 
-  let doc: { schema: string; title: string; items: unknown[] } | null = null;
+  let doc: { schema: string; title: string; items: unknown[]; product?: V2Tree["product"] } | null = null;
 
   if (await prdLayout(rexDir) === "v2") {
     // v2: the cache is the change layer projected as v1 items.
     try {
-      doc = await (await resolveStore(rexDir)).loadDocument();
+      doc = { ...await (await resolveStore(rexDir)).loadDocument(), product: (await loadPrdModel(rexDir)).tree.product };
     } catch (err) {
       console.warn(`[prd-cache] v2 projection error: ${(err as Error).message}`);
     }

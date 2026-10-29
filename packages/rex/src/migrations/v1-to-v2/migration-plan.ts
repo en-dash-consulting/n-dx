@@ -106,6 +106,8 @@ export interface MigrationPlan {
 export const DEFAULT_PRODUCT_NAMES: readonly string[] = ["ndx", "n-dx"];
 
 export interface ClassifyOptions {
+  /** Code paths tied to a v1 item by the caller (commits, runs or analysis). */
+  filesOf?: (itemId: string) => readonly string[];
   /** Names a release title may put before its version (`Acme 2.0`). Defaults to {@link DEFAULT_PRODUCT_NAMES}. */
   productNames?: readonly string[];
 }
@@ -406,12 +408,14 @@ export function placementChangeOf(item: PRDItem): PlacementChange {
 }
 
 /** Place held changes on a clear rules leader; otherwise hold them for a person. */
-function place(plan: PlanBuilder): void {
+function place(plan: PlanBuilder, filesOf?: ClassifyOptions["filesOf"]): void {
+  const codeFiles = filesOf ? capabilityCodeFiles({ entries: plan.entries }, filesOf) : {};
+  const nodes = plan.productNodes.map((node) => ({ ...node, realizedBy: codeFiles[node.id] }));
   for (const { entry, area, item } of plan.unplaced) {
-    const change = placementChangeOf(item);
+    const change = { ...placementChangeOf(item), ...(filesOf ? { files: [...filesOf(item.id)] } : {}) };
     entry.relation ??= placementRelation(change);
-    const local = plan.productNodes.filter((n) => n.area === area);
-    const pools = area !== undefined && local.length > 0 ? [local, plan.productNodes] : [plan.productNodes];
+    const local = nodes.filter((n) => n.area === area);
+    const pools = area !== undefined && local.length > 0 ? [local, nodes] : [nodes];
     let placed = false;
     for (const pool of pools) {
       const [top, next] = rankPlacementCandidates(change, pool, 2);
@@ -455,9 +459,26 @@ export function classifyV1Tree(items: readonly PRDItem[], options: ClassifyOptio
       plan.workUnder(item.children, item.id);
     }
   }
-  place(plan);
+  place(plan, options.filesOf);
 
   const counts = { area: 0, capability: 0, constraint: 0, change: 0, task: 0, subtask: 0, release: 0 } as Record<PlanTargetType, number>;
   for (const e of plan.entries) counts[e.target] += 1;
   return { entries: plan.entries, areas: proposeAreas(plan), constraints: plan.constraints, counts };
+}
+
+
+/** Evidence for standing nodes: their own paths plus their applied history. */
+export function capabilityCodeFiles(plan: Pick<MigrationPlan, "entries">, filesOf: NonNullable<ClassifyOptions["filesOf"]>): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  const children = new Map<string, PlanEntry[]>();
+  for (const entry of plan.entries) {
+    if (entry.parent) children.set(entry.parent, [...(children.get(entry.parent) ?? []), entry]);
+  }
+  const filesUnder = (id: string): string[] => [...filesOf(id), ...(children.get(id) ?? []).flatMap((child) => filesUnder(child.id))];
+  for (const node of plan.entries) {
+    if (node.target !== "capability" && node.target !== "constraint") continue;
+    const history = plan.entries.filter((entry) => entry.applied && entry.placement === node.id);
+    result[node.id] = [...new Set([...filesOf(node.id), ...history.flatMap((entry) => filesUnder(entry.id))])].sort();
+  }
+  return result;
 }
