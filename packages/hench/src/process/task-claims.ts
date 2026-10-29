@@ -152,6 +152,16 @@ export class TaskClaims {
   }
 
   /**
+   * Ids of every task a live claim holds, this worktree's included: work a
+   * running process already owns. The queue planner passes over all of them,
+   * because a lane offered for a task this worktree's own run holds would
+   * start a second run of it.
+   */
+  async liveClaims(): Promise<Map<string, TaskClaim>> {
+    return new Map((await this.store.readClaims()).map((c) => [c.taskId, c]));
+  }
+
+  /**
    * The first change enclosing `taskId` that another worktree claims, with its
    * claim, or null. On v2 a claim on a change covers the work inside it (rex
    * refuses the same in claim_task), so the task's own id is not enough.

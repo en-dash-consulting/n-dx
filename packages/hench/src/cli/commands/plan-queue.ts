@@ -140,8 +140,10 @@ export async function cmdPlanQueue(dir: string, flags: Record<string, string>): 
   }
   const llmConfig = await loadLLMConfig(henchDir);
   const tier = defaultTier(resolveTaskModel("agent.execute", llmConfig, { vendor: resolveLLMVendor(llmConfig) }).tier);
-  const foreign = await TaskClaims.forProject(dir, { readOnly: true }).foreignClaims();
-  const { tasks, changes } = queueInputFromTree(tree, { excludeIds: new Set(foreign.keys()), defaultTier: tier });
+  // Every live claim, this worktree's own included: a task a running process
+  // holds is not ready, and offering it would start a second run of it.
+  const claimed = await TaskClaims.forProject(dir, { readOnly: true }).liveClaims();
+  const { tasks, changes } = queueInputFromTree(tree, { excludeIds: new Set(claimed.keys()), defaultTier: tier });
   const cliName = resolveProjectCliName(dir);
   const plan = planQueue({
     tasks,
