@@ -27,7 +27,8 @@ export interface CarryOutResult {
 export interface SidecarActions {
   /** A work card's preview: the task's `ndx work --resolve`, rendered. Never throws. */
   previewWork(taskId: string, options: Record<string, unknown> | undefined): Promise<string>;
-  runCommand(argv: string[]): Promise<CarryOutResult> | CarryOutResult;
+  /** Runs the command and waits for it (see {@link awaitSidecarCommand}); `signal` aborts the wait, never the command. */
+  runCommand(argv: string[], signal?: AbortSignal): Promise<CarryOutResult> | CarryOutResult;
   startWork(taskId: string, options: Record<string, unknown> | undefined): Promise<CarryOutResult>;
 }
 
@@ -47,6 +48,7 @@ export async function carryOutDecision(
   input: Record<string, unknown>,
   outcome: BrokerOutcome,
   actions: SidecarActions | undefined,
+  signal?: AbortSignal,
 ): Promise<CarryOutResult> {
   if (outcome.decidedBy !== "allow-list") {
     const { card } = outcome;
@@ -59,7 +61,7 @@ export async function carryOutDecision(
   const decided = outcome.decidedBy === "allow-list"
     ? "Allowed by the Sidecar allow-list."
     : `The operator approved card ${outcome.card.id}.${outcome.card.reason ? ` Operator's note: ${outcome.card.reason}` : ""}`;
-  const effect = await carryOut(tool, input, actions);
+  const effect = await carryOut(tool, input, actions, signal);
   return { ok: effect.ok, text: `${decided} ${effect.text}` };
 }
 
@@ -67,13 +69,14 @@ async function carryOut(
   tool: BrokerToolName,
   input: Record<string, unknown>,
   actions: SidecarActions | undefined,
+  signal: AbortSignal | undefined,
 ): Promise<CarryOutResult> {
   const later = CARRIED_OUT_LATER[tool];
   if (later !== undefined) return { ok: true, text: `Recorded, not carried out yet: ${later} carries out ${tool} calls.` };
   if (!actions) return { ok: false, text: `This server cannot carry out ${tool} calls; nothing ran.` };
   switch (tool) {
     case "run_command":
-      return actions.runCommand((input.argv as unknown[]).map(String));
+      return actions.runCommand((input.argv as unknown[]).map(String), signal);
     case "start_work":
       return actions.startWork(String(input.taskId), workOptions(input));
     default:
@@ -105,6 +108,105 @@ export function renderWorkPreview(resolution: Record<string, unknown>): string {
   notes("refusals", "Refusals");
   notes("warnings", "Warnings");
   return lines.join("\n");
+}
+
+/** How a Sidecar command job ended. */
+export interface SidecarCommandEnd {
+  /** The exit code; null when the command never exited by itself (timed out, stopped, or failed to start). */
+  exitCode: number | null;
+  /** Everything it printed: stdout, then stderr. */
+  output: string;
+  error: string | null;
+  /** True when Stop in the job tray ended it. */
+  stopped: boolean;
+}
+
+/** A started Sidecar command, as {@link awaitSidecarCommand} waits on it. */
+export interface SidecarCommandJob {
+  jobId: string;
+  command: string;
+  settled: Promise<SidecarCommandEnd>;
+}
+
+/** How long the agent waits on a command before it is told the job carries on. */
+export const SIDECAR_COMMAND_WAIT_MS = 60_000;
+/** The output tail a tool result carries: its last lines, within a byte budget. */
+export const SIDECAR_OUTPUT_MAX_LINES = 80;
+export const SIDECAR_OUTPUT_MAX_BYTES = 8 * 1024;
+
+/**
+ * The tool result for a started command: its exit status and output tail
+ * when it ends within `waitMs`, else that it is still running. A stopped turn
+ * (`signal`) answers at once. Neither the bound nor the signal stops the job;
+ * Stop in the job tray does.
+ */
+export async function awaitSidecarCommand(
+  job: SidecarCommandJob,
+  waitMs: number,
+  signal?: AbortSignal,
+): Promise<CarryOutResult> {
+  const still: CarryOutResult = {
+    ok: true,
+    text: `\`${job.command}\` is still running as job ${job.jobId}; output in the job tray and on Live.`,
+  };
+  if (signal?.aborted) return still;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const cutShort = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), waitMs);
+    onAbort = () => resolve(null);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    const end = await Promise.race([job.settled, cutShort]);
+    return end ? commandEndResult(job, end) : still;
+  } finally {
+    clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+function commandEndResult(job: SidecarCommandJob, end: SidecarCommandEnd): CarryOutResult {
+  const ended = end.stopped
+    ? "was stopped from the job tray"
+    : end.exitCode === null
+      ? `ended without an exit code: ${end.error ?? "unknown error"}`
+      : `exited with code ${end.exitCode}`;
+  const tail = outputTail(end.output);
+  const body = tail.text
+    ? `\n${tail.cutBytes > 0 ? `Output, cut to its end (${tail.cutLines} lines, ${tail.cutBytes} bytes cut before it):` : "Output:"}\n${tail.text}`
+    : "\nIt printed nothing.";
+  return { ok: end.exitCode === 0 && !end.stopped, text: `\`${job.command}\` (job ${job.jobId}) ${ended}.${body}` };
+}
+
+/**
+ * The end of `output`: at most {@link SIDECAR_OUTPUT_MAX_LINES} lines and
+ * {@link SIDECAR_OUTPUT_MAX_BYTES} UTF-8 bytes, cut at line starts. A last
+ * line longer than the budget keeps its end.
+ */
+export function outputTail(output: string): { text: string; cutLines: number; cutBytes: number } {
+  const lines = output.replace(/\s+$/, "").split("\n");
+  if (lines.length === 1 && lines[0] === "") return { text: "", cutLines: 0, cutBytes: 0 };
+  const kept: string[] = [];
+  let bytes = 0;
+  for (let i = lines.length - 1; i >= 0 && kept.length < SIDECAR_OUTPUT_MAX_LINES; i -= 1) {
+    const size = Buffer.byteLength(lines[i]) + (kept.length > 0 ? 1 : 0);
+    if (bytes + size > SIDECAR_OUTPUT_MAX_BYTES) {
+      if (kept.length === 0) {
+        const end = Buffer.from(lines[i]).subarray(-SIDECAR_OUTPUT_MAX_BYTES).toString("utf-8").replace(/^�+/, "");
+        kept.unshift(end);
+      }
+      break;
+    }
+    kept.unshift(lines[i]);
+    bytes += size;
+  }
+  const text = kept.join("\n");
+  return {
+    text,
+    cutLines: lines.length - kept.length,
+    cutBytes: Buffer.byteLength(lines.join("\n")) - Buffer.byteLength(text),
+  };
 }
 
 /** A start_work call's run options, when it gave any. */

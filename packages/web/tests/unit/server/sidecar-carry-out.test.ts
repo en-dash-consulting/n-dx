@@ -23,8 +23,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { commandJobsOf, handleCommandsRoute } from "../../../src/server/routes-commands.js";
 import { resetHenchRouteStateForTests } from "../../../src/server/routes-hench.js";
-import { createAnnouncingBroker, handleSidecarRoute, type SidecarCardMessage } from "../../../src/server/routes-sidecar.js";
+import { createAnnouncingBroker, handleSidecarRoute, sidecarActions, type SidecarCardMessage } from "../../../src/server/routes-sidecar.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
+import { SIDECAR_OUTPUT_MAX_BYTES, outputTail } from "../../../src/server/sidecar/carry-out.js";
 import type { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { workspaceKeyOf } from "../../../src/server/workspace-scoped.js";
@@ -49,7 +50,7 @@ let server: RouteTestServer;
 let broker: SidecarBroker;
 let cardMessages: SidecarCardMessage[];
 let cardWaiters: Array<(m: SidecarCardMessage) => boolean>;
-let finishSpawn: Array<(r: { exitCode: number; stdout: string; stderr: string }) => void>;
+let finishSpawn: Array<(r: { exitCode: number | null; stdout: string; stderr: string }) => void>;
 
 function broadcast(message: unknown): void {
   const m = message as SidecarCardMessage;
@@ -136,10 +137,27 @@ afterEach(async () => {
   await removeTestDir(root);
 });
 
+/** How long a command's tool result waits on the job; a test that reaches the bound shortens it. */
+let commandWaitMs: number;
+
 async function serve(): Promise<void> {
+  commandWaitMs = 10_000;
   server = await startRouteTestServer(async (req, res) =>
-    (await handleSidecarRoute(req, res, ctx, broadcast, { registryFor: runningRegistry, brokerFor: () => broker }))
+    (await handleSidecarRoute(req, res, ctx, broadcast, {
+      registryFor: runningRegistry,
+      brokerFor: () => broker,
+      actionsFor: (c) => sidecarActions(c, broadcast, { commandWaitMs }),
+    }))
     || handleCommandsRoute(req, res, ctx, broadcast));
+}
+
+/** Resolves once the command job has spawned. */
+async function spawned(count = 1): Promise<void> {
+  await vi.waitFor(() => expect(finishSpawn).toHaveLength(count));
+}
+
+async function sidecarCommandStatus(): Promise<Record<string, unknown>> {
+  return (await fetch(`${server.baseUrl}/api/commands/sidecar-command/status`)).json() as Promise<Record<string, unknown>>;
 }
 
 describe("run_command", () => {
@@ -152,20 +170,90 @@ describe("run_command", () => {
     expect(spawnManagedMock).not.toHaveBeenCalled();
 
     expect((await decide(cardId, { decision: "approve" })).status).toBe(200);
-    const result = await call;
-    expect(result.isError).toBeFalsy();
-    expect(spawnedArgs()).toHaveLength(1);
+    await spawned();
     expect(spawnedArgs()[0].slice(-2)).toEqual(["status", "."]);
 
-    // The job tray reads the status route; Live reads commandJobsOf.
-    const status = await (await fetch(`${server.baseUrl}/api/commands/sidecar-command/status`)).json();
+    // While it runs, the job tray reads the status route; Live reads commandJobsOf.
+    const status = await sidecarCommandStatus();
     expect(status).toMatchObject({ running: true, command: "ndx status ." });
-    expect(resultText(result)).toContain(`approved card ${cardId}`);
-    expect(resultText(result)).toContain("`ndx status .`");
-    expect(resultText(result)).toContain(`job ${status.jobId}`);
     expect(commandJobsOf(workspaceKeyOf(ctx))).toEqual([
       expect.objectContaining({ kind: "sidecar-command", running: true, detail: "ndx status ." }),
     ]);
+
+    finishSpawn[0]({ exitCode: 0, stdout: "PRD: 3 of 5 tasks done\n", stderr: "" });
+    const result = await call;
+    expect(result.isError).toBeFalsy();
+    expect(resultText(result)).toBe(
+      `The operator approved card ${cardId}. \`ndx status .\` (job ${String(status.jobId)}) exited with code 0.\nOutput:\nPRD: 3 of 5 tasks done`,
+    );
+    await client.close();
+  });
+
+  it("returns a failed command's non-zero exit status and its output, stderr included", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "run_command", arguments: { argv: ["git", "show", "nope"] } });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
+    await spawned();
+    finishSpawn[0]({ exitCode: 128, stdout: "", stderr: "fatal: bad revision 'nope'\n" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/`git show nope` \(job sidecar-command-\w+\) exited with code 128\.\nOutput:\nfatal: bad revision 'nope'$/);
+    await client.close();
+  });
+
+  it("cuts long output to its last lines and says how much was cut", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "run_command", arguments: { argv: ["git", "log"] } });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
+    await spawned();
+    const lines = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`);
+    finishSpawn[0]({ exitCode: 0, stdout: lines.join("\n"), stderr: "" });
+    const text = resultText(await call);
+    const cutBytes = Buffer.byteLength(lines.slice(0, 120).join("\n")) + 1;
+    expect(text).toContain(`Output, cut to its end (120 lines, ${cutBytes} bytes cut before it):\nline 121\n`);
+    expect(text.endsWith("\nline 200")).toBe(true);
+    expect(text).not.toContain("line 120\n");
+    await client.close();
+  });
+
+  it("answers that a command still running at the bound carries on as its job", async () => {
+    commandWaitMs = 50;
+    const client = await brokerClient();
+    const call = client.callTool({ name: "run_command", arguments: { argv: ["ndx", "ci", "."] } });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
+    const result = await call;
+    const status = await sidecarCommandStatus();
+    expect(result.isError).toBeFalsy();
+    expect(resultText(result)).toMatch(new RegExp(`\`ndx ci \\.\` is still running as job ${String(status.jobId)}; output in the job tray and on Live\\.$`));
+    expect(status).toMatchObject({ running: true, command: "ndx ci ." });
+    expect(commandJobsOf(workspaceKeyOf(ctx))).toEqual([expect.objectContaining({ kind: "sidecar-command", running: true })]);
+    await client.close();
+  });
+
+  it("answers at once when the turn stops while the command runs, and leaves the job running", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "run_command", arguments: { argv: ["ndx", "ci", "."] } });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
+    await spawned();
+    broker.withdraw(SESSION, "The operator stopped the turn");
+    const result = await call;
+    expect(resultText(result)).toMatch(/`ndx ci \.` is still running as job sidecar-command-\w+; output in the job tray and on Live\.$/);
+    const child = spawnManagedMock.mock.results[0].value as { kill: ReturnType<typeof vi.fn> };
+    expect(child.kill).not.toHaveBeenCalled();
+    expect(await sidecarCommandStatus()).toMatchObject({ running: true });
+    await client.close();
+  });
+
+  it("says so when Stop in the job tray ends the command", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "run_command", arguments: { argv: ["ndx", "ci", "."] } });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
+    await spawned();
+    expect((await fetch(`${server.baseUrl}/api/commands/sidecar-command/stop`, { method: "POST" })).status).toBe(200);
+    finishSpawn[0]({ exitCode: null, stdout: "partial\n", stderr: "" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/was stopped from the job tray\.\nOutput:\npartial$/);
     await client.close();
   });
 
@@ -176,11 +264,12 @@ describe("run_command", () => {
       rules: [{ tool: "run_command", key: JSON.stringify(argv) }],
     }));
     const client = await brokerClient();
-    const result = await client.callTool({ name: "run_command", arguments: { argv } });
+    const call = client.callTool({ name: "run_command", arguments: { argv } });
+    await spawned();
     expect(broker.cards(SESSION)).toEqual([]);
-    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
     expect(spawnManagedMock.mock.calls[0].slice(0, 2)).toEqual(["git", ["log", "--oneline", "-5"]]);
-    expect(resultText(result)).toMatch(/^Allowed by the Sidecar allow-list\. Started `git log --oneline -5` as job sidecar-command-\w+/);
+    finishSpawn[0]({ exitCode: 0, stdout: "abc123 one\n", stderr: "" });
+    expect(resultText(await call)).toMatch(/^Allowed by the Sidecar allow-list\. `git log --oneline -5` \(job sidecar-command-\w+\) exited with code 0\./);
     await client.close();
   });
 
@@ -224,7 +313,9 @@ describe("run_command", () => {
     cardMessages = [];
     const next = client.callTool({ name: "run_command", arguments: { argv: ["git", "status"] } });
     await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
-    expect(resultText(await next)).toMatch(/Started `git status` as job/);
+    await spawned();
+    finishSpawn[0]({ exitCode: 0, stdout: "", stderr: "" });
+    expect(resultText(await next)).toMatch(/`git status` \(job sidecar-command-\w+\) exited with code 0\.\nIt printed nothing\.$/);
     await client.close();
   });
 
@@ -330,5 +421,30 @@ describe("tools carried out by a later batch", () => {
     expect(resultText(result)).toContain(`Recorded, not carried out yet: ${batch}`);
     expect(spawnManagedMock).not.toHaveBeenCalled();
     await client.close();
+  });
+});
+
+describe("outputTail", () => {
+  it("keeps output within the line and byte caps whole", () => {
+    expect(outputTail("a\nb\n\n")).toEqual({ text: "a\nb", cutLines: 0, cutBytes: 0 });
+    expect(outputTail("")).toEqual({ text: "", cutLines: 0, cutBytes: 0 });
+  });
+
+  it("cuts whole lines from the front to fit the byte cap", () => {
+    const line = "x".repeat(999);
+    const output = Array.from({ length: 20 }, () => line).join("\n");
+    const tail = outputTail(output);
+    expect(Buffer.byteLength(tail.text)).toBeLessThanOrEqual(SIDECAR_OUTPUT_MAX_BYTES);
+    expect(tail.text.split("\n")).toHaveLength(8);
+    expect(tail.cutLines).toBe(12);
+    expect(tail.cutBytes).toBe(Buffer.byteLength(output) - Buffer.byteLength(tail.text));
+  });
+
+  it("keeps the end of a last line longer than the byte cap", () => {
+    const output = `first\n${"é".repeat(SIDECAR_OUTPUT_MAX_BYTES)}`;
+    const tail = outputTail(output);
+    expect(Buffer.byteLength(tail.text)).toBeLessThanOrEqual(SIDECAR_OUTPUT_MAX_BYTES);
+    expect(tail.text).toMatch(/^é+$/);
+    expect(tail.cutBytes).toBe(Buffer.byteLength(output) - Buffer.byteLength(tail.text));
   });
 });

@@ -83,8 +83,14 @@ export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, 
         ? await actions.previewWork(String(input.taskId), workOptions(input))
         : undefined;
       const outcome = await broker.request(sessionId, name, input, extra.signal, preview);
-      const result = await carryOutDecision(name, input, outcome, actions);
-      return text(result.text, !result.ok);
+      // A stopped turn ends the wait on an effect (a command), never the effect itself.
+      const carrying = broker.carryOutSignal(sessionId, extra.signal);
+      try {
+        const result = await carryOutDecision(name, input, outcome, actions, carrying.signal);
+        return text(result.text, !result.ok);
+      } finally {
+        carrying.release();
+      }
     });
   }
 

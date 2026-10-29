@@ -53,6 +53,7 @@ import { readCliName } from "./cli-name.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { readAnalyzeProgress } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
+import type { SidecarCommandEnd } from "./sidecar/carry-out.js";
 
 const CMD_PREFIX = "/api/commands/";
 
@@ -1364,7 +1365,8 @@ export function startAsyncJob(
 
 /**
  * Spawn `bin` into an idle `job` and return its start time; `onSettled` runs
- * once the job has ended, with its status final. The caller has checked that
+ * once the job has ended, with its status final and the child's full result
+ * (absent when the child never produced one). The caller has checked that
  * the job is not running.
  */
 function launchAsyncJob<S extends AsyncJobStatus>(
@@ -1373,7 +1375,7 @@ function launchAsyncJob<S extends AsyncJobStatus>(
   cmdArgs: string[],
   ctx: ServerContext,
   timeout: number,
-  onSettled?: (status: S) => void,
+  onSettled?: (status: S, result?: SpawnToolResult) => void,
 ): string {
   const status = job.status;
   const startedAt = new Date().toISOString();
@@ -1390,7 +1392,7 @@ function launchAsyncJob<S extends AsyncJobStatus>(
   // is JSON.parse'd from it, and a payload larger than the display slice
   // would otherwise be truncated into a parse failure.
   let streamed = "";
-  const settle = (error: string | null) => {
+  const settle = (error: string | null, result?: SpawnToolResult) => {
     const wasStopped = job.stopRequested;
     status.running = false;
     status.finishedAt = new Date().toISOString();
@@ -1398,7 +1400,7 @@ function launchAsyncJob<S extends AsyncJobStatus>(
     status.error = wasStopped ? null : error;
     job.child = null;
     job.stopRequested = false;
-    onSettled?.(status);
+    onSettled?.(status, result);
   };
 
   // `spawn` throws synchronously on an argument it rejects (a NUL byte); the
@@ -1427,7 +1429,7 @@ function launchAsyncJob<S extends AsyncJobStatus>(
     } catch {
       status.report = null; // not JSON — `output` carries the text
     }
-    settle(managedChildError(result, timeout));
+    settle(managedChildError(result, timeout), result);
   }).catch((err: unknown) => {
     settle(errorMessage(err));
   });
@@ -1457,7 +1459,7 @@ const sidecarCommandJobs = new WorkspaceScoped<JobSlot<SidecarCommandStatus>>(()
 }));
 
 export type SidecarCommandStart =
-  | { started: true; jobId: string; command: string; startedAt: string }
+  | { started: true; jobId: string; command: string; startedAt: string; settled: Promise<SidecarCommandEnd> }
   | { started: false; reason: string };
 
 /**
@@ -1465,6 +1467,8 @@ export type SidecarCommandStart =
  * job, so it shows in the job tray and on Live with Stop like any dashboard
  * job. Only `ndx` (or the project's CLI name) and `git` run: argv, never a
  * shell. One at a time per workspace; a second while one runs is refused.
+ * `settled` resolves once the job ends, with its exit code and everything it
+ * printed, for the session's tool result.
  */
 export function startSidecarCommand(
   ctx: ServerContext,
@@ -1495,11 +1499,21 @@ export function startSidecarCommand(
   const jobId = `sidecar-command-${randomUUID().slice(0, 8)}`;
   job.status.jobId = jobId;
   job.status.command = command;
+  let ended!: (end: SidecarCommandEnd) => void;
+  const settled = new Promise<SidecarCommandEnd>((resolve) => { ended = resolve; });
   try {
-    const startedAt = launchAsyncJob(job, bin, args, ctx, timeout, (status) => {
+    const startedAt = launchAsyncJob(job, bin, args, ctx, timeout, (status, result) => {
       broadcast?.({ type: "commands:sidecar-command-finished", jobId, ok: !status.error, timestamp: status.finishedAt });
+      const stdout = (result?.stdout ?? "").trimEnd();
+      const stderr = (result?.stderr ?? "").trimEnd();
+      ended({
+        exitCode: result?.exitCode ?? null,
+        output: [stdout, stderr].filter(Boolean).join("\n"),
+        error: status.error,
+        stopped: status.stopped,
+      });
     });
-    return { started: true, jobId, command, startedAt };
+    return { started: true, jobId, command, startedAt, settled };
   } catch (err) {
     return { started: false, reason: `the command could not be started: ${errorMessage(err)}` };
   }

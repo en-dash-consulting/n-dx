@@ -55,7 +55,7 @@ import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/br
 import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
-import { renderWorkPreview, type SidecarActions } from "./sidecar/carry-out.js";
+import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { startSidecarCommand } from "./routes-commands.js";
 import { runSlotUsage, startTaskExecution } from "./routes-hench.js";
 import { resolveTaskRun } from "./routes-hench-prep.js";
@@ -183,20 +183,25 @@ export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions
 
 /**
  * The effects of an approved broker call in `ctx`'s workspace: a command
- * runs as the workspace's Sidecar command job (job tray, Live), work starts
- * through the hench execute route under `guard.maxConcurrentProcesses`, and
- * a work card's preview is the Prepare route's `ndx work --resolve`.
+ * runs as the workspace's Sidecar command job (job tray, Live) and the agent
+ * waits up to `commandWaitMs` for its output, work starts through the hench
+ * execute route under `guard.maxConcurrentProcesses`, and a work card's
+ * preview is the Prepare route's `ndx work --resolve`.
  */
-export function sidecarActions(ctx: ServerContext, broadcast: WebSocketBroadcaster): SidecarActions {
+export function sidecarActions(
+  ctx: ServerContext,
+  broadcast: WebSocketBroadcaster,
+  { commandWaitMs = SIDECAR_COMMAND_WAIT_MS }: { commandWaitMs?: number } = {},
+): SidecarActions {
   return {
     async previewWork(taskId, options) {
       const read = await resolveTaskRun(ctx, taskId, options);
       return read.ok ? renderWorkPreview(read.resolution) : `ndx work --resolve did not answer: ${read.failure}`;
     },
-    runCommand(argv) {
+    runCommand(argv, signal) {
       const started = startSidecarCommand(ctx, argv, broadcast);
       return started.started
-        ? { ok: true, text: `Started \`${started.command}\` as job ${started.jobId}; it shows in the dashboard's job tray and on Live.` }
+        ? awaitSidecarCommand(started, commandWaitMs, signal)
         : { ok: false, text: `Nothing ran: ${started.reason}.` };
     },
     async startWork(taskId, options) {

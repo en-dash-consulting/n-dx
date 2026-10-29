@@ -95,6 +95,8 @@ export class SidecarBroker {
   /** Every card raised since the server started, per session, oldest first. */
   private readonly sessionCards = new Map<string, SidecarCard[]>();
   private readonly pending = new Map<string, PendingCard>();
+  /** Per session, the decided calls still carrying out their effect; `withdraw` aborts them. */
+  private readonly carrying = new Map<string, Set<AbortController>>();
 
   constructor(opts: SidecarBrokerOptions) {
     this.dir = opts.dir;
@@ -181,8 +183,32 @@ export class SidecarBroker {
     return { ...card };
   }
 
-  /** Withdraw every pending card of a session; returns how many. */
+  /**
+   * The signal a decided call carries out its effect under: it aborts when
+   * `signal` does or when the session is withdrawn (the turn stopped or
+   * ended). Call `release` once the effect has answered.
+   */
+  carryOutSignal(sessionId: string, signal?: AbortSignal): { signal: AbortSignal; release: () => void } {
+    const controller = new AbortController();
+    const calls = this.carrying.get(sessionId) ?? new Set<AbortController>();
+    calls.add(controller);
+    this.carrying.set(sessionId, calls);
+    const onAbort = (): void => controller.abort();
+    if (signal?.aborted) controller.abort();
+    else signal?.addEventListener("abort", onAbort, { once: true });
+    return {
+      signal: controller.signal,
+      release: () => {
+        signal?.removeEventListener("abort", onAbort);
+        calls.delete(controller);
+        if (calls.size === 0) this.carrying.delete(sessionId);
+      },
+    };
+  }
+
+  /** Withdraw every pending card of a session and abort its calls still carrying out; returns how many cards. */
   withdraw(sessionId: string, reason: string): number {
+    for (const controller of this.carrying.get(sessionId) ?? []) controller.abort();
     let count = 0;
     for (const { card } of [...this.pending.values()]) {
       if (card.sessionId !== sessionId) continue;
