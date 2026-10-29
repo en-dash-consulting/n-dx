@@ -10,6 +10,7 @@ import { initConfig } from "../../../src/store/config.js";
 import { fillFailureReason, recordRunDiagnosis } from "../../../src/agent/lifecycle/run-diagnosis.js";
 import { cmdRuns } from "../../../src/cli/commands/runs.js";
 import { CLIError } from "../../../src/cli/errors.js";
+import { formatTaskBrief } from "../../../src/agent/planning/brief.js";
 
 /**
  * The file side of the run classifier: what the run-end path stores, the
@@ -33,14 +34,30 @@ function makeRun(over: Partial<RunRecord> = {}): RunRecord {
   };
 }
 
-/** A store double holding one item; records every update. */
+/** A store double holding one item; records and applies every update. */
 function fakeStore(item: { id: string; failureReason?: string } | null) {
   const updates: Array<{ id: string; updates: Record<string, unknown> }> = [];
   const store = {
     getItem: vi.fn(async (id: string) => (item && item.id === id ? { ...item, title: "t", status: "pending", level: "task" } : null)),
-    updateItem: vi.fn(async (id: string, u: Record<string, unknown>) => { updates.push({ id, updates: u }); }),
+    updateItem: vi.fn(async (id: string, u: Record<string, unknown>) => {
+      updates.push({ id, updates: u });
+      if (item && item.id === id) Object.assign(item, u);
+    }),
   } as unknown as PRDStore;
-  return { store, updates };
+  return { store, updates, item };
+}
+
+/** A run that failed its test gate on a file it edited (test-gate-new). */
+async function testGateRun(henchDir: string, over: Partial<RunRecord> = {}): Promise<RunRecord> {
+  const id = over.id ?? "run-001";
+  const eventsPath = join(henchDir, "runs", `${id}.events.jsonl`);
+  await writeFile(eventsPath, JSON.stringify({ kind: "file_edited", at: "t", summary: "Edited", detail: "src/widget.ts" }));
+  return makeRun({
+    status: "failed",
+    eventsPath,
+    testGate: { ran: true, passed: false, packages: [], failureDigest: "FAIL src/widget.ts > x" },
+    ...over,
+  });
 }
 
 describe("run diagnosis — run end", () => {
@@ -126,6 +143,49 @@ describe("run diagnosis — run end", () => {
     await recordRunDiagnosis({ projectDir, henchDir,run: makeRun(), store });
     expect(updates).toEqual([]);
     expect(await fillFailureReason(store, "task-42", "x")).toBe(false);
+  });
+
+  it("the next failed run's verdict replaces a verdict an earlier run wrote, and the brief carries it", async () => {
+    const { store, item } = fakeStore({ id: "task-42" });
+
+    const first = makeRun({ id: "run-000", startedAt: "2026-10-28T09:00:00.000Z", status: "error_transient" });
+    const vendor = await recordRunDiagnosis({ projectDir, henchDir, run: first, store });
+    expect(vendor?.class).toBe("vendor-transient");
+    await saveRun(henchDir, first);
+    expect(item!.failureReason).toBe(vendor!.summary);
+
+    const second = await testGateRun(henchDir);
+    const gate = await recordRunDiagnosis({ projectDir, henchDir, run: second, store });
+    expect(gate?.class).toBe("test-gate-new");
+    expect(item!.failureReason).toBe(gate!.summary);
+
+    const brief = formatTaskBrief({
+      task: { id: "task-42", title: "t", level: "task", status: "pending", failureReason: item!.failureReason },
+      parentChain: [], siblings: [], requirements: [], project: { name: "p" }, workflow: "", recentLog: [],
+    });
+    expect(brief).toContain(gate!.summary);
+    expect(brief).not.toContain(vendor!.summary);
+  });
+
+  it("a reason a person or the agent wrote after an earlier verdict is never overwritten", async () => {
+    const earlier = makeRun({ id: "run-000", startedAt: "2026-10-28T09:00:00.000Z", status: "error_transient" });
+    await recordRunDiagnosis({ projectDir, henchDir, run: earlier });
+    await saveRun(henchDir, earlier);
+
+    const { store, updates, item } = fakeStore({ id: "task-42", failureReason: "Agent: the fixture is stale" });
+    await recordRunDiagnosis({ projectDir, henchDir, run: await testGateRun(henchDir), store });
+    expect(updates).toEqual([]);
+    expect(item!.failureReason).toBe("Agent: the fixture is stale");
+  });
+
+  it("a verdict another task's run wrote is not this task's to replace", async () => {
+    const other = makeRun({ id: "run-000", taskId: "task-7", startedAt: "2026-10-28T09:00:00.000Z", status: "error_transient" });
+    const verdict = await recordRunDiagnosis({ projectDir, henchDir, run: other });
+    await saveRun(henchDir, other);
+
+    const { store, updates } = fakeStore({ id: "task-42", failureReason: verdict!.summary });
+    await recordRunDiagnosis({ projectDir, henchDir, run: await testGateRun(henchDir), store });
+    expect(updates).toEqual([]);
   });
 });
 

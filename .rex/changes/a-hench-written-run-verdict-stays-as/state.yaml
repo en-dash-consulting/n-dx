@@ -1,8 +1,22 @@
 schema: "rex/v2"
 items:
   "112f9a0f-f3f3-4024-86f8-aa01ebaba3a1":
-    lastModified: "2026-10-28T23:55:13.368Z"
+    status: "completed"
+    startedAt: "2026-10-29T00:00:31.334Z"
+    completedAt: "2026-10-29T00:04:22.214Z"
+    endedAt: "2026-10-29T00:04:22.214Z"
+    activeIntervals: [{"end":"2026-10-29T00:04:22.214Z","start":"2026-10-29T00:00:31.334Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "fillFailureReason replaces failureReason only when it is empty or equals another run of the task's diagnosis.summary; recordRunDiagnosis loads runs once for both attempt counting and that set."
+    lastModified: "2026-10-29T00:04:22.214Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "85f347e4-607d-4e9f-97e0-1841d54088ba":
-    lastModified: "2026-10-28T23:55:13.368Z"
+    status: "completed"
+    startedAt: "2026-10-29T00:04:22.214Z"
+    completedAt: "2026-10-29T00:04:22.214Z"
+    endedAt: "2026-10-29T00:04:22.214Z"
+    activeIntervals: [{"end":"2026-10-29T00:04:22.214Z","start":"2026-10-29T00:04:22.214Z"}]
+    appliedAt: "2026-10-29T00:04:22.214Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-29T00:04:22.214Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

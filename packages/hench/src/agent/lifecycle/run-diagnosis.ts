@@ -64,21 +64,41 @@ export async function diagnoseRun(
 }
 
 /**
- * Write the verdict's summary as the task's failureReason, unless it already
- * has one: a reason a person or the agent wrote outranks a rule's.
- * Returns whether it wrote.
+ * Write the verdict's summary as the task's failureReason when it has none,
+ * or when its current value is a summary hench wrote for another run of the
+ * task (`henchSummaries`). Any other value was written by a person or the
+ * agent and outranks a rule's. Returns whether it wrote.
  */
-export async function fillFailureReason(store: PRDStore, taskId: string, summary: string): Promise<boolean> {
+export async function fillFailureReason(
+  store: PRDStore,
+  taskId: string,
+  summary: string,
+  henchSummaries: ReadonlySet<string> = new Set(),
+): Promise<boolean> {
   const item = await store.getItem(taskId);
-  if (!item || item.failureReason) return false;
+  if (!item) return false;
+  const current = item.failureReason;
+  if (current === summary) return false;
+  if (current && !henchSummaries.has(current)) return false;
   await store.updateItem(taskId, { failureReason: summary }, { preserveModifiedBy: true });
   return true;
 }
 
+/** Verdict summaries hench stored on the task's other runs. */
+export function earlierVerdictSummaries(run: RunRecord, runs: readonly RunRecord[]): Set<string> {
+  const summaries = new Set<string>();
+  for (const r of runs) {
+    if (r.id === run.id || r.taskId !== run.taskId) continue;
+    if (r.diagnosis?.summary) summaries.add(r.diagnosis.summary);
+  }
+  return summaries;
+}
+
 /**
  * Run-end: classify a run that ended in any status other than completed,
- * store the verdict on the record as `diagnosis`, and fill the task's
- * failureReason when it has none. The caller saves the record.
+ * store the verdict on the record as `diagnosis`, and write its summary as
+ * the task's failureReason unless a person or the agent wrote the current
+ * one. The caller saves the record.
  */
 export async function recordRunDiagnosis(opts: {
   projectDir: string;
@@ -91,8 +111,11 @@ export async function recordRunDiagnosis(opts: {
     delete run.diagnosis;
     return undefined;
   }
-  const diagnosis = await diagnoseRun(projectDir, henchDir, run);
+  const runs = await listRuns(henchDir);
+  const diagnosis = await diagnoseRun(projectDir, henchDir, run, runs);
   run.diagnosis = diagnosis;
-  if (store && run.taskId) await fillFailureReason(store, run.taskId, diagnosis.summary);
+  if (store && run.taskId) {
+    await fillFailureReason(store, run.taskId, diagnosis.summary, earlierVerdictSummaries(run, runs));
+  }
   return diagnosis;
 }

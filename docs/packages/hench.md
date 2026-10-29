@@ -243,6 +243,8 @@ with no model call. `hench runs diagnose <run-id> [--format=json]` prints it.
 
 `attempt` counts the task's finished runs that did not complete, capped at 2. On
 the second attempt the verdict drops every re-run action and leads with a
-follow-up fix or a split. When the task has no `failureReason`, the verdict's
-summary is written there; an existing reason is kept. The dashboard shows the
+follow-up fix or a split. The verdict's summary is written as the task's
+`failureReason` when it has none, or when its current one is an earlier run's
+verdict, so the next brief names the latest cause. A reason a person or the
+agent wrote is kept. The dashboard shows the
 verdict on the task page behind the `hench.runVerdict` toggle.
