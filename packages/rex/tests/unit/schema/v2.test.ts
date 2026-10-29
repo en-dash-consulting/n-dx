@@ -479,7 +479,10 @@ describe("isolation", () => {
     // (core/change-next-task.ts), and v2 completion and apply-on-complete
     // behind update_task_status and `rex update --status`
     // (cli/v2-completion.ts), and the v1 deprecation notice, which reads the
-    // product folder name (cli/legacy-layout-notice.ts).
+    // product folder name (cli/legacy-layout-notice.ts), and the v2 post-merge
+    // scan behind `rex validate --post-merge`, which reads raw state.yaml rows
+    // and node files so it can see a merge residue the store would reject
+    // (core/post-merge-validate-v2.ts).
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -554,6 +557,7 @@ describe("isolation", () => {
         "core/change-next-task.ts",
         "cli/v2-completion.ts",
         "cli/legacy-layout-notice.ts",
+        "core/post-merge-validate-v2.ts",
         "analyze/place-draft.ts",
       ].map(
         (f) => join(srcRoot, f),
