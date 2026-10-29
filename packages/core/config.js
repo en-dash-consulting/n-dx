@@ -3371,6 +3371,12 @@ async function handleSetPackageConfig(
  * stay the repository's credential routing and keep the checkout untrusted.
  */
 async function setPackageSettingLocally(dir, pkg, settingPath, keyArg, coerced, rawConfigs) {
+  // Only the settings PACKAGE_LOCAL_ONLY_VALUES lists come here. Requiring both
+  // keys to be its own properties keeps `local[pkg]`, `rawConfigs[pkg]` and the
+  // delete below off Object.prototype, as splitSettingPath does for paths.
+  if (!Object.hasOwn(PACKAGE_LOCAL_ONLY_VALUES, pkg) || !Object.hasOwn(PACKAGE_LOCAL_ONLY_VALUES[pkg], settingPath)) {
+    throw new Error(`"${keyArg}" is not a machine-local package setting.`);
+  }
   const localPath = projectConfigPath(dir, LOCAL_CONFIG_FILE);
   const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
   if (!local[pkg] || typeof local[pkg] !== "object") local[pkg] = {};
