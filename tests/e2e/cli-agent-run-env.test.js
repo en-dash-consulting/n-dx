@@ -115,9 +115,12 @@ describe("agent run environment", () => {
     seedTask("fix it");
     const reviewer = await writeFailingReviewer();
     // Primary is claude, so the reviewer is codex; one round means one remediation pass.
+    await writeFile(join(dir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }) + "\n");
+    // cli_path is machine-local: a shared .n-dx.json value applies only once the
+    // repository is trusted, so the double goes where `ndx config` writes it.
     await writeFile(
-      join(dir, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "claude", codex: { cli_path: reviewer } } }) + "\n",
+      join(dir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { codex: { cli_path: reviewer } } }) + "\n",
     );
     const henchConfig = join(dir, ".hench", "config.json");
     await writeFile(

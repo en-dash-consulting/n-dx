@@ -1,0 +1,88 @@
+schema: "rex/v2"
+items:
+  "02f8c4c2-20f3-462e-a061-5fd05b50f9d1":
+    status: "completed"
+    startedAt: "2026-10-28T21:22:01.340Z"
+    completedAt: "2026-10-28T21:22:01.340Z"
+    endedAt: "2026-10-28T21:22:01.340Z"
+    activeIntervals: [{"end":"2026-10-28T21:22:01.340Z","start":"2026-10-28T21:22:01.340Z"}]
+    appliedAt: "2026-10-28T21:22:01.340Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T21:22:01.340Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0a3bfa7b-3b67-4500-b0a1-0602445f46fc":
+    status: "completed"
+    startedAt: "2026-10-28T20:35:54.922Z"
+    completedAt: "2026-10-28T20:41:52.992Z"
+    endedAt: "2026-10-28T20:41:52.992Z"
+    activeIntervals: [{"end":"2026-10-28T20:41:52.992Z","start":"2026-10-28T20:35:54.922Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "npx fallback runs in <ndx home>/graview/npx (own package.json) instead of the project root; integration test with a planted node_modules/graview fails before, passes after."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T20:41:52.992Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "22fb3f27-2ae8-43b2-928e-649f1da131d0":
+    status: "completed"
+    startedAt: "2026-10-28T20:42:31.480Z"
+    completedAt: "2026-10-28T20:52:31.042Z"
+    endedAt: "2026-10-28T20:52:31.042Z"
+    activeIntervals: [{"end":"2026-10-28T20:52:31.042Z","start":"2026-10-28T20:42:31.480Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench.apiKeyEnv (non-default) is credential routing: listed by the trust review, in the digest, dropped by applyRepoTrust while restricted; local untracked value still applies."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T20:52:31.042Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3e9eafaa-ceae-4a1c-a5a3-9dd121698c14":
+    status: "completed"
+    startedAt: "2026-10-28T15:17:53.856Z"
+    completedAt: "2026-10-28T15:38:44.319Z"
+    endedAt: "2026-10-28T15:38:44.319Z"
+    activeIntervals: [{"end":"2026-10-28T15:38:44.319Z","start":"2026-10-28T15:17:53.856Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client's local-config tracked check asks git case-insensitively about the file, every symlinked directory on its path, and its in-checkout real path; core's duplicate removed, readConfiguredClaudePath asks via hench trust status --format=json (fails closed)."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T15:38:44.319Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "47654649-c6f7-4277-a156-d5d606f9ed2c":
+    status: "completed"
+    startedAt: "2026-10-28T20:53:21.287Z"
+    completedAt: "2026-10-28T21:01:35.115Z"
+    endedAt: "2026-10-28T21:01:35.115Z"
+    activeIntervals: [{"end":"2026-10-28T21:01:35.115Z","start":"2026-10-28T20:53:21.287Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "local-config-tracked finding and report advice name the index paths git matched (case variant; symlink + target) instead of the path n-dx opens"
+    lastModified: "2026-10-28T21:01:35.115Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ac6b536a-c462-40a2-b5c1-bd2d425ab8a9":
+    status: "completed"
+    startedAt: "2026-10-28T21:02:40.731Z"
+    completedAt: "2026-10-28T21:22:01.340Z"
+    endedAt: "2026-10-28T21:22:01.340Z"
+    activeIntervals: [{"end":"2026-10-28T21:22:01.340Z","start":"2026-10-28T21:02:40.731Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hench.apiKeyEnv is written to .n-dx.local.json by all three writers. core: LOCAL_ONLY_SETTINGS.hench routes handleSetPackageConfig. hench config and the dashboard PUT use llm-client's new HENCH_LOCAL_ONLY_SETTINGS / writeHenchLocalSetting. Each writer keeps ANTHROPIC_API_KEY in .hench/config.json and removes a shared .n-dx.json copy. A test per writer checks evaluateRepoTrust stays at baseline."
+    lastModified: "2026-10-28T21:22:01.340Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c4333256-6e2d-4c9f-aeaa-6a772e17fb88":
+    status: "completed"
+    startedAt: "2026-10-28T18:33:16.324Z"
+    completedAt: "2026-10-28T18:49:24.596Z"
+    endedAt: "2026-10-28T18:49:24.596Z"
+    activeIntervals: [{"end":"2026-10-28T18:49:24.596Z","start":"2026-10-28T18:33:16.324Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runVendorAuthPreflight and testCliPath (core config.js) pass loadVendorCliEnv(dir, vendor); web llm-catalog probeCli passes resolveVendorCliEnv({...config, vendor}). Sentinel tests in tests/e2e/cli-auth.test.js and web routes-llm-catalog.test.ts failed before the fix."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T18:49:24.596Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cd98987d-aaed-4775-b013-f8146d569837":
+    status: "completed"
+    startedAt: "2026-10-28T20:30:10.412Z"
+    completedAt: "2026-10-28T20:35:26.338Z"
+    endedAt: "2026-10-28T20:35:26.338Z"
+    activeIntervals: [{"end":"2026-10-28T20:35:26.338Z","start":"2026-10-28T20:30:10.412Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ci.js passes loadShellTestEnv(dir).env to the pnpm docs:build spawn; inventory row, allowlist reason, changeset updated; regression test tests/integration/ci-docs-build-env.test.js fails before the fix."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T20:35:26.338Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

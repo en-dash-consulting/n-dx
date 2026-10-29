@@ -18,6 +18,15 @@
   "bin": {
     "ndx-graview-face": "./bin/serve.js"
   },
+  "ndx": {
+    "extension": {
+      "apiVersion": 1,
+      "name": "graview-face",
+      "displayName": "n-dx on Graview",
+      "ndxVersion": ">=0.10.0",
+      "sidecar": { "bin": "bin/serve.js" }
+    }
+  },
   "files": [
     "bin",
     "dev",

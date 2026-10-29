@@ -66,6 +66,9 @@ import {
   resolveLayout,
   getAvailableMemory,
   readAvailableMemory,
+  HENCH_LOCAL_ONLY_SETTINGS,
+  isHenchLocalOnlySetting,
+  writeHenchLocalSetting,
   type ManagedChild,
   type AvailableMemoryReading,
   type MemoryPressure,
@@ -298,6 +301,28 @@ export function loadHenchConfig(projectDir: string): Record<string, unknown> | n
   } catch {
     return null;
   }
+}
+
+/**
+ * The `HENCH_LOCAL_ONLY_SETTINGS` keys the user set in `.n-dx.local.json`.
+ * The settings page writes them there (see {@link handleConfigUpdate}), so it
+ * must read them back from there too.
+ */
+function localHenchSettings(projectDir: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(resolveLayout(projectDir).localConfigFile, "utf-8"));
+  } catch {
+    // Absent or unreadable: the user set nothing locally.
+    return {};
+  }
+  const hench = parsed && typeof parsed === "object" ? (parsed as { hench?: unknown }).hench : undefined;
+  if (!hench || typeof hench !== "object" || Array.isArray(hench)) return {};
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(hench)) {
+    if (isHenchLocalOnlySetting(key)) out[key] = value;
+  }
+  return out;
 }
 
 /** Read a single run file, returning the full parsed JSON or null on error. */
@@ -895,11 +920,12 @@ function routeConfig(rc: RouteContext): boolean | Promise<boolean> | null {
   if (!rc.path.startsWith("config")) return null;
 
   if (rc.path === "config" && rc.method === "GET") {
-    const config = loadHenchConfig(rc.ctx.projectDir);
-    if (!config) {
+    const fileConfig = loadHenchConfig(rc.ctx.projectDir);
+    if (!fileConfig) {
       errorResponse(rc.res, 404, "Hench configuration not found. Run 'hench init' first.");
       return true;
     }
+    const config = { ...fileConfig, ...localHenchSettings(rc.ctx.projectDir) };
 
     const fields = CONFIG_FIELD_META.map((field) => {
       const value = getNestedValue(config, field.path);
@@ -1034,6 +1060,12 @@ async function handleConfigUpdate(
   // Validate and apply each change
   const errors: string[] = [];
   const applied: Array<{ path: string; oldValue: unknown; newValue: unknown; impact: string }> = [];
+  // `HENCH_LOCAL_ONLY_SETTINGS` keys go to .n-dx.local.json: the trust review
+  // reads them from .hench/config.json as the repository's credential
+  // routing, so the user's choice written there would be ignored until the
+  // checkout is trusted. The hench file keeps the neutral value.
+  const localBefore = localHenchSettings(ctx.projectDir);
+  const localChanges: Record<string, unknown> = {};
 
   for (const [fieldPath, newValue] of Object.entries(changes)) {
     const field = CONFIG_FIELD_META.find((f) => f.path === fieldPath);
@@ -1056,8 +1088,17 @@ async function handleConfigUpdate(
       }
     }
 
-    const oldValue = getNestedValue(current, fieldPath);
-    setNestedValue(current, fieldPath, newValue);
+    const oldValue = localBefore[fieldPath] ?? getNestedValue(current, fieldPath);
+    if (isHenchLocalOnlySetting(fieldPath)) {
+      localChanges[fieldPath] = newValue;
+      // Local-only keys are top-level; an `undefined` neutral (optional
+      // claudePath) leaves the key out of .hench/config.json.
+      const neutral = HENCH_LOCAL_ONLY_SETTINGS[fieldPath];
+      if (neutral === undefined) delete current[fieldPath];
+      else current[fieldPath] = neutral;
+    } else {
+      setNestedValue(current, fieldPath, newValue);
+    }
     applied.push({
       path: fieldPath,
       oldValue,
@@ -1087,8 +1128,13 @@ async function handleConfigUpdate(
     return true;
   }
 
-  // Write back
+  // Write back. The local file first: it refuses an unparseable file, and
+  // the hench file must not lose its value to the neutral one when the value
+  // never reached the local file.
   try {
+    for (const [key, value] of Object.entries(localChanges)) {
+      writeHenchLocalSetting(ctx.projectDir, key, value);
+    }
     writeFileSync(configPath, JSON.stringify(current, null, 2) + "\n", "utf-8");
   } catch (err) {
     errorResponse(res, 500, `Failed to write config: ${errorMessage(err)}`);
@@ -1097,10 +1143,10 @@ async function handleConfigUpdate(
 
   // Fail-forward commits the change; a no-op when the mode is off. The
   // pre-run menu writes this same file through this same handler, so both
-  // surfaces commit by one path.
+  // surfaces commit by one path. The local file is the user's and git-ignored.
   await commitSettingsChange(ctx.projectDir, configPath, "hench");
 
-  jsonResponse(res, 200, { applied, config: current });
+  jsonResponse(res, 200, { applied, config: { ...current, ...localBefore, ...localChanges } });
   return true;
 }
 
@@ -1337,11 +1383,18 @@ async function handleTemplateCreate(
     return true;
   }
 
-  const overlay = (body.config as Record<string, unknown>) || {};
-  if (!overlay || typeof overlay !== "object" || Array.isArray(overlay)) {
+  const rawOverlay = (body.config as Record<string, unknown>) || {};
+  if (!rawOverlay || typeof rawOverlay !== "object" || Array.isArray(rawOverlay)) {
     errorResponse(res, 400, "Template config must be an object");
     return true;
   }
+  // The settings page saves the GET config as the overlay, and that carries
+  // the user's `HENCH_LOCAL_ONLY_SETTINGS` from .n-dx.local.json. Applying the
+  // template would write them into .hench/config.json, where the trust review
+  // reads them as the repository's and the checkout turns untrusted.
+  const overlay = Object.fromEntries(
+    Object.entries(rawOverlay).filter(([key]) => !isHenchLocalOnlySetting(key)),
+  );
   const overlayProblem = validateTemplateOverlay(overlay);
   if (overlayProblem) {
     errorResponse(res, 400, overlayProblem);

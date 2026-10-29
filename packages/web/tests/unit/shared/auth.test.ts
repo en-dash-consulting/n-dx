@@ -4,6 +4,7 @@ import {
   isAuthenticated,
   parseCookieValue,
   presentedToken,
+  removeTokenParam,
   splitTokenQuery,
   tokensEqual,
   urlWithToken,
@@ -70,6 +71,23 @@ describe("splitTokenQuery", () => {
     // The other query parameters survive on the root, as they do on a real path.
     expect(splitTokenQuery(`//evil.com/?x=1&ndx_token=${T}`)).toEqual({ token: T, location: "/?x=1" });
     expect(splitTokenQuery(`/p/app/?ndx_token=${T}`)).toEqual({ token: T, location: "/p/app/" });
+  });
+
+  it("keeps every other query segment byte for byte", () => {
+    const rest = "a=%20b&c&path=/a/b~c&cb=%E9&d=x+y";
+    expect(splitTokenQuery(`/prd?${rest}&ndx_token=${T}`)).toEqual({ token: T, location: `/prd?${rest}` });
+  });
+});
+
+describe("removeTokenParam", () => {
+  it("returns the first token, decoded, and the other segments unchanged", () => {
+    expect(removeTokenParam(`a=%20b&ndx_token=${T}&c&cb=%E9`)).toEqual({ token: T, rest: "a=%20b&c&cb=%E9" });
+    expect(removeTokenParam("ndx_token=a%2Bb&ndx%5Ftoken=second")).toEqual({ token: "a+b", rest: "" });
+  });
+
+  it("returns the query unchanged when there is no token", () => {
+    expect(removeTokenParam("a=%20b&&c")).toEqual({ token: null, rest: "a=%20b&&c" });
+    expect(removeTokenParam("")).toEqual({ token: null, rest: "" });
   });
 });
 

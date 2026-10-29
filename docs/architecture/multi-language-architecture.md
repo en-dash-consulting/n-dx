@@ -162,14 +162,18 @@ Archetypes without language-scoped signals (utility, middleware, model, service,
 
 ## Hench Guard Templates
 
-Hench's security guard uses language-specific defaults for allowed commands and blocked paths:
+Hench's security guard uses language-specific allowed commands. Blocked paths are the same for every language — n-dx state, `.git/**`, credential files, and every ecosystem's dependency directories — because the language is detected from marker files the repository ships, and a marker must not loosen what an untrusted checkout is kept out of:
 
 | Setting | TypeScript/JS | Go |
 |---------|--------------|-----|
 | Allowed commands | `npm`, `npx`, `node`, `git`, `tsc`, `vitest` | `go`, `make`, `git`, `golangci-lint` |
-| Blocked paths | `.hench/**`, `.rex/**`, `.git/**`, `node_modules/**` | `.hench/**`, `.rex/**`, `.git/**`, `vendor/**` |
+| Blocked paths | `.hench/**`, `.rex/**`, `.ndx/**`, `.git/**`, `**/node_modules/**`, `**/vendor/**`, `**/.build/**`, `**/DerivedData/**`, `**/Pods/**`, `**/Carthage/**`, credential files | same |
+
+Dependency directories are blocked at any depth: the guard anchors a pattern at the project root, and a workspace package's or a polyglot frontend's `node_modules/` runs at the next install as the root's does.
 
 The `guardDefaultsForLanguage(language)` function returns the appropriate template. The resolved language from `manifest.language` drives the selection.
+
+The trust assessment (`ndx trust .`) asks only for the detected language's own dependency directories: a repository guard that drops one — `node_modules/**` in a JS/TS checkout, `vendor/**` in Go, the Swift set in Swift — raises a `dependency-paths-removed` warning and needs `ndx trust accept .`, so hench clamps it until then. A guard that drops another ecosystem's directory raises nothing, because older `ndx init` defaults never listed them. Either spelling counts as listed — the root-anchored `node_modules/**` older defaults wrote, or `**/node_modules/**` — because the clamp adds the any-depth form whenever the checkout is restricted.
 
 ---
 

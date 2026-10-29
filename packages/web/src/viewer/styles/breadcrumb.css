@@ -33,6 +33,33 @@
   align-self: flex-start;
 }
 
+/* Extension project links (components/extension-links.ts) */
+.project-context-links {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-sm);
+  white-space: nowrap;
+}
+
+.project-context-link {
+  color: var(--accent);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-context-link:hover,
+.project-context-link:focus-visible {
+  text-decoration: underline;
+}
+
+.project-context-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* Project name — prominent styling */
 .breadcrumb-project {
   font-weight: var(--weight-semibold);
