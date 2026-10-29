@@ -11,6 +11,7 @@ import { join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadPrdModel } from "../../../src/server/rex-gateway.js";
+import { checkRunOptions } from "../../../src/shared/index.js";
 import { prepareReads, sidecarContextOptions } from "../../../src/server/routes-sidecar.js";
 import { buildDescribePacket } from "../../../src/server/sidecar/packet-builders.js";
 import { createPacketSources, type SpawnedReads } from "../../../src/server/sidecar/packet-sources.js";
@@ -212,6 +213,25 @@ describe("createPacketSources taskRun", () => {
     // A configured model is the project's to resolve again; a run with no review plan had no review.
     const configured = await createPacketSources(seed({ status: "failed", model: "sonnet", modelSource: "hench.models.claude" }), spawned).taskRun(TASK);
     expect(configured?.settings).toEqual({});
+  });
+
+  it("repeats a pair review as pair with its vendor, never the other vendor's model", async () => {
+    const pair = await createPacketSources(
+      seed({ status: "failed", reviewPlan: { mode: "pair", vendor: "codex", model: "gpt-5.5", modelSource: "vendor-default", optional: false } }),
+      spawned,
+    ).taskRun(TASK);
+    expect(pair?.settings).toEqual({ review: true, reviewMode: "pair", reviewVendor: "codex" });
+    expect(checkRunOptions(pair?.settings)).toMatchObject({ ok: true });
+  });
+
+  it("redacts the spawned verdict, whose evidence quotes the run's error", async () => {
+    const leaky = createPacketSources(seed({ status: "failed" }), {
+      ...spawned,
+      diagnose: async () => ({ ...diagnosis, evidence: [`error: auth failed for ${SECRET}`] }),
+    });
+    const read = await leaky.diagnose("newest");
+    expect(read?.evidence.join("\n")).not.toContain(SECRET);
+    expect(read?.class).toBe("review-blocked");
   });
 
   it("reads null when no run of the task is recorded", async () => {

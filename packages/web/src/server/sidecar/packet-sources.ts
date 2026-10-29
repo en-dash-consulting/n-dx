@@ -175,19 +175,37 @@ export interface RunSettingsRead {
   model?: string;
   /** The run had a review pass. */
   review?: true;
+  /** A pair review: the other vendor reviewed. */
+  reviewMode?: "pair";
+  reviewVendor?: string;
+  /** The self reviewer's model. */
   reviewModel?: string;
 }
 
-/** The run's {@link RunSettingsRead}, from `modelSource` and `reviewPlan`. */
+/**
+ * The run's {@link RunSettingsRead}, from `modelSource` and `reviewPlan`.
+ *
+ * A pair review repeats as pair with its vendor, not its model: the launch
+ * checks `reviewModel` against the active vendor's catalog, so the other
+ * vendor's model would refuse the card, and without `reviewMode` it would
+ * run as a self review.
+ */
 export function readRunSettings(run: Record<string, unknown>): RunSettingsRead {
   const settings: RunSettingsRead = {};
   const model = str(run.model);
   if (model && run.modelSource === "cli-flag") settings.model = model;
   const plan = run.reviewPlan;
   if (plan && typeof plan === "object") {
+    const p = plan as Record<string, unknown>;
     settings.review = true;
-    const reviewModel = str((plan as Record<string, unknown>).model);
-    if (reviewModel) settings.reviewModel = reviewModel;
+    if (p.mode === "pair") {
+      settings.reviewMode = "pair";
+      const vendor = str(p.vendor);
+      if (vendor) settings.reviewVendor = vendor;
+    } else {
+      const reviewModel = str(p.model);
+      if (reviewModel) settings.reviewModel = reviewModel;
+    }
   }
   return settings;
 }
@@ -485,7 +503,8 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
 
     resolve: (taskId, signal) => spawned.resolve(taskId, signal),
     preview: (taskId, signal) => spawned.preview(taskId, signal),
-    diagnose: (runId, signal) => spawned.diagnose(runId, signal),
+    // The classifier's evidence quotes the run's error, and this text goes to the vendor.
+    diagnose: async (runId, signal) => redactDeep(await spawned.diagnose(runId, signal)),
 
     async runs(taskId) {
       return taskRunRecords(join(layout.henchDir, "runs"), taskId).map(({ record }) => ({

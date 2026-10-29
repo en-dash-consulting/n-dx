@@ -70,8 +70,11 @@ newest run has ended without completing, the verdict comes from
 spawns) and named as the section's provenance. A failed or timed-out spawn
 leaves a gap naming the command; a running or completed run is never
 classified. The verdict section also lists the failed run's settings (`model`
-when a flag chose it, `review` and `reviewModel` when it had a review plan) for
-the model to pass to `start_work` on a re-run or `--fresh`.
+when a flag chose it, `review` and `reviewModel` when it had a review plan; a
+pair review repeats as `reviewMode: "pair"` with its `reviewVendor`) for the
+model to pass to `start_work` on a re-run or `--fresh`. The spawned verdict
+passes through `redactDeep` like the recorded one: its evidence quotes the
+run's error.
 
 ## HTTP-request concurrency
 
