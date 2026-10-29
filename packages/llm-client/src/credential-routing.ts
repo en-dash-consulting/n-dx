@@ -22,10 +22,11 @@
  * is credential routing too. It lives in hench's config rather than the LLM
  * loaders', so the review lists it and hench's `applyRepoTrust` drops it.
  *
- * The vendor CLI binary (`*.cli_path`), the graview binary (`graview.bin`)
- * and the graview product face (`graview.app`) follow the same rule: a
- * repository that chose one would run its own script with the user's
- * environment.
+ * The vendor CLI binary (`*.cli_path`) and the graview binary
+ * (`graview.bin`) follow the same rule: a repository that chose one would run
+ * its own script with the user's environment. So does `graview.app`, which
+ * once named the product face; it is retired and runs nothing, but a
+ * checkout that still sets it is not trusted silently.
  *
  * @module llm-client/credential-routing
  */

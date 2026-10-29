@@ -40,7 +40,7 @@ import { createRequire } from "module";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
-import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings } from "./config.js";
+import { runConfig, runAuthCheck, loadProjectConfig, repairProjectConfig, experimentalEnv, isConfigKey, readReviewerSettings, loadExtensionConfig } from "./config.js";
 import {
   parseRecommendationsJson,
   formatQueuedTaskSummary,
@@ -68,6 +68,20 @@ import {
   rollbackRefreshState,
 } from "./refresh-validate.js";
 import { handleInstallSample, handleDestroySample } from "./sample-app.js";
+import { runExtensions, terminalConfirm } from "./extensions-command.js";
+import {
+  approveOnFirstRun,
+  EXTENSION_REFUSED_EXIT_CODE,
+  listExtensionCommands,
+  PROMPT_INTERRUPTED_EXIT_CODE,
+  resolveExtensionCommand,
+  resolveExtensionSidecar,
+  runExtensionCommand,
+  SIDECAR_LOG_DIRNAME,
+  SIDECAR_LOG_FILENAME,
+} from "./extension-dispatch.js";
+import { extensionEnvironment, extensionStateDir, releaseExtensionConfig } from "./extension-env.js";
+import { configCheckerByName, configCheckerFor } from "./extension-config-schema.js";
 
 const CLI_ERROR_CODES = Object.freeze({
   NOT_INITIALIZED: "NDX_CLI_NOT_INITIALIZED",
@@ -401,7 +415,7 @@ let staleCheckResult = null;
 // `mcp` joins them for a different reason than the rest: it speaks a protocol
 // on stdout, and a stale-project notice printed there desynchronises the
 // editor's parser for the whole session.
-const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth", "hub", "mcp"]);
+const STALE_CHECK_SKIP_COMMANDS = new Set(["init", "help", "version", "which", "auth", "hub", "mcp", "extensions"]);
 
 /**
  * Spawn options that make each child tree-killable by the tracker. Owned by
@@ -2564,6 +2578,101 @@ async function handleHub(rest) {
   }
 }
 
+/** Every built-in name, so no extension can be listed or run under one. */
+function builtinCommandNames() {
+  return [...COMMAND_DISPATCH.keys(), ...Object.keys(tools)];
+}
+
+async function handleExtensions(rest) {
+  if (rest[0] === "sidecar") {
+    await handleExtensionSidecar(rest.slice(1));
+    return;
+  }
+  try {
+    exitWithCleanup(await runExtensions(rest, { builtinCommands: builtinCommandNames() }));
+  } catch (err) {
+    if (err instanceof ExitRequest) throw err;
+    console.error(formatError(err));
+    exitWithCleanup(1);
+  }
+}
+
+/**
+ * `ndx extensions sidecar <name> [--json]` — the hub's launch plan for the
+ * sidecar mounted at `/x/<name>/`: the bin, the contract environment, the
+ * health path, the idle limit and the log file. The hub spawns the bin itself
+ * (packages/web/src/hub/sidecars.ts); asking here keeps discovery, approval,
+ * the config check and the environment in one place, the same one
+ * `ndx <name>` uses. `ndx graview serve` asks the same question for the
+ * product face, and runs the plan in the foreground. Nothing is run here. A
+ * refusal exits 2, and with `--json` also prints `{ error, reason }` (plus the
+ * extension's `state` when it was refused) so the caller can answer in the
+ * same words.
+ */
+async function handleExtensionSidecar(args) {
+  const json = args.includes("--json");
+  const name = args.find((a) => !a.startsWith("-"));
+  const refuse = (reason, message, extra = [], state = undefined) => {
+    if (json) console.log(JSON.stringify({ error: [message, ...extra].join("\n"), reason, ...(state ? { state } : {}) }));
+    console.error(message);
+    for (const line of extra) console.error(line);
+    exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
+  };
+  if (!name) {
+    refuse("usage", "Error: 'ndx extensions sidecar' needs an extension name.");
+    return;
+  }
+  const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+  const resolution = resolveExtensionSidecar(name, { builtinCommands: builtinCommandNames(), ndxVersion: version });
+  if (resolution.kind !== "run") {
+    refuse(resolution.kind, resolution.message, [], resolution.kind === "refused" ? resolution.state : undefined);
+    return;
+  }
+
+  // A sidecar serves no single project, so it gets the user's section alone.
+  const config = await loadExtensionConfig({ home: resolution.home, name });
+  const violations = configCheckerFor(resolution.ext).check(config);
+  if (violations.length > 0) {
+    refuse("config", `Error: the sidecar of '${name}' has a config section extensions.${name} that does not match its configSchema:`, [
+      ...violations.map((v) => `  ${v.message}`),
+      `  fix: ndx config extensions.${name}.<key> <value>`,
+    ]);
+    return;
+  }
+  let env;
+  let logFile;
+  try {
+    env = extensionEnvironment({ name, home: resolution.home, ndxVersion: version, config, sidecar: true });
+    const logDir = join(extensionStateDir(resolution.home, name), SIDECAR_LOG_DIRNAME);
+    mkdirSync(logDir, { recursive: true });
+    logFile = join(logDir, SIDECAR_LOG_FILENAME);
+  } catch (err) {
+    refuse("state", `Error: the sidecar of '${name}' could not prepare its state folder under ${resolution.home} (${err.code ?? err.message}) — fix: make the n-dx home writable, or set NDX_HOME`);
+    return;
+  }
+
+  const plan = {
+    name,
+    dir: resolution.ext.dir,
+    execPath: process.execPath,
+    bin: resolution.bin,
+    cwd: env.NDX_EXTENSION_STATE_DIR,
+    env,
+    health: resolution.health,
+    idleStopMinutes: resolution.idleStopMinutes,
+    logFile,
+  };
+  if (json) {
+    console.log(JSON.stringify(plan));
+  } else {
+    console.log(`sidecar  ${plan.bin}`);
+    console.log(`health   ${plan.health}`);
+    console.log(`idle     ${plan.idleStopMinutes} min`);
+    console.log(`log      ${plan.logFile}`);
+  }
+  exitWithCleanup(0);
+}
+
 async function handleStart(rest, commandName = "start") {
   const dir = resolveDir(rest);
   try {
@@ -2913,7 +3022,10 @@ async function handleExport(rest) {
 
 async function handleConfig(rest) {
   try {
-    await runConfig(rest);
+    await runConfig(rest, {
+      extensionConfigChecker: (name, dir, home) =>
+        configCheckerByName(name, { builtinCommands: builtinCommandNames(), projectDir: dir, home }),
+    });
   } catch (err) {
     console.error(formatError(err));
     exitWithCleanup(1);
@@ -3419,11 +3531,76 @@ function handleHelp(rest) {
   exitWithCleanup(0);
 }
 
-function handleUnknownCommand(command) {
+/**
+ * `ndx <name>` for a name no built-in owns: run the enabled extension command
+ * that claims it, or report an unknown command — with the reason when an
+ * extension claims the name but cannot run. An unapproved extension's first
+ * run asks on the terminal; without one it is refused with exit 2.
+ */
+async function handleExtensionCommand(command, rest) {
+  const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+  const resolveOptions = { builtinCommands: builtinCommandNames(), ndxVersion: version };
+  let resolution = resolveExtensionCommand(command, resolveOptions);
+  const answer = await approveOnFirstRun(resolution, command, { confirm: terminalConfirm(), out: (line) => console.log(line) });
+  if (answer === "interrupted") {
+    exitWithCleanup(PROMPT_INTERRUPTED_EXIT_CODE);
+    return;
+  }
+  if (answer === "approved") {
+    resolution = resolveExtensionCommand(command, resolveOptions);
+  }
+  switch (resolution.kind) {
+    case "run": {
+      const name = resolution.ext.name;
+      const config = await loadExtensionConfig({ dir: process.cwd(), home: resolution.home, name });
+      const violations = configCheckerFor(resolution.ext).check(config);
+      if (violations.length > 0) {
+        console.error(`Error: 'ndx ${command}' has a config section extensions.${name} that does not match its configSchema:`);
+        for (const violation of violations) console.error(`  ${violation.message}`);
+        console.error(`  fix: ndx config extensions.${name}.<key> <value>`);
+        exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
+        return;
+      }
+      let env;
+      try {
+        env = extensionEnvironment({ name, home: resolution.home, ndxVersion: version, config });
+      } catch (err) {
+        console.error(`Error: 'ndx ${command}' could not prepare its state folder under ${resolution.home} (${err.code ?? err.message}) — fix: make the n-dx home writable, or set NDX_HOME`);
+        exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
+        return;
+      }
+      // The extension owns Ctrl+C while it runs: it shares the terminal, and
+      // runExtensionCommand forwards SIGTERM/SIGHUP and waits, so ndx's
+      // kill-and-exit handlers stand down.
+      signalHandlers.dispose();
+      let code;
+      try {
+        code = await runExtensionCommand({ bin: resolution.bin, args: rest, spawn: spawnTracked, env });
+      } finally {
+        releaseExtensionConfig(env);
+      }
+      exitWithCleanup(code);
+      return;
+    }
+    case "refused":
+      console.error(resolution.message);
+      exitWithCleanup(EXTENSION_REFUSED_EXIT_CODE);
+      return;
+    case "unavailable":
+      handleUnknownCommand(command, resolution.hint);
+      return;
+    default:
+      handleUnknownCommand(command);
+  }
+}
+
+function handleUnknownCommand(command, extensionHint) {
   const allCommands = [...getOrchestratorCommands(), "help"];
   const typoHint = formatTypoSuggestion(command, allCommands, "ndx ");
   console.error(`Error: [${CLI_ERROR_CODES.UNKNOWN_COMMAND}] Unknown command: ${command}`);
-  if (typoHint) {
+  if (extensionHint) {
+    console.error(`Hint: ${extensionHint}`);
+  } else if (typoHint) {
     console.error(`Hint: ${typoHint}`);
   } else {
     console.error("Hint: Run 'ndx --help' to see available commands, or 'ndx help <keyword>' to search.");
@@ -3431,8 +3608,20 @@ function handleUnknownCommand(command) {
   exitWithCleanup(1);
 }
 
+/**
+ * The main help page, with the enabled extension commands. An extension
+ * problem never costs the user the built-in help: it is printed without the
+ * Extensions section, and the problem goes to stderr with the fix.
+ */
 function showMainHelp() {
-  console.log(formatMainHelp());
+  const { version } = JSON.parse(readFileSync(join(__dir, "package.json"), "utf-8"));
+  let extensions = [];
+  try {
+    extensions = listExtensionCommands({ builtinCommands: builtinCommandNames(), ndxVersion: version });
+  } catch (err) {
+    console.error(`Warning: extension commands are not listed (${err.message}) — fix: ndx extensions doctor`);
+  }
+  console.log(formatMainHelp({ extensions }));
 }
 
 // ── Command dispatch map ─────────────────────────────────────────────────────
@@ -3469,7 +3658,8 @@ const COMMAND_DISPATCH = new Map([
   ["start",             (rest) => handleStart(rest, "start")],
   ["web",               (rest) => handleStart(rest, "web")],
   ["hub",               handleHub],
-  ["mcp",               handleMcpShim],
+  ["extensions",        handleExtensions],
+  ["mcp",              handleMcpShim],
   ["export",            handleExport],
   ["install-sample",    (rest) => handleInstallSample(rest, { rexScript: tools.rex })],
   ["destroy-sample",    (rest) => handleDestroySample(rest, { rexScript: tools.rex })],
@@ -3585,7 +3775,12 @@ async function main() {
   updateCheckQuiet = rest.some((a) => a === "--quiet" || a === "-q");
   cliVerbose = rest.some((a) => a === "--verbose" || a === "--debug");
   cliDebug = rest.some((a) => a === "--debug");
-  if (!updateCheckQuiet) {
+  // A command no built-in owns runs an extension (or is unknown), and its
+  // output is the extension's own: no n-dx update notice joins its stderr.
+  // A top-level flag (--version, --help) is still n-dx's.
+  const builtin = builtinCommandNames().includes(command);
+  const extension = Boolean(command) && !builtin;
+  if (!updateCheckQuiet && !(extension && !command.startsWith("-"))) {
     try {
       const { version: currentVersion } = JSON.parse(
         readFileSync(join(__dir, "package.json"), "utf-8"),
@@ -3628,9 +3823,14 @@ async function main() {
   // key-beats-directory tiebreaker the config handler itself applies
   // (isConfigKey); disagreeing here made `ndx config hench` read config from
   // ./hench and report an initialized project as stale.
-  const dir = resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
-  const projectConfig = await loadProjectConfig(dir).catch(() => ({}));
-  const timeoutMs = resolveCommandTimeout(command ?? "", projectConfig);
+  //
+  // An extension command gets neither: n-dx resolves no project for an
+  // extension, its arguments are its own, and it runs as long as it likes.
+  const dir = extension
+    ? process.cwd()
+    : resolveExistingDir(rest, undefined, command === "config" ? { skip: isConfigKey } : undefined);
+  const projectConfig = extension ? {} : await loadProjectConfig(dir).catch(() => ({}));
+  const timeoutMs = extension ? 0 : resolveCommandTimeout(command ?? "", projectConfig);
 
   // Resolve BETA experimental flags from the same config read, so childEnv() can
   // forward them to sub-CLIs without a second filesystem hit.
@@ -3638,8 +3838,9 @@ async function main() {
 
   // ── Stale-project detection (synchronous) ───────────────────────────────
   // Run before command dispatch so the notice can be shown after output.
-  // Skipped for init (about to fix staleness), help, version, and quiet mode.
-  if (!updateCheckQuiet && command && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp) {
+  // Skipped for init (about to fix staleness), help, version, and quiet mode,
+  // and for extension commands: n-dx resolves no project for an extension.
+  if (!updateCheckQuiet && builtin && !STALE_CHECK_SKIP_COMMANDS.has(command) && !hasHelp) {
     try {
       staleCheckResult = checkProjectStaleness(dir);
     } catch {
@@ -3661,8 +3862,8 @@ async function main() {
       return;
     }
 
-    // ── Unknown command or no command ───────────────────────────────────────
-    if (command) return handleUnknownCommand(command);
+    // ── Extension command, unknown command, or no command ──────────────────
+    if (command) return handleExtensionCommand(command, rest);
 
     showMainHelp();
     exitWithCleanup(0);

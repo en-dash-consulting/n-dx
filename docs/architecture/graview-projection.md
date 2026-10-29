@@ -190,10 +190,11 @@ depends on. So:
   a workspace package published on its own that no other `@n-dx/*` package
   depends on, so installing n-dx never pulls Graview or React. It is built
   from the emitted document with `appFromOrCompile`, with a shell, home and
-  record pages in n-dx's words over the derived ones. `ndx graview serve .`
-  finds it beside `@n-dx/graview` in the monorepo or in `node_modules`, or
-  through `graview.app` in the project config, and runs its `bin/serve.js`
-  on the fresh projection (`NDX_GRAVIEW_DIR`). The declaration carries
+  record pages in n-dx's words over the derived ones. It is the
+  `graview-face` extension ([extensions.md](extensions.md)): `ndx graview
+  serve .` asks core for its sidecar's launch plan, so finding and approving
+  it are core's, and runs `bin/serve.js` on the fresh projection
+  (`NDX_GRAVIEW_DIR`). The declaration carries
   glance, page groups, brand, the home and per-kind card, row and page
   blocks as data, so the face adds React and nothing about the graph.
 ## Deferred

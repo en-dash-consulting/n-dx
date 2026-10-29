@@ -1,12 +1,12 @@
 /**
- * `ndx graview serve` never runs a repository-chosen product face while the
- * checkout is untrusted (#635 follow-up). The spawn is recorded rather than
- * run: the untrusted fallback is the installed `@n-dx/graview-face`, a real
- * server.
+ * `ndx graview serve` never runs a repository-chosen product face (#635
+ * follow-up). `graview.app` is retired: the face is the `graview-face`
+ * extension, which core finds and the user approves. A repository that still
+ * sets the field gets a trust finding, and serve runs nothing it names,
+ * trusted or not. Spawns are recorded rather than run.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { EventEmitter } from "node:events";
-import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -28,17 +28,13 @@ vi.mock("../../src/llm-gateway.js", async (importActual) => {
   };
 });
 
-const { main, findProductFace } = await import("../../src/cli/index.js");
+const { main } = await import("../../src/cli/index.js");
 
 let root: string;
 let home: string;
 let repoFace: string;
 
 const ranRepoFace = () => spawned.some((s) => s.cwd === repoFace || s.args.some((a) => a.startsWith(repoFace)));
-
-function git(...args: string[]): void {
-  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: root, stdio: "ignore" });
-}
 
 beforeEach(() => {
   spawned.length = 0;
@@ -58,7 +54,7 @@ afterEach(() => {
   for (const dir of [root, home]) rmSync(dir, { recursive: true, force: true });
 });
 
-describe("a repository's graview.app in an untrusted checkout", () => {
+describe("a repository's graview.app", () => {
   it("is a vendor-cli-path finding in the digest, and serve does not run it", async () => {
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "./face" } }));
     const ev = evaluateRepoTrust(root);
@@ -70,56 +66,10 @@ describe("a repository's graview.app in an untrusted checkout", () => {
     expect(ranRepoFace()).toBe(false);
   });
 
-  it("runs once the checkout is trusted, and waits again when it changes", async () => {
+  it("runs nothing even once the checkout is trusted: the field is retired", async () => {
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "./face" } }));
-    const before = evaluateRepoTrust(root).config.digest;
     recordRepoTrust(root);
     expect(await main(["serve", root, "--quiet"])).toBe(0);
-    expect(spawned).toContainEqual({ cmd: process.execPath, args: [join(repoFace, "bin", "serve.js")], cwd: repoFace });
-
-    spawned.length = 0;
-    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ graview: { app: "./face/" } }));
-    expect(evaluateRepoTrust(root).config.digest).not.toBe(before);
-    expect(await main(["serve", root, "--quiet"])).toBe(0);
     expect(ranRepoFace()).toBe(false);
-  });
-
-  it("gates a graview.app in a git-tracked .n-dx.local.json until trusted", async () => {
-    git("init", "-q");
-    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { app: "./face" } }));
-    git("add", ".n-dx.local.json");
-    git("commit", "-q", "-m", "ship local config");
-    expect(evaluateRepoTrust(root).config.vendorCliPaths).toEqual(["graview.app = ./face"]);
-
-    expect(await main(["serve", root, "--quiet"])).toBe(0);
-    expect(ranRepoFace()).toBe(false);
-
-    recordRepoTrust(root);
-    spawned.length = 0;
-    expect(await main(["serve", root, "--quiet"])).toBe(0);
-    expect(ranRepoFace()).toBe(true);
-  });
-
-  it("keeps applying a graview.app in an untracked .n-dx.local.json without trust", async () => {
-    git("init", "-q");
-    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ graview: { app: "./face" } }));
-    expect(evaluateRepoTrust(root).state).toBe("baseline");
-    expect(await main(["serve", root, "--quiet"])).toBe(0);
-    expect(ranRepoFace()).toBe(true);
-  });
-});
-
-describe("the default face lookup (graview.app unset)", () => {
-  it("never resolves into the checkout's own node_modules", () => {
-    const shipped = join(root, "node_modules", "@n-dx", "graview-face");
-    mkdirSync(join(shipped, "bin"), { recursive: true });
-    writeFileSync(join(shipped, "package.json"), JSON.stringify({ name: "@n-dx/graview-face" }));
-    writeFileSync(join(shipped, "bin", "serve.js"), "process.exit(0);\n");
-    const cwd = vi.spyOn(process, "cwd").mockReturnValue(root);
-    try {
-      expect(findProductFace()?.startsWith(root) ?? false).toBe(false);
-    } finally {
-      cwd.mockRestore();
-    }
   });
 });

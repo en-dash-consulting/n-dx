@@ -29,6 +29,7 @@
 
 import { describe, it, expect } from "vitest";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { checkArchitecturePolicy, checkRestrictedImports, isNdxMonorepo } from "../../packages/core/ci.js";
@@ -253,6 +254,167 @@ describe("architecture policy: orchestration spawn-only rule", () => {
   }
 });
 
+/**
+ * Extensions are spawned, never imported (docs/architecture/extensions.md):
+ * n-dx reads an extension's `package.json` and runs its `bin` as a child
+ * process. Two holes would break that: an extension module that loads code at
+ * run time, and an `import()` or `require` by computed specifier anywhere in
+ * core, which could be pointed at a discovered package.
+ */
+describe("architecture policy: orchestration never imports extension code", () => {
+  const CORE = "packages/core";
+  /** Core modules allowed an `import()` whose specifier is computed, with why. */
+  const COMPUTED_IMPORTS = new Map([
+    ["packages/core/export.js", "rex's public API from the installed @n-dx/rex (pathToFileURL of a resolved path)"],
+  ]);
+  /** An `import(` not followed by a plain string literal and its closing paren. */
+  const COMPUTED_IMPORT = /\bimport\s*\(\s*(?!["'][^"'`$]*["']\s*\))/;
+  /** Core modules allowed a require whose specifier is computed, with why. */
+  const COMPUTED_REQUIRES = new Map();
+  /** A call's opening paren not followed by a plain string literal and its closing paren. */
+  const NON_LITERAL_CALL = String.raw`\s*\(\s*(?!["'][^"'\`$]*["']\s*\))`;
+
+  const escapeName = (n) => n.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+
+  /**
+   * Whether `text` loads a module by computed specifier through `require`: a
+   * bare `require(…)`, a `createRequire(…)` result called directly or through
+   * any name it reaches by declaration, assignment or alias (also via `.call`
+   * / `.apply`), or `Module._load(…)` with any argument. `.resolve()` only
+   * locates a file and runs nothing, so it does not count.
+   */
+  function hasComputedRequire(text) {
+    if (/\b_load\s*\(/.test(text)) return true;
+    const names = new Set(["require"]);
+    for (const m of text.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*=(?!=)\s*(?:[\w$]+\.)?createRequire\s*\(/g)) {
+      names.add(m[1]);
+    }
+    // Aliases: `const load = _require;`, followed until no new name appears.
+    for (let size = 0; size !== names.size; ) {
+      size = names.size;
+      const known = [...names].map(escapeName).join("|");
+      const alias = new RegExp(String.raw`(?<![\w$.])([A-Za-z_$][\w$]*)\s*=(?!=)\s*(?:${known})(?![\w$])(?!\s*[.(\[])`, "g");
+      for (const m of text.matchAll(alias)) names.add(m[1]);
+    }
+    const callee = [...names].map(escapeName).join("|");
+    return [
+      new RegExp(String.raw`(?<![\w$.])(?:${callee})(?:\s*\.\s*(?:call|apply))?` + NON_LITERAL_CALL),
+      new RegExp(String.raw`\bcreateRequire\s*\([^()]*(?:\([^()]*\)[^()]*)*\)` + NON_LITERAL_CALL),
+    ].some((pattern) => pattern.test(text));
+  }
+
+  /** A file core can run as a module. */
+  const MODULE_FILE = /\.[cm]?js$/;
+
+  /** Core's own modules: its top-level .js, .mjs and .cjs files and bin/. */
+  function coreModules() {
+    return [CORE, `${CORE}/bin`].flatMap((dir) =>
+      readdirSync(join(ROOT, dir)).filter((f) => MODULE_FILE.test(f)).map((f) => `${dir}/${f}`),
+    );
+  }
+
+  it("scans every module extension core can run", () => {
+    expect(["a.js", "a.mjs", "a.cjs"].filter((f) => !MODULE_FILE.test(f))).toEqual([]);
+    expect(["a.json", "a.d.ts", "a.js.map"].filter((f) => MODULE_FILE.test(f))).toEqual([]);
+  });
+
+  /** `rel`'s text with comment lines dropped, so JSDoc `import("…")` types do not count. */
+  function code(rel) {
+    return readFileSync(join(ROOT, rel), "utf-8")
+      .split("\n")
+      .filter((line) => !/^\s*(?:\/\/|\/?\*)/.test(line))
+      .join("\n");
+  }
+
+  const extensionModules = () => coreModules().filter((rel) => /\/extensions?-[a-z-]+\.[cm]?js$/.test(rel));
+
+  it("sees the extension modules", () => {
+    expect(extensionModules()).toEqual(expect.arrayContaining([
+      `${CORE}/extension-discovery.js`,
+      `${CORE}/extension-dispatch.js`,
+      `${CORE}/extension-env.js`,
+      `${CORE}/extension-manifest.js`,
+      `${CORE}/extension-state.js`,
+      `${CORE}/extensions-command.js`,
+    ]));
+  });
+
+  it("extension modules import only node builtins and core peers, and load no code at run time", () => {
+    const violations = [];
+    for (const rel of extensionModules()) {
+      const text = code(rel);
+      for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s+)["']([^"']+)["']/g)) {
+        const builtin = m[1].startsWith("node:") || builtinModules.includes(m[1]);
+        if (!builtin && !m[1].startsWith("./")) violations.push(`${rel}: imports ${m[1]}`);
+      }
+      for (const [pattern, what] of [
+        [/\bimport\s*\(/, "dynamic import()"],
+        [/\brequire\s*\(|\bcreateRequire\b/, "require"],
+        [/\bnew\s+Function\b|["']node:vm["']/, "code evaluation"],
+      ]) {
+        if (pattern.test(text)) violations.push(`${rel}: ${what}`);
+      }
+    }
+    expect(violations, "an extension module that loads code could load an extension's; spawn it instead").toEqual([]);
+  });
+
+  it("core imports by computed specifier only where documented", () => {
+    const violations = coreModules()
+      .filter((rel) => COMPUTED_IMPORT.test(code(rel)))
+      .filter((rel) => !COMPUTED_IMPORTS.has(rel));
+    expect(violations, "a computed import() in core could load a discovered package").toEqual([]);
+  });
+
+  it("COMPUTED_IMPORTS has no stale entries", () => {
+    for (const rel of COMPUTED_IMPORTS.keys()) {
+      expect(existsSync(join(ROOT, rel)), `${rel} no longer exists`).toBe(true);
+      expect(COMPUTED_IMPORT.test(code(rel)), `${rel} no longer has a computed import()`).toBe(true);
+    }
+  });
+
+  it("core requires by computed specifier only where documented", () => {
+    const violations = coreModules()
+      .filter((rel) => hasComputedRequire(code(rel)))
+      .filter((rel) => !COMPUTED_REQUIRES.has(rel));
+    expect(violations, "a computed require in core could load a discovered package").toEqual([]);
+  });
+
+  it("COMPUTED_REQUIRES has no stale entries", () => {
+    for (const rel of COMPUTED_REQUIRES.keys()) {
+      expect(existsSync(join(ROOT, rel)), `${rel} no longer exists`).toBe(true);
+      expect(hasComputedRequire(code(rel)), `${rel} no longer has a computed require`).toBe(true);
+    }
+  });
+
+  it("the computed-require check sees every way core can call require", () => {
+    const flagged = [
+      'const _require = createRequire(import.meta.url);\n_require(resolution.bin);',
+      'const r = module.createRequire(import.meta.url);\nr(path);',
+      'const _require = createRequire(import.meta.url);\n_require.call(null, "x");',
+      "createRequire(import.meta.url)(spec);",
+      "createRequire(pathToFileURL(dir))(spec);",
+      "require(name);",
+      "require(`./${name}`);",
+      "let r;\nr = createRequire(import.meta.url);\nr(bin);",
+      "const _require = createRequire(import.meta.url);\nconst load = _require;\nload(bin);",
+      "const _require = createRequire(import.meta.url);\nconst a = _require;\nlet b;\nb = a;\nb.apply(null, [bin]);",
+      'import Module from "module";\nModule._load(bin);',
+      'import Module from "module";\nModule._load("./x.js");',
+    ];
+    const allowed = [
+      'const _require = createRequire(import.meta.url);\n_require.resolve(npmName + "/package.json");',
+      'const _require = createRequire(import.meta.url);\n_require("./x.json");',
+      'const _require = createRequire(import.meta.url);\nconst where = _require.resolve;\nwhere(bin);',
+      "const _require = createRequire(import.meta.url);\nif (x == _require) f(bin);",
+      'require("node:fs");',
+      "foo.require(name);",
+      "my_require(name);",
+    ];
+    expect(flagged.filter((text) => !hasComputedRequire(text))).toEqual([]);
+    expect(allowed.filter((text) => hasComputedRequire(text))).toEqual([]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // CLAUDE.md policy coverage cross-reference
 // ---------------------------------------------------------------------------
@@ -281,6 +443,10 @@ const DOCUMENTED_POLICIES = [
   {
     rule: "Orchestration-tier scripts must spawn CLIs, not import libraries",
     enforcedBy: "architecture-policy.test.js → architecture policy: orchestration spawn-only rule",
+  },
+  {
+    rule: "Extensions are spawned, never imported: extension modules load no code, and core imports by computed specifier only where documented",
+    enforcedBy: "architecture-policy.test.js → architecture policy: orchestration never imports extension code",
   },
   {
     rule: "Cross-package runtime imports must flow through gateway modules",
@@ -561,7 +727,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(24);
+    expect(DOCUMENTED_POLICIES.length).toBe(25);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {
@@ -1722,6 +1888,7 @@ describe("architecture policy: required test annotations", () => {
       "tests/e2e/cli-dev.test.js",
       "tests/integration/scheduler-startup.test.js",
       "packages/web/tests/e2e-ui/navigation.spec.ts",
+      "tests/e2e/extension-fixture.test.js",
     ];
 
     const violations = [];

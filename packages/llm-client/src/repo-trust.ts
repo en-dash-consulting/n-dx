@@ -434,10 +434,12 @@ function fieldAt(root: Record<string, unknown>, path: readonly string[]): unknow
  * writes it to `.n-dx.local.json`, which always applies. `cli.claudePath` is
  * the binary `ndx init` probes and registers MCP servers with; core's
  * discovery reads it from `.n-dx.local.json` only. `graview.bin` is the
- * binary `ndx graview <sub>` spawns, and `graview.app` the product face whose
- * `bin/serve.js` or `dev` script `ndx graview serve` runs; `@n-dx/graview`
- * reads its config through `trustedProjectConfig` and `trustedLocalConfig`
- * (credential-routing).
+ * binary `ndx graview <sub>` spawns; `@n-dx/graview` reads its config through
+ * `trustedProjectConfig` and `trustedLocalConfig` (credential-routing).
+ * `graview.app` once named the product face, which is now an extension that
+ * core finds and the user approves; the field is retired and runs nothing,
+ * but stays a finding so a checkout that still sets it is not trusted
+ * silently.
  */
 export const VENDOR_CLI_PATH_FIELDS: readonly (readonly string[])[] = [
   ["cli", "claudePath"],

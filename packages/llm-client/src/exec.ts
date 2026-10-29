@@ -1214,6 +1214,8 @@ export interface SpawnToolOptions {
    * - `"pipe"` — capture stdout and stderr; return them in the result.
    */
   stdio?: "inherit" | "pipe";
+  /** Managed children only: keep a stdin pipe open as a parent-lifetime channel. */
+  keepStdinOpen?: boolean;
   /**
    * When true, spawn the process detached and un-ref it so the parent
    * can exit without waiting. Implies `stdio: "ignore"` (overrides
@@ -1250,6 +1252,13 @@ export interface SpawnToolOptions {
    * while the result still carries the full accumulated text on exit.
    */
   onStdout?: (chunk: string) => void;
+  /**
+   * {@link spawnManaged} only: append the child's stdout and stderr to this
+   * file instead of inheriting or buffering them, so a long-lived child (an
+   * extension sidecar) leaves a readable log without the parent holding its
+   * whole output in memory. Overrides `stdio`.
+   */
+  logFile?: string;
 }
 
 /** Result from {@link spawnTool}. */
@@ -1403,14 +1412,22 @@ export function spawnManaged(
   opts: SpawnToolOptions = {},
 ): ManagedChild {
   const { cwd, env, timeout } = opts;
-  const stdio = opts.stdio ?? "inherit";
+  const logFd = opts.logFile ? openSync(opts.logFile, "a") : undefined;
+  // A log file replaces both stdio modes, so nothing is buffered either.
+  const stdio = logFd === undefined ? opts.stdio ?? "inherit" : "inherit";
 
-  const child = spawn(cmd, args, {
-    cwd,
-    env,
-    stdio: stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
-    windowsHide: opts.windowsHide ?? true,
-  });
+  let child: ChildProcess;
+  try {
+    child = spawn(cmd, args, {
+      cwd,
+      env,
+      stdio: logFd !== undefined ? [opts.keepStdinOpen ? "pipe" : "ignore", logFd, logFd] : stdio === "pipe" ? ["ignore", "pipe", "pipe"] : "inherit",
+      windowsHide: opts.windowsHide ?? true,
+    });
+  } finally {
+    // The child holds its own copy of the descriptor once spawned.
+    if (logFd !== undefined) closeSync(logFd);
+  }
 
   const done = new Promise<SpawnToolResult>((resolve) => {
     let stdout = "";
