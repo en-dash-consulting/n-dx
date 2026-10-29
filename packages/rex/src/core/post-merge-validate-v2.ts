@@ -66,13 +66,15 @@ export async function detectV2PostMergeIssues(rexDir: string): Promise<PostMerge
   const nodes: NodeFile[] = [];
   const states: StateRows[] = [];
   const issues: PostMergeIssue[] = [];
+  /** Ids and display ids named in node files that still hold conflict markers. */
+  const unresolved = new Set<string>();
 
   for (const layer of [PRODUCT_DIRNAME, CHANGES_DIRNAME]) {
-    await walk(rexDir, join(rexDir, layer), nodes, states, issues);
+    await walk(rexDir, join(rexDir, layer), nodes, states, issues, unresolved);
   }
 
   const byId = new Map<string, NodeFile[]>();
-  const names = new Set<string>();
+  const names = new Set<string>(unresolved);
   for (const node of nodes) {
     for (const name of node.names) names.add(name);
     if (!node.id) continue;
@@ -92,7 +94,7 @@ export async function detectV2PostMergeIssues(rexDir: string): Promise<PostMerge
   }
 
   for (const state of states) {
-    const orphans = state.ids.filter((id) => !byId.has(id));
+    const orphans = state.ids.filter((id) => !byId.has(id) && !unresolved.has(id));
     if (orphans.length === 0) continue;
     issues.push({
       class: "orphaned-state-row",
@@ -126,6 +128,7 @@ async function walk(
   nodes: NodeFile[],
   states: StateRows[],
   issues: PostMergeIssue[],
+  unresolved: Set<string>,
 ): Promise<void> {
   const entries = await listDir(dir);
   if (entries === null) return;
@@ -133,7 +136,7 @@ async function walk(
     if (entry.name.startsWith(".")) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      await walk(rexDir, full, nodes, states, issues);
+      await walk(rexDir, full, nodes, states, issues, unresolved);
       continue;
     }
     const relPath = toRel(rexDir, full);
@@ -155,6 +158,9 @@ async function walk(
     const id = matchScalar(text, "id");
     if (CONFLICT_MARKERS.test(text)) {
       issues.push({ class: "conflict-markers", path: relPath, itemId: id, message: "unresolved merge conflict markers — resolve them, then re-run", repairable: false });
+      // Either side may survive the resolution, so every id or display id
+      // the file names still counts: its state row and refs are not residue.
+      for (const match of text.matchAll(/^(?:id|displayId):[^\S\n]*(.+)$/gm)) unresolved.add(unquote(match[1].trim()));
       continue;
     }
     const displayId = matchScalar(text, "displayId");
@@ -196,6 +202,15 @@ export async function repairV2PostMergeIssues(
     }
   });
   return { repaired, refused };
+}
+
+function unquote(value: string): string {
+  if (!value.startsWith('"')) return value;
+  try {
+    return JSON.parse(value) as string;
+  } catch {
+    return value.slice(1, -1);
+  }
 }
 
 async function listDir(dir: string) {

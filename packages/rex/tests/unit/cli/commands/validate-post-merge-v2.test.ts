@@ -79,6 +79,19 @@ describe("detectV2PostMergeIssues", () => {
       ["conflict-markers", "changes/two/state.yaml"],
     ]);
   });
+
+  it("keeps the row and refs of an item whose file still holds conflict markers", async () => {
+    // Both sides edited X's file; it is mid-conflict, not dropped.
+    await writeFile(
+      join(change, "x.md"),
+      ["---", "<<<<<<< ours", 'id: "X"', "=======", 'id: "X"', ">>>>>>> theirs", 'title: "X"', "---", ""].join("\n"),
+    );
+    const { issues } = await detectV2PostMergeIssues(rexDir);
+    expect(issues.map((i) => i.class)).toEqual(["conflict-markers"]);
+    await repairV2PostMergeIssues(rexDir, issues);
+    expect(await readFile(join(change, "state.yaml"), "utf-8")).toContain('"X"');
+    expect(await readFile(join(change, "other.md"), "utf-8")).toContain('"X"');
+  });
 });
 
 describe("repairV2PostMergeIssues", () => {
