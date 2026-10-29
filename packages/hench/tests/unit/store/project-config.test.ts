@@ -21,7 +21,7 @@ describe("project-config merge (hench)", () => {
   it("loads config without .n-dx.json", async () => {
     const config = await loadConfig(henchDir);
     expect(config.model).toBe("sonnet");
-    expect(config.maxTurns).toBe(50);
+    expect(config.maxTurns).toBe(200);
   });
 
   it("merges .n-dx.json overrides into config", async () => {

@@ -20,7 +20,7 @@ import {
   type LocalVerifierConfig,
 } from "./llm-types.js";
 import type { ClaudeConfig } from "./types.js";
-import { normalizeCodexModel } from "./config.js";
+import { clampTrackedProjectConfig, clampTrackedLocalConfig, normalizeCodexModel, type LoadProjectConfigOptions } from "./config.js";
 
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -286,13 +286,10 @@ export function parseLLMConfig(root: Record<string, unknown>): LLMConfig {
  * - Falls back to the legacy top-level `claude` block **per field** — see
  *   {@link resolveClaudeConfig}.
  */
-export async function loadLLMConfig(dir: string): Promise<LLMConfig> {
+export async function loadLLMConfig(dir: string, options: LoadProjectConfigOptions = {}): Promise<LLMConfig> {
   const { root, configFile, localConfigFile } = resolveLayout(dir);
-  // The project config's endpoints and key variables apply only while the
-  // repository is trusted; the local file's always do, unless the repository
-  // commits it. See credential-routing.ts.
-  const projectData = trustedProjectConfig(root, await loadJSONFile(configFile));
-  const localData = trustedLocalConfig(root, await loadJSONFile(localConfigFile));
+  const projectData = clampTrackedProjectConfig(root, trustedProjectConfig(root, await loadJSONFile(configFile), options.trust), options);
+  const localData = clampTrackedLocalConfig(root, await loadJSONFile(localConfigFile), options);
 
   // Merge project and local configs (local wins)
   let merged: Record<string, unknown> | null = projectData;

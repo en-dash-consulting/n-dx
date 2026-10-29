@@ -15,7 +15,7 @@
  * presentation component.
  */
 
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
 import {
@@ -23,6 +23,7 @@ import {
   isFeatureDisabled,
   onDegradationChange,
 } from "./use-gateway.js";
+import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
 // Types (mirror server-side ProjectStatus shape)
@@ -197,7 +198,7 @@ export function useProjectStatus(): ProjectStatus | null {
     });
 
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
       ws.onmessage = (event) => {
         if (!mountedRef.current) return;
         try {

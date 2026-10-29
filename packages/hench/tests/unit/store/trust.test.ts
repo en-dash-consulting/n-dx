@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { applyRepoTrust, formatTrustWarningForRun, trustSummaryForRun } from "../../../src/store/trust.js";
-import { guardBaselineForLanguage, recordRepoTrust } from "../../../src/prd/llm-gateway.js";
+import { guardBaselineForLanguage, recordRepoTrust, resolveVendorCliEnv } from "../../../src/prd/llm-gateway.js";
 import { GuardError, validatePath } from "../../../src/guard/paths.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
 import { HenchConfigSchema } from "../../../src/schema/index.js";
@@ -293,7 +293,7 @@ describe("applyRepoTrust", () => {
   it("keeps a nested node_modules blocked under a baseline guard that lists only the root one", () => {
     writeFileSync(join(repo, "package.json"), "{}");
     const config = DEFAULT_HENCH_CONFIG();
-    config.guard = { ...config.guard, blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"] };
+    config.guard = { ...config.guard, blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**", ".env"] };
     writeHenchConfig(config);
 
     const applied = applyRepoTrust(config, repo, "bypassPermissions", { ndxHome: home });
@@ -301,7 +301,7 @@ describe("applyRepoTrust", () => {
     expect(applied.permissionMode).toBe("bypassPermissions");
     expect(applied.config.guard.allowedCommands).toEqual(config.guard.allowedCommands);
     expect(() => validatePath("packages/a/node_modules/x/package.json", repo, applied.config.guard.blockedPaths)).toThrow(GuardError);
-    expect(applied.config.guard.blockedPaths).not.toContain(".env");
+    expect(applied.config.guard.blockedPaths).not.toContain(".npmrc");
   });
 
   it("summarises for the run record and warns with the CLI-provider note", () => {
@@ -320,6 +320,53 @@ describe("applyRepoTrust", () => {
     expect(lines[0]).toContain("NOT TRUSTED");
     expect(lines.some((l) => l.includes("provider=cli"))).toBe(true);
     expect(formatTrustWarningForRun(applied.evaluation, "api").some((l) => l.includes("provider=cli"))).toBe(false);
+  });
+
+  it("drops guard.env.allow while restricted, so the child environment loses the credential it tried to keep", () => {
+    const widened = DEFAULT_HENCH_CONFIG();
+    widened.guard = { ...widened.guard, env: { allow: ["NDX_TEST_TOKEN"], deny: ["MY_PRIVATE_*"] } };
+    writeHenchConfig(widened);
+    const source = { PATH: "/usr/bin", NDX_TEST_TOKEN: "secret", MY_PRIVATE_THING: "x", HOME: "/home/u" };
+
+    const restricted = applyRepoTrust(widened, repo, undefined, { ndxHome: home });
+    expect(restricted.evaluation.state).toBe("untrusted");
+    expect(restricted.clamped).toBe(true);
+    expect(restricted.config.guard.env).toEqual({ allow: [], deny: ["MY_PRIVATE_*"] });
+    const childEnv = resolveVendorCliEnv({ vendor: "claude" }, restricted.config.guard.env, source);
+    expect(childEnv.NDX_TEST_TOKEN).toBeUndefined();
+    expect(childEnv.MY_PRIVATE_THING).toBeUndefined();
+    expect(childEnv.PATH).toBe("/usr/bin");
+
+    recordRepoTrust(repo, { ndxHome: home });
+    const trusted = applyRepoTrust(widened, repo, undefined, { ndxHome: home });
+    expect(trusted.config.guard.env).toEqual({ allow: ["NDX_TEST_TOKEN"], deny: ["MY_PRIVATE_*"] });
+    expect(resolveVendorCliEnv({ vendor: "claude" }, trusted.config.guard.env, source).NDX_TEST_TOKEN).toBe("secret");
+  });
+
+  it("reverts a tracked claudePath and apiKeyEnv while restricted, unless the user's local file sets them", () => {
+    const widened = DEFAULT_HENCH_CONFIG();
+    widened.guard = { ...widened.guard, allowedCommands: ["bash"] };
+    widened.claudePath = "./node_modules/.bin/claude";
+    widened.apiKeyEnv = "GITHUB_TOKEN";
+    writeHenchConfig(widened);
+
+    const restricted = applyRepoTrust(widened, repo, undefined, { ndxHome: home });
+    expect(restricted.config.claudePath).toBeUndefined();
+    expect(restricted.config.apiKeyEnv).toBe(DEFAULT_HENCH_CONFIG().apiKeyEnv);
+    expect(restricted.clamped).toBe(true);
+
+    writeFileSync(
+      join(repo, ".n-dx.local.json"),
+      JSON.stringify({ hench: { claudePath: "/home/u/bin/claude", apiKeyEnv: "MY_ANTHROPIC_API_KEY" } }),
+    );
+    const withLocal = applyRepoTrust({ ...widened, claudePath: "/home/u/bin/claude", apiKeyEnv: "MY_ANTHROPIC_API_KEY" }, repo, undefined, { ndxHome: home });
+    expect(withLocal.config.claudePath).toBe("/home/u/bin/claude");
+    expect(withLocal.config.apiKeyEnv).toBe("MY_ANTHROPIC_API_KEY");
+
+    recordRepoTrust(repo, { ndxHome: home });
+    const trusted = applyRepoTrust(widened, repo, undefined, { ndxHome: home });
+    expect(trusted.config.claudePath).toBe("./node_modules/.bin/claude");
+    expect(trusted.config.apiKeyEnv).toBe("GITHUB_TOKEN");
   });
 });
 
@@ -515,7 +562,7 @@ describe("repository trust under project overrides", () => {
   it("lists every guard field hench validates", () => {
     expect(guardKeys.sort()).toEqual([
       "allowedCommands", "allowedGitSubcommands", "blockedPaths", "commandTimeout", "env", "maxConcurrentProcesses",
-      "maxFileSize", "memoryMonitor", "memoryThrottle", "policy", "spawnTimeout",
+      "maxFileSize", "memoryMonitor", "memoryThrottle", "policy", "sessionTimeout", "spawnTimeout",
     ]);
   });
 

@@ -26,7 +26,11 @@
  * 4. **Path validation** (`paths.ts`)
  *    - Null-byte rejection (defense against poison-null-byte attacks)
  *    - Directory escape prevention (no `..` traversal outside project)
- *    - Glob-based blocked path patterns (e.g., `.git/**`, `node_modules/**`)
+ *    - Real-path containment (symbolic links are resolved; a link inside the
+ *      project that points elsewhere is refused, and tools operate on the
+ *      real path)
+ *    - Glob-based blocked path patterns (e.g., `.git/**`, `node_modules/**`),
+ *      matched against the path as given and its real location
  *    - n-dx's own config files (`NDX_CONFIG_BLOCKED_PATHS`), blocked whatever
  *      the configured patterns say: an agent that wrote `.n-dx.local.json`
  *      would hand itself an unreviewed guard for every later command
@@ -64,6 +68,7 @@ import type { ShellKind } from "./commands.js";
 import { PolicyEngine } from "./policy.js";
 import type { AuditEntry, SessionCounters } from "./policy.js";
 import { compileEnvPolicy, sanitizeChildEnv } from "./env.js";
+import type { ToolSandbox } from "./sandbox.js";
 import { NDX_CONFIG_BLOCKED_PATHS } from "../prd/llm-gateway.js";
 
 export { GuardError, validatePath, simpleGlobMatch } from "./paths.js";
@@ -79,6 +84,14 @@ export {
   strippedEnvNames,
 } from "./env.js";
 export type { EnvPolicy } from "./env.js";
+export {
+  createToolSandbox,
+  createVendorCliSandbox,
+  resolveSandboxPosture,
+  assertSandboxReady,
+  formatSandboxPosture,
+} from "./sandbox.js";
+export type { ToolSandbox, SandboxPosture, CreateToolSandboxOptions, CreateVendorCliSandboxOptions } from "./sandbox.js";
 export type { GuardConfig, EnvPolicyConfig, PolicyLimitsConfig } from "./contracts.js";
 export type {
   PolicyLimits,
@@ -98,6 +111,12 @@ export interface GuardRailsOptions {
   shellKind?: ShellKind;
   /** The environment to filter for child processes. Defaults to `process.env`; inject for tests. */
   env?: NodeJS.ProcessEnv;
+  /**
+   * OS-level confinement for `run_command` and `git` children, from
+   * {@link createToolSandbox}. Absent or null means the children run with
+   * the operator's full permissions; the agent loops always pass one.
+   */
+  sandbox?: ToolSandbox | null;
 }
 
 /**
@@ -127,6 +146,8 @@ export class GuardRails {
    * variable exported mid-run neither appears nor disappears between tools.
    */
   readonly childEnv: NodeJS.ProcessEnv;
+  /** OS confinement for tool children, or null when the run is unconfined. */
+  readonly sandbox: ToolSandbox | null;
 
   constructor(projectDir: string, config: GuardConfig, options: GuardRailsOptions = {}) {
     this.projectDir = projectDir;
@@ -135,10 +156,26 @@ export class GuardRails {
     this.shellKind = options.shellKind ?? resolveShellKind();
     this.policy = new PolicyEngine(config.policy);
     this.childEnv = sanitizeChildEnv(options.env ?? process.env, compileEnvPolicy(config.env));
+    this.sandbox = options.sandbox ?? null;
   }
 
   checkPath(filepath: string): string {
     return validatePath(filepath, this.projectDir, this.blockedPaths);
+  }
+
+  /**
+   * Whether `filepath` would pass {@link checkPath}. For directory walks,
+   * which visit many entries and leave a refused one out rather than stop.
+   * Only guard verdicts are swallowed; any other failure propagates.
+   */
+  isPathAllowed(filepath: string): boolean {
+    try {
+      this.checkPath(filepath);
+      return true;
+    } catch (err) {
+      if (err instanceof GuardError) return false;
+      throw err;
+    }
   }
 
   checkCommand(command: string): void {

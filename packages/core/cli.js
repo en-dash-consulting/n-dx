@@ -59,6 +59,7 @@ import {
   removePidFile,
   removePortFile,
   readAuthTokenFile,
+  identifyTokenTarget,
 } from "./web.js";
 import { buildRefreshPlan, RefreshPlanError } from "./refresh-plan.js";
 import { refreshSourcevisionDashboardArtifacts } from "./refresh-artifacts.js";
@@ -1052,8 +1053,21 @@ async function signalLiveReload(dir) {
   const timeout = setTimeout(() => controller.abort(), 2000);
   try {
     // The hub and a project server both answer 401 without the per-user token
-    // unless auth is off; sending it when the file exists costs nothing otherwise.
+    // unless auth is off. The port comes from a file in the project, so the
+    // token goes only to a listener identified as this user's own server.
     const token = readAuthTokenFile();
+    if (token) {
+      const target = await identifyTokenTarget(port, resolve(dir));
+      if (!target.ok) {
+        return {
+          attempted: false,
+          success: false,
+          message:
+            `Live reload: skipped (${target.reason}; nothing was sent to :${port}).\n`
+            + `Restart required: ${restartCommand}`,
+        };
+      }
+    }
     const res = await fetch(`http://127.0.0.1:${port}/api/reload`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(token ? { "X-Ndx-Token": token } : {}) },
@@ -3437,7 +3451,9 @@ async function handlePairProgramming(rest) {
       }
       const reviewer = resolveReviewerVendor(primaryVendor, settings.vendor);
       const model = settings.modelFor(reviewer);
-      const testCommand = readRexTestCommand(dir);
+      const testCommand = await readRexTestCommand(dir, {
+        onRestricted: (note) => process.stderr.write(`⚠ pair-programming: ${note}\n`),
+      });
       const border = "─".repeat(60);
 
       // ── Steps 2–3: review, then up to `rounds` remediation cycles ─────────

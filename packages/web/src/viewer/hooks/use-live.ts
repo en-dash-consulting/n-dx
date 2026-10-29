@@ -15,9 +15,10 @@
  */
 
 import { useState, useEffect } from "preact/hooks";
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
 import { registerPoller } from "../polling/index.js";
 import { createWSPipeline } from "./use-gateway.js";
+import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
 // Shape — the slice of server/routes-live.ts's LiveSnapshot the tab reads
@@ -392,7 +393,7 @@ function startFeed(): () => void {
   const connect = (isReconnect: boolean): void => {
     if (typeof WebSocket === "undefined") return; // no socket at all: the poll carries it
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
     } catch {
       scheduleReconnect();
       return;

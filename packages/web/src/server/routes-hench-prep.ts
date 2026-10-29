@@ -37,6 +37,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import { exec, getWorktreeRoot, listWorktrees, resolveLayout } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { refuseWhileRestricted } from "./trust-gate.js";
 import { errorResponse, jsonResponse, readBody, errorMessage } from "./response-utils.js";
 import { resolveNdxBin } from "./routes-commands.js";
 import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
@@ -672,7 +673,12 @@ export async function handleHenchPrepRoute(
     errorResponse(res, 400, "Task id is not valid URL encoding");
     return true;
   }
-  if (match[2]) return method === "POST" ? handlePreview(req, res, ctx, taskId) : false;
+  // The preview and the prep GET spawn `ndx work` against this repository's
+  // execution config, so both wait until it has been accepted.
+  if (match[2]) {
+    if (method !== "POST") return false;
+    return refuseWhileRestricted(res, ctx.projectDir) ? true : handlePreview(req, res, ctx, taskId);
+  }
   // The PUT writes the PRD, so a foreign page must not reach it either — the
   // browser's preflight already blocks the common shapes, but the write is what
   // matters and it is refused here rather than relying on that.
@@ -680,5 +686,6 @@ export async function handleHenchPrepRoute(
     return isForeignSiteRequest(req) ? refuseForeignSite(res) : handleSave(req, res, ctx, taskId, broadcast);
   }
   if (method !== "GET") return false;
-  return isForeignSiteRequest(req) ? refuseForeignSite(res) : handlePrep(req, res, ctx, taskId);
+  if (isForeignSiteRequest(req)) return refuseForeignSite(res);
+  return refuseWhileRestricted(res, ctx.projectDir) ? true : handlePrep(req, res, ctx, taskId);
 }

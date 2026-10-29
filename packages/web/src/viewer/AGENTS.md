@@ -47,3 +47,9 @@ Never hand-build a URL. `installBasePathFetch()` prefixes root-relative `fetch`,
 share links and the logo. All three derive the hub prefix and the `/w/<key>` workspace
 slot from `location.pathname` at boot (`viewer/base-path.ts`), over the same
 `src/shared/base-path.ts` the server uses, so where the prefix ends is defined once.
+
+**Sockets open through `openWebSocket()`** (`viewer/session.ts`), never
+`new WebSocket(...)`: on a token-protected server the handshake needs a
+single-use ticket (`socket-guard.test.ts`). A link to a server-generated
+document uses `credentialedLinkClick`, since a navigation carries no credential
+([why](../../../../docs/architecture/web-server.md#authentication)).

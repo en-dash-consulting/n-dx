@@ -11,8 +11,10 @@
  * Two kinds of rule, applied in order:
  *
  * 1. **Well-known token shapes** — vendor prefixes (`sk-ant-…`, `ghp_…`,
- *    `AKIA…`, `xoxb-…`, `ATBB…`), JWTs, private-key blocks, `Bearer` and
- *    `Basic` headers, `-u user:password` flags and URL userinfo. These need no
+ *    `AKIA…`, `xoxb-…`, `ATBB…`, `sk_live_…`, `SG.…`, `hvs.…`), JWTs,
+ *    private-key blocks, webhook URLs, signed-URL query parameters,
+ *    `Bearer`, `Token` and `Basic` headers, `Cookie` headers, `-u
+ *    user:password` and `--token value` flags and URL userinfo. These need no
  *    key to be recognised.
  * 2. **Credential-shaped assignments** — `KEY=value`, `key: value` or
  *    `"key": "value"` where the key *ends* in a sensitive word (`token`,
@@ -20,6 +22,10 @@
  *    value replaced. The suffix rule, and the requirement that the value hold
  *    a letter, keep run-record fields such as `tokenUsage`, `totalTokens` or
  *    `tokenDiagnosticStatus` untouched.
+ *
+ * Every rule skips a span that an earlier rule (or an earlier pass) has
+ * already replaced, so the output carries no nested markers and a second pass
+ * over redacted text changes nothing.
  *
  * Redaction is best-effort by nature — a secret split across two output
  * chunks or encoded unusually will slip through — so it is a floor, not a
@@ -33,7 +39,9 @@
  * done. Such a credential is caught when it appears behind a key
  * (`BITBUCKET_APP_PASSWORD=…`), in URL userinfo, behind `-u`, or inside a
  * `Basic` header — which covers how one is actually used — and not when it is
- * printed bare.
+ * printed bare. The one exception is an AWS secret key, which is matched bare
+ * when the same text also carries an AWS access key id or an
+ * `aws_secret…` key name — see the `aws-secret` rule.
  */
 
 export const REDACTED_TOKEN = "[redacted:token]";
@@ -41,23 +49,120 @@ export const REDACTED_VALUE = "[redacted:value]";
 export const REDACTED_KEY_BLOCK = "[redacted:private-key]";
 export const REDACTED_PASSWORD = "[redacted:password]";
 
+/** The opening of every marker this module writes. */
+const MARKER_PREFIX = "[redacted:";
+
 interface Rule {
   kind: string;
   pattern: RegExp;
+  /**
+   * The replacement. A function receives the match and its groups and may
+   * return the match unchanged to decline — a declined match is not counted
+   * as a redaction.
+   */
   replace: string | ((...groups: string[]) => string);
+  /**
+   * Gate on the *original* text: the rule is skipped unless this returns
+   * true. Used by a rule whose shape is only credential-like in context.
+   */
+  when?: (text: string) => boolean;
 }
 
 // The key half of an assignment: a name ending in a sensitive word, with or
 // without a prefix, so both `password=` and `GITHUB_TOKEN=` match. Written
 // once and shared by the two assignment rules, which must agree on what a
 // key is.
-const ASSIGNMENT_KEY = "\\b[A-Za-z0-9_.-]*?(?:token|secret|password|passwd|api[_-]?key|apikey|private[_-]?key|credentials?|(?:secret|access)[_-]?key)\\b";
+//
+// Words that are *not* here, and why:
+// - `session` / `sessionid` — hench's run record carries `sessionId` (the
+//   CLI session reused on resume) and `session`; redacting either would
+//   break resume. `session_key` is matched through the `…key` branch.
+// - a bare `pass` — Go's test runner prints `--- PASS: TestName`, so `pass`
+//   needs a prefix (`DB_PASS`, `db-pass`) to count as a key.
+const ASSIGNMENT_KEY =
+  "\\b(?:" +
+  "[A-Za-z0-9_.-]*?(?:token|secret|password|passwd|pwd|auth|cookie|signature|sig|dsn|api[_-]?key|apikey|credentials?" +
+  "|(?:secret|access|encryption|signing|master|session|stripe|private)[_-]?key)" +
+  "|[A-Za-z0-9_.-]+?pass" +
+  ")\\b";
+
+/** Keys that name a password: the value floor is lowered for these (a PIN). */
+const PASSWORD_KEY = /(?:password|passwd|pass|pwd)$/i;
+
+/** Values that are a language literal, not a credential. */
+const LITERAL_VALUE = /^(?:null|true|false|none|undefined)$/i;
+
+/**
+ * Decide whether an assignment value is a credential worth replacing.
+ *
+ * @param head   The matched key plus separator (`GITHUB_TOKEN=`, `"api_key": `).
+ * @param value  The value, without quotes or trailing whitespace.
+ * @param quoted Whether the value was quoted; quoted values have exact bounds
+ *               so no length floor is needed to tell them from prose.
+ */
+function isCredentialValue(head: string, value: string, quoted: boolean): boolean {
+  // Already handled by an earlier rule or an earlier pass.
+  if (value.includes(MARKER_PREFIX)) return false;
+  if (value.length === 0 || LITERAL_VALUE.test(value)) return false;
+  const key = /([A-Za-z0-9_.-]+)["']?\s*[=:]\s*$/.exec(head)?.[1] ?? "";
+  // `env` prints the working directory as PWD=/path — a directory, not a
+  // password. Only the exact shell variables are exempt, and only when the
+  // value is a path; `pwd=` in a connection string is still redacted.
+  if (/^(?:OLD)?PWD$/.test(key) && /^(?:[/~]|[A-Za-z]:[\\/])/.test(value)) return false;
+  if (PASSWORD_KEY.test(key)) {
+    // A password may be short and all-digit (a PIN); the key already says
+    // what it is. Four characters keeps `password: no` style prose alone.
+    return quoted || value.length >= 4;
+  }
+  // Other keys need a letter — `totalTokens: 12345678` is a counter — unless
+  // the value is a long digit run, which is a secret, not a count.
+  if (/^[0-9]{16,}$/.test(value)) return true;
+  if (!/[A-Za-z]/.test(value)) return false;
+  return quoted || value.length >= 8;
+}
+
+/** Cookie attributes that follow the pairs in a `Set-Cookie` header. */
+const COOKIE_ATTRIBUTE = /^(?:path|domain|expires|max-age|samesite|secure|httponly|priority|partitioned|version|comment)$/i;
 
 const RULES: readonly Rule[] = [
   {
+    // PEM private keys and PGP private key blocks, whole.
     kind: "private-key",
-    pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+    pattern: /-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/g,
     replace: REDACTED_KEY_BLOCK,
+  },
+  {
+    // Incoming webhook URLs: the path *is* the credential. The host is kept
+    // so the record still says which service was called.
+    //
+    // gitleaks `slack-webhook-url`: `hooks.slack.com/(services|workflows|
+    // triggers)/[A-Za-z0-9+/]{43,56}`; the floor here is lower, as with the
+    // vendor prefixes below. Discord documents its webhook URL as
+    // `discord.com/api/webhooks/<id>/<token>`.
+    kind: "webhook",
+    pattern: /(\bhooks\.slack\.com\/(?:services|workflows|triggers)\/|\bdiscord(?:app)?\.com\/api\/webhooks\/[0-9]+\/)(?!\[redacted:)[A-Za-z0-9+/_-]{20,}/g,
+    replace: (_m: string, head: string) => `${head}${REDACTED_TOKEN}`,
+  },
+  {
+    // Signed URLs: an Azure SAS `sig=`, an S3 presigned `X-Amz-Signature=`
+    // and `X-Amz-Credential=`, a GCS `X-Goog-Signature=`. The query value is
+    // the credential; the rest of the URL is kept.
+    kind: "url-signature",
+    pattern: /([?&](?:sig|signature|X-Amz-Signature|X-Amz-Credential|X-Amz-Security-Token|X-Goog-Signature|X-Goog-Credential)=)(?!\[redacted:)[^&\s"'<>]+/gi,
+    replace: (_m: string, head: string) => `${head}${REDACTED_TOKEN}`,
+  },
+  {
+    // An AWS secret access key printed bare — `echo $AWS_SECRET_ACCESS_KEY`,
+    // or a credentials file with the key on its own line. The shape (40
+    // characters of base64) is also a content hash, so it is only matched
+    // when the same text carries an access key id or an `aws_secret…` name:
+    // trufflehog `pkg/detectors/aws` pairs `[A-Za-z0-9+/]{40}` with
+    // `(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}` the same way. Upper, lower and
+    // digit are all required, which base64 of 30 random bytes always has.
+    kind: "aws-secret",
+    when: (text) => /(?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}/.test(text) || /aws[_-]?secret/i.test(text),
+    pattern: /(?<![A-Za-z0-9/+])(?=[A-Za-z0-9/+]*[A-Z])(?=[A-Za-z0-9/+]*[a-z])(?=[A-Za-z0-9/+]*[0-9])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+=])/g,
+    replace: REDACTED_TOKEN,
   },
   {
     // Vendor-prefixed API keys and tokens. Each prefix is followed by a long
@@ -122,6 +227,30 @@ const RULES: readonly Rule[] = [
         // is `Ab+/` repeated — so `+`, `/` and `=` all belong in the class and
         // none of them were there before.
         "BBDC-[A-Za-z0-9+/=]{20,}",
+
+        // gitleaks `stripe-access-token`:
+        // `(sk|rk)_(test|live|prod)_[0-9a-zA-Z]{10,99}`.
+        "(?:sk|rk)_(?:live|test|prod)_[A-Za-z0-9]{10,}",
+        // gitleaks `sendgrid-api-token`:
+        // `SG\\.[a-zA-Z0-9_-]{22}\\.[a-zA-Z0-9_-]{43}`.
+        "SG\\.[A-Za-z0-9_-]{16,}\\.[A-Za-z0-9_-]{16,}",
+        // gitleaks `vault-service-token` `hvs\\.[a-z0-9A-Z_-]{24,}` and
+        // `vault-batch-token` `hvb\\.[a-z0-9A-Z_-]{24,}`.
+        "hv[sb]\\.[A-Za-z0-9_-]{20,}",
+        // gitleaks `shopify-access-token` and siblings: `shpat_`, `shpss_`,
+        // `shpca_`, `shppa_`, each followed by 32 hex.
+        "shp(?:at|ss|ca|pa)_[a-fA-F0-9]{32}",
+        // gitleaks `twilio-api-key`: `SK[0-9a-fA-F]{32}`. Bounded on both
+        // sides — the prefix is two letters, so a longer identifier that
+        // happens to contain it must not match.
+        "\\bSK[0-9a-fA-F]{32}\\b",
+        // trufflehog `pkg/detectors/discordbottoken`:
+        // `[MN][A-Za-z\\d]{23}\\.[\\w-]{6}\\.[\\w-]{27,}` — a base64 user id,
+        // a timestamp and an HMAC, dot-separated.
+        "[MN][A-Za-z0-9]{23}\\.[A-Za-z0-9_-]{6}\\.[A-Za-z0-9_-]{27,}",
+        // gitleaks `azure-ad-client-secret`:
+        // `[a-zA-Z0-9_~.]{3}\\dQ~[a-zA-Z0-9_~.-]{31,34}`, bounded on the left.
+        "(?<![A-Za-z0-9_~.-])[A-Za-z0-9_~.]{3}[0-9]Q~[A-Za-z0-9_~.-]{31,34}",
         "eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}",
       ].join("|"),
       "g",
@@ -129,8 +258,21 @@ const RULES: readonly Rule[] = [
     replace: REDACTED_TOKEN,
   },
   {
+    // `Bearer <token>`. Sixteen characters of token alphabet are enough on
+    // their own. A shorter token — some gateways issue twelve — is accepted
+    // from eight characters when it holds a digit, which is what separates
+    // it from the word that follows "Bearer" in prose ("Bearer tokens are
+    // sent in a header", "Bearer authentication").
     kind: "bearer",
-    pattern: /\b(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}/g,
+    pattern: /\b(Bearer\s+)(?:[A-Za-z0-9._~+/=-]{16,}|(?=[A-Za-z._~+/=-]*[0-9])[A-Za-z0-9._~+/=-]{8,})/g,
+    replace: (_m: string, prefix: string) => `${prefix}${REDACTED_TOKEN}`,
+  },
+  {
+    // `Authorization: Token <key>` (Django REST framework, many APIs) and
+    // `Authorization: ApiKey <key>` (Elasticsearch). "Token" is an ordinary
+    // word, so the header name is required.
+    kind: "token-header",
+    pattern: /(\bAuthorization["']?\s*[:=]\s*["']?(?:Token|ApiKey)\s+)[A-Za-z0-9._~+/=-]{8,}/gi,
     replace: (_m: string, prefix: string) => `${prefix}${REDACTED_TOKEN}`,
   },
   {
@@ -165,23 +307,44 @@ const RULES: readonly Rule[] = [
       `${lead}${flag}${sep}${user}:${REDACTED_PASSWORD}`,
   },
   {
+    // A credential handed over on the command line: `--token <value>`,
+    // `--password=<value>`. The flag must be followed directly by a space or
+    // `=`, so `--token-file` and `--password-stdin` are not flags of this
+    // kind, and `--no-auth` is not `--auth`.
+    kind: "flag",
+    pattern: /((?:^|\s)--(?:token|access-token|api-key|apikey|password|passwd|pwd|secret|client-secret|auth)[ =])(?!\[redacted:)\S{2,}/gi,
+    replace: (_m: string, head: string) => `${head}${REDACTED_VALUE}`,
+  },
+  {
     // user:password@host in a URL. The user is kept — it is often a service
-    // name — and only the password goes.
+    // name — and only the password goes. A userinfo that an earlier rule has
+    // already replaced (`https://[redacted:token]@github.com/…`) is left as
+    // it is, rather than being wrapped in a second marker.
     kind: "url-password",
-    pattern: /(\b[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:)([^/\s@]+)(@)/gi,
+    pattern: /(\b[a-z][a-z0-9+.-]*:\/\/(?!\[redacted:)[^/\s:@]+:)([^/\s@]+)(@)/gi,
     replace: (_m: string, before: string, _pw: string, at: string) => `${before}${REDACTED_PASSWORD}${at}`,
   },
-
+  {
+    // `Cookie:` and `Set-Cookie:` headers. Each `name=value` pair loses its
+    // value and keeps its name; the attributes that follow the pair in a
+    // `Set-Cookie` (`Path=/`, `Max-Age=…`) are not cookies and are kept.
+    kind: "cookie",
+    pattern: /(\b(?:Set-)?Cookie["']?\s*:\s*["']?)([^\n]*)/gi,
+    replace: (_m: string, head: string, body: string) =>
+      head +
+      body.replace(/([A-Za-z0-9_.-]+)=([^;\s"']*)/g, (pair: string, name: string, value: string) => {
+        if (value.length === 0 || value.startsWith(MARKER_PREFIX) || COOKIE_ATTRIBUTE.test(name)) return pair;
+        return `${name}=${REDACTED_VALUE}`;
+      }),
+  },
   {
     // key="value with spaces" — the whole quoted value goes. This rule must
     // come first: the unquoted rule below would otherwise stop at the opening
     // quote and redact only the first word of a quoted passphrase.
     kind: "assignment",
-    pattern: new RegExp(
-      `(${ASSIGNMENT_KEY}["']?\\s*[=:]\\s*)(["'])((?!\\[redacted:)(?:[^"'\\\\\\n]|\\\\.)*[A-Za-z](?:[^"'\\\\\\n]|\\\\.)*)\\2`,
-      "gi",
-    ),
-    replace: (_m: string, head: string, quote: string) => `${head}${quote}${REDACTED_VALUE}${quote}`,
+    pattern: new RegExp(`(${ASSIGNMENT_KEY}["']?\\s*[=:]\\s*)(["'])((?:[^"'\\\\\\n]|\\\\.)*)\\2`, "gi"),
+    replace: (m: string, head: string, quote: string, value: string) =>
+      isCredentialValue(head, value, true) ? `${head}${quote}${REDACTED_VALUE}${quote}` : m,
   },
   {
     // key=value, unquoted, running to the end of the line.
@@ -200,16 +363,15 @@ const RULES: readonly Rule[] = [
     // The first character is pinned to a non-space, non-quote on purpose:
     // `\s*` above would otherwise backtrack to empty and let the value start
     // at the space before an opening quote — matching a quoted value after
-    // all, and undoing the rule above it.
+    // all, and undoing the rule above it. It must not open a bracket either:
+    // `"auth": {` begins an object, and taking it would break the JSON.
     kind: "assignment",
-    pattern: new RegExp(
-      `(${ASSIGNMENT_KEY}["']?\\s*[=:]\\s*)((?!\\[redacted:)(?=[^\\n;,]*[A-Za-z])[^\\s"'\\n;,][^\\n;,]{7,})`,
-      "gi",
-    ),
-    replace: (_m: string, head: string, value: string) => {
+    pattern: new RegExp(`(${ASSIGNMENT_KEY}["']?\\s*[=:]\\s*)([^\\s"'\\n;,{\\[][^\\n;,]*)`, "gi"),
+    replace: (m: string, head: string, raw: string) => {
       // Trailing whitespace is not part of the value; keep the line's shape.
-      const trailing = /\s*$/.exec(value)?.[0] ?? "";
-      return `${head}${REDACTED_VALUE}${trailing}`;
+      const trailing = /\s*$/.exec(raw)?.[0] ?? "";
+      const value = raw.slice(0, raw.length - trailing.length);
+      return isCredentialValue(head, value, false) ? `${head}${REDACTED_VALUE}${trailing}` : m;
     },
   },
 ];
@@ -228,11 +390,15 @@ export function redactSecretsDetailed(text: string): RedactionResult {
   let count = 0;
   const kinds: string[] = [];
   for (const rule of RULES) {
+    if (rule.when && !rule.when(text)) continue;
     let fired = 0;
     out = out.replace(rule.pattern, (...args: unknown[]) => {
-      fired += 1;
+      const match = args[0] as string;
       const groups = args.slice(0, -2) as string[];
-      return typeof rule.replace === "string" ? rule.replace : rule.replace(...groups);
+      const replacement = typeof rule.replace === "string" ? rule.replace : rule.replace(...groups);
+      // A rule may look at a match and decline it; that is not a redaction.
+      if (replacement !== match) fired += 1;
+      return replacement;
     });
     if (fired > 0) {
       count += fired;
@@ -268,8 +434,8 @@ export function redactDeep<T>(value: T): T {
 /** Longest run of withheld lines before a `BEGIN` is judged not to be a key. */
 const MAX_KEY_BLOCK_LINES = 512;
 
-const KEY_BEGIN = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
-const KEY_END = /-----END [A-Z ]*PRIVATE KEY-----/;
+const KEY_BEGIN = /-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/;
+const KEY_END = /-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/;
 
 /**
  * A redactor for callers that only ever hold one line at a time.

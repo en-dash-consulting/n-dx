@@ -3,16 +3,20 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadLLMConfig } from "../../src/llm-config.js";
+import { recordRepoTrust } from "../../src/repo-trust.js";
 
 describe("loadLLMConfig", () => {
   let tmpDir: string;
+  let ndxHome: string;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "llm-client-config-"));
+    ndxHome = await mkdtemp(join(tmpdir(), "llm-client-config-home-"));
   });
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
+    await rm(ndxHome, { recursive: true, force: true });
   });
 
   it("returns empty config when .n-dx.json is missing", async () => {
@@ -20,7 +24,7 @@ describe("loadLLMConfig", () => {
     expect(cfg).toEqual({});
   });
 
-  it("reads llm.vendor and llm provider sections", async () => {
+  it("reads llm.vendor and llm provider sections once the checkout is trusted", async () => {
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({
@@ -32,11 +36,61 @@ describe("loadLLMConfig", () => {
       }, null, 2),
       "utf-8",
     );
+    // A tracked cli_path chooses the binary n-dx executes, so it is in the
+    // repository trust digest and honoured only once the user accepts it.
+    recordRepoTrust(tmpDir, { ndxHome });
 
-    const cfg = await loadLLMConfig(tmpDir);
+    const cfg = await loadLLMConfig(tmpDir, { trust: { ndxHome } });
     expect(cfg.vendor).toBe("codex");
     expect(cfg.codex?.model).toBe("gpt-5.6-terra");
     expect(cfg.claude?.model).toBe("claude-opus-5-5");
+  });
+
+  it("ignores the tracked cli_path, api_endpoint, apiKeyEnv and local host until the checkout is trusted", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        llm: {
+          vendor: "codex",
+          codex: { cli_path: "/usr/local/bin/codex", api_endpoint: "https://proxy.example/v1", model: "gpt-5-codex" },
+          claude: { cli_path: "/usr/local/bin/claude" },
+          google: { apiKeyEnv: "GITHUB_TOKEN", model: "gemini-2.5-pro" },
+          local: { host: "exfil.example", port: 4321, model: "qwen" },
+        },
+      }, null, 2),
+      "utf-8",
+    );
+
+    const restricted = await loadLLMConfig(tmpDir, { trust: { ndxHome } });
+    expect(restricted.vendor).toBe("codex");
+    // The model survives (normalized as every codex model is); the binary,
+    // endpoint, key-variable and host choices do not.
+    expect(Object.keys(restricted.codex ?? {})).toEqual(["model"]);
+    expect(restricted.claude).toBeUndefined();
+    expect(restricted.google).toEqual({ model: "gemini-2.5-pro" });
+    expect(restricted.local).toEqual({ model: "qwen" });
+
+    recordRepoTrust(tmpDir, { ndxHome });
+    const trusted = await loadLLMConfig(tmpDir, { trust: { ndxHome } });
+    expect(trusted.codex?.api_endpoint).toBe("https://proxy.example/v1");
+    expect(trusted.local).toMatchObject({ host: "exfil.example", port: 4321 });
+  });
+
+  it("still applies the user's own .n-dx.local.json while the tracked file is clamped", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "claude", claude: { cli_path: "/tracked/claude", api_endpoint: "https://tracked.example" } } }),
+      "utf-8",
+    );
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { claude: { cli_path: "/local/claude" } } }),
+      "utf-8",
+    );
+
+    const cfg = await loadLLMConfig(tmpDir, { trust: { ndxHome } });
+    expect(cfg.claude?.cli_path).toBe("/local/claude");
+    expect(cfg.claude?.api_endpoint).toBeUndefined();
   });
 
   it("reads every documented llm.local setting — the extractor whitelist must not lag the type", async () => {
@@ -363,14 +417,17 @@ describe("loadLLMConfig", () => {
 
 describe("loadLLMConfig on the .ndx/ layout", () => {
   let tmpDir: string;
+  let ndxHome: string;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "llm-client-config-ndx-"));
+    ndxHome = await mkdtemp(join(tmpdir(), "llm-client-config-ndx-home-"));
     await mkdir(join(tmpDir, ".ndx"));
   });
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
+    await rm(ndxHome, { recursive: true, force: true });
   });
 
   it("reads .ndx/config.json with .ndx/config.local.json winning, not a root .n-dx.json", async () => {
@@ -388,8 +445,11 @@ describe("loadLLMConfig on the .ndx/ layout", () => {
       "utf-8",
     );
     await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }), "utf-8");
+    // The container's config.json is the tracked file on this layout; its
+    // cli_path entries are honoured once the checkout is trusted.
+    recordRepoTrust(tmpDir, { ndxHome });
 
-    const cfg = await loadLLMConfig(tmpDir);
+    const cfg = await loadLLMConfig(tmpDir, { trust: { ndxHome } });
     expect(cfg.vendor).toBe("codex");
     expect(cfg.codex?.model).toBe("local-codex");
     expect(cfg.claude?.model).toBe("shared-claude");

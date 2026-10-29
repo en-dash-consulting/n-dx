@@ -288,6 +288,12 @@ export interface SharedLoopOptions {
    * {@link FinalizeRunOptions.reviewOptional}.
    */
   reviewOptional?: boolean;
+  /**
+   * Aborted when the operator interrupts the run (SIGINT/SIGTERM). The CLI
+   * loop passes it to every vendor spawn, which terminates the vendor's
+   * process tree; the run is then recorded as cancelled.
+   */
+  abortSignal?: AbortSignal;
   /** Task IDs to skip during autoselection (e.g. stuck tasks). */
   excludeTaskIds?: Set<string>;
   /** Restrict task selection to this epic (ID). */

@@ -34,8 +34,14 @@ export interface CliInvocation {
   stdin: string;
 }
 
-/** A single scripted session: inspect the invocation, act, emit stream-json. */
-export type ScriptedTurn = (call: CliInvocation) => { lines: object[]; code?: number };
+/**
+ * A single scripted session: inspect the invocation, act, emit stream-json.
+ *
+ * `hang: true` leaves the session running after its lines are emitted, the
+ * way a live CLI does mid-task: it closes only when killed, reporting the
+ * signal. That is what interrupt and limit tests need to observe.
+ */
+export type ScriptedTurn = (call: CliInvocation) => { lines: object[]; code?: number; hang?: boolean };
 
 function commandBase(command: string): string {
   return command.replace(/^.*[\\/]/, "").replace(/\.exe$/i, "");
@@ -155,12 +161,19 @@ export function createScriptedClaudeCli(actualSpawn: typeof nodeSpawn): Scripted
           proc.emit("close", 1, null);
           return;
         }
-        const { lines, code = 0 } = turn(call);
+        const { lines, code = 0, hang = false } = turn(call);
         const text = lines.map((line) => JSON.stringify(line)).join("\n") + "\n";
         stdout.emit("data", Buffer.from(text));
+        if (hang) {
+          hanging = true;
+          return;
+        }
+        proc.exitCode = code;
         proc.emit("close", code, null);
       });
     };
+    let hanging = false;
+    let killed = false;
 
     Object.assign(proc, {
       pid: undefined,
@@ -176,7 +189,19 @@ export function createScriptedClaudeCli(actualSpawn: typeof nodeSpawn): Scripted
         end: run,
         on: () => {},
       },
-      kill: () => true,
+      kill: (signal: NodeJS.Signals = "SIGTERM") => {
+        if (killed || proc.exitCode !== null) return false;
+        killed = true;
+        // A session still running dies of the signal; one that already ended
+        // has nothing left to kill.
+        if (!hanging) return false;
+        proc.signalCode = signal;
+        setImmediate(() => {
+          proc.emit("exit", null, signal);
+          proc.emit("close", null, signal);
+        });
+        return true;
+      },
     });
     return proc;
   }

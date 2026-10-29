@@ -41,6 +41,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { spawnCli, terminateProcessTree } from "@n-dx/llm-client";
 
 import type { ServerContext } from "./types.js";
+import { refuseWhileRestricted } from "./trust-gate.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody } from "./response-utils.js";
 import {
@@ -267,7 +268,12 @@ export async function handleRunCommandsRoute(
 
   if (path === "/api/run-commands" && method === "GET") return handleList(res, ctx);
   if (path === "/api/run-commands/status" && method === "GET") return handleStatus(res, ctx);
-  if (path === "/api/run-commands/start" && method === "POST") return handleStart(req, res, ctx);
+  // A detected command is the repository's own script (package.json,
+  // Makefile, manage.py), so it waits until the repository's execution config
+  // has been accepted (see trust-gate.ts).
+  if (path === "/api/run-commands/start" && method === "POST") {
+    return refuseWhileRestricted(res, ctx.projectDir) ? true : handleStart(req, res, ctx);
+  }
   if (path === "/api/run-commands/stop" && method === "POST") return handleStop(res, ctx);
 
   return false;

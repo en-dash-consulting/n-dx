@@ -1,13 +1,13 @@
 /**
  * The hub's browser-origin gate.
  *
- * The hub listens on a fixed, well-known port (3117) with no authentication,
- * and `POST /api/hub/projects` makes it *spawn a process*: `ndxBin` is any
- * absolute path that exists on disk. A `fetch` from any page the user has open
- * is a same-site-less cross-origin request, and a `text/plain` POST is a CORS
- * "simple request" — no preflight, so nothing asks the hub's permission before
- * the body arrives. Without this gate, visiting a web page was enough to make
- * the hub execute a chosen file.
+ * The hub listens on a fixed, well-known port (3117), and
+ * `POST /api/hub/projects` makes it *spawn a process* — the hub's own CLI
+ * entry point, for the repository the body names. A `fetch` from any page the
+ * user has open is a same-site-less cross-origin request, and a `text/plain`
+ * POST is a CORS "simple request" — no preflight, so nothing asks the hub's
+ * permission before the body arrives. Without this gate, visiting a web page
+ * was enough to make the hub register and serve a chosen directory.
  *
  * The rule matches the project server's (`server/request-security.ts`), which
  * the hub cannot import from — its zone may not reach into `src/server/` — so
@@ -29,19 +29,38 @@
  * sees the original.
  *
  * With a per-user token configured (`ndx start` always passes one), every
- * request must also present it, or it is answered 401; see `enforceHubToken`.
- * This is what tells this user's browser and CLI apart from another account
- * on the same machine, which the Host and Origin rules cannot do.
+ * request must also present it or a session credential this hub minted, in a
+ * header; see `shared/auth.ts`. This is what tells this user's browser and
+ * CLI apart from another account on the same machine, which the Host and
+ * Origin rules cannot do. A safe-method request without one is passed on
+ * marked public-only ({@link isPublicOnlyHubRequest}) so a navigation still
+ * gets the page shell that signs itself in; a mutation is answered 401. The
+ * credential routes (`/api/auth/*`, at the root or under any `/p/<id>/`) are
+ * the hub's own and answered here — never forwarded to a project server.
  *
  * It guards proxied traffic too, not just `/api/hub/*`: the hub is the outer
- * boundary, and it rewrites the forwarded `Origin` for the child behind it
- * (see `proxy.ts`), so the child can no longer tell a browser origin apart.
+ * boundary. The proxy restates a *trusted* `Origin` as the child's own (see
+ * `proxy.ts`) and forwards an untrusted one unchanged, so a child route that
+ * judges its own GETs (`isForeignSiteRequest`) still sees the foreign origin.
  *
  * @module web/hub/request-guard
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isLoopbackHostOnPort, isLoopbackOriginOnPort, isAuthenticated, splitTokenQuery, tokensEqual, authCookie } from "../shared/index.js";
+import {
+  isLoopbackHostOnPort,
+  isLoopbackOriginOnPort,
+  applySecurityHeaders,
+  requestAccess,
+  authRouteOf,
+  answerAuthRoute,
+  authorizeUpgrade,
+  detectBasePath,
+  stripBasePath,
+  stripWorkspaceSlot,
+  AUTH_HINT,
+} from "../shared/index.js";
+import type { CredentialStore, RequestAccess } from "../shared/index.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -86,37 +105,29 @@ function rejectUnauthenticated(res: ServerResponse): true {
     "Cache-Control": "no-store",
     "WWW-Authenticate": 'Bearer realm="n-dx"',
   });
-  res.end(JSON.stringify({
-    error: "Authentication required",
-    hint: "Open the URL printed by `ndx start`, or send the token from <ndx home>/auth.token as `Authorization: Bearer <token>` or `X-Ndx-Token`.",
-  }));
+  res.end(JSON.stringify({ error: "Authentication required", hint: AUTH_HINT }));
   return true;
 }
 
+/** Requests the gate let through without a credential. */
+const publicOnly = new WeakSet<object>();
+
 /**
- * The per-user token rule, same as the project server's
- * (`server/request-security.ts`, which the hub cannot import): present it in
- * a header or the cookie, or — for a safe-method navigation — carry it once
- * as `?ndx_token=` and be redirected with the cookie set. Returns true when
- * the request has been answered.
- *
- * The redirect fires even when the cookie already authenticates the request
- * — the printed URL is reopened on every `ndx start` — so the token never
- * stays in the address bar and the child never sees the parameter.
+ * Whether the gate let `req` through without a credential (a safe method
+ * only). The hub then serves it only what is public: the home page shell, and
+ * a proxied request with no credential attached, which the project server
+ * answers with its own public shell or a 401.
  */
-export function enforceHubToken(req: IncomingMessage, res: ServerResponse, token: string): boolean {
-  const authenticated = isAuthenticated(req.headers, token);
-  const method = (req.method || "GET").toUpperCase();
-  if (method === "GET" || method === "HEAD") {
-    const { token: fromQuery, location } = splitTokenQuery(req.url ?? "/");
-    if (fromQuery !== null && tokensEqual(fromQuery, token)) {
-      res.writeHead(302, { Location: location, "Set-Cookie": authCookie(token), "Cache-Control": "no-store" });
-      res.end();
-      return true;
-    }
-  }
-  if (authenticated) return false;
-  return rejectUnauthenticated(res);
+export function isPublicOnlyHubRequest(req: object): boolean {
+  return publicOnly.has(req);
+}
+
+/** The path a credential route is matched on: no query, no `/p/<id>` or `/w/<key>`. */
+export function hubRoutePath(url: string): string {
+  const pathname = url.split("?")[0];
+  const prefix = detectBasePath(pathname);
+  const afterPrefix = prefix ? stripBasePath(prefix, pathname) : pathname;
+  return stripWorkspaceSlot(afterPrefix).url;
 }
 
 /** Whether the request's `Host` names loopback on the hub's own port. */
@@ -133,11 +144,21 @@ export function guardHubRequest(
   res: ServerResponse,
   hubPort: number | undefined,
   token: string | null = null,
+  credentials: CredentialStore | null = null,
 ): boolean {
+  // Same headers, same moment as the project server's gate: before any
+  // verdict is written, from the shared helper, so the two cannot drift.
+  applySecurityHeaders(res);
   if (!hostAllowed(req, hubPort)) return rejectHost(res);
-  if (token && enforceHubToken(req, res, token)) return true;
 
   const method = (req.method || "GET").toUpperCase();
+  const route = authRouteOf(hubRoutePath(req.url ?? "/"));
+  const access: RequestAccess = requestAccess(req.headers, token, credentials);
+  if (access === "public" && route === null) {
+    if (method !== "GET" && method !== "HEAD") return rejectUnauthenticated(res);
+    publicOnly.add(req);
+  }
+
   const mutating = method === "OPTIONS" || !SAFE_METHODS.has(method);
   const verdict = classifyOrigin(req, hubPort);
 
@@ -165,6 +186,15 @@ export function guardHubRequest(
     return true;
   }
 
+  if (route !== null) {
+    const answer = answerAuthRoute(route, method, req.headers, token, credentials, access);
+    const headers: Record<string, string> = { "Content-Type": "application/json", "Cache-Control": "no-store" };
+    if (answer.status === 401) headers["WWW-Authenticate"] = 'Bearer realm="n-dx"';
+    res.writeHead(answer.status, headers);
+    res.end(JSON.stringify(answer.body));
+    return true;
+  }
+
   return false;
 }
 
@@ -178,18 +208,21 @@ export function guardHubRequest(
  *
  * The rules apply in the same order as the HTTP gate, and each is reported
  * distinctly rather than collapsed into one refusal: Host (421 Misdirected
- * Request), then the per-user token (401 Unauthorized), then Origin (403
+ * Request), then the credential — the per-user token in a header, or a
+ * single-use ticket from `POST /api/auth/ws-ticket` in the URL, spent here —
+ * (401 Unauthorized), then Origin (403
  * Forbidden). A boolean here would have answered 403 for a foreign `Host`,
  * which contradicts both the HTTP path above and the project server's own
  * upgrade handler (`server/websocket.ts`).
  */
 export function upgradeRefusal(
-  req: Pick<IncomingMessage, "headers">,
+  req: Pick<IncomingMessage, "headers" | "url">,
   hubPort: number | undefined,
   token: string | null = null,
+  credentials: CredentialStore | null = null,
 ): "421 Misdirected Request" | "401 Unauthorized" | "403 Forbidden" | null {
   if (!hostAllowed(req, hubPort)) return "421 Misdirected Request";
-  if (token && !isAuthenticated(req.headers, token)) return "401 Unauthorized";
+  if (token && !authorizeUpgrade(req, token, credentials).ok) return "401 Unauthorized";
   if (classifyOrigin(req, hubPort) === "untrusted") return "403 Forbidden";
   return null;
 }

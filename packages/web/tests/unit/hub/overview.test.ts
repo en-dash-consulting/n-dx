@@ -17,7 +17,6 @@ function project(id: string, overrides: Partial<ProjectView> = {}): ProjectView 
     name: id,
     repoRoot: `/repos/${id}`,
     worktrees: [`/repos/${id}`],
-    ndxBin: "/ndx",
     port: 4001,
     pid: 100,
     lastSeen: null,

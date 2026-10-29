@@ -3,23 +3,37 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, realpathSync, statSync } from "node:fs";
 import { join, extname, sep } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
-import { ALL_DATA_FILES, SUPPLEMENTARY_FILES } from "../shared/index.js";
+import { ALL_DATA_FILES, SUPPLEMENTARY_FILES, applyStrictContentPolicy } from "../shared/index.js";
 import { prdExists, loadPRDSync, prdMaxMtimeMs } from "./prd-io.js";
 
-const MIME_TYPES: Record<string, string> = {
-  ".html": "text/html",
-  ".js": "application/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".md": "text/markdown",
-  ".txt": "text/plain",
-};
+/**
+ * The files `/data/*` serves: the sourcevision data set and its supplementary
+ * text files, plus the aggregated `prd.json`. Anything else under
+ * `.sourcevision/` is not the dashboard's to serve, whatever its extension —
+ * an `.html` or `.svg` there would otherwise run on the dashboard's origin.
+ */
+const SERVED_DATA_FILES: ReadonlySet<string> = new Set<string>([...ALL_DATA_FILES, ...SUPPLEMENTARY_FILES]);
+
+/** Data, never a document: JSON as JSON, everything else as plain text. */
+function dataContentType(file: string): string {
+  return extname(file) === ".json" ? "application/json; charset=utf-8" : "text/plain; charset=utf-8";
+}
+
+/** Headers every `/data/*` answer carries, before its status is written. */
+function applyDataHeaders(res: ServerResponse): void {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  applyStrictContentPolicy(res);
+}
+
+function refuse(res: ServerResponse, status: 403 | 404): true {
+  res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" });
+  res.end(status === 403 ? "Forbidden" : "Not found");
+  return true;
+}
 
 export interface DataWatcher {
   fileMtimes: Record<string, number>;
@@ -99,7 +113,8 @@ export function handleDataRoute(
 
   // Serve individual data files
   if (url.startsWith("/data/")) {
-    const dataFile = url.replace("/data/", "");
+    applyDataHeaders(res);
+    const dataFile = url.slice("/data/".length).split("?")[0]!;
 
     // Serve aggregated PRD from .rex/ directory (all prd_*.json + legacy prd.json)
     if (dataFile === "prd.json") {
@@ -108,46 +123,53 @@ export function handleDataRoute(
         if (doc) {
           const body = JSON.stringify(doc);
           res.writeHead(200, {
-            "Content-Type": "application/json",
+            "Content-Type": "application/json; charset=utf-8",
             "Content-Length": Buffer.byteLength(body),
             "Cache-Control": "no-cache",
           });
           res.end(body);
         } else {
-          res.writeHead(500);
+          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
           res.end("Failed to load PRD");
         }
       } else {
-        res.writeHead(404);
-        res.end("Not found");
+        refuse(res, 404);
       }
       return true;
     }
 
-    const filePath = join(ctx.svDir, dataFile);
-
-    // Prevent directory traversal. The separator matters: a bare prefix check
-    // would accept a sibling directory that merely starts with the same name
-    // (`.sourcevision-old/…`), and the directory itself for an empty name.
-    if (!filePath.startsWith(ctx.svDir + sep)) {
-      res.writeHead(403);
-      res.end("Forbidden");
-      return true;
+    // A name that is not a single path segment is a traversal attempt, not a
+    // file this route could ever serve.
+    if (dataFile === "" || dataFile.includes("/") || dataFile.includes("\\") || dataFile.includes("..")) {
+      return refuse(res, 403);
     }
+    if (!SERVED_DATA_FILES.has(dataFile)) return refuse(res, 404);
 
-    if (existsSync(filePath)) {
-      const ext = extname(filePath);
-      const mime = MIME_TYPES[ext] || "application/octet-stream";
-      const stat = statSync(filePath);
-      res.writeHead(200, {
-        "Content-Type": mime,
-        "Content-Length": stat.size,
-      });
-      createReadStream(filePath).pipe(res);
-    } else {
-      res.writeHead(404);
-      res.end("Not found");
+    // Confined by real path, so a symlink in .sourcevision/ cannot serve a
+    // file from anywhere else on disk.
+    let realFile: string;
+    let realDir: string;
+    try {
+      realDir = realpathSync(ctx.svDir);
+      realFile = realpathSync(join(ctx.svDir, dataFile));
+    } catch {
+      return refuse(res, 404);
     }
+    if (!realFile.startsWith(realDir + sep)) return refuse(res, 403);
+
+    let size: number;
+    try {
+      const stat = statSync(realFile);
+      if (!stat.isFile()) return refuse(res, 404);
+      size = stat.size;
+    } catch {
+      return refuse(res, 404);
+    }
+    res.writeHead(200, {
+      "Content-Type": dataContentType(dataFile),
+      "Content-Length": size,
+    });
+    createReadStream(realFile).pipe(res);
     return true;
   }
 

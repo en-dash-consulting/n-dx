@@ -26,6 +26,8 @@ export {
   webSocketUrl,
 } from "./base-path.js";
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
+export { PAGE_CSP, STRICT_CSP, applySecurityHeaders, applyStrictContentPolicy } from "./response-headers.js";
+export type { HeaderSink } from "./response-headers.js";
 export {
   V1_LEVELS,
   PRODUCT_TYPES,
@@ -60,19 +62,35 @@ export type { HubAdmissionHeader, HubMemoryPressure, HubQueuedRequest } from "./
 export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, resetsDeferred, runOptionArgs, workCommandArgs, checkRunMode, RUN_MODES, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "./run-options.js";
 export type { RunOptionSpec, RunOptions, RunOptionKey, RunOptionsCheck, WorkCommand, RunMode, RunModeCheck } from "./run-options.js";
 export {
-  AUTH_COOKIE_NAME,
   AUTH_HEADER_NAME,
-  AUTH_QUERY_PARAM,
+  NONCE_HEADER_NAME,
+  NONCE_QUERY_PARAM,
+  TICKET_QUERY_PARAM,
+  SESSION_STORAGE_KEY,
+  AUTH_ROUTES,
+  AUTH_HINT,
+  NONCE_TTL_MS,
+  TICKET_TTL_MS,
+  SESSION_IDLE_TTL_MS,
+  SESSION_MAX_TTL_MS,
   tokensEqual,
-  parseCookieValue,
   presentedToken,
   isAuthenticated,
+  randomCredential,
+  CredentialStore,
+  requestAccess,
+  splitQueryParam,
+  authorizeUpgrade,
+  urlWithNonce,
+  authRouteOf,
+  answerAuthRoute,
+  authRequiredPage,
+  wantsHtml,
   splitTokenQuery,
   removeTokenParam,
-  authCookie,
-  urlWithToken,
 } from "./auth.js";
-export type { AuthHeaders } from "./auth.js";
+export { BROWSER_SESSION_SCRIPT, injectSessionScript } from "./browser-session.js";
+export type { AuthHeaders, AuthRouteAnswer, CredentialStoreOptions, RequestAccess } from "./auth.js";
 export {
   SOURCEVISION_SCOPE_VIEWS,
   REX_SCOPE_VIEWS,

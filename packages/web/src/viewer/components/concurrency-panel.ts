@@ -15,6 +15,7 @@
 import { getWebSocketUrl, acceptsFrame } from "../base-path.js";
 import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
+import { openWebSocket } from "../session.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -114,7 +115,7 @@ export function ConcurrencyPanel() {
     let ws: WebSocket | null = null;
 
     try {
-      ws = new WebSocket(wsUrl);
+      ws = openWebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {

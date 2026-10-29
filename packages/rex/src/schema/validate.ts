@@ -126,7 +126,18 @@ export const RunSettingsSchema = z
     tier: RunTierSchema.optional(),
     models: RunModelsSchema.optional(),
     provider: z.enum(["cli", "api"]).optional(),
-    permissionMode: z.enum(["default", "acceptEdits", "bypassPermissions"]).optional(),
+    // `bypassPermissions` is refused rather than left out of the enum so the
+    // error names the key and says where the mode belongs: a PRD item is
+    // repository content, and the agent can write one through the rex MCP
+    // tools, so the one mode that skips every confirmation is never saved on
+    // an item. `hench.permissionMode` and `--permission-mode` still accept it.
+    permissionMode: z
+      .enum(["default", "acceptEdits", "bypassPermissions"])
+      .refine((mode) => mode !== "bypassPermissions", {
+        message:
+          "bypassPermissions cannot be saved on an item; set hench.permissionMode or pass --permission-mode for the run",
+      })
+      .optional(),
     review: z.boolean().optional(),
     reviewMode: z.enum(RUN_SETTING_REVIEW_MODES).optional(),
     reviewVendor: z.enum(RUN_SETTING_REVIEW_VENDORS).optional(),

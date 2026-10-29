@@ -1,6 +1,10 @@
 import { z, ZodError } from "zod";
 import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MAX_REVIEW_ROUNDS, MIN_PRUNE_PAIRS, MIN_REVIEW_ROUNDS } from "./v1.js";
 import type { HenchConfig } from "./v1.js";
+import { guardBaselineForLanguage } from "../prd/llm-gateway.js";
+
+/** The git subcommands an absent or empty `guard.allowedGitSubcommands` grants. */
+const DEFAULT_GIT_SUBCOMMANDS: readonly string[] = guardBaselineForLanguage().allowedGitSubcommands;
 
 export type ValidationResult<T> =
   | { ok: true; data: T }
@@ -33,11 +37,17 @@ const GuardConfigSchema = z.object({
   commandTimeout: z.number().positive(),
   maxFileSize: z.number().positive(),
   spawnTimeout: z.number().nonnegative().optional().default(300000),
+  // No default: absent means DEFAULT_SESSION_TIMEOUT_MS, kept in one place.
+  sessionTimeout: z.number().int().nonnegative().optional(),
   maxConcurrentProcesses: z.number().int().positive().optional().default(3),
-  allowedGitSubcommands: z.array(z.string()).optional().default([
-    "status", "add", "commit", "diff", "log",
-    "branch", "checkout", "stash", "show", "rev-parse",
-  ]),
+  // An explicit empty list reads as the baseline, like an absent key: a guard
+  // that names no subcommands gets the defaults, never every subcommand. The
+  // Claude CLI adapter applies the same reading to a policy built outside
+  // this schema (`agent/lifecycle/git-subcommands.ts`).
+  allowedGitSubcommands: z
+    .array(z.string())
+    .optional()
+    .transform((list) => (list && list.length > 0 ? list : [...DEFAULT_GIT_SUBCOMMANDS])),
   policy: PolicyLimitsConfigSchema,
   memoryThrottle: MemoryThrottleConfigSchema,
   memoryMonitor: MemoryMonitorConfigSchema,
@@ -158,6 +168,10 @@ export const HenchConfigSchema = z.object({
   // DEFAULT_LIVELOCK_THRESHOLD in agent/analysis/livelock.ts (schema cannot
   // import from agent without inverting the layering).
   livelockThreshold: z.number().int().nonnegative().optional().default(6),
+  // USD spend caps; absent or 0 = unlimited. Finite so a typo like 1e999
+  // (Infinity) cannot read as a cap.
+  maxCostUsdPerRun: z.number().finite().nonnegative().optional(),
+  maxCostUsdPerDay: z.number().finite().nonnegative().optional(),
   fullTestCommand: z.string().optional(),
   // 0 means "no limit" — see the field docs on HenchConfig. Mirrors
   // DEFAULT_TEST_GATE_TIMEOUT_MS in tools/test-runner.ts (schema cannot import
@@ -466,6 +480,9 @@ export const RunRecordSchema = z.object({
     .passthrough()
     .optional(),
   reviewSpend: z.object({}).passthrough().optional(),
+  // Passthrough for the same reason as the opaque sections below: a record
+  // written by a build that audits one more counter must still load.
+  guardAudit: z.object({}).passthrough().optional(),
   // One entry per pair-review fix round; the fields ride along untouched.
   reviewRounds: z.array(z.object({ round: z.number() }).passthrough()).optional(),
   actor: z.string().optional(),

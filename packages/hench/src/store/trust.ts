@@ -49,8 +49,26 @@ export interface RepoTrustApplied {
   config: HenchConfig;
   /** The permission mode to run with: lowered from bypassPermissions when restricted. */
   permissionMode: PermissionMode | undefined;
-  /** True when either the guard or the permission mode was changed. */
+  /** True when the guard, the environment policy, a binary/credential key or the permission mode was changed. */
   clamped: boolean;
+}
+
+/**
+ * The `hench` section of the user's own `.n-dx.local.json`, which is
+ * git-ignored and therefore theirs: a `claudePath` or `apiKeyEnv` set there
+ * survives the clamp. Read directly rather than through the async override
+ * loader because the clamp is applied synchronously per task.
+ */
+function localHenchOverrides(projectDir: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(resolveLayout(projectDir).localConfigFile, "utf-8"));
+    const hench = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>).hench
+      : undefined;
+    return hench && typeof hench === "object" && !Array.isArray(hench) ? (hench as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 /**

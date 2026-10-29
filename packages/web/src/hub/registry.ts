@@ -43,12 +43,9 @@ export interface ProjectRecord {
   repoRoot: string;
   /** Worktree roots registered under this project, `repoRoot` included. */
   worktrees: string[];
-  /**
-   * The `@n-dx/web` CLI entry that serves this project — a path to
-   * `dist/cli/index.js`, or an executable exposing the same `serve` command.
-   * Per project, so each repository can run its own n-dx version.
-   */
-  ndxBin: string;
+  // No `ndxBin`: every project server is spawned from the hub's own entry
+  // (`Hub.selfBin`). Registries written before that rule carried one per
+  // record; {@link loadRegistryHealing} drops it on read.
   /** Loopback port the project server bound, or null when not running. */
   port: number | null;
   /** Pid of the project server, or null when not running. */
@@ -195,31 +192,53 @@ export function readHubConfig(path: string): HubConfigResult {
  * with no way to repair it through the hub itself.
  */
 export function loadRegistry(path: string): HubRegistry {
+  return loadRegistryHealing(path).registry;
+}
+
+/** A record that named its own binary, as an older hub recorded it. */
+export interface HealedRecord {
+  id: string;
+  /** The binary the record named; never spawned, reported so the operator can see what was dropped. */
+  ndxBin: string;
+}
+
+/**
+ * {@link loadRegistry}, also reporting which records carried a recorded
+ * `ndxBin`. That field is stripped from every record: the hub spawns project
+ * servers from its own entry only, so a binary written into `hub.json` by an
+ * older hub (or by anything else that can write the file) is never executed.
+ * The caller writes the healed registry back so the field does not linger.
+ */
+export function loadRegistryHealing(path: string): { registry: HubRegistry; healed: HealedRecord[] } {
+  const healed: HealedRecord[] = [];
   let raw: string;
   try {
     raw = readFileSync(path, "utf-8");
   } catch {
-    return emptyRegistry();
+    return { registry: emptyRegistry(), healed };
   }
   try {
-    const parsed = JSON.parse(raw) as Partial<HubRegistry> | null;
+    const parsed = JSON.parse(raw) as { projects?: unknown } | null;
     if (!parsed || typeof parsed !== "object" || typeof parsed.projects !== "object" || parsed.projects === null) {
-      return emptyRegistry();
+      return { registry: emptyRegistry(), healed };
     }
     const projects: Record<string, ProjectRecord> = {};
-    for (const [id, record] of Object.entries(parsed.projects)) {
-      if (isProjectRecord(record)) projects[id] = { ...record, id };
+    for (const [id, record] of Object.entries(parsed.projects as Record<string, unknown>)) {
+      if (!isProjectRecord(record)) continue;
+      const { ndxBin, ...rest } = record as ProjectRecord & { ndxBin?: unknown };
+      if (ndxBin !== undefined) healed.push({ id, ndxBin: typeof ndxBin === "string" ? ndxBin : String(ndxBin) });
+      projects[id] = { ...rest, id };
     }
-    return { version: HUB_REGISTRY_VERSION, projects };
+    return { registry: { version: HUB_REGISTRY_VERSION, projects }, healed };
   } catch {
-    return emptyRegistry();
+    return { registry: emptyRegistry(), healed };
   }
 }
 
 function isProjectRecord(value: unknown): value is ProjectRecord {
   if (!value || typeof value !== "object") return false;
   const r = value as Record<string, unknown>;
-  return typeof r.repoRoot === "string" && typeof r.ndxBin === "string";
+  return typeof r.repoRoot === "string";
 }
 
 /**
@@ -229,7 +248,7 @@ function isProjectRecord(value: unknown): value is ProjectRecord {
 export function saveRegistry(path: string, registry: HubRegistry): void {
   mkdirSync(join(path, ".."), { recursive: true });
   const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(registry, null, 2) + "\n", "utf-8");
+  writeFileSync(tmp, JSON.stringify(registry, null, 2) + "\n", { encoding: "utf-8", mode: 0o600 });
   renameSync(tmp, path);
 }
 

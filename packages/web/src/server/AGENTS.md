@@ -6,8 +6,8 @@ Rules for the server composition root. The reasoning behind each is in
 
 ## Request gate: Host first, then Origin
 
-Both servers are loopback-only and unauthenticated, so the gate *is* the access
-control against a page the operator has open. Two rules, in order, both in
+Both servers are loopback-only, so the gate *is* the access control against a
+page the operator has open. Two rules, in order, both in
 `src/shared/origin.ts` so the hub (`hub/request-guard.ts`) and the project
 server (`server/request-security.ts`) cannot drift:
 
@@ -23,13 +23,15 @@ server (`server/request-security.ts`) cannot drift:
 - **Every listener gets the gate.** A new `createServer` here calls
   `handleRequestSecurity` (or the hub's `guardHubRequest`) before routing, and
   its `upgrade` handler applies `isTrustedHost` plus the origin check.
+- **Spawns** use `own-cli.ts`, `refuseWhileRestricted` ([why](../../../../docs/architecture/web-server.md#repository-trust)).
+- **Credentials ride in headers**, never cookies ([why](../../../../docs/architecture/web-server.md#authentication)).
 - **`GET` must be read-only** — one that writes a file or spawns a process is a
   bug even on loopback.
-- **Internal clients use a loopback name**, never the machine's hostname or
-  `0.0.0.0`. Tunnels and port-forwards are unsupported by construction; making
-  one work needs an explicit Host allowlist, not a relaxed check.
-- **Tests build requests by hand** — `fetch()` will not send a foreign `Host`.
-  Use `node:http` with `setHost: false`, as `tests/integration/hub-proxy.test.ts` does.
+- **Internal clients use a loopback name**, never the hostname or `0.0.0.0`.
+  Tunnels and port-forwards are unsupported; supporting one needs an explicit
+  Host allowlist, not a relaxed check.
+- **Tests build requests by hand** — `fetch()` sends no foreign `Host`; use
+  `node:http` with `setHost: false` (`tests/integration/hub-proxy.test.ts`).
 
 ## PRD writes are workspace-scoped
 
@@ -41,8 +43,7 @@ so two worktrees neither contend nor serialize.
 
 - **No cross-workspace write action.** No route takes a workspace parameter and
   no UI offers "apply to the anchor instead"; switching workspace is a full
-  navigation through the breadcrumb switcher. Otherwise the write target becomes
-  something the reader has to check rather than something the URL states.
+  navigation through the breadcrumb switcher, so the URL states the target.
 - **The write target is stated, not inferred** — `WorkspaceWriteStrip` names a
   non-anchor workspace in the PRD view and renders nothing on the anchor.
 - **A header naming no known worktree is a 404**, on reads as much as writes;

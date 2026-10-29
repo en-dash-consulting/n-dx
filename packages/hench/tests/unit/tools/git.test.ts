@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync, execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { toolGit, tokenizeArgs, assertSafeGitArgs } from "../../../src/tools/git.js";
 import { GuardError } from "../../../src/guard/paths.js";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
 import { initGitFixtureRepoSync, RM_RETRY } from "../../helpers/index.js";
+import { createToolSandbox } from "../../../src/guard/sandbox.js";
+import { detectSandboxBackend } from "../../../src/prd/llm-gateway.js";
 // toolGit now spawns `git` with an explicit argv and NO shell. The
 // `itNeedsPosixShell` guard is kept on cases that assert on git's real output
 // only so this suite still skips cleanly on a machine without git-friendly
@@ -19,6 +21,9 @@ function createGitGuard(allowedGitSubcommands: string[]): ToolGuard {
   return {
     checkPath(filepath: string): string {
       return filepath;
+    },
+    isPathAllowed(): boolean {
+      return true;
     },
     checkCommand(): void {},
     checkGitSubcommand(subcommand: string): void {
@@ -85,6 +90,78 @@ describe("toolGit", () => {
         toolGit(guard, projectDir, { subcommand: "log", args: "--output=/tmp/pwned" }),
       ).rejects.toThrow(/not allowed/);
       expect(existsSync("/tmp/pwned")).toBe(false);
+    });
+  });
+
+  describe("repository hooks", () => {
+    /** A pre-commit hook in `.husky/`, opted in via core.hooksPath (the test gitconfig points hooks elsewhere). */
+    async function installHook(body: string): Promise<void> {
+      const hooksDir = join(projectDir, ".husky");
+      await mkdir(hooksDir, { recursive: true });
+      await writeFile(join(hooksDir, "pre-commit"), body);
+      await chmod(join(hooksDir, "pre-commit"), 0o755);
+      execFileSync("git", ["config", "core.hooksPath", ".husky"], { cwd: projectDir });
+    }
+
+    itNeedsPosixShell("runs the checkout's pre-commit hook, as a human commit would", async () => {
+      await installHook("#!/bin/sh\necho ran > hook-ran.txt\n");
+      await writeFile(join(projectDir, "b.txt"), "b");
+      await toolGit(guard, projectDir, { subcommand: "add", args: "b.txt" });
+      await toolGit(guard, projectDir, { subcommand: "commit", args: '-m "via hench"' });
+      expect(execFileSync("git", ["log", "-1", "--format=%s"], { cwd: projectDir, encoding: "utf-8" }).trim()).toBe("via hench");
+      expect(existsSync(join(projectDir, "hook-ran.txt"))).toBe(true);
+    });
+
+    itNeedsPosixShell("lets a failing pre-commit hook reject the commit", async () => {
+      await installHook("#!/bin/sh\necho 'lint failed' >&2\nexit 1\n");
+      await writeFile(join(projectDir, "b.txt"), "b");
+      await toolGit(guard, projectDir, { subcommand: "add", args: "b.txt" });
+      const out = await toolGit(guard, projectDir, { subcommand: "commit", args: '-m "rejected"' });
+      expect(out).toContain("lint failed");
+      expect(() => execFileSync("git", ["rev-parse", "HEAD"], { cwd: projectDir, stdio: "ignore" })).toThrow();
+    });
+
+    // The git tool's child runs inside the OS sandbox, and git starts the hook
+    // as its own child, so the hook inherits the confinement. Skips where the
+    // backend cannot apply a profile (a harness that is itself sandboxed).
+    const live = detectSandboxBackend();
+    describe.skipIf(!live.available)(`live ${live.name}`, () => {
+      it("confines a pre-commit hook run through the tool to the project", async () => {
+        const real = realpathSync(projectDir);
+        const outside = realpathSync(await mkdtemp(join(tmpdir(), "hench-git-outside-")));
+        try {
+          await installHook([
+            "#!/bin/sh",
+            "echo ran > hook-ran.txt",
+            `echo escaped > '${join(outside, "escaped")}' 2>/dev/null`,
+            "exit 0",
+            "",
+          ].join("\n"));
+          const sandbox = createToolSandbox(real, { setting: { mode: "on", toolNetwork: "none", source: "default" } })!;
+          // The suite's global gitconfig lives outside the sandbox's read roots;
+          // give the confined git an identity through the environment instead.
+          const childEnv = {
+            ...process.env,
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_NOSYSTEM: "1",
+            GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com",
+            GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com",
+          };
+          const confined = Object.assign(Object.create(guard), { sandbox, childEnv }) as ToolGuard;
+          try {
+            await writeFile(join(real, "b.txt"), "b");
+            await toolGit(confined, real, { subcommand: "add", args: "b.txt" });
+            await toolGit(confined, real, { subcommand: "commit", args: '-m "confined"' });
+          } finally {
+            sandbox.dispose();
+          }
+          expect(execFileSync("git", ["log", "-1", "--format=%s"], { cwd: real, encoding: "utf-8" }).trim()).toBe("confined");
+          expect(existsSync(join(real, "hook-ran.txt"))).toBe(true);
+          expect(existsSync(join(outside, "escaped"))).toBe(false);
+        } finally {
+          await rm(outside, { recursive: true, force: true });
+        }
+      });
     });
   });
 

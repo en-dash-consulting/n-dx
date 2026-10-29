@@ -46,6 +46,7 @@ import {
 } from "../../../prd/llm-gateway.js";
 import type { PermissionMode } from "../../../schema/index.js";
 import { AGENT_REX_MCP_TOOLS } from "../../../process/agent-mcp-config.js";
+import { effectiveGitSubcommands } from "../git-subcommands.js";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -63,14 +64,15 @@ const MAX_SUMMARY_LENGTH = 500;
  * tool pattern format (e.g. `["Bash(npm:*)", "Bash(git:*)"]`), and includes
  * file tools that are inherently scoped to `cwd` by Claude CLI.
  *
- * When `allowedGitSubcommands` is provided and non-empty, `git` is granted at
- * subcommand granularity (`Bash(git commit:*)`, `Bash(git status:*)`, …) rather
- * than the blanket `Bash(git:*)`. This mirrors the API-provider guard's
- * `checkGitSubcommand` allowlist, so destructive subcommands not on the list
- * (`reset`, `clean`, `revert`, `push`) are not auto-approved in CLI mode — they
- * fall through to a permission prompt (denied under a non-interactive
- * `acceptEdits` spawn). When the list is omitted/empty, `git` keeps its legacy
- * blanket grant for backward compatibility.
+ * `git` is always granted at subcommand granularity (`Bash(git commit:*)`,
+ * `Bash(git status:*)`, …), never as the blanket `Bash(git:*)`. This mirrors
+ * the API-provider guard's `checkGitSubcommand` allowlist, so destructive
+ * subcommands not on the list (`reset`, `clean`, `revert`, `push`) are not
+ * auto-approved in CLI mode — they fall through to a permission prompt
+ * (denied under a non-interactive `acceptEdits` spawn). An omitted or empty
+ * `allowedGitSubcommands` means the language baseline
+ * ({@link effectiveGitSubcommands}): a guard that names no subcommands gets
+ * the defaults, not every subcommand there is.
  *
  * The list also carries {@link AGENT_REX_MCP_TOOLS} — the rex MCP tools hench's
  * own prompts direct the agent to call, on the rex server hench itself attaches.
@@ -86,10 +88,10 @@ export function buildAllowedTools(
   allowedCommands: ReadonlyArray<string>,
   allowedGitSubcommands?: ReadonlyArray<string>,
 ): string[] {
-  const scopeGit = !!allowedGitSubcommands && allowedGitSubcommands.length > 0;
+  const gitSubcommands = effectiveGitSubcommands(allowedGitSubcommands);
   const bashTools = allowedCommands.flatMap((cmd) =>
-    cmd === "git" && scopeGit
-      ? allowedGitSubcommands!.map((sub) => `Bash(git ${sub}:*)`)
+    cmd === "git"
+      ? gitSubcommands.map((sub) => `Bash(git ${sub}:*)`)
       : [`Bash(${cmd}:*)`],
   );
   return [...bashTools, ...CLI_FILE_TOOLS, ...AGENT_REX_MCP_TOOLS];
@@ -182,6 +184,12 @@ export interface ClaudeCliInput {
    * @see packages/hench/src/process/agent-mcp-config.ts — builds the file
    */
   mcpConfigPath?: string;
+  /**
+   * Turn cap for the session (`--max-turns <n>`). Omitted when undefined, 0 or
+   * not a positive integer, so the CLI's own (unbounded) default applies only
+   * when the run asked for no cap.
+   */
+  maxTurns?: number;
 }
 
 /** Separates the system prompt from the task prompt when both travel via stdin. */
@@ -221,6 +229,9 @@ export function buildClaudeCliArgs(
     ...(input.modelOverride ? ["--model", input.modelOverride] : []),
     ...(input.effort ? ["--effort", input.effort] : []),
     ...(input.permissionMode ? ["--permission-mode", input.permissionMode] : []),
+    ...(input.maxTurns !== undefined && Number.isInteger(input.maxTurns) && input.maxTurns > 0
+      ? ["--max-turns", String(input.maxTurns)]
+      : []),
     // A file path, never inline JSON: an inline document would have to survive
     // cmd.exe quoting on Windows, the hazard the isWindows branches above work
     // around. --strict-mcp-config makes the file the session's only source of
@@ -322,6 +333,7 @@ function parseStreamLine(
           toolCall: {
             tool: firstTool.name,
             input: firstTool.input,
+            ...(firstTool.id ? { id: firstTool.id } : {}),
           },
         };
       }
@@ -370,6 +382,30 @@ function parseStreamLine(
       };
     }
 
+    // Tool results arrive as the `user` side of the conversation: a message
+    // whose content holds `tool_result` blocks, each naming the `tool_use` it
+    // answers. Only the first block is mapped, as only the first `tool_use` of
+    // an assistant line is; the CLI writes one block per line in practice.
+    case "user": {
+      const block = extractToolResultBlocks(event)[0];
+      if (!block) return null;
+      return {
+        type: "tool_result" as RuntimeEventType,
+        vendor,
+        turn,
+        timestamp,
+        toolResult: {
+          // Empty rather than a guess: the block names the call by id only,
+          // and an empty name is what the accumulator's sequential pairing
+          // accepts when no id matches.
+          tool: "",
+          output: (block.isError ? "[error] " : "") + block.output.slice(0, TOOL_RESULT_OUTPUT_LIMIT),
+          durationMs: 0,
+          ...(block.toolUseId ? { id: block.toolUseId } : {}),
+        },
+      };
+    }
+
     case "result": {
       if (event.is_error) {
         return {
@@ -400,13 +436,55 @@ function parseStreamLine(
   }
 }
 
+/** How much of a tool result is kept on the run record — the CLI path's existing cap. */
+const TOOL_RESULT_OUTPUT_LIMIT = 2000;
+
+/** Flatten a `tool_result` block's `content` (a string or an array of text blocks) to text. */
+function toolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) =>
+      part && typeof part === "object" && (part as Record<string, unknown>).type === "text" &&
+      typeof (part as Record<string, unknown>).text === "string"
+        ? ((part as Record<string, unknown>).text as string)
+        : "",
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Extract `tool_result` blocks from a stream-json `user` message.
+ *
+ * @internal Exported for testing.
+ */
+export function extractToolResultBlocks(
+  event: Record<string, unknown>,
+): Array<{ toolUseId?: string; output: string; isError: boolean }> {
+  const message = event.message;
+  if (!message || typeof message !== "object") return [];
+  const blocks = (message as Record<string, unknown>).content;
+  if (!Array.isArray(blocks)) return [];
+  const results: Array<{ toolUseId?: string; output: string; isError: boolean }> = [];
+  for (const block of blocks as Array<Record<string, unknown>>) {
+    if (!block || block.type !== "tool_result") continue;
+    results.push({
+      ...(typeof block.tool_use_id === "string" && block.tool_use_id ? { toolUseId: block.tool_use_id } : {}),
+      output: toolResultText(block.content),
+      isError: block.is_error === true,
+    });
+  }
+  return results;
+}
+
 /**
  * Extract tool_use blocks from an assistant event's content/message.
  */
 function extractToolUseBlocks(
   event: Record<string, unknown>,
-): Array<{ name: string; input: Record<string, unknown> }> {
-  const results: Array<{ name: string; input: Record<string, unknown> }> = [];
+): Array<{ name: string; input: Record<string, unknown>; id?: string }> {
+  const results: Array<{ name: string; input: Record<string, unknown>; id?: string }> = [];
 
   const message = event.message;
   if (message && typeof message === "object") {
@@ -418,6 +496,7 @@ function extractToolUseBlocks(
           results.push({
             name: (block.name as string) || "unknown",
             input: (block.input as Record<string, unknown>) || {},
+            ...(typeof block.id === "string" && block.id ? { id: block.id } : {}),
           });
         }
       }
@@ -484,6 +563,7 @@ export const claudeCliAdapter: VendorAdapter = {
   vendor: LLM_VENDOR.CLAUDE,
   parseMode: "stream-json",
   resumesUnfinishedSessions: true,
+  enforcesTurnCap: true,
 
   buildSpawnConfig(
     envelope: PromptEnvelope,
@@ -504,6 +584,7 @@ export const claudeCliAdapter: VendorAdapter = {
       resumeSessionId: opts.resumeSessionId,
       forkSession: opts.forkSession,
       mcpConfigPath: opts.mcpConfigPath,
+      maxTurns: opts.maxTurns,
     });
 
     return {

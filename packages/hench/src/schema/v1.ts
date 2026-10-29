@@ -53,6 +53,17 @@ export interface GuardConfig {
   maxFileSize: number;
   /** Timeout in ms for spawn-based execution (spawnTool/spawnManaged). 0 = no timeout. */
   spawnTimeout: number;
+  /**
+   * Wall-clock limit in ms for one vendor CLI session (one `claude`/`codex`
+   * spawn). When it elapses the session's process tree is terminated and the
+   * run ends with status `timeout`. 0 = no limit. Absent = the built-in
+   * default, {@link DEFAULT_SESSION_TIMEOUT_MS}.
+   *
+   * Separate from {@link spawnTimeout}, which bounds a single tool child:
+   * `hench init` writes that value (five minutes) into every config, and a
+   * five-minute ceiling on a whole agent session would end ordinary runs.
+   */
+  sessionTimeout?: number;
   /** Maximum concurrent child processes allowed. */
   maxConcurrentProcesses: number;
   /** Allowed git subcommands. Centralizes the git safety allowlist in guard config. */
@@ -137,7 +148,7 @@ export interface PruneConfig {
  * What the pair does rest on is arithmetic. The gap between them is twenty
  * messages, so each prune is followed by ten turns of pure append — the shape
  * the prompt cache rewards — and peak context is the trigger. Against the
- * default `maxTurns: 50` that is a handful of prunes per run. Moving either
+ * default `maxTurns: 200` that is a few dozen prunes per run at most. Moving either
  * number trades a known cadence for an unmeasured one, so it wants a batch
  * that actually exercises an API loop first.
  *
@@ -485,6 +496,19 @@ export interface HenchConfig {
    */
   livelockThreshold?: number;
   /**
+   * USD spend cap for one run (one task), priced from its token usage with
+   * llm-client's model table. Checked before every vendor spawn; a run that
+   * has reached it stops with status `budget_exceeded`. 0 or absent =
+   * unlimited. A task's saved `run` block cannot set or raise it.
+   */
+  maxCostUsdPerRun?: number;
+  /**
+   * USD spend cap across every run started today (local calendar day), read
+   * from `.hench/runs` before every vendor spawn. Same pricing, status and
+   * saved-block rule as {@link maxCostUsdPerRun}. 0 or absent = unlimited.
+   */
+  maxCostUsdPerDay?: number;
+  /**
    * When true, skip the mandatory full test suite gate before commit.
    * Default: false (gate is mandatory). The --skip-test-gate CLI flag sets this.
    * Test gate failure blocks commit unless this flag is set or user selects skip.
@@ -702,7 +726,7 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
     schema: HENCH_SCHEMA_VERSION,
     provider: "cli",
     model: "sonnet",
-    maxTurns: 50,
+    maxTurns: 200,
     maxTokens: 8192,
     tokenBudget: 0,
     rexDir: PROJECT_DIRS.REX,
@@ -717,6 +741,9 @@ export function DEFAULT_HENCH_CONFIG(language?: ProjectLanguage): HenchConfig {
     ...(language ? { language } : {}),
   };
 }
+
+/** Default {@link GuardConfig.sessionTimeout}: two hours per vendor CLI session. */
+export const DEFAULT_SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
 export type RunStatus = "running" | "completed" | "failed" | "timeout" | "budget_exceeded" | "error_transient" | "cancelled";
 
@@ -1520,6 +1547,36 @@ export interface RunReviewSpend {
 }
 
 /**
+ * The API-loop guard's audit, persisted at run end. See {@link RunRecord.guardAudit}.
+ *
+ * Mirrors `PolicyEngine.auditSummary()` and `PolicyEngine.counters` (guard/
+ * policy.ts) structurally; schema stays free of guard imports.
+ */
+export interface RunGuardAudit {
+  /** Guard decisions made during the run. */
+  total: number;
+  allowed: number;
+  denied: number;
+  /**
+   * The denials, oldest first, capped at the most recent
+   * {@link RUN_GUARD_AUDIT_MAX_DENIALS}. `denialsDropped` counts what the cap left out.
+   */
+  denials: Array<{ timestamp: number; operation: string; target: string; reason?: string }>;
+  denialsDropped?: number;
+  /** Session counters at run end. */
+  counters: {
+    commandsRun: number;
+    bytesWritten: number;
+    filesRead: number;
+    filesWritten: number;
+    operationsTotal: number;
+  };
+}
+
+/** How many guard denials a run record keeps. */
+export const RUN_GUARD_AUDIT_MAX_DENIALS = 50;
+
+/**
  * A completion whose PRD "record" commit did not land — the work itself is
  * committed and the task stays completed; only the bookkeeping is pending.
  * See {@link RunRecord.recordCommitPending}.
@@ -1796,6 +1853,14 @@ export interface RunRecord {
    * v1 additive field — records without it load normally.
    */
   reviewSpend?: RunReviewSpend;
+  /**
+   * The hench guard's audit summary and session counters, for runs whose tool
+   * calls go through the guard (the API provider loops). Absent on CLI-provider
+   * runs, where the vendor CLI executes tools itself.
+   *
+   * v1 additive field — records without it load normally.
+   */
+  guardAudit?: RunGuardAudit;
   /**
    * Full RuntimeEvent stream captured during the run.
    *

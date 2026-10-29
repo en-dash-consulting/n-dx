@@ -21,6 +21,8 @@ const NDX_BIN = join(WEB_PKG, "dist/cli/index.js");
 
 const HUB_OPTS = {
   port: 0,
+  // In-process, `process.argv[1]` is the test runner; name the real entry point.
+  selfBin: NDX_BIN,
   healthIntervalMs: 60_000,
   supervisor: { portFileTimeoutMs: 30_000, stopGraceMs: 3_000 },
 };
@@ -95,7 +97,8 @@ describe("hub daemon", () => {
 
     // The registry on disk carries pid and port.
     const persisted = loadRegistry(hub.registryPath);
-    expect(persisted.projects.alpha).toMatchObject({ repoRoot: repoA, pid: a.pid, port: a.port, ndxBin: NDX_BIN });
+    expect(persisted.projects.alpha).toMatchObject({ repoRoot: repoA, pid: a.pid, port: a.port });
+    expect(persisted.projects.alpha).not.toHaveProperty("ndxBin");
 
     // Delete stops that child and forgets it.
     const del = await api(hub, "/api/hub/projects/alpha", { method: "DELETE" });

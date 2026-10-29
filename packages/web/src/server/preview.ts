@@ -24,8 +24,23 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "n
 import { writeFile, rename, unlink } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { handleRequestSecurity } from "./request-security.js";
+import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "./request-security.js";
+import { CredentialStore, injectSessionScript, urlWithNonce } from "../shared/index.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
+
+/** The page policy plus https: sources, for a design document that loads from a CDN. */
+const PREVIEW_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https:",
+  "style-src 'self' 'unsafe-inline' https:",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
 
 /** Default port for the preview server — one above the dashboard's 3117. */
 export const DEFAULT_PREVIEW_PORT = 3118;
@@ -37,6 +52,36 @@ const LOOPBACK_HOST = "127.0.0.1";
 
 /** How often the browser asks whether the document changed on disk. */
 const DEFAULT_RELOAD_INTERVAL_MS = 600;
+
+/**
+ * Where a signed-in tab reads the document and its sibling files:
+ * `/__preview/s/<capability>/…`. A browser loads a page's stylesheets,
+ * images and linked pages without custom headers, so the session header
+ * alone cannot cover a design document's relative URLs; a capability in the
+ * path does. It is minted for a request that presents a credential
+ * (`POST /__preview/session-path`), is distinct from that credential, reads
+ * the document directory only, and dies with the process.
+ */
+const SESSION_PATH_PREFIX = "/__preview/s/";
+const SESSION_PATH_ROUTE = "/__preview/session-path";
+
+/** The page a navigation without a credential gets: sign in, then move to a capability path. */
+const BOOTSTRAP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>n-dx preview</title></head>
+<body><p style="font:15px system-ui,sans-serif;margin:2rem">Signing in…</p>
+<script>
+(function () {
+  var auth = window.ndxAuth;
+  if (!auth) return;
+  auth.ready.then(function (state) {
+    if (!state.ok) return;
+    return fetch(${JSON.stringify(SESSION_PATH_ROUTE)}, { method: "POST", cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (body) {
+        if (body && body.path) location.replace(body.path + location.pathname.replace(/^\//, "") + location.search + location.hash);
+      });
+  });
+})();
+</script></body></html>`;
 
 /** The endpoint the reload poller reads — also the marker for "this document polls for itself". */
 const STATE_ROUTE = "/__preview/state";
@@ -373,14 +418,97 @@ export async function startPreviewServer(
   const layoutPath = layoutPathFor(docPath);
   const token = opts.tokenFile ? ensureAuthToken(opts.tokenFile) : null;
 
+  // Browser sessions and landing nonces (the gate's), and the read-only
+  // capability paths below — separate stores, so a path capability is never a
+  // session credential.
+  const credentials = token ? new CredentialStore() : null;
+  const pathCaps = token ? new CredentialStore() : null;
+
+  /** The document (`/`, `/index.html`) or a file beside it, or a 404. */
+  function serveDocument(urlPath: string, res: ServerResponse): void {
+    if (urlPath === "/" || urlPath === "/index.html") {
+      try {
+        const html = readFileSync(docPath!, "utf-8");
+        send(res, 200, injectSessionScript(withReloadSnippet(html, reloadIntervalMs)), MIME_TYPES[".html"]);
+      } catch (err) {
+        send(res, 500, `Failed to read ${docPath}: ${(err as Error).message}`, "text/plain; charset=utf-8");
+      }
+      return;
+    }
+
+    const sibling = resolveSibling(docDir, urlPath);
+    if (sibling) {
+      try {
+        // A sibling HTML page (a second mock-up, a filled-in demo of the same
+        // layout) gets the same live reload as the main document, so iterating
+        // on it works the same way. Non-HTML assets are served as-is.
+        if (extname(sibling).toLowerCase() === ".html") {
+          send(res, 200, injectSessionScript(withReloadSnippet(readFileSync(sibling, "utf-8"), reloadIntervalMs)), MIME_TYPES[".html"]);
+          return;
+        }
+        send(res, 200, readFileSync(sibling), MIME_TYPES[extname(sibling).toLowerCase()] ?? "application/octet-stream");
+      } catch (err) {
+        send(res, 500, `Failed to read ${sibling}: ${(err as Error).message}`, "text/plain; charset=utf-8");
+      }
+      return;
+    }
+
+    send(res, 404, "Not found", "text/plain; charset=utf-8");
+  }
+
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     // Same gate as the dashboard: loopback Host on this port for every request,
-    // and a browser origin on mutations. The layout endpoint below writes a
-    // file from the request body, so it needs the same protection as the
-    // dashboard's write routes.
-    if (handleRequestSecurity(req, res, { token })) return;
+    // a credential in a header, and a browser origin on mutations. The layout
+    // endpoint below writes a file from the request body, so it needs the
+    // same protection as the dashboard's write routes.
+    if (handleRequestSecurity(req, res, { token, credentials })) return;
+    // The previewed document is a design file that may pull fonts, styles or
+    // scripts from a CDN, so it runs under a policy that adds https: sources
+    // to the page policy; it still may not be framed or post forms elsewhere.
+    res.setHeader("Content-Security-Policy", PREVIEW_CSP);
 
     const urlPath = (req.url ?? "/").split("?")[0];
+
+    if (urlPath.startsWith(SESSION_PATH_PREFIX)) {
+      const rest = urlPath.slice(SESSION_PATH_PREFIX.length);
+      const slash = rest.indexOf("/");
+      const cap = slash === -1 ? rest : rest.slice(0, slash);
+      if (!pathCaps || !pathCaps.isSession(cap)) {
+        // Unknown or expired (the server restarted): start over at the root,
+        // which signs in again from this tab's session.
+        res.writeHead(302, { Location: "/", "Cache-Control": "no-store" });
+        res.end();
+        return;
+      }
+      serveDocument(slash === -1 ? "/" : rest.slice(slash), res);
+      return;
+    }
+
+    if (isPublicOnlyRequest(req)) {
+      // No credential: an HTML navigation gets the page that signs in and
+      // moves to a capability path; nothing else is public.
+      if (urlPath === "/" || urlPath.toLowerCase().endsWith(".html")) {
+        send(res, 200, injectSessionScript(BOOTSTRAP_PAGE), MIME_TYPES[".html"]);
+        return;
+      }
+      refusePublicOnly(req, res);
+      return;
+    }
+
+    if (urlPath === SESSION_PATH_ROUTE) {
+      if (req.method !== "POST") {
+        send(res, 405, JSON.stringify({ error: `${req.method} not allowed` }), MIME_TYPES[".json"]);
+        return;
+      }
+      if (!pathCaps) {
+        // An open server needs no capability: the plain paths are readable.
+        send(res, 200, JSON.stringify({ path: "/" }), MIME_TYPES[".json"]);
+        return;
+      }
+      const { credential } = pathCaps.mintSession();
+      send(res, 200, JSON.stringify({ path: `${SESSION_PATH_PREFIX}${credential}/` }), MIME_TYPES[".json"]);
+      return;
+    }
 
     if (urlPath === STATE_ROUTE) {
       send(res, 200, JSON.stringify({ fingerprint: docFingerprint(docPath) }), MIME_TYPES[".json"]);
@@ -427,34 +555,7 @@ export async function startPreviewServer(
       return;
     }
 
-    if (urlPath === "/" || urlPath === "/index.html") {
-      try {
-        const html = readFileSync(docPath, "utf-8");
-        send(res, 200, withReloadSnippet(html, reloadIntervalMs), MIME_TYPES[".html"]);
-      } catch (err) {
-        send(res, 500, `Failed to read ${docPath}: ${(err as Error).message}`, "text/plain; charset=utf-8");
-      }
-      return;
-    }
-
-    const sibling = resolveSibling(docDir, urlPath);
-    if (sibling) {
-      try {
-        // A sibling HTML page (a second mock-up, a filled-in demo of the same
-        // layout) gets the same live reload as the main document, so iterating
-        // on it works the same way. Non-HTML assets are served as-is.
-        if (extname(sibling).toLowerCase() === ".html") {
-          send(res, 200, withReloadSnippet(readFileSync(sibling, "utf-8"), reloadIntervalMs), MIME_TYPES[".html"]);
-          return;
-        }
-        send(res, 200, readFileSync(sibling), MIME_TYPES[extname(sibling).toLowerCase()] ?? "application/octet-stream");
-      } catch (err) {
-        send(res, 500, `Failed to read ${sibling}: ${(err as Error).message}`, "text/plain; charset=utf-8");
-      }
-      return;
-    }
-
-    send(res, 404, "Not found", "text/plain; charset=utf-8");
+    serveDocument(urlPath, res);
   });
 
   await new Promise<void>((resolveListen, rejectListen) => {
@@ -472,7 +573,8 @@ export async function startPreviewServer(
 
   await writeFile(portFilePath, String(boundPort) + "\n", "utf-8").catch(() => {});
 
-  console.log(`n-dx UI preview running at http://localhost:${boundPort}`);
+  // With a token the URL carries a single-use landing nonce — never the token.
+  console.log(`n-dx UI preview running at ${credentials ? urlWithNonce(`http://localhost:${boundPort}/`, credentials.mintNonce().nonce) : `http://localhost:${boundPort}`}`);
   console.log(`  Document: ${docPath}`);
   console.log(`  Layout:   ${layoutPath}`);
   console.log(`  Shuffle in the browser (saves to the layout file), or edit either file directly.`);

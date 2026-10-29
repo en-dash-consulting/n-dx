@@ -1153,3 +1153,11 @@ describe("codex-adapter run: append_log route survives into the prompt", () => {
     expect(config.stdinContent).toContain("append_log");
   });
 });
+
+describe("codexCliAdapter turn cap", () => {
+  it("has no turn flag, so the spawn enforces the cap from the event stream", () => {
+    expect(codexCliAdapter.enforcesTurnCap).not.toBe(true);
+    const config = codexCliAdapter.buildSpawnConfig(createStandardEnvelope(), DEFAULT_EXECUTION_POLICY, { maxTurns: 10 });
+    expect(config.args.join(" ")).not.toMatch(/turn/i);
+  });
+});

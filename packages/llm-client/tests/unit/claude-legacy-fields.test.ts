@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveClaudeConfig, loadLLMConfig } from "../../src/llm-config.js";
 import { loadClaudeConfig } from "../../src/config.js";
+import { recordRepoTrust } from "../../src/repo-trust.js";
 
 /** Every field the legacy top-level `claude` block could carry. */
 const FIELDS = ["model", "lightModel", "reviewModel", "cli_path", "api_key", "api_endpoint"] as const;
@@ -98,13 +99,16 @@ describe("resolveClaudeConfig: per-field new ?? old", () => {
 
 describe("loadLLMConfig: legacy claude fields survive a partial llm.claude block", () => {
   let tmpDir: string;
+  let ndxHome: string;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "llm-claude-legacy-"));
+    ndxHome = await mkdtemp(join(tmpdir(), "llm-claude-legacy-home-"));
   });
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
+    await rm(ndxHome, { recursive: true, force: true });
   });
 
   it("honours each legacy field the llm.claude block leaves unset", async () => {
@@ -116,8 +120,11 @@ describe("loadLLMConfig: legacy claude fields survive a partial llm.claude block
       }, null, 2),
       "utf-8",
     );
+    // The legacy cli_path is a tracked binary choice: in the trust digest,
+    // honoured once the checkout is trusted.
+    recordRepoTrust(tmpDir, { ndxHome });
 
-    const cfg = await loadLLMConfig(tmpDir);
+    const cfg = await loadLLMConfig(tmpDir, { trust: { ndxHome } });
     expect(cfg.claude?.model).toBe("modern-model");
     expect(cfg.claude?.lightModel).toBe("legacy-light");
     expect(cfg.claude?.api_key).toBe("sk-legacy");
@@ -126,13 +133,16 @@ describe("loadLLMConfig: legacy claude fields survive a partial llm.claude block
 
 describe("loadClaudeConfig: reads llm.claude.* as well as legacy claude.*", () => {
   let tmpDir: string;
+  let ndxHome: string;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "llm-claude-load-"));
+    ndxHome = await mkdtemp(join(tmpdir(), "llm-claude-load-home-"));
   });
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
+    await rm(ndxHome, { recursive: true, force: true });
   });
 
   it("returns credentials set only under llm.claude, where ndx config now writes them", async () => {
@@ -157,6 +167,21 @@ describe("loadClaudeConfig: reads llm.claude.* as well as legacy claude.*", () =
       "utf-8",
     );
 
-    expect(await loadClaudeConfig(tmpDir)).toEqual(resolveClaudeConfig(modern, LEGACY).config);
+    recordRepoTrust(tmpDir, { ndxHome });
+    expect(await loadClaudeConfig(tmpDir, { trust: { ndxHome } })).toEqual(resolveClaudeConfig(modern, LEGACY).config);
+  });
+
+  it("drops the tracked cli_path and api_endpoint, legacy or modern, until the checkout is trusted", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({ claude: LEGACY, llm: { claude: { model: MODERN.model, api_endpoint: MODERN.api_endpoint } } }, null, 2),
+      "utf-8",
+    );
+
+    const cfg = await loadClaudeConfig(tmpDir, { trust: { ndxHome } });
+    expect(cfg.model).toBe(MODERN.model);
+    expect(cfg.api_key).toBe(LEGACY.api_key);
+    expect(cfg.cli_path).toBeUndefined();
+    expect(cfg.api_endpoint).toBeUndefined();
   });
 });

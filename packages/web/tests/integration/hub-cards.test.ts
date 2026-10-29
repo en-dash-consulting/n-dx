@@ -65,7 +65,6 @@ function project(overrides: Partial<ProjectView> = {}): ProjectView {
     name: "acme-api-feature-x",
     repoRoot: tmpDir,
     worktrees: [tmpDir],
-    ndxBin: "/ndx",
     port,
     pid: process.pid,
     lastSeen: null,

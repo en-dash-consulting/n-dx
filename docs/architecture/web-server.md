@@ -5,8 +5,10 @@ themselves are there, beside the code; this page is why they are what they are.
 
 ## Request gate: Host first, then Origin
 
-Both servers are loopback-only and unauthenticated, so the request gate *is*
-the access control against a web page the operator has open. It has two rules,
+Both servers are loopback-only, so the request gate is the access control
+against a web page the operator has open; the credential check between its
+two rules is what tells this user from another account
+([Authentication](#authentication)). It has two rules,
 applied in this order, and both live in `src/shared/origin.ts` so the hub
 (`hub/request-guard.ts`) and the project server (`server/request-security.ts`)
 cannot drift:
@@ -41,6 +43,106 @@ Consequences for new code:
   `tests/integration/hub-proxy.test.ts`) or the mock request helpers in the
   unit tests, which default `Host` to the socket so origin tests exercise the
   origin rule.
+
+## Authentication
+
+Host and Origin tell a web page apart from the dashboard; they cannot tell
+this user from another account on the same machine, since every account can
+reach `127.0.0.1`. With a per-user token configured (`ndx start` always
+configures one unless `--no-auth`), every request to the hub, a project server
+or the preview server must also carry a credential, **in a header**
+(`X-Ndx-Token` or `Authorization: Bearer`). The shared definitions are in
+`src/shared/auth.ts`; each gate applies them after the Host rule and before the
+Origin rule.
+
+**Why not a cookie.** A cookie set by `localhost:3117` is sent to every
+`localhost:<port>` — cookies are scoped by host, not port, and `SameSite` is
+same-*site*, which ignores the port. Any other local server the operator opens
+in the same browser (a dev server, a tool's web UI) would receive it and could
+replay it. `sessionStorage` is scoped to the origin, port included, so a
+credential kept there and sent as a header reaches only the server that issued
+it. No server sets or reads an `ndx_token` cookie any more; one presented is
+ignored, so the request is answered as if it carried nothing (401 for anything
+but the page shell).
+
+**Two kinds of credential.**
+
+- The **per-user token** (`<ndx home>/auth.token`, 0600) — the CLI, MCP
+  clients, scripts, and the hub's own calls to the project servers it
+  supervises. Never handed to a browser, and never put in a URL: what
+  `ndx start` prints and passes to the browser opener (whose argv is visible
+  in `ps`, and which lands in browser history) carries a nonce instead.
+- **Browser sessions**, minted by the server the page is on and held in its
+  memory (`CredentialStore`): 256-bit CSPRNG values, compared in constant
+  time, distinct from and not derived from the token. A session ends after
+  12 hours idle or 7 days, and every session ends when that server restarts.
+
+**The landing exchange.** `ndx start` asks the server it just started or
+registered with — over a token-bearing request, after identifying the listener
+as its own — for a nonce (`POST /api/auth/nonce`, token only; a session cannot
+mint nonces), and prints `…/?ndx_nonce=<nonce>`. The nonce is single-use and
+expires after 60 seconds. Every HTML document the servers send starts with the
+session script (`src/shared/browser-session.ts`), which posts the nonce in
+`X-Ndx-Nonce` to `POST /api/auth/session`, stores the returned credential in
+`sessionStorage`, removes the nonce from the address bar, and wraps `fetch` so
+every same-origin request carries the credential. Behind the hub the nonce and
+the session are the hub's: the hub answers `/api/auth/*` itself, at the root
+and under any `/p/<id>/`, and its proxy replaces whatever credential a client
+sent with the per-user token before forwarding, so a project server never sees
+a hub session. A `--here` server or the preview server mints and keeps its own.
+
+**WebSockets.** A browser cannot set headers on a handshake, so the page trades
+its session for a ticket (`POST /api/auth/ws-ticket`) and puts it in the socket
+URL as `?ndx_ticket=`. Tickets are single-use and expire after 30 seconds. The
+hub spends the ticket and forwards the upgrade with the token header. Viewer
+code opens sockets only through `openWebSocket()` (`viewer/session.ts`),
+asserted by `tests/unit/viewer/socket-guard.test.ts`.
+
+**What is public.** A navigation carries no header, so a safe-method request
+with no credential is passed on *marked* public-only, and gets only the page
+shell: the viewer HTML, the landing page, static images, the hub home page
+without its cards (they load once the page is signed in). Anything else is 401
+— an HTML "sign-in needed" page for a navigation, JSON otherwise. The shell is
+the built bundle, the same for every user. The preview server's document is
+not public: a navigation without a credential gets a sign-in page, which moves
+the tab to `/__preview/s/<capability>/` — a separate, read-only capability for
+the document directory, minted for a signed-in page — because a design
+document's stylesheets and images load without headers.
+
+**Reload, new tab, deep link.**
+
+- *Reload* keeps the tab's `sessionStorage`, so the tab stays signed in.
+- *A new tab* starts with empty `sessionStorage`. The session script asks the
+  other tabs of the same origin over a `BroadcastChannel`; if one is signed in,
+  it hands its credential over. So a link opened in a new tab, or a deep link
+  pasted while the dashboard is open, works.
+- *A deep link with no signed-in tab* (or after a server restart) gets the
+  shell, whose script finds no credential and replaces the page with "Sign-in
+  needed — run `ndx start` again and open the URL it prints". A deep link to
+  data rather than a page gets the same text as a 401 page. An expired or
+  reused landing link says so.
+
+## Response headers
+
+`src/shared/response-headers.ts` is applied by both gates before any verdict is
+written, so a refusal carries the same headers as a page: `nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: same-origin` and a
+Content-Security-Policy. The built viewer and hub pages ship an inline
+bootstrap script and inline styles, so the page policy keeps `'unsafe-inline'`
+for scripts and styles and is otherwise same-origin (plus `data:`/`blob:`
+images and loopback WebSockets). `/data/*` responses switch to a strict policy
+that allows nothing, because they are data, not documents. The preview server
+adds `https:` sources, since a design document may load from a CDN.
+
+## Repository trust
+
+A repository's tracked config can widen what n-dx executes. The dashboard
+follows the same decision as `ndx work` (`isRepoRestricted`): routes that spawn
+from repository content answer 403 with `hint: "ndx trust accept ."` until the
+operator accepts the config, and the LLM catalog skips the probes that config
+would steer (reporting a tracked CLI path as not verified). CLIs are never
+resolved from the analyzed project — it is what the dashboard serves, not what
+it runs.
 
 ## HTTP-request concurrency
 

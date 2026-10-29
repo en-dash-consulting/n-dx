@@ -427,16 +427,22 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     description:
       "Files n-dx reads to decide what it may execute usually live in the\n" +
       "repository and are tracked by git: the guard in .hench/config.json\n" +
-      "(command allowlist, blocked paths, git subcommands, permission mode),\n" +
-      "the test command in .rex/config.json, and the MCP servers in .mcp.json.\n" +
-      "A clone, a fork or a checked-out pull request can therefore widen them.\n" +
+      "(command allowlist, blocked paths, git subcommands, permission mode,\n" +
+      "env.allow, autonomous/autoCommit/skipFullTestGate, apiKeyEnv, claudePath),\n" +
+      "the llm.*.cli_path / api_endpoint / local host and web.auth in .n-dx.json,\n" +
+      "the test command in .rex/config.json, the MCP servers in .mcp.json, the\n" +
+      "assistants' own files (.claude/settings.json, .claude/hooks/, .codex/config.toml)\n" +
+      "and every run block saved on a PRD item. A clone, a fork or a checked-out\n" +
+      "pull request can therefore widen them.\n" +
       "\n" +
       "status compares them to the defaults for the project's language and\n" +
       "lists what is wider, plus what else came with the checkout (PRD items,\n" +
       "analysis, run records). Until you accept, hench runs under the default\n" +
-      "guard — the repository's config can only tighten it — lowers\n" +
-      "bypassPermissions to acceptEdits, and verify_criteria does not run the\n" +
-      "repository's test command.\n" +
+      "guard (allowlists intersected with it, blocked paths added, env.allow\n" +
+      "ignored), lowers bypassPermissions to acceptEdits, ignores the cli_path,\n" +
+      "claudePath, api_endpoint, local host and apiKeyEnv the checkout sets\n" +
+      "(your .n-dx.local.json still applies), and verify_criteria does not run\n" +
+      "the repository's test command.\n" +
       "\n" +
       "accept records the current configuration's digest in your ndx home\n" +
       "(not in the repository). A later change to those files shows as\n" +

@@ -35,6 +35,7 @@ import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js
 import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { GoogleConfig } from "./llm-types.js";
+import { resolveApiEndpoint } from "./config.js";
 import type { GeminiFunctionDeclaration } from "./tool-schema.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
 
@@ -223,7 +224,7 @@ function classifyAndThrow(status: number, body: string, message: string): never 
 
 /** Build the base URL for Gemini API requests. */
 function resolveBaseUrl(googleConfig?: GoogleConfig): string {
-  return googleConfig?.api_endpoint ?? DEFAULT_BASE_URL;
+  return resolveApiEndpoint(googleConfig, DEFAULT_BASE_URL);
 }
 
 /**

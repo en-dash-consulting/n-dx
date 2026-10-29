@@ -1135,7 +1135,8 @@ function useAuthCheck(): { state: AuthState; detail: string | null; check: (forc
     setState("checking");
     setDetail(null);
     try {
-      const res = await fetch(force ? "/api/commands/auth?refresh=true" : "/api/commands/auth");
+      // POST: the check spawns a process, so it is not a GET a foreign page could trigger.
+      const res = await fetch(force ? "/api/commands/auth?refresh=true" : "/api/commands/auth", { method: "POST" });
       const body = await res.json() as { ok?: boolean; error?: string | null; output?: string };
       if (body.ok) {
         setState("ok");

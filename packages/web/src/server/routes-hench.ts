@@ -74,6 +74,7 @@ import {
   type MemoryPressure,
 } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
+import { refuseWhileRestricted } from "./trust-gate.js";
 import { commitSettingsChange } from "./settings-commit.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import {
@@ -801,6 +802,8 @@ function routeExecute(rc: RouteContext): boolean | Promise<boolean> | null {
     return handleTerminate(terminateMatch[1], rc.res, rc.runsDir, rc.broadcast, rc.onStatusInvalidate);
   }
   if (rc.path === "execute" && rc.method === "POST") {
+    // Runs the agent under this repository's execution config (see trust-gate.ts).
+    if (refuseWhileRestricted(rc.res, rc.ctx.projectDir)) return true;
     return handleExecute(rc.req, rc.res, rc.ctx, rc.broadcast);
   }
   if (rc.path === "execute/check" && rc.method === "POST") {
@@ -2215,10 +2218,10 @@ async function startExecution(
   // hench directly. `ndx work` forwards flags straight to `hench run` (see
   // handleWork in packages/core/cli.js) but also does the vendor-config
   // validation "Start Working" needs — and, critically, resolveNdxBin has a
-  // real cross-install resolution ladder (the NDX_CLI_PATH and N_DX_CLI_PATH
-  // env vars set by the launching CLI, project-local node_modules/.bin/ndx,
-  // this server's own module graph, then the monorepo dogfood path; see its
-  // doc comment for the order and why there are two env names). The hench-specific
+  // cross-install resolution ladder over this server's own install (the
+  // NDX_CLI_PATH and N_DX_CLI_PATH env vars set by the launching CLI, this
+  // server's module graph, the sibling core package, then PATH; see
+  // own-cli.ts) and never looks under the analyzed project. The hench-specific
   // equivalent this replaced (`<projectDir>/node_modules/.bin/hench`,
   // falling back to `<projectDir>/packages/hench/dist/cli/index.js`) only
   // works for the n-dx monorepo dogfooding itself — every other analyzed

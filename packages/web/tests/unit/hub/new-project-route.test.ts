@@ -29,7 +29,6 @@ function projectView(overrides: Partial<ProjectView> = {}): ProjectView {
     name: "alpha",
     repoRoot: join("/repos", "alpha"),
     worktrees: [join("/repos", "alpha")],
-    ndxBin: join("/bin", "ndx.js"),
     port: 4001,
     pid: 100,
     lastSeen: null,
@@ -57,7 +56,6 @@ function stubHub(stub: StubHub): Hub {
         name: input.name ?? input.id,
         repoRoot: input.repoRoot,
         worktrees: [input.repoRoot],
-        ndxBin: input.ndxBin,
       });
       stub.projects = [...stub.projects, project];
       return { created: true, project };
@@ -157,7 +155,6 @@ describe("hub route — creating a project folder", () => {
       id: "my-app",
       repoRoot: join(tmpDir, "my-app"),
       worktree: join(tmpDir, "my-app"),
-      ndxBin: binPath,
       name: "my-app",
     });
   });

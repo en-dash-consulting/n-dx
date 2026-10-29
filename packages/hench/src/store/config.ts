@@ -32,7 +32,10 @@ export async function loadConfiguredHenchKeys(henchDir: string): Promise<Set<str
 
 export async function ensureHenchDir(henchDir: string): Promise<void> {
   await mkdir(henchDir, { recursive: true });
-  await mkdir(join(henchDir, "runs"), { recursive: true });
+  // Run records hold tool output; only the owner should be able to list or
+  // read them. The mode applies on creation and leaves an existing directory
+  // as it is.
+  await mkdir(join(henchDir, "runs"), { recursive: true, mode: 0o700 });
 }
 
 export interface LoadConfigOptions {

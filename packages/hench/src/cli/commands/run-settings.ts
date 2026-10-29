@@ -276,13 +276,49 @@ export function parseTestGateFlags(flags: Record<string, string>): {
 export type PermissionModeOrigin = "cli-flag" | "task.run" | "config" | "autonomous-default" | "built-in";
 
 /**
+ * Permission modes from the most to the least confirmed. A saved setting may
+ * move a run down this list, never up it.
+ */
+const PERMISSION_MODE_RANK: Record<PermissionMode, number> = {
+  plan: 0,
+  default: 1,
+  acceptEdits: 2,
+  bypassPermissions: 3,
+};
+
+/** The mode the Claude CLI runs in when nothing names one. */
+const CLI_DEFAULT_PERMISSION_MODE: PermissionMode = "default";
+
+/**
+ * Whether a cap saved on a task is tighter than the operator's. `0` means
+ * unlimited for both `tokenBudget` and `maxTurns`, so it is the widest value
+ * there is: a saved `0` never replaces a cap, and any cap tightens an
+ * unlimited default.
+ */
+function capIsTighter(saved: number, operator: number): boolean {
+  if (operator === 0) return saved !== 0;
+  return saved !== 0 && saved < operator;
+}
+
+/** Whether a saved cap would loosen the operator's; equal caps are neither. */
+function capIsWider(saved: number, operator: number): boolean {
+  if (saved === 0) return operator !== 0;
+  return operator !== 0 && saved > operator;
+}
+
+/**
  * The permission mode the spawned Claude session runs with.
  *
- * Precedence: `--permission-mode` > the task's saved `run.permissionMode` >
- * `hench.permissionMode` > the autonomous default (`acceptEdits`, so an
- * unattended run cannot stall in plan mode) > undefined (the Claude CLI's own
- * default). Other vendors have no such setting, so the winning value is
- * returned as `dropped` and `value` is undefined — the caller says so.
+ * The operator's own mode is `--permission-mode`, else `hench.permissionMode`,
+ * else the autonomous default (`acceptEdits`, so an unattended run cannot
+ * stall in plan mode), else undefined (the Claude CLI's own default). A task's
+ * saved `run.permissionMode` is honoured only when it is *lower* than that —
+ * a saved block can tighten the run it describes, never widen it — and an
+ * explicit flag is the operator's instruction for this run, so it stands
+ * either way. A saved mode that would widen comes back as `widened` so the
+ * caller can say it was ignored. Other vendors have no such setting, so the
+ * winning value is returned as `dropped` and `value` is undefined — the
+ * caller says so.
  */
 export function resolveRunPermissionMode(params: {
   flag: PermissionMode | undefined;
@@ -291,22 +327,33 @@ export function resolveRunPermissionMode(params: {
   configured: PermissionMode | undefined;
   autonomous: boolean;
   vendor: LLMVendor;
-}): { value: PermissionMode | undefined; origin: PermissionModeOrigin; dropped?: PermissionMode } {
+}): {
+  value: PermissionMode | undefined;
+  origin: PermissionModeOrigin;
+  dropped?: PermissionMode;
+  /** A saved mode that was ignored because it would widen the operator's. */
+  widened?: PermissionMode;
+} {
   const { flag, saved, configured, autonomous, vendor } = params;
-  const chosen: { value: PermissionMode | undefined; origin: PermissionModeOrigin } =
+  const operator: { value: PermissionMode | undefined; origin: PermissionModeOrigin } =
     flag !== undefined
       ? { value: flag, origin: "cli-flag" }
-      : saved !== undefined
-        ? { value: saved, origin: "task.run" }
-        : configured !== undefined
-          ? { value: configured, origin: "config" }
-          : autonomous
-            ? { value: "acceptEdits", origin: "autonomous-default" }
-            : { value: undefined, origin: "built-in" };
-  if (chosen.value && vendor !== LLM_VENDOR.CLAUDE) {
-    return { value: undefined, origin: chosen.origin, dropped: chosen.value };
+      : configured !== undefined
+        ? { value: configured, origin: "config" }
+        : autonomous
+          ? { value: "acceptEdits", origin: "autonomous-default" }
+          : { value: undefined, origin: "built-in" };
+  let chosen = operator;
+  let widened: PermissionMode | undefined;
+  if (saved !== undefined && operator.origin !== "cli-flag") {
+    const ceiling = operator.value ?? CLI_DEFAULT_PERMISSION_MODE;
+    if (PERMISSION_MODE_RANK[saved] < PERMISSION_MODE_RANK[ceiling]) chosen = { value: saved, origin: "task.run" };
+    else if (PERMISSION_MODE_RANK[saved] > PERMISSION_MODE_RANK[ceiling]) widened = saved;
   }
-  return chosen;
+  if (chosen.value && vendor !== LLM_VENDOR.CLAUDE) {
+    return { value: undefined, origin: chosen.origin, dropped: chosen.value, ...(widened ? { widened } : {}) };
+  }
+  return { ...chosen, ...(widened ? { widened } : {}) };
 }
 
 /**
@@ -509,6 +556,8 @@ export type SettingWarningCode =
   | "saved-review-unsupported"
   /** `permissionMode` is a Claude-only setting on another vendor. */
   | "saved-permission-mode-dropped"
+  /** A saved `permissionMode`, `skipTestGate`, `maxTurns` or `tokenBudget` would widen the operator's own; ignored. */
+  | "saved-setting-widens"
   /** `hench.review.mode: "self"` cannot run on the provider this task resolved to. */
   | "configured-review-unsupported"
   /** `reviewMode: "pair"` has no usable reviewer or provider here; the next source decides. */
@@ -563,6 +612,14 @@ export interface TaskRunSettings {
   skipTestGate: Resolved<boolean>;
   maxTurns: Resolved<number>;
   tokenBudget: Resolved<number>;
+  /**
+   * `hench.maxCostUsdPerRun` / `hench.maxCostUsdPerDay` (0 = unlimited).
+   * Operator settings: rex's run-block schema has no key for either, so a
+   * saved block that names one is rejected whole. Should a key ever be added,
+   * it resolves through the same tighten-only rule as `tokenBudget`.
+   */
+  maxCostUsdPerRun: Resolved<number>;
+  maxCostUsdPerDay: Resolved<number>;
   /** `--context-file` text, else the task's saved `contextNotes`. */
   contextNotes: Resolved<string | null>;
   /** The saved block that was honoured; undefined when absent or ignored. */
@@ -603,6 +660,16 @@ export interface TaskRunSettingsInput {
  * `hench.*` > `llm.*` > the built-in default. A saved block that fails rex's
  * own validator is ignored whole, with one warning — a run must not stop
  * because somebody hand-edited one field of one item's front matter.
+ *
+ * The execution-posture settings — `permissionMode`, `skipTestGate`,
+ * `maxTurns`, `tokenBudget` — are the exception to "saved beats config": a
+ * saved value is honoured only when it *tightens* what the operator's own
+ * flags and config allow. The PRD is repository content, and the agent can
+ * write it through the rex MCP tools, so a block that could raise the
+ * permission mode or lift a budget would be a way for a run to widen the next
+ * one. A saved value that would widen is ignored with a
+ * `saved-setting-widens` warning and the operator's own value is reported as
+ * the source, so `--resolve` says which key really won.
  */
 export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSettings {
   const { flags, config, configuredHenchKeys, llmConfig, vendor, autonomous, item } = input;
@@ -771,6 +838,71 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
         `feature; ignoring it for vendor="${vendor}".`,
     });
   }
+  const widenWarning = (key: string, savedValue: unknown, operator: { value: unknown; source: string }): void => {
+    warnings.push({
+      code: "saved-setting-widens",
+      message:
+        `Ignoring ${key} ${JSON.stringify(savedValue)} saved on "${item?.title}": a saved setting can only ` +
+        `tighten this run's ${key} (${JSON.stringify(operator.value)} from ${operator.source}).`,
+    });
+  };
+  if (permission.widened !== undefined && vendor === LLM_VENDOR.CLAUDE) {
+    widenWarning("permissionMode", permission.widened, {
+      value: permission.value ?? CLI_DEFAULT_PERMISSION_MODE,
+      source: permission.origin === "config" ? "hench.permissionMode" : permission.origin,
+    });
+  }
+
+  // -- Gates and budgets -----------------------------------------------------
+  // The operator's own value first; a saved value replaces it only when it is
+  // tighter. A flag is the operator's instruction for this run and stands
+  // either way. `false` is a meaningful saved gate value: it re-enables a gate
+  // `hench.skipFullTestGate` turns off.
+  const operatorGate: Resolved<boolean> = testGate.skip
+    ? { value: true, source: "cli-flag" }
+    : testGate.noSkip
+      ? { value: false, source: "cli-flag" }
+      : config.skipFullTestGate !== undefined
+        ? { value: config.skipFullTestGate, source: "hench.skipFullTestGate" }
+        : { value: false, source: "built-in" };
+  let skipTestGate: Resolved<boolean> = operatorGate;
+  if (saved?.skipTestGate !== undefined && operatorGate.source !== "cli-flag") {
+    if (!saved.skipTestGate && operatorGate.value) skipTestGate = { value: false, source: "task.run" };
+    else if (saved.skipTestGate && !operatorGate.value) widenWarning("skipTestGate", true, operatorGate);
+  }
+
+  const operatorMaxTurns: Resolved<number> =
+    budgets.maxTurns !== undefined
+      ? { value: budgets.maxTurns, source: "cli-flag" }
+      : { value: config.maxTurns, source: henchSource("maxTurns") };
+  let maxTurns: Resolved<number> = operatorMaxTurns;
+  if (saved?.maxTurns !== undefined && operatorMaxTurns.source !== "cli-flag") {
+    if (capIsTighter(saved.maxTurns, operatorMaxTurns.value)) maxTurns = { value: saved.maxTurns, source: "task.run" };
+    else if (capIsWider(saved.maxTurns, operatorMaxTurns.value)) widenWarning("maxTurns", saved.maxTurns, operatorMaxTurns);
+  }
+
+  const operatorBudget: Resolved<number> =
+    budgets.tokenBudget !== undefined
+      ? { value: budgets.tokenBudget, source: "cli-flag" }
+      : { value: config.tokenBudget, source: henchSource("tokenBudget") };
+  let tokenBudget: Resolved<number> = operatorBudget;
+  if (saved?.tokenBudget !== undefined && operatorBudget.source !== "cli-flag") {
+    if (capIsTighter(saved.tokenBudget, operatorBudget.value)) tokenBudget = { value: saved.tokenBudget, source: "task.run" };
+    else if (capIsWider(saved.tokenBudget, operatorBudget.value)) widenWarning("tokenBudget", saved.tokenBudget, operatorBudget);
+  }
+
+  // Spend caps: config only, tightened (never widened) by a saved value.
+  const savedCaps = saved as Partial<Record<"maxCostUsdPerRun" | "maxCostUsdPerDay", unknown>> | undefined;
+  const resolveSpendCap = (key: "maxCostUsdPerRun" | "maxCostUsdPerDay"): Resolved<number> => {
+    const operator: Resolved<number> = { value: config[key] ?? 0, source: henchSource(key) };
+    const savedValue = savedCaps?.[key];
+    if (typeof savedValue !== "number" || !Number.isFinite(savedValue) || savedValue < 0) return operator;
+    if (capIsTighter(savedValue, operator.value)) return { value: savedValue, source: "task.run" };
+    if (capIsWider(savedValue, operator.value)) widenWarning(key, savedValue, operator);
+    return operator;
+  };
+  const maxCostUsdPerRun = resolveSpendCap("maxCostUsdPerRun");
+  const maxCostUsdPerDay = resolveSpendCap("maxCostUsdPerDay");
 
   // -- Review --------------------------------------------------------------
   // The review pass spawns a second vendor CLI session, so it exists only on
@@ -935,31 +1067,15 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
         : saved?.reviewOptional !== undefined
           ? { value: saved.reviewOptional, source: "task.run" }
           : { value: false, source: "built-in" },
-    // `false` is a meaningful saved value: it re-enables a gate
-    // `hench.skipFullTestGate` turns off. Either flag outranks it; an absent
-    // flag says nothing, which is why the pair exists rather than one flag
-    // with two readings.
-    skipTestGate: testGate.skip
-      ? { value: true, source: "cli-flag" }
-      : testGate.noSkip
-        ? { value: false, source: "cli-flag" }
-        : saved?.skipTestGate !== undefined
-          ? { value: saved.skipTestGate, source: "task.run" }
-          : config.skipFullTestGate !== undefined
-            ? { value: config.skipFullTestGate, source: "hench.skipFullTestGate" }
-            : { value: false, source: "built-in" },
-    maxTurns:
-      budgets.maxTurns !== undefined
-        ? { value: budgets.maxTurns, source: "cli-flag" }
-        : saved?.maxTurns !== undefined
-          ? { value: saved.maxTurns, source: "task.run" }
-          : { value: config.maxTurns, source: henchSource("maxTurns") },
-    tokenBudget:
-      budgets.tokenBudget !== undefined
-        ? { value: budgets.tokenBudget, source: "cli-flag" }
-        : saved?.tokenBudget !== undefined
-          ? { value: saved.tokenBudget, source: "task.run" }
-          : { value: config.tokenBudget, source: henchSource("tokenBudget") },
+    // Resolved above: the operator's value, tightened by the saved block when
+    // the saved block is tighter. Either flag outranks it; an absent flag says
+    // nothing, which is why the gate pair exists rather than one flag with
+    // two readings.
+    skipTestGate,
+    maxTurns,
+    tokenBudget,
+    maxCostUsdPerRun,
+    maxCostUsdPerDay,
     // Saved notes reach the agent the way `--context-file` does. An explicit
     // `--context-file` replaces them rather than appending: the flag is the
     // operator saying what context this run gets.

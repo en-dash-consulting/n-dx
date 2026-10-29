@@ -306,6 +306,16 @@ export class EventAccumulator {
   private _deriveToolCalls(): AccumulatedToolCalls {
     const calls: ToolCallRecord[] = [];
 
+    // Results that name the call they answer (the Claude CLI's tool_use_id).
+    // Paired by id wherever they land in the stream, so parallel calls whose
+    // results arrive after both invocations are not cross-assigned.
+    const resultsById = new Map<string, NonNullable<RuntimeEvent["toolResult"]>>();
+    for (const event of this._events) {
+      if (event.type === "tool_result" && event.toolResult?.id && !resultsById.has(event.toolResult.id)) {
+        resultsById.set(event.toolResult.id, event.toolResult);
+      }
+    }
+
     // Collect tool_use events, and pair with following tool_result events
     for (let i = 0; i < this._events.length; i++) {
       const event = this._events[i];
@@ -318,10 +328,22 @@ export class EventAccumulator {
           durationMs: 0,
         };
 
+        const callId = event.toolCall.id;
+        if (callId) {
+          const byId = resultsById.get(callId);
+          if (byId) {
+            record.output = byId.output.slice(0, 2000);
+            record.durationMs = byId.durationMs;
+          }
+          calls.push(record);
+          continue;
+        }
+
         // Look ahead for a matching tool_result
         for (let j = i + 1; j < this._events.length; j++) {
           const next = this._events[j];
-          if (next.type === "tool_result" && next.toolResult) {
+          // A result carrying an id answers an id-bearing call, paired above.
+          if (next.type === "tool_result" && next.toolResult && !next.toolResult.id) {
             // Match by tool name or assume sequential pairing
             if (next.toolResult.tool === event.toolCall.tool || next.toolResult.tool === "") {
               record.output = next.toolResult.output.slice(0, 2000);

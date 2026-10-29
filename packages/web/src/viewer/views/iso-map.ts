@@ -46,6 +46,7 @@ import {
   type IsoMapSource,
 } from "./iso-map-url.js";
 import { appUrl } from "../base-path.js";
+import { credentialedLinkClick } from "../session.js";
 
 export type IsoMapLoadState = "loading" | "ready" | "empty" | "error";
 
@@ -340,11 +341,13 @@ export function IsoMapView({ analysisStamp = "" }: { analysisStamp?: string } = 
           href: appUrl(appliedUrl),
           target: "_blank",
           rel: "noopener noreferrer",
+          onClick: credentialedLinkClick(appliedUrl),
         }, "Open in new tab"),
         h("a", {
           class: "cmd-btn cmd-btn-secondary",
           href: appUrl(appliedUrl),
           download: isoMapDownloadName(applied),
+          onClick: credentialedLinkClick(appliedUrl, { download: isoMapDownloadName(applied) }),
         }, "Download HTML"),
       ),
     ),
@@ -518,6 +521,7 @@ export function IsoMapHero({ analysisStamp = "", onOpenOptions, facts = [], onEx
           href: appUrl(standaloneUrl),
           target: "_blank",
           rel: "noopener noreferrer",
+          onClick: credentialedLinkClick(standaloneUrl),
           title: "Open the map on its own in a new tab",
         }, "New tab", h("span", { "aria-hidden": "true" }, "↗")),
         hosted ? null : h("button", {

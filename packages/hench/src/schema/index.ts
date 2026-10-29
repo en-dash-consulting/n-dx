@@ -14,6 +14,8 @@ export {
   DEFAULT_REVIEW_ROUNDS,
   MIN_REVIEW_ROUNDS,
   MAX_REVIEW_ROUNDS,
+  DEFAULT_SESSION_TIMEOUT_MS,
+  RUN_GUARD_AUDIT_MAX_DENIALS,
 } from "./v1.js";
 
 export type {
@@ -52,6 +54,7 @@ export type {
   RunReviewPlan,
   RunReviewRound,
   RunReviewSpend,
+  RunGuardAudit,
   RunRecord,
   RunLoopPosition,
   RunTrustRecord,
