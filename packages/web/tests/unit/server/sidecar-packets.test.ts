@@ -258,6 +258,20 @@ describe("Explain", () => {
     expect(packet.text).toMatch(/- capability A1\.1 Pay by card \(\w+, \w+\)/);
   });
 
+  it("resolves an area or capability by alias, and does not throw on a deleted capability", async () => {
+    const sources = await sourcesFor("v2");
+    const tree = (await sources.prd())!.tree;
+    indexTree(tree).resolve(AREA)!.aliases = ["shop-checkout"];
+    const capability = indexTree(tree).resolve(CAPABILITY)!;
+    capability.aliases = ["card-pay"];
+    expect((await buildExplainPacket(sources, { ref: "shop-checkout" }, NOW)).text).toContain("Capabilities in the area");
+    expect((await buildExplainPacket(sources, { ref: "card-pay" }, NOW)).text).toContain("- c1 [not verified] A valid card is charged once");
+
+    capability.status = "deleted";
+    const deleted = await buildExplainPacket(sources, { ref: CAPABILITY }, NOW);
+    expect(deleted.text).not.toContain("[met]");
+  });
+
   it("zone: carries the zone's summary, metrics, entry points and insights", async () => {
     const packet = await buildExplainPacket(await sourcesFor("v2"), { ref: "pay" }, NOW);
     expect(packet.text).toContain("pay (Payments)");

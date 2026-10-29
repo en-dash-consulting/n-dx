@@ -360,13 +360,14 @@ export async function buildExplainPacket(sources: PacketSources, target: PacketT
   const v1Note = prd?.layout === "v1" ? [noProductLayer(now)] : [];
 
   if (prd) {
-    const all = [...prd.tree.product, ...prd.tree.changes];
-    const found = findNode(all, target.ref);
-    if (found && prd.layout === "v2" && found.node.type === "area") return done(areaSections(prd.tree, found, now));
-    if (found && prd.layout === "v2" && found.node.type === "capability") {
-      const built = v2CapabilitySections(prd.tree, found.node, now);
+    // Rex's index resolves aliases and skips deleted nodes, as get_capability does.
+    const product = prd.layout === "v2" ? indexTree(prd.tree).resolve(target.ref) : undefined;
+    if (product?.type === "area") return done(areaSections(prd.tree, { node: product, chain: [], siblings: [] }, now));
+    if (product?.type === "capability") {
+      const built = v2CapabilitySections(prd.tree, product, now);
       return done([...built.sections, ...(await evidenceSections(sources, built.ids, now))]);
     }
+    const found = findNode([...prd.tree.product, ...prd.tree.changes], target.ref);
     if (found) {
       const built = v1ItemSections(found, now);
       return done([...v1Note, ...built.sections, ...(await evidenceSections(sources, built.ids, now))]);
