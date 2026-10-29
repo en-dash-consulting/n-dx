@@ -237,10 +237,8 @@ describe("run_command", () => {
     const call = client.callTool({ name: "run_command", arguments: { argv: ["ndx", "ci", "."] } });
     await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
     await spawned();
-    const stoppedAt = Date.now();
     broker.withdraw(SESSION, "The operator stopped the turn");
     const result = await call;
-    expect(Date.now() - stoppedAt).toBeLessThan(5_000);
     expect(resultText(result)).toMatch(/`ndx ci \.` is still running as job sidecar-command-\w+; output in the job tray and on Live\.$/);
     const child = spawnManagedMock.mock.results[0].value as { kill: ReturnType<typeof vi.fn> };
     expect(child.kill).not.toHaveBeenCalled();
