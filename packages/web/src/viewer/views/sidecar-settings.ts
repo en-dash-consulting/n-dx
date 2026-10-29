@@ -75,11 +75,12 @@ export interface SidecarSettingsForm {
   onCeilingChange: (scope: "worktree" | "hub", raw: string) => void;
   onIdleChange: (raw: string) => void;
   onGithubReadsChange: (on: boolean) => void;
-  onAddRule: (command: string) => void;
+  /** Ask the server first, stage the command if allowed; resolves to the refusal, else null. */
+  onAddRule: (command: string) => Promise<string | null>;
   onUnstageAdd: (command: string) => void;
   onToggleRemove: (rule: Rule) => void;
-  /** Read the settings and allow-list; clears every edit. */
-  load: () => Promise<void>;
+  /** Read the settings and allow-list; clears every edit unless `keepEdits`, which drops only those already on disk. */
+  load: (keepEdits?: boolean) => Promise<void>;
   save: () => Promise<boolean>;
   discard: () => void;
 }
@@ -89,6 +90,18 @@ const sameRule = (a: Rule, b: Rule) => a.tool === b.tool && a.key === b.key;
 async function failure(res: Response, fallback: string): Promise<string> {
   const body = await res.json().catch(() => ({})) as { error?: string };
   return body.error ?? fallback;
+}
+
+const argvOf = (command: string) => command.trim().split(/\s+/);
+
+/** The server's verdict on allow-listing `command`, written nowhere: null when allowed, else its refusal. */
+async function checkCommand(command: string): Promise<string | null> {
+  const res = await fetch("/api/sidecar/allow-list?dryRun=1", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tool: "run_command", argv: argvOf(command) }),
+  });
+  return res.ok ? null : failure(res, "Not allowed");
 }
 
 /**
@@ -116,15 +129,24 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
     setSaveError(null);
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (keepEdits = false) => {
     try {
       const [settingsRes, rulesRes] = await Promise.all([fetch("/api/sidecar/settings"), fetch("/api/sidecar/allow-list")]);
       if (!settingsRes.ok) throw new Error(await failure(settingsRes, "Failed to load Sidecar settings"));
       if (!rulesRes.ok) throw new Error(await failure(rulesRes, "Failed to load the allow-list"));
       setSettings(await settingsRes.json() as SettingsResponse);
-      setRules((await rulesRes.json() as { rules: Rule[] }).rules);
+      const onDisk = (await rulesRes.json() as { rules: Rule[] }).rules;
+      setRules(onDisk);
       setLoadError(null);
-      reset();
+      if (keepEdits) {
+        // A Save that failed part-way may have written some rules: show the file's,
+        // and stop calling a staged add "unsaved" once it is on the list.
+        const listed = new Set(onDisk.map((r) => describeRule(r)));
+        setAdded((prev) => prev.filter((c) => !listed.has(argvOf(c).join(" "))));
+        setRemoved((prev) => prev.filter((r) => onDisk.some((x) => sameRule(x, r))));
+      } else {
+        reset();
+      }
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load Sidecar settings");
     } finally {
@@ -153,18 +175,26 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
       setSaveError("Fix the invalid Sidecar settings before saving");
       return false;
     }
+    // Whatever fails, the allow-list shown is re-read from the broker's file.
+    const fail = async (message: string) => {
+      await load(true);
+      setSaveError(message);
+      return false;
+    };
     try {
+      // Every staged add is checked before anything is written, so a refusal
+      // leaves the allow-list and the other settings untouched.
       for (const command of added) {
-        const argv = command.trim().split(/\s+/);
+        const refusal = await checkCommand(command);
+        if (refusal !== null) return await fail(`Not allow-listed (${command}): ${refusal}`);
+      }
+      for (const command of added) {
         const res = await fetch("/api/sidecar/allow-list", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tool: "run_command", argv }),
+          body: JSON.stringify({ tool: "run_command", argv: argvOf(command) }),
         });
-        if (!res.ok) {
-          setSaveError(`Not allow-listed (${command}): ${await failure(res, "Save failed")}`);
-          return false;
-        }
+        if (!res.ok) return await fail(`Not allow-listed (${command}): ${await failure(res, "Save failed")}`);
       }
       for (const rule of removed) {
         const res = await fetch("/api/sidecar/allow-list", {
@@ -172,10 +202,7 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(rule),
         });
-        if (!res.ok) {
-          setSaveError(await failure(res, "Save failed"));
-          return false;
-        }
+        if (!res.ok) return await fail(await failure(res, "Save failed"));
       }
       const patch: Record<string, unknown> = {};
       const ceiling: Record<string, number> = {};
@@ -194,14 +221,10 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
-        if (!res.ok) {
-          setSaveError(await failure(res, "Save failed"));
-          return false;
-        }
+        if (!res.ok) return await fail(await failure(res, "Save failed"));
       }
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Save failed");
-      return false;
+      return await fail(err instanceof Error ? err.message : "Save failed");
     }
     await load();
     return true;
@@ -223,9 +246,17 @@ export function useSidecarSettingsForm(): SidecarSettingsForm {
     onCeilingChange: (scope, raw) => setCeilingEdit((prev) => ({ ...prev, [scope]: raw })),
     onIdleChange: setIdleMinutesEdit,
     onGithubReadsChange: setGithubReadsEdit,
-    onAddRule: (command) => {
+    onAddRule: async (command) => {
       const trimmed = command.trim().replace(/\s+/g, " ");
-      if (trimmed) setAdded((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+      if (!trimmed) return null;
+      try {
+        const refusal = await checkCommand(trimmed);
+        if (refusal !== null) return refusal;
+      } catch (err) {
+        return err instanceof Error ? err.message : "Could not check the command";
+      }
+      setAdded((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+      return null;
     },
     onUnstageAdd: (command) => setAdded((prev) => prev.filter((c) => c !== command)),
     onToggleRemove: (rule) =>
@@ -280,15 +311,18 @@ function NumberInput({ label, value, placeholder, unit, error, onInput }: {
 
 function AllowListEditor({ form }: { form: SidecarSettingsForm }) {
   const [draft, setDraft] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
   const cliName = useCliName();
-  const add = () => {
-    form.onAddRule(draft);
-    setDraft("");
+  const add = async () => {
+    const refusal = await form.onAddRule(draft);
+    setAddError(refusal === null ? null : `Not allow-listed (${draft.trim()}): ${refusal}`);
+    if (refusal === null) setDraft("");
   };
   return h(Card, {
     field: "allowList",
     title: "Allow-list",
     description: "Commands the Sidecar may run without asking. Anything not listed raises a card first.",
+    error: addError,
   },
     h("ul", { class: "sidecar-allow-rules", "aria-label": "Allow-list rules" },
       ...form.rules.map((rule) => {
@@ -318,15 +352,18 @@ function AllowListEditor({ form }: { form: SidecarSettingsForm }) {
         value: draft,
         placeholder: `${cliName} status`,
         "aria-label": "Command to allow",
-        onInput: (e: Event) => setDraft((e.target as HTMLInputElement).value),
+        onInput: (e: Event) => {
+          setDraft((e.target as HTMLInputElement).value);
+          setAddError(null);
+        },
         onKeyDown: (e: KeyboardEvent) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            add();
+            void add();
           }
         },
       }),
-      h("button", { type: "button", class: "ct-reset-btn", disabled: draft.trim() === "", onClick: add }, "Add"),
+      h("button", { type: "button", class: "ct-reset-btn", disabled: draft.trim() === "", onClick: () => void add() }, "Add"),
     ),
   );
 }

@@ -551,6 +551,22 @@ describe("broker", () => {
     await api(`/${id}/interrupt`, { method: "POST" });
   });
 
+  it("answers an allow-list dry run with the verdict and writes nothing", async () => {
+    const post = (query: string, argv: string[]) => fetch(`${server.baseUrl}/api/sidecar/allow-list${query}`, {
+      method: "POST",
+      body: JSON.stringify({ tool: "run_command", argv }),
+    });
+    const ok = await post("?dryRun=1", ["ndx", "status", "."]);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ rule: { tool: "run_command", key: JSON.stringify(["ndx", "status", "."]) } });
+    for (const argv of [["ndx", "work", "."], ["git", "reset", "--hard"], ["git", "push"]]) {
+      const refused = await post("?dryRun=1", argv);
+      expect(refused.status).toBe(409);
+      expect(((await refused.json()) as { error: string }).error).toMatch(/can never be allow-listed/);
+    }
+    expect(await (await fetch(`${server.baseUrl}/api/sidecar/allow-list`)).json()).toEqual({ rules: [] });
+  });
+
   it("withdraws a pending card when the operator stops the turn", async () => {
     const id = await runningSession();
     const client = await brokerClient(id);

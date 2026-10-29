@@ -296,11 +296,16 @@ export class SidecarBroker {
    * push, writes); returns the rule, which is already on the list if it was.
    */
   allow(tool: BrokerToolName, input: Record<string, unknown>): AllowListRule {
-    const key = allowListKey(tool, input);
-    if (key === null) throw new BrokerDecisionError(409, `A ${tool} call like this can never be allow-listed`);
-    const rule = { tool, key };
+    const rule = this.checkAllow(tool, input);
     this.addRule(rule);
     return rule;
+  }
+
+  /** The rule {@link allow} would add, or the same refusal; writes nothing. */
+  checkAllow(tool: BrokerToolName, input: Record<string, unknown>): AllowListRule {
+    const key = allowListKey(tool, input);
+    if (key === null) throw new BrokerDecisionError(409, `A ${tool} call like this can never be allow-listed`);
+    return { tool, key };
   }
 
   /** Remove a rule; true when it was on the list. */

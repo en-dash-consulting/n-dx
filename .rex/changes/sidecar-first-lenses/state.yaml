@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "123bf048-b90c-4bc2-9ead-1ab2ca059e5d":
-    lastModified: "2026-10-29T01:19:09.471Z"
+    status: "completed"
+    startedAt: "2026-10-29T01:27:19.862Z"
+    completedAt: "2026-10-29T01:32:37.029Z"
+    endedAt: "2026-10-29T01:32:37.029Z"
+    activeIntervals: [{"end":"2026-10-29T01:32:37.029Z","start":"2026-10-29T01:27:19.862Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added POST /api/sidecar/allow-list?dryRun=1 (broker.checkAllow). Add checks with the server and never stages a refused command; Save checks all staged adds before any write; a failed Save re-reads the allow-list file."
+    lastModified: "2026-10-29T01:32:37.029Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "21fe75a3-8af7-4ce7-9fbd-08549905bb5b":
     lastModified: "2026-10-28T21:46:05.256Z"

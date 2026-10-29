@@ -29,7 +29,7 @@
  * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | POST | `/api/sidecar/sessions/:id/mcp` | the `ndx-sidecar` broker (MCP, Streamable HTTP), while a turn runs |
  * | GET  | `/api/sidecar/allow-list` | the Sidecar allow-list |
- * | POST | `/api/sidecar/allow-list` | add a rule (`{ tool, argv }`); refused for work, reset, push and every never-allow-listed tool |
+ * | POST | `/api/sidecar/allow-list` | add a rule (`{ tool, argv }`); refused for work, reset, push and every never-allow-listed tool; `?dryRun=1` gives the same verdict and writes nothing |
  * | DELETE | `/api/sidecar/allow-list` | revoke a rule (`{ tool, key }`) |
  * | GET  | `/api/sidecar/settings` | mode, context ceilings, idle window, GitHub reads (`sidecar/settings.ts`) |
  * | PUT  | `/api/sidecar/settings` | save them; `null` resets a value, an invalid one answers 400 and writes nothing |
@@ -477,7 +477,8 @@ export async function handleSidecarRoute(
       const { tool, argv } = body;
       if (typeof tool !== "string" || !isBrokerTool(tool)) return refuse(res, 400, `"tool" must be a broker tool`);
       try {
-        jsonResponse(res, 200, { rule: broker.allow(tool, { argv }) });
+        const dryRun = new URLSearchParams(search).get("dryRun") === "1";
+        jsonResponse(res, 200, { rule: dryRun ? broker.checkAllow(tool, { argv }) : broker.allow(tool, { argv }) });
       } catch (err) {
         if (err instanceof BrokerDecisionError) return refuse(res, err.status, err.message);
         throw err;

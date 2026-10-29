@@ -40,9 +40,16 @@ const REX_SETTINGS = {
 };
 const RULE ={ tool: "run_command", key: JSON.stringify(["ndx", "status", "."]) };
 
-function stubApi(opts: { sidecar: boolean; failAllowAdd?: string }) {
+type FetchStub = (url: string, init?: { method?: string; body?: string }) => Promise<unknown>;
+const LOCKED = new Set(["work", "reset", "push"]);
+const refusal = (argv: string[]) =>
+  argv.some((a) => LOCKED.has(a)) ? "A run_command call like this can never be allow-listed" : null;
+
+function stubApi(opts: { sidecar: boolean }) {
   toggles.sidecar = opts.sidecar;
   const requests: Req[] = [];
+  /** The broker's allow-list file: real POSTs and DELETEs change it. */
+  let file = [RULE];
   const respond = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body });
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { method?: string; body?: string }) => {
     const method = init?.method ?? "GET";
@@ -54,15 +61,28 @@ function stubApi(opts: { sidecar: boolean; failAllowAdd?: string }) {
       case "GET /api/hench/config": return respond({ config: { schema: "hench/v1" }, fields: [] });
       case "GET /api/cli/timeouts": return respond({ timeoutMs: null, timeouts: {}, defaultTimeoutMs: 1, noDefaultTimeoutCommands: [] });
       case "GET /api/sidecar/settings": return respond(SETTINGS);
-      case "GET /api/sidecar/allow-list": return respond({ rules: [RULE] });
-      case "POST /api/sidecar/allow-list":
-        return opts.failAllowAdd ? respond({ error: opts.failAllowAdd }, 409) : respond({ rule: RULE });
+      case "GET /api/sidecar/allow-list": return respond({ rules: file });
+      case "POST /api/sidecar/allow-list?dryRun=1": {
+        const argv = (JSON.parse(init!.body!) as { argv: string[] }).argv;
+        const no = refusal(argv);
+        return no ? respond({ error: no }, 409) : respond({ rule: { tool: "run_command", key: JSON.stringify(argv) } });
+      }
+      case "POST /api/sidecar/allow-list": {
+        const argv = (JSON.parse(init!.body!) as { argv: string[] }).argv;
+        const rule = { tool: "run_command", key: JSON.stringify(argv) };
+        file = [...file, rule];
+        return respond({ rule });
+      }
       case "PUT /api/sidecar/settings": return respond(SETTINGS);
-      case "DELETE /api/sidecar/allow-list": return respond({ removed: true });
+      case "DELETE /api/sidecar/allow-list": {
+        const gone = JSON.parse(init!.body!) as { key: string };
+        file = file.filter((r) => r.key !== gone.key);
+        return respond({ removed: true });
+      }
       default: return respond({});
     }
   }));
-  return { writes: () => requests.filter((r) => r.method !== "GET"), requests };
+  return { writes: () => requests.filter((r) => r.method !== "GET" && !r.url.includes("dryRun")), requests, file: () => file };
 }
 
 describe("Workflow Sidecar section", () => {
@@ -136,6 +156,7 @@ describe("Workflow Sidecar section", () => {
     await click(input("GitHub reads"));
     await type(input("Command to allow"), "ndx rex status .");
     await click(button("Add"));
+    await settle();
     await click(button("Remove"));
     expect(api.writes()).toEqual([]);
 
@@ -160,12 +181,69 @@ describe("Workflow Sidecar section", () => {
     expect(root.textContent).toMatch(/Fix the invalid Sidecar settings before saving/);
   });
 
-  it("shows the server's refusal when a command can never be allow-listed", async () => {
-    stubApi({ sidecar: true, failAllowAdd: "A run_command call like this can never be allow-listed" });
+  it.each(["ndx work .", "git reset --hard", "git push"])("refuses %s at Add time and never stages it", async (command) => {
+    const api = stubApi({ sidecar: true });
     await mount();
-    await type(input("Command to allow"), "ndx work .");
+    await type(input("Command to allow"), command);
     await click(button("Add"));
+    await settle();
+    await settle();
+    expect(root.textContent).toMatch(/Not allow-listed \(.*\): A run_command call like this can never be allow-listed/);
+    expect(root.querySelector('.sidecar-allow-rule[data-state="adding"]')).toBeNull();
+    expect(input("Command to allow").value).toBe(command);
+    expect(api.writes()).toEqual([]);
+  });
+
+  it("writes nothing when Save finds one staged command refused", async () => {
+    const api = stubApi({ sidecar: true });
+    await mount();
+    await type(input("Command to allow"), "ndx rex status .");
+    await click(button("Add"));
+    await settle();
+    await type(input("Command to allow"), "ndx hench status .");
+    await click(button("Add"));
+    await settle();
+    await type(input("Hub context ceiling in tokens"), "50000");
+    // The broker turns against the second command after Add accepted it.
+    const f = fetch as unknown as ReturnType<typeof vi.fn>;
+    const real = f.getMockImplementation() as FetchStub;
+    f.mockImplementation(async (url: string, init?: { method?: string; body?: string }) => {
+      if (url.includes("dryRun") && init?.body?.includes("hench")) {
+        return { ok: false, status: 409, json: async () => ({ error: "A run_command call like this can never be allow-listed" }) };
+      }
+      return real(url, init);
+    });
     await save();
-    expect(root.textContent).toMatch(/Not allow-listed \(ndx work \.\): A run_command call like this can never be allow-listed/);
+    expect(api.writes()).toEqual([]);
+    expect(api.file()).toEqual([RULE]);
+    expect(root.textContent).toMatch(/Not allow-listed \(ndx hench status \.\)/);
+  });
+
+  it("shows the broker's file after a Save that fails part-way", async () => {
+    const api = stubApi({ sidecar: true });
+    await mount();
+    await type(input("Command to allow"), "ndx rex status .");
+    await click(button("Add"));
+    await settle();
+    await type(input("Command to allow"), "ndx hench status .");
+    await click(button("Add"));
+    await settle();
+    // The second real write fails; the first has landed.
+    const f = fetch as unknown as ReturnType<typeof vi.fn>;
+    const real = f.getMockImplementation() as FetchStub;
+    let posts = 0;
+    f.mockImplementation(async (url: string, init?: { method?: string; body?: string }) => {
+      if (url === "/api/sidecar/allow-list" && init?.method === "POST" && (posts += 1) === 2) {
+        return { ok: false, status: 500, json: async () => ({ error: "disk full" }) };
+      }
+      return real(url, init);
+    });
+    await save();
+    expect(api.file().map((r) => r.key)).toEqual([RULE.key, JSON.stringify(["ndx", "rex", "status", "."])]);
+    const shown = [...root.querySelectorAll('.sidecar-allow-rule[data-state="saved"] code')].map((c) => c.textContent);
+    expect(shown).toEqual(["ndx status .", "ndx rex status ."]);
+    const unsaved = [...root.querySelectorAll('.sidecar-allow-rule[data-state="adding"] code')].map((c) => c.textContent);
+    expect(unsaved).toEqual(["ndx hench status ."]);
+    expect(root.textContent).toMatch(/disk full/);
   });
 });
