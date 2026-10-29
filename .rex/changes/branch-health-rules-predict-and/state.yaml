@@ -21,8 +21,15 @@ items:
     lastModified: "2026-10-29T16:54:22.173Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "477c02f8-fba6-46ea-93ef-19fbf9293954":
+    status: "completed"
+    startedAt: "2026-10-29T18:03:17.586Z"
+    completedAt: "2026-10-29T18:03:17.586Z"
+    endedAt: "2026-10-29T18:03:17.586Z"
+    activeIntervals: [{"end":"2026-10-29T18:03:17.586Z","start":"2026-10-29T18:03:17.586Z"}]
+    appliedAt: "2026-10-29T18:03:17.586Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     issues: ["https://www.notion.so/3f7a80b7192481b38426d554c9a1cfa8","https://www.notion.so/3f7a80b7192481c9be12e2721b3bdbb9"]
-    lastModified: "2026-10-29T18:02:56.352Z"
+    lastModified: "2026-10-29T18:03:17.586Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5b73d052-964f-4145-ab5f-bf6c6b221f01":
     status: "completed"
@@ -65,7 +72,10 @@ items:
     lastModified: "2026-10-29T17:41:32.789Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2c90a0d-ac38-4bdf-9bfb-45fe667160ec":
+    status: "completed"
     startedAt: "2026-10-29T17:41:38.568Z"
-    activeIntervals: [{"end":"2026-10-29T17:56:20.006Z","start":"2026-10-29T17:41:38.568Z"}]
-    lastModified: "2026-10-29T17:56:20.546Z"
+    completedAt: "2026-10-29T18:03:17.586Z"
+    endedAt: "2026-10-29T18:03:17.586Z"
+    activeIntervals: [{"end":"2026-10-29T17:56:20.006Z","start":"2026-10-29T17:41:38.568Z"},{"end":"2026-10-29T18:03:17.586Z","start":"2026-10-29T18:03:17.586Z"}]
+    lastModified: "2026-10-29T18:03:17.586Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
