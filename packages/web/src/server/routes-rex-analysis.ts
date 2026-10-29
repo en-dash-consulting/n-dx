@@ -9,7 +9,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { exec as foundationExec } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
@@ -18,6 +17,8 @@ import type { WebSocketBroadcaster } from "./websocket.js";
 import { appendLog } from "./routes-rex/rex-route-helpers.js";
 import { loadPRDSync, refreshPRDCache } from "./prd-io.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
+import { resolveOwnPackageCli } from "./own-cli.js";
+import { refuseWhileRestricted } from "./trust-gate.js";
 import { startAsyncJob, stopAsyncJob, newAsyncJob } from "./routes-commands.js";
 import type { AsyncJobStatus } from "./routes-commands.js";
 
@@ -43,38 +44,14 @@ const CAPTURE_ROOT_LEVEL = levelOf("change")!;
 const CAPTURE_CHILD_LEVEL = levelOf("change", "change")!;
 
 /**
- * Resolve how to invoke the rex CLI for a given analyzed project.
- *
- * Resolution order:
- *  1. Project-local install: `<projectDir>/node_modules/.bin/rex`.
- *  2. The rex CLI resolved from THIS server's own module graph via the
- *     `@n-dx/rex/dist/*` subpath export. This is the correct path for any
- *     normal analyzed project — rex ships with the running n-dx install and
- *     must NOT be looked up under the analyzed project's directory (doing so
- *     produced `Cannot find module
- *     '<projectDir>/packages/rex/dist/cli/index.js'` whenever the dashboard
- *     pointed at a project that isn't the n-dx monorepo itself).
- *     NOTE: rex's package `exports["."]` only has an `import` condition, so
- *     a bare CJS `require.resolve("@n-dx/rex")` throws
- *     ERR_PACKAGE_PATH_NOT_EXPORTED. We resolve the CLI subpath directly,
- *     which matches the `"./dist/*"` export and works under CJS.
- *  3. Monorepo dogfood fallback: `<projectDir>/packages/rex/dist/cli/index.js`
- *     (only valid when analyzing the n-dx repo itself).
+ * How to invoke the rex CLI: from this server's own install (see own-cli.ts),
+ * never from the analyzed project's node_modules/.bin or a packages/
+ * directory inside it. `projectDir` is accepted for the call sites' shape and
+ * deliberately unused.
  */
-function resolveRexCli(projectDir: string): { binPath: string; prefixArgs: string[] } {
-  const localBin = join(projectDir, "node_modules", ".bin", "rex");
-  if (existsSync(localBin)) return { binPath: localBin, prefixArgs: [] };
-  try {
-    const req = createRequire(import.meta.url);
-    const cli = req.resolve("@n-dx/rex/dist/cli/index.js");
-    if (existsSync(cli)) return { binPath: "node", prefixArgs: [cli] };
-  } catch {
-    /* fall through to dogfood path */
-  }
-  return {
-    binPath: "node",
-    prefixArgs: [join(projectDir, "packages", "rex", "dist", "cli", "index.js")],
-  };
+function resolveRexCli(_projectDir: string): { binPath: string; prefixArgs: string[] } {
+  const { bin, args } = resolveOwnPackageCli("@n-dx/rex", "rex", "rex");
+  return { binPath: bin, prefixArgs: args };
 }
 
 // ---------------------------------------------------------------------------
@@ -307,12 +284,21 @@ const BATCH_FORMAT_EXT: Record<string, string> = {
 // Route dispatcher
 // ---------------------------------------------------------------------------
 
+/** POST routes in {@link routeProposals} that spawn the rex CLI. */
+const TRUST_GATED_PROPOSAL_POSTS = new Set(["analyze", "smart-add-preview", "smart-add-accept", "batch-import"]);
+
 /** Analysis and proposal routes: analyze, proposals, smart-add, batch-import. */
 export function routeProposals(
   path: string, method: string,
   req: IncomingMessage, res: ServerResponse, ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): boolean | Promise<boolean> {
+  // The routes that spawn rex on this repository wait until its execution
+  // config has been accepted (see trust-gate.ts).
+  if (method === "POST" && TRUST_GATED_PROPOSAL_POSTS.has(path) && refuseWhileRestricted(res, ctx.projectDir)) {
+    return true;
+  }
+
   // POST /api/rex/analyze — start analysis as a background job
   if (path === "analyze" && method === "POST") {
     return handleAnalyze(req, res, ctx, broadcast);

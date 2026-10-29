@@ -103,6 +103,28 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
         : `Run will stop after ${Number(v).toLocaleString()} total tokens`,
   },
   {
+    path: "maxCostUsdPerRun",
+    label: "Max Cost per Run (USD)",
+    description: "USD spend cap for one run, checked before every vendor spawn. 0 = unlimited",
+    type: "number",
+    category: "execution",
+    impact: (v) =>
+      Number(v) === 0
+        ? "No USD cap per run (unlimited)"
+        : `A run stops with budget_exceeded once it has spent $${Number(v).toFixed(2)}`,
+  },
+  {
+    path: "maxCostUsdPerDay",
+    label: "Max Cost per Day (USD)",
+    description: "USD spend cap across runs started today, read from .hench/runs before every vendor spawn. 0 = unlimited",
+    type: "number",
+    category: "execution",
+    impact: (v) =>
+      Number(v) === 0
+        ? "No USD cap per day (unlimited)"
+        : `Runs stop with budget_exceeded once today's runs have spent $${Number(v).toFixed(2)}`,
+  },
+  {
     path: "loopPauseMs",
     label: "Loop Pause (ms)",
     description: "Pause between loop/iteration runs in milliseconds",
@@ -590,6 +612,17 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
     type: "number",
     category: "guard",
     impact: (v) => `Spawned processes killed after ${Number(v) / 1000}s`,
+  },
+  {
+    path: "guard.sessionTimeout",
+    label: "Session Timeout (ms)",
+    description: "Wall-clock limit for one vendor CLI session (default: 7200000, two hours). 0 = no limit",
+    type: "number",
+    category: "guard",
+    impact: (v) =>
+      Number(v) === 0
+        ? "Vendor CLI sessions have no time limit"
+        : `A vendor CLI session is stopped after ${Number(v) / 1000}s and the run ends with status timeout`,
   },
   {
     path: "guard.policy.maxCommandsPerMinute",

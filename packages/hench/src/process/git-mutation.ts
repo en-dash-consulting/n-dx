@@ -2,6 +2,7 @@
 
 import { exec } from "./exec.js";
 import type { ExecResult } from "./exec.js";
+import { prepareConfinedHooks } from "../guard/git-hooks.js";
 
 /**
  * Turn a failed structured Git result into the original command failure.
@@ -27,17 +28,32 @@ function gitMutationError(result: ExecResult): Error {
   return wrapped;
 }
 
-/** Execute Git and reject when the command did not complete successfully. */
+/**
+ * Execute Git and reject when the command did not complete successfully.
+ *
+ * Repository hooks run, as they would for a human commit. When the run has
+ * an OS sandbox, each hook git starts is re-executed inside it (see
+ * `guard/git-hooks.ts`): `commit` and `merge` run the commit hooks, and any
+ * index or ref write can run `post-index-change` or `reference-transaction`,
+ * so every command here goes through the same path. With the sandbox off or
+ * unavailable the hooks run unconfined, which the run's posture line reports.
+ */
 export async function execCheckedGit(
   projectDir: string,
   args: string[],
   timeout: number,
 ): Promise<ExecResult> {
-  const result = await exec("git", args, { cwd: projectDir, timeout });
-  if (!result.launched || result.exitCode !== 0) {
-    throw gitMutationError(result);
+  const hooks = await prepareConfinedHooks(projectDir);
+  try {
+    const argv = hooks ? ["-c", `core.hooksPath=${hooks.hooksPath}`, ...args] : args;
+    const result = await exec("git", argv, { cwd: projectDir, timeout });
+    if (!result.launched || result.exitCode !== 0) {
+      throw gitMutationError(result);
+    }
+    return result;
+  } finally {
+    hooks?.dispose();
   }
-  return result;
 }
 
 /** Execute a Git mutation and reject when Git did not complete it. */

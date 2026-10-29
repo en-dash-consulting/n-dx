@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -147,25 +147,30 @@ describe("n-dx refresh", () => {
     expect(stdout).toContain(`Live reload: attempted on :${port} and succeeded (2 WebSocket clients notified).`);
   });
 
-  it("sends the per-user token on the live-reload signal when the token file exists", async () => {
-    // With auth on, the hub and a project server answer 401 without it.
+  it("does not send the per-user token to a live-reload port it cannot identify", async () => {
+    // The port comes from a file in the project. With a token file present,
+    // the signal goes only to a listener identified as this user's own hub or
+    // dashboard; nothing here is, so nothing is sent at all.
     const home = join(tmpDir, "ndx-home");
     await mkdir(home, { recursive: true });
     await writeFile(join(home, "auth.token"), "reload-token-value\n", { mode: 0o600 });
+    const sentPath = join(tmpDir, "fetch-called");
     const mockPath = join(tmpDir, "mock-fetch-auth.mjs");
     await writeFile(
       mockPath,
       [
-        "globalThis.fetch = async (_url, init = {}) => {",
-        "  const ok = (init.headers ?? {})['X-Ndx-Token'] === 'reload-token-value';",
-        "  return new Response(JSON.stringify(ok ? { ok: true } : { error: 'unauthorized' }),",
-        "    { status: ok ? 200 : 401, headers: { 'content-type': 'application/json' } });",
+        'import { appendFileSync } from "node:fs";',
+        "globalThis.fetch = async (url, init = {}) => {",
+        `  appendFileSync(${JSON.stringify(sentPath)}, JSON.stringify({ url: String(url), headers: init.headers ?? {} }) + "\\n");`,
+        "  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });",
         "};",
       ].join("\n"),
       "utf-8",
     );
 
-    const port = 3117;
+    // A port no process of this user's serves, so identification fails
+    // deterministically whatever else runs on the machine.
+    const port = 1;
     await writeFile(join(tmpDir, ".n-dx-web.port"), String(port));
     const env = { ...process.env, NDX_HOME: home };
     delete env.N_DX_HOME;
@@ -174,7 +179,11 @@ describe("n-dx refresh", () => {
       ["--import", pathToFileURL(mockPath).href, CLI_PATH, "refresh", "--ui-only", "--no-build", tmpDir],
       { encoding: "utf-8", timeout: 60000, stdio: "pipe", env },
     );
-    expect(stdout).toContain(`Live reload: attempted on :${port} and succeeded.`);
+    expect(stdout).toContain("Live reload: skipped");
+    expect(stdout).toContain("nothing was sent");
+    const sent = existsSync(sentPath) ? readFileSync(sentPath, "utf-8") : "";
+    expect(sent).not.toContain("reload-token-value");
+    expect(sent).not.toContain(`:${port}/api/reload`);
   });
 
   it("prints restart-required guidance when live reload signaling is unavailable", async () => {

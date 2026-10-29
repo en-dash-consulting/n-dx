@@ -1,6 +1,19 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { MAX_REQUEST_BODY_BYTES } from "./response-utils.js";
-import { isLoopbackHostOnPort, isLoopbackOriginOnPort, isAuthenticated, splitTokenQuery, tokensEqual, authCookie } from "../shared/index.js";
+import {
+  isLoopbackHostOnPort,
+  isLoopbackOriginOnPort,
+  isAuthenticated,
+  applySecurityHeaders,
+  requestAccess,
+  authRouteOf,
+  answerAuthRoute,
+  authRequiredPage,
+  wantsHtml,
+  stripWorkspaceSlot,
+  AUTH_HINT,
+} from "../shared/index.js";
+import type { CredentialStore, RequestAccess } from "../shared/index.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -51,14 +64,31 @@ function rejectMisdirected(res: ServerResponse): true {
 /** Per-request options for {@link handleRequestSecurity}. */
 export interface RequestSecurityOptions {
   /**
-   * The per-user token every request must present (bearer header,
-   * `X-Ndx-Token`, or the `ndx_token` cookie). `null`/absent means the server
-   * runs without one — a bare `web serve`, or a test harness.
+   * The per-user token (bearer header or `X-Ndx-Token`). `null`/absent means
+   * the server runs without one — a bare `web serve`, or a test harness.
    */
   token?: string | null;
+  /**
+   * The browser credentials this server has issued (`shared/auth.ts`). With a
+   * token but no store, only the per-user token itself is accepted.
+   */
+  credentials?: CredentialStore | null;
 }
 
-/** Whether the request presents the token in a header or the cookie. Used by the upgrade path too. */
+/** Requests the gate let through without a credential: the public shell only. */
+const publicOnly = new WeakSet<object>();
+
+/**
+ * Whether the gate let `req` through without a credential. Such a request is
+ * a safe-method one, and the caller may answer it only with the public shell
+ * (the viewer HTML, the landing page, static images) — or
+ * {@link refusePublicOnly}. Everything else needs a credential.
+ */
+export function isPublicOnlyRequest(req: object): boolean {
+  return publicOnly.has(req);
+}
+
+/** Whether the request presents the per-user token in a header. */
 export function isAuthenticatedRequest(req: Pick<IncomingMessage, "headers">, token: string): boolean {
   return isAuthenticated(req.headers, token);
 }
@@ -69,45 +99,38 @@ function rejectUnauthenticated(res: ServerResponse): true {
     "Cache-Control": "no-store",
     "WWW-Authenticate": 'Bearer realm="n-dx"',
   });
-  res.end(JSON.stringify({
-    error: "Authentication required",
-    hint: "Open the URL printed by `ndx start`, or send the token from <ndx home>/auth.token as `Authorization: Bearer <token>` or `X-Ndx-Token`.",
-  }));
+  res.end(JSON.stringify({ error: "Authentication required", hint: AUTH_HINT }));
   return true;
 }
 
 /**
- * Apply the token rule. Returns true when the request was answered.
- *
- * A navigation carrying `?ndx_token=<token>` is how the URL `ndx start`
- * prints opens the dashboard: the cookie is set and the browser is sent to
- * the same URL without the parameter, so the token stays out of the address
- * bar and history. Only safe methods get that treatment; a POST with the
- * token in its query is answered 401 like any other unauthenticated request.
- *
- * The redirect happens whether or not the browser already holds the cookie:
- * the printed URL is reopened on every `ndx start`, and letting an
- * already-authenticated navigation through with the parameter attached left
- * the token in the address bar and handed routes a URL they did not expect.
+ * Answer a request the gate passed as public-only and the caller has no
+ * public answer for: a page saying how to sign in for a navigation, a JSON
+ * 401 for anything else.
  */
-export function enforceToken(req: IncomingMessage, res: ServerResponse, token: string): boolean {
-  const authenticated = isAuthenticatedRequest(req, token);
-  const method = (req.method || "GET").toUpperCase();
-  if (method === "GET" || method === "HEAD") {
-    const { token: fromQuery, location } = splitTokenQuery(req.url ?? "/");
-    if (fromQuery !== null && tokensEqual(fromQuery, token)) {
-      res.writeHead(302, {
-        Location: location,
-        "Set-Cookie": authCookie(token),
-        "Cache-Control": "no-store",
-      });
-      res.end();
-      return true;
-    }
+export function refusePublicOnly(req: IncomingMessage, res: ServerResponse): true {
+  if (wantsHtml(req.headers)) {
+    res.writeHead(401, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "WWW-Authenticate": 'Bearer realm="n-dx"',
+    });
+    res.end(authRequiredPage());
+    return true;
   }
-  if (authenticated) return false;
   return rejectUnauthenticated(res);
 }
+
+/** The path a credential route is matched on: no query, no `/w/<key>/` slot. */
+function routePathOf(url: string): string {
+  return stripWorkspaceSlot(url.split("?")[0]).url;
+}
+
+/**
+ * Whether a WebSocket handshake carries a credential; the shared rule in
+ * `shared/auth.ts`, re-exported for the upgrade path.
+ */
+export { authorizeUpgrade } from "../shared/index.js";
 
 function setCorsHeaders(res: ServerResponse, origin: string): void {
   // Reflect only a validated origin. A wildcard would let any website read API
@@ -133,11 +156,17 @@ function rejectCrossOrigin(res: ServerResponse): true {
  *
  * Every request, safe methods included, must carry a `Host` naming loopback on
  * this socket's port, or it is answered 421. When the server runs with a
- * per-user token, the request must then present it or it is answered 401
- * (a navigation carrying `?ndx_token=` sets the cookie and redirects instead).
+ * per-user token, the request must then present it or a session credential
+ * in a header. Without one, a mutation is answered 401 and a safe-method
+ * request is passed on marked public-only ({@link isPublicOnlyRequest}): the
+ * caller serves the public shell, which signs itself in, or
+ * {@link refusePublicOnly}. The credential routes (`/api/auth/*`, see
+ * `shared/auth.ts`) are answered here, after the Origin rules.
  * Requests without browser origin metadata remain supported for CLI and MCP
  * clients. Origin-bearing mutations must come from this loopback server, while
  * Fetch Metadata rejects cross-site mutations if a browser omits Origin.
+ * Every response, refusals included, carries the baseline security headers
+ * (`nosniff`, `X-Frame-Options: DENY`, the page Content-Security-Policy).
  * Returns true when the request has been fully handled.
  */
 export function handleRequestSecurity(
@@ -145,10 +174,22 @@ export function handleRequestSecurity(
   res: ServerResponse,
   options: RequestSecurityOptions = {},
 ): boolean {
+  // Before any verdict is written, so a refusal carries them as a page does.
+  // Shared with the hub's gate (`shared/response-headers.ts`) so the two
+  // servers cannot drift.
+  applySecurityHeaders(res);
   if (!isTrustedHost(req)) return rejectMisdirected(res);
-  if (options.token && enforceToken(req, res, options.token)) return true;
 
   const method = (req.method || "GET").toUpperCase();
+  const route = authRouteOf(routePathOf(req.url ?? "/"));
+  const access: RequestAccess = requestAccess(req.headers, options.token, options.credentials);
+  if (access === "public" && route === null) {
+    // No credential. A navigation still gets the public shell — it is what
+    // signs itself in — so a safe method is passed on, marked; anything else
+    // is refused here.
+    if (method !== "GET" && method !== "HEAD") return rejectUnauthenticated(res);
+    publicOnly.add(req);
+  }
 
   // Refuse an over-large body before any route buffers it. A declared
   // Content-Length past the cap is rejected here with 413; a chunked body with
@@ -182,6 +223,15 @@ export function handleRequestSecurity(
   if (method === "OPTIONS") {
     res.writeHead(204);
     res.end();
+    return true;
+  }
+
+  if (route !== null) {
+    const answer = answerAuthRoute(route, method, req.headers, options.token, options.credentials, access);
+    const headers: Record<string, string> = { "Content-Type": "application/json", "Cache-Control": "no-store" };
+    if (answer.status === 401) headers["WWW-Authenticate"] = 'Bearer realm="n-dx"';
+    res.writeHead(answer.status, headers);
+    res.end(JSON.stringify(answer.body));
     return true;
   }
 

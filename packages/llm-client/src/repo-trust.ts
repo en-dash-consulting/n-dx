@@ -5,11 +5,15 @@
  * Several files that n-dx reads to decide *what it may execute* live inside
  * the repository and are usually tracked by git: the hench guard in
  * `.hench/config.json` (command allowlist, blocked paths, git subcommands,
- * permission mode, the child-environment allowlist), the test command in
- * `.rex/config.json`, and the MCP
- * servers in `.mcp.json`. A clone, a fork, or a checked-out pull request can
- * therefore ship a *looser* policy than the one the user's own `ndx init`
- * would have written, and nothing used to say so.
+ * permission mode, the child-environment allowlist) and its run posture
+ * (`autonomous`, `autoCommit`, `skipFullTestGate`, `apiKeyEnv`,
+ * `claudePath`); the `llm.*` binaries and endpoints and `web.auth` in the
+ * project config; the test command in `.rex/config.json`; the MCP servers in
+ * `.mcp.json`; the assistants' own project files (`.claude/settings.json`,
+ * `.claude/hooks/**`, `.codex/config.toml`); and every `run` block saved on
+ * a PRD item. A clone, a fork, or a checked-out pull request can therefore
+ * ship a *looser* policy than the one the user's own `ndx init` would have
+ * written, and nothing used to say so.
  *
  * This module gives every entry point one answer:
  *
@@ -26,7 +30,8 @@
  *   the repository in `<ndx home>/trust/`, and decides the state: `baseline`
  *   (nothing to trust), `trusted` (digest matches the record), `untrusted`
  *   (deviates, never trusted), or `changed` (deviates, and the record was
- *   for a different digest).
+ *   for a different digest). {@link isRepoRestricted} is the same decision
+ *   for readers that run on every config load.
  * - {@link recordRepoTrust} writes the record for the current digest; the
  *   file is mode 0600 in a 0700 directory, so another account on the machine
  *   cannot pre-approve a repository for this one.
@@ -62,6 +67,7 @@
  * tracked, so the local file is the user's, as before; inside one, a git that
  * cannot answer counts the file as tracked, and the finding says git could not
  * confirm it is untracked ({@link RepoExecutionConfig.localConfigUnanswered}).
+ * Readers also ignore tracked local hosts, run posture, assistant grants and saved run settings until accepted.
  *
  * The trust store is deliberately a plain file for now. It records a
  * decision, not a secret; an encrypted store is a later concern.
@@ -136,6 +142,10 @@ export const SECRET_PATH_PATTERNS: readonly string[] = [
   "**/id_ed25519*",
   ".npmrc",
   ".netrc",
+  // Machine-local n-dx overrides hold API keys by design. The `.ndx/` layout's
+  // copy sits inside the container, which CORE_BLOCKED already covers.
+  relativeToRoot(LEGACY_LAYOUT, LEGACY_LAYOUT.localConfigFile),
+  `**/${relativeToRoot(LEGACY_LAYOUT, LEGACY_LAYOUT.localConfigFile)}`,
   "**/.aws/**",
   "**/.ssh/**",
 ];
@@ -240,7 +250,7 @@ export function guardBaselineForLanguage(language?: string | null): GuardBaselin
   const entry = LANGUAGE_BASELINES[language ?? ""] ?? LANGUAGE_BASELINES.typescript;
   return {
     allowedCommands: [...entry.allowedCommands],
-    blockedPaths: [...CORE_BLOCKED, ...NDX_CONFIG_BLOCKED_PATHS, ...DEPENDENCY_BLOCKED, ...SECRET_PATH_PATTERNS],
+    blockedPaths: [...new Set([...CORE_BLOCKED, ...NDX_CONFIG_BLOCKED_PATHS, ...DEPENDENCY_BLOCKED, ...SECRET_PATH_PATTERNS])],
     allowedGitSubcommands: [...GIT_SUBCOMMAND_BASELINE],
   };
 }
@@ -305,6 +315,67 @@ export interface RepoMcpServer {
   url: string | null;
 }
 
+/**
+ * Hench settings that decide how far an unattended run goes on its own and
+ * which binary and credential it uses. Read from `.hench/config.json` with
+ * the project config's `hench` overrides folded over it, like the guard.
+ */
+export interface RepoRunPosture {
+  /** `hench.autonomous`: runs never wait for a confirmation. */
+  autonomous: boolean | null;
+  /** `hench.autoCommit`: the agent's work is committed without review. */
+  autoCommit: boolean | null;
+  /** `hench.skipFullTestGate`: a task completes without the project's tests. */
+  skipFullTestGate: boolean | null;
+  /** `hench.apiKeyEnv`: the environment variable sent as the API key. */
+  apiKeyEnv: string | null;
+  /** `hench.claudePath`: the binary the Claude CLI provider executes. */
+  claudePath: string | null;
+}
+
+/** `llm.*` keys in the project config that choose a binary or a network destination. */
+export interface RepoLlmEndpoints {
+  /** `llm.<vendor>.cli_path`, plus the legacy top-level `claude.cli_path`, keyed by vendor. */
+  cliPaths: Record<string, string>;
+  /** `llm.<vendor>.api_endpoint`, keyed by vendor. */
+  apiEndpoints: Record<string, string>;
+  /** `llm.local.host`. */
+  localHost: string | null;
+  /** `llm.local.port`. */
+  localPort: number | null;
+  /** An explicitly configured local verifier destination. */
+  localVerifier?: { host: string | null; port: number | null };
+  /** `llm.google.apiKeyEnv`. */
+  googleApiKeyEnv: string | null;
+}
+
+/** One assistant configuration file the checkout ships, by content hash. */
+export interface RepoAssistantFile {
+  /** Relative to the project root, forward slashes. */
+  path: string;
+  sha256: string;
+}
+
+/** What `.claude/settings.json` grants the assistant without asking. */
+export interface RepoClaudeSettings {
+  /** `permissions.allow` entries. */
+  allow: string[];
+  /** `permissions.defaultMode`. */
+  defaultMode: string | null;
+  /** Whether a `hooks` block is present. */
+  hooks: boolean;
+  /** Variable names set by the `env` block. */
+  env: string[];
+}
+
+/** A `run` block saved on a PRD item, as its front matter spells it. */
+export interface RepoPrdRunBlock {
+  /** The item's `index.md`, relative to the project root. */
+  path: string;
+  /** The parsed block when it is JSON, else the raw text after `run:`. */
+  run: unknown;
+}
+
 /** The hench config keys whose value hench's test gate runs as a shell command. */
 const GATE_TEST_COMMAND_KEYS = ["testGate.command", "testGate.rerunCommand", "fullTestCommand"] as const;
 
@@ -357,6 +428,16 @@ export interface RepoExecutionConfig {
   vendorCliPaths: string[];
   permissionMode: string | null;
   provider: string | null;
+  posture: RepoRunPosture;
+  llm: RepoLlmEndpoints;
+  /** `web.auth === false` in the project config: the dashboard starts without its token. */
+  webAuthDisabled: boolean;
+  /** `.claude/settings.json`, `.claude/hooks/**` and `.codex/config.toml`, each by content hash. */
+  assistantFiles: RepoAssistantFile[];
+  /** The grants in `.claude/settings.json`, when the file parses. */
+  claudeSettings: RepoClaudeSettings | null;
+  /** Every `run` block saved on a PRD item, in path order. */
+  prdRunBlocks: RepoPrdRunBlock[];
   /** The project config's `rex.test`, else `.rex/config.json` → `test`: the command rex runs. */
   testCommand: string | null;
   /** The commands hench's test gate runs, as the folded hench config sets them, in gate order. */
@@ -488,6 +569,18 @@ function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function optionalBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function optionalNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
 /** `config[key]` when it is a plain object, else null. */
 function sectionOf(config: Record<string, unknown> | null, key: string): Record<string, unknown> | null {
   const value = config?.[key];
@@ -617,6 +710,118 @@ function relOf(root: string, path: string): string {
   return path.slice(root.length).replace(/^[\\/]/, "").split(sep).join("/");
 }
 
+function sha256(text: string | Buffer): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+/** Every regular file under `dir`, recursively, sorted. Empty when `dir` is absent. */
+function listFilesUnder(dir: string): string[] {
+  const out: string[] = [];
+  const walk = (current: string): void => {
+    let entries: string[];
+    try {
+      entries = readdirSync(current);
+    } catch {
+      return;
+    }
+    for (const name of entries.sort()) {
+      const full = join(current, name);
+      let isDir = false;
+      let isFile = false;
+      try {
+        const st = lstatSync(full);
+        isDir = st.isDirectory();
+        isFile = st.isFile();
+      } catch {
+        continue;
+      }
+      if (isDir) walk(full);
+      else if (isFile) out.push(full);
+    }
+  };
+  walk(dir);
+  return out;
+}
+
+/** The content hash of a file, or null when it cannot be read. */
+function hashFile(path: string): string | null {
+  try {
+    return sha256(readFileSync(path));
+  } catch {
+    return null;
+  }
+}
+
+/** The grants `.claude/settings.json` makes, or null when it is absent or not an object. */
+function readClaudeSettings(path: string): RepoClaudeSettings | null {
+  const settings = readJson(path);
+  if (!settings) return null;
+  const permissions = asRecord(settings.permissions);
+  const env = asRecord(settings.env);
+  return {
+    allow: permissions ? (stringArray(permissions.allow) ?? []) : [],
+    defaultMode: permissions ? optionalString(permissions.defaultMode) : null,
+    hooks: asRecord(settings.hooks) !== null && Object.keys(asRecord(settings.hooks)!).length > 0,
+    env: env ? Object.keys(env).sort() : [],
+  };
+}
+
+/**
+ * The `run:` entry of one item's front matter, or undefined when the file
+ * has none. rex writes the block as inline JSON (`run: {"tier":"light"}`);
+ * a block spelled any other way is kept as raw text so a hand edit still
+ * moves the digest. Only the front matter is scanned — a `run:` in the body
+ * is prose.
+ */
+export function scanFrontMatterRunBlock(content: string): unknown {
+  const lines = content.split(/\r?\n/);
+  if (lines[0]?.trim() !== "---") return undefined;
+  let i = 1;
+  for (; i < lines.length; i++) {
+    if (lines[i].trim() === "---") break;
+    const match = /^run:(.*)$/.exec(lines[i]);
+    if (!match) continue;
+    const inline = match[1].trim();
+    if (inline.length > 0) {
+      try {
+        return JSON.parse(inline);
+      } catch {
+        return inline;
+      }
+    }
+    // A block value: the indented lines that follow.
+    const block: string[] = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].trim() === "---" || !/^\s/.test(lines[j])) break;
+      block.push(lines[j]);
+    }
+    return block.join("\n");
+  }
+  return undefined;
+}
+
+/** Every `run` block saved on an item under the PRD directories, in path order. */
+function scanPrdRunBlocks(root: string, rexDir: string): RepoPrdRunBlock[] {
+  const blocks: RepoPrdRunBlock[] = [];
+  for (const sub of ["changes", "prd_tree", "product"]) {
+    for (const file of listFilesUnder(join(rexDir, sub))) {
+      if (!file.endsWith(`${sep}index.md`)) continue;
+      let content: string;
+      try {
+        content = readFileSync(file, "utf-8");
+      } catch {
+        continue;
+      }
+      const run = scanFrontMatterRunBlock(content);
+      if (run !== undefined) blocks.push({ path: relOf(root, file), run });
+    }
+  }
+  return blocks.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** Vendor names whose `llm.<vendor>` block the digest reads. */
+const LLM_VENDOR_KEYS = ["claude", "codex", "google", "local"] as const;
+
 // ── Override folding ────────────────────────────────────────────────────────
 //
 // hench deep-merges each project override layer over `.hench/config.json`,
@@ -649,12 +854,15 @@ const shape = (fields: Record<string, FieldCheck>): FieldCheck =>
 // key, so one is missing after the merge only when `.hench/config.json` lacks
 // it, and hench refuses or salvages that file before any override applies.
 const HENCH_FIELD_CHECKS = {
+  autonomous: optional((v) => typeof v === "boolean"),
+  autoCommit: optional((v) => typeof v === "boolean"),
   guard: shape({
     blockedPaths: optional(strings),
     allowedCommands: optional(strings),
     commandTimeout: optional(positive),
     maxFileSize: optional(positive),
     spawnTimeout: optional(nonNegative),
+    sessionTimeout: optional(nonNegativeInt),
     maxConcurrentProcesses: optional((v) => positive(v) && Number.isSafeInteger(v)),
     allowedGitSubcommands: optional(strings),
     policy: optional(shape({
@@ -745,6 +953,7 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
   } = localConfigTrackState(projectDir);
   const localConfig = localConfigTracked ? readJson(layout.localConfigFile) : null;
   if (localConfigTracked) sources.push(relOf(root, layout.localConfigFile));
+  const effective = localConfig ? deepMerge(projectConfig ?? {}, localConfig) : projectConfig;
 
   // Layer by layer, as hench's loader folds them: deep (a shallow spread let a
   // project-config `guard` without `env` drop the hench file's
@@ -785,6 +994,63 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     return command ? [{ key, command }] : [];
   });
 
+  // How far a run goes on its own, and which binary and credential it uses.
+  const posture: RepoRunPosture = {
+    autonomous: optionalBoolean(merged.autonomous),
+    autoCommit: optionalBoolean(merged.autoCommit),
+    skipFullTestGate: optionalBoolean(asRecord(merged)?.skipFullTestGate),
+    apiKeyEnv: optionalString(merged.apiKeyEnv),
+    claudePath: optionalString(merged.claudePath),
+  };
+
+  // `llm.*` in the project config: binaries and network destinations. The
+  // legacy top-level `claude` block still names a Claude binary and endpoint.
+  const projectLlm = effective ? asRecord(effective.llm) : null;
+  const legacyClaude = effective ? asRecord(effective.claude) : null;
+  const llm: RepoLlmEndpoints = { cliPaths: {}, apiEndpoints: {}, localHost: null, localPort: null, googleApiKeyEnv: null };
+  for (const vendor of LLM_VENDOR_KEYS) {
+    const block = projectLlm ? asRecord(projectLlm[vendor]) : null;
+    const cliPath = optionalString(block?.cli_path) ?? (vendor === "claude" ? optionalString(legacyClaude?.cli_path) : null);
+    const endpoint = optionalString(block?.api_endpoint) ?? (vendor === "claude" ? optionalString(legacyClaude?.api_endpoint) : null);
+    if (cliPath) llm.cliPaths[vendor] = cliPath;
+    if (endpoint) llm.apiEndpoints[vendor] = endpoint;
+  }
+  const local = projectLlm ? asRecord(projectLlm.local) : null;
+  llm.localHost = optionalString(local?.host);
+  llm.localPort = optionalNumber(local?.port);
+  const verifier = asRecord(local?.verifier);
+  if (verifier && (verifier.host !== undefined || verifier.port !== undefined)) {
+    llm.localVerifier = { host: optionalString(verifier.host), port: optionalNumber(verifier.port) };
+  }
+  llm.googleApiKeyEnv = optionalString((projectLlm ? asRecord(projectLlm.google) : null)?.apiKeyEnv);
+  const projectWeb = effective ? asRecord(effective.web) : null;
+  const webAuthDisabled = projectWeb?.auth === false;
+  const projectConfigRelevant =
+    Object.keys(llm.cliPaths).length > 0 || Object.keys(llm.apiEndpoints).length > 0
+    || llm.localHost !== null || llm.localPort !== null || llm.googleApiKeyEnv !== null || webAuthDisabled;
+  if (projectConfigRelevant && !sources.includes(relOf(root, layout.configFile))) sources.push(relOf(root, layout.configFile));
+
+  // What the assistants themselves read from the checkout: Claude Code's
+  // project settings and hooks, Codex's project config. Hashed whole — any
+  // change to them is a change to what an assistant may do unprompted.
+  const assistantFiles: RepoAssistantFile[] = [];
+  const claudeSettingsPath = join(root, ".claude", "settings.json");
+  const claudeSettingsHash = hashFile(claudeSettingsPath);
+  if (claudeSettingsHash) assistantFiles.push({ path: ".claude/settings.json", sha256: claudeSettingsHash });
+  const claudeSettings = claudeSettingsHash ? readClaudeSettings(claudeSettingsPath) : null;
+  for (const file of listFilesUnder(join(root, ".claude", "hooks"))) {
+    const hash = hashFile(file);
+    if (hash) assistantFiles.push({ path: relOf(root, file), sha256: hash });
+  }
+  const codexConfigHash = hashFile(join(root, ".codex", "config.toml"));
+  if (codexConfigHash) assistantFiles.push({ path: ".codex/config.toml", sha256: codexConfigHash });
+  for (const file of assistantFiles) sources.push(file.path);
+
+  // The PRD is repository content too, and a saved `run` block steers the
+  // next run of the item it sits on.
+  const prdRunBlocks = scanPrdRunBlocks(root, layout.rexDir);
+  for (const block of prdRunBlocks) sources.push(block.path);
+
   const rexConfigPath = join(layout.rexDir, "config.json");
   const rexConfig = readJson(rexConfigPath);
   if (rexConfig) sources.push(relOf(root, rexConfigPath));
@@ -796,7 +1062,6 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     ?? optionalString(sectionOf(projectConfig, "rex")?.test);
   // A field the tracked local file sets wins over the project config's, as
   // in every loader's merge, so the effective value is what is listed.
-  const effective = localConfig ? deepMerge(projectConfig ?? {}, localConfig) : projectConfig;
   // Hench's API loop sends the variable `apiKeyEnv` names as the Anthropic
   // key. The default names nothing new, and leaving it out keeps the digest
   // of every checkout `hench init` wrote it into.
@@ -851,12 +1116,28 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     // Present only when the repository ships entries. An empty key would
     // move every existing digest on upgrade, and a repository trusted before
     // this field existed would read as `changed` with nothing having changed.
+    // The same rule holds for every field added since: a key enters the body
+    // only when the checkout sets it.
     ...(envAllow.length ? { envAllow: [...envAllow].sort() } : {}),
     // Present only when set, for the same reason.
     ...(credentialRouting.length ? { credentialRouting } : {}),
     ...(vendorCliPaths.length ? { vendorCliPaths } : {}),
     permissionMode: optionalString(merged.permissionMode),
     provider: optionalString(merged.provider),
+    ...(posture.autonomous !== null ? { autonomous: posture.autonomous } : {}),
+    ...(posture.autoCommit !== null ? { autoCommit: posture.autoCommit } : {}),
+    ...(posture.skipFullTestGate !== null ? { skipFullTestGate: posture.skipFullTestGate } : {}),
+    ...(posture.apiKeyEnv !== null ? { apiKeyEnv: posture.apiKeyEnv } : {}),
+    ...(posture.claudePath !== null ? { claudePath: posture.claudePath } : {}),
+    ...(Object.keys(llm.cliPaths).length ? { cliPaths: llm.cliPaths } : {}),
+    ...(Object.keys(llm.apiEndpoints).length ? { apiEndpoints: llm.apiEndpoints } : {}),
+    ...(llm.localHost !== null ? { localHost: llm.localHost } : {}),
+    ...(llm.localPort !== null ? { localPort: llm.localPort } : {}),
+    ...(llm.localVerifier ? { localVerifier: llm.localVerifier } : {}),
+    ...(llm.googleApiKeyEnv !== null ? { googleApiKeyEnv: llm.googleApiKeyEnv } : {}),
+    ...(webAuthDisabled ? { webAuthDisabled } : {}),
+    ...(assistantFiles.length ? { assistantFiles } : {}),
+    ...(prdRunBlocks.length ? { prdRunBlocks } : {}),
     testCommand: projectTest ?? optionalString(rexConfig?.test),
     // Present only when set, for the same reason as `envAllow`.
     ...(gateTestCommands.length ? { gateTestCommands } : {}),
@@ -879,8 +1160,23 @@ export function collectRepoExecutionConfig(projectDir: string): RepoExecutionCon
     localConfigTrackedPaths,
     localConfigNestedIn,
     gateTestCommands,
+    posture, llm, webAuthDisabled, assistantFiles, claudeSettings, prdRunBlocks,
     digest: createHash("sha256").update(toCanonicalJSON(body)).digest("hex"),
   };
+}
+
+/**
+ * Whether a caller should clamp what it reads from the checkout: the
+ * repository deviates from the baseline and this user has not accepted its
+ * current digest. The same decision as {@link evaluateRepoTrust}`.restricted`
+ * without the inventory, for readers that run on every config load.
+ */
+export function isRepoRestricted(projectDir: string, options: RepoTrustStoreOptions = {}): boolean {
+  const config = collectRepoExecutionConfig(projectDir);
+  const deviates = assessRepoExecutionConfig(config).some((f) => f.severity === "warning");
+  if (!deviates) return false;
+  const record = readRepoTrustRecord(projectDir, options);
+  return !record || record.digest !== config.digest;
 }
 
 // ── Assessment ──────────────────────────────────────────────────────────────
@@ -898,7 +1194,45 @@ export type RepoTrustFindingCode =
   | "test-command"
   | "mcp-servers"
   | "secret-paths-unblocked"
+  /** `hench.autonomous`, `autoCommit` or `skipFullTestGate` is on. */
+  | "run-posture"
+  /** `hench.apiKeyEnv` or `llm.google.apiKeyEnv` names a variable that is not an API key. */
+  | "api-key-env"
+  /** `hench.claudePath` or `llm.<vendor>.cli_path` chooses the binary n-dx executes. */
+  | "cli-path"
+  /** `llm.<vendor>.api_endpoint` or `llm.local.host` redirects API calls carrying a key. */
+  | "api-endpoint"
+  /** `web.auth` is false: the dashboard and hub start without the per-user token. */
+  | "web-auth-disabled"
+  /** `.claude/settings.json` grants tools, a default mode, hooks or environment unprompted. */
+  | "assistant-settings"
+  /** `.claude/hooks/**` or `.codex/config.toml` ships code or policy an assistant runs. */
+  | "assistant-hooks"
+  /** A saved PRD `run` block carries an execution-posture setting. */
+  | "run-settings"
   | "local-config-tracked";
+
+/** `apiKeyEnv` values that name an API key by convention need no review. */
+const API_KEY_ENV_SHAPE = /^[A-Z0-9_]*API_KEY$/;
+
+/** Hosts `llm.local` is expected to point at. */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/** The bare command a vendor CLI resolves to on PATH; anything else chooses the binary. */
+function isBareVendorCommand(vendor: string, value: string): boolean {
+  return value === vendor;
+}
+
+/** The keys of a saved `run` block that set execution posture rather than a model. */
+function runBlockPostureKeys(run: unknown): string[] {
+  const block = asRecord(run);
+  if (!block) return [];
+  const keys: string[] = [];
+  if (typeof block.permissionMode === "string") keys.push(`permissionMode=${block.permissionMode}`);
+  if (block.skipTestGate === true) keys.push("skipTestGate=true");
+  if (block.tokenBudget === 0) keys.push("tokenBudget=0");
+  return keys;
+}
 
 export interface RepoTrustFinding {
   code: RepoTrustFindingCode;
@@ -1065,10 +1399,13 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
 
     const hasSecretBlock = config.guard.blockedPaths.some((p) => p === ".env" || p === "**/.env" || p === ".env*" || p === "**/.env*");
     if (!hasSecretBlock) {
+      // A warning, not a note: a guard that drops the credential-file blocks
+      // is wider than the baseline, and the clamp is what keeps them blocked
+      // until the user accepts that.
       findings.push({
         code: "secret-paths-unblocked",
-        severity: "info",
-        message: "Does not block credential files (.env, keys); the current defaults do. Blocked anyway until trusted.",
+        severity: "warning",
+        message: "Does not block credential files (.env, keys); the current defaults do. Blocked until trusted.",
         values: [],
       });
     }
@@ -1098,6 +1435,109 @@ function assessRawFindings(config: RepoExecutionConfig): RepoTrustFinding[] {
       severity: "warning",
       message: "Runs the vendor CLI with bypassPermissions, so the agent's own tool calls are never confirmed",
       values: ["bypassPermissions"],
+    });
+  }
+
+  const postureOn = (["autonomous", "autoCommit", "skipFullTestGate"] as const).filter((k) => config.posture[k] === true);
+  if (postureOn.length) {
+    findings.push({
+      code: "run-posture",
+      severity: "warning",
+      message: `Turns on unattended-run settings: ${postureOn.join(", ")}`,
+      values: [...postureOn],
+    });
+  }
+
+  const oddKeyEnvs = [
+    ...(config.posture.apiKeyEnv && !API_KEY_ENV_SHAPE.test(config.posture.apiKeyEnv) ? [`hench.apiKeyEnv=${config.posture.apiKeyEnv}`] : []),
+    ...(config.llm.googleApiKeyEnv && !API_KEY_ENV_SHAPE.test(config.llm.googleApiKeyEnv) ? [`llm.google.apiKeyEnv=${config.llm.googleApiKeyEnv}`] : []),
+  ];
+  if (oddKeyEnvs.length) {
+    findings.push({
+      code: "api-key-env",
+      severity: "warning",
+      message: `Sends an environment variable that is not named like an API key as the API key: ${oddKeyEnvs.join(", ")}`,
+      values: oddKeyEnvs,
+    });
+  }
+
+  const cliPaths = [
+    ...(config.posture.claudePath && !isBareVendorCommand("claude", config.posture.claudePath) ? [`hench.claudePath=${config.posture.claudePath}`] : []),
+    ...Object.entries(config.llm.cliPaths)
+      .filter(([vendor, path]) => !isBareVendorCommand(vendor, path))
+      .map(([vendor, path]) => `llm.${vendor}.cli_path=${path}`),
+  ];
+  if (cliPaths.length) {
+    findings.push({
+      code: "cli-path",
+      severity: "warning",
+      message: `Chooses the vendor CLI binary n-dx executes: ${cliPaths.join(", ")}`,
+      values: cliPaths,
+    });
+  }
+
+  const endpoints = [
+    ...Object.entries(config.llm.apiEndpoints).map(([vendor, url]) => `llm.${vendor}.api_endpoint=${url}`),
+    ...(config.llm.localHost && !LOOPBACK_HOSTS.has(config.llm.localHost.toLowerCase()) ? [`llm.local.host=${config.llm.localHost}`] : []),
+    ...(config.llm.localVerifier?.host && !LOOPBACK_HOSTS.has(config.llm.localVerifier.host.toLowerCase())
+      ? [`llm.local.verifier.host=${config.llm.localVerifier.host}`] : []),
+  ];
+  if (endpoints.length) {
+    findings.push({
+      code: "api-endpoint",
+      severity: "warning",
+      message: `Sends API requests, and the key they carry, to a configured endpoint: ${endpoints.join(", ")}`,
+      values: endpoints,
+    });
+  }
+
+  if (config.webAuthDisabled) {
+    findings.push({
+      code: "web-auth-disabled",
+      severity: "warning",
+      message: "Sets web.auth to false, so the dashboard and hub start without the per-user token",
+      values: ["web.auth=false"],
+    });
+  }
+
+  if (config.claudeSettings) {
+    const s = config.claudeSettings;
+    const grants = [
+      ...(s.allow.length ? [`${s.allow.length} permissions.allow entr${s.allow.length === 1 ? "y" : "ies"}`] : []),
+      ...(s.defaultMode ? [`permissions.defaultMode=${s.defaultMode}`] : []),
+      ...(s.hooks ? ["hooks"] : []),
+      ...(s.env.length ? [`env: ${s.env.join(", ")}`] : []),
+    ];
+    if (grants.length) {
+      findings.push({
+        code: "assistant-settings",
+        severity: "warning",
+        message: `.claude/settings.json grants the assistant without asking: ${grants.join("; ")}`,
+        values: [...s.allow, ...(s.defaultMode ? [`defaultMode=${s.defaultMode}`] : []), ...(s.hooks ? ["hooks"] : []), ...s.env.map((e) => `env.${e}`)],
+      });
+    }
+  }
+
+  const hookFiles = config.assistantFiles.filter((f) => f.path !== ".claude/settings.json").map((f) => f.path);
+  if (hookFiles.length) {
+    findings.push({
+      code: "assistant-hooks",
+      severity: "warning",
+      message: `Ships assistant hooks or policy an assistant runs from the checkout: ${hookFiles.join(", ")}`,
+      values: hookFiles,
+    });
+  }
+
+  const posturedBlocks = config.prdRunBlocks
+    .map((b) => ({ path: b.path, keys: runBlockPostureKeys(b.run) }))
+    .filter((b) => b.keys.length > 0);
+  if (posturedBlocks.length) {
+    const shown = posturedBlocks.map((b) => `${b.path}: ${b.keys.join(", ")}`);
+    findings.push({
+      code: "run-settings",
+      severity: "warning",
+      message: `Saves run settings on PRD items that set execution posture: ${shown.join("; ")}`,
+      values: shown,
     });
   }
 

@@ -117,11 +117,15 @@ function doc(first: unknown, second: unknown): unknown {
 let projectDir: string;
 let rexDir: string;
 
-async function setup(document: unknown, llm: Record<string, unknown> = {}): Promise<void> {
+async function setup(
+  document: unknown,
+  llm: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {},
+): Promise<void> {
   ({ projectDir, rexDir } = await setupProjectDir("hench-per-task-"));
   await (await resolveStore(rexDir)).saveDocument(document as never);
   const { codex, ...shared } = llm as { codex?: Record<string, unknown> };
-  await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude", ...shared } }), "utf-8");
+  await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude", ...shared }, ...extra }), "utf-8");
   // cli_path is machine-local: a shared one applies only once the repository is trusted.
   await writeFile(
     join(projectDir, ".n-dx.local.json"),
@@ -188,20 +192,37 @@ describe("each task in a loop runs with its own saved settings", () => {
   });
 
   it("applies a task's saved gates and notes to that task only", async () => {
+    // A saved block only tightens: the second task lowers the permission mode
+    // below the autonomous default and turns a gate back on that the project
+    // skips; the first task runs on the project's own settings. (The gated
+    // task goes last because its gate ends the loop either way.)
+    // The project skips the gate through its .n-dx.json hench override.
     await setup(
-      doc({ permissionMode: "bypassPermissions", skipTestGate: true, contextNotes: "watch the lock" }, null),
+      doc(null, { permissionMode: "default", skipTestGate: false, contextNotes: "watch the lock" }),
+      {},
+      { hench: { skipFullTestGate: true } },
     );
 
     await cmdRun(projectDir, { auto: "true", iterations: "2" });
 
-    expect(calls[0]).toMatchObject({
-      permissionMode: "bypassPermissions",
-      skipFullTestGate: true,
+    expect(calls[0].permissionMode).toBe("acceptEdits");
+    expect(calls[0].skipFullTestGate).toBe(true);
+    expect(calls[0].extraContext).toBeUndefined();
+    expect(calls[1]).toMatchObject({
+      permissionMode: "default",
+      skipFullTestGate: false,
       extraContext: "watch the lock",
     });
-    expect(calls[1].permissionMode).toBe("acceptEdits");
-    expect(calls[1].skipFullTestGate).not.toBe(true);
-    expect(calls[1].extraContext).toBeUndefined();
+  });
+
+  it("ignores a saved block that would widen a task's run, and runs it on the project's settings", async () => {
+    await setup(doc({ skipTestGate: true, tokenBudget: 0, maxTurns: 400 }, null));
+
+    await cmdRun(projectDir, { auto: "true", iterations: "2" });
+
+    expect(calls[0].skipFullTestGate).not.toBe(true);
+    expect(calls[0].permissionMode).toBe("acceptEdits");
+    expect(calls[0].maxTurns).not.toBe(400);
   });
 
   it("applies a task's saved turn budget, which only the api loop takes", async () => {

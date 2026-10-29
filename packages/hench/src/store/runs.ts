@@ -27,7 +27,7 @@ export async function saveRun(
   run: RunRecord,
 ): Promise<void> {
   const runsDir = join(henchDir, "runs");
-  await mkdir(runsDir, { recursive: true });
+  await mkdir(runsDir, { recursive: true, mode: 0o700 });
   // Always stamp the normalized token tuple so that failed/aborted runs
   // are still joinable back to their PRD item at rollup time. Mutate the
   // caller's record so in-memory readers see the same value that was
@@ -37,7 +37,8 @@ export async function saveRun(
   // echoed a .env, a bearer header in a failing curl, a connection string in a
   // stack trace). The in-memory record the agent is still working from is
   // left as it is; every later save re-applies the same idempotent pass.
-  await writeFile(join(runsDir, `${run.id}.json`), toCanonicalJSON(redactDeep(run)), "utf-8");
+  // Owner-only on creation; a later save leaves the mode alone.
+  await writeFile(join(runsDir, `${run.id}.json`), toCanonicalJSON(redactDeep(run)), { encoding: "utf-8", mode: 0o600 });
 }
 
 export async function loadRun(
@@ -102,5 +103,25 @@ export async function listRuns(
   // Sort by startedAt descending
   runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 
+  return runs;
+}
+
+/**
+ * Load the named runs, skipping any that are missing or invalid. For callers
+ * that already narrowed the ledger (the per-day spend cap reads only files
+ * written today) and should not pay for parsing the rest of it.
+ */
+export async function listRunsByIds(
+  henchDir: string,
+  ids: ReadonlyArray<string>,
+): Promise<RunRecord[]> {
+  const runs: RunRecord[] = [];
+  for (const id of ids) {
+    try {
+      runs.push(await loadRun(henchDir, id));
+    } catch {
+      // Skip invalid or vanished run files
+    }
+  }
   return runs;
 }

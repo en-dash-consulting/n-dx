@@ -609,6 +609,17 @@ function initLanding(): void {
   initSectionTracking(prefersReducedMotion);
 }
 
-initLanding();
+/**
+ * The page's session script (shared/browser-session.ts, injected by the
+ * server) signs the tab in and adds the credential to every same-origin
+ * fetch; the wizard's preflight must not run before that. Absent — a server
+ * without a token, or the page opened as a file — there is nothing to wait for.
+ */
+const sessionReady: Promise<{ ok: boolean }> =
+  (globalThis as unknown as { ndxAuth?: { ready: Promise<{ ok: boolean }> } }).ndxAuth?.ready ?? Promise.resolve({ ok: true });
+
+void sessionReady.then(({ ok }) => {
+  if (ok) initLanding();
+});
 
 export {};

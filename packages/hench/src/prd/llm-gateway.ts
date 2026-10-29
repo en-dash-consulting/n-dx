@@ -232,6 +232,11 @@ export type { ClaudeEffort } from "@n-dx/llm-client";
 // ---- Usage formatting -------------------------------------------------------
 export { formatUsage } from "@n-dx/llm-client";
 
+// ---- Model pricing ----------------------------------------------------------
+// The spend caps (hench.maxCostUsdPerRun / PerDay) price the run ledger with
+// the same table and arithmetic `ndx usage` quotes, so a cap and the bill agree.
+export { resolveModelPricing, priceTokens } from "@n-dx/llm-client";
+
 // ---- Runtime contract -------------------------------------------------------
 export {
   DEFAULT_EXECUTION_POLICY,
@@ -354,3 +359,18 @@ export {
   repoCommandEnv,
 } from "@n-dx/llm-client";
 export type { EnvPolicy, EnvPolicyConfig } from "@n-dx/llm-client";
+
+// OS-level confinement for the processes an agent run starts (guard/sandbox.ts).
+export {
+  detectSandboxBackend,
+  resolveSandboxSetting,
+  wrapInSandbox,
+  wrapShellInSandbox,
+  nodeToolchainRoots,
+} from "@n-dx/llm-client";
+export type {
+  SandboxBackend,
+  SandboxPolicy,
+  SandboxSetting,
+  SandboxedInvocation,
+} from "@n-dx/llm-client";

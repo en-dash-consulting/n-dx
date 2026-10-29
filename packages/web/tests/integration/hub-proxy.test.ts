@@ -68,7 +68,7 @@ beforeAll(async () => {
   home = mkdtempSync(join(tmpdir(), "ndx-hub-proxy-home-"));
   repoA = mkdtempSync(join(tmpdir(), "ndx-hub-proxy-a-"));
   repoB = mkdtempSync(join(tmpdir(), "ndx-hub-proxy-b-"));
-  hub = await startHub({ port: 0, homeDir: home, healthIntervalMs: 60_000, supervisor: { portFileTimeoutMs: 30_000, stopGraceMs: 3_000 } });
+  hub = await startHub({ port: 0, selfBin: NDX_BIN, homeDir: home, healthIntervalMs: 60_000, supervisor: { portFileTimeoutMs: 30_000, stopGraceMs: 3_000 } });
 }, 60_000);
 
 afterAll(async () => {

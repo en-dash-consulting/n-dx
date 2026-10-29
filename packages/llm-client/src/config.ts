@@ -8,6 +8,8 @@
 import { readFile, access } from "node:fs/promises";
 import { resolveLayout } from "./layout.js";
 import { deepMerge } from "./project-config.js";
+import { isRepoRestricted, isLocalConfigTracked, type RepoTrustStoreOptions } from "./repo-trust.js";
+import { stripTrackedExecutionConfig } from "./tracked-config-clamp.js";
 import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import type { ClaudeConfig } from "./types.js";
 import {
@@ -879,6 +881,55 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
   return Object.keys(result).length > 0 ? result : null;
 }
 
+/** Options shared by the project-config loaders. */
+export interface LoadProjectConfigOptions {
+  /**
+   * Where the repository trust store lives (tests relocate it). The loaders
+   * ignore the tracked file's binary, endpoint and key-variable choices while
+   * the repository is not trusted; see `tracked-config-clamp.ts`.
+   */
+  trust?: RepoTrustStoreOptions;
+}
+
+/**
+ * The tracked project config as a reader may use it: whole once the user
+ * trusts the checkout, otherwise without the keys that choose a binary, an
+ * endpoint or a credential variable. The local file is merged afterwards by
+ * the caller, so the user's own values still apply.
+ */
+export function clampTrackedProjectConfig(
+  dir: string,
+  projectData: Record<string, unknown> | null,
+  options: LoadProjectConfigOptions = {},
+): Record<string, unknown> | null {
+  if (!projectData) return null;
+  if (!isRepoRestricted(dir, options.trust)) return projectData;
+  return stripTrackedExecutionConfig(projectData).root;
+}
+
+/** Apply both the tracked-local check and the complete execution clamp to a local config shipped by the repository. */
+export function clampTrackedLocalConfig(dir: string, data: Record<string, unknown> | null, options: LoadProjectConfigOptions = {}): Record<string, unknown> | null {
+  const gated = trustedLocalConfig(dir, data, options.trust);
+  return isLocalConfigTracked(dir) ? clampTrackedProjectConfig(dir, gated, options) : gated;
+}
+
+/**
+ * The base URL a vendor's API provider sends requests to: the configured
+ * `api_endpoint`, else the vendor's default. One helper for every provider,
+ * so the rule about *which* configured endpoint counts lives in one place:
+ * the loaders drop an endpoint set in the tracked `.n-dx.json` while the
+ * repository is not trusted, so an endpoint that reaches this function came
+ * from the user's own local file or from a checkout they accepted — and only
+ * then does a key taken from the environment travel to a non-default host.
+ */
+export function resolveApiEndpoint<D extends string | undefined>(
+  block: { api_endpoint?: string } | undefined,
+  defaultUrl: D,
+): string | D {
+  const configured = block?.api_endpoint;
+  return typeof configured === "string" && configured.length > 0 ? configured : defaultUrl;
+}
+
 /**
  * Load the "claude" section from .n-dx.json in the given directory,
  * with .n-dx.local.json overrides merged on top (local wins).
@@ -887,12 +938,10 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
  *
  * @param dir  The directory containing .n-dx.json (project root)
  */
-export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
+export async function loadClaudeConfig(dir: string, options: LoadProjectConfigOptions = {}): Promise<ClaudeConfig> {
   const { root, configFile, localConfigFile } = resolveLayout(dir);
-  // api_endpoint from the project config applies only while the repository
-  // is trusted; see credential-routing.ts.
-  const projectData = trustedProjectConfig(root, await loadJSONFile(configFile));
-  const localData = trustedLocalConfig(root, await loadJSONFile(localConfigFile));
+  const projectData = clampTrackedProjectConfig(root, trustedProjectConfig(root, await loadJSONFile(configFile), options.trust), options);
+  const localData = clampTrackedLocalConfig(root, await loadJSONFile(localConfigFile), options);
 
   // Merge project and local configs (local wins)
   let merged: Record<string, unknown> | null = projectData;

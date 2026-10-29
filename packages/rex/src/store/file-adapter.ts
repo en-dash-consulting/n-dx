@@ -1,6 +1,6 @@
 import { readFile, writeFile, appendFile, mkdir, rename, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { projectRootOf } from "@n-dx/llm-client";
+import { projectRootOf, redactSecrets } from "@n-dx/llm-client";
 import type { PRDDocument, PRDItem, RexConfig, LogEntry } from "../schema/index.js";
 import { validateDocument, validateConfig, validateLogEntry } from "../schema/validate.js";
 import { SCHEMA_VERSION } from "../schema/index.js";
@@ -37,6 +37,19 @@ import { preImageOf, tryTargetedItemWrite } from "./targeted-update.js";
 import type { PRDStore, StoreCapabilities, WriteOptions, SaveFileReport } from "./contracts.js";
 import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
 import { CHANGES_DIRNAME, PRODUCT_DIRNAME, prdLayout } from "./prd-model-reader.js";
+
+/**
+ * Drop C0 control characters (and DEL) other than newline and tab.
+ *
+ * Log text is replayed by terminals and viewers; an escape sequence inside it
+ * is not data but an instruction to whatever prints it. JSON encoding keeps
+ * such a byte as `\u001b`, so it survives the round trip intact unless it is
+ * removed here.
+ */
+function stripControlCharacters(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+}
 
 /** Canonical filename for the consolidated PRD document. */
 export const PRD_FILENAME = "prd.json";
@@ -844,12 +857,22 @@ export class FileStore implements PRDStore {
     if (!result.ok) {
       throw new Error(`Invalid log entry: ${result.errors.message}`);
     }
-    // Truncate detail to prevent huge log entries
+    // `append_log` is callable by an agent, so `detail` can be anything a tool
+    // printed. Credential-shaped text is scrubbed before it is truncated —
+    // a private-key block cut at the limit would no longer match — and C0
+    // control characters other than newline and tab are dropped from both
+    // text fields: an escape sequence survives JSON encoding as `\u001b` and
+    // is replayed by whatever prints the line back.
     const MAX_DETAIL_LENGTH = 2000;
-    const sanitizedEntry =
-      stampedEntry.detail && stampedEntry.detail.length > MAX_DETAIL_LENGTH
-        ? { ...stampedEntry, detail: stampedEntry.detail.slice(0, MAX_DETAIL_LENGTH) + "..." }
-        : stampedEntry;
+    const detail =
+      stampedEntry.detail === undefined ? undefined : redactSecrets(stripControlCharacters(stampedEntry.detail));
+    const sanitizedEntry = {
+      ...stampedEntry,
+      event: stripControlCharacters(stampedEntry.event),
+      ...(detail === undefined
+        ? {}
+        : { detail: detail.length > MAX_DETAIL_LENGTH ? detail.slice(0, MAX_DETAIL_LENGTH) + "..." : detail }),
+    };
 
     const logPath = this.path("execution-log.jsonl");
 

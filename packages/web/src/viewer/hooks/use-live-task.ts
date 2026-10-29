@@ -19,8 +19,9 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
 import { createWSPipeline } from "./use-gateway.js";
+import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-live-task.ts and hench's store/run-events.ts
@@ -319,7 +320,7 @@ export function useLiveTask(taskId: string, pick: (snapshot: LiveTaskSnapshot) =
       coalescerWindowMs: 100,
     });
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
       ws.onopen = () => { if (mountedRef.current) setSocketOpen(true); };
       ws.onclose = () => { if (mountedRef.current) setSocketOpen(false); };
       ws.onmessage = (event) => {

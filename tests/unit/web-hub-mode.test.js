@@ -16,9 +16,12 @@ import {
   hubAuthMismatchMessage,
   hubAuthState,
   hubDashboardUrl,
+  judgeHubIdentity,
+  loadAuthEnabled,
   loadHubPort,
   parseMainWorktree,
   readHubRegistry,
+  resolveAuthEnabled,
   resolveRepo,
   slugifyProjectId,
 } from "../../packages/core/web.js";
@@ -156,32 +159,95 @@ describe("resolveRepo", () => {
 describe("hubAuthState", () => {
   /** A probe stub: `/api/hub/health` answers one way anonymously, another with the token. */
   const probe = (anonymous, credentialed) => (_port, _method, _path, _body, _timeout, opts = {}) =>
-    Promise.resolve(opts.sendToken === false ? anonymous : credentialed);
+    Promise.resolve(opts.sendToken === true ? credentialed : anonymous);
+  /** The listener has been identified as this user's hub. */
+  const own = async () => ({ ok: true, pid: 4242 });
+  const stranger = async () => ({ ok: false, reason: "port held by another process (PID 99)" });
 
   const ok = { status: 200, body: { ok: true } };
   const unauthorized = { status: 401, body: { error: "Unauthorized" } };
   const unreachable = { status: 0, body: null };
 
+  it("never sends the token to a 401 listener that is not this user's hub", async () => {
+    // The credentialed probe is the one that carries the token; it must not be
+    // made at all when the listener cannot be identified as the hub.
+    const calls = [];
+    const spy = (_port, _method, _path, _body, _timeout, opts = {}) => {
+      calls.push(opts.sendToken === true);
+      return Promise.resolve(unauthorized);
+    };
+    expect(await hubAuthState(3117, spy, stranger)).toBe("foreign");
+    expect(calls).toEqual([false]);
+  });
+
   it("calls a hub that answers an anonymous probe open", async () => {
     // It served health to a caller with no credential at all; every project it
     // takes on is served the same way.
-    expect(await hubAuthState(3117, probe(ok, ok))).toBe("open");
+    expect(await hubAuthState(3117, probe(ok, ok), stranger)).toBe("open");
   });
 
   it("calls a hub that refuses the anonymous probe but accepts ours a token hub", async () => {
-    expect(await hubAuthState(3117, probe(unauthorized, ok))).toBe("token");
+    expect(await hubAuthState(3117, probe(unauthorized, ok), own)).toBe("token");
   });
 
   it("reports a mismatch when the hub wants a token but not the one we hold", async () => {
     // A hub started from another token file, or one rotated since. Reusing it
     // would fail at registration with a bare 401 and no explanation.
-    expect(await hubAuthState(3117, probe(unauthorized, unauthorized))).toBe("mismatch");
+    expect(await hubAuthState(3117, probe(unauthorized, unauthorized), own)).toBe("mismatch");
   });
 
   it("reports absent when nothing answers", async () => {
-    expect(await hubAuthState(3117, probe(unreachable, unreachable))).toBe("absent");
+    expect(await hubAuthState(3117, probe(unreachable, unreachable), own)).toBe("absent");
     // A 200 that is not the health payload is not a hub either.
-    expect(await hubAuthState(3117, probe({ status: 200, body: null }, ok))).toBe("absent");
+    expect(await hubAuthState(3117, probe({ status: 200, body: null }, ok), own)).toBe("absent");
+  });
+});
+
+describe("judgeHubIdentity", () => {
+  const base = { recordedPid: 4242, ownership: "ours", listeners: [4242], uid: 501, ownUid: 501 };
+
+  it("accepts the recorded hub when it is this user's, alive, and the sole listener", () => {
+    expect(judgeHubIdentity(base)).toEqual({ ok: true, pid: 4242 });
+  });
+
+  it("refuses when no hub is recorded, the recorded one is gone, or it belongs to another user", () => {
+    expect(judgeHubIdentity({ ...base, recordedPid: null }).ok).toBe(false);
+    expect(judgeHubIdentity({ ...base, ownership: "gone" }).ok).toBe(false);
+    expect(judgeHubIdentity({ ...base, ownership: "foreign" })).toMatchObject({ ok: false, reason: expect.stringContaining("another user") });
+  });
+
+  it("refuses when the port is held by another process, or shared", () => {
+    expect(judgeHubIdentity({ ...base, listeners: [99] })).toMatchObject({ ok: false, reason: expect.stringContaining("another process") });
+    expect(judgeHubIdentity({ ...base, listeners: [4242, 99] }).ok).toBe(false);
+    expect(judgeHubIdentity({ ...base, listeners: [] }).ok).toBe(false);
+  });
+
+  it("refuses when ps reports another owner, and does without ps when it cannot answer", () => {
+    expect(judgeHubIdentity({ ...base, uid: 0 }).ok).toBe(false);
+    // No `ps` (Windows, a sandbox): the null signal's verdict stands on its own.
+    expect(judgeHubIdentity({ ...base, uid: null })).toEqual({ ok: true, pid: 4242 });
+    expect(judgeHubIdentity({ ...base, uid: null, ownUid: null })).toEqual({ ok: true, pid: 4242 });
+  });
+});
+
+describe("resolveAuthEnabled", () => {
+  const files = { sharedFile: "/p/.n-dx.json", localFile: "/p/.n-dx.local.json", userFile: "/home/.ndx/config.json" };
+
+  it("is on by default", () => {
+    expect(resolveAuthEnabled({ ...files, noAuthFlag: false })).toEqual({ enabled: true, warning: null });
+  });
+
+  it("is turned off by --no-auth, the machine-local file, or the user config", () => {
+    expect(resolveAuthEnabled({ ...files, noAuthFlag: true }).enabled).toBe(false);
+    expect(resolveAuthEnabled({ ...files, noAuthFlag: false, local: false }).enabled).toBe(false);
+    expect(resolveAuthEnabled({ ...files, noAuthFlag: false, user: false }).enabled).toBe(false);
+  });
+
+  it("ignores web.auth=false in the shared config file and names it in the warning", () => {
+    const result = resolveAuthEnabled({ ...files, noAuthFlag: false, shared: false });
+    expect(result.enabled).toBe(true);
+    expect(result.warning).toContain("/p/.n-dx.json");
+    expect(result.warning).toContain("/p/.n-dx.local.json");
   });
 });
 
@@ -208,19 +274,19 @@ describe("hubAuthMismatchMessage", () => {
 });
 
 describe("hubDashboardUrl", () => {
-  it("carries the token so --open and the printed URL cannot diverge", () => {
-    expect(hubDashboardUrl(3117, "my app", "tok/en")).toBe(
-      "http://localhost:3117/p/my%20app/?ndx_token=tok%2Fen",
+  it("carries the landing nonce so --open and the printed URL cannot diverge", () => {
+    expect(hubDashboardUrl(3117, "my app", "non/ce")).toBe(
+      "http://localhost:3117/p/my%20app/?ndx_nonce=non%2Fce",
     );
   });
 
-  it("is the plain URL when there is no token", () => {
+  it("is the plain URL when there is no nonce", () => {
     expect(hubDashboardUrl(3117, "alpha", null)).toBe("http://localhost:3117/p/alpha/");
   });
 });
 
 describe("browserOpenCommand", () => {
-  const url = "http://localhost:3117/p/my%20app/?ndx_token=a%PATH%b%2F";
+  const url = "http://localhost:3117/p/my%20app/?ndx_nonce=a%PATH%b%2F";
 
   it("opens on win32 through rundll32, with no cmd.exe, shell or verbatim arguments", () => {
     const { command, args, options } = browserOpenCommand(url, "win32");
@@ -268,5 +334,31 @@ describe("ensureAuthTokenFile", () => {
 
     expect(ensureAuthTokenFile(path)).toBe("pre-existing-token");
     expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
+});
+
+describe("loadAuthEnabled", () => {
+  it("ignores web.auth=false in a tracked .n-dx.json, warns naming it, and honours the local file", async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { vi } = await import("vitest");
+    const dir = mkdtempSync(join(tmpdir(), "auth-tracked-"));
+    const home = mkdtempSync(join(tmpdir(), "auth-home-"));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ web: { auth: false } }));
+      expect(await loadAuthEnabled(dir, false, home)).toBe(true);
+      expect(errors.mock.calls.flat().join("\n")).toContain(join(dir, ".n-dx.json"));
+
+      errors.mockClear();
+      writeFileSync(join(dir, ".n-dx.local.json"), JSON.stringify({ web: { auth: false } }));
+      expect(await loadAuthEnabled(dir, false, home)).toBe(false);
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });

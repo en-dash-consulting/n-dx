@@ -98,7 +98,7 @@ describe("hub admission with auth on", () => {
     alpha = await startAuthChild(mkdtempSync(join(tmpdir(), "hub-admission-auth-alpha-")), token);
     beta = await startAuthChild(mkdtempSync(join(tmpdir(), "hub-admission-auth-beta-")), token);
     const record = (id: string, c: AuthChild) => ({
-      id, name: id, repoRoot: c.dir, worktrees: [c.dir], ndxBin: "/nonexistent/ndx",
+      id, name: id, repoRoot: c.dir, worktrees: [c.dir],
       port: c.port, pid: process.pid, lastSeen: new Date().toISOString(),
     });
     writeFileSync(registryPath(home), JSON.stringify({

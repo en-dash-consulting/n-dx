@@ -38,6 +38,8 @@ export interface GuardConfig {
   maxFileSize: number;
   /** Timeout in ms for spawn-based execution (spawnTool/spawnManaged). 0 = no timeout. */
   spawnTimeout: number;
+  /** Wall-clock limit in ms for one vendor CLI session. 0 = no limit. See schema/v1. */
+  sessionTimeout?: number;
   /** Maximum concurrent child processes allowed. */
   maxConcurrentProcesses: number;
   /** Allowed git subcommands. Centralizes the git safety allowlist in guard config. */

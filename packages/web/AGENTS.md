@@ -21,10 +21,9 @@ zero upward dependencies. `boundary-check.test.ts` enforces all of it. Read live
 zone metrics with `ndx analyze --deep .` rather than a number written down here;
 no web zone currently meets the dual-fragility threshold.
 
-**The sections below are directory policies, not zone policies.** Louvain does
-not currently emit standalone `web-shared`, `crash` or `viewer-ui-hub` zones, but
-the directories exist and the tests enforce the rules, so they stay in force. The
-root `AGENTS.md` has the threshold definition and the universal rules.
+**The sections below are directory policies.** They stay in force whether
+Louvain emits their zones or not; tests enforce them. Root `AGENTS.md` defines
+the fragility threshold and universal rules.
 
 **Guidance for a directory sits beside it.** `src/server/AGENTS.md` holds the
 request gate, workspace-scoped writes, the PRD lock and the injection seams;

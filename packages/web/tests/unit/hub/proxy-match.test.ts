@@ -7,7 +7,7 @@ import type { ProjectView } from "../../../src/hub/index.js";
 
 function view(id: string, repoRoot: string, worktrees: string[] = []): ProjectView {
   return {
-    id, name: id, repoRoot, worktrees: [repoRoot, ...worktrees], ndxBin: "/x.js", port: 1, pid: 1, lastSeen: null,
+    id, name: id, repoRoot, worktrees: [repoRoot, ...worktrees], port: 1, pid: 1, lastSeen: null,
     status: { state: "healthy", pid: 1, port: 1, attached: false, respawns: 0, lastHealthAt: null, lastError: null },
   };
 }

@@ -21,6 +21,8 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { commitSettingsChange } from "./settings-commit.js";
+import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
+import { isProjectRestricted, refuseWhileRestricted, TRUST_HINT } from "./trust-gate.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { invalidateAuthCheckCache } from "./routes-commands.js";
 import {
@@ -1098,7 +1100,13 @@ export async function buildLlmCatalog(projectDir: string, refresh: boolean): Pro
   const llm = (config["llm"] ?? {}) as Record<string, unknown>;
   const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
   const local = savedLocalEndpoint(llmLocal);
-  const localStatus = local.error !== null ? unprobeableStatus(local.error) : await probeLocalServer(local.host, local.port);
+  // The local endpoint comes from config; while the repository's config is
+  // unaccepted it is reported, not contacted.
+  const localStatus = local.error !== null
+    ? unprobeableStatus(local.error)
+    : isProjectRestricted(projectDir)
+      ? unprobeableStatus(`Not probed: this repository's config has not been accepted (${TRUST_HINT})`)
+      : await probeLocalServer(local.host, local.port);
 
   return {
     claude: cliEntry(
@@ -1392,6 +1400,9 @@ export async function handleLlmRoute(
     }
     // The model count comes from the same host and port, so it describes the
     // server under test even when the edits are unsaved.
+    // The endpoint may come from the repository's tracked config, so the
+    // probe waits until that config has been accepted (see trust-gate.ts).
+    if (refuseWhileRestricted(res, ctx.projectDir)) return true;
     const [result, listing] = await Promise.all([runSmokeTest(host, port, model), probeLocalServer(host, port)]);
     const body: LocalTestResponse = { ...result, modelCount: listing.ok ? listing.models.length : null };
     jsonResponse(res, 200, body);
@@ -1400,10 +1411,16 @@ export async function handleLlmRoute(
 
   // GET /api/llm/local-status — probe the configured local LLM server
   if (method === "GET" && pathname === LLM_LOCAL_STATUS) {
+    // A probe of a host named by config: never for a foreign page, and not
+    // while the repository's config is unaccepted.
+    if (isForeignSiteRequest(req)) return refuseForeignSite(res);
     const config = readEffectiveNdxConfig(ctx.projectDir);
     const llm = (config["llm"] ?? {}) as Record<string, unknown>;
     const llmLocal = (llm["local"] ?? {}) as Record<string, unknown>;
     const local = savedLocalEndpoint(llmLocal);
+    // A saved endpoint that fails the shape check is reported without a
+    // request; one that passes is contacted only once the config is accepted.
+    if (local.error === null && refuseWhileRestricted(res, ctx.projectDir)) return true;
     const result = local.error !== null ? unprobeableStatus(local.error) : await probeLocalServer(local.host, local.port);
     jsonResponse(res, 200, result);
     return true;
@@ -1442,6 +1459,10 @@ export async function handleLlmRoute(
 
   // GET /api/llm/catalog — models to offer and provider choices, per vendor
   if (method === "GET" && pathname === LLM_CATALOG) {
+    // Probes CLIs and vendor APIs; a foreign page must not trigger that. While
+    // the repository is restricted the catalog still answers, without the
+    // probes that config would steer (see buildLlmCatalog).
+    if (isForeignSiteRequest(req)) return refuseForeignSite(res);
     const refresh = new URL(url, "http://localhost").searchParams.get("refresh") === "true";
     jsonResponse(res, 200, await buildLlmCatalog(ctx.projectDir, refresh));
     return true;

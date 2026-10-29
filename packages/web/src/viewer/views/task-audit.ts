@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { BrandedHeader, RexTaskLink, ElapsedTime } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
+import { openWebSocket } from "../session.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -470,7 +471,7 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
     const wsUrl = `${protocol}//${window.location.host}`;
 
     try {
-      const ws = new WebSocket(wsUrl);
+      const ws = openWebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {

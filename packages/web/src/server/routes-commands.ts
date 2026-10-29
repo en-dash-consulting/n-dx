@@ -27,7 +27,7 @@
  * POST /api/commands/reshape         — rex reshape (body: { accept?: boolean }); previews unless accepted
  * GET  /api/commands/reshape/status  — reshape status and proposal report
  * POST /api/commands/reshape/stop    — interrupt the running reshape pass
- * GET  /api/commands/auth            — verify LLM provider credentials (read-only)
+ * POST /api/commands/auth            — verify LLM provider credentials (spawns `ndx auth`)
  * POST /api/commands/validate-tokens — hench vendor token-accuracy check
  * POST /api/commands/export-pdf      — sourcevision PDF report (returns the written path)
  *
@@ -40,13 +40,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { join, dirname, relative, resolve, sep } from "node:path";
-import { createRequire } from "node:module";
 import { redactSecrets, exec as foundationExec, spawnManaged, isVerbose, isDebug, resolveLayout } from "@n-dx/llm-client";
 import type { ManagedChild, SpawnToolResult } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "./response-utils.js";
 import { readCliName } from "./cli-name.js";
+import { resolveOwnNdxCli, resolveOwnPackageCli, type CliInvocation } from "./own-cli.js";
+import { refuseWhileRestricted } from "./trust-gate.js";
+import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 import { resolveEffectiveCliTimeoutMs } from "./routes-cli-timeout.js";
 import { readAnalyzeProgress } from "./domain-gateway.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
@@ -176,102 +178,30 @@ const initStatuses = new WorkspaceScoped<InitStatus>(() => ({
 }));
 
 // ── Binary resolution helpers ─────────────────────────────────────────
+//
+// Every CLI comes from this server's own install (see own-cli.ts), never from
+// the analyzed project's node_modules/.bin or a packages/ directory inside it.
 
-/**
- * Resolve an n-dx CLI: project-local install first, then the package
- * resolved from THIS server's own module graph (correct for any analyzed
- * project — the CLIs ship with the running n-dx install), and only then the
- * monorepo dogfood path (valid solely when analyzing the n-dx repo itself).
- * The middle step prevents `Cannot find module
- * '<projectDir>/packages/<pkg>/dist/cli/index.js'` for non-n-dx projects.
- *
- * The CLI subpath is resolved directly (e.g. `@n-dx/rex/dist/cli/index.js`):
- * these packages' `exports["."]` only define an `import` condition, so a bare
- * CJS `require.resolve("@n-dx/rex")` throws ERR_PACKAGE_PATH_NOT_EXPORTED.
- * The subpath matches the `"./dist/*"` export and resolves under CJS.
- */
-function resolveNdxCli(
-  projectDir: string,
-  localBin: string,
-  pkg: string,
-  dogfoodRel: string[],
-): { bin: string; args: string[] } {
-  const local = join(projectDir, "node_modules", ".bin", localBin);
-  if (existsSync(local)) return { bin: local, args: [] };
-  try {
-    const req = createRequire(import.meta.url);
-    const cli = req.resolve(`${pkg}/dist/cli/index.js`);
-    if (existsSync(cli)) return { bin: "node", args: [cli] };
-  } catch {
-    /* fall through to dogfood path */
-  }
-  return { bin: "node", args: [join(projectDir, ...dogfoodRel)] };
+function resolveSvBin(_ctx: ServerContext): CliInvocation {
+  return resolveOwnPackageCli("@n-dx/sourcevision", "sourcevision", "sourcevision");
 }
 
-function resolveSvBin(ctx: ServerContext): { bin: string; args: string[] } {
-  return resolveNdxCli(ctx.projectDir, "sourcevision", "@n-dx/sourcevision",
-    ["packages", "sourcevision", "dist", "cli", "index.js"]);
+function resolveRexBin(_ctx: ServerContext): CliInvocation {
+  return resolveOwnPackageCli("@n-dx/rex", "rex", "rex");
 }
 
-function resolveRexBin(ctx: ServerContext): { bin: string; args: string[] } {
-  return resolveNdxCli(ctx.projectDir, "rex", "@n-dx/rex",
-    ["packages", "rex", "dist", "cli", "index.js"]);
+function resolveHenchBin(_ctx: ServerContext): CliInvocation {
+  return resolveOwnPackageCli("@n-dx/hench", "hench", "hench");
 }
 
 /**
- * Resolve the ndx orchestrator CLI. Ladder:
- *
- *  1. `NDX_CLI_PATH` — the launching CLI's own path.
- *  2. Project-local `node_modules/.bin/ndx` — the analyzed project's own
- *     install, matching {@link resolveNdxCli}.
- *  3. `N_DX_CLI_PATH` — also the launching CLI's own path.
- *  4. `@n-dx/core/cli.js` resolved from THIS server's module graph — covers
- *     servers not started via ndx on flat (npm-hoisted) installs. Unlike the
- *     domain CLIs, this step often fails by design: web cannot declare
- *     @n-dx/core as a dependency (core depends on web — a cycle), so strict
- *     pnpm layouts won't resolve it.
- *  5. The monorepo dogfood path — valid solely when the analyzed project is
- *     the n-dx repo itself.
- *
- * Rungs 1 and 3 are one mechanism under two names: `cli.js` assigns both to
- * `fileURLToPath(import.meta.url)` on startup (packages/core/cli.js), so a
- * server started by `ndx start` knows the running install's cli.js whatever
- * the layout (global, npm, pnpm, monorepo). Rung 1 straddles the project-local
- * bin and rung 3 sits below it, which means the launcher outranks the analyzed
- * project's own install today — the two names were added at different times
- * and only rung 3's placement was deliberate. Consolidating them is a
- * behaviour change for anyone reading either name, so it is left alone; what
- * matters here is that both are documented and both are covered by the ladder
- * tests, because an ambient `NDX_CLI_PATH` answering silently from rung 1 is
- * what made the rungs below it untested.
- *
- * Both env rungs are guarded on `existsSync`. The value is exported to every
- * child of an `ndx` process, so it outlives the install that wrote it: a
- * dev-link install that moved or was uninstalled leaves a path that no longer
- * exists, and spawning it verbatim fails with MODULE_NOT_FOUND where the rungs
- * below would have resolved.
+ * The ndx orchestrator CLI for a dashboard-triggered command — this server's
+ * own install, whatever project `ctx` names. See {@link resolveOwnNdxCli} for
+ * the ladder. `ctx` is kept so callers need not change if a per-workspace
+ * rung is ever wanted; it must never name a binary inside the project.
  */
-export function resolveNdxBin(ctx: ServerContext): { bin: string; args: string[] } {
-  const launcherCli = process.env["NDX_CLI_PATH"];
-  if (launcherCli && existsSync(launcherCli)) {
-    return { bin: "node", args: [launcherCli] };
-  }
-  const bin = join(ctx.projectDir, "node_modules", ".bin", "ndx");
-  if (existsSync(bin)) return { bin, args: [] };
-
-  const envCli = process.env["N_DX_CLI_PATH"];
-  if (envCli && existsSync(envCli)) return { bin: "node", args: [envCli] };
-
-  try {
-    const req = createRequire(import.meta.url);
-    const cli = req.resolve("@n-dx/core/cli.js");
-    if (existsSync(cli)) return { bin: "node", args: [cli] };
-  } catch {
-    /* fall through to dogfood path */
-  }
-
-  const fallback = join(ctx.projectDir, "packages", "core", "cli.js");
-  return { bin: "node", args: [fallback] };
+export function resolveNdxBin(_ctx: ServerContext): CliInvocation {
+  return resolveOwnNdxCli();
 }
 
 /**
@@ -1675,9 +1605,9 @@ async function runAuthCheck(ctx: ServerContext): Promise<AuthCheckResult> {
 }
 
 /**
- * GET /api/commands/auth — verify LLM provider credentials.
+ * POST /api/commands/auth — verify LLM provider credentials.
  *
- * Read-only (hence GET): runs `ndx auth`, whose exit code answers "are the
+ * Writes nothing, but it is a POST because it spawns: it runs `ndx auth`, whose exit code answers "are the
  * configured provider's credentials usable". Surfaced as a chip in LLM
  * settings so a missing key is visible *before* an agent command fails.
  * Served from cache after the first check; `?refresh=true` re-runs it.
@@ -1715,10 +1645,7 @@ async function handleValidateTokens(
   res: ServerResponse,
   ctx: ServerContext,
 ): Promise<boolean> {
-  const { bin, args: prefixArgs } = resolveNdxCli(
-    ctx.projectDir, "hench", "@n-dx/hench",
-    ["packages", "hench", "dist", "cli", "index.js"],
-  );
+  const { bin, args: prefixArgs } = resolveHenchBin(ctx);
   try {
     const result = await foundationExec(bin, [...prefixArgs, "validate-tokens", ctx.projectDir], {
       cwd: ctx.projectDir,
@@ -2053,6 +1980,32 @@ function handleSampleStatus(
 
 // ── Dispatcher ────────────────────────────────────────────────────────
 
+/** GET routes that spawn or probe, refused when a foreign site asks. */
+const FOREIGN_GUARDED_GETS = new Set(["manifest", "init/preflight"]);
+
+/**
+ * POST routes whose spawned command acts on the repository's own execution
+ * config (its agent commands, test command, CLI paths, endpoints), refused
+ * while the repository is restricted. Stop routes are not here: stopping
+ * what is already running never starts anything.
+ */
+const TRUST_GATED_POSTS = new Set([
+  "init",
+  "sv-analyze",
+  "recommend",
+  "export",
+  "install-sample",
+  "destroy-sample",
+  "self-heal",
+  "refresh",
+  "auth",
+  "validate-tokens",
+  "export-pdf",
+  "fix",
+  "ci",
+  "reshape",
+]);
+
 /** Handle command trigger API requests. Returns true if the request was handled. */
 /** Options threaded into {@link handleCommandsRoute} from start.ts, beyond the plain ctx/broadcast pair. */
 export interface CommandsRouteOptions {
@@ -2078,6 +2031,18 @@ export function handleCommandsRoute(
   if (!url.startsWith(CMD_PREFIX) && url !== CMD_PREFIX.slice(0, -1)) return false;
 
   const path = url.slice(CMD_PREFIX.length).split("?")[0];
+
+  // These GETs make the server work — a spawn, a probe — so a foreign page's
+  // <img src> must not be able to trigger them. The browser blocks the
+  // cross-origin read, not the work, so it is refused here.
+  if (method === "GET" && FOREIGN_GUARDED_GETS.has(path) && isForeignSiteRequest(req)) {
+    return refuseForeignSite(res);
+  }
+  // Routes that spawn a CLI working on this repository's own configuration
+  // wait until that configuration has been accepted (see trust-gate.ts).
+  if (method === "POST" && TRUST_GATED_POSTS.has(path) && refuseWhileRestricted(res, ctx.projectDir)) {
+    return true;
+  }
 
   if (path === "init" && method === "POST") {
     return handleInit(req, res, ctx, options?.onProjectInitialized);
@@ -2140,7 +2105,7 @@ export function handleCommandsRoute(
   if (path === "manifest" && method === "GET") {
     return handleManifest(req, res, ctx);
   }
-  if (path === "auth" && method === "GET") {
+  if (path === "auth" && method === "POST") {
     return handleAuth(req, res, ctx);
   }
   if (path === "validate-tokens" && method === "POST") {

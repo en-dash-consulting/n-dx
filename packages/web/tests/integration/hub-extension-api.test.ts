@@ -86,6 +86,7 @@ const LISTED: ListResult = {
 async function hub(options: Partial<HubOptions> = {}): Promise<HubHandle> {
   const handle = await startHub({
     port: 0,
+    selfBin: NDX_BIN,
     homeDir: join(dir, "home"),
     keepAlive: true,
     healthIntervalMs: 60_000,

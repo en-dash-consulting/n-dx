@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { usePolling } from "../../hooks/index.js";
 import { createFetchPipeline } from "../../messaging/index.js";
 import { isFeatureDisabled, onDegradationChange } from "../../performance/index.js";
+import { openWebSocket } from "../../session.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ export function ExecutionPanel({ onPrdChanged }: ExecutionPanelProps) {
     let ws: WebSocket;
 
     try {
-      ws = new WebSocket(wsUrl);
+      ws = openWebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {

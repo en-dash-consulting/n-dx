@@ -42,7 +42,7 @@ function rawCopy(error: ServerUnavailable): ServerUnavailableCopy {
     case 401:
       return {
         title: "Sign in to the dashboard again",
-        body: "The server refused the request (401): this tab has no valid token. Open the URL that `{cli} start` printed — it carries this user's token and sets it as a cookie.",
+        body: "The server refused the request (401): this tab is not signed in, or its session ended when the server restarted. Run `{cli} start` again and open the URL it prints — a one-time sign-in link.",
         retrying: false,
       };
     case 403:

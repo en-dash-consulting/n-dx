@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
@@ -118,7 +118,7 @@ async function setupProject(dir) {
         rexDir: ".rex",
         apiKeyEnv: "ANTHROPIC_API_KEY",
         guard: {
-          blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"],
+          blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**", ".env"],
           allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"],
           commandTimeout: 30000,
           maxFileSize: 1048576,
@@ -544,7 +544,7 @@ describe("n-dx config", () => {
       expect(output).toContain('default: "file"');
       expect(output).toContain('default: "cli"');
       expect(output).toContain('default: "sonnet"');
-      expect(output).toContain("default: 50");
+      expect(output).toContain("default: 200");
       expect(output).toContain("default: 8192");
       expect(output).toContain("default: 30000");
       expect(output).toContain("default: 1048576");
@@ -810,6 +810,51 @@ describe("n-dx config", () => {
       } catch { /* not created — fine */ }
       expect(shared.claude?.api_key).toBeUndefined();
       expect(shared.llm?.claude?.api_key).toBeUndefined();
+    });
+
+    it.skipIf(isWin)("creates .n-dx.local.json owner-only, leaving no temp file behind", async () => {
+      run(["claude.api_key", "sk-ant-test-key", tmpDir]);
+      const { mode } = await stat(LOCAL_CONFIG_PATH(tmpDir));
+      expect(mode & 0o777).toBe(0o600);
+      const leftovers = (await readdir(tmpDir)).filter((name) => name.endsWith(".tmp"));
+      expect(leftovers).toEqual([]);
+      // A second write goes through the same temp-and-rename path.
+      run(["claude.api_key", "sk-ant-test-key-2", tmpDir]);
+      expect((await stat(LOCAL_CONFIG_PATH(tmpDir))).mode & 0o777).toBe(0o600);
+    });
+
+    it("refuses to write an api_key into a file git tracks", async () => {
+      spawnSync("git", ["init", "-q"], { cwd: tmpDir, stdio: "pipe" });
+      await writeFile(LOCAL_CONFIG_PATH(tmpDir), "{}\n");
+      spawnSync("git", ["add", "-f", "--", ".n-dx.local.json"], { cwd: tmpDir, stdio: "pipe" });
+
+      const stderr = runFail(["claude.api_key", "sk-ant-test-key", tmpDir]);
+      expect(stderr).toContain("tracked by git");
+      expect(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8")).toBe("{}\n");
+    });
+
+    it("warns when the key file is not ignored by git, and still writes", async () => {
+      spawnSync("git", ["init", "-q"], { cwd: tmpDir, stdio: "pipe" });
+
+      const result = spawnSync("node", [CLI_PATH, "config", "claude.api_key", "sk-ant-test-key", tmpDir], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+        stdio: "pipe",
+      });
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain("not ignored by git");
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.llm.claude.api_key).toBe("sk-ant-test-key");
+
+      // Once ignored, the write is silent about git.
+      await writeFile(join(tmpDir, ".gitignore"), ".n-dx.local.json\n");
+      const quiet = spawnSync("node", [CLI_PATH, "config", "claude.api_key", "sk-ant-test-key", tmpDir], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+        stdio: "pipe",
+      });
+      expect(quiet.status).toBe(0);
+      expect(quiet.stderr).not.toContain("not ignored by git");
     });
 
     it("writes claude.<field> to llm.claude.<field> and notes the redirect on stderr", () => {
@@ -1643,12 +1688,15 @@ describe("n-dx config", () => {
       await expectNotOwnerOnly(join(tmpDir, ".n-dx.json"));
     });
 
-    it("restricts permissions when api_key is added to existing config", async () => {
-      // First set a non-sensitive value
+    it("keeps .n-dx.local.json owner-only before and after an api_key is added", async () => {
+      // The machine-local file is written owner-only from its first byte,
+      // whatever it holds: it is the file every key ends up in, and a key
+      // added later must not land in a file that was created readable.
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
-      await expectNotOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
+      if (!isWin) await expectOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
 
-      // Now add an API key — same file as cli_path, now owner-only
+      // Adding the key keeps it so — and on Windows, where mode means
+      // nothing, is what applies and verifies the ACL.
       run(["claude.api_key", "sk-ant-secure-key", tmpDir]);
       await expectOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
     });

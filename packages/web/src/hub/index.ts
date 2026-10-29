@@ -21,6 +21,7 @@ export {
   readHubConfig,
   HUB_CONFIG_DEFAULTS,
   loadRegistry,
+  loadRegistryHealing,
   saveRegistry,
   emptyRegistry,
   readHubPidFile,
@@ -28,7 +29,7 @@ export {
   removeHubPidFile,
   isPidAlive,
 } from "./registry.js";
-export type { HubRegistry, ProjectRecord, HubPidFile, HubConfig, HubConfigResult, HubConfigProblem } from "./registry.js";
+export type { HealedRecord, HubRegistry, ProjectRecord, HubPidFile, HubConfig, HubConfigResult, HubConfigProblem } from "./registry.js";
 export { parseRegisterInput, handleHubRoute } from "./routes.js";
 export {
   planNewProject,

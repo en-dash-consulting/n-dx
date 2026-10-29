@@ -47,6 +47,12 @@ const LAUNCH_ONLY = new Set(["fresh", "allowDirty"]);
 const SAVED_MODEL_KEYS = { model: ["tier", "models"], reviewModel: ["reviewTier", "reviewModels"] };
 const savedKeys = (keys) => keys.flatMap((k) => SAVED_MODEL_KEYS[k] ?? [k]);
 const EXCLUDED_VALUES = { permissionMode: ["plan"] };
+/**
+ * Values one launch may send but a saved block may not hold. A launch is the
+ * operator's own instruction; a saved block is PRD content the agent can
+ * write, so the mode that skips every confirmation is never saved on an item.
+ */
+const SAVED_REFUSED_VALUES = { permissionMode: ["bypassPermissions"] };
 
 function git(cwd, ...args) {
   return execFileSync(
@@ -193,11 +199,13 @@ describe("run options contract: dashboard allow-list vs ndx work --resolve", () 
         const base = spec.key === "reviewOptional" ? { review: true } : {};
         for (const value of cases) {
           const input = { ...base, [spec.key]: value };
+          const savedRefused = SAVED_REFUSED_VALUES[spec.key]?.includes(value) ?? false;
           expect({ key: spec.key, value, ok: validateRunSettings(input).ok }).toEqual({
             key: spec.key,
             value,
-            ok: checkRunOptions(input).ok,
+            ok: savedRefused ? false : checkRunOptions(input).ok,
           });
+          if (savedRefused) expect(checkRunOptions(input).ok).toBe(true);
         }
       }
     });

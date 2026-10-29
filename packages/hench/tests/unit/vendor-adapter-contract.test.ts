@@ -813,7 +813,9 @@ describe("vendor adapter contract: Claude CLI arg snapshots", () => {
     const tools = buildAllowedTools(["npm", "git", "node"]);
 
     expect(tools).toContain("Bash(npm:*)");
-    expect(tools).toContain("Bash(git:*)");
+    // git is always scoped to subcommands — the baseline when none are named.
+    expect(tools).toContain("Bash(git commit:*)");
+    expect(tools).not.toContain("Bash(git:*)");
     expect(tools).toContain("Bash(node:*)");
     // File tools are always included
     expect(tools).toContain("Read");

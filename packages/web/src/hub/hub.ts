@@ -31,17 +31,18 @@ import {
   hubConfigPath,
   hubPidPath,
   readHubConfig,
-  loadRegistry,
+  loadRegistryHealing,
   registryPath,
   removeHubPidFile,
   resolveHubHome,
   saveRegistry,
   writeHubPidFile,
 } from "./registry.js";
-import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
+import type { HealedRecord, HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
-import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
-import { guardHubRequest, upgradeRefusal } from "./request-guard.js";
+import { handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest } from "./proxy.js";
+import { guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "./request-guard.js";
+import { CredentialStore } from "../shared/index.js";
 import { NO_NDX_CLI, SidecarManager, ndxCliPlanner } from "./sidecars.js";
 import { ndxCliLister } from "./extensions.js";
 import type { ListExtensions } from "./extensions.js";
@@ -91,13 +92,11 @@ export interface HubOptions {
    */
   onEmpty?: () => void;
   /**
-   * The n-dx binary a project created *from the hub* is registered with.
-   *
-   * Every other project names its own (`ndxBin` on the registration, so each
-   * repository can run its own n-dx version), but a folder the hub creates has
-   * nobody to name one — so it inherits the hub's own. Defaults to the script
-   * this process was started from, which is `@n-dx/web`'s CLI, the same entry
-   * `buildServeCommand` expects.
+   * The n-dx binary every project server is spawned from — registered by
+   * `ndx start`, created from the dashboard, or loaded from the registry
+   * alike. Nothing a request or `hub.json` carries overrides it. Defaults to
+   * the script this process was started from, which is `@n-dx/web`'s CLI, the
+   * same entry `buildServeCommand` expects.
    */
   selfBin?: string;
   /**
@@ -136,7 +135,6 @@ export interface HubHandle {
 export interface RegisterProjectInput {
   id: string;
   repoRoot: string;
-  ndxBin: string;
   /** A worktree of the repository to record under the project; `repoRoot` is always recorded. */
   worktree?: string;
   name?: string;
@@ -144,6 +142,8 @@ export interface RegisterProjectInput {
 
 /** A registry record joined with its supervisor's live status. */
 export interface ProjectView extends ProjectRecord {
+  /** Informational only: always the hub's own binary, never persisted. */
+  ndxBin: string;
   status: ChildStatus;
 }
 
@@ -213,34 +213,22 @@ async function readJsonObject(res: Response): Promise<Record<string, unknown> | 
  * the lifecycle is testable without a socket.
  */
 /**
- * The binary to register hub-created projects with.
+ * The binary every project server is spawned from.
  *
  * `process.argv[1]` is this process's entry — `@n-dx/web`'s `dist/cli/index.js`,
  * which answers `serve` as well as `hub`, so it is exactly what a project
- * server is spawned from. A registered project's own `ndxBin` is the fallback
- * for the case the entry cannot be read back (a bundled or renamed launcher).
+ * server is spawned from. An explicit option (tests, embedders) is tried first.
  *
- * Every candidate must pass {@link isAcceptableNdxBin}, including the registry
- * ones: "it is already in the registry" is not evidence, because an entry
- * written before `parseRegisterInput` enforced that rule can name anything.
- * Returns "" when no candidate qualifies, which the new-project route reports
- * rather than spawning.
+ * The registry is deliberately not a candidate: a binary recorded in
+ * `hub.json` — by an older hub, or by anything else that can write the file —
+ * is not evidence of anything, and spawning it would let that file choose
+ * what the hub executes. Each candidate must also pass
+ * {@link isAcceptableNdxBin}. Returns "" when none qualifies; registration is
+ * then refused and no child is spawned.
  */
-export function resolveSelfBin(explicit: string | undefined, registry: HubRegistry): string {
-  const candidates = [
-    explicit,
-    process.argv[1],
-    ...Object.values(registry.projects).map((p) => p.ndxBin),
-  ];
-  for (const candidate of candidates) {
+export function resolveSelfBin(explicit: string | undefined): string {
+  for (const candidate of [explicit, process.argv[1]]) {
     if (!candidate || !isAbsolute(candidate) || !existsSync(candidate)) continue;
-    // The registry entries are the reason this is a filter and not an
-    // assertion: a registration recorded before `parseRegisterInput` learned
-    // this rule can name any executable, and picking it here would hand the
-    // hub an arbitrary program to spawn for every project created from the
-    // dashboard. Skipping rather than failing also keeps the chain useful —
-    // an unrecognizable `process.argv[1]` (a bundled or renamed launcher)
-    // falls through to a registered binary that does pass.
     if (!isAcceptableNdxBin(candidate)) continue;
     return candidate;
   }
@@ -261,6 +249,13 @@ export class Hub {
   readonly selfBin: string;
   /** The per-user token every request must present, or null when running without one. */
   readonly token: string | null;
+  /**
+   * Browser sessions, landing nonces and WebSocket tickets this hub issued
+   * (`shared/auth.ts`); null without a token. In memory, so a hub restart
+   * revokes them. Project servers behind the hub never see these: the proxy
+   * replaces them with the per-user token.
+   */
+  readonly credentials: CredentialStore | null;
   /** Extension sidecars mounted at `/x/<name>/`. */
   readonly sidecars: SidecarManager;
   /** Installed extensions as n-dx reports them, for `GET /api/hub/extensions`. */
@@ -270,6 +265,8 @@ export class Hub {
   private readonly supervisorOptions: SupervisorOptions;
   private readonly log: (message: string) => void;
   private readonly onEmpty: (() => void) | undefined;
+  /** Projects whose saved record named a binary other than {@link selfBin}; their live server is replaced, not adopted. */
+  private readonly replaceOnAttach = new Set<string>();
   private port = 0;
 
   constructor(options: HubOptions = {}) {
@@ -282,12 +279,16 @@ export class Hub {
     this.configProblems = problems;
     this.keepAlive = options.keepAlive ?? config.keepAlive;
     this.token = options.tokenFile ? ensureAuthToken(options.tokenFile) : null;
-    this.supervisorOptions = { log: this.log, tokenFile: options.tokenFile, token: this.token, ...options.supervisor };
-    this.registry = loadRegistry(this.registryPath);
-    this.selfBin = resolveSelfBin(options.selfBin, this.registry);
+    this.credentials = this.token ? new CredentialStore() : null;
+    this.selfBin = resolveSelfBin(options.selfBin);
+    // `ndxBin` last: the binary is the hub's, whatever a caller's supervisor options say.
+    this.supervisorOptions = { log: this.log, tokenFile: options.tokenFile, token: this.token, ...options.supervisor, ndxBin: this.selfBin };
+    const { registry, healed } = loadRegistryHealing(this.registryPath);
+    this.registry = registry;
     for (const record of Object.values(this.registry.projects)) {
       this.supervisors.set(record.id, new ProjectSupervisor(record, this.supervisorOptions));
     }
+    this.healRecordedBinaries(healed);
     this.admission = new AdmissionGate({
       limits: {
         maxSessions: options.limits?.maxSessions ?? config.maxSessions,
@@ -405,12 +406,40 @@ export class Hub {
     this.port = port;
   }
 
+  /**
+   * Drop the binaries an older hub recorded per project and write the healed
+   * registry back, before anything is spawned. A record whose binary was not
+   * this hub's own also has its live server replaced rather than adopted by
+   * {@link attachAll}, so nothing that binary started keeps serving.
+   */
+  private healRecordedBinaries(healed: HealedRecord[]): void {
+    if (healed.length === 0) return;
+    for (const { id, ndxBin } of healed) {
+      const name = this.registry.projects[id]?.name ?? id;
+      if (ndxBin === this.selfBin) {
+        this.log(`[hub] ${id} (${name}): dropped its recorded binary; servers are spawned from the hub's own entry`);
+      } else {
+        this.replaceOnAttach.add(id);
+        this.log(
+          `[hub] ${id} (${name}): ignoring recorded binary ${ndxBin}; its server is spawned from ${this.selfBin || "(none — restart the hub with `ndx start`)"}`,
+        );
+      }
+    }
+    try {
+      saveRegistry(this.registryPath, this.registry);
+    } catch (err) {
+      // Not fatal: the field is already gone in memory and is never spawned;
+      // the next persist() retries the write.
+      this.log(`[hub] could not rewrite ${this.registryPath}: ${(err as Error).message}`);
+    }
+  }
+
   /** Re-attach or respawn every registered project. Failures are recorded on the project, not thrown. */
   async attachAll(): Promise<void> {
     await Promise.all(
       Array.from(this.supervisors.values()).map(async (sup) => {
         try {
-          await sup.attach();
+          await sup.attach({ adopt: !this.replaceOnAttach.has(sup.record.id) });
         } catch (err) {
           this.log(`[hub] ${sup.record.id}: attach failed — ${(err as Error).message}`);
         }
@@ -421,13 +450,13 @@ export class Hub {
 
   listProjects(): ProjectView[] {
     return Array.from(this.supervisors.values())
-      .map((sup) => ({ ...sup.record, status: sup.status() }))
+      .map((sup) => ({ ...sup.record, ndxBin: this.selfBin, status: sup.status() }))
       .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   }
 
   getProject(id: string): ProjectView | null {
     const sup = this.supervisors.get(id);
-    return sup ? { ...sup.record, status: sup.status() } : null;
+    return sup ? { ...sup.record, ndxBin: this.selfBin, status: sup.status() } : null;
   }
 
   /**
@@ -444,7 +473,6 @@ export class Hub {
         name: input.name ?? basename(input.repoRoot),
         repoRoot: input.repoRoot,
         worktrees: [input.repoRoot],
-        ndxBin: input.ndxBin,
         port: null,
         pid: null,
         lastSeen: null,
@@ -453,8 +481,7 @@ export class Hub {
       sup = new ProjectSupervisor(record, this.supervisorOptions);
       this.supervisors.set(record.id, sup);
     } else {
-      // Re-registration refreshes what may have changed: a newer n-dx, a rename.
-      sup.record.ndxBin = input.ndxBin;
+      // Re-registration refreshes what may have changed: a rename.
       if (input.name) sup.record.name = input.name;
     }
     if (input.worktree && !sup.record.worktrees.includes(input.worktree)) {
@@ -466,7 +493,7 @@ export class Hub {
       await sup.start();
       this.persist();
     }
-    return { created, project: { ...sup.record, status: sup.status() } };
+    return { created, project: { ...sup.record, ndxBin: this.selfBin, status: sup.status() } };
   }
 
   /** How many projects are registered. */
@@ -505,7 +532,7 @@ export class Hub {
       worktreeKnown,
       projectRemoved: false,
       remaining,
-      project: { ...sup.record, status: sup.status() },
+      project: { ...sup.record, ndxBin: this.selfBin, status: sup.status() },
       hubExiting: false,
     };
   }
@@ -577,7 +604,17 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // The origin gate is the hub's outer boundary and runs before any routing:
     // registration spawns a process, and the project servers behind the proxy
     // see a rewritten Origin, so this is where a browser request is judged.
-    if (guardHubRequest(req, res, hub.listeningPort, hub.token)) return;
+    if (guardHubRequest(req, res, hub.listeningPort, hub.token, hub.credentials)) return;
+    // No credential: only what is public — the home page shell and proxied
+    // requests the project server answers with its own public shell or a 401.
+    if (isPublicOnlyHubRequest(req)) {
+      void handlePublicHubRequest(req, res, hub).catch((err: unknown) => {
+        console.error("[hub] request failed:", err);
+        if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        if (!res.writableEnded) res.end(JSON.stringify({ error: "Internal server error" }));
+      });
+      return;
+    }
     void handleHubRoute(req, res, hub)
       .then((handled) => {
         // Everything that is not the hub's own API belongs to a project server:
@@ -598,7 +635,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // Each refusal keeps its own status line, as on the HTTP path and on the
     // project server's own upgrade path: a `Host` that does not name this hub
     // is 421 Misdirected Request, a missing token 401, a foreign `Origin` 403.
-    const refusal = upgradeRefusal(req, hub.listeningPort, hub.token);
+    const refusal = upgradeRefusal(req, hub.listeningPort, hub.token, hub.credentials);
     if (refusal !== null) {
       socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();

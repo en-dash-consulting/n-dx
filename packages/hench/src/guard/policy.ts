@@ -218,6 +218,39 @@ export class PolicyEngine {
     };
   }
 
+  /**
+   * The audit summary and counters in the shape a run record persists
+   * (`RunRecord.guardAudit`). Denials keep only the most recent `maxDenials`,
+   * without the per-entry counter snapshots, so a run that was denied
+   * thousands of times does not bloat its record; `denialsDropped` says how
+   * many were left out.
+   */
+  runAudit(maxDenials = 50): {
+    total: number;
+    allowed: number;
+    denied: number;
+    denials: Array<{ timestamp: number; operation: OperationType; target: string; reason?: string }>;
+    denialsDropped?: number;
+    counters: SessionCounters;
+  } {
+    const summary = this.auditSummary();
+    const kept = maxDenials > 0 ? summary.denials.slice(-maxDenials) : [];
+    const dropped = summary.denials.length - kept.length;
+    return {
+      total: summary.total,
+      allowed: summary.allowed,
+      denied: summary.denied,
+      denials: kept.map(({ timestamp, operation, target, reason }) => ({
+        timestamp,
+        operation,
+        target,
+        ...(reason !== undefined ? { reason } : {}),
+      })),
+      ...(dropped > 0 ? { denialsDropped: dropped } : {}),
+      counters: this.counters,
+    };
+  }
+
   // -- Internal helpers --
 
   private pruneWindow(timestamps: number[], now: number): void {

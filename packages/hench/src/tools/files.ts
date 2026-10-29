@@ -45,11 +45,15 @@ export async function toolListDirectory(
   async function listDir(dir: string, prefix: string): Promise<void> {
     const items = await readdir(dir, { withFileTypes: true });
     for (const item of items) {
+      // Every entry passes the checks the top path passed; a refused entry is
+      // left out and never descended into.
+      const path = join(dir, item.name);
+      if (!guard.isPathAllowed(path)) continue;
       const name = prefix ? `${prefix}/${item.name}` : item.name;
       if (item.isDirectory()) {
         entries.push(name + "/");
         if (params.recursive) {
-          await listDir(join(dir, item.name), name);
+          await listDir(path, name);
         }
       } else {
         entries.push(name);
@@ -90,11 +94,14 @@ export async function toolSearchFiles(
     for (const item of items) {
       if (results.length >= MAX_RESULTS) break;
 
+      // Blocked directories and files are skipped by the guard, as they are
+      // when named directly; nothing is read from or below them.
+      const filePath = join(dir, item.name);
+      if (!guard.isPathAllowed(filePath)) continue;
       const name = prefix ? `${prefix}/${item.name}` : item.name;
 
       if (item.isDirectory()) {
-        if (item.name === "node_modules" || item.name === ".git") continue;
-        await searchDir(join(dir, item.name), name);
+        await searchDir(filePath, name);
       } else {
         // Check glob filter if provided
         if (params.glob && !simpleGlobMatch(params.glob, name)) {
@@ -102,7 +109,6 @@ export async function toolSearchFiles(
         }
 
         try {
-          const filePath = join(dir, item.name);
           const s = await stat(filePath);
           if (s.size > guard.maxFileSize) continue;
 

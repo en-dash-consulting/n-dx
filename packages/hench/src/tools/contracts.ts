@@ -1,5 +1,7 @@
 import type { PRDStore } from "../prd/rex-gateway.js";
 import type { SystemMemoryMonitor } from "../process/memory-monitor.js";
+import type { ToolSandbox } from "../guard/sandbox.js";
+import type { PolicyEngine } from "../guard/policy.js";
 import type { ConfigBackstop } from "../guard/config-backstop.js";
 
 /**
@@ -8,6 +10,12 @@ import type { ConfigBackstop } from "../guard/config-backstop.js";
  */
 export interface ToolGuard {
   checkPath(filepath: string): string;
+  /**
+   * Non-throwing form of `checkPath` for directory walks: whether an entry
+   * passes the same containment and blocked-path checks. A walk leaves a
+   * refused entry out and does not descend into it.
+   */
+  isPathAllowed(filepath: string): boolean;
   checkCommand(command: string): void;
   checkGitSubcommand(subcommand: string): void;
   recordFileRead(filepath: string): void;
@@ -20,6 +28,16 @@ export interface ToolGuard {
    * provide one; tools fall back to `process.env` when it is absent.
    */
   readonly childEnv?: NodeJS.ProcessEnv;
+  /**
+   * OS-level confinement every tool child is spawned inside. Optional so
+   * lightweight test guards need not provide one; absent means unconfined.
+   */
+  readonly sandbox?: ToolSandbox | null;
+  /**
+   * The session policy engine whose audit the run record keeps. Optional so
+   * lightweight test guards need not provide one; absent means no audit.
+   */
+  readonly policy?: Pick<PolicyEngine, "runAudit">;
 }
 
 /**

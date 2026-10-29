@@ -57,14 +57,22 @@ one of them is a vulnerability we want to hear about.
 Origin rules, which tell a web page apart from the dashboard, and the
 per-user token in `~/.ndx/auth.token` (mode 0600), which tells this user's
 browser and CLI apart from another account on the same machine — loopback is
-shared by every account on a host. Any way for a web page the operator merely
+shared by every account on a host. Scripts and MCP clients send the token in a
+header. A browser never holds it: the URL `ndx start` prints carries a
+single-use, 60-second nonce that the page exchanges for a session credential
+of its own, kept in `sessionStorage` (scoped to the origin, port included) and
+sent as a header; WebSocket handshakes carry single-use tickets. No cookie is
+used, because a cookie on `localhost` reaches every port on it
+([details](docs/architecture/web-server.md#authentication)). Any way for a web page the operator merely
 visits, or for another local account, to **read** dashboard data (PRD,
 analysis, agent run records, configuration) or to **trigger** an action
 (start or stop an agent, edit the PRD, change settings, spawn a process) is in
 scope, regardless of the HTTP method or transport (fetch, WebSocket, MCP over
 HTTP, DNS rebinding, and so on). Safe methods are not exempt: a `GET` that
 leaks data or has a side effect counts. So is any way to obtain or bypass the
-token, or to make the hub spawn something other than its own project server.
+token or a session credential — including from another server on a different
+loopback port the operator has open — or to make the hub spawn something other
+than its own project server.
 
 **The agent stays inside the project directory.** Hench's guard rejects path
 traversal, null bytes and symlink escapes, blocks `.hench/`, `.rex/`, `.git/`

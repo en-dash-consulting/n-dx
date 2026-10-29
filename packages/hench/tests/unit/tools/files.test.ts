@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
 import { toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles } from "../../../src/tools/files.js";
+import { GuardRails } from "../../../src/guard/index.js";
+import { guardDefaultsForLanguage } from "../../../src/schema/v1.js";
 
 function createToolGuard(projectDir: string): ToolGuard {
   const maxFileSize = 1024 * 1024;
@@ -14,6 +16,14 @@ function createToolGuard(projectDir: string): ToolGuard {
         throw new Error(`Path escapes project directory: ${filepath}`);
       }
       return resolved;
+    },
+    isPathAllowed(filepath: string): boolean {
+      try {
+        this.checkPath(filepath);
+        return true;
+      } catch {
+        return false;
+      }
     },
     checkCommand(): void {},
     checkGitSubcommand(): void {},
@@ -126,5 +136,55 @@ describe("file tools", () => {
         }),
       ).rejects.toThrow("Invalid regex");
     });
+  });
+});
+
+describe("directory walks under the default guard", () => {
+  let projectDir: string;
+  let guard: GuardRails;
+
+  const fixture: Array<[string, string]> = [
+    [".env", "DB_PASSWORD=hunter2\n"],
+    [".hench/config.json", '{"api_key":"k"}\n'],
+    [".rex/x", "prd state\n"],
+    [".git/config", "[core]\n"],
+    [".n-dx.local.json", '{"llm":{"api_key":"k"}}\n'],
+    ["node_modules/a.js", "module.exports = 1;\n"],
+    ["src/ok.ts", "export const ok = 1;\n"],
+  ];
+
+  beforeEach(async () => {
+    projectDir = await mkdtemp(join(tmpdir(), "hench-test-walk-"));
+    for (const [rel, content] of fixture) {
+      await mkdir(dirname(join(projectDir, rel)), { recursive: true });
+      await writeFile(join(projectDir, rel), content);
+    }
+    guard = new GuardRails(projectDir, guardDefaultsForLanguage("typescript"));
+  });
+
+  afterEach(async () => {
+    await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it("list_directory leaves blocked entries out and does not descend into them", async () => {
+    const result = await toolListDirectory(guard, { path: ".", recursive: true });
+    expect(result.split("\n").sort()).toEqual(["src/", "src/ok.ts"]);
+  });
+
+  it("search_files returns lines from allowed files only", async () => {
+    const result = await toolSearchFiles(guard, { pattern: ".*", path: "." });
+    const lines = result.split("\n");
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line.startsWith("src/ok.ts:"), line).toBe(true);
+    }
+    expect(result).not.toContain("DB_PASSWORD");
+    expect(result).not.toContain("api_key");
+  });
+
+  it("search_files applies the same patterns as read_file", async () => {
+    await expect(toolReadFile(guard, { path: ".n-dx.local.json" })).rejects.toThrow(/blocked pattern/);
+    const result = await toolSearchFiles(guard, { pattern: "api_key", path: "." });
+    expect(result).toBe("No matches found");
   });
 });

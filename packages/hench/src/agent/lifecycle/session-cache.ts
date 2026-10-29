@@ -38,6 +38,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir, rm, open, rename, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveLayout } from "../../prd/llm-gateway.js";
+import { effectiveGitSubcommands } from "./git-subcommands.js";
 
 /** File under `.hench/` holding the cached parent session. */
 export const SESSION_CACHE_FILE = "session-cache.json";
@@ -785,9 +786,10 @@ export interface PolicyFingerprintInput {
  * value makes that a named miss instead.
  *
  * Arrays are sorted before hashing, because a reordered allowlist grants the
- * same permissions. `allowedGitSubcommands` hashes as `null` when absent and
- * `[]` when empty, which are genuinely different policies: unscoped git versus
- * no git subcommand at all.
+ * same permissions. `allowedGitSubcommands` hashes as the grant it produces:
+ * an absent or empty list is the language baseline, exactly as
+ * `buildAllowedTools` spells it, so the three spellings of the same policy
+ * resume the same chain.
  */
 export function policyFingerprint(policy: PolicyFingerprintInput): string {
   const canonical = JSON.stringify([
@@ -796,7 +798,7 @@ export function policyFingerprint(policy: PolicyFingerprintInput): string {
     policy.networkAccess,
     [...policy.writableRoots].sort(),
     [...policy.allowedCommands].sort(),
-    policy.allowedGitSubcommands ? [...policy.allowedGitSubcommands].sort() : null,
+    effectiveGitSubcommands(policy.allowedGitSubcommands).sort(),
     [...policy.allowedFileTools].sort(),
   ]);
   return createHash("sha256").update(canonical).digest("hex").slice(0, 16);

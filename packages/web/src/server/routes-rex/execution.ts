@@ -13,10 +13,10 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { spawnManaged, killWithFallback, type ManagedChild } from "@n-dx/llm-client";
 import type { ServerContext } from "../types.js";
+import { resolveOwnPackageCli } from "../own-cli.js";
+import { refuseWhileRestricted } from "../trust-gate.js";
 import { WorkspaceScoped } from "../workspace-scoped.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
@@ -136,12 +136,9 @@ function refreshEpicProgress(ctx: ServerContext): void {
  */
 async function runHenchForEpic(ctx: ServerContext, epicId: string): Promise<{ code: number | null; signal: string | null }> {
   const slot = executionSlots.get(ctx);
-  const henchBin = join(ctx.projectDir, "node_modules", ".bin", "hench");
-  const henchFallback = join(ctx.projectDir, "packages", "hench", "dist", "cli", "index.js");
-  const args = ["run", "--epic=" + epicId, "--loop", "--auto", ctx.projectDir];
-
-  const binPath = existsSync(henchBin) ? henchBin : "node";
-  const binArgs = existsSync(henchBin) ? args : [henchFallback, ...args];
+  // This server's own hench, never one under the analyzed project.
+  const { bin: binPath, args: prefixArgs } = resolveOwnPackageCli("@n-dx/hench", "hench", "hench");
+  const binArgs = [...prefixArgs, "run", "--epic=" + epicId, "--loop", "--auto", ctx.projectDir];
 
   const handle = spawnManaged(binPath, binArgs, {
     cwd: ctx.projectDir,
@@ -248,6 +245,13 @@ export function routeExecution(
   req: IncomingMessage, res: ServerResponse, ctx: ServerContext,
   broadcast?: WebSocketBroadcaster,
 ): boolean | Promise<boolean> {
+  // Starting or resuming runs the agent under this repository's execution
+  // config, so both wait until it has been accepted (see trust-gate.ts).
+  if (method === "POST" && (path === "execute/epic-by-epic" || path === "execute/resume")
+    && refuseWhileRestricted(res, ctx.projectDir)) {
+    return true;
+  }
+
   // POST /api/rex/execute/epic-by-epic — start epic-by-epic execution
   if (path === "execute/epic-by-epic" && method === "POST") {
     return handleStartEpicByEpic(req, res, ctx, broadcast);

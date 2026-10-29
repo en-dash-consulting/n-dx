@@ -13,8 +13,9 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
 import { createWSPipeline } from "./use-gateway.js";
+import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-live-analyze.ts and sourcevision's analyze-progress.ts
@@ -178,7 +179,7 @@ export function useLiveAnalyze(): LiveAnalyzeData {
       coalescerWindowMs: 100,
     });
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
       ws.onmessage = (event) => {
         try {
           pipeline.push(JSON.parse(event.data));

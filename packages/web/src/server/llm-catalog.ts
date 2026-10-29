@@ -23,6 +23,7 @@ import {
   resolveVendorCliEnv,
 } from "@n-dx/llm-client";
 import type { LLMConfig, ListableVendor } from "@n-dx/llm-client";
+import { isProjectRestricted, TRUST_HINT } from "./trust-gate.js";
 
 /** How long a live list and CLI probe are served before they are fetched again. */
 export const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -34,6 +35,11 @@ export interface CliInfo {
   found: boolean;
   version: string | null;
   path: string | null;
+  /**
+   * False when the binary was named by the repository's config and not run,
+   * because that config has not been accepted. Omitted when it was probed.
+   */
+  verified?: false;
 }
 
 /** What one vendor's live lookup produced. */
@@ -98,7 +104,10 @@ async function probeVendor(
   vendor: ListableVendor,
   projectDir: string,
   config: LLMConfig,
+  restricted: boolean,
 ): Promise<LiveVendorProbe> {
+  // The live list goes to the configured endpoint with the operator's key, so
+  // it waits for the same acceptance as the CLI probe.
   const [listing, cli] = await Promise.all([
     listVendorModels(vendor, config),
     probeCli(vendor, projectDir, config),
@@ -119,8 +128,11 @@ export async function getLiveVendorProbe(
   const hit = cache.get(key);
   if (!options.refresh && hit && hit.expiresAt > Date.now()) return hit.probe;
 
-  const probe = await probeVendor(vendor, projectDir, await loadLLMConfig(projectDir));
-  cache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, probe });
+  const restricted = isProjectRestricted(projectDir);
+  const probe = await probeVendor(vendor, projectDir, await loadLLMConfig(projectDir), restricted);
+  // A restricted answer is not cached: accepting the config must show the
+  // probed result on the next request, not ten minutes later.
+  if (!restricted) cache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, probe });
   return probe;
 }
 
@@ -133,7 +145,9 @@ export interface VendorReadiness {
 }
 
 const cliReadiness = (cli: CliInfo): VendorReadiness =>
-  cli.found
+  cli.verified === false
+    ? { state: "needs-setup", summary: `CLI not verified · run ${TRUST_HINT}` }
+    : cli.found
     ? { state: "ready", summary: cli.version ? `Ready · CLI ${cli.version}` : "Ready · CLI" }
     : { state: "needs-setup", summary: "CLI not found" };
 

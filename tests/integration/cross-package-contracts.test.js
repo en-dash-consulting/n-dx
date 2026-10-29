@@ -332,6 +332,13 @@ describe("hench → llm-client gateway contract", () => {
     "sanitizeChildEnv",
     "strippedEnvNames",
     "resolveVendorCliEnv",
+    "detectSandboxBackend",
+    "resolveSandboxSetting",
+    "wrapInSandbox",
+    "wrapShellInSandbox",
+    "nodeToolchainRoots",
+    "resolveModelPricing",
+    "priceTokens",
     "repoCommandEnv",
     "resolveApiKey",
     "resolveCliPath",
@@ -869,6 +876,10 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv", "repoCommandEnv",
+        // OS sandbox for tool children and the vendor CLI (guard/sandbox.ts).
+        "detectSandboxBackend", "resolveSandboxSetting", "wrapInSandbox", "wrapShellInSandbox", "nodeToolchainRoots",
+        // Spend caps price a run's tokens before each vendor spawn (agent/lifecycle/spend-cap.ts).
+        "resolveModelPricing", "priceTokens",
         "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
         // Repository trust: the guard baseline and the per-user trust store
         // are one evaluation shared by hench, the dashboard and ndx init.

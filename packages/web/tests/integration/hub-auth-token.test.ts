@@ -1,8 +1,9 @@
 /**
  * The per-user token, end to end through a real hub and a real spawned
  * project server: the hub requires it, passes it to the child it spawns,
- * probes the child with it, forwards the browser's cookie through the proxy,
- * and sets that cookie from the one-time URL.
+ * probes the child with it, and lets a browser in only through a landing
+ * nonce exchanged for a session credential (header) and single-use WebSocket
+ * tickets. The old `ndx_token` cookie is no credential anywhere.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -51,7 +52,7 @@ beforeAll(async () => {
   home = mkdtempSync(join(tmpdir(), "ndx-hub-auth-home-"));
   repo = mkdtempSync(join(tmpdir(), "ndx-hub-auth-repo-"));
   tokenFile = join(home, "auth.token");
-  hub = await startHub({ port: 0, homeDir: home, tokenFile, healthIntervalMs: 60_000, supervisor: { portFileTimeoutMs: 30_000, stopGraceMs: 3_000 } });
+  hub = await startHub({ port: 0, selfBin: NDX_BIN, homeDir: home, tokenFile, healthIntervalMs: 60_000, supervisor: { portFileTimeoutMs: 30_000, stopGraceMs: 3_000 } });
   token = readFileSync(tokenFile, "utf-8").trim();
 }, 60_000);
 
@@ -72,7 +73,8 @@ describe("hub with a per-user token", () => {
 
     expect((await fetch(`${base()}/api/hub/health`, withToken())).status).toBe(200);
     expect((await fetch(`${base()}/api/hub/health`, { headers: { Authorization: `Bearer ${token}` } })).status).toBe(200);
-    expect((await fetch(`${base()}/api/hub/health`, { headers: { Cookie: `ndx_token=${token}` } })).status).toBe(200);
+    // A cookie on localhost reaches every port, so it is no credential.
+    expect((await fetch(`${base()}/api/hub/health`, { headers: { Cookie: `ndx_token=${token}` } })).status).toBe(401);
   });
 
   it("refuses an unauthenticated registration, so the spawn route needs the token as well as a good Origin", async () => {
@@ -103,28 +105,68 @@ describe("hub with a per-user token", () => {
     expect((await fetch(`http://127.0.0.1:${childPort}/api/status`, withToken())).status).toBe(200);
   }, 60_000);
 
-  it("forwards the browser's cookie through the proxy and refuses without it", async () => {
+  it("refuses the old cookie through the proxy, as a page on another loopback port would send it", async () => {
     expect((await fetch(`${base()}/p/alpha/api/status`)).status).toBe(401);
-    const ok = await fetch(`${base()}/p/alpha/api/status`, { headers: { Cookie: `ndx_token=${token}` } });
+    const cookie = await fetch(`${base()}/p/alpha/api/status`, {
+      headers: { Cookie: `ndx_token=${token}`, Origin: "http://localhost:5173", "Sec-Fetch-Site": "same-site" },
+    });
+    expect(cookie.status).toBe(401);
+    const ok = await fetch(`${base()}/p/alpha/api/status`, withToken());
     expect(ok.status).toBe(200);
     expect((await ok.json()).projectDir).toBe(repo);
   });
 
-  it("turns the one-time URL into a cookie and redirects to the clean URL", async () => {
-    const res = await fetch(`${base()}/p/alpha/?ndx_token=${encodeURIComponent(token)}`, { redirect: "manual" });
-    expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/p/alpha/");
-    const cookie = res.headers.get("set-cookie") ?? "";
-    expect(cookie).toContain(`ndx_token=${encodeURIComponent(token)}`);
-    expect(cookie).toContain("HttpOnly");
-    // And the cookie it set works for the page.
-    const page = await fetch(`${base()}/p/alpha/`, { headers: { Cookie: cookie.split(";")[0] } });
+  it("serves the page shell to a navigation without a credential, and nothing else", async () => {
+    const page = await fetch(`${base()}/p/alpha/`, { headers: { Accept: "text/html" } });
     expect(page.status).toBe(200);
-    expect(page.headers.get("content-type")).toContain("text/html");
+    const html = await page.text();
+    expect(html).toContain("ndxAuth");
+    expect(html).not.toContain(token);
+    expect(page.headers.get("set-cookie")).toBeNull();
+    // The hub's own pages: the chooser shell carries no project, and its API is closed.
+    const home = await fetch(`${base()}/hub`, { headers: { Accept: "text/html" } });
+    expect(home.status).toBe(200);
+    expect(await home.text()).not.toContain(repo);
+    expect((await fetch(`${base()}/api/hub/overview`)).status).toBe(401);
+    // A deep link to data, rather than the shell, is a sign-in page.
+    const data = await fetch(`${base()}/p/alpha/api/status`, { headers: { Accept: "text/html", "Sec-Fetch-Mode": "navigate" } });
+    expect(data.status).toBe(401);
+    expect(await data.text()).toContain("ndx start");
   });
 
-  it("requires the cookie on the WebSocket handshake", async () => {
+  it("exchanges a nonce once for a session that works through the proxy, and never for the token", async () => {
+    const minted = await fetch(`${base()}/api/auth/nonce`, withToken({ method: "POST" }));
+    expect(minted.status).toBe(200);
+    const { nonce } = await minted.json();
+    expect(nonce).not.toBe(token);
+
+    const exchange = () => fetch(`${base()}/p/alpha/api/auth/session`, { method: "POST", headers: { "X-Ndx-Nonce": nonce } });
+    const first = await exchange();
+    expect(first.status).toBe(200);
+    const { credential } = await first.json();
+    expect(credential).not.toBe(token);
+    expect((await exchange()).status).toBe(401);
+
+    const ok = await fetch(`${base()}/p/alpha/api/status`, { headers: { "X-Ndx-Token": credential } });
+    expect(ok.status).toBe(200);
+    expect((await fetch(`${base()}/api/hub/overview`, { headers: { "X-Ndx-Token": credential } })).status).toBe(200);
+    // The session is the hub's: the child never sees it, and refuses it directly.
+    const childPort = ((await (await fetch(`${base()}/api/hub/projects/alpha`, withToken())).json()).project.status.port) as number;
+    expect((await fetch(`http://127.0.0.1:${childPort}/api/status`, { headers: { "X-Ndx-Token": credential } })).status).toBe(401);
+    // A session cannot mint the nonces that would mint more sessions.
+    expect((await fetch(`${base()}/api/auth/nonce`, { method: "POST", headers: { "X-Ndx-Token": credential } })).status).toBe(401);
+  });
+
+  it("requires a single-use ticket (or the token header) on the WebSocket handshake", async () => {
     expect(await wsHandshake("/p/alpha/", "")).toMatch(/^HTTP\/1\.1 401/);
-    expect(await wsHandshake("/p/alpha/", `Cookie: ndx_token=${token}\r\n`)).toMatch(/^HTTP\/1\.1 101/);
+    expect(await wsHandshake("/p/alpha/", `Cookie: ndx_token=${token}\r\n`)).toMatch(/^HTTP\/1\.1 401/);
+    expect(await wsHandshake("/p/alpha/?ndx_ticket=forged", "")).toMatch(/^HTTP\/1\.1 401/);
+
+    const { nonce } = await (await fetch(`${base()}/api/auth/nonce`, withToken({ method: "POST" }))).json();
+    const { credential } = await (await fetch(`${base()}/api/auth/session`, { method: "POST", headers: { "X-Ndx-Nonce": nonce } })).json();
+    const { ticket } = await (await fetch(`${base()}/p/alpha/api/auth/ws-ticket`, { method: "POST", headers: { "X-Ndx-Token": credential } })).json();
+    expect(await wsHandshake(`/p/alpha/?ndx_ticket=${ticket}`, "")).toMatch(/^HTTP\/1\.1 101/);
+    expect(await wsHandshake(`/p/alpha/?ndx_ticket=${ticket}`, "")).toMatch(/^HTTP\/1\.1 401/);
+    expect(await wsHandshake("/p/alpha/", `X-Ndx-Token: ${token}\r\n`)).toMatch(/^HTTP\/1\.1 101/);
   }, 30_000);
 });

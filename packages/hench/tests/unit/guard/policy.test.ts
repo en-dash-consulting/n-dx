@@ -267,3 +267,32 @@ describe("PolicyEngine", () => {
     });
   });
 });
+
+describe("PolicyEngine.runAudit", () => {
+  it("is the audit summary plus counters, in the run record's shape", () => {
+    const engine = new PolicyEngine({ maxCommandsPerMinute: 1 });
+    engine.checkPolicy("command", "npm test");
+    expect(() => engine.checkPolicy("command", "npm run build")).toThrow();
+    engine.checkPolicy("file_write", "a.ts", { bytesWritten: 10 });
+
+    const audit = engine.runAudit();
+    expect(audit).toMatchObject({ total: 3, allowed: 2, denied: 1 });
+    expect(audit.denials).toHaveLength(1);
+    expect(audit.denials[0]).toMatchObject({ operation: "command", target: "npm run build" });
+    expect(audit.denials[0].reason).toMatch(/Rate limit/);
+    // Per-entry counter snapshots are left off the record.
+    expect("counters" in audit.denials[0]).toBe(false);
+    expect(audit.counters).toEqual({ commandsRun: 1, bytesWritten: 10, filesRead: 0, filesWritten: 1, operationsTotal: 2 });
+    expect(audit.denialsDropped).toBeUndefined();
+  });
+
+  it("keeps only the most recent denials and counts the rest", () => {
+    const engine = new PolicyEngine({ maxTotalCommands: 1, maxCommandsPerMinute: 0 });
+    engine.checkPolicy("command", "ok");
+    for (let i = 0; i < 5; i++) expect(() => engine.checkPolicy("command", `c${i}`)).toThrow();
+
+    const audit = engine.runAudit(2);
+    expect(audit.denials.map((d) => d.target)).toEqual(["c3", "c4"]);
+    expect(audit.denialsDropped).toBe(3);
+  });
+});

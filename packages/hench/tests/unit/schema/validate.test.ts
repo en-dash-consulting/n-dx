@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { guardBaselineForLanguage } from "../../../src/prd/llm-gateway.js";
 import {
   validateConfig,
   validateRunRecord,
@@ -296,6 +297,34 @@ describe("validateConfig", () => {
     it("rejects a fractional timeout", () => {
       const config = { ...DEFAULT_HENCH_CONFIG(), fullTestTimeoutMs: 1500.5 };
       expect(validateConfig(config).ok).toBe(false);
+    });
+  });
+
+  describe("guard.allowedGitSubcommands", () => {
+    const baseline = guardBaselineForLanguage().allowedGitSubcommands;
+
+    it("defaults to the language baseline when absent", () => {
+      const config = DEFAULT_HENCH_CONFIG();
+      const { allowedGitSubcommands, ...guardWithout } = config.guard;
+      const result = validateConfig({ ...config, guard: guardWithout });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.guard.allowedGitSubcommands).toEqual(baseline);
+    });
+
+    it("reads an explicit empty list as the baseline, never as every subcommand", () => {
+      // An empty list used to reach the Claude CLI adapter as "no allowlist",
+      // which it read as a blanket Bash(git:*) grant.
+      const config = DEFAULT_HENCH_CONFIG();
+      const result = validateConfig({ ...config, guard: { ...config.guard, allowedGitSubcommands: [] } });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.guard.allowedGitSubcommands).toEqual(baseline);
+    });
+
+    it("keeps a non-empty list as written", () => {
+      const config = DEFAULT_HENCH_CONFIG();
+      const result = validateConfig({ ...config, guard: { ...config.guard, allowedGitSubcommands: ["status", "push"] } });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.guard.allowedGitSubcommands).toEqual(["status", "push"]);
     });
   });
 

@@ -65,6 +65,7 @@ export async function toolGit(
     cwd: projectDir,
     timeout: GIT_TIMEOUT,
     env: guard.childEnv,
+    sandbox: guard.sandbox,
   });
 }
 

@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { installRunInterrupt } from "../../process/run-interrupt.js";
 import { createInterface } from "node:readline";
 import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock, prdLayout } from "../../prd/rex-gateway.js";
@@ -1466,6 +1467,8 @@ async function runOne(
   assignee?: string,
   wouldResetIds?: ReadonlySet<string>,
   settingsCtx?: TaskRunContext,
+  /** The invocation's interrupt signal: aborting it stops the vendor CLI in flight. */
+  abortSignal?: AbortSignal,
 ): Promise<{ status: string; taskTitle: string; selectedTaskId?: string; model?: string }> {
   // First statement in the task: a tree this build would re-slug stops the task
   // before the claim below is taken and before any token is spent. The tree can
@@ -1583,6 +1586,11 @@ async function runOne(
     ...trusted.config,
     provider,
     ...(tokenBudget != null ? { tokenBudget } : {}),
+    // Spend caps as the resolver settled them: operator config, never raised
+    // by the task's saved block.
+    ...(settings
+      ? { maxCostUsdPerRun: settings.maxCostUsdPerRun.value, maxCostUsdPerDay: settings.maxCostUsdPerDay.value }
+      : {}),
     ...(skipTestGate ? { skipFullTestGate: true } : {}),
     // `run.skipTestGate: false` is a saved value with meaning: it re-enables a
     // gate `hench.skipFullTestGate` turns off. Only an explicit `false` from
@@ -1626,6 +1634,8 @@ async function runOne(
         permissionMode,
         claims,
         wouldResetIds,
+        ...(maxTurns !== undefined ? { maxTurns } : {}),
+        ...(abortSignal ? { abortSignal } : {}),
         configBackstop,
       })
     : await agentLoop({
@@ -2510,7 +2520,15 @@ async function runIterations(
   // Tasks excluded from selection due to reaching 3 attempts
   const forcedExclusionIds = new Set<string>();
 
+  // SIGINT/SIGTERM stop the vendor CLI in flight; a second one exits.
+  const interrupt = installRunInterrupt({
+    onStop: (signal) => info(`\nReceived ${signal} — stopping the current task…`),
+    onForce: () => info("\nSecond interrupt — terminating the vendor CLI and exiting."),
+  });
+
+  try {
   for (let i = 0; i < iterations; i++) {
+    if (interrupt.stopping) break;
     // Banner between iterations: printed before iteration i+1 starts,
     // i.e. after iteration i's commit and run summary have been rendered.
     // Not emitted before the first iteration (i === 0).
@@ -2554,7 +2572,14 @@ async function runIterations(
       assignee,
       wouldResetIds,
       settingsCtx,
+      interrupt.signal,
     );
+
+    if (interrupt.stopping) {
+      info(`\nRun stopped by interrupt after ${i + 1} iteration(s).`);
+      process.exitCode = 1;
+      break;
+    }
 
     // Track attempt count for the selected task
     if (selectedTaskId) {
@@ -2588,6 +2613,9 @@ async function runIterations(
     }
 
     if (dryRun) break;
+  }
+  } finally {
+    interrupt.dispose();
   }
 }
 
@@ -2627,27 +2655,20 @@ async function runLoop(
    *  which suppresses fail-forward at the iteration boundary. */
   allowDirty = false,
 ): Promise<void> {
-  // Graceful shutdown via SIGINT (Ctrl-C)
-  const ac = new AbortController();
+  // SIGINT (Ctrl-C) and SIGTERM (the dashboard's Stop button, a server
+  // shutdown) stop the task in flight: the vendor CLI's process tree is
+  // terminated through the abort signal every spawn carries, the queue drains,
+  // and the loop ends. A second signal terminates any vendor process still
+  // alive and exits, rather than exiting past it and leaving it orphaned.
   let stopping = false;
-
-  const onSignal = () => {
-    if (stopping) {
-      // Second Ctrl-C: force exit
-      process.exit(1);
-    }
-    stopping = true;
-    ac.abort();
-    if (queue) queue.drain();
-    info("\nReceived interrupt — finishing current task then stopping…");
-  };
-
-  process.on("SIGINT", onSignal);
-  // Also handle SIGTERM (e.g. the web dashboard's Stop button, or a graceful
-  // server shutdown) the same way as Ctrl-C — otherwise an unhandled SIGTERM
-  // kills this process immediately, orphaning whatever LLM CLI child is
-  // currently in flight instead of draining the queue first.
-  process.on("SIGTERM", onSignal);
+  const interrupt = installRunInterrupt({
+    onStop: (signal) => {
+      stopping = true;
+      if (queue) queue.drain();
+      info(`\nReceived ${signal} — stopping the current task, then the loop…`);
+    },
+    onForce: () => info("\nSecond interrupt — terminating the vendor CLI and exiting."),
+  });
 
   let completed = 0;
   // Tracks per-task outcomes when a tag filter is active (e.g. self-heal mode).
@@ -2666,7 +2687,7 @@ async function runLoop(
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      if (stopping) {
+      if (interrupt.stopping) {
         info(`\nLoop stopped by user after ${completed} task(s).`);
         break;
       }
@@ -2729,6 +2750,7 @@ async function runLoop(
             assignee,
             wouldResetIds,
             settingsCtx,
+            interrupt.signal,
           );
           status = result.status;
 
@@ -2845,7 +2867,7 @@ async function runLoop(
       // Pause between tasks (interruptible)
       if (!stopping && pauseMs > 0) {
         const spinner = createSpinner(formatPauseMessage(pauseMs, "task")).start();
-        await loopPause(pauseMs, ac.signal);
+        await loopPause(pauseMs, interrupt.signal);
         spinner.stop();
       }
 
@@ -2859,8 +2881,7 @@ async function runLoop(
       }
     }
   } finally {
-    process.removeListener("SIGINT", onSignal);
-    process.removeListener("SIGTERM", onSignal);
+    interrupt.dispose();
   }
 }
 
@@ -2931,26 +2952,20 @@ async function runEpicByEpic(
    *  which suppresses fail-forward at the iteration boundary. */
   allowDirty = false,
 ): Promise<void> {
-  // Graceful shutdown via SIGINT (Ctrl-C)
-  const ac = new AbortController();
+  // SIGINT (Ctrl-C) and SIGTERM (the dashboard's Stop button, a server
+  // shutdown) stop the task in flight: the vendor CLI's process tree is
+  // terminated through the abort signal every spawn carries, the queue drains,
+  // and the loop ends. A second signal terminates any vendor process still
+  // alive and exits, rather than exiting past it and leaving it orphaned.
   let stopping = false;
-
-  const onSignal = () => {
-    if (stopping) {
-      process.exit(1);
-    }
-    stopping = true;
-    ac.abort();
-    if (queue) queue.drain();
-    info("\nReceived interrupt — finishing current task then stopping…");
-  };
-
-  process.on("SIGINT", onSignal);
-  // Also handle SIGTERM (e.g. the web dashboard's Stop button, or a graceful
-  // server shutdown) the same way as Ctrl-C — otherwise an unhandled SIGTERM
-  // kills this process immediately, orphaning whatever LLM CLI child is
-  // currently in flight instead of draining the queue first.
-  process.on("SIGTERM", onSignal);
+  const interrupt = installRunInterrupt({
+    onStop: (signal) => {
+      stopping = true;
+      if (queue) queue.drain();
+      info(`\nReceived ${signal} — stopping the current task, then the loop…`);
+    },
+    onForce: () => info("\nSecond interrupt — terminating the vendor CLI and exiting."),
+  });
 
   const summaries: EpicRunSummary[] = [];
   /**
@@ -2988,7 +3003,7 @@ async function runEpicByEpic(
     }
 
     for (let epicIdx = 0; epicIdx < actionableEpics.length; epicIdx++) {
-      if (stopping) {
+      if (interrupt.stopping) {
         // Mark remaining epics as interrupted
         for (let j = epicIdx; j < actionableEpics.length; j++) {
           summaries.push({
@@ -3093,6 +3108,7 @@ async function runEpicByEpic(
               undefined, // assignee — --mine is refused with --epic-by-epic
               wouldResetIds,
               settingsCtx,
+              interrupt.signal,
             );
             status = result.status;
             tasksStarted++;
@@ -3136,7 +3152,7 @@ async function runEpicByEpic(
         // Pause between tasks (interruptible)
         if (!stopping && pauseMs > 0) {
           const spinner = createSpinner(formatPauseMessage(pauseMs, "task")).start();
-          await loopPause(pauseMs, ac.signal);
+          await loopPause(pauseMs, interrupt.signal);
           spinner.stop();
         }
       }
@@ -3160,15 +3176,14 @@ async function runEpicByEpic(
       // Pause between epics (interruptible)
       if (!stopping && epicIdx < actionableEpics.length - 1 && pauseMs > 0) {
         info(`\n${formatPauseMessage(pauseMs, "epic")}`);
-        await loopPause(pauseMs, ac.signal);
+        await loopPause(pauseMs, interrupt.signal);
       }
     }
 
     // Print final summary
     printEpicByEpicSummary(summaries);
   } finally {
-    process.removeListener("SIGINT", onSignal);
-    process.removeListener("SIGTERM", onSignal);
+    interrupt.dispose();
   }
 }
 

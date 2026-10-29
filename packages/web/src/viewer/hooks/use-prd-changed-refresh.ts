@@ -8,9 +8,10 @@
  * `refresh` should be a stable callback (e.g. wrapped in useCallback).
  */
 
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
 import { useEffect } from "preact/hooks";
 import { createWSPipeline } from "./use-gateway.js";
+import { openWebSocket } from "../session.js";
 
 export function usePrdChangedRefresh(refresh: () => void): void {
   useEffect(() => {
@@ -30,7 +31,7 @@ export function usePrdChangedRefresh(refresh: () => void): void {
     });
 
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
       ws.onmessage = (event) => {
         try {
           pipeline.push(JSON.parse(event.data));

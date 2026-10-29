@@ -11,7 +11,8 @@
 
 import { describe, it, expect } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { classifyOrigin, guardHubRequest, upgradeRefusal } from "../../../src/hub/request-guard.js";
+import { classifyOrigin, guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "../../../src/hub/request-guard.js";
+import { CredentialStore } from "../../../src/shared/index.js";
 
 const HUB_PORT = 3117;
 
@@ -174,56 +175,69 @@ describe("guardHubRequest — Host validation", () => {
 describe("guardHubRequest — per-user token", () => {
   const TOKEN = "hubtok_0123456789abcdefghijklmnopqrstuv";
 
-  it("is inert without a token and refuses with 401 when one is configured", () => {
+  it("is inert without a token; with one, refuses a mutation with 401 and marks a GET public-only", () => {
     const a = res();
     expect(guardHubRequest(req("GET"), a.res, HUB_PORT)).toBe(false);
     const b = res();
-    expect(guardHubRequest(req("GET"), b.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(guardHubRequest(req("POST"), b.res, HUB_PORT, TOKEN)).toBe(true);
     expect(b.statusCode).toBe(401);
     expect(b.headers["www-authenticate"]).toContain("Bearer");
+    const get = req("GET");
+    expect(guardHubRequest(get, res().res, HUB_PORT, TOKEN)).toBe(false);
+    expect(isPublicOnlyHubRequest(get)).toBe(true);
   });
 
-  it("accepts the token as bearer, header or cookie, including on the spawn route", () => {
+  it("accepts the token as bearer or header, including on the spawn route — never as a cookie", () => {
     const carriers: Array<Record<string, string>> = [
       { authorization: `Bearer ${TOKEN}` },
       { "x-ndx-token": TOKEN },
-      { cookie: `ndx_token=${TOKEN}` },
     ];
     for (const headers of carriers) {
       const out = res();
       expect(guardHubRequest(req("POST", { ...headers, origin: "http://localhost:3117" }), out.res, HUB_PORT, TOKEN), JSON.stringify(headers)).toBe(false);
     }
+    // The cookie a server on another loopback port could have been sent.
+    const cookie = res();
+    expect(guardHubRequest(req("POST", { cookie: `ndx_token=${TOKEN}`, origin: "http://localhost:3117" }), cookie.res, HUB_PORT, TOKEN)).toBe(true);
+    expect(cookie.statusCode).toBe(401);
   });
 
-  it("sets the cookie and redirects for a navigation that carries the token once", () => {
+  it("no longer turns ?ndx_token= into a cookie", () => {
     const r = req("GET", {}) as IncomingMessage & { url: string };
     r.url = `/p/alpha/?ndx_token=${TOKEN}`;
     const out = res();
-    expect(guardHubRequest(r, out.res, HUB_PORT, TOKEN)).toBe(true);
-    expect(out.statusCode).toBe(302);
-    expect(out.headers["set-cookie"]).toContain(`ndx_token=${TOKEN}`);
-    expect(out.headers["location"]).toBe("/p/alpha/");
+    expect(guardHubRequest(r, out.res, HUB_PORT, TOKEN)).toBe(false);
+    expect(out.headers["set-cookie"]).toBeUndefined();
+    expect(isPublicOnlyHubRequest(r)).toBe(true);
   });
 
-  it("redirects to the hub root, not off-origin, for an absolute-form request-target", () => {
-    // `GET http://evil.com/x?ndx_token=T` reaches req.url verbatim.
-    const r = req("GET", {}) as IncomingMessage & { url: string };
-    r.url = `http://evil.com/x?ndx_token=${TOKEN}`;
-    const out = res();
-    expect(guardHubRequest(r, out.res, HUB_PORT, TOKEN)).toBe(true);
-    expect(out.statusCode).toBe(302);
-    expect(out.headers["location"]).toBe("/");
-    expect(out.headers["set-cookie"]).toContain(`ndx_token=${TOKEN}`);
-  });
+  it("answers the credential routes itself, at the root and under a project prefix", () => {
+    const credentials = new CredentialStore();
+    const mint = req("POST", { "x-ndx-token": TOKEN }) as IncomingMessage & { url: string };
+    mint.url = "/api/auth/nonce";
+    const minted = res();
+    expect(guardHubRequest(mint, minted.res, HUB_PORT, TOKEN, credentials)).toBe(true);
+    expect(minted.statusCode).toBe(200);
+    const { nonce } = JSON.parse(minted.body);
 
-  it("still strips the query token from a navigation the cookie already authenticates", () => {
-    // Reopening the printed URL must not proxy "/?ndx_token=…" to the child.
-    const r = req("GET", { cookie: `ndx_token=${TOKEN}` }) as IncomingMessage & { url: string };
-    r.url = `/p/alpha/?ndx_token=${TOKEN}`;
-    const out = res();
-    expect(guardHubRequest(r, out.res, HUB_PORT, TOKEN)).toBe(true);
-    expect(out.statusCode).toBe(302);
-    expect(out.headers["location"]).toBe("/p/alpha/");
+    const exchange = req("POST", { "x-ndx-nonce": nonce, origin: "http://localhost:3117" }) as IncomingMessage & { url: string };
+    exchange.url = "/p/alpha/w/feature/api/auth/session";
+    const exchanged = res();
+    expect(guardHubRequest(exchange, exchanged.res, HUB_PORT, TOKEN, credentials)).toBe(true);
+    expect(exchanged.statusCode).toBe(200);
+    const { credential } = JSON.parse(exchanged.body);
+
+    const ticketReq = req("POST", { "x-ndx-token": credential, origin: "http://localhost:3117" }) as IncomingMessage & { url: string };
+    ticketReq.url = "/p/alpha/api/auth/ws-ticket";
+    const ticketed = res();
+    expect(guardHubRequest(ticketReq, ticketed.res, HUB_PORT, TOKEN, credentials)).toBe(true);
+    const { ticket } = JSON.parse(ticketed.body);
+
+    const upgrade = req("GET", { origin: "http://localhost:3117" }) as IncomingMessage & { url: string };
+    upgrade.url = `/p/alpha/?ndx_ticket=${ticket}`;
+    expect(upgradeRefusal(upgrade, HUB_PORT, TOKEN, credentials)).toBeNull();
+    // Single-use.
+    expect(upgradeRefusal(upgrade, HUB_PORT, TOKEN, credentials)).toBe("401 Unauthorized");
   });
 
   it("still applies the Host and Origin rules to an authenticated request", () => {
@@ -237,7 +251,7 @@ describe("guardHubRequest — per-user token", () => {
 
   it("requires the token on a WebSocket handshake too, and says 401", () => {
     expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, TOKEN)).toBe("401 Unauthorized");
-    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117", cookie: `ndx_token=${TOKEN}` }), HUB_PORT, TOKEN)).toBeNull();
+    expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117", cookie: `ndx_token=${TOKEN}` }), HUB_PORT, TOKEN)).toBe("401 Unauthorized");
     expect(upgradeRefusal(req("GET", { "x-ndx-token": TOKEN }), HUB_PORT, TOKEN)).toBeNull();
     expect(upgradeRefusal(req("GET", { origin: "http://localhost:3117" }), HUB_PORT, null)).toBeNull();
   });
