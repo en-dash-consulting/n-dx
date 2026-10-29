@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
-import { PROJECT_DIRS } from "../prd/llm-gateway.js";
+import { PROJECT_DIRS, repoCommandEnv } from "../prd/llm-gateway.js";
 import { execShellCmd } from "../process/exec.js";
 import { completeV2Work, computeTimestampUpdates, isChangeLayerStore, reconcileAutoCompletions,validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
@@ -360,6 +360,7 @@ export function createCommandExecutor(projectDir: string): CommandExecutor {
     const result = await execShellCmd(command, {
       cwd: projectDir,
       timeout: REQ_CMD_TIMEOUT,
+      env: repoCommandEnv(projectDir),
     });
     // A command that never launched returns exitCode 1 with empty output, and
     // the CommandExecutor contract has no field to say "could not run" — so the

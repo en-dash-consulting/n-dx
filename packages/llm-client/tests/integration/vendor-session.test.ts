@@ -131,7 +131,14 @@ describe("claude sessions", () => {
 
     const [a, b] = calls();
     expect(a.argv).not.toContain("--resume");
-    expect(a.argv).toEqual(expect.arrayContaining(["--system-prompt", "be brief", "--model", "claude-test"]));
+    if (process.platform === "win32") {
+      // cmd.exe cannot carry a multi-line argument, so the system prompt rides stdin.
+      expect(a.argv).not.toContain("--system-prompt");
+      expect(a.stdin.startsWith("be brief")).toBe(true);
+      expect(a.argv).toEqual(expect.arrayContaining(["--model", "claude-test"]));
+    } else {
+      expect(a.argv).toEqual(expect.arrayContaining(["--system-prompt", "be brief", "--model", "claude-test"]));
+    }
     expect(b.argv.slice(-2)).toEqual(["--resume", "claude-1"]);
     expect(session.turns).toBe(2);
   });

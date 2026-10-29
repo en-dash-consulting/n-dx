@@ -9,6 +9,7 @@ import type { AnySchema, GraviewApp } from "@graview/core";
 import { appFromOrCompile, sayFindings } from "@graview/core/compiled";
 import { fetchSnapshot } from "@graview/core/snapshot";
 import type { GraphSnapshot } from "@graview/ship/browser";
+import { BASE } from "./base.js";
 
 export type App = GraviewApp<AnySchema>;
 
@@ -27,8 +28,8 @@ export async function compileProjection(document: unknown, snapshot: GraphSnapsh
   return { app: compiled.app as App, document: document as Record<string, unknown>, snapshot, ...(generatedAt ? { generatedAt } : {}) };
 }
 
-/** Fetch /data/document.json and /data/snapshot.json (scripts/sync-data.mjs puts them there) and compile. */
-export async function loadProjection(base = "/data"): Promise<Projection> {
+/** Fetch /data/document.json and /data/snapshot.json, under the face's base (scripts/sync-data.mjs puts them there), and compile. */
+export async function loadProjection(base = `${BASE}/data`): Promise<Projection> {
   const missing = (name: string, status: number) => new Error(`${base}/${name}: ${status}. Run \`ndx graview emit .\` in the n-dx project, then \`pnpm sync\` here.`);
   const document = await fetch(`${base}/document.json`, { cache: "no-store" }).then((response) => {
     if (!response.ok) throw missing("document.json", response.status);

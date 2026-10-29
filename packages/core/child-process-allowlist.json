@@ -47,7 +47,7 @@
     },
     {
       "path": "packages/core/ci.js",
-      "reason": "Orchestration layer \u2014 spawns CLIs directly (no library imports)"
+      "reason": "Orchestration layer \u2014 spawns CLIs directly (no library imports). The repository's own `pnpm docs:build` gets the repository-command environment (loadShellTestEnv), never the parent environment"
     },
     {
       "path": "packages/core/web.js",

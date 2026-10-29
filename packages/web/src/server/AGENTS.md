@@ -23,7 +23,6 @@ server (`server/request-security.ts`) cannot drift:
 - **Every listener gets the gate.** A new `createServer` here calls
   `handleRequestSecurity` (or the hub's `guardHubRequest`) before routing, and
   its `upgrade` handler applies `isTrustedHost` plus the origin check.
-- **Sidecar broker key:** the one other credential — [rule](../../../../docs/architecture/web-server.md#sidecar-broker-key).
 - **`GET` must be read-only** — one that writes a file or spawns a process is a
   bug even on loopback.
 - **Internal clients use a loopback name**, never the machine's hostname or

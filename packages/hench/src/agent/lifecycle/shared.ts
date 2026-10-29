@@ -75,6 +75,8 @@ import { resolveTestCommand } from "../../tools/test-command-resolver.js";
 import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
 import { section, subsection, stream, detail, info, warn, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
 import { recordRunDiagnosis } from "./run-diagnosis.js";
+import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
+import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
@@ -231,6 +233,12 @@ export interface SharedLoopOptions {
   dryRun?: boolean;
   /** See {@link AssembleBriefOptions.wouldResetIds}. */
   wouldResetIds?: ReadonlySet<string>;
+  /**
+   * Snapshot of n-dx's own config files, taken by the caller before the loop
+   * starts so its `finally` can put them back even when the loop throws. The
+   * loop checks it after every vendor spawn and tool call and at finalization.
+   */
+  configBackstop?: ConfigBackstop;
   model?: string;
   /**
    * The tier {@link model} belongs to, and the setting that chose it, as the
@@ -1404,6 +1412,12 @@ export interface FinalizeRunOptions {
    * the gate would skip the very run it should be testing.
    */
   startingHead?: string;
+  /**
+   * The run's snapshot of n-dx's own config files. Finalization puts back what
+   * is still changed, then fails the run on every write found since the
+   * snapshot, before the test gate or the commit reads any of them.
+   */
+  configBackstop?: ConfigBackstop;
   /**
    * Commit `{base}` in `hench.testGate.command` is replaced with. Defaults to
    * {@link startingHead}; a gate-only retry sets it to an earlier run's start
@@ -4097,6 +4111,27 @@ export function recordClaimLoss(
 }
 
 /**
+ * Put back n-dx's config files and fail the run if the agent changed any.
+ *
+ * Whatever wrote them — a Codex agent, an allowed shell command, a reviewer —
+ * the work cannot be trusted as the task's: it was steered at the config that
+ * decides what n-dx runs next. The run records each path and what happened to
+ * it, never the content, and a completed run becomes a failed one, so the test
+ * gate is skipped and the agent's completion is not applied.
+ */
+export function enforceConfigBackstop(run: RunRecord, backstop: ConfigBackstop | undefined): void {
+  if (!backstop) return;
+  backstop.restore();
+  const writes = backstop.writes;
+  if (writes.length === 0) return;
+  run.protectedConfigWrites = writes;
+  const finding = formatProtectedConfigFinding(writes);
+  run.error = run.error ? `${run.error}\n${finding}` : finding;
+  if (run.status === "completed") run.status = "failed";
+  info(`\n⚠ ${finding}`);
+}
+
+/**
  * Finalize a run: build structured summary, capture memory stats,
  * run post-task tests, retrieve Codex tokens if applicable, set timestamps,
  * and persist. Called at the end of both loops.
@@ -4107,6 +4142,10 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
   run.structuredSummary = buildRunSummary(run.toolCalls);
   // Every spawn has closed; a leftover heartbeat-written pid would name a process that is gone.
   delete run.vendorPid;
+
+  // Before anything below reads n-dx's config: the test gate's environment,
+  // the commit, the next task in a loop.
+  enforceConfigBackstop(run, opts.configBackstop);
 
   // Every agent session is over by now, so whatever completion it asked for
   // is on the claim. Nothing is applied until the gates below have passed.
