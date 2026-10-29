@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,7 @@ import { exec, type ExecOptions } from "@n-dx/llm-client";
 import { collectBranchHealth, type PredictedConflict } from "../../src/server/branch-health/index.js";
 
 const REX_CLI = resolve(dirname(fileURLToPath(import.meta.url)), "../../../rex/dist/cli/index.js");
+const V2_FIXTURE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../rex/tests/fixtures/v2-tree");
 
 let root: string;
 let repo: string;
@@ -120,6 +121,78 @@ describe("prd-children-table on a real v1 tree", () => {
     expect(text).toContain("Main feature");
     expect(text).toContain("First feature");
     expect(spawnSync(process.execPath, [REX_CLI, "validate", "."], { cwd: repo }).status).toBe(0);
+  });
+});
+
+describe("duplicate-capture on a real v2 tree", () => {
+  /**
+   * main and feat each `rex add task "Add a widget"` under one change: the
+   * same file path, different ids. Main's id is kept; returns feat's (dropped)
+   * id, the change folder, and feat's other task that is blocked by it.
+   */
+  async function captureTwice(): Promise<{ dropped: string; kept: string; folder: string; conflict: PredictedConflict }> {
+    rex("init", ".");
+    for (const tree of ["prd_tree", "product", "changes"]) rmSync(join(repo, ".rex", tree), { recursive: true, force: true });
+    cpSync(V2_FIXTURE, join(repo, ".rex"), { recursive: true });
+    // state.yaml rows merge by id through the driver ndx init registers.
+    write(".gitattributes", ".rex/**/state.yaml merge=rex-state\n");
+    git("config", "merge.rex-state.driver", `"${process.execPath}" "${REX_CLI}" merge-state %O %A %B %P`);
+    const change = { id: "c0000000-0000-4000-8000-000000000001" };
+    commitAll("v2 tree");
+    publishMain();
+
+    const addTask = (title: string, ...extra: string[]) =>
+      (JSON.parse(rex("add", "task", `--title=${title}`, `--parent=${change.id}`, ...extra, "--format=json", ".")) as { id: string }).id;
+    git("checkout", "-q", "-b", "feat");
+    const dropped = addTask("Add a widget");
+    addTask("Use the widget", `--blocked-by=${dropped}`);
+    commitAll("feat captures the widget");
+    git("checkout", "-q", "main");
+    const kept = addTask("Add a widget");
+    commitAll("main captures the widget");
+    publishMain();
+    git("checkout", "-q", "feat");
+
+    const conflicts = await predict();
+    expect(conflicts.map((c) => c.class)).toEqual(["duplicate-capture"]);
+    const conflict = conflicts[0];
+    return { dropped, kept, folder: dirname(join(repo, conflict.path)), conflict };
+  }
+
+  function namesAnywhere(folder: string, id: string): string[] {
+    return readdirSync(folder).filter((f) => readFileSync(join(folder, f), "utf-8").includes(id));
+  }
+
+  it("leaves no state row or blockedBy naming the dropped id once its steps run", async () => {
+    const { dropped, kept, folder, conflict } = await captureTwice();
+    const steps = (conflict.fix as { steps: string[][] }).steps;
+    expect(steps.some((s) => s[0] === "rex" && s.includes("--repair"))).toBe(true);
+    expect(namesAnywhere(folder, dropped).sort()).toEqual(expect.arrayContaining(["state.yaml"]));
+
+    mergeBase();
+    runSteps(steps);
+
+    expect(namesAnywhere(folder, dropped)).toEqual([]);
+    expect(readFileSync(join(folder, "state.yaml"), "utf-8")).toContain(kept);
+    // Everything the repair rewrote is staged: the merge can be committed.
+    expect(git("diff", "--name-only")).toBe("");
+    expect(git("diff", "--name-only", "--diff-filter=U")).toBe("");
+  });
+
+  it("fails its validation step on a reference to the dropped id planted after the repair", async () => {
+    const { dropped, folder, conflict } = await captureTwice();
+    const steps = (conflict.fix as { steps: string[][] }).steps;
+    mergeBase();
+    runSteps(steps.slice(0, -1));
+
+    const user = readdirSync(folder).find((f) => readFileSync(join(folder, f), "utf-8").includes("Use the widget"))!;
+    const text = readFileSync(join(folder, user), "utf-8").replace(/^---\n/, `---\nblockedBy:\n  - "${dropped}"\n`);
+    writeFileSync(join(folder, user), text);
+    const [cmd, ...args] = steps[steps.length - 1];
+    expect(cmd).toBe("rex");
+    const run = spawnSync(process.execPath, [REX_CLI, ...args], { cwd: repo, encoding: "utf-8" });
+    expect(run.status).toBe(1);
+    expect(run.stdout).toContain(dropped);
   });
 });
 

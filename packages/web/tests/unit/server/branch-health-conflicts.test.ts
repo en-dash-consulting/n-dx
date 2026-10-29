@@ -130,9 +130,17 @@ describe("duplicate-capture", () => {
       steps: [
         ["git", "checkout", "--theirs", "--", PATH],
         ["git", "add", "--", PATH],
+        ["rex", "validate", "--post-merge", "--repair"],
+        ["git", "add", "-u", "--", ".rex"],
         ["rex", "validate", "--post-merge"],
       ],
     });
+  });
+
+  it("stages the rex directory the item sits in", () => {
+    const path = "app/.ndx/rex/changes/c/add-a-widget.md";
+    const c = only(sides(path, { stages: [2, 3], ancestor: null, base: item("base-id"), branch: item("branch-id"), result: null }));
+    expect((c.fix as { steps: string[][] }).steps[3]).toEqual(["git", "add", "-u", "--", "app/.ndx/rex"]);
   });
 
   it("is not a duplicate when the titles differ or the ids match", () => {

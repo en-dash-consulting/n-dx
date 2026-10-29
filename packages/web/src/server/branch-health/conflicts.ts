@@ -69,6 +69,8 @@ const REX_DIR = String.raw`(?:^|/)(?:\.rex|\.ndx/rex)/`;
 const V1_INDEX = new RegExp(`${REX_DIR}prd_tree/(?:.+/)?index\\.md$`);
 const V2_STATE = new RegExp(`${REX_DIR}(?:product|changes)/(?:.+/)?state\\.yaml$`);
 const PRD_ITEM = new RegExp(`${REX_DIR}(?:prd_tree|product|changes)/.+\\.md$`);
+/** The rex directory a PRD path sits in, as a repository-relative path. */
+const REX_DIR_OF = /^((?:.*\/)?(?:\.rex|\.ndx\/rex))\//;
 
 /** Classify every conflict; generated files come last, since their fix regenerates over the others. */
 export function classifyConflicts(conflicts: readonly ConflictSides[], ctx: ConflictContext): PredictedConflict[] {
@@ -232,19 +234,27 @@ function sourceReason(c: ConflictSides, hunks: ConflictHunk[] | null): string {
   return "A side removes or changes a line the other side also changed: a person decides.";
 }
 
-/** Both sides added the same PRD item under different ids: keep the base's. */
+/**
+ * Both sides added the same PRD item under different ids: keep the base's.
+ * Taking the base's file drops this branch's id, but its state row and any
+ * blockedBy naming it survive the merge; `--repair` prunes them, `git add -u`
+ * stages what it rewrote, and a last check fails on anything left.
+ */
 function duplicateCapture(c: ConflictSides): Verdict | null {
-  if (c.stages.includes(1) || c.base === null || c.branch === null || !PRD_ITEM.test(c.path)) return null;
+  const rexDir = REX_DIR_OF.exec(c.path)?.[1];
+  if (c.stages.includes(1) || c.base === null || c.branch === null || !rexDir || !PRD_ITEM.test(c.path)) return null;
   const base = frontmatter(c.base);
   const branch = frontmatter(c.branch);
   if (!base.id || !branch.id || base.id === branch.id || !base.title || base.title !== branch.title) return null;
   return {
     class: "duplicate-capture",
-    reason: `Both sides captured "${base.title}": the base as ${base.id}, this branch as ${branch.id}. Keep ${base.id}; taking the base's copy removes ${branch.id}, and \`rex validate --post-merge\` reports anything still pointing at it.`,
+    reason: `Both sides captured "${base.title}": the base as ${base.id}, this branch as ${branch.id}. Keep ${base.id}: take the base's copy, then \`rex validate --post-merge --repair\` prunes the state row and blockedBy references still naming ${branch.id}.`,
     fix: {
       steps: [
         ["git", "checkout", "--theirs", "--", c.path],
         ["git", "add", "--", c.path],
+        ["rex", "validate", "--post-merge", "--repair"],
+        ["git", "add", "-u", "--", rexDir],
         ["rex", "validate", "--post-merge"],
       ],
     },
