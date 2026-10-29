@@ -16,7 +16,7 @@
 
 import { randomUUID } from "node:crypto";
 import { trustSummaryForRun } from "../../store/trust.js";
-import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
+import { evaluateRepoTrust, redactSecrets } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -72,7 +72,8 @@ import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
-import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
+import { toolRexUpdateStatus, toolRexAppendLog, toolRexSetFailureReason } from "../../tools/rex.js";
+import { buildGateFailureReason } from "../analysis/gate-failure-reason.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
@@ -3200,7 +3201,8 @@ export async function updateCompletedTaskStatus(
     // Check current status to avoid redundant updates
     const existingItem = await store.getItem(taskId);
     if (existingItem?.status === "completed") {
-      // Already completed — no-op
+      // Already completed — no-op, beyond dropping a failure this run fixed.
+      await clearFailureReason(store, taskId);
       return false;
     }
 
@@ -3211,6 +3213,9 @@ export async function updateCompletedTaskStatus(
       ...(resolution?.resolutionType ? { resolutionType: resolution.resolutionType } : {}),
       ...(resolution?.resolutionDetail ? { resolutionDetail: resolution.resolutionDetail } : {}),
     });
+
+    // A completed task has no previous failure for the next brief to report.
+    await clearFailureReason(store, taskId);
 
     // Log the completion event
     await toolRexAppendLog(store, taskId, {
@@ -3228,6 +3233,19 @@ export async function updateCompletedTaskStatus(
       run.diagnostics.notes.push(`cascade_failure: ${msg}`);
     }
     return false;
+  }
+}
+
+/**
+ * Drop the `failureReason` an earlier failed attempt left, once the task has
+ * completed. Best-effort: the completion is what matters, and a stale reason
+ * is only shown to a run that would never be briefed on a completed task.
+ */
+async function clearFailureReason(store: PRDStore, taskId: string): Promise<void> {
+  try {
+    await toolRexSetFailureReason(store, taskId, undefined);
+  } catch (err) {
+    detail(`Warning: could not clear the task's previous failure reason: ${(err as Error).message}`);
   }
 }
 
@@ -3913,6 +3931,44 @@ async function settleAfterTestGateFailure(
   noteUncommittedRepairs(run, repairs);
 }
 
+/**
+ * Leave on the task why the gate failed, so the next attempt's brief carries
+ * it under "Previous attempt failed" instead of the retry starting blind.
+ *
+ * Built from what the gate kept — its failure digest, each package's failure
+ * output and the output tail — with the files the run changed, so a failing
+ * test the task wrote itself is marked as possibly wrong
+ * (agent/analysis/gate-failure-reason.ts). Redacted like the run log.
+ *
+ * Best-effort, like the completion withdrawal before it: the run has already
+ * failed, and a PRD write that fails here is reported, never thrown.
+ */
+async function recordGateFailureReason(opts: FinalizeRunOptions, run: RunRecord): Promise<void> {
+  if (!opts.store || !run.taskId) return;
+  const gate = run.testGate;
+  const output = [
+    gate?.failureDigest,
+    ...(gate?.packages ?? []).map((p) => p.failureOutput),
+    gate?.outputTail,
+  ].filter((part): part is string => typeof part === "string" && part.trim() !== "").join("\n");
+  const reason = buildGateFailureReason({
+    output,
+    filesChanged: run.structuredSummary?.filesChanged,
+    headline: run.error,
+    redact: redactSecrets,
+  });
+  try {
+    if (await toolRexSetFailureReason(opts.store, run.taskId, reason)) {
+      detail("Recorded the gate failure on the task for the next attempt's brief.");
+    }
+  } catch (err) {
+    const msg = (err as Error).message;
+    detail(`Warning: could not record the gate failure on the task: ${msg}`);
+    run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
+    run.diagnostics.notes.push(`failure_reason_not_recorded: ${msg}`);
+  }
+}
+
 /** Record on the run which review repairs no commit owns, for the retry and the dashboard. */
 function noteUncommittedRepairs(run: RunRecord, repairs: string[]): void {
   run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
@@ -4496,6 +4552,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
   if (testGateFailed) {
     await settleAfterTestGateFailure(opts, run, completionHold);
+    await recordGateFailureReason(opts, run);
   }
 
   // Missing-review gate. `--review` is sold as a gate, and an opt-in gate that
