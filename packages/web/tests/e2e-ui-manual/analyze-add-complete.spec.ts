@@ -22,7 +22,7 @@ import {
   KEEP_FIXTURE,
   type RealVendorProject,
 } from "./helpers/real-vendor-project.js";
-import { readPrdItems, prdItem, openLiveTask, waitForLiveTaskCompleted, attachRunArtifacts } from "./helpers/run-watch.js";
+import { readPrdItems, prdItem, openLiveTask, snapshotRunIds, waitForLiveTaskCompleted, attachRunArtifacts } from "./helpers/run-watch.js";
 import { caption } from "./helpers/caption.js";
 import { hasCli, probeCredentials } from "./helpers/preconditions.js";
 
@@ -119,9 +119,10 @@ test("full analysis, then a task added through the form, completed by the agent"
   await page.goto(`${dashboard.baseUrl}/live`, { waitUntil: "domcontentloaded" });
   await caption(page, "4/5 Start the task with the agent");
   await expect(page.locator(".live-idle .live-card-title")).toHaveText(task.title, { timeout: 15_000 });
+  const knownRunIds = await snapshotRunIds(dashboard.baseUrl);
   await page.getByRole("button", { name: /More ways to run/ }).click();
   await page.getByRole("menuitem", { name: /^Start now/ }).click();
-  const startedTaskId = await openLiveTask(page, task.id);
+  const startedTaskId = await openLiveTask(page, task.id, knownRunIds);
   expect(startedTaskId).toBe(task.id);
 
   await caption(page, "5/5 Watching the run until it completes");

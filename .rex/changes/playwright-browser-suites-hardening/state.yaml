@@ -7,8 +7,15 @@ items:
     lastModified: "2026-10-13T19:10:40.125Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "4d41b19c-5597-482a-986e-c28b08ff2e08":
-    lastModified: "2026-10-13T19:10:16.179Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-27T22:56:50.446Z"
+    completedAt: "2026-10-27T23:43:35.449Z"
+    endedAt: "2026-10-27T23:43:35.449Z"
+    activeIntervals: [{"end":"2026-10-27T23:43:35.449Z","start":"2026-10-27T22:56:50.446Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "openLiveTask takes a run-id snapshot taken before Start now and ignores those runs; listRuns is workspace-scoped, untruncated, bounded and throws on malformed lists. 9 helper tests, typecheck and manual spec discovery pass."
+    lastModified: "2026-10-27T23:43:35.449Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "5db09032-fd81-4c9a-be03-e47787b62282":
     status: "completed"
     startedAt: "2026-10-27T18:26:49.859Z"
