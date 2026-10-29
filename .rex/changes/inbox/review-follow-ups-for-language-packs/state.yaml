@@ -147,8 +147,15 @@ items:
     lastModified: "2026-10-08T05:43:26.020Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "beb90979-827d-40a1-80ac-a9b82edeca09":
-    lastModified: "2026-10-11T07:17:22.036Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:18:55.450Z"
+    completedAt: "2026-10-29T18:28:45.983Z"
+    endedAt: "2026-10-29T18:28:45.983Z"
+    activeIntervals: [{"end":"2026-10-29T18:28:45.983Z","start":"2026-10-29T18:18:55.450Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "The agreement test derives every configured filename and its uppercase variant. Baseline 51 tests and updated 53 tests pass; required startup tests pass (14)."
+    lastModified: "2026-10-29T18:28:45.983Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "bfc8e82b-0f2c-4731-911e-1f5cdc9c5474":
     status: "completed"
     startedAt: "2026-10-16T02:49:31.772Z"
