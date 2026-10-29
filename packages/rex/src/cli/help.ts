@@ -913,8 +913,9 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     description: "Lists added, dropped, moved and changed v1-to-v2 plan entries in sentences,\n" +
       "with counts per kind and corrupt metadata counted once. Reads only the two\n" +
       "plan files; it does not need a PRD, write state or call a model.\n" +
-      "Cut time, source digest, object key order and cached model answers alone\n" +
-      "are ignored; entry decisions, summary decisions and completion are compared.",
+      "Cut time, source digest, code evidence metadata, object key order, cached\n" +
+      "model answers and spelled-out defaults alone are ignored; entry decisions,\n" +
+      "summary decisions and completion are compared.",
     options: [
       { flag: "--before=<path>", description: "Earlier JSON migration plan (required)" },
       { flag: "--after=<path>", description: "Later JSON migration plan (required)" },

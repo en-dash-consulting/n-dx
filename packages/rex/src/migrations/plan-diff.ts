@@ -20,13 +20,29 @@ const EntrySchema = z.object({
 type Entry = z.infer<typeof EntrySchema>;
 const MOVEMENT = ["target", "parent", "placement", "relation", "needsPlacement"] as const;
 
+/**
+ * Rewrite what apply reads the same way into one form: it reads only
+ * `needsPlacement: true` and `relation: "amends"`, and an applied change with
+ * no completion time takes the cut time, which is not a decision.
+ */
+function normalize(entry: Entry, cutAt: string): Entry {
+  const { needsPlacement, relation, ...rest } = entry;
+  const data = entry.data?.appliedAt === cutAt ? { ...entry.data, appliedAt: "cut time" } : entry.data;
+  return {
+    ...rest,
+    ...(needsPlacement === true ? { needsPlacement } : {}),
+    ...(relation === "amends" ? { relation } : {}),
+    ...(data === undefined ? {} : { data }),
+  };
+}
+
 function entries(plan: PlanFile): Record<string, Entry> {
   const parsed = z.record(z.string(), EntrySchema).safeParse(plan.entries);
   if (!parsed.success) throw new Error(`Cannot diff plan entries: ${parsed.error.message}`);
   for (const [id, entry] of Object.entries(parsed.data)) {
     if (id !== entry.id) throw new Error(`Cannot diff entry ${id}: its id is ${entry.id}.`);
   }
-  return parsed.data;
+  return Object.fromEntries(Object.entries(parsed.data).map(([id, entry]) => [id, normalize(entry, plan.header.cutAt)]));
 }
 
 /** Quoted, single-line text also disambiguates titles containing punctuation. */
@@ -38,7 +54,7 @@ function destination(entry: Entry): string {
   const parent = entry.parent === undefined ? "at the layer root" : `under ${JSON.stringify(entry.parent).slice(1, -1)}`;
   const placement = (entry.needsPlacement ? "; held for placement" : "") +
     (entry.placement === undefined ? "" : `; ${entry.relation ?? "touches"} ${JSON.stringify(entry.placement)}`);
-  // A relation without a placement is still a decision worth reporting.
+  // An amends relation without a placement is still a decision worth reporting.
   const relation = entry.placement === undefined && entry.relation !== undefined ? `; relation ${JSON.stringify(entry.relation)}` : "";
   return `${entry.target} ${parent}${placement}${relation}`;
 }
@@ -65,7 +81,8 @@ function totals(items: Record<string, Entry>) {
  * Compare the decisions that apply will read, keyed by source id. Hash the
  * entry itself, never the recorded answer: its hash covers the question and
  * input, not the decision, and rules-only plans have no recorded answers.
- * Object order, source digest, cut time and the answer cache are not decisions.
+ * Object order, source digest, cut time and the answer cache are not decisions;
+ * nor is a default spelled out, such as `relation: "touches"`.
  * Plan-wide summary decisions and pass completion are reported separately.
  */
 export function diffPlanFiles(before: PlanFile, after: PlanFile): string {
@@ -100,12 +117,13 @@ export function diffPlanFiles(before: PlanFile, after: PlanFile): string {
       }
     }
   }
-  // These aggregates are repeated in entries or recomputed for the report.
-  // Everything else in the summary may carry a plan-wide decision.
+  // These are repeated in or recomputed from entries, or describe the evidence
+  // rather than a decision. Everything else may carry a plan-wide decision.
   const summaryDecisions = (plan: PlanFile): Record<string, unknown> => {
     const parsed = z.record(z.string(), z.unknown()).safeParse(plan.summary);
     if (!parsed.success) throw new Error("Cannot diff plan summary: expected an object.");
-    const { counts: _counts, corrupt: _corrupt, flagCounts: _flags, legacyLoe: _loe, evidenceDigest: _digest, ...rest } = parsed.data;
+    const { counts: _counts, corrupt: _corrupt, flagCounts: _flags, legacyLoe: _loe, evidenceDigest: _digest, codeEvidence: _evidence,
+      reviewQueue: _queue, jevReview: _jev, dissolvedReleases: _dissolved, ...rest } = parsed.data;
     return rest;
   };
   const summaryFields = changedKeys(summaryDecisions(before), summaryDecisions(after));

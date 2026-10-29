@@ -41,8 +41,9 @@ ndx rex migrate-diff --before=old-plan.json --after=new-plan.json
 ```
 
 Entry decisions, plan-wide summary decisions and pass completion are compared.
-Object key order, cut time, source digest and cached model answers alone do not
-count as decision changes. Identical decisions report no differences.
+Object key order, cut time, source digest, code evidence metadata, cached model
+answers and spelled-out defaults (`relation: "touches"`, `needsPlacement: false`)
+alone do not count as decision changes. Identical decisions report no differences.
 
 ### `rex init [dir]`
 

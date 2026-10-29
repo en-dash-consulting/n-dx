@@ -103,6 +103,35 @@ describe("migration plan diff", () => {
     expect(diffPlanFiles(before, after)).toContain("After plan is incomplete: text.");
   });
 
+  it("ignores an applied change's appliedAt when it only follows the new cut time", () => {
+    const applied = (appliedAt: string) => entry("c", { target: "change", data: { appliedAt } });
+    const before = plan({ c: applied("2026-10-08T00:00:00.000Z") });
+    const after = plan({ c: applied("2026-10-09T00:00:00.000Z") });
+    after.header.cutAt = "2026-10-09T00:00:00.000Z";
+    expect(diffPlanFiles(before, after)).toBe("No differences between migration plans.\n");
+    // A real completion time replacing the cut-time fallback is still a change.
+    expect(diffPlanFiles(before, plan({ c: applied("2026-09-01T00:00:00.000Z") }))).toContain('Changed "c" (c): data.');
+  });
+
+  it("ignores evidence metadata and summary fields recomputed from entries", () => {
+    const before = plan();
+    const after = structuredClone(before);
+    after.summary = {
+      codeEvidence: { items: 3, analyzedAt: "2026-10-09T00:00:00.000Z", gitSha: "abc", offHistory: true },
+      reviewQueue: [{ id: "a" }], jevReview: { flagged: 1 }, dissolvedReleases: [{ id: "r", title: "R" }],
+    };
+    expect(diffPlanFiles(before, after)).toBe("No differences between migration plans.\n");
+  });
+
+  it.each([
+    [{ placement: "cap" }, { placement: "cap", relation: "touches" }],
+    [{}, { needsPlacement: false }],
+    [{}, { relation: "touches" }],
+  ])("does not read a spelled-out default as a move: %j vs %j", (old, next) => {
+    expect(diffPlanFiles(plan({ a: entry("a", old) }), plan({ a: entry("a", next) })))
+      .toBe("No differences between migration plans.\n");
+  });
+
   it.each([
     null, { a: null }, { a: entry("different-id") }, { a: entry("a", { target: "unknown" }) },
     { a: entry("a", { data: { droppedMeta: -1 } }) },
