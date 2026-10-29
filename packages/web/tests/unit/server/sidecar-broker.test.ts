@@ -151,6 +151,42 @@ describe("cards", () => {
   });
 });
 
+describe("change-set proposals", () => {
+  const changeSet = { layout: "v1" as const, items: [{ title: "x", type: "epic" }] };
+
+  it("keeps an approved change-set card a proposal until its write is recorded, so its ghost rows stay until the items exist", async () => {
+    const call = broker.request("s1", "propose_prd_change", SAMPLE.propose_prd_change, undefined, { changeSet });
+    const [card] = raised;
+    expect(broker.proposals().map((c) => c.id)).toEqual([card.id]);
+
+    broker.decide("s1", card.id, { approve: true });
+    await call;
+    expect(broker.proposals().map((c) => c.id)).toEqual([card.id]);
+
+    broker.recordCarriedOut("s1", card.id, { ok: true, ids: ["n1"] });
+    expect(broker.proposals()).toEqual([]);
+    expect(broker.cards("s1")[0].carriedOut).toEqual({ ok: true, ids: ["n1"] });
+  });
+
+  it("drops a denied change-set card at once, and records no write for it", async () => {
+    const call = broker.request("s1", "propose_prd_change", SAMPLE.propose_prd_change, undefined, { changeSet });
+    const [card] = raised;
+    broker.decide("s1", card.id, { approve: false });
+    await call;
+    expect(broker.proposals()).toEqual([]);
+    broker.recordCarriedOut("s1", card.id, { ok: true, ids: ["n1"] });
+    expect(broker.cards("s1")[0].carriedOut).toBeUndefined();
+  });
+
+  it("refuses edits on a card with no change set, before remembering anything", async () => {
+    void broker.request("s1", "run_command", SAMPLE.run_command);
+    const [card] = raised;
+    expect(() => broker.decide("s1", card.id, { approve: true, remember: true, edits: [] })).toThrow(BrokerDecisionError);
+    expect(broker.allowList()).toEqual([]);
+    expect(broker.cards("s1")[0].status).toBe("pending");
+  });
+});
+
 describe("ledger", () => {
   it("appends typed, bounded entries without a card", () => {
     broker.appendLedger("s1", "gotcha", "the cache is per worktree");

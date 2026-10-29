@@ -250,10 +250,12 @@ describe("on a v1 PRD", () => {
     });
     await (await resolveStore(ctx.rexDir)).removeItem("feature-1");
     const before = JSON.stringify(await v1Items());
-    await decide(card.id, { decision: "approve" });
+    await decide(card.id, { decision: "approve", edits: [{ index: 0, title: "Refunds" }] });
     const result = await call;
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain(`Nothing was written: parent "feature-1"`);
+    // An edited approval that wrote nothing must not tell the agent its edits were written.
+    expect(resultText(result)).not.toContain("edited values were written");
     expect(JSON.stringify(await v1Items())).toBe(before);
     expect(broker.cards(SESSION)[0].carriedOut).toEqual({ ok: false });
     expect(await proposals()).toEqual([]);

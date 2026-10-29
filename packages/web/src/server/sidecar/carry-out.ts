@@ -92,8 +92,11 @@ async function carryOut(
       // The card's change set, with the operator's edits; never the raw input.
       const changeSet = outcome.decidedBy === "allow-list" ? undefined : outcome.card.changeSet;
       if (!changeSet) return { ok: false, text: "The card carried no change set; nothing was written." };
-      const edited = outcome.decidedBy !== "allow-list" && outcome.card.edited ? " The operator edited it before approving; the edited values were written." : "";
       const written = await actions.writeChangeSet(changeSet);
+      // Said only of a write that happened: a failed one wrote no values at all.
+      const edited = written.ok && outcome.decidedBy !== "allow-list" && outcome.card.edited
+        ? " The operator edited it before approving; the edited values were written."
+        : "";
       return { ...written, text: `${written.text}${edited}` };
     }
     default:
