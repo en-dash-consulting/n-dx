@@ -22,7 +22,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "477c02f8-fba6-46ea-93ef-19fbf9293954":
     issues: ["https://www.notion.so/3f7a80b7192481b38426d554c9a1cfa8","https://www.notion.so/3f7a80b7192481c9be12e2721b3bdbb9"]
-    lastModified: "2026-10-29T16:40:13.593Z"
+    lastModified: "2026-10-29T16:59:21.410Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5b73d052-964f-4145-ab5f-bf6c6b221f01":
     status: "completed"
@@ -33,6 +33,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option (a): a feature_disabled 403 from a worktree renders a neutral 'off in this worktree' note; documented in web-server.md Branch health."
     lastModified: "2026-10-29T16:44:54.810Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "87d74c1d-2684-4abc-b1ee-440637a1b751":
+    lastModified: "2026-10-29T16:59:21.410Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d62623bb-3542-4c31-8461-83eb874fe2c3":
     lastModified: "2026-10-29T16:08:50.531Z"
