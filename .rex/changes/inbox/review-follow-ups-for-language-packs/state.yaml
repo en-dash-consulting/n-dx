@@ -126,8 +126,15 @@ items:
     lastModified: "2026-10-16T04:09:47.146Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82784841-557f-4bc6-bde9-c17cd0f35bbd":
-    lastModified: "2026-10-17T10:38:04.139Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T22:50:18.223Z"
+    completedAt: "2026-10-29T22:51:15.333Z"
+    endedAt: "2026-10-29T22:51:15.333Z"
+    activeIntervals: [{"end":"2026-10-29T22:51:15.333Z","start":"2026-10-29T22:50:18.223Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "A root test compares every published package name and license to the Included components table, rejects extra rows, and runs on metadata and scope-document changes."
+    lastModified: "2026-10-29T22:51:15.333Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "92a4e1ed-adff-4386-8bf2-a0737945f204":
     status: "completed"
     startedAt: "2026-10-16T16:42:17.010Z"
