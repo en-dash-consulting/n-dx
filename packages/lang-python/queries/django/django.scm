@@ -107,3 +107,6 @@
 ; of the aliased import @django.aliased, whose name the imports query captures.
 (aliased_import
   alias: (identifier) @django.alias) @django.aliased
+
+; Rebindings outside def/class also count under module-level if/try blocks.
+(assignment left: (identifier) @django.binding right: (_))

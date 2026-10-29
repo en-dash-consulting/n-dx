@@ -318,6 +318,47 @@ describe("an imported name rebound at module level", () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
+  it("does not follow imports rebound inside module-level conditionals or try blocks", async (ctx) => {
+    write("app/routers.py", "from rest_framework.routers import DefaultRouter\nrouter = DefaultRouter()\n");
+    write("app/conditional.py", 'from .routers import router\nif DEBUG:\n    router = make_other()\nrouter.register("a", AView)\n');
+    write("app/guarded.py", 'from .routers import router\ntry:\n    router = make_other()\nexcept ValueError:\n    pass\nrouter.register("b", BView)\n');
+    write("app/items.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/items")\ndef items(): ...\n');
+    write("app/main.py", 'from fastapi import FastAPI\nfrom .items import router\nif DEBUG:\n    router = make_other()\napp = FastAPI()\napp.include_router(router, prefix="/api")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/items.py")).toEqual(["GET /items items"]);
+    expect(notices).toEqual([
+      "FastAPI: 1 mount names no application or router the rules can follow and was not followed: app/main.py:6 (include_router router).",
+    ]);
+  });
+
+  it("follows an import instead of a function-local or earlier constructor with the same name", async (ctx) => {
+    write("app/items.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/items")\ndef items(): ...\n');
+    write("app/nested.py", 'from fastapi import FastAPI, APIRouter\nfrom .items import router\ndef make():\n    router = APIRouter()\napp = FastAPI()\napp.include_router(router, prefix="/nested")\n');
+    write("app/before.py", 'from fastapi import FastAPI, APIRouter\nrouter = APIRouter()\nfrom .items import router\napp = FastAPI()\napp.include_router(router, prefix="/before")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/items.py")?.sort()).toEqual(["GET /before/items items", "GET /nested/items items"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("keeps module URL patterns when functions or classes assign their own urlpatterns", async (ctx) => {
+    write("app/urls.py", 'from django.urls import path\nurlpatterns = [path("a/", views.a)]\ndef get_urls():\n    urlpatterns = super().get_urls()\nclass Admin:\n    urlpatterns = [path("local/", views.local)]\nif DEBUG:\n    urlpatterns += [path("b/", views.b)]\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/urls.py")).toEqual(["ANY /a/ a", "ANY /b/ b"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("does not treat a function-local package import as a re-export", async (ctx) => {
+    write("app/api/__init__.py", 'def setup():\n    from .legacy import router\n    return router\n');
+    write("app/api/router.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/x")\ndef x(): ...\n');
+    write("app/api/legacy.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/z")\ndef z(): ...\n');
+    write("app/main.py", 'from fastapi import FastAPI\nfrom app.api import router\napp = FastAPI()\napp.include_router(router, prefix="/api")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/legacy.py")).toEqual(["GET /z z"]);
+    expect(notices).toEqual([
+      "FastAPI: 1 mount names no application or router the rules can follow and was not followed: app/main.py:4 (include_router router).",
+    ]);
+  });
+
   it("is not followed through its import when the rebinding comes after it", async (ctx) => {
     write("app/routers.py", "from rest_framework.routers import DefaultRouter\nrouter = DefaultRouter()\n");
     write("app/after.py", 'from .routers import router\nrouter = make_other()\nrouter.register("a", AView)\n');
