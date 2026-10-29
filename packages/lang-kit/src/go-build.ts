@@ -115,8 +115,8 @@ async function readModule(projectDir: string, dir: string): Promise<GoModuleBuil
   return parseGoMod(dir, file, text);
 }
 
-/** Parse one `go.mod`. Exported for tests; production code goes through {@link readGoBuildModels}. */
-export function parseGoMod(dir: string, file: string, text: string): GoModuleBuild {
+/** Parse one `go.mod`; declaration order is available for callers presenting the written requirements. */
+export function parseGoMod(dir: string, file: string, text: string, options: { dependencyOrder?: "declaration" } = {}): GoModuleBuild {
   const notices: string[] = [];
   const deps: BuildDependency[] = [];
   const replaces: GoReplace[] = [];
@@ -167,7 +167,7 @@ export function parseGoMod(dir: string, file: string, text: string): GoModuleBui
     dir,
     buildSystem: "go",
     ...(split && split.group !== "" && { group: { resolved: true as const, value: split.group } }),
-    dependencies: deps.sort(compareDeps),
+    dependencies: options.dependencyOrder === "declaration" ? deps : deps.sort(compareDeps),
     notices,
     goMod: {
       ...(modulePath !== undefined && { module: modulePath }),

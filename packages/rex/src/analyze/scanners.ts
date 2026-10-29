@@ -1,6 +1,7 @@
 import { readFile, readdir, access } from "node:fs/promises";
 import { join, relative, dirname, basename, extname } from "node:path";
 import { PROJECT_DIRS, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
+import { parseGoMod as parseGoModule } from "@n-dx/lang-kit";
 import type { Priority } from "../schema/index.js";
 import { computeFindingHash, loadAcknowledged, isAcknowledged } from "./acknowledge.js";
 import type { AcknowledgedStore } from "./acknowledge.js";
@@ -990,58 +991,15 @@ export async function parseGoMod(goModPath: string): Promise<GoModData | null> {
     return null;
   }
 
-  const lines = content.split("\n");
-  let module = "";
-  let goVersion: string | undefined;
-  const dependencies: { path: string; version: string }[] = [];
-  let inRequireBlock = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    // Module declaration: module github.com/example/project
-    const moduleMatch = trimmed.match(/^module\s+(.+)$/);
-    if (moduleMatch) {
-      module = moduleMatch[1].trim();
-      continue;
-    }
-
-    // Go version: go 1.21
-    const goMatch = trimmed.match(/^go\s+(.+)$/);
-    if (goMatch) {
-      goVersion = goMatch[1].trim();
-      continue;
-    }
-
-    // Start of require block
-    if (trimmed === "require (") {
-      inRequireBlock = true;
-      continue;
-    }
-
-    // End of require block
-    if (inRequireBlock && trimmed === ")") {
-      inRequireBlock = false;
-      continue;
-    }
-
-    // Dependency inside require block: github.com/foo/bar v1.2.3
-    if (inRequireBlock) {
-      const depMatch = trimmed.match(/^(\S+)\s+(\S+)/);
-      if (depMatch) {
-        dependencies.push({ path: depMatch[1], version: depMatch[2] });
-      }
-      continue;
-    }
-
-    // Single-line require: require github.com/foo/bar v1.2.3
-    const singleReqMatch = trimmed.match(/^require\s+(\S+)\s+(\S+)/);
-    if (singleReqMatch) {
-      dependencies.push({ path: singleReqMatch[1], version: singleReqMatch[2] });
-    }
-  }
-
-  return { module, goVersion, dependencies };
+  const model = parseGoModule("", basename(goModPath), content, { dependencyOrder: "declaration" });
+  return {
+    module: model.goMod.module ?? "",
+    goVersion: model.goMod.go,
+    dependencies: model.dependencies.map((dep) => ({
+      path: dep.group ? `${dep.group}/${dep.artifact}` : dep.artifact,
+      version: dep.version.resolved ? dep.version.value : "",
+    })),
+  };
 }
 
 function isGoMod(rel: string): boolean {
