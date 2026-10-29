@@ -543,7 +543,9 @@ interface HttpMatch {
  *
  * Both, or a declared host with no path to check, is `certain`. Either alone
  * is `likely`. Neither — only the host *resembling* the member's name — is
- * `inferred`, and is withheld.
+ * `inferred`, and is withheld. So is a resembling host that the member's
+ * declared base URL contradicts: the operator sees it rather than losing it.
+ * Among equally confident declared matches, the longest base path wins.
  */
 function matchLiteralTarget(
   caller: SubAnalysis,
@@ -555,6 +557,7 @@ function matchLiteralTarget(
   const path = pathOf(target);
 
   let best: HttpMatch | null = null;
+  let bestSpecificity = -1;
   let tied: string[] = [];
   const endpointOf = (url: string): URL | null => {
     try { return new URL(url.includes("://") ? url : `http://${url}`); }
@@ -572,8 +575,9 @@ function matchLiteralTarget(
     const hostDeclared = declaredHost !== null && declaredEndpoint !== null && declaredEndpoint.host === endpoint.host &&
       (!/^https?:\/\//i.test(member.baseUrl!) || !/^https?:\/\//i.test(target) || declaredEndpoint.origin === endpoint.origin) &&
       (!basePath || path === basePath || path.startsWith(`${basePath}/`));
+    const nameResembles = memberNames(member).some((n) => sameIdentity(firstLabel(host), n));
     // An explicit endpoint contradicting the target outweighs name resemblance.
-    const nameResembles = !member.baseUrl && memberNames(member).some((n) => sameIdentity(firstLabel(host), n));
+    const contradicted = member.baseUrl !== undefined && !hostDeclared;
 
     if (!hostDeclared && !nameResembles) continue;
 
@@ -589,9 +593,12 @@ function matchLiteralTarget(
     } else if (hostDeclared) {
       confidence = "likely";
       why = `host "${host}" is ${member.prefix}'s declared base URL, which serves no route matching ${path}`;
-    } else if (served) {
+    } else if (served && !contradicted) {
       confidence = "likely";
       why = `host "${host}" names ${member.prefix}, which serves ${served.path}`;
+    } else if (contradicted) {
+      confidence = "inferred";
+      why = `host "${host}" resembles ${member.prefix}'s name, but its declared base URL is ${member.baseUrl}`;
     } else {
       confidence = "inferred";
       why = `host "${host}" resembles ${member.prefix}'s name and nothing else corroborates it`;
@@ -603,10 +610,14 @@ function matchLiteralTarget(
       why,
       ...(served ? { routeFile: served.file } : {}),
     };
-    if (!best || CONFIDENCE_RANK[confidence] > CONFIDENCE_RANK[best.confidence]) {
+    // A longer declared base path is the more specific claim on this target.
+    const specificity = hostDeclared ? basePath.length : -1;
+    const rank = CONFIDENCE_RANK[confidence] - (best ? CONFIDENCE_RANK[best.confidence] : -Infinity);
+    if (rank > 0 || (rank === 0 && specificity > bestSpecificity)) {
       best = candidate;
+      bestSpecificity = specificity;
       tied = [member.prefix];
-    } else if (CONFIDENCE_RANK[confidence] === CONFIDENCE_RANK[best.confidence]) {
+    } else if (rank === 0 && specificity === bestSpecificity) {
       tied.push(member.prefix);
     }
   }
@@ -812,12 +823,25 @@ const SHARED_BY_NAME_KINDS: ReadonlySet<string> = new Set([
   "stream",
 ]);
 
-/** The literals that identify a resource, falling back to its name. */
+/**
+ * An IaC-discovered id (`infra:<type>.<label>`) is local to its repository.
+ * A config id is chosen by an operator, and an ARN names one resource, so
+ * either can join two members on its own.
+ */
+function localId(resource: InfraResource): boolean {
+  return resource.origin !== "config" && resource.id.startsWith("infra:");
+}
+
+/**
+ * The deployed names that identify a resource across repositories. A
+ * declaration label is local even when two repos use it, so only names an
+ * attribute or property gave count. A file written before `deployedNames`
+ * existed falls back to its literals less the label.
+ */
 function resourceLiterals(resource: InfraResource): string[] {
-  // IaC ids and declaration labels are local, even when two repos use them.
-  const literals = resource.literals ?? [];
-  const localLabel = resource.id.startsWith("infra:") ? resource.id.slice(resource.id.lastIndexOf(".") + 1) : undefined;
-  return literals.filter((l) => l.length > 2 && l !== localLabel);
+  const localLabel = localId(resource) ? resource.id.slice(resource.id.lastIndexOf(".") + 1) : undefined;
+  const names = resource.deployedNames ?? (resource.literals ?? []).filter((l) => l !== localLabel);
+  return names.filter((l) => l.length > 2);
 }
 
 /**
@@ -873,7 +897,7 @@ export function computeInfraCrossings(
 
       for (const resourceA of a.infrastructure?.resources ?? []) {
         for (const resourceB of b.infrastructure?.resources ?? []) {
-          const sameId = resourceA.id === resourceB.id && /^arn:/.test(resourceA.id);
+          const sameId = resourceA.id === resourceB.id && !localId(resourceA) && !localId(resourceB);
           const sharedName =
             !sameId &&
             SHARED_BY_NAME_KINDS.has(resourceA.kind) &&

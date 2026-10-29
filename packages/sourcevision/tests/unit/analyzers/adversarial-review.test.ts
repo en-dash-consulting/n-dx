@@ -81,4 +81,36 @@ describe("adversarial workspace review", () => {
     }
     expect(computeInfraCrossings(members, members.flatMap(promoteZones)).crossings).toEqual([]);
   });
+  it("prefers the member with the longest matching base path over an equally confident one", () => {
+    const members = [caller("https://gw.internal/billing/charge"), member("gw", "https://gw.internal"), member("billing", "https://gw.internal/billing")];
+    expect(http(members).crossings.map((c) => c.toZone)).toEqual(["billing:core"]);
+    expect(http(members).withheld).toEqual([]);
+  });
+  it("withholds a name match that the member's declared base URL contradicts", () => {
+    const members = [caller("https://orders.prod.internal/api/orders"), member("orders", "https://orders.staging.internal")];
+    const result = http(members);
+    expect(result.crossings).toEqual([]);
+    expect(result.withheld).toHaveLength(1);
+    expect(result.withheld[0]).toMatchObject({ toMember: "orders", confidence: "inferred" });
+  });
+  it("joins a Terraform resource whose deployed name repeats its label", () => {
+    const members = [member("payments"), member("email")];
+    for (const m of members) {
+      m.infrastructure = {
+        resources: [{ id: "infra:aws_sqs_queue.orders", name: "orders", kind: "queue", origin: "main.tf", literals: ["orders"], deployedNames: ["orders"] }],
+        seams: [], links: [{ resourceId: "infra:aws_sqs_queue.orders", target: "src/app.ts", evidence: "name-literal" }], sawIaC: true,
+      };
+    }
+    expect(computeInfraCrossings(members, members.flatMap(promoteZones)).crossings).toHaveLength(1);
+  });
+  it.each(["orders-events", "infra:external.orders-events"])("still joins config-declared resources by id: %s", (id) => {
+    const members = [member("payments"), member("email")];
+    for (const m of members) {
+      m.infrastructure = {
+        resources: [{ id, name: "orders-events", kind: "topic", origin: "config" }],
+        seams: [], links: [{ resourceId: id, target: "src/app.ts", evidence: "config" }], sawIaC: false,
+      };
+    }
+    expect(computeInfraCrossings(members, members.flatMap(promoteZones)).crossings.map((c) => c.evidence)).toEqual([expect.stringContaining("same resource id")]);
+  });
 });

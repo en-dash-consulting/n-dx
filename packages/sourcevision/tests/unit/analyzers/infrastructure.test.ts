@@ -108,6 +108,17 @@ describe("discovery", () => {
     expect(arch.sawIaC).toBe(true);
   });
 
+  it("records deployed names apart from the local declaration label", () => {
+    const arch = computeInfrastructure(root, SOURCE_FILES);
+    const byId = Object.fromEntries(arch.infrastructure.map((i) => [i.id, i]));
+    const queue = byId["infra:aws_sqs_queue.orders"];
+    expect(queue.literals).toEqual(expect.arrayContaining(["orders", "orders-intake-queue"]));
+    expect(queue.deployedNames).toContain("orders-intake-queue");
+    expect(queue.deployedNames).not.toContain("orders");
+    expect(byId["infra:AWS::SNS::Topic.NotifyTopic"].deployedNames).toEqual(["change-notifications-topic"]);
+    expect(byId["infra:external.payments"].deployedNames).toBeUndefined();
+  });
+
   it("links a resource to the files that name it", () => {
     const arch = computeInfrastructure(root, SOURCE_FILES);
     const queue = arch.infrastructure.find((i) => i.id === "infra:aws_sqs_queue.orders");

@@ -117,6 +117,12 @@ export interface DeclaredInfra {
    * discovery and linking; not something a config author writes.
    */
   literals?: string[];
+  /**
+   * The literals a `name`-ish attribute or property gave: the deployed names
+   * another repository can share. The local declaration label is in
+   * `literals` only, unless an attribute repeats it.
+   */
+  deployedNames?: string[];
 }
 
 export interface DeclaredArchitecture {
@@ -278,7 +284,7 @@ function parseCloudFormation(content: string, file: string): DeclaredInfra[] {
 
   const found: DeclaredInfra[] = [];
   let baseIndent: number | null = null;
-  let current: { name: string; literals: Set<string>; type?: string } | null = null;
+  let current: { name: string; literals: Set<string>; deployed: Set<string>; type?: string } | null = null;
 
   const flush = (): void => {
     if (!current?.type) return;
@@ -292,6 +298,7 @@ function parseCloudFormation(content: string, file: string): DeclaredInfra[] {
       note: `${current.type} declared in ${file}`,
       origin: file,
       literals: [...current.literals].sort(),
+      deployedNames: [...current.deployed].sort(),
     });
   };
 
@@ -304,7 +311,7 @@ function parseCloudFormation(content: string, file: string): DeclaredInfra[] {
     if (logical && (baseIndent === null || logical[1].length === baseIndent)) {
       baseIndent = logical[1].length;
       flush();
-      current = { name: logical[2], literals: new Set([logical[2]]) };
+      current = { name: logical[2], literals: new Set([logical[2]]), deployed: new Set() };
       continue;
     }
     if (!current) continue;
@@ -319,6 +326,7 @@ function parseCloudFormation(content: string, file: string): DeclaredInfra[] {
     // "!Sub '${AWS::StackName}-docs'" would attribute the resource to nothing.
     if (prop && !prop[1].startsWith("!") && !prop[1].includes("Fn::")) {
       current.literals.add(prop[1].trim());
+      current.deployed.add(prop[1].trim());
     }
   }
   flush();
@@ -384,9 +392,10 @@ export function discoverFromIaC(
       // Literal names inside the block give us something to match in code.
       const block = content.slice(match.index, match.index + 800);
       TF_NAME_ATTR.lastIndex = 0;
-      const literals = new Set<string>([localName]);
+      const deployed = new Set<string>();
       let attr;
-      while ((attr = TF_NAME_ATTR.exec(block)) !== null) literals.add(attr[1]);
+      while ((attr = TF_NAME_ATTR.exec(block)) !== null) deployed.add(attr[1]);
+      const literals = new Set<string>([localName, ...deployed]);
 
       add({
         id: `infra:${type}.${localName}`,
@@ -396,6 +405,7 @@ export function discoverFromIaC(
         note: `${type} declared in ${file}`,
         origin: file,
         literals: [...literals].sort(),
+        deployedNames: [...deployed].sort(),
       });
     }
   }
@@ -568,6 +578,7 @@ export function toInfrastructureData(arch: DeclaredArchitecture): Infrastructure
       origin: infra.origin,
       ...(infra.note === undefined ? {} : { note: infra.note }),
       ...(infra.literals === undefined ? {} : { literals: infra.literals }),
+      ...(infra.deployedNames === undefined ? {} : { deployedNames: infra.deployedNames }),
     });
     for (const target of infra.usedBy ?? []) {
       links.push({ resourceId: infra.id, target, evidence });
@@ -602,6 +613,7 @@ export function fromInfrastructureData(data: InfrastructureData): DeclaredArchit
     ...(resource.note === undefined ? {} : { note: resource.note }),
     origin: resource.origin,
     ...(resource.literals === undefined ? {} : { literals: resource.literals }),
+    ...(resource.deployedNames === undefined ? {} : { deployedNames: resource.deployedNames }),
   }));
 
   return { seams: data.seams, infrastructure, sawIaC: data.sawIaC };
