@@ -5,9 +5,10 @@ document `@n-dx/graview` emits (`appFromOrCompile`), seeds a store from the
 snapshot, and lays a shell, home and record pages in n-dx's words over the
 derived ones. It is published on its own and **no other `@n-dx/*` package
 depends on it**: `@n-dx/core` never lists it, so installing n-dx never pulls
-`@graview/*` or React. `ndx graview serve .` finds it beside `@n-dx/graview`
-in the monorepo, or in `node_modules` when installed, or through
-`graview.app` in the project config, and runs `bin/serve.js`.
+`@graview/*` or React. It is an n-dx extension: the `ndx.extension` block
+in `package.json` declares the `graview-face` sidecar (`bin/serve.js`), and
+`ndx graview serve .` runs it from the launch plan core prints for that
+sidecar, once n-dx has found and the user has approved it.
 
 Rules that keep that honest:
 

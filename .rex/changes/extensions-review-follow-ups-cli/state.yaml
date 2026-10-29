@@ -1,0 +1,88 @@
+schema: "rex/v2"
+items:
+  "12ff922d-4022-45d6-9f9e-3f0439a4421b":
+    status: "completed"
+    startedAt: "2026-10-27T15:57:41.563Z"
+    completedAt: "2026-10-27T15:57:41.563Z"
+    endedAt: "2026-10-27T15:57:41.563Z"
+    activeIntervals: [{"end":"2026-10-27T15:57:41.563Z","start":"2026-10-27T15:57:41.563Z"}]
+    appliedAt: "2026-10-27T15:57:41.563Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T15:57:41.563Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "13eb4c96-616f-4999-97c2-895b16d105d4":
+    status: "completed"
+    startedAt: "2026-10-27T15:52:12.770Z"
+    completedAt: "2026-10-27T15:56:47.799Z"
+    endedAt: "2026-10-27T15:56:47.799Z"
+    activeIntervals: [{"end":"2026-10-27T15:56:47.799Z","start":"2026-10-27T15:52:12.770Z"}]
+    lastModified: "2026-10-27T15:56:47.799Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "6e69e53f-cb54-4427-b727-f0dee62e42c9":
+    status: "completed"
+    startedAt: "2026-10-27T13:52:42.019Z"
+    completedAt: "2026-10-27T14:04:40.485Z"
+    endedAt: "2026-10-27T14:04:40.485Z"
+    activeIntervals: [{"end":"2026-10-27T14:04:40.485Z","start":"2026-10-27T13:52:42.019Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Per-process ndx-config-<pid>-<rand>.json written tmp+rename and released on close, stale files swept; sidecars get user-only sidecar-config.json. Concurrency e2e test fails before the fix."
+    lastModified: "2026-10-27T14:04:40.485Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "6fd9edf1-f003-480c-b0ee-4c498c1ddf7b":
+    status: "completed"
+    startedAt: "2026-10-27T15:01:37.664Z"
+    completedAt: "2026-10-27T15:06:33.849Z"
+    endedAt: "2026-10-27T15:06:33.849Z"
+    activeIntervals: [{"end":"2026-10-27T15:06:33.849Z","start":"2026-10-27T15:01:37.664Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Dispatch prefers a claimant with a readable manifest, so a listed command always runs (bd355eb03)."
+    lastModified: "2026-10-27T15:06:33.849Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "71b2eac7-f338-4955-9bb9-7b0555f575ce":
+    status: "completed"
+    startedAt: "2026-10-27T15:56:58.610Z"
+    completedAt: "2026-10-27T15:57:41.563Z"
+    endedAt: "2026-10-27T15:57:41.563Z"
+    activeIntervals: [{"end":"2026-10-27T15:57:41.563Z","start":"2026-10-27T15:56:58.610Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "docs/architecture/extensions.md process-contract bullet corrected: missing bin/unapproved exit 2; disabled/incompatible (incl. out-of-range ndxVersion) is Unknown command, exit 1, with hint. Commit 9952c2a50."
+    lastModified: "2026-10-27T15:57:41.563Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "76f0d280-28d7-4ef3-a086-36ded6465eca":
+    status: "completed"
+    startedAt: "2026-10-27T15:47:07.021Z"
+    completedAt: "2026-10-27T15:52:02.886Z"
+    endedAt: "2026-10-27T15:52:02.886Z"
+    activeIntervals: [{"end":"2026-10-27T15:52:02.886Z","start":"2026-10-27T15:47:07.021Z"}]
+    lastModified: "2026-10-27T15:52:02.886Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "7ee5c876-10a1-4aed-bafd-a3a360fd0832":
+    status: "completed"
+    startedAt: "2026-10-27T15:06:43.882Z"
+    completedAt: "2026-10-27T15:12:11.287Z"
+    endedAt: "2026-10-27T15:12:11.287Z"
+    activeIntervals: [{"end":"2026-10-27T15:12:11.287Z","start":"2026-10-27T15:06:43.882Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Extension commands spawn non-detached (shares terminal session); SIGTERM/SIGHUP forwarded by pid, SIGINT left to the terminal; Windows unchanged."
+    lastModified: "2026-10-27T15:12:11.287Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "d287f3f5-da82-4200-b7b2-5a9a580eae94":
+    status: "completed"
+    startedAt: "2026-10-27T14:05:08.677Z"
+    completedAt: "2026-10-27T14:09:34.996Z"
+    endedAt: "2026-10-27T14:09:34.996Z"
+    activeIntervals: [{"end":"2026-10-27T14:09:34.996Z","start":"2026-10-27T14:05:08.677Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "main() in cli.js skips the project-config read and the command timeout for extension commands; e2e tests cover cli.timeoutMs 1000 with a 2 s bin (exit 7 passes through) and a positional dir carrying its own .n-dx.json."
+    lastModified: "2026-10-27T14:09:34.996Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "d66c59d3-bdb2-4117-ae83-f91377fa3bb6":
+    status: "completed"
+    startedAt: "2026-10-27T15:12:21.947Z"
+    completedAt: "2026-10-27T15:16:20.728Z"
+    endedAt: "2026-10-27T15:16:20.728Z"
+    activeIntervals: [{"end":"2026-10-27T15:16:20.728Z","start":"2026-10-27T15:12:21.947Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "architecture-policy now flags computed require/createRequire calls in core, allowlisted via COMPUTED_REQUIRES (commit 6c141bce8)"
+    lastModified: "2026-10-27T15:16:20.728Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

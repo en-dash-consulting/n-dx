@@ -59,6 +59,10 @@ packages/
 
 See [Gateway Modules](./gateways) for the full gateway pattern.
 
+### Extensions
+
+Extensions sit outside the tiers. An extension is a separately installed npm package that core discovers by reading its `package.json`. Core spawns the extension's commands, and the hub spawns and proxies its sidecar at `/x/<name>/`. No package imports extension code, and extensions reach n-dx only by spawning `ndx` or calling the hub and project endpoints. The design is in [Extensions](./extensions), and the author-facing contract is in the [extension guide](../extensions/).
+
 ## Shared State via Filesystem
 
 Packages share state through filesystem rather than runtime imports:
@@ -82,6 +86,7 @@ Single writer per file. Hench and web read `.rex/` files but modify PRD state by
 | `plan` + `work` | No | Both write PRD roots |
 | `refresh` + any writer | No | Refresh can rewrite analysis and PRD state |
 | `config` + `config` | No | Both merge shared config files |
+| `extensions add\|remove` + another extension writer | No | Both run npm in the shared per-user extensions folder and rewrite `extensions.json`; serialize them across worktrees. |
 | `sv pack add\|remove` + another `sv pack add\|remove` | No | Both write the per-user pack directory, shared by every worktree and project on one ndx home; the second fails naming the holder's PID |
 
 **General rule:** Commands that write to PRD roots, analysis output, or hench
