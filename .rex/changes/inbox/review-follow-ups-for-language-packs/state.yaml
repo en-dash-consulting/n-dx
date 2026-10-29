@@ -13,11 +13,17 @@ items:
     lastModified: "2026-10-12T03:00:18.506Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "278055d7-6995-4a91-8995-51d43aa7e4e6":
-    lastModified: "2026-10-16T17:18:07.619Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "in_progress"
+    startedAt: "2026-10-29T18:31:03.714Z"
+    activeIntervals: [{"start":"2026-10-29T18:31:03.714Z"}]
+    lastModified: "2026-10-29T18:31:04.285Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "2d8ed30f-928b-48a9-8a13-5e0b20baf11a":
-    lastModified: "2026-10-17T08:53:35.743Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "in_progress"
+    startedAt: "2026-10-29T18:31:16.219Z"
+    activeIntervals: [{"start":"2026-10-29T18:31:16.219Z"}]
+    lastModified: "2026-10-29T18:31:16.799Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "2d9f8f9b-75d3-4920-8dba-bf091950f6f8":
     lastModified: "2026-10-17T08:11:40.387Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -34,8 +40,11 @@ items:
     lastModified: "2026-10-17T07:40:54.572Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "452790b2-6514-426b-99f9-9ba9a45326e9":
-    lastModified: "2026-10-17T07:47:22.074Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "in_progress"
+    startedAt: "2026-10-29T18:31:22.536Z"
+    activeIntervals: [{"start":"2026-10-29T18:31:22.536Z"}]
+    lastModified: "2026-10-29T18:31:23.034Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "468a2c2f-ab25-48a3-9d75-a85fe22ce178":
     status: "completed"
     startedAt: "2026-10-12T03:24:13.613Z"
@@ -87,8 +96,11 @@ items:
     lastModified: "2026-10-16T16:53:09.327Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5b2ea100-4790-4834-9309-9e3d3f221f44":
-    lastModified: "2026-10-16T17:18:15.606Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "in_progress"
+    startedAt: "2026-10-29T18:31:09.960Z"
+    activeIntervals: [{"start":"2026-10-29T18:31:09.960Z"}]
+    lastModified: "2026-10-29T18:31:10.528Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "69ec8bf2-b1c6-480d-8060-df5a3bc680ba":
     status: "completed"
     startedAt: "2026-10-12T02:02:07.613Z"
@@ -139,8 +151,15 @@ items:
     lastModified: "2026-10-16T03:30:52.687Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9b692c8a-208f-4676-952e-1674631a3a4c":
-    lastModified: "2026-10-08T06:48:15.306Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:39:28.096Z"
+    completedAt: "2026-10-29T18:55:29.501Z"
+    endedAt: "2026-10-29T18:55:29.501Z"
+    activeIntervals: [{"end":"2026-10-29T18:55:29.501Z","start":"2026-10-29T18:39:28.096Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rex uses the lang-kit Go module parser; versioned workspace replacements compare against the originally required version. Regression and existing Go scanner/resolver tests pass."
+    lastModified: "2026-10-29T18:55:29.501Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "a1e02321-b162-4fc0-bd5b-b7bdcbacacf4":
     status: "completed"
     startedAt: "2026-10-12T02:09:29.092Z"
@@ -192,8 +211,15 @@ items:
     lastModified: "2026-10-08T07:09:51.367Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e45ebbf3-0d40-4bf2-b34d-19c7161c0ea7":
-    lastModified: "2026-10-08T06:40:18.908Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:39:33.731Z"
+    completedAt: "2026-10-29T18:55:46.438Z"
+    endedAt: "2026-10-29T18:55:46.438Z"
+    activeIntervals: [{"end":"2026-10-29T18:55:46.438Z","start":"2026-10-29T18:39:33.731Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rex uses the lang-kit Go module parser; versioned workspace replacements compare against the originally required version. Regression and existing Go scanner/resolver tests pass."
+    lastModified: "2026-10-29T18:55:46.438Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "e894d040-e93a-4d12-9f56-1a48e6af22eb":
     lastModified: "2026-10-17T07:21:02.089Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
