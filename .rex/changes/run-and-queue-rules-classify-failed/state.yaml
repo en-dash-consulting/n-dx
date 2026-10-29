@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "248236d8-2f12-46ed-8b7f-5087eba15d14":
-    lastModified: "2026-10-29T00:28:15.398Z"
+    status: "completed"
+    startedAt: "2026-10-29T00:42:16.064Z"
+    completedAt: "2026-10-29T00:50:09.039Z"
+    endedAt: "2026-10-29T00:50:09.039Z"
+    activeIntervals: [{"end":"2026-10-29T00:50:09.039Z","start":"2026-10-29T00:42:16.064Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "run-resolve.ts refuses with new RunRefusalCode \"blocked\" via openBlockersRefusal under --require-unblocked; flag kept in printed command; help + changeset updated; integration tests."
+    lastModified: "2026-10-29T00:50:09.039Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5aa5da8f-9587-4ff6-a27a-379525a7fc04":
     status: "completed"
@@ -52,6 +59,13 @@ items:
     lastModified: "2026-10-28T23:52:42.082Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "eef3d129-ffc2-4598-bfce-a30c88faf4ef":
+    status: "completed"
+    startedAt: "2026-10-29T00:50:09.039Z"
+    completedAt: "2026-10-29T00:50:09.039Z"
+    endedAt: "2026-10-29T00:50:09.039Z"
+    activeIntervals: [{"end":"2026-10-29T00:50:09.039Z","start":"2026-10-29T00:50:09.039Z"}]
+    appliedAt: "2026-10-29T00:50:09.039Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     issues: ["https://www.notion.so/3f7a80b7192481cab29eea95b9d8b8c8","https://www.notion.so/3f7a80b719248118bf40ee8742778786"]
-    lastModified: "2026-10-29T00:28:15.398Z"
+    lastModified: "2026-10-29T00:50:09.039Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -167,6 +167,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "  options    the per-run options, with flag, type, values and scope\n" +
           "  refusals   [{code, message}] for each reason the run would not start:\n" +
           "             prd-unreadable (task is null), task-not-found, not-actionable, claimed-elsewhere,\n" +
+          "             blocked (--require-unblocked, a blocker not completed),\n" +
           "             tree-not-conformant, vendor-unset, vendor-cli-missing,\n" +
           "             provider-unsupported, model-vendor-mismatch, dirty-tree\n" +
           "  warnings   [{code, message}] for a condition that does not stop the\n" +
