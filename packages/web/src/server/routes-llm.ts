@@ -102,6 +102,14 @@ export interface LocalVendorConfig {
    * `cli.timeoutMs`, which bounds a whole command rather than one request.
    */
   timeoutMs: number | null;
+  /** Retries after a refused or dropped connection (default 6). Null when unset. */
+  maxRetries: number | null;
+  /** First wait in ms before a connection retry (default 2000). Null when unset. */
+  retryBaseDelayMs: number | null;
+  /** Cap on one connection-retry wait in ms (default 60000). Null when unset. */
+  retryMaxDelayMs: number | null;
+  /** Resends of a turn the model answered with malformed output (default 3). Null when unset. */
+  maxFormatRetries: number | null;
   /** Second-model review pass config. All fields null when unset. */
   verifier: LocalVerifierVendorConfig;
 }
@@ -238,6 +246,10 @@ const VALID_PATHS = new Set([
   "llm.local.port",
   "llm.local.maxContextTokens",
   "llm.local.timeoutMs",
+  "llm.local.maxRetries",
+  "llm.local.retryBaseDelayMs",
+  "llm.local.retryMaxDelayMs",
+  "llm.local.maxFormatRetries",
   "llm.local.verifier.host",
   "llm.local.verifier.port",
   "llm.local.verifier.model",
@@ -384,11 +396,20 @@ function validateRoutingChange(path: string, value: unknown, deleting = false): 
   return null;
 }
 
+/** The llm.local connection- and format-retry settings: non-negative integers, 0 meaningful. */
+const LOCAL_RETRY_PATHS = [
+  "llm.local.maxRetries",
+  "llm.local.retryBaseDelayMs",
+  "llm.local.retryMaxDelayMs",
+  "llm.local.maxFormatRetries",
+] as const;
+
 /** Paths that accept numeric values (stored as numbers in JSON). */
 const NUMERIC_PATHS = new Set([
   "llm.local.port",
   "llm.local.maxContextTokens",
   "llm.local.timeoutMs",
+  ...LOCAL_RETRY_PATHS,
   "llm.local.verifier.port",
   "llm.local.verifier.maxCycles",
   "llm.escalation.maxSteps",
@@ -401,8 +422,8 @@ const PORT_PATHS = new Set(["llm.local.port", "llm.local.verifier.port"]);
 /** String paths that name a server and are validated with `isPlausibleLlmHost`. */
 const HOST_PATHS = new Set(["llm.local.host", "llm.local.verifier.host"]);
 
-/** Numeric paths where 0 is meaningful (0 = no timeout) and must not be rejected. */
-const NON_NEGATIVE_PATHS = new Set(["llm.local.timeoutMs"]);
+/** Numeric paths where 0 is meaningful (0 = no timeout, 0 = no retries) and must not be rejected. */
+const NON_NEGATIVE_PATHS = new Set<string>(["llm.local.timeoutMs", ...LOCAL_RETRY_PATHS]);
 
 /** Paths that accept boolean values. */
 const BOOLEAN_PATHS = new Set(["llm.autoFailover", "llm.escalation.enabled"]);
@@ -727,6 +748,10 @@ function extractLlmConfig(projectDir: string): LlmConfigResponse {
       port: getNumber(llmLocal, "port"),
       maxContextTokens: getNumber(llmLocal, "maxContextTokens"),
       timeoutMs: getNumber(llmLocal, "timeoutMs"),
+      maxRetries: getNumber(llmLocal, "maxRetries"),
+      retryBaseDelayMs: getNumber(llmLocal, "retryBaseDelayMs"),
+      retryMaxDelayMs: getNumber(llmLocal, "retryMaxDelayMs"),
+      maxFormatRetries: getNumber(llmLocal, "maxFormatRetries"),
       verifier: {
         host: getString(llmLocalVerifier, "host"),
         port: getNumber(llmLocalVerifier, "port"),

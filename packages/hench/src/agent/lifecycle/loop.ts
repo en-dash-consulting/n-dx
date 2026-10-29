@@ -19,7 +19,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalWithRetry, ClaudeClientError } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -1193,11 +1193,12 @@ async function summarizeLocalHistory(args: {
   if (!args.model) delete reqBody["model"];
 
   try {
-    const response = await fetch(`${args.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(reqBody),
-      ...(args.timeoutMs > 0 ? { signal: AbortSignal.timeout(args.timeoutMs) } : {}),
+    // Streamed so a slow model's headers are not held past Node's 300 s
+    // limit; sent once, with llm.local.timeoutMs bounding the whole read.
+    const response = await fetchLocalCompletion(`${args.baseUrl}/chat/completions`, reqBody, {
+      baseUrl: args.baseUrl,
+      timeoutMs: args.timeoutMs,
+      resend: false,
     });
     if (!response.ok) return null;
     const data = await response.json() as Record<string, unknown>;
@@ -1261,11 +1262,11 @@ async function callVerifier(
     };
     if (model) reqBody["model"] = model;
 
-    const resp = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(reqBody),
-      ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
+    // Streamed and assembled like the turn request; sent once.
+    const resp = await fetchLocalCompletion(`${baseUrl}/chat/completions`, reqBody, {
+      baseUrl,
+      timeoutMs,
+      resend: false,
     });
 
     if (!resp.ok) {
@@ -1292,33 +1293,48 @@ async function callVerifier(
 
 // ---------------------------------------------------------------------------
 
-type LocalFetchConfig = NonNullable<Parameters<typeof fetchLocalWithRetry>[2]["localConfig"]>;
+type LocalFetchConfig = NonNullable<Parameters<typeof fetchLocalCompletion>[2]["localConfig"]>;
 
 /**
  * Send one local chat request, riding out a dropped LM Studio connection.
  *
- * `fetchLocalWithRetry` retries a refused or dropped connection on the
+ * The request is streamed and assembled back into the non-streamed response
+ * (`fetchLocalCompletion`), so LM Studio sends its headers at once and a slow
+ * turn is not cut off by Node's 300 s wait for them; `llm.local.timeoutMs`
+ * still bounds the whole turn.
+ *
+ * `fetchLocalCompletion` retries a refused or dropped connection on the
  * `llm.local.maxRetries` / `retryBaseDelayMs` / `retryMaxDelayMs` schedule and
  * then throws a retryable `ClaudeClientError` (reason "network"). That error is
  * retried again on `hench.retry.*`, the run-level policy every other vendor's
  * transient failures get, before the run fails. A timeout
  * (`llm.local.timeoutMs`) is not retried — it fails the run as before.
+ *
+ * A turn the server rejects because the model's output was malformed (a broken
+ * tool call or channel), whether as a 400 or inside the stream, is resent
+ * inside `fetchLocalCompletion` on `llm.local.maxFormatRetries`, one log line
+ * per resend; when those run out the error names the setting and the run fails.
  */
 async function fetchLocalTurn(
   url: string,
-  init: RequestInit,
+  body: Record<string, unknown>,
   options: { baseUrl: string; timeoutMs: number; localConfig?: LocalFetchConfig },
   retry: HenchConfig["retry"] | undefined,
 ): Promise<Response> {
   const runRetry = retry ?? { maxRetries: 0, baseDelayMs: 0, maxDelayMs: 0 };
   for (let attempt = 0; ; attempt++) {
     try {
-      return await fetchLocalWithRetry(url, init, {
+      return await fetchLocalCompletion(url, body, {
         ...options,
         onRetry: ({ attempt: n, maxRetries, delayMs, error }) =>
           detail(
             `[Local] ${options.baseUrl} unreachable (${error}) — retry ${n}/${maxRetries} ` +
             `in ${Math.round(delayMs / 100) / 10}s (llm.local.maxRetries)`,
+          ),
+        onFormatRetry: ({ attempt: n, maxRetries, delayMs, error }) =>
+          detail(
+            `[Local] model produced malformed output (${error}) — resending turn ${n}/${maxRetries} ` +
+            `in ${Math.round(delayMs / 100) / 10}s (llm.local.maxFormatRetries)`,
           ),
       });
     } catch (err) {
@@ -1536,11 +1552,7 @@ async function runLocalToolLoop(params: {
       const t0 = Date.now();
       const response = await fetchLocalTurn(
         `${baseUrl}/chat/completions`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(reqBody),
-        },
+        reqBody,
         // llm.local.timeoutMs; 0 means wait indefinitely for a slow local model.
         { baseUrl, timeoutMs: requestTimeoutMs, localConfig: localCfg as LocalFetchConfig },
         config.retry,

@@ -1403,6 +1403,7 @@ const LLM_VALIDATORS = {
   "local.maxRetries": validateNonNegativeInteger("local.maxRetries", "e.g. 10, or 0 to fail on the first refused connection"),
   "local.retryBaseDelayMs": validateNonNegativeInteger("local.retryBaseDelayMs", "milliseconds, e.g. 2000"),
   "local.retryMaxDelayMs": validateNonNegativeInteger("local.retryMaxDelayMs", "milliseconds, e.g. 60000"),
+  "local.maxFormatRetries": validateNonNegativeInteger("local.maxFormatRetries", "e.g. 5, or 0 to fail on the first malformed reply"),
   "local.verifier.host": validateLocalHost("local.verifier.host"),
   "local.verifier.port": validateLocalPort("local.verifier.port"),
   "local.verifier.model": validateModel,
@@ -2385,7 +2386,9 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     e.g. 7200000 for 2 hours. This is separate from
                                     cli.timeoutMs / the CLI timeouts on the Workflow settings
                                     page, which bound the whole command rather than one
-                                    HTTP request.
+                                    HTTP request. It also sets how long to wait for the
+                                    server's response headers, which Node otherwise caps
+                                    at 300 s.
   llm.local.maxRetries     number    Retries after the local server refuses or drops the
                                     connection (or answers 429/5xx) before the request fails
                                     (default: 6; 0 = fail on the first). With the default
@@ -2395,6 +2398,10 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.local.retryBaseDelayMs number  First wait in ms before a retry; each later one doubles
                                     (default: 2000)
   llm.local.retryMaxDelayMs number   Cap on one wait in ms (default: 60000)
+  llm.local.maxFormatRetries number  Resends of a turn the server rejects because the model's
+                                    output was malformed — a broken tool call or channel
+                                    ("does not match the expected … format") — before the
+                                    run fails (default: 3; 0 = fail on the first)
   llm.local.verifier.host  string    Hostname of a second local server used to review the
                                     primary model's output before finalizing a run (optional)
   llm.local.verifier.port  number    Port of the verifier server (optional)
@@ -2661,6 +2668,7 @@ Examples:
   n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
   n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
   n-dx config llm.local.maxRetries 10          Wait longer for a restarting local server
+  n-dx config llm.local.maxFormatRetries 5     Resend malformed model replies more often
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config llm.claude.model claude-opus-5-5 Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex

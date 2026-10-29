@@ -36,6 +36,18 @@
  * A request that hits `llm.local.timeoutMs` is not retried here; it surfaces
  * as reason `"timeout"`.
  *
+ * Completions are always requested streamed (see {@link fetchLocalCompletion}):
+ * Node's fetch gives up after 300 s without response headers, and LM Studio
+ * sends none for a non-streamed completion until generation ends — so a slow
+ * model's turn died after five minutes whatever `llm.local.timeoutMs` said.
+ * Streamed, the headers come at once; the chunks are assembled back into the
+ * non-streamed response, and `llm.local.timeoutMs` bounds the whole read.
+ *
+ * A 400/500 saying the model produced malformed output (a broken tool call or
+ * channel — "does not match the expected … format") is the model's mistake, not
+ * the request's: the same request is sent again, up to
+ * `llm.local.maxFormatRetries` times (default 3).
+ *
  * @see {@link createOpenAiApiProvider} in `openai-api-provider.ts` for the cloud alternative
  */
 
@@ -46,6 +58,7 @@ import type { LocalConfig } from "./llm-types.js";
 import { parseOpenAiTokenUsage } from "./openai-api-provider.js";
 import { CLASSIFY_WINDOW } from "./llm-error-classifier.js";
 import { DEFAULT_LOCAL_HOST, DEFAULT_LOCAL_PORT, describeLocalEndpointProblem } from "./local-endpoint.js";
+import { assembleLocalChatStream, readSseData } from "./local-chat-stream.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 /**
@@ -56,6 +69,12 @@ const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 export const DEFAULT_LOCAL_MAX_RETRIES = 6;
 export const DEFAULT_LOCAL_RETRY_BASE_DELAY_MS = 2000;
 export const DEFAULT_LOCAL_RETRY_MAX_DELAY_MS = 60_000;
+/**
+ * Resends of a turn the local server rejected because the model's output was
+ * malformed (see {@link isLocalModelOutputError}). Sampling differs per
+ * attempt, so a resend usually comes back well formed.
+ */
+export const DEFAULT_LOCAL_MAX_FORMAT_RETRIES = 3;
 const DEFAULT_MAX_TOKENS = 8192;
 // Local inference can be slow; use a long timeout. Streaming is unaffected
 // because the connection stays open as chunks arrive.
@@ -83,6 +102,11 @@ export interface LocalApiProviderOptions {
    * then {@link DEFAULT_LOCAL_RETRY_MAX_DELAY_MS}.
    */
   maxDelayMs?: number;
+  /**
+   * Resends after the server reports malformed model output. Defaults to
+   * `llm.local.maxFormatRetries`, then {@link DEFAULT_LOCAL_MAX_FORMAT_RETRIES}.
+   */
+  maxFormatRetries?: number;
   /** Wait between attempts. Tests replace it; defaults to a timer. */
   sleep?: (ms: number) => Promise<void>;
   /** Maximum response tokens (default: 8192). */
@@ -160,6 +184,8 @@ export interface LocalRetryPolicy {
   baseDelayMs: number;
   /** Cap on one backoff delay in ms. */
   maxDelayMs: number;
+  /** Resends after malformed model output. 0 disables. */
+  maxFormatRetries: number;
 }
 
 function pickNonNegative(...values: Array<number | undefined>): number | undefined {
@@ -170,7 +196,7 @@ function pickNonNegative(...values: Array<number | undefined>): number | undefin
  * Resolve the retry policy for local requests.
  *
  * Precedence per field: explicit `overrides` → `llm.local.maxRetries` /
- * `retryBaseDelayMs` / `retryMaxDelayMs` → the defaults
+ * `retryBaseDelayMs` / `retryMaxDelayMs` / `maxFormatRetries` → the defaults
  * ({@link DEFAULT_LOCAL_MAX_RETRIES} etc.). A negative or non-numeric value is
  * skipped rather than trusted.
  */
@@ -183,7 +209,14 @@ export function resolveLocalRetryPolicy(
     ?? DEFAULT_LOCAL_RETRY_BASE_DELAY_MS;
   const maxDelayMs = pickNonNegative(overrides.maxDelayMs, localConfig?.retryMaxDelayMs)
     ?? DEFAULT_LOCAL_RETRY_MAX_DELAY_MS;
-  return { maxRetries: Math.floor(maxRetries), baseDelayMs, maxDelayMs: Math.max(maxDelayMs, 0) };
+  const maxFormatRetries = pickNonNegative(overrides.maxFormatRetries, localConfig?.maxFormatRetries)
+    ?? DEFAULT_LOCAL_MAX_FORMAT_RETRIES;
+  return {
+    maxRetries: Math.floor(maxRetries),
+    baseDelayMs,
+    maxDelayMs: Math.max(maxDelayMs, 0),
+    maxFormatRetries: Math.floor(maxFormatRetries),
+  };
 }
 
 /** Backoff before retry number `attempt` (0-based): doubling, capped. */
@@ -242,11 +275,44 @@ function describeWait(ms: number): string {
   return ms >= 60_000 ? `${Math.round(ms / 6_000) / 10} min` : `${Math.round(ms / 100) / 10}s`;
 }
 
-/** Options for {@link fetchLocalWithRetry}. */
+// ── Malformed model output ───────────────────────────────────────────────
+
+/**
+ * What a local server says when the *model's* output could not be parsed — a
+ * tool call or channel in the wrong shape. Kept narrow on purpose: an ordinary
+ * 400 (context length, a bad request body) must not be resent.
+ */
+const MODEL_OUTPUT_ERROR = new RegExp(
+  [
+    "does not match the expected",
+    "model produced output",
+    "produced output that",
+    "invalid tool call",
+    "failed to parse (?:the )?(?:tool|function|model|generated|output|input at pos)",
+  ].join("|"),
+  "i",
+);
+
+/**
+ * True when an HTTP status and error body from the local server mean the
+ * model produced malformed output (LM Studio: `Engine protocol predict stream
+ * returned an error: … The model produced output that does not match the
+ * expected peg-native format`). Only 400 and 500 qualify.
+ */
+export function isLocalModelOutputError(status: number, rawBody: string): boolean {
+  if (status !== 400 && status !== 500) return false;
+  return MODEL_OUTPUT_ERROR.test(rawBody.slice(0, CLASSIFY_WINDOW));
+}
+
+/** Options for {@link fetchLocalWithRetry} and {@link fetchLocalCompletion}. */
 export interface LocalFetchOptions {
   /** The server's base URL, named in the error when retries run out. */
   baseUrl: string;
-  /** Per-attempt timeout in ms; 0 means none. Cleared once headers arrive. */
+  /**
+   * Per-attempt timeout in ms; 0 means none. {@link fetchLocalWithRetry}
+   * clears it once headers arrive; {@link fetchLocalCompletion} holds it until
+   * the whole streamed completion has been read.
+   */
   timeoutMs: number;
   /** `llm.local.*` settings the retry policy is read from. */
   localConfig?: LocalConfig;
@@ -254,42 +320,68 @@ export interface LocalFetchOptions {
   policy?: Partial<LocalRetryPolicy>;
   /** Told before each wait, so a caller can say why the run is pausing. */
   onRetry?: (notice: { attempt: number; maxRetries: number; delayMs: number; error: string }) => void;
+  /** Told before each resend after malformed model output. */
+  onFormatRetry?: (notice: { attempt: number; maxRetries: number; delayMs: number; error: string }) => void;
   /** Wait between attempts. Tests replace it; defaults to a timer. */
   sleep?: (ms: number) => Promise<void>;
 }
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/** What one attempt came back with: a response for the caller, or malformed model output to resend on. */
+type LocalAttempt =
+  | { response: Response }
+  | { formatError: { status: number; rawBody: string } };
+
 /**
- * `fetch` a local-server URL, retrying while the connection is refused or
- * dropped.
- *
- * Only network failures are retried here (see {@link isLocalNetworkError}); an
- * HTTP response of any status is returned for the caller to judge, and a
- * timeout's `AbortError` is rethrown as it came. When the retries run out the
- * error is a retryable `ClaudeClientError` with reason `"network"`, naming the
- * server, the attempts made, how long they waited and the settings to raise —
- * so a caller's own retry policy (`hench.retry.*`) can still apply.
- *
- * Shared by the provider's blocking and streaming paths and by hench's local
- * tool loop, which builds its own chat request.
+ * Judge a 400/500 by its body: malformed model output is resent, anything else
+ * goes back to the caller as an equivalent response (the body has been read).
  */
-export async function fetchLocalWithRetry(
+async function judgeErrorStatus(response: Response): Promise<LocalAttempt> {
+  if (response.status !== 400 && response.status !== 500) return { response };
+  const rawBody = await response.text().catch(() => "");
+  if (isLocalModelOutputError(response.status, rawBody)) {
+    return { formatError: { status: response.status, rawBody } };
+  }
+  return {
+    response: new Response(rawBody, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    }),
+  };
+}
+
+/**
+ * The attempt loop {@link fetchLocalWithRetry} and {@link fetchLocalCompletion}
+ * share. `read` turns the fetched response into the attempt's outcome; with
+ * `holdTimeout` it runs under the same `timeoutMs` abort as the fetch, so the
+ * bound covers the whole body, and a connection dropped while it reads is
+ * retried like a refused one.
+ */
+async function sendLocalWithRetry(
   url: string,
   init: RequestInit,
   options: LocalFetchOptions,
+  read: (response: Response) => Promise<LocalAttempt>,
+  holdTimeout: boolean,
 ): Promise<Response> {
   const policy = resolveLocalRetryPolicy(options.localConfig, options.policy ?? {});
   const sleep = options.sleep ?? defaultSleep;
+  let networkAttempt = 0;
+  let formatAttempt = 0;
   let waitedMs = 0;
-  for (let attempt = 0; ; attempt++) {
+  for (;;) {
     const abort = createTimeoutAbort(options.timeoutMs);
+    let attempt: LocalAttempt;
     try {
-      return await fetch(url, { ...init, ...(abort ? { signal: abort.signal } : {}) });
+      const response = await fetch(url, { ...init, ...(abort ? { signal: abort.signal } : {}) });
+      if (!holdTimeout) abort?.clear();
+      attempt = await read(response);
     } catch (err) {
       if (!isLocalNetworkError(err)) throw err;
-      if (attempt >= policy.maxRetries) {
-        const attempts = attempt + 1;
+      if (networkAttempt >= policy.maxRetries) {
+        const attempts = networkAttempt + 1;
         throw new ClaudeClientError(
           `Cannot reach local server at ${options.baseUrl}: ${describeNetworkError(err)}. ` +
           `Gave up after ${attempts} attempt${attempts === 1 ? "" : "s"} over ${describeWait(waitedMs)}. ` +
@@ -300,13 +392,166 @@ export async function fetchLocalWithRetry(
           true,
         );
       }
-      const delayMs = retryDelayMs(policy, attempt);
-      options.onRetry?.({ attempt: attempt + 1, maxRetries: policy.maxRetries, delayMs, error: describeNetworkError(err) });
+      const delayMs = retryDelayMs(policy, networkAttempt);
+      networkAttempt++;
+      options.onRetry?.({ attempt: networkAttempt, maxRetries: policy.maxRetries, delayMs, error: describeNetworkError(err) });
       await sleep(delayMs);
       waitedMs += delayMs;
+      continue;
     } finally {
       abort?.clear();
     }
+
+    if ("response" in attempt) return attempt.response;
+    const error = parseLmStudioError(attempt.formatError.status, attempt.formatError.rawBody);
+    if (formatAttempt >= policy.maxFormatRetries) {
+      const attempts = formatAttempt + 1;
+      throw new ClaudeClientError(
+        `The local model at ${options.baseUrl} produced malformed output (a tool call or message the server ` +
+        `could not parse) ${attempts} time${attempts === 1 ? "" : "s"} in a row: ${error}. ` +
+        `Raise llm.local.maxFormatRetries (now ${policy.maxFormatRetries}) to resend it more often, ` +
+        "e.g. 'ndx config llm.local.maxFormatRetries 6', or try a model that follows the tool-call format more reliably.",
+        "unknown",
+        false,
+      );
+    }
+    // A short, fixed pause: the server is up, only the sample was bad.
+    const delayMs = Math.min(policy.baseDelayMs, policy.maxDelayMs);
+    formatAttempt++;
+    options.onFormatRetry?.({ attempt: formatAttempt, maxRetries: policy.maxFormatRetries, delayMs, error });
+    await sleep(delayMs);
+  }
+}
+
+/**
+ * `fetch` a local-server URL, retrying while the connection is refused or
+ * dropped, and resending while the model's output comes back malformed.
+ *
+ * Network failures (see {@link isLocalNetworkError}) are retried on
+ * `llm.local.maxRetries`; when those run out the error is a retryable
+ * `ClaudeClientError` with reason `"network"`, naming the server, the attempts
+ * made, how long they waited and the settings to raise — so a caller's own
+ * retry policy (`hench.retry.*`) can still apply.
+ *
+ * A 400/500 whose body says the model produced malformed output (see
+ * {@link isLocalModelOutputError}) is resent up to `llm.local.maxFormatRetries`
+ * times after a short pause; when those run out the error names what happened
+ * and the setting. Any other HTTP response is returned for the caller to judge.
+ *
+ * `timeoutMs` bounds the wait for headers and is then cleared, so a stream can
+ * run as long as it keeps sending; hitting it is not retried — the abort's
+ * `AbortError` is rethrown as it came. Used by the provider's `stream()`; a
+ * completion read whole goes through {@link fetchLocalCompletion}.
+ */
+export async function fetchLocalWithRetry(
+  url: string,
+  init: RequestInit,
+  options: LocalFetchOptions,
+): Promise<Response> {
+  return sendLocalWithRetry(url, init, options, judgeErrorStatus, false);
+}
+
+/**
+ * The status a failure reported inside the stream is given. LM Studio answers
+ * the same failures with a 400 when the request is not streamed (a context
+ * overflow, malformed model output), so callers keep judging them as before.
+ */
+const IN_STREAM_ERROR_STATUS = 400;
+
+/** True when the response is a server-sent event stream. */
+function isEventStream(response: Response): boolean {
+  const type = response.headers?.get?.("content-type") ?? "";
+  return /text\/event-stream/i.test(type);
+}
+
+/** Read a streamed completion to its end and assemble it into the non-streamed response. */
+async function readStreamedCompletion(response: Response): Promise<LocalAttempt> {
+  if (!response.ok || !response.body || !isEventStream(response)) return judgeErrorStatus(response);
+  const assembled = await assembleLocalChatStream(response.body);
+  if ("error" in assembled) {
+    if (isLocalModelOutputError(IN_STREAM_ERROR_STATUS, assembled.error)) {
+      return { formatError: { status: IN_STREAM_ERROR_STATUS, rawBody: assembled.error } };
+    }
+    return {
+      response: new Response(assembled.error, {
+        status: IN_STREAM_ERROR_STATUS,
+        statusText: "Bad Request",
+        headers: { "Content-Type": "application/json" },
+      }),
+    };
+  }
+  return {
+    response: new Response(JSON.stringify(assembled.completion), {
+      status: 200,
+      statusText: "OK",
+      headers: { "Content-Type": "application/json" },
+    }),
+  };
+}
+
+/** Options for {@link fetchLocalCompletion}. */
+export interface LocalCompletionOptions extends LocalFetchOptions {
+  /**
+   * `false` sends once: no connection retries (the fetch error is rethrown as
+   * it came) and no malformed-output resends (that error comes back as a 400
+   * response). For best-effort calls such as hench's context summarizer and
+   * verifier. Default `true`.
+   */
+  resend?: boolean;
+}
+
+/**
+ * POST a chat completion to the local server, streamed, and return it as the
+ * non-streamed response: `response.json()` is the usual
+ * `{ choices: [{ message, finish_reason }], usage }`.
+ *
+ * The request asks for `stream: true`, and for `stream_options.include_usage`
+ * so the token counts still arrive (a server that ignores it sends no `usage`,
+ * as a non-streamed reply without one would). LM Studio sends a streamed
+ * response's headers at once, so Node's 300 s wait for headers — which a slow
+ * non-streamed completion runs into — no longer applies. The chunks are
+ * assembled by `assembleLocalChatStream`: content and reasoning concatenated,
+ * tool calls merged by index, the last `finish_reason`, the usage chunk. A
+ * server that answers with plain JSON is passed through unchanged.
+ *
+ * `timeoutMs` (`llm.local.timeoutMs`, 0 = none) bounds the whole request, from
+ * sending to the last chunk, as it did for a non-streamed completion; hitting
+ * it rethrows the abort's `AbortError` and is not retried. A connection that
+ * drops mid-stream is retried like a refused one. A failure the server reports
+ * inside the stream comes back as a 400 response carrying that error body —
+ * or, when it is malformed model output, is resent on
+ * `llm.local.maxFormatRetries` exactly like its HTTP 400 form (see
+ * {@link fetchLocalWithRetry}).
+ *
+ * Shared by the provider's blocking path and by hench's local tool loop,
+ * context summarizer and verifier, which build their own chat requests.
+ */
+export async function fetchLocalCompletion(
+  url: string,
+  body: Record<string, unknown>,
+  options: LocalCompletionOptions,
+  headers: Record<string, string> = { "Content-Type": "application/json" },
+): Promise<Response> {
+  const init: RequestInit = {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...body, stream: true, stream_options: { include_usage: true } }),
+  };
+  if (options.resend !== false) {
+    return sendLocalWithRetry(url, init, options, readStreamedCompletion, true);
+  }
+  const abort = createTimeoutAbort(options.timeoutMs);
+  try {
+    const response = await fetch(url, { ...init, ...(abort ? { signal: abort.signal } : {}) });
+    const attempt = await readStreamedCompletion(response);
+    if ("response" in attempt) return attempt.response;
+    return new Response(attempt.formatError.rawBody, {
+      status: attempt.formatError.status,
+      statusText: "Bad Request",
+      headers: { "Content-Type": "application/json" },
+    });
+  } finally {
+    abort?.clear();
   }
 }
 
@@ -353,7 +598,10 @@ export function parseLmStudioError(status: number, rawBody: string): string {
     const parsed = JSON.parse(rawBody) as Record<string, unknown>;
     // LM Studio / OpenAI: { error: { message: "..." } }
     const errObj = parsed.error;
-    if (errObj && typeof errObj === "object") {
+    if (typeof errObj === "string") {
+      // LM Studio's engine errors: { error: "Engine protocol … returned an error: …" }
+      innerMessage = errObj;
+    } else if (errObj && typeof errObj === "object") {
       const m = (errObj as Record<string, unknown>).message;
       if (typeof m === "string") innerMessage = m;
     } else if (typeof parsed.message === "string") {
@@ -452,6 +700,7 @@ export function createLocalApiProvider(
     maxRetries: options.maxRetries,
     baseDelayMs: options.baseDelayMs,
     maxDelayMs: options.maxDelayMs,
+    maxFormatRetries: options.maxFormatRetries,
   });
   const maxRetries = policy.maxRetries;
   const sleep = options.sleep ?? defaultSleep;
@@ -501,12 +750,14 @@ export function createLocalApiProvider(
       for (let attempt = 0; ; attempt++) {
         let response: Response;
         try {
-          // Network failures are retried inside; timeoutMs === 0 disables the
-          // abort entirely (llm.local.timeoutMs 0).
-          response = await fetchLocalWithRetry(
+          // Streamed and assembled, so the headers come at once; network
+          // failures are retried inside; timeoutMs bounds the whole read, and
+          // 0 disables the abort entirely (llm.local.timeoutMs 0).
+          response = await fetchLocalCompletion(
             `${baseUrl}/chat/completions`,
-            { method: "POST", headers, body: JSON.stringify(body) },
+            body,
             { baseUrl, timeoutMs, policy, sleep },
+            headers,
           );
         } catch (err) {
           throw toLocalClientError(err, timeoutMs);
@@ -610,60 +861,32 @@ export function createLocalApiProvider(
       }
 
       // Parse SSE stream
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
       let totalUsage: TokenUsage | undefined;
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          // Keep the last (possibly incomplete) line in the buffer
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith(":")) continue;
-
-            if (trimmed === "data: [DONE]") {
-              yield { done: true, usage: totalUsage };
-              return;
-            }
-
-            if (trimmed.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(trimmed.slice(6)) as Record<string, unknown>;
-                const choices = data.choices as Array<Record<string, unknown>> | undefined;
-
-                if (choices && choices.length > 0) {
-                  const delta = choices[0].delta as Record<string, unknown> | undefined;
-                  if (delta && typeof delta.content === "string") {
-                    yield { text: delta.content };
-                  }
-                }
-
-                if (data.usage) {
-                  totalUsage = parseOpenAiTokenUsage(
-                    data.usage as Record<string, unknown>,
-                  );
-                }
-              } catch {
-                // Skip malformed JSON lines
-              }
-            }
-          }
-        }
-
-        if (buffer.trim() === "data: [DONE]") {
+      for await (const { data: line } of readSseData(response.body)) {
+        if (line === "[DONE]") {
           yield { done: true, usage: totalUsage };
           return;
         }
-      } finally {
-        reader.releaseLock();
+        try {
+          const data = JSON.parse(line) as Record<string, unknown>;
+          const choices = data.choices as Array<Record<string, unknown>> | undefined;
+
+          if (choices && choices.length > 0) {
+            const delta = choices[0].delta as Record<string, unknown> | undefined;
+            if (delta && typeof delta.content === "string") {
+              yield { text: delta.content };
+            }
+          }
+
+          if (data.usage) {
+            totalUsage = parseOpenAiTokenUsage(
+              data.usage as Record<string, unknown>,
+            );
+          }
+        } catch {
+          // Skip malformed JSON lines
+        }
       }
 
       yield { done: true, usage: totalUsage };

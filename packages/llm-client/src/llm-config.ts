@@ -70,6 +70,9 @@ function extractLocalConfig(value: unknown): LocalConfig | undefined {
   }
   if (typeof v.retryBaseDelayMs === "number" && v.retryBaseDelayMs >= 0) cfg.retryBaseDelayMs = v.retryBaseDelayMs;
   if (typeof v.retryMaxDelayMs === "number" && v.retryMaxDelayMs >= 0) cfg.retryMaxDelayMs = v.retryMaxDelayMs;
+  if (typeof v.maxFormatRetries === "number" && Number.isInteger(v.maxFormatRetries) && v.maxFormatRetries >= 0) {
+    cfg.maxFormatRetries = v.maxFormatRetries;
+  }
   const verifier = extractLocalVerifierConfig(v.verifier);
   if (verifier) cfg.verifier = verifier;
   return Object.keys(cfg).length > 0 ? cfg : undefined;

@@ -283,11 +283,14 @@ export {
   resolveLocalRetryPolicy,
   isLocalNetworkError,
   fetchLocalWithRetry,
+  fetchLocalCompletion,
+  isLocalModelOutputError,
   DEFAULT_LOCAL_MAX_RETRIES,
+  DEFAULT_LOCAL_MAX_FORMAT_RETRIES,
   DEFAULT_LOCAL_RETRY_BASE_DELAY_MS,
   DEFAULT_LOCAL_RETRY_MAX_DELAY_MS,
 } from "./local-api-provider.js";
-export type { LocalApiProviderOptions, LocalRetryPolicy, LocalFetchOptions } from "./local-api-provider.js";
+export type { LocalApiProviderOptions, LocalRetryPolicy, LocalFetchOptions, LocalCompletionOptions } from "./local-api-provider.js";
 
 // The one host-and-port shape rule for the local LLM endpoint. Inference,
 // the dashboard's probes and `ndx config` all splice these into a URL, so

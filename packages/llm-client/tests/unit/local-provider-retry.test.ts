@@ -205,6 +205,7 @@ describe("local retry settings", () => {
       maxRetries: DEFAULT_LOCAL_MAX_RETRIES,
       baseDelayMs: DEFAULT_LOCAL_RETRY_BASE_DELAY_MS,
       maxDelayMs: DEFAULT_LOCAL_RETRY_MAX_DELAY_MS,
+      maxFormatRetries: 3,
     });
     expect(DEFAULT_LOCAL_MAX_RETRIES).toBe(6);
     expect(DEFAULT_LOCAL_RETRY_BASE_DELAY_MS).toBe(2000);
@@ -213,23 +214,24 @@ describe("local retry settings", () => {
 
   it("takes llm.local.* over the defaults and explicit options over both", () => {
     const local = { maxRetries: 0, retryBaseDelayMs: 500, retryMaxDelayMs: 5000 };
-    expect(resolveLocalRetryPolicy(local)).toEqual({ maxRetries: 0, baseDelayMs: 500, maxDelayMs: 5000 });
-    expect(resolveLocalRetryPolicy(local, { maxRetries: 9 })).toEqual({ maxRetries: 9, baseDelayMs: 500, maxDelayMs: 5000 });
+    expect(resolveLocalRetryPolicy(local)).toEqual({ maxRetries: 0, baseDelayMs: 500, maxDelayMs: 5000, maxFormatRetries: 3 });
+    expect(resolveLocalRetryPolicy(local, { maxRetries: 9 })).toEqual({ maxRetries: 9, baseDelayMs: 500, maxDelayMs: 5000, maxFormatRetries: 3 });
     // A negative value is skipped, not trusted.
     expect(resolveLocalRetryPolicy({ maxRetries: -1 }).maxRetries).toBe(DEFAULT_LOCAL_MAX_RETRIES);
   });
 
-  it("reads llm.local.maxRetries, retryBaseDelayMs and retryMaxDelayMs from .n-dx.json", async () => {
+  it("reads llm.local.maxRetries, retryBaseDelayMs, retryMaxDelayMs and maxFormatRetries from .n-dx.json", async () => {
     const dir = await mkdtemp(join(tmpdir(), "llm-local-retry-"));
     try {
       await writeFile(join(dir, ".n-dx.json"), JSON.stringify({
-        llm: { vendor: "local", local: { maxRetries: 10, retryBaseDelayMs: 3000, retryMaxDelayMs: 90000 } },
+        llm: { vendor: "local", local: { maxRetries: 10, retryBaseDelayMs: 3000, retryMaxDelayMs: 90000, maxFormatRetries: 5 } },
       }));
       const cfg = await loadLLMConfig(dir);
       expect(cfg.local?.maxRetries).toBe(10);
       expect(cfg.local?.retryBaseDelayMs).toBe(3000);
       expect(cfg.local?.retryMaxDelayMs).toBe(90000);
-      expect(resolveLocalRetryPolicy(cfg.local)).toEqual({ maxRetries: 10, baseDelayMs: 3000, maxDelayMs: 90000 });
+      expect(cfg.local?.maxFormatRetries).toBe(5);
+      expect(resolveLocalRetryPolicy(cfg.local)).toEqual({ maxRetries: 10, baseDelayMs: 3000, maxDelayMs: 90000, maxFormatRetries: 5 });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

@@ -159,6 +159,11 @@ export interface LocalConfig {
   /** Cap on one backoff delay in ms. Default 60000. */
   retryMaxDelayMs?: number;
   /**
+   * Resends of a turn the server rejected because the model's output was
+   * malformed (a broken tool call or channel). Default 3. 0 disables.
+   */
+  maxFormatRetries?: number;
+  /**
    * Second-model verifier. When set, hench sends the primary model's completed
    * solution to this endpoint for review before finalizing the run.
    *

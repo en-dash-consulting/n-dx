@@ -14,6 +14,16 @@
  *      and the change lands through edit_file with the file otherwise intact.
  *   4. A refused connection is retried on llm.local.* and then hench.retry.*
  *      before the run fails, and the failure names the settings to raise.
+ *   5. A turn LM Studio rejects as malformed model output — a 400, or an
+ *      error event inside the stream — is resent on llm.local.maxFormatRetries
+ *      and the run carries on; when the resends run out the failure names that
+ *      setting.
+ *
+ * Every completion is requested streamed (the headers then arrive at once, so
+ * a slow turn is not cut off by Node's 300 s wait for them), and the fake
+ * answers as LM Studio does: server-sent events with tool-call arguments split
+ * across chunks and a usage chunk at the end. The loop must see the same tool
+ * calls, reasoning and usage the non-streamed response carried.
  *
  * The chat/completions endpoint is mocked via a global fetch stub — no LM
  * Studio required. The provider registry is mocked the same way as the Gemini
@@ -62,6 +72,54 @@ function chatResponse(turn: ScriptedTurn): Record<string, unknown> {
     ],
     usage: { prompt_tokens: turn.prompt_tokens ?? 100, completion_tokens: 20 },
   };
+}
+
+/**
+ * The same turn as LM Studio streams it: reasoning and content in two pieces
+ * each, each tool call's name in its first delta and its arguments in three
+ * fragments, then the finish_reason chunk, the include_usage chunk and [DONE].
+ */
+function chatStreamEvents(turn: ScriptedTurn): string[] {
+  const full = chatResponse(turn);
+  const choice = (full["choices"] as Array<Record<string, unknown>>)[0]!;
+  const message = choice["message"] as Record<string, unknown>;
+  const event = (delta: Record<string, unknown>, finish: unknown = null): string =>
+    "data: " + JSON.stringify({ id: "c1", object: "chat.completion.chunk", choices: [{ index: 0, delta, finish_reason: finish }] }) + "\n\n";
+  const halves = (text: string): string[] => [text.slice(0, Math.ceil(text.length / 2)), text.slice(Math.ceil(text.length / 2))];
+  const events = [event({ role: "assistant" })];
+  if (typeof message["reasoning_content"] === "string") {
+    for (const piece of halves(message["reasoning_content"])) events.push(event({ reasoning_content: piece }));
+  }
+  if (typeof message["content"] === "string") {
+    for (const piece of halves(message["content"])) events.push(event({ content: piece }));
+  }
+  const calls = (message["tool_calls"] as ScriptedTurn["tool_calls"]) ?? [];
+  calls.forEach((call, index) => {
+    events.push(event({ tool_calls: [{ index, id: call.id, type: "function", function: { name: call.function.name, arguments: "" } }] }));
+    const args = call.function.arguments;
+    const third = Math.ceil(args.length / 3);
+    for (const piece of [args.slice(0, third), args.slice(third, 2 * third), args.slice(2 * third)]) {
+      events.push(event({ tool_calls: [{ index, type: "function", function: { arguments: piece } }] }));
+    }
+  });
+  events.push(event({}, choice["finish_reason"]));
+  events.push("data: " + JSON.stringify({ id: "c1", object: "chat.completion.chunk", choices: [], usage: full["usage"] }) + "\n\n");
+  events.push("data: [DONE]\n\n");
+  return events;
+}
+
+/** An SSE response carrying `events`, each its own network chunk. */
+function sseResponse(events: string[]): Response {
+  const enc = new TextEncoder();
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const e of events) controller.enqueue(enc.encode(e));
+        controller.close();
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "text/event-stream" } },
+  );
 }
 
 describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
@@ -114,9 +172,10 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
   });
 
   /**
-   * Stub global fetch to answer chat/completions from a script, in order.
-   * Requests WITHOUT a `tools` field are the condenser's summarization calls —
-   * they get a fixed summary and do not consume the script.
+   * Stub global fetch to answer chat/completions from a script, in order,
+   * streamed (see chatStreamEvents). Requests WITHOUT a `tools` field are the
+   * condenser's summarization calls — they get a fixed summary and do not
+   * consume the script.
    */
   function stubChatEndpoint(turns: ScriptedTurn[]): void {
     let call = 0;
@@ -125,12 +184,7 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
       const turn: ScriptedTurn = !("tools" in body)
         ? { content: "Summary: earlier files were read; remaining work: finish the output file." }
         : turns[Math.min(call++, turns.length - 1)]!;
-      return {
-        ok: true,
-        status: 200,
-        json: async () => chatResponse(turn),
-        text: async () => JSON.stringify(chatResponse(turn)),
-      } as unknown as Response;
+      return sseResponse(chatStreamEvents(turn));
     });
     vi.stubGlobal("fetch", fetchMock);
   }
@@ -227,6 +281,15 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     expect(result.run.turns).toBe(4);
     expect(result.run.toolCalls.length).toBeGreaterThanOrEqual(1);
     expect(result.run.toolCalls[0].tool).toBe("write_file");
+    // The streamed arguments were reassembled whole: the file holds exactly
+    // what the scripted call carried.
+    expect(written).toBe("export const source = 'local';\n");
+    // Every turn was requested streamed with usage, and the usage chunks were
+    // counted as the non-streamed usage was: 4 turns × (100 in, 20 out).
+    for (const c of fetchMock.mock.calls) {
+      expect(JSON.parse((c[1] as { body: string }).body)).toMatchObject({ stream: true, stream_options: { include_usage: true } });
+    }
+    expect(result.run.tokenUsage).toMatchObject({ input: 400, output: 80 });
     // This completed through the real git-derived path, not a mocked verdict.
     // Asked of the file's own history rather than of HEAD: the PRD completion
     // record is committed after the work, so HEAD is that record and the work
@@ -409,24 +472,34 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     expect(task!.status).toBe("pending");
   });
 
-  describe("a dropped LM Studio connection", () => {
-    /** The completing script: write, stage, hand off the commit, claim done. */
-    const completingTurns = (): ScriptedTurn[] => [
-      {
-        content: null,
-        tool_calls: [{ id: "r1", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: "out.ts", content: "export {};\n" }) } }],
-      },
-      {
-        content: null,
-        tool_calls: [{ id: "r2", type: "function", function: { name: "git", arguments: JSON.stringify({ subcommand: "add", args: "out.ts" }) } }],
-      },
-      {
-        content: null,
-        tool_calls: [{ id: "r3", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: ".hench-commit-msg.txt", content: "feat: out\n" }) } }],
-      },
-      { content: "Done." },
-    ];
+  /** The completing script: write, stage, hand off the commit, claim done. */
+  const completingTurns = (): ScriptedTurn[] => [
+    {
+      content: null,
+      tool_calls: [{ id: "r1", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: "out.ts", content: "export {};\n" }) } }],
+    },
+    {
+      content: null,
+      tool_calls: [{ id: "r2", type: "function", function: { name: "git", arguments: JSON.stringify({ subcommand: "add", args: "out.ts" }) } }],
+    },
+    {
+      content: null,
+      tool_calls: [{ id: "r3", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: ".hench-commit-msg.txt", content: "feat: out\n" }) } }],
+    },
+    { content: "Done." },
+  ];
 
+  async function writeLocalSettings(local: Record<string, unknown>): Promise<void> {
+    await writeFile(
+      join(projectDir, ".n-dx.json"),
+      JSON.stringify({ llm: { vendor: "local", local: { host: "localhost", port: 1234, ...local } } }),
+      "utf-8",
+    );
+    execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "local settings"], { cwd: projectDir, stdio: "ignore" });
+  }
+
+  describe("a dropped LM Studio connection", () => {
     /** Refuse the first `failures` requests the way Node's fetch does, then answer from the script. */
     function stubFlakyEndpoint(failures: number): void {
       stubChatEndpoint(completingTurns());
@@ -441,16 +514,6 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
         }
         return (answer as (...a: unknown[]) => Promise<Response>)(...args);
       });
-    }
-
-    async function writeLocalSettings(local: Record<string, unknown>): Promise<void> {
-      await writeFile(
-        join(projectDir, ".n-dx.json"),
-        JSON.stringify({ llm: { vendor: "local", local: { host: "localhost", port: 1234, ...local } } }),
-        "utf-8",
-      );
-      execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
-      execFileSync("git", ["commit", "-m", "local settings"], { cwd: projectDir, stdio: "ignore" });
     }
 
     it("retries on llm.local.* and completes the task", async () => {
@@ -488,6 +551,100 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
       expect(result.run.error).toContain("llm.local.maxRetries");
       // llm.local: 2 attempts, twice (one hench.retry).
       expect(fetchMock).toHaveBeenCalledTimes(4);
+      const doc = await store.loadDocument();
+      expect(doc!.items.find((i: { id: string }) => i.id === "task-1")!.status).toBe("pending");
+    });
+  });
+  describe("malformed model output", () => {
+    /** LM Studio's 400 when the model emitted a tool call in the wrong shape. */
+    const MALFORMED = JSON.stringify({
+      error:
+        "Engine protocol predict stream returned an error: " +
+        JSON.stringify({
+          code: 500,
+          message: "The model produced output that does not match the expected peg-native format",
+          type: "server_error",
+        }),
+    });
+
+    /** The same failure as LM Studio reports it once a streamed response has begun. */
+    const MALFORMED_EVENT =
+      "event: error\ndata: " +
+      JSON.stringify({
+        error: {
+          message:
+            "Engine protocol predict stream returned an error: " +
+            "The model produced output that does not match the expected peg-native format",
+        },
+      }) +
+      "\n\n";
+
+    /**
+     * Answer the `failOn`-th tool turn (1-based) as malformed `times` times —
+     * an HTTP 400, or an error event inside the stream — then carry on.
+     */
+    function stubMalformedTurn(failOn: number, times: number, form: "status" | "stream" = "status"): void {
+      stubChatEndpoint(completingTurns());
+      const answer = fetchMock.getMockImplementation()!;
+      let toolTurns = 0;
+      let rejected = 0;
+      fetchMock.mockImplementation(async (...args: unknown[]) => {
+        const init = args[1] as { body?: string } | undefined;
+        const isToolTurn = init?.body ? "tools" in JSON.parse(init.body) : false;
+        if (isToolTurn && toolTurns + 1 === failOn && rejected < times) {
+          rejected++;
+          return form === "stream"
+            ? sseResponse([`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: "assistant", content: "x" } }] })}\n\n`, MALFORMED_EVENT])
+            : new Response(MALFORMED, { status: 400, statusText: "Bad Request" });
+        }
+        if (isToolTurn) toolTurns++;
+        return (answer as (...a: unknown[]) => Promise<Response>)(...args);
+      });
+    }
+
+    it("resends the turn on llm.local.maxFormatRetries and the run carries on to completion", async () => {
+      mockLocalProvider();
+      await writeLocalSettings({ maxFormatRetries: 3, retryBaseDelayMs: 1, retryMaxDelayMs: 1 });
+      // The second turn (after write_file ran) comes back malformed twice.
+      stubMalformedTurn(2, 2);
+
+      const { result } = await runLoop();
+
+      expect(result.run.status).toBe("completed");
+      expect(existsSync(join(projectDir, "out.ts"))).toBe(true);
+      // Four scripted turns plus the two resends.
+      expect(fetchMock.mock.calls.filter((c) => {
+        const init = c[1] as { body?: string } | undefined;
+        return init?.body ? "tools" in JSON.parse(init.body) : false;
+      })).toHaveLength(6);
+    });
+
+    it("resends a turn whose malformed output arrives inside the stream", async () => {
+      mockLocalProvider();
+      await writeLocalSettings({ maxFormatRetries: 3, retryBaseDelayMs: 1, retryMaxDelayMs: 1 });
+      stubMalformedTurn(2, 1, "stream");
+
+      const { result } = await runLoop();
+
+      expect(result.run.status).toBe("completed");
+      expect(fetchMock.mock.calls.filter((c) => {
+        const init = c[1] as { body?: string } | undefined;
+        return init?.body ? "tools" in JSON.parse(init.body) : false;
+      })).toHaveLength(5);
+    });
+
+    it("fails the run naming llm.local.maxFormatRetries when the resends run out", async () => {
+      mockLocalProvider();
+      await writeLocalSettings({ maxFormatRetries: 1, retryBaseDelayMs: 1, retryMaxDelayMs: 1 });
+      stubMalformedTurn(1, 100);
+
+      const { result, store } = await runLoop({ retry: { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 } });
+
+      expect(result.run.status).toBe("failed");
+      expect(result.run.error).toContain("produced malformed output");
+      expect(result.run.error).toContain("llm.local.maxFormatRetries (now 1)");
+      // One send and one resend; hench.retry does not resend a format failure.
+      expect(fetchMock).toHaveBeenCalledTimes(2);
       const doc = await store.loadDocument();
       expect(doc!.items.find((i: { id: string }) => i.id === "task-1")!.status).toBe("pending");
     });
