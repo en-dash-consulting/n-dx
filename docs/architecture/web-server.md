@@ -162,7 +162,7 @@ is on; the route gate refuses it with 403 while the toggle is off.
   (`rev-list --left-right --count`), predicted conflicts and stack containment
   come from git alone, so the strip still answers offline.
 - **The base is chosen in a fixed order:** the PR's base when GitHub reads are
-  on, else the upstream when it names another branch, else origin's default
+  on, else the PR base a GitHub read cached, else the upstream when it names another branch, else origin's default
   branch. `baseSource` says which, because a branch whose upstream is its own
   remote copy has no useful upstream base.
 - **Conflicts are predicted, not rehearsed.** `git merge-tree --write-tree`
@@ -183,11 +183,20 @@ is on; the route gate refuses it with 403 while the toggle is off.
 - **gh runs only on request.** Without `?github=1` the route answers local
   facts and sets `githubDeferred` when reads are allowed. The board asks that
   way on mount and adds `?github=1` when a card's strip is first expanded, so
-  opening a board of many worktrees runs no gh command. Local-only answers take
-  the base and stack from upstreams, not PR bases.
+  opening a board of many worktrees runs no gh command. A GitHub read
+  remembers each PR base it finds, per worktree and branch, in the server's
+  memory; later local-only answers use it for the base (`baseSource:
+  "pr-cached"`) and the stack. Before any GitHub read, a local-only answer
+  falls back to upstreams and origin's default branch, and `baseNote` says the
+  PR base is not read yet, so a stacked branch's strip does not pass off
+  `origin/main` as its base.
 - **A failing check is classed on the whole log.** gh's per-line job, step and
-  timestamp prefix and colour codes are removed first. When no policy suite or
-  touched test explains the failure, behind-base also fires when the PR's
+  timestamp prefix and colour codes are removed first, whether gh wrote the
+  escape as the 0x1b byte or as literal `^[` text. policy-test needs a policy
+  suite among the failing test files: a log names passing suites on its ✓
+  lines too. A failing-file line may carry a vitest project label between
+  `FAIL` and the path (`FAIL  llm-client:shared tests/x.test.ts`). When no
+  policy suite or touched test explains the failure, behind-base also fires when the PR's
   `mergeStateStatus` is `BEHIND` or a stack layer is not contained, and the
   evidence names which. A test path printed by a package's
   runner (`packages/p test: FAIL tests/x.test.ts`) matches only that

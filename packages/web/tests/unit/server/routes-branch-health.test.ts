@@ -21,6 +21,8 @@ describe("GET /api/branch-health", () => {
   let dir: string;
   let started: RouteTestServer;
   let ghCalls: string[][];
+  /** What `gh pr view` prints; null answers "no pull requests found". */
+  let prJson: string | null;
 
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), "branch-health-route-"));
@@ -36,10 +38,13 @@ describe("GET /api/branch-health", () => {
     writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ web: { sidecarGithubReads: true } }));
 
     ghCalls = [];
+    prJson = null;
     const run = async (cmd: string, args: string[], opts: ExecOptions): Promise<ExecResult> => {
       if (cmd !== "gh") return exec(cmd, args, opts);
       ghCalls.push(args);
-      return { stdout: "", stderr: "no pull requests found", exitCode: 1, error: null, launched: true };
+      return prJson
+        ? { stdout: prJson, stderr: "", exitCode: 0, error: null, launched: true }
+        : { stdout: "", stderr: "no pull requests found", exitCode: 1, error: null, launched: true };
     };
     const ctx: ServerContext = { projectDir: dir, svDir: join(dir, ".sourcevision"), rexDir: join(dir, ".rex"), dev: false };
     started = await startRouteTestServer((req, res) => handleBranchHealthRoute(req, res, ctx, { exec: run }));
@@ -84,5 +89,16 @@ describe("GET /api/branch-health", () => {
     expect(ghCalls[0]?.slice(0, 2)).toEqual(["pr", "view"]);
     expect(body).toMatchObject({ githubDeferred: false });
     expect(body.githubReason).toContain("no pull requests found");
+  });
+
+  it("reuses the PR base a GitHub read found in later local-only answers", async () => {
+    prJson = JSON.stringify({ number: 1, url: "u", baseRefName: "main", statusCheckRollup: [] });
+    const read = await (await fetch(`${started.baseUrl}/api/branch-health?github=1`)).json();
+    expect(read).toMatchObject({ base: "main", baseSource: "pr" });
+
+    ghCalls = [];
+    const local = await (await fetch(`${started.baseUrl}/api/branch-health`)).json();
+    expect(ghCalls).toEqual([]);
+    expect(local).toMatchObject({ base: "main", baseSource: "pr-cached", baseNote: null, githubDeferred: true });
   });
 });

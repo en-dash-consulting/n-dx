@@ -553,6 +553,7 @@ const HEALTH_FEATURE: BranchHealthResponse = {
   head: "0123456789abcdef",
   base: "origin/main",
   baseSource: "pr",
+  baseNote: null,
   ahead: 4,
   behind: 2,
   conflicts: [{ path: "src/a.ts", stages: [1, 2, 3] }],
@@ -598,6 +599,19 @@ describe("branchHealthChips", () => {
       { text: "1 conflict", tone: "bad" },
       { text: "stack: 1 not contained", tone: "bad" },
       { text: "PR #42: 1 failing", tone: "bad" },
+    ]);
+  });
+
+  it("says the PR base is not read when the base is a fallback before a GitHub read", () => {
+    const chips = branchHealthChips({
+      ...HEALTH_FEATURE_LOCAL,
+      baseSource: "default",
+      baseNote: "The PR base is not read yet.",
+      stack: [],
+    });
+    expect(chips.slice(0, 2)).toEqual([
+      { text: "↑4 ↓2 origin/main", tone: "warn" },
+      { text: "PR base not read", tone: "info" },
     ]);
   });
 

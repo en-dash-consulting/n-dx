@@ -5,7 +5,9 @@
  * base, ahead/behind, predicted conflicts and stack containment. GitHub facts
  * (the PR, its checks, failed-check logs) come from `gh` and are read only
  * when the caller says GitHub reads are allowed; without them no gh command
- * runs and `github` is null with a reason.
+ * runs and `github` is null with a reason. A GitHub read remembers each PR
+ * base it finds in a {@link PrBaseCache}; a local-only read uses those for the
+ * base and the stack, and says so when it has none.
  *
  * Nothing here changes the worktree, the index or HEAD. `git merge-tree
  * --write-tree` computes the merge in the object store only.
@@ -42,11 +44,34 @@ export interface CollectOptions {
    * this way on mount and for GitHub facts only when a strip is expanded.
    */
   localOnly?: boolean;
+  /**
+   * PR bases found by earlier GitHub reads. A GitHub read fills it; a
+   * local-only read uses it for the base and the stack before upstreams.
+   */
+  prBases?: PrBaseCache;
   /** Injected for tests; defaults to the llm-client `exec`. */
   exec?: BranchHealthExec;
 }
 
 export const LOCAL_ONLY_REASON = "Only local facts were asked for; GitHub facts load when the strip is expanded.";
+export const PR_BASE_NOT_READ = "The PR base is not read yet: GitHub facts, and the PR's base, load when the strip is expanded.";
+
+/**
+ * The base branch each branch's PR named when GitHub was last read, per
+ * worktree. Held in server memory only: a restart forgets it, and the next
+ * GitHub read fills it again.
+ */
+export class PrBaseCache {
+  private readonly bases = new Map<string, string>();
+
+  get(projectDir: string, branch: string): string | undefined {
+    return this.bases.get(`${projectDir}\0${branch}`);
+  }
+
+  set(projectDir: string, branch: string, base: string): void {
+    this.bases.set(`${projectDir}\0${branch}`, base);
+  }
+}
 
 const GIT_TIMEOUT_MS = 10_000;
 const MERGE_TREE_TIMEOUT_MS = 30_000;
@@ -197,17 +222,18 @@ async function viewPr(git: Runner, branch: string | null, fields: string): Promi
 /**
  * The layers below `base` in this branch's base chain, each checked against HEAD.
  *
- * A layer's own base is its PR base when GitHub reads are on, else its
- * upstream when that names another branch. The chain stops at origin's default
- * branch (the trunk is not a layer), at a branch with no base, at a cycle, or
- * after {@link MAX_STACK_DEPTH} layers.
+ * A layer's own base is its PR base when GitHub reads are on, else the PR
+ * base an earlier read cached, else its upstream when that names another
+ * branch. The chain stops at origin's default branch (the trunk is not a
+ * layer), at a branch with no base, at a cycle, or after
+ * {@link MAX_STACK_DEPTH} layers.
  */
 async function readStack(
   git: Runner,
   base: { ref: string; branch: string },
   upstreams: Map<string, Upstream>,
   defaultBranch: string | null,
-  githubReads: boolean,
+  prBases: PrBaseLookup,
 ): Promise<StackLayer[]> {
   const stack: StackLayer[] = [];
   const seen = new Set<string>();
@@ -216,24 +242,38 @@ async function readStack(
     seen.add(layer.branch);
     const contained = await git.git(["merge-base", "--is-ancestor", layer.ref, "HEAD"]);
     stack.push({ branch: layer.branch, contained: contained.ok });
-    layer = await nextLayer(git, layer.branch, upstreams, githubReads);
+    layer = await nextLayer(git, layer.branch, upstreams, prBases);
   }
   return stack;
+}
+
+/** How a branch's PR base is found: asked of gh, and remembered in or read from the cache. */
+interface PrBaseLookup {
+  gh: boolean;
+  projectDir: string;
+  cache: PrBaseCache | undefined;
 }
 
 async function nextLayer(
   git: Runner,
   branch: string,
   upstreams: Map<string, Upstream>,
-  githubReads: boolean,
+  prBases: PrBaseLookup,
 ): Promise<{ ref: string; branch: string } | null> {
-  if (githubReads) {
+  let baseRefName: string | undefined;
+  if (prBases.gh) {
     const found = await viewPr(git, branch, "baseRefName");
-    const baseRefName = "pr" in found ? found.pr.baseRefName : null;
-    if (typeof baseRefName === "string" && baseRefName) {
-      const ref = await resolveBranchRef(git, baseRefName);
-      if (ref) return { ref, branch: baseRefName };
+    const named = "pr" in found ? found.pr.baseRefName : null;
+    if (typeof named === "string" && named) {
+      baseRefName = named;
+      prBases.cache?.set(prBases.projectDir, branch, named);
     }
+  } else {
+    baseRefName = prBases.cache?.get(prBases.projectDir, branch);
+  }
+  if (baseRefName) {
+    const ref = await resolveBranchRef(git, baseRefName);
+    if (ref) return { ref, branch: baseRefName };
   }
   const upstream = upstreams.get(branch);
   return upstream && upstream.branch !== branch ? upstream : null;
@@ -321,12 +361,19 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
 
   let base: { ref: string; branch: string } | null = null;
   let baseSource: BaseSource | null = null;
-  const prBase = pr && typeof pr.baseRefName === "string" ? pr.baseRefName : null;
+  const prBase = pr && typeof pr.baseRefName === "string" && pr.baseRefName ? pr.baseRefName : null;
+  if (prBase && branch) options.prBases?.set(projectDir, branch, prBase);
+  // A local-only read reuses the PR base the last GitHub read found.
+  const cachedBase = !ghAllowed && branch ? options.prBases?.get(projectDir, branch) ?? null : null;
   const prBaseRef = prBase ? await resolveBranchRef(git, prBase) : null;
+  const cachedBaseRef = cachedBase ? await resolveBranchRef(git, cachedBase) : null;
   const upstream = branch ? upstreams.get(branch) : undefined;
   if (prBase && prBaseRef) {
     base = { ref: prBaseRef, branch: prBase };
     baseSource = "pr";
+  } else if (cachedBase && cachedBaseRef) {
+    base = { ref: cachedBaseRef, branch: cachedBase };
+    baseSource = "pr-cached";
   } else if (upstream && upstream.branch !== branch) {
     base = upstream;
     baseSource = "upstream";
@@ -337,14 +384,17 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
 
   const counts = base ? await aheadBehind(git, base.ref) : { ahead: null, behind: null };
   const predicted = base ? await predictConflicts(git, base.ref) : { conflicts: [], unavailable: "There is no base to merge with." };
-  const stack = base ? await readStack(git, base, upstreams, defaultBranch?.branch ?? null, ghAllowed) : [];
+  const prBases: PrBaseLookup = { gh: ghAllowed, projectDir, cache: options.prBases };
+  const stack = base ? await readStack(git, base, upstreams, defaultBranch?.branch ?? null, prBases) : [];
   const github = pr ? await readGithubFacts(git, pr, base?.ref ?? null, stack) : null;
+  const githubDeferred = options.githubReads && options.localOnly === true;
 
   return {
     branch,
     head,
     base: base?.ref ?? null,
     baseSource,
+    baseNote: githubDeferred && (baseSource === "upstream" || baseSource === "default") ? PR_BASE_NOT_READ : null,
     ahead: counts.ahead,
     behind: counts.behind,
     conflicts: predicted.conflicts,
@@ -352,6 +402,6 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
     stack,
     github,
     githubReason,
-    githubDeferred: options.githubReads && options.localOnly === true,
+    githubDeferred,
   };
 }

@@ -158,6 +158,57 @@ describe("coloured CI logs", () => {
   });
 });
 
+describe("PR #907's real Windows log", () => {
+  // Lines as `gh run view --log-failed` printed them: colour codes as literal
+  // caret text, a vitest project label between FAIL and the path, and passing
+  // policy suites named on ✓ lines.
+  const prefix = "Tests (Windows, root+llm-client)\tRun tests\t2026-10-29T15:02:11.1234567Z ";
+  const failLine = "^[[41m^[[1m FAIL ^[[22m^[[49m ^[[30m^[[42m llm-client:shared ^[[49m^[[39m tests/integration/vendor-session.test.ts^[[2m > ^[[22mclaude sessions";
+  const log = [
+    `${prefix} ^[[32m✓^[[39m tests/e2e/architecture-policy.test.js ^[[2m(42 tests)^[[22m`,
+    `${prefix} ✓ tests/e2e/domain-isolation.test.js (17 tests)`,
+    `${prefix}${failLine}`,
+    `${prefix} ❯ tests/integration/vendor-session.test.ts:134:20`,
+    `${prefix}AssertionError: expected 'codex' to be 'claude'`,
+  ].join("\n");
+  const input = {
+    name: "Tests (Windows, root+llm-client)",
+    outcome: "FAILURE",
+    log,
+    isCrossRepository: false,
+    changedFiles: ["packages/web/src/server/routes-git.ts"],
+  };
+
+  it("strips caret-text colour codes from the stored tail and finds the failing file", () => {
+    const tail = capLogTail(log);
+    expect(tail).not.toContain("^[");
+    expect(cleanLog(failLine)).toBe(" FAIL   llm-client:shared  tests/integration/vendor-session.test.ts > claude sessions");
+    expect(failedTestFiles(log)).toEqual(["tests/integration/vendor-session.test.ts"]);
+  });
+
+  it("is not policy-test when policy suites appear only on passing lines", () => {
+    expect(classifyFailingCheck(input).class).toBe("unclassified");
+  });
+
+  it("is behind-base when the PR is BEHIND with an uncontained layer and the failing file is unchanged", () => {
+    const verdict = classifyFailingCheck({
+      ...input,
+      mergeStateStatus: "BEHIND",
+      stack: [{ branch: "feat/sidecar-m3-lenses", contained: true }, { branch: "feat/sidecar-m2-drawer", contained: false }],
+    });
+    expect(verdict.class).toBe("behind-base");
+    expect(verdict.evidence).toContain("BEHIND");
+  });
+
+  it("is policy-test when a policy suite is among the failing files, project label or not", () => {
+    const verdict = classifyFailingCheck({
+      ...input,
+      log: " FAIL  root tests/e2e/architecture-policy.test.js > spawn-only\n",
+    });
+    expect(verdict).toMatchObject({ class: "policy-test", evidence: "The policy suite architecture-policy.test.js failed." });
+  });
+});
+
 describe("behind-base from the PR and the stack", () => {
   // PR #907: one Windows check failing in a test the branch never touched,
   // while the PR was BEHIND and lower stack layers held the fix.
@@ -248,6 +299,11 @@ describe("whole-log classification", () => {
 });
 
 describe("failedTestFiles", () => {
+  it("reads past a vitest project label between FAIL and the path", () => {
+    expect(failedTestFiles(" FAIL  llm-client:shared tests/x.test.ts > suite\n")).toEqual(["tests/x.test.ts"]);
+    expect(failedTestFiles(" ❯ web tests/y.test.ts (3 tests | 1 failed)\n")).toEqual(["tests/y.test.ts"]);
+  });
+
   it("collects vitest FAIL lines once each", () => {
     expect(failedTestFiles(" FAIL  a.test.ts > x\n FAIL  a.test.ts > y\n × ./b.spec.tsx\n")).toEqual(["a.test.ts", "b.spec.tsx"]);
   });

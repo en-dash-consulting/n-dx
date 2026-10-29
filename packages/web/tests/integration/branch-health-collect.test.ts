@@ -20,6 +20,8 @@ import {
   LOCAL_ONLY_REASON,
   LOG_TAIL_MAX_CHARS,
   LOG_TAIL_MAX_LINES,
+  PR_BASE_NOT_READ,
+  PrBaseCache,
   type BranchHealthExec,
 } from "../../src/server/branch-health/index.js";
 
@@ -316,5 +318,71 @@ describe("GitHub facts", () => {
 
     expect(ghCalls).toEqual([]);
     expect(health).toMatchObject({ base: "origin/main", github: null, githubDeferred: true, githubReason: LOCAL_ONLY_REASON });
+  });
+});
+
+describe("PR base cache", () => {
+  // R1 on PR #907: a stacked branch whose PR base is a lower layer, with no
+  // upstream naming it, so a local-only read falls back to origin's default.
+  beforeEach(() => {
+    git("checkout", "-q", "-b", "layer");
+    write("layer.txt", "layer\n");
+    commitAll("layer");
+    git("checkout", "-q", "-b", "feat");
+    write("feat.txt", "feat\n");
+    commitAll("feat");
+  });
+
+  const pr = (baseRefName: string): string => JSON.stringify({
+    number: 907,
+    url: "https://github.com/acme/repo/pull/907",
+    baseRefName,
+    isCrossRepository: false,
+    mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
+    reviewDecision: null,
+    statusCheckRollup: [],
+  });
+
+  it("says the PR base is not read yet before a GitHub read, then reuses the PR base it found", async () => {
+    const prBases = new PrBaseCache();
+
+    const before = await collectBranchHealth(repo, { githubReads: true, localOnly: true, prBases, exec: stubExec().run });
+    expect(before).toMatchObject({ base: "origin/main", baseSource: "default", baseNote: PR_BASE_NOT_READ, stack: [] });
+
+    const { run } = stubExec((args) => {
+      // `gh pr view` for this branch, then `gh pr view layer` while walking the stack.
+      if (args[0] === "pr" && args[2] === "layer") return result(pr("main"));
+      if (args[0] === "pr") return result(pr("layer"));
+      throw new Error(`unexpected gh call: ${args.join(" ")}`);
+    });
+    const read = await collectBranchHealth(repo, { githubReads: true, prBases, exec: run });
+    expect(read).toMatchObject({ base: "layer", baseSource: "pr", baseNote: null });
+
+    const { run: local, ghCalls } = stubExec();
+    const after = await collectBranchHealth(repo, { githubReads: true, localOnly: true, prBases, exec: local });
+    expect(ghCalls).toEqual([]);
+    expect(after).toMatchObject({
+      base: "layer",
+      baseSource: "pr-cached",
+      baseNote: null,
+      ahead: 1,
+      behind: 0,
+      stack: [{ branch: "layer", contained: true }],
+    });
+  });
+
+  it("keeps cached PR bases per worktree", async () => {
+    const prBases = new PrBaseCache();
+    prBases.set(join(root, "elsewhere"), "feat", "layer");
+
+    const health = await collectBranchHealth(repo, { githubReads: true, localOnly: true, prBases, exec: stubExec().run });
+
+    expect(health.baseSource).toBe("default");
+  });
+
+  it("adds no note when GitHub reads are off", async () => {
+    const health = await collectBranchHealth(repo, { githubReads: false, exec: stubExec().run });
+    expect(health).toMatchObject({ baseSource: "default", baseNote: null });
   });
 });

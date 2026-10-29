@@ -12,8 +12,11 @@ import type { ExecOptions, ExecResult } from "@n-dx/llm-client";
 /** Runs one command. The llm-client `exec` in production; a stub in tests. */
 export type BranchHealthExec = (cmd: string, args: string[], opts: ExecOptions) => Promise<ExecResult>;
 
-/** Where `base` came from, in precedence order. */
-export type BaseSource = "pr" | "upstream" | "default";
+/**
+ * Where `base` came from, in precedence order. `pr-cached` is the PR base an
+ * earlier GitHub read found, reused by a local-only answer.
+ */
+export type BaseSource = "pr" | "pr-cached" | "upstream" | "default";
 
 /** One file `git merge-tree --write-tree` could not merge, with the index stages it left. */
 export interface PredictedConflict {
@@ -71,6 +74,11 @@ export interface BranchHealth {
   /** The ref compared against, e.g. `origin/main`; null when none could be found. */
   base: string | null;
   baseSource: BaseSource | null;
+  /**
+   * Why `base` may not be the PR's base: set when GitHub reads are allowed but
+   * deferred and no earlier read found the PR base. Null otherwise.
+   */
+  baseNote: string | null;
   /** Null when there is no base. */
   ahead: number | null;
   behind: number | null;

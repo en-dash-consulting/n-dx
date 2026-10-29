@@ -8,7 +8,14 @@
  * @module web/server/branch-health
  */
 
-export { collectBranchHealth, LOCAL_ONLY_REASON, NotAGitBranchError, parseMergeTree } from "./collect.js";
+export {
+  collectBranchHealth,
+  LOCAL_ONLY_REASON,
+  NotAGitBranchError,
+  parseMergeTree,
+  PR_BASE_NOT_READ,
+  PrBaseCache,
+} from "./collect.js";
 export type { CollectOptions } from "./collect.js";
 export {
   capLogTail,

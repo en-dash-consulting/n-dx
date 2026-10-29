@@ -35,7 +35,14 @@ items:
     lastModified: "2026-10-29T16:44:54.810Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "87d74c1d-2684-4abc-b1ee-440637a1b751":
-    lastModified: "2026-10-29T16:59:21.410Z"
+    status: "completed"
+    startedAt: "2026-10-29T16:59:36.691Z"
+    completedAt: "2026-10-29T17:06:26.835Z"
+    endedAt: "2026-10-29T17:06:26.835Z"
+    activeIntervals: [{"end":"2026-10-29T17:06:26.835Z","start":"2026-10-29T16:59:36.691Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "checks.ts: caret-text colour codes stripped, project label allowed in FAILED_TEST_FILE, policy-test only among failing files. collect.ts: PrBaseCache (server memory, per worktree+branch) gives local-only reads baseSource pr-cached and cached stack bases; baseNote says PR base not read yet. Viewer shows the note."
+    lastModified: "2026-10-29T17:06:26.835Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d62623bb-3542-4c31-8461-83eb874fe2c3":
     lastModified: "2026-10-29T16:08:50.531Z"

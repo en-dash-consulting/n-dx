@@ -59,9 +59,10 @@ export function parseRollup(rollup: unknown): RollupCheck[] {
 
 // CSI sequences (colours, cursor moves). Test runners colour their output on
 // GitHub Actions because `CI` is set, and a colour code between `FAIL` and the
-// path would hide the failing file from the classifier.
+// path would hide the failing file from the classifier. `gh run view` may
+// write the escape as the two characters `^[` rather than the 0x1b byte.
 const ESC = String.fromCharCode(0x1b);
-const ANSI_CSI = new RegExp(`${ESC}\\[[0-?]*[ -/]*[@-~]`, "g");
+const ANSI_CSI = new RegExp(`(?:${ESC}|\\^\\[)\\[[0-?]*[ -/]*[@-~]`, "g");
 // `gh run view --log-failed` starts every line with "<job>\t<step>\t<timestamp> ".
 const GH_LINE_PREFIX = /^[^\t\n]*\t[^\t\n]*\t\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?/gm;
 
@@ -97,10 +98,14 @@ export interface CheckClassInput {
 }
 
 const BEHIND_BASE = /\b(?:out of date with|is behind|not up to date with|behind (?:the )?base|must be rebased|needs? (?:a )?rebase)\b/i;
-const POLICY_TEST = /\b((?:architecture-policy|domain-isolation|instruction-alignment|boundary-check|agents-md-size-budget|[\w-]+-policy)\.test\.[cm]?[jt]s)\b/;
+// A policy suite's file name. Matched against failing test files only: a log
+// names every suite it ran, passing ones included.
+const POLICY_TEST = /^(?:architecture-policy|domain-isolation|instruction-alignment|boundary-check|agents-md-size-budget|[\w-]+-policy)\.test\.[cm]?[jt]s$/;
 const CODEQL = /\bcodeql\b|\bcode scanning\b/i;
-// Vitest's `FAIL  path > suite > case`, and the ×/✗/❯ markers of its failed-file lines.
-const FAILED_TEST_FILE = /(?:\bFAIL\b|[×✗❯])\s+(\S+?\.(?:test|spec)\.[cm]?[jt]sx?)\b/g;
+// Vitest's `FAIL  path > suite > case`, and the ×/✗/❯ markers of its failed-file
+// lines. A workspace run puts the project's label between marker and path
+// (`FAIL  llm-client:shared tests/x.test.ts`): any word that is not a test file.
+const FAILED_TEST_FILE = /(?:\bFAIL\b|[×✗❯])\s+(?:(?!\S*\.(?:test|spec)\.)\S+\s+)?(\S+?\.(?:test|spec)\.[cm]?[jt]sx?)\b/g;
 // `pnpm -r run` prefixes each package's output with its directory: "packages/p test: ".
 const PNPM_PACKAGE_PREFIX = /^\s*([\w@.-]+(?:\/[\w@.-]+)*) [\w:-]+: /;
 
@@ -161,7 +166,7 @@ function behindFact(input: CheckClassInput): string | null {
  *    or GitHub is waiting for a maintainer to approve the workflows.
  * 2. **codeql** — a CodeQL or code-scanning check.
  * 3. **behind-base** — the log or name says the branch is out of date with its base.
- * 4. **policy-test** — the log names one of the repository's policy suites.
+ * 4. **policy-test** — a failing test file is one of the repository's policy suites.
  * 5. **touched-test** — the log names a failing test file this branch changed.
  * 6. **behind-base** — the PR's merge state is `BEHIND`, or a stack layer is
  *    not contained. Ranked below the log's own evidence: being behind is
@@ -185,12 +190,15 @@ export function classifyFailingCheck(input: CheckClassInput): { class: CheckFail
   if (behind) {
     return { class: "behind-base", evidence: `The check reports "${behind[0]}".` };
   }
-  const policy = POLICY_TEST.exec(log);
+  const failed = failedTestFileRefs(log);
+  const policy = failed
+    .map((ref) => ref.file.slice(ref.file.lastIndexOf("/") + 1))
+    .find((name) => POLICY_TEST.test(name));
   if (policy) {
-    return { class: "policy-test", evidence: `The policy suite ${policy[1]} failed.` };
+    return { class: "policy-test", evidence: `The policy suite ${policy} failed.` };
   }
   const changed = input.changedFiles;
-  for (const ref of failedTestFileRefs(log)) {
+  for (const ref of failed) {
     const touched = touchedPath(ref, changed);
     if (touched) {
       return { class: "touched-test", evidence: `${touched} failed, and this branch changed it.` };

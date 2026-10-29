@@ -10,7 +10,9 @@
  * while `git.branchHealth` is off (route-feature-gates.ts). gh runs only when
  * `web.sidecarGithubReads` is true and the request asks with `?github=1`;
  * without it the answer is local facts only and `githubDeferred` says GitHub
- * facts are one request away. See `branch-health/collect.ts`.
+ * facts are one request away. A local-only answer reuses the PR base the last
+ * GitHub read found for that worktree and branch (`baseSource: "pr-cached"`),
+ * held in this server's memory. See `branch-health/collect.ts`.
  *
  * @module web/server/routes-branch-health
  */
@@ -18,14 +20,19 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { errorMessage, errorResponse, jsonResponse } from "./response-utils.js";
-import { collectBranchHealth, NotAGitBranchError, type BranchHealthExec } from "./branch-health/index.js";
+import { collectBranchHealth, NotAGitBranchError, PrBaseCache, type BranchHealthExec } from "./branch-health/index.js";
 import { readSidecarSettings } from "./sidecar/settings.js";
 
 export const BRANCH_HEALTH_PATH = "/api/branch-health";
 
+/** PR bases found by GitHub reads, for every worktree this server answers. */
+const serverPrBases = new PrBaseCache();
+
 export interface BranchHealthRouteOptions {
   /** Injected for tests; defaults to the llm-client `exec`. */
   exec?: BranchHealthExec;
+  /** Injected for tests; defaults to this server's cache. */
+  prBases?: PrBaseCache;
 }
 
 export async function handleBranchHealthRoute(
@@ -46,6 +53,7 @@ export async function handleBranchHealthRoute(
     const health = await collectBranchHealth(ctx.projectDir, {
       githubReads: readSidecarSettings(ctx.projectDir).githubReads,
       localOnly: query.get("github") !== "1",
+      prBases: options.prBases ?? serverPrBases,
       exec: options.exec,
     });
     jsonResponse(res, 200, health);

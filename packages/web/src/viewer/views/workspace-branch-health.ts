@@ -37,7 +37,9 @@ export interface BranchHealthResponse {
   branch: string | null;
   head: string;
   base: string | null;
-  baseSource: "pr" | "upstream" | "default" | null;
+  baseSource: "pr" | "pr-cached" | "upstream" | "default" | null;
+  /** Set when `base` may not be the PR's base because GitHub has not been read yet. */
+  baseNote: string | null;
   ahead: number | null;
   behind: number | null;
   conflicts: Array<{ path: string; stages: number[] }>;
@@ -86,6 +88,7 @@ export function branchHealthChips(health: BranchHealthResponse): HealthChip[] {
       text: `↑${health.ahead ?? "?"} ↓${health.behind ?? "?"} ${health.base}`,
       tone: behind > 0 ? "warn" : "ok",
     });
+    if (health.baseNote) chips.push({ text: "PR base not read", tone: "info" });
     if (health.conflictsUnavailable === null) {
       const n = health.conflicts.length;
       chips.push(n > 0
@@ -110,6 +113,7 @@ export function branchHealthChips(health: BranchHealthResponse): HealthChip[] {
 
 const BASE_SOURCE_LABEL: Record<NonNullable<BranchHealthResponse["baseSource"]>, string> = {
   pr: "the PR's base",
+  "pr-cached": "the PR's base when GitHub was last read",
   upstream: "the upstream branch",
   default: "origin's default branch",
 };
@@ -131,6 +135,7 @@ function Details({ health, githubNote }: {
         ? `Compared with ${health.base} (${BASE_SOURCE_LABEL[health.baseSource ?? "default"]}) at ${health.head.slice(0, 9)}.`
         : "No base branch: no PR, no upstream naming another branch, and no origin default branch.",
     ),
+    health.baseNote ? h("p", { class: "branch-health-line" }, health.baseNote) : null,
 
     health.conflictsUnavailable
       ? h("p", { class: "branch-health-line" }, health.conflictsUnavailable)
