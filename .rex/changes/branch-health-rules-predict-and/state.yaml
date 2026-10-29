@@ -22,7 +22,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "477c02f8-fba6-46ea-93ef-19fbf9293954":
     issues: ["https://www.notion.so/3f7a80b7192481b38426d554c9a1cfa8","https://www.notion.so/3f7a80b7192481c9be12e2721b3bdbb9"]
-    lastModified: "2026-10-29T17:26:29.477Z"
+    lastModified: "2026-10-29T17:33:31.311Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5b73d052-964f-4145-ab5f-bf6c6b221f01":
     status: "completed"
@@ -53,6 +53,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Pure conflict classifier (branch-health/conflicts.ts + unified-diff.ts) wired into the collector, route and Workspaces strip; web.generatedFiles declared in .n-dx.json; unit, integration (real merges, rex validate) and viewer tests."
     lastModified: "2026-10-29T17:30:03.900Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ddb6a3b7-e44f-43b6-8291-8f88de0916bd":
+    lastModified: "2026-10-29T17:33:31.311Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2c90a0d-ac38-4bdf-9bfb-45fe667160ec":
     lastModified: "2026-10-29T17:26:29.477Z"
