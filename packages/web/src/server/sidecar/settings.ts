@@ -9,8 +9,9 @@
  *     }
  *
  * Context ceilings are read by `context-refresh.ts` and the idle window by the
- * session registry, each on every use. `sidecarGithubReads` is stored for the
- * GitHub lens (batch L2) and read by nothing yet. Mode has one value, `ask`:
+ * session registry, each on every use. `sidecarGithubReads` decides whether
+ * `GET /api/branch-health` may run gh (routes-branch-health.ts), and is
+ * stored for the GitHub lens (batch L2). Mode has one value, `ask`:
  * `auto` is refused until it exists.
  */
 

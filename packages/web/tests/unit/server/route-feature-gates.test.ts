@@ -72,6 +72,7 @@ const GATED: ReadonlyArray<[path: string, feature: string]> = [
   ["/api/commands/sidecar-command/status", "web.sidecar"],
   ["/api/commands/sidecar-command/stop", "web.sidecar"],
   ["/api/hench/plan-queue", "hench.readyNext"],
+  ["/api/branch-health", "git.branchHealth"],
 ];
 
 /** A server that answers 200 "reached" for anything the gate lets past. */

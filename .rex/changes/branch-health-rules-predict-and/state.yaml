@@ -1,7 +1,10 @@
 schema: "rex/v2"
 items:
   "18f3e71f-7f60-4940-8dbb-2e6f93ed8fe6":
-    lastModified: "2026-10-29T16:08:48.946Z"
+    status: "in_progress"
+    startedAt: "2026-10-29T16:12:27.218Z"
+    activeIntervals: [{"start":"2026-10-29T16:12:27.218Z"}]
+    lastModified: "2026-10-29T16:12:28.099Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "477c02f8-fba6-46ea-93ef-19fbf9293954":
     issues: ["https://www.notion.so/3f7a80b7192481b38426d554c9a1cfa8","https://www.notion.so/3f7a80b7192481c9be12e2721b3bdbb9"]

@@ -141,6 +141,46 @@ should move B's card while the viewer sits on A. It reads the `workspace` tag
 itself (`frameWorkspace`) and refreshes only that workspace's slice, falling back
 to a whole-board reload for a `"*"` frame or an unrecognised key.
 
+## Branch health
+
+`GET /api/branch-health` (`routes-branch-health.ts`, logic in
+`server/branch-health/`) reports one worktree's branch by fixed rules, with no
+model: the data the Sidecar's Diagnose branch lens and the hub narrate later.
+The Workspaces board asks it once per card, by header, while `git.branchHealth`
+is on; the route gate refuses it with 403 while the toggle is off.
+
+- **Local facts need no network.** Branch, head, base, ahead/behind
+  (`rev-list --left-right --count`), predicted conflicts and stack containment
+  come from git alone, so the strip still answers offline.
+- **The base is chosen in a fixed order:** the PR's base when GitHub reads are
+  on, else the upstream when it names another branch, else origin's default
+  branch. `baseSource` says which, because a branch whose upstream is its own
+  remote copy has no useful upstream base.
+- **Conflicts are predicted, not rehearsed.** `git merge-tree --write-tree`
+  merges in the object store and returns the conflicted paths with their index
+  stages. It leaves the worktree, the index and HEAD untouched, so a `GET` that
+  predicts a merge stays read-only where it matters; the only trace is
+  unreferenced objects that `git gc` collects. A git older than 2.38 cannot do
+  this, and the answer says so in `conflictsUnavailable`.
+- **A stack is content, not configuration.** Each layer below in the base
+  chain is checked with `merge-base --is-ancestor`. A branch whose base is set
+  to a lower layer but lacks that layer's commits is reported not contained:
+  restacking is the fix, and a base setting alone would hide it. The chain
+  follows each layer's PR base (GitHub reads on) or its upstream, and stops at
+  origin's default branch, which is the trunk and not a layer.
+- **gh runs only with `web.sidecarGithubReads` true.** That one project
+  allowance governs every GitHub read the Sidecar makes. With it off, or gh
+  missing or signed out, `github` is null and `githubReason` says why. Failed
+  check logs are cut to the last 80 lines and 8,000 characters, enough to
+  classify and quote the failure without shipping a whole CI log per card.
+- **A failing check gets one class, first rule wins:** `fork-no-ci`,
+  `codeql`, `behind-base`, `policy-test`, `touched-test`, else
+  `unclassified`, each with the fact that decided it (`branch-health/checks.ts`).
+  The order puts what no code change on the branch can fix first.
+- **git and gh run through `@n-dx/llm-client`'s `exec`.** Web imports no
+  `node:child_process`; the collector takes the exec function as an option
+  so tests stub gh and run git for real against temporary repositories.
+
 ## web-server zone stability
 
 `web-server` (composition root — Express routes, gateways, MCP handlers) is prone to dissolving into `web-viewer` in Louvain analysis because server files import from `packages/web/src/shared/` (required by the barrel-import policy), and shared files are also imported by viewer files, creating a Louvain connectivity bridge. If the zone dissolves:

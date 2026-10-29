@@ -115,6 +115,12 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     exact: ["/api/hench/plan-queue"],
     reason: "Live's Ready next section. Each call spawns `ndx work --plan-queue`, so it is off when the section is.",
   },
+  {
+    feature: "git.branchHealth",
+    exact: ["/api/branch-health"],
+    reason:
+      "The Workspaces health strip's one read. Each call runs git (and gh when GitHub reads are on), so it is off when the strip is.",
+  },
 ];
 
 /** The gate covering `pathname`, or null when the path is ungated. */

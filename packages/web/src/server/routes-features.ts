@@ -213,6 +213,15 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     stability: "experimental",
     defaultValue: false,
   },
+  {
+    key: "git.branchHealth",
+    label: "Branch health",
+    description: "Show a health strip on each Workspaces card: commits ahead of and behind its base, files predicted to conflict, whether the branches it stacks on are contained, and its PR's failing checks. Expand the strip for the full status.",
+    impact: "Read-only, from fixed rules with no model call. git computes the predicted merge in its object store and never touches the worktree, index or HEAD. gh is asked only when Sidecar GitHub reads (web.sidecarGithubReads) are on. When disabled, /api/branch-health refuses.",
+    package: "git",
+    stability: "experimental",
+    defaultValue: false,
+  },
   // ── Web dashboard ──────────────────────────────────────────────────
   {
     key: "web.sidecar",

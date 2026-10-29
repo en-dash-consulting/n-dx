@@ -30,6 +30,7 @@ import {
   type PrdDeltaCounts,
 } from "../../../src/viewer/views/workspaces.js";
 import { formatSince } from "../../../src/viewer/utils/format.js";
+import { branchHealthChips, type BranchHealthResponse } from "../../../src/viewer/views/workspace-branch-health.js";
 import { setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { renderToDiv, cleanupRenderedDiv } from "../../helpers/preact-test-support.js";
 
@@ -540,5 +541,118 @@ describe("WorkspacesView", () => {
     cleanupRenderedDiv(root);
     root = null;
     expect(socket.socket.close).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Branch health strip (git.branchHealth)
+// ---------------------------------------------------------------------------
+
+const HEALTH_FEATURE: BranchHealthResponse = {
+  branch: "feat/x",
+  head: "0123456789abcdef",
+  base: "origin/main",
+  baseSource: "pr",
+  ahead: 4,
+  behind: 2,
+  conflicts: [{ path: "src/a.ts", stages: [1, 2, 3] }],
+  conflictsUnavailable: null,
+  stack: [{ branch: "feat/lower", contained: false }],
+  github: {
+    number: 42,
+    url: "https://github.com/acme/repo/pull/42",
+    baseRefName: "main",
+    isCrossRepository: false,
+    mergeable: "CONFLICTING",
+    mergeStateStatus: "DIRTY",
+    reviewDecision: "REVIEW_REQUIRED",
+    checks: { total: 3, failing: 1, pending: 0 },
+    failing: [{
+      name: "test (ubuntu)", conclusion: "FAILURE", url: null,
+      class: "policy-test", evidence: "The policy suite architecture-policy.test.js failed.", logTail: "FAIL tests/e2e/architecture-policy.test.js",
+    }],
+  },
+  githubReason: null,
+};
+
+const HEALTH_ANCHOR: BranchHealthResponse = {
+  ...HEALTH_FEATURE,
+  branch: "main", base: null, baseSource: null, ahead: null, behind: null,
+  conflicts: [], conflictsUnavailable: "There is no base to merge with.", stack: [],
+  github: null, githubReason: "GitHub reads are off for this project (web.sidecarGithubReads), so no gh command ran.",
+};
+
+describe("branchHealthChips", () => {
+  it("summarises ahead/behind, conflicts, stack and failing checks", () => {
+    expect(branchHealthChips(HEALTH_FEATURE)).toEqual([
+      { text: "↑4 ↓2 origin/main", tone: "warn" },
+      { text: "1 conflict", tone: "bad" },
+      { text: "stack: 1 not contained", tone: "bad" },
+      { text: "PR #42: 1 failing", tone: "bad" },
+    ]);
+  });
+
+  it("says there is no base rather than inventing counts", () => {
+    expect(branchHealthChips(HEALTH_ANCHOR)).toEqual([{ text: "no base", tone: "info" }]);
+  });
+});
+
+describe("WorkspacesView branch health strip", () => {
+  let root: HTMLDivElement | null = null;
+  const original = globalThis.fetch;
+
+  afterEach(() => {
+    if (root) cleanupRenderedDiv(root);
+    root = null;
+    // The toggle hook reads /api/features through the global fetch.
+    globalThis.fetch = original;
+  });
+
+  function withToggle(enabled: boolean) {
+    const made = makeFetcher({
+      "/api/features": { toggles: [{ key: "git.branchHealth", enabled }] },
+      "/api/branch-health@feature": HEALTH_FEATURE,
+      "/api/branch-health@n-dx": HEALTH_ANCHOR,
+    });
+    globalThis.fetch = made.fetcher;
+    return made;
+  }
+
+  it("leaves the card unchanged and never asks for branch health while the toggle is off", async () => {
+    const { fetcher, calls } = withToggle(false);
+    root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));
+
+    expect(root.querySelectorAll(".workspace-card").length).toBe(2);
+    expect(root.querySelector(".branch-health")).toBeNull();
+    expect(root.querySelector(".branch-health-strip")).toBeNull();
+    expect(calls.some((c) => c.url === "/api/branch-health")).toBe(false);
+  });
+
+  it("shows each card's strip from its own workspace, and expands to the full status", async () => {
+    const { fetcher, calls } = withToggle(true);
+    root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));
+    await settle();
+
+    expect(calls.filter((c) => c.url === "/api/branch-health").map((c) => c.workspace).sort())
+      .toEqual(["feature", "n-dx"]);
+
+    const cards = root.querySelectorAll(".workspace-card");
+    expect(cards[0].querySelector(".branch-health-strip")!.textContent).toBe("no base");
+    const strip = cards[1].querySelector<HTMLButtonElement>(".branch-health-strip")!;
+    expect(strip.textContent).toBe("↑4 ↓2 origin/main1 conflictstack: 1 not containedPR #42: 1 failing");
+    expect(strip.getAttribute("aria-expanded")).toBe("false");
+    expect(cards[1].querySelector(".branch-health-details")).toBeNull();
+
+    await act(async () => {
+      strip.click();
+    });
+
+    expect(strip.getAttribute("aria-expanded")).toBe("true");
+    const details = cards[1].querySelector(".branch-health-details")!.textContent!;
+    expect(details).toContain("Compared with origin/main (the PR's base)");
+    expect(details).toContain("src/a.ts — stages: ancestor, base, this branch");
+    expect(details).toContain("feat/lower — not contained");
+    expect(details).toContain("policy-test");
+    expect(details).toContain("architecture-policy.test.js failed");
   });
 });

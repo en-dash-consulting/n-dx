@@ -20,7 +20,8 @@
  * `/api/workspaces` (the registry's keys), `/api/worktrees` (git state and
  * run counts) and `/api/hench/memory` (the machine's memory, not a
  * worktree's). The per-workspace fetches are the execution status, the
- * concurrency count, and the PRD delta.
+ * concurrency count, the PRD delta, and — while `git.branchHealth` is on —
+ * each card's branch health strip (`workspace-branch-health.ts`).
  *
  * ## Why this view does not filter WebSocket frames
  *
@@ -41,6 +42,8 @@ import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index.js";
 import { formatSince } from "../utils/format.js";
+import { useFeatureToggle } from "../hooks/index.js";
+import { BRANCH_HEALTH_FEATURE, BranchHealthStrip } from "./workspace-branch-health.js";
 
 // ---------------------------------------------------------------------------
 // Wire types
@@ -455,16 +458,19 @@ function LiveRun({ card, live, onStop, stopping }: {
   );
 }
 
-function WorkspaceCardView({ card, doFetch, onChanged }: {
+function WorkspaceCardView({ card, doFetch, onChanged, branchHealth }: {
   card: WorkspaceCard;
   doFetch: Fetcher;
   onChanged: () => void;
+  /** `git.branchHealth`: show the health strip. Off renders the card unchanged. */
+  branchHealth: boolean;
 }) {
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const status = cardStatus(card);
   const headingId = `workspace-card-${card.key}`;
   const since = formatSince(card.runs.lastFinishedAt);
+  const healthFetch = useCallback((path: string) => workspaceFetch(doFetch, card.key, path), [doFetch, card.key]);
 
   const stop = useCallback(async () => {
     if (!card.live) return;
@@ -525,6 +531,10 @@ function WorkspaceCardView({ card, doFetch, onChanged }: {
         : null,
     ),
 
+    branchHealth
+      ? h(BranchHealthStrip, { workspace: card.key, branch: card.branch, doFetch: healthFetch })
+      : null,
+
     h("div", { class: "workspace-card-actions" },
       h("a", {
         class: "workspace-card-open",
@@ -576,6 +586,7 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
     [fetcher],
   );
   const currentKey = getWorkspaceKey();
+  const branchHealth = useFeatureToggle(BRANCH_HEALTH_FEATURE, false);
   /**
    * Per-workspace state carried between loads, so a frame about one worktree
    * can refresh that worktree's four endpoints and leave the others' answers
@@ -690,9 +701,10 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
         card,
         doFetch,
         onChanged: () => void load(card.key),
+        branchHealth,
       })),
     );
-  }, [loading, error, cards, doFetch, load]);
+  }, [loading, error, cards, doFetch, load, branchHealth]);
 
   return h("div", { class: "workspaces-container" },
     h("header", { class: "workspaces-header" },
