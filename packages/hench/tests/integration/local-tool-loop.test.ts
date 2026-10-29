@@ -139,13 +139,15 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     vi.spyOn(defaultRegistry, "getActiveProvider").mockReturnValue(provider);
   }
 
-  async function runLoop(overrides: { livelockThreshold?: number } = {}) {
+  async function runLoop(overrides: { livelockThreshold?: number; provider?: "api" } = {}) {
     const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../src/store/config.js");
 
     const config = await loadConfig(henchDir);
     config.skipFullTestGate = true;
+    // `ndx work` runs this loop with provider "api" (run.ts effectiveConfig).
+    if (overrides.provider) config.provider = overrides.provider;
     if (overrides.livelockThreshold !== undefined) {
       config.livelockThreshold = overrides.livelockThreshold;
     }
@@ -324,6 +326,53 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     expect(toolRequestBodies.some((body) =>
       JSON.stringify(body.messages).includes("[tool output condensed]"),
     )).toBe(true);
+  });
+
+  it("refuses a write_file that blanks an existing file, then lands the change through edit_file", async () => {
+    mockLocalProvider();
+    // A file large enough for the shrink guard, committed so the run's
+    // baseline holds it.
+    const original = Array.from({ length: 120 }, (_, i) => `export const v${i} = ${i};`).join("\n") +
+      "\nexport const pattern = /old-regex/;\n";
+    await mkdir(join(projectDir, "src"), { recursive: true });
+    await writeFile(join(projectDir, "src/extract.ts"), original, "utf-8");
+    execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "extract baseline"], { cwd: projectDir, stdio: "ignore" });
+
+    const call = (id: string, name: string, args: Record<string, unknown>): ScriptedTurn => ({
+      content: null,
+      tool_calls: [{ id, type: "function", function: { name, arguments: JSON.stringify(args) } }],
+    });
+    stubChatEndpoint([
+      // What gpt-oss-20b did: send back a placeholder, then nothing at all.
+      call("w1", "write_file", { path: "src/extract.ts", content: "/* updated */" }),
+      call("w2", "write_file", { path: "src/extract.ts", content: "" }),
+      // Pointed at edit_file by the refusal, it changes the one line.
+      call("e1", "edit_file", { path: "src/extract.ts", old_string: "/old-regex/", new_string: "/new-regex/" }),
+      call("g1", "git", { subcommand: "add", args: "src/extract.ts" }),
+      call("m1", "write_file", { path: ".hench-commit-msg.txt", content: "fix: update the extract regex\n" }),
+      { content: "Done.", finish_reason: "stop" },
+    ]);
+
+    const { result } = await runLoop({ provider: "api" });
+
+    const after = await readFile(join(projectDir, "src/extract.ts"), "utf-8");
+    expect(after).toBe(original.replace("/old-regex/", "/new-regex/"));
+
+    const [w1, w2, e1] = result.run.toolCalls;
+    expect(w1.tool).toBe("write_file");
+    expect(w1.output).toMatch(/^\[GUARD\] write_file refused.*edit_file/s);
+    expect(w2.output).toMatch(/^\[GUARD\] write_file refused/);
+    expect(e1.tool).toBe("edit_file");
+    expect(e1.output).toMatch(/^Edited src\/extract\.ts/);
+    expect(result.run.status).toBe("completed");
+
+    // The system prompt the local model saw tells it to edit, not rewrite, and
+    // the tool list offers edit_file.
+    const firstBody = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body);
+    const system = firstBody.messages.find((m: { role: string }) => m.role === "system");
+    expect(system.content).toContain("use edit_file");
+    expect(firstBody.tools.map((t: { function: { name: string } }) => t.function.name)).toContain("edit_file");
   });
 
   it("re-prompts a no-change completion claim, then fails the run — same standard as the CLI loop", async () => {

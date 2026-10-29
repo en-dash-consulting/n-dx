@@ -6,6 +6,7 @@ export type { RuntimePoolConfig } from "../process/pool.js";
 import type { MemoryThrottleConfig } from "../process/memory-throttle.js";
 import type { MemoryMonitorConfig } from "../process/memory-monitor.js";
 import type { RuntimePoolConfig } from "../process/pool.js";
+export { DEFAULT_WRITE_SHRINK_RATIO, DEFAULT_WRITE_SHRINK_MIN_BYTES } from "../guard/contracts.js";
 
 export const HENCH_SCHEMA_VERSION = "hench/v1";
 
@@ -57,6 +58,15 @@ export interface GuardConfig {
   maxConcurrentProcesses: number;
   /** Allowed git subcommands. Centralizes the git safety allowlist in guard config. */
   allowedGitSubcommands: string[];
+  /**
+   * `write_file` refuses to replace an existing file with content smaller than
+   * this share of its size (0-1) unless the call passes `rewrite: true`, so a
+   * model cannot blank a file it meant to change one line of. 0 disables the
+   * check. Default {@link DEFAULT_WRITE_SHRINK_RATIO}.
+   */
+  writeShrinkRatio?: number;
+  /** Existing files at or below this many bytes are exempt from the shrink check. */
+  writeShrinkMinBytes?: number;
   /** Policy limits for session-aware rate limiting and resource tracking. */
   policy?: PolicyLimitsConfig;
   /** Memory-based execution throttling configuration. */

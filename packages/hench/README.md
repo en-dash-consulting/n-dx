@@ -84,7 +84,8 @@ Display full details of a specific run including tool calls, token usage, and ou
 | Tool | Description |
 |------|-------------|
 | `read_file` | Read file contents |
-| `write_file` | Write/create files |
+| `write_file` | Create files or rewrite one whole (shrinking an existing file needs `rewrite: true`) |
+| `edit_file` | Replace an exact string in an existing file |
 | `list_directory` | List files and directories |
 | `search_files` | Regex search across files |
 | `run_command` | Execute shell commands |

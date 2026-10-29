@@ -2231,6 +2231,14 @@ Hench guard settings (security boundaries):
                                            (default: npm, npx, node, git, tsc, vitest)
   hench.guard.commandTimeout     number    Command timeout in ms (default: 30000)
   hench.guard.maxFileSize        number    Max file size in bytes (default: 1048576)
+  hench.guard.writeShrinkRatio   number    write_file (API and local agents) refuses to replace an
+                                           existing file with content under this share of its
+                                           size unless the call passes rewrite: true; the model
+                                           is pointed at edit_file instead. 0-1 (default: 0.5,
+                                           0 disables)
+  hench.guard.writeShrinkMinBytes
+                                 number    Existing files at or below this size are exempt from
+                                           the shrink check (default: 1024)
   hench.guard.spawnTimeout       number    Timeout for a spawned vendor process in ms
                                            (default: 300000)
   hench.guard.maxConcurrentProcesses

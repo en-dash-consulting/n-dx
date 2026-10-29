@@ -1,5 +1,6 @@
 import { z, ZodError } from "zod";
 import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MAX_REVIEW_ROUNDS, MIN_PRUNE_PAIRS, MIN_REVIEW_ROUNDS } from "./v1.js";
+import { DEFAULT_WRITE_SHRINK_MIN_BYTES, DEFAULT_WRITE_SHRINK_RATIO } from "./v1.js";
 import type { HenchConfig } from "./v1.js";
 
 export type ValidationResult<T> =
@@ -38,6 +39,8 @@ const GuardConfigSchema = z.object({
     "status", "add", "commit", "diff", "log",
     "branch", "checkout", "stash", "show", "rev-parse",
   ]),
+  writeShrinkRatio: z.number().min(0).max(1).optional().default(DEFAULT_WRITE_SHRINK_RATIO),
+  writeShrinkMinBytes: z.number().int().nonnegative().optional().default(DEFAULT_WRITE_SHRINK_MIN_BYTES),
   policy: PolicyLimitsConfigSchema,
   memoryThrottle: MemoryThrottleConfigSchema,
   memoryMonitor: MemoryMonitorConfigSchema,

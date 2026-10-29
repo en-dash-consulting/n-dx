@@ -22,6 +22,7 @@ import { classifyChangedFiles, getCodeFiles } from "../../store/file-classifier.
 /** Tools that directly modify the codebase or task state. */
 const CODE_MODIFYING_TOOLS = new Set([
   "write_file",        // Direct file modification
+  "edit_file",         // In-place file modification
   "git",               // Commit, stage changes
   "run_command",       // May run build/test/script that modifies state
   "rex_update_status", // Task status changes
@@ -96,7 +97,7 @@ export function validateTaskCompletion(run: RunRecord): TaskCompletionGateResult
       taskClassification: "code",
       codeFiles: [],
       reason:
-        "Code-modifying tool calls were made (write_file, git, or run_command), " +
+        "Code-modifying tool calls were made (edit_file, write_file, git, or run_command), " +
         "but zero code files were changed. Tasks that invoke code tools must produce " +
         "at least one staged or committed code file change. " +
         "To mark complete without code changes, ensure all changes are documentation " +

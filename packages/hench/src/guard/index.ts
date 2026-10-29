@@ -58,6 +58,7 @@
  */
 
 import type { GuardConfig } from "./contracts.js";
+import { DEFAULT_WRITE_SHRINK_MIN_BYTES, DEFAULT_WRITE_SHRINK_RATIO } from "./contracts.js";
 import { validatePath, simpleGlobMatch, GuardError } from "./paths.js";
 import { validateCommand, resolveShellKind } from "./commands.js";
 import type { ShellKind } from "./commands.js";
@@ -201,6 +202,16 @@ export class GuardRails {
 
   get maxFileSize(): number {
     return this.config.maxFileSize;
+  }
+
+  /** Share of an existing file's size below which a whole-file write is refused (0 = off). */
+  get writeShrinkRatio(): number {
+    return this.config.writeShrinkRatio ?? DEFAULT_WRITE_SHRINK_RATIO;
+  }
+
+  /** Existing files at or below this size are exempt from the shrink check. */
+  get writeShrinkMinBytes(): number {
+    return this.config.writeShrinkMinBytes ?? DEFAULT_WRITE_SHRINK_MIN_BYTES;
   }
 
   get spawnTimeout(): number {

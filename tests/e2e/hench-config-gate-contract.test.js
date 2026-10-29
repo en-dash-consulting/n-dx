@@ -196,6 +196,8 @@ describe("dashboard hench-config gate agrees with hench's schema", () => {
       "guard.commandTimeout": 45000,
       "guard.maxFileSize": 2097152,
       "guard.maxConcurrentProcesses": 2,
+      "guard.writeShrinkRatio": 0.25,
+      "guard.writeShrinkMinBytes": 4096,
       "guard.allowedGitSubcommands": ["status", "diff"],
       "guard.memoryThrottle.enabled": true,
       "guard.memoryThrottle.rejectThreshold": 90,

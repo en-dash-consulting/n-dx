@@ -15,6 +15,15 @@ export interface ToolGuard {
   readonly maxFileSize: number;
   readonly commandTimeout: number;
   /**
+   * `write_file` refuses to replace an existing file with content smaller than
+   * this share of its size unless the call sets `rewrite: true`. 0 disables the
+   * check; absent means the default (0.5). Optional so lightweight test guards
+   * need not provide it.
+   */
+  readonly writeShrinkRatio?: number;
+  /** Existing files at or below this many bytes are exempt (default 1024). */
+  readonly writeShrinkMinBytes?: number;
+  /**
    * Environment for processes the tools spawn, already filtered of
    * credential-shaped variables. Optional so lightweight test guards need not
    * provide one; tools fall back to `process.env` when it is absent.

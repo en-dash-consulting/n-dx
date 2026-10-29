@@ -26,7 +26,7 @@
 
 import type { ToolDefinition, AnthropicToolDef, GeminiFunctionDeclaration } from "../prd/llm-gateway.js";
 import { toAnthropicToolDefs, toGeminiFunctionDeclarations } from "../prd/llm-gateway.js";
-import { toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles } from "./files.js";
+import { toolReadFile, toolWriteFile, toolEditFile, toolListDirectory, toolSearchFiles } from "./files.js";
 import { toolRunCommand } from "./shell.js";
 import { toolGit } from "./git.js";
 import { formatProtectedConfigFinding } from "../guard/config-backstop.js";
@@ -59,14 +59,38 @@ export const TOOL_DEFINITIONS_NEUTRAL: ReadonlyArray<ToolDefinition> = [
   },
   {
     name: "write_file",
-    description: "Write content to a file. Creates parent directories if needed.",
+    description:
+      "Create a new file, or replace an existing file's whole content. Creates parent directories if needed. " +
+      "To change part of an existing file, use edit_file instead. Replacing an existing file with much " +
+      "smaller content is refused unless rewrite is true.",
     inputSchema: {
       type: "object",
       properties: {
         path: { type: "string", description: "File path relative to project root" },
-        content: { type: "string", description: "File content to write" },
+        content: { type: "string", description: "The complete file content to write" },
+        rewrite: {
+          type: "boolean",
+          description: "Set true only for an intentional full rewrite that makes an existing file much smaller",
+        },
       },
       required: ["path", "content"],
+    },
+  },
+  {
+    name: "edit_file",
+    description:
+      "Edit an existing file by replacing an exact string. old_string must match the file exactly " +
+      "(including whitespace) and occur exactly once unless replace_all is true; include enough " +
+      "surrounding lines to make it unique. Use this, not write_file, to change existing files.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path relative to project root" },
+        old_string: { type: "string", description: "Exact text to replace (copy it from read_file output)" },
+        new_string: { type: "string", description: "Text to put in its place" },
+        replace_all: { type: "boolean", description: "Replace every occurrence (default: false)" },
+      },
+      required: ["path", "old_string", "new_string"],
     },
   },
   {
@@ -245,7 +269,13 @@ async function dispatchUnchecked(
       case "write_file":
         return await toolWriteFile(
           ctx.guard,
-          input as { path: string; content: string },
+          input as { path: string; content: string; rewrite?: boolean },
+        );
+
+      case "edit_file":
+        return await toolEditFile(
+          ctx.guard,
+          input as { path: string; old_string: string; new_string: string; replace_all?: boolean },
         );
 
       case "list_directory":

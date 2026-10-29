@@ -498,6 +498,25 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
       `Agent limited to writing files under ${(Number(v) / 1024 / 1024).toFixed(1)}MB`,
   },
   {
+    path: "guard.writeShrinkRatio",
+    label: "Write Shrink Ratio",
+    description: "write_file refuses to replace an existing file with content under this share of its size (0-1) unless the call sets rewrite: true. 0 disables",
+    type: "number",
+    category: "guard",
+    impact: (v) =>
+      Number(v) > 0
+        ? `Whole-file writes that drop below ${Math.round(Number(v) * 100)}% of an existing file need rewrite: true`
+        : "Whole-file writes may shrink an existing file without confirmation",
+  },
+  {
+    path: "guard.writeShrinkMinBytes",
+    label: "Write Shrink Min Bytes",
+    description: "Existing files at or below this size are exempt from the write shrink check",
+    type: "number",
+    category: "guard",
+    impact: (v) => `Files of ${v} bytes or less may be rewritten smaller without rewrite: true`,
+  },
+  {
     path: "guard.maxConcurrentProcesses",
     label: "Max Concurrent Processes",
     description: "Maximum simultaneous hench processes allowed (prevents memory exhaustion)",
