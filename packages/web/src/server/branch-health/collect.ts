@@ -90,6 +90,8 @@ const GH_TIMEOUT_MS = 20_000;
 const LOG_MAX_BUFFER = 32 * 1024 * 1024;
 /** Stack layers below this branch that are followed before giving up. */
 const MAX_STACK_DEPTH = 10;
+/** git processes one request runs at once while reading conflicts and other worktrees. */
+const GIT_CONCURRENCY = 8;
 
 const PR_FIELDS = "number,url,baseRefName,isCrossRepository,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup";
 
@@ -228,10 +230,24 @@ async function readOtherWorktrees(git: Runner, base: string): Promise<WorktreeCh
       worktrees.push({ path, branch: field.slice("branch refs/heads/".length) });
     }
   }
-  return Promise.all(worktrees.map(async (w) => {
+  return mapLimit(worktrees, GIT_CONCURRENCY, async (w) => {
     const out = await git.git(["diff", "--name-only", "-z", `${base}...refs/heads/${w.branch}`]);
     return { ...w, changed: out.ok ? out.stdout.split("\0").filter(Boolean) : [] };
-  }));
+  });
+}
+
+/** `fn` over `items`, at most `limit` at once, results in input order. */
+async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 async function predictConflicts(
@@ -249,13 +265,16 @@ async function predictConflicts(
   if (out.exitCode === 0) return { conflicts: [], unavailable: null };
   if (out.exitCode === 1 && out.stdout) {
     const { tree, files } = parseMergeTree(out.stdout);
-    const [sides, driver, worktrees] = await Promise.all([
-      Promise.all(files.map((file) => readSides(git, tree, file))),
+    const [sides, driver] = await Promise.all([
+      mapLimit(files, GIT_CONCURRENCY, (file) => readSides(git, tree, file)),
       git.git(["config", "--get", "merge.rex-state.driver"]),
-      readOtherWorktrees(git, base),
     ]);
-    const conflicts = classifyConflicts(sides, { generatedFiles, rexStateDriver: driver.ok && driver.stdout.trim() !== "", worktrees });
-    return { conflicts, unavailable: null };
+    const ctx = { generatedFiles, rexStateDriver: driver.ok && driver.stdout.trim() !== "", worktrees: [] };
+    const conflicts = classifyConflicts(sides, ctx);
+    // Other worktrees only matter to a source conflict, and a repository can
+    // have dozens of them: read their changes only when one needs naming.
+    if (!conflicts.some((c) => c.class === "source")) return { conflicts, unavailable: null };
+    return { conflicts: classifyConflicts(sides, { ...ctx, worktrees: await readOtherWorktrees(git, base) }), unavailable: null };
   }
   return {
     conflicts: [],

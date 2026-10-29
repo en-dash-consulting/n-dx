@@ -181,12 +181,14 @@ is on; the route gate refuses it with 403 while the toggle is off.
   | Class | When | Fix |
   |-------|------|-----|
   | `generated` | the path matches a `web.generatedFiles` glob | `checkout --theirs`, the declared command, `git add`; listed after every other fix |
-  | `prd-state` | a v2 `state.yaml` while `merge.rex-state.driver` is unset | register the driver, `checkout --merge`, `git add`. With the driver set it is `source` |
+  | `prd-state` | a v2 `state.yaml` while `merge.rex-state.driver` is unset | register the driver, `checkout --merge`, `git diff --check HEAD` (stops on markers the driver left, since `checkout --merge` exits 0 regardless), `git add`. With the driver set it is `source` |
   | `duplicate-capture` | add/add on a PRD item file, same title, different ids | keep the base's id (`checkout --theirs`), `git add`, `rex validate --post-merge` |
-  | `prd-children-table` | a v1 `prd_tree` `index.md` whose hunks are all `## Children` rows | `checkout --ours`, `rex validate --post-merge --repair`, `git add`, `rex validate` |
+  | `prd-children-table` | a v1 `prd_tree` `index.md` whose hunks are all `## Children` rows, and the base changed nothing above the table (else `source`: keeping this branch's copy would drop it) | `checkout --ours`, `rex validate --post-merge --repair`, `git add`, `rex validate` |
   | `allowlist-union` | every hunk only adds lines on both sides | a unified diff against this branch's copy: ours, then theirs |
   | `source` | everything else | none; names the other local worktrees whose branch changed the path |
 
+  Stage blobs and other worktrees' diffs are read at most eight git processes
+  at a time, and other worktrees only when a `source` conflict needs naming.
   `web.generatedFiles` is `[{ "paths": [globs], "command": [argv] }]`; with no
   declaration nothing is `generated`. This repository declares the prompt
   baseline and the iso-map skill script.

@@ -14,6 +14,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { exec, type ExecOptions } from "@n-dx/llm-client";
 import { collectBranchHealth, type PredictedConflict } from "../../src/server/branch-health/index.js";
 
 const REX_CLI = resolve(dirname(fileURLToPath(import.meta.url)), "../../../rex/dist/cli/index.js");
@@ -137,9 +138,19 @@ describe("allowlist-union on a real merge", () => {
     git("checkout", "-q", "feat");
 
     const status = git("status", "--porcelain");
-    const [conflict] = await predict();
+    const gitCalls: string[][] = [];
+    const health = await collectBranchHealth(repo, {
+      githubReads: false,
+      exec: async (cmd: string, args: string[], opts: ExecOptions) => {
+        if (cmd === "git") gitCalls.push(args);
+        return exec(cmd, args, opts);
+      },
+    });
+    const [conflict] = health.conflicts;
     expect(git("status", "--porcelain")).toBe(status);
     expect(conflict.class).toBe("allowlist-union");
+    // No source conflict, so other worktrees are never listed or diffed.
+    expect(gitCalls.some((args) => args.includes("worktree"))).toBe(false);
 
     mergeBase();
     runSteps([["git", "checkout", "--ours", "--", "allow.txt"]]);
@@ -196,6 +207,38 @@ describe("source conflicts and other worktrees", () => {
     expect(conflict.class).toBe("source");
     expect(conflict.fix).toBeNull();
     expect(conflict.otherWorktrees).toEqual([{ path: join(root, "side"), branch: "side" }]);
+  });
+});
+
+describe("prd-state on a real merge", () => {
+  it("stops at the check step, before git add, when the redone merge leaves conflict markers", async () => {
+    write(".rex/changes/c/state.yaml", "items:\n  a: pending\n");
+    commitAll("base");
+    publishMain();
+    git("checkout", "-q", "-b", "feat");
+    write(".rex/changes/c/state.yaml", "items:\n  a: in_progress\n");
+    commitAll("feat");
+    git("checkout", "-q", "main");
+    write(".rex/changes/c/state.yaml", "items:\n  a: completed\n");
+    commitAll("main");
+    publishMain();
+    git("checkout", "-q", "feat");
+
+    const [conflict] = await predict();
+    expect(conflict.class).toBe("prd-state");
+    const steps = (conflict.fix as { steps: string[][] }).steps;
+
+    mergeBase();
+    // No driver attribute here, so `checkout --merge` recreates the text
+    // conflict, as an unresolvable rex-state row would: markers, exit 0.
+    const checkAt = steps.findIndex((s) => s.includes("--check"));
+    for (const [cmd, ...args] of steps.slice(0, checkAt)) {
+      expect(spawnSync(cmd, args, { cwd: repo }).status).toBe(0);
+    }
+    const [cmd, ...args] = steps[checkAt];
+    expect(spawnSync(cmd, args, { cwd: repo }).status).not.toBe(0);
+    expect(checkAt).toBeLessThan(steps.findIndex((s) => s[1] === "add"));
+    expect(git("diff", "--name-only", "--diff-filter=U")).toBe(".rex/changes/c/state.yaml");
   });
 });
 

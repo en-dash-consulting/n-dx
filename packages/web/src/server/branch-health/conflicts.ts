@@ -107,12 +107,15 @@ function decide(c: ConflictSides, ctx: ConflictContext): Verdict {
     if (!ctx.rexStateDriver) {
       return {
         class: "prd-state",
-        reason: "PRD state merges by item id through the rex-state driver, but merge.rex-state.driver is not registered here: register it and redo this file's merge.",
+        reason: "PRD state merges by item id through the rex-state driver, but merge.rex-state.driver is not registered here: register it and redo this file's merge. If the driver leaves conflict markers, the check step stops before they are staged.",
         fix: {
           steps: [
             ["git", "config", "merge.rex-state.name", REX_STATE_DRIVER.name],
             ["git", "config", "merge.rex-state.driver", REX_STATE_DRIVER.driver],
+            // `checkout --merge` exits 0 even when the driver could not resolve
+            // a row and wrote markers; `diff --check` exits non-zero on them.
             ["git", "checkout", "--merge", "--", c.path],
+            ["git", "diff", "--check", "HEAD", "--", c.path],
             ["git", "add", "--", c.path],
           ],
         },
@@ -127,7 +130,13 @@ function decide(c: ConflictSides, ctx: ConflictContext): Verdict {
   const hunks = c.result === null ? null : parseConflictHunks(c.result);
 
   if (V1_INDEX.test(c.path)) {
-    if (hunks && hunks.length > 0 && hunks.every((h) => h.section === "## Children" && h.tableOnly)) {
+    const childrenOnly = hunks && hunks.length > 0 && hunks.every((h) => h.section === "## Children" && h.tableOnly);
+    // The fix keeps this branch's copy whole, so it is safe only when the base
+    // changed nothing above the table that merged cleanly into the result.
+    if (childrenOnly && c.branch !== null && c.result !== null && beforeChildren(c.result) !== beforeChildren(c.branch)) {
+      return source("The base also changed this item above its ## Children table; keeping this branch's copy would drop that change.");
+    }
+    if (childrenOnly) {
       return {
         class: "prd-children-table",
         reason: "Every conflict is inside the informational ## Children table, which rex rewrites from the directory.",
@@ -157,6 +166,13 @@ function decide(c: ConflictSides, ctx: ConflictContext): Verdict {
     return source("The conflicted result has no ancestor section, so whether a side removed lines cannot be told.");
   }
   return source(sourceReason(c, hunks));
+}
+
+/** A v1 index.md up to its `## Children` heading: the frontmatter and anything else the item holds. */
+function beforeChildren(text: string): string {
+  const lines = text.split("\n");
+  const at = lines.findIndex((line) => line.trim() === "## Children");
+  return (at < 0 ? lines : lines.slice(0, at)).join("\n");
 }
 
 function source(reason: string): Verdict {

@@ -22,7 +22,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "477c02f8-fba6-46ea-93ef-19fbf9293954":
     issues: ["https://www.notion.so/3f7a80b7192481b38426d554c9a1cfa8","https://www.notion.so/3f7a80b7192481c9be12e2721b3bdbb9"]
-    lastModified: "2026-10-29T16:59:21.410Z"
+    lastModified: "2026-10-29T17:26:29.477Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5b73d052-964f-4145-ab5f-bf6c6b221f01":
     status: "completed"
@@ -45,8 +45,15 @@ items:
     lastModified: "2026-10-29T17:06:26.835Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d62623bb-3542-4c31-8461-83eb874fe2c3":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-29T17:10:38.638Z"
-    activeIntervals: [{"start":"2026-10-29T17:10:38.638Z"}]
-    lastModified: "2026-10-29T17:10:39.184Z"
+    completedAt: "2026-10-29T17:30:03.900Z"
+    endedAt: "2026-10-29T17:30:03.900Z"
+    activeIntervals: [{"end":"2026-10-29T17:30:03.900Z","start":"2026-10-29T17:10:38.638Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Pure conflict classifier (branch-health/conflicts.ts + unified-diff.ts) wired into the collector, route and Workspaces strip; web.generatedFiles declared in .n-dx.json; unit, integration (real merges, rex validate) and viewer tests."
+    lastModified: "2026-10-29T17:30:03.900Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f2c90a0d-ac38-4bdf-9bfb-45fe667160ec":
+    lastModified: "2026-10-29T17:26:29.477Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

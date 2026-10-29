@@ -43,9 +43,11 @@ const FRONT = ["---", 'id: "epic-1"', 'level: "epic"', 'title: "Epic"', 'status:
 const TABLE_HEAD = ["## Children", "", "| Title | Status |", "|-------|--------|", "| [A](./a.md) | pending |"];
 
 describe("prd-children-table", () => {
+  const branch = [...FRONT, ...TABLE_HEAD, "| [C](./c.md) | pending |", ""].join("\n");
+
   it("offers checkout --ours, the post-merge repair and validate when every hunk is a Children row", () => {
     const result = [...FRONT, ...TABLE_HEAD, ...hunk(["| [B](./b.md) | pending |"], [], ["| [C](./c.md) | pending |"]), ""].join("\n");
-    const c = only(sides(V1_INDEX, { result }));
+    const c = only(sides(V1_INDEX, { result, branch }));
     expect(c.class).toBe("prd-children-table");
     expect(c.fix).toEqual({
       steps: [
@@ -55,6 +57,16 @@ describe("prd-children-table", () => {
         ["rex", "validate"],
       ],
     });
+  });
+
+  it("is source when the base's clean change above the table would be lost by keeping this branch's copy", () => {
+    // The base set the epic completed (merged cleanly) and added a row; this branch added a row.
+    const merged = FRONT.map((l) => (l.startsWith("status:") ? 'status: "completed"' : l));
+    const result = [...merged, ...TABLE_HEAD, ...hunk(["| [B](./b.md) | pending |"], [], ["| [C](./c.md) | pending |"]), ""].join("\n");
+    const c = only(sides(V1_INDEX, { result, branch }));
+    expect(c.class).toBe("source");
+    expect(c.fix).toBeNull();
+    expect(c.reason).toMatch(/drop that change/);
   });
 
   it("is source when any hunk lies outside ## Children, even with another inside it", () => {
@@ -85,6 +97,7 @@ describe("prd-state", () => {
         ["git", "config", "merge.rex-state.name", "n-dx PRD state merge"],
         ["git", "config", "merge.rex-state.driver", "rex merge-state %O %A %B %P"],
         ["git", "checkout", "--merge", "--", STATE],
+        ["git", "diff", "--check", "HEAD", "--", STATE],
         ["git", "add", "--", STATE],
       ],
     });
