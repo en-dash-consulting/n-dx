@@ -127,6 +127,10 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   if (unfinished.length > 0) {
     throw new ApplyAmendmentsError(label, [`${describeWork(unfinished)} not completed; a change applies once its work is done`]);
   }
+  const unapplied = options.allowOpenWork ? [] : unappliedNestedChanges(change);
+  if (unapplied.length > 0) {
+    throw new ApplyAmendmentsError(label, [`${describeWork(unapplied)} not applied; ${NESTED_FIRST}`]);
+  }
 
   const amends = change.amends ?? [];
   const context: ApplyContext = { options, removing: new Set([...removedIds(next.product, amends), ...(options.alsoRemoving ?? [])]) };
@@ -246,6 +250,17 @@ export function unfinishedWork(change: RuleNode): RuleNode[] {
   return (change.children ?? []).filter(
     (c) => (c.type === "task" || c.type === "change") && c.status !== "deleted" && !SUCCESSFUL_CHILD_STATUSES.has(c.status ?? "pending"),
   );
+}
+
+/** Why a container waits for the changes nested in it. */
+export const NESTED_FIRST = "a change applies after the changes nested in it";
+
+/**
+ * The live changes nested directly in `change` that are not applied yet. A
+ * container applies only once this is empty, so inner amendments land first.
+ */
+export function unappliedNestedChanges(change: RuleNode): RuleNode[] {
+  return (change.children ?? []).filter((c) => c.type === "change" && c.status !== "deleted" && isOpenChange(c));
 }
 
 /** Names `nodes` for a refusal, with the verb: `task T-1, change CH-2 are`. */
