@@ -1,6 +1,0 @@
----
-"@n-dx/web": patch
-"@n-dx/rex": patch
----
-
-Sidecar planning ends in one editable change-set card (behind `web.sidecar`). A `propose_prd_change` call is read against the PRD before its card is raised. Each item's type and parent are resolved, and an item that matches an existing one is flagged with the match. On v2 the card says where the change lands: on the targeted capability or constraint, or in the Inbox needing placement. A proposal the PRD cannot take raises no card and says why. The operator can edit each item's title, description and done-when on the card. Approval writes the edited items in one transaction under the PRD lock, by the dashboard's own add and placement rules: on v1 each item is added as `add_item` adds it, and on v2 one change with its tasks is written and placed when the card names a target. The tool result lists the ids written. A denied or withdrawn card writes nothing, and the card never applies a change. While a card waits, the Plan tree shows its items as dimmed "proposed" rows under their parents. The rows go when the card is denied and give way to the real items once approval writes them. Rex exports `findDuplicateItem`, the duplicate rule smart add now shares.
