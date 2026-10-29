@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { handleSidecarRoute } from "../../../src/server/routes-sidecar.js";
 import { SidecarBroker } from "../../../src/server/sidecar/broker.js";
 import { DEFAULT_CONTEXT_CEILINGS, resolveContextCeiling } from "../../../src/server/sidecar/context-refresh.js";
-import { DEFAULT_SIDECAR_TTL_MS } from "../../../src/server/sidecar/session-registry.js";
+import { DEFAULT_SIDECAR_TTL_MS, worktreeSidecarDir } from "../../../src/server/sidecar/session-registry.js";
 import { readSidecarSettings, resolveSidecarIdleMs } from "../../../src/server/sidecar/settings.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { closeRouteTestServer, removeTestDir } from "../../helpers/server-route-test-support.js";
@@ -106,6 +106,27 @@ describe("settings route", () => {
     expect(status).toBe(400);
     expect(String(json.error)).toMatch(message);
     expect(existsSync(config())).toBe(false);
+  });
+});
+
+describe("the dashboard's session registry", () => {
+  it("forgets a resume id once the saved idle window has passed", async () => {
+    // The route's own registry (no registryFor), seeded with a session idle for ten minutes.
+    const sidecarDir = worktreeSidecarDir(root);
+    mkdirSync(sidecarDir, { recursive: true });
+    const idleSince = new Date(Date.now() - 10 * 60_000).toISOString();
+    writeFileSync(join(sidecarDir, "index.json"), JSON.stringify({
+      schema: "ndx/sidecar-index/v1",
+      sessions: [{
+        id: "s1", scope: "worktree", worktree: root, vendor: "claude", resumeId: "vendor-1",
+        createdAt: idleSince, lastActivityAt: idleSince, turns: 1, cursor: 0, tokens: { input: 0, output: 0 },
+      }],
+    }));
+    const resumeId = async () => (await call("GET", "/api/sidecar/sessions")).json.sessions[0].session.resumeId;
+
+    expect(await resumeId()).toBe("vendor-1");
+    await call("PUT", "/api/sidecar/settings", { idleMs: 5 * 60_000 });
+    expect(await resumeId()).toBeUndefined();
   });
 });
 
