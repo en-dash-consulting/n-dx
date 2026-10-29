@@ -1,8 +1,13 @@
 schema: "rex/v2"
 items:
   "2b5ff0ac-509b-4c0a-85ac-423a469d8c58":
-    lastModified: "2026-10-13T19:10:08.961Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-27T22:49:08.556Z"
+    completedAt: "2026-10-27T22:49:34.407Z"
+    endedAt: "2026-10-27T22:49:34.407Z"
+    activeIntervals: [{"end":"2026-10-27T22:49:34.407Z","start":"2026-10-27T22:49:08.556Z"}]
+    lastModified: "2026-10-27T22:49:34.407Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "3367feeb-2a9f-4b7f-8b25-6feb7ea4d7eb":
     lastModified: "2026-10-13T19:10:40.125Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"

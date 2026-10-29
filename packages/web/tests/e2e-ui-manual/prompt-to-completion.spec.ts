@@ -55,7 +55,6 @@ test.afterAll(async ({}, testInfo) => {
 test("a typed prompt becomes a task the agent completes", async ({ page }, testInfo) => {
   const tracker = trackConsoleErrors(page);
   const before = new Set(readPrdItems(project.dir).map((i) => i.id));
-  const baseSha = headSha(project.dir);
 
   await page.goto(`${dashboard.baseUrl}/prd`, { waitUntil: "domcontentloaded" });
   await expect(page.locator(".prd-tree-container").getByText("E2E Manual Epic")).toBeVisible({ timeout: 10_000 });
@@ -94,6 +93,7 @@ test("a typed prompt becomes a task the agent completes", async ({ page }, testI
   await caption(page, "4/5 Start the task with the agent");
   await expect(page.locator(".live-idle .live-card-title")).toHaveText(task.title, { timeout: 15_000 });
   await page.getByRole("button", { name: /More ways to run/ }).click();
+  const baseSha = headSha(project.dir);
   await page.getByRole("menuitem", { name: /^Start now/ }).click();
 
   // The proposal may hold several tasks; hench starts the highest-priority one.
