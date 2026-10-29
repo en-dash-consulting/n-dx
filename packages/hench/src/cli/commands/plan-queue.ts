@@ -136,9 +136,14 @@ export function formatPlan(plan: QueuePlan): string[] {
   return lines;
 }
 
+/**
+ * The path as `listWorktrees` spells it: `.native` returns the on-disk case
+ * and long (not 8.3) names, so a mis-cased or short `dir` still matches its
+ * listed worktree instead of being counted a second time.
+ */
 function canonical(path: string): string {
   try {
-    return realpathSync(path);
+    return realpathSync.native(path);
   } catch {
     return resolve(path);
   }

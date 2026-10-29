@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
@@ -105,6 +106,15 @@ describe("plan-queue across worktrees", () => {
   it("counts this worktree's own live run too", async () => {
     const p = await plan(sibling);
     expect(p.activeRuns).toBe(1);
+    expect(p.summary).toMatch(/0 live runs in other worktrees\./);
+  });
+
+  it("does not count its own worktree twice when given a differently cased path", async (ctx) => {
+    const upper = sibling.toUpperCase();
+    if (upper === sibling || !existsSync(upper)) ctx.skip(); // Case-sensitive filesystem.
+    const p = await plan(upper);
+    expect(p.activeRuns).toBe(1);
+    expect(p.activeRunsByWorktree).toHaveLength(3);
     expect(p.summary).toMatch(/0 live runs in other worktrees\./);
   });
 
