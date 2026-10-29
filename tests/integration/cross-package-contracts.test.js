@@ -973,7 +973,7 @@ describe("gateway export auto-detection", () => {
         "isRequirementCategory", "isValidationType",
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
-        "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "addChangeNode", "cascadeParentReset", "cascadeParentCompletion",
+        "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "addChangeNode", "changeInputsFromProposals", "addProposedChanges", "cascadeParentReset", "cascadeParentCompletion",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
         "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",

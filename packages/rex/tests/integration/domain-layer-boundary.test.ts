@@ -173,8 +173,9 @@ describe("rex cli/commands import surface", () => {
     "../../recommend/create-from-recommendations.js",
     // `rex analyze --accept` and `rex recommend --accept` on a v2 tree map
     // their proposals to change-layer adds here. It sits beside the v1 creation
-    // module it mirrors, is pure, and has no caller outside those two commands
-    // — public.ts would hand hench and web a mapper neither one calls.
+    // module it mirrors. public.ts exports the proposal mapping too, for the
+    // dashboard's accept routes; the commands import it directly, as the rest
+    // of this list does.
     "../../recommend/changes-from-proposals.js",
     "../../schema/index.js",
     "../../schema/validate.js",

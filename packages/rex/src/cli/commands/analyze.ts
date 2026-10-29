@@ -479,6 +479,16 @@ async function acceptProposalsAsChanges(
         status: t.status,
         source: t.source,
         tags: t.tags,
+        // An oversized task's decomposition: tasks under the change it makes.
+        subtasks: t.decomposition?.children.map((c) => ({
+          title: c.title,
+          description: c.description,
+          acceptanceCriteria: c.acceptanceCriteria,
+          priority: c.priority as ProposedWork["priority"],
+          status: c.status,
+          source: c.source,
+          tags: c.tags,
+        })),
       })),
     })),
   }));
@@ -489,7 +499,9 @@ async function acceptProposalsAsChanges(
     result("No proposals to create: every one describes code that already exists.");
   } else {
     report(await addChanges(dir, inputs), false);
-    result(`\nAdded ${inputs.length} change${inputs.length === 1 ? "" : "s"} to the Inbox.`);
+    const taskCount = inputs.reduce((n, input) => n + (input.tasks?.length ?? 0), 0);
+    const tasksNote = taskCount ? `, with ${taskCount} proposed subtask${taskCount === 1 ? "" : "s"} as their tasks` : "";
+    result(`\nAdded ${inputs.length} change${inputs.length === 1 ? "" : "s"} to the Inbox${tasksNote}.`);
   }
   if (baselineCount > 0) {
     info(`${baselineCount} proposal${baselineCount === 1 ? "" : "s"} describing existing code were not created: on a v2 PRD that baseline is the product layer, not a change.`);
