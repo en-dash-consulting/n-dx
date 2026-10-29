@@ -49,7 +49,7 @@
 
 import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, rename, rm, rmdir } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import {
   AreaIntentSchema,
   CapabilityIntentSchema,
@@ -183,6 +183,7 @@ export async function writePrdModel(
     await planFolder(changesDir, model.tree.changes, "changes", stamp, loaded, plan, isInboxChange);
   }
   await assertStaleRemovable(plan.stale, collectIds(model), options.removed ?? new Set());
+  await assertNoStrandedFiles(plan, productDir);
 
   const result: WritePrdModelResult = { written: [], removed: [], deletedFiles: [] };
   const rel = (path: string): string => relative(rexDir, path).split("\\").join("/");
@@ -575,6 +576,40 @@ async function removeTreeFiles(dir: string): Promise<Removal> {
       out.removed.push(path);
       out.files.push(path);
     }
+  }
+  return out;
+}
+
+/**
+ * A product folder that goes stale (its node became a leaf or was removed)
+ * loses its tree files, but anything else in it stays, leaving a folder with
+ * no `index.md` that every later read warns about and skips. Refuse, naming
+ * those files, before anything is written. Files a moved folder carries along
+ * do not count. Product layer only: a change is always a folder.
+ */
+async function assertNoStrandedFiles(plan: Plan, productDir: string): Promise<void> {
+  const carried = new Set(plan.carried.map((c) => c.from));
+  const inProduct = (path: string): boolean => path.startsWith(productDir + sep);
+  for (const { path, isDir } of plan.stale) {
+    if (!isDir || !inProduct(path)) continue;
+    const stranded = (await nonTreeFilesUnder(path)).filter((file) => !carried.has(file));
+    if (stranded.length === 0) continue;
+    throw new Error(
+      `Refusing to write the PRD: the folder ${path} would lose its node (it becomes a leaf or is removed), ` +
+        `but it also holds ${stranded.map((f) => relative(path, f).split(sep).join("/")).join(", ")}, ` +
+        `which would be left in a folder with no index.md. Nothing was written. Move or delete those files by hand first.`,
+    );
+  }
+}
+
+/** Every file under `dir` that is not a tree file (`.md`, `state.yaml`); dot entries are ignored, as the reader does. */
+async function nonTreeFilesUnder(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of (await listDir(dir)) ?? []) {
+    if (entry.name.startsWith(".")) continue;
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...(await nonTreeFilesUnder(path)));
+    else if (!entry.name.endsWith(".md") && entry.name !== STATE_FILE_NAME) out.push(path);
   }
   return out;
 }
