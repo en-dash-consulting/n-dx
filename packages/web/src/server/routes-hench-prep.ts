@@ -567,6 +567,28 @@ export async function resolveTaskRun(
   }
 }
 
+/**
+ * `ndx work --task=<id> --dry-run` for the run `options` would start, for a
+ * caller inside this server that renders it: the Sidecar Describe lens. A
+ * refusal or timeout is the failure.
+ */
+export async function previewTaskRun(
+  ctx: ServerContext,
+  taskId: string,
+  options: unknown,
+): Promise<{ ok: true; brief: string } | { ok: false; failure: string }> {
+  const checked = await validateRunOptions(ctx.projectDir, options);
+  if (!checked.ok) return { ok: false, failure: `the run options are refused: ${checked.error}` };
+  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
+  const run = await runNdx(
+    ctx,
+    ["work", `--task=${taskId}`, "--dry-run", ...runOptionArgs(checked.options), ...resetDeferredArgs(prdEntryOf(ctx, taskId)), ctx.projectDir],
+    PREP_PREVIEW_TIMEOUT_MS,
+  );
+  if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
+  return { ok: true, brief: run.stdout };
+}
+
 /** POST /api/hench/prep/:taskId/preview */
 async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
   let body: Record<string, unknown>;

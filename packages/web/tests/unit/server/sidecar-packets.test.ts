@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { indexTree, loadPrdModel, nodeSpec, specHash } from "../../../src/server/rex-gateway.js";
+import { DESCRIBE_INSTRUCTIONS } from "../../../src/server/sidecar/lens-instructions.js";
 import { assemblePacket, type PacketSection } from "../../../src/server/sidecar/packet.js";
 import {
   buildDescribePacket,
@@ -327,6 +328,48 @@ describe("Describe", () => {
   it("v1: carries a blocked task with its blocker named", async () => {
     const packet = await buildDescribePacket(await sourcesFor("v1"), { ref: V1_TASK }, NOW);
     expect(packet.text).toMatchSnapshot();
+  });
+
+  it("carries done-when as checks, likely files, and the tier with its reason", async () => {
+    const sources = await sourcesFor("v2", {
+      resolve: async () => ({
+        savedTier: "deep",
+        settings: [{ key: "model", value: "opus", source: "task.run.tier" }],
+        refusals: [],
+        warnings: [],
+      }),
+    });
+    const text = (await buildDescribePacket(sources, { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).toMatch(/Done when \(checks\):\n- \[ \] /);
+    expect(text).toContain("## Likely files");
+    expect(text).toContain("- src/pay/button.ts");
+    expect(text).toContain("Tier: deep");
+    expect(text).toContain('model "opus" comes from task.run.tier');
+  });
+
+  it("carries the resolved settings and the dry-run digest from the reads, not a gap", async () => {
+    const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).toContain("model = \"opus\" (from task.run)");
+    expect(text).toContain("## Brief preview digest");
+    expect(text).toContain("# Task brief");
+    expect(text).not.toContain("Not available: the dry run");
+  });
+
+  it("marks each failed Prepare read unavailable and still builds the packet", async () => {
+    const down = await sourcesFor("v2", { resolve: async () => null, preview: async () => null });
+    const text = (await buildDescribePacket(down, { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).toContain("Not available: the resolve command did not answer");
+    expect(text).toContain("Not available: the dry run did not answer");
+    expect(text).toContain("## Prior runs");
+    expect(text).toContain("## Task");
+  });
+
+  it("tells the agent to flag vague done-when and propose tightened ones through a change-set card", async () => {
+    const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).toContain(DESCRIBE_INSTRUCTIONS);
+    expect(DESCRIBE_INSTRUCTIONS).toMatch(/flag any that is vague/);
+    expect(DESCRIBE_INSTRUCTIONS).toContain("propose_prd_change");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("change-set card");
   });
 
   it("names each refusal and marks an unanswered resolve as unavailable", async () => {

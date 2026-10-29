@@ -11,6 +11,7 @@ import { join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadPrdModel } from "../../../src/server/rex-gateway.js";
+import { prepareReads } from "../../../src/server/routes-sidecar.js";
 import { buildDescribePacket } from "../../../src/server/sidecar/packet-builders.js";
 import { createPacketSources, type SpawnedReads } from "../../../src/server/sidecar/packet-sources.js";
 import type { ServerContext } from "../../../src/server/types.js";
@@ -140,5 +141,53 @@ describe("createPacketSources zone", () => {
   it("reads null when there is no analysis", async () => {
     const sources = createPacketSources(contextFor(dir, (name) => join(dir, `.${name}`)), spawned);
     expect(await sources.zone("pay")).toBeNull();
+  });
+});
+
+describe("prepareReads", () => {
+  const ctx = { projectDir: "/p", svDir: "/p/sv", rexDir: "/p/rex", dev: false } as ServerContext;
+
+  it("parses the resolve JSON and returns the dry-run brief from the Prepare seams", async () => {
+    const calls: string[] = [];
+    const reads = prepareReads(ctx, {
+      resolve: async (_c, id, options) => {
+        calls.push(`resolve ${id} ${JSON.stringify(options)}`);
+        return {
+          ok: true,
+          resolution: {
+            resolved: { model: { value: "opus", source: "task.run.tier" }, maxTurns: { value: 40, source: "default" } },
+            saved: { tier: "deep" },
+            refusals: [{ code: "dirty-tree", message: "dirty" }],
+            warnings: [],
+          },
+        };
+      },
+      preview: async (_c, id) => {
+        calls.push(`preview ${id}`);
+        return { ok: true, brief: "# brief" };
+      },
+    });
+    expect(await reads.resolve("t1")).toEqual({
+      settings: [
+        { key: "model", value: "opus", source: "task.run.tier" },
+        { key: "maxTurns", value: 40, source: "default" },
+      ],
+      savedTier: "deep",
+      refusals: [{ code: "dirty-tree", message: "dirty" }],
+      warnings: [],
+    });
+    expect(await reads.preview("t1")).toBe("# brief");
+    expect(calls).toEqual(["resolve t1 {}", "preview t1"]);
+  });
+
+  it("answers null when a read fails or throws, so the packet marks the part unavailable", async () => {
+    const failing = prepareReads(ctx, {
+      resolve: async () => ({ ok: false, failure: "Timed out" }),
+      preview: async () => {
+        throw new Error("spawn failed");
+      },
+    });
+    expect(await failing.resolve("t1")).toBeNull();
+    expect(await failing.preview("t1")).toBeNull();
   });
 });

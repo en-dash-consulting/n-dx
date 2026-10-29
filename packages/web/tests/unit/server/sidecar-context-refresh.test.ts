@@ -480,8 +480,8 @@ describe("the packet opens the first turn", () => {
       evidence: async () => null,
       zones: async () => null,
       zone: async () => null,
-      resolve: async () => null,
-      preview: async () => null,
+      resolve: async () => ({ savedTier: "deep", settings: [{ key: "model", value: "opus", source: "task.run.tier" }], refusals: [], warnings: [] }),
+      preview: async () => "# Task brief\n## Acceptance\n",
       runs: async () => [],
     };
     const task = "c0000000-0000-4000-8000-000000000002";
@@ -505,6 +505,13 @@ describe("the packet opens the first turn", () => {
     // The header names any ref; the title proves the task itself was resolved and described.
     expect(spawns[0]!.stdin).toContain("Wire the button");
     expect(spawns[0]!.stdin).toContain("what is this?");
+    // The instructions and the Prepare reads reach the first turn, ahead of the operator's message.
+    const first = spawns[0]!.stdin;
+    expect(first).toContain("## How to describe");
+    expect(first).toContain("propose_prd_change");
+    expect(first).toContain("model = \"opus\" (from task.run.tier)");
+    expect(first).toContain("## Brief preview digest");
+    expect(first.indexOf("## How to describe")).toBeLessThan(first.indexOf("## Operator's message"));
   });
 
   it("sends the Explain packet and its instructions on turn one, within the lens's bound", async () => {

@@ -86,9 +86,30 @@ export interface ResolvedSetting {
 
 export interface ResolveRead {
   settings: ResolvedSetting[];
+  /** The tier saved on the task (`run.tier`), or `null` when none is saved. */
+  savedTier?: string | null;
   /** Why a run would be refused, as hench states it. */
   refusals: Array<{ code: string; message: string }>;
   warnings: Array<{ code: string; message: string }>;
+}
+
+/**
+ * `ndx work --resolve`'s JSON as a {@link ResolveRead}. Only entries that
+ * carry a `source` are settings; anything else in `resolved` is skipped.
+ */
+export function readResolution(resolution: Record<string, unknown>): ResolveRead {
+  const resolved = resolution.resolved && typeof resolution.resolved === "object" ? (resolution.resolved as Record<string, unknown>) : {};
+  const settings: ResolvedSetting[] = Object.entries(resolved).flatMap(([key, entry]) => {
+    const setting = entry as { value?: unknown; source?: unknown } | null;
+    return setting && typeof setting.source === "string" ? [{ key, value: setting.value ?? null, source: setting.source }] : [];
+  });
+  const notes = (field: string): Array<{ code: string; message: string }> =>
+    (Array.isArray(resolution[field]) ? (resolution[field] as Array<{ code?: unknown; message?: unknown }>) : []).map((n) => ({
+      code: String(n.code),
+      message: String(n.message),
+    }));
+  const saved = resolution.saved as { tier?: unknown } | null | undefined;
+  return { settings, savedTier: typeof saved?.tier === "string" ? saved.tier : null, refusals: notes("refusals"), warnings: notes("warnings") };
 }
 
 export interface RunStatusRead {

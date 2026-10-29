@@ -4,15 +4,28 @@ exports[`Describe > v1: carries a blocked task with its blocker named 1`] = `
 "# Sidecar context packet: describe · 33333333-3333-3333-3333-333333333333
 Built by code from the repository's own records. No model wrote it.
 
+## How to describe
+Describe the task as it would run: what it asks for, how it is checked, what it is set to run with, what blocks it.
+- Read each done-when check and flag any that is vague: no observable result, no number or name to test against, or a word such as "works", "properly" or "better" doing the work. Quote it and say what cannot be checked.
+- For every vague check, propose a tightened one and send the tightened set through a \`propose_prd_change\` call, which raises a change-set card the operator edits and approves. Do not rewrite the PRD any other way and do not paste replacement text as the answer.
+- Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.
+- Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.
+
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
 
 Password Login
 Status: blocked · priority critical
 Description: Build password-based authentication.
-Done when:
-- Valid passwords authenticate users
-- Invalid passwords show a generic error
+Done when (checks):
+- [ ] Valid passwords authenticate users
+- [ ] Invalid passwords show a generic error
+
+## Likely files
+_source: task text, .rex/ (live read); git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- src/pay/button.ts
+- src/pay/wallet.ts
 
 ## Parent chain
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -25,6 +38,13 @@ _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
 
 Blocked by:
 - dep-password-policy: not found
+
+## Tier
+_source: .rex/ (live read); ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Tier: none saved on the task
+Reason:
+- model "opus" comes from task.run
 
 ## Run settings (ndx work --resolve)
 _source: ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -53,14 +73,27 @@ exports[`Describe > v2: carries the task, parents, blockers, resolved settings w
 "# Sidecar context packet: describe · c0000000-0000-4000-8000-000000000002
 Built by code from the repository's own records. No model wrote it.
 
+## How to describe
+Describe the task as it would run: what it asks for, how it is checked, what it is set to run with, what blocks it.
+- Read each done-when check and flag any that is vague: no observable result, no number or name to test against, or a word such as "works", "properly" or "better" doing the work. Quote it and say what cannot be checked.
+- For every vague check, propose a tightened one and send the tightened set through a \`propose_prd_change\` call, which raises a change-set card the operator edits and approves. Do not rewrite the PRD any other way and do not paste replacement text as the answer.
+- Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.
+- Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.
+
 ## Task
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
 
 Wire the button
 Status: pending
 Description: (none)
-Done when:
-- The button appears on Safari only
+Done when (checks):
+- [ ] The button appears on Safari only
+
+## Likely files
+_source: task text, .rex/ (live read); git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- src/pay/button.ts
+- src/pay/wallet.ts
 
 ## Parent chain
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
@@ -72,6 +105,13 @@ _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
 
 Blocked by:
 nothing
+
+## Tier
+_source: .rex/ (live read); ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Tier: none saved on the task
+Reason:
+- model "opus" comes from task.run
 
 ## Run settings (ndx work --resolve)
 _source: ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_

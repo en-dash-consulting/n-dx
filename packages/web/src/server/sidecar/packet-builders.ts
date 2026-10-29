@@ -14,8 +14,8 @@
 import { capabilityReport, indexTree, isAppliedChange, productReport } from "../rex-gateway.js";
 import type { RuleNode, V2Tree } from "../rex-gateway.js";
 import { assemblePacket, type Packet, type PacketSection, type Staleness } from "./packet.js";
-import { EXPLAIN_INSTRUCTIONS } from "./lens-instructions.js";
-import type { PacketSources, PrdRead } from "./packet-sources.js";
+import { DESCRIBE_INSTRUCTIONS, EXPLAIN_INSTRUCTIONS } from "./lens-instructions.js";
+import type { PacketSources, PrdRead, ResolveRead } from "./packet-sources.js";
 
 export const EXPLAIN_CAP = 8_000;
 export const DESCRIBE_CAP = 8_000;
@@ -394,10 +394,13 @@ function previewDigest(brief: string): string {
 /** Describe: the task as it will run: text, done-when, settings, what blocks it and how it has gone. */
 export async function buildDescribePacket(sources: PacketSources, target: PacketTarget, now: string): Promise<Packet> {
   const lens = "describe";
+  const head = `${header(lens, target)}\n\n${DESCRIBE_INSTRUCTIONS}`;
+  const refused = (why: string): Packet =>
+    assemblePacket({ lens, cap: DESCRIBE_CAP, header: head, sections: [gap("prd", "PRD", why, now, PRD_SOURCE)] });
   const prd = await sources.prd();
-  if (!prd) return noPrd(lens, DESCRIBE_CAP, target, now, "no readable PRD");
+  if (!prd) return refused("no readable PRD");
   const found = target.ref ? findNode(prd.tree.changes, target.ref) : null;
-  if (!found) return noPrd(lens, DESCRIBE_CAP, target, now, target.ref ? `"${target.ref}" names no task` : "Describe needs a task");
+  if (!found) return refused(target.ref ? `"${target.ref}" names no task` : "Describe needs a task");
   const { node, chain } = found;
 
   const sections: PacketSection[] = [
@@ -408,17 +411,21 @@ export async function buildDescribePacket(sources: PacketSources, target: Packet
         label(node),
         `Status: ${nodeStatus(node)}${text(node.priority) ? ` · priority ${text(node.priority)}` : ""}`,
         `Description: ${text(node.description) ?? text(node.intent) ?? "(none)"}`,
-        "Done when:",
-        bullets(strings(node.acceptanceCriteria), "(none stated)"),
+        "Done when (checks):",
+        strings(node.acceptanceCriteria).map((c) => `- [ ] ${c}`).join("\n") || "(none stated)",
       ].join("\n"),
       now,
     ),
+    await likelyFilesSection(sources, node, now),
     prdSection("parents", "Parent chain", bullets(chain.map((p) => `${kindOf(p)} ${label(p)} (${nodeStatus(p)})`), "(top level)"), now),
     prdSection("blockers", "Blockers and dependencies", blockersBody(prd, node), now),
   ];
 
   const resolved = await sources.resolve(node.id);
   sections.push(
+    resolved
+      ? tierSection(node, resolved, now)
+      : gap("tier", "Tier", "the resolve command did not answer", now, "ndx work --resolve"),
     resolved
       ? {
           id: "settings",
@@ -456,7 +463,46 @@ export async function buildDescribePacket(sources: PacketSources, target: Packet
       : gap("runs", "Prior runs", "the run records could not be read", now, runSource),
   );
 
-  return assemblePacket({ lens, cap: DESCRIBE_CAP, header: header(lens, target), sections });
+  return assemblePacket({ lens, cap: DESCRIBE_CAP, header: head, sections });
+}
+
+const LIKELY_FILES_MAX = 12;
+const PATH_IN_TEXT = /(?:[\w.-]+\/)+[\w.-]+\.\w{1,5}\b/g;
+
+/** Files the task names in its own text, then files earlier commits on it touched. */
+async function likelyFilesSection(sources: PacketSources, node: RuleNode, now: string): Promise<PacketSection> {
+  const prose = [text(node.description), text(node.intent), ...strings(node.acceptanceCriteria)].filter(Boolean).join("\n");
+  const named = [...new Set(prose.match(PATH_IN_TEXT) ?? [])];
+  const evidence = await sources.evidence([node.id]);
+  const touched = evidence ? evidence.commits.flatMap((c) => c.files) : [];
+  const files = [...new Set([...named, ...touched])].slice(0, LIKELY_FILES_MAX);
+  return {
+    id: "files",
+    title: "Likely files",
+    body: [
+      bullets(files, "None named in the task, and no earlier commit names it."),
+      ...(evidence ? [] : ["Git history was not readable, so earlier commits are not counted."]),
+    ].join("\n"),
+    provenance: { source: `task text, ${PRD_SOURCE}; git history, N-DX-Item trailers`, generatedAt: now },
+    staleness: evidence ? FRESH : { state: "unknown", reason: "git history not readable" },
+  };
+}
+
+/** The tier saved on the task, with the reason the PRD and `--resolve` give for it. */
+function tierSection(node: RuleNode, resolved: ResolveRead, now: string): PacketSection {
+  const model = resolved.settings.find((s) => s.key === "model");
+  const reasons = [
+    text(node.loeRationale) ? `effort rationale: ${oneLine(text(node.loeRationale)!)}` : null,
+    typeof node.loe === "number" ? `estimated effort ${node.loe}${text(node.loeConfidence) ? ` (${text(node.loeConfidence)} confidence)` : ""}` : null,
+    model ? `model ${JSON.stringify(model.value)} comes from ${model.source}` : null,
+  ].filter((r): r is string => r !== null);
+  return {
+    id: "tier",
+    title: "Tier",
+    body: [`Tier: ${resolved.savedTier ?? "none saved on the task"}`, "Reason:", bullets(reasons, "none recorded")].join("\n"),
+    provenance: { source: `${PRD_SOURCE}; ndx work --resolve`, generatedAt: now },
+    staleness: FRESH,
+  };
 }
 
 function blockersBody(prd: PrdRead, node: RuleNode): string {

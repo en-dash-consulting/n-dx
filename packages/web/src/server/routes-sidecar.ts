@@ -63,14 +63,14 @@ import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type S
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { startSidecarCommand } from "./routes-commands.js";
 import { runSlotUsage, startTaskExecution } from "./routes-hench.js";
-import { resolveTaskRun } from "./routes-hench-prep.js";
+import { previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readSidecarSettings, resolveSidecarIdleMs, saveSidecarSettings } from "./sidecar/settings.js";
 import { commitSettingsChange } from "./settings-commit.js";
 import { readLedger } from "./sidecar/ledger.js";
 import { buildLensPacket, LENS_IDS, LENS_PACKETS } from "./sidecar/lens-packets.js";
 import type { PacketTarget } from "./sidecar/packet-builders.js";
-import { createPacketSources } from "./sidecar/packet-sources.js";
+import { createPacketSources, readResolution, type SpawnedReads } from "./sidecar/packet-sources.js";
 import {
   createWorktreeSidecarRegistry,
   worktreeSidecarDir,
@@ -171,19 +171,40 @@ export function sidecarBrokerEndpoint(ctx: ServerContext, sessionId: string): Si
 }
 
 /**
+ * The two Describe reads, through the Prepare route's own seams: `ndx work
+ * --resolve` and `--dry-run` with no run options, as the modal opens. A read
+ * that fails answers `null`, so the packet marks that part unavailable and the
+ * session still starts.
+ */
+export function prepareReads(
+  ctx: ServerContext,
+  reads: { resolve: typeof resolveTaskRun; preview: typeof previewTaskRun } = { resolve: resolveTaskRun, preview: previewTaskRun },
+): SpawnedReads {
+  return {
+    async resolve(taskId) {
+      const read = await reads.resolve(ctx, taskId, {}).catch(() => null);
+      return read?.ok ? readResolution(read.resolution) : null;
+    },
+    async preview(taskId) {
+      const read = await reads.preview(ctx, taskId, {}).catch(() => null);
+      return read?.ok ? read.brief : null;
+    },
+  };
+}
+
+/**
  * Checkpoint wiring for `ctx`'s workspace: the project's ceiling for the
  * session's scope (read per turn), its ledger, and its lens's packet rebuilt
- * from disk. The two reads that spawn `ndx` answer nothing here — the Prepare
- * route that owns that spawn is not part of Sidecar — so a Plan packet says
- * those sections are missing rather than leaving a gap unmarked.
+ * from disk. The two reads that spawn `ndx` go through the Prepare route's
+ * seams ({@link prepareReads}).
  */
-export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions {
+export function sidecarContextOptions(ctx: ServerContext, reads: SpawnedReads = prepareReads(ctx)): SidecarContextOptions {
   const dir = worktreeSidecarDir(ctx.projectDir);
   return {
     ceiling: (record) => resolveContextCeiling(ctx.projectDir, record.scope),
     ledger: (record) => readLedger(dir, record.id),
     packet: async (record) => {
-      const sources = createPacketSources(ctx, { resolve: async () => null, preview: async () => null });
+      const sources = createPacketSources(ctx, reads);
       const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString());
       return built.status === "ready" ? built.packet.text : undefined;
     },
