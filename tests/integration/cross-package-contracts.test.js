@@ -332,6 +332,7 @@ describe("hench → llm-client gateway contract", () => {
     "sanitizeChildEnv",
     "strippedEnvNames",
     "resolveVendorCliEnv",
+    "repoCommandEnv",
     "resolveApiKey",
     "resolveCliPath",
     "loadProjectOverrides",
@@ -343,6 +344,8 @@ describe("hench → llm-client gateway contract", () => {
     "recordRepoTrust",
     "clearRepoTrust",
     "formatRepoTrustReport",
+    "escapeTerminalControls",
+    "writeHenchLocalSetting",
     "redactDeep",
     "redactSecrets",
     "createLineRedactor",
@@ -401,7 +404,7 @@ describe("hench → llm-client gateway contract", () => {
 
   const GATEWAY_CLASSES = ["CLIError", "ClaudeClientError", "ProcessPool", "ProcessLimitError"];
 
-  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"];
+  const GATEWAY_CONSTANTS = ["PROJECT_DIRS", "VENDOR_CONTEXT_CHAR_LIMITS", "SECRET_PATH_PATTERNS", "NDX_CONFIG_BLOCKED_PATHS", "DEFAULT_ENV_DENY", "DEFAULT_ENV_ALLOW"];
   const GATEWAY_STRING_CONSTANTS = ["NDX_CONTAINER_DIRNAME", "CLI_LOG_FILENAME"];
 
   for (const name of GATEWAY_FUNCTIONS) {
@@ -865,12 +868,15 @@ describe("gateway export auto-detection", () => {
 
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
-        "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv",
+        "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv", "repoCommandEnv",
         "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
         // Repository trust: the guard baseline and the per-user trust store
         // are one evaluation shared by hench, the dashboard and ndx init.
         "guardBaselineForLanguage", "clampGuardToBaseline", "evaluateRepoTrust",
-        "recordRepoTrust", "clearRepoTrust", "formatRepoTrustReport",
+        "recordRepoTrust", "clearRepoTrust", "formatRepoTrustReport", "escapeTerminalControls",
+        // `hench config` writes these keys to .n-dx.local.json, where the
+        // trust review does not read them as the repository's routing.
+        "HENCH_LOCAL_ONLY_SETTINGS", "writeHenchLocalSetting",
         "redactDeep", "redactSecrets", "createLineRedactor",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
@@ -927,6 +933,8 @@ describe("gateway export auto-detection", () => {
         "DEFAULT_EXECUTION_POLICY", "CANONICAL_PROMPT_SECTIONS", "ALL_FAILURE_CATEGORIES",
         "DEFAULT_LLM_VENDOR", "LLM_VENDOR", "LLM_VENDORS",
         "PROJECT_CONFIG_FILE", "LOCAL_CONFIG_FILE", "SECRET_PATH_PATTERNS",
+        // n-dx's own config files: the guard and the Claude CLI deny writes.
+        "NDX_CONFIG_BLOCKED_PATHS",
         "isFailForwardEnabled",
         "NDX_CONTAINER_DIRNAME",
         // The vendor-CLI invocation log's file name: the uncommitted-work gate

@@ -26,8 +26,8 @@ describe("loadLLMConfig", () => {
       JSON.stringify({
         llm: {
           vendor: "codex",
-          codex: { cli_path: "/usr/local/bin/codex", model: "gpt-5-codex" },
-          claude: { cli_path: "/usr/local/bin/claude" },
+          codex: { model: "gpt-5.6-terra" },
+          claude: { model: "claude-opus-5-5" },
         },
       }, null, 2),
       "utf-8",
@@ -35,8 +35,8 @@ describe("loadLLMConfig", () => {
 
     const cfg = await loadLLMConfig(tmpDir);
     expect(cfg.vendor).toBe("codex");
-    expect(cfg.codex?.cli_path).toBe("/usr/local/bin/codex");
-    expect(cfg.claude?.cli_path).toBe("/usr/local/bin/claude");
+    expect(cfg.codex?.model).toBe("gpt-5.6-terra");
+    expect(cfg.claude?.model).toBe("claude-opus-5-5");
   });
 
   it("reads every documented llm.local setting — the extractor whitelist must not lag the type", async () => {
@@ -379,19 +379,19 @@ describe("loadLLMConfig on the .ndx/ layout", () => {
     // not this project's config any more and must not be read.
     await writeFile(
       join(tmpDir, ".ndx", "config.json"),
-      JSON.stringify({ llm: { vendor: "codex", codex: { cli_path: "/opt/codex-shared" }, claude: { cli_path: "/opt/claude" } } }),
+      JSON.stringify({ llm: { vendor: "codex", codex: { model: "shared-codex" }, claude: { model: "shared-claude" } } }),
       "utf-8",
     );
     await writeFile(
       join(tmpDir, ".ndx", "config.local.json"),
-      JSON.stringify({ llm: { codex: { cli_path: "/opt/codex" } } }),
+      JSON.stringify({ llm: { codex: { model: "local-codex" } } }),
       "utf-8",
     );
     await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }), "utf-8");
 
     const cfg = await loadLLMConfig(tmpDir);
     expect(cfg.vendor).toBe("codex");
-    expect(cfg.codex?.cli_path).toBe("/opt/codex");
-    expect(cfg.claude?.cli_path).toBe("/opt/claude");
+    expect(cfg.codex?.model).toBe("local-codex");
+    expect(cfg.claude?.model).toBe("shared-claude");
   });
 });

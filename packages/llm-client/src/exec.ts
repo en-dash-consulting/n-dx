@@ -35,7 +35,7 @@ import type { ChildProcess, ExecFileSyncOptions, StdioOptions } from "node:child
 import { existsSync, realpathSync, openSync, closeSync } from "node:fs";
 // Aliased: `resolve` is the conventional name for a Promise executor argument
 // throughout this file, and the import would be shadowed inside every one.
-import { isAbsolute, resolve as resolvePath } from "node:path";
+import { dirname, isAbsolute, join, resolve as resolvePath } from "node:path";
 import { logCliInvocation } from "./cli-log.js";
 import { forwardsInterrupts, processInterruptForwarder } from "./interrupt-forwarding.js";
 import { terminateProcessTree, treeKillSpawnOptions } from "./process-tree.js";
@@ -671,6 +671,102 @@ export function getCurrentHead(cwd: string): string | undefined {
     }).trim();
   } catch {
     return undefined;
+  }
+}
+
+/** Environment variables that change how git reads every pathspec. */
+const PATHSPEC_MODE_VARS = ["GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const;
+
+/** git's answer to "is this path in the index?", or why it gave none. */
+export type GitTrackAnswer =
+  /** `paths`: the index entries git matched, as git spells them (its case; a symlink itself, not a path through it). */
+  | { state: "tracked"; paths: string[] }
+  | { state: "untracked" }
+  | { state: "unanswered"; reason: string };
+
+/**
+ * Synchronous git helper — is `relPath` (relative to `cwd`) in the git index?
+ *
+ * Tracked or untracked only when git answers: exit 0 is tracked, exit 1 is
+ * git's own "not in the index". Every other outcome — no repository, git
+ * missing, `detected dubious ownership`, a corrupt index, the timeout — is
+ * unanswered, with git's first stderr line (else the spawn error) as the
+ * reason, so the caller decides what it means and can say why.
+ *
+ * `ignoreCase` matches the path in any case (`:(icase)`): git compares a
+ * pathspec by exact case even under `core.ignorecase`, so on a case-insensitive
+ * filesystem a file committed as `.N-DX.local.json` would otherwise read as
+ * untracked under the name n-dx opens. The path is always matched literally,
+ * and git runs without the `GIT_*_PATHSPECS` variables: `GIT_LITERAL_PATHSPECS`
+ * turns the magic off, so a committed file would read as untracked.
+ */
+export function gitTracksPath(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitTrackAnswer {
+  const pathspec = `:(literal${options.ignoreCase ? ",icase" : ""})${relPath}`;
+  const env = { ...process.env };
+  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  try {
+    // -z: raw names, not git's octal quoting of non-ASCII paths.
+    const out = execFileSync("git", ["ls-files", "-z", "--error-unmatch", "--", pathspec], {
+      windowsHide: true,
+      cwd,
+      env,
+      encoding: "utf-8",
+      timeout: 5000,
+      // See getCurrentHead — an untracked file or a non-repository is an
+      // expected answer, so git's stderr is captured rather than printed.
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return { state: "tracked", paths: out.split("\0").filter(Boolean) };
+  } catch (err) {
+    const e = err as { status?: number | null; stderr?: string | Buffer; message?: string };
+    if (e.status === 1) return { state: "untracked" };
+    const stderrLine = String(e.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+    return { state: "unanswered", reason: stderrLine ?? e.message ?? "git failed" };
+  }
+}
+
+/** git's answer to "is this path a gitlink (a submodule) in the index?", or why it gave none. */
+export type GitlinkAnswer = { state: "answered"; gitlink: boolean } | { state: "unanswered"; reason: string };
+
+/**
+ * Synchronous git helper — is `relPath` (relative to `cwd`) a gitlink, an
+ * index entry of mode 160000? git lists nothing inside a submodule, so
+ * {@link gitTracksPath} reads a file the submodule ships as untracked; this
+ * asks about the directory instead. Matched literally, `ignoreCase` as there.
+ * Any git failure is unanswered, with git's first stderr line as the reason.
+ */
+export function gitlinkAt(cwd: string, relPath: string, options: { ignoreCase?: boolean } = {}): GitlinkAnswer {
+  const pathspec = `:(literal${options.ignoreCase ? ",icase" : ""})${relPath}`;
+  const env = { ...process.env };
+  for (const name of PATHSPEC_MODE_VARS) delete env[name];
+  const same = (a: string) => (options.ignoreCase ? a.toLowerCase() === relPath.toLowerCase() : a === relPath);
+  try {
+    // -s: `<mode> <object> <stage>\t<path>`; -z: raw names, NUL-terminated.
+    const out = execFileSync("git", ["ls-files", "-s", "-z", "--", pathspec], {
+      windowsHide: true,
+      cwd,
+      env,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const gitlink = out.split("\0").some((entry) => {
+      const tab = entry.indexOf("\t");
+      return tab > 0 && entry.startsWith("160000 ") && same(entry.slice(tab + 1));
+    });
+    return { state: "answered", gitlink };
+  } catch (err) {
+    const e = err as { stderr?: string | Buffer; message?: string };
+    const stderrLine = String(e.stderr ?? "").split(/\r?\n/).map((l) => l.trim()).find(Boolean);
+    return { state: "unanswered", reason: stderrLine ?? e.message ?? "git failed" };
+  }
+}
+
+/** Is `dir`, or a directory above it, the top of a git work tree (has a `.git` entry)? */
+export function insideGitWorkTree(dir: string): boolean {
+  for (let d = resolvePath(dir); ; d = dirname(d)) {
+    if (existsSync(join(d, ".git"))) return true;
+    if (dirname(d) === d) return false;
   }
 }
 

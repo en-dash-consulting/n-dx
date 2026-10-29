@@ -107,7 +107,7 @@ import {
   commitInitBaseline,
   formatGitInitCommitLines,
 } from "./git-preflight.js";
-import { formatClaudeCliNotFoundError } from "./claude-integration.js";
+import { formatClaudeCliNotFoundError, moveDiscoveredClaudePath } from "./claude-integration.js";
 import {
   formatInitBanner,
   formatRecap,
@@ -1675,6 +1675,10 @@ async function handleInit(rest) {
   ensureGitignoreEntry(dir, `${relativeToRoot(layout, layout.graviewDir)}/`);
   ensureGitattributesRules(dir, layout);
   ensureMergeDriverRegistered(dir);
+  // Independent of the Claude integration and of how it finds Claude: a
+  // claudePath an older init discovered and wrote into .hench/config.json
+  // reads as a repository-chosen binary and leaves this checkout untrusted.
+  moveDiscoveredClaudePath(dir);
 
   // ── Ink animated UI (TTY, non-quiet) vs static fallback ───────────
   // Ink owns sub-package inits, LLM config writes, assistant integrations,
@@ -1824,7 +1828,9 @@ async function reviewRepoTrustAfterInit(dir, rest, quiet) {
   // Nothing to review on a repository that matches the defaults: keep init's
   // summary short. Anything else prints the full review, including what the
   // checkout brought (PRD items, analysis, runs), so the user sees it once.
-  if (evaluation.state === "baseline" && !quiet) {
+  // A test command keeps a baseline checkout reviewable: verify_criteria and
+  // rex verify run it only once accepted, and the full report says so.
+  if (evaluation.state === "baseline" && !evaluation.config?.testCommand && !quiet) {
     console.log("");
     console.log("Repository config: matches the defaults (nothing to trust).");
     return;

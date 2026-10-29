@@ -106,7 +106,10 @@ sharing — is in [docs/architecture/overview.md](docs/architecture/overview.md)
 The four orchestration entry points (`cli.js`, `web.js`, `ci.js`, `config.js`)
 share mutable state on disk. `ndx status` and `ndx usage` are read-only and
 safe against anything. `ndx start` runs alongside `ndx work`, and tolerates
-`ndx plan` — though only a restart flushes its in-process caches. Never pair
+`ndx plan` — though only a restart flushes its in-process caches. A save to
+`.n-dx.json`, `.n-dx.local.json` or `.mcp.json` while `ndx work` runs
+(dashboard, `ndx config`) is reverted at the run's next restore point and
+fails the run; save it again after. Never pair
 two writers: `ndx ci` with `ndx work`, `ndx plan` with `ndx work`, `ndx refresh`
 with any write command, or two `ndx config` runs. The full table is in
 [docs/architecture/overview.md](docs/architecture/overview.md#concurrency).

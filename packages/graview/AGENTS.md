@@ -8,7 +8,10 @@ rex PRD model, sourcevision's JSON output and hench's run records. `ndx graview 
 
 - **No `@graview/*` or `graview` dependency, ever.** The binary is a peer tool
   resolved from `graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH,
-  then `npx -y graview@<pinned>` (`src/graview-bin.ts`). `@graview/core` is a
+  then `npx -y graview@<pinned>` (`src/graview-bin.ts`), run from a directory
+  under the ndx home so npx never resolves the checkout's own install. A repository's
+  `graview.bin` (`.n-dx.json`, or a git-tracked `.n-dx.local.json`) is a
+  trust finding and applies only once the checkout is trusted. `@graview/core` is a
   devDependency only, so the tests can compile the declaration;
   `tests/e2e/architecture-policy.test.js` ("Graview stays a peer tool") fails
   the workspace if any `package.json` but the product face's lists one at

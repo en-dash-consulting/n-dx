@@ -80,7 +80,7 @@ Single writer per file. Hench and web read `.rex/` files but modify PRD state by
 | Command pair | Safe? | Notes |
 |-------------|-------|-------|
 | `start` + `status` | Yes | Status is read-only |
-| `start` + `work` | Yes | Different write targets |
+| `start` + `work` | Yes | Different write targets — except a settings save to n-dx's own config (`.n-dx.json`, `.n-dx.local.json`, `.ndx/config*.json`, `.mcp.json`): the run's config backstop reverts it at its next restore point and fails the run; save again after the run |
 | `start` + `plan` | Warning | Plan writes PRD roots; restart server to flush in-process caches |
 | `ci` + `work` | No | Both write analysis and PRD roots |
 | `plan` + `work` | No | Both write PRD roots |

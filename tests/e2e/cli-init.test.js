@@ -702,6 +702,128 @@ describe("claude CLI discovery diagnostics", () => {
     }
   }, 60_000);
 
+  /**
+   * A repository's shared `.n-dx.json` cannot pick the Claude binary init
+   * probes (#635 follow-up): init runs before the trust review. The user's
+   * `.n-dx.local.json` still can. Every binary here is a sentinel that records
+   * it ran, and a fake `claude` on PATH keeps the run off the real CLI.
+   */
+  describe("cli.claudePath", () => {
+    async function initWith(configName) {
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-claudepath-bin-"));
+      const toolsDir = await mkdtemp(join(tmpdir(), "ndx-claudepath-tools-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+        // The shim records at its base path's `.args`; on Windows the returned
+        // path is `<base>.cmd`, so keep the base for the args check.
+        const pathClaude = join(binDir, "claude");
+        await writeFakeBinary(pathClaude, { stdout: "1.0.0", captureArgs: true });
+        const chosenBase = join(toolsDir, "x");
+        const chosen = await writeFakeBinary(chosenBase, { stdout: "1.0.0", captureArgs: true });
+        await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
+        const config = { cli: { claudePath: chosen } };
+        if (configName === ".n-dx.json") config.llm = { vendor: "codex" };
+        await writeFile(join(tmpDir, configName), JSON.stringify(config));
+        const { CLAUDE_CLI_PATH: _omit, ...env } = pathEnvWith(binDir);
+        const result = runCapture(["init", "--provider=codex", tmpDir], { timeout: 50_000, env });
+        return {
+          result,
+          chosen,
+          chosenRan: existsSync(fakeBinaryArgsPath(chosenBase)),
+          pathClaudeRan: existsSync(fakeBinaryArgsPath(pathClaude)),
+        };
+      } finally {
+        await removeDirs(binDir, toolsDir);
+      }
+    }
+
+    it("never runs a shared .n-dx.json cli.claudePath", async () => {
+      const { result, chosenRan, pathClaudeRan } = await initWith(".n-dx.json");
+      expect(result.status).toBe(0);
+      expect(chosenRan).toBe(false);
+      expect(pathClaudeRan).toBe(true);
+    }, 60_000);
+
+    // An older `ndx config cli.claudePath` wrote the shared file. Init says it
+    // no longer runs it and where it belongs, without echoing the path (the
+    // trust review's own finding line is what shows the value).
+    it("names an ignored shared cli.claudePath and the move to .n-dx.local.json", async () => {
+      const { result, chosen } = await initWith(".n-dx.json");
+      expect(result.status).toBe(0);
+      const note = result.stdout.split("\n").filter((l) => l.includes("cli.claudePath") && l.includes(".n-dx.local.json"));
+      expect(note).toHaveLength(1);
+      expect(note[0]).toContain(".n-dx.json ");
+      expect(note[0]).not.toContain(chosen);
+    }, 60_000);
+
+    it("runs a .n-dx.local.json cli.claudePath", async () => {
+      const { result, chosenRan, pathClaudeRan } = await initWith(".n-dx.local.json");
+      expect(result.status).toBe(0);
+      expect(chosenRan).toBe(true);
+      expect(pathClaudeRan).toBe(false);
+      expect(result.stdout).not.toContain("cli.claudePath");
+    }, 60_000);
+  });
+
+  /**
+   * An older init wrote a well-known install it discovered into
+   * `.hench/config.json`, where it now reads as a repository-chosen binary
+   * (#635 follow-up). Init moves it to `.n-dx.local.json` however it finds
+   * Claude, and when it does not look. HOME is a temp dir holding that
+   * install, so the path is a discovery candidate; Windows reads the home
+   * directory from USERPROFILE and has other candidates, so POSIX only.
+   */
+  describe.skipIf(isWin)("a claudePath an older init wrote into .hench/config.json", () => {
+    async function initMoving({ env = {}, local, flags = [] }) {
+      const home = await mkdtemp(join(tmpdir(), "ndx-claudepath-home-"));
+      const binDir = await mkdtemp(join(tmpdir(), "ndx-claudepath-bin-"));
+      try {
+        await writeFakeBinary(join(binDir, "codex"), { stdout: "ok" });
+        const chosen = await writeFakeBinary(join(binDir, "chosen-claude"), { stdout: "1.0.0" });
+        const installed = join(home, ".claude", "local", "claude");
+        await mkdir(dirname(installed), { recursive: true });
+        await writeFile(installed, "");
+        await mkdir(join(tmpDir, ".hench"), { recursive: true });
+        await writeFile(join(tmpDir, ".hench", "config.json"), JSON.stringify({ provider: "cli", claudePath: installed }));
+        await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "codex" } }));
+        if (local) await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify(local(chosen)));
+        const { CLAUDE_CLI_PATH: _omit, ...base } = pathEnvWith(binDir);
+        const result = runCapture(["init", "--provider=codex", ...flags, tmpDir], {
+          timeout: 50_000,
+          env: { ...base, HOME: home, ...env(chosen) },
+        });
+        const readJson = (name) => JSON.parse(readFileSync(join(tmpDir, name), "utf-8"));
+        return { result, installed, chosen, hench: readJson(".hench/config.json"), local: readJson(".n-dx.local.json") };
+      } finally {
+        await removeDirs(home, binDir);
+      }
+    }
+
+    it("moves it when CLAUDE_CLI_PATH names a working binary", async () => {
+      const { result, installed, hench, local } = await initMoving({ env: (chosen) => ({ CLAUDE_CLI_PATH: chosen }) });
+      expect(result.status).toBe(0);
+      expect(hench.claudePath).toBeUndefined();
+      expect(local.hench).toEqual({ claudePath: installed });
+    }, 60_000);
+
+    it("moves it when .n-dx.local.json sets cli.claudePath", async () => {
+      const { result, installed, chosen, hench, local } = await initMoving({
+        env: () => ({}),
+        local: (chosen) => ({ cli: { claudePath: chosen } }),
+      });
+      expect(result.status).toBe(0);
+      expect(hench.claudePath).toBeUndefined();
+      expect(local).toEqual({ cli: { claudePath: chosen }, hench: { claudePath: installed } });
+    }, 60_000);
+
+    it("moves it with Claude integration off", async () => {
+      const { result, installed, hench, local } = await initMoving({ env: () => ({}), flags: ["--no-claude"] });
+      expect(result.status).toBe(0);
+      expect(hench.claudePath).toBeUndefined();
+      expect(local.hench).toEqual({ claudePath: installed });
+    }, 60_000);
+  });
+
   // Skipped: feature branch's setupAssistantIntegrations is designed so that
   // failure in one vendor (Claude) does not block another (Codex). When
   // --provider=codex is used, Claude discovery failure is captured in the

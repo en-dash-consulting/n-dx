@@ -40,6 +40,7 @@ import type {
 } from "../../../prd/llm-gateway.js";
 import {
   LLM_VENDOR,
+  NDX_CONFIG_BLOCKED_PATHS,
   assemblePrompt,
   classifyVendorError,
 } from "../../../prd/llm-gateway.js";
@@ -95,6 +96,17 @@ export function buildAllowedTools(
 }
 
 /**
+ * The `--disallowed-tools` list: n-dx's own config files, which hench's guard
+ * refuses its own tools too (#686). A deny rule outranks the bare `Edit` and
+ * `Write` grants above, and Claude Code applies `Edit(...)` rules to every
+ * built-in tool that edits a file. `./` anchors each pattern at the session's
+ * cwd, the project root.
+ */
+export function buildDisallowedTools(): string[] {
+  return NDX_CONFIG_BLOCKED_PATHS.map((p) => `Edit(./${p})`);
+}
+
+/**
  * Build the Claude CLI args and stdin content from envelope + policy.
  *
  * On Windows, system prompt and allowed-tools are adapted for cmd.exe:
@@ -109,6 +121,8 @@ export interface ClaudeCliInput {
   systemPrompt: string;
   promptText: string;
   allowedTools: string[];
+  /** Tool rules denied outright (`--disallowed-tools`); see {@link buildDisallowedTools}. */
+  disallowedTools?: string[];
   modelOverride?: string;
   /**
    * Effort level for the spawned session (`--effort <level>`).
@@ -201,6 +215,9 @@ export function buildClaudeCliArgs(
     // On Windows: join as a single comma-separated arg. spawnCli/quoteWindowsToken
     // is the sole quoting authority — no manual wrapping here.
     ...(isWindows ? [input.allowedTools.join(",")] : input.allowedTools),
+    ...(input.disallowedTools?.length
+      ? ["--disallowed-tools", ...(isWindows ? [input.disallowedTools.join(",")] : input.disallowedTools)]
+      : []),
     ...(input.modelOverride ? ["--model", input.modelOverride] : []),
     ...(input.effort ? ["--effort", input.effort] : []),
     ...(input.permissionMode ? ["--permission-mode", input.permissionMode] : []),
@@ -480,6 +497,7 @@ export const claudeCliAdapter: VendorAdapter = {
       systemPrompt,
       promptText: taskPrompt,
       allowedTools,
+      disallowedTools: buildDisallowedTools(),
       modelOverride: opts.model,
       effort: opts.effort,
       permissionMode: opts.permissionMode,

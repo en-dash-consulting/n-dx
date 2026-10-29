@@ -17,9 +17,9 @@
  */
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { relativeToRoot, spawnCli } from "../llm-gateway.js";
+import { relativeToRoot, repoCommandEnv, spawnCli } from "../llm-gateway.js";
 import { emitProjection, type EmitResult } from "../emit.js";
-import { readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from "../graview-bin.js";
+import { prepareCommandCwd, readGraviewConfig, resolveGraviewCommand, type GraviewCommand } from "../graview-bin.js";
 import { loadDocument } from "../document.js";
 import { rexMcpEndpoint } from "../hub.js";
 import { fileURLToPath } from "node:url";
@@ -107,12 +107,21 @@ function describeEmit(result: EmitResult): string {
  * the binary may be an `npx.cmd`/`graview.cmd` shim, which Node refuses to
  * spawn without a shell; it routes those through cmd.exe and is a plain
  * spawn everywhere else.
+ *
+ * `env` is required: graview and its npx fallback (a binary fetched from the
+ * registry) are peer tools, like the vendor CLIs, so each gets the project's
+ * sanitized environment ({@link repoCommandEnv}: the user's local denies
+ * always apply, a repository's allows only once trusted), never the
+ * credentials in the operator's shell. The product face is an approved
+ * extension and runs with the environment core's launch plan gives it. PATH, HOME and npm's own
+ * config pass the default filter; npm auth tokens do not, and the pinned
+ * graview comes from the public registry.
  */
-function run(cmd: string, args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv; stdoutToStderr?: boolean }): Promise<number> {
+function run(cmd: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; stdoutToStderr?: boolean }): Promise<number> {
   return new Promise((resolve) => {
     // Under `mcp`, stdout is the JSON-RPC stream: a helper child's chatter goes to stderr instead.
     const stdio = options.stdoutToStderr ? [0, 2, 2] : "inherit";
-    const child = spawnCli(cmd, args, { cwd: options.cwd, ...(options.env ? { env: options.env } : {}), stdio });
+    const child = spawnCli(cmd, args, { cwd: options.cwd, env: options.env, stdio });
     child.on("error", (error) => {
       console.error(`Error: could not run ${cmd}: ${error.message}`);
       resolve(1);
@@ -121,8 +130,30 @@ function run(cmd: string, args: string[], options: { cwd: string; env?: NodeJS.P
   });
 }
 
-async function runGraview(command: GraviewCommand, args: string[], cwd: string, options: { stdoutToStderr?: boolean } = {}): Promise<number> {
-  return run(command.cmd, [...command.prefix, ...args], { cwd, ...options });
+/** graview's flags whose value is a path. */
+const PATH_FLAGS = ["--data", "--sqlite"];
+
+/**
+ * A relative path given to a path flag, made absolute against the project
+ * root, which is where it resolved when graview always ran there. The npx
+ * fallback runs elsewhere.
+ */
+export function absolutePathFlags(args: string[], root: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    const eq = arg.indexOf("=");
+    if (eq > 0 && PATH_FLAGS.includes(arg.slice(0, eq))) out.push(`${arg.slice(0, eq + 1)}${resolve(root, arg.slice(eq + 1))}`);
+    else if (PATH_FLAGS.includes(arg) && i + 1 < args.length) out.push(arg, resolve(root, args[++i]!));
+    else out.push(arg);
+  }
+  return out;
+}
+
+/** Runs in the project root unless the command names its own directory (the npx fallback). */
+async function runGraview(command: GraviewCommand, args: string[], root: string, options: { stdoutToStderr?: boolean } = {}): Promise<number> {
+  prepareCommandCwd(command);
+  return run(command.cmd, [...command.prefix, ...absolutePathFlags(args, root)], { cwd: command.cwd ?? root, env: repoCommandEnv(root), ...options });
 }
 
 /**

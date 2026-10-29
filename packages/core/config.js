@@ -100,22 +100,46 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *
  * Two kinds live here, for two different reasons:
  *
- * - **Machine-specific paths** (`*.cli_path`) differ per developer machine, so
- *   sharing them through git would break a teammate's checkout.
+ * - **Machine-specific paths** (`*.cli_path`, `cli.claudePath`, `hench.claudePath`) differ per developer machine, so
+ *   sharing them through git would break a teammate's checkout. The loaders
+ *   also honour them from the shared file only once the repository is
+ *   trusted, since they pick the binary that runs (llm-client
+ *   `credential-routing.ts`).
  * - **Secrets** (`*.api_key`). `.n-dx.json` is meant to be committed — it
  *   carries zone pins, the vendor, the dashboard port — and `ndx init` never
  *   gitignores it. A key written there is one `git add -A` away from the
  *   remote. `.n-dx.local.json` is gitignored by init and by the shipped
  *   template, and every reader already merges it over the shared file.
  *
+ * - **Credential routing** (`*.api_endpoint`, `llm.google.apiKeyEnv`,
+ *   `hench.apiKeyEnv`): where a key is sent and which variable is sent as
+ *   one. The loaders honour these from the shared file only once the
+ *   repository is trusted (llm-client `credential-routing.ts`, hench
+ *   `applyRepoTrust`), so writing the user's own choice there would have it
+ *   ignored and mark their repository untrusted.
+ *
  * Keyed by section, then by the setting path within that section. `llm`
  * entries are matched by suffix so `llm.claude.api_key`, `llm.codex.api_key`
- * and `llm.google.api_key` all route without listing each vendor.
+ * and `llm.google.api_key` all route without listing each vendor. `hench` is
+ * a package, not a project section: {@link handleSetPackageConfig} routes it,
+ * and its entries match llm-client's `HENCH_LOCAL_ONLY_SETTINGS`, which
+ * `hench config` and the dashboard use.
  */
 const LOCAL_ONLY_SETTINGS = {
-  claude: new Set(["cli_path", "api_key"]),
-  llm: { suffixes: [".cli_path", ".api_key"] },
+  cli: new Set(["claudePath"]),
+  claude: new Set(["cli_path", "api_key", "api_endpoint"]),
+  llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
+  hench: new Set(["apiKeyEnv", "claudePath"]),
 };
+
+/**
+ * The value a package config file keeps for each of its settings in
+ * {@link LOCAL_ONLY_SETTINGS}, so the checkout's own config names nothing the
+ * trust review reads as credential routing or a binary to run. `undefined`
+ * means the key is removed from the file (claudePath is optional). Mirrors
+ * hench's `DEFAULT_HENCH_CONFIG()`; core imports no package.
+ */
+const PACKAGE_LOCAL_ONLY_VALUES = { hench: { apiKeyEnv: "ANTHROPIC_API_KEY", claudePath: undefined } };
 
 /** Setting-path leaf that marks a secret, for the shared-file scan. */
 const SECRET_SETTING_LEAF = "api_key";
@@ -683,13 +707,13 @@ async function validateCliPath(value) {
  * Validate llm.codex.cli_path.
  * Accepts either an absolute/relative file path or a binary name on PATH.
  */
-async function validateCodexCliPath(value) {
+async function validateCodexCliPath(value, dir) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error("CLI path must be a non-empty string.");
   }
 
   if (!value.includes("/") && !value.includes("\\")) {
-    const probe = testCliPath(value);
+    const probe = await testCliPath(value, dir, LLM_VENDOR.CODEX);
     if (!probe.ok) {
       throw new Error(
         `Command not found or not runnable: ${value}\n` +
@@ -824,28 +848,36 @@ function isValidGoogleApiKeyFormat(value) {
 /**
  * Run a lightweight preflight call to the Gemini API to validate the API key.
  *
- * Reads the API key from llmConfig.google.api_key or the GEMINI_API_KEY env var.
- * Returns { ok: true } on success, or { ok: false, detail, errorCode } on failure.
+ * Reads the API key from `api_key` or the variable `apiKeyEnv` names
+ * (default GEMINI_API_KEY). The settings come from llm-client's
+ * `loadLLMConfig`, not the raw merged config: `apiKeyEnv` picks which variable
+ * is sent, and a shared `.n-dx.json` may choose it only once the repository is
+ * trusted (llm-client `credential-routing.ts`).
+ * Returns { ok: true } on success, or { ok: false, detail, errorCode } on
+ * failure; a missing key's result names the variable consulted in `apiKeyEnv`.
  *
  * Test bypass: set NDX_TEST_GOOGLE_PREFLIGHT=ok to skip the HTTP call (for integration
  * tests that cannot make real Gemini API requests).
  *
- * @param {object} llmConfig  Contents of .n-dx.json llm section
- * @returns {Promise<{ ok: boolean, vendor: "google", detail?: string, errorCode?: string }>}
+ * @param {string} dir  Project directory
+ * @returns {Promise<{ ok: boolean, vendor: "google", apiKeyEnv?: string, detail?: string, errorCode?: string }>}
  */
-async function runGoogleApiPreflight(llmConfig) {
+async function runGoogleApiPreflight(dir) {
   // Test bypass: allows integration tests to simulate successful auth without HTTP
   if (process.env.NDX_TEST_GOOGLE_PREFLIGHT === "ok") {
     return { ok: true, vendor: LLM_VENDOR.GOOGLE };
   }
 
-  const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
-  const apiKey = llmConfig?.google?.api_key || process.env[apiKeyEnvVar];
+  const { loadLLMConfig } = await import("@n-dx/llm-client");
+  const google = (await loadLLMConfig(dir)).google;
+  const apiKeyEnvVar = google?.apiKeyEnv || "GEMINI_API_KEY";
+  const apiKey = google?.api_key || process.env[apiKeyEnvVar];
 
   if (!apiKey) {
     return {
       ok: false,
       vendor: LLM_VENDOR.GOOGLE,
+      apiKeyEnv: apiKeyEnvVar,
       detail:
         `No API key found. Set the ${apiKeyEnvVar} environment variable or store the key with: ` +
         "n-dx config llm.google.api_key <key>",
@@ -1027,15 +1059,18 @@ function validateGoogleApiKeyEnv(value) {
 
 
 /**
- * Validate CLI path by trying to run `<binary> --version`.
+ * Validate CLI path by trying to run `<binary> --version`, with the vendor's
+ * filtered environment ({@link loadVendorCliEnv}), never the whole parent one.
  * Returns { ok, version?, error? }.
  */
-function testCliPath(cliPath) {
+async function testCliPath(cliPath, dir, vendor) {
+  const env = await loadVendorCheckEnv(dir, vendor);
   try {
     const output = execFileSyncCli(cliPath, ["--version"], {
       encoding: "utf-8",
       timeout: 10000,
       stdio: "pipe",
+      env,
     });
     return { ok: true, version: output.trim() };
   } catch (err) {
@@ -1613,49 +1648,56 @@ function getLLMRoutingValidator(settingPath) {
 }
 
 /**
- * Build provider-specific auth preflight command.
- * Returns binary + args for the selected vendor.
+ * The vendor CLI binary n-dx spawns for `vendor`: `llm.<vendor>.cli_path`
+ * (legacy `claude.cli_path` for Claude), else the bare name, resolved on PATH.
+ *
+ * Read through llm-client's `loadLLMConfig`, never the raw merged config: the
+ * binary runs with the user's environment, so a shared `.n-dx.json` may choose
+ * it only once the repository is trusted (llm-client `credential-routing.ts`).
+ * `.n-dx.local.json`, where `ndx config` writes `cli_path`, always applies.
+ *
+ * @param {string} dir  Project directory
+ * @param {"claude" | "codex"} vendor
+ * @returns {Promise<string>}
  */
-function getVendorAuthPreflightCommand(vendor, llmConfig, legacyClaudeConfig) {
-  if (vendor === LLM_VENDOR.CODEX) {
-    const binary = llmConfig?.codex?.cli_path || "codex";
-    return {
-      binary,
-      args: ["exec", "--skip-git-repo-check", "Reply with exactly: ok"],
-    };
-  }
+export async function loadVendorCliPath(dir, vendor) {
+  const { loadLLMConfig } = await import("@n-dx/llm-client");
+  const configured = (await loadLLMConfig(dir))[vendor]?.cli_path?.trim();
+  return configured || vendor;
+}
 
-  const binary =
-    llmConfig?.claude?.cli_path || legacyClaudeConfig?.cli_path || "claude";
-  return {
-    binary,
-    args: ["-p", "Reply with exactly: ok", "--output-format", "json"],
-  };
+/** The auth preflight's arguments for a CLI vendor. */
+function vendorAuthPreflightArgs(vendor) {
+  return vendor === LLM_VENDOR.CODEX
+    ? ["exec", "--skip-git-repo-check", "Reply with exactly: ok"]
+    : ["-p", "Reply with exactly: ok", "--output-format", "json"];
 }
 
 /**
  * Run provider auth preflight for the selected vendor.
  * Returns an object instead of throwing so callers can branch deterministically.
  *
- * For google, performs a lightweight HTTP call to the Gemini API.
- * For claude/codex, spawns the vendor CLI synchronously.
+ * For google, performs a lightweight HTTP call to the Gemini API, reading its
+ * settings from `dir` through the trust-gated loader rather than `llmConfig`.
+ * For claude/codex, spawns the vendor CLI ({@link loadVendorCliPath})
+ * synchronously.
  *
- * @returns {Promise<{ ok: boolean, binary?: string, args?: string[], detail?: string, errorCode?: string }>}
+ * @returns {Promise<{ ok: boolean, binary?: string, args?: string[], apiKeyEnv?: string, detail?: string, errorCode?: string }>}
  */
-async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
+async function runVendorAuthPreflight(dir, vendor, llmConfig) {
   if (vendor === LLM_VENDOR.GOOGLE) {
-    return runGoogleApiPreflight(llmConfig);
+    return runGoogleApiPreflight(dir);
   }
 
   if (vendor === LLM_VENDOR.LOCAL) {
     return runLocalApiPreflight(llmConfig);
   }
 
-  const { binary, args } = getVendorAuthPreflightCommand(
-    vendor,
-    llmConfig,
-    legacyClaudeConfig,
-  );
+  const cliVendor = vendor === LLM_VENDOR.CODEX ? LLM_VENDOR.CODEX : LLM_VENDOR.CLAUDE;
+  const binary = await loadVendorCliPath(dir, cliVendor);
+  const args = vendorAuthPreflightArgs(vendor);
+  // The agent loop's vendor environment: no credential outside the vendor's mode.
+  const env = await loadVendorCheckEnv(dir, cliVendor);
   try {
     // Windows-safe: routes .cmd shims through cmd.exe with a self-quoted
     // verbatim command line (GH #37/#68/#69) — see execFileSyncCli.
@@ -1663,6 +1705,7 @@ async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
       encoding: "utf-8",
       timeout: 15000,
       stdio: "pipe",
+      env,
     });
     return { ok: true, binary, args };
   } catch (err) {
@@ -1695,18 +1738,6 @@ async function runVendorAuthPreflight(vendor, llmConfig, legacyClaudeConfig) {
       errorCode: typeof err?.code === "string" ? err.code : undefined,
     };
   }
-}
-
-/**
- * Return the exact login command for the selected provider.
- */
-function getVendorLoginCommand(vendor, llmConfig, legacyClaudeConfig) {
-  const { binary } = getVendorAuthPreflightCommand(
-    vendor,
-    llmConfig,
-    legacyClaudeConfig,
-  );
-  return `${binary} login`;
 }
 
 function isBareCommand(binary) {
@@ -1815,17 +1846,13 @@ async function printAuthFailureGuidance(vendor, code) {
   }
 }
 
-async function printVendorPreflightFailure(
-  vendor,
-  preflight,
-  llmConfig,
-  legacyClaudeConfig,
-) {
+async function printVendorPreflightFailure(vendor, preflight, llmConfig) {
   const { red, yellow, dim } = await import("./cli-brand.js");
   // Google uses API-key auth — no binary / CLI args to display.
   if (vendor === LLM_VENDOR.GOOGLE) {
     const errorCode = preflight.errorCode || "NDX_GOOGLE_PREFLIGHT_FAILED";
-    const apiKeyEnvVar = llmConfig?.google?.apiKeyEnv || "GEMINI_API_KEY";
+    // The variable the preflight actually read, after the trust gate.
+    const apiKeyEnvVar = preflight.apiKeyEnv || "GEMINI_API_KEY";
     // A rejected or malformed key is an invalid-credentials problem →
     // canonical re-auth guidance.
     if (
@@ -1882,11 +1909,8 @@ async function printVendorPreflightFailure(
 
   if (vendor !== LLM_VENDOR.CLAUDE) {
     // codex (or other CLI vendor) non-auth launch failure.
-    const loginCommand = getVendorLoginCommand(
-      vendor,
-      llmConfig,
-      legacyClaudeConfig,
-    );
+    // The binary the preflight actually ran, after the trust gate.
+    const loginCommand = `${preflight.binary || vendor} login`;
     console.error(red(`✗ Provider auth preflight failed for "${vendor}".`));
     if (preflight.detail && !looksLikeJson(preflight.detail)) {
       console.error(`  ${preflight.detail}`);
@@ -2016,9 +2040,12 @@ Hench settings (.hench/config.json):
                                      unlimited). A run stops once it crosses this.
   hench.rexDir             string    Path to the rex PRD directory (default: the project's
                                      resolved rex directory — .rex, or .ndx/rex on the new layout)
-  hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY")
+  hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY").
+                                     Written to .n-dx.local.json.
   hench.claudePath         string    Path to the Claude Code binary. Falls back to "claude" on
                                      PATH. Prefer claude.cli_path, which is shared across packages.
+                                     Written to .n-dx.local.json; outside it the value applies
+                                     only once the repository is trusted (ndx trust accept .).
   hench.language           string    Project toolchain — "typescript", "javascript", "go" or
                                      "swift". Selects the hench.guard.* defaults.
   hench.loopPauseMs        number    Pause between consecutive runs in a loop (default: 2000)
@@ -2199,7 +2226,7 @@ Hench review settings (the review pass after a task validates):
 
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths
-                                           (default: .hench/**, .rex/**, .git/**, node_modules/**)
+                                           (default: .hench/**, .rex/**, .git/**, **/node_modules/**, …)
   hench.guard.allowedCommands    string[]  Whitelisted shell commands
                                            (default: npm, npx, node, git, tsc, vitest)
   hench.guard.commandTimeout     number    Command timeout in ms (default: 30000)
@@ -2268,6 +2295,8 @@ Claude settings (.n-dx.json / .n-dx.local.json — shared across all packages):
                                     compatible services.
                                     Default: https://api.anthropic.com
                                     Validated: must be a valid HTTP(S) URL.
+                                    Stored in .n-dx.local.json; the shared .n-dx.json's
+                                    value applies only once the repository is trusted.
   claude.model             string    Default Claude model for API calls (optional)
                                     Override the default model used by all packages.
                                     Examples: claude-sonnet-5-5, claude-opus-5-5
@@ -2285,6 +2314,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.claude.api_key       string    Claude API key (optional)
                                     Stored in .n-dx.local.json.
   llm.claude.api_endpoint  string    Claude API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.claude.model         string    Claude default model (optional)
   llm.claude.lightModel    string    Claude model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
@@ -2295,6 +2325,7 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.codex.api_key        string    Codex API key (optional)
                                     Stored in .n-dx.local.json.
   llm.codex.api_endpoint   string    Codex API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.codex.model          string    Codex default model (optional)
   llm.codex.lightModel     string    Codex model for light-weight tasks (optional)
                                     When set, commands that explicitly opt into the
@@ -2309,7 +2340,9 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     (default: GEMINI_API_KEY). Override when your
                                     key is stored in a custom env var.
                                     Example: n-dx config llm.google.apiKeyEnv MY_GOOGLE_KEY
+                                    Stored in .n-dx.local.json.
   llm.google.api_endpoint  string    Gemini API endpoint (optional; validated URL)
+                                    Stored in .n-dx.local.json.
   llm.google.model         string    Gemini default model (optional)
                                     Must be a valid Gemini model ID starting with "gemini-".
                                     Known models: gemini-3.5-flash-lite (light),
@@ -2446,8 +2479,9 @@ CLI settings (.n-dx.json):
                                      Homebrew, etc.). Set this when claude is installed
                                      in a non-standard location and ndx init cannot
                                      locate it automatically. The value is NOT validated
-                                     on set — use --force to skip validation on other
-                                     keys, or set directly in .n-dx.json.
+                                     on set. Stored in .n-dx.local.json; ndx init never
+                                     runs one from the shared .n-dx.json, which reads as
+                                     a trust finding.
                                      Example: n-dx config cli.claudePath /usr/local/bin/claude
   cli.timeoutMs            number    Global command timeout in milliseconds.
                                      Default: 1800000 (30 minutes). Commands that exceed
@@ -2552,7 +2586,8 @@ Local overrides (.n-dx.local.json):
   settings without conflicts. Deep-merged over .n-dx.json (local wins).
 
   Machine-specific keys (claude.cli_path, llm.claude.cli_path, llm.codex.cli_path)
-  are automatically written to .n-dx.local.json instead of .n-dx.json.
+  are automatically written to .n-dx.local.json instead of .n-dx.json. A
+  cli_path in .n-dx.json applies only once the repository is trusted.
 
 Options:
   --json                   Output as JSON
@@ -2733,20 +2768,45 @@ async function loadAllConfigs(dir) {
 }
 
 /**
- * Resolve the same filtered environment as hench for cross-vendor reviewers.
+ * Resolve the same filtered environment as hench for a vendor CLI n-dx spawns
+ * outside the agent loop (the cross-vendor reviewer, the auth and cli_path checks).
  * Config I/O and foundation loading stay in the spawn-exempt config module.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
- * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions }} [options]
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions, subject?: string }} [options]
  *   `trust` relocates the repository-trust store (e.g. `{ ndxHome }`); callers
- *   that omit it use the user's real store.
+ *   that omit it use the user's real store. `subject` names the caller in the
+ *   untrusted-allow warning (default "the reviewer CLI").
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
 export async function loadVendorCliEnv(dir, vendor, options = {}) {
   const { loadLLMConfig, resolveVendorCliEnv } = await import("@n-dx/llm-client");
   const envPolicy = await loadProjectEnvPolicy(dir);
   const llmConfig = await loadLLMConfig(dir);
-  return resolveVendorCliEnv({ ...llmConfig, vendor }, await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust));
+  const policy = await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust, options.subject);
+  return resolveVendorCliEnv({ ...llmConfig, vendor }, policy);
+}
+
+/**
+ * {@link loadVendorCliEnv} for a vendor CLI check (auth preflight, cli_path
+ * test). A check must still report on the binary when `hench.guard.env` is
+ * malformed, so an unusable policy is named on stderr and llm-client's
+ * `repoEnvPolicy` applies: it drops only the malformed field and keeps every
+ * valid deny list, the user's local one included — never the parent environment.
+ * @param {string} dir
+ * @param {"claude" | "codex"} vendor
+ * @returns {Promise<NodeJS.ProcessEnv>}
+ */
+async function loadVendorCheckEnv(dir, vendor) {
+  const subject = `the ${vendor} CLI check`;
+  try {
+    return await loadVendorCliEnv(dir, vendor, { subject });
+  } catch (err) {
+    const { loadLLMConfig, repoEnvPolicy, resolveVendorCliEnv } = await import("@n-dx/llm-client");
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(`hench.guard.env is not a usable policy (${reason}); ${subject} ignores the malformed field.`);
+    return resolveVendorCliEnv({ ...(await loadLLMConfig(dir)), vendor }, repoEnvPolicy(dir));
+  }
 }
 
 /** Directories already warned about, so a loop of reviews warns once. */
@@ -2754,28 +2814,40 @@ const warnedUntrustedEnvAllow = new Set();
 
 /**
  * Drop repository-supplied `guard.env.allow` entries unless the user trusts
- * this checkout. `deny` is kept: it only narrows. "Not trusted" is
+ * this checkout. The user's own `.n-dx.local.json` entries always apply (unless
+ * git tracks that file, when they are the repository's), as in
+ * hench's agent shell (`applyRepoTrust`) and llm-client's `repoCommandEnv`.
+ * `deny` is kept: it only narrows. "Not trusted" is
  * `evaluateRepoTrust(...).restricted` (untrusted or changed), which is also
  * the state of any checkout with an unaccepted `env-allow-added` finding.
  * Loaded dynamically: config.js may not import packages statically.
  */
-async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust) {
+async function applyRepoTrustToEnvPolicy(dir, envPolicy, trust, subject = "the reviewer CLI") {
   if (!envPolicy?.allow?.length) return envPolicy;
   const { evaluateRepoTrust } = await import("@n-dx/llm-client");
   const evaluation = evaluateRepoTrust(dir, trust);
   if (!evaluation.restricted) return envPolicy;
-  if (!warnedUntrustedEnvAllow.has(dir)) {
+  // A local file the repository commits is its config: restricted, none of it applies.
+  const localAllow = evaluation.config.localConfigTracked ? [] : await loadLocalEnvAllow(dir);
+  const dropped = envPolicy.allow.filter((entry) => !localAllow.includes(entry));
+  if (dropped.length && !warnedUntrustedEnvAllow.has(dir)) {
     warnedUntrustedEnvAllow.add(dir);
     const finding = evaluation.findings.find((f) => f.code === "env-allow-added");
     console.warn(
-      `Ignoring repository guard.env.allow (${envPolicy.allow.join(", ")}) for the reviewer CLI: ` +
+      `Ignoring repository guard.env.allow (${dropped.join(", ")}) for ${subject}: ` +
       `this checkout is ${evaluation.state}` +
       (finding ? ` (finding: ${finding.code})` : "") +
       ". Run 'ndx trust accept .' to apply it.",
     );
   }
   const { allow: _ignored, ...rest } = envPolicy;
-  return rest;
+  return localAllow.length ? { ...rest, allow: localAllow } : rest;
+}
+
+/** `hench.guard.env.allow` from the user's git-ignored `.n-dx.local.json`, which the repository does not ship. */
+async function loadLocalEnvAllow(dir) {
+  const allow = (await loadLocalConfig(dir))?.hench?.guard?.env?.allow;
+  return Array.isArray(allow) ? allow.filter((entry) => typeof entry === "string") : [];
 }
 
 /** The project's `hench.guard.env` policy, `.hench/config.json` merged with `.n-dx.json`. */
@@ -2785,29 +2857,33 @@ async function loadProjectEnvPolicy(dir) {
 }
 
 /**
- * Environment for the reviewer's shell test command: `process.env` filtered by
- * the project's `hench.guard.env` policy, with none of a vendor CLI's
- * authentication exceptions — the test command is not a vendor CLI.
+ * Environment for the reviewer's shell test command. Built by llm-client's
+ * `repoCommandEnv`, the one builder for repository-owned commands: the
+ * project's `hench.guard.env` policy with none of a vendor CLI's
+ * authentication exceptions, and the repository's own `allow` entries only
+ * once the checkout is trusted.
  *
- * When the project policy cannot be loaded or compiled, the default deny
- * policy applies and `policyError` says why, so the caller can report it.
+ * `repoCommandEnv` skips a malformed policy list without saying so, so the
+ * policy is compiled here first; when that fails, the default deny policy
+ * applies and `policyError` says why, so the caller can report it.
  * Never returns the unfiltered parent environment.
  *
  * @param {string} dir
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions }} [options]
+ *   `trust` relocates the repository-trust store; omitted, the user's real one.
  * @returns {Promise<{ env: NodeJS.ProcessEnv; policyError?: string }>}
  */
-export async function loadShellTestEnv(dir) {
-  const { compileEnvPolicy, sanitizeChildEnv } = await import("@n-dx/llm-client");
-  let policy;
-  let policyError;
+export async function loadShellTestEnv(dir, options = {}) {
+  const { compileEnvPolicy, repoCommandEnv, sanitizeChildEnv } = await import("@n-dx/llm-client");
   try {
-    policy = compileEnvPolicy(await loadProjectEnvPolicy(dir));
+    compileEnvPolicy(await loadProjectEnvPolicy(dir));
   } catch (err) {
-    policy = compileEnvPolicy(undefined);
-    policyError = err instanceof Error ? err.message : String(err);
+    return {
+      env: sanitizeChildEnv(process.env, compileEnvPolicy(undefined)),
+      policyError: err instanceof Error ? err.message : String(err),
+    };
   }
-  const env = sanitizeChildEnv(process.env, policy);
-  return policyError === undefined ? { env } : { env, policyError };
+  return { env: repoCommandEnv(dir, { trust: options.trust }) };
 }
 
 // ── Test connection handler ──────────────────────────────────────────────────
@@ -2835,10 +2911,18 @@ async function resolveClaudeSettings(configs) {
   return resolveClaudeConfig(configs?.llm?.claude, configs?.claude).config;
 }
 
-/** Handle --test-connection mode. */
-async function handleTestConnection(configs) {
-  const claudeConfig = await resolveClaudeSettings(configs);
-  if (!claudeConfig) {
+/**
+ * Handle --test-connection mode.
+ *
+ * Reads Claude settings through llm-client's `loadClaudeConfig`, not the raw
+ * merged config: this call sends the API key, and a shared `.n-dx.json`
+ * `api_endpoint` may choose its destination only once the repository is
+ * trusted (llm-client `credential-routing.ts`).
+ */
+async function handleTestConnection(dir) {
+  const { loadClaudeConfig } = await import("@n-dx/llm-client");
+  const claudeConfig = await loadClaudeConfig(dir);
+  if (Object.keys(claudeConfig).length === 0) {
     console.error(
       "No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.",
     );
@@ -2868,7 +2952,7 @@ async function handleTestConnection(configs) {
 
   if (claudeConfig.cli_path) {
     tested = true;
-    const result = testCliPath(claudeConfig.cli_path);
+    const result = await testCliPath(claudeConfig.cli_path, dir, LLM_VENDOR.CLAUDE);
     if (result.ok) {
       console.log(
         "Testing CLI path... ✓ " + (result.version || "CLI is available."),
@@ -2892,6 +2976,7 @@ async function handleTestConnection(configs) {
 
 /** Coerce and validate a value for a project-level section key. */
 async function coerceAndValidateProjectValue(
+  dir,
   pkg,
   settingPath,
   valueArg,
@@ -2924,7 +3009,7 @@ async function coerceAndValidateProjectValue(
     const validator = getValidator(pkg, settingPath);
     if (validator) {
       try {
-        await validator(coerced);
+        await validator(coerced, dir);
       } catch (err) {
         console.error(`Invalid value for "${keyArg}": ${err.message}`);
         console.error("  Use --force to set this value anyway.");
@@ -2946,14 +3031,10 @@ async function coerceAndValidateProjectValue(
  * all later commands) even before auth is configured — the auth error then surfaces
  * clearly at actual use rather than silently reverting to the Claude default.
  */
-async function runLLMVendorPreflight(coerced, configs, soft = false) {
+async function runLLMVendorPreflight(dir, coerced, configs, soft = false) {
   const currentLLM =
     configs.llm && typeof configs.llm === "object" ? configs.llm : {};
   const llmForPreflight = { ...currentLLM, vendor: coerced };
-  const legacyClaude =
-    configs.claude && typeof configs.claude === "object"
-      ? configs.claude
-      : undefined;
 
   // Local vendor requires a running HTTP server. During soft-preflight (used
   // by `ndx init` and `ndx config llm.vendor local`), skip the connectivity
@@ -2968,18 +3049,9 @@ async function runLLMVendorPreflight(coerced, configs, soft = false) {
     return;
   }
 
-  const preflight = await runVendorAuthPreflight(
-    coerced,
-    llmForPreflight,
-    legacyClaude,
-  );
+  const preflight = await runVendorAuthPreflight(dir, coerced, llmForPreflight);
   if (!preflight.ok) {
-    await printVendorPreflightFailure(
-      coerced,
-      preflight,
-      llmForPreflight,
-      legacyClaude,
-    );
+    await printVendorPreflightFailure(coerced, preflight, llmForPreflight);
     if (!soft) {
       process.exit(1);
     }
@@ -3058,6 +3130,7 @@ async function handleSetProjectSection(
   if (!configs[storagePkg]) configs[storagePkg] = {};
 
   const coerced = await coerceAndValidateProjectValue(
+    dir,
     pkg,
     settingPath,
     valueArg,
@@ -3070,7 +3143,7 @@ async function handleSetProjectSection(
   // downgrades a failed preflight from a fatal abort to a warning so the chosen
   // vendor is still persisted.
   if (pkg === "llm" && settingPath === "vendor") {
-    await runLLMVendorPreflight(coerced, configs, flags["soft-preflight"] === "true");
+    await runLLMVendorPreflight(dir, coerced, configs, flags["soft-preflight"] === "true");
   }
 
   // Advisory did-you-mean for routing keys. A mistyped class is accepted by
@@ -3268,13 +3341,18 @@ async function handleSetPackageConfig(
     const validator = getValidator(pkg, settingPath);
     if (validator) {
       try {
-        await validator(coerced);
+        await validator(coerced, dir);
       } catch (err) {
         console.error(`Invalid value for "${keyArg}": ${err.message}`);
         console.error("  Use --force to set this value anyway.");
         process.exit(1);
       }
     }
+  }
+
+  if (isLocalProjectSetting(pkg, settingPath)) {
+    await setPackageSettingLocally(dir, pkg, settingPath, keyArg, coerced, rawConfigs);
+    return;
   }
 
   // Write to raw (un-merged) config so project overrides don't leak
@@ -3284,6 +3362,44 @@ async function handleSetPackageConfig(
   await saveJSON(configPath, rawConfigs[pkg]);
 
   console.log(`${keyArg} = ${formatValue(coerced)}`);
+}
+
+/**
+ * Write a package setting listed in {@link LOCAL_ONLY_SETTINGS} to the
+ * `<pkg>` section of `.n-dx.local.json`. The package file keeps its neutral
+ * value and a shared `.n-dx.json` copy is removed: either would otherwise
+ * stay the repository's credential routing and keep the checkout untrusted.
+ */
+async function setPackageSettingLocally(dir, pkg, settingPath, keyArg, coerced, rawConfigs) {
+  // Only the settings PACKAGE_LOCAL_ONLY_VALUES lists come here. Requiring both
+  // keys to be its own properties keeps `local[pkg]`, `rawConfigs[pkg]` and the
+  // delete below off Object.prototype, as splitSettingPath does for paths.
+  if (!Object.hasOwn(PACKAGE_LOCAL_ONLY_VALUES, pkg) || !Object.hasOwn(PACKAGE_LOCAL_ONLY_VALUES[pkg], settingPath)) {
+    throw new Error(`"${keyArg}" is not a machine-local package setting.`);
+  }
+  const localPath = projectConfigPath(dir, LOCAL_CONFIG_FILE);
+  const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
+  if (!local[pkg] || typeof local[pkg] !== "object") local[pkg] = {};
+  setByPath(local[pkg], settingPath, coerced, pkg);
+  await saveProjectJSON(localPath, local);
+  console.log(`${keyArg} = ${formatValue(coerced)}  (in ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)})`);
+
+  const neutral = PACKAGE_LOCAL_ONLY_VALUES[pkg][settingPath];
+  const current = getByPath(rawConfigs[pkg], settingPath, pkg);
+  if (current !== undefined && current !== neutral) {
+    // Local-only package settings are top-level keys, so delete needs no path walk.
+    if (neutral === undefined) delete rawConfigs[pkg][settingPath];
+    else setByPath(rawConfigs[pkg], settingPath, neutral, pkg);
+    await saveJSON(packageConfigPath(dir, pkg), rawConfigs[pkg]);
+  }
+
+  const removed = await removeFromSharedConfig(dir, [[pkg, settingPath]]);
+  if (removed.length > 0) {
+    console.log(
+      `  → moved ${removed.join(", ")} out of ${projectConfigLabel(dir, PROJECT_CONFIG_FILE)}`
+      + ` into ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)}`,
+    );
+  }
 }
 
 // ── GET mode handler ─────────────────────────────────────────────────────────
@@ -3680,7 +3796,7 @@ export async function runConfig(args, deps = {}) {
 
   // Test connection mode
   if (flags["test-connection"] === "true") {
-    await handleTestConnection(configs);
+    await handleTestConnection(dir);
     return;
   }
 
@@ -3778,10 +3894,6 @@ export async function runAuthCheck(args) {
 
   const llmConfig =
     configs.llm && typeof configs.llm === "object" ? configs.llm : {};
-  const legacyClaude =
-    configs.claude && typeof configs.claude === "object"
-      ? configs.claude
-      : undefined;
   const vendor =
     typeof llmConfig.vendor === "string" && llmConfig.vendor
       ? llmConfig.vendor
@@ -3797,13 +3909,13 @@ export async function runAuthCheck(args) {
   }
 
   console.log(dim(`Checking ${vendor} credentials…`));
-  const preflight = await runVendorAuthPreflight(vendor, llmConfig, legacyClaude);
+  const preflight = await runVendorAuthPreflight(dir, vendor, llmConfig);
   if (preflight.ok) {
     console.log(green(`✓ Credentials valid — vendor: ${vendor}, model: ${model}`));
     return 0;
   }
 
-  await printVendorPreflightFailure(vendor, preflight, llmConfig, legacyClaude);
+  await printVendorPreflightFailure(vendor, preflight, llmConfig);
   console.error("Re-run 'ndx auth' after fixing the issue above to verify.");
   return 1;
 }

@@ -70,6 +70,7 @@
  * - `project-config.ts` — `.n-dx.json` override loading and merging
  * - `json.ts` — canonical JSON serialization
  * - `repo-trust.ts` — repository execution-config trust (baseline, digest, per-user trust store)
+ * - `repo-command-env.ts` — the sanitized environment for repository-owned commands
  * - `redact.ts` — credential redaction for run records, logs and live output
  * - `auth-token.ts` — per-user dashboard token file (`<ndx home>/auth.token`)
  * - `output.ts` — CLI output control (quiet mode)
@@ -418,8 +419,10 @@ export { toCanonicalJSON } from "./json.js";
 // this user has accepted it (record kept in <ndx home>/trust/, never in the repo)
 export {
   SECRET_PATH_PATTERNS,
+  NDX_CONFIG_BLOCKED_PATHS,
   GIT_SUBCOMMAND_BASELINE,
   guardBaselineForLanguage,
+  detectRepoLanguage,
   clampGuardToBaseline,
   collectRepoExecutionConfig,
   assessRepoExecutionConfig,
@@ -430,10 +433,15 @@ export {
   clearRepoTrust,
   evaluateRepoTrust,
   formatRepoTrustReport,
+  escapeTerminalControls,
+  isLocalConfigTracked,
+  HENCH_OVERRIDE_FIELD_CHECKS,
 } from "./repo-trust.js";
 export type {
   GuardBaseline,
+  DetectedRepoLanguage,
   RepoMcpServer,
+  RepoGateTestCommand,
   RepoExecutionConfig,
   RepoTrustFindingCode,
   RepoTrustFinding,
@@ -444,6 +452,13 @@ export type {
   RepoTrustEvaluation,
   RepoTrustReportOptions,
 } from "./repo-trust.js";
+// Project and local config with the trust-gated fields (API endpoints, key
+// variables, binary paths) removed while the repository is untrusted
+export { trustedProjectConfig, trustedLocalConfig } from "./credential-routing.js";
+// Hench settings every writer stores in .n-dx.local.json, since the trust
+// review reads them from the repository's config as credential routing
+export { HENCH_LOCAL_ONLY_SETTINGS, isHenchLocalOnlySetting, writeHenchLocalSetting } from "./hench-local-settings.js";
+export type { HenchLocalSettingWrite } from "./hench-local-settings.js";
 // Credential redaction for persisted or displayed text (run records, logs, live output)
 export {
   REDACTED_TOKEN,
@@ -742,6 +757,11 @@ export {
   resolveVendorCliEnv,
 } from "./child-env.js";
 export type { EnvPolicy, EnvPolicyConfig } from "./child-env.js";
+// The one environment every repository-owned command runs with (test gate,
+// post-task tests, audit, validation commands, rex verify).
+// repoEnvPolicy is the same policy for a vendor CLI's resolveVendorCliEnv.
+export { repoCommandEnv, repoEnvPolicy } from "./repo-command-env.js";
+export type { RepoCommandEnvOptions } from "./repo-command-env.js";
 
 // ---- Vendor-CLI invocation log ----------------------------------------------
 // The file name is public so consumers that classify a project's files (hench's

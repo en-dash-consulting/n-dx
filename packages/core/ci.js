@@ -25,7 +25,7 @@ import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
-import { findSharedSecrets, loadProjectConfigStrict, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
+import { findSharedSecrets, loadProjectConfigStrict, loadShellTestEnv, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
 import { isGitTracked } from "./gitignore.js";
 import { layoutStateNames, relativeToRoot, resolveLayout } from "./layout.js";
 
@@ -136,10 +136,15 @@ async function runDocsPhase(dir, info, isJSON, spawnTracked) {
     }
   }
 
-  // Step 0c: docs build
+  // Step 0c: docs build. `docs:build` is the repository's own script, so it
+  // runs with the repository-command environment, never the operator's shell.
   info("── docs build ──");
+  const docsEnv = await loadShellTestEnv(dir);
+  if (docsEnv.policyError !== undefined) {
+    info(`  ⚠ project guard.env policy could not be loaded (${docsEnv.policyError}); docs build runs with the default environment filter`);
+  }
   const docsBuild = await new Promise((res) => {
-    const child = spawnTracked("pnpm", ["docs:build"], { cwd: dir, stdio: ["ignore", "pipe", "pipe"], shell: process.platform === "win32", windowsHide: true });
+    const child = spawnTracked("pnpm", ["docs:build"], { cwd: dir, env: docsEnv.env, stdio: ["ignore", "pipe", "pipe"], shell: process.platform === "win32", windowsHide: true });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => { stdout += d; });

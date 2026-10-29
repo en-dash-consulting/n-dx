@@ -38,12 +38,17 @@ describe("loadClaudeConfig", () => {
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({
         claude: {
-          cli_path: "/usr/local/bin/claude",
           api_key: "sk-ant-test-key",
-          api_endpoint: "https://custom.api.example.com",
           model: "claude-opus-4-20250514",
         },
       }),
+    );
+    // An endpoint or CLI path applies from the user's local file; from the
+    // project file only once the repository is trusted
+    // (credential-routing.test.ts, vendor-cli-path-trust.test.ts).
+    await writeFile(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ claude: { api_endpoint: "https://custom.api.example.com", cli_path: "/usr/local/bin/claude" } }),
     );
 
     const config = await loadClaudeConfig(tmpDir);
