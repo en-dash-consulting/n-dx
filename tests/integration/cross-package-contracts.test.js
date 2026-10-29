@@ -912,8 +912,8 @@ describe("gateway export auto-detection", () => {
         "mapApprovalToCodexFlag", "toAnthropicToolDef", "toAnthropicToolDefs",
         "toOpenAiToolDef", "toOpenAiToolDefs", "toGeminiFunctionDeclaration",
         "toGeminiFunctionDeclarations", "ProviderRegistry", "defaultRegistry",
-        "classifyLLMError", "isAuthError", "parseLmStudioError", "resolveLocalTimeoutMs", "getNextFailoverAttempt",
-        "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli", "terminateProcessTree",
+        "classifyLLMError", "isAuthError", "parseLmStudioError", "resolveLocalTimeoutMs", "fetchLocalCompletion",
+        "getNextFailoverAttempt", "quoteWindowsToken", "buildWindowsCliCommandLine", "spawnCli", "terminateProcessTree",
         "diagnoseCliInvocation", "diagnoseCliNotFound", "isLLMVendor",
         // Folder-layout resolution. Lives in llm-client so every package
         // resolves `.hench/` against the same lookup order; a hench-local copy
