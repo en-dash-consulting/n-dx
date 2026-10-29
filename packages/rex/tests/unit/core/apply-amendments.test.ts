@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, bodyNotes, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, bodyNotes, applyAmendmentsProblems, newErrors, resolve } from "../../../src/core/apply-amendments.js";
 import { checkV2Rules, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
 import { isWindowsSafeSegment } from "../../../src/store/folder-tree-serializer.js";
@@ -279,6 +279,48 @@ describe("applyAmendments: pre-existing dependsOn cycle", () => {
     get(t, AREA).children = [capNode("d", ["a"]), capNode("c", ["a"]), capNode("a", ["b", "c"]), capNode("b", ["c"])];
     const { tree: out } = applyAmendments(t, CHANGE, OPTS);
     expect(get(out, "d").status).toBe("deleted");
+  });
+
+  it("applies removing one member of a knot that stays cyclic without it", () => {
+    const t = tree([{ target: "b", delta: "removed", summary: "gone" }]);
+    get(t, AREA).children = [capNode("a", ["b", "c"]), capNode("b", ["c"]), capNode("c", ["a"])];
+    expect(checkV2Rules(t, { now: NOW }).filter((f) => f.rule === "depends-on-acyclic").map((f) => f.message)).toEqual([
+      'dependsOn cycle among "A", "B", "C"',
+    ]);
+    const { tree: out } = applyAmendments(t, CHANGE, OPTS);
+    expect(get(out, "b").status).toBe("deleted");
+    expect(checkV2Rules(out, { now: NOW }).filter((f) => f.rule === "depends-on-acyclic").map((f) => f.message)).toEqual([
+      'dependsOn cycle among "A", "C"',
+    ]);
+  });
+
+  it("applies a removal that splits a knot into separate cycles", () => {
+    const t = tree([{ target: "x", delta: "removed", summary: "gone" }]);
+    get(t, AREA).children = [
+      capNode("a", ["b", "x"]),
+      capNode("b", ["a"]),
+      capNode("c", ["d"]),
+      capNode("d", ["c", "x"]),
+      capNode("x", ["a", "c"]),
+    ];
+    const { tree: out } = applyAmendments(t, CHANGE, OPTS);
+    expect(get(out, "x").status).toBe("deleted");
+    expect(checkV2Rules(out, { now: NOW }).filter((f) => f.rule === "depends-on-acyclic")).toHaveLength(2);
+  });
+
+  it("still reports a cycle whose members were not all in one cycle before", () => {
+    const before = tree();
+    get(before, AREA).children = [capNode("a", ["b"]), capNode("b", ["a"]), capNode("c", ["d"]), capNode("d", ["c"])];
+    const joined = structuredClone(before);
+    get(joined, "b").dependsOn = ["a", "c"];
+    get(joined, "d").dependsOn = ["c", "a"];
+    expect(newErrors(before, joined, NOW).map((f) => f.message)).toEqual(['dependsOn cycle among "A", "B", "C", "D"']);
+
+    const fresh = tree();
+    get(fresh, AREA).children = [capNode("a", []), capNode("b", ["a"])];
+    const cyclicNow = structuredClone(fresh);
+    get(cyclicNow, "a").dependsOn = ["b"];
+    expect(newErrors(fresh, cyclicNow, NOW).map((f) => f.message)).toEqual(['dependsOn cycle among "A", "B"']);
   });
 });
 
