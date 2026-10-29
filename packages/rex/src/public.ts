@@ -356,6 +356,11 @@ export { resolveActor } from "./core/identity.js";
 
 export { extractKeywords, scoreMatch } from "./core/keywords.js";
 
+// ---- Core: duplicate match --------------------------------------------------
+
+export { findDuplicateItem } from "./core/duplicate-match.js";
+export type { DuplicateItemMatch, DuplicateCandidateText } from "./core/duplicate-match.js";
+
 // ---- Core: fix (structural auto-repair) -------------------------------------
 
 export {

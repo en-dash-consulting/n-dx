@@ -25,7 +25,8 @@
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
  * | POST | `/api/sidecar/sessions/:id/end` | end the session |
  * | GET  | `/api/sidecar/sessions/:id/cards` | the session's permission cards |
- * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember? }`) |
+ * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits? }`; `edits` only on a change-set approval) |
+ * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | POST | `/api/sidecar/sessions/:id/mcp` | the `ndx-sidecar` broker (MCP, Streamable HTTP), while a turn runs |
  * | GET  | `/api/sidecar/allow-list` | the Sidecar allow-list |
  * | DELETE | `/api/sidecar/allow-list` | revoke a rule (`{ tool, key }`) |
@@ -56,6 +57,7 @@ import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
+import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { startSidecarCommand } from "./routes-commands.js";
 import { runSlotUsage, startTaskExecution } from "./routes-hench.js";
 import { resolveTaskRun } from "./routes-hench-prep.js";
@@ -81,6 +83,7 @@ import { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
 const LENSES_PATH = "/api/sidecar/lenses";
+const PROPOSALS_PATH = "/api/sidecar/proposals";
 
 /** The registry as the drawer reads it: every lens, and what an unavailable one waits on. */
 function sidecarLenses(): Array<{ id: string; available: boolean; needs?: string }> {
@@ -186,7 +189,9 @@ export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions
  * runs as the workspace's Sidecar command job (job tray, Live) and the agent
  * waits up to `commandWaitMs` for its output, work starts through the hench
  * execute route under `guard.maxConcurrentProcesses`, and a work card's
- * preview is the Prepare route's `ndx work --resolve`.
+ * preview is the Prepare route's `ndx work --resolve`. A change-set card is
+ * read against the workspace's PRD before it is raised and written there,
+ * under the PRD lock, on approval (`sidecar/change-set.ts`).
  */
 export function sidecarActions(
   ctx: ServerContext,
@@ -203,6 +208,17 @@ export function sidecarActions(
       return started.started
         ? awaitSidecarCommand(started, commandWaitMs, signal)
         : { ok: false, text: `Nothing ran: ${started.reason}.` };
+    },
+    reviewChangeSet(input) {
+      return reviewChangeSet(ctx.rexDir, input);
+    },
+    async writeChangeSet(changeSet) {
+      try {
+        const written = await writeChangeSet(ctx, changeSet, broadcast);
+        return { ok: true, text: written.text, ids: written.ids };
+      } catch (err) {
+        return { ok: false, text: `Nothing was written: ${errorMessage(err)}.` };
+      }
     },
     async startWork(taskId, options) {
       const { inUse, max } = runSlotUsage(ctx);
@@ -394,7 +410,10 @@ export async function handleSidecarRoute(
   opts: SidecarRouteOptions = {},
 ): Promise<boolean> {
   const [pathname, search = ""] = (req.url || "/").split("?");
-  if (pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`) && pathname !== ALLOW_LIST_PATH && pathname !== LENSES_PATH) {
+  if (
+    pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`)
+    && pathname !== ALLOW_LIST_PATH && pathname !== LENSES_PATH && pathname !== PROPOSALS_PATH
+  ) {
     return false;
   }
   const method = req.method || "GET";
@@ -404,6 +423,12 @@ export async function handleSidecarRoute(
   if (pathname === LENSES_PATH) {
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${LENSES_PATH}`);
     jsonResponse(res, 200, { lenses: sidecarLenses() });
+    return true;
+  }
+
+  if (pathname === PROPOSALS_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${PROPOSALS_PATH}`);
+    jsonResponse(res, 200, { cards: broker.proposals() });
     return true;
   }
 
@@ -553,6 +578,7 @@ export async function handleSidecarRoute(
           approve: body.decision === "approve",
           ...(reason && { reason }),
           ...(body.remember && { remember: true }),
+          ...(body.edits !== undefined && { edits: body.edits }),
         });
         jsonResponse(res, 200, { card });
       } catch (err) {

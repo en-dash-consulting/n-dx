@@ -29,6 +29,8 @@ import {
   type BrokerToolName,
   type SidecarCardKind,
 } from "./broker-policy.js";
+import type { SidecarChangeSet } from "../../shared/index.js";
+import { applyChangeSetEdits } from "./change-set.js";
 import { appendLedgerEntry, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 
@@ -44,6 +46,8 @@ export interface SidecarCard {
   allowListKey: string | null;
   /** What the call would do, read before the card was raised: a work card's `ndx work --resolve`. */
   preview?: string;
+  /** A change-set card's items as approval writes them, read against the PRD before the card was raised. */
+  changeSet?: SidecarChangeSet;
   status: SidecarCardStatus;
   raisedAt: string;
   decidedAt?: string;
@@ -51,6 +55,16 @@ export interface SidecarCard {
   reason?: string;
   /** Approved with "always allow": its rule went onto the allow-list. */
   remembered?: true;
+  /** The operator edited the change set before approving it. */
+  edited?: true;
+  /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote. */
+  carriedOut?: { ok: boolean; ids?: string[] };
+}
+
+/** What the broker reads before raising a card, for the operator to see on it. */
+export interface CardAnnex {
+  preview?: string;
+  changeSet?: SidecarChangeSet;
 }
 
 /** How a broker call was settled. */
@@ -63,11 +77,13 @@ export interface CardDecision {
   reason?: string;
   /** Also add the call's rule to the allow-list. Refused for a call that can never be allow-listed. */
   remember?: boolean;
+  /** A change-set card's item edits, written by the approval. Refused on any other card or decision. */
+  edits?: unknown;
 }
 
 /** A refused decision; `status` is the HTTP status a route answers with. */
 export class BrokerDecisionError extends Error {
-  constructor(readonly status: 404 | 409, message: string) {
+  constructor(readonly status: 400 | 404 | 409, message: string) {
     super(message);
   }
 }
@@ -107,7 +123,7 @@ export class SidecarBroker {
   /**
    * Settle a write tool's call: at once when the allow-list covers it, else
    * when the operator decides its card, or when the card is withdrawn
-   * (the turn stopped, or `signal` aborted). `preview` goes on the card for
+   * (the turn stopped, or `signal` aborted). `annex` goes on the card for
    * the operator to read before deciding.
    */
   request(
@@ -115,7 +131,7 @@ export class SidecarBroker {
     tool: BrokerToolName,
     input: Record<string, unknown>,
     signal?: AbortSignal,
-    preview?: string,
+    annex: CardAnnex = {},
   ): Promise<BrokerOutcome> {
     const kind = BROKER_TOOL_POLICY[tool].card;
     if (!kind) throw new Error(`${tool} raises no card`);
@@ -130,7 +146,8 @@ export class SidecarBroker {
       kind,
       input,
       allowListKey: key,
-      ...(preview !== undefined && { preview }),
+      ...(annex.preview !== undefined && { preview: annex.preview }),
+      ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
       status: "pending",
       raisedAt: this.iso(),
     };
@@ -157,6 +174,31 @@ export class SidecarBroker {
     return (this.sessionCards.get(sessionId) ?? []).map((card) => ({ ...card }));
   }
 
+  /**
+   * Change-set cards whose items are not in the PRD yet: waiting on the
+   * operator, or approved and still being written. The Plan tree draws
+   * their items as ghost rows.
+   */
+  proposals(): SidecarCard[] {
+    return [...this.sessionCards.values()].flat()
+      .filter((card) => card.changeSet && (card.status === "pending" || (card.status === "approved" && !card.carriedOut)))
+      .map((card) => ({ ...card }));
+  }
+
+  /**
+   * Record how an approved call's effect ended, on the card and in its audit
+   * trail, and announce it: a change-set card's ghost rows give way to the
+   * items it wrote.
+   */
+  recordCarriedOut(sessionId: string, cardId: string, carriedOut: NonNullable<SidecarCard["carriedOut"]>): void {
+    const card = this.sessionCards.get(sessionId)?.find((c) => c.id === cardId);
+    if (!card || card.status !== "approved" || card.carriedOut) return;
+    card.carriedOut = carriedOut;
+    ensureSidecarDir(this.dir);
+    appendFileSync(join(this.dir, `${card.sessionId}.cards.jsonl`), JSON.stringify(card) + "\n", "utf-8");
+    this.onCard?.({ ...card });
+  }
+
   /** Decide the session's first undecided card. */
   decide(sessionId: string, cardId: string, decision: CardDecision): SidecarCard {
     const entry = this.pending.get(cardId);
@@ -171,6 +213,15 @@ export class SidecarBroker {
       throw new BrokerDecisionError(409, `Cards are decided in order: decide card ${first.id} first`);
     }
     const { card } = entry;
+    // Every refusal comes before anything is changed.
+    let edited: SidecarChangeSet | undefined;
+    if (decision.edits !== undefined) {
+      if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries edits");
+      if (!card.changeSet) throw new BrokerDecisionError(409, `A ${card.kind} card takes no edits`);
+      const applied = applyChangeSetEdits(card.changeSet, decision.edits);
+      if (typeof applied === "string") throw new BrokerDecisionError(400, applied);
+      edited = applied;
+    }
     if (decision.remember) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval can be remembered");
       if (card.allowListKey === null) {
@@ -178,6 +229,10 @@ export class SidecarBroker {
       }
       this.addRule({ tool: card.tool, key: card.allowListKey });
       card.remembered = true;
+    }
+    if (edited) {
+      card.changeSet = edited;
+      card.edited = true;
     }
     this.settle(cardId, decision.approve ? "approved" : "denied", decision.reason);
     return { ...card };

@@ -12,8 +12,12 @@
  * Bodies are generic: a title from the card's input and the input itself.
  * A command card adds the effects line its ndx command declares in the
  * command manifest; a work card shows the run's `ndx work --resolve`
- * preview, read before the card was raised. Rich change-set and edit bodies
- * come later (M3).
+ * preview, read before the card was raised. A change-set card (story 11)
+ * shows its items as the server read them: each item's title, description
+ * and done-when, editable while it is the first waiting card and sent with
+ * the approval; any existing item it matches; and, on v2, where the change
+ * lands — on its target, or in the Inbox needing placement. It never offers
+ * to apply the change. Rich edit bodies come later.
  *
  * A card withdrawn because its session ended draws as denied with the note
  * "session ended" (UX8); one withdrawn because the turn stopped draws as
@@ -22,9 +26,10 @@
 
 import { h } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
-import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, workCommandArgs } from "../external.js";
+import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, itemTypeLabel, workCommandArgs } from "../external.js";
 import { useCliName } from "../hooks/index.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/index.js";
+import type { SidecarChangeSetEdit } from "../external.js";
 
 export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>> = {
   command: "Command",
@@ -100,6 +105,110 @@ export function sidecarCommandEffectsLine(card: SidecarCard, manifest: SidecarSt
   return `reads ${reads} · writes ${writes} · ${llm} · ${effects.duration}`;
 }
 
+// ── Change-set card (story 11) ───────────────────────────────────────
+
+/** One item's fields as the operator is editing them; criteria one per line. */
+export interface ChangeSetDraft {
+  title: string;
+  description: string;
+  criteria: string;
+}
+
+type ChangeSetItem = NonNullable<SidecarCard["changeSet"]>["items"][number];
+
+const criteriaLines = (text: string): string[] => text.split("\n").map((l) => l.trim()).filter(Boolean);
+
+function draftOf(item: ChangeSetItem): ChangeSetDraft {
+  return { title: item.title, description: item.description ?? "", criteria: (item.acceptanceCriteria ?? []).join("\n") };
+}
+
+/** The edits an approval sends: only the items, and fields, the operator changed. */
+export function changeSetEdits(card: SidecarCard, drafts: Readonly<Record<number, ChangeSetDraft>>): SidecarChangeSetEdit[] {
+  const items = card.changeSet?.items ?? [];
+  const edits: SidecarChangeSetEdit[] = [];
+  for (const [key, draft] of Object.entries(drafts)) {
+    const index = Number(key);
+    const item = items[index];
+    if (!item) continue;
+    const edit: SidecarChangeSetEdit = { index };
+    if (draft.title.trim() !== item.title) edit.title = draft.title;
+    if (draft.description.trim() !== (item.description ?? "").trim()) edit.description = draft.description;
+    const criteria = criteriaLines(draft.criteria);
+    if (criteria.join("\n") !== (item.acceptanceCriteria ?? []).join("\n")) edit.acceptanceCriteria = criteria;
+    if (Object.keys(edit).length > 1) edits.push(edit);
+  }
+  return edits;
+}
+
+/** Where a v2 change-set's change lands, said before approval. */
+export function changeSetPlacementLine(card: SidecarCard): string | null {
+  const placement = card.changeSet?.placement;
+  if (!placement) return null;
+  return "target" in placement
+    ? `Placed on ${placement.title} (touches ${placement.target})`
+    : "No target: the change lands in the Inbox needing placement. Placing it from Sidecar comes with the Place lens.";
+}
+
+function parentLine(item: ChangeSetItem, items: readonly ChangeSetItem[]): string {
+  if (item.parent !== undefined) return `under item ${item.parent + 1} (${items[item.parent]?.title ?? "?"})`;
+  if (item.parentId) return `under ${item.parentId}`;
+  return item.type === "change" ? "" : "at the root";
+}
+
+interface ChangeSetBodyProps {
+  card: SidecarCard;
+  /** The first waiting card: its fields are editable. */
+  editable: boolean;
+  drafts: Readonly<Record<number, ChangeSetDraft>>;
+  onDraft: (index: number, draft: ChangeSetDraft) => void;
+}
+
+function ChangeSetBody({ card, editable, drafts, onDraft }: ChangeSetBodyProps) {
+  const changeSet = card.changeSet!;
+  const placement = changeSetPlacementLine(card);
+  const written = card.carriedOut;
+  return h("div", { class: "sidecar-change-set" },
+    placement
+      ? h("p", { class: `sidecar-change-set-placement${"inbox" in changeSet.placement! ? " sidecar-change-set-inbox" : ""}` }, placement)
+      : null,
+    h("ol", { class: "sidecar-change-set-items" },
+      changeSet.items.map((item, index) => {
+        const draft = drafts[index] ?? draftOf(item);
+        const set = (field: keyof ChangeSetDraft) => (e: Event) =>
+          onDraft(index, { ...draft, [field]: (e.target as HTMLInputElement | HTMLTextAreaElement).value });
+        const label = `item ${index + 1}`;
+        return h("li", { class: "sidecar-change-set-item", "data-index": index },
+          h("div", { class: "sidecar-change-set-item-head" },
+            h("span", { class: "sidecar-change-set-type" }, itemTypeLabel(item.type)),
+            h("span", { class: "sidecar-change-set-parent" }, parentLine(item, changeSet.items)),
+          ),
+          item.duplicate
+            ? h("p", { class: "sidecar-change-set-duplicate", role: "note" },
+                `Matches existing ${itemTypeLabel(item.duplicate.type).toLowerCase()} "${item.duplicate.title}" (${item.duplicate.id}, ${item.duplicate.status})`)
+            : null,
+          editable
+            ? h("div", { class: "sidecar-change-set-fields" },
+                h("input", { type: "text", class: "sidecar-change-set-title", "aria-label": `Title of ${label}`, value: draft.title, onInput: set("title") }),
+                h("textarea", { class: "sidecar-change-set-description", "aria-label": `Description of ${label}`, rows: 2, value: draft.description, onInput: set("description") }),
+                h("textarea", { class: "sidecar-change-set-criteria", "aria-label": `Done when (one per line) for ${label}`, rows: 2, placeholder: "Done when… (one per line)", value: draft.criteria, onInput: set("criteria") }),
+              )
+            : h("div", { class: "sidecar-change-set-fields" },
+                h("p", { class: "sidecar-change-set-title" }, item.title, written?.ids?.[index] ? h("code", null, ` ${written.ids[index]}`) : null),
+                item.description ? h("p", { class: "sidecar-change-set-description" }, item.description) : null,
+                item.acceptanceCriteria?.length
+                  ? h("ul", { class: "sidecar-change-set-criteria", "aria-label": "Done when" }, item.acceptanceCriteria.map((c) => h("li", null, c)))
+                  : null,
+              ),
+        );
+      }),
+    ),
+    written
+      ? h("p", { class: "sidecar-change-set-written" },
+          written.ok ? `Written${card.edited ? " with your edits" : ""}: ${written.ids?.length ?? 0} items` : "Nothing was written; the agent was told why")
+      : null,
+  );
+}
+
 function settledNote(card: SidecarCard, state: SidecarCardState): string {
   switch (state) {
     case "approved": return "Approved";
@@ -138,11 +247,24 @@ interface CardProps {
   onNote: (note: string) => void;
   deciding: boolean;
   onDecide: (decision: SidecarCardDecision) => void;
+  /** The first waiting change-set card's edits, by item index. */
+  drafts: Readonly<Record<number, ChangeSetDraft>>;
+  onDraft: (index: number, draft: ChangeSetDraft) => void;
 }
 
-function SidecarCardView({ card, cliName, first, manifest, note, onNote, deciding, onDecide }: CardProps) {
+function SidecarCardView({ card, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft }: CardProps) {
   const state = sidecarCardState(card);
   const input = h("pre", { class: "sidecar-card-input" }, JSON.stringify(card.input, null, 2));
+  const editable = first && state === "pending";
+  // A change-set card's body is its items; the raw input stays behind a disclosure.
+  const body = card.changeSet
+    ? [
+        h(ChangeSetBody, { card, editable, drafts: editable ? drafts : {}, onDraft }),
+        h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+      ]
+    : state === "pending"
+      ? input
+      : h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input);
   return h("li", { class: `sidecar-card sidecar-card--${state}`, "data-card": card.id, "data-kind": card.kind },
     h("div", { class: "sidecar-card-head" },
       h("span", { class: "sidecar-card-kind" }, SIDECAR_CARD_KIND_LABELS[card.kind] ?? card.kind),
@@ -152,9 +274,7 @@ function SidecarCardView({ card, cliName, first, manifest, note, onNote, decidin
     card.preview !== undefined
       ? h("pre", { class: "sidecar-card-preview", "aria-label": "What this would run" }, card.preview)
       : null,
-    state === "pending"
-      ? input
-      : h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+    body,
     state !== "pending"
       ? h("p", { class: "sidecar-card-note" }, settledNote(card, state))
       : first
@@ -168,7 +288,8 @@ function SidecarCardView({ card, cliName, first, manifest, note, onNote, decidin
               onInput: (e: Event) => onNote((e.target as HTMLInputElement).value),
             }),
             h("div", { class: "sidecar-card-actions" },
-              h("button", { type: "button", class: "sidecar-card-approve", disabled: deciding, onClick: () => onDecide({ approve: true }) }, "Approve"),
+              h("button", { type: "button", class: "sidecar-card-approve", disabled: deciding, onClick: () => onDecide({ approve: true }) },
+                card.changeSet ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}` : "Approve"),
               h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) }, "Deny"),
               card.allowListKey !== null
                 ? h("button", {
@@ -195,17 +316,20 @@ export function SidecarCards({ cards, manifest, decide }: SidecarCardsProps) {
   const cliName = useCliName();
   const first = cards.find((c) => c.status === "pending") ?? null;
   const [note, setNote] = useState("");
+  const [drafts, setDrafts] = useState<Record<number, ChangeSetDraft>>({});
   const [deciding, setDeciding] = useState(false);
   const firstId = first?.id ?? null;
 
-  // A note belongs to the card it was typed on.
-  useEffect(() => { setNote(""); }, [firstId]);
+  // A note, and a change set's edits, belong to the card they were typed on.
+  useEffect(() => { setNote(""); setDrafts({}); }, [firstId]);
 
   const answer = async (decision: SidecarCardDecision) => {
     if (!first || deciding) return;
     setDeciding(true);
     try {
-      await decide(first.id, decision);
+      // An approval writes the operator's edits; a denial writes nothing, so it sends none.
+      const edits = decision.approve && first.changeSet ? changeSetEdits(first, drafts) : [];
+      await decide(first.id, edits.length > 0 ? { ...decision, edits } : decision);
     } finally {
       setDeciding(false);
     }
@@ -242,6 +366,8 @@ export function SidecarCards({ cards, manifest, decide }: SidecarCardsProps) {
       onNote: setNote,
       deciding,
       onDecide: (decision: SidecarCardDecision) => { void answer(decision); },
+      drafts,
+      onDraft: (index: number, draft: ChangeSetDraft) => setDrafts((prev) => ({ ...prev, [index]: draft })),
     })),
   );
 }

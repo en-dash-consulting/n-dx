@@ -38,6 +38,7 @@ import { highlightSearchText, buildBranchVisibleSet } from "./tree-search.js";
 import { getTaskDuration } from "./durations.js";
 import { formatTokensExact, formatDuration, formatUsd, newTokens, EMPTY_DASH } from "./format-usage.js";
 import { useLiveTick } from "./use-live-tick.js";
+import type { PRDGhostRow } from "./ghost-rows.js";
 
 // ── Status rendering ────────────────────────────────────────────────
 
@@ -839,6 +840,8 @@ export interface PRDTreeProps {
   onBranchChange?: (branch: string | null) => void;
   /** Ids of the changes rex holds for placement; each gets an Inbox badge. */
   inboxIds?: ReadonlySet<string>;
+  /** Sidecar's proposed items, by the existing item they hang under (`null`: with the roots); see ghost-rows.ts. */
+  ghostRows?: ReadonlyMap<string | null, PRDGhostRow[]>;
   /** Rendered beside the title — the Tasks view's glossary ⓘ. */
   titleInfo?: ComponentChild;
   /**
@@ -846,6 +849,34 @@ export interface PRDTreeProps {
    * so the tree reads title → progress → filters → items.
    */
   controls?: ComponentChild;
+}
+
+// ── Ghost rows ──────────────────────────────────────────────────────
+
+/** A proposed item from a waiting Sidecar change-set card: dimmed, not selectable. */
+function GhostRowView({ row, depth }: { row: PRDGhostRow; depth: number }) {
+  return h(
+    "div",
+    {
+      class: `prd-node-row prd-ghost-row prd-level-${row.type}`,
+      style: `padding-left: ${depth * 24 + 8}px`,
+      role: "treeitem",
+      "aria-disabled": "true",
+      "aria-label": `Proposed ${itemTypeLabel(row.type)}: ${row.title}`,
+      title: "Proposed in Sidecar: waiting on its change-set card",
+      "data-ghost": row.key,
+      "data-card": row.cardId,
+    },
+    h("span", { class: "prd-chevron", "aria-hidden": "true" }, ""),
+    h("span", { class: "prd-ghost-badge" }, "proposed"),
+    h("span", { class: `prd-level-badge prd-level-${row.type}` }, itemTypeLabel(row.type)),
+    h("span", { class: "prd-node-title" }, row.title),
+    row.duplicate ? h("span", { class: "prd-ghost-duplicate" }, "matches an existing item") : null,
+  );
+}
+
+function ghostRowsUnder(rows: readonly PRDGhostRow[] | undefined, depth: number): ComponentChild[] {
+  return (rows ?? []).map((row) => h(GhostRowView, { key: `ghost:${row.key}`, row, depth: depth + row.depth }));
 }
 
 // ── Item lookup helper ──────────────────────────────────────────────
@@ -863,7 +894,7 @@ function buildItemMap(items: PRDItemData[]): Map<string, PRDItemData> {
   return map;
 }
 
-export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange, inboxIds, titleInfo, controls }: PRDTreeProps) {
+export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, weeklyBudget, showTokenBudget, defaultExpandDepth = 2, onSelectItem, selectedItemId, bulkSelectedIds, onBulkSelect, onInlineAddSubmit, highlightedItemId, deepLinkExpandIds, onRemoveItem, onUpdateItem, deletingItemId, activeStatuses: externalStatuses, searchQuery, searchVisibleIds, searchMatchIds, chunkSize, availableBranches, activeBranch, onBranchChange, inboxIds, ghostRows, titleInfo, controls }: PRDTreeProps) {
   // ── Flat item map for delegated event handlers ────────────────────
   const itemMap = useMemo(() => buildItemMap(doc.items), [doc.items]);
   const getItem = useCallback((id: string) => itemMap.get(id) ?? null, [itemMap]);
@@ -1116,6 +1147,9 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
         h("p", null, "No PRD items yet."),
         h("p", { class: "prd-empty-hint" }, "Run ", h("code", null, "rex add epic --title=\"...\""), " to get started."),
       ),
+      ghostRows?.get(null)?.length
+        ? h("div", { class: "prd-tree", role: "tree", "aria-label": "Proposed PRD items" }, ghostRowsUnder(ghostRows.get(null), 0))
+        : null,
     );
   }
 
@@ -1160,6 +1194,8 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
         onClick: treeHandlers.onClick,
         onKeyDown: treeHandlers.onKeyDown,
       },
+      // Proposed root items (a Sidecar change-set card's new change or epic) sit above the tree.
+      ghostRowsUnder(ghostRows?.get(null), 0),
       // Spacer before visible items (maintains scroll position)
       virtualScroll.offsetY > 0
         ? h("div", {
@@ -1217,6 +1253,8 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
                 onCancel: handleInlineAddCancel,
               })
             : null,
+          // Proposed items that go under this one.
+          ghostRowsUnder(ghostRows?.get(item.id), depth + 1),
         );
       }),
       // Spacer after visible items (maintains total scroll height)

@@ -122,6 +122,8 @@ const noEffects: SidecarActions = {
   previewWork: async () => "preview",
   runCommand: () => ({ ok: true, text: "Ran it." }),
   startWork: async () => ({ ok: true, text: "Started it." }),
+  reviewChangeSet: async () => ({ layout: "v1", items: [{ title: "x", type: "epic" }] }),
+  writeChangeSet: async () => ({ ok: true, text: "Wrote it.", ids: ["x"] }),
 };
 
 function newRegistry(): SidecarSessionRegistry {

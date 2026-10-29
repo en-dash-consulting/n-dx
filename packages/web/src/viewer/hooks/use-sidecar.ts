@@ -30,6 +30,7 @@ import { useSidecarSessions } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
 import { GENERAL_LENS, useSidecarAttachment } from "./use-sidecar-attachment.js";
 import type { SidecarAttachment, SidecarPageSelection } from "./use-sidecar-attachment.js";
+import type { SidecarChangeSet, SidecarChangeSetEdit } from "../external.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-sidecar.ts and server/sidecar/session-registry.ts
@@ -95,12 +96,18 @@ export interface SidecarCard {
   allowListKey: string | null;
   /** What the call would do, read before the card was raised: a work card's `ndx work --resolve`. */
   preview?: string;
+  /** A change-set card's items as approval writes them. */
+  changeSet?: SidecarChangeSet;
   status: "pending" | "approved" | "denied" | "withdrawn";
   raisedAt: string;
   decidedAt?: string;
   reason?: string;
   /** Approved with "always allow". */
   remembered?: true;
+  /** The operator edited the change set before approving it. */
+  edited?: true;
+  /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote. */
+  carriedOut?: { ok: boolean; ids?: string[] };
 }
 
 /** The operator's answer to the first waiting card. */
@@ -110,6 +117,8 @@ export interface SidecarCardDecision {
   reason?: string;
   /** "Always allow": only when the card has an allowListKey. */
   remember?: boolean;
+  /** A change-set approval's item edits; the approval writes the edited values. */
+  edits?: SidecarChangeSetEdit[];
 }
 
 /**
@@ -657,6 +666,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
         decision: decision.approve ? "approve" : "deny",
         ...(reason && { reason }),
         ...(decision.remember && { remember: true }),
+        ...(decision.approve && decision.edits?.length && { edits: decision.edits }),
       },
     );
     if (!mountedRef.current) return;

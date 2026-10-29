@@ -316,6 +316,21 @@
   font-size: 11px;
 }
 .sidecar-card-details summary { cursor: pointer; color: var(--text-muted); font-size: 11px; }
+
+/* Change-set card (story 11) */
+.sidecar-change-set { display: flex; flex-direction: column; gap: var(--space-1); }
+.sidecar-change-set-placement { margin: 0; font-size: 12px; }
+.sidecar-change-set-inbox { color: var(--orange, var(--text-muted)); }
+.sidecar-change-set-items { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.sidecar-change-set-item { border: 1px solid var(--border); border-radius: 4px; padding: var(--space-1) var(--space-2); }
+.sidecar-change-set-item-head { display: flex; gap: var(--space-2); font-size: 11px; color: var(--text-muted); }
+.sidecar-change-set-type { font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.sidecar-change-set-duplicate { margin: var(--space-1) 0 0; font-size: 12px; color: var(--orange, var(--text-muted)); }
+.sidecar-change-set-fields { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-1); }
+.sidecar-change-set-fields input, .sidecar-change-set-fields textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; }
+.sidecar-change-set-fields p, .sidecar-change-set-fields ul { margin: 0; font-size: 12px; }
+.sidecar-change-set-title { font-weight: 600; }
+.sidecar-change-set-written { margin: 0; color: var(--text-muted); font-size: 12px; }
 .sidecar-card-note, .sidecar-card-queued { margin: 0; color: var(--text-muted); }
 .sidecar-card-decide { display: flex; flex-direction: column; gap: var(--space-1); }
 .sidecar-card-reason { font: inherit; font-size: 12px; }

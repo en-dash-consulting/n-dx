@@ -39,7 +39,10 @@ import {
   useFeatureToggle,
   useFacetState,
   useClaims,
+  useSidecarProposals,
 } from "../hooks/index.js";
+import { isDeployedMode } from "../deployed-mode.js";
+import { ghostRowsByParent } from "../components/prd-tree/ghost-rows.js";
 import { searchTree, collectAllTags, collectAllBranches } from "../components/prd-tree/tree-search.js";
 import { FacetFilter } from "../components/prd-tree/facet-filter.js";
 import { useProductRead } from "./product-pages.js";
@@ -81,6 +84,10 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
 
   // ── Feature toggles ────────────────────────────────────────────
   const showTokenBudget = useFeatureToggle("rex.showTokenBudget", false);
+
+  // ── Sidecar's proposed items as ghost rows (UX5), behind web.sidecar ──
+  const proposals = useSidecarProposals(useFeatureToggle("web.sidecar", false) && !isDeployedMode());
+  const ghostRows = useMemo(() => ghostRowsByParent(proposals), [proposals]);
 
   // ── Cross-worktree claims (read-only chips on claimed rows) ─────
   const { claimsById } = useClaims();
@@ -341,6 +348,7 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       activeBranch,
       onBranchChange: setActiveBranch,
       inboxIds,
+      ghostRows,
       titleInfo: h(InfoTip, { term: "epic / feature / task" }),
       // Search, facets and item actions — one wrapping row beneath the summary.
       controls: h("div", { class: "prd-filter-bar" },

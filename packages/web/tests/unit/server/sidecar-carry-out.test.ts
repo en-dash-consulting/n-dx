@@ -411,7 +411,6 @@ describe("tools carried out by a later batch", () => {
     ["github_read", { kind: "pr", ref: "#1" }, "L2/H1"],
     ["draft_github_post", { kind: "comment", target: "#1", body: "hi" }, "L2/H1"],
     ["migration_decision", { entries: [{ id: "x" }] }, "G1"],
-    ["propose_prd_change", { items: [{ title: "a" }] }, "the change-set card"],
   ])("an approved %s reports it is recorded, not carried out yet, and names %s", async (tool, args, batch) => {
     const client = await brokerClient();
     const call = client.callTool({ name: tool, arguments: args });

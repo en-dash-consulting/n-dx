@@ -2,10 +2,12 @@
  * What an approved broker call does.
  *
  * The broker decides a call (`broker.ts`); this module carries out the
- * decided call and words the tool result the session's agent reads. Two tools
- * run today: `run_command` as the workspace's Sidecar command job, and
- * `start_work` through the hench execute route. Every other approved call is
- * recorded on its card and names the batch that will carry it out.
+ * decided call and words the tool result the session's agent reads. Three
+ * tools run today: `run_command` as the workspace's Sidecar command job,
+ * `start_work` through the hench execute route, and `propose_prd_change` as
+ * its change-set card's PRD write (`change-set.ts`), with the operator's
+ * edits. Every other approved call is recorded on its card and names the
+ * batch that will carry it out.
  *
  * The effects themselves are injected ({@link SidecarActions}): the command
  * job model and the execute route own their spawns, so this module never
@@ -14,6 +16,7 @@
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.3, §12.
  */
 
+import type { SidecarChangeSet } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import type { BrokerOutcome } from "./broker.js";
 
@@ -21,6 +24,8 @@ import type { BrokerOutcome } from "./broker.js";
 export interface CarryOutResult {
   ok: boolean;
   text: string;
+  /** The PRD items the effect wrote, in order. */
+  ids?: string[];
 }
 
 /** The effects an approved call can have, wired to the server's job model and execute route. */
@@ -30,11 +35,14 @@ export interface SidecarActions {
   /** Runs the command and waits for it (see {@link awaitSidecarCommand}); `signal` aborts the wait, never the command. */
   runCommand(argv: string[], signal?: AbortSignal): Promise<CarryOutResult> | CarryOutResult;
   startWork(taskId: string, options: Record<string, unknown> | undefined): Promise<CarryOutResult>;
+  /** A proposal read against the PRD for its change-set card, or why it cannot be written. */
+  reviewChangeSet(input: Record<string, unknown>): Promise<SidecarChangeSet | string>;
+  /** An approved change-set card's write, under the PRD lock. Never throws. */
+  writeChangeSet(changeSet: SidecarChangeSet): Promise<CarryOutResult>;
 }
 
 /** The tools that are recorded but not carried out yet, and the batch that will carry each out. */
 export const CARRIED_OUT_LATER: Readonly<Partial<Record<BrokerToolName, string>>> = {
-  propose_prd_change: "the change-set card (M3, story 11)",
   place_change_card: "the L2 Place lens",
   propose_edit: "a later batch",
   github_read: "L2/H1",
@@ -61,13 +69,14 @@ export async function carryOutDecision(
   const decided = outcome.decidedBy === "allow-list"
     ? "Allowed by the Sidecar allow-list."
     : `The operator approved card ${outcome.card.id}.${outcome.card.reason ? ` Operator's note: ${outcome.card.reason}` : ""}`;
-  const effect = await carryOut(tool, input, actions, signal);
-  return { ok: effect.ok, text: `${decided} ${effect.text}` };
+  const effect = await carryOut(tool, input, outcome, actions, signal);
+  return { ...effect, text: `${decided} ${effect.text}` };
 }
 
 async function carryOut(
   tool: BrokerToolName,
   input: Record<string, unknown>,
+  outcome: BrokerOutcome,
   actions: SidecarActions | undefined,
   signal: AbortSignal | undefined,
 ): Promise<CarryOutResult> {
@@ -79,6 +88,14 @@ async function carryOut(
       return actions.runCommand((input.argv as unknown[]).map(String), signal);
     case "start_work":
       return actions.startWork(String(input.taskId), workOptions(input));
+    case "propose_prd_change": {
+      // The card's change set, with the operator's edits; never the raw input.
+      const changeSet = outcome.decidedBy === "allow-list" ? undefined : outcome.card.changeSet;
+      if (!changeSet) return { ok: false, text: "The card carried no change set; nothing was written." };
+      const edited = outcome.decidedBy !== "allow-list" && outcome.card.edited ? " The operator edited it before approving; the edited values were written." : "";
+      const written = await actions.writeChangeSet(changeSet);
+      return { ...written, text: `${written.text}${edited}` };
+    }
     default:
       return { ok: false, text: `${tool} has no effect to carry out; nothing ran.` };
   }

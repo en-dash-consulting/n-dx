@@ -67,6 +67,12 @@ export type { PlacementCandidate, PlacementProposal, PlacementStrength } from "@
 // model drafts a pick or a proposal and writes nothing.
 export { draftChangePlacement } from "@n-dx/rex";
 
+// ---- Rex duplicate match ----------------------------------------------------
+// The Sidecar change-set card flags a proposed item that matches an existing
+// one by the rule smart add flags duplicates by.
+export { findDuplicateItem } from "@n-dx/rex";
+export type { DuplicateItemMatch } from "@n-dx/rex";
+
 // ---- Rex PRD tree slug conformance ------------------------------------------
 // The Execute route's pre-run gate. The run it spawns writes the PRD when it
 // completes, so a tree this build would re-slug must stop the run before it
