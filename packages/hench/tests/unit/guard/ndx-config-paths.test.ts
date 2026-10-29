@@ -75,23 +75,27 @@ describe("n-dx config files are outside what the agent may write", () => {
     }
   });
 
+  /** The `--disallowed-tools` rules in `args`: one comma-joined value on Windows, one value each elsewhere. */
+  function deniedRules(args: readonly string[], platform: NodeJS.Platform): string[] {
+    const at = args.indexOf("--disallowed-tools") + 1;
+    return platform === "win32" ? args[at].split(",") : args.slice(at, at + buildDisallowedTools().length);
+  }
+
   it.each(["darwin", "win32"] as const)("the Claude CLI is denied edits to them (%s)", (platform) => {
-    const config = claudeCliAdapter.buildSpawnConfig(createPromptEnvelope([]), DEFAULT_EXECUTION_POLICY, {});
-    const flag = config.args.indexOf("--disallowed-tools");
-    expect(flag).toBeGreaterThan(-1);
     const denied = buildClaudeCliArgs({
       systemPrompt: "s",
       promptText: "p",
       allowedTools: ["Edit"],
       disallowedTools: buildDisallowedTools(),
     }, platform).args;
-    const rules = platform === "win32"
-      ? denied[denied.indexOf("--disallowed-tools") + 1].split(",")
-      : denied.slice(denied.indexOf("--disallowed-tools") + 1);
+    const rules = deniedRules(denied, platform);
     for (const p of [".n-dx.json", ".n-dx.local.json", ".mcp.json", ".claude/**", ".codex/**"]) {
       expect(rules, p).toContain(`Edit(./${p})`);
     }
-    expect(config.args.slice(flag + 1, flag + 1 + rules.length)).toEqual(buildDisallowedTools());
+    // The adapter builds its arguments for the platform it runs on.
+    const config = claudeCliAdapter.buildSpawnConfig(createPromptEnvelope([]), DEFAULT_EXECUTION_POLICY, {});
+    expect(config.args).toContain("--disallowed-tools");
+    expect(deniedRules(config.args, process.platform)).toEqual(buildDisallowedTools());
   });
 
   it.each(["legacy", "ndx"] as const)("an agent's attempt on the %s layout leaves the child environment unchanged", async (layout) => {
