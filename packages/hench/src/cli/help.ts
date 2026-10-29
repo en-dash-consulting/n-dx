@@ -192,8 +192,11 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "whose touches do not overlap, and a change with no touches runs alone.\n" +
           "Tasks tagged review-critical, migration or cross-package are left out.\n" +
           "At most guard.maxConcurrentProcesses minus the runs active now are\n" +
-          "offered. JSON: lanes [{command, changeId, tasks [{id, title, reason}]}],\n" +
-          "excluded [{id, title, reason}], activeRuns, runLimit, summary.\n" +
+          "offered, counting live runs in every worktree of the repository (this\n" +
+          "one alone when git cannot list them; the summary says which).\n" +
+          "JSON: lanes [{command, changeId, tasks [{id, title, reason}]}],\n" +
+          "excluded [{id, title, reason}], activeRuns, activeRunsByWorktree\n" +
+          "[{path, runs}], runLimit, summary.\n" +
           "Starts no run, takes no claim and writes no file. A lane's command\n" +
           "chains its steps with &&; the step for a blocked task passes\n" +
           "--require-unblocked, so it refuses to start while a blocker is open\n" +

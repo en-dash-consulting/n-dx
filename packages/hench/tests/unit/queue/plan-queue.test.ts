@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { V2Tree } from "@n-dx/rex";
 import { planQueue, COLD_ONLY_TAGS } from "../../../src/queue/plan-queue.js";
-import type { QueuePlan } from "../../../src/queue/plan-queue.js";
+import type { ActiveRunCount, QueuePlan } from "../../../src/queue/plan-queue.js";
 import { laneCommand, queueInputFromTree } from "../../../src/cli/commands/plan-queue.js";
 
 type Node = V2Tree["changes"][number];
@@ -15,11 +15,18 @@ function change(id: string, children: Node[], extra: Partial<Node> = {}): Node {
 }
 
 /** The plan for `changes`, as the CLI builds it, with `activeRuns` of `runLimit` in use. */
-function plan(changes: Node[], opts: { activeRuns?: number; runLimit?: number; defaultTier?: string } = {}): QueuePlan {
+function plan(
+  changes: Node[],
+  opts: { activeRuns?: number; runLimit?: number; defaultTier?: string; activeRunCount?: ActiveRunCount } = {},
+): QueuePlan {
   const input = queueInputFromTree({ product: [], changes }, { defaultTier: opts.defaultTier ?? "standard" });
   return planQueue({
     ...input,
-    activeRuns: opts.activeRuns ?? 0,
+    activeRuns: opts.activeRunCount ?? {
+      scope: "repository",
+      worktreePath: "/repo",
+      byWorktree: [{ path: "/repo", runs: opts.activeRuns ?? 0 }],
+    },
     runLimit: opts.runLimit ?? 3,
     command: (ids) => laneCommand("ndx", ids, new Set(input.tasks.filter((t) => t.blockedBy.length > 0).map((t) => t.id))),
   });
@@ -153,6 +160,27 @@ describe("planQueue", () => {
     expect(p.lanes).toEqual([]);
     expect(p.summary).toMatch(/3 runs active of a limit of 3/);
     expect(excludedReason(p, "t-a1")).toMatch(/no free run slot: 3 active of 3/);
+  });
+
+  it("counts live runs in every worktree against the limit and reports the split", () => {
+    const changes = ["A", "B"].map((id, i) => change(id, [task(`${id}1`)], { touches: [`cap-${i}`] }));
+    const byWorktree = [
+      { path: "/repo", runs: 1 },
+      { path: "/repo/.claude/worktrees/x", runs: 1 },
+      { path: "/repo-y", runs: 0 },
+    ];
+    const p = plan(changes, { runLimit: 3, activeRunCount: { scope: "repository", worktreePath: "/repo", byWorktree } });
+    expect(p.activeRuns).toBe(2);
+    expect(p.activeRunsByWorktree).toEqual(byWorktree);
+    expect(p.lanes).toHaveLength(1);
+    expect(p.summary).toMatch(/\(2 active of 3\)\. 1 live run in other worktrees\.$/);
+  });
+
+  it("says when git could not list the worktrees, so only this one was counted", () => {
+    const p = plan([change("A", [task("a1")], { touches: ["x"] })], {
+      activeRunCount: { scope: "worktree", worktreePath: "/repo", byWorktree: [{ path: "/repo", runs: 0 }] },
+    });
+    expect(p.summary).toMatch(/counted in this worktree only: git could not list/);
   });
 
   it("passes over claimed and non-actionable tasks, as selection does", () => {

@@ -3,16 +3,17 @@
  *
  * Reads what the queue planner (`queue/plan-queue.ts`) needs and prints its
  * plan. Advisory: it starts no run, claims no task and writes no file — the
- * claims store is opened read-only and the active-run count reads the lock
- * files without cleaning them.
+ * claims store is opened read-only and the active-run count reads every
+ * worktree's lock files without cleaning them.
  *
  * @module hench/cli/commands/plan-queue
  */
 
-import { join } from "node:path";
+import { realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { findActionableWork, indexTree, resolveStore, validateRunSettings } from "../../prd/rex-gateway.js";
 import type { V2Tree } from "../../prd/rex-gateway.js";
-import { resolveTaskModel } from "../../prd/llm-gateway.js";
+import { listWorktrees, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { loadConfig } from "../../store/config.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { resolveHenchPaths } from "../../store/paths.js";
@@ -21,7 +22,7 @@ import { resolveProjectCliName } from "../../agent/planning/cli-identity.js";
 import { TaskClaims } from "../../process/task-claims.js";
 import { countActiveLocksReadOnly } from "../../process/limiter.js";
 import { planQueue } from "../../queue/plan-queue.js";
-import type { QueueChange, QueuePlan, QueueTask } from "../../queue/plan-queue.js";
+import type { ActiveRunCount, QueueChange, QueuePlan, QueueTask } from "../../queue/plan-queue.js";
 import { CLIError } from "../errors.js";
 import { result as output, warn } from "../output.js";
 
@@ -135,6 +136,34 @@ export function formatPlan(plan: QueuePlan): string[] {
   return lines;
 }
 
+function canonical(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * Live hench runs in every worktree of the repository containing `dir`, read
+ * without writing: each worktree's lock files, found through its own layout.
+ * Lanes started here share the machine with runs in sibling worktrees, so a
+ * plan that counted only this worktree would offer more lanes than free slots.
+ * The run limiter keeps its per-worktree scope; this count is advisory.
+ * Outside a repository, or when git fails, only `dir` is counted.
+ */
+export async function countRepositoryActiveRuns(dir: string): Promise<ActiveRunCount> {
+  const self = canonical(dir);
+  const listed = (await listWorktrees(dir)).filter((wt) => !wt.bare).map((wt) => wt.path);
+  const scope = listed.length > 0 ? "repository" : "worktree";
+  const paths = listed.length > 0 ? listed : [self];
+  if (!paths.includes(self)) paths.unshift(self);
+  const byWorktree = await Promise.all(
+    paths.map(async (path) => ({ path, runs: await countActiveLocksReadOnly(resolveHenchPaths(path).henchDir) })),
+  );
+  return { scope, worktreePath: self, byWorktree };
+}
+
 export async function cmdPlanQueue(dir: string, flags: Record<string, string>): Promise<void> {
   const henchDir = resolveHenchPaths(dir).henchDir;
   const config = await loadConfig(henchDir, { onInvalid: "use-defaults", onWarning: (m) => warn(m) });
@@ -157,7 +186,7 @@ export async function cmdPlanQueue(dir: string, flags: Record<string, string>): 
   const plan = planQueue({
     tasks,
     changes,
-    activeRuns: await countActiveLocksReadOnly(henchDir),
+    activeRuns: await countRepositoryActiveRuns(dir),
     runLimit: config.guard.maxConcurrentProcesses,
     command: (ids) => laneCommand(cliName, ids, blocked),
   });

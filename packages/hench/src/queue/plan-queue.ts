@@ -57,12 +57,26 @@ export interface QueueChange {
   touches: readonly string[];
 }
 
+/** Live runs in one worktree. */
+export interface WorktreeActiveRuns {
+  path: string;
+  runs: number;
+}
+
+/** Hench runs active now, per worktree. */
+export interface ActiveRunCount {
+  /** `repository`: every worktree git lists; `worktree`: git could not list them, so this one alone. */
+  scope: "repository" | "worktree";
+  /** The worktree the plan is for. */
+  worktreePath: string;
+  byWorktree: readonly WorktreeActiveRuns[];
+}
+
 export interface PlanQueueInput {
   /** Candidate tasks, ready ones in selection-comparator order. */
   tasks: readonly QueueTask[];
   changes: ReadonlyMap<string, QueueChange>;
-  /** Hench runs active now. */
-  activeRuns: number;
+  activeRuns: ActiveRunCount;
   /** `guard.maxConcurrentProcesses`. */
   runLimit: number;
   /** Builds the command that runs a lane's task ids in order. */
@@ -84,7 +98,9 @@ export interface PlannedLane {
 export interface QueuePlan {
   lanes: PlannedLane[];
   excluded: PlannedTask[];
+  /** Live runs in every worktree of the repository (this one alone when git could not list them). */
   activeRuns: number;
+  activeRunsByWorktree: WorktreeActiveRuns[];
   runLimit: number;
   /** One line on the plan as a whole; says why when there are no lanes. */
   summary: string;
@@ -112,7 +128,9 @@ function sharedTouch(a: QueueChange, b: QueueChange): string | undefined {
 }
 
 export function planQueue(input: PlanQueueInput): QueuePlan {
-  const { tasks, changes, activeRuns, runLimit } = input;
+  const { tasks, changes, runLimit } = input;
+  const activeRunsByWorktree = input.activeRuns.byWorktree.map((w) => ({ ...w }));
+  const activeRuns = activeRunsByWorktree.reduce((sum, w) => sum + w.runs, 0);
   const excluded: PlannedTask[] = [];
   const exclude = (t: QueueTask, reason: string): void => {
     excluded.push({ id: t.id, title: t.title, reason });
@@ -200,7 +218,16 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
     })),
   }));
 
-  const summary =
+  const plural = (n: number): string => `${n} live run${n === 1 ? "" : "s"}`;
+  const elsewhere = activeRunsByWorktree
+    .filter((w) => w.path !== input.activeRuns.worktreePath)
+    .reduce((sum, w) => sum + w.runs, 0);
+  const scopeNote =
+    input.activeRuns.scope === "repository"
+      ? ` ${plural(elsewhere)} in other worktrees.`
+      : " Live runs counted in this worktree only: git could not list the repository's worktrees.";
+
+  const verdict =
     tasks.length === 0
       ? "No ready tasks."
       : free === 0
@@ -208,6 +235,7 @@ export function planQueue(input: PlanQueueInput): QueuePlan {
         : lanes.length === 0
           ? "No lanes: every ready task is excluded."
           : `${lanes.length} lane${lanes.length === 1 ? "" : "s"} for ${free} free run slot${free === 1 ? "" : "s"} (${activeRuns} active of ${runLimit}).`;
+  const summary = verdict + scopeNote;
 
-  return { lanes, excluded, activeRuns, runLimit, summary };
+  return { lanes, excluded, activeRuns, activeRunsByWorktree, runLimit, summary };
 }

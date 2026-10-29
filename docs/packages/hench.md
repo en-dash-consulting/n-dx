@@ -264,6 +264,10 @@ no run, takes no claim and writes no file.
 - Tasks tagged `review-critical`, `migration` or `cross-package`, on the task
   or its change, are left out: run them on their own.
 - At most `guard.maxConcurrentProcesses` minus the runs active now are offered.
+  Live runs are counted in every worktree `git worktree list` names for the
+  repository, since their lanes share the machine; outside a repository, or when
+  git fails, only this worktree is counted and the summary says so. The run
+  limiter itself still counts per worktree.
 
 A lane's command runs its tasks one after another in this worktree
 (`ndx work --task=a --auto . && ndx work --task=b --auto .`). An explicit
@@ -272,6 +276,7 @@ transient vendor error), so the step for a blocked task adds
 `--require-unblocked`: it refuses to start while any blocker is not completed.
 The JSON has
 `lanes [{command, changeId, tasks [{id, title, reason}]}]`, `excluded
-[{id, title, reason}]`, `activeRuns`, `runLimit` and `summary`; every ready task
+[{id, title, reason}]`, `activeRuns`, `activeRunsByWorktree [{path, runs}]`,
+`runLimit` and `summary`; every ready task
 appears once, with its reason. Live shows the plan as Ready next behind the
 `hench.readyNext` toggle.
