@@ -30,13 +30,13 @@ import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
 import { explicitTaskRefusal } from "../../agent/planning/brief.js";
-import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal } from "../../agent/planning/work-selection.js";
+import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal, readTreeAsReset } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
 import { CLIError, requireLLMCLI } from "../errors.js";
 import { result as output, warn } from "../output.js";
 import { VENDOR_PROVIDERS } from "./provider-support.js";
-import { readTreeConformanceRefusal } from "./run.js";
+import { collectResettableTasks, readTreeConformanceRefusal } from "./run.js";
 import {
   parseBudgetFlags,
   parsePermissionModeFlag,
@@ -257,6 +257,15 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
         "Fix or restore the corrupt file under .rex/, then try again.",
       ),
     );
+  }
+  // `--reset-deferred` returns deferred and failing tasks to pending before a
+  // run selects (the operator's own under `--mine`), so a change's tasks are
+  // read as reset, as a dry run reads them: the preview names the task the
+  // run would pick. The named item's own status is checked by wouldBeReset.
+  if (v2Tree && prdItems && flags["reset-deferred"] === "true") {
+    const assignee = flags.mine === "true" ? await resolveActor(dir) : undefined;
+    const resetIds = new Set(collectResettableTasks(prdItems, assignee).map((t) => t.id));
+    if (resetIds.size > 0) v2Tree = readTreeAsReset(v2Tree, resetIds);
   }
   const claims = TaskClaims.forProject(dir, { readOnly: true });
   // A change with open tasks reports the task a run would pick, passing over

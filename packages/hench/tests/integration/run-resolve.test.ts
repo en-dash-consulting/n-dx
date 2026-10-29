@@ -573,6 +573,38 @@ describe("on a v2 tree", () => {
     expect(codes(await resolve({ task: "CH-1", "reset-deferred": "true" }))).toEqual([]);
   });
 
+  describe("a change whose only open task is deferred", () => {
+    /** Defer CH-1's task, optionally assigned to `assignee`. */
+    async function deferTask(assignee?: string): Promise<void> {
+      const stateFile = join(rexDir, "changes/add-apple-pay/state.yaml");
+      const row = `  "${WIRE_ID}":\n    status: "deferred"\n${assignee ? `    assignee: ${JSON.stringify(assignee)}\n` : ""}`;
+      await writeFile(stateFile, `${(await readFile(stateFile, "utf-8")).trimEnd()}\n${row}`);
+      git(projectDir, "add", "-A");
+      git(projectDir, "commit", "-q", "-m", "defer task");
+    }
+
+    it("reports that task with no refusal under --reset-deferred, as the run would pick it", async () => {
+      await deferTask();
+      const r = await resolve({ task: "CH-1", "reset-deferred": "true" });
+      expect(codes(r)).toEqual([]);
+      expect(r.task?.id).toBe(WIRE_ID);
+    });
+
+    it("refuses without --reset-deferred, naming the deferred task", async () => {
+      await deferTask();
+      const r = await resolve({ task: "CH-1" });
+      expect(codes(r)).toEqual(["not-actionable"]);
+      expect(r.refusals[0].message).toMatch(/"Wire the button" \(deferred\)/);
+    });
+
+    it("refuses under --mine when the deferred task is someone else's, which the reset leaves deferred", async () => {
+      await deferTask("Someone Else <someone.else@example.invalid>");
+      const r = await resolve({ task: "CH-1", "reset-deferred": "true", mine: "true" });
+      expect(codes(r)).toEqual(["not-actionable"]);
+      expect(r.refusals[0].message).toMatch(/"Wire the button" \(deferred\)/);
+    });
+  });
+
   it("reports a task-less change as the unit", async () => {
     await rm(join(rexDir, "changes/add-apple-pay/wire-the-button.md"));
     git(projectDir, "add", "-A");
