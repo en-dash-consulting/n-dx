@@ -10,6 +10,11 @@
 - **Finds its assets from its own root** (`src/package-paths.ts`): the grammar in `build/grammars`, queries in `queries/go`.
 - **No language SDK at run time.** Grammars ship prebuilt as WASM; nothing here may require a toolchain (JDK, Go, Terraform) on the user's machine.
 - **One public entry**, `.` (`src/index.ts`). There is no `./dist/*` escape hatch.
+- **Oversized generated files keep imports.** The entry scans their declaration
+  prefix and asks the same Go resolver to resolve its import block. It emits
+  imports only and a notice that structure was skipped; comments and strings
+  never become import declarations. A malformed or still-oversized prefix
+  retains the normal unparsed-file behavior.
 
 ### Scripts
 

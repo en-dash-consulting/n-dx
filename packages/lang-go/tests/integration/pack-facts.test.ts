@@ -134,6 +134,16 @@ describe("Go facts", () => {
 });
 
 describe("Go pack entry", () => {
+  it("contains an oversized import reader failure to the unreadable file", async (ctx) => {
+    skipUnlessGrammar(ctx, goGrammarPath());
+    const projectDir = project({ "go.mod": GO_MOD, "a.go": 'package a\nvar text = "' + "x".repeat(1000) + '"\n' });
+    const entry = createPackEntry({ package: GO_PACKAGE, pack: goPack, symbolRules: GO_SYMBOL_RULES, runner: { maxFileBytes: 100 }, oversizedImportSource: () => { throw new Error("bad header"); } });
+    const result = await entry.analyzeProject({ projectDir, files: ["a.go"], kinds: ["imports"] });
+    expect(result.degraded).toBeUndefined();
+    expect(result.unparsed).toEqual(["a.go"]);
+    expect(result.notices).toEqual(["a.go oversized import recovery failed (bad header); left unparsed"]);
+  });
+
   it("resolves imports against the project's go.mod", async (ctx) => {
     skipUnlessGrammar(ctx, goGrammarPath());
     const projectDir = project({ "go.mod": GO_MOD, "store/store.go": GO_STORE, "model/model.go": GO_MODEL });
@@ -145,7 +155,7 @@ describe("Go pack entry", () => {
     ]);
   });
 
-  it("keeps the edge to a package whose only file is over the runner's size limit, listing that file as unparsed", async (ctx) => {
+  it("keeps the edge to an oversized package file and recovers only its imports", async (ctx) => {
     skipUnlessGrammar(ctx, goGrammarPath());
     const projectDir = project({
       "go.mod": "module example.com/root\n",
@@ -153,8 +163,41 @@ describe("Go pack entry", () => {
       "cmd/main.go": 'package main\n\nimport "example.com/root/pb"\n',
     });
     const result = await pack.analyzeProject({ projectDir, files: ["cmd/main.go", "pb/api.pb.go"], kinds: ["imports"] });
-    expect(result.unparsed).toEqual(["pb/api.pb.go"]);
-    expect(result.facts).toEqual([{ path: "cmd/main.go", imports: { files: [{ to: "pb", symbols: ["*"] }], external: [] } }]);
+    expect(result.unparsed).toEqual([]);
+    expect(result.facts.find((f) => f.path === "pb/api.pb.go")).toEqual({ path: "pb/api.pb.go", imports: { files: [], external: [] } });
+    expect(result.notices?.join("\n")).toContain("structure skipped");
+    expect(result.facts.find((f) => f.path === "cmd/main.go")).toEqual({ path: "cmd/main.go", imports: { files: [{ to: "pb", symbols: ["*"] }], external: [] } });
+  });
+
+  it("resolves an oversized file's workspace imports and module root through the Go resolver", async (ctx) => {
+    skipUnlessGrammar(ctx, goGrammarPath());
+    const projectDir = project({
+      "go.work": "go 1.23\nuse (\n ./api\n ./lib\n)\n",
+      "api/go.mod": "module example.com/ws/api\n",
+      "lib/go.mod": "module example.com/ws/lib\n",
+      "api/root.go": "package api\n",
+      "api/root_test.go": "package api\n",
+      "lib/store/store.go": "package store\n",
+      "api/generated.go": '/* import "wrong/package" */\npackage api\nimport (\n store "example.com/ws/lib/store"\n _ `example.com/ws/api`\n)\nvar generated = "' + "x".repeat(DEFAULT_MAX_FILE_BYTES) + '"\n',
+    });
+    const result = await pack.analyzeProject({ projectDir, files: ["api/root.go", "api/root_test.go", "lib/store/store.go", "api/generated.go"], kinds: ["imports", "symbols"] });
+    expect(result.degraded).toBeUndefined();
+    expect(result.unparsed).toEqual([]);
+    const generated = result.facts.find((f) => f.path === "api/generated.go")!;
+    expect(generated.imports?.files).toEqual([{ to: "api", symbols: ["*"] }, { to: "lib/store", symbols: ["store"] }]);
+    expect(generated.imports?.external).toEqual([]);
+    expect(generated.symbols).toBeUndefined();
+  });
+
+  it("expands a root-package import from an oversized file to non-test files instead of an empty directory", async (ctx) => {
+    skipUnlessGrammar(ctx, goGrammarPath());
+    const projectDir = project({
+      "go.mod": "module example.com/root\n",
+      "root.go": "package root\n", "root_test.go": "package root\n",
+      "cmd/generated.go": 'package main\nimport "example.com/root"\nvar generated = "' + "x".repeat(DEFAULT_MAX_FILE_BYTES) + '"\n',
+    });
+    const result = await pack.analyzeProject({ projectDir, files: ["root.go", "root_test.go", "cmd/generated.go"], kinds: ["imports"] });
+    expect(result.facts.find((f) => f.path === "cmd/generated.go")?.imports).toEqual({ files: [{ to: "root.go", symbols: ["*"] }], external: [] });
   });
 
   it("degrades, rather than throwing, when the project's build files cannot be read", async (ctx) => {

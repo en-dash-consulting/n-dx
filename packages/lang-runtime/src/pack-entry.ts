@@ -65,6 +65,8 @@ export interface TreeSitterEntryOptions {
    */
   readonly projectNotices?: (files: readonly PackSourceFile[], kinds: readonly FactKind[]) => readonly string[];
   readonly runner?: RunnerOptions;
+  /** A complete declaration prefix whose imports can be read when the full file is oversized. */
+  readonly oversizedImportSource?: (source: string) => string | undefined;
 }
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -135,6 +137,8 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
 
     const parsed: PackSourceFile[] = [];
     const unparsed: string[] = [];
+    const importsOnly = new Set<string>();
+    const fallbackNotices: string[] = [];
     for (const path of request.files) {
       let source: string;
       try {
@@ -143,8 +147,22 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
         unparsed.push(path); // unreadable files are skipped, as for every other language
         continue;
       }
-      // Oversized files are skipped by the runner and contribute no references.
-      const result = await runner.parseSource(target, path, source);
+      // A pack may recover a complete import header without parsing the oversized body.
+      let result = await runner.parseSource(target, path, source);
+      if (result.status === "skipped" && wantsImports && options.oversizedImportSource) {
+        try {
+          const prefix = options.oversizedImportSource(source);
+          if (prefix !== undefined) {
+            const recovered = await runner.parseSource(target, path, prefix);
+            if (recovered.status === "parsed" && !recovered.hasErrorNodes && !recovered.hasMissingNodes) {
+              result = recovered;
+              importsOnly.add(path);
+            }
+          }
+        } catch (error) {
+          fallbackNotices.push(`${path} oversized import recovery failed (${errorText(error)}); left unparsed`);
+        }
+      }
       if (result.status === "parsed") parsed.push({ path, captures: result.captures });
       else unparsed.push(path);
     }
@@ -157,23 +175,26 @@ async function analyzeProject(options: TreeSitterEntryOptions, request: PackProj
       resolve: (fromFile) => prepare(resolver).resolve(fromFile),
       module: (fromFile, specifier) => prepare(resolver).module?.(fromFile, specifier),
     };
-    const project = options.projectFacts && readProjectFacts(options.projectFacts, pack, parsed, kinds);
-    const framed = frameworks.map((f) => readFramework(f, parsed, kinds, context));
+    const structural = parsed.filter((file) => !importsOnly.has(file.path));
+    const project = options.projectFacts && readProjectFacts(options.projectFacts, pack, structural, kinds);
+    const framed = frameworks.map((f) => readFramework(f, structural, kinds, context));
     const refined = containRefine(pack, symbolRules);
     const facts: FileFacts[] = parsed.map((file) =>
       framed.reduce(
         (merged, { facts: byPath }) => mergeFileFacts(merged, byPath.get(file.path)),
         mergeFileFacts(
-          readPackFacts(pack, file, { kinds, resolver: prepared, symbolRules: refined.rules }),
+          readPackFacts(pack, file, { kinds: importsOnly.has(file.path) ? ["imports"] : kinds, resolver: prepared, symbolRules: refined.rules }),
           project?.facts.get(file.path),
         ),
       ),
     );
     const notices = [
+      ...fallbackNotices,
+      ...[...importsOnly].map((path) => `${path} exceeds the parser size limit; imports read from its declaration prefix, structure skipped`),
       ...framed.flatMap((f) => f.notices),
       ...(project?.notices ?? []),
       ...refined.notices(),
-      ...(options.projectNotices ? readProjectNotices(options.projectNotices, pack, parsed, kinds) : []),
+      ...(options.projectNotices ? readProjectNotices(options.projectNotices, pack, structural, kinds) : []),
       ...(prepared?.notices?.() ?? []),
     ];
     return notices.length === 0 ? { facts, unparsed } : { facts, unparsed, notices };

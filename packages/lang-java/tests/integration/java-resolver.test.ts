@@ -44,7 +44,63 @@ const targets = (refs: FileReferences): Record<string, readonly string[]> =>
 const externals = (refs: FileReferences): Record<string, readonly string[]> =>
   Object.fromEntries(refs.external.map((e) => [e.package, e.symbols]));
 
+async function resolveSources(ctx: Parameters<typeof skipUnlessGrammar>[0], sources: Record<string, string>, path: string): Promise<FileReferences> {
+  skipUnlessGrammar(ctx, JAVA_WASM);
+  const runner = createTreeSitterRunner();
+  try {
+    const files: PackSourceFile[] = [];
+    for (const [name, source] of Object.entries(sources)) {
+      const result = await runner.parseSource({ pack: javaPack, grammarPath: JAVA_WASM }, name, source);
+      if (result.status !== "parsed") throw new Error(`could not parse ${name}`);
+      files.push(result);
+    }
+    return javaPack.resolver!.prepare(files).resolve(path);
+  } finally { runner.dispose(); }
+}
+
 describe("java resolver", () => {
+  it("resolves inherited nested types through superclass and interface chains, scoped to the owning type", async (ctx) => {
+    const sources = {
+      "src/base/Root.java": "package base; public class Root { public static class Token {} }",
+      "src/base/Middle.java": "package base; public class Middle extends Root {}",
+      "src/base/Options.java": "package base; public interface Options { class Setting {} }",
+      "src/use/Child.java": "package use; import base.Middle; import base.Options; class Child extends Middle implements Options { Token t = new Token(); Setting s; } class Unrelated { Token nope; }",
+      "src/use/Other.java": "package use; class Other { Token nope; }",
+      "src/use/Container.java": "package use; import base.Root; class Container { static class Base extends Root {} static class Child extends Base { Token token; } }",
+    };
+    expect(targets(await resolveSources(ctx, sources, "src/use/Child.java"))).toEqual({
+      "src/base/Middle.java": ["Middle"], "src/base/Options.java": ["Options", "Setting"], "src/base/Root.java": ["Token"],
+    });
+    expect(targets(await resolveSources(ctx, sources, "src/use/Other.java"))).toEqual({});
+    expect(targets(await resolveSources(ctx, sources, "src/use/Container.java"))).toEqual({ "src/base/Root.java": ["Root", "Token"] });
+  });
+
+  it.each(["main", "test"])("falls through invisible same-package declarations to wildcard imports from %s", async (set, ctx) => {
+    const path = `svc-a/src/${set}/java/a/Use.java`;
+    const refs = await resolveSources(ctx, {
+      [path]: "package a; import b.*; class Use { Helper h; }",
+      "svc-b/src/test/java/a/Helper.java": "package a; class Helper {}",
+      "svc-a/src/main/java/b/Helper.java": "package b; public class Helper {}",
+    }, path);
+    expect(targets(refs)).toEqual({ "svc-a/src/main/java/b/Helper.java": ["Helper"] });
+  });
+
+  it("resolves a method-reference qualifier in the same package", async (ctx) => {
+    const refs = await resolveSources(ctx, {
+      "src/a/Use.java": "package a; class Use { Object f() { return CacheSpecs::ttl; } }",
+      "src/a/CacheSpecs.java": "package a; class CacheSpecs {}",
+    }, "src/a/Use.java");
+    expect(targets(refs)).toEqual({ "src/a/CacheSpecs.java": ["CacheSpecs"] });
+  });
+
+  it("names non-javax JDK packages as stdlib while preserving third-party com.sun packages", async (ctx) => {
+    const refs = await resolveSources(ctx, { "Uses.java": "import org.w3c.dom.Document; import org.xml.sax.SAXException; import org.ietf.jgss.GSSContext; import com.sun.net.httpserver.HttpServer; import sun.misc.Unsafe; import com.sun.mail.Mail; class Uses {}" }, "Uses.java");
+    expect(externals(refs)).toEqual({
+      "java:stdlib:org.w3c.dom": ["Document"], "java:stdlib:org.xml.sax": ["SAXException"],
+      "java:stdlib:org.ietf.jgss": ["GSSContext"], "java:stdlib:com.sun.net.httpserver": ["HttpServer"],
+      "java:stdlib:sun.misc": ["Unsafe"], "java:com.sun.mail": ["Mail"],
+    });
+  });
   it("resolves every import form and bare name in Java's lookup order", async (ctx) => {
     const resolve = await resolveFixture(ctx);
     expect(targets(resolve(`${APP}/Checkout.java`))).toEqual({
@@ -315,6 +371,15 @@ describe("java resolver", () => {
       });
       expect(targets(resolve(APP_TEST))).toEqual({ [DAO_FIXTURE]: ["DaoFixture"] });
       expect(targets(resolve(APP_MAIN))).toEqual({});
+    });
+
+    it("links Gradle fixtures through a type-safe project accessor", async (ctx) => {
+      const resolve = await resolveProject(ctx, {
+        "settings.gradle.kts": 'include(":app", ":dao")\n',
+        "dao/build.gradle.kts": 'plugins { `java-test-fixtures` }\n',
+        "app/build.gradle.kts": "dependencies { testImplementation(testFixtures(projects.dao)) }\n",
+      });
+      expect(targets(resolve(APP_TEST))).toEqual({ [DAO_FIXTURE]: ["DaoFixture"] });
     });
 
     it("links a test to a Gradle test-configuration dependency's test classes", async (ctx) => {
