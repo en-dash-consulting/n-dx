@@ -19,7 +19,7 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, sidecarSetupNeed } from "../hooks/index.js";
+import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/index.js";
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
 import { SidecarCards } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
@@ -200,6 +200,12 @@ function SidecarAttachmentBar({ attachment, menuOpen, setMenuOpen }: {
   setMenuOpen: (open: boolean) => void;
 }) {
   const { item, lens, lenses, chooseLens, removeItem } = attachment;
+  // What a menu entry cannot run on yet: its source, or the item it needs attached.
+  const noteFor = (entry: { id: string; available: boolean }): string | null => {
+    if (!entry.available) return "not available yet";
+    const needs = entry.id === GENERAL_LENS ? undefined : resolveLens(entry.id, lenses, item).needs;
+    return needs ? `needs ${needs}` : null;
+  };
   return h("div", { class: "sidecar-attachment" },
     item
       ? h("span", { class: "sidecar-chip sidecar-chip-item", "data-kind": item.kind },
@@ -225,18 +231,20 @@ function SidecarAttachmentBar({ attachment, menuOpen, setMenuOpen }: {
         lens.needs ? h("span", { class: "sidecar-chip-note" }, "not available yet") : null),
       menuOpen
         ? h("ul", { class: "sidecar-lens-menu", role: "listbox", "aria-label": "Lens" },
-            [{ id: GENERAL_LENS, available: true }, ...lenses.filter((l) => l.id !== GENERAL_LENS)].map((entry) =>
-              h("li", { key: entry.id, role: "presentation" },
+            [{ id: GENERAL_LENS, available: true }, ...lenses.filter((l) => l.id !== GENERAL_LENS)].map((entry) => {
+              const note = noteFor(entry);
+              return h("li", { key: entry.id, role: "presentation" },
                 h("button", {
                   type: "button",
                   role: "option",
                   class: "sidecar-lens-option",
                   "aria-selected": entry.id === lens.wanted ? "true" : "false",
-                  "aria-disabled": entry.available ? undefined : "true",
+                  "aria-disabled": note ? "true" : undefined,
                   "data-lens": entry.id,
-                  disabled: !entry.available,
+                  disabled: note !== null,
                   onClick: () => { if (chooseLens(entry.id)) setMenuOpen(false); },
-                }, lensLabel(entry.id), entry.available ? null : h("span", { class: "sidecar-chip-note" }, "not available yet")))))
+                }, lensLabel(entry.id), note ? h("span", { class: "sidecar-chip-note" }, note) : null));
+            }))
         : null),
   );
 }

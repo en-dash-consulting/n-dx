@@ -63,7 +63,8 @@ import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type S
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { startSidecarCommand } from "./routes-commands.js";
 import { runSlotUsage, startTaskExecution } from "./routes-hench.js";
-import { previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
+import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
+import { readDiagnosis } from "./run-diagnosis.js";
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readSidecarSettings, resolveSidecarIdleMs, saveSidecarSettings } from "./sidecar/settings.js";
 import { commitSettingsChange } from "./settings-commit.js";
@@ -182,9 +183,17 @@ export function sidecarBrokerEndpoint(ctx: ServerContext, sessionId: string): Si
  */
 export function prepareReads(
   ctx: ServerContext,
-  reads: { resolve: typeof resolveTaskRun; preview: typeof previewTaskRun } = { resolve: resolveTaskRun, preview: previewTaskRun },
+  reads: { resolve: typeof resolveTaskRun; preview: typeof previewTaskRun; diagnose: typeof diagnoseTaskRun } = {
+    resolve: resolveTaskRun,
+    preview: previewTaskRun,
+    diagnose: diagnoseTaskRun,
+  },
 ): SpawnedReads {
   return {
+    async diagnose(runId, signal) {
+      const read = await reads.diagnose(ctx, runId, signal).catch(() => null);
+      return read?.ok ? readDiagnosis(read.diagnosis) ?? null : null;
+    },
     async resolve(taskId, signal) {
       const read = await reads.resolve(ctx, taskId, {}, signal).catch(() => null);
       return read?.ok ? readResolution(read.resolution) : null;

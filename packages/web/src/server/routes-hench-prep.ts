@@ -593,6 +593,35 @@ export async function previewTaskRun(
   return { ok: true, brief: run.stdout };
 }
 
+/**
+ * `hench runs diagnose <run-id> --format=json` through `ndx hench`, for a
+ * caller inside this server that renders it: the Sidecar Diagnose run lens,
+ * for a run whose record carries no verdict. Hench prints the verdict but does
+ * not write it. A refusal (the run is running or completed) or a timeout is
+ * the failure.
+ */
+export async function diagnoseTaskRun(
+  ctx: ServerContext,
+  runId: string,
+  signal?: AbortSignal,
+): Promise<{ ok: true; diagnosis: Record<string, unknown> } | { ok: false; failure: string }> {
+  if (inFlight >= PREP_MAX_IN_FLIGHT) return { ok: false, failure: "too many prepare requests in flight" };
+  const run = await runNdx(
+    ctx,
+    ["hench", "runs", "diagnose", runId, "--format=json", ctx.projectDir],
+    PREP_RESOLVE_TIMEOUT_MS,
+    signal,
+  );
+  if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
+  try {
+    const parsed: unknown = JSON.parse(run.stdout);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+    return { ok: true, diagnosis: parsed as Record<string, unknown> };
+  } catch {
+    return { ok: false, failure: "the diagnose output was not JSON" };
+  }
+}
+
 /** POST /api/hench/prep/:taskId/preview */
 async function handlePreview(req: IncomingMessage, res: ServerResponse, ctx: ServerContext, taskId: string): Promise<boolean> {
   let body: Record<string, unknown>;

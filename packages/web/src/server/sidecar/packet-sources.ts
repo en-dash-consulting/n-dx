@@ -169,6 +169,29 @@ export interface RunEventRead {
   detail: string | null;
 }
 
+/** The run options a re-run must repeat; each key appears only when the run's record says it was set. */
+export interface RunSettingsRead {
+  /** The run's model, when a flag chose it; a configured model is not repeated. */
+  model?: string;
+  /** The run had a review pass. */
+  review?: true;
+  reviewModel?: string;
+}
+
+/** The run's {@link RunSettingsRead}, from `modelSource` and `reviewPlan`. */
+export function readRunSettings(run: Record<string, unknown>): RunSettingsRead {
+  const settings: RunSettingsRead = {};
+  const model = str(run.model);
+  if (model && run.modelSource === "cli-flag") settings.model = model;
+  const plan = run.reviewPlan;
+  if (plan && typeof plan === "object") {
+    settings.review = true;
+    const reviewModel = str((plan as Record<string, unknown>).model);
+    if (reviewModel) settings.reviewModel = reviewModel;
+  }
+  return settings;
+}
+
 /** The newest run of a task, read for the Diagnose run lens. */
 export interface TaskRunRead {
   run: {
@@ -183,6 +206,8 @@ export interface TaskRunRead {
   };
   /** Null when the run carries no verdict: it completed, is running, or predates the classifier. */
   diagnosis: RunVerdictRead | null;
+  /** What the run was launched with, as `start_work` options for a re-run or `--fresh`; empty when it recorded nothing to carry. */
+  settings: RunSettingsRead;
   /** Null when the run recorded no gate. */
   gate: RunGateRead | null;
   /** Null when the run has no readable review report. */
@@ -206,6 +231,8 @@ export interface PacketSources {
   runs(taskId: string): Promise<RunStatusRead[] | null>;
   /** The task's newest run with its verdict, gate, review and last events; `null` when no run of it is recorded. */
   taskRun(taskId: string): Promise<TaskRunRead | null>;
+  /** The classifier's verdict for an ended run whose record carries none, spawned; `null` when that fails. */
+  diagnose(runId: string, signal?: AbortSignal): Promise<RunVerdictRead | null>;
 }
 
 /** Most characters of gate text a {@link TaskRunRead} carries, kept from the end. */
@@ -214,8 +241,10 @@ export const GATE_TEXT_MAX_CHARS = 2_400;
 /** How many of the run's last events a {@link TaskRunRead} carries. */
 export const RUN_EVENTS_SHOWN = 12;
 
-/** The two reads that spawn `ndx`; the Prepare route owns that spawn, so it is injected. */
+/** The reads that spawn `ndx`; the Prepare route owns that spawn, so it is injected. */
 export interface SpawnedReads {
+  /** `hench runs diagnose <run-id> --format=json`: the verdict for a run whose record has none; `null` when the spawn fails or times out. */
+  diagnose(runId: string, signal?: AbortSignal): Promise<RunVerdictRead | null>;
   /** Aborting `signal` kills the spawned `ndx`. */
   resolve(taskId: string, signal?: AbortSignal): Promise<ResolveRead | null>;
   preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
@@ -456,6 +485,7 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
 
     resolve: (taskId, signal) => spawned.resolve(taskId, signal),
     preview: (taskId, signal) => spawned.preview(taskId, signal),
+    diagnose: (runId, signal) => spawned.diagnose(runId, signal),
 
     async runs(taskId) {
       return taskRunRecords(join(layout.henchDir, "runs"), taskId).map(({ record }) => ({
@@ -484,6 +514,7 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
           path: display(newest.path),
         },
         diagnosis: readDiagnosis(run.diagnosis) ?? null,
+        settings: readRunSettings(run),
         gate: readGate(run),
         review: redactDeep(readReview(layout.henchDir, id, display)),
         events: events.kind === "file"

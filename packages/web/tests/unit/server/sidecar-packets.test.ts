@@ -89,6 +89,7 @@ async function sourcesFor(layout: "v1" | "v2", overrides: Partial<PacketSources>
       { id: "22222222-bbbb", status: "failed", startedAt: "2026-10-09T08:00:00.000Z" },
     ],
     taskRun: async () => null,
+    diagnose: async () => null,
     ...overrides,
   };
 }
@@ -423,6 +424,7 @@ function failedRun(overrides: Partial<TaskRunRead> = {}): TaskRunRead {
       path: ".hench/runs/run-0001.json",
     },
     diagnosis: null,
+    settings: {},
     gate: { ran: true, passed: true, command: "pnpm test", note: null, textKind: null, text: null, cutChars: 0 },
     review: { path: ".hench/reviews/run-0001.json", summary: "Attacked the wallet button.", unrepaired: [], total: 1 },
     events: {
@@ -565,11 +567,67 @@ describe("Diagnose run", () => {
     expect(verdict.staleness.state).toBe("unknown");
   });
 
-  it("with a run but no verdict, carries a gap naming hench runs diagnose <run id>", async () => {
-    const packet = await buildDiagnoseRunPacket(await sourcesFor("v2", { taskRun: async () => failedRun() }), { ref: CHANGE_TASK }, NOW);
+  it("with an ended run but no recorded verdict, takes the verdict from the spawned command and names it as the source", async () => {
+    const [, newTest] = DIAGNOSE_FIXTURES[0]!;
+    const verdictOf = newTest.diagnosis!;
+    const diagnose = vi.fn(async () => verdictOf);
+    const controller = new AbortController();
+    const packet = await buildDiagnoseRunPacket(
+      await sourcesFor("v2", {
+        taskRun: async () => failedRun({ settings: { model: "claude-opus-4-7", review: true, reviewModel: "claude-sonnet-5-5" } }),
+        diagnose,
+      }),
+      { ref: CHANGE_TASK },
+      NOW,
+      controller.signal,
+    );
+    expect(diagnose).toHaveBeenCalledWith("run-0001", controller.signal);
     const verdict = packet.sections.find((s) => s.id === "verdict")!;
-    expect(verdict.body).toContain("`hench runs diagnose run-0001`");
+    expect(verdict.body).toContain("Class: test-gate-new");
+    expect(verdict.provenance.source).toBe("`hench runs diagnose run-0001 --format=json`");
+    expect(verdict.staleness.state).toBe("fresh");
+  });
+
+  it("names the spawned command in a gap when it fails or times out", async () => {
+    const packet = await buildDiagnoseRunPacket(
+      await sourcesFor("v2", { taskRun: async () => failedRun(), diagnose: async () => null }),
+      { ref: CHANGE_TASK },
+      NOW,
+    );
+    const verdict = packet.sections.find((s) => s.id === "verdict")!;
+    expect(verdict.body).toContain("`hench runs diagnose run-0001 --format=json` failed or timed out");
     expect(verdict.staleness.state).toBe("unknown");
+  });
+
+  it.each(["running", "completed"])("never classifies a %s run", async (status) => {
+    const diagnose = vi.fn(async () => DIAGNOSE_FIXTURES[0]![1].diagnosis!);
+    const packet = await buildDiagnoseRunPacket(
+      await sourcesFor("v2", { taskRun: async () => failedRun({ run: { ...failedRun().run, status } }), diagnose }),
+      { ref: CHANGE_TASK },
+      NOW,
+    );
+    expect(diagnose).not.toHaveBeenCalled();
+    expect(packet.sections.find((s) => s.id === "verdict")!.body).toMatch(/^Not available: /);
+  });
+
+  it("does not spawn when the run already carries its verdict", async () => {
+    const diagnose = vi.fn(async () => null);
+    await buildDiagnoseRunPacket(
+      await sourcesFor("v2", { taskRun: async () => failedRun(DIAGNOSE_FIXTURES[0]![1]), diagnose }),
+      { ref: CHANGE_TASK },
+      NOW,
+    );
+    expect(diagnose).not.toHaveBeenCalled();
+  });
+
+  it("lists the failed run's settings in the verdict section for start_work, and omits the line when it has none", async () => {
+    const [, newTest] = DIAGNOSE_FIXTURES[0]!;
+    const settings = { model: "claude-opus-4-7", review: true as const, reviewModel: "claude-sonnet-5-5" };
+    const withSettings = await buildDiagnoseRunPacket(await sourcesFor("v2", { taskRun: async () => failedRun({ ...newTest, settings }) }), { ref: CHANGE_TASK }, NOW);
+    const verdict = withSettings.sections.find((s) => s.id === "verdict")!.body;
+    expect(verdict).toContain(`options of start_work for a re-run or --fresh: ${JSON.stringify(settings)}`);
+    const without = await buildDiagnoseRunPacket(await sourcesFor("v2", { taskRun: async () => failedRun(newTest) }), { ref: CHANGE_TASK }, NOW);
+    expect(without.sections.find((s) => s.id === "verdict")!.body).not.toContain("The failed run's settings");
   });
 
   it("marks a missing gate, review and event stream as gaps rather than leaving them out", async () => {
@@ -600,9 +658,11 @@ describe("Diagnose run", () => {
     expect(DIAGNOSE_RUN_INSTRUCTIONS).toMatch(/`--fresh` \(`fresh`\): `start_work` for the task with options `\{ "fresh": true \}`/);
   });
 
-  it("states the PK4 exception for the gate digest in the builder", () => {
+  it("states the PK4 exception for the gate text in the builder, as the start of a digest or the end of a tail", () => {
     const source = readFileSync(resolve(__dirname, "../../../src/server/sidecar/packet-builders.ts"), "utf-8");
-    expect(source).toMatch(/Knowledge packets omit error text \(PK4\)\. This one deliberately carries the\s+\* gate digest tail/);
+    expect(source).toMatch(
+      /Knowledge packets omit error text \(PK4\)\. This one deliberately carries the\s+\* gate text, the start of the failure digest \(or the end of the output tail\)/,
+    );
   });
 
   it("says which end of a cut gate text was dropped", async () => {

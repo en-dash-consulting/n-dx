@@ -20,6 +20,7 @@ import type { ServerContext } from "../../../src/server/types.js";
 const spawned: SpawnedReads = {
   resolve: async () => null,
   preview: async () => null,
+  diagnose: async () => null,
 };
 
 let dir: string;
@@ -197,6 +198,22 @@ describe("createPacketSources taskRun", () => {
     expect(read?.events).toBeNull();
   });
 
+  it("carries the settings a re-run repeats: a flag's model, and the review plan", async () => {
+    const flagged = await createPacketSources(
+      seed({
+        status: "failed",
+        model: "claude-opus-4-7",
+        modelSource: "cli-flag",
+        reviewPlan: { mode: "self", model: "claude-sonnet-5-5", modelSource: "flag", optional: false },
+      }),
+      spawned,
+    ).taskRun(TASK);
+    expect(flagged?.settings).toEqual({ model: "claude-opus-4-7", review: true, reviewModel: "claude-sonnet-5-5" });
+    // A configured model is the project's to resolve again; a run with no review plan had no review.
+    const configured = await createPacketSources(seed({ status: "failed", model: "sonnet", modelSource: "hench.models.claude" }), spawned).taskRun(TASK);
+    expect(configured?.settings).toEqual({});
+  });
+
   it("reads null when no run of the task is recorded", async () => {
     expect(await createPacketSources(contextFor(dir, (name) => join(dir, `.${name}`)), spawned).taskRun(TASK)).toBeNull();
   });
@@ -267,7 +284,15 @@ describe("prepareReads", () => {
         calls.push(`preview ${id}`);
         return { ok: true, brief: "# brief" };
       },
+      diagnose: async (_c, runId) => {
+        calls.push(`diagnose ${runId}`);
+        return {
+          ok: true,
+          diagnosis: { runId, taskId: "t1", class: "no-changes", summary: "none", evidence: [], actions: [], attempt: { n: 1, of: 2 } },
+        };
+      },
     });
+    expect(await reads.diagnose("r1")).toMatchObject({ class: "no-changes", attempt: { n: 1, of: 2 } });
     expect(await reads.resolve("t1")).toEqual({
       settings: [
         { key: "model", value: "opus", source: "task.run.tier" },
@@ -278,7 +303,7 @@ describe("prepareReads", () => {
       warnings: [],
     });
     expect(await reads.preview("t1")).toBe("# brief");
-    expect(calls).toEqual(["resolve t1 {}", "preview t1"]);
+    expect(calls).toEqual(["diagnose r1", "resolve t1 {}", "preview t1"]);
   });
 
   it("answers null when a read fails or throws, so the packet marks the part unavailable", async () => {
@@ -287,7 +312,9 @@ describe("prepareReads", () => {
       preview: async () => {
         throw new Error("spawn failed");
       },
+      diagnose: async () => ({ ok: false, failure: "Timed out" }),
     });
+    expect(await failing.diagnose("run-1")).toBeNull();
     expect(await failing.resolve("t1")).toBeNull();
     expect(await failing.preview("t1")).toBeNull();
   });
@@ -302,6 +329,7 @@ describe("sidecarContextOptions packet", () => {
     const options = sidecarContextOptions(ctx, {
       resolve: async () => ({ savedTier: "deep", settings: [{ key: "model", value: "opus", source: "task.run.tier" }], refusals: [], warnings: [] }),
       preview: async () => "# Task brief\n",
+      diagnose: async () => null,
     });
     const record = { id: "s1", lens: "describe", target: { ref: TASK } } as SidecarSessionRecord;
     const text = await options.packet!(record, new AbortController().signal);

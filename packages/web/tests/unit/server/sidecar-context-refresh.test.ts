@@ -30,7 +30,7 @@ import {
   type LedgerEntry,
 } from "../../../src/server/sidecar/ledger.js";
 import { loadPrdModel } from "../../../src/server/rex-gateway.js";
-import type { previewTaskRun, resolveTaskRun } from "../../../src/server/routes-hench-prep.js";
+import type { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "../../../src/server/routes-hench-prep.js";
 import { prepareReads } from "../../../src/server/routes-sidecar.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { buildLensPacket } from "../../../src/server/sidecar/lens-packets.js";
@@ -487,6 +487,7 @@ describe("the packet opens the first turn", () => {
       preview: async () => "# Task brief\n## Acceptance\n",
       runs: async () => [],
       taskRun: async () => null,
+      diagnose: async () => null,
     };
     const task = "c0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
@@ -532,6 +533,7 @@ describe("the packet opens the first turn", () => {
     const spawned = prepareReads({} as ServerContext, {
       resolve: hang("resolve") as typeof resolveTaskRun,
       preview: hang("preview") as typeof previewTaskRun,
+      diagnose: (async () => ({ ok: false, failure: "not read by a describe packet" })) as typeof diagnoseTaskRun,
     });
     const sources: PacketSources = {
       sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },
@@ -543,6 +545,7 @@ describe("the packet opens the first turn", () => {
       preview: (id, signal) => spawned.preview(id, signal),
       runs: async () => [],
       taskRun: async () => null,
+      diagnose: (id, signal) => spawned.diagnose(id, signal),
     };
     const task = "c0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
@@ -586,6 +589,7 @@ describe("the packet opens the first turn", () => {
       preview: async () => null,
       runs: async () => [],
       taskRun: async () => null,
+      diagnose: async () => null,
     };
     const capability = "a0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({

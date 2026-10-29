@@ -15,7 +15,7 @@ import { capabilityReport, indexTree, isAppliedChange, productReport } from "../
 import type { RuleNode, V2Tree } from "../rex-gateway.js";
 import { assemblePacket, type Packet, type PacketSection, type Staleness } from "./packet.js";
 import { DESCRIBE_INSTRUCTIONS, DIAGNOSE_RUN_INSTRUCTIONS, EXPLAIN_INSTRUCTIONS } from "./lens-instructions.js";
-import type { PacketSources, PrdRead, ResolveRead, RunGateRead, RunReviewRead, RunVerdictRead } from "./packet-sources.js";
+import type { PacketSources, PrdRead, ResolveRead, RunGateRead, RunReviewRead, RunSettingsRead, RunVerdictRead } from "./packet-sources.js";
 
 export const EXPLAIN_CAP = 8_000;
 export const DESCRIBE_CAP = 8_000;
@@ -542,7 +542,7 @@ const ACTION_CARDS: Readonly<Record<string, string>> = {
   "clean-tree": "run_command (command card)",
 };
 
-function verdictBody(diagnosis: RunVerdictRead): string {
+function verdictBody(diagnosis: RunVerdictRead, settings: RunSettingsRead): string {
   const { n, of } = diagnosis.attempt;
   return [
     `Class: ${diagnosis.class}`,
@@ -556,6 +556,9 @@ function verdictBody(diagnosis: RunVerdictRead): string {
           .map((a, i) => `${i + 1}. [${a.kind}] ${oneLine(a.label, 200)} → ${ACTION_CARDS[a.kind] ?? "no card: name it for the operator"}`)
           .join("\n")
       : "(none ranked)",
+    ...(Object.keys(settings).length > 0
+      ? [`The failed run's settings. Pass them as the options of start_work for a re-run or --fresh: ${JSON.stringify(settings)}`]
+      : []),
   ].join("\n");
 }
 
@@ -606,11 +609,17 @@ function reviewBody(review: RunReviewRead): string {
  * last events.
  *
  * Knowledge packets omit error text (PK4). This one deliberately carries the
- * gate digest tail: the diagnosis is about that error, and the text is local,
+ * gate text, the start of the failure digest (or the end of the output tail),
+ * capped: the diagnosis is about that error, and the text is local,
  * redacted, and goes only to the vendor the project is configured with. See
  * docs/architecture/web-server.md, "Sidecar Diagnose run packet".
  */
-export async function buildDiagnoseRunPacket(sources: PacketSources, target: PacketTarget, now: string): Promise<Packet> {
+export async function buildDiagnoseRunPacket(
+  sources: PacketSources,
+  target: PacketTarget,
+  now: string,
+  signal?: AbortSignal,
+): Promise<Packet> {
   const lens = "diagnose-run";
   const head = `${header(lens, target)}\n\n${DIAGNOSE_RUN_INSTRUCTIONS}`;
   const done = (sections: PacketSection[]): Packet => assemblePacket({ lens, cap: DIAGNOSE_RUN_CAP, header: head, sections });
@@ -643,15 +652,35 @@ export async function buildDiagnoseRunPacket(sources: PacketSources, target: Pac
     provenance: { source, generatedAt: at },
     staleness: FRESH,
   });
+  // A run from a hench that predates the classifier records no verdict, and `hench runs
+  // diagnose` prints one without writing it. Ask for it once the run has ended; a run that
+  // is running or completed is never classified.
+  const diagnoseCommand = `hench runs diagnose ${run.id} --format=json`;
+  const classifiable = run.status !== "running" && run.status !== "completed";
+  const spawned = !read.diagnosis && classifiable ? await sources.diagnose(run.id, signal) : null;
+  const diagnosis = read.diagnosis ?? spawned;
   sections.push(
     runSection(
       "run",
       "Newest run",
       [`Run ${run.id}: ${run.status}`, `Started ${run.startedAt}${run.finishedAt ? `, finished ${run.finishedAt}` : ""}`, ...(run.error ? [`Error: ${oneLine(run.error, 300)}`] : [])].join("\n"),
     ),
-    read.diagnosis
-      ? runSection("verdict", "Run verdict (the run classifier)", verdictBody(read.diagnosis), `${run.path} (diagnosis)`)
-      : gap("verdict", "Run verdict", `run ${run.id} has no recorded verdict: ${noVerdictReason(run.status)}. \`hench runs diagnose ${run.id}\` classifies it`, now, run.path),
+    diagnosis
+      ? runSection(
+          "verdict",
+          "Run verdict (the run classifier)",
+          verdictBody(diagnosis, read.settings),
+          read.diagnosis ? `${run.path} (diagnosis)` : `\`${diagnoseCommand}\``,
+        )
+      : gap(
+          "verdict",
+          "Run verdict",
+          `run ${run.id} has no recorded verdict: ${noVerdictReason(run.status)}. ${
+            classifiable ? `Running \`${diagnoseCommand}\` failed or timed out` : `\`hench runs diagnose ${run.id}\` classifies it once it has ended`
+          }`,
+          now,
+          run.path,
+        ),
     read.gate
       ? runSection("gate", "Test gate", gateBody(read.gate), `${run.path} (testGate)`)
       : gap("gate", "Test gate", "the run recorded no test gate", now, run.path),

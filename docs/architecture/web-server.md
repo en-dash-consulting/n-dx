@@ -63,6 +63,16 @@ verdict (`RunRecord.diagnosis`), the review's unrepaired findings and the
 run's last events, each read from disk in `sidecar/packet-sources.ts`; web
 still imports nothing from hench.
 
+A run from a hench that predates the classifier records no verdict. When the
+newest run has ended without completing, the verdict comes from
+`hench runs diagnose <id> --format=json`, spawned through `SpawnedReads`
+(`diagnoseTaskRun` in `routes-hench-prep.ts`, beside the resolve and preview
+spawns) and named as the section's provenance. A failed or timed-out spawn
+leaves a gap naming the command; a running or completed run is never
+classified. The verdict section also lists the failed run's settings (`model`
+when a flag chose it, `review` and `reviewModel` when it had a review plan) for
+the model to pass to `start_work` on a re-run or `--fresh`.
+
 ## HTTP-request concurrency
 
 When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:

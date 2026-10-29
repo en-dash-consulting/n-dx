@@ -1226,6 +1226,26 @@ describe("attachment and lens", () => {
     expect(root.querySelector(".sidecar-lens-menu")).toBeNull();
   });
 
+  it("a lens that needs a task is marked and cannot be picked until one is attached", async () => {
+    server.lenses = server.lenses.map((l) => l.id === "diagnose-run"
+      ? { id: "diagnose-run", available: true, target: { kind: "task", needs: "a task to diagnose" } }
+      : l);
+    server.sessions = [{ session: session({ id: "s1" }), running: false }];
+    await open("plan");
+    await click(lensChip());
+    const option = () => root.querySelector<HTMLButtonElement>(`.sidecar-lens-option[data-lens="diagnose-run"]`)!;
+    expect(option().disabled).toBe(true);
+    expect(option().textContent).toContain("needs a task to diagnose");
+    server.requests = [];
+    await click(option());
+    expect(patches()).toEqual([]);
+    await unmount();
+    await open("prd", { taskId: "t1" });
+    await click(lensChip());
+    expect(option().disabled).toBe(false);
+    expect(option().textContent).not.toContain("needs");
+  });
+
   it("/ in an empty composer opens the lens list; in a typed composer it types", async () => {
     await open("plan");
     const input = root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
