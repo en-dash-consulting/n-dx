@@ -192,10 +192,13 @@ describe("runShellTestCommand environment", () => {
 describe("runCrossVendorReview shell-test fallback environment", () => {
   it("runs the fallback under the default filter when the project policy cannot be resolved", async () => {
     // deny: [42] fails the reviewer's env resolution (spawnError) and the shell test env alike.
-    writeProjectConfig({
-      llm: { claude: { cli_path: writeMockReviewer() } },
-      hench: { guard: { env: { deny: [42] } } },
-    });
+    writeProjectConfig({ hench: { guard: { env: { deny: [42] } } } });
+    // The user's own config: a repository's cli_path applies only once it is trusted.
+    writeFileSync(
+      join(tmpDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { claude: { cli_path: writeMockReviewer() } } }),
+      "utf-8",
+    );
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude", testCommand: probeCommand() });
 
