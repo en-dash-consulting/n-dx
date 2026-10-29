@@ -190,7 +190,7 @@ const PROJECT_SECTIONS = new Set([
  * Valid values for the top-level `language` field in .n-dx.json.
  * "auto" (or omitting the field) triggers marker-based detection.
  */
-const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "auto"]);
+const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "swift", "python", "csharp", "java", "auto"]);
 
 /**
  * Regex matching integer or simple decimal strings (positive or negative).
@@ -2560,7 +2560,7 @@ Extension settings (<ndx home>/config.json and .n-dx.json):
 
 Language detection override (.n-dx.json):
   language                 string    Primary project language (default: "auto")
-                                    Valid values: typescript, javascript, go, auto
+                                    Valid values: typescript, javascript, go, swift, python, csharp, java, auto
                                     When set to a specific language, overrides
                                     marker-based auto-detection in sourcevision.
                                     Use "auto" (or omit) to use the detection chain.

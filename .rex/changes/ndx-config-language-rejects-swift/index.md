@@ -8,6 +8,8 @@ acceptanceCriteria:
   - "`ndx config language java .` succeeds and writes language: java"
   - "`ndx config language swift .` and `ndx config language python .` succeed"
   - "A test fails when core's accepted language ids differ from sourcevision's VALID_LANGUAGE_IDS"
+touches:
+  - "956b7119-989e-41f1-ba0e-3e8d26494fee"
 priority: "medium"
 tags:
   - "ndx-adversarial-review"
