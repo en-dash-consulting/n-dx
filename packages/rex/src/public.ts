@@ -134,6 +134,7 @@ export type { ChangeLanding, ReleaseTag } from "./core/change-landing.js";
 // them) and the template capability specs. A proposal for review; nothing
 // here writes.
 export { classifyV1Tree, DEFAULT_PRODUCT_NAMES } from "./migrations/v1-to-v2/migration-plan.js";
+export { capabilityCodeFiles } from "./migrations/v1-to-v2/migration-plan.js";
 export type { MigrationPlan, PlanEntry, PlanTargetType, ProposedArea, ProposedConstraint, ClassifyOptions } from "./migrations/v1-to-v2/migration-plan.js";
 export { draftCapabilitySpecs } from "./migrations/v1-to-v2/capability-spec.js";
 export type { CapabilitySpecDraft, SpecCriterion, SpecDraftOptions } from "./migrations/v1-to-v2/capability-spec.js";
@@ -720,3 +721,6 @@ export { ChangeLayerStore, isChangeLayerStore } from "./store/change-layer-store
 // Brief
 export { buildChangeBrief, renderChangeBrief } from "./core/change-brief.js";
 export type { ChangeBrief, ChangeBriefOptions, BriefCommands, BriefLogEntry } from "./core/change-brief.js";
+
+// Whole-tree write policy, shared by CLI, MCP and dashboard bulk routes.
+export { checkBranchGuard, branchGuardRefusal } from "./core/branch-guard.js";

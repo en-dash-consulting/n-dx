@@ -8,7 +8,8 @@
   flex-direction: column;
   justify-content: center;
   gap: 2px;
-  min-width: 0;
+  min-width: 140px;
+  flex-shrink: 0;
   max-width: 260px;
   padding: 0 var(--space-4);
   border-right: 1px solid var(--border);
@@ -366,4 +367,8 @@
 .zone-breadcrumb-current {
   color: var(--text);
   font-weight: var(--weight-semibold);
+}
+
+@media (max-width: 560px) {
+  .project-context { min-width: 0; flex-shrink: 1; padding: 0 var(--space-1); }
 }

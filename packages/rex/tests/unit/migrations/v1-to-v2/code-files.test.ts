@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { gzipSync } from "node:zlib";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -5,7 +7,7 @@ import { tmpdir } from "node:os";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
 import { draftCapabilitySpecs } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
-import { readCapabilityCodeFiles, readCodeEvidence } from "../../../../src/migrations/v1-to-v2/code-files.js";
+import { readCapabilityCodeFiles, readCodeEvidence, readCommitCodeFiles } from "../../../../src/migrations/v1-to-v2/code-files.js";
 
 let seq = 0;
 function item(level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
@@ -93,6 +95,20 @@ describe("readCapabilityCodeFiles", () => {
 
   afterEach(async () => {
     await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("collects trailer and compressed run commits without dropping evidence for an unavailable SHA", async () => {
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: tempDir, encoding: "utf-8" }).trim();
+    git("init", "--initial-branch=main");
+    await writeFile(join(tempDir, "ledger.ts"), "export const total = 1;\n");
+    git("add", "ledger.ts");
+    git("commit", "-m", "Build ledger\n\nN-DX-Item: 11111111-1111-4111-8111-111111111111");
+    const sha = git("rev-parse", "HEAD");
+    await mkdir(join(tempDir, ".hench/runs"), { recursive: true });
+    await writeFile(join(tempDir, ".hench/runs/run.json.gz"), gzipSync(JSON.stringify({ taskId: "run-task", commits: [{ sha }, { sha: "f".repeat(40) }] })));
+    const files = await readCommitCodeFiles(tempDir);
+    expect(files["11111111-1111-4111-8111-111111111111"]).toEqual(["ledger.ts"]);
+    expect(files["run-task"]).toEqual(["ledger.ts"]);
   });
 
   it("builds the map from zones and the files a capability's tests exercise, and the drafter's specs carry it", async () => {

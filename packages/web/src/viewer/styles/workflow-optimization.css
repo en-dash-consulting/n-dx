@@ -319,9 +319,6 @@
 /* ── Toast ─────────────────────────────────────────────────────────── */
 
 .wf-toast {
-  position: fixed;
-  bottom: calc(20px + var(--bottombar-h, 0px));
-  right: 20px;
   background: var(--green);
   color: var(--bg);
   padding: 10px 18px;

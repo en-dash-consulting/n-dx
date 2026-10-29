@@ -19,7 +19,7 @@ import { contentHash, type MigrationSource, type PlanContext, type PlanStage, ty
 import { defineMigration, sourceDigest } from "../pipeline.js";
 import { draftCapabilitySpecs, type CapabilitySpecDraft, type SpecDraftOptions } from "./capability-spec.js";
 import { buildPlanData, stampReview, type ItemPlanData, type PlanData, type PlanDataOptions } from "./migration-plan-data.js";
-import { classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
+import { capabilityCodeFiles, classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
 import {
   jevHeldPass,
   flagThresholdOf,
@@ -127,7 +127,9 @@ function draftSettledSpecs(
   context: PlanContext<V1ToV2Options>,
 ): Record<string, V1ToV2Entry> {
   const { testFiles = [], codeFiles, testCommand, minTestScore } = context.options ?? {};
-  const specs = draftCapabilitySpecs({ entries: Object.values(entries) }, items, { testFiles, codeFiles, testCommand, minTestScore });
+  const plan = { entries: Object.values(entries) };
+  const filesOf = context.options?.filesOf ?? ((id: string) => codeFiles?.[id] ?? []);
+  const specs = draftCapabilitySpecs(plan, items, { testFiles, codeFiles: capabilityCodeFiles(plan, filesOf), testCommand, minTestScore });
   const out = { ...entries };
   for (const spec of specs) {
     const entry = out[spec.capability]!;
@@ -157,8 +159,9 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
   to: "v2",
   rules(items, { cutAt, options = {} }) {
     const { testFiles = [], codeFiles, testCommand, minTestScore, reviewed, releases, prMerges, productNames } = options;
-    const plan = classifyV1Tree(items, { productNames });
-    const specs = draftCapabilitySpecs(plan, items, { testFiles, codeFiles, testCommand, minTestScore });
+    const filesOf = options.filesOf ?? ((id: string) => codeFiles?.[id] ?? []);
+    const plan = classifyV1Tree(items, { productNames, filesOf });
+    const specs = draftCapabilitySpecs(plan, items, { testFiles, codeFiles: capabilityCodeFiles(plan, filesOf), testCommand, minTestScore });
     const data = buildPlanData(items, plan, { cutAt, specs, reviewed, releases, prMerges });
     const specById = new Map(specs.map((s) => [s.capability, s]));
 

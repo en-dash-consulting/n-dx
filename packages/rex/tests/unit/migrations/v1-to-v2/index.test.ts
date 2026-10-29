@@ -50,6 +50,18 @@ describe("v1-to-v2 migration", () => {
     expect(JSON.stringify(Object.values(plan.entries).map((e) => e.data))).not.toContain('"e2"');
   });
 
+  it("feeds the same file evidence to placement and capability spec drafting", async () => {
+    const items = tree();
+    items[1]!.children![0]!.title = "Polish zebra";
+    const filesOf = (id: string) => id === "t1" || id === "f3" ? ["src/ledger.ts"] : [];
+    const plan = await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT, options: { filesOf } });
+    expect(plan.entries.f3?.placement).toBe("f1");
+    expect(plan.entries.f1?.spec?.codeFiles).toEqual(["src/ledger.ts"]);
+    const cliPlan = await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT, options: { codeFiles: { t1: ["src/ledger.ts"], f3: ["src/ledger.ts"] } } });
+    expect(cliPlan.entries.f3?.placement).toBe("f1");
+    expect(cliPlan.entries.f1?.spec?.codeFiles).toEqual(["src/ledger.ts"]);
+  });
+
   it("passes the caller's product names to classification", async () => {
     const acme = [item("a1", "epic", "Acme 2.0", [item("a2", "feature", "Billing", [], "pending")])];
     expect((await v1ToV2.plan(v1TreeSource(acme), { cutAt: CUT })).entries.a1?.target).toBe("area");

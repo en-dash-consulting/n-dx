@@ -8,9 +8,6 @@
  */
 
 .polling-suspension-indicator {
-  position: fixed;
-  bottom: calc(1rem + var(--bottombar-h, 0px));
-  left: 1rem;
   z-index: var(--z-tray);
   padding: 0.4rem 0.75rem;
   border-radius: 6px;
@@ -20,7 +17,6 @@
   align-items: center;
   gap: 0.5rem;
   max-width: 360px;
-  animation: polling-suspension-fade-in 0.2s ease-out;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   background: var(--color-warning-bg, #3a2d00);
   border: 1px solid var(--color-warning, #f0ad4e);

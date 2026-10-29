@@ -1,3 +1,4 @@
+import { TOAST_DURATION_MS } from "../utils/notifications.js";
 /**
  * App data management hook for the viewer.
  *
@@ -115,7 +116,7 @@ export function useAppData(options: UseAppDataOptions = {}): AppDataState {
         toastTimerRef.current = setTimeout(() => {
           setRefreshToast(false);
           toastTimerRef.current = null;
-        }, 3000);
+        }, TOAST_DURATION_MS);
       }
     });
 

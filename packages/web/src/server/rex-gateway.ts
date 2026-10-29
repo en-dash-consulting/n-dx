@@ -34,6 +34,7 @@ export { PRD_CACHE_DIRNAME, PRD_TREE_DIRNAME, resolveStore, cascadeParentReset, 
 // On a v2 tree the dashboard's PRD cache is the change-layer projection
 // `resolveStore` returns, not a parse of `prd_tree/`.
 export { prdLayout } from "@n-dx/rex";
+export { findNextWorkTask } from "@n-dx/rex";
 // Item writes on a v2 tree: the guard narrows resolveStore's answer to the
 // change-layer store, and completion is rex's own v2 completion (apply-on-complete).
 export { isChangeLayerStore, completeV2Work } from "@n-dx/rex";
@@ -211,3 +212,5 @@ export { parseFolderTree } from "@n-dx/rex";
 // their folder-tree path so the context-graph hierarchy mirrors `.rex/prd_tree/`
 // without re-walking the directory.
 export { resolveSiblingSlugs } from "@n-dx/rex";
+
+export { checkBranchGuard, branchGuardRefusal } from "@n-dx/rex";

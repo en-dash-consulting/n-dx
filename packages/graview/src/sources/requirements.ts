@@ -39,6 +39,8 @@ export interface RequirementsSlice extends SourceSlice {
 export interface RequirementsOptions {
   /** On a v1 tree, draw the product layer rex's migration plan proposes. Default true. */
   proposeProductLayer?: boolean;
+  /** Gather code evidence only when a v1 product layer is proposed. */
+  codeFiles?: () => Promise<Readonly<Record<string, readonly string[]>>>;
 }
 
 export const RELEASE_PREFIX = "release:";
@@ -49,7 +51,8 @@ export function releaseId(version: string): string {
 
 export async function readRequirements(rexDir: string, warn: Warn, options: RequirementsOptions = {}): Promise<RequirementsSlice> {
   const model = await loadPrdModel(rexDir, { warn });
-  const proposed = options.proposeProductLayer === false ? undefined : proposeProductLayer(model);
+  const codeFiles = model.layout === "v1" && options.proposeProductLayer !== false ? await options.codeFiles?.() : undefined;
+  const proposed = options.proposeProductLayer === false ? undefined : proposeProductLayer(model, codeFiles);
   const tree = proposed?.tree ?? model.tree;
   const index = indexTree(tree);
   const productEdges = computeEdges(tree);
