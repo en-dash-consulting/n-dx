@@ -50,7 +50,14 @@ items:
     lastModified: "2026-10-29T01:27:06.023Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7da01445-1d7e-48ed-9d26-cf303ce98d72":
-    lastModified: "2026-10-29T01:51:46.106Z"
+    status: "completed"
+    startedAt: "2026-10-29T01:54:10.866Z"
+    completedAt: "2026-10-29T01:59:18.038Z"
+    endedAt: "2026-10-29T01:59:18.038Z"
+    activeIntervals: [{"end":"2026-10-29T01:59:18.038Z","start":"2026-10-29T01:54:10.866Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Describe builder runs resolve and preview via Promise.all; the turn's AbortSignal flows registry → context.packet → buildLensPacket → builder → prepareReads → resolveTaskRun/previewTaskRun → runNdx. Commit e77e45b06."
+    lastModified: "2026-10-29T01:59:18.038Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9559114b-dfe3-466e-9158-c3bc6c626462":
     status: "completed"
