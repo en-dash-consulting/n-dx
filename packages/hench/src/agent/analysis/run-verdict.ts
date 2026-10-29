@@ -107,8 +107,14 @@ function isUnder(path: string, dir: string): boolean {
   return path === d || path.startsWith(`${d}/`);
 }
 
+/**
+ * Files the digest names, each once. A package runner prints package-relative
+ * paths and the gate repo-relative ones, so a path that is a suffix of another
+ * listed path collapses into the longer one.
+ */
 function digestFiles(digest: string, root: string | undefined): string[] {
-  return [...new Set([...digest.matchAll(DIGEST_FILE)].map((m) => normalizePath(m[0], root)))];
+  const named = [...new Set([...digest.matchAll(DIGEST_FILE)].map((m) => normalizePath(m[0], root)))];
+  return named.filter((p) => !named.some((q) => q !== p && q.endsWith(`/${p}`)));
 }
 
 function vendorFailureCategories(run: RunRecord): string[] {

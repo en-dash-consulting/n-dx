@@ -370,7 +370,7 @@ function Queue({ snapshot, navigateTo }: { snapshot: LiveSnapshot; navigateTo: N
   // Ready next takes the Up next list's place; the loop control stays.
   const readyKey = [...next.map((t) => t.id), ...snapshot.runs.map((r) => r.runId)].join(",");
   const list = readyNext
-    ? h(ReadyNext, { refreshKey: readyKey })
+    ? h(ReadyNext, { refreshKey: readyKey, navigateTo })
     : [
       h("h3", { key: "h", id: "live-queue-h", class: "live-side-title" }, "Up next"),
       next.length === 0

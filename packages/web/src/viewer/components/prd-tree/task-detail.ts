@@ -982,55 +982,50 @@ function getRunStatusConfig(status: string) {
   return RUN_STATUS_ICONS[status] ?? { icon: "\u25cb", color: "var(--text-dim)" };
 }
 
-/** Fetches and displays hench runs associated with a task. */
-function HenchRunsList({
-  taskId,
-  navigateTo,
-}: {
-  taskId: string;
-  navigateTo?: NavigateTo;
-}) {
+/**
+ * A task's hench runs, fetched once for the detail panel: the verdict banner at
+ * the top and the runs list further down both read them. A `null` taskId (an
+ * item that is not a task or subtask) fetches nothing. Until the fetch lands,
+ * and when it fails, there are no runs, so neither renders.
+ */
+function useTaskRuns(taskId: string | null): RunEntry[] {
   const [runs, setRuns] = useState<RunEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const verdictEnabled = useFeatureToggle(RUN_VERDICT_FEATURE, false);
 
   useEffect(() => {
+    setRuns([]);
+    if (!taskId) return;
     let cancelled = false;
-    setLoading(true);
-    setError(false);
-
     fetch(`/api/hench/runs?taskId=${encodeURIComponent(taskId)}`)
       .then((res) => {
         if (!res.ok) throw new Error("fetch failed");
         return res.json();
       })
       .then((json) => {
-        if (!cancelled) {
-          setRuns(json.runs ?? []);
-          setLoading(false);
-        }
+        if (!cancelled) setRuns(json.runs ?? []);
       })
       .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setLoading(false);
-        }
+        if (!cancelled) setRuns([]);
       });
-
     return () => { cancelled = true; };
   }, [taskId]);
 
-  // Don't render the section at all while loading on first mount, or if no runs
-  if (loading) return null;
-  if (error) return null;
+  return runs;
+}
+
+/** Displays the hench runs associated with a task. */
+function HenchRunsList({
+  runs,
+  navigateTo,
+}: {
+  runs: readonly RunEntry[];
+  navigateTo?: NavigateTo;
+}) {
   if (runs.length === 0) return null;
 
   return h(
     "div",
     { class: "task-section task-runs-section" },
     h("div", { class: "task-section-label" }, `Hench Runs (${runs.length})`),
-    h(RunVerdictBanner, { runs, enabled: verdictEnabled }),
     h(
       "div",
       { class: "task-runs-list" },
@@ -1121,6 +1116,8 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
   const itemType = itemTypeOf(item);
   const itemLabel = itemTypeLabel(itemType);
+  const runs = useTaskRuns(isWorkItemType(itemType) ? item.id : null);
+  const verdictEnabled = useFeatureToggle(RUN_VERDICT_FEATURE, false);
 
   // Determine if this item can have children added
   const canAddChild = onAddChild != null && canAddChildType(itemType);
@@ -1292,6 +1289,9 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
         : null,
     ),
 
+    // Why the latest run did not complete: leads the panel, above the description
+    h(RunVerdictBanner, { runs, enabled: verdictEnabled }),
+
     // Description (editable)
     h(
       "div",
@@ -1348,7 +1348,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
     // Associated hench runs (tasks/subtasks only)
     isWorkItemType(itemType)
-      ? h(HenchRunsList, { taskId: item.id, navigateTo })
+      ? h(HenchRunsList, { runs, navigateTo })
       : null,
 
     // Failure reason

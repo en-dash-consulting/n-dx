@@ -37,6 +37,27 @@ export function latestRunVerdict(runs: readonly VerdictRun[]): RunVerdict | null
   return latest.diagnosis ?? null;
 }
 
+/**
+ * A readable label per class of hench's `RUN_VERDICT_CLASSES`. The web server
+ * never imports hench, so the ids are mirrored here; an id missing from this
+ * map (a newer hench) shows as itself.
+ */
+export const RUN_VERDICT_CLASS_LABELS: Readonly<Record<string, string>> = {
+  "test-gate-new": "New test failure",
+  "test-gate-preexisting": "Pre-existing test failure",
+  "completion-held": "Completion held",
+  "review-blocked": "Blocked by review",
+  "claim-lost": "Claim lost",
+  "budget-timeout": "Out of budget or time",
+  "vendor-transient": "Vendor outage",
+  "no-changes": "No changes made",
+  "unclassified": "Unclassified failure",
+};
+
+export function runVerdictClassLabel(verdictClass: string): string {
+  return RUN_VERDICT_CLASS_LABELS[verdictClass] ?? verdictClass;
+}
+
 export function RunVerdictBanner({ runs, enabled }: { runs: readonly VerdictRun[]; enabled: boolean }) {
   if (!enabled) return null;
   const verdict = latestRunVerdict(runs);
@@ -44,9 +65,9 @@ export function RunVerdictBanner({ runs, enabled }: { runs: readonly VerdictRun[
   const first = verdict.actions[0];
   return h(
     "div",
-    { class: "task-run-verdict", role: "status" },
+    { class: "task-section task-run-verdict", role: "status", "data-verdict-class": verdict.class },
     h("div", { class: "task-run-verdict-header" },
-      h("span", { class: "task-run-verdict-class" }, verdict.class),
+      h("span", { class: "task-run-verdict-class", title: verdict.class }, runVerdictClassLabel(verdict.class)),
       h("span", { class: "task-run-verdict-attempt" }, `attempt ${verdict.attempt.n} of ${verdict.attempt.of}`),
     ),
     h("p", { class: "task-run-verdict-summary" }, verdict.summary),

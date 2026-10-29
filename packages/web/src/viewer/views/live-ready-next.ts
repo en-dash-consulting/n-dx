@@ -13,6 +13,7 @@
 
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import type { NavigateTo } from "../types.js";
 
 /** The registry key in routes-features.ts. */
 export const READY_NEXT_FEATURE = "hench.readyNext";
@@ -32,9 +33,14 @@ export interface QueuePlan {
   summary: string;
 }
 
-function TaskLine({ task }: { task: PlanTask }) {
+/** A planned task: its title opens the task, as an Up next item does. */
+function TaskLine({ task, navigateTo }: { task: PlanTask; navigateTo: NavigateTo }) {
   return h("li", { class: "live-ready-task" },
-    h("span", { class: "live-card-title" }, task.title),
+    h("a", {
+      class: "live-queue-item",
+      href: "#",
+      onClick: (e: MouseEvent) => { e.preventDefault(); navigateTo("prd", { taskId: task.id }); },
+    }, h("span", { class: "live-card-title" }, task.title)),
     h("span", { class: "live-card-chain" }, task.reason));
 }
 
@@ -43,7 +49,7 @@ function TaskLine({ task }: { task: PlanTask }) {
  * ids of the queue and the running runs, so the plan follows the work rather
  * than spawning a planner on every poll.
  */
-export function ReadyNext({ refreshKey }: { refreshKey: string }) {
+export function ReadyNext({ refreshKey, navigateTo }: { refreshKey: string; navigateTo: NavigateTo }) {
   const [plan, setPlan] = useState<QueuePlan | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,12 +81,12 @@ export function ReadyNext({ refreshKey }: { refreshKey: string }) {
               h("li", { key: lane.changeId, class: "live-ready-lane" },
                 h("span", { class: "live-side-title" }, `Lane ${i + 1}`),
                 h("code", { class: "live-ready-command" }, lane.command),
-                h("ul", null, lane.tasks.map((t) => h(TaskLine, { key: t.id, task: t }))))))
+                h("ul", null, lane.tasks.map((t) => h(TaskLine, { key: t.id, task: t, navigateTo }))))))
             : null,
           plan.excluded.length > 0
             ? h("details", { key: "x", class: "live-ready-excluded" },
               h("summary", null, `Not in a lane (${plan.excluded.length})`),
-              h("ul", null, plan.excluded.map((t) => h(TaskLine, { key: t.id, task: t }))))
+              h("ul", null, plan.excluded.map((t) => h(TaskLine, { key: t.id, task: t, navigateTo }))))
             : null,
         ],
   );

@@ -114,6 +114,26 @@ describe("classifyRun — one fixture per class", () => {
     expect(d.summary).toContain(": packages/web/tests/unit/viewer/add-item-form.test.ts.");
   });
 
+  it("a file the digest names package-relative and repo-relative is listed once, by its longer path", () => {
+    const digest = [
+      " FAIL  tests/unit/viewer/add-item-form.test.ts > adds",
+      " ❯ packages/web/tests/unit/viewer/add-item-form.test.ts:12:5",
+    ].join("\n");
+    const summary = {
+      filesRead: [], commandsExecuted: [], testsRun: [],
+      counts: { filesRead: 0, filesChanged: 1, commandsExecuted: 0, testsRun: 0, toolCallsTotal: 0 },
+    };
+    const full = "packages/web/tests/unit/viewer/add-item-form.test.ts";
+    const pre = classify(run({ testGate: failedGate(digest), structuredSummary: { ...summary, filesChanged: ["src/other.ts"] } }));
+    expect(pre.class).toBe("test-gate-preexisting");
+    expect(pre.summary).toBe(`The test gate failed only in files this run did not change: ${full}.`);
+    expect(pre.evidence[0]).toBe(`Gate failure names only unchanged file(s): ${full}`);
+    const fresh = classify(run({ testGate: failedGate(digest), structuredSummary: { ...summary, filesChanged: [full] } }));
+    expect(fresh.class).toBe("test-gate-new");
+    expect(fresh.summary).toBe(`The test gate failed in files this run changed: ${full}.`);
+    expect(fresh.evidence).toEqual([`Gate failure names changed file(s): ${full}`]);
+  });
+
   it("an absolute Windows digest path under worktreeRoot is reported repo-relative", () => {
     const d = classify(run({
       worktreeRoot: "C:\\repo",

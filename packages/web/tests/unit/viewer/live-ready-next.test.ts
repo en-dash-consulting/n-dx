@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { LiveView } from "../../../src/viewer/views/live.js";
+import type { NavigateTo } from "../../../src/viewer/types.js";
 
 const PLAN = {
   lanes: [{
@@ -58,8 +59,11 @@ describe("Live Ready next", () => {
     }));
   }
 
+  let navigateTo: ReturnType<typeof vi.fn<NavigateTo>>;
+
   async function mount(): Promise<void> {
-    act(() => { render(h(LiveView, { navigateTo: vi.fn(), analyzedAt: null, jobs: { refresh: vi.fn(async () => {}), operations: [] } as never }), root); });
+    navigateTo = vi.fn<NavigateTo>();
+    act(() => { render(h(LiveView, { navigateTo, analyzedAt: null, jobs: { refresh: vi.fn(async () => {}), operations: [] } as never }), root); });
     for (let i = 0; i < 5; i++) {
       await act(async () => { await new Promise<void>((r) => setTimeout(r, 0)); });
     }
@@ -87,6 +91,17 @@ describe("Live Ready next", () => {
     expect(side.textContent).toContain("lane 1, step 2 of 2: change c1, tier light, after t1");
     expect(side.textContent).toContain("tagged migration: cold-only");
     expect(side.textContent).toContain(PLAN.summary);
+  });
+
+  it("links each task title to its task, as Up next items do", async () => {
+    stub(true);
+    await mount();
+    const links = [...root.querySelectorAll<HTMLAnchorElement>(".live-ready a.live-queue-item")];
+    expect(links.map((a) => a.textContent)).toEqual(["First task", "Second task", "Migrate it"]);
+    for (const [i, id] of ["t1", "t2", "t3"].entries()) {
+      act(() => { links[i].click(); });
+      expect(navigateTo).toHaveBeenLastCalledWith("prd", { taskId: id });
+    }
   });
 
   it("leaves Live unchanged and never asks for the plan when off", async () => {

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
 import { TaskDetail } from "../../../src/viewer/components/prd-tree/task-detail.js";
-import { latestRunVerdict, type VerdictRun } from "../../../src/viewer/components/prd-tree/run-verdict-banner.js";
+import { latestRunVerdict, runVerdictClassLabel, RUN_VERDICT_CLASS_LABELS, type VerdictRun } from "../../../src/viewer/components/prd-tree/run-verdict-banner.js";
 import type { PRDItemData } from "../../../src/viewer/components/prd-tree/types.js";
 
 /**
@@ -58,11 +58,51 @@ describe("run verdict banner", () => {
     const banner = root.querySelector(".task-run-verdict");
     expect(banner).not.toBeNull();
     const text = banner!.textContent ?? "";
-    expect(text).toContain("budget-timeout");
+    expect(text).toContain("Out of budget or time");
+    expect(text).not.toContain("budget-timeout");
+    expect(banner!.getAttribute("data-verdict-class")).toBe("budget-timeout");
+    expect(banner!.querySelector(".task-run-verdict-class")!.getAttribute("title")).toBe("budget-timeout");
     expect(text).toContain("The run timed out before finishing.");
     expect(text).toContain("Next: Split the task into smaller ones");
     expect(text).not.toContain("raise the task's model tier");
     expect(text).toContain("attempt 2 of 2");
+  });
+
+  it("leads the panel: below the title and status, above the description and the runs list", async () => {
+    const root = await renderWith([runSummary({ diagnosis: DIAGNOSIS })], true);
+    const order = [".task-title-display", ".task-status-selector", ".task-run-verdict", ".task-add-description-btn", ".task-runs-section"]
+      .map((sel) => {
+        const el = root.querySelector(sel);
+        expect(el, sel).not.toBeNull();
+        return el!;
+      });
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(root.querySelector(".task-runs-section .task-run-verdict")).toBeNull();
+  });
+
+  it("labels each of hench's nine classes readably, keeping the raw id as title and data attribute", async () => {
+    const classes = [
+      "test-gate-new", "test-gate-preexisting", "completion-held", "review-blocked", "claim-lost",
+      "budget-timeout", "vendor-transient", "no-changes", "unclassified",
+    ];
+    const labels = new Set<string>();
+    for (const cls of classes) {
+      const root = await renderWith([runSummary({ diagnosis: { ...DIAGNOSIS, class: cls } })], true);
+      const label = root.querySelector(".task-run-verdict-class")!;
+      expect(label.getAttribute("title")).toBe(cls);
+      expect(label.closest(".task-run-verdict")!.getAttribute("data-verdict-class")).toBe(cls);
+      expect(label.textContent).toBe(RUN_VERDICT_CLASS_LABELS[cls]);
+      expect(label.textContent).not.toBe(cls);
+      labels.add(label.textContent!);
+    }
+    expect(labels.size).toBe(classes.length);
+    expect(RUN_VERDICT_CLASS_LABELS["test-gate-preexisting"]).toBe("Pre-existing test failure");
+  });
+
+  it("shows an unknown class as its id", () => {
+    expect(runVerdictClassLabel("some-new-class")).toBe("some-new-class");
   });
 
   it("shows nothing when the toggle is off", async () => {
