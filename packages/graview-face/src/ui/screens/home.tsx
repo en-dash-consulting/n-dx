@@ -2,6 +2,7 @@ import { placesOf } from "@graview/core";
 import { pluralSlug, useStoreTick } from "@graview/pages";
 import { Link } from "react-router-dom";
 import type { App } from "../../app.js";
+import { BASE } from "../../base.js";
 import { tokens } from "../../model/graph.js";
 import { fragileZones } from "../../model/code.js";
 import { spend } from "../../model/spend.js";
@@ -42,7 +43,7 @@ export function HomeScreen({ context, app }: { context: Ctx; app: App }) {
         ) : (
           <Badge tone="good">Nothing needs a person right now</Badge>
         )}
-        <a className="ndx-btn quiet" href="/scene">
+        <a className="ndx-btn quiet" href={`${BASE}/scene`}>
           <Icon name="scene" /> Open the map
         </a>
       </Hero>

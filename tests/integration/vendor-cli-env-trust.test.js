@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -48,6 +49,54 @@ describe("loadVendorCliEnv repository trust", () => {
     expect(first[SECRET_NAME]).toBeUndefined();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain("env-allow-added");
+    expect(warn.mock.calls[0][0]).toContain("guard.env.allow (*)");
+  });
+
+  it("keeps the user's .n-dx.local.json allow entries in an untrusted checkout", async () => {
+    // Credential-shaped, so the default deny strips it unless an allow keeps it.
+    const LOCAL_NAME = "NDX_TEST_REVIEWER_LOCAL_TOKEN";
+    process.env[LOCAL_NAME] = "user-secret";
+    writeFileSync(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ hench: { guard: { env: { allow: [LOCAL_NAME] } } } }),
+      "utf-8",
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const env = await loadVendorCliEnv(projectDir, "codex", { trust: { ndxHome } });
+
+      expect(env[LOCAL_NAME]).toBeDefined();
+      expect(env[SECRET_NAME]).toBeUndefined();
+      for (const [message] of warn.mock.calls) expect(message).not.toContain(LOCAL_NAME);
+    } finally {
+      delete process.env[LOCAL_NAME];
+    }
+  });
+
+  it("drops the allow entries of a .n-dx.local.json the repository commits until trusted", async () => {
+    const LOCAL_NAME = "NDX_TEST_REVIEWER_LOCAL_TOKEN";
+    process.env[LOCAL_NAME] = "user-secret";
+    // Only the committed local file widens anything here.
+    rmSync(join(projectDir, ".hench", "config.json"));
+    writeFileSync(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ hench: { guard: { env: { allow: [LOCAL_NAME] } } } }),
+      "utf-8",
+    );
+    execFileSync("git", ["init", "-q"], { cwd: projectDir, stdio: "ignore" });
+    execFileSync("git", ["add", "-f", ".n-dx.local.json"], { cwd: projectDir, stdio: "ignore" });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const trust = { ndxHome };
+      expect((await loadVendorCliEnv(projectDir, "codex", { trust }))[LOCAL_NAME]).toBeUndefined();
+
+      recordRepoTrust(projectDir, { ndxHome });
+      expect((await loadVendorCliEnv(projectDir, "codex", { trust }))[LOCAL_NAME]).toBeDefined();
+    } finally {
+      delete process.env[LOCAL_NAME];
+    }
   });
 
   it("applies the configured allow list once the checkout is trusted", async () => {

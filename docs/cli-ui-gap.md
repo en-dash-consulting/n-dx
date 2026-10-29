@@ -65,11 +65,12 @@ Paths the layout owns are written as tokens: `{rex}` = `.rex` (`.ndx/rex` on the
 | `ndx web` | `{webPid} and {webPort}`<br>`~/.ndx/hub.json`<br>`~/.ndx/auth.token` | none | localhost | long-running server; hub mode returns once registered |
 | `ndx ci` | `{sourcevision}/` | none | none | minutes |
 | `ndx which` | nothing (read-only) | none | none | seconds |
-| `ndx config` | `{config}, {localConfig}, {rex}/config.json, {hench}/config.json` (only when setting a value) | auth probe ~0-1 | llm-provider (only when setting llm.vendor, or with --test-connection) | seconds |
+| `ndx config` | `{config}, {localConfig}, {rex}/config.json, {hench}/config.json` (only when setting a value)<br>`~/.ndx/config.json` (only when setting an extensions.&lt;name&gt; value with --user) | auth probe ~0-1 | llm-provider (only when setting llm.vendor, or with --test-connection) | seconds |
 | `ndx auth` | nothing (read-only) | auth probe ~1 | llm-provider | seconds |
 | `ndx export` | `ndx-export/`<br>`.gitignore`<br>the n-dx-dashboard branch (only with --deploy=github) | none | remote (only with --deploy=github) | seconds to a minute |
 | `ndx prd` | the --out file (only on export)<br>`{prd}` (only on import)<br>`{rex}/.backups/` (only on import, without --no-snapshot) | none | none | seconds |
 | `ndx trust` | `~/.ndx/trust/` (only on accept or revoke) | none | none | seconds |
+| `ndx extensions` | `~/.ndx/extensions.json`<br>`~/.ndx/extensions/` (only on add or remove)<br>`~/.ndx/ext/<name>/` (only on remove --purge) | none | remote (only on add or remove) | seconds; add and remove take as long as npm does |
 | `ndx self-heal` | `{sourcevision}/`<br>`{prd}`<br>`{rex}/acknowledged-findings.json`<br>source files (only without --capture-only)<br>git commits (only without --capture-only)<br>`{hench}/runs/` (only without --capture-only) | analysis ~several per zone batch, per iteration<br>agent ~1 agent session per task | llm-provider | long — tens of minutes to hours |
 | `ndx pair-programming` | `{prd}`<br>`{hench}/runs/`<br>source files | agent ~1 agent session<br>review ~1-2 reviewer sessions<br>remediation ~0-1 agent session | llm-provider | minutes to tens of minutes |
 | `ndx bicker` | `{prd}`<br>`{hench}/runs/`<br>source files | agent ~1 agent session<br>review ~1-2 reviewer sessions<br>remediation ~0-1 agent session | llm-provider | minutes to tens of minutes |

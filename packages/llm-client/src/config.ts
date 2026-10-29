@@ -8,6 +8,7 @@
 import { readFile, access } from "node:fs/promises";
 import { resolveLayout } from "./layout.js";
 import { deepMerge } from "./project-config.js";
+import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import type { ClaudeConfig } from "./types.js";
 import {
   LLM_VENDOR,
@@ -887,9 +888,11 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
  * @param dir  The directory containing .n-dx.json (project root)
  */
 export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
-  const { configFile, localConfigFile } = resolveLayout(dir);
-  const projectData = await loadJSONFile(configFile);
-  const localData = await loadJSONFile(localConfigFile);
+  const { root, configFile, localConfigFile } = resolveLayout(dir);
+  // api_endpoint from the project config applies only while the repository
+  // is trusted; see credential-routing.ts.
+  const projectData = trustedProjectConfig(root, await loadJSONFile(configFile));
+  const localData = trustedLocalConfig(root, await loadJSONFile(localConfigFile));
 
   // Merge project and local configs (local wins)
   let merged: Record<string, unknown> | null = projectData;

@@ -36,6 +36,11 @@ function cell(text) {
   return String(text).replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 
+/** Descriptions are prose, so placeholders must not become Vue/HTML elements. */
+function prose(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 /** "`{rex}` = `.rex` (`.ndx/rex` on the .ndx layout), …" — from the resolver, not restated here. */
 function tokenLegend() {
   const legacy = resolveLayout(ROOT, { mode: "legacy" });
@@ -56,7 +61,7 @@ function formatPath(path) {
 function formatWrites(effects) {
   if (effects.writes.length === 0) return "nothing (read-only)";
   return effects.writes
-    .map((w) => `${formatPath(w.path)}${w.conditional ? ` (only ${w.when})` : ""}`)
+    .map((w) => `${formatPath(w.path)}${w.conditional ? ` (only ${prose(w.when)})` : ""}`)
     .join("<br>");
 }
 
@@ -69,7 +74,7 @@ function formatLlm(effects) {
 
 function formatNetwork(effects) {
   if (effects.network.length === 0) return "none";
-  return effects.network.map((n) => `${n.to}${n.when ? ` (only ${n.when})` : ""}`).join("<br>");
+  return effects.network.map((n) => `${n.to}${n.when ? ` (only ${prose(n.when)})` : ""}`).join("<br>");
 }
 
 /** The generated section body, markers included. */

@@ -57,7 +57,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await hub?.close({ stopChildren: true });
-  for (const dir of [home, repo]) rmSync(dir, { recursive: true, force: true });
+  // Retry: on Windows a stopped child's handles on the repo dir are not always released when close() resolves (EBUSY).
+  for (const dir of [home, repo]) rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }, 30_000);
 
 describe("hub with a per-user token", () => {

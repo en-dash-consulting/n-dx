@@ -14,6 +14,7 @@ All commands are run through `ndx` (or `n-dx`). The directory argument `[dir]` d
 | `ndx config [key] [value]` | View or edit settings |
 | `ndx which` | Show which n-dx is running: version, path, install kind, git |
 | `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config this checkout ships |
+| `ndx extensions <list\|add\|remove\|enable\|disable\|info\|doctor>` | Install, approve, disable, remove and check extensions (`--json`, `--yes`, `--purge`) |
 
 ## Analyze
 

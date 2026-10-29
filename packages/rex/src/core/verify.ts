@@ -10,7 +10,7 @@
 
 import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { PROJECT_DIRS, execShellCmd } from "@n-dx/llm-client";
+import { PROJECT_DIRS, execShellCmd, repoCommandEnv } from "@n-dx/llm-client";
 import { walkTree } from "./tree.js";
 import { extractKeywords, scoreMatch } from "./keywords.js";
 import type {PRDItem} from "../schema/index.js";
@@ -206,7 +206,9 @@ function execShell(
   cwd: string,
   timeout: number,
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null; launched: boolean }> {
-  return execShellCmd(command, { cwd, timeout, maxBuffer: 2 * 1024 * 1024 });
+  // The repository's own command: it gets the sanitized environment, never
+  // the parent's credentials (#686).
+  return execShellCmd(command, { cwd, timeout, maxBuffer: 2 * 1024 * 1024, env: repoCommandEnv(cwd) });
 }
 
 /**

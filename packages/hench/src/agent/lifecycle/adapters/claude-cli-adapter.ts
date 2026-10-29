@@ -29,6 +29,7 @@ import type {
 } from "../../../prd/llm-gateway.js";
 import {
   LLM_VENDOR,
+  NDX_CONFIG_BLOCKED_PATHS,
   assemblePrompt,
   classifyVendorError,
   claudeSessionDriver,
@@ -85,6 +86,17 @@ export function buildAllowedTools(
 }
 
 /**
+ * The `--disallowed-tools` list: n-dx's own config files, which hench's guard
+ * refuses its own tools too (#686). A deny rule outranks the bare `Edit` and
+ * `Write` grants above, and Claude Code applies `Edit(...)` rules to every
+ * built-in tool that edits a file. `./` anchors each pattern at the session's
+ * cwd, the project root.
+ */
+export function buildDisallowedTools(): string[] {
+  return NDX_CONFIG_BLOCKED_PATHS.map((p) => `Edit(./${p})`);
+}
+
+/**
  * Input to {@link buildClaudeCliArgs}.
  *
  * @internal Exported for snapshot testing — not part of the adapter's public API.
@@ -93,6 +105,8 @@ export interface ClaudeCliInput {
   systemPrompt: string;
   promptText: string;
   allowedTools: string[];
+  /** Tool rules denied outright (`--disallowed-tools`); see {@link buildDisallowedTools}. */
+  disallowedTools?: string[];
   modelOverride?: string;
   /**
    * Effort level for the spawned session (`--effort <level>`).
@@ -164,6 +178,7 @@ export function buildClaudeCliArgs(
         : undefined,
       claude: {
         allowedTools: input.allowedTools,
+        disallowedTools: input.disallowedTools,
         effort: input.effort,
         permissionMode: input.permissionMode,
         mcpConfigPath: input.mcpConfigPath,
@@ -232,6 +247,7 @@ export const claudeCliAdapter: VendorAdapter = {
       systemPrompt,
       promptText: taskPrompt,
       allowedTools,
+      disallowedTools: buildDisallowedTools(),
       modelOverride: opts.model,
       effort: opts.effort,
       permissionMode: opts.permissionMode,

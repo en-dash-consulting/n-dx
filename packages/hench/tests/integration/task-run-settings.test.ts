@@ -550,11 +550,15 @@ describe("ndx work --resolve reports the task's saved settings", () => {
   beforeEach(async () => {
     ({ projectDir, rexDir } = await setupProjectDir("hench-task-run-settings-"));
     await (await resolveStore(rexDir)).saveDocument(DOC as never);
+    await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }), "utf-8");
+    // cli_path is machine-local: a shared one applies only once the repository is trusted.
     await writeFile(
-      join(projectDir, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "claude", claude: { cli_path: process.execPath } } }),
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { claude: { cli_path: process.execPath } } }),
       "utf-8",
     );
+    // Ignored, as `ndx init` leaves it: a committed one is repository config.
+    await writeFile(join(projectDir, ".gitignore"), ".n-dx.local.json\n", "utf-8");
     commitGitFixtureBaseline(projectDir);
     vi.spyOn(console, "error").mockImplementation(() => {});
   });

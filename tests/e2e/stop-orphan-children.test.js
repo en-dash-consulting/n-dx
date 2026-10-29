@@ -240,6 +240,29 @@ describe("stopping a detached server takes its children with it", () => {
     return (await readdir(dir)).filter((f) => f.startsWith("tick-")).length;
   }
 
+  /**
+   * A shell-launched Node process on a Windows runner can need well over 5 s
+   * (antivirus scan, cold cache); elsewhere it starts in well under one.
+   */
+  const CHILD_READY_TIMEOUT_MS = process.platform === "win32" ? 20_000 : 5000;
+  const SERVER_READY_TIMEOUT_MS = 5000;
+  const FORCE_KILL_TIMEOUT_MS = 2000;
+  /**
+   * terminateTreeByPid waits up to four grace periods: taskkill, its exit wait,
+   * then SIGTERM and SIGKILL on Windows; group then pid escalation on POSIX.
+   */
+  const TERMINATE_WORST_CASE_MS = 4 * FORCE_KILL_TIMEOUT_MS;
+  const DEATH_TIMEOUT_MS = 5000;
+  const QUIET_WINDOW_MS = 1000;
+  /** Server wait + child wait + terminate + both death waits + quiet window + slack. */
+  const TEST_TIMEOUT_MS =
+    SERVER_READY_TIMEOUT_MS +
+    CHILD_READY_TIMEOUT_MS +
+    TERMINATE_WORST_CASE_MS +
+    2 * DEATH_TIMEOUT_MS +
+    QUIET_WINDOW_MS +
+    10_000;
+
   async function waitFor(predicate, timeoutMs = 5000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -265,7 +288,7 @@ describe("stopping a detached server takes its children with it", () => {
     // The server's record must arrive before we attribute any delay to the shell
     // or its Node grandchild. Windows CI can defer a detached process long enough
     // to make an otherwise healthy child readiness timeout misleading.
-    if (!(await waitFor(() => serverLaunchError !== null || readReadyServerPid() !== null))) {
+    if (!(await waitFor(() => serverLaunchError !== null || readReadyServerPid() !== null, SERVER_READY_TIMEOUT_MS))) {
       throw new Error(
         serverLaunchError ?? "The detached stand-in server never announced startup.",
       );
@@ -280,13 +303,22 @@ describe("stopping a detached server takes its children with it", () => {
     const childReady = async () =>
       readShellFailure() !== null ||
       (readReadyChildPid() !== null && (await tickCount()) > 0);
-    const reachedReady = await waitFor(childReady);
+    const waitStartedAt = Date.now();
+    const reachedReady = await waitFor(childReady, CHILD_READY_TIMEOUT_MS);
     if (!reachedReady || readReadyChildPid() === null || (await tickCount()) === 0) {
+      // Separates a slow start from a missing one: a recorded, live pid with
+      // ticks means the clock was the problem; no pid means it never started.
+      const recordedPid = readChildPid();
+      const observed =
+        `waited ${Date.now() - waitStartedAt} ms of ${CHILD_READY_TIMEOUT_MS} ms; ` +
+        `child pid recorded: ${recordedPid ?? "no"}; ` +
+        `alive: ${recordedPid === null ? "n/a" : isAlive(recordedPid)}; ` +
+        `ready record: ${readReadyChildPid() ?? "no"}; ticks: ${await tickCount()}`;
       throw new Error(
-        describeShellStartupFailure({
+        `${describeShellStartupFailure({
           what: "The stand-in server's grandchild",
           recordedError: readLaunchError(),
-        }),
+        })} [${observed}]`,
       );
     }
     const childPid = readReadyChildPid();
@@ -294,17 +326,17 @@ describe("stopping a detached server takes its children with it", () => {
     expect(isAlive(childPid)).toBe(true);
 
     // The stop path has only a pid, read from a file written by another process.
-    await terminateTreeByPid(server.pid, { forceKillTimeoutMs: 2000 });
+    await terminateTreeByPid(server.pid, { forceKillTimeoutMs: FORCE_KILL_TIMEOUT_MS });
 
-    expect(await waitFor(async () => !isAlive(server.pid))).toBe(true);
-    expect(await waitFor(async () => !isAlive(childPid))).toBe(true);
+    expect(await waitFor(async () => !isAlive(server.pid), DEATH_TIMEOUT_MS)).toBe(true);
+    expect(await waitFor(async () => !isAlive(childPid), DEATH_TIMEOUT_MS)).toBe(true);
 
     // And it stopped working, not merely became unsignallable: a survivor writing
     // every 100ms would add ~10 files over this window.
     const atStop = await tickCount();
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, QUIET_WINDOW_MS));
     expect(await tickCount()).toBe(atStop);
-  });
+  }, TEST_TIMEOUT_MS);
 
   it("reports success for a pid that is already gone", async () => {
     // Stale pid files are the common case — the server crashed and nobody cleaned

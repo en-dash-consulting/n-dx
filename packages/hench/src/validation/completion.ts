@@ -1,4 +1,5 @@
 import { exec, execShellCmd } from "../process/exec.js";
+import { repoCommandEnv } from "../prd/llm-gateway.js";
 import { BOOKKEEPING_PATHS } from "../store/paths.js";
 import { discoverChangedFiles } from "./changed-files.js";
 
@@ -139,7 +140,7 @@ export async function validateCompletion(
   if (options?.testCommand) {
     const { error: testError, stderr: testStderr, launched } = await execShellCmd(
       options.testCommand,
-      { cwd: projectDir, timeout },
+      { cwd: projectDir, timeout, env: repoCommandEnv(projectDir) },
     );
 
     // A command that never launched also arrives here with a non-null `error`,

@@ -66,6 +66,8 @@ export interface SessionResume {
 export interface ClaudeTurnFlags {
   /** `--allowed-tools` entries. Absent omits the flag. */
   readonly allowedTools?: readonly string[];
+  /** `--disallowed-tools` rules, which outrank an allowed entry. Absent or empty omits the flag. */
+  readonly disallowedTools?: readonly string[];
   /**
    * `--tools`: the only built-in tools the session gets. Unlike a deny list,
    * an allowlist also excludes built-ins a later CLI release adds. Absent
@@ -190,6 +192,9 @@ function claudeTurnSpawn(
           // is the sole quoting authority — no manual wrapping here.
           ...(isWindows ? [allowedTools.join(",")] : allowedTools),
         ]
+      : []),
+    ...(flags.disallowedTools?.length
+      ? ["--disallowed-tools", ...(isWindows ? [flags.disallowedTools.join(",")] : flags.disallowedTools)]
       : []),
     // One comma-separated token on every platform. An empty list becomes an
     // empty argument ("none"), not an omitted flag ("all").

@@ -1,0 +1,42 @@
+schema: "rex/v2"
+items:
+  "0983c2da-c4f0-4561-abcc-a24049a70d37":
+    status: "completed"
+    startedAt: "2026-10-26T18:25:42.058Z"
+    completedAt: "2026-10-26T18:32:55.284Z"
+    endedAt: "2026-10-26T18:32:55.284Z"
+    activeIntervals: [{"end":"2026-10-26T18:32:55.284Z","start":"2026-10-26T18:25:42.058Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx --help lists enabled extension commands under EXTENSIONS; ndx <name> --help reaches the extension (pinned by e2e test)."
+    lastModified: "2026-10-26T18:32:55.284Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "0d02f78e-7d40-4f25-837e-777eecf044fe":
+    status: "completed"
+    startedAt: "2026-10-26T18:00:47.944Z"
+    completedAt: "2026-10-26T18:12:07.230Z"
+    endedAt: "2026-10-26T18:12:07.230Z"
+    activeIntervals: [{"end":"2026-10-26T18:12:07.230Z","start":"2026-10-26T18:00:47.944Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extension-dispatch.js resolves and spawns extension commands; cli.js routes unknown names through it; unit, e2e and architecture-policy tests added."
+    lastModified: "2026-10-26T18:12:07.230Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "165648b5-2c3b-48b2-8911-fe42059c4381":
+    status: "completed"
+    startedAt: "2026-10-26T18:12:36.054Z"
+    completedAt: "2026-10-26T18:22:04.140Z"
+    endedAt: "2026-10-26T18:22:04.140Z"
+    activeIntervals: [{"end":"2026-10-26T18:22:04.140Z","start":"2026-10-26T18:12:36.054Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "New packages/core/extension-env.js builds the contract environment. cli.js passes it to every extension command; unit and e2e tests cover it, including NDX_BIN re-entry from linked project and global installs."
+    lastModified: "2026-10-26T18:22:04.140Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "b32557a0-0121-4610-8e02-34af29bd26be":
+    status: "completed"
+    startedAt: "2026-10-26T18:32:55.284Z"
+    completedAt: "2026-10-26T18:32:55.284Z"
+    endedAt: "2026-10-26T18:32:55.284Z"
+    activeIntervals: [{"end":"2026-10-26T18:32:55.284Z","start":"2026-10-26T18:32:55.284Z"}]
+    appliedAt: "2026-10-26T18:32:55.284Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-26T18:32:55.284Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

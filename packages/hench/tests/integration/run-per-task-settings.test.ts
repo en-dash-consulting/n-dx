@@ -120,11 +120,16 @@ let rexDir: string;
 async function setup(document: unknown, llm: Record<string, unknown> = {}): Promise<void> {
   ({ projectDir, rexDir } = await setupProjectDir("hench-per-task-"));
   await (await resolveStore(rexDir)).saveDocument(document as never);
+  const { codex, ...shared } = llm as { codex?: Record<string, unknown> };
+  await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude", ...shared } }), "utf-8");
+  // cli_path is machine-local: a shared one applies only once the repository is trusted.
   await writeFile(
-    join(projectDir, ".n-dx.json"),
-    JSON.stringify({ llm: { vendor: "claude", claude: { cli_path: process.execPath }, ...llm } }),
+    join(projectDir, ".n-dx.local.json"),
+    JSON.stringify({ llm: { claude: { cli_path: process.execPath }, ...(codex ? { codex } : {}) } }),
     "utf-8",
   );
+  // Ignored, as `ndx init` leaves it: a committed one is repository config.
+  await writeFile(join(projectDir, ".gitignore"), ".n-dx.local.json\n", "utf-8");
   commitGitFixtureBaseline(projectDir);
 }
 

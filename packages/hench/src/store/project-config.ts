@@ -111,6 +111,22 @@ export function resolveVendorCliEnv(
   return sharedResolveVendorCliEnv(llmConfig, envConfig, process.env, onStripped);
 }
 
+type EnvReportKind = Parameters<NonNullable<Parameters<typeof sharedResolveVendorCliEnv>[3]>>[1];
+
+/**
+ * The run-log line for one `resolveVendorCliEnv` report, names only.
+ *
+ * The missing-credentials wording is mode-neutral and claims no fallback:
+ * Claude on Bedrock or Vertex can still find credential files, but Codex has
+ * none for a provider's `env_key`, so any promise here would be wrong for
+ * some row of the mode table.
+ */
+export function cliEnvReportLine(label: string, names: readonly string[], kind: EnvReportKind): string {
+  return kind === "missing-credentials"
+    ? `${label}: a vendor mode is on but none of ${names.join(", ")} is set, so the CLI starts without them`
+    : `${label}: stripped ${names.join(", ")}`;
+}
+
 /**
  * Resolve the API key with the following priority:
  * 1. claude.api_key from unified config (.n-dx.json)

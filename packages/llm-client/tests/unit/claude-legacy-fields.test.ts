@@ -111,7 +111,7 @@ describe("loadLLMConfig: legacy claude fields survive a partial llm.claude block
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({
-        claude: { cli_path: "/legacy/claude", api_key: "sk-legacy", model: "legacy-model" },
+        claude: { lightModel: "legacy-light", api_key: "sk-legacy", model: "legacy-model" },
         llm: { claude: { model: "modern-model" } },
       }, null, 2),
       "utf-8",
@@ -119,7 +119,7 @@ describe("loadLLMConfig: legacy claude fields survive a partial llm.claude block
 
     const cfg = await loadLLMConfig(tmpDir);
     expect(cfg.claude?.model).toBe("modern-model");
-    expect(cfg.claude?.cli_path).toBe("/legacy/claude");
+    expect(cfg.claude?.lightModel).toBe("legacy-light");
     expect(cfg.claude?.api_key).toBe("sk-legacy");
   });
 });
@@ -149,8 +149,10 @@ describe("loadClaudeConfig: reads llm.claude.* as well as legacy claude.*", () =
 
   it("agrees with resolveClaudeConfig field by field", async () => {
     const modern = { model: MODERN.model, api_key: MODERN.api_key };
+    // The local file: an untrusted project file's api_endpoint is dropped
+    // (credential-routing.ts), which is not the precedence rule under test.
     await writeFile(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx.local.json"),
       JSON.stringify({ claude: LEGACY, llm: { claude: modern } }, null, 2),
       "utf-8",
     );

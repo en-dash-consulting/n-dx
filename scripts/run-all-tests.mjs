@@ -31,6 +31,7 @@
  *   node scripts/run-all-tests.mjs root-policy # the static root policy tests (~2 s)
  *   node scripts/run-all-tests.mjs root-drift  # the source-vs-twin drift tests (~14 s)
  *   node scripts/run-all-tests.mjs root-docs   # the docs-page tests (README, guide, cli-ui-gap)
+ *   node scripts/run-all-tests.mjs root-extensions # the fixture extension through the CLI and hub
  *   node scripts/run-all-tests.mjs rex,web   # named suites (root, or a package dir name)
  *   node scripts/run-all-tests.mjs affected <baseRef>   # only suites the change touches
  *   add --list to print the selection and exit without running anything
@@ -53,6 +54,7 @@ const ROOT_SUBSET_NAMES = {
   "root-policy": "root policy (static)",
   "root-drift": "root drift (artifacts and cross-package twins)",
   "root-docs": "root docs (pages a root test validates)",
+  "root-extensions": "root extensions (the fixture extension through the CLI and hub)",
 };
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));

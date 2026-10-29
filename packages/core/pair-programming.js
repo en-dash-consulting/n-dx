@@ -26,7 +26,7 @@ import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { relativeToRoot, resolveLayout } from "./layout.js";
-import { loadShellTestEnv, loadVendorCliEnv } from "./config.js";
+import { loadShellTestEnv, loadVendorCliEnv, loadVendorCliPath } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // NDX context assembly
@@ -294,36 +294,17 @@ export function resolveReviewerVendor(primaryVendor, configured) {
 }
 
 /**
- * Resolve the CLI binary path for a given vendor.
- * Reads llm.<vendor>.cli_path from .n-dx.local.json (where every cli_path is
- * written), then .n-dx.json, and falls back to the bare vendor name
- * (resolved by PATH lookup).
+ * Resolve the CLI binary path for a given vendor: `llm.<vendor>.cli_path`
+ * (legacy `claude.cli_path` for Claude) from `.n-dx.local.json`, then from
+ * `.n-dx.json` once the repository is trusted, else the bare vendor name
+ * (resolved by PATH lookup). See `loadVendorCliPath` in config.js.
  *
  * @param {string} dir  Project root directory.
  * @param {"claude" | "codex"} vendor
- * @returns {string}  CLI binary path or name.
+ * @returns {Promise<string>}  CLI binary path or name.
  */
 export function resolveVendorCliPath(dir, vendor) {
-  const layout = resolveLayout(dir);
-  for (const configPath of [layout.localConfigFile, layout.configFile]) {
-    const found = readCliPath(configPath, vendor);
-    if (found) return found;
-  }
-  return vendor; // "claude" or "codex" — resolved via PATH
-}
-
-/** The trimmed `cli_path` for `vendor` in one config file, or undefined. */
-function readCliPath(configPath, vendor) {
-  try {
-    if (!existsSync(configPath)) return undefined;
-    const data = JSON.parse(readFileSync(configPath, "utf-8"));
-    const candidates = [data?.llm?.[vendor]?.cli_path];
-    // Legacy claude.cli_path key
-    if (vendor === REVIEWER_VENDOR.CLAUDE) candidates.push(data?.claude?.cli_path);
-    return candidates.find((c) => typeof c === "string" && c.trim().length > 0)?.trim();
-  } catch {
-    return undefined; // unreadable config — fall through to the next source
-  }
+  return loadVendorCliPath(dir, vendor);
 }
 
 // ---------------------------------------------------------------------------
@@ -852,20 +833,23 @@ export function buildRemediationContext(feedback, description, priorContext) {
  * Always spawns via the system shell so quoted arguments and compound
  * commands (e.g. "pnpm -r test") are handled correctly.
  *
- * The child never inherits the raw parent environment: it gets `process.env`
- * filtered by the project's `hench.guard.env` policy (see `loadShellTestEnv`),
- * or by the default deny policy when the project's cannot be loaded — reported
+ * The child never inherits the raw parent environment: it gets the one
+ * repository-command environment (see `loadShellTestEnv`), where the
+ * repository's own `guard.env.allow` counts only once the checkout is trusted,
+ * or the default deny policy when the project's cannot be loaded — reported
  * as `envWarning`. If no filtered environment can be built, nothing is spawned.
  *
  * @param {string} testCommand  Full shell command (e.g. "pnpm test").
  * @param {string} dir          Working directory.
  * @param {number} [timeout=120000]  Max run time in ms.
+ * @param {typeof doNotTrack} [registerChild]
+ * @param {import("@n-dx/llm-client").RepoTrustStoreOptions} [trust]  Relocates the trust store.
  * @returns {Promise<{ exitCode: number; output: string; envWarning?: string }>}
  */
-export async function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack) {
+export async function runShellTestCommand(testCommand, dir, timeout = 120_000, registerChild = doNotTrack, trust) {
   let shellEnv;
   try {
-    shellEnv = await loadShellTestEnv(dir);
+    shellEnv = await loadShellTestEnv(dir, { trust });
   } catch (err) {
     return {
       exitCode: 1,
@@ -972,7 +956,7 @@ function spawnShellTestCommand(testCommand, dir, timeout, registerChild, env) {
  * @returns {Promise<ReviewResult>}
  */
 export async function runCrossVendorReview({ dir, reviewer, model, testCommand, timeout, contextFiles, registerChild = doNotTrack }) {
-  const cliPath = resolveVendorCliPath(dir, reviewer);
+  const cliPath = await resolveVendorCliPath(dir, reviewer);
   const { available } = checkReviewerAvailability(cliPath);
 
   const ctx = {

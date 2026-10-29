@@ -243,6 +243,10 @@ describe("rex cli/commands import surface", () => {
     // the migration's Jev review off. The module is already loaded statically
     // through v1-to-v2/index.js and seams.js above, so this pulls in nothing new.
     "../../migrations/v1-to-v2/jev-review-pass.js",
+    // `rex migrate-diff` compares two plan files read through plan-file.js
+    // above; the diff renderer is its only caller, off public.ts for the same
+    // reason as the rest of the plan machinery.
+    "../../migrations/plan-diff.js",
     // Loaded by migrate-plan through `await import()` so a --rules-only run
     // never pulls the model machinery in. The extractor above only matches
     // static `from "…"`, so these would otherwise sit outside the tracked

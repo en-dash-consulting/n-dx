@@ -24,10 +24,13 @@ pnpm look           # graview preview: the default faces over the emitted files,
 ```
 
 `NDX_GRAVIEW_DIR` points `pnpm sync` at a project's graview dir (default: this
-monorepo's `.graview`). `ndx graview serve .` finds this package beside
-`@n-dx/graview` in the monorepo or in `node_modules`, or through `graview.app`
-in the project config, and runs `bin/serve.js` on a fresh projection with the
-rex endpoint in the environment. Published on its own: `npm i -g @n-dx/graview-face`.
+monorepo's `.graview`). This package is an n-dx extension: its `package.json`
+declares an `ndx.extension` block named `graview-face` whose sidecar is
+`bin/serve.js`. Once n-dx finds it (installed, or this checkout listed under
+`extensions.paths` in `<ndx home>/config.json`) and `ndx extensions enable
+graview-face` approves it, `ndx graview serve .` runs it on a fresh projection
+with the rex endpoint in the environment. Published on its own:
+`npm i -g @n-dx/graview-face`.
 
 ## Where things are
 

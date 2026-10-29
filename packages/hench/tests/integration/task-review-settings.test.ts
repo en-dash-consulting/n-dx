@@ -257,11 +257,15 @@ describe("ndx work --resolve", () => {
   beforeEach(async () => {
     ({ projectDir, rexDir } = await setupProjectDir("hench-task-review-settings-"));
     await (await resolveStore(rexDir)).saveDocument(DOC as never);
+    await writeFile(join(projectDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }), "utf-8");
+    // A repository's own cli_path applies only once it is trusted; the user's
+    // ignored .n-dx.local.json, where `ndx config` writes it, always applies.
     await writeFile(
-      join(projectDir, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "claude", claude: { cli_path: process.execPath } } }),
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { claude: { cli_path: process.execPath } } }),
       "utf-8",
     );
+    await writeFile(join(projectDir, ".gitignore"), ".n-dx.local.json\n", "utf-8");
     commitGitFixtureBaseline(projectDir);
     vi.spyOn(console, "error").mockImplementation(() => {});
   });

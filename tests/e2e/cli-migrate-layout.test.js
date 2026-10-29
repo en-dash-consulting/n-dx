@@ -42,7 +42,8 @@ describe("ndx migrate-layout", () => {
   });
 
   afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
+    // Windows may not have released the exited child's handles on the dir yet (EBUSY).
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("documents itself in the command surface", () => {

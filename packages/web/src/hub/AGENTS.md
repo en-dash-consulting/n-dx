@@ -31,6 +31,32 @@ already-resolved directory in `$NDX_HOME` — the orchestration tier still never
 imports this package, and keeps its own hand-written twin of the resolver in
 `packages/core/layout.js`.
 
+## Extension sidecars
+
+`hub/sidecars.ts` runs the sidecars mounted at `/x/<name>/` — lazy start,
+health wait, idle stop, crash backoff, the memory floor. The hub never reads a
+manifest: it spawns `ndx extensions sidecar <name> --json` (core's CLI, passed
+as `--ndx-cli`) for a launch plan and runs exactly that, so discovery, approval
+and the config check stay in core. Sidecars are always stopped with the hub,
+even when `close({ stopChildren: false })` leaves project servers to be
+re-attached, because nothing records them for the next hub.
+
+The proxy treats a sidecar as untrusted code: the token is checked at the hub's
+boundary like any request, then `sidecarHeaderValue` (proxy.ts) drops every place
+it rides — `X-Ndx-Token`, the `ndx_token` cookie, a bearer carrying it — from
+HTTP and WebSocket requests alike, and `X-Ndx-Base-Path: /x/<name>/` is added.
+Unknown, disabled and unapproved names are all 404, with core's `reason` in the
+body. `x` is reserved as a project id (`isReservedProjectId`, twinned in
+`packages/core/web.js`): registration refuses it and derivation hashes it.
+
+**Versioned API.** `GET`/`POST /api/hub/projects` and `/api/hub/extensions`
+(list, `:name/stop`) are the extension API, stable under `apiVersion` 1
+(docs/architecture/extensions.md, "Versioned hub API"). Their answers carry
+`apiVersion`; removing or retyping a field there needs a bump and an update to
+`tests/integration/hub-extension-api.test.ts`. `hub/extensions.ts` gets the list
+from `ndx extensions list --json`, and its `EXTENSION_API_VERSION` is core's
+twin, pinned by the root `extension-api-version-parity` test.
+
 ## Proxy and base path
 
 `hub/proxy.ts` forwards `/p/<id>/…` to that project's server with the prefix

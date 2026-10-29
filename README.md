@@ -255,6 +255,7 @@ ndx config llm.codex.cli_path codex .
 | `ndx prd export\|import` | Carry the PRD between machines as a portable JSON bundle (`--out`, `--in`, `--replace`), scoped to one item with `--item` (its subtree, its `blockedBy` closure, and its ancestors), or write a stakeholder document with `--format=narrative` (`--include-completed`; one-way) — distinct from `ndx export` above |
 | `ndx which` | Show which n-dx is running: version, `cli.js` path, install kind (registry, global link, checkout) and git ref |
 | `ndx trust [status\|accept\|revoke] [dir]` | Review or accept the execution config a checkout ships (hench guard, test command, `.mcp.json`); `ndx work` runs under the default guard until accepted (`--format=json`) |
+| `ndx extensions <list\|add\|remove\|enable\|disable\|info\|doctor>` | Manage extensions: npm packages with an `ndx.extension` block. `add` installs into `~/.ndx/extensions` (never a project), `enable` approves (`--yes` without a prompt), `remove --purge` also deletes the state folder, `list --json` gives each one's state and reason, `doctor` prints one line per problem with its fix |
 | `ndx iso [dir]` | Render a standalone isometric architecture map (`--source=auto\|sourcevision\|scan`, `--max-nodes=N`, `--no-externals`) |
 | `ndx graview <emit\|check\|describe\|serve\|mcp\|info> [dir]` | Project the PRD, analysis and runs into [Graview](https://graview.dev) and drive the `graview` CLI on the result; `serve` runs the separately published `@n-dx/graview-face` when installed (`--no-face` for the bare store; `--files` adds file nodes; binary from `graview.bin`, `$NDX_GRAVIEW_BIN`, PATH, the face's own `graview`, or `npx -y graview@0.1.20`) |
 | `ndx auth [dir]` | Check and configure LLM provider credentials |
@@ -301,6 +302,18 @@ ndx sourcevision <command> [args] # or standalone: sv <command> [args]
 ```
 
 Both `n-dx` and `ndx` work identically. `sv` is an alias for `sourcevision`.
+
+### Extensions
+
+Separately installed npm packages can add `ndx <name>` commands and a web app that the hub mounts at `/x/<name>/`. n-dx runs them only as separate processes, and only after you approve them.
+
+```sh
+ndx extensions add <package>      # install into the n-dx home
+ndx extensions enable <name>      # approve it
+ndx extensions list               # state and reason for each installed extension
+```
+
+To write one, see the [extension authoring guide](docs/extensions/index.md).
 
 ## MCP Servers
 
@@ -454,15 +467,26 @@ Two limits to know. With `provider: cli`, the vendor CLI (Claude Code, Codex) ex
 
 ### Child-process environment
 
-Commands the agent runs (shell, git, the test runner) receive `process.env` minus variables whose names look like credentials — `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*_API_KEY`, `AWS_*`, and so on. Values are never inspected. A project whose tests need one of them lists it under `guard.env.allow` in `.hench/config.json`; `guard.env.deny` strips more. The default blocked paths also cover credential files (`.env`, `.env.*`, `*.pem`, `*.key`, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`).
+Commands the agent runs (shell, git, the test runner) receive `process.env` minus variables whose names look like credentials — `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*_API_KEY`, `AWS_*`, and so on. Values are never inspected. A project whose tests need one of them lists it under `guard.env.allow` in `.hench/config.json`; `guard.env.deny` strips more. An allow entry the repository ships (`.hench/config.json` or `.n-dx.json`) applies only once you trust the repository; one under `hench.guard.env.allow` in your git-ignored `.n-dx.local.json` always applies. The default blocked paths also cover credential files (`.env`, `.env.*`, `*.pem`, `*.key`, `.npmrc`, `.netrc`, `.aws/`, `.ssh/`).
 
 Every vendor CLI n-dx launches gets the same filter, plus that vendor's own
 authentication. Claude retains `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
 `CLAUDE_CODE_OAUTH_TOKEN`, and `CLAUDE_CONFIG_DIR`, and with
 `CLAUDE_CODE_USE_BEDROCK` or `CLAUDE_CODE_USE_VERTEX` on, that mode's AWS or
 Google credentials; Codex retains `OPENAI_API_KEY`, `CODEX_API_KEY`,
-`CODEX_ACCESS_TOKEN`, and `CODEX_HOME`. Configured API keys override exported
-keys. Google retains its configured `apiKeyEnv` (default `GEMINI_API_KEY`).
+`CODEX_ACCESS_TOKEN`, and `CODEX_HOME`, and the `env_key` of the model provider
+(Azure OpenAI, for example) that your own `$CODEX_HOME/config.toml` or
+`~/.codex/config.toml` selects; a repository's `.codex/config.toml` is never
+read for it. Configured API keys override exported keys. Google retains its
+configured `apiKeyEnv` (default `GEMINI_API_KEY`), and with
+`GOOGLE_GENAI_USE_VERTEXAI` on, `GOOGLE_API_KEY`,
+`GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` and
+`GOOGLE_CLOUD_LOCATION`.
+Which variable is sent as the key (`llm.google.apiKeyEnv`) and where a key is
+sent (`api_endpoint` for any vendor) are honoured from your git-ignored
+`.n-dx.local.json` always, and from the shared `.n-dx.json` only after you
+trust the repository (`ndx trust accept .`), so a cloned repository cannot
+send `GITHUB_TOKEN` to a host it chose.
 Home, PATH, proxy and CA plumbing still passes unless explicitly denied.
 Other tokens must be explicitly allowed.
 

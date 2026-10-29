@@ -157,7 +157,7 @@ describe("hub daemon", () => {
     const bad = await api(hub, "/api/hub/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: "x", repoRoot: "relative", ndxBin: NDX_BIN }),
+      body: JSON.stringify({ id: "p", repoRoot: "relative", ndxBin: NDX_BIN }),
     });
     expect(bad.status).toBe(400);
     expect(bad.body.error).toMatch(/repoRoot/);

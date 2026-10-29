@@ -43,7 +43,8 @@ describe("/api/run-commands", () => {
   afterEach(async () => {
     await closeRouteTestServer(server);
     resetRunCommandJobs();
-    await rm(tmpDir, { recursive: true, force: true });
+    // Windows may not have released the exited child's handles on the dir yet (EBUSY).
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   const base = () => `http://127.0.0.1:${port}/api/run-commands`;

@@ -7,6 +7,7 @@
  *    more than one (`project-switcher.ts`).
  *  - The workspace chip, "<worktree> · <branch>" — a menu of the repository's
  *    worktrees when there is more than one (`workspace-switcher.ts`).
+ *  - Behind the hub, enabled extensions' project links (`extension-links.ts`).
  *
  * It replaced the breadcrumb row above the page. The stage and view segments
  * that row carried went with it: the top bar's stage tabs already say where a
@@ -26,6 +27,7 @@ import { VIEW_META, PRODUCT_LABELS } from "../api.js";
 import type { ViewMeta } from "../api.js";
 import { WorkspaceSwitcher } from "./workspace-switcher.js";
 import { HubLink, ProjectSwitcher, useHubProjects } from "./project-switcher.js";
+import { ExtensionLinks, useExtensionLinks } from "./extension-links.js";
 
 export interface ProjectContextProps {
   view: ViewId;
@@ -37,6 +39,7 @@ export function ProjectContext({ view, hubFetcher }: ProjectContextProps) {
   const project = useProjectMetadata();
   const cliName = useCliName();
   const hub = useHubProjects(hubFetcher);
+  const extensionLinks = useExtensionLinks(hub, hubFetcher);
 
   // Looked up rather than asserted: `view` is not always a live view id. The
   // crash-recovery banner restores a navigation state read out of
@@ -78,5 +81,6 @@ export function ProjectContext({ view, hubFetcher }: ProjectContextProps) {
       }),
     ),
     h(WorkspaceSwitcher, { view, branch: project.git?.branch ?? null }),
+    h(ExtensionLinks, { links: extensionLinks }),
   );
 }

@@ -206,6 +206,24 @@ describe("finalizeRun — uncommitted-work gate", () => {
     expect(statuses).toEqual(["completed"]);
   });
 
+  it.each(["claude_commands.log", "claude_commands.log.1"])("completes with only the CLI invocation log %s untracked", async (log) => {
+    // Simulate the operational file a credential probe or agent spawn leaves.
+    // Deliberately omit a gitignore entry: the completion gate must protect
+    // projects initialized before init learned to ignore the CLI log too.
+    await writeFile(join(projectDir, log), "vendor CLI invocation\n", "utf-8");
+    expect((await porcelain()).trim()).toBe(`?? ${log}`);
+
+    const run = buildCompletedRun();
+    await runFinalize(run, buildStore());
+
+    expect(run.status).toBe("completed");
+    expect(statuses).toEqual(["completed"]);
+    expect(await porcelain()).toContain(`?? ${log}`);
+    const committed = await headFiles();
+    expect(committed).toContain(`.rex/${PRD_TREE_DIRNAME}/task-slug-abc/index.md`);
+    expect(committed).not.toContain(log);
+  });
+
   /**
    * The cross-worktree claim across the refusal (PR E, audit item c943aa11).
    *

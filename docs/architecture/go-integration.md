@@ -201,7 +201,9 @@ Frontend-specific archetypes (`component`, `hook`, `page`, `route-module`) are s
 
 ```typescript
 const GO_GUARD_DEFAULTS = {
-  blockedPaths: [".hench/**", ".rex/**", ".git/**", "vendor/**"],
+  // Shared by every language: n-dx state, .git, every ecosystem's
+  // dependency directories (vendor/**, node_modules/**, …), credential files.
+  blockedPaths: guardBaselineForLanguage("go").blockedPaths,
   allowedCommands: ["go", "make", "git", "golangci-lint"],
   commandTimeout: 30000,
   maxFileSize: 1048576,

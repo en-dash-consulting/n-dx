@@ -61,6 +61,14 @@ describe("findUncommittedWork", () => {
     ).resolves.toEqual({ clean: true, paths: [] });
   });
 
+  it.each(["claude_commands.log", "claude_commands.log.1"])("does not refuse completion over the CLI log %s", async (log) => {
+    await expect(findUncommittedWork(withDirty([`?? ${log}`])))
+      .resolves.toEqual({ clean: true, paths: [] });
+    // The discount must not hide real agent work alongside the log.
+    await expect(findUncommittedWork(withDirty([`?? ${log}`, "?? src/uncommitted.ts"])))
+      .resolves.toEqual({ clean: false, paths: ["src/uncommitted.ts"] });
+  });
+
   it("does not count the PRD paths the completion commit still covers", async () => {
     await expect(
       findUncommittedWork(

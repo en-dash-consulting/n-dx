@@ -1,0 +1,96 @@
+schema: "rex/v2"
+items:
+  "10c03aa1-046b-4eb9-ad6d-f5d128e5aad5":
+    status: "completed"
+    startedAt: "2026-10-27T16:06:47.482Z"
+    completedAt: "2026-10-27T16:10:27.814Z"
+    endedAt: "2026-10-27T16:10:27.814Z"
+    activeIntervals: [{"end":"2026-10-27T16:10:27.814Z","start":"2026-10-27T16:06:47.482Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "decideProxy strips ndx_token from sidecar paths (HTTP any method, WebSocket) and the trailing-slash redirect. Commit 11268a788."
+    lastModified: "2026-10-27T16:10:27.814Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "28b36086-bfff-4cc8-9ace-087fe2a03360":
+    status: "completed"
+    startedAt: "2026-10-27T14:26:46.347Z"
+    completedAt: "2026-10-27T14:39:15.813Z"
+    endedAt: "2026-10-27T14:39:15.813Z"
+    activeIntervals: [{"end":"2026-10-27T14:36:21.899Z","start":"2026-10-27T14:26:46.347Z"},{"end":"2026-10-27T14:39:15.813Z","start":"2026-10-27T14:39:15.813Z"}]
+    lastModified: "2026-10-27T14:39:15.813Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "3ac5b6b4-1452-4ccb-8d81-b84cce474af8":
+    status: "completed"
+    startedAt: "2026-10-27T16:14:43.925Z"
+    completedAt: "2026-10-27T16:14:43.925Z"
+    endedAt: "2026-10-27T16:14:43.925Z"
+    activeIntervals: [{"end":"2026-10-27T16:14:43.925Z","start":"2026-10-27T16:14:43.925Z"}]
+    appliedAt: "2026-10-27T16:14:43.925Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T16:14:43.925Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "9a784d5f-3468-4e89-acc1-6395304c4fd4":
+    status: "completed"
+    startedAt: "2026-10-27T15:31:14.439Z"
+    completedAt: "2026-10-27T15:34:23.501Z"
+    endedAt: "2026-10-27T15:34:23.501Z"
+    activeIntervals: [{"end":"2026-10-27T15:34:23.501Z","start":"2026-10-27T15:31:14.439Z"}]
+    lastModified: "2026-10-27T15:34:23.501Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "c400642c-8e21-4338-b3c5-997c2a3be4a2":
+    status: "completed"
+    startedAt: "2026-10-27T15:22:37.878Z"
+    completedAt: "2026-10-27T15:27:37.037Z"
+    endedAt: "2026-10-27T15:27:37.037Z"
+    activeIntervals: [{"end":"2026-10-27T15:27:37.037Z","start":"2026-10-27T15:22:37.878Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "SidecarManager gains a closed flag set by stopAll; start refuses 503 on entry and again after the plan/port awaits, before spawning. Hub close stops listening before the stops and closes connections after. Two tests: manager-level in-flight plan, and hub-level request during close; neither leaves a process."
+    lastModified: "2026-10-27T15:27:37.037Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "cb9b167b-479f-4ae5-b618-52fe27fa4211":
+    status: "completed"
+    startedAt: "2026-10-27T15:27:46.894Z"
+    completedAt: "2026-10-27T15:31:04.626Z"
+    endedAt: "2026-10-27T15:31:04.626Z"
+    activeIntervals: [{"end":"2026-10-27T15:31:04.626Z","start":"2026-10-27T15:27:46.894Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "proxy.ts skips the Location rewrite for sidecars when Location equals the prefix or starts with prefix + '/'; hub-sidecars test covers both cases and a /x/recondite near-miss."
+    lastModified: "2026-10-27T15:31:04.626Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "d3e8d81c-b5db-4094-ad90-f4df8fe06082":
+    status: "completed"
+    startedAt: "2026-10-27T15:57:52.103Z"
+    completedAt: "2026-10-27T16:01:38.009Z"
+    endedAt: "2026-10-27T16:01:38.009Z"
+    activeIntervals: [{"end":"2026-10-27T16:01:38.009Z","start":"2026-10-27T15:57:52.103Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Counts tagged with a per-instance generation; releases from a let-go instance no longer touch the replacement. Commit 23994c46b."
+    lastModified: "2026-10-27T16:01:38.009Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "dc6d3692-a206-4348-ab5e-18cad96e97dc":
+    status: "completed"
+    startedAt: "2026-10-27T16:10:40.905Z"
+    completedAt: "2026-10-27T16:14:43.925Z"
+    endedAt: "2026-10-27T16:14:43.925Z"
+    activeIntervals: [{"end":"2026-10-27T16:14:43.925Z","start":"2026-10-27T16:10:40.905Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "homeExtensions keeps incompatible entries with a null manifest; renderExtensionCard labels them by name. HOME_EXTENSIONS_WAIT_MS moved to home.ts; both timeouts pinned by tests. Commit aad7e53f1."
+    lastModified: "2026-10-27T16:14:43.925Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "e4387d5b-5cb9-49c8-906a-c78fb748a4e1":
+    status: "completed"
+    startedAt: "2026-10-27T15:16:30.610Z"
+    completedAt: "2026-10-27T15:22:18.186Z"
+    endedAt: "2026-10-27T15:22:18.186Z"
+    activeIntervals: [{"end":"2026-10-27T15:20:54.040Z","start":"2026-10-27T15:16:30.610Z"},{"end":"2026-10-27T15:22:18.186Z","start":"2026-10-27T15:22:18.186Z"}]
+    lastModified: "2026-10-27T15:22:18.186Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "ecfcc5a2-aff2-4a3d-832e-b402dd9dbdff":
+    status: "completed"
+    startedAt: "2026-10-27T16:01:49.727Z"
+    completedAt: "2026-10-27T16:06:36.148Z"
+    endedAt: "2026-10-27T16:06:36.148Z"
+    activeIntervals: [{"end":"2026-10-27T16:06:36.148Z","start":"2026-10-27T16:01:49.727Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "After the first healthy probe, the hub waits SIDECAR_SETTLE_MS (250 ms) or the child's exit, whichever comes first, and refuses the start if the child has gone. A new integration test covers a squatter server that answers health while the bin fails to bind."
+    lastModified: "2026-10-27T16:06:36.148Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

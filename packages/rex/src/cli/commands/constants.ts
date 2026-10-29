@@ -43,6 +43,7 @@ export function usage(): void {
           { name: "release stamp <version> [dir]", description: "Stamp shippedIn on the changes a release ships (no-op on a v1 tree)" },
           { name: "reorganize [dir]", description: "Detect and fix structural issues in the PRD" },
           { name: "health [dir]", description: "Show structure health score (depth, balance, completeness)" },
+          { name: "migrate-diff --before=<path> --after=<path>", description: "Compare migration plan decisions in sentences (read-only)" },
           { name: "migrate-to-md [dir]", description: "Create .rex/prd.md from .rex/prd.json without modifying JSON" },
           { name: "migrate-folder-tree-filenames [dir]", description: "Rename legacy index.md files to title-based filenames" },
           { name: "migrate-slugs [dir]", description: `Re-serialise the PRD tree at the current rule: ${SLUG_RULE_SUMMARY}` },

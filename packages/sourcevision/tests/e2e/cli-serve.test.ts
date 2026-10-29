@@ -95,7 +95,8 @@ describe.skipIf(!canBindLoopbackSync())("sourcevision serve (e2e)", () => {
         }, 3_000);
       });
     }
-    if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
+    // Retry: on Windows the killed server's handles on tmpDir outlive its close event (EBUSY on rmdir).
+    if (tmpDir) await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("serves viewer and data files", { timeout: 30000 }, async () => {

@@ -1,0 +1,90 @@
+schema: "rex/v2"
+items:
+  "11c9e658-ff8b-43a2-9d27-bd2d99155059":
+    status: "completed"
+    startedAt: "2026-10-27T18:41:23.203Z"
+    completedAt: "2026-10-27T18:43:39.191Z"
+    endedAt: "2026-10-27T18:43:39.191Z"
+    activeIntervals: [{"end":"2026-10-27T18:43:39.191Z","start":"2026-10-27T18:41:23.203Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Retry the between-runs .sourcevision rm in cli-analyze.test.ts; sv analyze --fast spawns no long-lived child."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T18:43:39.191Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3039164b-8369-450c-8745-9b133c345ae7":
+    status: "completed"
+    startedAt: "2026-10-27T18:09:41.690Z"
+    completedAt: "2026-10-27T18:11:28.338Z"
+    endedAt: "2026-10-27T18:11:28.338Z"
+    activeIntervals: [{"end":"2026-10-27T18:11:28.338Z","start":"2026-10-27T18:09:41.690Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "cli-serve.test.ts afterEach rm now uses maxRetries:10, retryDelay:100 with a Windows handle-release comment."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T18:11:28.338Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7f70e60d-151b-4fd5-bb80-7c1d07e61131":
+    status: "completed"
+    startedAt: "2026-10-27T19:40:49.534Z"
+    completedAt: "2026-10-27T19:49:54.041Z"
+    endedAt: "2026-10-27T19:49:54.041Z"
+    activeIntervals: [{"end":"2026-10-27T19:49:54.041Z","start":"2026-10-27T19:40:49.534Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Test-only: chunked 413 test tolerates EPIPE/ECONNRESET, writes with backpressure, and asserts the 413 from a server-side wire record."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T19:49:54.041Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c354b598-2c38-4049-a534-443923746d2c":
+    status: "completed"
+    startedAt: "2026-10-27T19:51:36.805Z"
+    completedAt: "2026-10-27T19:57:14.799Z"
+    endedAt: "2026-10-27T19:57:14.799Z"
+    activeIntervals: [{"end":"2026-10-27T19:57:14.799Z","start":"2026-10-27T19:51:36.805Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Staleness probe now written to an os tmpdir; PROMPT_CENSUS_ROOT seam (inert unless set) points it at the repo. Commit 12dd3362b, closes #632."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T19:57:14.799Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cd7b335d-310a-4700-86a8-0b064b689618":
+    status: "completed"
+    startedAt: "2026-10-27T18:58:41.199Z"
+    completedAt: "2026-10-27T19:07:17.750Z"
+    endedAt: "2026-10-27T19:07:17.750Z"
+    activeIntervals: [{"end":"2026-10-27T19:07:17.750Z","start":"2026-10-27T18:58:41.199Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added maxRetries:10/retryDelay:100 plus a Windows handle-release comment to the four named teardowns (commit 30fdbd94e)."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T19:07:17.750Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d2ae6bd7-a3b1-425f-957e-1e5654bd9b1c":
+    status: "completed"
+    startedAt: "2026-10-27T19:18:18.136Z"
+    completedAt: "2026-10-27T19:27:29.954Z"
+    endedAt: "2026-10-27T19:27:29.954Z"
+    activeIntervals: [{"end":"2026-10-27T19:27:29.954Z","start":"2026-10-27T19:18:18.136Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Windows-sized (20 s) grandchild ready wait, derived it() timeout, richer failure message; forced-slow check: old wait fails, new passes."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T19:27:29.954Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "da20dc09-9f7e-46f1-8772-5da52fa6a927":
+    status: "completed"
+    startedAt: "2026-10-27T19:57:14.799Z"
+    completedAt: "2026-10-27T19:57:14.799Z"
+    endedAt: "2026-10-27T19:57:14.799Z"
+    activeIntervals: [{"end":"2026-10-27T19:57:14.799Z","start":"2026-10-27T19:57:14.799Z"}]
+    appliedAt: "2026-10-27T19:57:14.799Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T19:57:14.799Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f720598e-9179-40e1-87d7-ece32720ac81":
+    status: "completed"
+    startedAt: "2026-10-27T17:56:07.454Z"
+    completedAt: "2026-10-27T17:58:34.750Z"
+    endedAt: "2026-10-27T17:58:34.750Z"
+    activeIntervals: [{"end":"2026-10-27T17:58:34.750Z","start":"2026-10-27T17:56:07.454Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "afterAll rmSync in hub-auth-token.test.ts now uses maxRetries:10, retryDelay:100 with a Windows handle-release comment."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T17:58:34.750Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

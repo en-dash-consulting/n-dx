@@ -491,7 +491,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
     usage: "rex verify [options] [dir]",
     description:
       "Maps acceptance criteria to test files and optionally executes tests\n" +
-      "to validate task completion.",
+      "to validate task completion. The repository's test command runs only\n" +
+      "once you have accepted its execution config with 'ndx trust accept .'.",
     options: [
       { flag: "--task=<id>", description: "Verify a specific task only" },
       { flag: "--dry-run", description: "Map criteria to tests without running them" },
@@ -903,6 +904,24 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { command: "rex migrate-plan --out=./migration-plan.json", description: "Re-run after a model error to continue from the recorded answers" },
     ],
     related: ["migrate-apply", "migrate-to-folder-tree", "export", "validate"],
+  },
+  "migrate-diff": {
+    tool: "rex",
+    command: "migrate-diff",
+    summary: "compare two migration plans in words",
+    usage: "rex migrate-diff --before=<plan.json> --after=<plan.json>",
+    description: "Lists added, dropped, moved and changed v1-to-v2 plan entries in sentences,\n" +
+      "with counts per kind and corrupt metadata counted once. Reads only the two\n" +
+      "plan files; it does not need a PRD, write state or call a model.\n" +
+      "Cut time, source digest, code evidence metadata, object key order, cached\n" +
+      "model answers and spelled-out defaults alone are ignored; entry decisions,\n" +
+      "summary decisions and completion are compared.",
+    options: [
+      { flag: "--before=<path>", description: "Earlier JSON migration plan (required)" },
+      { flag: "--after=<path>", description: "Later JSON migration plan (required)" },
+    ],
+    examples: [{ command: "rex migrate-diff --before=old.json --after=new.json", description: "Review what re-planning changed" }],
+    related: ["migrate-plan", "migrate-apply"],
   },
   "migrate-apply": {
     tool: "rex",

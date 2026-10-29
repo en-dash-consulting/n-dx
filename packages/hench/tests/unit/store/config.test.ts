@@ -224,14 +224,18 @@ describe("loadConfig", () => {
       expect(warnings[0]).not.toContain(".n-dx.json\"");
     });
 
-    it("blames .n-dx.local.json when both files set the same invalid field (local wins)", async () => {
+    // Layer by layer: an invalid local value reverts to the .n-dx.json value
+    // beneath it, not to .hench/config.json — the repository-trust review
+    // folds the files the same way and must agree on what runs.
+    it("reverts an invalid .n-dx.local.json field to the .n-dx.json value beneath it", async () => {
       await writeProjectConfig({ hench: { maxTurns: 20 } });
       await writeLocalConfig({ hench: { maxTurns: -5 } });
       const warnings: string[] = [];
       const config = await loadConfig(henchDir, {
         onWarning: (message) => warnings.push(message),
       });
-      expect(config.maxTurns).toBe(DEFAULT_HENCH_CONFIG().maxTurns);
+      expect(config.maxTurns).toBe(20);
+      expect(warnings).toHaveLength(1);
       expect(warnings[0]).toContain(".n-dx.local.json");
     });
 

@@ -1,0 +1,40 @@
+schema: "rex/v2"
+items:
+  "03ef01ab-cea6-48f9-934b-c06c6fbf5673":
+    status: "completed"
+    startedAt: "2026-10-26T17:05:00.842Z"
+    completedAt: "2026-10-26T17:12:03.232Z"
+    endedAt: "2026-10-26T17:12:03.232Z"
+    activeIntervals: [{"end":"2026-10-26T17:12:03.232Z","start":"2026-10-26T17:05:00.842Z"}]
+    lastModified: "2026-10-26T17:12:03.232Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "4b5bea35-7ea0-4135-a478-c732154f06de":
+    status: "completed"
+    startedAt: "2026-10-26T17:39:48.332Z"
+    completedAt: "2026-10-26T18:00:24.192Z"
+    endedAt: "2026-10-26T18:00:24.192Z"
+    activeIntervals: [{"end":"2026-10-26T18:00:24.192Z","start":"2026-10-26T17:39:48.332Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx extensions list/add/remove/enable/disable/info/doctor in packages/core/extensions-command.js, state in extension-state.js; committed b804b08f1"
+    lastModified: "2026-10-26T18:00:24.192Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "61b61d32-8d55-4084-9b10-6c71e71e3d88":
+    status: "completed"
+    startedAt: "2026-10-26T18:00:24.192Z"
+    completedAt: "2026-10-26T18:00:24.192Z"
+    endedAt: "2026-10-26T18:00:24.192Z"
+    activeIntervals: [{"end":"2026-10-26T18:00:24.192Z","start":"2026-10-26T18:00:24.192Z"}]
+    appliedAt: "2026-10-26T18:00:24.192Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-26T18:00:24.192Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "e9435b47-1ab2-4739-9338-ab00f1c518d6":
+    status: "completed"
+    startedAt: "2026-10-26T17:30:12.128Z"
+    completedAt: "2026-10-26T17:39:26.834Z"
+    endedAt: "2026-10-26T17:39:26.834Z"
+    activeIntervals: [{"end":"2026-10-26T17:39:26.834Z","start":"2026-10-26T17:30:12.128Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "packages/core/extension-discovery.js + tests/unit/extension-discovery.test.js (commit 6087b8c9c)"
+    lastModified: "2026-10-26T17:39:26.834Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

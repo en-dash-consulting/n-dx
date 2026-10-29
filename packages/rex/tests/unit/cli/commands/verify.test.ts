@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { recordRepoTrust } from "@n-dx/llm-client";
 import { cmdVerify } from "../../../../src/cli/commands/verify.js";
 import { CLIError } from "../../../../src/cli/errors.js";
 import type { PRDDocument } from "../../../../src/schema/index.js";
@@ -180,5 +181,80 @@ describe("cmdVerify", () => {
     const out = output();
 
     expect(out).toContain("No test command configured");
+  });
+
+  describe("a repository test command and repository trust (#686 finding 2)", () => {
+    let home: string;
+    let savedHome: string | undefined;
+    // Plain and unchained: an info finding, so the checkout stays baseline.
+    // The command runs in the repository, so a relative marker keeps quoting shell-neutral.
+    const command = `node -e "require('fs').writeFileSync('RAN', 'x')"`;
+    const ran = () => existsSync(join(tmp, "RAN"));
+
+    beforeEach(() => {
+      home = mkdtempSync(join(tmpdir(), "rex-verify-cmd-home-"));
+      savedHome = process.env.NDX_HOME;
+      process.env.NDX_HOME = home;
+      writePRD(tmp, PRD_WITH_CRITERIA);
+      mkdirSync(join(tmp, "tests"), { recursive: true });
+      writeFileSync(join(tmp, "tests", "login.test.ts"), "");
+      writeConfig(tmp, { ...BASE_CONFIG, test: command });
+    });
+
+    afterEach(() => {
+      if (savedHome === undefined) delete process.env.NDX_HOME;
+      else process.env.NDX_HOME = savedHome;
+      rmSync(home, { recursive: true, force: true });
+      process.exitCode = undefined;
+    });
+
+    it("is not run until the user accepts it, and runs once they have", async () => {
+      await cmdVerify(tmp, {});
+      expect(ran()).toBe(false);
+      expect(output()).toContain("ndx trust accept .");
+      // Tests asked for and refused is not a pass: a CI step must not go green.
+      expect(process.exitCode).toBe(1);
+
+      recordRepoTrust(tmp);
+      logSpy.mockClear();
+      process.exitCode = undefined;
+
+      await cmdVerify(tmp, {});
+      expect(ran()).toBe(true);
+      expect(output()).toContain("Tests passed");
+      expect(output()).not.toContain("ndx trust accept .");
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it("reports the refusal in JSON output with verify_criteria's fields", async () => {
+      await cmdVerify(tmp, { format: "json" });
+      const parsed = JSON.parse(output());
+      expect(parsed.testRun).toBeUndefined();
+      expect(parsed.testsSkipped).toContain("ndx trust accept .");
+      expect(parsed.trust.state).toBe("baseline");
+      expect(ran()).toBe(false);
+      expect(process.exitCode).toBe(1);
+    });
+
+    it("is refused again once the accepted command changes", async () => {
+      recordRepoTrust(tmp);
+      writeConfig(tmp, { ...BASE_CONFIG, test: `${command} --` });
+      await cmdVerify(tmp, {});
+      expect(ran()).toBe(false);
+      expect(output()).toContain("ndx trust accept .");
+    });
+
+    it("never runs a non-string rex.test from the project config", async () => {
+      recordRepoTrust(tmp);
+      writeFileSync(join(tmp, ".n-dx.json"), JSON.stringify({ rex: { test: [command] } }));
+      await cmdVerify(tmp, {});
+      expect(ran()).toBe(false);
+    });
+
+    it("does not consult trust with --dry-run", async () => {
+      await cmdVerify(tmp, { "dry-run": "true" });
+      expect(ran()).toBe(false);
+      expect(output()).not.toContain("ndx trust accept .");
+    });
   });
 });

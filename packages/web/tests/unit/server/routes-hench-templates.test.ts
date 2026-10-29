@@ -198,6 +198,31 @@ describe("Hench Templates API routes", () => {
     expect(saved[0].id).toBe("my-new-template");
   });
 
+  it("a template saved from the settings page does not carry the user's local claudePath into .hench/config.json", async () => {
+    // The settings page posts the GET config as the overlay, and GET carries
+    // hench.claudePath from .n-dx.local.json. Applied, it would land in
+    // .hench/config.json, where the trust review reads it as the repository's.
+    await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ hench: { claudePath: "/x/claude" } }));
+    const current = (await (await fetch(`http://127.0.0.1:${port}/api/hench/config`)).json()) as { config: Record<string, unknown> };
+    expect(current.config.claudePath).toBe("/x/claude");
+
+    const create = await fetch(`http://127.0.0.1:${port}/api/hench/templates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "from-settings", config: { ...current.config, schema: undefined, maxTurns: 12 } }),
+    });
+    expect(create.status).toBe(201);
+    const stored = JSON.parse(await readFile(join(henchDir, "templates.json"), "utf-8"));
+    expect(Object.hasOwn(stored[0].config, "claudePath")).toBe(false);
+    expect(stored[0].config.maxTurns).toBe(12);
+
+    const apply = await fetch(`http://127.0.0.1:${port}/api/hench/templates/from-settings/apply`, { method: "POST" });
+    expect(apply.status).toBe(200);
+    const saved = JSON.parse(await readFile(join(henchDir, "config.json"), "utf-8"));
+    expect(Object.hasOwn(saved, "claudePath")).toBe(false);
+    expect(saved.maxTurns).toBe(12);
+  });
+
   it("POST /api/hench/templates rejects built-in template ID", async () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/hench/templates`, {
       method: "POST",

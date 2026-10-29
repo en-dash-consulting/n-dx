@@ -8,7 +8,7 @@ import {
   DEFAULT_HENCH_CONFIG,
 } from "../schema/index.js";
 import { toCanonicalJSON } from "../prd/llm-gateway.js";
-import { deepMerge, loadProjectOverrideSources, mergeWithOverrides } from "./project-config.js";
+import { loadProjectOverrideSources, mergeWithOverrides } from "./project-config.js";
 import type { ProjectOverrideSource } from "./project-config.js";
 import type { HenchConfig, ProjectLanguage } from "../schema/index.js";
 
@@ -73,15 +73,6 @@ function topLevelKeys(issues: Array<{ path: Array<PropertyKey> }>): string[] {
   return [...keys].sort();
 }
 
-/** Which override file most recently set `key` — later sources win, matching the merge order. */
-function fileForOverrideKey(sources: ProjectOverrideSource[], key: string): string {
-  let owner = sources[sources.length - 1].file;
-  for (const source of sources) {
-    if (Object.prototype.hasOwnProperty.call(source.data, key)) owner = source.file;
-  }
-  return owner;
-}
-
 export async function loadConfig(
   henchDir: string,
   options: LoadConfigOptions = {},
@@ -111,43 +102,48 @@ export async function loadConfig(
   // Merge project-level .n-dx.json / .n-dx.local.json overrides (project
   // config takes precedence). These files skip HenchConfigSchema entirely on
   // the way in — unlike .hench/config.json above, nothing here validates a
-  // single field as it's written — so the merged result is re-validated. An
-  // invalid override field reverts to its value in `config` (the already-
-  // validated base) or the schema default when the base doesn't carry it,
-  // with a warning naming the field and the file it came from. Unlike an
-  // invalid .hench/config.json, this never throws regardless of
-  // `options.onInvalid`: a stray project override must not stop a run.
+  // single field as it's written — so each layer's result is re-validated.
+  // An invalid override field reverts to its value in the layer below (or
+  // the schema default when that layer doesn't carry it), with a warning
+  // naming the field and the file it came from. Layer by layer, so an invalid
+  // local value cannot resurrect a `.hench/config.json` value that
+  // `.n-dx.json` replaced: the repository-trust review folds the layers the
+  // same way (llm-client `repo-trust.ts`), and the two must agree on the
+  // guard that runs. Unlike an invalid .hench/config.json, this never throws
+  // regardless of `options.onInvalid`: a stray project override must not
+  // stop a run.
   const overrideSources = await loadProjectOverrideSources(henchDir, "hench");
-  if (overrideSources.length === 0) return config;
+  return overrideSources.reduce((lower, source) => applyOverrideLayer(lower, source, options), config);
+}
 
-  const overrides = overrideSources.reduce(
-    (acc, source) => deepMerge(acc, source.data),
-    {} as Record<string, unknown>,
-  );
-  const merged = mergeWithOverrides(config, overrides);
+function applyOverrideLayer(
+  lower: HenchConfig,
+  source: ProjectOverrideSource,
+  options: LoadConfigOptions,
+): HenchConfig {
+  const merged = mergeWithOverrides(lower, source.data);
   const mergedResult = validateConfig(merged);
   if (mergedResult.ok) return merged;
 
   const repaired = revertInvalidFields(
     merged as unknown as Record<string, unknown>,
     mergedResult.errors.issues,
-    config as unknown as Record<string, unknown>,
+    lower as unknown as Record<string, unknown>,
   );
   const badKeys = repaired ? repaired.replacedFields : topLevelKeys(mergedResult.errors.issues);
   for (const key of badKeys) {
-    const file = fileForOverrideKey(overrideSources, key);
     const detail = formatFieldIssues(mergedResult.errors.issues, key);
     options.onWarning?.(
-      `Invalid hench.${key} in ${file} — keeping the current config value. (${detail})`,
+      `Invalid hench.${key} in ${source.file} — keeping the current config value. (${detail})`,
     );
   }
-  // `candidate`, not `config`: the success path above returns the merged
-  // object unparsed, and HenchConfig carries fields the schema does not
-  // declare (skipFullTestGate, planOnlyMaxRetries, selfHeal). Returning the
-  // parsed config here would let one invalid field silently discard every
+  // `candidate`, not the parsed config: the success path above returns the
+  // merged object unparsed, and HenchConfig carries fields the schema does
+  // not declare (skipFullTestGate, planOnlyMaxRetries, selfHeal). Returning
+  // the parsed config here would let one invalid field silently discard every
   // valid override of those — a loss no warning above mentions, and one that
   // would depend on whether some unrelated field happened to be valid.
-  return repaired ? (repaired.candidate as unknown as HenchConfig) : config;
+  return repaired ? (repaired.candidate as unknown as HenchConfig) : lower;
 }
 
 export async function saveConfig(

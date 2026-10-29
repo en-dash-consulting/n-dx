@@ -29,6 +29,7 @@
 
 import { describe, it, expect } from "vitest";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { checkArchitecturePolicy, checkRestrictedImports, isNdxMonorepo } from "../../packages/core/ci.js";
@@ -253,6 +254,167 @@ describe("architecture policy: orchestration spawn-only rule", () => {
   }
 });
 
+/**
+ * Extensions are spawned, never imported (docs/architecture/extensions.md):
+ * n-dx reads an extension's `package.json` and runs its `bin` as a child
+ * process. Two holes would break that: an extension module that loads code at
+ * run time, and an `import()` or `require` by computed specifier anywhere in
+ * core, which could be pointed at a discovered package.
+ */
+describe("architecture policy: orchestration never imports extension code", () => {
+  const CORE = "packages/core";
+  /** Core modules allowed an `import()` whose specifier is computed, with why. */
+  const COMPUTED_IMPORTS = new Map([
+    ["packages/core/export.js", "rex's public API from the installed @n-dx/rex (pathToFileURL of a resolved path)"],
+  ]);
+  /** An `import(` not followed by a plain string literal and its closing paren. */
+  const COMPUTED_IMPORT = /\bimport\s*\(\s*(?!["'][^"'`$]*["']\s*\))/;
+  /** Core modules allowed a require whose specifier is computed, with why. */
+  const COMPUTED_REQUIRES = new Map();
+  /** A call's opening paren not followed by a plain string literal and its closing paren. */
+  const NON_LITERAL_CALL = String.raw`\s*\(\s*(?!["'][^"'\`$]*["']\s*\))`;
+
+  const escapeName = (n) => n.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+
+  /**
+   * Whether `text` loads a module by computed specifier through `require`: a
+   * bare `require(…)`, a `createRequire(…)` result called directly or through
+   * any name it reaches by declaration, assignment or alias (also via `.call`
+   * / `.apply`), or `Module._load(…)` with any argument. `.resolve()` only
+   * locates a file and runs nothing, so it does not count.
+   */
+  function hasComputedRequire(text) {
+    if (/\b_load\s*\(/.test(text)) return true;
+    const names = new Set(["require"]);
+    for (const m of text.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*=(?!=)\s*(?:[\w$]+\.)?createRequire\s*\(/g)) {
+      names.add(m[1]);
+    }
+    // Aliases: `const load = _require;`, followed until no new name appears.
+    for (let size = 0; size !== names.size; ) {
+      size = names.size;
+      const known = [...names].map(escapeName).join("|");
+      const alias = new RegExp(String.raw`(?<![\w$.])([A-Za-z_$][\w$]*)\s*=(?!=)\s*(?:${known})(?![\w$])(?!\s*[.(\[])`, "g");
+      for (const m of text.matchAll(alias)) names.add(m[1]);
+    }
+    const callee = [...names].map(escapeName).join("|");
+    return [
+      new RegExp(String.raw`(?<![\w$.])(?:${callee})(?:\s*\.\s*(?:call|apply))?` + NON_LITERAL_CALL),
+      new RegExp(String.raw`\bcreateRequire\s*\([^()]*(?:\([^()]*\)[^()]*)*\)` + NON_LITERAL_CALL),
+    ].some((pattern) => pattern.test(text));
+  }
+
+  /** A file core can run as a module. */
+  const MODULE_FILE = /\.[cm]?js$/;
+
+  /** Core's own modules: its top-level .js, .mjs and .cjs files and bin/. */
+  function coreModules() {
+    return [CORE, `${CORE}/bin`].flatMap((dir) =>
+      readdirSync(join(ROOT, dir)).filter((f) => MODULE_FILE.test(f)).map((f) => `${dir}/${f}`),
+    );
+  }
+
+  it("scans every module extension core can run", () => {
+    expect(["a.js", "a.mjs", "a.cjs"].filter((f) => !MODULE_FILE.test(f))).toEqual([]);
+    expect(["a.json", "a.d.ts", "a.js.map"].filter((f) => MODULE_FILE.test(f))).toEqual([]);
+  });
+
+  /** `rel`'s text with comment lines dropped, so JSDoc `import("…")` types do not count. */
+  function code(rel) {
+    return readFileSync(join(ROOT, rel), "utf-8")
+      .split("\n")
+      .filter((line) => !/^\s*(?:\/\/|\/?\*)/.test(line))
+      .join("\n");
+  }
+
+  const extensionModules = () => coreModules().filter((rel) => /\/extensions?-[a-z-]+\.[cm]?js$/.test(rel));
+
+  it("sees the extension modules", () => {
+    expect(extensionModules()).toEqual(expect.arrayContaining([
+      `${CORE}/extension-discovery.js`,
+      `${CORE}/extension-dispatch.js`,
+      `${CORE}/extension-env.js`,
+      `${CORE}/extension-manifest.js`,
+      `${CORE}/extension-state.js`,
+      `${CORE}/extensions-command.js`,
+    ]));
+  });
+
+  it("extension modules import only node builtins and core peers, and load no code at run time", () => {
+    const violations = [];
+    for (const rel of extensionModules()) {
+      const text = code(rel);
+      for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s+)["']([^"']+)["']/g)) {
+        const builtin = m[1].startsWith("node:") || builtinModules.includes(m[1]);
+        if (!builtin && !m[1].startsWith("./")) violations.push(`${rel}: imports ${m[1]}`);
+      }
+      for (const [pattern, what] of [
+        [/\bimport\s*\(/, "dynamic import()"],
+        [/\brequire\s*\(|\bcreateRequire\b/, "require"],
+        [/\bnew\s+Function\b|["']node:vm["']/, "code evaluation"],
+      ]) {
+        if (pattern.test(text)) violations.push(`${rel}: ${what}`);
+      }
+    }
+    expect(violations, "an extension module that loads code could load an extension's; spawn it instead").toEqual([]);
+  });
+
+  it("core imports by computed specifier only where documented", () => {
+    const violations = coreModules()
+      .filter((rel) => COMPUTED_IMPORT.test(code(rel)))
+      .filter((rel) => !COMPUTED_IMPORTS.has(rel));
+    expect(violations, "a computed import() in core could load a discovered package").toEqual([]);
+  });
+
+  it("COMPUTED_IMPORTS has no stale entries", () => {
+    for (const rel of COMPUTED_IMPORTS.keys()) {
+      expect(existsSync(join(ROOT, rel)), `${rel} no longer exists`).toBe(true);
+      expect(COMPUTED_IMPORT.test(code(rel)), `${rel} no longer has a computed import()`).toBe(true);
+    }
+  });
+
+  it("core requires by computed specifier only where documented", () => {
+    const violations = coreModules()
+      .filter((rel) => hasComputedRequire(code(rel)))
+      .filter((rel) => !COMPUTED_REQUIRES.has(rel));
+    expect(violations, "a computed require in core could load a discovered package").toEqual([]);
+  });
+
+  it("COMPUTED_REQUIRES has no stale entries", () => {
+    for (const rel of COMPUTED_REQUIRES.keys()) {
+      expect(existsSync(join(ROOT, rel)), `${rel} no longer exists`).toBe(true);
+      expect(hasComputedRequire(code(rel)), `${rel} no longer has a computed require`).toBe(true);
+    }
+  });
+
+  it("the computed-require check sees every way core can call require", () => {
+    const flagged = [
+      'const _require = createRequire(import.meta.url);\n_require(resolution.bin);',
+      'const r = module.createRequire(import.meta.url);\nr(path);',
+      'const _require = createRequire(import.meta.url);\n_require.call(null, "x");',
+      "createRequire(import.meta.url)(spec);",
+      "createRequire(pathToFileURL(dir))(spec);",
+      "require(name);",
+      "require(`./${name}`);",
+      "let r;\nr = createRequire(import.meta.url);\nr(bin);",
+      "const _require = createRequire(import.meta.url);\nconst load = _require;\nload(bin);",
+      "const _require = createRequire(import.meta.url);\nconst a = _require;\nlet b;\nb = a;\nb.apply(null, [bin]);",
+      'import Module from "module";\nModule._load(bin);',
+      'import Module from "module";\nModule._load("./x.js");',
+    ];
+    const allowed = [
+      'const _require = createRequire(import.meta.url);\n_require.resolve(npmName + "/package.json");',
+      'const _require = createRequire(import.meta.url);\n_require("./x.json");',
+      'const _require = createRequire(import.meta.url);\nconst where = _require.resolve;\nwhere(bin);',
+      "const _require = createRequire(import.meta.url);\nif (x == _require) f(bin);",
+      'require("node:fs");',
+      "foo.require(name);",
+      "my_require(name);",
+    ];
+    expect(flagged.filter((text) => !hasComputedRequire(text))).toEqual([]);
+    expect(allowed.filter((text) => hasComputedRequire(text))).toEqual([]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // CLAUDE.md policy coverage cross-reference
 // ---------------------------------------------------------------------------
@@ -281,6 +443,10 @@ const DOCUMENTED_POLICIES = [
   {
     rule: "Orchestration-tier scripts must spawn CLIs, not import libraries",
     enforcedBy: "architecture-policy.test.js → architecture policy: orchestration spawn-only rule",
+  },
+  {
+    rule: "Extensions are spawned, never imported: extension modules load no code, and core imports by computed specifier only where documented",
+    enforcedBy: "architecture-policy.test.js → architecture policy: orchestration never imports extension code",
   },
   {
     rule: "Cross-package runtime imports must flow through gateway modules",
@@ -561,7 +727,7 @@ describe("architecture policy: CLAUDE.md coverage cross-reference", () => {
     // add an entry to DOCUMENTED_POLICIES above. If this test has
     // fewer entries than the rules in CLAUDE.md, the gap is visible
     // in code review. Minimum: 12 policies.
-    expect(DOCUMENTED_POLICIES.length).toBe(24);
+    expect(DOCUMENTED_POLICIES.length).toBe(25);
   });
 
   for (const policy of DOCUMENTED_POLICIES) {
@@ -1295,8 +1461,8 @@ const BOUNDARY_FILES = [
   },
   {
     file: "packages/hench/src/prd/llm-gateway.ts",
-    maxExports: 227,
-    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token accumulation, usage de-duplication, child-environment policy, vendor session drivers, and model catalogs). Raised from 219 to 227 for claudeSessionDriver, codexSessionDriver, vendorSessionDriver, normalizeCodexResponse, parseMaybeJson, WINDOWS_STDIN_PROMPT_SEPARATOR and the NormalizedCodexResponse and NormalizedCodexToolEvent types (Sidecar M1): how a vendor CLI starts, resumes and forks a session, how its output lines become RuntimeEvents and which line names the session moved from hench's adapters into llm-client, where the Sidecar's resumable sessions use them too. The adapters and the fork strategy's capability check now build on the drivers, so a hench-local copy of the resume argv or the parsers would be a second definition free to drift from the one the Sidecar runs — and the two would disagree exactly on which session a resume lands in. Raised from 215 to 217 for usageMessageId and UsageMessageFilter: Claude's stream-json repeats a finished message once per content block, usage included, so every consumer that summed line by line over-counted a turn by its block count — 4.27x on a measured session. Which payloads are the same vendor message is a parsing fact about the vendor's output, so it belongs beside the token parsers in the foundation tier; a hench-local Set would leave the transcript reader in hench and the aggregator in web deduping by different rules. Raised from 214 to 215 for resolveClaudeCliEffort: hench's CLI agent loop assembles its own `claude` argv, so it has to decide what `--effort` to pass without going through an llm-client provider — and the decision is the same one the API path already delegates (is this a known level, and does this model accept one?), minus the per-model default, which is the API's. A hench-local check would be a second copy of the level list and the effort-capable-model allowlist, free to drift from the one resolveClaudeApiEffort enforces two lines away. Raised from 205 to 214 for the child-environment policy (#623): DEFAULT_ENV_DENY, DEFAULT_ENV_ALLOW, compileEnvPolicy, envNameAllowed, sanitizeChildEnv, strippedEnvNames and resolveVendorCliEnv plus the EnvPolicy and EnvPolicyConfig types. The commands the agent's tools run and the vendor CLI hench drives are filtered by one guard.env policy, which the cross-vendor reviewer also resolves through llm-client — a hench-local copy of the deny list or of a vendor's authentication names would be a second definition, free to drift from it, and the two would disagree exactly on which credentials reach a child. Raised from 203 to 204 for NDX_CONTAINER_DIRNAME: the changed-files filter and the reviewer's repaired-files filter both skip n-dx's own bookkeeping, and on the .ndx/ layout all of it sits under that one container — the prefixes were spelled '.rex/' and '.hench/' only, so on a migrated project every run looked like it had changed files and the full-suite gate fired for runs that produced no code. The container's name is the layout resolver's, like every other path it owns. Raised from 170 to 175 for resolveLayout and detectLayoutMode plus the Layout, LayoutMode and ResolveLayoutOptions types (0.8.0, layout resolver): whether a project keeps its state under .ndx/ or the legacy dot-directories is one decision, and it is the foundation tier's — a hench-local copy of the lookup order would be a second definition of where .hench/ lives, free to drift from the one every other package resolves against, and the two would disagree exactly on the projects that are mid-migration. The combined branch exposes both terminateProcessTree for complete Windows CLI-tree cleanup and resolveLocalTimeoutMs for the local-provider timeout configuration; both are consumed only through this gateway. Raised from 166 to 168 for listWorktrees and its GitWorktree type (0.6.0 PR 5, worktree awareness): the async sibling of getWorktreeRoot, so hench's cross-worktree run views read the same realpath-resolved worktree list the dashboard does rather than shelling out to git themselves. Raised from 168 to 170 for hasPosixShell and resolveShellKind: the command guard must know whether run_command will be interpreted by sh or cmd.exe, and that decision has to come from the same function execShellCmd uses (a copy in hench would drift and re-open the cmd.exe bypass). Raised from 175 to 180 for deepMerge, loadProjectOverrideSources, PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE and the ProjectOverrideSource type (0.8.0 PR BN): loadConfig now re-validates a merged .n-dx.json/.n-dx.local.json override against HenchConfigSchema instead of trusting it, and needs the per-file section (not just the merged result) to blame the right file when it reverts a bad field — llm-client's project-config.ts is the only place that reads those two files. Raised from 180 to 181 for relativeToRoot: hench init writes the .gitignore lines for its own state directory, and on the .ndx/ layout that directory is .ndx/hench — a name spelled by hand at the write site is the layout decision this resolver exists to remove, just relocated into a gitignore string. Raised from 181 to 183 for redactDeep and redactSecrets: run records and run logs are scrubbed of credential-shaped text before they are written, and the dashboard scrubs them again when it serves them, so the patterns must be one list in the foundation tier rather than a hench copy and a web copy that drift. Raised from 183 to 185 for createLineRedactor and the LineRedactor type: the run log is written a line at a time while the run is in progress, and redactSecrets matches whole strings — a PEM private key spans lines, so per-line scrubbing could not see one and wrote the whole key to disk. The stateful form belongs beside the patterns it carries, not in a hench reimplementation that would drift from them. Raised from 185 to 197 for repository trust (guardBaselineForLanguage, clampGuardToBaseline, evaluateRepoTrust, recordRepoTrust, clearRepoTrust, formatRepoTrustReport, SECRET_PATH_PATTERNS and the GuardBaseline, RepoTrustEvaluation, RepoTrustFinding, RepoTrustState, RepoTrustStoreOptions types): whether a checkout's .hench/config.json is wider than the defaults, and whether this user accepted it, is one evaluation shared by hench at run start, the web dashboard's strip and ndx init's review — a hench-local copy of the baseline would be a second definition of the defaults, free to drift from the one the trust review compares against, and the guard defaults themselves now derive from that baseline so the two cannot disagree. Raised from 197 to 201 for readAvailableMemory, getAvailableMemory, createAvailableMemoryReader and the AvailableMemoryReading type (0.8.0, macOS available memory): the available-memory reading is one decision shared with the dashboard and hub, and a hench-local reader is how hench and the dashboard came to disagree — the throttle read os.freemem() (115 MB on a healthy 16 GB Mac) while the pre-spawn check parsed vm_stat itself. createAvailableMemoryReader is the seam the memory monitor builds on when a caller overrides the platform or the os readings. Raised from 201 to 203 for resolveClaudeApiEffort and the ClaudeEffort type: hench's Claude API turn loop builds its own Anthropic request and must send the same output_config.effort the llm-client API provider sends — a hench-local copy of the allowlist and Opus 5.5 default would drift from it and send effort to a model that answers 400. Raised from 204 to 205 for projectRootOf (0.8.0, the .n-dx config sweep): hench passes its own state directory around and recovered the project root as its parent, which on the .ndx/ layout is the container — resolving a layout there selects legacy and reads .ndx/.n-dx.json, a file nothing writes, so every project override was silently ignored on a migrated project. Stepping over the container is the resolver's knowledge of its own layout, not something hench should re-derive. Raised from 217 to 218 for isFailForwardEnabled: whether fail-forward mode is on is one project setting read by the dashboard, by `ndx work` and by the hench run loop, and the run loop never goes through the web server — a hench-local reader of the `features` block would be a second definition of where the toggle lives and what counts as on, free to drift from the one the settings page writes, and the two would disagree exactly when an operator flips it mid-run. Raised from 218 to 219 for CLI_LOG_FILENAME: every vendor-CLI spawn appends to claude_commands.log in the project root, and the uncommitted-work gate refused to complete a task over that untracked file in every project ndx init had not ignored it for — the file is n-dx's own runtime output, so the gate discounts it like the hench artifacts, and the name has to be the one the writer in llm-client uses rather than a hench-side spelling free to drift from it.",
+    maxExports: 232,
+    description: "hench→llm-client gateway (config, constants, JSON, output, errors, exec, runtime-contract, codex-policy, diagnostics, tool-schema, provider-registry, vendor-error-classification, failover, color/model helpers, token accumulation, usage de-duplication, child-environment policy, vendor session drivers, and model catalogs). Raised from 215 to 217 for usageMessageId and UsageMessageFilter: Claude's stream-json repeats a finished message once per content block, usage included, so every consumer that summed line by line over-counted a turn by its block count — 4.27x on a measured session. Which payloads are the same vendor message is a parsing fact about the vendor's output, so it belongs beside the token parsers in the foundation tier; a hench-local Set would leave the transcript reader in hench and the aggregator in web deduping by different rules. Raised from 214 to 215 for resolveClaudeCliEffort: hench's CLI agent loop assembles its own `claude` argv, so it has to decide what `--effort` to pass without going through an llm-client provider — and the decision is the same one the API path already delegates (is this a known level, and does this model accept one?), minus the per-model default, which is the API's. A hench-local check would be a second copy of the level list and the effort-capable-model allowlist, free to drift from the one resolveClaudeApiEffort enforces two lines away. Raised from 205 to 214 for the child-environment policy (#623): DEFAULT_ENV_DENY, DEFAULT_ENV_ALLOW, compileEnvPolicy, envNameAllowed, sanitizeChildEnv, strippedEnvNames and resolveVendorCliEnv plus the EnvPolicy and EnvPolicyConfig types. The commands the agent's tools run and the vendor CLI hench drives are filtered by one guard.env policy, which the cross-vendor reviewer also resolves through llm-client — a hench-local copy of the deny list or of a vendor's authentication names would be a second definition, free to drift from it, and the two would disagree exactly on which credentials reach a child. Raised from 203 to 204 for NDX_CONTAINER_DIRNAME: the changed-files filter and the reviewer's repaired-files filter both skip n-dx's own bookkeeping, and on the .ndx/ layout all of it sits under that one container — the prefixes were spelled '.rex/' and '.hench/' only, so on a migrated project every run looked like it had changed files and the full-suite gate fired for runs that produced no code. The container's name is the layout resolver's, like every other path it owns. Raised from 170 to 175 for resolveLayout and detectLayoutMode plus the Layout, LayoutMode and ResolveLayoutOptions types (0.8.0, layout resolver): whether a project keeps its state under .ndx/ or the legacy dot-directories is one decision, and it is the foundation tier's — a hench-local copy of the lookup order would be a second definition of where .hench/ lives, free to drift from the one every other package resolves against, and the two would disagree exactly on the projects that are mid-migration. The combined branch exposes both terminateProcessTree for complete Windows CLI-tree cleanup and resolveLocalTimeoutMs for the local-provider timeout configuration; both are consumed only through this gateway. Raised from 166 to 168 for listWorktrees and its GitWorktree type (0.6.0 PR 5, worktree awareness): the async sibling of getWorktreeRoot, so hench's cross-worktree run views read the same realpath-resolved worktree list the dashboard does rather than shelling out to git themselves. Raised from 168 to 170 for hasPosixShell and resolveShellKind: the command guard must know whether run_command will be interpreted by sh or cmd.exe, and that decision has to come from the same function execShellCmd uses (a copy in hench would drift and re-open the cmd.exe bypass). Raised from 175 to 180 for deepMerge, loadProjectOverrideSources, PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE and the ProjectOverrideSource type (0.8.0 PR BN): loadConfig now re-validates a merged .n-dx.json/.n-dx.local.json override against HenchConfigSchema instead of trusting it, and needs the per-file section (not just the merged result) to blame the right file when it reverts a bad field — llm-client's project-config.ts is the only place that reads those two files. Raised from 180 to 181 for relativeToRoot: hench init writes the .gitignore lines for its own state directory, and on the .ndx/ layout that directory is .ndx/hench — a name spelled by hand at the write site is the layout decision this resolver exists to remove, just relocated into a gitignore string. Raised from 181 to 183 for redactDeep and redactSecrets: run records and run logs are scrubbed of credential-shaped text before they are written, and the dashboard scrubs them again when it serves them, so the patterns must be one list in the foundation tier rather than a hench copy and a web copy that drift. Raised from 183 to 185 for createLineRedactor and the LineRedactor type: the run log is written a line at a time while the run is in progress, and redactSecrets matches whole strings — a PEM private key spans lines, so per-line scrubbing could not see one and wrote the whole key to disk. The stateful form belongs beside the patterns it carries, not in a hench reimplementation that would drift from them. Raised from 185 to 197 for repository trust (guardBaselineForLanguage, clampGuardToBaseline, evaluateRepoTrust, recordRepoTrust, clearRepoTrust, formatRepoTrustReport, SECRET_PATH_PATTERNS and the GuardBaseline, RepoTrustEvaluation, RepoTrustFinding, RepoTrustState, RepoTrustStoreOptions types): whether a checkout's .hench/config.json is wider than the defaults, and whether this user accepted it, is one evaluation shared by hench at run start, the web dashboard's strip and ndx init's review — a hench-local copy of the baseline would be a second definition of the defaults, free to drift from the one the trust review compares against, and the guard defaults themselves now derive from that baseline so the two cannot disagree. Raised from 197 to 201 for readAvailableMemory, getAvailableMemory, createAvailableMemoryReader and the AvailableMemoryReading type (0.8.0, macOS available memory): the available-memory reading is one decision shared with the dashboard and hub, and a hench-local reader is how hench and the dashboard came to disagree — the throttle read os.freemem() (115 MB on a healthy 16 GB Mac) while the pre-spawn check parsed vm_stat itself. createAvailableMemoryReader is the seam the memory monitor builds on when a caller overrides the platform or the os readings. Raised from 201 to 203 for resolveClaudeApiEffort and the ClaudeEffort type: hench's Claude API turn loop builds its own Anthropic request and must send the same output_config.effort the llm-client API provider sends — a hench-local copy of the allowlist and Opus 5.5 default would drift from it and send effort to a model that answers 400. Raised from 204 to 205 for projectRootOf (0.8.0, the .n-dx config sweep): hench passes its own state directory around and recovered the project root as its parent, which on the .ndx/ layout is the container — resolving a layout there selects legacy and reads .ndx/.n-dx.json, a file nothing writes, so every project override was silently ignored on a migrated project. Stepping over the container is the resolver's knowledge of its own layout, not something hench should re-derive. Raised from 217 to 218 for isFailForwardEnabled: whether fail-forward mode is on is one project setting read by the dashboard, by `ndx work` and by the hench run loop, and the run loop never goes through the web server — a hench-local reader of the `features` block would be a second definition of where the toggle lives and what counts as on, free to drift from the one the settings page writes, and the two would disagree exactly when an operator flips it mid-run. Raised from 218 to 219 for CLI_LOG_FILENAME: every vendor-CLI spawn appends to claude_commands.log in the project root, and the uncommitted-work gate refused to complete a task over that untracked file in every project ndx init had not ignored it for — the file is n-dx's own runtime output, so the gate discounts it like the hench artifacts, and the name has to be the one the writer in llm-client uses rather than a hench-side spelling free to drift from it. Raised from 219 to 220 for escapeTerminalControls (#686 finding 2 follow-up): `hench trust accept` names the repository's test command, a repository-controlled string, and must show it with the same control-character escaping the trust report applies, so the user sees exactly what they accepted — a hench-local escaper would be a second definition of which characters are unsafe to print, free to drift from the report's. Raised from 220 to 221 for NDX_CONFIG_BLOCKED_PATHS (#686 finding 1 follow-up): hench's guard refuses writes to n-dx's own config files whatever the configured guard says, and the Claude CLI adapter denies them to the vendor's edit tools — the list is part of the guard baseline the trust review compares against and is derived from the layout resolver, so a hench-local copy would be a second definition of which files configure n-dx, free to drift from the baseline's. Raised from 221 to 222 for repoCommandEnv (#686): the test gate, post-task tests, dependency audit, requirement validation commands and cleanup typecheck run a command the repository owns, and rex's verify_criteria runs the same kind — one builder in the foundation tier gives both packages the same sanitized environment and the same rule that a repository-supplied guard.env.allow applies only while the repository is trusted; a hench-local copy would be a second reading of that rule, free to drift from rex's. Raised from 222 to 224 for HENCH_LOCAL_ONLY_SETTINGS and writeHenchLocalSetting: the trust review reads a non-default apiKeyEnv in .hench/config.json as the repository's credential routing, so `hench config apiKeyEnv` writes the user's choice to .n-dx.local.json — the same keys and the same write the dashboard uses, so the two writers cannot disagree about which keys move. Raised from 224 to 232 for claudeSessionDriver, codexSessionDriver, vendorSessionDriver, normalizeCodexResponse, parseMaybeJson, WINDOWS_STDIN_PROMPT_SEPARATOR and the NormalizedCodexResponse and NormalizedCodexToolEvent types (Sidecar M1): how a vendor CLI starts, resumes and forks a session, how its output lines become RuntimeEvents and which line names the session moved from hench's adapters into llm-client, where the Sidecar's resumable sessions use them too. The adapters and the fork strategy's capability check now build on the drivers, so a hench-local copy of the resume argv or the parsers would be a second definition free to drift from the one the Sidecar runs — and the two would disagree exactly on which session a resume lands in.",
   },
 ];
 
@@ -1722,6 +1888,7 @@ describe("architecture policy: required test annotations", () => {
       "tests/e2e/cli-dev.test.js",
       "tests/integration/scheduler-startup.test.js",
       "packages/web/tests/e2e-ui/navigation.spec.ts",
+      "tests/e2e/extension-fixture.test.js",
     ];
 
     const violations = [];

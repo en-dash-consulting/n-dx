@@ -168,6 +168,12 @@ describe("parseRegisterInput", () => {
 
     expect(parseRegisterInput(null)).toHaveProperty("problem");
     expect(parseRegisterInput({ id: "../etc", repoRoot: home, ndxBin })).toHaveProperty("problem");
+    // `/x/` mounts extension sidecars, so no project may be called x.
+    expect(parseRegisterInput({ id: "x", repoRoot: home, ndxBin })).toEqual({
+      problem: 'id "x" is reserved: /x/ is where the hub mounts extension sidecars',
+    });
+    expect(parseRegisterInput({ id: "X", repoRoot: home, ndxBin })).toHaveProperty("problem");
+    expect(parseRegisterInput({ id: "x1", repoRoot: home, ndxBin })).toHaveProperty("input");
     expect(parseRegisterInput({ id: "p", repoRoot: "relative", ndxBin })).toHaveProperty("problem");
     expect(parseRegisterInput({ id: "p", repoRoot: join(home, "missing"), ndxBin })).toHaveProperty("problem");
     expect(parseRegisterInput({ id: "p", repoRoot: home, ndxBin: join(home, "nope.js") })).toHaveProperty("problem");

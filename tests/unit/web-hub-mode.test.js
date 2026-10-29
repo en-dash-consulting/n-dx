@@ -83,6 +83,10 @@ describe("deriveProjectId", () => {
     // Without a remote the path stands in.
     expect(deriveProjectId("App", { repoRoot: "/repos/app", remoteUrl: null, registryProjects: registry })).toMatch(/^app-[0-9a-f]{6}$/);
   });
+
+  it("hashes a repository named x, which the hub refuses as an id because /x/ mounts extension sidecars", () => {
+    expect(deriveProjectId("X", { repoRoot: "/repos/x", remoteUrl: null, registryProjects: {} })).toMatch(/^x-[0-9a-f]{6}$/);
+  });
 });
 
 describe("hub home files", () => {

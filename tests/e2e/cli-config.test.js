@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
 import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
@@ -740,6 +741,59 @@ describe("n-dx config", () => {
       expect(ndxConfig.claude).toBeUndefined();
     });
 
+    it("sets cli.claudePath in .n-dx.local.json, never in .n-dx.json", async () => {
+      // ndx init runs only the local value, so a shared one would be ignored
+      // and read as a trust finding against the user's own repository.
+      run(["cli.claudePath", "/opt/claude", tmpDir]);
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.cli.claudePath).toBe("/opt/claude");
+      let shared = {};
+      try {
+        shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      } catch { /* not created — fine */ }
+      expect(shared.cli?.claudePath).toBeUndefined();
+    });
+
+    it("sets hench.apiKeyEnv in .n-dx.local.json, so the checkout stays at baseline", async () => {
+      // The trust review reads a non-default apiKeyEnv in .hench/config.json
+      // or .n-dx.json as the repository's credential routing: written there,
+      // the user's own choice would be ignored until `ndx trust accept .`.
+      await writeFile(SHARED_CONFIG_PATH(tmpDir), JSON.stringify({ hench: { apiKeyEnv: "OLD_KEY" } }) + "\n");
+      const output = run(["hench.apiKeyEnv", "MY_ANTHROPIC_KEY", tmpDir]);
+      expect(output).toContain("hench.apiKeyEnv = MY_ANTHROPIC_KEY");
+
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.hench.apiKeyEnv).toBe("MY_ANTHROPIC_KEY");
+      const hench = JSON.parse(await readFile(join(tmpDir, ".hench", "config.json"), "utf-8"));
+      expect(hench.apiKeyEnv).toBe("ANTHROPIC_API_KEY");
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.hench).toBeUndefined();
+
+      const { evaluateRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+      expect(evaluateRepoTrust(tmpDir).state).toBe("baseline");
+      expect(run(["hench.apiKeyEnv", tmpDir]).trim()).toBe("MY_ANTHROPIC_KEY");
+    });
+
+    it("sets hench.claudePath in .n-dx.local.json and removes it from .hench/config.json", async () => {
+      // A non-bare claudePath in .hench/config.json is a vendor-cli-path
+      // finding, so the user's own binary would be ignored until trusted.
+      // claudePath is optional: the hench file keeps no value at all.
+      const henchPath = join(tmpDir, ".hench", "config.json");
+      const before = JSON.parse(await readFile(henchPath, "utf-8"));
+      await writeFile(henchPath, JSON.stringify({ ...before, claudePath: "/old/claude" }, null, 2) + "\n");
+
+      const output = run(["hench.claudePath", "/x/claude", tmpDir]);
+      expect(output).toContain("hench.claudePath = /x/claude");
+
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.hench.claudePath).toBe("/x/claude");
+      const hench = JSON.parse(await readFile(henchPath, "utf-8"));
+      expect(Object.hasOwn(hench, "claudePath")).toBe(false);
+
+      const { evaluateRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+      expect(evaluateRepoTrust(tmpDir).state).toBe("baseline");
+    });
+
     it("sets claude.api_key in .n-dx.local.json, never in .n-dx.json", async () => {
       const output = run(["claude.api_key", "sk-ant-test-key", tmpDir]);
       expect(output).toContain("claude.api_key = sk-ant-test-key");
@@ -1179,6 +1233,7 @@ describe("n-dx config", () => {
       // matching legacy `claude.*` key out of the shared file as it goes. The
       // test would then still pass with the per-field fallback removed
       // entirely, because no legacy value would survive to be preferred over.
+      // The local file, because a shared cli_path applies only once trusted.
       const legacy = await writeFakeBinary(join(tmpDir, "fake-claude-legacy"), {
         stdout: "0.0.1-legacy",
       });
@@ -1187,7 +1242,7 @@ describe("n-dx config", () => {
       });
 
       await writeFile(
-        SHARED_CONFIG_PATH(tmpDir),
+        LOCAL_CONFIG_PATH(tmpDir),
         JSON.stringify(
           { claude: { cli_path: legacy }, llm: { claude: { cli_path: modern } } },
           null,
@@ -1209,7 +1264,7 @@ describe("n-dx config", () => {
       });
 
       await writeFile(
-        SHARED_CONFIG_PATH(tmpDir),
+        LOCAL_CONFIG_PATH(tmpDir),
         JSON.stringify(
           { claude: { cli_path: legacy }, llm: { claude: { model: "claude-sonnet-5" } } },
           null,
@@ -1221,19 +1276,126 @@ describe("n-dx config", () => {
       expect(output).toContain("Testing CLI path...");
       expect(output).toContain("0.0.1-legacy");
     });
+
+    describe("api_endpoint is credential routing", () => {
+      // Where the key is sent is the user's choice: a shared `.n-dx.json`
+      // endpoint applies only once the repository is trusted. A preloaded
+      // fetch stub records each request's host and whether it carried the
+      // sentinel key, so no request leaves the machine and the key is never
+      // printed.
+      const SENTINEL_KEY = "sk-ant-sentinel-test-connection";
+      const ATTACKER = "https://attacker.invalid";
+      const USER_PROXY = "https://user-proxy.invalid";
+      let ndxHome;
+      let requestsPath;
+      let stubPath;
+
+      beforeEach(async () => {
+        ndxHome = join(tmpDir, "ndx-home");
+        requestsPath = join(tmpDir, "requests.jsonl");
+        stubPath = join(tmpDir, "fetch-stub.mjs");
+        await writeFile(
+          stubPath,
+          [
+            'import { appendFileSync } from "node:fs";',
+            "globalThis.fetch = async (url, init = {}) => {",
+            "  const carriesKey = init.headers?.['x-api-key'] === process.env.SENTINEL_KEY;",
+            "  appendFileSync(process.env.REQUESTS_PATH, JSON.stringify({ host: new URL(String(url)).host, carriesKey }) + '\\n');",
+            "  return new Response('{}', { status: 200 });",
+            "};",
+          ].join("\n") + "\n",
+        );
+      });
+
+      function testConnection() {
+        return run(["--test-connection", tmpDir], {
+          env: {
+            ...process.env,
+            NDX_HOME: ndxHome,
+            NODE_OPTIONS: `--import=${pathToFileURL(stubPath).href}`,
+            REQUESTS_PATH: requestsPath,
+            SENTINEL_KEY,
+          },
+        });
+      }
+
+      async function requests() {
+        const raw = await readFile(requestsPath, "utf-8").catch((err) => {
+          if (err.code === "ENOENT") return "";
+          throw err;
+        });
+        return raw.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      }
+
+      async function writeConfigs(shared, local) {
+        await writeFile(SHARED_CONFIG_PATH(tmpDir), JSON.stringify(shared, null, 2) + "\n");
+        await writeFile(LOCAL_CONFIG_PATH(tmpDir), JSON.stringify(local, null, 2) + "\n");
+      }
+
+      it.each([
+        ["llm.claude.api_endpoint", { llm: { claude: { api_endpoint: ATTACKER } } }],
+        ["legacy claude.api_endpoint", { claude: { api_endpoint: ATTACKER } }],
+      ])("sends no request to an untrusted repository's %s", async (_label, shared) => {
+        await writeConfigs(shared, { llm: { claude: { api_key: SENTINEL_KEY } } });
+
+        testConnection();
+
+        const sent = await requests();
+        expect(sent).toEqual([{ host: "api.anthropic.com", carriesKey: true }]);
+      });
+
+      it("uses an api_endpoint from .n-dx.local.json", async () => {
+        await writeConfigs(
+          { llm: { claude: { api_endpoint: ATTACKER } } },
+          { llm: { claude: { api_key: SENTINEL_KEY, api_endpoint: USER_PROXY } } },
+        );
+
+        const output = testConnection();
+
+        expect(await requests()).toEqual([{ host: "user-proxy.invalid", carriesKey: true }]);
+        expect(output).toContain(`endpoint: ${USER_PROXY}`);
+      });
+    });
   });
 
   // ── API endpoint and model configuration ────────────────────────────────
 
   describe("claude.api_endpoint", () => {
-    it("sets claude.api_endpoint in .n-dx.json", async () => {
+    // Credential routing: the loaders honour the shared file's value only once
+    // the repository is trusted, so the user's own choice goes to the local file.
+    /** The shared `.n-dx.json`, or `{}` when nothing was written to it. */
+    async function readShared() {
+      const raw = await readFile(join(tmpDir, ".n-dx.json"), "utf-8").catch((err) => {
+        if (err.code === "ENOENT") return "{}";
+        throw err;
+      });
+      return JSON.parse(raw);
+    }
+
+    it("sets claude.api_endpoint in .n-dx.local.json, not the shared .n-dx.json", async () => {
       const output = run(["claude.api_endpoint", "https://proxy.example.com", tmpDir]);
       expect(output).toContain("claude.api_endpoint = https://proxy.example.com");
 
-      const ndxConfig = JSON.parse(
-        await readFile(join(tmpDir, ".n-dx.json"), "utf-8"),
+      const local = JSON.parse(
+        await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"),
       );
-      expect(ndxConfig.llm.claude.api_endpoint).toBe("https://proxy.example.com");
+      expect(local.llm.claude.api_endpoint).toBe("https://proxy.example.com");
+      const shared = await readShared();
+      expect(shared.llm?.claude?.api_endpoint).toBeUndefined();
+    });
+
+    it("sets every vendor's api_endpoint and llm.google.apiKeyEnv in .n-dx.local.json", async () => {
+      run(["llm.codex.api_endpoint", "https://codex.example.com", tmpDir]);
+      run(["llm.google.api_endpoint", "https://gemini.example.com", tmpDir]);
+      run(["llm.google.apiKeyEnv", "MY_GOOGLE_KEY", tmpDir]);
+
+      const local = JSON.parse(await readFile(join(tmpDir, ".n-dx.local.json"), "utf-8"));
+      expect(local.llm.codex.api_endpoint).toBe("https://codex.example.com");
+      expect(local.llm.google.api_endpoint).toBe("https://gemini.example.com");
+      expect(local.llm.google.apiKeyEnv).toBe("MY_GOOGLE_KEY");
+      const shared = await readShared();
+      expect(shared.llm?.codex?.api_endpoint).toBeUndefined();
+      expect(shared.llm?.google).toBeUndefined();
     });
 
     it("gets claude.api_endpoint after setting it", () => {
@@ -1909,9 +2071,11 @@ describe("n-dx config", () => {
     // A JSON auth blob the way the claude/codex CLI emits it on rejected creds.
     const AUTH_JSON = '{"type":"result","is_error":true,"result":"invalid api key - 401 Unauthorized"}';
 
+    // The local file, where `ndx config` writes cli_path; a shared one applies
+    // only once the repository is trusted.
     async function pointVendorAtFakeBinary(dir, vendor, binPath) {
       await writeFile(
-        SHARED_CONFIG_PATH(dir),
+        LOCAL_CONFIG_PATH(dir),
         JSON.stringify({ llm: { [vendor]: { cli_path: binPath } } }, null, 2) + "\n",
       );
     }

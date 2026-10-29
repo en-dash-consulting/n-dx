@@ -268,7 +268,8 @@ describe("sourcevision analyze (e2e)", { timeout: 120_000 }, () => {
     const imp1 = readFileSync(join(svDir, "imports.json"), "utf-8");
 
     // Remove .sourcevision and run again
-    await rm(svDir, { recursive: true });
+    // Retry: on Windows, antivirus/indexer can briefly hold freshly written files (EBUSY).
+    await rm(svDir, { recursive: true, maxRetries: 10, retryDelay: 100 });
 
     execFileSync(process.execPath, [CLI_PATH, "analyze", tmpDir, "--fast"], {
       encoding: "utf-8",

@@ -157,6 +157,8 @@ export function formatInitReport(results, opts = {}) {
       for (const line of formatPinnedMcpWarning(result.detail?.mcp?.pinned)) {
         lines.push(`      ${line}`);
       }
+      // Likewise: the setting the user chose is silently skipped otherwise.
+      if (result.detail?.claudePathNote) lines.push(`      ⚠ ${result.detail.claudePathNote}`);
       continue;
     }
 
@@ -250,6 +252,7 @@ function formatVendorArtifacts(vendor, detail) {
     for (const line of formatPinnedMcpWarning(detail.mcp?.pinned)) {
       lines.push(line);
     }
+    if (detail.claudePathNote) lines.push(`⚠ ${detail.claudePathNote}`);
   }
 
   if (vendor === ASSISTANT_VENDOR.CODEX) {

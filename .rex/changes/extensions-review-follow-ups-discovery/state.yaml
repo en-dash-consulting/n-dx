@@ -1,0 +1,112 @@
+schema: "rex/v2"
+items:
+  "02ae881a-a188-44f9-a703-6118b07c1ed0":
+    status: "completed"
+    startedAt: "2026-10-27T14:20:50.417Z"
+    completedAt: "2026-10-27T14:26:36.390Z"
+    endedAt: "2026-10-27T14:26:36.390Z"
+    activeIntervals: [{"end":"2026-10-27T14:26:36.390Z","start":"2026-10-27T14:20:50.417Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "--user writes read the user config strictly (fail naming the path, file untouched) and write via tmp+rename; reserved names refused as config sections even with --force."
+    lastModified: "2026-10-27T14:26:36.390Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "0c1401b1-5398-41c9-bc05-98d172048518":
+    status: "completed"
+    startedAt: "2026-10-27T14:57:12.312Z"
+    completedAt: "2026-10-27T15:01:26.785Z"
+    endedAt: "2026-10-27T15:01:26.785Z"
+    activeIntervals: [{"end":"2026-10-27T15:01:26.785Z","start":"2026-10-27T14:57:12.312Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "checkPackagePath rejects /^[A-Za-z]:/; dispatch resolves bins through new packageFile() and refuses paths outside the package (fdc1f1c88)."
+    lastModified: "2026-10-27T15:01:26.785Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "0cc63aed-a641-4bbc-9a43-b2b18713c668":
+    status: "completed"
+    startedAt: "2026-10-27T14:15:59.415Z"
+    completedAt: "2026-10-27T14:20:40.017Z"
+    endedAt: "2026-10-27T14:20:40.017Z"
+    activeIntervals: [{"end":"2026-10-27T14:20:40.017Z","start":"2026-10-27T14:15:59.415Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "listedScan and globalScan stamp each found extension's package.json; one stat per extension (42be44f3c)"
+    lastModified: "2026-10-27T14:20:40.017Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "143e479a-714f-44dd-8047-636012e9ee5b":
+    status: "completed"
+    startedAt: "2026-10-27T15:42:49.717Z"
+    completedAt: "2026-10-27T15:46:56.354Z"
+    endedAt: "2026-10-27T15:46:56.354Z"
+    activeIntervals: [{"end":"2026-10-27T15:46:56.354Z","start":"2026-10-27T15:42:49.717Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "writeCache keeps the 20 most recently scanned project: entries (MAX_PROJECT_ENTRIES); commit a1f2f2f0b"
+    lastModified: "2026-10-27T15:46:56.354Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "1466e27e-19f4-413a-bb45-265042446ece":
+    status: "completed"
+    startedAt: "2026-10-27T14:39:31.775Z"
+    completedAt: "2026-10-27T14:46:35.065Z"
+    endedAt: "2026-10-27T14:46:35.065Z"
+    activeIntervals: [{"end":"2026-10-27T14:46:35.065Z","start":"2026-10-27T14:39:31.775Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Validator rules control-character (every manifest string, package name) and package-version (semver, discovery passes version); list/info/doctor/approval prompt escape control characters as \\xNN (commit 5aad4404b)"
+    lastModified: "2026-10-27T14:46:35.065Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "37e5c938-463a-472a-8666-046c3511d5b2":
+    status: "completed"
+    startedAt: "2026-10-27T14:51:04.862Z"
+    completedAt: "2026-10-27T14:57:02.296Z"
+    endedAt: "2026-10-27T14:57:02.296Z"
+    activeIntervals: [{"end":"2026-10-27T14:57:02.296Z","start":"2026-10-27T14:51:04.862Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extensions-command.js: localSpecPath resolves path/tarball specs against the caller's cwd before npm runs in the user folder; listing diff by saved spec plus file: match finds a re-added path; per-subcommand flag allowlist refuses unknown flags. Commit c5f8f194e."
+    lastModified: "2026-10-27T14:57:02.296Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "436bdb1a-8bc0-4250-8405-b506aa4590e3":
+    status: "completed"
+    startedAt: "2026-10-27T15:38:59.519Z"
+    completedAt: "2026-10-27T15:42:40.104Z"
+    endedAt: "2026-10-27T15:42:40.104Z"
+    activeIntervals: [{"end":"2026-10-27T15:42:40.104Z","start":"2026-10-27T15:38:59.519Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "remove --purge skips the state folder when a shadowed non-user copy takes over, and names that copy"
+    lastModified: "2026-10-27T15:42:40.104Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "473f775b-508d-46fa-a65a-4c8e7e239fc2":
+    status: "completed"
+    startedAt: "2026-10-27T14:09:58.346Z"
+    completedAt: "2026-10-27T14:15:48.882Z"
+    endedAt: "2026-10-27T14:15:48.882Z"
+    activeIntervals: [{"end":"2026-10-27T14:15:48.882Z","start":"2026-10-27T14:09:58.346Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Approvals bound to source + real package dir; findGlobalRoot refuses a node_modules with package.json beside it (except under $PNPM_HOME/global)."
+    lastModified: "2026-10-27T14:15:48.882Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "52c9a605-a471-417c-b9dc-181af66e293a":
+    status: "completed"
+    startedAt: "2026-10-27T14:46:44.874Z"
+    completedAt: "2026-10-27T14:50:54.818Z"
+    endedAt: "2026-10-27T14:50:54.818Z"
+    activeIntervals: [{"end":"2026-10-27T14:50:54.818Z","start":"2026-10-27T14:46:44.874Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extension-discovery.js writeCache re-reads extensions.json just before writing and replaces only the discovery key, merging only recomputed source entries; tests interleave a disable/removal/approval with a cache write (commit 566f1953f)"
+    lastModified: "2026-10-27T14:50:54.818Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "612513ef-4a1b-4c8f-94fe-8cd6d51ad4cd":
+    status: "completed"
+    startedAt: "2026-10-27T15:46:56.354Z"
+    completedAt: "2026-10-27T15:46:56.354Z"
+    endedAt: "2026-10-27T15:46:56.354Z"
+    activeIntervals: [{"end":"2026-10-27T15:46:56.354Z","start":"2026-10-27T15:46:56.354Z"}]
+    appliedAt: "2026-10-27T15:46:56.354Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T15:46:56.354Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "8327401a-6629-49c4-aa66-d2746d0ad07b":
+    status: "completed"
+    startedAt: "2026-10-27T15:34:34.367Z"
+    completedAt: "2026-10-27T15:38:48.973Z"
+    endedAt: "2026-10-27T15:38:48.973Z"
+    activeIntervals: [{"end":"2026-10-27T15:38:48.973Z","start":"2026-10-27T15:34:34.367Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "own() helper (Object.hasOwn) for approvals, projectApprovals and disabled lookups in extension-state.js; test for an extension named constructor."
+    lastModified: "2026-10-27T15:38:48.973Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

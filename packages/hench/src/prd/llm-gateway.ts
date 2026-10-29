@@ -83,13 +83,18 @@ export { toCanonicalJSON } from "@n-dx/llm-client";
 // lives in the per-user ndx home, never in the repository.
 export {
   SECRET_PATH_PATTERNS,
+  NDX_CONFIG_BLOCKED_PATHS,
   guardBaselineForLanguage,
   clampGuardToBaseline,
   evaluateRepoTrust,
   recordRepoTrust,
   clearRepoTrust,
   formatRepoTrustReport,
+  escapeTerminalControls,
 } from "@n-dx/llm-client";
+// The hench keys `hench config` writes to .n-dx.local.json, since the review
+// reads them from .hench/config.json as the repository's credential routing.
+export { HENCH_LOCAL_ONLY_SETTINGS, writeHenchLocalSetting } from "@n-dx/llm-client";
 export type {
   GuardBaseline,
   RepoTrustEvaluation,
@@ -361,5 +366,6 @@ export {
   sanitizeChildEnv,
   strippedEnvNames,
   resolveVendorCliEnv,
+  repoCommandEnv,
 } from "@n-dx/llm-client";
 export type { EnvPolicy, EnvPolicyConfig } from "@n-dx/llm-client";

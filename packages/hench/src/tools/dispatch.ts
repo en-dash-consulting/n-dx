@@ -29,6 +29,7 @@ import { toAnthropicToolDefs, toGeminiFunctionDeclarations } from "../prd/llm-ga
 import { toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles } from "./files.js";
 import { toolRunCommand } from "./shell.js";
 import { toolGit } from "./git.js";
+import { formatProtectedConfigFinding } from "../guard/config-backstop.js";
 import type {
   ToolContext,
   RexToolHandlers,
@@ -206,7 +207,27 @@ async function checkSpawnMemory(
   return undefined;
 }
 
+/**
+ * Run one tool call, then put back any of n-dx's own config files it changed.
+ *
+ * The guard keeps `write_file` off those files, but an allowed command
+ * (`node -e`, `npm`) or a git hook writes whatever it likes, and the next
+ * call's environment and the completion check read the result. The check runs
+ * after every call, whatever its name, so no tool has to be known to write.
+ */
 export async function dispatchTool(
+  ctx: ToolContext,
+  name: string,
+  input: Record<string, unknown>,
+  rexHandlers?: RexToolHandlers,
+): Promise<string> {
+  const output = await dispatchUnchecked(ctx, name, input, rexHandlers);
+  const writes = ctx.configBackstop?.restore() ?? [];
+  if (writes.length === 0) return output;
+  return `${output}\n[GUARD] ${formatProtectedConfigFinding(writes)} This fails the task.`;
+}
+
+async function dispatchUnchecked(
   ctx: ToolContext,
   name: string,
   input: Record<string, unknown>,

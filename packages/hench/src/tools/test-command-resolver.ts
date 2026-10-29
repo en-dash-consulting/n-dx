@@ -25,7 +25,7 @@ export interface TestCommandResolverOptions {
   /** Hench config directory (.hench). */
   henchDir: string;
   /** Current hench config with potential fullTestCommand / testGate.command fields. */
-  config?: { fullTestCommand?: string; testGate?: { command?: string } };
+  config?: { fullTestCommand?: string; testGate?: { command?: string }; repositoryTestCommandsWithheld?: boolean };
   /** Commit `{base}` in `testGate.command` is replaced with. */
   base?: string;
 }
@@ -334,8 +334,11 @@ async function resolveUntemplatedTestCommand(
     };
   }
 
-  // 2. Check .n-dx.json
-  const projectConfigCommand = await loadProjectConfig(options.projectDir);
+  // 2. Check .n-dx.json — unless repository trust withheld the repository's
+  // test commands (store/trust.ts), which this would read straight back.
+  const projectConfigCommand = options.config?.repositoryTestCommandsWithheld
+    ? undefined
+    : await loadProjectConfig(options.projectDir);
   if (projectConfigCommand) {
     return {
       command: projectConfigCommand,

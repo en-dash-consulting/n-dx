@@ -88,7 +88,15 @@
     "init-summary.js",
     "migrate-layout.js",
     "migrate-chain.js",
-    "run-summary.js"
+    "run-summary.js",
+    "extension-manifest.js",
+    "extension-manifest.schema.json",
+    "extension-discovery.js",
+    "extension-state.js",
+    "extensions-command.js",
+    "extension-dispatch.js",
+    "extension-env.js",
+    "extension-config-schema.js"
   ],
   "scripts": {
     "build": "echo '@n-dx/core: plain JS, no build needed'"

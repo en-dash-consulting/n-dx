@@ -12,7 +12,9 @@ vi.mock("node:child_process", () => ({
 
 import { execFile, execFileSync, spawn } from "node:child_process";
 import { exec, execStdout, execShellCmd, buildShellInvocation, hasPosixShell, resolveShellKind, getCurrentHead, getWorktreeRoot, getGitCommonDir, listWorktrees, spawnTool, spawnManaged, killWithFallback, ProcessPool, ProcessLimitError, quoteWindowsToken, buildWindowsCliCommandLine, spawnCli, diagnoseCliInvocation, isCliNotFoundError, diagnoseCliNotFound, isPosixFreezeKillEnabled } from "../../src/exec.js";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fakeSpawn } from "../helpers/fake-spawn.js";
 
 const mockExecFile = vi.mocked(execFile);
@@ -819,6 +821,27 @@ describe("spawnManaged", () => {
     const result = await handle.done;
     expect(result.stdout).toBe("output\n");
     expect(result.stderr).toBe("warning\n");
+  });
+
+  it("appends stdout and stderr to logFile instead of buffering them", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "spawn-managed-log-"));
+    try {
+      const logFile = join(dir, "child.log");
+      const child = createMockChild();
+      mockSpawn.mockReturnValue(child as never);
+
+      const handle = spawnManaged("node", ["serve.js"], { stdio: "pipe", logFile });
+
+      expect(existsSync(logFile)).toBe(true);
+      const stdio = mockSpawn.mock.calls.at(-1)![2]!.stdio as unknown[];
+      expect(stdio[0]).toBe("ignore");
+      expect(typeof stdio[1]).toBe("number");
+      expect(stdio[2]).toBe(stdio[1]);
+      child.emit("close", 0);
+      expect((await handle.done).stdout).toBe("");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("streams stdout chunks through onStdout as they arrive", async () => {

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
 import { GuardRails } from "../../guard/index.js";
+import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
 import { rexToolHandlers } from "../../tools/rex.js";
@@ -243,9 +244,10 @@ async function callWithFailover(
       try {
         // Recreate client for the new vendor
         const provider = defaultRegistry.create(nextVendor as any, llmConfig);
+        // Only the client is taken; the loop's own tool context keeps its backstop.
         const apiResources = await initApiResources(
           provider, config, henchDir, projectDir, store, taskId,
-          testCommand, startingHead,
+          testCommand, startingHead, undefined,
         );
         client = apiResources.client;
         currentVendor = apiResources.vendor;
@@ -295,6 +297,7 @@ async function initApiResources(
   taskId: string,
   testCommand: string | undefined,
   startingHead: string | undefined,
+  configBackstop: ConfigBackstop | undefined,
 ): Promise<ApiResources> {
   const vendor = provider.info.vendor;
 
@@ -334,6 +337,7 @@ async function initApiResources(
     startingHead,
     memoryMonitor,
     selfHeal: config.selfHeal,
+    configBackstop,
   };
 
   return { client, provider, vendor, toolCtx };
@@ -509,6 +513,7 @@ function initGoogleApiResources(
   taskId: string,
   testCommand: string | undefined,
   startingHead: string | undefined,
+  configBackstop: ConfigBackstop | undefined,
 ): ToolContext {
   const guard = new GuardRails(projectDir, config.guard);
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
@@ -522,6 +527,7 @@ function initGoogleApiResources(
     startingHead,
     memoryMonitor,
     selfHeal: config.selfHeal,
+    configBackstop,
   };
 }
 
@@ -807,7 +813,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       stream(formatModelLabel(model), completionResult.text ?? "");
     } else {
       const toolCtx = initGoogleApiResources(
-        config, projectDir, store, taskId, testCommand, startingHead,
+        config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop,
       );
       const tools = [{ functionDeclarations: TOOL_DEFINITIONS_GEMINI }];
       const contents: GeminiContent[] = [
@@ -943,6 +949,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
 
   await finalizeRun({
     claims: opts.claims,
+    configBackstop: opts.configBackstop,
     run,
     henchDir,
     projectDir,
@@ -1399,7 +1406,7 @@ async function runLocalToolLoop(params: {
   process.on("SIGINT", handleSignal);
 
   const toolCtx = initGoogleApiResources(
-    config, projectDir, store, taskId, testCommand, startingHead,
+    config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop,
   );
 
   const messages: OpenAiMessage[] = [];
@@ -1719,6 +1726,7 @@ async function runLocalToolLoop(params: {
 
   await finalizeRun({
     claims: opts.claims,
+    configBackstop: opts.configBackstop,
     run,
     henchDir,
     projectDir,
@@ -1906,7 +1914,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
 
   const { client, vendor, toolCtx } = await initApiResources(
     provider, config, henchDir, projectDir, store, taskId,
-    brief.project.testCommand, startingHead,
+    brief.project.testCommand, startingHead, opts.configBackstop,
   );
 
   // Shared: initialize run record + capture start memory snapshot
@@ -2181,6 +2189,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
   await finalizeRun({
     claims: opts.claims,
+    configBackstop: opts.configBackstop,
     run,
     henchDir,
     projectDir,

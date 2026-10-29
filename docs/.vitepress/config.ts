@@ -33,6 +33,7 @@ export default defineConfig({
       { text: "Guide", link: "/guide/getting-started" },
       { text: "Architecture", link: "/architecture/overview" },
       { text: "Packages", link: "/packages/overview" },
+      { text: "Extensions", link: "/extensions/" },
       { text: "Contributing", link: "/contributing/testing" },
     ],
 
@@ -87,6 +88,7 @@ export default defineConfig({
             { text: "Public Surface", link: "/architecture/public-surface" },
             { text: "PRD Write Concurrency", link: "/architecture/prd-write-concurrency" },
             { text: "Graview Projection", link: "/architecture/graview-projection" },
+            { text: "Extensions", link: "/architecture/extensions" },
           ],
         },
         {
@@ -130,6 +132,21 @@ export default defineConfig({
             { text: "Hench", link: "/packages/hench" },
             { text: "LLM Client", link: "/packages/llm-client" },
             { text: "Web Dashboard", link: "/packages/web" },
+          ],
+        },
+      ],
+      "/extensions/": [
+        {
+          text: "Extensions",
+          items: [
+            { text: "Overview", link: "/extensions/" },
+            { text: "Minimal Example", link: "/extensions/example" },
+            { text: "Manifest", link: "/extensions/manifest" },
+            { text: "Environment", link: "/extensions/environment" },
+            { text: "Hub and API", link: "/extensions/hub-api" },
+            { text: "Consent", link: "/extensions/consent" },
+            { text: "Config", link: "/extensions/config" },
+            { text: "Versioning", link: "/extensions/versioning" },
           ],
         },
       ],

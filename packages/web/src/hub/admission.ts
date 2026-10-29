@@ -369,6 +369,14 @@ export class AdmissionGate {
     };
   }
 
+  /**
+   * Available memory now, as this gate reads it — what the hub holds sidecar
+   * starts to, so they and agent runs answer to one floor. Null when unknown.
+   */
+  availableMemoryBytes(): number | null {
+    return this.measureMemory().availableBytes;
+  }
+
   /** Measure the machine now. */
   async measure(): Promise<AdmissionSnapshot> {
     const running = await this.options.countRunning().catch(() => 0);

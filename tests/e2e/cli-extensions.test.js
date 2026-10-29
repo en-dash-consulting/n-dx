@@ -1,0 +1,538 @@
+/**
+ * `ndx extensions` and `ndx <extension command>` through the real CLI:
+ * dispatch, help, exit codes, signals, and an n-dx home of the test's own
+ * (`N_DX_HOME`). The subcommands and resolution themselves are covered in
+ * tests/unit/extensions-command.test.js and tests/unit/extension-dispatch.test.js.
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { CLI_PATH, createTmpDir, removeTmpDir, run, runResult } from "./e2e-helpers.js";
+
+let root;
+let home;
+
+beforeEach(async () => {
+  root = await createTmpDir("ndx-e2e-extensions-");
+  home = join(root, "home");
+  mkdirSync(home, { recursive: true });
+});
+
+afterEach(async () => {
+  await removeTmpDir(root);
+});
+
+const env = () => ({ ...process.env, N_DX_HOME: home, NDX_HOME: "" });
+const opts = () => ({ cwd: root, env: env() });
+
+/** A user-installed extension whose command bin is missing. */
+function installBroken() {
+  const folder = join(home, "extensions");
+  writeFileSync(join(mkdirp(folder), "package.json"), JSON.stringify({ name: "ndx-user-extensions", dependencies: { "ndx-recon": "^1.0.0" } }));
+  writeFileSync(join(mkdirp(join(folder, "node_modules", "ndx-recon")), "package.json"), JSON.stringify({
+    name: "ndx-recon",
+    version: "1.0.0",
+    ndx: { extension: { apiVersion: 1, name: "recon", ndxVersion: ">=0.0.0", commands: [{ name: "recon", bin: "bin/cli.js", summary: "Recon" }] } },
+  }));
+}
+
+function mkdirp(dir) {
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+describe("ndx extensions", () => {
+  it("has its own help page and a line in the main help", () => {
+    const help = run(["extensions", "--help"], opts());
+    for (const sub of ["list", "add", "remove", "enable", "disable", "info", "doctor"]) {
+      expect(help).toContain(`ndx extensions ${sub}`);
+    }
+    expect(run(["--help"], opts())).toMatch(/extensions <sub>/);
+  });
+
+  it("lists nothing in an empty home", () => {
+    const out = run(["extensions", "list", "--json"], opts());
+    expect(JSON.parse(out)).toEqual({ extensions: [], errors: [] });
+  });
+
+  it("lists an installed extension, and doctor exits 1 naming the missing bin", () => {
+    installBroken();
+    const [row] = JSON.parse(run(["extensions", "list", "--json"], opts())).extensions;
+    expect(row).toMatchObject({ name: "recon", version: "1.0.0", source: "user", state: "unapproved" });
+
+    const doctor = runResult(["extensions", "doctor"], opts());
+    expect(doctor.code).toBe(1);
+    expect(doctor.stdout).toMatch(/ndx-recon: ndx\.extension\.commands\[0\]\.bin "bin\/cli\.js" does not exist .* — fix: /);
+  });
+
+  it("enable without a terminal exits 2 and names --yes; with --yes it approves", () => {
+    installBroken();
+    const asked = runResult(["extensions", "enable", "recon"], opts());
+    expect(asked.code).toBe(2);
+    expect(asked.stderr).toMatch(/ndx extensions enable recon --yes/);
+
+    run(["extensions", "enable", "recon", "--yes"], opts());
+    const [row] = JSON.parse(run(["extensions", "list", "--json"], opts())).extensions;
+    expect(row.state).toBe("enabled");
+  });
+});
+
+/**
+ * A user-installed extension `name` whose command prints its args and Node,
+ * then exits with the code in its first arg (or waits, given `wait`).
+ * Approved unless `approve` is false.
+ */
+function installEcho(name, { approve = true, ndxVersion = ">=0.0.0" } = {}) {
+  const folder = join(home, "extensions");
+  writeFileSync(join(mkdirp(folder), "package.json"), JSON.stringify({ name: "ndx-user-extensions", dependencies: { [`ndx-${name}`]: "^1.0.0" } }));
+  const dir = mkdirp(join(folder, "node_modules", `ndx-${name}`));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({
+    name: `ndx-${name}`,
+    version: "1.0.0",
+    ndx: { extension: { apiVersion: 1, name, ndxVersion, commands: [{ name, bin: "bin/cli.js", summary: name }] } },
+  }));
+  writeFileSync(join(mkdirp(join(dir, "bin")), "cli.js"), [
+    `process.on("SIGTERM", () => { console.log("got SIGTERM"); process.exit(7); });`,
+    `console.log("args " + JSON.stringify(process.argv.slice(2)) + " exec " + process.execPath);`,
+    `if (process.argv[2] === "wait") setInterval(() => {}, 1000);`,
+    `else process.exit(Number(process.argv[2] ?? 0));`,
+  ].join("\n"));
+  if (approve) run(["extensions", "enable", name, "--yes"], opts());
+}
+
+/**
+ * An approved user-installed extension `name` whose command prints, as JSON,
+ * its NDX_* environment, whether its state folder exists, and what
+ * `NDX_BIN version` prints when it re-enters n-dx.
+ */
+function installReport(name) {
+  installEcho(name, { approve: false });
+  const bin = join(home, "extensions", "node_modules", `ndx-${name}`, "bin", "cli.js");
+  writeFileSync(bin, [
+    `const { execFileSync } = require("node:child_process");`,
+    `const { existsSync } = require("node:fs");`,
+    `const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith("NDX_")));`,
+    `const reentered = execFileSync(process.execPath, [process.env.NDX_BIN, "version"], { encoding: "utf-8", windowsHide: true }).trim();`,
+    `console.log(JSON.stringify({ env, stateDirExists: existsSync(process.env.NDX_EXTENSION_STATE_DIR), reentered }));`,
+  ].join("\n"));
+  run(["extensions", "enable", name, "--yes"], opts());
+}
+
+describe("ndx <extension command>", () => {
+  for (const code of [0, 1, 7]) {
+    it(`runs the bin with the remaining args and passes exit code ${code} through`, () => {
+      installEcho("recon");
+      const result = runResult(["recon", String(code), "--flag"], opts());
+      expect(result.code).toBe(code);
+      expect(result.stdout).toContain(`args ${JSON.stringify([String(code), "--flag"])}`);
+    });
+  }
+
+  it("an extension outlives cli.timeoutMs and passes its own exit code through", () => {
+    installEcho("recon");
+    writeFileSync(join(home, "extensions", "node_modules", "ndx-recon", "bin", "cli.js"), `setTimeout(() => process.exit(7), 2000);`);
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ cli: { timeoutMs: 1000 } }));
+    const result = runResult(["recon"], opts());
+    expect(result.stderr).not.toMatch(/timed out/);
+    expect(result.code).toBe(7);
+  });
+
+  it("an extension's positional argument is not read as an n-dx project", () => {
+    installEcho("recon");
+    writeFileSync(join(home, "extensions", "node_modules", "ndx-recon", "bin", "cli.js"), `setTimeout(() => process.exit(7), 2000);`);
+    const other = mkdirp(join(root, "other"));
+    writeFileSync(join(other, ".n-dx.json"), JSON.stringify({ cli: { timeoutMs: 1000 } }));
+    const result = runResult(["recon", other], opts());
+    expect(result.stderr).not.toMatch(/timed out/);
+    expect(result.code).toBe(7);
+  });
+
+  it("an extension run carries no n-dx update notice; a built-in run still does", () => {
+    installEcho("recon");
+    // A cached newer release makes the notice deterministic, with no network.
+    const tmp = mkdirp(join(root, "tmp"));
+    writeFileSync(join(tmp, "n-dx-update-check.json"), JSON.stringify({ checkedAt: Date.now(), latestVersion: "999.0.0" }));
+    // spawnSync, not runResult: runResult drops stderr on exit 0, where the notice is printed.
+    const ndx = (args) => spawnSync(process.execPath, [CLI_PATH, ...args], {
+      cwd: root,
+      env: { ...env(), TMPDIR: tmp, TEMP: tmp, TMP: tmp },
+      encoding: "utf-8",
+      windowsHide: true,
+    });
+
+    const extension = ndx(["recon", "0"]);
+    expect(extension.status).toBe(0);
+    expect(extension.stdout).toContain("args");
+    expect(extension.stderr).not.toMatch(/Update available/);
+
+    expect(ndx(["version"]).stderr).toMatch(/Update available/);
+  });
+
+  it("runs the extension with the Node n-dx runs on", () => {
+    installEcho("recon");
+    expect(run(["recon"], opts())).toContain(`exec ${process.execPath}`);
+  });
+
+  it("a built-in always wins over an extension claiming its name", () => {
+    installEcho("version", { approve: false });
+    const out = run(["version"], opts());
+    expect(out).not.toContain("args");
+    expect(out.trim()).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it("an unapproved extension exits 2 with one line naming enable", () => {
+    installEcho("recon", { approve: false });
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(2);
+    expect(result.stdout).not.toContain("args");
+    expect(result.stderr.trim()).toMatch(/^Error: 'ndx recon' comes from .* — fix: ndx extensions enable recon$/);
+  });
+
+  it("a disabled extension's name is an unknown command with a hint", () => {
+    installEcho("recon");
+    run(["extensions", "disable", "recon"], opts());
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/Unknown command: recon/);
+    expect(result.stderr).toMatch(/Hint: extension recon .* is disabled: .*'ndx extensions enable recon'/);
+  });
+
+  it("an incompatible extension's name is an unknown command with a hint", () => {
+    installEcho("recon", { approve: false, ndxVersion: ">=99.0.0" });
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/Hint: extension recon .* is incompatible: needs n-dx >=99\.0\.0/);
+  });
+
+  it("ndx --help lists enabled extension commands under EXTENSIONS with their summary", () => {
+    expect(run(["--help"], opts())).not.toContain("EXTENSIONS");
+    installEcho("recon", { approve: false });
+    expect(run(["--help"], opts())).not.toContain("EXTENSIONS");
+
+    run(["extensions", "enable", "recon", "--yes"], opts());
+    const help = run(["--help"], opts());
+    const section = help.slice(help.indexOf("EXTENSIONS"));
+    expect(section).toMatch(/^EXTENSIONS\n {2}recon +recon\n/);
+    expect(run([], opts())).toContain(section.split("\n\n")[0]);
+  });
+
+  it("ndx <name> --help is passed through to the extension", () => {
+    installEcho("recon");
+    writeFileSync(join(home, "extensions", "node_modules", "ndx-recon", "bin", "cli.js"), `console.log("args " + JSON.stringify(process.argv.slice(2)));`);
+    const result = runResult(["recon", "--help"], opts());
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`args ${JSON.stringify(["--help"])}`);
+  });
+
+  it("a name nothing claims is today's unknown command", () => {
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/Unknown command: recon/);
+    expect(result.stderr).toMatch(/Hint: Run 'ndx --help'/);
+  });
+
+  it("gives the extension the environment contract, and no token", () => {
+    installReport("recon");
+    writeFileSync(join(home, "auth.token"), "s3cret-token\n");
+    const report = JSON.parse(run(["recon"], opts()));
+    const stateDir = join(home, "ext", "recon");
+    expect(report.env).toMatchObject({
+      NDX_EXTENSION_API: "1",
+      NDX_VERSION: report.reentered,
+      NDX_BIN: realpathSync(CLI_PATH),
+      NDX_HOME: home,
+      NDX_EXTENSION_NAME: "recon",
+      NDX_EXTENSION_STATE_DIR: stateDir,
+      NDX_EXTENSION_CONFIG: expect.stringMatching(/[\\/]ndx-config-\d+-[0-9a-f]+\.json$/),
+    });
+    expect(dirname(report.env.NDX_EXTENSION_CONFIG)).toBe(stateDir);
+    expect(report.stateDirExists).toBe(true);
+    expect(report.env).not.toHaveProperty("NDX_HUB_URL");
+    expect(JSON.stringify(report)).not.toContain("s3cret-token");
+  });
+
+  // n-dx installed as a project dependency and globally: both reached through a
+  // node_modules link, as npm and pnpm install it.
+  for (const install of ["project", "global"]) {
+    it(`NDX_BIN re-enters the same n-dx from a ${install} install`, () => {
+      installReport("recon");
+      const prefix = install === "project" ? join(root, "app") : join(root, "global", "lib");
+      const coreDir = join(mkdirp(join(prefix, "node_modules", "@n-dx")), "core");
+      symlinkSync(dirname(CLI_PATH), coreDir, "junction");
+      const out = execFileSync(process.execPath, [join(coreDir, "cli.js"), "recon"], { ...opts(), encoding: "utf-8", windowsHide: true });
+      const report = JSON.parse(out);
+      expect(realpathSync(report.env.NDX_BIN)).toBe(realpathSync(join(coreDir, "cli.js")));
+      expect(report.reentered).toBe(run(["version"], opts()).trim());
+    });
+  }
+
+  it("hands the extension an empty config file when no section is set", () => {
+    installConfigReader("recon");
+    expect(JSON.parse(run(["recon"], opts()))).toEqual({});
+  });
+
+  it.skipIf(process.platform === "win32")("forwards SIGTERM to the extension and exits with its code", async () => {
+    installEcho("recon");
+    const child = spawn(process.execPath, [CLI_PATH, "recon", "wait"], { ...opts(), stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      if (stdout.includes("args ")) child.kill("SIGTERM");
+    });
+    const code = await new Promise((resolve) => child.on("close", resolve));
+    expect(stdout).toContain("got SIGTERM");
+    expect(code).toBe(7);
+  });
+});
+
+/**
+ * An approved user-installed extension `name` whose command prints the JSON
+ * file `NDX_EXTENSION_CONFIG` names, with `schema` as its configSchema when given.
+ */
+function installConfigReader(name, schema) {
+  installEcho(name, { approve: false });
+  const dir = join(home, "extensions", "node_modules", `ndx-${name}`);
+  writeFileSync(join(dir, "bin", "cli.js"), `process.stdout.write(require("node:fs").readFileSync(process.env.NDX_EXTENSION_CONFIG, "utf-8"));`);
+  if (schema) {
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf-8"));
+    pkg.ndx.extension.configSchema = "schema/config.json";
+    writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
+    writeFileSync(join(mkdirp(join(dir, "schema")), "config.json"), JSON.stringify(schema));
+  }
+  run(["extensions", "enable", name, "--yes"], opts());
+}
+
+const RECON_SCHEMA = {
+  type: "object",
+  properties: {
+    mode: { enum: ["fast", "deep"] },
+    depth: { type: "integer", minimum: 1 },
+    target: { type: "string" },
+  },
+  required: ["target"],
+  additionalProperties: false,
+};
+
+const readJson = (path) => JSON.parse(readFileSync(path, "utf-8"));
+
+describe("ndx config extensions.<name>", () => {
+  it("merges the project section over the user's and hands the result to the extension", () => {
+    installConfigReader("recon", RECON_SCHEMA);
+    expect(run(["config", "extensions.recon.mode", "deep", "--user"], opts())).toContain("extensions.recon.mode = deep");
+    run(["config", "extensions.recon.depth", "3", "--user"], opts());
+    run(["config", "extensions.recon.mode", "fast"], opts());
+    run(["config", "extensions.recon.target", "12345"], opts());
+
+    expect(readJson(join(home, "config.json")).extensions.recon).toEqual({ mode: "deep", depth: 3 });
+    expect(readJson(join(root, ".n-dx.json")).extensions.recon).toEqual({ mode: "fast", target: "12345" });
+
+    const merged = { mode: "fast", depth: 3, target: "12345" };
+    expect(JSON.parse(run(["config", "extensions.recon", "--json"], opts()))).toEqual(merged);
+    expect(run(["config", "extensions.recon.depth"], opts()).trim()).toBe("3");
+    expect(JSON.parse(run(["recon"], opts()))).toEqual(merged);
+  });
+
+  it("coerces nullable strings, map values, array items and composed schemas", () => {
+    installConfigReader("recon", { properties: {
+      token: { type: ["string", "null"] },
+      env: { type: "object", additionalProperties: { type: "string" } },
+      ids: { type: "array", items: { type: "integer" } },
+      all: { allOf: [{ type: "string" }] },
+      any: { anyOf: [{ type: "string" }, { type: "null" }] },
+      one: { oneOf: [{ type: "string" }, { type: "boolean" }] },
+    } });
+    for (const [key, value] of [["token", "12345"], ["env.PORT", "8080"], ["ids", "1,2"], ["all", "123"], ["any", "456"], ["one", "true"]]) {
+      run(["config", `extensions.recon.${key}`, value], opts());
+    }
+    const expected = { token: "12345", env: { PORT: "8080" }, ids: [1, 2], all: "123", any: "456", one: "true" };
+    expect(readJson(join(root, ".n-dx.json")).extensions.recon).toEqual(expected);
+    expect(JSON.parse(run(["recon"], opts()))).toEqual(expected);
+  });
+
+  it("refuses a value the configSchema rejects, unless --force", () => {
+    installConfigReader("recon", RECON_SCHEMA);
+    const bad = runResult(["config", "extensions.recon.mode", "slow"], opts());
+    expect(bad.code).toBe(1);
+    expect(bad.stderr).toContain('mode must be one of: "fast", "deep"');
+    expect(bad.stderr).toContain("--force");
+    expect(runResult(["config", "extensions.recon.depth", "0"], opts()).stderr).toContain("depth must be >= 1");
+    expect(runResult(["config", "extensions.recon.extra", "1"], opts()).stderr).toContain('must not have the property "extra"');
+
+    run(["config", "extensions.recon.mode", "slow", "--force"], opts());
+    expect(readJson(join(root, ".n-dx.json")).extensions.recon.mode).toBe("slow");
+  });
+
+  it("refuses to run an extension whose merged section breaks its schema, required keys included", () => {
+    installConfigReader("recon", RECON_SCHEMA);
+    run(["config", "extensions.recon.mode", "fast"], opts());
+    const result = runResult(["recon"], opts());
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('the section must have the property "target"');
+    expect(result.stderr).toContain("fix: ndx config extensions.recon.<key> <value>");
+  });
+
+  it("refuses a key for an extension that is not installed, unless --force", () => {
+    const result = runResult(["config", "extensions.ghost.mode", "fast"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/No installed extension is named "ghost" — fix: ndx extensions list/);
+    run(["config", "extensions.ghost.mode", "fast", "--force"], opts());
+    expect(run(["config", "extensions.ghost.mode"], opts()).trim()).toBe("fast");
+  });
+
+  it("concurrent runs in different projects each read their own project's config", async () => {
+    // The command waits before reading, so a run that shared one config file
+    // with the others would read whichever project wrote it last.
+    installConfigReader("recon");
+    const bin = join(home, "extensions", "node_modules", "ndx-recon", "bin", "cli.js");
+    writeFileSync(bin, [
+      `setTimeout(() => process.stdout.write(require("node:fs").readFileSync(process.env.NDX_EXTENSION_CONFIG, "utf-8")), 1500);`,
+    ].join("\n"));
+    const projects = ["p1", "p2", "p3", "p4"].map((who) => {
+      const dir = mkdirp(join(root, who));
+      writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ extensions: { recon: { who } } }));
+      return { who, dir };
+    });
+    // Fill the discovery cache for each project first, so the parallel runs only
+    // read it: four runs rewriting <home>/extensions.json at once is a separate race.
+    for (const { dir } of projects) run(["extensions", "list", "--json"], { cwd: dir, env: env() });
+    const runIn = (dir) => new Promise((resolve) => {
+      const child = spawn(process.execPath, [CLI_PATH, "recon"], { cwd: dir, env: env(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => { stdout += chunk; });
+      child.stderr.on("data", (chunk) => { stderr += chunk; });
+      child.on("close", (code) => resolve({ code, stdout, stderr }));
+    });
+    const results = await Promise.all(projects.map(({ dir }) => runIn(dir)));
+    expect(results.map((r) => [r.code, r.stderr])).toEqual(projects.map(() => [0, ""]));
+    expect(results.map((r) => JSON.parse(r.stdout).who)).toEqual(projects.map((p) => p.who));
+    // Each run removes its own file when the command closes.
+    expect(readdirSync(join(home, "ext", "recon")).filter((f) => f.startsWith("ndx-config"))).toEqual([]);
+  });
+
+  it("says when the project config overrides a --user write", () => {
+    installConfigReader("recon");
+    run(["config", "extensions.recon.mode", "fast"], opts());
+    // runResult keeps stderr only on failure; this note comes with exit 0.
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "extensions.recon.mode", "deep", "--user"], { ...opts(), encoding: "utf-8", windowsHide: true });
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain('the project config also sets "extensions.recon.mode", and its value wins');
+  });
+
+  it("refuses a --user write over a malformed user config, naming it and leaving it byte-for-byte", () => {
+    installConfigReader("recon");
+    const path = join(home, "config.json");
+    const broken = '{\n  "extensions": { "paths": ["../dev/ndx-recon"], }\n}\n';
+    writeFileSync(path, broken);
+    const result = runResult(["config", "extensions.recon.mode", "deep", "--user", "--force"], opts());
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(path);
+    expect(readFileSync(path, "utf-8")).toBe(broken);
+  });
+
+  it("writes the user config through a rename, keeping discovery's extensions.paths", () => {
+    installConfigReader("recon");
+    const path = join(home, "config.json");
+    writeFileSync(path, JSON.stringify({ extensions: { paths: ["../dev/ndx-recon"] } }));
+    run(["config", "extensions.recon.mode", "deep", "--user"], opts());
+    expect(readJson(path).extensions).toEqual({ paths: ["../dev/ndx-recon"], recon: { mode: "deep" } });
+    expect(readdirSync(home).filter((f) => f.startsWith("config.json."))).toEqual([]);
+  });
+
+  it("refuses extensions.paths and other reserved names as a section, even with --force", () => {
+    const path = join(home, "config.json");
+    const before = JSON.stringify({ extensions: { paths: ["../dev/ndx-recon"] } });
+    writeFileSync(path, before);
+    for (const args of [
+      ["config", "extensions.paths.x", "1", "--user", "--force"],
+      ["config", "extensions.hub.x", "1", "--force"],
+    ]) {
+      const result = runResult(args, opts());
+      expect(result.code).toBe(1);
+      expect(result.stderr).toMatch(/is reserved/);
+    }
+    expect(readFileSync(path, "utf-8")).toBe(before);
+    expect(existsSync(join(root, ".n-dx.json")) ? readJson(join(root, ".n-dx.json")).extensions : undefined).toBeUndefined();
+  });
+});
+
+/** A user-installed extension `name` that declares only a sidecar. */
+function installSidecar(name, { approve = true, sidecar = { bin: "bin/serve.js", health: "/healthz" } } = {}) {
+  const folder = join(home, "extensions");
+  writeFileSync(join(mkdirp(folder), "package.json"), JSON.stringify({ name: "ndx-user-extensions", dependencies: { [`ndx-${name}`]: "^1.0.0" } }));
+  const dir = mkdirp(join(folder, "node_modules", `ndx-${name}`));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({
+    name: `ndx-${name}`,
+    version: "1.0.0",
+    ndx: { extension: { apiVersion: 1, name, ndxVersion: ">=0.0.0", sidecar } },
+  }));
+  writeFileSync(join(mkdirp(join(dir, "bin")), "serve.js"), "// served by the hub\n");
+  if (approve) run(["extensions", "enable", name, "--yes"], opts());
+  return dir;
+}
+
+describe("ndx extensions sidecar", () => {
+  it("prints the hub's launch plan for an enabled sidecar, with the defaults filled in", () => {
+    const dir = installSidecar("recon", { sidecar: { bin: "bin/serve.js" } });
+    const plan = JSON.parse(run(["extensions", "sidecar", "recon", "--json"], opts()));
+    const stateDir = join(home, "ext", "recon");
+    expect(plan).toMatchObject({
+      name: "recon",
+      execPath: process.execPath,
+      bin: join(dir, "bin", "serve.js"),
+      cwd: stateDir,
+      health: "/",
+      idleStopMinutes: 15,
+      logFile: join(stateDir, "logs", "sidecar.log"),
+    });
+    expect(plan.env).toMatchObject({ NDX_EXTENSION_NAME: "recon", NDX_EXTENSION_STATE_DIR: stateDir });
+    expect(readJson(plan.env.NDX_EXTENSION_CONFIG)).toEqual({});
+    expect(readdirSync(join(stateDir, "logs"))).toEqual([]);
+  });
+
+  it("gives the sidecar the user's config only, in a file no command run rewrites", () => {
+    // A command and a sidecar in one manifest, written before discovery first runs.
+    installEcho("recon", { approve: false });
+    const dir = join(home, "extensions", "node_modules", "ndx-recon");
+    const pkg = readJson(join(dir, "package.json"));
+    pkg.ndx.extension.sidecar = { bin: "bin/serve.js" };
+    writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
+    writeFileSync(join(dir, "bin", "serve.js"), "// served by the hub\n");
+    writeFileSync(join(dir, "bin", "cli.js"), `process.stdout.write(process.env.NDX_EXTENSION_CONFIG);`);
+    run(["extensions", "enable", "recon", "--yes"], opts());
+    run(["config", "extensions.recon.mode", "deep", "--user", "--force"], opts());
+    run(["config", "extensions.recon.who", "project", "--force"], opts());
+
+    const plan = JSON.parse(run(["extensions", "sidecar", "recon", "--json"], opts()));
+    expect(plan.env.NDX_EXTENSION_CONFIG).toBe(join(home, "ext", "recon", "sidecar-config.json"));
+    const before = readFileSync(plan.env.NDX_EXTENSION_CONFIG, "utf-8");
+    expect(JSON.parse(before)).toEqual({ mode: "deep" });
+
+    expect(run(["recon"], opts())).not.toBe(plan.env.NDX_EXTENSION_CONFIG);
+    expect(readFileSync(plan.env.NDX_EXTENSION_CONFIG, "utf-8")).toBe(before);
+  });
+
+  it("keeps the manifest's health path", () => {
+    installSidecar("recon");
+    expect(JSON.parse(run(["extensions", "sidecar", "recon", "--json"], opts())).health).toBe("/healthz");
+  });
+
+  it("refuses an unapproved sidecar with exit 2, naming enable", () => {
+    installSidecar("recon", { approve: false });
+    const result = runResult(["extensions", "sidecar", "recon", "--json"], opts());
+    expect(result.code).toBe(2);
+    const body = JSON.parse(result.stdout);
+    expect(body.reason).toBe("refused");
+    expect(body.error).toMatch(/is unapproved .* — fix: ndx extensions enable recon$/);
+    expect(result.stderr.trim()).toBe(body.error);
+  });
+
+  it("refuses a name with no sidecar with exit 2", () => {
+    installEcho("recon");
+    const result = runResult(["extensions", "sidecar", "recon", "--json"], opts());
+    expect(result.code).toBe(2);
+    expect(JSON.parse(result.stdout)).toMatchObject({ reason: "none" });
+  });
+});

@@ -107,7 +107,7 @@ All file operations (read, write, list, search) pass through `guard.checkPath()`
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `blockedPaths` | `.hench/**`, `.rex/**`, `.git/**`, `node_modules/**` | Glob patterns the agent cannot read or write |
+| `blockedPaths` | `.hench/**`, `.rex/**`, `.git/**`, `**/node_modules/**` and the other ecosystems' dependency directories at any depth, credential files | Glob patterns the agent cannot read or write |
 | `maxFileSize` | 1 MB | Maximum file size for read/write operations |
 
 ### Shell execution

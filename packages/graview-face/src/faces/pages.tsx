@@ -4,6 +4,7 @@ import type { Scheme } from "@graview/primitives";
 import { rememberedPrincipal } from "@graview/ship/browser";
 import { createRoot } from "react-dom/client";
 import type { App } from "../app.js";
+import { BASE } from "../base.js";
 import { pages } from "../ui/pages.js";
 import { views } from "../ui/views.js";
 import { SchemeContext } from "../ui/scheme.js";
@@ -24,7 +25,7 @@ export interface Mount {
  */
 async function connect(store: Mount["store"]): Promise<void> {
   try {
-    const info = (await (await fetch("/ndx/sync-info")).json()) as { rex?: boolean };
+    const info = (await (await fetch(`${BASE}/ndx/sync-info`)).json()) as { rex?: boolean };
     if (!info.rex) return;
     const who = rememberedPrincipal();
     setSync(startSync({ store, principal: who.name ?? who.id ?? "reader" }));
@@ -39,11 +40,11 @@ export function mount(root: HTMLElement, { app, store, scheme, applyScheme }: Mo
   createRoot(root).render(
     <SchemeContext.Provider value={{ initial: scheme, apply: applyScheme }}>
       <PagesApp
-        basename="/pages"
+        basename={`${BASE}/pages`}
         context={{
           store,
           brand: app.brand,
-          sceneHref: "/scene",
+          sceneHref: `${BASE}/scene`,
           remembers: false,
           // The same pictures on both faces: the registry the scene draws from, so every titled lens is a place here too.
           views: views(app),

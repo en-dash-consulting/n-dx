@@ -1,5 +1,6 @@
 import type { PRDStore } from "../prd/rex-gateway.js";
 import type { SystemMemoryMonitor } from "../process/memory-monitor.js";
+import type { ConfigBackstop } from "../guard/config-backstop.js";
 
 /**
  * Minimal guard contract required by tool handlers.
@@ -37,6 +38,11 @@ export interface ToolContext {
   memoryMonitor?: SystemMemoryMonitor;
   /** When true, the agent is in self-heal mode (stricter completion validation). */
   selfHeal?: boolean;
+  /**
+   * The run's snapshot of n-dx's own config files. `dispatchTool` puts back
+   * whatever a call changed before the next call can read it.
+   */
+  configBackstop?: ConfigBackstop;
 }
 
 export interface RexUpdateStatusParams {

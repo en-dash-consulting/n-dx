@@ -301,27 +301,81 @@ describe("GET /api/llm/catalog — installed CLI", () => {
     expect(execMock).toHaveBeenCalledWith("claude", ["--version"], expect.objectContaining({ timeout: 5000 }));
   });
 
+  it("hands each probed CLI the vendor's filtered environment, not the parent's (#686)", async () => {
+    vi.stubEnv("GITHUB_TOKEN", "sentinel-github");
+    vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "sentinel-anthropic");
+    vi.stubEnv("CODEX_ACCESS_TOKEN", "sentinel-codex");
+
+    await getCatalog();
+
+    const envFor = (cmd: string): NodeJS.ProcessEnv | undefined =>
+      execMock.mock.calls.find(([called]) => called === cmd)?.[2]?.env;
+    const claudeEnv = envFor("claude");
+    const codexEnv = envFor("codex");
+    expect(claudeEnv?.GITHUB_TOKEN).toBeUndefined();
+    expect(claudeEnv?.CODEX_ACCESS_TOKEN).toBeUndefined();
+    expect(claudeEnv?.ANTHROPIC_AUTH_TOKEN).toBe("sentinel-anthropic");
+    expect(codexEnv?.GITHUB_TOKEN).toBeUndefined();
+    expect(codexEnv?.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    expect(codexEnv?.CODEX_ACCESS_TOKEN).toBe("sentinel-codex");
+  });
+
+  it("applies the user's own hench.guard.env.deny to each probed CLI", async () => {
+    vi.stubEnv("NDX_HOME", await mkdtemp(join(tmpdir(), "ndx-llm-catalog-home-")));
+    vi.stubEnv("NDX_USER_DENIED_PLAIN", "placeholder");
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ hench: { guard: { env: { deny: ["NDX_USER_DENIED_*"] } } } }),
+      "utf-8",
+    );
+
+    await getCatalog();
+
+    for (const cmd of ["claude", "codex"]) {
+      const env = execMock.mock.calls.find(([called]) => called === cmd)?.[2]?.env;
+      expect(env, cmd).toBeDefined();
+      expect(env?.PATH, cmd).toBeDefined();
+      expect(env?.NDX_USER_DENIED_PLAIN, cmd).toBeUndefined();
+    }
+  });
+
   it("reports a missing CLI as not found", async () => {
     const body = await getCatalog();
     expect(body.claude.cli).toEqual({ found: false, version: null, path: null });
     expect(body.codex.cli).toEqual({ found: false, version: null, path: null });
   });
 
-  it("resolves the binary the way runs do: env, then .n-dx.local.json over .n-dx.json", async () => {
-    await writeConfig({ cli: { claudePath: "/shared/claude" }, llm: { codex: { cli_path: "/shared/codex" } } });
+  it("resolves the binary the way runs do: env, then the user's .n-dx.local.json cli_path", async () => {
     await writeFile(
       join(projectDir, ".n-dx.local.json"),
-      JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }),
+      JSON.stringify({ llm: { claude: { cli_path: "/local/claude" }, codex: { cli_path: "/local/codex" } } }),
       "utf-8",
     );
     execMock.mockResolvedValue({ stdout: "1.0.0", stderr: "", exitCode: 0, error: null, launched: true });
 
     const body = await getCatalog();
-    expect(body.claude.cli.path).toBe("/shared/claude");
+    expect(body.claude.cli.path).toBe("/local/claude");
     expect(body.codex.cli.path).toBe("/local/codex");
 
     vi.stubEnv("CLAUDE_CLI_PATH", "/env/claude");
     expect((await getCatalog("?refresh=true")).claude.cli.path).toBe("/env/claude");
+  });
+
+  it("never spawns a binary an untrusted repository's shared config names", async () => {
+    vi.stubEnv("NDX_HOME", await mkdtemp(join(tmpdir(), "ndx-llm-catalog-home-")));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await writeConfig({
+      cli: { claudePath: "/shared/claude" },
+      llm: { claude: { cli_path: "/shared/claude-llm" }, codex: { cli_path: "/shared/codex" } },
+    });
+    execMock.mockResolvedValue({ stdout: "1.0.0", stderr: "", exitCode: 0, error: null, launched: true });
+
+    const body = await getCatalog();
+
+    const spawned = execMock.mock.calls.map(([cmd]) => cmd);
+    expect(spawned.some((cmd) => String(cmd).startsWith("/shared/"))).toBe(false);
+    expect(body.claude.cli.path).toBe("claude");
+    expect(body.codex.cli.path).toBe("codex");
   });
 });
 

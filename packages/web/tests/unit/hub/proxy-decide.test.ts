@@ -63,3 +63,35 @@ describe("decideProxy: the hub chooser at /hub", () => {
     expect(decideProxy(several, HUB_PATH, true)).toMatchObject({ kind: "json", status: 404 });
   });
 });
+
+describe("decideProxy: a sidecar never sees ndx_token in the query", () => {
+  it("drops it for HTTP and for a WebSocket upgrade, keeping the other parameters", () => {
+    for (const upgrade of [false, true]) {
+      expect(decideProxy(one, "/x/recon/page?a=1&ndx_token=T&b=2", upgrade)).toMatchObject({ kind: "sidecar", path: "/page?a=1&b=2" });
+      expect(decideProxy(one, "/x/recon/?ndx_token=T", upgrade)).toMatchObject({ kind: "sidecar", path: "/" });
+    }
+    expect(decideProxy(one, "/x/recon?ndx_token=T", true)).toMatchObject({ kind: "sidecar", path: "/" });
+  });
+
+  it("forwards every other segment byte for byte", () => {
+    // URLSearchParams would rewrite each of these: %20 → +, bare key → c=,
+    // / and ~ escaped, invalid UTF-8 %E9 → %EF%BF%BD.
+    const rest = "a=%20b&c&path=/a/b~c&cb=%E9&d=x+y&&e=%2F";
+    for (const upgrade of [false, true]) {
+      expect(decideProxy(one, `/x/recon/page?${rest}&ndx_token=T`, upgrade)).toMatchObject({ kind: "sidecar", path: `/page?${rest}` });
+      expect(decideProxy(one, `/x/recon/page?ndx_token=T&${rest}`, upgrade)).toMatchObject({ kind: "sidecar", path: `/page?${rest}` });
+    }
+  });
+
+  it("drops an encoded or repeated ndx_token key too", () => {
+    expect(decideProxy(one, "/x/recon/?a=1&ndx%5Ftoken=T&ndx_token=U")).toMatchObject({ kind: "sidecar", path: "/?a=1" });
+  });
+
+  it("drops it from the trailing-slash redirect", () => {
+    expect(decideProxy(one, "/x/recon?q=2&ndx_token=T")).toEqual({ kind: "redirect", location: "/x/recon/?q=2" });
+  });
+
+  it("leaves a query without it untouched", () => {
+    expect(decideProxy(one, "/x/recon/p?a=%20b&c")).toMatchObject({ kind: "sidecar", path: "/p?a=%20b&c" });
+  });
+});

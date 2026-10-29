@@ -8,7 +8,10 @@ rex PRD model, sourcevision's JSON output and hench's run records. `ndx graview 
 
 - **No `@graview/*` or `graview` dependency, ever.** The binary is a peer tool
   resolved from `graview.bin` in the project config, `NDX_GRAVIEW_BIN`, PATH,
-  then `npx -y graview@<pinned>` (`src/graview-bin.ts`). `@graview/core` is a
+  then `npx -y graview@<pinned>` (`src/graview-bin.ts`), run from a directory
+  under the ndx home so npx never resolves the checkout's own install. A repository's
+  `graview.bin` (`.n-dx.json`, or a git-tracked `.n-dx.local.json`) is a
+  trust finding and applies only once the checkout is trusted. `@graview/core` is a
   devDependency only, so the tests can compile the declaration;
   `tests/e2e/architecture-policy.test.js` ("Graview stays a peer tool") fails
   the workspace if any `package.json` but the product face's lists one at
@@ -63,12 +66,18 @@ commits did (`livesIn`), all from the one commit-file read the zones of
 
 ### The product face
 
-`graview.app` in the project config names a checkout of a Graview product
-built from the emitted document (`@n-dx/graview-face`, published on its own and depended on by nothing). With
-it set, `ndx graview serve .` emits, then runs that product's dev server with
+The product face is a Graview product built from the emitted document
+(`@n-dx/graview-face`, published on its own and depended on by nothing), and
+an n-dx extension: its `ndx.extension` block declares the `graview-face`
+sidecar. `src/face.ts` never looks for it or reads its manifest; it asks the
+core CLI that spawned this one (`NDX_CLI_PATH`) for the sidecar's launch
+plan, the same question the hub asks for `/x/<name>/`, so discovery,
+approval and the extension environment stay core's. With the face enabled,
+`ndx graview serve .` emits, then runs that plan in the foreground with
 `NDX_GRAVIEW_DIR` pointing at the fresh files, instead of the bare
 `graview serve` (which is the store's HTTP and WebSocket wire and draws
-nothing). The declaration's `views` (home, per-kind card/row/page blocks),
+nothing). An unapproved face is refused with exit 2; a disabled or missing
+one gets the bare store. `graview.app` is retired and only warned about. The declaration's `views` (home, per-kind card/row/page blocks),
 `glance`, `page` groups, `computed` fields, `brand` and titled `lenses` are
 what that face draws; keep the data there, and React only in the product.
 
@@ -81,3 +90,9 @@ what that face draws; keep the data there, and React only in the product.
 home), and the hand-off (`ndx graview serve` sets `NDX_REX_MCP_URL`,
 `NDX_TOKEN_FILE`, `NDX_PROJECT_ROOT`, `NDX_GRAVIEW_CLI`). Rex stays the
 single writer: a face pushes through rex's MCP tools, never the tree.
+
+For this checkout, register the face once before using it: add the absolute
+`packages/graview-face` path to `extensions.paths` in `<ndx home>/config.json`,
+then run `ndx extensions enable graview-face --yes`. This enables the face and
+its pinned Graview binary offline. Without this setup, resolution may fall
+back to `npx`, which needs network access. `graview.app` no longer discovers it.
