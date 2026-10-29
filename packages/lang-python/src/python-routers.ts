@@ -13,7 +13,7 @@
  * @module lang-python/python-routers
  */
 
-import type { RouteFact } from "@n-dx/lang-kit";
+import type { RouteFact, SourcePosition } from "@n-dx/lang-kit";
 import type { Capture, FrameworkContext, FrameworkFacts, PackSourceFile } from "@n-dx/lang-runtime";
 import {
   argument,
@@ -68,6 +68,7 @@ export interface RouterRules {
 
 /** An application or router bound to a name. */
 interface Instance {
+  readonly at: SourcePosition;
   readonly key: string;
   readonly file: string;
   /** The constructor that made it: `APIRouter`, `Blueprint`. */
@@ -103,11 +104,14 @@ export function readRouterRoutes(rules: RouterRules, files: readonly PackSourceF
       if (!call || !constructor) continue;
       const prefix = constructor.prefix === undefined ? undefined : call.keywords.get(constructor.prefix);
       const key = keyOf(web.path, assignment.target);
-      instances.set(key, { key, file: web.path, madeBy: call.callee, ...(prefix ? { prefix } : {}) });
+      instances.set(key, { key, at: assignment.targetNode.start, file: web.path, madeBy: call.callee, ...(prefix ? { prefix } : {}) });
     }
   }
   const instanceAt = (file: string, text: string): Instance | undefined => {
-    const found = project.defined(file, text, (f, name) => instances.has(keyOf(f, name)));
+    const found = project.defined(file, text, (f, name, at) => {
+      const instance = instances.get(keyOf(f, name));
+      return instance !== undefined && (at === undefined || (instance.at.line === at.line && instance.at.column === at.column));
+    });
     return found && instances.get(keyOf(found.file, found.name));
   };
 

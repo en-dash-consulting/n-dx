@@ -13,10 +13,14 @@ items:
     lastModified: "2026-10-12T03:00:18.506Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "278055d7-6995-4a91-8995-51d43aa7e4e6":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-29T18:31:03.714Z"
-    activeIntervals: [{"start":"2026-10-29T18:31:03.714Z"}]
-    lastModified: "2026-10-29T18:31:04.285Z"
+    completedAt: "2026-10-29T22:51:54.216Z"
+    endedAt: "2026-10-29T22:51:54.216Z"
+    activeIntervals: [{"end":"2026-10-29T22:51:54.216Z","start":"2026-10-29T18:31:03.714Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Four regressions fail before the fix; all138 Python tests pass with fixture goldens unchanged. Seven pinned corpus repositories (25,337 files) compared; documented Django740→725 routes and NetBox147→146 DRF notices, other results unchanged. See docs/analysis/python-framework-scope-2026-10-29.md. Task2d8ed30f stays in progress for its incompatible byte-identical-corpus criterion."
+    lastModified: "2026-10-29T22:51:54.216Z"
     lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "2d8ed30f-928b-48a9-8a13-5e0b20baf11a":
     status: "in_progress"
@@ -40,10 +44,14 @@ items:
     lastModified: "2026-10-17T07:40:54.572Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "452790b2-6514-426b-99f9-9ba9a45326e9":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-29T18:31:22.536Z"
-    activeIntervals: [{"start":"2026-10-29T18:31:22.536Z"}]
-    lastModified: "2026-10-29T18:31:23.034Z"
+    completedAt: "2026-10-29T22:52:06.510Z"
+    endedAt: "2026-10-29T22:52:06.510Z"
+    activeIntervals: [{"end":"2026-10-29T22:52:06.510Z","start":"2026-10-29T18:31:22.536Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Four regressions fail before the fix; all138 Python tests pass with fixture goldens unchanged. Seven pinned corpus repositories (25,337 files) compared; documented Django740→725 routes and NetBox147→146 DRF notices, other results unchanged. See docs/analysis/python-framework-scope-2026-10-29.md. Task2d8ed30f stays in progress for its incompatible byte-identical-corpus criterion."
+    lastModified: "2026-10-29T22:52:06.510Z"
     lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "468a2c2f-ab25-48a3-9d75-a85fe22ce178":
     status: "completed"
@@ -96,10 +104,14 @@ items:
     lastModified: "2026-10-16T16:53:09.327Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5b2ea100-4790-4834-9309-9e3d3f221f44":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-29T18:31:09.960Z"
-    activeIntervals: [{"start":"2026-10-29T18:31:09.960Z"}]
-    lastModified: "2026-10-29T18:31:10.528Z"
+    completedAt: "2026-10-29T22:51:59.967Z"
+    endedAt: "2026-10-29T22:51:59.967Z"
+    activeIntervals: [{"end":"2026-10-29T22:51:59.967Z","start":"2026-10-29T18:31:09.960Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Four regressions fail before the fix; all138 Python tests pass with fixture goldens unchanged. Seven pinned corpus repositories (25,337 files) compared; documented Django740→725 routes and NetBox147→146 DRF notices, other results unchanged. See docs/analysis/python-framework-scope-2026-10-29.md. Task2d8ed30f stays in progress for its incompatible byte-identical-corpus criterion."
+    lastModified: "2026-10-29T22:51:59.967Z"
     lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "69ec8bf2-b1c6-480d-8060-df5a3bc680ba":
     status: "completed"

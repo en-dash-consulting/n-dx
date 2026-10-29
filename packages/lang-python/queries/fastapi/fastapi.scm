@@ -44,3 +44,6 @@
 ; of the aliased import @fastapi.aliased, whose name the imports query captures.
 (aliased_import
   alias: (identifier) @fastapi.alias) @fastapi.aliased
+
+; Rebindings outside def/class also count under module-level if/try blocks.
+(assignment left: (identifier) @fastapi.binding right: (_))

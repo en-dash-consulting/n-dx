@@ -97,6 +97,8 @@ export interface WebAssignment {
   readonly targetNode: Capture;
   readonly value: Capture;
   readonly augmented: boolean;
+  /** Assignments in a function or class do not bind names in the module. */
+  readonly nested?: true;
 }
 
 /** A decorator on a function, with the function's name. */
@@ -169,12 +171,15 @@ export function readWebFile(file: PackSourceFile, prefix: string): WebFile {
   const items = new Map([...byOwner(sequences, mine("item"))].map(([sequence, entries]) => [spanKey(sequence), entries]));
 
   const assignmentNodes = mine("assignment");
+  const definitions = file.captures.definitions ?? [];
+  const scopes = [...named(definitions, "class.declaration"), ...named(definitions, "function.declaration")];
+  const assignmentScopes = innermostEach(scopes, assignmentNodes);
   const targets = byOwner(assignmentNodes, mine("target"));
   const values = byOwner(assignmentNodes, mine("assigned"));
-  const assignments = assignmentNodes.flatMap((node): WebAssignment[] => {
+  const assignments = assignmentNodes.flatMap((node, i): WebAssignment[] => {
     const target = targets.get(node)?.[0];
     const value = values.get(node)?.[0];
-    return target && value ? [{ target: target.text, targetNode: target, value, augmented: node.nodeType === "augmented_assignment" }] : [];
+    return target && value ? [{ target: target.text, targetNode: target, value, augmented: node.nodeType === "augmented_assignment", ...(assignmentScopes[i] ? { nested: true as const } : {}) }] : [];
   });
 
   return {
@@ -185,7 +190,7 @@ export function readWebFile(file: PackSourceFile, prefix: string): WebFile {
     sequences,
     assignments,
     bindings: readBindings(file, mine("aliased"), mine("alias")),
-    moduleBound: readModuleBound(file),
+    moduleBound: readModuleBound(file, mine("binding")),
     decorated: readDecorated(file),
   };
 }
@@ -236,7 +241,7 @@ const comparePositions = (a: SourcePosition, b: SourcePosition): number => a.lin
  * `variables` query captured (an annotation alone binds nothing), and a
  * `def` or `class` inside no other definition. A later one replaces an earlier one.
  */
-function readModuleBound(file: PackSourceFile): Map<string, SourcePosition> {
+function readModuleBound(file: PackSourceFile, bindings: readonly Capture[]): Map<string, SourcePosition> {
   const entries: Array<[string, SourcePosition]> = [];
   const variables = file.captures.variables ?? [];
   const statements = named(variables, "variable.declaration");
@@ -248,6 +253,10 @@ function readModuleBound(file: PackSourceFile): Map<string, SourcePosition> {
   const definitions = file.captures.definitions ?? [];
   const of = (name: string): Capture[] => named(definitions, name);
   const declarations = [...of("class.declaration"), ...of("function.declaration")];
+  const bindingScopes = innermostEach(declarations, bindings);
+  bindings.forEach((binding, i) => {
+    if (!bindingScopes[i]) entries.push([binding.text, binding.start]);
+  });
   const definitionNames = byOwner(declarations, [...of("class.name"), ...of("function.name")]);
   const enclosing = innermostEach(declarations, declarations, true);
   declarations.forEach((declaration, i) => {
@@ -539,7 +548,7 @@ export class WebProject {
    * by `defines`: in the file itself, through `from m import name` (and any
    * re-exports after it), or as an attribute of an imported module.
    */
-  defined(from: string, text: string, defines: (file: string, name: string) => boolean): Defined | undefined {
+  defined(from: string, text: string, defines: (file: string, name: string, at?: SourcePosition) => boolean): Defined | undefined {
     const segments = dotted(text).split(".");
     if (segments.some((s) => !/^[A-Za-z_]\w*$/.test(s))) return undefined;
     if (segments.length === 1) return this.follow(from, segments[0]!, defines, 0);
@@ -547,28 +556,30 @@ export class WebProject {
     return module === undefined ? undefined : this.follow(module, segments.at(-1)!, defines, 0);
   }
 
-  private follow(file: string, name: string, defines: (file: string, name: string) => boolean, depth: number): Defined | undefined {
-    if (defines(file, name)) return { file, name };
+  private follow(file: string, name: string, defines: (file: string, name: string, at?: SourcePosition) => boolean, depth: number): Defined | undefined {
     const web = this.file(file);
     const binding = web?.bindings.get(name);
-    if (!binding?.name || depth >= MAX_REEXPORTS) return undefined;
-    // Python's last module-level binding wins: a name bound again after its import is not the imported one.
-    const bound = web!.moduleBound.get(name);
-    if (bound !== undefined && comparePositions(binding.at, bound) < 0) return undefined;
+    const bound = web?.moduleBound.get(name);
+    const importWins = binding && (!binding.nested || depth === 0) && (bound === undefined || comparePositions(binding.at, bound) > 0);
+    if (!importWins) {
+      // Factory-local routers remain useful in their own file, but cannot be a package attribute.
+      return defines(file, name, bound) && (depth === 0 || bound !== undefined) ? { file, name } : undefined;
+    }
+    if (!binding.name || depth >= MAX_REEXPORTS) return undefined;
     // `from pkg import name` gives `pkg`'s attribute: what `pkg/__init__.py` binds to `name`
     // (a re-export of `pkg/name.py`'s object included), and the submodule only when it binds nothing.
     const next = this.module(file, binding.module);
     if (next === undefined) return undefined;
-    if (next === file || !this.binds(next, binding.name, defines)) {
+    if (next === file || !this.binds(next, binding.name)) {
       if (this.module(file, submodule(binding.module, binding.name)) !== undefined) return undefined;
     }
     return this.follow(next, binding.name, defines, depth + 1);
   }
 
   /** Whether `file` binds `name` at module level: a definition `defines` accepts, an import, an assignment, `def` or `class`. */
-  private binds(file: string, name: string, defines: (file: string, name: string) => boolean): boolean {
+  private binds(file: string, name: string): boolean {
     const web = this.file(file);
-    return defines(file, name) || web?.bindings.has(name) === true || web?.moduleBound.has(name) === true;
+    return web?.moduleBound.has(name) === true || (web?.bindings.get(name) !== undefined && !web.bindings.get(name)!.nested);
   }
 }
 
