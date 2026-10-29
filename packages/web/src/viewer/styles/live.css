@@ -221,6 +221,20 @@
 .live-worktree { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
 .live-more { font-size: var(--font-sm); color: var(--accent); }
 
+/* Ready next (hench.readyNext): lanes from ndx work --plan-queue. */
+.live-ready { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.live-ready-lanes,
+.live-ready-lane ul,
+.live-ready-excluded ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.live-ready-lane { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.live-ready-command {
+  font-size: var(--font-sm);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.live-ready-task { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.live-ready-excluded summary { cursor: pointer; font-size: var(--font-sm); }
+
 /* ── Idle ───────────────────────────────────────────────────────────── */
 
 .live-idle-lede { margin: 0 0 var(--space-3); font-size: var(--font-lg); color: var(--text-dim); }

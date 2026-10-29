@@ -110,6 +110,11 @@ export const ROUTE_FEATURE_GATES: readonly RouteFeatureGate[] = [
     reason: "Draft with the model: each call spends tokens on the prd.place model. Writes nothing.",
     selfEnforced: true,
   },
+  {
+    feature: "hench.readyNext",
+    exact: ["/api/hench/plan-queue"],
+    reason: "Live's Ready next section. Each call spawns `ndx work --plan-queue`, so it is off when the section is.",
+  },
 ];
 
 /** The gate covering `pathname`, or null when the path is ungated. */

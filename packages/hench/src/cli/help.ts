@@ -53,6 +53,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--reset-deferred", description: "Reset all deferred/failing tasks to pending before running" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--resolve", description: "With --task: print the settings the run would use, where each came from, and why it would refuse, as JSON. Runs nothing (see below)" },
+      { flag: "--plan-queue", description: "Print lanes of ready tasks that can run side by side, each with its command, and why every other ready task is left out. Advisory: runs nothing (see below)" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-mode=<off|self|pair>", description: "Who reviews: self (this vendor), pair (another vendor reviews, the executor fixes) or off. --review is self, --no-review is off; overrides a task's saved reviewMode" },
       { flag: "--reviewer=<claude|codex>", description: "The pair reviewer's vendor, over the task's saved reviewVendor and hench.review.vendor. Must differ from the executor's vendor; refused with --review or --no-review" },
@@ -179,6 +180,20 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "\n" +
           "Exits 0 when it reports refusals. Takes no claim, writes nothing (no\n" +
           "--reset-deferred, no commit), and starts no vendor CLI or LLM call.",
+      },
+      {
+        title: "Plan the queue (--plan-queue)",
+        content:
+          "hench run --plan-queue [--format=json] [dir] groups the ready tasks of a\n" +
+          "v2 PRD into lanes that can run side by side, by fixed rules and no model\n" +
+          "call. A lane is up to 3 tasks of one change, each of tier light or\n" +
+          "standard, in dependency order; lanes offered together come from changes\n" +
+          "whose touches do not overlap, and a change with no touches runs alone.\n" +
+          "Tasks tagged review-critical, migration or cross-package are left out.\n" +
+          "At most guard.maxConcurrentProcesses minus the runs active now are\n" +
+          "offered. JSON: lanes [{command, changeId, tasks [{id, title, reason}]}],\n" +
+          "excluded [{id, title, reason}], activeRuns, runLimit, summary.\n" +
+          "Starts no run, takes no claim and writes no file.",
       },
     ],
     examples: [

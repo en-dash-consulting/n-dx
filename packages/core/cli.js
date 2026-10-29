@@ -2388,6 +2388,13 @@ async function handleWork(rest) {
     exitWithCleanup(0);
   }
 
+  // --plan-queue: hench prints the advisory lane plan and starts nothing, so
+  // like --resolve it needs no identity line, vendor or interrupt handler.
+  if (flags.some((f) => f === "--plan-queue" || (f.startsWith("--plan-queue=") && f !== "--plan-queue=false"))) {
+    await runAgentOrDie(["run", ...flags, dir]);
+    exitWithCleanup(0);
+  }
+
   // Which n-dx is about to run, against which checkout. A run is the most
   // expensive thing this CLI starts and the hardest to attribute afterwards:
   // the run record says what happened but not which install produced it, and

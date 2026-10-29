@@ -248,3 +248,26 @@ follow-up fix or a split. The verdict's summary is written as the task's
 verdict, so the next brief names the latest cause. A reason a person or the
 agent wrote is kept. The dashboard shows the
 verdict on the task page behind the `hench.runVerdict` toggle.
+
+### Queue plan
+
+`ndx work --plan-queue [--format=json] .` groups a v2 PRD's ready tasks into
+lanes that can run side by side, from fixed rules with no model call. It starts
+no run, takes no claim and writes no file.
+
+- A lane holds 1 to 3 tasks of one change, each of effective tier light or
+  standard (the task's saved `run.tier`, else its change's, else the tier
+  `agent.execute` routes to). A task blocked only by tasks of its own lane runs
+  after them.
+- Lanes offered together come from changes whose `touches` do not overlap. A
+  change with no `touches` never shares the plan with another lane.
+- Tasks tagged `review-critical`, `migration` or `cross-package`, on the task
+  or its change, are left out: run them on their own.
+- At most `guard.maxConcurrentProcesses` minus the runs active now are offered.
+
+A lane's command runs its tasks one after another in this worktree
+(`ndx work --task=a --auto . && ndx work --task=b --auto .`). The JSON has
+`lanes [{command, changeId, tasks [{id, title, reason}]}]`, `excluded
+[{id, title, reason}]`, `activeRuns`, `runLimit` and `summary`; every ready task
+appears once, with its reason. Live shows the plan as Ready next behind the
+`hench.readyNext` toggle.

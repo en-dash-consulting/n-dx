@@ -170,6 +170,15 @@ const FEATURE_REGISTRY: FeatureDefinition[] = [
     stability: "experimental",
     defaultValue: false,
   },
+  {
+    key: "hench.readyNext",
+    label: "Ready next",
+    description: "Replace Live's Up next list with Ready next: lanes of ready tasks that can run side by side, each with its command and the reason for every task in or out.",
+    impact: "Read-only. The plan comes from fixed rules (ndx work --plan-queue), with no model call; it starts no run and claims nothing.",
+    package: "hench",
+    stability: "experimental",
+    defaultValue: false,
+  },
   // ── Git ───────────────────────────────────────────────────────────
   {
     key: FAIL_FORWARD_FEATURE,

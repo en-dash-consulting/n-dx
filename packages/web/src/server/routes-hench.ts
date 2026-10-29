@@ -1026,7 +1026,44 @@ export function handleHenchRoute(
     ?? routeConfig(rc)
     ?? routeTemplates(rc)
     ?? routeConcurrency(rc)
+    ?? routePlanQueue(rc)
     ?? false;
+}
+
+/** Routes: plan-queue (gated by hench.readyNext in route-feature-gates.ts) */
+function routePlanQueue(rc: RouteContext): Promise<boolean> | null {
+  if (rc.path === "plan-queue" && rc.method === "GET") return handlePlanQueue(rc.res, rc.ctx);
+  return null;
+}
+
+/** How long `ndx work --plan-queue` may take: it reads the PRD and the claims, nothing more. */
+const PLAN_QUEUE_TIMEOUT_MS = 60_000;
+
+/**
+ * GET /api/hench/plan-queue — the advisory lane plan for Live's Ready next.
+ *
+ * Spawns `ndx work --plan-queue --format=json` through the same ndx path a run
+ * uses, so the rules stay hench's and web never imports it. The command starts
+ * nothing and writes nothing; its JSON is passed through as hench printed it.
+ */
+async function handlePlanQueue(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const result = await exec(
+    bin,
+    [...prefixArgs, "work", "--plan-queue", "--format=json", ctx.projectDir],
+    { cwd: ctx.projectDir, timeout: PLAN_QUEUE_TIMEOUT_MS },
+  );
+  if (!result.launched || result.exitCode !== 0) {
+    const detail = (result.stderr.trim() || result.stdout.trim() || "no output").slice(0, 2000);
+    errorResponse(res, 500, `'${readCliName(ctx.projectDir)} work --plan-queue' did not complete: ${detail}`);
+    return true;
+  }
+  try {
+    jsonResponse(res, 200, JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))));
+  } catch {
+    errorResponse(res, 500, `'${readCliName(ctx.projectDir)} work --plan-queue' printed no plan: ${result.stdout.slice(0, 2000)}`);
+  }
+  return true;
 }
 
 /** Routes: concurrency */

@@ -170,6 +170,12 @@ async function main(): Promise<void> {
           await cmdResolve(resolveDir(), flags);
           break;
         }
+        // --plan-queue prints the advisory lane plan and runs nothing.
+        if (flags["plan-queue"] !== undefined && flags["plan-queue"] !== "false") {
+          const { cmdPlanQueue } = await import("./commands/plan-queue.js");
+          await cmdPlanQueue(resolveDir(), flags);
+          break;
+        }
         const { cmdRun } = await import("./commands/run.js");
         await cmdRun(resolveDir(), flags);
         break;

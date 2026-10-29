@@ -193,6 +193,7 @@ ndx work --epic="Auth System" --auto . # scope to one top-level item
 ndx work --dry-run .                   # preview without executing
 ndx work --model=claude-opus-5-5 .        # override model
 ndx work --auto --loop .               # run continuously until done
+ndx work --plan-queue .                # which ready tasks can run side by side (runs nothing)
 ```
 
 #### Task selection modes
