@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createTmpDir, removeTmpDir, runResult, setupFullProject } from "./e2e-helpers.js";
 
@@ -52,10 +52,14 @@ describe("ndx work --resolve", () => {
   });
 
   it("forwards run flags to hench as a real run would", () => {
+    writeFileSync(join(repo, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }));
+    // A repository's own cli_path applies only once it is trusted; the user's
+    // ignored .n-dx.local.json, where `ndx config` writes it, always applies.
     writeFileSync(
-      join(repo, ".n-dx.json"),
-      JSON.stringify({ llm: { vendor: "claude", claude: { cli_path: process.execPath } } }),
+      join(repo, ".n-dx.local.json"),
+      JSON.stringify({ llm: { claude: { cli_path: process.execPath } } }),
     );
+    appendFileSync(join(repo, ".gitignore"), "\n.n-dx.local.json\n");
     git(repo, "add", "-A");
     git(repo, "commit", "--quiet", "-m", "vendor");
 

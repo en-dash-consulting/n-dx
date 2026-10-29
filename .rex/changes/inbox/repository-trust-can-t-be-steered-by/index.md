@@ -1,0 +1,15 @@
+---
+id: "346e0812-443a-4ae2-96e4-be96607b7d97"
+type: "change"
+title: "Repository trust can't be steered by the repository"
+slug: "repository-trust-can-t-be-steered-by"
+intent: "Layer 1 of 2 for the open findings in #686 (from the #490/#491 adversarial reviews). Three of the four still reproduce on origin/main 9f6a0e963 against the built code (re-checked 2026-10-16): a checkout picks its own trust baseline (finding 1), a plain repository test command runs from verify_criteria before trust (finding 2), and the trust inventory follows symlinked directories (finding 4). Layer 2, \"Every child process gets the sanitized environment\", takes finding 3 and #635. Branch fix/security-repo-trust; PR title \"Repository trust can't be steered by the repository (security 1/2)\". Out of scope here: packages/sourcevision (lang-kit stack), rex migrations and the folder-tree parser, and the rex MCP tools get_capabilities and get_product (v2 migrate stack)."
+acceptanceCriteria:
+  - "Closes #686 (findings 1, 2 and 4); #686 itself stays open until layer 2 merges"
+  - "Each fix has a test that fails on origin/main 9f6a0e963 and passes with the fix"
+priority: "high"
+tags:
+  - "security"
+  - "issue-cleanup"
+source: "ndx-capture"
+---

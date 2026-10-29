@@ -8,6 +8,7 @@
 import { access, readFile } from "node:fs/promises";
 import { resolveLayout } from "./layout.js";
 import { deepMerge } from "./project-config.js";
+import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import {
   LLM_VENDOR,
   isLLMVendor,
@@ -78,6 +79,7 @@ function extractGoogleConfig(value: unknown): GoogleConfig | undefined {
   if (typeof v.model === "string" && v.model) cfg.model = v.model;
   if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
   if (typeof v.reviewModel === "string" && v.reviewModel) cfg.reviewModel = v.reviewModel;
+  if (typeof v.apiKeyEnv === "string" && v.apiKeyEnv) cfg.apiKeyEnv = v.apiKeyEnv;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
@@ -285,9 +287,12 @@ export function parseLLMConfig(root: Record<string, unknown>): LLMConfig {
  *   {@link resolveClaudeConfig}.
  */
 export async function loadLLMConfig(dir: string): Promise<LLMConfig> {
-  const { configFile, localConfigFile } = resolveLayout(dir);
-  const projectData = await loadJSONFile(configFile);
-  const localData = await loadJSONFile(localConfigFile);
+  const { root, configFile, localConfigFile } = resolveLayout(dir);
+  // The project config's endpoints and key variables apply only while the
+  // repository is trusted; the local file's always do, unless the repository
+  // commits it. See credential-routing.ts.
+  const projectData = trustedProjectConfig(root, await loadJSONFile(configFile));
+  const localData = trustedLocalConfig(root, await loadJSONFile(localConfigFile));
 
   // Merge project and local configs (local wins)
   let merged: Record<string, unknown> | null = projectData;

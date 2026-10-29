@@ -67,7 +67,13 @@ import { createHash } from "node:crypto";
 // tests/e2e/architecture-policy.test.js.
 import { execFileSync } from "node:child_process";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+// PROMPT_CENSUS_ROOT is a test seam: tests/e2e/prompt-census.test.js runs a
+// modified copy of this script from an os tmpdir, outside the repository, so
+// the copy is never in scripts/ while architecture-policy scans it (#632).
+// Unset, the root is the parent of this file's directory.
+const ROOT = process.env.PROMPT_CENSUS_ROOT
+  ? resolve(process.env.PROMPT_CENSUS_ROOT)
+  : join(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE_JSON = join(ROOT, "docs/analysis/prompt-token-baseline.json");
 const BASELINE_MD = join(ROOT, "docs/analysis/prompt-token-baseline.md");
 

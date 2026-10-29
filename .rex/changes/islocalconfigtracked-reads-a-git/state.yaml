@@ -1,0 +1,35 @@
+schema: "rex/v2"
+items:
+  "139b71eb-523f-43c3-9ce9-c015ab551cfc":
+    status: "completed"
+    startedAt: "2026-10-27T22:02:31.206Z"
+    completedAt: "2026-10-27T22:02:31.206Z"
+    endedAt: "2026-10-27T22:02:31.206Z"
+    activeIntervals: [{"end":"2026-10-27T22:02:31.206Z","start":"2026-10-27T22:02:31.206Z"}]
+    appliedAt: "2026-10-27T22:02:31.206Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T22:02:31.206Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3bc4c88a-66f3-42f4-8849-9f0b6b42eb50":
+    status: "completed"
+    startedAt: "2026-10-27T21:54:36.035Z"
+    completedAt: "2026-10-27T22:02:31.206Z"
+    endedAt: "2026-10-27T22:02:31.206Z"
+    activeIntervals: [{"end":"2026-10-27T22:02:31.206Z","start":"2026-10-27T21:54:36.035Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "gitTracksPath returns tracked|untracked|unanswered(reason); RepoExecutionConfig.localConfigUnanswered drives the finding and warning wording"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T22:02:31.206Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "92cd4988-0eff-49ab-a62c-eb3bd880c28b":
+    status: "completed"
+    startedAt: "2026-10-27T21:31:57.679Z"
+    completedAt: "2026-10-27T21:46:15.161Z"
+    endedAt: "2026-10-27T21:46:15.161Z"
+    activeIntervals: [{"end":"2026-10-27T21:46:15.161Z","start":"2026-10-27T21:31:57.679Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "git exit 1 = untracked; other git failures inside a work tree (.git found walking up) count .n-dx.local.json as tracked, in llm-client isLocalConfigTracked and core readConfiguredClaudePath."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T21:46:15.161Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

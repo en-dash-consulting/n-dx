@@ -116,6 +116,7 @@ const REX_COMMANDS = [
   "product",
   "change",
   "claim",
+  "migrate-diff",
   "migrate-to-md",
   "migrate-folder-tree-filenames",
   "migrate-slugs",

@@ -1,0 +1,42 @@
+schema: "rex/v2"
+items:
+  "2b42b7b6-4d54-4824-bf97-93e2f5d6f8ba":
+    status: "completed"
+    startedAt: "2026-10-26T23:35:47.367Z"
+    completedAt: "2026-10-26T23:48:41.707Z"
+    endedAt: "2026-10-26T23:48:41.707Z"
+    activeIntervals: [{"end":"2026-10-26T23:48:41.707Z","start":"2026-10-26T23:35:47.367Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Commit bf200bf9f: GET /api/hub/extensions[?project=], POST /api/hub/extensions/:name/stop, apiVersion 1 on GET/POST /projects, docs and contract tests."
+    lastModified: "2026-10-26T23:48:41.707Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "40484365-0b30-45bf-bd5f-9e1315dbe8c6":
+    status: "completed"
+    startedAt: "2026-10-27T13:01:19.285Z"
+    completedAt: "2026-10-27T13:01:19.285Z"
+    endedAt: "2026-10-27T13:01:19.285Z"
+    activeIntervals: [{"end":"2026-10-27T13:01:19.285Z","start":"2026-10-27T13:01:19.285Z"}]
+    appliedAt: "2026-10-27T13:01:19.285Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T13:01:19.285Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "441bd20a-f0c2-4c63-9a27-403a17fb4ded":
+    status: "completed"
+    startedAt: "2026-10-27T12:55:49.616Z"
+    completedAt: "2026-10-27T13:01:19.285Z"
+    endedAt: "2026-10-27T13:01:19.285Z"
+    activeIntervals: [{"end":"2026-10-27T13:01:19.285Z","start":"2026-10-27T12:55:49.616Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Commit 2c80e5420: viewer extension-links.ts renders hub-resolved projectLinks in the top bar project context; no links standalone or on a failed list."
+    lastModified: "2026-10-27T13:01:19.285Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "f88f9d7b-df3b-4d24-acee-43e61b6f4371":
+    status: "completed"
+    startedAt: "2026-10-26T23:49:10.291Z"
+    completedAt: "2026-10-26T23:54:58.911Z"
+    endedAt: "2026-10-26T23:54:58.911Z"
+    activeIntervals: [{"end":"2026-10-26T23:54:58.911Z","start":"2026-10-26T23:49:10.291Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Commit eacb92048: Extensions row on the hub home (home.ts), fed from the hub's extension list in proxy.ts."
+    lastModified: "2026-10-26T23:54:58.911Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

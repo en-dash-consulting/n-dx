@@ -3,6 +3,7 @@ import { themeCss, type Scheme } from "@graview/primitives";
 import { applySettings } from "@graview/react";
 import { openStore, rememberedPrincipal } from "@graview/ship/browser";
 import { loadProjection } from "./app.js";
+import { BASE } from "./base.js";
 
 const sheet = new CSSStyleSheet();
 document.adoptedStyleSheets = [sheet];
@@ -23,17 +24,19 @@ function initialScheme(): Scheme {
 /*
  * THE PAGES ARE THE FRONT DOOR. `/` opens the pages; the scene lives at
  * `/scene`, as bee-bot arranges it. Anything else outside the pages' own
- * paths opens the pages, whose router says what it does not know.
+ * paths opens the pages, whose router says what it does not know. All of it
+ * under the face's base, which is the root unless the hub mounts the face.
  */
 function inScene(): boolean {
-  const { pathname, search, hash } = window.location;
+  const { search, hash } = window.location;
+  const pathname = window.location.pathname.startsWith(BASE) ? window.location.pathname.slice(BASE.length) : window.location.pathname;
   if (pathname === "/scene" || pathname.startsWith("/scene/")) return true;
   if (pathname === "/" || pathname === "") {
     const sceneHash = hash.length > 1;
-    window.history.replaceState(window.history.state, "", `${sceneHash ? "/scene" : "/pages"}${search}${hash}`);
+    window.history.replaceState(window.history.state, "", `${BASE}${sceneHash ? "/scene" : "/pages"}${search}${hash}`);
     return sceneHash;
   }
-  if (pathname !== "/pages" && !pathname.startsWith("/pages/")) window.history.replaceState(window.history.state, "", `/pages${search}${hash}`);
+  if (pathname !== "/pages" && !pathname.startsWith("/pages/")) window.history.replaceState(window.history.state, "", `${BASE}/pages${search}${hash}`);
   return false;
 }
 

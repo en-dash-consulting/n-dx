@@ -68,6 +68,7 @@ export {
   presentedToken,
   isAuthenticated,
   splitTokenQuery,
+  removeTokenParam,
   authCookie,
   urlWithToken,
 } from "./auth.js";

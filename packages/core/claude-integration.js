@@ -18,7 +18,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmdirSync, unlinkSync, readdirSync, realpathSync } from "fs";
 import { createRequire } from "module";
-import { isAbsolute, join, resolve } from "path";
+import { basename, isAbsolute, join, relative, resolve } from "path";
 // execFileSyncCli, not execSync: every argument here is a filesystem path
 // (the claude binary, the resolved MCP entrypoint, the project dir). Building a
 // cmd.exe command line by hand around those broke on `&`, `^`, `(`, `)`, `!` and
@@ -472,15 +472,27 @@ function writeMcpJson(dir) {
 }
 
 /**
- * Read cli.claudePath from .n-dx.json in the given project root.
+ * Read cli.claudePath from the machine-local `.n-dx.local.json`.
+ *
+ * Never from the shared `.n-dx.json`: init probes this binary before the trust
+ * review, so a path the repository ships would run its own script with the
+ * user's environment. llm-client's trust review flags a shared one
+ * (`vendor-cli-path`), and `ndx config cli.claudePath` writes the local file.
+ * A local file the repository ships is the repository's too
+ * (`local-config-tracked`), so it is not read either — see
+ * {@link localConfigIsRepositoryConfig}.
  * Returns undefined if not set.
  * @param {string|null} dir
  * @returns {string|undefined}
  */
 function readConfiguredClaudePath(dir) {
   if (!dir) return undefined;
+  const layout = resolveLayout(dir);
+  if (!existsSync(layout.localConfigFile) || localConfigIsRepositoryConfig(layout.root)) {
+    return undefined;
+  }
   try {
-    const raw = readFileSync(resolveLayout(dir).configFile, "utf-8");
+    const raw = readFileSync(layout.localConfigFile, "utf-8");
     const cfg = JSON.parse(raw);
     const p = cfg?.cli?.claudePath;
     return typeof p === "string" && p.length > 0 ? p : undefined;
@@ -488,22 +500,134 @@ function readConfiguredClaudePath(dir) {
 }
 
 /**
- * Persist the discovered claude CLI path to .hench/config.json so
- * subsequent hench invocations reuse it without re-discovering.
- * Silently skips if the config file doesn't exist yet.
+ * Does the repository ship the machine-local config file? llm-client's
+ * `isLocalConfigTracked` decides (a case variant, a symlinked `.ndx`, git
+ * unable to answer inside a work tree); core spawns rather than imports, so
+ * it asks through `hench trust status`, the route `ndx init`'s trust review
+ * already takes. No answer counts as shipped: the file then waits for trust
+ * rather than choosing a binary.
+ * @param {string} root
+ * @returns {boolean}
+ */
+function localConfigIsRepositoryConfig(root) {
+  try {
+    const out = execFileSyncCli(
+      process.execPath,
+      [resolveSubPackageCli("packages/hench", "@n-dx/hench"), "trust", "status", "--format=json", root],
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 15_000 },
+    );
+    return JSON.parse(String(out))?.config?.localConfigTracked !== false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * The note for a shared cli.claudePath that {@link discoverClaudeCli} skips:
+ * set in the project config while neither CLAUDE_CLI_PATH nor a local one
+ * takes precedence. Older `ndx config` wrote it there. Reads the shared file
+ * for presence only; the value is never run and never echoed.
+ * @param {string|null} dir
+ * @returns {string|undefined}
+ */
+function ignoredSharedClaudePathNote(dir) {
+  if (!dir || process.env.CLAUDE_CLI_PATH || readConfiguredClaudePath(dir)) return undefined;
+  const layout = resolveLayout(dir);
+  const p = readJsonObject(layout.configFile)?.cli;
+  if (!isPlainObject(p) || typeof p.claudePath !== "string" || p.claudePath.length === 0) return undefined;
+  const shared = relative(layout.root, layout.configFile);
+  const local = relative(layout.root, layout.localConfigFile);
+  return `cli.claudePath in ${shared} is not run (a repository's config cannot choose the Claude binary); move it to ${local}`;
+}
+
+/**
+ * Move a `claudePath` an older init wrote into `.hench/config.json` to
+ * `hench.claudePath` in the machine-local config (`.n-dx.local.json`).
+ *
+ * Older inits persisted a discovered path there, where it now reads as a
+ * repository-chosen binary (`vendor-cli-path`) and leaves the user's own
+ * checkout untrusted. Only a discovery candidate moves; any other value was
+ * set by hand and is left alone. A local `hench.claudePath` is never
+ * overridden. `ndx init` runs this whichever way it finds Claude, and with
+ * Claude integration off.
+ *
+ * Skips when either config file is missing, unreadable or not an object.
+ * @param {string} dir  Project root
+ */
+export function moveDiscoveredClaudePath(dir) {
+  const layout = resolveLayout(dir);
+  const henchConfigFile = join(layout.henchDir, "config.json");
+  const henchConfig = readJsonObject(henchConfigFile);
+  const stale = henchConfig?.claudePath;
+  if (typeof stale !== "string" || !isClaudeDiscoveryCandidate(stale)) return;
+  const local = existsSync(layout.localConfigFile) ? readJsonObject(layout.localConfigFile) : {};
+  if (!local) return;
+  try {
+    const hench = isPlainObject(local.hench) ? local.hench : {};
+    if (!hench.claudePath) {
+      local.hench = { ...hench, claudePath: stale };
+      writeFileSync(layout.localConfigFile, JSON.stringify(local, null, 2) + "\n", "utf-8");
+    }
+    // Removed only after the local write, so a failure there loses nothing.
+    delete henchConfig.claudePath;
+    writeFileSync(henchConfigFile, JSON.stringify(henchConfig, null, 2) + "\n", "utf-8");
+  } catch { /* skip — non-critical: `ndx trust accept .` or a manual move clears the finding */ }
+}
+
+/**
+ * Persist a claude CLI path found at a well-known location as
+ * `hench.claudePath` in the machine-local config (`.n-dx.local.json`), so
+ * subsequent hench invocations reuse it without re-discovering. Machine-local
+ * because the path is this machine's, and because hench honours a
+ * `claudePath` the repository ships (`.hench/config.json`) only once the
+ * repository is trusted. A path found now replaces a local one.
+ *
+ * Skips when hench is not initialized or the local config is unreadable.
  * @param {string|null} dir  Project root
  * @param {string} resolvedPath
  */
 function persistDiscoveredClaudePath(dir, resolvedPath) {
   if (!dir) return;
-  const configPath = join(resolveLayout(dir).henchDir, "config.json");
-  if (!existsSync(configPath)) return;
+  const layout = resolveLayout(dir);
+  if (!existsSync(join(layout.henchDir, "config.json"))) return;
+  const local = existsSync(layout.localConfigFile) ? readJsonObject(layout.localConfigFile) : {};
+  if (!local) return;
+  const hench = isPlainObject(local.hench) ? local.hench : {};
+  if (hench.claudePath === resolvedPath) return;
+  local.hench = { ...hench, claudePath: resolvedPath };
   try {
-    const config = JSON.parse(readFileSync(configPath, "utf-8"));
-    if (config.claudePath === resolvedPath) return; // already correct
-    config.claudePath = resolvedPath;
-    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
-  } catch { /* skip — non-critical */ }
+    writeFileSync(layout.localConfigFile, JSON.stringify(local, null, 2) + "\n", "utf-8");
+  } catch { /* skip — non-critical: hench falls back to `claude` on PATH */ }
+}
+
+/** @param {unknown} v @returns {v is Record<string, unknown>} */
+function isPlainObject(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * @param {string} path
+ * @returns {Record<string, unknown> | null}  null when missing, malformed or not an object
+ */
+function readJsonObject(path) {
+  let parsed;
+  try { parsed = JSON.parse(readFileSync(path, "utf-8")); } catch { return null; }
+  return isPlainObject(parsed) ? parsed : null;
+}
+
+/**
+ * Whether `p` is a path {@link discoverClaudeCli} could have found in step 4.
+ * Any nvm version counts, including one since uninstalled.
+ * @param {string} p
+ */
+function isClaudeDiscoveryCandidate(p) {
+  if (buildClaudeWellKnownCandidates().includes(p)) return true;
+  const nvmVersionsDir = join(homedir(), ".nvm", "versions", "node");
+  const binDir = dirname(p);
+  return process.platform !== "win32"
+    && basename(p) === "claude"
+    && basename(binDir) === "bin"
+    && dirname(dirname(binDir)) === nvmVersionsDir;
 }
 
 /**
@@ -547,14 +671,18 @@ function buildClaudeWellKnownCandidates() {
  *
  * Discovery order:
  *  1. CLAUDE_CLI_PATH env var (exclusive — no fallback when set)
- *  2. cli.claudePath in .n-dx.json (exclusive — no fallback when set)
+ *  2. cli.claudePath in .n-dx.local.json (exclusive — no fallback when set;
+ *     the shared .n-dx.json is not read, see {@link readConfiguredClaudePath})
  *  3. System PATH
  *  4. Well-known install locations (~/.claude/local/claude, nvm, Homebrew, etc.)
  *
- * When a path is found via (3) or (4) it is persisted to .hench/config.json
- * so subsequent hench invocations reuse it without re-discovering.
+ * When a path is found via (4) it is persisted as `hench.claudePath` in
+ * .n-dx.local.json so subsequent hench invocations reuse it without
+ * re-discovering (see {@link persistDiscoveredClaudePath}). A path an older
+ * init wrote into `.hench/config.json` is moved by `ndx init` itself, not
+ * here (see {@link moveDiscoveredClaudePath}).
  *
- * @param {string|null} [dir=null]  Project root (used to read .n-dx.json and write .hench/config.json)
+ * @param {string|null} [dir=null]  Project root (used to read and write .n-dx.local.json)
  * @returns {{ found: true, path: string } | { found: false, searched: string[] }}
  */
 export function discoverClaudeCli(dir = null) {
@@ -573,7 +701,7 @@ export function discoverClaudeCli(dir = null) {
     return { found: false, searched };
   }
 
-  // 2. cli.claudePath from .n-dx.json — exclusive if set
+  // 2. cli.claudePath from .n-dx.local.json — exclusive if set
   const configPath = readConfiguredClaudePath(dir);
   if (configPath) {
     searched.push(`${configPath} (cli.claudePath)`);
@@ -590,7 +718,6 @@ export function discoverClaudeCli(dir = null) {
   searched.push("claude (PATH)");
   try {
     execFileSyncCli("claude", ["--version"], { stdio: "ignore", timeout: 5_000 });
-    persistDiscoveredClaudePath(dir, "claude");
     return { found: true, path: "claude" };
   } catch { /* not in PATH */ }
 
@@ -606,6 +733,8 @@ export function discoverClaudeCli(dir = null) {
     }
   }
 
+  const ignored = ignoredSharedClaudePathNote(dir);
+  if (ignored) searched.push(ignored);
   return { found: false, searched };
 }
 
@@ -650,8 +779,9 @@ export function setupClaudeIntegration(dir, opts = {}) {
   const mcp = registerMcpServers(absDir, opts);
   const mcpJson = writeMcpJson(absDir);
   const instructions = writeClaudeMd(absDir);
+  const claudePathNote = ignoredSharedClaudePathNote(absDir);
 
-  return { settings, skills, mcp, mcpJson, instructions };
+  return { settings, skills, mcp, mcpJson, instructions, ...(claudePathNote && { claudePathNote }) };
 }
 
 /**

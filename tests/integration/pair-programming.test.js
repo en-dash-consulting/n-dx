@@ -19,6 +19,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, chmodSync } from "node:fs";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 
 const { recordRepoTrust } = await import("../../packages/llm-client/dist/public.js");
@@ -72,6 +74,11 @@ function writeRexConfig(dir, config) {
 
 function writeNdxConfig(dir, config) {
   writeFileSync(join(dir, ".n-dx.json"), JSON.stringify(config), "utf-8");
+}
+
+/** The user's machine-local config, where `ndx config` writes cli_path. */
+function writeLocalConfig(dir, config) {
+  writeFileSync(join(dir, ".n-dx.local.json"), JSON.stringify(config), "utf-8");
 }
 
 /**
@@ -194,44 +201,71 @@ describe("resolveReviewerVendor", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveVendorCliPath", () => {
-  it("falls back to vendor name when no config exists", () => {
-    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("claude");
-    expect(resolveVendorCliPath(tmpDir, "codex")).toBe("codex");
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("uses llm.<vendor>.cli_path from .n-dx.json", () => {
-    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/custom/claude" } } });
-    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/custom/claude");
+  /**
+   * resolveVendorCliPath in a child process whose NDX_HOME is the fixture's,
+   * so the trust store the code under test reads stays inside the fixture.
+   * Stubbing NDX_HOME onto this worker's env would leak into sibling e2e files
+   * that spawn CLIs with `{ ...process.env }` (tests/unit/color-env-neutralized.test.js).
+   */
+  function resolveVendorCliPathWithHome(dir, vendor, ndxHome) {
+    const moduleUrl = pathToFileURL(join(import.meta.dirname, "../../packages/core/pair-programming.js")).href;
+    const script = `const { resolveVendorCliPath } = await import(${JSON.stringify(moduleUrl)}); process.stdout.write(String(await resolveVendorCliPath(process.argv[1], process.argv[2])));`;
+    return execFileSync(process.execPath, ["--input-type=module", "-e", script, dir, vendor], {
+      env: { ...process.env, NDX_HOME: ndxHome },
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  }
+
+  it("falls back to vendor name when no config exists", async () => {
+    expect(await resolveVendorCliPath(tmpDir, "claude")).toBe("claude");
+    expect(await resolveVendorCliPath(tmpDir, "codex")).toBe("codex");
   });
 
-  it("uses legacy claude.cli_path for claude vendor", () => {
-    writeNdxConfig(tmpDir, { claude: { cli_path: "/legacy/claude" } });
-    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/legacy/claude");
+  it("uses llm.<vendor>.cli_path from .n-dx.local.json", async () => {
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: "/local/codex" } } });
+    expect(await resolveVendorCliPath(tmpDir, "codex")).toBe("/local/codex");
   });
 
-  it("prefers llm.<vendor>.cli_path over legacy key", () => {
-    writeNdxConfig(tmpDir, {
+  it("uses legacy claude.cli_path for claude vendor", async () => {
+    writeLocalConfig(tmpDir, { claude: { cli_path: "/legacy/claude" } });
+    expect(await resolveVendorCliPath(tmpDir, "claude")).toBe("/legacy/claude");
+  });
+
+  it("prefers llm.<vendor>.cli_path over legacy key", async () => {
+    writeLocalConfig(tmpDir, {
       llm: { claude: { cli_path: "/new/claude" } },
       claude: { cli_path: "/old/claude" },
     });
-    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/new/claude");
+    expect(await resolveVendorCliPath(tmpDir, "claude")).toBe("/new/claude");
   });
 
-  it("uses a cli_path set only in .n-dx.local.json", () => {
-    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }), "utf-8");
-    expect(resolveVendorCliPath(tmpDir, "codex")).toBe("/local/codex");
+  it("ignores a .n-dx.json cli_path while the repository is untrusted", async () => {
+    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" }, codex: { cli_path: "/shared/codex" } } });
+    expect(await resolveVendorCliPath(tmpDir, "claude")).toBe("claude");
+    expect(await resolveVendorCliPath(tmpDir, "codex")).toBe("codex");
   });
 
-  it("prefers .n-dx.local.json over .n-dx.json", () => {
+  it("uses a .n-dx.json cli_path once the repository is trusted", async () => {
     writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" } } });
-    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { claude: { cli_path: "/local/claude" } } }), "utf-8");
-    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/local/claude");
+    const ndxHome = join(tmpDir, "ndx-home");
+    recordRepoTrust(tmpDir, { ndxHome });
+    expect(resolveVendorCliPathWithHome(tmpDir, "claude", ndxHome)).toBe("/shared/claude");
   });
 
-  it("falls through to .n-dx.json when the local file has no cli_path for the vendor", () => {
+  it("prefers .n-dx.local.json over a trusted .n-dx.json", async () => {
     writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/shared/claude" } } });
-    writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ llm: { codex: { cli_path: "/local/codex" } } }), "utf-8");
-    expect(resolveVendorCliPath(tmpDir, "claude")).toBe("/shared/claude");
+    writeLocalConfig(tmpDir, { llm: { claude: { cli_path: "/local/claude" } } });
+    const ndxHome = join(tmpDir, "ndx-home");
+    recordRepoTrust(tmpDir, { ndxHome });
+    expect(resolveVendorCliPathWithHome(tmpDir, "claude", ndxHome)).toBe("/local/claude");
   });
 });
 
@@ -285,7 +319,7 @@ describe("runShellTestCommand", () => {
 describe("runCrossVendorReview — codex primary / claude reviewer", () => {
   it("skips when reviewer CLI is unavailable", async () => {
     // Claude binary deliberately set to a path that does not exist
-    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: "/nonexistent/claude-xxx" } } });
+    writeLocalConfig(tmpDir, { llm: { claude: { cli_path: "/nonexistent/claude-xxx" } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -301,7 +335,7 @@ describe("runCrossVendorReview — codex primary / claude reviewer", () => {
 
 describe("runCrossVendorReview — claude primary / codex reviewer", () => {
   it("skips when reviewer CLI is unavailable", async () => {
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: "/nonexistent/codex-xxx" } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: "/nonexistent/codex-xxx" } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -322,7 +356,7 @@ describe("runCrossVendorReview — claude primary / codex reviewer", () => {
 describe("runCrossVendorReview — LLM reviewer invocation", () => {
   it("returns mode=llm-review and passed=true when mock reviewer exits 0", async () => {
     const scriptPath = writeMockReviewer(tmpDir, 0);
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -338,7 +372,7 @@ describe("runCrossVendorReview — LLM reviewer invocation", () => {
 
   it("returns mode=llm-review and passed=false when mock reviewer exits 1", async () => {
     const scriptPath = writeMockReviewer(tmpDir, 1);
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -354,7 +388,7 @@ describe("runCrossVendorReview — LLM reviewer invocation", () => {
 
   it("same behaviour for claude reviewer direction", async () => {
     const scriptPath = writeMockReviewer(tmpDir, 0);
-    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -369,7 +403,7 @@ describe("runCrossVendorReview — LLM reviewer invocation", () => {
 
   it("invokes LLM even when no test command is configured", async () => {
     const scriptPath = writeMockReviewer(tmpDir, 0);
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -640,7 +674,7 @@ describe("writeNdxContextFile", () => {
 describe("runCrossVendorReview — contextFiles stored in result", () => {
   it("includes contextFiles in result when reviewer passes and contextFiles provided", async () => {
     const scriptPath = writeMockReviewer(tmpDir, 0);
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
     const result = await runCrossVendorReview({
       dir: tmpDir,
       reviewer: "codex",
@@ -655,7 +689,7 @@ describe("runCrossVendorReview — contextFiles stored in result", () => {
 
   it("does not add contextFiles property when no contextFiles provided", async () => {
     const scriptPath = writeMockReviewer(tmpDir, 0);
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
     const result = await runCrossVendorReview({
       dir: tmpDir,
       reviewer: "codex",
@@ -666,7 +700,7 @@ describe("runCrossVendorReview — contextFiles stored in result", () => {
   });
 
   it("includes contextFiles in skipped result when reviewer CLI unavailable", async () => {
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: "/nonexistent/codex-xxx" } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: "/nonexistent/codex-xxx" } } });
     const result = await runCrossVendorReview({
       dir: tmpDir,
       reviewer: "codex",
@@ -1156,7 +1190,7 @@ describe("runCrossVendorReview — feedback in llm-review result", () => {
       "feedback-reviewer",
       `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\nAll tests passed.\\n');\nprocess.exit(0);\n`,
     );
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({
       dir: tmpDir,
@@ -1177,7 +1211,7 @@ describe("runCrossVendorReview — feedback in llm-review result", () => {
       "output-reviewer",
       `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\n');\nprocess.exit(0);\n`,
     );
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "codex" });
 
@@ -1192,7 +1226,7 @@ describe("runCrossVendorReview — feedback in llm-review result", () => {
       "pass-reviewer",
       `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('PASS\\n');\nprocess.exit(0);\n`,
     );
-    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude" });
     expect(result.feedback.passed).toBe(true);
@@ -1205,7 +1239,7 @@ describe("runCrossVendorReview — feedback in llm-review result", () => {
       "fail-reviewer",
       `if (process.argv[2] === '--version') { console.log('1.0.0'); process.exit(0); }\nprocess.stdout.write('FAIL\\n- broken import\\n');\nprocess.exit(1);\n`,
     );
-    writeNdxConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
+    writeLocalConfig(tmpDir, { llm: { claude: { cli_path: scriptPath } } });
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "claude" });
     expect(result.feedback.passed).toBe(false);
@@ -1256,7 +1290,7 @@ describe("buildReviewerArgs", () => {
         `require('node:fs').writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));\n` +
         `process.exit(0);\n`,
     );
-    writeNdxConfig(tmpDir, { llm: { codex: { cli_path: script } } });
+    writeLocalConfig(tmpDir, { llm: { codex: { cli_path: script } } });
 
     const result = await runCrossVendorReview({ dir: tmpDir, reviewer: "codex", model: "gpt-5-codex" });
 
