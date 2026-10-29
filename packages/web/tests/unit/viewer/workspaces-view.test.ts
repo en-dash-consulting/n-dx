@@ -556,7 +556,21 @@ const HEALTH_FEATURE: BranchHealthResponse = {
   baseNote: null,
   ahead: 4,
   behind: 2,
-  conflicts: [{ path: "src/a.ts", stages: [1, 2, 3] }],
+  conflicts: [
+    {
+      path: "src/a.ts", stages: [1, 2, 3], class: "source", reason: "A side removes or changes a line.",
+      fix: null, otherWorktrees: [{ path: "/repo-other", branch: "feat/other" }],
+    },
+    {
+      path: "allow.txt", stages: [1, 2, 3], class: "allowlist-union", reason: "Every conflict only adds lines.",
+      fix: { diff: "--- a/allow.txt\n+++ b/allow.txt\n@@ -1,1 +1,2 @@\n a\n+b\n" }, otherWorktrees: [],
+    },
+    {
+      path: "docs/gen.json", stages: [1, 2, 3], class: "generated", reason: "Generated.",
+      fix: { steps: [["git", "checkout", "--theirs", "--", "docs/gen.json"], ["git", "config", "merge.x.driver", "rex merge-state %O"]] },
+      otherWorktrees: [],
+    },
+  ],
   conflictsUnavailable: null,
   stack: [{ branch: "feat/lower", contained: false }],
   github: {
@@ -596,7 +610,7 @@ describe("branchHealthChips", () => {
   it("summarises ahead/behind, conflicts, stack and failing checks", () => {
     expect(branchHealthChips(HEALTH_FEATURE)).toEqual([
       { text: "↑4 ↓2 origin/main", tone: "warn" },
-      { text: "1 conflict", tone: "bad" },
+      { text: "3 conflicts", tone: "bad" },
       { text: "stack: 1 not contained", tone: "bad" },
       { text: "PR #42: 1 failing", tone: "bad" },
     ]);
@@ -665,7 +679,7 @@ describe("WorkspacesView branch health strip", () => {
     const cards = root.querySelectorAll(".workspace-card");
     expect(cards[0].querySelector(".branch-health-strip")!.textContent).toBe("no base");
     const strip = cards[1].querySelector<HTMLButtonElement>(".branch-health-strip")!;
-    expect(strip.textContent).toBe("↑4 ↓2 origin/main1 conflictstack: 1 not contained");
+    expect(strip.textContent).toBe("↑4 ↓2 origin/main3 conflictsstack: 1 not contained");
     expect(strip.getAttribute("aria-expanded")).toBe("false");
     expect(cards[1].querySelector(".branch-health-details")).toBeNull();
 
@@ -675,12 +689,24 @@ describe("WorkspacesView branch health strip", () => {
     await settle();
 
     expect(githubCalls().map((c) => c.workspace)).toEqual(["feature"]);
-    expect(strip.textContent).toBe("↑4 ↓2 origin/main1 conflictstack: 1 not containedPR #42: 1 failing");
+    expect(strip.textContent).toBe("↑4 ↓2 origin/main3 conflictsstack: 1 not containedPR #42: 1 failing");
     expect(strip.getAttribute("aria-expanded")).toBe("true");
     const details = cards[1].querySelector(".branch-health-details")!.textContent!;
     expect(details).toContain("Compared with origin/main (the PR's base)");
     expect(details).toContain("src/a.ts — stages: ancestor, base, this branch");
     expect(details).toContain("feat/lower — not contained");
+
+    // Each conflict: class, reason, then its fix — steps copyable, diffs collapsed, source none.
+    const conflicts = [...cards[1].querySelectorAll(".branch-health-conflict")];
+    expect(conflicts.map((li) => li.querySelector(".branch-health-class")!.textContent)).toEqual(["source", "allowlist-union", "generated"]);
+    expect(conflicts[0].textContent).toContain("Also changed in: feat/other (/repo-other)");
+    expect(conflicts[0].querySelector(".branch-health-steps, details")).toBeNull();
+    const diff = conflicts[1].querySelector("details")!;
+    expect(diff.open).toBe(false);
+    expect(diff.querySelector("pre")!.textContent).toContain("+b");
+    const steps = [...conflicts[2].querySelectorAll(".branch-health-steps li code")].map((c) => c.textContent);
+    expect(steps).toEqual(["git checkout --theirs -- docs/gen.json", "git config merge.x.driver 'rex merge-state %O'"]);
+    expect(conflicts[2].querySelectorAll(".branch-health-steps button")).toHaveLength(2);
     expect(details).toContain("policy-test");
     expect(details).toContain("architecture-policy.test.js failed");
 

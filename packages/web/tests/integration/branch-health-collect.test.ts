@@ -118,7 +118,14 @@ describe("predicted conflicts", () => {
 
     const health = await collectBranchHealth(repo, { githubReads: false, exec: stubExec().run });
 
-    expect(health.conflicts).toEqual([{ path: "a.txt", stages: [1, 2, 3] }]);
+    expect(health.conflicts).toEqual([{
+      path: "a.txt",
+      stages: [1, 2, 3],
+      class: "source",
+      reason: expect.any(String),
+      fix: null,
+      otherWorktrees: [],
+    }]);
     expect(health.conflictsUnavailable).toBeNull();
     expect(snapshot()).toEqual(before);
   });

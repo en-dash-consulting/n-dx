@@ -9,6 +9,11 @@
  * base it finds in a {@link PrBaseCache}; a local-only read uses those for the
  * base and the stack, and says so when it has none.
  *
+ * Each predicted conflict is classified with a deterministic fix
+ * (`conflicts.ts`) from its merge-tree stages and conflicted result, the
+ * project's `web.generatedFiles`, whether the rex-state driver is registered,
+ * and the paths other local worktrees' branches changed.
+ *
  * Nothing here changes the worktree, the index or HEAD. `git merge-tree
  * --write-tree` computes the merge in the object store only.
  *
@@ -25,14 +30,17 @@ import {
   isPending,
   parseRollup,
 } from "./checks.js";
+import { classifyConflicts, type ConflictSides, type WorktreeChanges } from "./conflicts.js";
 import type {
   BaseSource,
   BranchHealth,
   BranchHealthExec,
   FailingCheck,
+  GeneratedFileRule,
   GithubFacts,
   PredictedConflict,
   StackLayer,
+  WorktreeRef,
 } from "./types.js";
 
 export interface CollectOptions {
@@ -49,6 +57,8 @@ export interface CollectOptions {
    * local-only read uses it for the base and the stack before upstreams.
    */
   prBases?: PrBaseCache;
+  /** `web.generatedFiles`: conflicts in these paths are regenerated. None when undeclared. */
+  generatedFiles?: readonly GeneratedFileRule[];
   /** Injected for tests; defaults to the llm-client `exec`. */
   exec?: BranchHealthExec;
 }
@@ -163,30 +173,90 @@ async function resolveBranchRef(git: Runner, branch: string): Promise<string | n
   return null;
 }
 
-/** Parse `git merge-tree --write-tree -z --no-messages` output into conflicted files. */
-export function parseMergeTree(stdout: string): PredictedConflict[] {
+/** One conflicted file from merge-tree: its stages and each stage's blob. */
+export interface MergeTreeFile {
+  path: string;
+  stages: number[];
+  /** Blob id per stage present. */
+  blobs: Partial<Record<1 | 2 | 3, string>>;
+}
+
+/** Parse `git merge-tree --write-tree -z --no-messages` output: the result tree and the conflicted files. */
+export function parseMergeTree(stdout: string): { tree: string; files: MergeTreeFile[] } {
   // <tree>\0 then one "<mode> <oid> <stage>\t<path>\0" per conflicted stage.
-  const entries = stdout.split("\0").slice(1);
-  const byPath = new Map<string, Set<number>>();
+  const [tree = "", ...entries] = stdout.split("\0");
+  const byPath = new Map<string, MergeTreeFile>();
   for (const entry of entries) {
     if (entry === "") break;
     const tab = entry.indexOf("\t");
     if (tab < 0) continue;
-    const stage = Number(entry.slice(0, tab).split(" ")[2]);
+    const [, oid, stageText] = entry.slice(0, tab).split(" ");
+    const stage = Number(stageText);
     const path = entry.slice(tab + 1);
-    if (!Number.isInteger(stage)) continue;
-    const stages = byPath.get(path) ?? new Set<number>();
-    stages.add(stage);
-    byPath.set(path, stages);
+    if (stage !== 1 && stage !== 2 && stage !== 3) continue;
+    const file = byPath.get(path) ?? { path, stages: [], blobs: {} };
+    if (!file.stages.includes(stage)) file.stages.push(stage);
+    file.blobs[stage] = oid;
+    byPath.set(path, file);
   }
-  return [...byPath].map(([path, stages]) => ({ path, stages: [...stages].sort((a, b) => a - b) }));
+  for (const file of byPath.values()) file.stages.sort((a, b) => a - b);
+  return { tree: tree.trim(), files: [...byPath.values()] };
 }
 
-async function predictConflicts(git: Runner, base: string): Promise<{ conflicts: PredictedConflict[]; unavailable: string | null }> {
-  const out = await git.git(["merge-tree", "--write-tree", "-z", "--no-messages", base, "HEAD"], MERGE_TREE_TIMEOUT_MS);
+/** A blob as text; null when it cannot be read or is binary. */
+async function readBlob(git: Runner, spec: string): Promise<string | null> {
+  const out = await git.git(["cat-file", "blob", spec]);
+  return out.ok && !out.stdout.includes("\0") ? out.stdout : null;
+}
+
+async function readSides(git: Runner, tree: string, file: MergeTreeFile): Promise<ConflictSides> {
+  const blob = (stage: 1 | 2 | 3) => (file.blobs[stage] ? readBlob(git, file.blobs[stage]) : Promise.resolve(null));
+  const [ancestor, base, branch, result] = await Promise.all([blob(1), blob(2), blob(3), readBlob(git, `${tree}:${file.path}`)]);
+  return { path: file.path, stages: file.stages, ancestor, base, branch, result };
+}
+
+/** Every other local worktree on a branch, with the paths that branch changed against `base`. */
+async function readOtherWorktrees(git: Runner, base: string): Promise<WorktreeChanges[]> {
+  const [list, top] = await Promise.all([git.git(["worktree", "list", "--porcelain", "-z"]), git.git(["rev-parse", "--show-toplevel"])]);
+  if (!list.ok) return [];
+  const self = top.ok ? top.stdout.trim() : null;
+  const worktrees: WorktreeRef[] = [];
+  let path: string | null = null;
+  for (const field of list.stdout.split("\0")) {
+    if (field.startsWith("worktree ")) path = field.slice("worktree ".length);
+    else if (field.startsWith("branch refs/heads/") && path && path !== self) {
+      worktrees.push({ path, branch: field.slice("branch refs/heads/".length) });
+    }
+  }
+  return Promise.all(worktrees.map(async (w) => {
+    const out = await git.git(["diff", "--name-only", "-z", `${base}...refs/heads/${w.branch}`]);
+    return { ...w, changed: out.ok ? out.stdout.split("\0").filter(Boolean) : [] };
+  }));
+}
+
+async function predictConflicts(
+  git: Runner,
+  base: string,
+  generatedFiles: readonly GeneratedFileRule[],
+): Promise<{ conflicts: PredictedConflict[]; unavailable: string | null }> {
+  // diff3 style puts the ancestor's lines in each hunk, which tells an
+  // add-only hunk from one that changes a line.
+  const out = await git.git(
+    ["-c", "merge.conflictStyle=diff3", "merge-tree", "--write-tree", "-z", "--no-messages", base, "HEAD"],
+    MERGE_TREE_TIMEOUT_MS,
+  );
   // 0 = clean, 1 = conflicts; anything else is git refusing (older than 2.38, unrelated histories).
   if (out.exitCode === 0) return { conflicts: [], unavailable: null };
-  if (out.exitCode === 1 && out.stdout) return { conflicts: parseMergeTree(out.stdout), unavailable: null };
+  if (out.exitCode === 1 && out.stdout) {
+    const { tree, files } = parseMergeTree(out.stdout);
+    const [sides, driver, worktrees] = await Promise.all([
+      Promise.all(files.map((file) => readSides(git, tree, file))),
+      git.git(["config", "--get", "merge.rex-state.driver"]),
+      readOtherWorktrees(git, base),
+    ]);
+    const conflicts = classifyConflicts(sides, { generatedFiles, rexStateDriver: driver.ok && driver.stdout.trim() !== "", worktrees });
+    return { conflicts, unavailable: null };
+  }
   return {
     conflicts: [],
     unavailable: `git merge-tree could not predict the merge: ${out.stderr.trim() || "no output"}. It needs git 2.38 or newer.`,
@@ -383,7 +453,7 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
   }
 
   const counts = base ? await aheadBehind(git, base.ref) : { ahead: null, behind: null };
-  const predicted = base ? await predictConflicts(git, base.ref) : { conflicts: [], unavailable: "There is no base to merge with." };
+  const predicted = base ? await predictConflicts(git, base.ref, options.generatedFiles ?? []) : { conflicts: [], unavailable: "There is no base to merge with." };
   const prBases: PrBaseLookup = { gh: ghAllowed, projectDir, cache: options.prBases };
   const stack = base ? await readStack(git, base, upstreams, defaultBranch?.branch ?? null, prBases) : [];
   const github = pr ? await readGithubFacts(git, pr, base?.ref ?? null, stack) : null;

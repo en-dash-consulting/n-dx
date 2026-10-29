@@ -16,6 +16,7 @@
 
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { CopyTextButton } from "../components/index.js";
 
 /** The feature toggle that shows the strip and opens the endpoint. */
 export const BRANCH_HEALTH_FEATURE = "git.branchHealth";
@@ -33,6 +34,25 @@ export interface BranchHealthFailingCheck {
   logTail: string | null;
 }
 
+export type BranchHealthConflictClass =
+  | "prd-children-table"
+  | "prd-state"
+  | "duplicate-capture"
+  | "allowlist-union"
+  | "generated"
+  | "source";
+
+/** One predicted conflict with its class and, except for source, its fix. */
+export interface BranchHealthConflict {
+  path: string;
+  stages: number[];
+  class: BranchHealthConflictClass;
+  reason: string;
+  /** Argv steps to run in order after `git merge <base>`, or a diff against this branch's copy. */
+  fix: { steps: string[][] } | { diff: string } | null;
+  otherWorktrees: Array<{ path: string; branch: string }>;
+}
+
 export interface BranchHealthResponse {
   branch: string | null;
   head: string;
@@ -42,7 +62,7 @@ export interface BranchHealthResponse {
   baseNote: string | null;
   ahead: number | null;
   behind: number | null;
-  conflicts: Array<{ path: string; stages: number[] }>;
+  conflicts: BranchHealthConflict[];
   conflictsUnavailable: string | null;
   stack: Array<{ branch: string; contained: boolean }>;
   github: {
@@ -120,6 +140,41 @@ const BASE_SOURCE_LABEL: Record<NonNullable<BranchHealthResponse["baseSource"]>,
 
 const STAGE_LABEL: Record<number, string> = { 1: "ancestor", 2: "base", 3: "this branch" };
 
+/** An argv as a command a POSIX shell reads back as the same argv. */
+export function shellCommand(argv: readonly string[]): string {
+  return argv.map((arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`)).join(" ");
+}
+
+function ConflictFix({ conflict }: { conflict: BranchHealthConflict }) {
+  const { fix } = conflict;
+  if (!fix) {
+    return conflict.otherWorktrees.length > 0
+      ? h("p", { class: "branch-health-line" },
+          "Also changed in: ",
+          conflict.otherWorktrees.map((w, i) => h("span", { key: w.path },
+            i > 0 ? ", " : "", h("code", null, w.branch), ` (${w.path})`)),
+        )
+      : null;
+  }
+  if ("steps" in fix) {
+    return h("ol", { class: "branch-health-steps", "aria-label": `Fix for ${conflict.path}` },
+      fix.steps.map((step, i) => {
+        const command = shellCommand(step);
+        return h("li", { key: i },
+          h("code", null, command),
+          " ",
+          h(CopyTextButton, { text: command, class: "branch-health-copy", label: `Copy: ${command}` }),
+        );
+      }),
+    );
+  }
+  return h("details", { class: "branch-health-log" },
+    h("summary", null, "Union diff, to apply to this branch's copy"),
+    h("pre", null, fix.diff),
+    h(CopyTextButton, { text: fix.diff, class: "branch-health-copy", label: `Copy the diff for ${conflict.path}` }),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Components
 // ---------------------------------------------------------------------------
@@ -142,10 +197,16 @@ function Details({ health, githubNote }: {
       : health.conflicts.length > 0
         ? h("div", null,
             h("h4", { class: "branch-health-heading" }, "Predicted conflicts"),
+            h("p", { class: "branch-health-line" },
+              "Fixes are for ", h("code", null, `git merge ${health.base}`), " run on this branch, in the order listed."),
             h("ul", { class: "branch-health-list" },
-              health.conflicts.map((c) => h("li", { key: c.path },
+              health.conflicts.map((c) => h("li", { key: c.path, class: "branch-health-conflict" },
+                h("span", { class: "branch-health-class" }, c.class),
+                " ",
                 h("code", null, c.path),
                 ` — stages: ${c.stages.map((s) => STAGE_LABEL[s] ?? String(s)).join(", ")}`,
+                h("p", { class: "branch-health-line" }, c.reason),
+                h(ConflictFix, { conflict: c }),
               )),
             ),
           )

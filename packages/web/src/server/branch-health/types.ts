@@ -18,11 +18,48 @@ export type BranchHealthExec = (cmd: string, args: string[], opts: ExecOptions) 
  */
 export type BaseSource = "pr" | "pr-cached" | "upstream" | "default";
 
-/** One file `git merge-tree --write-tree` could not merge, with the index stages it left. */
+/** What kind of conflict a file has, which decides the fix offered (conflicts.ts). */
+export type ConflictClass =
+  | "prd-children-table"
+  | "prd-state"
+  | "duplicate-capture"
+  | "allowlist-union"
+  | "generated"
+  | "source";
+
+/**
+ * A deterministic fix, for the merge `git merge <base>` run on this branch:
+ * argv steps to run in order from the worktree root, or a unified diff to
+ * apply to this branch's copy of the file.
+ */
+export type ConflictFix = { steps: string[][] } | { diff: string };
+
+/** A local worktree and the branch checked out in it. */
+export interface WorktreeRef {
+  path: string;
+  branch: string;
+}
+
+/** `web.generatedFiles` in `.n-dx.json`: files a command regenerates, so a conflict in them is redone, not merged. */
+export interface GeneratedFileRule {
+  /** Repo-relative globs. */
+  paths: string[];
+  /** The argv that regenerates them, run from the worktree root. */
+  command: string[];
+}
+
+/** One file `git merge-tree --write-tree` could not merge, classified. */
 export interface PredictedConflict {
   path: string;
   /** 1 = common ancestor, 2 = base, 3 = this branch. A missing stage is a side that deleted the file. */
   stages: number[];
+  class: ConflictClass;
+  /** Why it has this class, in a sentence. */
+  reason: string;
+  /** Null for a source conflict: a person resolves it. */
+  fix: ConflictFix | null;
+  /** For a source conflict, the other local worktrees whose branch also changed this path; empty otherwise. */
+  otherWorktrees: WorktreeRef[];
 }
 
 /** One layer below this branch in its base chain. */

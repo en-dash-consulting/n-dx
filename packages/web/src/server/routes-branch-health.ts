@@ -12,7 +12,9 @@
  * without it the answer is local facts only and `githubDeferred` says GitHub
  * facts are one request away. A local-only answer reuses the PR base the last
  * GitHub read found for that worktree and branch (`baseSource: "pr-cached"`),
- * held in this server's memory. See `branch-health/collect.ts`.
+ * held in this server's memory. Each predicted conflict carries a class and,
+ * except for source conflicts, a fix; `web.generatedFiles` declares the files
+ * a command regenerates. See `branch-health/collect.ts` and `conflicts.ts`.
  *
  * @module web/server/routes-branch-health
  */
@@ -20,8 +22,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
 import { errorMessage, errorResponse, jsonResponse } from "./response-utils.js";
-import { collectBranchHealth, NotAGitBranchError, PrBaseCache, type BranchHealthExec } from "./branch-health/index.js";
+import {
+  collectBranchHealth,
+  NotAGitBranchError,
+  parseGeneratedFiles,
+  PrBaseCache,
+  type BranchHealthExec,
+} from "./branch-health/index.js";
 import { readSidecarSettings } from "./sidecar/settings.js";
+import { readWebValue } from "./sidecar/web-config.js";
 
 export const BRANCH_HEALTH_PATH = "/api/branch-health";
 
@@ -54,6 +63,7 @@ export async function handleBranchHealthRoute(
       githubReads: readSidecarSettings(ctx.projectDir).githubReads,
       localOnly: query.get("github") !== "1",
       prBases: options.prBases ?? serverPrBases,
+      generatedFiles: readWebValue(ctx.projectDir, (web) => parseGeneratedFiles(web.generatedFiles)) ?? [],
       exec: options.exec,
     });
     jsonResponse(res, 200, health);

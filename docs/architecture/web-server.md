@@ -171,6 +171,25 @@ is on; the route gate refuses it with 403 while the toggle is off.
   predicts a merge stays read-only where it matters; the only trace is
   unreferenced objects that `git gc` collects. A git older than 2.38 cannot do
   this, and the answer says so in `conflictsUnavailable`.
+- **Each conflict is classified, with a fix a person runs.**
+  `branch-health/conflicts.ts` is a pure function over each file's stages and
+  the diff3-style conflicted result merge-tree wrote, plus the project config:
+  it reads no file, runs no process and writes nothing. Fixes assume
+  `git merge <base>` on this branch (ours = this branch, theirs = the base).
+  First match wins:
+
+  | Class | When | Fix |
+  |-------|------|-----|
+  | `generated` | the path matches a `web.generatedFiles` glob | `checkout --theirs`, the declared command, `git add`; listed after every other fix |
+  | `prd-state` | a v2 `state.yaml` while `merge.rex-state.driver` is unset | register the driver, `checkout --merge`, `git add`. With the driver set it is `source` |
+  | `duplicate-capture` | add/add on a PRD item file, same title, different ids | keep the base's id (`checkout --theirs`), `git add`, `rex validate --post-merge` |
+  | `prd-children-table` | a v1 `prd_tree` `index.md` whose hunks are all `## Children` rows | `checkout --ours`, `rex validate --post-merge --repair`, `git add`, `rex validate` |
+  | `allowlist-union` | every hunk only adds lines on both sides | a unified diff against this branch's copy: ours, then theirs |
+  | `source` | everything else | none; names the other local worktrees whose branch changed the path |
+
+  `web.generatedFiles` is `[{ "paths": [globs], "command": [argv] }]`; with no
+  declaration nothing is `generated`. This repository declares the prompt
+  baseline and the iso-map skill script.
 - **A stack is content, not configuration.** Each layer below in the base
   chain is checked with `merge-base --is-ancestor`. A branch whose base is set
   to a lower layer but lacks that layer's commits is reported not contained:

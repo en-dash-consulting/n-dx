@@ -101,4 +101,19 @@ describe("GET /api/branch-health", () => {
     expect(ghCalls).toEqual([]);
     expect(local).toMatchObject({ base: "main", baseSource: "pr-cached", baseNote: null, githubDeferred: true });
   });
+
+  it("classes conflicts in web.generatedFiles from the project config", async () => {
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, stdio: "ignore" });
+    writeFileSync(join(dir, "a.txt"), "feat\n");
+    git("commit", "-q", "-am", "feat");
+    git("checkout", "-q", "main");
+    writeFileSync(join(dir, "a.txt"), "main\n");
+    git("commit", "-q", "-am", "main");
+    git("checkout", "-q", "feat");
+    git("branch", "-q", "--set-upstream-to=main");
+    writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ web: { generatedFiles: [{ paths: ["*.txt"], command: ["node", "gen.mjs"] }] } }));
+
+    const body = await (await fetch(`${started.baseUrl}/api/branch-health`)).json();
+    expect(body.conflicts).toMatchObject([{ path: "a.txt", class: "generated" }]);
+  });
 });
