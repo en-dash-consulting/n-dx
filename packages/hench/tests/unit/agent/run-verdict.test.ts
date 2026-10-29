@@ -134,6 +134,24 @@ describe("classifyRun — one fixture per class", () => {
     expect(fresh.evidence).toEqual([`Gate failure names changed file(s): ${full}`]);
   });
 
+  it("collapsing a package-relative path never hides that the run changed the file it names", () => {
+    // Package a prints its failing test package-relative; package b's same-named
+    // test appears repo-relative. The short path is a's, which the run changed.
+    const digest = [
+      " FAIL  tests/unit/foo.test.ts > a",
+      " FAIL  packages/b/tests/unit/foo.test.ts > b",
+    ].join("\n");
+    const d = classify(run({
+      testGate: failedGate(digest),
+      structuredSummary: {
+        filesChanged: ["packages/a/tests/unit/foo.test.ts"],
+        filesRead: [], commandsExecuted: [], testsRun: [],
+        counts: { filesRead: 0, filesChanged: 1, commandsExecuted: 0, testsRun: 0, toolCallsTotal: 0 },
+      },
+    }));
+    expect(d.class).toBe("test-gate-new");
+  });
+
   it("an absolute Windows digest path under worktreeRoot is reported repo-relative", () => {
     const d = classify(run({
       worktreeRoot: "C:\\repo",

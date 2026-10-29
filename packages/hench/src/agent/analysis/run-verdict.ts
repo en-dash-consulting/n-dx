@@ -107,14 +107,19 @@ function isUnder(path: string, dir: string): boolean {
   return path === d || path.startsWith(`${d}/`);
 }
 
-/**
- * Files the digest names, each once. A package runner prints package-relative
- * paths and the gate repo-relative ones, so a path that is a suffix of another
- * listed path collapses into the longer one.
- */
 function digestFiles(digest: string, root: string | undefined): string[] {
-  const named = [...new Set([...digest.matchAll(DIGEST_FILE)].map((m) => normalizePath(m[0], root)))];
-  return named.filter((p) => !named.some((q) => q !== p && q.endsWith(`/${p}`)));
+  return [...new Set([...digest.matchAll(DIGEST_FILE)].map((m) => normalizePath(m[0], root)))];
+}
+
+/**
+ * Paths for a summary, each file once. A package's runner prints
+ * package-relative paths and other lines repo-relative ones, so a path that is
+ * a suffix of another listed path collapses into the longer one. For display
+ * only: a package-relative path may belong to a different package than the
+ * longer one, so matching against changed files uses the uncollapsed list.
+ */
+function collapseSuffixPaths(paths: readonly string[]): string[] {
+  return paths.filter((p) => !paths.some((q) => q !== p && q.endsWith(`/${p}`)));
 }
 
 function vendorFailureCategories(run: RunRecord): string[] {
@@ -247,7 +252,7 @@ const testGate: Rule = ({ run }, changed) => {
   if (!digest) return null;
   const named = digestFiles(digest, run.worktreeRoot);
   if (named.length === 0) return null;
-  const ours = named.filter((n) => changed.some((c) => samePath(n, c)));
+  const ours = collapseSuffixPaths(named.filter((n) => changed.some((c) => samePath(n, c))));
   if (ours.length > 0) {
     return {
       class: "test-gate-new",
@@ -259,11 +264,12 @@ const testGate: Rule = ({ run }, changed) => {
       ],
     };
   }
+  const unchanged = collapseSuffixPaths(named);
   return {
     class: "test-gate-preexisting",
-    summary: `The test gate failed only in files this run did not change: ${list(named)}.`,
+    summary: `The test gate failed only in files this run did not change: ${list(unchanged)}.`,
     evidence: [
-      `Gate failure names only unchanged file(s): ${list(named)}`,
+      `Gate failure names only unchanged file(s): ${list(unchanged)}`,
       "Not verified on main",
     ],
     actions: [
