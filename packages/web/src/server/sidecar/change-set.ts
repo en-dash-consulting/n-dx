@@ -111,12 +111,18 @@ export async function reviewChangeSet(rexDir: string, input: Raw): Promise<Sidec
 
   // Each item is compared with the existing items of its own type, as smart add compares levels.
   const existing = [...walkTree(doc.items)].map((entry) => entry.item);
-  resolved.items = resolved.items.map((item) => {
+  // The scan is synchronous and costs ~190 ms per item on a large PRD, so the
+  // loop yields between items: other requests, the websocket and Live are
+  // served while it runs. The matcher is unchanged.
+  const flagged: SidecarChangeSetItem[] = [];
+  for (const item of resolved.items) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
     const match = findDuplicateItem(item, existing.filter((e) => itemTypeOf(e) === item.type));
-    return match
+    flagged.push(match
       ? { ...item, duplicate: { id: match.item.id, title: match.item.title, type: itemTypeOf(match.item), status: match.item.status } }
-      : item;
-  });
+      : item);
+  }
+  resolved.items = flagged;
   return resolved;
 }
 

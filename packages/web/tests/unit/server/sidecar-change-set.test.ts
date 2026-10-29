@@ -18,10 +18,23 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { findItem, indexTree, loadPrdModel, resolveStore, type PRDItem } from "@n-dx/rex";
 import { createAnnouncingBroker, handleSidecarRoute, sidecarActions } from "../../../src/server/routes-sidecar.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
-import { INBOX_NOTE } from "../../../src/server/sidecar/change-set.js";
+import { INBOX_NOTE, reviewChangeSet } from "../../../src/server/sidecar/change-set.js";
 import type { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../../helpers/server-route-test-support.js";
+
+/** Each duplicate scan, in order, with the real matcher behind it. */
+const order = vi.hoisted<string[]>(() => []);
+vi.mock("../../../src/server/rex-gateway.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/server/rex-gateway.js")>();
+  return {
+    ...actual,
+    findDuplicateItem: ((...args: Parameters<typeof actual.findDuplicateItem>) => {
+      order.push("scan");
+      return actual.findDuplicateItem(...args);
+    }) as typeof actual.findDuplicateItem,
+  };
+});
 
 const SESSION = "s1";
 const V2_FIXTURE = resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree");
@@ -207,6 +220,26 @@ describe("on a v1 PRD", () => {
     await decide(card.id, { decision: "deny" });
     await call;
     await client.close();
+  });
+
+  it("yields to the event loop while it scans, so other work runs before the review finishes", async () => {
+    // The scan's own calls are recorded; a callback chain on the event loop
+    // stands in for any other request. Scans with no "other work" between
+    // them ran back to back, blocking the loop.
+    order.length = 0;
+    const tick = (): void => {
+      order.push("other work");
+      timer = setImmediate(tick);
+    };
+    let timer = setImmediate(tick);
+    const result = await reviewChangeSet(ctx.rexDir, {
+      items: [{ title: "Checkout hardening" }, { title: "Something unrelated entirely", parent: 0 }],
+    });
+    clearImmediate(timer);
+    const scans = order.flatMap((entry, i) => (entry === "scan" ? [i] : []));
+    expect(scans).toHaveLength(2);
+    expect(order.slice(scans[0], scans[1])).toContain("other work");
+    expect(typeof result).not.toBe("string");
   });
 
   it("raises no card for a proposal it cannot write, and says why", async () => {
