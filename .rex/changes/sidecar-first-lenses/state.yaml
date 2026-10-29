@@ -11,7 +11,12 @@ items:
     lastModified: "2026-10-29T01:32:37.029Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "21fe75a3-8af7-4ce7-9fbd-08549905bb5b":
-    lastModified: "2026-10-28T21:46:05.256Z"
+    status: "completed"
+    startedAt: "2026-10-29T02:02:01.803Z"
+    completedAt: "2026-10-29T02:02:01.803Z"
+    endedAt: "2026-10-29T02:02:01.803Z"
+    activeIntervals: [{"end":"2026-10-29T02:02:01.803Z","start":"2026-10-29T02:02:01.803Z"}]
+    lastModified: "2026-10-29T02:02:01.803Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "27eab993-7418-46e3-bdb0-52d868031058":
     status: "completed"
@@ -78,8 +83,15 @@ items:
     lastModified: "2026-10-29T00:58:14.797Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b1ee136b-d88d-4f2f-848d-70db805df38b":
+    status: "completed"
+    startedAt: "2026-10-29T02:02:01.803Z"
+    completedAt: "2026-10-29T02:02:01.803Z"
+    endedAt: "2026-10-29T02:02:01.803Z"
+    activeIntervals: [{"end":"2026-10-29T02:02:01.803Z","start":"2026-10-29T02:02:01.803Z"}]
+    appliedAt: "2026-10-29T02:02:01.803Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     issues: ["https://www.notion.so/3f7a80b7192481f8b679c82db62c39f5","https://www.notion.so/3f7a80b7192481a1ace0c96947b08d57","https://www.notion.so/3f7a80b71924816398f4d93e0d38edd2","https://www.notion.so/3f7a80b7192481f88060ea9e55cdbf00","https://www.notion.so/3f7a80b7192481ee9289c4d0f14f3609"]
-    lastModified: "2026-10-29T01:49:39.720Z"
+    lastModified: "2026-10-29T02:02:01.803Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d4f33bf0-b520-43d8-962e-c2269bbf7b39":
     status: "completed"
