@@ -186,9 +186,10 @@ is on; the route gate refuses it with 403 while the toggle is off.
   opening a board of many worktrees runs no gh command. Local-only answers take
   the base and stack from upstreams, not PR bases.
 - **A failing check is classed on the whole log.** gh's per-line job, step and
-  timestamp prefix and colour codes are removed first. Behind-base also fires
-  when the PR's `mergeStateStatus` is `BEHIND` or a stack layer is not
-  contained, and the evidence names which. A test path printed by a package's
+  timestamp prefix and colour codes are removed first. When no policy suite or
+  touched test explains the failure, behind-base also fires when the PR's
+  `mergeStateStatus` is `BEHIND` or a stack layer is not contained, and the
+  evidence names which. A test path printed by a package's
   runner (`packages/p test: FAIL tests/x.test.ts`) matches only that
   package's `packages/p/tests/x.test.ts`. Only the stored `logTail` is cut, to
   the last 80 lines and 8,000 characters.

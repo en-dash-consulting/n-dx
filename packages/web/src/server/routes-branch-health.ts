@@ -34,13 +34,18 @@ export async function handleBranchHealthRoute(
   ctx: ServerContext,
   options: BranchHealthRouteOptions = {},
 ): Promise<boolean> {
-  const url = new URL(req.url || "/", "http://localhost");
-  if (url.pathname !== BRANCH_HEALTH_PATH || (req.method || "GET") !== "GET") return false;
+  // Split the raw target the way the route gate does: URL parsing would read
+  // `//host/api/branch-health` as this path, which the gate does not cover.
+  const target = req.url || "/";
+  const queryAt = target.indexOf("?");
+  const path = queryAt < 0 ? target : target.slice(0, queryAt);
+  if (path !== BRANCH_HEALTH_PATH || (req.method || "GET") !== "GET") return false;
+  const query = new URLSearchParams(queryAt < 0 ? "" : target.slice(queryAt + 1));
 
   try {
     const health = await collectBranchHealth(ctx.projectDir, {
       githubReads: readSidecarSettings(ctx.projectDir).githubReads,
-      localOnly: url.searchParams.get("github") !== "1",
+      localOnly: query.get("github") !== "1",
       exec: options.exec,
     });
     jsonResponse(res, 200, health);

@@ -59,6 +59,23 @@ describe("GET /api/branch-health", () => {
     expect(body).toMatchObject({ branch: "feat", github: null, githubDeferred: true });
   });
 
+  it("does not answer a target whose path only parses to /api/branch-health", async () => {
+    // The route gate matches the raw path before `?`; `//x/api/branch-health`
+    // is ungated there, so the route must not claim it either.
+    const { request } = await import("node:http");
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request({ host: "127.0.0.1", port: started.port, path: "//x/api/branch-health" }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on("error", reject);
+      req.end();
+    });
+
+    expect(status).not.toBe(200);
+    expect(ghCalls).toEqual([]);
+  });
+
   it("reads GitHub facts when asked with ?github=1", async () => {
     const res = await fetch(`${started.baseUrl}/api/branch-health?github=1`);
     const body = await res.json();

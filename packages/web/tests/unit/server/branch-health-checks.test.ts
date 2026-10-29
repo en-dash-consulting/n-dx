@@ -186,6 +186,23 @@ describe("behind-base from the PR and the stack", () => {
     expect(verdict.evidence).not.toContain("feat/sidecar-m3-lenses");
   });
 
+  it("still names a test the branch changed, or a policy suite, ahead of being BEHIND", () => {
+    const touched = classifyFailingCheck({
+      ...base,
+      changedFiles: ["packages/llm-client/tests/integration/vendor-session.test.ts"],
+      mergeStateStatus: "BEHIND",
+      stack: [{ branch: "feat/sidecar-m2-drawer", contained: false }],
+    });
+    expect(touched.class).toBe("touched-test");
+
+    const policy = classifyFailingCheck({
+      ...base,
+      log: " FAIL  tests/e2e/architecture-policy.test.js > spawn-only\n",
+      mergeStateStatus: "BEHIND",
+    });
+    expect(policy.class).toBe("policy-test");
+  });
+
   it("stays unclassified when the PR is up to date and every layer is contained", () => {
     const verdict = classifyFailingCheck({
       ...base,
