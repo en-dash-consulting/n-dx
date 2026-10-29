@@ -26,6 +26,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve, relative } from "path";
 import { fileURLToPath } from "url";
 import { findSharedSecrets, loadProjectConfigStrict, loadShellTestEnv, LOCAL_CONFIG_FILE, PROJECT_CONFIG_FILE, projectConfigLabel } from "./config.js";
+import { localConfigStatus } from "./local-config-status.js";
 import { isGitTracked } from "./gitignore.js";
 import { layoutStateNames, relativeToRoot, resolveLayout } from "./layout.js";
 
@@ -141,7 +142,7 @@ async function runDocsPhase(dir, info, isJSON, spawnTracked) {
   info("── docs build ──");
   const docsEnv = await loadShellTestEnv(dir);
   if (docsEnv.policyError !== undefined) {
-    info(`  ⚠ project guard.env policy could not be loaded (${docsEnv.policyError}); docs build runs with the default environment filter`);
+    info(`  ⚠ project guard.env policy could not be loaded (${docsEnv.policyError}); the malformed field was ignored; valid environment filters still apply to the docs build`);
   }
   const docsBuild = await new Promise((res) => {
     const child = spawnTracked("pnpm", ["docs:build"], { cwd: dir, env: docsEnv.env, stdio: ["ignore", "pipe", "pipe"], shell: process.platform === "win32", windowsHide: true });
@@ -1451,15 +1452,19 @@ async function checkConfigSecrets(dir) {
 
   // Checked first and reported alone: it is the file the keys are in, so it
   // is the more urgent of the two even when the shared file is also wrong.
-  if (isGitTracked(localFile, dir)) {
+  const localStatus = localConfigStatus(dir);
+  if (localStatus.tracked) {
     const also = secrets.length > 0
       ? ` ${sharedFile} also contains ${list}.`
       : "";
     return {
       ok: false,
       detail:
-        `${localFile} is tracked by git — it holds every API key \`ndx config\` writes and must stay ignored. ` +
-        `Run \`git rm --cached ${localFile}\`, restore its \`.gitignore\` line, and rotate any key it has held.${also}`,
+        (localStatus.unanswered
+          ? `${localFile}: git could not confirm the local config is untracked; check git safe.directory and rerun. `
+          : localStatus.nestedIn
+            ? `${localFile} is repository config in nested work tree ${localStatus.nestedIn}; untrack it there. `
+            : `${localFile} is tracked by git — it holds every API key \`ndx config\` writes and must stay ignored. Run \`git rm --cached -- ${localStatus.paths.map((p) => "'" + p.replaceAll("'", "'\\''") + "'").join(" ")}\`, restore its \`.gitignore\` line, and rotate any key it has held. `) + also,
       secrets,
     };
   }

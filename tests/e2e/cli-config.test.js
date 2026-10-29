@@ -2292,3 +2292,30 @@ describe("n-dx config", () => {
     });
   });
 });
+
+
+describe("writes to git-tracked machine-local configuration", () => {
+  let dir;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "ndx-tracked-local-write-"));
+    await setupProject(dir);
+    await writeFile(LOCAL_CONFIG_PATH(dir), "{}\n");
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["add", ".n-dx.local.json"], { cwd: dir });
+  });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
+  it("refuses a credential without printing or persisting its value", async () => {
+    const key = "sk-ant-fixture-never-print";
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.stdout + result.stderr).not.toContain(key);
+    expect(JSON.parse(await readFile(LOCAL_CONFIG_PATH(dir), "utf8"))).toEqual({});
+  });
+  it("warns for a nonsecret local setting", () => {
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "cli.claudePath", "/fixture/claude", dir], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toContain("repository config");
+    expect(result.stderr).toContain("trust-gated");
+  });
+});

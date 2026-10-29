@@ -36,6 +36,7 @@ import {
   renderClaudeMd,
 } from "./assistant-assets.js";
 import { getCliName } from "./cli-identity.js";
+import { localConfigStatus } from "./local-config-status.js";
 import { resolveLayout } from "./layout.js";
 import { homedir } from "os";
 
@@ -510,16 +511,7 @@ function readConfiguredClaudePath(dir) {
  * @returns {boolean}
  */
 function localConfigIsRepositoryConfig(root) {
-  try {
-    const out = execFileSyncCli(
-      process.execPath,
-      [resolveSubPackageCli("packages/hench", "@n-dx/hench"), "trust", "status", "--format=json", root],
-      { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 15_000 },
-    );
-    return JSON.parse(String(out))?.config?.localConfigTracked !== false;
-  } catch {
-    return true;
-  }
+  return localConfigStatus(root).tracked;
 }
 
 /**
@@ -733,6 +725,12 @@ export function discoverClaudeCli(dir = null) {
     }
   }
 
+  if (dir) {
+    const layout = resolveLayout(dir);
+    if (typeof readJsonObject(layout.localConfigFile)?.cli?.claudePath === "string" && localConfigStatus(layout.root).unanswered) {
+      searched.push(`cli.claudePath in ${relative(layout.root, layout.localConfigFile)} was not run: git could not confirm the local file is untracked; check git safe.directory, then run ndx trust status .`);
+    }
+  }
   const ignored = ignoredSharedClaudePathNote(dir);
   if (ignored) searched.push(ignored);
   return { found: false, searched };

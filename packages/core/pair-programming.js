@@ -858,7 +858,7 @@ export async function runShellTestCommand(testCommand, dir, timeout = 120_000, r
   }
   const envWarning = shellEnv.policyError === undefined
     ? undefined
-    : `project guard.env policy could not be loaded (${shellEnv.policyError}); the test command ran with the default environment filter`;
+    : `project guard.env policy could not be loaded (${shellEnv.policyError}); the malformed field was ignored; valid environment filters still apply to the test command`;
   const result = await spawnShellTestCommand(testCommand, dir, timeout, registerChild, shellEnv.env);
   return envWarning === undefined ? result : { ...result, envWarning };
 }

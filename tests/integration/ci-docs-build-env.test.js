@@ -34,12 +34,12 @@ afterEach(() => {
 });
 
 /** Runs `ndx ci` in-process and returns what the docs-build child saw. */
-async function docsBuildView() {
+async function docsBuildView(name = SECRET_NAME) {
   let seen;
   const spawnTracked = (cmd, args, opts) => {
     if (cmd === "pnpm" && args[0] === "docs:build") {
       const { shell: _shell, ...rest } = opts;
-      const child = spawn(process.execPath, ["-e", STUB, SECRET_NAME], rest);
+      const child = spawn(process.execPath, ["-e", STUB, name], rest);
       let out = "";
       child.stdout.on("data", (d) => { out += d; });
       child.on("close", () => { seen = JSON.parse(out); });
@@ -53,6 +53,15 @@ async function docsBuildView() {
 }
 
 describe("ndx ci docs build environment", () => {
+  it("keeps the user's deny when repository policy is malformed", async () => {
+    const name = "NDX_DOCS_PLAIN";
+    process.env[name] = "sentinel";
+    try {
+      writeFileSync(join(projectDir, ".n-dx.json"), JSON.stringify({ hench: { guard: { env: { allow: 7 } } } }));
+      writeFileSync(join(projectDir, ".n-dx.local.json"), JSON.stringify({ hench: { guard: { env: { deny: [name] } } } }));
+      expect((await docsBuildView(name)).secret).toBeNull();
+    } finally { delete process.env[name]; }
+  });
   it("does not hand the operator's credentials to the repository's docs:build", async () => {
     const seen = await docsBuildView();
     expect(seen).toBeDefined();

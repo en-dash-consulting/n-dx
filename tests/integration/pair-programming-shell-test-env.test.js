@@ -7,7 +7,7 @@
  * without a vendor CLI's authentication exceptions, and the repository's own
  * `allow` entries count only once the checkout is trusted.
  * When that policy cannot be loaded — which is also what sends
- * `runCrossVendorReview` to this fallback — the default deny policy applies
+ * `runCrossVendorReview` to this fallback — malformed fields are ignored while valid denies apply
  * and the result says so. Assertions are made in the real child process.
  */
 
@@ -101,6 +101,25 @@ function writeMockReviewer() {
 }
 
 describe("runShellTestCommand environment", () => {
+  it("keeps a user deny when the repository allow field is malformed", async () => {
+    const name = "NDX_REVIEW_FIXTURE_PLAIN";
+    const previous = process.env[name];
+    process.env[name] = "sentinel";
+    try {
+      writeProjectConfig({ hench: { guard: { env: { allow: 7 } } } });
+      writeFileSync(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ hench: { guard: { env: { deny: [name] } } } }));
+      const probe = join(tmpDir, "denied.js");
+      writeFileSync(probe, `console.log('PROBE ' + JSON.stringify('${name}' in process.env));`);
+      const result = await runShellTestCommand(`"${process.execPath}" "${probe}"`, tmpDir, undefined, undefined, { ndxHome: join(tmpDir, "ndx-home") });
+      expect(result.exitCode).toBe(0);
+      expect(probedNames(result.output)).toBe(false);
+      expect(result.envWarning).toContain("malformed");
+      expect(result.envWarning).not.toContain("default environment filter");
+    } finally {
+      if (previous === undefined) delete process.env[name]; else process.env[name] = previous;
+    }
+  });
+
   it("applies a trusted project's guard.env policy without vendor authentication exceptions", async () => {
     writeProjectConfig({ hench: { guard: { env: { allow: ["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"] } } } });
     const trust = { ndxHome: join(tmpDir, "ndx-home") };
@@ -178,7 +197,7 @@ describe("runShellTestCommand environment", () => {
     expect(collected.envDeny).toEqual(coreGuard.env.deny);
   });
 
-  it("falls back to the default deny policy, and says so, when the project policy is invalid", async () => {
+  it("ignores the malformed deny field, and says so, when the project policy is invalid", async () => {
     writeProjectConfig({ hench: { guard: { env: { deny: [42], allow: ["NDX_REVIEW_FIXTURE_ALLOWED_TOKEN"] } } } });
 
     const result = await runShellTestCommand(probeCommand(), tmpDir);
@@ -190,7 +209,7 @@ describe("runShellTestCommand environment", () => {
 });
 
 describe("runCrossVendorReview shell-test fallback environment", () => {
-  it("runs the fallback under the default filter when the project policy cannot be resolved", async () => {
+  it("runs the fallback under the sanitized filter when the project policy cannot be resolved", async () => {
     // deny: [42] fails the reviewer's env resolution (spawnError) and the shell test env alike.
     writeProjectConfig({ hench: { guard: { env: { deny: [42] } } } });
     // The user's own config: a repository's cli_path applies only once it is trusted.

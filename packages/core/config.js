@@ -2864,8 +2864,8 @@ async function loadProjectEnvPolicy(dir) {
  * once the checkout is trusted.
  *
  * `repoCommandEnv` skips a malformed policy list without saying so, so the
- * policy is compiled here first; when that fails, the default deny policy
- * applies and `policyError` says why, so the caller can report it.
+ * policy is compiled here first; when that fails, only malformed fields
+ * are ignored and valid user denies still apply and `policyError` says why, so the caller can report it.
  * Never returns the unfiltered parent environment.
  *
  * @param {string} dir
@@ -2874,12 +2874,12 @@ async function loadProjectEnvPolicy(dir) {
  * @returns {Promise<{ env: NodeJS.ProcessEnv; policyError?: string }>}
  */
 export async function loadShellTestEnv(dir, options = {}) {
-  const { compileEnvPolicy, repoCommandEnv, sanitizeChildEnv } = await import("@n-dx/llm-client");
+  const { compileEnvPolicy, repoCommandEnv } = await import("@n-dx/llm-client");
   try {
     compileEnvPolicy(await loadProjectEnvPolicy(dir));
   } catch (err) {
     return {
-      env: sanitizeChildEnv(process.env, compileEnvPolicy(undefined)),
+      env: repoCommandEnv(dir, { trust: options.trust }),
       policyError: err instanceof Error ? err.message : String(err),
     };
   }
@@ -3160,6 +3160,20 @@ async function handleSetProjectSection(
     ? LOCAL_CONFIG_FILE
     : PROJECT_CONFIG_FILE;
   const configPath = projectConfigPath(dir, targetFile);
+  if (targetFile === LOCAL_CONFIG_FILE) {
+    // config.js already uses this foundation reader for trust-aware config I/O.
+    const { collectRepoExecutionConfig } = await import("@n-dx/llm-client");
+    const config = collectRepoExecutionConfig(dir);
+    const status = { tracked: config.localConfigTracked, unanswered: Boolean(config.localConfigUnanswered) };
+    if (status.tracked) {
+      const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
+      const reason = status.unanswered ? "git could not confirm it is untracked" : "the file is repository config tracked by git";
+      if (storageSettingPath.split(".").at(-1) === SECRET_SETTING_LEAF) {
+        throw new Error(`Refusing to write a credential to ${label}: ${reason}. Untrack the local config before storing credentials.`);
+      }
+      console.error(`Warning: ${label} is repository config (${reason}); this setting may be shared and execution settings remain trust-gated.`);
+    }
+  }
   const current = await loadProjectConfigFile(dir, targetFile);
   if (!current[storagePkg] || typeof current[storagePkg] !== "object") {
     current[storagePkg] = {};
