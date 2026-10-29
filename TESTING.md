@@ -115,7 +115,7 @@ Test-file pointers for the scenarios added above:
 
 ### Running a subset of suites
 
-`node scripts/run-all-tests.mjs` runs every suite. Suites are labelled `root`, the three root subsets `root-policy`, `root-drift` and `root-docs`, plus each package directory that has a `test` script (`rex`, `hench`, `web`, …). `core` has no suite of its own; its tests are in `root`.
+`node scripts/run-all-tests.mjs` runs every suite. Suites are labelled `root`, the four root subsets `root-policy`, `root-drift`, `root-docs` and `root-extensions`, plus each package directory that has a `test` script (`rex`, `hench`, `web`, …). `core` has no suite of its own; its tests are in `root`.
 
 ```sh
 node scripts/run-all-tests.mjs                       # root + every package
@@ -123,6 +123,7 @@ node scripts/run-all-tests.mjs rex,web               # named suites (labels, @n-
 node scripts/run-all-tests.mjs root-policy           # static policy tests only (~2 s)
 node scripts/run-all-tests.mjs root-drift            # source-vs-twin drift tests only (~14 s)
 node scripts/run-all-tests.mjs root-docs             # docs-page tests only (~2 s)
+node scripts/run-all-tests.mjs root-extensions       # the fixture extension through the CLI and hub (~10 s)
 node scripts/run-all-tests.mjs affected <baseRef>    # only suites the change since <baseRef> touches
 node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection and why; run nothing
 ```
@@ -134,7 +135,8 @@ node scripts/run-all-tests.mjs affected <baseRef> --list   # print the selection
 - Documentation pages that a root test reads select the `root-docs` subset (`ROOT_DOCS_TEST_FILES`, about 2 s: `command-docs-parity`, `docs-skill-refs`, `docs-command-refs`, `cli-ui-gap-drift`), never full `root`. `VALIDATED_DOC_PAGES` maps them as groups, because a list of pages would go stale the day one is added: `README.md`, `packages/core/README.md` and `docs/guide/commands.md` (`command-docs-parity`); every `docs/guide/*.md` except `skills.md`, which it exempts (`docs-skill-refs`); `docs/index.md` and every page under `docs/guide/` and `docs/packages/`, `skills.md` and nested pages included (`docs-command-refs`); `docs/cli-ui-gap.md` (`cli-ui-gap-drift`). Other `docs/` pages (architecture, analysis, archive, contributing) are prose. `docs/guide/troubleshooting.md` and `packages/web/README.md` also select `root-drift`, which runs `assistant-parity-smoke`, the test that reads them. `node scripts/run-all-tests.mjs root-docs` runs the subset alone.
 - Any change under `packages/<dir>/src/` or `packages/<dir>/tests/` also selects `root-policy`. `root-policy` is the ~2 s set of static root tests that police package sources and tests: `architecture-policy`, `domain-isolation`, `shell-spawn-inventory-policy`, `wall-clock-inventory-policy`, `layout-literal-policy`, `obfuscated-code-policy` and `integration-coverage-policy` (`ROOT_POLICY_TEST_FILES` in `scripts/lib/select-suites.mjs`). Run it alone with `node scripts/run-all-tests.mjs root-policy`.
 - A change under `packages/<dir>/src/` *also* selects `root-drift` — the ~14 s set of root tests a package-source change can break on its own, because they assert that two definitions agree rather than that code behaves (`ROOT_DRIFT_TEST_FILES`). Its members and the audit that chose them are in [Root-drift membership](#root-drift-membership) below. It is a separate label from `root-policy` because it costs seven times as much; keeping them apart means the cheap policy gate stays cheap and can still be run on its own with `node scripts/run-all-tests.mjs root-drift`. A `tests/`-only change does not select it: no checked-in artifact is generated from a test file.
-- Both subsets are dropped when `root` is selected (root runs their files already, so they never run twice), and `all` and `packages` do not include either.
+- A change to a web hub source that serves extensions — `proxy.ts`, `sidecars.ts`, `extensions.ts` under `packages/web/src/hub/` (`EXTENSION_HUB_FILES`) — also selects `root-extensions`, which runs `tests/e2e/extension-fixture.test.js`, a required test. Dispatch and discovery are core, which selects `root` and so runs it already.
+- The subsets are dropped when `root` is selected (root runs their files already, so they never run twice), and `all` and `packages` include none of them.
 - `scripts/`, `tests/`, `.github/`, other top-level files, `packages/core/` (non-Markdown) and instruction surfaces (`AGENTS.md`, `CLAUDE.md`, `.claude/`, `.agents/`, `.codex/`, `.mcp.json`, `.rex/workflow.md`, `packages/core/assistant-assets/`) select `root`.
 - Run-everything triggers: `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `vitest.config.js`, `scripts/run-all-tests.mjs`, `scripts/run-vitest-bind-aware.mjs`.
 - Machine-written state (`.rex/prd_tree/`, `.hench/`, `.sourcevision/`) selects nothing.
@@ -303,6 +305,7 @@ would create silent coverage gaps.
 | `tests/e2e/cli-dev.test.js` | `ndx dev` command startup | Single point of failure for dev-mode coverage |
 | `tests/integration/scheduler-startup.test.js` | Usage cleanup scheduler boot | Single point of failure for server scheduler wiring |
 | `packages/web/tests/e2e-ui/navigation.spec.ts` | Every dashboard view deep-links, and every 0.8.0 redirect alias resolves to its target | Single point of failure for the whole nav surface — a broken view or a dangling old path fails silently otherwise |
+| `tests/e2e/extension-fixture.test.js` | The fixture extension (`tests/e2e/fixture-extension/`: one command, one sidecar, one project link) through the real CLI and hub — discovery, approval, dispatch, environment, config, help, the `/x/<name>/` proxy, the hub API and home | The only test that crosses every process boundary of the extensions contract; required on every change to dispatch, the hub proxy or discovery |
 
 These tests must remain in the test suite. If refactoring changes their targets,
 update the tests — do not delete them.

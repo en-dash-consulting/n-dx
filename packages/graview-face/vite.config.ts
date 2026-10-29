@@ -1,11 +1,13 @@
 // From `vite`, not `vitest/config`: bin/serve.js loads this file from an npm install where vitest is absent.
 import { defineConfig } from "vite";
+import { hubMount } from "./dev/hub-mount.js";
 import { ndxDoor } from "./dev/ndx-door.js";
 
 export default defineConfig({
   esbuild: { jsx: "automatic" },
   // The door to n-dx in development only: a proxy to rex behind the hub, a re-emit, and the fresh projection.
-  plugins: [ndxDoor()],
+  // The mount comes first, so the door sees paths under the base whether or not the hub stripped them.
+  plugins: [hubMount(), ndxDoor()],
   build: {
     outDir: "build",
     target: "es2022",

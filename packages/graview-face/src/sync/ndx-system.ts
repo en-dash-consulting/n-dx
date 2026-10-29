@@ -14,6 +14,7 @@
  */
 import { fetchSnapshot } from "@graview/core/snapshot";
 import { doorClient, mcpRemote, type RemoteChange, type RemoteSystem, type RemoteWrite, type ToolCall } from "@graview/core/sync";
+import { BASE } from "../base.js";
 import { isSyncedKind, SYNC_FIELDS, SYNCED_KINDS, SYSTEM, VERSION_FIELD } from "./mapping.js";
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -22,7 +23,7 @@ export interface NdxRemoteOptions {
   /** Who is moving things in this face, for the execution log. */
   readonly principal: string;
   readonly fetch?: Fetch;
-  /** The door's base: "" in the page, a full origin in a test. */
+  /** The door's base: the face's own (`BASE`) in the page, a full origin in a test. */
   readonly base?: string;
   /** The door's key; in the page, read from the `<meta name="ndx-door">` the dev server writes. */
   readonly key?: string;
@@ -76,7 +77,7 @@ export function ndxRemote(options: NdxRemoteOptions): NdxRemote {
     headers.set("x-ndx-door", key);
     return send(input, { ...init, headers });
   };
-  const base = options.base ?? "";
+  const base = options.base ?? BASE;
   const JSON_HEADERS = { "content-type": "application/json" };
   let lastEmit: EmitOutcome | undefined;
 
