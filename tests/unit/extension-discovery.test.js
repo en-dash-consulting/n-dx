@@ -469,8 +469,16 @@ describe("writing extensions.json", () => {
     };
     const waits = [];
 
-    expect(readExtensionsText(flaky, cachePath(), (ms) => waits.push(ms))).toBe("{}\n");
+    expect(readExtensionsText(flaky, cachePath(), { sleep: (ms) => waits.push(ms), platform: "win32" })).toBe("{}\n");
     expect(waits).toHaveLength(2);
+  });
+
+  it.each(["EPERM", "EACCES"])("fails a %s read at once outside Windows, where it is permanent", (code) => {
+    const denied = { ...fs, readFileSync: () => { throw errno(code); } };
+    const waits = [];
+
+    expect(() => readExtensionsText(denied, cachePath(), { sleep: (ms) => waits.push(ms), platform: "linux" })).toThrow(code);
+    expect(waits).toEqual([]);
   });
 
   it("removes the temp file when discovery's cache write fails", () => {
