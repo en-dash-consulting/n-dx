@@ -97,7 +97,15 @@ test("full analysis, then a task added through the form, completed by the agent"
   await caption(page, "1/5 Run the full SourceVision analysis");
   const full = page.getByRole("button", { name: "Full analysis" }).first();
   await expect(full).toBeEnabled({ timeout: 15_000 });
+  // Leaving the page before the start POST is sent cancels it, and the
+  // status route would then read idle at once.
+  const started = page.waitForResponse(
+    (res) => res.request().method() === "POST" && new URL(res.url()).pathname === "/api/commands/sv-analyze",
+    { timeout: 15_000 },
+  );
   await full.click();
+  const startResponse = await started;
+  expect(startResponse.ok(), `starting the analysis returned HTTP ${startResponse.status()}`).toBe(true);
 
   await page.goto(`${dashboard.baseUrl}/live/analyze`, { waitUntil: "domcontentloaded" });
   await caption(page, "2/5 Following the analysis on the Live page");
