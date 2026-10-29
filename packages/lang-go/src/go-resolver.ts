@@ -45,9 +45,9 @@ import { posix } from "node:path";
 import {
   goConfig,
   isGoStdlibPath,
-  readGoBuildModels,
+  readGoBuildModelsResult,
   readGoVendorModules,
-  readGoWorkFiles,
+  readGoWorkFilesResult,
   type GoModuleBuild,
   type GoReplace,
   type GoVendoredModule,
@@ -71,20 +71,24 @@ export interface GoProject {
   readonly workspaces: readonly GoWorkFacts[];
   /** Module directory → the modules vendored there. */
   readonly vendored: ReadonlyMap<string, readonly GoVendoredModule[]>;
+  readonly notices?: readonly string[];
 }
 
 const EMPTY_PROJECT: GoProject = { modules: [], workspaces: [], vendored: new Map() };
 
 /** Read every `go.mod`, `go.work` and `vendor/modules.txt` of a project. */
 export async function readGoProject(projectDir: string): Promise<GoProject> {
-  const modules = await readGoBuildModels(projectDir);
-  const workspaces = await readGoWorkFiles(projectDir);
+  const moduleRead = await readGoBuildModelsResult(projectDir);
+  const workspaceRead = await readGoWorkFilesResult(projectDir);
+  const modules = moduleRead.models;
+  const workspaces = workspaceRead.files;
   const vendored = new Map<string, readonly GoVendoredModule[]>();
   for (const { dir } of modules) {
     const list = await readGoVendorModules(projectDir, dir);
     if (list.length > 0) vendored.set(dir, list);
   }
-  return { modules, workspaces, vendored };
+  const notices = [...new Set([...moduleRead.notices, ...workspaceRead.notices, ...modules.flatMap((m) => m.notices), ...workspaces.flatMap((w) => w.notices)])];
+  return { modules, workspaces, vendored, notices };
 }
 
 // ── Facts read from one file's captures ─────────────────────────────────────
@@ -348,6 +352,7 @@ function createGoResolver(project: GoProject): PackResolver {
       const byPath = new Map(files.map((f) => [f.path, f]));
       const cache = new Map<string, FileReferences>();
       return {
+        notices: () => project.notices ?? [],
         resolve(fromFile) {
           const file = byPath.get(fromFile);
           if (!file) return { files: [], external: [] };

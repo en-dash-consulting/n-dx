@@ -34,7 +34,7 @@ const BOOT_GRADLE_PLUGIN = "spring-boot-gradle-plugin";
 const BOOT_BOM = "spring-boot-dependencies";
 const NO_VERSION = "no version in the script; a plugin or platform may manage it";
 /** Dependency-block statements that name no external coordinate. */
-const NON_COORDINATE = /^(?:project|files|fileTree|gradleApi|localGroovy|gradleTestKit|kotlin|testFixtures)\b/;
+const NON_COORDINATE = /^(?:project|projects|files|fileTree|gradleApi|localGroovy|gradleTestKit|kotlin|testFixtures)\b/;
 /** Statement heads that are declarations or control flow, not configurations. */
 /** A plugin declaration's trailing `apply false` / `.apply(false)`. */
 const APPLY_TAIL = /(?:\.\s*apply\s*\(\s*\w+\s*\)|\s+apply\s+\w+)\s*$/;
@@ -51,7 +51,7 @@ interface ScriptFacts {
   /** `buildscript { dependencies { classpath … } }` entries. */
   classpath: BuildDependency[];
   dependencies: BuildDependency[];
-  /** `project(…)` dependencies of the top-level `dependencies` blocks. */
+  /** `project(…)` and `projects.x` dependencies of the top-level `dependencies` blocks. */
   projects: ProjectDependency[];
   group?: BuildValue;
   version?: BuildValue;
@@ -65,8 +65,14 @@ export async function readGradleBuildModels(
   modules: readonly JavaModule[],
 ): Promise<ModuleBuildModel[]> {
   const { catalogs, notices: catalogNotices } = await readVersionCatalogs(projectDir);
+  const accessors = new Map<string, string | undefined>();
+  for (const module of modules) {
+    if (!module.name.startsWith(":")) continue;
+    const key = "projects." + module.name.slice(1).split(":").map((part) => part.replace(/[-_]([A-Za-z0-9])/g, (_, ch: string) => ch.toUpperCase())).join(".");
+    accessors.set(key, accessors.has(key) ? undefined : module.name);
+  }
   const facts = new Map<string, ScriptFacts>();
-  for (const m of modules) facts.set(m.dir, await readModuleScript(projectDir, m.dir, catalogs));
+  for (const m of modules) facts.set(m.dir, await readModuleScript(projectDir, m.dir, catalogs, accessors));
   const root = facts.get("");
 
   return modules.map((m) => {
@@ -91,6 +97,7 @@ async function readModuleScript(
   projectDir: string,
   dir: string,
   catalogs: ReadonlyMap<string, VersionCatalog>,
+  accessors: ReadonlyMap<string, string | undefined>,
 ): Promise<ScriptFacts> {
   const empty = (notices: string[]): ScriptFacts => ({ plugins: [], classpath: [], dependencies: [], projects: [], notices });
   for (const name of GRADLE_BUILD) {
@@ -105,7 +112,7 @@ async function readModuleScript(
       if (code === "EACCES" || code === "EPERM") return empty([`${file} is unreadable (${code}); skipped`]);
       throw err;
     }
-    return new ScriptReader(file, new GradleScript(text), catalogs).facts();
+    return new ScriptReader(file, new GradleScript(text), catalogs, accessors).facts();
   }
   return empty([]); // an aggregator with no build script
 }
@@ -143,6 +150,7 @@ class ScriptReader {
     private readonly file: string,
     private readonly script: GradleScript,
     private readonly catalogs: ReadonlyMap<string, VersionCatalog>,
+    private readonly accessors: ReadonlyMap<string, string | undefined>,
   ) {}
 
   facts(): ScriptFacts {
@@ -276,7 +284,8 @@ class ScriptReader {
   /**
    * `project(':x')`, `project(path: ':x', configuration: 'tests')` (Groovy),
    * `project(":x", "tests")` or `project(path = ":x", configuration = "tests")`
-   * (Kotlin), each optionally wrapped in `testFixtures(…)`. Undefined for any
+   * (Kotlin), or a type-safe `projects.x` accessor matched against settings,
+   * each optionally wrapped in `testFixtures(…)`. Undefined for any
    * other expression, including a project followed by more
    * (`project(':x').sourceSets…`); a computed path is also noted.
    */
@@ -285,6 +294,13 @@ class ScriptReader {
     if (fixtures) {
       const inner = fixtures.length === 1 ? this.projectDependency(config, fixtures[0]!) : undefined;
       return inner && !inner.configuration ? { ...inner, testFixtures: true } : undefined;
+    }
+    const accessor = this.script.text(span);
+    if (/^projects(?:\.[A-Za-z_$][\w$]*)+$/.test(accessor)) {
+      const path = this.accessors.get(accessor);
+      if (path) return { path, scope: config };
+      this.note(`project accessor "${accessor}" is ${this.accessors.has(accessor) ? "ambiguous" : "not declared in settings"}`);
+      return undefined;
     }
     const args = this.call(span, "project");
     if (!args) return undefined;

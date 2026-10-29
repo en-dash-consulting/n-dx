@@ -42,3 +42,30 @@
   (#eq? @_entry_point.name "main")
   (#any-of? @_entry_point.type "String" "java.lang.String")
   (#eq? @_entry_point.dimensions "[]")) @entry_point.main
+
+; Interface static methods are implicitly public unless declared private.
+(interface_declaration body: (interface_body
+(method_declaration
+  (modifiers "static") @_entry_point.modifiers
+  type: (void_type)
+  name: (identifier) @_entry_point.name
+  parameters: (formal_parameters
+    .
+    [
+      (formal_parameter
+        type: (array_type
+          element: [(type_identifier) (scoped_type_identifier)] @_entry_point.type
+          dimensions: (dimensions) @_entry_point.dimensions)
+        !dimensions)
+      (formal_parameter
+        type: [(type_identifier) (scoped_type_identifier)] @_entry_point.type
+        dimensions: (dimensions) @_entry_point.dimensions)
+      (spread_parameter
+        [(type_identifier) (scoped_type_identifier)] @_entry_point.type)
+    ]
+    .)
+  (#eq? @_entry_point.name "main")
+  (#not-match? @_entry_point.modifiers "(^|\\s)(public|private)(\\s|$)")
+  (#any-of? @_entry_point.type "String" "java.lang.String")
+  (#eq? @_entry_point.dimensions "[]")) @entry_point.main
+))

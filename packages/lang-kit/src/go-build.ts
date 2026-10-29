@@ -71,28 +71,38 @@ export async function findGoModuleDirs(projectDir: string): Promise<string[]> {
 /**
  * Build models for the `go.mod` files of a project, one per directory in `dirs`
  * (default: every `go.mod` found). Directories the search could not list are
- * reported as notices on the first model; with no model there is nowhere to
- * attach them.
+ * reported as notices on the first model. Use readGoBuildModelsResult to
+ * retain walk notices when no model was discovered.
  */
 export async function readGoBuildModels(
   projectDir: string,
   dirs?: readonly string[],
 ): Promise<GoModuleBuild[]> {
+  return (await readGoBuildModelsResult(projectDir, dirs)).models;
+}
+
+/** Models and walk notices, including failures when no module could be discovered. */
+export async function readGoBuildModelsResult(projectDir: string, dirs?: readonly string[]): Promise<{ models: GoModuleBuild[]; notices: readonly string[] }> {
   const found = dirs ? { dirs, notices: [] as string[] } : await findDirsWith(projectDir, "go.mod");
   const out: GoModuleBuild[] = [];
   for (const dir of found.dirs) {
     out.push(await readModule(projectDir, dir));
   }
   if (out.length > 0) out[0] = { ...out[0], notices: [...out[0].notices, ...found.notices] };
-  return out;
+  return { models: out, notices: found.notices };
 }
 
 /**
  * The `go.work` files of a project, one per directory that has one, sorted by
  * path. Directories the search could not list are reported as notices on the
- * first file.
+ * first file. Use readGoWorkFilesResult to retain notices without a file.
  */
 export async function readGoWorkFiles(projectDir: string): Promise<GoWorkFacts[]> {
+  return (await readGoWorkFilesResult(projectDir)).files;
+}
+
+/** Workspace files and walk notices, including failures when none could be discovered. */
+export async function readGoWorkFilesResult(projectDir: string): Promise<{ files: GoWorkFacts[]; notices: readonly string[] }> {
   const out: GoWorkFacts[] = [];
   const found = await findDirsWith(projectDir, "go.work");
   for (const dir of found.dirs) {
@@ -101,7 +111,7 @@ export async function readGoWorkFiles(projectDir: string): Promise<GoWorkFacts[]
     out.push(typeof text === "string" ? parseGoWork(file, text) : { file, use: [], replaces: [], notices: [`${file} ${text.reason}`] });
   }
   if (out.length > 0) out[0] = { ...out[0], notices: [...out[0].notices, ...found.notices] };
-  return out;
+  return { files: out, notices: found.notices };
 }
 
 // ── go.mod ───────────────────────────────────────────────────────────────

@@ -26,6 +26,10 @@ const texts = (captures: readonly Capture[] | undefined, name: string): string[]
   (captures ?? []).filter((c) => c.name === name).map((c) => c.text);
 
 describe("java pack", () => {
+  it("recognizes an interface's implicitly public static main without accepting package-private class mains", async (ctx) => {
+    const { captures } = await parse(ctx, "interface Tool { static void main(String[] args) {} }\nclass Hidden { static void main(String[] args) {} }\ninterface Private { private static void main(String[] args) {} }\n");
+    expect(texts(captures.methods, "entry_point.main")).toEqual(["static void main(String[] args) {}"]);
+  });
   it("has every query file and provenance naming the grammar version and a date", () => {
     for (const q of javaPack.queries) {
       expect(existsSync(q.path), q.path).toBe(true);
