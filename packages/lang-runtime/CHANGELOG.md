@@ -1,5 +1,13 @@
 # @n-dx/lang-runtime
 
+## 0.10.1
+
+### Patch Changes
+
+- [#867](https://github.com/en-dash-consulting/n-dx/pull/867) [`de8bc93`](https://github.com/en-dash-consulting/n-dx/commit/de8bc939849ed25a4376dca29ec18646cc906954) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dependency updates: `@anthropic-ai/sdk` ^0.133.0 → ^0.137.0 (llm-client, hench), `web-tree-sitter` 0.27.0 → 0.27.1 (lang-runtime), and `react` / `react-dom` ^19.3.0 → ^19.3.1 (core, graview-face).
+- Updated dependencies []:
+  - @n-dx/lang-kit@0.10.1
+
 ## 0.10.0
 
 ### Patch Changes
