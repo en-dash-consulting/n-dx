@@ -23,12 +23,24 @@ import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, type LLMVendor } from "./p
 export interface EnvPolicyConfig {
   /** Additional case-insensitive variable-name globs to strip. */
   deny?: string[];
-  /** Variable-name globs to retain even when a deny glob matches. */
+  /** Variable-name globs to retain over deny globs; exact deny names still win. */
   allow?: string[];
 }
 
 /** Name globs stripped by default. `*` matches any run of characters; matching ignores case. */
 export const DEFAULT_ENV_DENY: readonly string[] = [
+  "API_KEY",
+  "*_PAT",
+  "*_KEY",
+  "*_KEYS",
+  "*_PASS",
+  "*PWD*",
+  "*JWT*",
+  "*_DSN",
+  "*SESSION*",
+  "*_WEBHOOK_URL",
+  "DATABASE_URL",
+  "*SERVICE_ROLE*",
   "*TOKEN*",
   "*SECRET*",
   "*PASSWORD*",
@@ -50,9 +62,21 @@ export const DEFAULT_ENV_DENY: readonly string[] = [
 /**
  * Variables that match a deny glob by shape but are plumbing, not secrets.
  * `SSH_AUTH_SOCK` is a socket path git needs; the vitest/npm entries are
- * booleans or paths.
+ * booleans or paths. Directory/terminal/desktop session names below contain
+ * paths or identifiers rather than authentication sessions; every exception
+ * still yields to an exact name in the operator's deny list.
  */
 export const DEFAULT_ENV_ALLOW: readonly string[] = [
+  "PWD",
+  "OLDPWD",
+  "TERM_SESSION_ID",
+  "XDG_SESSION_ID",
+  "XDG_SESSION_TYPE",
+  "XDG_SESSION_CLASS",
+  "XDG_SESSION_DESKTOP",
+  "XDG_SESSION_PATH",
+  "DBUS_SESSION_BUS_ADDRESS",
+  "DESKTOP_SESSION",
   "SSH_AUTH_SOCK",
   "GIT_ASKPASS",
   "NPM_CONFIG_USERCONFIG",
@@ -71,10 +95,13 @@ function compile(globs: readonly string[]): RegExp[] {
 export interface EnvPolicy {
   deny: RegExp[];
   allow: RegExp[];
+  /** Exact operator denies override plumbing exceptions and explicit allows. */
+  exactDeny?: RegExp[];
 }
 
 export function compileEnvPolicy(config: EnvPolicyConfig | undefined): EnvPolicy {
   return {
+    exactDeny: compile((config?.deny ?? []).filter((name) => !name.includes("*"))),
     deny: compile([...DEFAULT_ENV_DENY, ...(config?.deny ?? [])]),
     allow: compile([...DEFAULT_ENV_ALLOW, ...(config?.allow ?? [])]),
   };
@@ -82,6 +109,7 @@ export function compileEnvPolicy(config: EnvPolicyConfig | undefined): EnvPolicy
 
 /** Whether a variable of this name survives the policy. */
 export function envNameAllowed(name: string, policy: EnvPolicy): boolean {
+  if (policy.exactDeny?.some((re) => re.test(name))) return false;
   if (policy.allow.some((re) => re.test(name))) return true;
   return !policy.deny.some((re) => re.test(name));
 }

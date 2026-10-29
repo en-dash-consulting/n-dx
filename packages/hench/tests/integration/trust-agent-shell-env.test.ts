@@ -47,6 +47,13 @@ async function childSeesSentinel(): Promise<string> {
 }
 
 describeNeedsPosixShell("run_command under repository trust", () => {
+  itNeedsPosixShell("an exact user deny removes the ssh-agent socket and askpass helper", async () => {
+    const config = DEFAULT_HENCH_CONFIG();
+    const guard = new GuardRails(repo, { ...config.guard, env: { deny: ["SSH_AUTH_SOCK", "GIT_ASKPASS"] } }, { env: { ...process.env, SSH_AUTH_SOCK: "/fixture/socket", GIT_ASKPASS: "/fixture/helper" } });
+    const output = await toolRunCommand(guard, repo, { command: `node -e "process.stdout.write(JSON.stringify(['SSH_AUTH_SOCK','GIT_ASKPASS'].filter(n => n in process.env)))"` });
+    expect(output).toBe("[]");
+  });
+
   itNeedsPosixShell("withholds a repository-allowed credential while untrusted", async () => {
     expect(await childSeesSentinel()).toBe("false");
   });

@@ -61,6 +61,7 @@
     "assistant-assets.js",
     "assistant-integration.js",
     "claude-integration.js",
+    "local-config-status.js",
     "sample-app.js",
     "codex-integration.js",
     "refresh-validate.js",
