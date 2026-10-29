@@ -200,7 +200,8 @@ describe("a local config file the repository ships under another name or path", 
     expect(ev.config.localConfigTrackedPaths).toEqual(paths);
     const finding = ev.findings.find((f) => f.code === "local-config-tracked");
     expect(finding?.values).toEqual(paths);
-    expect(finding?.message).toMatch(new RegExp(`^Commits ${paths.join(", ").replace(/\./g, "\\.")}`));
+    const named = `Commits ${paths.join(", ")}`;
+    expect(finding?.message.slice(0, named.length)).toBe(named);
     const report = formatRepoTrustReport(ev).join("\n");
     expect(report).toContain(`git rm --cached -- ${paths.join(" ")}`);
   }
