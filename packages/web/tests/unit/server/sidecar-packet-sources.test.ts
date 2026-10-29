@@ -99,3 +99,46 @@ describe("createPacketSources runs", () => {
     expect(packet.text).not.toContain("No run of this task is recorded.");
   });
 });
+
+describe("createPacketSources zone", () => {
+  function withAnalysis(): ServerContext {
+    const ctx = contextFor(dir, (name) => join(dir, `.${name}`));
+    mkdirSync(ctx.svDir, { recursive: true });
+    writeFileSync(join(ctx.svDir, "manifest.json"), JSON.stringify({ analyzedAt: "2026-10-21T00:00:00.000Z" }));
+    writeFileSync(
+      join(ctx.svDir, "zones.json"),
+      JSON.stringify({
+        zones: [
+          {
+            id: "pay-2",
+            previousIds: ["pay"],
+            name: "Payments",
+            description: "Card and wallet payment.",
+            files: Array.from({ length: 30 }, (_, i) => `src/pay/f${i}.ts`),
+            entryPoints: ["src/pay/index.ts"],
+            cohesion: 0.8,
+            coupling: 0.2,
+            insights: ["Shared with refunds."],
+          },
+        ],
+      }),
+    );
+    return ctx;
+  }
+
+  it("finds a zone by id, an id it was known by, or its name, and bounds the file sample", async () => {
+    const sources = createPacketSources(withAnalysis(), spawned);
+    for (const ref of ["pay-2", "pay", "payments"]) {
+      const zone = await sources.zone(ref);
+      expect(zone).toMatchObject({ id: "pay-2", name: "Payments", fileCount: 30, cohesion: 0.8, coupling: 0.2, analyzedAt: "2026-10-21T00:00:00.000Z" });
+      expect(zone?.files).toHaveLength(20);
+      expect(zone?.insights).toEqual(["Shared with refunds."]);
+    }
+    expect(await sources.zone("nope")).toBeNull();
+  });
+
+  it("reads null when there is no analysis", async () => {
+    const sources = createPacketSources(contextFor(dir, (name) => join(dir, `.${name}`)), spawned);
+    expect(await sources.zone("pay")).toBeNull();
+  });
+});

@@ -100,13 +100,25 @@ exports[`Explain > v1: states the epic with its acceptance criteria, evidence an
 "# Sidecar context packet: explain · 11111111-1111-1111-1111-111111111111
 Built by code from the repository's own records. No model wrote it.
 
+## How to explain
+Explain the target for someone who has not seen it: what it is, where it stands, what backs it.
+- Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
+- Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
+- Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+
+## Product layer
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+There is no product layer on this tree: it is a v1 PRD, so it has no areas, capabilities or capability criteria.
+Explain from the PRD items and the sourcevision zones below. An item's acceptance criteria are its "done when", not capability criteria.
+
 ## epic
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
 
 Auth Platform
 Status: in_progress
 Description: Authentication platform rollout.
-Acceptance criteria:
+Done when (acceptance criteria, not capability criteria):
 (none)
 
 ## Parent chain
@@ -135,14 +147,26 @@ exports[`Explain > v2: states the capability, its derived status, linked changes
 "# Sidecar context packet: explain · a0000000-0000-4000-8000-000000000002
 Built by code from the repository's own records. No model wrote it.
 
+## How to explain
+Explain the target for someone who has not seen it: what it is, where it stands, what backs it.
+- Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
+- Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
+- Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+
 ## Capability
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
 
 A1.1 Pay by card
 Statement: A shopper can pay for a basket with a card.
-Criteria:
-- c1: A valid card is charged once
-- c2: A declined card shows why
+
+## Capability criteria (standing requirements)
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Rex derives status per capability, not per criterion: each criterion carries the capability's verdict.
+- c1 [not verified] A valid card is charged once
+  because an open change is amending it. Evidence: change CH-1 Add Apple Pay: open
+- c2 [not verified] A declined card shows why
+  because an open change is amending it. Evidence: change CH-1 Add Apple Pay: open
 
 ## Derived status and health
 _source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_

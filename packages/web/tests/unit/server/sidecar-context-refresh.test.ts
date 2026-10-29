@@ -31,6 +31,7 @@ import {
 } from "../../../src/server/sidecar/ledger.js";
 import { loadPrdModel } from "../../../src/server/rex-gateway.js";
 import { buildLensPacket } from "../../../src/server/sidecar/lens-packets.js";
+import { EXPLAIN_CAP } from "../../../src/server/sidecar/packet-builders.js";
 import type { PacketSources } from "../../../src/server/sidecar/packet-sources.js";
 import {
   SidecarSessionRegistry,
@@ -478,6 +479,7 @@ describe("the packet opens the first turn", () => {
       prd: async () => ({ layout: model.layout, tree: model.tree }),
       evidence: async () => null,
       zones: async () => null,
+      zone: async () => null,
       resolve: async () => null,
       preview: async () => null,
       runs: async () => [],
@@ -503,5 +505,48 @@ describe("the packet opens the first turn", () => {
     // The header names any ref; the title proves the task itself was resolved and described.
     expect(spawns[0]!.stdin).toContain("Wire the button");
     expect(spawns[0]!.stdin).toContain("what is this?");
+  });
+
+  it("sends the Explain packet and its instructions on turn one, within the lens's bound", async () => {
+    const rexDir = join(root, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    cpSync(resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree"), rexDir, { recursive: true });
+    const model = await loadPrdModel(rexDir);
+    const sources: PacketSources = {
+      sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },
+      prd: async () => ({ layout: model.layout, tree: model.tree }),
+      evidence: async () => null,
+      zones: async () => null,
+      zone: async () => null,
+      resolve: async () => null,
+      preview: async () => null,
+      runs: async () => [],
+    };
+    const capability = "a0000000-0000-4000-8000-000000000002";
+    const reg = new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      context: {
+        ceiling: () => 1000,
+        ledger: () => [],
+        packet: async (record) => {
+          const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, "2026-10-28T12:00:00.000Z");
+          return built.status === "ready" ? built.packet.text : undefined;
+        },
+      },
+    });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "explain", target: { ref: capability } });
+    await reg.sendTurn(id, "explain this");
+    await reg.sendTurn(id, "and the second criterion?");
+
+    const first = spawns[0]!.stdin;
+    expect(first).toContain("## How to explain");
+    expect(first).toContain("- c1 [not verified] A valid card is charged once");
+    expect(first).toContain("## Operator's message\nexplain this");
+    expect(first.indexOf("## How to explain")).toBeLessThan(first.indexOf("## Operator's message"));
+    // Everything before the operator's message is the packet, and it fits Explain's cap.
+    expect(first.split("\n\n## Operator's message")[0]!.length).toBeLessThanOrEqual(EXPLAIN_CAP);
+    expect(spawns[1]!.stdin).toBe("and the second criterion?");
   });
 });

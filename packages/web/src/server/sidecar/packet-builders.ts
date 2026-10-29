@@ -14,6 +14,7 @@
 import { capabilityReport, indexTree, isAppliedChange, productReport } from "../rex-gateway.js";
 import type { RuleNode, V2Tree } from "../rex-gateway.js";
 import { assemblePacket, type Packet, type PacketSection, type Staleness } from "./packet.js";
+import { EXPLAIN_INSTRUCTIONS } from "./lens-instructions.js";
 import type { PacketSources, PrdRead } from "./packet-sources.js";
 
 export const EXPLAIN_CAP = 8_000;
@@ -173,21 +174,70 @@ async function evidenceSections(sources: PacketSources, ids: string[], now: stri
 
 // ── Explain ──────────────────────────────────────────────────────────
 
+type CriterionLabel = "met" | "not met" | "not verified";
+
+/** Evidence lines for a capability: its latest check per requirement, then its changes. Rex records neither per criterion. */
+function capabilityEvidence(node: RuleNode, report: ReturnType<typeof capabilityReport>): { lines: string[]; passed: boolean; failed: boolean } {
+  const requirements = (Array.isArray(node.requirements) ? node.requirements : []) as Array<{ id: string; title?: string }>;
+  const titles = new Map(requirements.map((r) => [r.id, r.title ?? r.id]));
+  const latest = new Map<string, { requirementId: string; result: string; at: string; detail?: string; commit?: string }>();
+  for (const c of (Array.isArray(node.checks) ? node.checks : []) as Array<{ requirementId: string; result: string; at: string; detail?: string; commit?: string }>) {
+    if (!titles.has(c.requirementId)) continue;
+    const held = latest.get(c.requirementId);
+    if (!held || !(Date.parse(c.at) < Date.parse(held.at))) latest.set(c.requirementId, c);
+  }
+  const checks = [...latest.values()];
+  const lines = [
+    ...checks.map(
+      (c) =>
+        `check "${oneLine(titles.get(c.requirementId) ?? c.requirementId, 80)}": ${c.result} on ${c.at.slice(0, 10)}${c.commit ? ` at ${c.commit.slice(0, 9)}` : ""}${c.detail ? `, ${oneLine(c.detail, 80)}` : ""}`,
+    ),
+    ...report.changes.map(
+      (c) => `change ${c.displayId ?? c.id} ${oneLine(c.title, 80)}: ${c.open ? "open" : c.applied ? `applied${c.appliedAt ? ` ${c.appliedAt.slice(0, 10)}` : ""}` : c.status}`,
+    ),
+  ];
+  return {
+    lines,
+    passed: checks.some((c) => c.result === "pass") || report.changes.some((c) => c.applied),
+    failed: checks.some((c) => c.result === "fail"),
+  };
+}
+
+/**
+ * The label every capability criterion carries. Rex derives status and health
+ * for the capability, not per criterion, so each criterion reads the
+ * capability's verdict and the packet says so: nothing here claims a
+ * criterion was checked on its own.
+ */
+function capabilityLabel(status: string, health: string, evidence: { passed: boolean; failed: boolean }): { label: CriterionLabel; why: string } {
+  if (status === "retired") return { label: "not verified", why: "the capability is retired" };
+  if (health === "defective" || evidence.failed) return { label: "not met", why: "a check failed or an open fix change targets it" };
+  if (status === "proposed") return { label: "not met", why: "no applied change has satisfied it yet" };
+  if (status === "revised") return { label: "not met", why: "its spec changed since it was last met" };
+  if (status === "changing") return { label: "not verified", why: "an open change is amending it" };
+  return evidence.passed
+    ? { label: "met", why: "its spec is unchanged since it was met" }
+    : { label: "not verified", why: "no passing check or applied change is on record" };
+}
+
+function criteriaBody(node: RuleNode, report: ReturnType<typeof capabilityReport>): string {
+  const criteria = (Array.isArray(node.criteria) ? node.criteria : []) as Array<{ id: string; text: string }>;
+  if (criteria.length === 0) return "(this capability has no capability criteria)";
+  const evidence = capabilityEvidence(node, report);
+  const { label: verdict, why } = capabilityLabel(report.status.status, report.status.health, evidence);
+  const shown = evidence.lines.slice(0, 3);
+  const evidenceText = `${shown.length > 0 ? shown.join("; ") : "none on record"}${evidence.lines.length > shown.length ? `; ${evidence.lines.length - shown.length} more` : ""}`;
+  return [
+    "Rex derives status per capability, not per criterion: each criterion carries the capability's verdict.",
+    ...criteria.map((c) => `- ${c.id} [${verdict}] ${c.text}\n  because ${why}. Evidence: ${evidenceText}`),
+  ].join("\n");
+}
+
 function v2CapabilitySections(tree: V2Tree, node: RuleNode, now: string): { sections: PacketSection[]; ids: string[] } {
   const report = capabilityReport(tree, node.id, { status: "all", limit: 10 });
-  const criteria = (Array.isArray(node.criteria) ? node.criteria : []) as Array<{ id: string; text: string }>;
   const sections: PacketSection[] = [
-    prdSection(
-      "capability",
-      "Capability",
-      [
-        `${label(node)}`,
-        `Statement: ${text(node.statement) ?? "(none)"}`,
-        "Criteria:",
-        bullets(criteria.map((c) => `${c.id}: ${c.text}`), "(none)"),
-      ].join("\n"),
-      now,
-    ),
+    prdSection("capability", "Capability", [label(node), `Statement: ${text(node.statement) ?? "(none)"}`].join("\n"), now),
+    prdSection("criteria", "Capability criteria (standing requirements)", criteriaBody(node, report), now),
     prdSection(
       "status",
       "Derived status and health",
@@ -228,7 +278,7 @@ function v1ItemSections(found: Found, now: string): { sections: PacketSection[];
           label(node),
           `Status: ${nodeStatus(node)}`,
           ...(text(node.description) ? [`Description: ${text(node.description)}`] : []),
-          "Acceptance criteria:",
+          "Done when (acceptance criteria, not capability criteria):",
           bullets(criteria, "(none)"),
         ].join("\n"),
         now,
@@ -245,24 +295,88 @@ function v1ItemSections(found: Found, now: string): { sections: PacketSection[];
   };
 }
 
-/** Explain: what a capability (or, on a v1 tree, an epic or feature) is, where it stands and what code backs it. */
+/** A v1 tree has no product layer; say so where a capability's sections would be. */
+function noProductLayer(now: string): PacketSection {
+  return prdSection(
+    "product-layer",
+    "Product layer",
+    [
+      "There is no product layer on this tree: it is a v1 PRD, so it has no areas, capabilities or capability criteria.",
+      "Explain from the PRD items and the sourcevision zones below. An item's acceptance criteria are its \"done when\", not capability criteria.",
+    ].join("\n"),
+    now,
+  );
+}
+
+function areaSections(tree: V2Tree, found: Found, now: string): PacketSection[] {
+  const { node } = found;
+  return [
+    prdSection("area", "Product area", [label(node), `Summary: ${text(node.summary) ?? "(none)"}`].join("\n"), now),
+    prdSection("capabilities", "Capabilities in the area (derived status, health)", productSlice(tree, found), now),
+  ];
+}
+
+async function zoneSections(sources: PacketSources, ref: string, now: string): Promise<PacketSection[] | null> {
+  const zone = await sources.zone(ref);
+  if (!zone) return null;
+  const source = sources.sourcePaths.zones;
+  return [
+    {
+      id: "zone",
+      title: "Sourcevision zone",
+      body: [
+        `${zone.id} (${zone.name})`,
+        `Cohesion ${zone.cohesion}, coupling ${zone.coupling}, ${zone.fileCount} file${zone.fileCount === 1 ? "" : "s"}.`,
+        `Summary: ${oneLine(zone.description, 400) || "(none)"}`,
+        "Entry points:",
+        bullets(zone.entryPoints, "(none)"),
+        "Insights:",
+        bullets(zone.insights.map((i) => oneLine(i, 200)), "(none)"),
+        `Files (${zone.files.length} of ${zone.fileCount}):`,
+        bullets(zone.files, "(none)"),
+      ].join("\n"),
+      provenance: { source, generatedAt: zone.analyzedAt },
+      staleness: FRESH,
+    },
+  ];
+}
+
+/**
+ * Explain: what a product area, capability or zone is and where it stands. A
+ * capability lists each capability criterion with its label and evidence; an
+ * area carries its capabilities; a zone carries the analysis summary. On a v1
+ * tree the packet says there is no product layer and explains an epic or
+ * feature from the PRD and the zones.
+ */
 export async function buildExplainPacket(sources: PacketSources, target: PacketTarget, now: string): Promise<Packet> {
   const lens = "explain";
+  const head = `${header(lens, target)}\n\n${EXPLAIN_INSTRUCTIONS}`;
+  const done = (sections: PacketSection[]): Packet => assemblePacket({ lens, cap: EXPLAIN_CAP, header: head, sections });
+  const refused = (why: string): Packet =>
+    assemblePacket({ lens, cap: EXPLAIN_CAP, header: head, sections: [gap("prd", "Target", why, now, PRD_SOURCE)] });
+  if (!target.ref) return refused("Explain needs a target: name a product area, capability or zone (an epic or feature on a v1 tree)");
+
   const prd = await sources.prd();
-  if (!prd) return noPrd(lens, EXPLAIN_CAP, target, now, "no readable PRD");
-  if (!target.ref) return noPrd(lens, EXPLAIN_CAP, target, now, "Explain needs a target: name a capability, epic or feature");
+  const v1Note = prd?.layout === "v1" ? [noProductLayer(now)] : [];
 
-  let built: { sections: PacketSection[]; ids: string[] } | null = null;
-  if (prd.layout === "v2") {
-    const node = indexTree(prd.tree).resolve(target.ref);
-    if (node?.type === "capability") built = v2CapabilitySections(prd.tree, node, now);
+  if (prd) {
+    const all = [...prd.tree.product, ...prd.tree.changes];
+    const found = findNode(all, target.ref);
+    if (found && prd.layout === "v2" && found.node.type === "area") return done(areaSections(prd.tree, found, now));
+    if (found && prd.layout === "v2" && found.node.type === "capability") {
+      const built = v2CapabilitySections(prd.tree, found.node, now);
+      return done([...built.sections, ...(await evidenceSections(sources, built.ids, now))]);
+    }
+    if (found) {
+      const built = v1ItemSections(found, now);
+      return done([...v1Note, ...built.sections, ...(await evidenceSections(sources, built.ids, now))]);
+    }
   }
-  const found = built ? null : findNode([...prd.tree.product, ...prd.tree.changes], target.ref);
-  if (!built && found) built = v1ItemSections(found, now);
-  if (!built) return noPrd(lens, EXPLAIN_CAP, target, now, `"${target.ref}" names no capability, epic or feature`);
 
-  const sections = [...built.sections, ...(await evidenceSections(sources, built.ids, now))];
-  return assemblePacket({ lens, cap: EXPLAIN_CAP, header: header(lens, target), sections });
+  const zone = await zoneSections(sources, target.ref, now);
+  if (zone) return done([...v1Note, ...zone]);
+  if (!prd) return refused("no readable PRD, and no zone by that name");
+  return done([...v1Note, gap("prd", "Target", `"${target.ref}" names no product area, capability, zone, epic or feature`, now, PRD_SOURCE)]);
 }
 
 // ── Describe ─────────────────────────────────────────────────────────

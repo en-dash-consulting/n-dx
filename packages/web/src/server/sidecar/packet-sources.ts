@@ -61,6 +61,22 @@ export interface ZoneRead {
   unzoned: number;
 }
 
+/** One zone in full, for the Explain lens: what the analysis says it is. */
+export interface ZoneDetail {
+  /** The analysis stamp (`manifest.analyzedAt`). */
+  analyzedAt: string;
+  id: string;
+  name: string;
+  description: string;
+  cohesion: number;
+  coupling: number;
+  fileCount: number;
+  /** A bounded sample, in analysis order. */
+  files: string[];
+  entryPoints: string[];
+  insights: string[];
+}
+
 export interface ResolvedSetting {
   key: string;
   value: unknown;
@@ -87,6 +103,8 @@ export interface PacketSources {
   prd(): Promise<PrdRead | null>;
   evidence(itemIds: string[]): Promise<EvidenceRead | null>;
   zones(files: string[]): Promise<ZoneRead | null>;
+  /** The zone `ref` names (id, name, or an id it was known by), or `null` when there is none or no analysis. */
+  zone(ref: string): Promise<ZoneDetail | null>;
   /** `ndx work --task=<id> --resolve`, parsed. */
   resolve(taskId: string): Promise<ResolveRead | null>;
   /** `ndx work --task=<id> --dry-run` output: the brief hench would send. */
@@ -102,6 +120,9 @@ export interface SpawnedReads {
 
 /** Most commits read for one packet; evidence is a sample, and the packet caps it again. */
 const MAX_EVIDENCE_COMMITS = 40;
+
+/** Most files, entry points and insights one zone read carries; the packet is a summary, not an inventory. */
+const ZONE_SAMPLE = 20;
 
 /** Most run records parsed for one packet, newest file first; older runs are not read. */
 const MAX_RUN_FILES = 200;
@@ -188,6 +209,30 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
       }
       summaries.sort((a, b) => b.matched - a.matched || a.id.localeCompare(b.id));
       return { analyzedAt: manifest.analyzedAt, zones: summaries, unzoned: wanted.size - zoned.size };
+    },
+
+    async zone(ref) {
+      const manifest = readJson<Manifest>(join(ctx.svDir, DATA_FILES.manifest));
+      const zones = readJson<Zones>(join(ctx.svDir, DATA_FILES.zones));
+      if (!manifest || !zones || !Array.isArray(zones.zones)) return null;
+      const wanted = ref.trim().toLowerCase();
+      const zone =
+        zones.zones.find((z) => z.id === ref) ??
+        zones.zones.find((z) => z.previousIds?.includes(ref)) ??
+        zones.zones.find((z) => z.name.toLowerCase() === wanted);
+      if (!zone) return null;
+      return {
+        analyzedAt: manifest.analyzedAt,
+        id: zone.id,
+        name: zone.name,
+        description: zone.description,
+        cohesion: zone.cohesion,
+        coupling: zone.coupling,
+        fileCount: zone.files.length,
+        files: zone.files.slice(0, ZONE_SAMPLE),
+        entryPoints: (zone.entryPoints ?? []).slice(0, ZONE_SAMPLE),
+        insights: (zone.insights ?? []).slice(0, 5),
+      };
     },
 
     resolve: (taskId) => spawned.resolve(taskId),
