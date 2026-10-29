@@ -37,6 +37,7 @@ import type {
   PreparedResolver,
   SourcePosition,
 } from "@n-dx/lang-runtime";
+import { innermostEach } from "@n-dx/lang-runtime";
 import { readTestArtifactGrants, type TestArtifactGrants } from "./java-test-artifacts.js";
 
 // ── Facts read from one file's captures ─────────────────────────────────────
@@ -51,6 +52,8 @@ interface JavaImport {
 /** A reference in code: a simple name (`Order`) or a dotted one (`java.util.List`, `Map.Entry`). */
 interface JavaReference {
   readonly segments: readonly string[];
+  readonly capture: Capture;
+  readonly owner?: string;
 }
 
 interface JavaFileFacts {
@@ -60,6 +63,7 @@ interface JavaFileFacts {
   readonly imports: readonly JavaImport[];
   /** Qualified names (without the package) of every type declared in the file, nested included. */
   readonly declared: readonly string[];
+  readonly heritage: readonly { readonly name: string; readonly bases: readonly string[][] }[];
   readonly references: readonly JavaReference[];
 }
 
@@ -188,6 +192,7 @@ function readFacts(file: PackSourceFile): JavaFileFacts {
 
   // Declarations arrive in document order, each immediately followed by its name.
   const declared: string[] = [];
+  const declarations: Array<{ span: Capture; name: string }> = [];
   const open: Array<{ readonly span: Capture; readonly qualified: string }> = [];
   const declCaptures = of("declarations");
   for (let i = 0; i + 1 < declCaptures.length; i++) {
@@ -198,10 +203,34 @@ function readFacts(file: PackSourceFile): JavaFileFacts {
     const parent = open[open.length - 1];
     const qualified = parent ? `${parent.qualified}.${name.text}` : name.text;
     declared.push(qualified);
+    declarations.push({ span, name: qualified });
     open.push({ span, qualified });
   }
 
-  return { path: file.path, pkg, imports, declared, references: readReferences(file) };
+  const typeRefs = of("type-references");
+  const bases = typeRefs.filter((c) => c.name === "typeref.extends" || c.name === "typeref.implements");
+  const baseOwners = innermostEach(declarations.map((d) => d.span), bases);
+  const nameOf = new Map(declarations.map((d) => [d.span, d.name]));
+  const inherited = new Map<string, string[][]>();
+  bases.forEach((base, i) => {
+    const owner = baseOwners[i];
+    const name = owner && nameOf.get(owner);
+    if (name) {
+      const list = inherited.get(name) ?? [];
+      list.push(dottedSegments(base.text));
+      inherited.set(name, list);
+    }
+  });
+  const references = readReferences(file);
+  const owners = innermostEach(declarations.map((d) => d.span), references.map((r) => r.capture));
+  return {
+    path: file.path, pkg, imports, declared,
+    heritage: declarations.map((d) => ({ name: d.name, bases: inherited.get(d.name) ?? [] })),
+    references: references.map((r, i) => {
+      const owner = owners[i] && nameOf.get(owners[i]!);
+      return { ...r, ...(owner ? { owner: pkg ? `${pkg}.${owner}` : owner } : {}) };
+    }),
+  };
 }
 
 function readReferences(file: PackSourceFile): JavaReference[] {
@@ -209,22 +238,22 @@ function readReferences(file: PackSourceFile): JavaReference[] {
   const qualified = typeRefs.filter((c) => c.name === "typeref.qualified");
   const outermost = outermostSpans(qualified);
 
-  const references: JavaReference[] = outermost.map((q) => ({ segments: dottedSegments(q.text) }));
+  const references: JavaReference[] = outermost.map((q) => ({ segments: dottedSegments(q.text), capture: q }));
   // Simple names inside a scoped name are its segments, already read above
   // (this also drops type arguments of a generic qualifier, `Outer<String>.Inner`).
   for (const c of typeRefs) {
     if (c.name === "typeref.name" && !insideAny(c, outermost)) {
-      references.push({ segments: [c.text] });
+      references.push({ segments: [c.text], capture: c });
     } else if (c.name === "typeref.annotation") {
-      references.push({ segments: dottedSegments(c.text) });
+      references.push({ segments: dottedSegments(c.text), capture: c });
     } else if (c.name === "typeref.qualifier" && startsWithCapital(c.text)) {
-      references.push({ segments: [c.text] });
+      references.push({ segments: [c.text], capture: c });
     }
   }
   // `Tax.rate()`: a capitalised bare receiver is taken as a type.
   for (const c of file.captures["calls"] ?? []) {
     if (c.name === "call.receiver" && c.nodeType === "identifier" && startsWithCapital(c.text)) {
-      references.push({ segments: [c.text] });
+      references.push({ segments: [c.text], capture: c });
     }
   }
   return references.filter((r) => r.segments.length > 0);
@@ -286,6 +315,8 @@ interface JavaIndex {
   readonly locations: ReadonlyMap<string, SourceLocation>;
   /** Other modules' test sets each module's tests see, from the build files. */
   readonly testGrants: TestArtifactGrants;
+  /** Qualified type → its directly declared project supertypes. */
+  readonly bases: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 function buildIndex(facts: readonly JavaFileFacts[], testGrants: TestArtifactGrants): JavaIndex {
@@ -302,7 +333,34 @@ function buildIndex(facts: readonly JavaFileFacts[], testGrants: TestArtifactGra
       if (!name.includes(".")) topLevel.add(`${file.pkg}\0${name}`, file.path);
     }
   }
-  return { types, topLevel, packages, locations, testGrants };
+  const bases = new Map<string, Set<string>>();
+  for (const file of facts) {
+    for (const declaration of file.heritage) {
+      const owner = file.pkg ? `${file.pkg}.${declaration.name}` : declaration.name;
+      const direct = bases.get(owner) ?? new Set<string>();
+      for (const segments of declaration.bases) {
+        const head = segments[0]!;
+        const single = file.imports.find((i) => !i.isWildcard && !i.isStatic && i.name.split(".").at(-1) === head);
+        const enclosing = declaration.name.split(".").slice(0, -1);
+        const lexical: string[] = [];
+        while (enclosing.length > 0) {
+          lexical.push([file.pkg, ...enclosing, ...segments].filter(Boolean).join("."));
+          enclosing.pop();
+        }
+        const candidates = [
+          ...lexical,
+          ...(single ? [[single.name, ...segments.slice(1)].join(".")] : []),
+          file.pkg ? `${file.pkg}.${segments.join(".")}` : segments.join("."),
+          ...(segments.length > 1 ? [segments.join(".")] : []),
+          ...file.imports.filter((i) => i.isWildcard && !i.isStatic).map((i) => `${i.name}.${segments.join(".")}`),
+        ];
+        const found = candidates.find((name) => types.has(name));
+        if (found) direct.add(found);
+      }
+      bases.set(owner, direct);
+    }
+  }
+  return { types, topLevel, packages, locations, testGrants, bases };
 }
 
 /**
@@ -392,13 +450,20 @@ const JDK_JAVAX_PACKAGES = [
 /** Java EE packages nested under a {@link JDK_JAVAX_PACKAGES} root: JASPIC and JSR 77. */
 const JAVA_EE_UNDER_JDK_ROOTS = ["javax.security.auth.message", "javax.management.j2ee"];
 
+/** Additional packages exported by JDK modules, rather than third-party com.sun artifacts. */
+const JDK_OTHER_PACKAGES = [
+  "org.w3c.dom", "org.xml.sax", "org.ietf.jgss", "com.sun.net.httpserver",
+  "com.sun.management", "com.sun.nio.sctp", "com.sun.security.auth", "com.sun.jdi",
+  "sun.misc", "sun.reflect",
+];
+
 const isUnder = (pkg: string, root: string): boolean => pkg === root || pkg.startsWith(`${root}.`);
 
 /** `java.*` and `jdk.*` (reserved to the JDK), `javax.xml`, and the {@link JDK_JAVAX_PACKAGES} and their subpackages. */
 function isJdkPackage(pkg: string): boolean {
   if (isUnder(pkg, "java") || isUnder(pkg, "jdk") || pkg === "javax.xml") return true;
   if (JAVA_EE_UNDER_JDK_ROOTS.some((root) => isUnder(pkg, root))) return false;
-  return JDK_JAVAX_PACKAGES.some((root) => isUnder(pkg, root));
+  return [...JDK_JAVAX_PACKAGES, ...JDK_OTHER_PACKAGES].some((root) => isUnder(pkg, root));
 }
 
 /** `java.util` → `java:stdlib:java.util`, `org.acme` → `java:org.acme`. */
@@ -418,10 +483,13 @@ class Collector {
   ) {}
 
   /** Narrowed before `self` is dropped, so a declaration in this file shadows a duplicate elsewhere. */
-  file(candidates: ReadonlySet<string>, symbol: string): void {
+  file(candidates: ReadonlySet<string>, symbol: string): boolean {
+    let visible = false;
     for (const path of visibleCandidates(this.index, this.self, candidates)) {
+      visible = true;
       if (path !== this.self) this.files.add(path, symbol);
     }
+    return visible;
   }
 
   /** A package the project declares is never external, even when the type is missing (e.g. generated at build time). */
@@ -460,30 +528,48 @@ function resolveFile(index: JavaIndex, file: JavaFileFacts): FileReferences {
   }
 
   /** Resolve a simple name; true when it named something (in the project or not). */
-  const resolveSimple = (name: string): boolean => {
+  const inherited = new Map<string, ReadonlySet<string>>();
+  const inheritedFiles = (owner: string, name: string): ReadonlySet<string> => {
+    const key = `${owner}\0${name}`;
+    const cached = inherited.get(key);
+    if (cached) return cached;
+    const seen = new Set<string>([owner]);
+    let next = [...(index.bases.get(owner) ?? [])];
+    const found = new Set<string>();
+    while (next.length > 0 && found.size === 0) {
+      const following: string[] = [];
+      for (const base of next) {
+        if (seen.has(base)) continue;
+        seen.add(base);
+        for (const path of index.types.get(`${base}.${name}`) ?? []) found.add(path);
+        following.push(...(index.bases.get(base) ?? []));
+      }
+      next = following;
+    }
+    inherited.set(key, found);
+    return found;
+  };
+  const resolveSimple = (name: string, owner?: string): boolean => {
     if (declaredHere.has(name)) return true;
+    if (owner && out.file(inheritedFiles(owner, name), name)) return true;
     // Single-type imports were recorded above, whether resolved or external.
     if (singles.has(name)) return true;
     const samePackage = index.topLevel.get(`${file.pkg}\0${name}`);
-    if (samePackage) {
-      out.file(samePackage, name);
-      return true;
-    }
+    if (samePackage && out.file(samePackage, name)) return true;
     let found = false;
     for (const segments of wildcards) {
       const prefix = segments.join(".");
       const files = index.types.has(prefix) ? index.types.get(`${prefix}.${name}`) : index.topLevel.get(`${prefix}\0${name}`);
       if (files) {
-        out.file(files, name);
-        found = true;
+        found = out.file(files, name) || found;
       }
     }
     return found;
   };
 
-  for (const { segments } of file.references) {
+  for (const { segments, owner } of file.references) {
     const head = segments[0]!;
-    if (resolveSimple(head) || segments.length === 1) continue;
+    if (resolveSimple(head, owner) || segments.length === 1) continue;
     // Fully qualified: `com.example.model.Customer`, `java.time.Instant`.
     const found = longestType(index, segments);
     if (found) out.file(found.files, segments[found.length - 1]!);

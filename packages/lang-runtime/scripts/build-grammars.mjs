@@ -183,8 +183,8 @@ function sha256(bytes) {
 }
 
 /** Download `url` once into the cache, refusing bytes whose SHA-256 differs from `expected`. */
-async function fetchVerified(url, expected, cacheName) {
-  const cached = join(CACHE_DIR, cacheName);
+async function fetchVerified(url, expected, cacheName, cacheDir = CACHE_DIR) {
+  const cached = join(cacheDir, cacheName);
   if (existsSync(cached)) {
     const bytes = readFileSync(cached);
     if (sha256(bytes) === expected) return bytes;
@@ -197,7 +197,7 @@ async function fetchVerified(url, expected, cacheName) {
   if (actual !== expected) {
     throw new Error(`Checksum mismatch for ${url}\n  expected ${expected}\n  actual   ${actual}`);
   }
-  mkdirSync(CACHE_DIR, { recursive: true });
+  mkdirSync(cacheDir, { recursive: true });
   writeFileSync(cached, bytes);
   return bytes;
 }
@@ -223,25 +223,28 @@ async function installCli() {
  * `tar`, as the CLI does: the archives hold symlinks (`bin/clang`) and are too
  * large to unpack in memory.
  */
-async function installToolchain(name, cliKey) {
+export async function installToolchain(name, cliKey, cacheDir = CACHE_DIR) {
   const platform = TOOLCHAIN_PLATFORM[cliKey];
   if (!platform) throw new Error(`tree-sitter cannot build WASM on ${process.platform}/${process.arch}: it has no wasi-sdk for it`);
   const { version, sha256: pins, url } = WASM_TOOLCHAIN[name];
   const expected = pins[platform];
   const base = `${name}-${version}-${platform}`;
   const archive = `${base}.tar.gz`;
-  await fetchVerified(url(version, platform), expected, archive);
-
-  const dir = join(CACHE_DIR, base);
+  const dir = join(cacheDir, base);
   const marker = join(dir, ".n-dx-sha256");
-  if (existsSync(marker) && readFileSync(marker, "utf8") === expected) return dir;
+  if (existsSync(marker) && readFileSync(marker, "utf8") === expected) {
+    rmSync(join(cacheDir, archive), { force: true });
+    return dir;
+  }
+  await fetchVerified(url(version, platform), expected, archive, cacheDir);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   // Paths relative to the cache: GNU tar on Windows reads `C:...` as a remote host.
-  const extracted = spawnSync("tar", ["-xzf", archive, "--strip-components=1", "-C", base], { cwd: CACHE_DIR, stdio: "inherit" });
+  const extracted = spawnSync("tar", ["-xzf", archive, "--strip-components=1", "-C", base], { cwd: cacheDir, stdio: "inherit" });
   if (extracted.error) throw extracted.error;
   if (extracted.status !== 0) throw new Error(`tar failed to extract ${archive} (exit ${extracted.status})`);
   writeFileSync(marker, expected);
+  rmSync(join(cacheDir, archive), { force: true });
   return dir;
 }
 
