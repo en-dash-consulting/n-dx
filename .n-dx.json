@@ -311,6 +311,10 @@
       {
         "paths": [".claude/skills/iso-map/scripts/iso-map.mjs"],
         "command": ["node", "scripts/build-iso-skill.mjs"]
+      },
+      {
+        "paths": ["pnpm-lock.yaml"],
+        "command": ["pnpm", "install", "--lockfile-only"]
       }
     ]
   },

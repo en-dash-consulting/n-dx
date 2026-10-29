@@ -55,7 +55,14 @@ items:
     lastModified: "2026-10-29T17:30:03.900Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ddb6a3b7-e44f-43b6-8291-8f88de0916bd":
-    lastModified: "2026-10-29T17:33:31.311Z"
+    status: "completed"
+    startedAt: "2026-10-29T17:33:44.137Z"
+    completedAt: "2026-10-29T17:41:32.789Z"
+    endedAt: "2026-10-29T17:41:32.789Z"
+    activeIntervals: [{"end":"2026-10-29T17:41:32.789Z","start":"2026-10-29T17:33:44.137Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "allowlist-union requires list entries on both sides; lockfiles never union; pnpm-lock.yaml declared generated; viewer caps other worktrees at 3."
+    lastModified: "2026-10-29T17:41:32.789Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f2c90a0d-ac38-4bdf-9bfb-45fe667160ec":
     lastModified: "2026-10-29T17:26:29.477Z"

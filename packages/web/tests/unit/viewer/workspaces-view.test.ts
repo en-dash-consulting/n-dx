@@ -559,7 +559,11 @@ const HEALTH_FEATURE: BranchHealthResponse = {
   conflicts: [
     {
       path: "src/a.ts", stages: [1, 2, 3], class: "source", reason: "A side removes or changes a line.",
-      fix: null, otherWorktrees: [{ path: "/repo-other", branch: "feat/other" }],
+      fix: null,
+      otherWorktrees: [
+        { path: "/repo-other", branch: "feat/other" },
+        ...[2, 3, 4, 5].map((n) => ({ path: `/repo-${n}`, branch: `feat/${n}` })),
+      ],
     },
     {
       path: "allow.txt", stages: [1, 2, 3], class: "allowlist-union", reason: "Every conflict only adds lines.",
@@ -699,7 +703,9 @@ describe("WorkspacesView branch health strip", () => {
     // Each conflict: class, reason, then its fix — steps copyable, diffs collapsed, source none.
     const conflicts = [...cards[1].querySelectorAll(".branch-health-conflict")];
     expect(conflicts.map((li) => li.querySelector(".branch-health-class")!.textContent)).toEqual(["source", "allowlist-union", "generated"]);
-    expect(conflicts[0].textContent).toContain("Also changed in: feat/other (/repo-other)");
+    // At most three other worktrees are named; the rest are counted.
+    expect(conflicts[0].textContent).toContain("Also changed in: feat/other (/repo-other), feat/2 (/repo-2), feat/3 (/repo-3) and 2 more");
+    expect(conflicts[0].textContent).not.toContain("feat/4");
     expect(conflicts[0].querySelector(".branch-health-steps, details")).toBeNull();
     const diff = conflicts[1].querySelector("details")!;
     expect(diff.open).toBe(false);

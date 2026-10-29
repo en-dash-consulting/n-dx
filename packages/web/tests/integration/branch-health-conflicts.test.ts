@@ -124,18 +124,34 @@ describe("prd-children-table on a real v1 tree", () => {
 });
 
 describe("allowlist-union on a real merge", () => {
-  it("applies to this branch's copy and keeps both additions, ours first, writing nothing itself", async () => {
-    write("allow.txt", "alpha\nomega\n");
+  // The shape of route-feature-gates.test.ts: both sides add one row after the same line.
+  const gates = (...rows: string[]) => [
+    "const GATED: ReadonlyArray<[path: string, feature: string]> = [",
+    '  ["/api/rex/capture-ask", "sourcevision.ask"],',
+    ...rows,
+    "];",
+    "",
+  ].join("\n");
+  const FEAT_ROW = '  ["/api/branch-health", "git.branchHealth"],';
+  const MAIN_ROW = '  ["/api/hench/plan-queue", "hench.readyNext"],';
+
+  /** Commit `start` on main, `feat` on a feat branch, `main` on main, and leave feat checked out. */
+  function diverge(file: string, start: string, feat: string, main: string): void {
+    write(file, start);
     commitAll("base");
     publishMain();
     git("checkout", "-q", "-b", "feat");
-    write("allow.txt", "alpha\nfrom-feat\nomega\n");
+    write(file, feat);
     commitAll("feat adds");
     git("checkout", "-q", "main");
-    write("allow.txt", "alpha\nfrom-main\nomega\n");
+    write(file, main);
     commitAll("main adds");
     publishMain();
     git("checkout", "-q", "feat");
+  }
+
+  it("applies to this branch's copy and keeps both rows, ours first, writing nothing itself", async () => {
+    diverge("gates.test.ts", gates(), gates(FEAT_ROW), gates(MAIN_ROW));
 
     const status = git("status", "--porcelain");
     const gitCalls: string[][] = [];
@@ -153,11 +169,18 @@ describe("allowlist-union on a real merge", () => {
     expect(gitCalls.some((args) => args.includes("worktree"))).toBe(false);
 
     mergeBase();
-    runSteps([["git", "checkout", "--ours", "--", "allow.txt"]]);
+    runSteps([["git", "checkout", "--ours", "--", "gates.test.ts"]]);
     const patch = join(root, "fix.diff");
     writeFileSync(patch, (conflict.fix as { diff: string }).diff);
     runSteps([["git", "apply", patch]]);
-    expect(readFileSync(join(repo, "allow.txt"), "utf-8")).toBe("alpha\nfrom-feat\nfrom-main\nomega\n");
+    expect(readFileSync(join(repo, "gates.test.ts"), "utf-8")).toBe(gates(FEAT_ROW, MAIN_ROW));
+  });
+
+  it("is source when both sides add a code block", async () => {
+    const fn = (name: string) => [`export function ${name}() {`, "  return 1;", "}"].join("\n");
+    diverge("code.ts", "// start\n// end\n", `// start\n${fn("feat")}\n// end\n`, `// start\n${fn("main")}\n// end\n`);
+    const [conflict] = await predict();
+    expect(conflict).toMatchObject({ path: "code.ts", class: "source", fix: null });
   });
 
   it("is source when a side changes a base line", async () => {

@@ -19,7 +19,7 @@
  * | prd-state          | a v2 `state.yaml` while `merge.rex-state.driver` is unset     |
  * | duplicate-capture  | add/add on a PRD item file, same title, different ids          |
  * | prd-children-table | a v1 `prd_tree` `index.md`, every hunk inside `## Children`   |
- * | allowlist-union    | every hunk only adds lines on both sides                      |
+ * | allowlist-union    | every hunk only adds list entries on both sides; no lockfile  |
  * | source             | everything else                                               |
  *
  * @module web/server/branch-health/conflicts
@@ -153,11 +153,19 @@ function decide(c: ConflictSides, ctx: ConflictContext): Verdict {
     return source("A PRD index.md conflict outside its ## Children table changes the item itself.");
   }
 
-  if (hunks && hunks.length > 0 && c.stages.includes(1) && c.branch !== null && hunks.every((h) => h.ancestor !== null && h.ancestor.length === 0)) {
+  if (LOCKFILES.has(basename(c.path))) {
+    return source("A lockfile is regenerated, never unioned: declare it in web.generatedFiles with its install command to get a fix.");
+  }
+
+  const addsOnly = hunks !== null && hunks.length > 0 && hunks.every((h) => h.ancestor !== null && h.ancestor.length === 0);
+  if (addsOnly && c.stages.includes(1) && c.branch !== null) {
+    if (!hunks.every((h) => listEntries(h.base) && listEntries(h.branch))) {
+      return source("Both sides add lines here, but not only list entries: unioning code or mappings is a person's call.");
+    }
     const union = unionResult(c.result!);
     return {
       class: "allowlist-union",
-      reason: "Every conflict only adds lines on both sides: keep both, this branch's lines first.",
+      reason: "Both sides only add list entries: keep both, this branch's entries first.",
       fix: { diff: unifiedDiff(c.path, c.branch, union) },
     };
   }
@@ -166,6 +174,43 @@ function decide(c: ConflictSides, ctx: ConflictContext): Verdict {
     return source("The conflicted result has no ancestor section, so whether a side removed lines cannot be told.");
   }
   return source(sourceReason(c, hunks));
+}
+
+const LOCKFILES = new Set(["pnpm-lock.yaml", "package-lock.json", "yarn.lock"]);
+
+function basename(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+
+/** A YAML `- ` item whose value is a scalar, not a `key: value` mapping. */
+const YAML_ITEM = /^- (?!\S*:(?:\s|$))\S.*$/;
+/** A quoted string, optionally followed by a comma. */
+const QUOTED = /^(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\$]|\\.)*`),?$/;
+/** A one-line bracketed array or object element, optionally followed by a comma. */
+const BRACKETED = /^(?:\[.*\]|\{.*\}),?$/;
+/** A JSON number or literal element. */
+const LITERAL = /^(?:-?\d+(?:\.\d+)?|true|false|null),?$/;
+
+/**
+ * Whether the lines one side adds are list entries only: each non-blank line
+ * a YAML `- ` item, a quoted string, a number or literal, or a one-line
+ * bracketed element; or, all together, a run of JSON array elements (a
+ * multi-line object entry such as child-process-allowlist.json's).
+ */
+export function listEntries(lines: readonly string[]): boolean {
+  const entries = lines.map((l) => l.trim()).filter((l) => l !== "");
+  if (entries.length === 0) return true;
+  if (entries.every((l) => YAML_ITEM.test(l) || QUOTED.test(l) || BRACKETED.test(l) || LITERAL.test(l))) return true;
+  return jsonElements(entries.join("\n"));
+}
+
+function jsonElements(text: string): boolean {
+  if (!/^[[{"]/.test(text)) return false;
+  try {
+    return Array.isArray(JSON.parse(`[${text.replace(/,\s*$/, "")}]`));
+  } catch {
+    return false;
+  }
 }
 
 /** A v1 index.md up to its `## Children` heading: the frontmatter and anything else the item holds. */

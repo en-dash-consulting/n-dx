@@ -138,6 +138,9 @@ const BASE_SOURCE_LABEL: Record<NonNullable<BranchHealthResponse["baseSource"]>,
   default: "origin's default branch",
 };
 
+/** Other worktrees named per source conflict; the rest are counted, and the API keeps them all. */
+const OTHER_WORKTREES_SHOWN = 3;
+
 const STAGE_LABEL: Record<number, string> = { 1: "ancestor", 2: "base", 3: "this branch" };
 
 /** An argv as a command a POSIX shell reads back as the same argv. */
@@ -148,11 +151,14 @@ export function shellCommand(argv: readonly string[]): string {
 function ConflictFix({ conflict }: { conflict: BranchHealthConflict }) {
   const { fix } = conflict;
   if (!fix) {
-    return conflict.otherWorktrees.length > 0
+    const others = conflict.otherWorktrees;
+    const shown = others.slice(0, OTHER_WORKTREES_SHOWN);
+    return others.length > 0
       ? h("p", { class: "branch-health-line" },
           "Also changed in: ",
-          conflict.otherWorktrees.map((w, i) => h("span", { key: w.path },
+          shown.map((w, i) => h("span", { key: w.path },
             i > 0 ? ", " : "", h("code", null, w.branch), ` (${w.path})`)),
+          others.length > shown.length ? ` and ${others.length - shown.length} more` : "",
         )
       : null;
   }

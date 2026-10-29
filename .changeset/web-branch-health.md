@@ -9,8 +9,8 @@ Each predicted conflict is classified by fixed rules and carries a fix that a pe
 - `prd-children-table` (a v1 PRD `index.md` whose conflicts are all `## Children` rows): `git checkout --ours`, `rex validate --post-merge --repair`, `git add`, `rex validate`.
 - `prd-state` (a v2 `state.yaml` while the rex-state merge driver is unregistered): register the driver and redo that file's merge.
 - `duplicate-capture` (both sides added the same PRD item under different ids): keep the base's id.
-- `allowlist-union` (both sides only added lines): a unified diff holding both additions, this branch's first.
+- `allowlist-union` (both sides only added list entries: YAML `- ` items, quoted strings, one-line array rows or JSON array elements; never a lockfile, and an added code block or mapping is `source`): a unified diff holding both additions, this branch's first.
 - `generated` (a path in the new `web.generatedFiles` setting, `[{ paths, command }]`): take the base's copy, run the declared command, `git add`, after every other fix.
-- `source` (everything else): no fix; names the other local worktrees whose branch changed the same file.
+- `source` (everything else): no fix; names the other local worktrees whose branch changed the same file (the card shows three and counts the rest).
 
 A new experimental toggle, `git.branchHealth` (off by default), adds a health strip to each Workspaces card that expands to the full status, listing each conflicted file with its class and fix: steps as copyable commands, diffs collapsed. The board reads local facts on open and asks GitHub only when a card is expanded. While the toggle is off the endpoint refuses with 403 and the cards are unchanged.

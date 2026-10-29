@@ -146,11 +146,11 @@ describe("duplicate-capture", () => {
 
 describe("allowlist-union", () => {
   const ancestor = "one\ntwo\nthree\n";
-  const branch = "one\ntwo\nfrom-branch\nthree\n";
-  const result = ["one", "two", ...hunk(["from-base"], [], ["from-branch"]), "three", ""].join("\n");
+  const branch = "one\ntwo\n\"from-branch\",\nthree\n";
+  const result = ["one", "two", ...hunk(['"from-base",'], [], ['"from-branch",']), "three", ""].join("\n");
 
-  it("offers this branch's lines then the base's, as a diff against this branch's copy", () => {
-    const c = only(sides("allow.txt", { ancestor, base: "one\ntwo\nfrom-base\nthree\n", branch, result }));
+  it("offers this branch's entries then the base's, as a diff against this branch's copy", () => {
+    const c = only(sides("allow.txt", { ancestor, base: "one\ntwo\n\"from-base\",\nthree\n", branch, result }));
     expect(c.class).toBe("allowlist-union");
     expect(c.fix).toEqual({
       diff: [
@@ -159,12 +159,48 @@ describe("allowlist-union", () => {
         "@@ -1,4 +1,5 @@",
         " one",
         " two",
-        " from-branch",
-        "+from-base",
+        " \"from-branch\",",
+        "+\"from-base\",",
         " three",
         "",
       ].join("\n"),
     });
+  });
+
+  /** Both sides add `base` and `branch` lines after `anchor`, ancestor intact. */
+  const adds = (path: string, baseLines: string[], branchLines: string[]) => only(sides(path, {
+    ancestor: "anchor\nend\n",
+    branch: ["anchor", ...branchLines, "end", ""].join("\n"),
+    result: ["anchor", ...hunk(baseLines, [], branchLines), "end", ""].join("\n"),
+  }));
+
+  it("is union when every added line is one list entry", () => {
+    expect(adds("gates.test.ts", ['  ["/api/b", "web.b"],'], ['  ["/api/a", "web.a"],']).class).toBe("allowlist-union");
+    expect(adds("list.yaml", ["  - beta"], ["  - alpha", "  - 'gamma'"]).class).toBe("allowlist-union");
+    expect(adds("ids.ts", ["  'b',", "  2,"], ["  `a`,", "  { id: 1 },"]).class).toBe("allowlist-union");
+  });
+
+  it("is union for multi-line JSON array elements, as in child-process-allowlist.json", () => {
+    const entry = (p: string) => ["    {", `      "path": "${p}",`, '      "reason": "x"', "    },"];
+    expect(adds("allow.json", entry("b.js"), entry("a.js")).class).toBe("allowlist-union");
+  });
+
+  it("is source when a side adds a code block, a function or a mapping", () => {
+    const fn = ["function added() {", "  return 1;", "}"];
+    expect(adds("a.ts", ["const b = 2;"], fn)).toMatchObject({ class: "source", fix: null });
+    expect(adds("a.ts", ['"b",'], ["if (x) {", "  y();", "}"]).class).toBe("source");
+    expect(adds("c.yaml", ["  - beta"], ["  key: value"]).class).toBe("source");
+    expect(adds("c.yaml", ["  - beta"], ["  - name: x"]).class).toBe("source");
+    expect(adds("c.json", ['"b",'], ['  "key": "value",']).class).toBe("source");
+    expect(adds("c.json", ['"b",'], ["plain words"]).reason).toMatch(/list entries/);
+  });
+
+  it("is never union for a lockfile, which is source without a generatedFiles entry", () => {
+    for (const path of ["pnpm-lock.yaml", "packages/x/package-lock.json", "yarn.lock"]) {
+      const c = adds(path, ["  - beta"], ["  - alpha"]);
+      expect(c).toMatchObject({ class: "source", fix: null });
+      expect(c.reason).toMatch(/lockfile/);
+    }
   });
 
   it("is source when a hunk removes or changes an ancestor line", () => {
@@ -231,6 +267,7 @@ describe("generated", () => {
     expect(commandFor("docs/analysis/prompt-token-baseline.json")).toEqual(["node", "scripts/prompt-census.mjs", "--write"]);
     expect(commandFor("docs/analysis/prompt-token-baseline.md")).toEqual(["node", "scripts/prompt-census.mjs", "--write"]);
     expect(commandFor(".claude/skills/iso-map/scripts/iso-map.mjs")).toEqual(["node", "scripts/build-iso-skill.mjs"]);
+    expect(commandFor("pnpm-lock.yaml")).toEqual(["pnpm", "install", "--lockfile-only"]);
   });
 });
 
@@ -249,6 +286,11 @@ describe("source", () => {
     });
     expect(c.class).toBe("source");
     expect(c.otherWorktrees).toEqual([{ path: "/w/one", branch: "feat/one" }]);
+  });
+
+  it("keeps every other worktree, however many; the viewer caps what it shows", () => {
+    const worktrees = Array.from({ length: 15 }, (_, i) => ({ path: `/w/${i}`, branch: `feat/${i}`, changed: ["src/a.ts"] }));
+    expect(only(sides("src/a.ts", { result: changed }), { ...NO_CONFIG, worktrees }).otherWorktrees).toHaveLength(15);
   });
 
   it("explains deletes and binaries", () => {

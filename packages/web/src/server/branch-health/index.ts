@@ -23,6 +23,7 @@ export {
   classifyConflicts,
   frontmatter,
   globToRegExp,
+  listEntries,
   parseConflictHunks,
   parseGeneratedFiles,
   REX_STATE_DRIVER,
