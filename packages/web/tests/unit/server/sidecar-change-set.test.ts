@@ -232,10 +232,14 @@ describe("on a v1 PRD", () => {
       timer = setImmediate(tick);
     };
     let timer = setImmediate(tick);
-    const result = await reviewChangeSet(ctx.rexDir, {
-      items: [{ title: "Checkout hardening" }, { title: "Something unrelated entirely", parent: 0 }],
-    });
-    clearImmediate(timer);
+    let result: Awaited<ReturnType<typeof reviewChangeSet>>;
+    try {
+      result = await reviewChangeSet(ctx.rexDir, {
+        items: [{ title: "Checkout hardening" }, { title: "Something unrelated entirely", parent: 0 }],
+      });
+    } finally {
+      clearImmediate(timer);
+    }
     const scans = order.flatMap((entry, i) => (entry === "scan" ? [i] : []));
     expect(scans).toHaveLength(2);
     expect(order.slice(scans[0], scans[1])).toContain("other work");

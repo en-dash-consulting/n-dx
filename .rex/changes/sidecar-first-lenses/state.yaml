@@ -43,8 +43,12 @@ items:
     lastModified: "2026-10-29T00:34:23.041Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d4f33bf0-b520-43d8-962e-c2269bbf7b39":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-10-29T00:58:33.195Z"
-    activeIntervals: [{"start":"2026-10-29T00:58:33.195Z"}]
-    lastModified: "2026-10-29T00:58:33.751Z"
+    completedAt: "2026-10-29T01:02:11.950Z"
+    endedAt: "2026-10-29T01:02:11.950Z"
+    activeIntervals: [{"end":"2026-10-29T01:02:11.950Z","start":"2026-10-29T00:58:33.195Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "reviewChangeSet awaits setImmediate before each item's duplicate scan; matcher unchanged. Ordering test spies on findDuplicateItem and asserts event-loop work runs between scans."
+    lastModified: "2026-10-29T01:02:11.950Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
