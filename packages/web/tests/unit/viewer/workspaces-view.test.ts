@@ -656,6 +656,32 @@ describe("WorkspacesView branch health strip", () => {
     expect(details).toContain("architecture-policy.test.js failed");
   });
 
+  it("shows a neutral note, not an error, when a worktree's own toggle is off", async () => {
+    // The anchor's toggle is on, but the branch worktree's tracked .n-dx.json
+    // still has it off, so the route gate there answers feature_disabled.
+    const { fetcher } = withToggle(true);
+    const wrapped = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const workspace = new Headers(init?.headers).get("X-Ndx-Workspace");
+      if (String(input) === "/api/branch-health" && workspace === "feature") {
+        await fetcher(input, init);
+        return jsonResponse({
+          error: 'The feature "git.branchHealth" is turned off for this project, so /api/branch-health refused the request.',
+          feature: "git.branchHealth",
+          kind: "feature_disabled",
+          suggestion: "Enable git.branchHealth in the feature flags on the Project settings page, or set features.git.branchHealth to true in .n-dx.json.",
+        }, 403);
+      }
+      return fetcher(input, init);
+    }) as typeof fetch;
+    root = await mount(h(WorkspacesView, { fetcher: wrapped, socketFactory: makeSocket().factory }));
+    await settle();
+
+    const card = root.querySelectorAll(".workspace-card")[1];
+    expect(card.querySelector(".branch-health-error")).toBeNull();
+    const note = card.querySelector(".branch-health-off")!;
+    expect(note.textContent).toBe("Branch health is off in this worktree (git.branchHealth in its .n-dx.json).");
+  });
+
   it("re-reads a card's branch health when a run in that worktree finishes", async () => {
     const { fetcher, calls } = withToggle(true);
     let branchTree = BRANCH_TREE;

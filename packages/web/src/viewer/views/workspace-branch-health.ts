@@ -6,7 +6,8 @@
  * `GET /api/branch-health`. The strip fetches for its own card's workspace by
  * header, like every other per-workspace read on the board, and only while
  * the toggle is on: with it off the card renders exactly as before and the
- * endpoint is never asked.
+ * endpoint is never asked. A worktree whose own `.n-dx.json` still has the
+ * toggle off answers 403 `feature_disabled`; its card shows a neutral note.
  *
  * @module web/viewer/views/workspace-branch-health
  */
@@ -188,6 +189,7 @@ export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
 }) {
   const [health, setHealth] = useState<BranchHealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [off, setOff] = useState(false);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -195,8 +197,12 @@ export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
     void (async () => {
       try {
         const res = await doFetch("/api/branch-health");
-        const body = (await res.json()) as BranchHealthResponse & { error?: string };
+        const body = (await res.json()) as BranchHealthResponse & { error?: string; kind?: string };
         if (!live) return;
+        // The route gate reads the addressed worktree's own (tracked)
+        // .n-dx.json, so a branch worktree can have the toggle off while the
+        // board's is on. That is a setting, not a failure.
+        setOff(res.status === 403 && body.kind === "feature_disabled");
         if (!res.ok) {
           setError(body.error ?? `Branch health failed (${res.status})`);
           setHealth(null);
@@ -213,6 +219,10 @@ export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
     };
   }, [workspace, branch, revision, doFetch]);
 
+  if (off) {
+    return h("p", { class: "branch-health-strip branch-health-off" },
+      `Branch health is off in this worktree (${BRANCH_HEALTH_FEATURE} in its .n-dx.json).`);
+  }
   if (error) return h("p", { class: "branch-health-strip branch-health-error" }, error);
   if (!health) return h("p", { class: "branch-health-strip branch-health-loading" }, "Reading branch health…");
 

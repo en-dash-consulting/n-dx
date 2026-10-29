@@ -149,6 +149,15 @@ model: the data the Sidecar's Diagnose branch lens and the hub narrate later.
 The Workspaces board asks it once per card, by header, while `git.branchHealth`
 is on; the route gate refuses it with 403 while the toggle is off.
 
+- **The toggle is per worktree.** The board reads `git.branchHealth` from its
+  own workspace, but the gate reads the addressed worktree's `.n-dx.json`,
+  which is tracked, so each worktree has its own copy. With the anchor's toggle
+  on and a branch worktree's still off, that card answers 403
+  `feature_disabled` and shows a neutral "off in this worktree" note, not an
+  error. Enable the flag in that worktree (or merge the `.n-dx.json` change
+  into its branch) to see its strip. The gate is not widened to follow the
+  viewer's toggle: it always reads the project the request addresses.
+
 - **Local facts need no network.** Branch, head, base, ahead/behind
   (`rev-list --left-right --count`), predicted conflicts and stack containment
   come from git alone, so the strip still answers offline.
