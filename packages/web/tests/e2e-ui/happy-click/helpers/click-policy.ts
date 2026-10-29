@@ -67,6 +67,9 @@ export const DENY_NAME: RegExp[] = [
   /^set failing/i,
   /^i understand/i,
   /^clear all$/i,
+  // PRD status picker options: the name is the icon, the label and, on the
+  // current status, a check mark. Each one writes the item's status.
+  /^\S \s*(pending|in progress|completed|failing|blocked|deferred|deleted)( ✓)?$/i,
   // Leaves the page or the browser sandbox.
   /^copy/i,
   /^download/i,
@@ -110,6 +113,7 @@ export const DENY_CLASS: string[] = [
   "cp-place",
   "cp-propose-btn",
   "cp-propose-next",
+  "prd-status-picker-option",
 ];
 
 export interface ControlIdentity {
