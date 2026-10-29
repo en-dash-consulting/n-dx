@@ -23,8 +23,15 @@ items:
     lastModified: "2026-10-13T19:10:21.974Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "90612f02-b6e2-48be-bd17-97ab0541461f":
-    lastModified: "2026-10-13T19:10:44.982Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-27T23:44:53.681Z"
+    completedAt: "2026-10-27T23:44:53.681Z"
+    endedAt: "2026-10-27T23:44:53.681Z"
+    activeIntervals: [{"end":"2026-10-27T23:44:53.681Z","start":"2026-10-27T23:44:53.681Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Each manual spec's afterAll now guards cleanup on project and the stop/attach steps on dashboard separately, honouring NDX_E2E_KEEP_FIXTURE. Typecheck and manual spec discovery pass."
+    lastModified: "2026-10-27T23:44:53.681Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "946e2ae1-8a5c-4aa4-ba80-ffb1bd2782e0":
     lastModified: "2026-10-13T19:10:27.446Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
