@@ -355,6 +355,34 @@ describe("Describe", () => {
     expect(text).not.toContain("Not available: the dry run");
   });
 
+  it("starts the resolve and dry-run reads together, before either answers", async () => {
+    const started: string[] = [];
+    const answers: Record<string, (value: never) => void> = {};
+    const sources = await sourcesFor("v2", {
+      resolve: () => new Promise((done) => { started.push("resolve"); answers.resolve = done as (v: never) => void; }),
+      preview: () => new Promise((done) => { started.push("preview"); answers.preview = done as (v: never) => void; }),
+    });
+    const building = buildDescribePacket(sources, { ref: CHANGE_TASK }, NOW);
+    // Let the builder run until it waits on its reads.
+    for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
+    expect(started.sort()).toEqual(["preview", "resolve"]);
+
+    answers.resolve!(null as never);
+    answers.preview!("# Task brief\n" as never);
+    expect((await building).text).toContain("## Brief preview digest");
+  });
+
+  it("hands its AbortSignal to both reads", async () => {
+    const seen: Array<AbortSignal | undefined> = [];
+    const sources = await sourcesFor("v2", {
+      resolve: async (_id, signal) => { seen.push(signal); return null; },
+      preview: async (_id, signal) => { seen.push(signal); return null; },
+    });
+    const controller = new AbortController();
+    await buildDescribePacket(sources, { ref: CHANGE_TASK }, NOW, controller.signal);
+    expect(seen).toEqual([controller.signal, controller.signal]);
+  });
+
   it("marks each failed Prepare read unavailable and still builds the packet", async () => {
     const down = await sourcesFor("v2", { resolve: async () => null, preview: async () => null });
     const text = (await buildDescribePacket(down, { ref: CHANGE_TASK }, NOW)).text;
@@ -437,8 +465,8 @@ describe("lens registry", () => {
     const resolveRead = vi.fn(async () => null);
     const previewRead = vi.fn(async () => null);
     await buildLensPacket("describe", { ref: CHANGE_TASK }, await sourcesFor("v2", { resolve: resolveRead, preview: previewRead }), NOW);
-    expect(resolveRead).toHaveBeenCalledWith(CHANGE_TASK);
-    expect(previewRead).toHaveBeenCalledWith(CHANGE_TASK);
+    expect(resolveRead).toHaveBeenCalledWith(CHANGE_TASK, undefined);
+    expect(previewRead).toHaveBeenCalledWith(CHANGE_TASK, undefined);
   });
 
   it("sends no packet for General and does not read anything", async () => {

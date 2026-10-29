@@ -204,7 +204,7 @@ describe("sidecarContextOptions packet", () => {
       preview: async () => "# Task brief\n",
     });
     const record = { id: "s1", lens: "describe", target: { ref: TASK } } as SidecarSessionRecord;
-    const text = await options.packet!(record);
+    const text = await options.packet!(record, new AbortController().signal);
     expect(text).toContain("model = \"opus\" (from task.run.tier)");
     expect(text).toContain("Tier: deep");
     expect(text).toContain("## Brief preview digest");

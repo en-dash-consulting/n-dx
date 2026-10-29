@@ -548,6 +548,7 @@ export async function resolveTaskRun(
   ctx: ServerContext,
   taskId: string,
   options: unknown,
+  signal?: AbortSignal,
 ): Promise<{ ok: true; resolution: Record<string, unknown> } | { ok: false; failure: string }> {
   const checked = await validateRunOptions(ctx.projectDir, options);
   if (!checked.ok) return { ok: false, failure: `the run options are refused: ${checked.error}` };
@@ -556,6 +557,7 @@ export async function resolveTaskRun(
     ctx,
     ["work", `--task=${taskId}`, "--resolve", ...resetDeferredArgs(prdEntryOf(ctx, taskId)), ...runOptionArgs(checked.options), ctx.projectDir],
     PREP_RESOLVE_TIMEOUT_MS,
+    signal,
   );
   if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
   try {
@@ -576,6 +578,7 @@ export async function previewTaskRun(
   ctx: ServerContext,
   taskId: string,
   options: unknown,
+  signal?: AbortSignal,
 ): Promise<{ ok: true; brief: string } | { ok: false; failure: string }> {
   const checked = await validateRunOptions(ctx.projectDir, options);
   if (!checked.ok) return { ok: false, failure: `the run options are refused: ${checked.error}` };
@@ -584,6 +587,7 @@ export async function previewTaskRun(
     ctx,
     ["work", `--task=${taskId}`, "--dry-run", ...runOptionArgs(checked.options), ...resetDeferredArgs(prdEntryOf(ctx, taskId)), ctx.projectDir],
     PREP_PREVIEW_TIMEOUT_MS,
+    signal,
   );
   if (run.failure) return { ok: false, failure: `${run.failure}${run.stderr.trim() ? `: ${tail(run.stderr)}` : ""}` };
   return { ok: true, brief: run.stdout };

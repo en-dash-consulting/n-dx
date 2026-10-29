@@ -181,12 +181,12 @@ export function prepareReads(
   reads: { resolve: typeof resolveTaskRun; preview: typeof previewTaskRun } = { resolve: resolveTaskRun, preview: previewTaskRun },
 ): SpawnedReads {
   return {
-    async resolve(taskId) {
-      const read = await reads.resolve(ctx, taskId, {}).catch(() => null);
+    async resolve(taskId, signal) {
+      const read = await reads.resolve(ctx, taskId, {}, signal).catch(() => null);
       return read?.ok ? readResolution(read.resolution) : null;
     },
-    async preview(taskId) {
-      const read = await reads.preview(ctx, taskId, {}).catch(() => null);
+    async preview(taskId, signal) {
+      const read = await reads.preview(ctx, taskId, {}, signal).catch(() => null);
       return read?.ok ? read.brief : null;
     },
   };
@@ -203,9 +203,9 @@ export function sidecarContextOptions(ctx: ServerContext, reads: SpawnedReads = 
   return {
     ceiling: (record) => resolveContextCeiling(ctx.projectDir, record.scope),
     ledger: (record) => readLedger(dir, record.id),
-    packet: async (record) => {
+    packet: async (record, signal) => {
       const sources = createPacketSources(ctx, reads);
-      const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString());
+      const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString(), signal);
       return built.status === "ready" ? built.packet.text : undefined;
     },
   };

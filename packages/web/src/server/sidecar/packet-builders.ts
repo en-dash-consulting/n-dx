@@ -392,7 +392,12 @@ function previewDigest(brief: string): string {
 }
 
 /** Describe: the task as it will run: text, done-when, settings, what blocks it and how it has gone. */
-export async function buildDescribePacket(sources: PacketSources, target: PacketTarget, now: string): Promise<Packet> {
+export async function buildDescribePacket(
+  sources: PacketSources,
+  target: PacketTarget,
+  now: string,
+  signal?: AbortSignal,
+): Promise<Packet> {
   const lens = "describe";
   const head = `${header(lens, target)}\n\n${DESCRIBE_INSTRUCTIONS}`;
   const refused = (why: string): Packet =>
@@ -421,7 +426,8 @@ export async function buildDescribePacket(sources: PacketSources, target: Packet
     prdSection("blockers", "Blockers and dependencies", blockersBody(prd, node), now),
   ];
 
-  const resolved = await sources.resolve(node.id);
+  // Both reads spawn `ndx`: start them together, and let `signal` stop both.
+  const [resolved, brief] = await Promise.all([sources.resolve(node.id, signal), sources.preview(node.id, signal)]);
   sections.push(
     resolved
       ? tierSection(node, resolved, now)
@@ -442,7 +448,6 @@ export async function buildDescribePacket(sources: PacketSources, target: Packet
       : gap("settings", "Run settings (ndx work --resolve)", "the resolve command did not answer", now, "ndx work --resolve"),
   );
 
-  const brief = await sources.preview(node.id);
   sections.push(
     brief !== null
       ? { id: "brief", title: "Brief preview digest", body: previewDigest(brief), provenance: { source: "ndx work --dry-run", generatedAt: now }, staleness: FRESH }

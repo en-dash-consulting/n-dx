@@ -127,16 +127,17 @@ export interface PacketSources {
   /** The zone `ref` names (id, name, or an id it was known by), or `null` when there is none or no analysis. */
   zone(ref: string): Promise<ZoneDetail | null>;
   /** `ndx work --task=<id> --resolve`, parsed. */
-  resolve(taskId: string): Promise<ResolveRead | null>;
+  resolve(taskId: string, signal?: AbortSignal): Promise<ResolveRead | null>;
   /** `ndx work --task=<id> --dry-run` output: the brief hench would send. */
-  preview(taskId: string): Promise<string | null>;
+  preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
   runs(taskId: string): Promise<RunStatusRead[] | null>;
 }
 
 /** The two reads that spawn `ndx`; the Prepare route owns that spawn, so it is injected. */
 export interface SpawnedReads {
-  resolve(taskId: string): Promise<ResolveRead | null>;
-  preview(taskId: string): Promise<string | null>;
+  /** Aborting `signal` kills the spawned `ndx`. */
+  resolve(taskId: string, signal?: AbortSignal): Promise<ResolveRead | null>;
+  preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
 }
 
 /** Most commits read for one packet; evidence is a sample, and the packet caps it again. */
@@ -256,8 +257,8 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
       };
     },
 
-    resolve: (taskId) => spawned.resolve(taskId),
-    preview: (taskId) => spawned.preview(taskId),
+    resolve: (taskId, signal) => spawned.resolve(taskId, signal),
+    preview: (taskId, signal) => spawned.preview(taskId, signal),
 
     async runs(taskId) {
       const dir = join(layout.henchDir, "runs");

@@ -139,7 +139,7 @@ export interface SidecarContextOptions {
   /** The session's ledger, oldest first. */
   ledger: (record: SidecarSessionRecord) => LedgerEntry[];
   /** The lens packet rebuilt fresh; `undefined` for a lens that sends none. */
-  packet?: (record: SidecarSessionRecord) => Promise<string | undefined>;
+  packet?: (record: SidecarSessionRecord, signal: AbortSignal) => Promise<string | undefined>;
 }
 
 /** What one finished turn spent, checkpoint included. */
@@ -238,6 +238,8 @@ export class SidecarSessionRegistry {
   private readonly turnOpen = new Set<string>();
   /** Open turns the operator stopped before their vendor call began (a cold turn building its packet). */
   private readonly stopRequested = new Set<string>();
+  /** One per running turn; a stop or an end aborts it, so a packet still building stops its reads. */
+  private readonly turnAborts = new Map<string, AbortController>();
   private readonly records = new Map<string, SidecarSessionRecord>();
   private readonly live = new Map<string, LiveSession>();
   /** Sessions whose cursor has been checked against the transcript; see {@link reconcileCursor}. */
@@ -325,10 +327,13 @@ export class SidecarSessionRegistry {
     if (record.endedAt) throw new Error(`Sidecar session ${id} has ended`);
     if (this.turnOpen.has(id)) throw new Error(`A turn is already running in Sidecar session ${id}`);
     this.turnOpen.add(id);
+    const abort = new AbortController();
+    this.turnAborts.set(id, abort);
     try {
-      return await this.runTurn(record, prompt, onFrame);
+      return await this.runTurn(record, prompt, abort.signal, onFrame);
     } finally {
       this.turnOpen.delete(id);
+      this.turnAborts.delete(id);
       this.stopRequested.delete(id);
     }
   }
@@ -336,6 +341,7 @@ export class SidecarSessionRegistry {
   private async runTurn(
     record: SidecarSessionRecord,
     prompt: string,
+    signal: AbortSignal,
     onFrame?: (frame: SidecarFrame) => void,
   ): Promise<SessionTurnResult> {
     // A checkpointed session never resumes: its next turn is a new vendor session.
@@ -371,7 +377,7 @@ export class SidecarSessionRegistry {
     try {
       let vendorPrompt = prompt;
       if (cold && context && record.refresh) {
-        const packet = await context.packet?.(record);
+        const packet = await context.packet?.(record, signal);
         const ledger = renderLedger(context.ledger(record));
         append({
           seq: record.cursor + 1,
@@ -389,7 +395,7 @@ export class SidecarSessionRegistry {
       }
 
       if (opening) {
-        const packet = await context?.packet?.(record);
+        const packet = await context?.packet?.(record, signal);
         if (packet) vendorPrompt = composeOpeningPrompt({ packet, prompt });
         if (this.stopRequested.has(record.id)) {
           return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
@@ -503,6 +509,7 @@ export class SidecarSessionRegistry {
     // A turn still before its vendor call has nothing to signal yet; it checks this before spawning.
     if (session?.state === "running") await session.interrupt();
     else this.stopRequested.add(id);
+    this.turnAborts.get(id)?.abort();
     return true;
   }
 
@@ -510,6 +517,7 @@ export class SidecarSessionRegistry {
   async end(id: string): Promise<void> {
     const record = this.records.get(id);
     if (!record || record.endedAt) return;
+    this.turnAborts.get(id)?.abort();
     await this.live.get(id)?.session.end();
     this.live.delete(id);
     record.endedAt = this.iso();
