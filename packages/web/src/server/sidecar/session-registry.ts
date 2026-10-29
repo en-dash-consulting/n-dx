@@ -159,7 +159,8 @@ export interface SidecarRegistryOptions {
   connect: SidecarSessionConnect;
   /** Without it a session never checkpoints. */
   context?: SidecarContextOptions;
-  ttlMs?: number;
+  /** The idle window in ms, or a function read each time it applies, so a saved change takes effect at once. */
+  ttlMs?: number | (() => number);
   now?: () => number;
 }
 
@@ -229,7 +230,7 @@ function isRecord(value: unknown): value is SidecarSessionRecord {
 export class SidecarSessionRegistry {
   private readonly dir: string;
   private readonly connect: SidecarSessionConnect;
-  private readonly ttlMs: number;
+  private readonly ttl: () => number;
   private readonly now: () => number;
   private readonly context?: SidecarContextOptions;
   private readonly onTurnSpend?: (spend: SidecarTurnSpend) => void;
@@ -245,7 +246,8 @@ export class SidecarSessionRegistry {
   constructor(opts: SidecarRegistryOptions) {
     this.dir = opts.dir;
     this.connect = opts.connect;
-    this.ttlMs = opts.ttlMs ?? DEFAULT_SIDECAR_TTL_MS;
+    const ttl = opts.ttlMs ?? DEFAULT_SIDECAR_TTL_MS;
+    this.ttl = typeof ttl === "function" ? ttl : () => ttl;
     this.now = opts.now ?? Date.now;
     this.context = opts.context;
     this.onTurnSpend = opts.onTurnSpend;
@@ -519,7 +521,7 @@ export class SidecarSessionRegistry {
   private expired(record: SidecarSessionRecord): boolean {
     return !!record.resumeId
       && this.live.get(record.id)?.session.state !== "running"
-      && Date.parse(record.lastActivityAt) <= this.now() - this.ttlMs;
+      && Date.parse(record.lastActivityAt) <= this.now() - this.ttl();
   }
 
   /** A copy of the record as a reader sees it: the TTL applied, nothing written. */

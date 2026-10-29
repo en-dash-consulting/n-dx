@@ -16,10 +16,9 @@
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.4.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { resolveLayout } from "@n-dx/llm-client";
 import type { TokenUsage } from "@n-dx/llm-client";
 import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES } from "./ledger.js";
+import { positiveInteger, readWebValue } from "./web-config.js";
 
 export type SidecarScope = "worktree" | "hub";
 
@@ -43,31 +42,18 @@ export function contextTokens(usage: TokenUsage): number {
   return usage.input + (usage.cacheCreationInput ?? 0) + (usage.cacheReadInput ?? 0);
 }
 
-function readJson(path: string): Record<string, unknown> {
-  if (!existsSync(path)) return {};
-  const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
-  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
-}
-
-function positiveInteger(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
-}
-
 /**
  * The ceiling for `scope`: the project's local config, then its shared config,
  * then the default. A value that is not a positive integer is ignored.
  */
 export function resolveContextCeiling(projectDir: string, scope: SidecarScope): number {
-  const { configFile, localConfigFile } = resolveLayout(projectDir);
-  for (const file of [localConfigFile, configFile]) {
-    const web = readJson(file).web;
-    const ceilings = web && typeof web === "object" ? (web as Record<string, unknown>).sidecarContextCeiling : undefined;
-    const value = ceilings && typeof ceilings === "object"
+  const value = readWebValue(projectDir, (web) => {
+    const ceilings = web.sidecarContextCeiling;
+    return ceilings && typeof ceilings === "object"
       ? positiveInteger((ceilings as Record<string, unknown>)[scope])
       : undefined;
-    if (value !== undefined) return value;
-  }
-  return DEFAULT_CONTEXT_CEILINGS[scope];
+  });
+  return value ?? DEFAULT_CONTEXT_CEILINGS[scope];
 }
 
 /** The checkpoint turn's prompt: ask for the ledger, nothing else. */

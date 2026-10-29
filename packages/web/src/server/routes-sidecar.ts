@@ -29,7 +29,10 @@
  * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | POST | `/api/sidecar/sessions/:id/mcp` | the `ndx-sidecar` broker (MCP, Streamable HTTP), while a turn runs |
  * | GET  | `/api/sidecar/allow-list` | the Sidecar allow-list |
+ * | POST | `/api/sidecar/allow-list` | add a rule (`{ tool, argv }`); refused for work, reset, push and every never-allow-listed tool |
  * | DELETE | `/api/sidecar/allow-list` | revoke a rule (`{ tool, key }`) |
+ * | GET  | `/api/sidecar/settings` | mode, context ceilings, idle window, GitHub reads (`sidecar/settings.ts`) |
+ * | PUT  | `/api/sidecar/settings` | save them; `null` resets a value, an invalid one answers 400 and writes nothing |
  *
  * Sessions are the addressed workspace's: `ctx.projectDir` picks the registry
  * and broker (`<henchDir>/sidecar/`) and is the worktree a new session runs in.
@@ -62,6 +65,8 @@ import { startSidecarCommand } from "./routes-commands.js";
 import { runSlotUsage, startTaskExecution } from "./routes-hench.js";
 import { resolveTaskRun } from "./routes-hench-prep.js";
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
+import { readSidecarSettings, resolveSidecarIdleMs, saveSidecarSettings } from "./sidecar/settings.js";
+import { commitSettingsChange } from "./settings-commit.js";
 import { readLedger } from "./sidecar/ledger.js";
 import { buildLensPacket, LENS_IDS, LENS_PACKETS } from "./sidecar/lens-packets.js";
 import type { PacketTarget } from "./sidecar/packet-builders.js";
@@ -82,6 +87,7 @@ import { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
+const SETTINGS_PATH = "/api/sidecar/settings";
 const LENSES_PATH = "/api/sidecar/lenses";
 const PROPOSALS_PATH = "/api/sidecar/proposals";
 
@@ -263,6 +269,7 @@ function defaultRegistryFor(ctx: ServerContext): SidecarSessionRegistry {
     registry = createWorktreeSidecarRegistry(ctx.projectDir, {
       broker: (id) => sidecarBrokerEndpoint(ctx, id),
       context: sidecarContextOptions(ctx),
+      ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
       onTurnSpend: sidecarTurnSpendRecorder(ctx),
     });
     registries.set(ctx.projectDir, registry);
@@ -412,7 +419,7 @@ export async function handleSidecarRoute(
   const [pathname, search = ""] = (req.url || "/").split("?");
   if (
     pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`)
-    && pathname !== ALLOW_LIST_PATH && pathname !== LENSES_PATH && pathname !== PROPOSALS_PATH
+    && pathname !== ALLOW_LIST_PATH && pathname !== SETTINGS_PATH && pathname !== LENSES_PATH && pathname !== PROPOSALS_PATH
   ) {
     return false;
   }
@@ -432,6 +439,23 @@ export async function handleSidecarRoute(
     return true;
   }
 
+  if (pathname === SETTINGS_PATH) {
+    if (method === "GET") {
+      jsonResponse(res, 200, readSidecarSettings(ctx.projectDir));
+      return true;
+    }
+    if (method === "PUT") {
+      const body = await readJsonObject(req, res);
+      if (typeof body === "string") return refuse(res, 400, body);
+      const saved = saveSidecarSettings(ctx.projectDir, body);
+      if ("error" in saved) return refuse(res, 400, saved.error);
+      for (const file of saved.files) await commitSettingsChange(ctx.projectDir, file, "sidecar");
+      jsonResponse(res, 200, readSidecarSettings(ctx.projectDir));
+      return true;
+    }
+    return refuse(res, 405, `${method} is not supported on ${SETTINGS_PATH}`);
+  }
+
   if (pathname === ALLOW_LIST_PATH) {
     if (method === "GET") {
       jsonResponse(res, 200, { rules: broker.allowList() });
@@ -445,6 +469,19 @@ export async function handleSidecarRoute(
         return refuse(res, 400, `"tool" must be a broker tool and "key" a string`);
       }
       jsonResponse(res, 200, { removed: broker.revoke({ tool, key }) });
+      return true;
+    }
+    if (method === "POST") {
+      const body = await readJsonObject(req, res);
+      if (typeof body === "string") return refuse(res, 400, body);
+      const { tool, argv } = body;
+      if (typeof tool !== "string" || !isBrokerTool(tool)) return refuse(res, 400, `"tool" must be a broker tool`);
+      try {
+        jsonResponse(res, 200, { rule: broker.allow(tool, { argv }) });
+      } catch (err) {
+        if (err instanceof BrokerDecisionError) return refuse(res, err.status, err.message);
+        throw err;
+      }
       return true;
     }
     return refuse(res, 405, `${method} is not supported on ${ALLOW_LIST_PATH}`);

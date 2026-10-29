@@ -290,6 +290,19 @@ export class SidecarBroker {
     });
   }
 
+  /**
+   * Add the rule covering a call, as the operator does from the settings
+   * editor. Refused for a call that can never be allow-listed (work, reset,
+   * push, writes); returns the rule, which is already on the list if it was.
+   */
+  allow(tool: BrokerToolName, input: Record<string, unknown>): AllowListRule {
+    const key = allowListKey(tool, input);
+    if (key === null) throw new BrokerDecisionError(409, `A ${tool} call like this can never be allow-listed`);
+    const rule = { tool, key };
+    this.addRule(rule);
+    return rule;
+  }
+
   /** Remove a rule; true when it was on the list. */
   revoke(rule: AllowListRule): boolean {
     const rules = this.allowList();

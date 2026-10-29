@@ -163,6 +163,17 @@ describe("idle TTL", () => {
     expect(index.sessions[0].resumeId).toBe("vendor-2");
   });
 
+  it("applies a TTL given as a function at once, so a saved change takes effect on the next read", async () => {
+    let ttl = DEFAULT_SIDECAR_TTL_MS;
+    const reg = new SidecarSessionRegistry({ dir, connect: () => ({ spawn: fakeSpawn }), now: () => clock, ttlMs: () => ttl });
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });
+    await reg.sendTurn(id, "one");
+    clock += 10 * 60_000;
+    expect(reg.get(id)?.resumeId).toBe("vendor-1");
+    ttl = 5 * 60_000;
+    expect(reg.get(id)?.resumeId).toBeUndefined();
+  });
+
   it("forgets after a restart too", async () => {
     const { id } = registry().create({ scope: "worktree", worktree: root, vendor: "claude" });
     await registry().sendTurn(id, "one");
