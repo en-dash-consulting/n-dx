@@ -10,6 +10,10 @@
  *   2. A completion claim with no changes gets execution re-prompts, and when
  *      the model still changes nothing the run FAILS with the task reset to
  *      pending — never a false "completed".
+ *   3. A whole-file write_file that would blank an existing file is refused,
+ *      and the change lands through edit_file with the file otherwise intact.
+ *   4. A refused connection is retried on llm.local.* and then hench.retry.*
+ *      before the run fails, and the failure names the settings to raise.
  *
  * The chat/completions endpoint is mocked via a global fetch stub — no LM
  * Studio required. The provider registry is mocked the same way as the Gemini
@@ -139,7 +143,11 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     vi.spyOn(defaultRegistry, "getActiveProvider").mockReturnValue(provider);
   }
 
-  async function runLoop(overrides: { livelockThreshold?: number; provider?: "api" } = {}) {
+  async function runLoop(overrides: {
+    livelockThreshold?: number;
+    provider?: "api";
+    retry?: { maxRetries: number; baseDelayMs: number; maxDelayMs: number };
+  } = {}) {
     const { agentLoop } = await import("../../src/agent/lifecycle/loop.js");
     const { createStore } = await import("@n-dx/rex/dist/store/index.js");
     const { loadConfig } = await import("../../src/store/config.js");
@@ -148,6 +156,7 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     config.skipFullTestGate = true;
     // `ndx work` runs this loop with provider "api" (run.ts effectiveConfig).
     if (overrides.provider) config.provider = overrides.provider;
+    if (overrides.retry) config.retry = overrides.retry;
     if (overrides.livelockThreshold !== undefined) {
       config.livelockThreshold = overrides.livelockThreshold;
     }
@@ -398,5 +407,89 @@ describe("Local (OpenAI-compatible) agentic tool-use loop", () => {
     const doc = await store.loadDocument();
     const task = doc!.items.find((i: { id: string }) => i.id === "task-1");
     expect(task!.status).toBe("pending");
+  });
+
+  describe("a dropped LM Studio connection", () => {
+    /** The completing script: write, stage, hand off the commit, claim done. */
+    const completingTurns = (): ScriptedTurn[] => [
+      {
+        content: null,
+        tool_calls: [{ id: "r1", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: "out.ts", content: "export {};\n" }) } }],
+      },
+      {
+        content: null,
+        tool_calls: [{ id: "r2", type: "function", function: { name: "git", arguments: JSON.stringify({ subcommand: "add", args: "out.ts" }) } }],
+      },
+      {
+        content: null,
+        tool_calls: [{ id: "r3", type: "function", function: { name: "write_file", arguments: JSON.stringify({ path: ".hench-commit-msg.txt", content: "feat: out\n" }) } }],
+      },
+      { content: "Done." },
+    ];
+
+    /** Refuse the first `failures` requests the way Node's fetch does, then answer from the script. */
+    function stubFlakyEndpoint(failures: number): void {
+      stubChatEndpoint(completingTurns());
+      const answer = fetchMock.getMockImplementation()!;
+      let refused = 0;
+      fetchMock.mockImplementation(async (...args: unknown[]) => {
+        if (refused < failures) {
+          refused++;
+          throw Object.assign(new TypeError("fetch failed"), {
+            cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:1234"), { code: "ECONNREFUSED" }),
+          });
+        }
+        return (answer as (...a: unknown[]) => Promise<Response>)(...args);
+      });
+    }
+
+    async function writeLocalSettings(local: Record<string, unknown>): Promise<void> {
+      await writeFile(
+        join(projectDir, ".n-dx.json"),
+        JSON.stringify({ llm: { vendor: "local", local: { host: "localhost", port: 1234, ...local } } }),
+        "utf-8",
+      );
+      execFileSync("git", ["add", "-A"], { cwd: projectDir, stdio: "ignore" });
+      execFileSync("git", ["commit", "-m", "local settings"], { cwd: projectDir, stdio: "ignore" });
+    }
+
+    it("retries on llm.local.* and completes the task", async () => {
+      mockLocalProvider();
+      await writeLocalSettings({ maxRetries: 3, retryBaseDelayMs: 1, retryMaxDelayMs: 1 });
+      stubFlakyEndpoint(3);
+
+      const { result } = await runLoop({ retry: { maxRetries: 0, baseDelayMs: 1, maxDelayMs: 1 } });
+
+      expect(result.run.status).toBe("completed");
+      expect(existsSync(join(projectDir, "out.ts"))).toBe(true);
+    });
+
+    it("retries again on hench.retry.* once llm.local.* runs out", async () => {
+      mockLocalProvider();
+      // No in-provider retries at all: only the run-level policy can save it.
+      await writeLocalSettings({ maxRetries: 0 });
+      stubFlakyEndpoint(2);
+
+      const { result } = await runLoop({ retry: { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 } });
+
+      expect(result.run.status).toBe("completed");
+    });
+
+    it("fails the run naming the server and the settings to raise when both run out", async () => {
+      mockLocalProvider();
+      await writeLocalSettings({ maxRetries: 1, retryBaseDelayMs: 1, retryMaxDelayMs: 1 });
+      stubFlakyEndpoint(100);
+
+      const { result, store } = await runLoop({ retry: { maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 } });
+
+      expect(result.run.status).toBe("failed");
+      expect(result.run.error).toContain("Cannot reach local server at http://localhost:1234/v1");
+      expect(result.run.error).toContain("after 2 attempts");
+      expect(result.run.error).toContain("llm.local.maxRetries");
+      // llm.local: 2 attempts, twice (one hench.retry).
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      const doc = await store.loadDocument();
+      expect(doc!.items.find((i: { id: string }) => i.id === "task-1")!.status).toBe("pending");
+    });
   });
 });

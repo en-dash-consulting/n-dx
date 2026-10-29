@@ -277,8 +277,8 @@ export {
   toGeminiFunctionDeclarations,
 } from "@n-dx/llm-client";
 
-// ---- Local API error parsing ------------------------------------------------
-export { parseLmStudioError, resolveLocalTimeoutMs } from "@n-dx/llm-client";
+// ---- Local API error parsing and connection retries -------------------------
+export { parseLmStudioError, resolveLocalTimeoutMs, fetchLocalWithRetry } from "@n-dx/llm-client";
 
 // ---- Provider registry ------------------------------------------------------
 export {

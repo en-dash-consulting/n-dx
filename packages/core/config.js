@@ -1353,6 +1353,16 @@ function validateLocalPort(key) {
   };
 }
 
+/** Validator for a key that takes a non-negative integer; `hint` is shown in the refusal. */
+function validateNonNegativeInteger(key, hint) {
+  return (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new Error(`Invalid ${key} "${v}". Expected a non-negative integer (${hint}).`);
+    }
+  };
+}
+
 /**
  * Validators for llm.* config keys in .n-dx.json.
  * Keys are setting paths relative to the llm section.
@@ -1390,6 +1400,9 @@ const LLM_VALIDATORS = {
       );
     }
   },
+  "local.maxRetries": validateNonNegativeInteger("local.maxRetries", "e.g. 10, or 0 to fail on the first refused connection"),
+  "local.retryBaseDelayMs": validateNonNegativeInteger("local.retryBaseDelayMs", "milliseconds, e.g. 2000"),
+  "local.retryMaxDelayMs": validateNonNegativeInteger("local.retryMaxDelayMs", "milliseconds, e.g. 60000"),
   "local.verifier.host": validateLocalHost("local.verifier.host"),
   "local.verifier.port": validateLocalPort("local.verifier.port"),
   "local.verifier.model": validateModel,
@@ -2373,6 +2386,15 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     cli.timeoutMs / the CLI timeouts on the Workflow settings
                                     page, which bound the whole command rather than one
                                     HTTP request.
+  llm.local.maxRetries     number    Retries after the local server refuses or drops the
+                                    connection (or answers 429/5xx) before the request fails
+                                    (default: 6; 0 = fail on the first). With the default
+                                    delays that rides out about two minutes — long enough for
+                                    LM Studio to reload a model. After that hench.retry.*
+                                    retries the turn again before the task fails.
+  llm.local.retryBaseDelayMs number  First wait in ms before a retry; each later one doubles
+                                    (default: 2000)
+  llm.local.retryMaxDelayMs number   Cap on one wait in ms (default: 60000)
   llm.local.verifier.host  string    Hostname of a second local server used to review the
                                     primary model's output before finalizing a run (optional)
   llm.local.verifier.port  number    Port of the verifier server (optional)
@@ -2638,6 +2660,7 @@ Examples:
   n-dx config llm.local.port 1234              Set local server port (default: 1234)
   n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
   n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
+  n-dx config llm.local.maxRetries 10          Wait longer for a restarting local server
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config llm.claude.model claude-opus-5-5 Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex

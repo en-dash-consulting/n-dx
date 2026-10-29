@@ -460,6 +460,9 @@ export function mapErrorReasonToFailureCategory(
       return "timeout";
     case "rate-limit":
       return "rate_limit";
+    // The provider already retried the connection before throwing this.
+    case "network":
+      return "transient_exhausted";
     case "cli":
     case "unknown":
     default:

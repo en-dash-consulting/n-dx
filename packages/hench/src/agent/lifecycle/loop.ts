@@ -19,7 +19,7 @@ import {
   resolveApiKey,
   resolveLLMVendor,
 } from "../../store/project-config.js";
-import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs } from "../../prd/llm-gateway.js";
+import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalWithRetry, ClaudeClientError } from "../../prd/llm-gateway.js";
 import type {
   LLMProvider,
   GeminiToolProvider,
@@ -1292,6 +1292,56 @@ async function callVerifier(
 
 // ---------------------------------------------------------------------------
 
+type LocalFetchConfig = NonNullable<Parameters<typeof fetchLocalWithRetry>[2]["localConfig"]>;
+
+/**
+ * Send one local chat request, riding out a dropped LM Studio connection.
+ *
+ * `fetchLocalWithRetry` retries a refused or dropped connection on the
+ * `llm.local.maxRetries` / `retryBaseDelayMs` / `retryMaxDelayMs` schedule and
+ * then throws a retryable `ClaudeClientError` (reason "network"). That error is
+ * retried again on `hench.retry.*`, the run-level policy every other vendor's
+ * transient failures get, before the run fails. A timeout
+ * (`llm.local.timeoutMs`) is not retried — it fails the run as before.
+ */
+async function fetchLocalTurn(
+  url: string,
+  init: RequestInit,
+  options: { baseUrl: string; timeoutMs: number; localConfig?: LocalFetchConfig },
+  retry: HenchConfig["retry"] | undefined,
+): Promise<Response> {
+  const runRetry = retry ?? { maxRetries: 0, baseDelayMs: 0, maxDelayMs: 0 };
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetchLocalWithRetry(url, init, {
+        ...options,
+        onRetry: ({ attempt: n, maxRetries, delayMs, error }) =>
+          detail(
+            `[Local] ${options.baseUrl} unreachable (${error}) — retry ${n}/${maxRetries} ` +
+            `in ${Math.round(delayMs / 100) / 10}s (llm.local.maxRetries)`,
+          ),
+      });
+    } catch (err) {
+      if (err instanceof ClaudeClientError) {
+        if (err.retryable && err.reason === "network" && attempt < runRetry.maxRetries) {
+          const delayMs = Math.min(runRetry.baseDelayMs * 2 ** attempt, runRetry.maxDelayMs);
+          detail(
+            `[Local] ${options.baseUrl} still unreachable — hench.retry ${attempt + 1}/${runRetry.maxRetries} ` +
+            `in ${Math.round(delayMs / 100) / 10}s`,
+          );
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+        throw err;
+      }
+      const reason = (err as Error).name === "AbortError"
+        ? `no response within llm.local.timeoutMs (${options.timeoutMs} ms)`
+        : (err as Error).message;
+      throw new Error(`Cannot reach local server at ${options.baseUrl}: ${reason}. Is LM Studio running?`);
+    }
+  }
+}
+
 /**
  * Local (OpenAI-compatible) agentic tool-use loop.
  *
@@ -1484,21 +1534,17 @@ async function runLocalToolLoop(params: {
       if (!model) delete reqBody["model"];
 
       const t0 = Date.now();
-      let response: Response;
-      try {
-        response = await fetch(`${baseUrl}/chat/completions`, {
+      const response = await fetchLocalTurn(
+        `${baseUrl}/chat/completions`,
+        {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(reqBody),
-          // llm.local.timeoutMs; 0 means wait indefinitely for a slow local model.
-          ...(requestTimeoutMs > 0 ? { signal: AbortSignal.timeout(requestTimeoutMs) } : {}),
-        });
-      } catch (err) {
-        throw new Error(
-          `Cannot reach local server at ${baseUrl}: ${(err as Error).message}. ` +
-          "Is LM Studio running?",
-        );
-      }
+        },
+        // llm.local.timeoutMs; 0 means wait indefinitely for a slow local model.
+        { baseUrl, timeoutMs: requestTimeoutMs, localConfig: localCfg as LocalFetchConfig },
+        config.retry,
+      );
 
       if (!response.ok) {
         const body = await response.text().catch(() => "");

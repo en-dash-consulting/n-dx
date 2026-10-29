@@ -64,6 +64,12 @@ function extractLocalConfig(value: unknown): LocalConfig | undefined {
   }
   // 0 is meaningful for timeoutMs (= wait indefinitely), so accept >= 0.
   if (typeof v.timeoutMs === "number" && v.timeoutMs >= 0) cfg.timeoutMs = v.timeoutMs;
+  // 0 retries is meaningful too (fail on the first refused connection).
+  if (typeof v.maxRetries === "number" && Number.isInteger(v.maxRetries) && v.maxRetries >= 0) {
+    cfg.maxRetries = v.maxRetries;
+  }
+  if (typeof v.retryBaseDelayMs === "number" && v.retryBaseDelayMs >= 0) cfg.retryBaseDelayMs = v.retryBaseDelayMs;
+  if (typeof v.retryMaxDelayMs === "number" && v.retryMaxDelayMs >= 0) cfg.retryMaxDelayMs = v.retryMaxDelayMs;
   const verifier = extractLocalVerifierConfig(v.verifier);
   if (verifier) cfg.verifier = verifier;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
