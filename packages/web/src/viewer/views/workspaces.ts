@@ -532,7 +532,12 @@ function WorkspaceCardView({ card, doFetch, onChanged, branchHealth }: {
     ),
 
     branchHealth
-      ? h(BranchHealthStrip, { workspace: card.key, branch: card.branch, doFetch: healthFetch })
+      ? h(BranchHealthStrip, {
+          workspace: card.key,
+          branch: card.branch,
+          revision: `${card.runs.total}|${card.runs.lastFinishedAt ?? ""}`,
+          doFetch: healthFetch,
+        })
       : null,
 
     h("div", { class: "workspace-card-actions" },

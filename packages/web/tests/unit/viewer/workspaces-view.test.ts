@@ -655,4 +655,29 @@ describe("WorkspacesView branch health strip", () => {
     expect(details).toContain("policy-test");
     expect(details).toContain("architecture-policy.test.js failed");
   });
+
+  it("re-reads a card's branch health when a run in that worktree finishes", async () => {
+    const { fetcher, calls } = withToggle(true);
+    let branchTree = BRANCH_TREE;
+    const wrapped = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/worktrees") return jsonResponse([ANCHOR_TREE, branchTree]);
+      return fetcher(input, init);
+    }) as typeof fetch;
+    const socket = makeSocket();
+    root = await mount(h(WorkspacesView, { fetcher: wrapped, socketFactory: socket.factory }));
+    await settle();
+    const healthCalls = (key: string) => calls.filter((c) => c.url === "/api/branch-health" && c.workspace === key).length;
+    expect(healthCalls("feature")).toBe(1);
+
+    // The run committed and finished: its worktree's run digest moves on.
+    branchTree = { ...BRANCH_TREE, runs: { total: 3, running: 0, lastFinishedAt: "2026-09-16T13:00:00.000Z" } };
+    await act(async () => {
+      socket.push({ type: "hench:run-changed", workspace: "feature" });
+      await new Promise((r) => setTimeout(r, 500)); // past the burst debounce
+    });
+    await settle();
+
+    expect(healthCalls("feature")).toBe(2);
+    expect(healthCalls("n-dx")).toBe(1);
+  });
 });

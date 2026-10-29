@@ -57,9 +57,18 @@ export function parseRollup(rollup: unknown): RollupCheck[] {
   return checks;
 }
 
-/** The last {@link LOG_TAIL_MAX_LINES} lines, then the last {@link LOG_TAIL_MAX_CHARS} characters of those. */
+// CSI sequences (colours, cursor moves). Test runners colour their output on
+// GitHub Actions because `CI` is set, and a colour code between `FAIL` and the
+// path would hide the failing file from the classifier.
+const ESC = String.fromCharCode(0x1b);
+const ANSI_CSI = new RegExp(`${ESC}\\[[0-?]*[ -/]*[@-~]`, "g");
+
+/**
+ * The last {@link LOG_TAIL_MAX_LINES} lines, then the last
+ * {@link LOG_TAIL_MAX_CHARS} characters of those, with colour codes removed.
+ */
 export function capLogTail(log: string): string {
-  const lines = log.replace(/\n+$/, "").split("\n");
+  const lines = log.replace(ANSI_CSI, "").replace(/\n+$/, "").split("\n");
   const tail = lines.slice(-LOG_TAIL_MAX_LINES).join("\n");
   return tail.length > LOG_TAIL_MAX_CHARS ? tail.slice(-LOG_TAIL_MAX_CHARS) : tail;
 }

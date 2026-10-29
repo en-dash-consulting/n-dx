@@ -143,6 +143,20 @@ describe("capLogTail", () => {
   });
 });
 
+describe("coloured CI logs", () => {
+  it("strips colour codes so a coloured FAIL line still classes as touched-test", () => {
+    const esc = String.fromCharCode(0x1b);
+    const raw = `test\tRun tests\t ${esc}[31m${esc}[1mFAIL${esc}[22m${esc}[39m ${esc}[2mtests/unit/${esc}[22ma.test.ts > a > b\n`;
+    const tail = capLogTail(raw);
+    expect(tail).not.toContain(esc);
+    const verdict = classifyFailingCheck({
+      name: "test", outcome: "FAILURE", log: tail, isCrossRepository: false,
+      changedFiles: ["packages/web/tests/unit/a.test.ts"],
+    });
+    expect(verdict.class).toBe("touched-test");
+  });
+});
+
 describe("failedTestFiles", () => {
   it("collects vitest FAIL lines once each", () => {
     expect(failedTestFiles(" FAIL  a.test.ts > x\n FAIL  a.test.ts > y\n × ./b.spec.tsx\n")).toEqual(["a.test.ts", "b.spec.tsx"]);

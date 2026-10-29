@@ -173,11 +173,17 @@ function Details({ health }: { health: BranchHealthResponse }) {
 
 /**
  * The strip for one card. `doFetch` addresses the card's workspace; the
- * strip is refetched when the card's branch changes.
+ * strip is refetched when the card's branch or `revision` changes.
  */
-export function BranchHealthStrip({ workspace, branch, doFetch }: {
+export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
   workspace: string;
   branch: string | null;
+  /**
+   * Changes whenever the worktree may have new commits — the board passes its
+   * run count and last finish time — so a run that commits refreshes the strip
+   * instead of leaving it on the counts from when the board opened.
+   */
+  revision: string;
   doFetch: (path: string) => Promise<Response>;
 }) {
   const [health, setHealth] = useState<BranchHealthResponse | null>(null);
@@ -205,8 +211,7 @@ export function BranchHealthStrip({ workspace, branch, doFetch }: {
     return () => {
       live = false;
     };
-    // doFetch is stable per board; the branch is what changes the answer.
-  }, [workspace, branch, doFetch]);
+  }, [workspace, branch, revision, doFetch]);
 
   if (error) return h("p", { class: "branch-health-strip branch-health-error" }, error);
   if (!health) return h("p", { class: "branch-health-strip branch-health-loading" }, "Reading branch health…");
