@@ -81,4 +81,9 @@ export interface BranchHealth {
   github: GithubFacts | null;
   /** Why `github` is null; null when it is not. */
   githubReason: string | null;
+  /**
+   * True when GitHub reads are allowed but only local facts were asked for:
+   * asking again with `?github=1` reads the PR, its checks and the stack's PR bases.
+   */
+  githubDeferred: boolean;
 }

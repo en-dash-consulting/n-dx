@@ -8,7 +8,9 @@
  * Answers for the workspace the request addressed (`X-Ndx-Workspace` or the
  * `/w/<key>/` slot), so the Workspaces board asks once per worktree. Refused
  * while `git.branchHealth` is off (route-feature-gates.ts). gh runs only when
- * `web.sidecarGithubReads` is true. See `branch-health/collect.ts`.
+ * `web.sidecarGithubReads` is true and the request asks with `?github=1`;
+ * without it the answer is local facts only and `githubDeferred` says GitHub
+ * facts are one request away. See `branch-health/collect.ts`.
  *
  * @module web/server/routes-branch-health
  */
@@ -32,12 +34,13 @@ export async function handleBranchHealthRoute(
   ctx: ServerContext,
   options: BranchHealthRouteOptions = {},
 ): Promise<boolean> {
-  const path = (req.url || "/").split("?")[0];
-  if (path !== BRANCH_HEALTH_PATH || (req.method || "GET") !== "GET") return false;
+  const url = new URL(req.url || "/", "http://localhost");
+  if (url.pathname !== BRANCH_HEALTH_PATH || (req.method || "GET") !== "GET") return false;
 
   try {
     const health = await collectBranchHealth(ctx.projectDir, {
       githubReads: readSidecarSettings(ctx.projectDir).githubReads,
+      localOnly: url.searchParams.get("github") !== "1",
       exec: options.exec,
     });
     jsonResponse(res, 200, health);

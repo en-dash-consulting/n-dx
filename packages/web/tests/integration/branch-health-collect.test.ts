@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { exec, type ExecOptions, type ExecResult } from "@n-dx/llm-client";
 import {
   collectBranchHealth,
+  LOCAL_ONLY_REASON,
   LOG_TAIL_MAX_CHARS,
   LOG_TAIL_MAX_LINES,
   type BranchHealthExec,
@@ -278,5 +279,42 @@ describe("GitHub facts", () => {
     const health = await collectBranchHealth(repo, { githubReads: true, exec: run });
 
     expect(health.github!.failing[0]).toMatchObject({ class: "touched-test" });
+  });
+
+  it("classifies over the whole log and stores a tail without gh's line prefix", async () => {
+    write("widget.test.ts", "it('x', () => {});\n");
+    commitAll("add a test");
+    const prefix = "test (ubuntu)\tRun tests\t2026-10-29T12:34:56.1234567Z ";
+    const log = [
+      `${prefix} FAIL  widget.test.ts > widget > renders`,
+      ...Array.from({ length: 300 }, (_, i) => `${prefix}    at frame ${i}`),
+    ].join("\n");
+    const { run } = stubExec((args) => result(args[0] === "pr" ? prJson() : log));
+
+    const health = await collectBranchHealth(repo, { githubReads: true, exec: run });
+
+    const [failing] = health.github!.failing;
+    expect(failing.class).toBe("touched-test");
+    expect(failing.logTail).not.toContain("widget.test.ts");
+    expect(failing.logTail!.split("\n").every((line) => line.startsWith("    at frame"))).toBe(true);
+  });
+
+  it("classes a failing check behind-base from the PR's BEHIND merge state", async () => {
+    const behind = JSON.stringify({ ...JSON.parse(prJson()), mergeStateStatus: "BEHIND" });
+    const { run } = stubExec((args) => result(args[0] === "pr" ? behind : " FAIL  other.test.ts > x\n"));
+
+    const health = await collectBranchHealth(repo, { githubReads: true, exec: run });
+
+    expect(health.github!.failing[0].class).toBe("behind-base");
+    expect(health.github!.failing[0].evidence).toContain("BEHIND");
+  });
+
+  it("runs no gh command when only local facts are asked for, and says GitHub facts are deferred", async () => {
+    const { run, ghCalls } = stubExec();
+
+    const health = await collectBranchHealth(repo, { githubReads: true, localOnly: true, exec: run });
+
+    expect(ghCalls).toEqual([]);
+    expect(health).toMatchObject({ base: "origin/main", github: null, githubDeferred: true, githubReason: LOCAL_ONLY_REASON });
   });
 });

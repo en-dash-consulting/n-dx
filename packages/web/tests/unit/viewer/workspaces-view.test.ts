@@ -573,6 +573,15 @@ const HEALTH_FEATURE: BranchHealthResponse = {
     }],
   },
   githubReason: null,
+  githubDeferred: false,
+};
+
+/** The feature worktree's answer on mount: local facts, GitHub facts one expansion away. */
+const HEALTH_FEATURE_LOCAL: BranchHealthResponse = {
+  ...HEALTH_FEATURE,
+  github: null,
+  githubReason: "Only local facts were asked for; GitHub facts load when the strip is expanded.",
+  githubDeferred: true,
 };
 
 const HEALTH_ANCHOR: BranchHealthResponse = {
@@ -611,7 +620,8 @@ describe("WorkspacesView branch health strip", () => {
   function withToggle(enabled: boolean) {
     const made = makeFetcher({
       "/api/features": { toggles: [{ key: "git.branchHealth", enabled }] },
-      "/api/branch-health@feature": HEALTH_FEATURE,
+      "/api/branch-health@feature": HEALTH_FEATURE_LOCAL,
+      "/api/branch-health?github=1@feature": HEALTH_FEATURE,
       "/api/branch-health@n-dx": HEALTH_ANCHOR,
     });
     globalThis.fetch = made.fetcher;
@@ -628,25 +638,30 @@ describe("WorkspacesView branch health strip", () => {
     expect(calls.some((c) => c.url === "/api/branch-health")).toBe(false);
   });
 
-  it("shows each card's strip from its own workspace, and expands to the full status", async () => {
+  it("shows each card's strip from local facts, and reads GitHub facts only when expanded", async () => {
     const { fetcher, calls } = withToggle(true);
     root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));
     await settle();
 
     expect(calls.filter((c) => c.url === "/api/branch-health").map((c) => c.workspace).sort())
       .toEqual(["feature", "n-dx"]);
+    const githubCalls = () => calls.filter((c) => c.url === "/api/branch-health?github=1");
+    expect(githubCalls()).toEqual([]);
 
     const cards = root.querySelectorAll(".workspace-card");
     expect(cards[0].querySelector(".branch-health-strip")!.textContent).toBe("no base");
     const strip = cards[1].querySelector<HTMLButtonElement>(".branch-health-strip")!;
-    expect(strip.textContent).toBe("↑4 ↓2 origin/main1 conflictstack: 1 not containedPR #42: 1 failing");
+    expect(strip.textContent).toBe("↑4 ↓2 origin/main1 conflictstack: 1 not contained");
     expect(strip.getAttribute("aria-expanded")).toBe("false");
     expect(cards[1].querySelector(".branch-health-details")).toBeNull();
 
     await act(async () => {
       strip.click();
     });
+    await settle();
 
+    expect(githubCalls().map((c) => c.workspace)).toEqual(["feature"]);
+    expect(strip.textContent).toBe("↑4 ↓2 origin/main1 conflictstack: 1 not containedPR #42: 1 failing");
     expect(strip.getAttribute("aria-expanded")).toBe("true");
     const details = cards[1].querySelector(".branch-health-details")!.textContent!;
     expect(details).toContain("Compared with origin/main (the PR's base)");
@@ -654,6 +669,16 @@ describe("WorkspacesView branch health strip", () => {
     expect(details).toContain("feat/lower — not contained");
     expect(details).toContain("policy-test");
     expect(details).toContain("architecture-policy.test.js failed");
+
+    // Collapsing and reopening keeps the facts already read.
+    await act(async () => {
+      strip.click();
+    });
+    await act(async () => {
+      strip.click();
+    });
+    await settle();
+    expect(githubCalls()).toHaveLength(1);
   });
 
   it("shows a neutral note, not an error, when a worktree's own toggle is off", async () => {

@@ -6,7 +6,9 @@
  * `GET /api/branch-health`. The strip fetches for its own card's workspace by
  * header, like every other per-workspace read on the board, and only while
  * the toggle is on: with it off the card renders exactly as before and the
- * endpoint is never asked. A worktree whose own `.n-dx.json` still has the
+ * endpoint is never asked. On mount it asks for local facts only, so opening
+ * the board runs no gh command; a card's GitHub facts (the PR, its checks,
+ * the stack's PR bases) are read when its strip is first expanded. A worktree whose own `.n-dx.json` still has the
  * toggle off answers 403 `feature_disabled`; its card shows a neutral note.
  *
  * @module web/viewer/views/workspace-branch-health
@@ -53,6 +55,13 @@ export interface BranchHealthResponse {
     failing: BranchHealthFailingCheck[];
   } | null;
   githubReason: string | null;
+  /** GitHub reads are allowed but were not asked for; `?github=1` reads them. */
+  githubDeferred: boolean;
+}
+
+/** The path that reads a workspace's branch health: local facts only unless `github`. */
+export function branchHealthPath(github: boolean): string {
+  return github ? "/api/branch-health?github=1" : "/api/branch-health";
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +120,11 @@ const STAGE_LABEL: Record<number, string> = { 1: "ancestor", 2: "base", 3: "this
 // Components
 // ---------------------------------------------------------------------------
 
-function Details({ health }: { health: BranchHealthResponse }) {
+function Details({ health, githubNote }: {
+  health: BranchHealthResponse;
+  /** Shown in place of `githubReason` while GitHub facts load or after they failed. */
+  githubNote: string | null;
+}) {
   return h("div", { class: "branch-health-details" },
     h("p", { class: "branch-health-line" },
       health.base
@@ -168,7 +181,7 @@ function Details({ health }: { health: BranchHealthResponse }) {
               )
             : null,
         )
-      : h("p", { class: "branch-health-line" }, health.githubReason ?? "No GitHub facts."),
+      : h("p", { class: "branch-health-line" }, githubNote ?? health.githubReason ?? "No GitHub facts."),
   );
 }
 
@@ -191,12 +204,19 @@ export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
   const [error, setError] = useState<string | null>(null);
   const [off, setOff] = useState(false);
   const [open, setOpen] = useState(false);
+  // GitHub facts, read only once the strip is expanded and kept for the
+  // revision they were read at, so collapsing and reopening does not ask again.
+  const readKey = `${workspace}\0${branch ?? ""}\0${revision}`;
+  const [full, setFull] = useState<{ key: string; health: BranchHealthResponse } | null>(null);
+  const [githubError, setGithubError] = useState<string | null>(null);
+  const wantGithub = open && health !== null && health.githubDeferred && full?.key !== readKey;
 
   useEffect(() => {
     let live = true;
     void (async () => {
       try {
-        const res = await doFetch("/api/branch-health");
+        // Local facts only: no gh runs until a card is expanded.
+        const res = await doFetch(branchHealthPath(false));
         const body = (await res.json()) as BranchHealthResponse & { error?: string; kind?: string };
         if (!live) return;
         // The route gate reads the addressed worktree's own (tracked)
@@ -221,6 +241,26 @@ export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
     };
   }, [workspace, branch, revision, doFetch]);
 
+  useEffect(() => {
+    if (!wantGithub) return;
+    let live = true;
+    setGithubError(null);
+    void (async () => {
+      try {
+        const res = await doFetch(branchHealthPath(true));
+        const body = (await res.json()) as BranchHealthResponse & { error?: string };
+        if (!live) return;
+        if (res.ok) setFull({ key: readKey, health: body });
+        else setGithubError(body.error ?? `GitHub facts failed (${res.status})`);
+      } catch (err) {
+        if (live) setGithubError(err instanceof Error ? err.message : "GitHub facts failed");
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [wantGithub, readKey, doFetch]);
+
   if (off) {
     return h("p", { class: "branch-health-strip branch-health-off" },
       `Branch health is off in this worktree (${BRANCH_HEALTH_FEATURE} in its .n-dx.json).`);
@@ -228,6 +268,8 @@ export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
   if (error) return h("p", { class: "branch-health-strip branch-health-error" }, error);
   if (!health) return h("p", { class: "branch-health-strip branch-health-loading" }, "Reading branch health…");
 
+  const shown = full?.key === readKey ? full.health : health;
+  const githubNote = shown.githubDeferred ? (githubError ?? "Reading GitHub facts…") : null;
   const detailsId = `branch-health-${workspace}`;
   return h("div", { class: "branch-health" },
     h("button", {
@@ -238,9 +280,9 @@ export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
       "aria-label": `Branch health for ${workspace}`,
       onClick: () => setOpen((v) => !v),
     },
-      branchHealthChips(health).map((chip) =>
+      branchHealthChips(shown).map((chip) =>
         h("span", { key: chip.text, class: `branch-health-chip branch-health-chip-${chip.tone}` }, chip.text)),
     ),
-    open ? h("div", { id: detailsId }, h(Details, { health })) : null,
+    open ? h("div", { id: detailsId }, h(Details, { health: shown, githubNote })) : null,
   );
 }

@@ -179,9 +179,19 @@ is on; the route gate refuses it with 403 while the toggle is off.
   origin's default branch, which is the trunk and not a layer.
 - **gh runs only with `web.sidecarGithubReads` true.** That one project
   allowance governs every GitHub read the Sidecar makes. With it off, or gh
-  missing or signed out, `github` is null and `githubReason` says why. Failed
-  check logs are cut to the last 80 lines and 8,000 characters, enough to
-  classify and quote the failure without shipping a whole CI log per card.
+  missing or signed out, `github` is null and `githubReason` says why.
+- **gh runs only on request.** Without `?github=1` the route answers local
+  facts and sets `githubDeferred` when reads are allowed. The board asks that
+  way on mount and adds `?github=1` when a card's strip is first expanded, so
+  opening a board of many worktrees runs no gh command. Local-only answers take
+  the base and stack from upstreams, not PR bases.
+- **A failing check is classed on the whole log.** gh's per-line job, step and
+  timestamp prefix and colour codes are removed first. Behind-base also fires
+  when the PR's `mergeStateStatus` is `BEHIND` or a stack layer is not
+  contained, and the evidence names which. A test path printed by a package's
+  runner (`packages/p test: FAIL tests/x.test.ts`) matches only that
+  package's `packages/p/tests/x.test.ts`. Only the stored `logTail` is cut, to
+  the last 80 lines and 8,000 characters.
 - **A failing check gets one class, first rule wins:** `fork-no-ci`,
   `codeql`, `behind-base`, `policy-test`, `touched-test`, else
   `unclassified`, each with the fact that decided it (`branch-health/checks.ts`).

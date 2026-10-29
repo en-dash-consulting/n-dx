@@ -18,6 +18,7 @@ import { errorMessage } from "../response-utils.js";
 import {
   capLogTail,
   classifyFailingCheck,
+  cleanLog,
   isFailing,
   isPending,
   parseRollup,
@@ -35,9 +36,17 @@ import type {
 export interface CollectOptions {
   /** Whether `gh` may be asked (the project's `web.sidecarGithubReads`). */
   githubReads: boolean;
+  /**
+   * Read local facts only, even when GitHub reads are allowed: no gh command
+   * runs, so the base and stack come from upstreams. The Workspaces board asks
+   * this way on mount and for GitHub facts only when a strip is expanded.
+   */
+  localOnly?: boolean;
   /** Injected for tests; defaults to the llm-client `exec`. */
   exec?: BranchHealthExec;
 }
+
+export const LOCAL_ONLY_REASON = "Only local facts were asked for; GitHub facts load when the strip is expanded.";
 
 const GIT_TIMEOUT_MS = 10_000;
 const MERGE_TREE_TIMEOUT_MS = 30_000;
@@ -236,27 +245,36 @@ async function changedFiles(git: Runner, base: string): Promise<string[]> {
   return out.ok ? out.stdout.split("\0").filter(Boolean) : [];
 }
 
+/** The whole failed log, cleaned; the classifier reads all of it and only the stored tail is capped. */
 async function readFailedLog(git: Runner, runId: string, jobId: string | null): Promise<string | null> {
   const out = await git.gh(["run", "view", runId, ...(jobId ? ["--job", jobId] : []), "--log-failed"], LOG_MAX_BUFFER);
-  return out.ok && out.stdout.trim() ? capLogTail(out.stdout) : null;
+  return out.ok && out.stdout.trim() ? cleanLog(out.stdout) : null;
 }
 
-async function readGithubFacts(git: Runner, pr: Record<string, unknown>, base: string | null): Promise<GithubFacts> {
+async function readGithubFacts(
+  git: Runner,
+  pr: Record<string, unknown>,
+  base: string | null,
+  stack: readonly StackLayer[],
+): Promise<GithubFacts> {
   const checks = parseRollup(pr.statusCheckRollup);
   const failingChecks = checks.filter(isFailing);
   const isCrossRepository = pr.isCrossRepository === true;
+  const mergeStateStatus = typeof pr.mergeStateStatus === "string" ? pr.mergeStateStatus : "UNKNOWN";
   const changed = failingChecks.length > 0 && base ? await changedFiles(git, base) : [];
   const failing: FailingCheck[] = [];
   for (const check of failingChecks) {
-    const logTail = check.runId ? await readFailedLog(git, check.runId, check.jobId) : null;
+    const log = check.runId ? await readFailedLog(git, check.runId, check.jobId) : null;
     const verdict = classifyFailingCheck({
       name: check.name,
       outcome: check.outcome,
-      log: logTail,
+      log,
       isCrossRepository,
       changedFiles: changed,
+      mergeStateStatus,
+      stack,
     });
-    failing.push({ name: check.name, conclusion: check.outcome, url: check.url, ...verdict, logTail });
+    failing.push({ name: check.name, conclusion: check.outcome, url: check.url, ...verdict, logTail: log === null ? null : capLogTail(log) });
   }
   return {
     number: typeof pr.number === "number" ? pr.number : 0,
@@ -264,7 +282,7 @@ async function readGithubFacts(git: Runner, pr: Record<string, unknown>, base: s
     baseRefName: typeof pr.baseRefName === "string" ? pr.baseRefName : "",
     isCrossRepository,
     mergeable: typeof pr.mergeable === "string" ? pr.mergeable : "UNKNOWN",
-    mergeStateStatus: typeof pr.mergeStateStatus === "string" ? pr.mergeStateStatus : "UNKNOWN",
+    mergeStateStatus,
     reviewDecision: typeof pr.reviewDecision === "string" && pr.reviewDecision ? pr.reviewDecision : null,
     checks: { total: checks.length, failing: failing.length, pending: checks.filter(isPending).length },
     failing,
@@ -285,11 +303,14 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
 
   const [upstreams, defaultBranch] = await Promise.all([readUpstreams(git), readDefaultBranch(git)]);
 
+  const ghAllowed = options.githubReads && !options.localOnly;
   // GitHub first, because the PR base outranks every local guess.
   let pr: Record<string, unknown> | null = null;
   let githubReason: string | null = null;
   if (!options.githubReads) {
     githubReason = "GitHub reads are off for this project (web.sidecarGithubReads), so no gh command ran.";
+  } else if (options.localOnly) {
+    githubReason = LOCAL_ONLY_REASON;
   } else if (!branch) {
     githubReason = "HEAD is detached, so there is no branch to find a PR for.";
   } else {
@@ -316,8 +337,8 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
 
   const counts = base ? await aheadBehind(git, base.ref) : { ahead: null, behind: null };
   const predicted = base ? await predictConflicts(git, base.ref) : { conflicts: [], unavailable: "There is no base to merge with." };
-  const stack = base ? await readStack(git, base, upstreams, defaultBranch?.branch ?? null, options.githubReads) : [];
-  const github = pr ? await readGithubFacts(git, pr, base?.ref ?? null) : null;
+  const stack = base ? await readStack(git, base, upstreams, defaultBranch?.branch ?? null, ghAllowed) : [];
+  const github = pr ? await readGithubFacts(git, pr, base?.ref ?? null, stack) : null;
 
   return {
     branch,
@@ -331,5 +352,6 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
     stack,
     github,
     githubReason,
+    githubDeferred: options.githubReads && options.localOnly === true,
   };
 }

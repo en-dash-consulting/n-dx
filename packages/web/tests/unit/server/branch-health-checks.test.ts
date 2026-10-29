@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import {
   capLogTail,
   classifyFailingCheck,
+  cleanLog,
   failedTestFiles,
   parseRollup,
   LOG_TAIL_MAX_CHARS,
@@ -154,6 +155,78 @@ describe("coloured CI logs", () => {
       changedFiles: ["packages/web/tests/unit/a.test.ts"],
     });
     expect(verdict.class).toBe("touched-test");
+  });
+});
+
+describe("behind-base from the PR and the stack", () => {
+  // PR #907: one Windows check failing in a test the branch never touched,
+  // while the PR was BEHIND and lower stack layers held the fix.
+  const base = {
+    name: "Tests (Windows, root+llm-client)",
+    outcome: "FAILURE",
+    log: "packages/llm-client test:  FAIL  tests/integration/vendor-session.test.ts > vendor session\n",
+    isCrossRepository: false,
+    changedFiles: ["packages/web/src/server/routes-git.ts"],
+  };
+
+  it("names the merge state when the PR is BEHIND", () => {
+    const verdict = classifyFailingCheck({ ...base, mergeStateStatus: "BEHIND", stack: [] });
+    expect(verdict.class).toBe("behind-base");
+    expect(verdict.evidence).toContain("BEHIND");
+  });
+
+  it("names the uncontained layer when the stack lacks one", () => {
+    const verdict = classifyFailingCheck({
+      ...base,
+      mergeStateStatus: "BLOCKED",
+      stack: [{ branch: "feat/sidecar-m3-lenses", contained: true }, { branch: "feat/sidecar-m2-drawer", contained: false }],
+    });
+    expect(verdict.class).toBe("behind-base");
+    expect(verdict.evidence).toContain("feat/sidecar-m2-drawer");
+    expect(verdict.evidence).not.toContain("feat/sidecar-m3-lenses");
+  });
+
+  it("stays unclassified when the PR is up to date and every layer is contained", () => {
+    const verdict = classifyFailingCheck({
+      ...base,
+      mergeStateStatus: "BLOCKED",
+      stack: [{ branch: "feat/sidecar-m3-lenses", contained: true }],
+    });
+    expect(verdict.class).toBe("unclassified");
+  });
+});
+
+describe("whole-log classification", () => {
+  const PREFIX = "Tests (Windows)\tRun tests\t2026-10-29T12:34:56.1234567Z ";
+
+  it("classes touched-test when the failing file appears above the last 80 lines", () => {
+    const log = [
+      `${PREFIX}packages/llm-client test:  FAIL  tests/integration/vendor-session.test.ts > vendor session`,
+      ...Array.from({ length: 500 }, (_, i) => `${PREFIX}stack frame ${i}`),
+    ].join("\n");
+    expect(capLogTail(log)).not.toContain("vendor-session.test.ts");
+    const verdict = classifyFailingCheck({
+      name: "Tests (Windows)", outcome: "FAILURE", log, isCrossRepository: false,
+      changedFiles: ["packages/llm-client/tests/integration/vendor-session.test.ts"],
+    });
+    expect(verdict.class).toBe("touched-test");
+  });
+
+  it("matches a package-relative path only against the package the log names", () => {
+    const log = "packages/llm-client test:  FAIL  tests/x.test.ts > a\n";
+    const classify = (changedFiles: string[]) => classifyFailingCheck({
+      name: "test", outcome: "FAILURE", log, isCrossRepository: false, changedFiles,
+    }).class;
+    expect(classify(["packages/llm-client/tests/x.test.ts"])).toBe("touched-test");
+    expect(classify(["packages/rex/tests/x.test.ts"])).toBe("unclassified");
+  });
+
+  it("drops gh's job, step and timestamp prefix from every line of the tail", () => {
+    const log = Array.from({ length: 200 }, (_, i) => `${PREFIX}line ${i + 1}`).join("\n");
+    const tail = capLogTail(log).split("\n");
+    expect(tail).toHaveLength(LOG_TAIL_MAX_LINES);
+    expect(tail.every((line) => /^line \d+$/.test(line))).toBe(true);
+    expect(cleanLog(log)).not.toMatch(/\t|2026-10-29T/);
   });
 });
 
