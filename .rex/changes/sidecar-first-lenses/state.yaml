@@ -49,8 +49,18 @@ items:
     activeIntervals: [{"end":"2026-10-29T01:21:43.647Z","start":"2026-10-29T01:05:07.466Z"},{"end":"2026-10-29T01:27:06.023Z","start":"2026-10-29T01:27:06.023Z"}]
     lastModified: "2026-10-29T01:27:06.023Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7da01445-1d7e-48ed-9d26-cf303ce98d72":
+    lastModified: "2026-10-29T01:49:39.720Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9559114b-dfe3-466e-9158-c3bc6c626462":
-    lastModified: "2026-10-28T21:46:00.261Z"
+    status: "completed"
+    startedAt: "2026-10-29T01:44:57.761Z"
+    completedAt: "2026-10-29T01:51:08.972Z"
+    endedAt: "2026-10-29T01:51:08.972Z"
+    activeIntervals: [{"end":"2026-10-29T01:51:08.972Z","start":"2026-10-29T01:44:57.761Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Describe reads wired to Prepare resolve/dry-run seams; packet carries checks, likely files, tier+reason; lens instructions added; tested. Commit b3055dc5a."
+    lastModified: "2026-10-29T01:51:08.972Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9637b970-57b6-4306-afc6-63e4a213b19a":
     status: "completed"
@@ -62,7 +72,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b1ee136b-d88d-4f2f-848d-70db805df38b":
     issues: ["https://www.notion.so/3f7a80b7192481f8b679c82db62c39f5","https://www.notion.so/3f7a80b7192481a1ace0c96947b08d57","https://www.notion.so/3f7a80b71924816398f4d93e0d38edd2","https://www.notion.so/3f7a80b7192481f88060ea9e55cdbf00","https://www.notion.so/3f7a80b7192481ee9289c4d0f14f3609"]
-    lastModified: "2026-10-29T01:19:09.471Z"
+    lastModified: "2026-10-29T01:49:39.720Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d4f33bf0-b520-43d8-962e-c2269bbf7b39":
     status: "completed"

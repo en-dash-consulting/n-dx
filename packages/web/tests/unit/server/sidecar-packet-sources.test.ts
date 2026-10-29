@@ -11,9 +11,10 @@ import { join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadPrdModel } from "../../../src/server/rex-gateway.js";
-import { prepareReads } from "../../../src/server/routes-sidecar.js";
+import { prepareReads, sidecarContextOptions } from "../../../src/server/routes-sidecar.js";
 import { buildDescribePacket } from "../../../src/server/sidecar/packet-builders.js";
 import { createPacketSources, type SpawnedReads } from "../../../src/server/sidecar/packet-sources.js";
+import type { SidecarSessionRecord } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
 
 const spawned: SpawnedReads = {
@@ -189,5 +190,25 @@ describe("prepareReads", () => {
     });
     expect(await failing.resolve("t1")).toBeNull();
     expect(await failing.preview("t1")).toBeNull();
+  });
+});
+
+describe("sidecarContextOptions packet", () => {
+  const TASK = "c0000000-0000-4000-8000-000000000002";
+
+  it("builds a Describe packet from the spawned reads it is given, not from stubs", async () => {
+    cpSync(resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree"), join(dir, ".rex"), { recursive: true });
+    const ctx = contextFor(dir, (name) => join(dir, `.${name}`));
+    const options = sidecarContextOptions(ctx, {
+      resolve: async () => ({ savedTier: "deep", settings: [{ key: "model", value: "opus", source: "task.run.tier" }], refusals: [], warnings: [] }),
+      preview: async () => "# Task brief\n",
+    });
+    const record = { id: "s1", lens: "describe", target: { ref: TASK } } as SidecarSessionRecord;
+    const text = await options.packet!(record);
+    expect(text).toContain("model = \"opus\" (from task.run.tier)");
+    expect(text).toContain("Tier: deep");
+    expect(text).toContain("## Brief preview digest");
+    expect(text).not.toContain("Not available: the resolve command did not answer");
+    expect(text).not.toContain("Not available: the dry run did not answer");
   });
 });
