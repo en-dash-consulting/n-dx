@@ -189,6 +189,8 @@ class Sidecar {
   sockets = 0;
   /** Bumped whenever an instance is let go, so releases from its connections no longer count. */
   generation = 0;
+  /** The last instance that exited on its own, so a revalidation it raced can tell a crash from a stop. */
+  crashed: ManagedChild | null = null;
   starting: Promise<EnsureResult> | null = null;
 
   constructor(readonly name: string) {}
@@ -263,7 +265,13 @@ export class SidecarManager {
       if (s.handle === handle) await this.stopSidecar(s);
       return this.refuse(s, statusForReason(planned.reason), planned.error, undefined, planned.reason);
     }
-    if (this.closed || s.handle !== handle || s.port === null) return this.refuseClosed(s);
+    if (this.closed) return this.refuseClosed(s);
+    // It exited on its own while the plan was asked for: the plan still holds,
+    // so start it again, as the next request would have.
+    if (handle && s.handle !== handle && s.crashed === handle) return this.start(s);
+    if (s.handle !== handle || s.port === null) {
+      return this.refuse(s, 404, "The sidecar was stopped while revalidating its launch", undefined, "refused");
+    }
     if (touchActivity) s.lastActivity = this.now();
     return { ok: true, port: s.port };
   }
@@ -423,6 +431,7 @@ export class SidecarManager {
       // A handle the hub already let go of was stopped on purpose.
       if (s.handle !== handle) return;
       this.letGo(s);
+      s.crashed = handle;
       this.recordCrash(s, `exited with code ${result.exitCode ?? "null"}`);
     });
 
