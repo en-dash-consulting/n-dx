@@ -491,6 +491,13 @@ export interface HenchConfig {
    */
   skipFullTestGate?: boolean;
   /**
+   * Set by `applyRepoTrust` (store/trust.ts) while the checkout is restricted:
+   * `fullTestCommand` and `testGate.command` / `rerunCommand` were removed, and
+   * the test-command resolver must not read them back from the project config.
+   * Never persisted; not in the schema.
+   */
+  repositoryTestCommandsWithheld?: boolean;
+  /**
    * Full test suite command for mandatory pre-commit gate.
    * Resolution precedence:
    * 1. .hench/config.json fullTestCommand field
@@ -664,9 +671,9 @@ const GO_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("go", {
  * `swift` covers `swift build`, `swift test`, `swift package …`. `make` is
  * included because Swift app codebases very commonly wrap their full build +
  * test + lint gate in a Makefile target (e.g. `make validate`). `xcodebuild`
- * + `xcrun` cover Xcode-driven builds and CLI tools. `.build/` (SPM build
- * cache) and `DerivedData/` (Xcode build cache) are blocked so the agent
- * can't pollute or trip on them.
+ * + `xcrun` cover Xcode-driven builds and CLI tools. Blocked paths are the
+ * shared baseline, which keeps every ecosystem's dependency and build
+ * directories (`.build/`, `DerivedData/`, `node_modules/`, …) out of reach.
  */
 const SWIFT_GUARD_DEFAULTS: GuardConfig = guardWithBaseline("swift", {
   commandTimeout: 60000,           // Swift builds are slower than `go test` — 60s.
@@ -1557,6 +1564,16 @@ export interface RunTrustRecord {
   findings: string[];
 }
 
+/** One of n-dx's own config files a run changed. See `RunRecord.protectedConfigWrites`. */
+export interface RunProtectedConfigWrite {
+  /** Project-relative path. */
+  path: string;
+  /** `replaced`: a protected directory swapped for something else, such as a link out of the project. */
+  change: "created" | "modified" | "deleted" | "replaced";
+  /** False when the pre-run file could not be put back. */
+  restored: boolean;
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -1599,6 +1616,13 @@ export interface RunRecord {
    * `.hench/config.json` said. v1 additive field.
    */
   trust?: RunTrustRecord;
+  /**
+   * n-dx's own config files the run changed — by whichever vendor, provider or
+   * tool — and whether each was put back. Present only when there were any;
+   * the run is failed when it is. Paths only, never content.
+   * v1 additive field.
+   */
+  protectedConfigWrites?: RunProtectedConfigWrite[];
   /**
    * Where this run sits in a `--iterations`/`--loop`/`--epic-by-epic`
    * invocation. Absent for a run started on its own. Written at run start so

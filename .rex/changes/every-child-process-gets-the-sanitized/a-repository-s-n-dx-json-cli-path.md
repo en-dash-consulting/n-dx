@@ -1,0 +1,20 @@
+---
+id: "d6282743-03be-43a4-b97c-e9f9e9b636b8"
+type: "task"
+title: "A repository's .n-dx.json cli_path chooses the binary ndx auth and ndx work run, while the repository is untrusted"
+slug: "a-repository-s-n-dx-json-cli-path"
+description: "**Severity:** high · **Verdict:** out-of-scope (pre-existing; found while reviewing 23dd18ba).\n\n**Failure scenario.** A cloned repository commits `.n-dx.json` with `{\"llm\":{\"claude\":{\"cli_path\":\"./tools/claude\"}}}` (or `llm.codex.cli_path`, or the legacy `claude.cli_path`). The user runs `ndx auth .` (or `ndx config llm.vendor claude`, `ndx init`). `runAuthCheck` reads `configs.llm` raw from `loadAllConfigs` (packages/core/config.js ~3436) and `getVendorAuthPreflightCommand` (~1505) spawns `llmConfig.claude.cli_path`: the repository's script runs with the user's full environment. llm-client's `extractClaudeConfig`/codex extractor (packages/llm-client/src/llm-config.ts:91, :161) also take `cli_path` from the shared file, so hench's vendor CLI spawn follows it. `ndx config` writes `cli_path` to `.n-dx.local.json` (MACHINE_LOCAL_KEYS), but nothing stops the shared file from setting it, and `repo-trust.ts` `collectRepoExecutionConfig` does not count it as execution config.\n\n**Reachability.** Any user running `ndx auth`, `ndx init`, `ndx config llm.vendor` or `ndx work` in an untrusted checkout whose `.n-dx.json` sets a cli_path.\n\n**Options.** 1 (recommended): treat `*.cli_path` like the credential-routing fields — strip them from the project config in `trustedProjectConfig` unless trusted, include them in the trust digest/finding, and make core's preflight read `cli_path` through `loadLLMConfig`/`loadClaudeConfig` instead of the raw merged config. Cost: small, mirrors credential-routing.ts; risk: a user who set cli_path in a shared file by hand must trust or move it to `.n-dx.local.json` (warning names the field). 2: ignore `cli_path` from the shared file entirely (it is machine-local by definition). Simpler; same migration risk.\n\n#635, which this follows up:\n\n> One table from vendor mode to the exact credential names that mode needs, applied only when the mode is active (its flag or config is set).\n\nReproduced by the session on 2026-10-17 against the L2 build: a temp checkout whose .n-dx.json llm.claude.cli_path pointed at its own script; `ndx auth .` ran the script (marker written) and printed \"Credentials valid\" from its output. Captured during the 23dd18ba run; kept in layer 2 by Ryan on 2026-10-17, to run next."
+acceptanceCriteria:
+  - "Closes #635 (follow-up): a repository cannot choose the vendor CLI binary n-dx spawns; a shared cli_path applies only once the repository is trusted"
+  - "An untrusted repository's .n-dx.json llm.claude.cli_path, llm.codex.cli_path or claude.cli_path is not spawned by ndx auth (e2e test with a sentinel script that records it ran)"
+  - "The same fields in .n-dx.local.json are still used"
+  - "llm-client's loaders drop a shared cli_path while the repository is untrusted, with a warning naming the field only"
+  - "A trusted repository that later sets a shared cli_path reads as changed in ndx trust"
+priority: "high"
+tags:
+  - "ndx-adversarial-review"
+  - "severity:high"
+  - "security"
+  - "issue-cleanup"
+source: "ndx-adversarial-review"
+---

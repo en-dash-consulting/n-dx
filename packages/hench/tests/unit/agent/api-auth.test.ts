@@ -169,9 +169,11 @@ describe("API loop authentication and endpoint config", () => {
     expect(resolved).toBe("sk-ant-env-key");
   });
 
-  it("reads api_endpoint from .n-dx.json", async () => {
+  // The project file's endpoint applies only once the repository is trusted
+  // (llm-client credential-routing.ts); these tests use the user's local file.
+  it("reads api_endpoint from the user's .n-dx.local.json", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-test",
@@ -214,12 +216,16 @@ describe("API loop authentication and endpoint config", () => {
       join(projectDir, ".n-dx.json"),
       JSON.stringify({
         claude: {
-          cli_path: "/opt/claude",
           api_key: "sk-ant-all-fields",
-          api_endpoint: "https://proxy.example.com",
           model: "claude-opus-4-20250514",
         },
       }),
+      "utf-8",
+    );
+    // Endpoint and CLI path apply from the shared file only once trusted.
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com", cli_path: "/opt/claude" } }),
       "utf-8",
     );
 
@@ -236,7 +242,7 @@ describe("API loop authentication and endpoint config", () => {
 
   it("dry run succeeds with api_endpoint configured", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-test",
@@ -269,7 +275,7 @@ describe("API loop authentication and endpoint config", () => {
   it("api_endpoint is passed to Anthropic client as baseURL", async () => {
     // Write config with custom endpoint
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-proxy-test",
@@ -328,9 +334,9 @@ describe("CLI loop claude-client integration", () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
-  it("resolves cli_path from .n-dx.json via @n-dx/llm-client", async () => {
+  it("resolves cli_path from .n-dx.local.json via @n-dx/llm-client", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: { cli_path: "/custom/path/to/claude" },
       }),

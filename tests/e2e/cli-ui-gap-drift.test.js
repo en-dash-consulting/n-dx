@@ -33,6 +33,13 @@ const toCrlf = (s) => norm(s).replace(/\n/g, "\r\n");
 const readDoc = () => norm(readFileSync(DOC_PATH, "utf-8"));
 
 describe("docs/cli-ui-gap.md command effects section", () => {
+  it("escapes extension placeholders in prose without escaping generated line breaks", () => {
+    const section = renderCommandEffectsSection();
+    expect(section).toContain("extensions.&lt;name&gt; value with --user");
+    expect(section).not.toContain("an extensions.<name> value");
+    expect(section).toContain("<br>");
+  });
+
   it("matches what the generator produces", () => {
     const committed = readDoc();
     expect(committed, "docs/cli-ui-gap.md is stale — run: node scripts/build-cli-ui-gap.mjs").toBe(

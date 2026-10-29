@@ -1,0 +1,24 @@
+schema: "rex/v2"
+items:
+  "58117c3d-c1eb-4ef0-a0da-ded997c9ebe7":
+    status: "completed"
+    startedAt: "2026-10-27T20:21:12.497Z"
+    completedAt: "2026-10-27T20:25:45.578Z"
+    endedAt: "2026-10-27T20:25:45.578Z"
+    activeIntervals: [{"end":"2026-10-27T20:25:45.578Z","start":"2026-10-27T20:21:12.497Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "applyRepoTrustToEnvPolicy keeps .n-dx.local.json hench.guard.env.allow while restricted, drops the rest, warns only about dropped entries."
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T20:25:45.578Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7106236d-a872-4d8e-951b-771aedb8076c":
+    status: "completed"
+    startedAt: "2026-10-27T20:25:45.578Z"
+    completedAt: "2026-10-27T20:25:45.578Z"
+    endedAt: "2026-10-27T20:25:45.578Z"
+    activeIntervals: [{"end":"2026-10-27T20:25:45.578Z","start":"2026-10-27T20:25:45.578Z"}]
+    appliedAt: "2026-10-27T20:25:45.578Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    assignee: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-27T20:25:45.578Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -1,0 +1,160 @@
+schema: "rex/v2"
+items:
+  "00cd9a30-8a64-4626-8491-d6131ac019fa":
+    status: "completed"
+    startedAt: "2026-10-27T17:54:39.595Z"
+    completedAt: "2026-10-27T17:59:02.543Z"
+    endedAt: "2026-10-27T17:59:02.543Z"
+    activeIntervals: [{"end":"2026-10-27T17:59:02.543Z","start":"2026-10-27T17:54:39.595Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "remove --purge skips the purge and names the package when another discovered package has the same extension name"
+    lastModified: "2026-10-27T17:59:02.543Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "02f9888b-e27d-4a1e-adce-779eab7467a9":
+    status: "completed"
+    startedAt: "2026-10-27T18:12:37.605Z"
+    completedAt: "2026-10-27T18:16:27.857Z"
+    endedAt: "2026-10-27T18:16:27.857Z"
+    activeIntervals: [{"end":"2026-10-27T18:16:27.857Z","start":"2026-10-27T18:12:37.605Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "removeTokenParam in shared/auth.ts drops only ndx_token segments from the raw query; proxy withoutTokenParam and splitTokenQuery use it."
+    lastModified: "2026-10-27T18:16:27.857Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "14c2f50f-112b-4fff-a07e-ae5820c5dbaa":
+    status: "completed"
+    startedAt: "2026-10-27T18:42:46.331Z"
+    completedAt: "2026-10-27T18:42:46.331Z"
+    endedAt: "2026-10-27T18:42:46.331Z"
+    activeIntervals: [{"end":"2026-10-27T18:42:46.331Z","start":"2026-10-27T18:42:46.331Z"}]
+    appliedAt: "2026-10-27T18:42:46.331Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-27T18:42:46.331Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "34624149-f10d-40ae-a334-fc1b4e533727":
+    status: "completed"
+    startedAt: "2026-10-27T18:19:26.733Z"
+    completedAt: "2026-10-27T18:23:34.918Z"
+    endedAt: "2026-10-27T18:23:34.918Z"
+    activeIntervals: [{"end":"2026-10-27T18:23:34.918Z","start":"2026-10-27T18:19:26.733Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "localSpecPath maps file:// specs with fileURLToPath; unit test covers pathToFileURL round-trip plus a platform literal."
+    lastModified: "2026-10-27T18:23:34.918Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "35e2dfd2-9f53-4753-8228-01b4128991b8":
+    status: "completed"
+    startedAt: "2026-10-27T18:03:28.190Z"
+    completedAt: "2026-10-27T18:05:06.387Z"
+    endedAt: "2026-10-27T18:05:06.387Z"
+    activeIntervals: [{"end":"2026-10-27T18:05:06.387Z","start":"2026-10-27T18:03:28.190Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx-door.ts hands mcpDoor req.url without the hub base (query kept); serve.test.ts POSTs /ndx/mcp stripped and under /x/graview-face/. Commit 9363d5ab4."
+    lastModified: "2026-10-27T18:05:06.387Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "3798c6e4-317b-4fe9-8aeb-41491e0def28":
+    status: "completed"
+    startedAt: "2026-10-27T18:23:48.026Z"
+    completedAt: "2026-10-27T18:27:18.998Z"
+    endedAt: "2026-10-27T18:27:18.998Z"
+    activeIntervals: [{"end":"2026-10-27T18:27:18.998Z","start":"2026-10-27T18:23:48.026Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runExtensions looks up SUBCOMMAND_FLAGS by own key only; constructor/toString/__proto__ reach the unknown-subcommand error. Test added. Commit 6f6a86c8e."
+    lastModified: "2026-10-27T18:27:18.998Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "3cb484e4-8668-491e-8927-268164c5d410":
+    status: "completed"
+    startedAt: "2026-10-27T17:48:13.468Z"
+    completedAt: "2026-10-27T17:52:13.522Z"
+    endedAt: "2026-10-27T17:52:13.522Z"
+    activeIntervals: [{"end":"2026-10-27T17:52:13.522Z","start":"2026-10-27T17:48:13.468Z"}]
+    lastModified: "2026-10-27T17:52:13.522Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "5eeaba10-0b5f-4d80-b786-e687846b5627":
+    status: "completed"
+    startedAt: "2026-10-27T18:16:38.328Z"
+    completedAt: "2026-10-27T18:19:16.257Z"
+    endedAt: "2026-10-27T18:19:16.257Z"
+    activeIntervals: [{"end":"2026-10-27T18:19:16.257Z","start":"2026-10-27T18:16:38.328Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "proxy.ts underMount also accepts prefix followed by ? or #; hub-sidecars redirect test covers /x/recon?tab=2 and /x/recon#a."
+    lastModified: "2026-10-27T18:19:16.257Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "69051203-482f-47c2-985a-51565fcc89fe":
+    status: "completed"
+    startedAt: "2026-10-27T18:27:29.358Z"
+    completedAt: "2026-10-27T18:32:37.859Z"
+    endedAt: "2026-10-27T18:32:37.859Z"
+    activeIntervals: [{"end":"2026-10-27T18:32:37.859Z","start":"2026-10-27T18:27:29.358Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "enable returns 130 silently on AbortError; approveOnFirstRun resolves \"interrupted\" instead of throwing; both covered by unit tests that fail on revert."
+    lastModified: "2026-10-27T18:32:37.859Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "9171679e-18fb-4773-8ec6-cc42f7984420":
+    status: "completed"
+    startedAt: "2026-10-27T18:32:48.687Z"
+    completedAt: "2026-10-27T18:38:23.122Z"
+    endedAt: "2026-10-27T18:38:23.122Z"
+    activeIntervals: [{"end":"2026-10-27T18:38:23.122Z","start":"2026-10-27T18:32:48.687Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "extension-dispatch.js escapes every resolution message and hint where it is built; control-character rule and escaper cover U+202A-202E and U+2066-2069 (escaped as \\uNNNN). Tests in extension-dispatch and extension-manifest unit suites. Commit b864e9412."
+    lastModified: "2026-10-27T18:38:23.122Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "b4ca7979-70ef-4f57-844f-d58ab2cec3d7":
+    status: "completed"
+    startedAt: "2026-10-27T17:59:12.652Z"
+    completedAt: "2026-10-27T18:03:17.700Z"
+    endedAt: "2026-10-27T18:03:17.700Z"
+    activeIntervals: [{"end":"2026-10-27T18:03:17.700Z","start":"2026-10-27T17:59:12.652Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "hasComputedRequire follows createRequire names bound by assignment and aliases, flags _load(; coreModules scans .mjs/.cjs; fixtures for each evasion form (66ecac3dd)"
+    lastModified: "2026-10-27T18:03:17.700Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "d882ed86-4d9e-475e-a3f4-5546e59535d1":
+    status: "completed"
+    startedAt: "2026-10-27T18:05:16.834Z"
+    completedAt: "2026-10-27T18:12:26.745Z"
+    endedAt: "2026-10-27T18:12:26.745Z"
+    activeIntervals: [{"end":"2026-10-27T18:12:26.745Z","start":"2026-10-27T18:05:16.834Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "findGlobalRoot recognises pnpm (PNPM_HOME or platform default), yarn classic (default or YARN_GLOBAL_FOLDER) and bun global dirs by location, symlink-tolerant; doctor notes when no global source was recognised."
+    lastModified: "2026-10-27T18:12:26.745Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "e0167d83-bac8-45cb-b6fc-3a94330d1f6a":
+    status: "completed"
+    startedAt: "2026-10-27T17:40:58.776Z"
+    completedAt: "2026-10-27T17:48:03.296Z"
+    endedAt: "2026-10-27T17:48:03.296Z"
+    activeIntervals: [{"end":"2026-10-27T17:48:03.296Z","start":"2026-10-27T17:40:58.776Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "replaceExtensionsFile in extension-discovery.js retries the rename on EPERM/EACCES/EBUSY (2 s backoff budget), removes the tmp file on failure, sweeps dead-pid tmp files; both writers use it."
+    lastModified: "2026-10-27T17:48:03.296Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "e2ad45bb-5c9b-470f-80d2-9effa139db85":
+    status: "completed"
+    startedAt: "2026-10-27T17:52:23.404Z"
+    completedAt: "2026-10-27T17:54:29.025Z"
+    endedAt: "2026-10-27T17:54:29.025Z"
+    activeIntervals: [{"end":"2026-10-27T17:54:29.025Z","start":"2026-10-27T17:52:23.404Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "serve.js detects the hub from PORT plus NDX_EXTENSION_NAME; underMount leaves URLs already under the mount unchanged; serve.test.ts covers both. Commit 414d9164e."
+    lastModified: "2026-10-27T17:54:29.025Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "eb5711bb-8730-40bc-bbd4-606c31bb5ae2":
+    status: "completed"
+    startedAt: "2026-10-27T17:23:47.289Z"
+    completedAt: "2026-10-27T17:27:26.350Z"
+    endedAt: "2026-10-27T17:27:26.350Z"
+    activeIntervals: [{"end":"2026-10-27T17:27:26.350Z","start":"2026-10-27T17:23:47.289Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "runExtensions accepts --quiet, -q, --verbose, --debug for every subcommand; unknown flags still refused; unit test covers both."
+    lastModified: "2026-10-27T17:27:26.350Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+  "fc7cb80d-1cb7-4074-bbad-165858721bb5":
+    status: "completed"
+    startedAt: "2026-10-27T18:38:33.727Z"
+    completedAt: "2026-10-27T18:42:46.331Z"
+    endedAt: "2026-10-27T18:42:46.331Z"
+    activeIntervals: [{"end":"2026-10-27T18:42:46.331Z","start":"2026-10-27T18:38:33.727Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Architecture doc, help.js and two changesets now describe sidecar user-only config, approval binding to source and real path, and non-detached dispatch forwarding SIGTERM/SIGHUP. Commit f47f48652."
+    lastModified: "2026-10-27T18:42:46.331Z"
+    lastModifiedBy: "Sterling H <sterling.h@endash.us>"

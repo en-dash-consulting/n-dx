@@ -31,6 +31,8 @@ import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
+import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
+import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { isSpinningRun } from "../analysis/spin.js";
 import { createLivelockDetector } from "../analysis/livelock.js";
 import type { LivelockDetection, LivelockDetector } from "../analysis/livelock.js";
@@ -102,6 +104,7 @@ import {
   resolveLLMVendor,
   resolveVendorCliPath,
   resolveVendorCliEnv,
+  cliEnvReportLine,
 } from "../../store/project-config.js";
 import { isAbsolute } from "node:path";
 import { UsageMessageFilter } from "../../prd/llm-gateway.js";
@@ -719,6 +722,13 @@ export interface SpawnWithAdapterOptions {
    * heartbeat's counters. Ignored when {@link liveProgress} is set.
    */
   pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
+  /**
+   * The run's snapshot of n-dx's own config files, put back once the CLI
+   * exits. Neither `codex exec` nor an allowed shell command can be denied a
+   * path, so this is what keeps their writes from reaching the next spawn,
+   * completion check or test gate. Writes found are reported at finalization.
+   */
+  configBackstop?: ConfigBackstop;
 }
 
 /** Mid-spawn counters. Mutated in place; read by the heartbeat. */
@@ -783,6 +793,17 @@ export function resetLiveSpawnProgress(progress: LiveSpawnProgress): void {
  *   live child process, which only a real spawn can exercise.
  */
 export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
+  const spawned = spawnVendorCli(opts);
+  const backstop = opts.configBackstop;
+  if (!backstop) return spawned;
+  // Settled either way: a spawn that failed may still have written first.
+  return spawned.finally(() => {
+    const writes = backstop.restore();
+    if (writes.length > 0) info(`\n⚠ ${formatProtectedConfigFinding(writes)}`);
+  });
+}
+
+function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
   const {
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
     useEventPipeline, accumulator, livelock, liveProgress,
@@ -1387,6 +1408,8 @@ export interface ReviewPassContext {
   mcpConfigPath?: string;
   /** Run's heartbeat-visible pid holder, so the record shows the reviewer's pid. */
   pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
+  /** See {@link SpawnWithAdapterOptions.configBackstop}; covers the reviewer and fix spawns. */
+  configBackstop?: ConfigBackstop;
 }
 
 /**
@@ -1579,6 +1602,7 @@ async function runExecutorFix(
         cwd: inv.projectDir,
         tokenMetadata: { vendor: fix.vendor, model: fix.model },
         pidHolder: ctx.pidHolder,
+        configBackstop: ctx.configBackstop,
       }),
     );
   } catch (err) {
@@ -1736,6 +1760,7 @@ export async function runAdversarialReviewPass(
           cwd: inv.projectDir,
           tokenMetadata: { vendor: ctx.vendor, model: ctx.reviewModel },
           pidHolder: ctx.pidHolder,
+          configBackstop: ctx.configBackstop,
         }),
       );
     } catch (err) {
@@ -2375,12 +2400,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // CLI-specific: load config for CLI path and env resolution
   const cliBinary = resolveVendorCliPath(llmConfig, config);
   const cliEnv = resolveVendorCliEnv(llmConfig, config.guard.env, (names, kind) => {
-    detail(
-      kind === "missing-credentials"
-        ? `CLI environment: cloud mode is on but none of ${names.join(", ")} is set; the CLI falls back to default credential files or instance metadata`
-        : `CLI environment: stripped ${names.join(", ")}`,
-      { captureWhenQuiet: true },
-    );
+    detail(cliEnvReportLine("CLI environment", names, kind), { captureWhenQuiet: true });
   });
 
   // Pin the spawned session's MCP servers to *this* project directory, so the
@@ -2424,8 +2444,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         vendor: reviewVendor,
         cliBinary: pairVendor ? resolveVendorCliPath({ ...llmConfig, vendor: pairVendor }, config) : cliBinary,
         cliEnv: pairVendor
-          ? resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names) => {
-            detail(`${pairVendor} reviewer environment: stripped ${names.join(", ")}`, { captureWhenQuiet: true });
+          ? resolveVendorCliEnv({ ...llmConfig, vendor: pairVendor }, config.guard.env, (names, kind) => {
+            detail(cliEnvReportLine(`${pairVendor} reviewer environment`, names, kind), { captureWhenQuiet: true });
           })
           : cliEnv,
         ...(pairVendor
@@ -2459,6 +2479,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         taskTitle: brief.task.title,
         mcpConfigPath: reviewerMcpConfigPath,
         pidHolder: liveProgress,
+        configBackstop: opts.configBackstop,
       }
     : undefined;
 
@@ -2710,6 +2731,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           cwd: projectDir,
           tokenMetadata,
           pidHolder: liveProgress,
+          configBackstop: opts.configBackstop,
         }),
     });
     warmParentId = decision.parentId;
@@ -2947,6 +2969,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             accumulator: attemptAccumulator,
             livelock,
             liveProgress,
+            configBackstop: opts.configBackstop,
           }),
         );
         // This attempt's numbers are about to be added to `accumulated`; the
@@ -3198,6 +3221,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     baselineDirty,
     startingHead,
     reviewOptional: opts.reviewOptional,
+    configBackstop: opts.configBackstop,
   });
 
   // Retry overhead, recorded whatever the outcome: a task that took four

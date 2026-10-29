@@ -5,7 +5,9 @@
  * error. Every reviewer failure must still reach `runCrossVendorReview` as
  * `spawnError`, because that is the signal it falls back to the shell test
  * command on. Nothing in the real config loaders rejects on a malformed file
- * today, so the failure is injected by mocking `config.js`.
+ * today, so the failure is injected by mocking `config.js`. The reviewer's
+ * cli_path sits in the user's own `.n-dx.local.json`, because a repository's
+ * `.n-dx.json` cli_path applies only once the checkout is trusted.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -67,7 +69,7 @@ describe("reviewer environment cannot be resolved", () => {
 
   it("runCrossVendorReview then runs the configured test command", async () => {
     writeFileSync(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx.local.json"),
       JSON.stringify({ llm: { claude: { cli_path: writeMockReviewer(tmpDir) } } }),
       "utf-8",
     );
@@ -84,7 +86,7 @@ describe("reviewer environment cannot be resolved", () => {
 
   it("without a test command the review is skipped, naming the cause", async () => {
     writeFileSync(
-      join(tmpDir, ".n-dx.json"),
+      join(tmpDir, ".n-dx.local.json"),
       JSON.stringify({ llm: { claude: { cli_path: writeMockReviewer(tmpDir) } } }),
       "utf-8",
     );
