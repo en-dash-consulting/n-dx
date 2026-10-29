@@ -211,7 +211,9 @@ export function BranchHealthStrip({ workspace, branch, revision, doFetch }: {
           setError(null);
         }
       } catch (err) {
-        if (live) setError(err instanceof Error ? err.message : "Branch health failed");
+        if (!live) return;
+        setOff(false);
+        setError(err instanceof Error ? err.message : "Branch health failed");
       }
     })();
     return () => {

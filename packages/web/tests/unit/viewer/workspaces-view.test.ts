@@ -682,6 +682,38 @@ describe("WorkspacesView branch health strip", () => {
     expect(note.textContent).toBe("Branch health is off in this worktree (git.branchHealth in its .n-dx.json).");
   });
 
+  it("drops the off note when a later read of that worktree fails", async () => {
+    const { fetcher } = withToggle(true);
+    let branchTree = BRANCH_TREE;
+    let failing = false;
+    const wrapped = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/worktrees") return jsonResponse([ANCHOR_TREE, branchTree]);
+      const workspace = new Headers(init?.headers).get("X-Ndx-Workspace");
+      if (url === "/api/branch-health" && workspace === "feature") {
+        if (failing) throw new Error("connection refused");
+        return jsonResponse({ error: "off", feature: "git.branchHealth", kind: "feature_disabled", suggestion: "" }, 403);
+      }
+      return fetcher(input, init);
+    }) as typeof fetch;
+    const socket = makeSocket();
+    root = await mount(h(WorkspacesView, { fetcher: wrapped, socketFactory: socket.factory }));
+    await settle();
+    expect(root.querySelectorAll(".workspace-card")[1].querySelector(".branch-health-off")).not.toBeNull();
+
+    failing = true;
+    branchTree = { ...BRANCH_TREE, runs: { total: 3, running: 0, lastFinishedAt: "2026-09-16T13:00:00.000Z" } };
+    await act(async () => {
+      socket.push({ type: "hench:run-changed", workspace: "feature" });
+      await new Promise((r) => setTimeout(r, 500)); // past the burst debounce
+    });
+    await settle();
+
+    const card = root.querySelectorAll(".workspace-card")[1];
+    expect(card.querySelector(".branch-health-off")).toBeNull();
+    expect(card.querySelector(".branch-health-error")!.textContent).toBe("connection refused");
+  });
+
   it("re-reads a card's branch health when a run in that worktree finishes", async () => {
     const { fetcher, calls } = withToggle(true);
     let branchTree = BRANCH_TREE;
