@@ -14,6 +14,7 @@
 
 import { h, type ComponentChildren } from "preact";
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import { resolveCliLabel, useCliName } from "../hooks/index.js";
 
 interface SettingsResponse {
   mode: "ask";
@@ -31,8 +32,8 @@ interface Rule {
 
 const MS_PER_MINUTE = 60_000;
 
-/** Commands that are never allow-listed; shown locked, and the server refuses them. */
-export const LOCKED_COMMANDS = ["ndx work", "git reset", "git push"] as const;
+/** Commands that are never allow-listed; shown locked, and the server refuses them. `{cli}` is resolveCliLabel's. */
+export const LOCKED_COMMANDS = ["{cli} work", "git reset", "git push"] as const;
 
 export const SIDECAR_LOCKED_MODE = "Auto";
 
@@ -279,6 +280,7 @@ function NumberInput({ label, value, placeholder, unit, error, onInput }: {
 
 function AllowListEditor({ form }: { form: SidecarSettingsForm }) {
   const [draft, setDraft] = useState("");
+  const cliName = useCliName();
   const add = () => {
     form.onAddRule(draft);
     setDraft("");
@@ -304,7 +306,7 @@ function AllowListEditor({ form }: { form: SidecarSettingsForm }) {
         )),
       ...LOCKED_COMMANDS.map((command) =>
         h("li", { key: `locked:${command}`, class: "sidecar-allow-rule", "data-state": "locked" },
-          h("code", null, command),
+          h("code", null, resolveCliLabel(command, cliName)),
           h("span", { class: "ct-badge-modified" }, "locked"),
           h("span", { class: "ct-field-impact" }, "never allow-listed"),
         )),
@@ -314,7 +316,7 @@ function AllowListEditor({ form }: { form: SidecarSettingsForm }) {
         type: "text",
         class: "ct-input",
         value: draft,
-        placeholder: "ndx status",
+        placeholder: `${cliName} status`,
         "aria-label": "Command to allow",
         onInput: (e: Event) => setDraft((e.target as HTMLInputElement).value),
         onKeyDown: (e: KeyboardEvent) => {

@@ -123,7 +123,8 @@ describe("Workflow Sidecar section", () => {
     expect(mode.value).toBe("ask");
     expect(mode.querySelector<HTMLOptionElement>('option[value="auto"]')!.disabled).toBe(true);
     const locked = [...section.querySelectorAll('.sidecar-allow-rule[data-state="locked"] code')].map((c) => c.textContent);
-    expect(locked).toEqual(["ndx work", "git reset", "git push"]);
+    // The work row names the project's CLI (useCliName; "n-dx" with no /api/project).
+    expect(locked).toEqual(["n-dx work", "git reset", "git push"]);
     expect(section.querySelector(".sidecar-allow-rule code")!.textContent).toBe("ndx status .");
   });
 
