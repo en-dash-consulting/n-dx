@@ -114,6 +114,8 @@ const VALUE_KEYS = new Set([
   "summary",
   "migration",
   "cut-at",
+  "before",
+  "after",
   "proposed",
   "statement",
   ...MULTI_VALUE_KEYS,
@@ -412,7 +414,7 @@ async function dispatchCommand(
   // their own dir resolution and requireRexDir check inside the case block.
   const SKIP_DIR_CHECK = new Set([
     "init", "analyze", "import", "update", "move", "add", "reshape", "remove",
-    "log", "parse-md", "product", "change",
+    "log", "parse-md", "product", "change", "migrate-diff",
     // Invoked by git with temp-file paths (%O %A %B) from any cwd —
     // there is no project dir to check.
     "merge-driver", "merge-state",
@@ -625,6 +627,11 @@ async function dispatchCommand(
       await cmdMigratePlan(resolveDir(positional), flags);
       break;
     }
+    case "migrate-diff": {
+      const { cmdMigrateDiff } = await import("./commands/migrate-diff.js");
+      await cmdMigrateDiff(flags);
+      break;
+    }
     case "migrate-apply": {
       const { cmdMigrateApply } = await import("./commands/migrate-apply.js");
       await cmdMigrateApply(resolveDir(positional), flags);
@@ -694,7 +701,7 @@ async function dispatchCommand(
         "prune", "restore", "validate", "fix", "usage", "report", "verify", "ready", "log",
         "recommend", "analyze", "import", "export", "import-bundle", "codeowners",
         "release", "reorganize", "health", "product", "change", "mcp",
-        "migrate-plan", "migrate-apply", "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
+        "migrate-plan", "migrate-diff", "migrate-apply", "migrate-to-md", "migrate-to-folder-tree", "migrate-folder-tree-filenames", "migrate-slugs", "merge-driver", "merge-state", "parse-md",
         "backfill-commit-attribution",
       ];
       const typoHint = formatTypoSuggestion(command, REX_COMMANDS, "rex ");
