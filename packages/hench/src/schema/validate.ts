@@ -199,6 +199,17 @@ export const HenchConfigSchema = z.object({
       rounds: z.number().int().min(MIN_REVIEW_ROUNDS).max(MAX_REVIEW_ROUNDS).optional(),
     })
     .optional(),
+  // No defaults, like review: the escalation resolver applies them.
+  escalation: z
+    .object({
+      enabled: z.boolean().optional(),
+      after: z.number().int().positive().optional(),
+      vendor: z.enum(["claude", "codex", "google", "local"]).optional(),
+      // Blank is accepted and means unset (activeEscalation trims it).
+      model: z.string().optional(),
+      maxAttempts: z.number().int().positive().optional(),
+    })
+    .optional(),
   promptCache: z.boolean().optional(),
   promptCacheTtl: z.enum(["5m", "1h"]).optional(),
 });
@@ -507,6 +518,11 @@ export const RunRecordSchema = z.object({
   vendor: z.string().optional(),
   weight: z.string().optional(),
   modelSource: z.string().optional(),
+  // Passthrough so a field a later build adds survives this one's load.
+  escalation: z
+    .object({ escalated: z.literal(true), vendor: z.string(), failures: z.number() })
+    .passthrough()
+    .optional(),
   parentSessionId: z.string().optional(),
   session: RunSessionRecordSchema.optional(),
   contextCondensations: z.number().optional(),

@@ -631,7 +631,7 @@ function coerceValue(newValue, existingValue) {
  * and wrong for a host: `ndx config llm.local.host 127.1` would store the
  * number 127.1, and every reader of the URL would then refuse it.
  */
-const STRING_SETTINGS = new Set(["llm.local.host", "llm.local.verifier.host"]);
+const STRING_SETTINGS = new Set(["llm.local.host", "llm.local.verifier.host", "hench.escalation.model"]);
 
 /**
  * Settings that are numbers whatever the file holds today. `coerceValue` keeps
@@ -1246,7 +1246,29 @@ const HENCH_VALIDATORS = {
       );
     }
   },
+  "escalation.enabled": (value) => {
+    if (typeof value !== "boolean") {
+      throw new Error(`Invalid escalation.enabled "${value}". Expected true or false.`);
+    }
+  },
+  "escalation.after": (value) => requirePositiveInteger("escalation.after", value),
+  "escalation.maxAttempts": (value) => requirePositiveInteger("escalation.maxAttempts", value),
+  "escalation.vendor": (value) => {
+    if (!ESCALATION_VENDORS.includes(value)) {
+      throw new Error(`Invalid escalation vendor "${value}". Expected one of: ${ESCALATION_VENDORS.join(", ")}.`);
+    }
+  },
 };
+
+/** Vendors `hench.escalation.vendor` accepts: every vendor hench can run on. */
+const ESCALATION_VENDORS = ["claude", "codex", "google", "local"];
+
+/** Refuse anything but a whole number of at least 1, as hench's schema does. */
+function requirePositiveInteger(key, value) {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`Invalid ${key} "${value}". Expected a whole number of at least 1.`);
+  }
+}
 
 /**
  * Validators for specific claude config keys.
@@ -2237,6 +2259,24 @@ Hench review settings (the review pass after a task validates):
                                      1-3 (default: 2)
                                      The reviewer's model stays llm.<vendor>.reviewModel, then
                                      llm.reviewModel, then the vendor default.
+
+Hench escalation settings (a failing task gets a stronger model before it is skipped):
+  hench.escalation.enabled boolean   Escalate a task that keeps failing before skipping it as
+                                     stuck (default: false). Off leaves hench.maxFailedAttempts
+                                     exactly as before.
+  hench.escalation.after   number    Consecutive failed attempts before the next attempt is
+                                     escalated (default: 2; never later than
+                                     hench.maxFailedAttempts)
+  hench.escalation.vendor  string    Vendor an escalated attempt runs on: "claude", "codex",
+                                     "google" or "local". Required for escalation. It runs on
+                                     that vendor's CLI when it has one, else its API.
+  hench.escalation.model   string    Model an escalated attempt runs on. Unset means the
+                                     escalation vendor's own configured model. An explicit
+                                     --model flag disables escalation for that run, and a
+                                     task's saved run block still outranks this.
+  hench.escalation.maxAttempts
+                           number    Escalated attempts before the task is skipped as stuck
+                                     (default: 1)
 
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths

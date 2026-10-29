@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, enclosingChangeIds, findItem, findParentResets, indexTree, isAppliedChange, isChangeLayerStore, loadPrdModel, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunLoopPosition, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunLoopPosition, RunMemoryStats, RunReviewPlan, RunEscalation, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
 import type { GitCommitMessageSource, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -37,7 +37,7 @@ import type { ClaimLostEvent, TaskClaims } from "../../process/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
-import type { PromptEnvelope } from "../../prd/llm-gateway.js";
+import type { LLMVendor, PromptEnvelope } from "../../prd/llm-gateway.js";
 import {
   excludeHenchRuntimeArtifacts,
   matchesProjectPath,
@@ -249,6 +249,15 @@ export interface SharedLoopOptions {
    */
   modelWeight?: string;
   modelSource?: string;
+  /**
+   * Run on this vendor instead of the project's `llm.vendor` — set only for an
+   * escalated attempt (`hench.escalation`), whose {@link model} the caller
+   * resolved for this vendor. The loop makes it the active vendor in the LLM
+   * config it loads, so the adapter, binary and provider all follow.
+   */
+  vendorOverride?: LLMVendor;
+  /** Recorded on the run as {@link RunRecord.escalation} when the attempt is escalated. */
+  escalation?: RunEscalation;
   /**
    * Show the diff and prompt for approval before finalizing (`--approve-diff`).
    *
@@ -584,6 +593,8 @@ export interface InitRunOptions {
   permissionMode?: string;
   /** The review pass the run was launched with (`--review`), recorded on the run from its first save. */
   reviewPlan?: RunReviewPlan;
+  /** Set for an escalated attempt; see {@link RunRecord.escalation}. */
+  escalation?: RunEscalation;
   /**
    * Where this run sits in a `--iterations`/`--loop`/`--epic-by-epic`
    * invocation — see {@link RunRecord.loop}. Absent for a run started on its
@@ -771,6 +782,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     modelSource: opts.modelSource,
     session: opts.session,
     ...(opts.reviewPlan ? { reviewPlan: opts.reviewPlan } : {}),
+    ...(opts.escalation ? { escalation: opts.escalation } : {}),
     ...(opts.loop ? { loop: opts.loop } : {}),
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),

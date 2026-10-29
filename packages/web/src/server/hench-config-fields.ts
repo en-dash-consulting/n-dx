@@ -104,6 +104,11 @@ export const CONFIG_FIELD_META: ConfigFieldInfo[] = [
 
   // ── Task selection ──
   { path: "maxFailedAttempts", label: "Max Failed Attempts", description: "Consecutive failures before a task is considered stuck", type: "number", integer: true, positive: true, category: "task-selection", defaultValue: 3 },
+  { path: "escalation.enabled", label: "Escalate Before Stuck", description: "Run a task that keeps failing on the escalation vendor before skipping it as stuck (default false)", type: "boolean", category: "task-selection" },
+  { path: "escalation.after", label: "Escalate After (failures)", description: "Consecutive failed attempts before the next one is escalated (default 2)", type: "number", integer: true, positive: true, category: "task-selection" },
+  { path: "escalation.vendor", label: "Escalation Vendor", description: "Vendor an escalated attempt runs on; escalation needs one", type: "enum", enumValues: ["claude", "codex", "google", "local"], category: "task-selection" },
+  { path: "escalation.model", label: "Escalation Model", description: "Model an escalated attempt runs on. Unset means the escalation vendor's configured model", type: "string", category: "task-selection" },
+  { path: "escalation.maxAttempts", label: "Escalated Attempts", description: "Escalated attempts before the task is skipped as stuck (default 1)", type: "number", integer: true, positive: true, category: "task-selection" },
   { path: "rexDir", label: "Rex Directory", description: "Path to the rex PRD directory for task data", type: "string", category: "task-selection", defaultValue: PROJECT_DIRS.REX },
 
   // ── Retry policy ──

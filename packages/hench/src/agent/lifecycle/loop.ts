@@ -18,6 +18,7 @@ import {
   loadLLMConfig,
   resolveApiKey,
   resolveLLMVendor,
+  withVendorOverride,
 } from "../../store/project-config.js";
 import { LLM_VENDOR, resolveModel, defaultRegistry, DEFAULT_EXECUTION_POLICY, classifyLLMError, getNextFailoverAttempt, toOpenAiToolDefs, parseLmStudioError, resolveLocalTimeoutMs, fetchLocalCompletion, ClaudeClientError } from "../../prd/llm-gateway.js";
 import type {
@@ -774,6 +775,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
     ...(opts.loop ? { loop: opts.loop } : {}),
+    ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
@@ -1447,6 +1449,7 @@ async function runLocalToolLoop(params: {
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
     ...(opts.loop ? { loop: opts.loop } : {}),
+    ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 
@@ -1855,7 +1858,8 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const baselineDirty = await captureBaselineDirty(projectDir);
 
   // Resolve provider — registry or legacy path based on config flag
-  const llmConfig = await loadLLMConfig(henchDir);
+  // An escalated attempt runs on another vendor (see cli-loop.ts).
+  const llmConfig = withVendorOverride(await loadLLMConfig(henchDir), opts.vendorOverride);
   const effectiveVendor = resolveLLMVendor(llmConfig);
 
   // The previous run failed only at the test gate with its work committed:
@@ -1880,6 +1884,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
       ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
       ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
       ...(opts.loop ? { loop: opts.loop } : {}),
+      ...(opts.escalation ? { escalation: opts.escalation } : {}),
     });
     await executeGateOnlyRetry({
       plan: gateOnly,
@@ -1992,6 +1997,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     ...(opts.modelWeight !== undefined ? { weight: opts.modelWeight } : {}),
     ...(opts.modelSource !== undefined ? { modelSource: opts.modelSource } : {}),
     ...(opts.loop ? { loop: opts.loop } : {}),
+    ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
   const briefText = formatTaskBrief(withCommitTrailers(brief, run));
 

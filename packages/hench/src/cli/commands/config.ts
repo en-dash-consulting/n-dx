@@ -261,6 +261,50 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
       `Tasks will be skipped as stuck after ${v} consecutive failures`,
   },
   {
+    path: "escalation.enabled",
+    label: "Escalate Before Stuck",
+    description: "Run a task that keeps failing on hench.escalation.vendor before skipping it as stuck (default false)",
+    type: "boolean",
+    category: "task-selection",
+    impact: (v) =>
+      v === true || v === "true"
+        ? "A failing task gets an attempt on the escalation vendor/model before it is skipped as stuck"
+        : "Failing tasks are skipped as stuck after hench.maxFailedAttempts, as before",
+  },
+  {
+    path: "escalation.after",
+    label: "Escalate After (failures)",
+    description: "Consecutive failed attempts before the next one is escalated (default 2)",
+    type: "number",
+    category: "task-selection",
+    impact: (v) => `A task's attempt after ${v} consecutive failures runs on the escalation vendor/model`,
+  },
+  {
+    path: "escalation.vendor",
+    label: "Escalation Vendor",
+    description: "Vendor an escalated attempt runs on; escalation needs one",
+    type: "enum",
+    enumValues: ["claude", "codex", "google", "local"],
+    category: "task-selection",
+    impact: (v) => `Escalated attempts run on ${v}`,
+  },
+  {
+    path: "escalation.model",
+    label: "Escalation Model",
+    description: "Model an escalated attempt runs on. Unset means the escalation vendor's configured model",
+    type: "string",
+    category: "task-selection",
+    impact: (v) => `Escalated attempts run on model "${v}"`,
+  },
+  {
+    path: "escalation.maxAttempts",
+    label: "Escalated Attempts",
+    description: "Escalated attempts before the task is skipped as stuck (default 1)",
+    type: "number",
+    category: "task-selection",
+    impact: (v) => `A task is skipped as stuck after ${v} failed escalated attempt${Number(v) === 1 ? "" : "s"}`,
+  },
+  {
     path: "rexDir",
     label: "Rex Directory",
     description: "Path to the .rex directory for task data",
