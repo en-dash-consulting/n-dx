@@ -318,6 +318,7 @@ describe("root subset test files", () => {
 
   it("runs the drift tests that compare a package source to its artifact or its twin", () => {
     expect(ROOT_DRIFT_TEST_FILES).toEqual([
+      "tests/e2e/open-source-scope.test.js",
       "tests/e2e/prompt-census.test.js",
       "tests/e2e/iso-skill-drift.test.js",
       "tests/e2e/hench-config-gate-contract.test.js",
