@@ -282,6 +282,73 @@ describe("SidecarManager", () => {
     expect(asked()).toBe(2);
   });
 
+  it("restarts a sidecar that exits while a request revalidates its plan, rather than refusing", async () => {
+    const exited = logGate("exited with code 1");
+    let hold: Promise<void> | null = null;
+    let release!: () => void;
+    let resolveAsked!: () => void;
+    const asked = new Promise<void>((resolve) => {
+      resolveAsked = resolve;
+    });
+    const { m } = manager("ok", {
+      log: exited.log,
+      plan: async (name): Promise<PlanResult> => {
+        if (hold) {
+          resolveAsked();
+          await hold;
+        }
+        return { ok: true, plan: planFor(name) };
+      },
+    });
+    const first = await m.ensure("recon");
+    const pid = m.list()[0].pid!;
+    hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    // Still `running` to the hub, so this request revalidates; the sidecar dies while the plan is held.
+    const revalidating = m.ensure("recon");
+    await asked;
+    hold = null;
+    await fetch(`http://127.0.0.1:${(first as { port: number }).port}/die`, { headers: { "X-Ndx-Sidecar-Secret": m.secret("recon")! } }).then((r) => r.text());
+    await exited.seen;
+    release();
+
+    expect(await revalidating).toMatchObject({ ok: true });
+    expect(m.list()[0]).toMatchObject({ state: "running", recentCrashes: 1 });
+    expect(m.list()[0].pid).not.toBe(pid);
+  });
+
+  it("leaves a sidecar stopped on purpose while a request revalidates its plan stopped", async () => {
+    let hold: Promise<void> | null = null;
+    let release!: () => void;
+    let resolveAsked!: () => void;
+    const asked = new Promise<void>((resolve) => {
+      resolveAsked = resolve;
+    });
+    const { m } = manager("ok", {
+      plan: async (name): Promise<PlanResult> => {
+        if (hold) {
+          resolveAsked();
+          await hold;
+        }
+        return { ok: true, plan: planFor(name) };
+      },
+    });
+    await m.ensure("recon");
+    hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const revalidating = m.ensure("recon");
+    await asked;
+    expect(await m.stop("recon")).toBe(true);
+    release();
+
+    expect(await revalidating).toMatchObject({ ok: false, status: 404, reason: "refused" });
+    expect(m.list()[0]).toMatchObject({ state: "stopped", pid: null, recentCrashes: 0 });
+  });
+
   it("backs off after three crashes in five minutes, and starts again once they age out", async () => {
     let now = 5_000_000;
     const { m, asked } = manager("crash", { now: () => now });
