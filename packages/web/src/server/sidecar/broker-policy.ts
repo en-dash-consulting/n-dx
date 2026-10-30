@@ -19,6 +19,7 @@ export const BROKER_TOOL_NAMES = [
   "run_command",
   "start_work",
   "propose_prd_change",
+  "propose_run_plan",
   "place_change_card",
   "propose_edit",
   "github_read",
@@ -34,6 +35,7 @@ export type SidecarCardKind =
   | "command"
   | "work"
   | "change-set"
+  | "run-plan"
   | "placement"
   | "edit"
   | "network-read"
@@ -57,6 +59,8 @@ export const BROKER_TOOL_POLICY: Readonly<Record<BrokerToolName, BrokerToolPolic
   run_command: { card: "command", allowList: "per-call" },
   start_work: { card: "work", allowList: "never" },
   propose_prd_change: { card: "change-set", allowList: "never" },
+  // A plan is advice that leads to work, so it is decided card by card like work itself.
+  propose_run_plan: { card: "run-plan", allowList: "never" },
   place_change_card: { card: "placement", allowList: "never" },
   propose_edit: { card: "edit", allowList: "never" },
   github_read: { card: "network-read", allowList: "per-tool" },

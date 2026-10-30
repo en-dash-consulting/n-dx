@@ -42,6 +42,22 @@ export const DIAGNOSE_RUN_INSTRUCTIONS = [
 ].join("\n");
 
 /**
+ * Guide. The planner has already formed the lanes and said why each task is in
+ * one or left out; the model reads that plan to the operator and raises the
+ * run-plan card. It never forms a lane of its own, and never starts anything.
+ */
+export const GUIDE_INSTRUCTIONS = [
+  "## How to guide",
+  "Say what to run next and why, from the queue planner's plan in the packet.",
+  "- Use the lanes exactly as the planner formed them: its commands, its task order, its reasons. Do not regroup, reorder or add to them, and never write a `ndx work` command of your own.",
+  "- Say why each excluded task was left out, in the planner's words, and how many runs are active against the limit.",
+  "- Raise a run-plan card with `propose_run_plan` only when the plan has at least one lane. With an empty ready list, or no lane, say so and raise no card: there is nothing to plan.",
+  "- The card is the only way to propose a plan. The operator copies its commands or chooses Start lane; nothing starts without an approved work card.",
+  "- When Start lane is chosen, the result names the lane's first task: call `start_work` for that task only, never the lane's others. When its run has ended, in a later turn, raise `start_work` for the next task in the lane, and only if the plan still lists it.",
+  "- Use only what the packet states. Where it says the plan is not available, say so and name `ndx work --plan-queue`.",
+].join("\n");
+
+/**
  * Describe. The agent cannot judge a model's answer, so the instructions name
  * the check it makes (vague done-when) and the one route for a fix: a
  * change-set card the operator edits and approves, never prose to paste.

@@ -31,6 +31,7 @@ import {
 } from "../../../src/server/sidecar/ledger.js";
 import { loadPrdModel } from "../../../src/server/rex-gateway.js";
 import type { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "../../../src/server/routes-hench-prep.js";
+import type { readQueuePlan } from "../../../src/server/routes-hench.js";
 import { prepareReads } from "../../../src/server/routes-sidecar.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { buildLensPacket } from "../../../src/server/sidecar/lens-packets.js";
@@ -488,6 +489,8 @@ describe("the packet opens the first turn", () => {
       runs: async () => [],
       taskRun: async () => null,
       diagnose: async () => null,
+      queuePlan: async () => null,
+      featureEnabled: () => true,
     };
     const task = "c0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
@@ -534,6 +537,7 @@ describe("the packet opens the first turn", () => {
       resolve: hang("resolve") as typeof resolveTaskRun,
       preview: hang("preview") as typeof previewTaskRun,
       diagnose: (async () => ({ ok: false, failure: "not read by a describe packet" })) as typeof diagnoseTaskRun,
+      queuePlan: (async () => ({ ok: false, failure: "not read by a describe packet" })) as typeof readQueuePlan,
     });
     const sources: PacketSources = {
       sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },
@@ -546,6 +550,8 @@ describe("the packet opens the first turn", () => {
       runs: async () => [],
       taskRun: async () => null,
       diagnose: (id, signal) => spawned.diagnose(id, signal),
+      queuePlan: (signal) => spawned.queuePlan(signal),
+      featureEnabled: () => true,
     };
     const task = "c0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
@@ -590,8 +596,10 @@ describe("the packet opens the first turn", () => {
       runs: async () => [],
       taskRun: async () => null,
       diagnose: async () => null,
+      queuePlan: async () => null,
+      featureEnabled: () => true,
     };
-    const capability = "a0000000-0000-4000-8000-000000000002";
+    const capability ="a0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
       dir,
       connect: () => ({ spawn: fakeSpawn }),

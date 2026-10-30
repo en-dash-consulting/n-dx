@@ -2,11 +2,12 @@
  * What an approved broker call does.
  *
  * The broker decides a call (`broker.ts`); this module carries out the
- * decided call and words the tool result the session's agent reads. Three
+ * decided call and words the tool result the session's agent reads. Four
  * tools run today: `run_command` as the workspace's Sidecar command job,
- * `start_work` through the hench execute route, and `propose_prd_change` as
+ * `start_work` through the hench execute route, `propose_prd_change` as
  * its change-set card's PRD write (`change-set.ts`), with the operator's
- * edits. Every other approved call is recorded on its card and names the
+ * edits, and `propose_run_plan`, which starts nothing: it names the chosen
+ * lane's first task for a `start_work` card. Every other approved call is recorded on its card and names the
  * batch that will carry it out.
  *
  * The effects themselves are injected ({@link SidecarActions}): the command
@@ -16,7 +17,8 @@
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.3, §12.
  */
 
-import type { SidecarChangeSet } from "../../shared/index.js";
+import { laneSteps, stepExtraFlags } from "../../shared/index.js";
+import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import type { BrokerOutcome } from "./broker.js";
 
@@ -39,6 +41,8 @@ export interface SidecarActions {
   reviewChangeSet(input: Record<string, unknown>): Promise<SidecarChangeSet | string>;
   /** An approved change-set card's write, under the PRD lock. Never throws. */
   writeChangeSet(changeSet: SidecarChangeSet): Promise<CarryOutResult>;
+  /** The queue planner's plan for a run-plan card, or why there is none to raise a card for. Never throws. */
+  readRunPlan(signal?: AbortSignal): Promise<QueuePlan | string>;
 }
 
 /** The tools that are recorded but not carried out yet, and the batch that will carry each out. */
@@ -99,9 +103,42 @@ async function carryOut(
         : "";
       return { ...written, text: `${written.text}${edited}` };
     }
+    case "propose_run_plan":
+      return runPlanResult(outcome);
     default:
       return { ok: false, text: `${tool} has no effect to carry out; nothing ran.` };
   }
+}
+
+/**
+ * The result of an approved run-plan card: the operator chose a lane, and
+ * the agent is told to raise `start_work` for that lane's first task alone.
+ * Nothing starts here; the work card is what the operator approves next. A
+ * first step that carries a flag a work card cannot (`--require-unblocked`)
+ * is not started from a card, and the result says so.
+ */
+function runPlanResult(outcome: BrokerOutcome): CarryOutResult {
+  if (outcome.decidedBy === "allow-list") return { ok: false, text: "A run plan is never allowed by the allow-list; nothing ran." };
+  const { runPlan, lane: chosen } = outcome.card;
+  const lane = runPlan && chosen !== undefined ? runPlan.lanes[chosen] : undefined;
+  if (!runPlan || !lane || chosen === undefined || lane.tasks.length === 0) return { ok: false, text: "The card carried no lane; nothing started." };
+  const steps = laneSteps(lane);
+  const [first, ...rest] = lane.tasks;
+  const flags = stepExtraFlags(steps[0] ?? "");
+  const remaining = rest.map((task, i) => `${task.id} ${task.title}: ${steps[i + 1] ?? "(no command)"}`);
+  const later = remaining.length > 0
+    ? ` Its other tasks wait, in order: ${remaining.join("; ")}. Do not start them now: when this task's run has ended, raise the next start_work card in a later turn.`
+    : "";
+  if (flags.length > 0) {
+    return {
+      ok: false,
+      text: `Lane ${chosen + 1} was chosen, but its first step is \`${steps[0]}\`, which carries ${flags.join(" ")} and a work card cannot. Nothing started; tell the operator to run the lane's command from a terminal.`,
+    };
+  }
+  return {
+    ok: true,
+    text: `The operator chose lane ${chosen + 1} (change ${lane.changeId}). Nothing has started. Call start_work for its first task only: ${first.id} ${first.title} (\`${steps[0]}\`).${later}`,
+  };
 }
 
 /**

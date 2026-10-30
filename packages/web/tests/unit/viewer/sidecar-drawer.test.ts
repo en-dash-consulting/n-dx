@@ -917,6 +917,8 @@ describe("permission cards", () => {
     command: { tool: "run_command", input: { argv: ["ndx", "status", "."] }, title: "ndx status ." },
     work: { tool: "start_work", input: { taskId: "425819f5", options: { review: true } }, title: "n-dx work --task=425819f5 --auto --review ." },
     "change-set": { tool: "propose_prd_change", input: { items: [{ title: "a" }, { title: "b" }] }, title: "2 items" },
+    // Without its plan (a card from before the plan was read) the title falls back to the tool.
+    "run-plan": { tool: "propose_run_plan", input: { note: "two lanes" }, title: "propose_run_plan" },
     placement: { tool: "place_change_card", input: { change: "CH-212", target: "A3.2", relation: "amends" }, title: "CH-212 → A3.2" },
     edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },

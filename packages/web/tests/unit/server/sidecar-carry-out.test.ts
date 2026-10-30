@@ -359,6 +359,7 @@ describe("start_work", () => {
       "review = true (from cli-flag)",
       "Warnings:",
       "- dirty-tree: The working tree has uncommitted changes",
+      "Active runs: 0 of 3",
     ].join("\n"));
     expect(spawnManagedMock).not.toHaveBeenCalled();
 
@@ -398,6 +399,177 @@ describe("start_work", () => {
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(/Nothing started: Task "missing" not found in PRD\.$/);
     expect(spawnManagedMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+});
+
+describe("work card run slots", () => {
+  beforeEach(async () => {
+    execMock.mockImplementation(async (_bin: string, args: string[]) =>
+      args.includes("--resolve")
+        ? { exitCode: 0, stdout: JSON.stringify(RESOLUTION), stderr: "" }
+        : { exitCode: 1, stdout: "", stderr: "unexpected exec in test" });
+    writeFileSync(join(root, ".rex", ".cache", "prd.json"), JSON.stringify({
+      schema: "rex/v1",
+      title: "slots",
+      items: [1, 2, 3, 4].map((n) => ({ id: `task-${n}`, title: `Task ${n}`, status: "pending", level: "task" })),
+    }));
+    await serve();
+  });
+
+  it("shows active runs against the limit of three, and refuses the approval that would make a fourth", async () => {
+    const client = await brokerClient();
+    const starts: string[] = [];
+    for (const n of [1, 2, 3]) {
+      cardMessages = [];
+      const call = client.callTool({ name: "start_work", arguments: { taskId: `task-${n}` } });
+      const { cardId } = await cardAnnounced("pending");
+      expect(broker.cards(SESSION).find((c) => c.id === cardId)?.preview).toMatch(new RegExp(`\\nActive runs: ${n - 1} of 3$`));
+      await decide(cardId, { decision: "approve" });
+      starts.push(resultText(await call));
+    }
+    expect(spawnManagedMock).toHaveBeenCalledTimes(3);
+
+    cardMessages = [];
+    const fourth = client.callTool({ name: "start_work", arguments: { taskId: "task-4" } });
+    const { cardId } = await cardAnnounced("pending");
+    const preview = broker.cards(SESSION).find((c) => c.id === cardId)!.preview!;
+    expect(preview).toMatch(/\nActive runs: 3 of 3 \(the limit: approving now starts nothing, the concurrent run limit is reached \(3 of 3 runs, guard\.maxConcurrentProcesses\)\)$/);
+    await decide(cardId, { decision: "approve" });
+    const result = await fourth;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/Nothing started: the concurrent run limit is reached \(3 of 3 runs, guard\.maxConcurrentProcesses\)\.$/);
+    expect(spawnManagedMock).toHaveBeenCalledTimes(3);
+    await client.close();
+  });
+});
+
+describe("propose_run_plan", () => {
+  const PLAN = {
+    lanes: [
+      {
+        command: "ndx work --task=task-1 --auto . && ndx work --task=task-2 --auto .",
+        changeId: "change-a",
+        tasks: [
+          { id: "task-1", title: "Carry it out", reason: "ready; first in its change" },
+          { id: "task-2", title: "And this", reason: "follows task-1" },
+        ],
+      },
+      { command: "ndx work --task=task-3 --auto .", changeId: "change-b", tasks: [{ id: "task-3", title: "Elsewhere", reason: "ready" }] },
+    ],
+    excluded: [],
+    activeRuns: 1,
+    runLimit: 3,
+    summary: "2 lanes from 3 ready tasks.",
+  };
+  let plan: unknown;
+
+  beforeEach(async () => {
+    plan = PLAN;
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" }, features: { hench: { readyNext: true } } }));
+    execMock.mockImplementation(async (_bin: string, args: string[]) =>
+      args.includes("--plan-queue")
+        ? { launched: true, exitCode: 0, stdout: JSON.stringify(plan), stderr: "" }
+        : args.includes("--resolve")
+          ? { exitCode: 0, stdout: JSON.stringify(RESOLUTION), stderr: "" }
+          : { exitCode: 1, stdout: "", stderr: "unexpected exec in test" });
+    await serve();
+  });
+
+  const planSpawns = (): number => execMock.mock.calls.filter(([, args]) => (args as string[]).includes("--plan-queue")).length;
+
+  it("raises a run-plan card of the planner's lanes with their exact commands, and starts nothing", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "propose_run_plan", arguments: { note: "Two lanes can run side by side." } });
+    const { cardId } = await cardAnnounced("pending");
+
+    const card = broker.cards(SESSION).find((c) => c.id === cardId)!;
+    expect(card).toMatchObject({ kind: "run-plan", tool: "propose_run_plan", allowListKey: null, status: "pending", runPlan: PLAN });
+    expect(card.runPlan!.lanes.map((l) => l.command)).toEqual([
+      "ndx work --task=task-1 --auto . && ndx work --task=task-2 --auto .",
+      "ndx work --task=task-3 --auto .",
+    ]);
+    expect(planSpawns()).toBe(1);
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+
+    // Not now: nothing started, and the agent is told so.
+    await decide(cardId, { decision: "deny" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe(`The operator denied card ${cardId}. Nothing ran.`);
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("Start lane names the lane's first task alone, lists the rest with their commands, and starts nothing until a work card is approved", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "propose_run_plan", arguments: {} });
+    const { cardId } = await cardAnnounced("pending");
+    expect((await decide(cardId, { decision: "approve" })).status).toBe(400);
+    expect((await decide(cardId, { decision: "approve", lane: 7 })).status).toBe(400);
+    expect((await decide(cardId, { decision: "approve", lane: 0 })).status).toBe(200);
+
+    const result = await call;
+    expect(result.isError).toBeFalsy();
+    const text = resultText(result);
+    expect(text).toContain("The operator chose lane 1 (change change-a). Nothing has started. Call start_work for its first task only: task-1 Carry it out (`ndx work --task=task-1 --auto .`).");
+    expect(text).toContain("Its other tasks wait, in order: task-2 And this: ndx work --task=task-2 --auto .");
+    expect(text).toContain("raise the next start_work card in a later turn");
+    expect(text).not.toContain("task-3");
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+
+    // The agent's next call is a work card for that task; the plan itself never started a run.
+    cardMessages = [];
+    const start = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+    const work = await cardAnnounced("pending");
+    expect(broker.cards(SESSION).find((c) => c.id === work.cardId)).toMatchObject({ kind: "work", input: { taskId: "task-1" } });
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+    await decide(work.cardId, { decision: "approve" });
+    expect(resultText(await start)).toMatch(/Started run exec-\w+ on task task-1/);
+    expect(spawnManagedMock).toHaveBeenCalledTimes(1);
+    await client.close();
+  });
+
+  it("will not start a lane whose first step carries a flag a work card cannot", async () => {
+    plan = { ...PLAN, lanes: [{ ...PLAN.lanes[0], command: "ndx work --task=task-1 --require-unblocked --auto . && ndx work --task=task-2 --auto ." }] };
+    const client = await brokerClient();
+    const call = client.callTool({ name: "propose_run_plan", arguments: {} });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve", lane: 0 });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain("carries --require-unblocked and a work card cannot. Nothing started");
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("raises no card when the planner has no lane", async () => {
+    plan = { lanes: [], excluded: [], activeRuns: 0, runLimit: 3, summary: "Nothing is ready." };
+    const client = await brokerClient();
+    const result = await client.callTool({ name: "propose_run_plan", arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe("No card was raised: the planner has no lane (Nothing is ready.). Nothing started.");
+    expect(broker.cards(SESSION)).toEqual([]);
+    await client.close();
+  });
+
+  it("raises no card, and spawns no planner, while hench.readyNext is off", async () => {
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }));
+    const client = await brokerClient();
+    const result = await client.callTool({ name: "propose_run_plan", arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe("No card was raised: the hench.readyNext feature is off. Nothing started.");
+    expect(planSpawns()).toBe(0);
+    expect(broker.cards(SESSION)).toEqual([]);
+    await client.close();
+  });
+
+  it("raises no card when the planner fails", async () => {
+    execMock.mockImplementation(async () => ({ launched: true, exitCode: 2, stdout: "", stderr: "boom" }));
+    const client = await brokerClient();
+    const result = await client.callTool({ name: "propose_run_plan", arguments: {} });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/^No card was raised: '[\w-]+ work --plan-queue' did not complete: boom\. Nothing started\.$/);
+    expect(broker.cards(SESSION)).toEqual([]);
     await client.close();
   });
 });

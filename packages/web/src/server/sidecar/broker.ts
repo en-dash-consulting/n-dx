@@ -29,7 +29,7 @@ import {
   type BrokerToolName,
   type SidecarCardKind,
 } from "./broker-policy.js";
-import type { SidecarChangeSet } from "../../shared/index.js";
+import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
 import { appendLedgerEntry, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
@@ -48,6 +48,10 @@ export interface SidecarCard {
   preview?: string;
   /** A change-set card's items as approval writes them, read against the PRD before the card was raised. */
   changeSet?: SidecarChangeSet;
+  /** A run-plan card's plan as the planner printed it when the card was raised; its commands are never the model's. */
+  runPlan?: QueuePlan;
+  /** The lane (0-based) the operator chose to start on a run-plan card. */
+  lane?: number;
   status: SidecarCardStatus;
   raisedAt: string;
   decidedAt?: string;
@@ -65,6 +69,7 @@ export interface SidecarCard {
 export interface CardAnnex {
   preview?: string;
   changeSet?: SidecarChangeSet;
+  runPlan?: QueuePlan;
 }
 
 /** How a broker call was settled. */
@@ -79,6 +84,8 @@ export interface CardDecision {
   remember?: boolean;
   /** A change-set card's item edits, written by the approval. Refused on any other card or decision. */
   edits?: unknown;
+  /** A run-plan card's Start lane: the lane (0-based) whose first task is to be started. Only on a run-plan approval, and required there. */
+  lane?: number;
 }
 
 /** A refused decision; `status` is the HTTP status a route answers with. */
@@ -148,6 +155,7 @@ export class SidecarBroker {
       allowListKey: key,
       ...(annex.preview !== undefined && { preview: annex.preview }),
       ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
+      ...(annex.runPlan !== undefined && { runPlan: annex.runPlan }),
       status: "pending",
       raisedAt: this.iso(),
     };
@@ -222,6 +230,15 @@ export class SidecarBroker {
       if (typeof applied === "string") throw new BrokerDecisionError(400, applied);
       edited = applied;
     }
+    if (card.kind === "run-plan" && decision.approve) {
+      const lanes = card.runPlan?.lanes.length ?? 0;
+      if (decision.lane === undefined) throw new BrokerDecisionError(400, "A run-plan card is approved by choosing a lane to start");
+      if (!Number.isInteger(decision.lane) || decision.lane < 0 || decision.lane >= lanes) {
+        throw new BrokerDecisionError(400, `"lane" must be a lane of the plan (0 to ${lanes - 1})`);
+      }
+    } else if (decision.lane !== undefined) {
+      throw new BrokerDecisionError(409, card.kind === "run-plan" ? "Only an approval chooses a lane" : `A ${card.kind} card takes no lane`);
+    }
     if (decision.remember) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval can be remembered");
       if (card.allowListKey === null) {
@@ -234,6 +251,7 @@ export class SidecarBroker {
       card.changeSet = edited;
       card.edited = true;
     }
+    if (decision.lane !== undefined) card.lane = decision.lane;
     this.settle(cardId, decision.approve ? "approved" : "denied", decision.reason);
     return { ...card };
   }

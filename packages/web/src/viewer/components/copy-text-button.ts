@@ -15,9 +15,11 @@ export interface CopyTextButtonProps {
   class?: string;
   /** Accessible name. Default: "Copy the command". */
   label?: string;
+  /** What the button reads while idle. Default: "Copy". */
+  caption?: string;
 }
 
-export function CopyTextButton({ text, class: className, label = "Copy the command" }: CopyTextButtonProps) {
+export function CopyTextButton({ text, class: className, label = "Copy the command", caption = "Copy" }: CopyTextButtonProps) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const copy = useCallback(async () => {
     try {
@@ -30,5 +32,5 @@ export function CopyTextButton({ text, class: className, label = "Copy the comma
     setTimeout(() => setState("idle"), 2000);
   }, [text]);
   return h("button", { type: "button", class: className, onClick: copy, "aria-label": label },
-    state === "copied" ? "Copied" : state === "failed" ? "Copy failed — select it" : "Copy");
+    state === "copied" ? "Copied" : state === "failed" ? "Copy failed — select it" : caption);
 }

@@ -1,7 +1,7 @@
 /**
  * Which packet each Sidecar lens opens a turn with.
  *
- * Four lenses have a builder today. General sends no packet. The rest need a
+ * Five lenses have a builder today. General sends no packet. The rest need a
  * data source that does not exist yet, so they register as unavailable and
  * name it: a lens never sends a partial packet in place of the real one, and
  * the drawer can say why it is greyed out. When a source lands, its lens
@@ -19,10 +19,12 @@ import {
   buildDescribePacket,
   buildDiagnoseRunPacket,
   buildExplainPacket,
+  buildGuidePacket,
   buildPlanPacket,
   DESCRIBE_CAP,
   DIAGNOSE_RUN_CAP,
   EXPLAIN_CAP,
+  GUIDE_CAP,
   PLAN_CAP,
   type PacketTarget,
 } from "./packet-builders.js";
@@ -55,15 +57,29 @@ export type LensPacketPlan =
       cap: number;
       build: (sources: PacketSources, target: PacketTarget, now: string, signal?: AbortSignal) => Promise<Packet>;
       target?: LensTarget;
+      /** A dashboard feature the lens needs on: while it is off the lens is unavailable and nothing is read. */
+      feature?: LensFeature;
     }
   | { kind: "unavailable"; needs: string };
+
+/** The feature toggle a lens depends on (the registry key in routes-features.ts) and what to say when it is off. */
+export interface LensFeature {
+  key: string;
+  needs: string;
+}
 
 export const LENS_PACKETS: Readonly<Record<LensId, LensPacketPlan>> = {
   general: { kind: "none" },
   explain: { kind: "packet", cap: EXPLAIN_CAP, build: buildExplainPacket },
   describe: { kind: "packet", cap: DESCRIBE_CAP, build: buildDescribePacket },
   plan: { kind: "packet", cap: PLAN_CAP, build: buildPlanPacket },
-  guide: { kind: "unavailable", needs: "the queue planner" },
+  // The target is the ready list as a whole: Live attaches it, and no ref is needed.
+  guide: {
+    kind: "packet",
+    cap: GUIDE_CAP,
+    build: buildGuidePacket,
+    feature: { key: "hench.readyNext", needs: "the hench.readyNext feature turned on" },
+  },
   "diagnose-run": {
     kind: "packet",
     cap: DIAGNOSE_RUN_CAP,
@@ -101,6 +117,7 @@ export async function buildLensPacket(
   const plan = LENS_PACKETS[lens];
   if (plan.kind === "none") return { status: "none", lens };
   if (plan.kind === "unavailable") return { status: "unavailable", lens, needs: plan.needs };
+  if (plan.feature && !sources.featureEnabled(plan.feature.key)) return { status: "unavailable", lens, needs: plan.feature.needs };
   if (plan.target && !target.ref) return { status: "unavailable", lens, needs: plan.target.needs };
   return { status: "ready", lens, packet: await plan.build(sources, target, now, signal) };
 }

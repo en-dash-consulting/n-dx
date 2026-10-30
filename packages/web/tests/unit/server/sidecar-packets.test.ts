@@ -10,7 +10,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { indexTree, loadPrdModel, nodeSpec, specHash } from "../../../src/server/rex-gateway.js";
-import { DESCRIBE_INSTRUCTIONS, DIAGNOSE_RUN_INSTRUCTIONS } from "../../../src/server/sidecar/lens-instructions.js";
+import type { QueuePlan } from "../../../src/shared/index.js";
+import { DESCRIBE_INSTRUCTIONS, DIAGNOSE_RUN_INSTRUCTIONS, GUIDE_INSTRUCTIONS } from "../../../src/server/sidecar/lens-instructions.js";
 import { assemblePacket, type PacketSection } from "../../../src/server/sidecar/packet.js";
 import {
   buildDescribePacket,
@@ -20,6 +21,7 @@ import {
   DESCRIBE_CAP,
   DIAGNOSE_RUN_CAP,
   EXPLAIN_CAP,
+  GUIDE_CAP,
   PLAN_CAP,
 } from "../../../src/server/sidecar/packet-builders.js";
 import type { PacketSources, RunGateRead, TaskRunRead } from "../../../src/server/sidecar/packet-sources.js";
@@ -90,6 +92,8 @@ async function sourcesFor(layout: "v1" | "v2", overrides: Partial<PacketSources>
     ],
     taskRun: async () => null,
     diagnose: async () => null,
+    queuePlan: async () => null,
+    featureEnabled: () => true,
     ...overrides,
   };
 }
@@ -780,8 +784,78 @@ describe("lens registry", () => {
     }
   });
 
+  describe("Guide", () => {
+    const PLAN: QueuePlan = {
+      lanes: [
+        {
+          command: "ndx work --task=t1 --auto . && ndx work --task=t2 --require-unblocked --auto .",
+          changeId: "ch1",
+          tasks: [
+            { id: "t1", title: "Wire the button", reason: "ready; first in its change" },
+            { id: "t2", title: "Style the button", reason: "follows t1 in the same change" },
+          ],
+        },
+      ],
+      excluded: [{ id: "t9", title: "Migrate the schema", reason: "tagged migration: runs cold, on its own" }],
+      activeRuns: 1,
+      runLimit: 3,
+      summary: "1 lane from 3 ready tasks.",
+    };
+
+    it("is a 6k packet whose body is the planner's plan, read through the injected source", async () => {
+      const queuePlan = vi.fn(async () => PLAN);
+      const controller = new AbortController();
+      const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan }), NOW, controller.signal);
+      expect(queuePlan).toHaveBeenCalledWith(controller.signal);
+      if (result.status !== "ready") throw new Error(`expected a packet, got ${result.status}`);
+      const { packet } = result;
+      expect(LENS_PACKETS.guide).toMatchObject({ kind: "packet", cap: GUIDE_CAP });
+      expect(packet).toMatchObject({ lens: "guide", cap: 6_000, cut: [] });
+      expect(packet.chars).toBeLessThanOrEqual(6_000);
+      expect(packet.text).toContain("Active runs: 1 of 3");
+      expect(packet.text).toContain("1 lane from 3 ready tasks.");
+      expect(packet.text).toContain(`Lane 1 (change ch1): ${PLAN.lanes[0].command}`);
+      expect(packet.text).toContain("t2 Style the button: follows t1 in the same change");
+      expect(packet.text).toContain("t9 Migrate the schema: tagged migration: runs cold, on its own");
+      expect(packet.text).toContain(GUIDE_INSTRUCTIONS);
+      expect(packet.sections.every((s) => s.provenance.source === "`ndx work --plan-queue --format=json`")).toBe(true);
+    });
+
+    it("needs no task: an empty ready list says so, and the instructions forbid a run-plan card", async () => {
+      const empty: QueuePlan = { lanes: [], excluded: [], activeRuns: 0, runLimit: 3, summary: "Nothing is ready." };
+      const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan: async () => empty }), NOW);
+      if (result.status !== "ready") throw new Error(`expected a packet, got ${result.status}`);
+      expect(result.packet.text).toContain("The ready list is empty: no task is ready to run, so there is no lane to plan and no run-plan card to raise.");
+      expect(GUIDE_INSTRUCTIONS).toMatch(/Raise a run-plan card with `propose_run_plan` only when the plan has at least one lane\. With an empty ready list/);
+    });
+
+    it("with ready tasks but no lane, says there is nothing to start and lists why each was left out", async () => {
+      const none: QueuePlan = { ...PLAN, lanes: [], summary: "Every ready task was left out." };
+      const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan: async () => none }), NOW);
+      if (result.status !== "ready") throw new Error(`expected a packet, got ${result.status}`);
+      expect(result.packet.text).toContain("No lane: every ready task was left out. There is nothing to start, so raise no run-plan card.");
+      expect(result.packet.text).toContain("t9 Migrate the schema");
+    });
+
+    it("marks the plan unavailable, naming the command, when the planner does not answer", async () => {
+      const result = await buildLensPacket("guide", {}, await sourcesFor("v2", { queuePlan: async () => null }), NOW);
+      if (result.status !== "ready") throw new Error(`expected a packet, got ${result.status}`);
+      expect(result.packet.text).toContain("Not available: the planner did not answer. Run `ndx work --plan-queue --format=json` to see why");
+    });
+
+    it("while hench.readyNext is off is unavailable, naming it, and builds no packet and spawns no planner", async () => {
+      const queuePlan = vi.fn(async () => PLAN);
+      const prd = vi.fn();
+      const featureEnabled = vi.fn(() => false);
+      const result = await buildLensPacket("guide", {}, { ...(await sourcesFor("v2", { queuePlan, featureEnabled })), prd }, NOW);
+      expect(result).toEqual({ status: "unavailable", lens: "guide", needs: "the hench.readyNext feature turned on" });
+      expect(featureEnabled).toHaveBeenCalledWith("hench.readyNext");
+      expect(queuePlan).not.toHaveBeenCalled();
+      expect(prd).not.toHaveBeenCalled();
+    });
+  });
+
   it.each([
-    ["guide", "the queue planner"],
     ["diagnose-branch", "the branch status collector"],
     ["place", "the Inbox list read"],
     ["migrate", "the migration plan reads"],

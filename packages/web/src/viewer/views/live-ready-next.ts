@@ -13,25 +13,11 @@
 
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import type { PlannedTask as PlanTask, QueuePlan } from "../external.js";
 import type { NavigateTo } from "../types.js";
 
 /** The registry key in routes-features.ts. */
 export const READY_NEXT_FEATURE = "hench.readyNext";
-
-interface PlanTask {
-  id: string;
-  title: string;
-  reason: string;
-}
-
-/** What `ndx work --plan-queue --format=json` prints. Mirrors hench's `QueuePlan`. */
-export interface QueuePlan {
-  lanes: Array<{ command: string; changeId: string; tasks: PlanTask[] }>;
-  excluded: PlanTask[];
-  activeRuns: number;
-  runLimit: number;
-  summary: string;
-}
 
 /** A planned task: its title opens the task, as an Up next item does. */
 function TaskLine({ task, navigateTo }: { task: PlanTask; navigateTo: NavigateTo }) {

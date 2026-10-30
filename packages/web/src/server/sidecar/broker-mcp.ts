@@ -57,6 +57,14 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
       target: z.string().optional().describe("v2: the capability or constraint the change touches"),
     },
   },
+  propose_run_plan: {
+    description: [
+      "Propose the queue planner's run plan. Always waits for the operator's run-plan card, which lists each lane with its exact `ndx work` command as the planner printed it; you give no commands.",
+      "The operator copies the commands or chooses Start lane; the result then names the lane's first task, for which you call start_work.",
+      "Refused when the planner has no lane. Starts nothing.",
+    ].join(" "),
+    input: { note: z.string().optional().describe("One line on why this plan, shown on the card") },
+  },
   place_change_card: {
     description: "Propose placing a change on a capability or constraint. Always waits for the operator's placement card.",
     input: { change: z.string().min(1), target: z.string().min(1), relation: z.string().min(1), amendment: z.string().optional() },
@@ -102,6 +110,14 @@ export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, 
         const changeSet = await actions.reviewChangeSet(input);
         if (typeof changeSet === "string") return text(`No card was raised: ${changeSet}. Nothing was written.`, true);
         annex.changeSet = changeSet;
+      }
+      // A run-plan card lists the planner's own lanes; with no plan, or no lane, no card is raised.
+      if (name === "propose_run_plan") {
+        if (!actions) return text("No card was raised: this server cannot read the queue planner. Nothing started.", true);
+        const plan = await actions.readRunPlan(extra.signal);
+        if (typeof plan === "string") return text(`No card was raised: ${plan}. Nothing started.`, true);
+        if (plan.lanes.length === 0) return text(`No card was raised: the planner has no lane (${plan.summary}). Nothing started.`, true);
+        annex.runPlan = plan;
       }
       const outcome = await broker.request(sessionId, name, input, extra.signal, annex);
       // A stopped turn ends the wait on an effect (a command), never the effect itself.

@@ -10,7 +10,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -124,6 +124,7 @@ const noEffects: SidecarActions = {
   startWork: async () => ({ ok: true, text: "Started it." }),
   reviewChangeSet: async () => ({ layout: "v1", items: [{ title: "x", type: "epic" }] }),
   writeChangeSet: async () => ({ ok: true, text: "Wrote it.", ids: ["x"] }),
+  readRunPlan: async () => "this test plans nothing",
 };
 
 function newRegistry(): SidecarSessionRegistry {
@@ -263,13 +264,20 @@ describe("lens registry", () => {
     const { lenses } = await res.json() as { lenses: Array<{ id: string; available: boolean; needs?: string }> };
     expect(lenses.map((l) => l.id)).toEqual([...LENS_IDS]);
     expect(lenses.find((l) => l.id === "plan")).toEqual({ id: "plan", available: true });
-    expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: false, needs: "the queue planner" });
+    // Guide reads the queue planner, which is behind hench.readyNext (off by default).
+    expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: false, needs: "the hench.readyNext feature turned on" });
     expect(lenses.find((l) => l.id === "diagnose-run")).toEqual({
       id: "diagnose-run",
       available: true,
       target: { kind: "task", needs: "a task to diagnose" },
     });
     expect((await fetch(`${server.baseUrl}/api/sidecar/lenses`, { method: "POST" })).status).toBe(405);
+  });
+
+  it("offers Guide, with no task to attach, once hench.readyNext is on, with no restart", async () => {
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { hench: { readyNext: true } } }));
+    const { lenses } = await (await fetch(`${server.baseUrl}/api/sidecar/lenses`)).json() as { lenses: Array<{ id: string }> };
+    expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: true });
   });
 });
 
@@ -486,7 +494,7 @@ describe("broker", () => {
     return (result.content as Array<{ text: string }>)[0].text;
   }
 
-  it("serves the nine broker tools while a turn runs, and refuses with no turn running", async () => {
+  it("serves the ten broker tools while a turn runs, and refuses with no turn running", async () => {
     const idle = await createSession();
     const refused = await fetch(`${server.baseUrl}/api/sidecar/sessions/${idle}/mcp`, {
       method: "POST",
@@ -500,7 +508,7 @@ describe("broker", () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "draft_github_post", "github_read", "ledger_append", "migration_decision", "place_change_card",
-      "propose_edit", "propose_prd_change", "run_command", "start_work",
+      "propose_edit", "propose_prd_change", "propose_run_plan", "run_command", "start_work",
     ]);
     await client.close();
     await api(`/${id}/interrupt`, { method: "POST" });

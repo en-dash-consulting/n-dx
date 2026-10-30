@@ -76,6 +76,31 @@ model to pass to `start_work` on a re-run or `--fresh`. The spawned verdict
 passes through `redactDeep` like the recorded one: its evidence quotes the
 run's error.
 
+## Sidecar Guide and the run-plan card
+
+The Guide packet (6k cap) is the queue planner's plan as hench printed it:
+lanes with their commands and reasons, the tasks left out and why, active
+runs against the limit. It is read through `readQueuePlan` in
+`routes-hench.ts`, the same spawn and parse `GET /api/hench/plan-queue`
+uses, injected as `SpawnedReads.queuePlan` (web has no `node:child_process`
+and no hench import). Its target is the whole ready list, so no ref is
+needed. While `hench.readyNext` is off, `GET /api/sidecar/lenses` reports the
+lens unavailable and naming that toggle, and `buildLensPacket` reads
+nothing: no packet, no planner spawn. The gate is `SpawnedReads.featureEnabled`
+because packet code imports no route.
+
+`propose_run_plan` raises a run-plan card and is never allow-listable. The
+model gives no commands: the broker reads the planner itself (refusing with
+no card when it has no lane or the toggle is off) and the card carries that
+plan. Copy commands is the page's own clipboard write, with no broker call.
+Start lane approves the card with `lane`, and the tool result then names that
+lane's first task alone for a `start_work` card, listing the rest with their
+exact commands for a later turn. A first step carrying a flag a work card
+cannot (`--require-unblocked`) is not started from a card. Nothing starts
+without an approved work card, whose preview shows active runs against
+`guard.maxConcurrentProcesses`; approving one that would make a run past the
+limit is refused with that reason.
+
 ## HTTP-request concurrency
 
 When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:

@@ -30,7 +30,7 @@ import { useSidecarSessions } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
 import { GENERAL_LENS, useSidecarAttachment } from "./use-sidecar-attachment.js";
 import type { SidecarAttachment, SidecarPageSelection } from "./use-sidecar-attachment.js";
-import type { SidecarChangeSet, SidecarChangeSetEdit } from "../external.js";
+import type { QueuePlan, SidecarChangeSet, SidecarChangeSetEdit } from "../external.js";
 
 // ---------------------------------------------------------------------------
 // Shape — mirrors server/routes-sidecar.ts and server/sidecar/session-registry.ts
@@ -79,6 +79,7 @@ export type SidecarCardKind =
   | "command"
   | "work"
   | "change-set"
+  | "run-plan"
   | "placement"
   | "edit"
   | "network-read"
@@ -98,6 +99,10 @@ export interface SidecarCard {
   preview?: string;
   /** A change-set card's items as approval writes them. */
   changeSet?: SidecarChangeSet;
+  /** A run-plan card's plan, as the planner printed it when the card was raised. */
+  runPlan?: QueuePlan;
+  /** The lane (0-based) the operator started from a run-plan card. */
+  lane?: number;
   status: "pending" | "approved" | "denied" | "withdrawn";
   raisedAt: string;
   decidedAt?: string;
@@ -119,6 +124,8 @@ export interface SidecarCardDecision {
   remember?: boolean;
   /** A change-set approval's item edits; the approval writes the edited values. */
   edits?: SidecarChangeSetEdit[];
+  /** A run-plan card's Start lane: the 0-based lane whose first task to start. */
+  lane?: number;
 }
 
 /**
@@ -667,6 +674,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
         ...(reason && { reason }),
         ...(decision.remember && { remember: true }),
         ...(decision.approve && decision.edits?.length && { edits: decision.edits }),
+        ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
       },
     );
     if (!mountedRef.current) return;

@@ -14,12 +14,13 @@
 import { capabilityReport, indexTree, isAppliedChange, productReport } from "../rex-gateway.js";
 import type { RuleNode, V2Tree } from "../rex-gateway.js";
 import { assemblePacket, type Packet, type PacketSection, type Staleness } from "./packet.js";
-import { DESCRIBE_INSTRUCTIONS, DIAGNOSE_RUN_INSTRUCTIONS, EXPLAIN_INSTRUCTIONS } from "./lens-instructions.js";
+import { DESCRIBE_INSTRUCTIONS, DIAGNOSE_RUN_INSTRUCTIONS, EXPLAIN_INSTRUCTIONS, GUIDE_INSTRUCTIONS } from "./lens-instructions.js";
 import type { PacketSources, PrdRead, ResolveRead, RunGateRead, RunReviewRead, RunSettingsRead, RunVerdictRead } from "./packet-sources.js";
 
 export const EXPLAIN_CAP = 8_000;
 export const DESCRIBE_CAP = 8_000;
 export const DIAGNOSE_RUN_CAP = 8_000;
+export const GUIDE_CAP = 6_000;
 export const PLAN_CAP = 10_000;
 
 /** What the operator pointed the lens at: an item id, display id or alias. Plan may have none. */
@@ -703,6 +704,62 @@ export async function buildDiagnoseRunPacket(
       staleness: FRESH,
     });
   }
+  return done(sections);
+}
+
+// ── Guide ────────────────────────────────────────────────────────────
+
+const PLAN_QUEUE_COMMAND = "ndx work --plan-queue --format=json";
+
+/**
+ * Guide: the queue planner's plan (lanes with their commands and reasons, what
+ * it left out and why, active runs against the limit), as hench's planner
+ * printed it. The lens's target is the whole ready list, so no ref is needed.
+ */
+export async function buildGuidePacket(
+  sources: PacketSources,
+  target: PacketTarget,
+  now: string,
+  signal?: AbortSignal,
+): Promise<Packet> {
+  const lens = "guide";
+  const head = `${header(lens, target)}\n\n${GUIDE_INSTRUCTIONS}`;
+  const source = `\`${PLAN_QUEUE_COMMAND}\``;
+  const done = (sections: PacketSection[]): Packet => assemblePacket({ lens, cap: GUIDE_CAP, header: head, sections });
+  const plan = await sources.queuePlan(signal);
+  if (!plan) return done([gap("plan", "Queue plan", `the planner did not answer. Run \`${PLAN_QUEUE_COMMAND}\` to see why`, now, source)]);
+
+  const section = (id: string, title: string, body: string): PacketSection => ({
+    id,
+    title,
+    body,
+    provenance: { source, generatedAt: now },
+    staleness: FRESH,
+  });
+  const sections = [
+    section("summary", "Plan summary", `${oneLine(plan.summary, 300)}\nActive runs: ${plan.activeRuns} of ${plan.runLimit}`),
+  ];
+  if (plan.lanes.length === 0 && plan.excluded.length === 0) {
+    sections.push(section("ready", "Ready list", "The ready list is empty: no task is ready to run, so there is no lane to plan and no run-plan card to raise."));
+    return done(sections);
+  }
+  sections.push(
+    section(
+      "lanes",
+      "Lanes",
+      plan.lanes.length === 0
+        ? "No lane: every ready task was left out. There is nothing to start, so raise no run-plan card."
+        : plan.lanes
+            .map((lane, i) =>
+              [
+                `Lane ${i + 1} (change ${lane.changeId}): ${lane.command}`,
+                ...lane.tasks.map((t) => `  - ${t.id} ${oneLine(t.title, 120)}: ${oneLine(t.reason, 200)}`),
+              ].join("\n"),
+            )
+            .join("\n"),
+    ),
+    section("excluded", "Left out of every lane", bullets(plan.excluded.map((t) => `${t.id} ${oneLine(t.title, 120)}: ${oneLine(t.reason, 200)}`), "No ready task was left out.")),
+  );
   return done(sections);
 }
 

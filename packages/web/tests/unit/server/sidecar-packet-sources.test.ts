@@ -22,6 +22,8 @@ const spawned: SpawnedReads = {
   resolve: async () => null,
   preview: async () => null,
   diagnose: async () => null,
+  queuePlan: async () => null,
+  featureEnabled: () => true,
 };
 
 let dir: string;
@@ -311,7 +313,12 @@ describe("prepareReads", () => {
           diagnosis: { runId, taskId: "t1", class: "no-changes", summary: "none", evidence: [], actions: [], attempt: { n: 1, of: 2 } },
         };
       },
+      queuePlan: async () => {
+        calls.push("queuePlan");
+        return { ok: true, plan: { lanes: [], excluded: [], activeRuns: 0, runLimit: 3, summary: "Nothing is ready." } };
+      },
     });
+    expect(await reads.queuePlan()).toMatchObject({ runLimit: 3, summary: "Nothing is ready." });
     expect(await reads.diagnose("r1")).toMatchObject({ class: "no-changes", attempt: { n: 1, of: 2 } });
     expect(await reads.resolve("t1")).toEqual({
       settings: [
@@ -323,7 +330,7 @@ describe("prepareReads", () => {
       warnings: [],
     });
     expect(await reads.preview("t1")).toBe("# brief");
-    expect(calls).toEqual(["diagnose r1", "resolve t1 {}", "preview t1"]);
+    expect(calls).toEqual(["queuePlan", "diagnose r1", "resolve t1 {}", "preview t1"]);
   });
 
   it("answers null when a read fails or throws, so the packet marks the part unavailable", async () => {
@@ -333,8 +340,10 @@ describe("prepareReads", () => {
         throw new Error("spawn failed");
       },
       diagnose: async () => ({ ok: false, failure: "Timed out" }),
+      queuePlan: async () => ({ ok: false, failure: "Timed out" }),
     });
     expect(await failing.diagnose("run-1")).toBeNull();
+    expect(await failing.queuePlan()).toBeNull();
     expect(await failing.resolve("t1")).toBeNull();
     expect(await failing.preview("t1")).toBeNull();
   });
@@ -350,6 +359,8 @@ describe("sidecarContextOptions packet", () => {
       resolve: async () => ({ savedTier: "deep", settings: [{ key: "model", value: "opus", source: "task.run.tier" }], refusals: [], warnings: [] }),
       preview: async () => "# Task brief\n",
       diagnose: async () => null,
+      queuePlan: async () => null,
+      featureEnabled: () => true,
     });
     const record = { id: "s1", lens: "describe", target: { ref: TASK } } as SidecarSessionRecord;
     const text = await options.packet!(record, new AbortController().signal);

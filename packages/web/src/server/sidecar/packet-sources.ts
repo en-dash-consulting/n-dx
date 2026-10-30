@@ -16,6 +16,7 @@ import { join, relative } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { redactDeep, resolveLayout } from "@n-dx/llm-client";
 import { DATA_FILES } from "../../shared/index.js";
+import type { QueuePlan } from "../../shared/index.js";
 import { loadCommitFiles, loadPrdModel, loadTrailerCommits, PRD_CACHE_DIRNAME } from "../rex-gateway.js";
 import type { V2Tree } from "../rex-gateway.js";
 import type { Manifest, Zones } from "../domain-gateway.js";
@@ -251,6 +252,10 @@ export interface PacketSources {
   taskRun(taskId: string): Promise<TaskRunRead | null>;
   /** The classifier's verdict for an ended run whose record carries none, spawned; `null` when that fails. */
   diagnose(runId: string, signal?: AbortSignal): Promise<RunVerdictRead | null>;
+  /** The queue planner's plan (`ndx work --plan-queue`), spawned; `null` when that fails. */
+  queuePlan(signal?: AbortSignal): Promise<QueuePlan | null>;
+  /** Whether the dashboard feature `key` is on; a lens behind a feature builds no packet while it is off. */
+  featureEnabled(key: string): boolean;
 }
 
 /** Most characters of gate text a {@link TaskRunRead} carries, kept from the end. */
@@ -259,10 +264,18 @@ export const GATE_TEXT_MAX_CHARS = 2_400;
 /** How many of the run's last events a {@link TaskRunRead} carries. */
 export const RUN_EVENTS_SHOWN = 12;
 
-/** The reads that spawn `ndx`; the Prepare route owns that spawn, so it is injected. */
+/**
+ * The reads that spawn `ndx` and the feature gate. The routes own both (the
+ * Prepare route the spawns, `routes-features.ts` the gate), and packet code
+ * imports no route, so they are injected.
+ */
 export interface SpawnedReads {
+  /** Whether the dashboard feature `key` is on, read per call. */
+  featureEnabled(key: string): boolean;
   /** `hench runs diagnose <run-id> --format=json`: the verdict for a run whose record has none; `null` when the spawn fails or times out. */
   diagnose(runId: string, signal?: AbortSignal): Promise<RunVerdictRead | null>;
+  /** `work --plan-queue --format=json`, the way `GET /api/hench/plan-queue` reads it; `null` when the spawn fails. */
+  queuePlan(signal?: AbortSignal): Promise<QueuePlan | null>;
   /** Aborting `signal` kills the spawned `ndx`. */
   resolve(taskId: string, signal?: AbortSignal): Promise<ResolveRead | null>;
   preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
@@ -505,6 +518,9 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
     preview: (taskId, signal) => spawned.preview(taskId, signal),
     // The classifier's evidence quotes the run's error, and this text goes to the vendor.
     diagnose: async (runId, signal) => redactDeep(await spawned.diagnose(runId, signal)),
+    // Task titles and reasons come from the PRD, and this text goes to the vendor.
+    queuePlan: async (signal) => redactDeep(await spawned.queuePlan(signal)),
+    featureEnabled: (key) => spawned.featureEnabled(key),
 
     async runs(taskId) {
       return taskRunRecords(join(layout.henchDir, "runs"), taskId).map(({ record }) => ({

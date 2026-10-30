@@ -26,15 +26,17 @@
 
 import { h } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
-import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, itemTypeLabel, workCommandArgs } from "../external.js";
+import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, itemTypeLabel, laneSteps, workCommandArgs } from "../external.js";
 import { useCliName } from "../hooks/index.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/index.js";
-import type { SidecarChangeSetEdit } from "../external.js";
+import type { QueuePlan, SidecarChangeSetEdit } from "../external.js";
+import { CopyTextButton } from "./copy-text-button.js";
 
 export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>> = {
   command: "Command",
   work: "Work",
   "change-set": "Change set",
+  "run-plan": "Run plan",
   placement: "Placement",
   edit: "Edit",
   "network-read": "Network read",
@@ -74,6 +76,7 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
         return str(input.taskId) ? [cliName, ...workCommandArgs({ taskId: str(input.taskId), options, dir: "." })].join(" ") : "";
       }
       case "change-set": return count(input.items, "item", "items");
+      case "run-plan": return card.runPlan ? count(card.runPlan.lanes, "lane", "lanes") : "";
       case "placement": return str(input.change) && str(input.target) ? `${str(input.change)} → ${str(input.target)}` : "";
       case "edit": return str(input.path);
       case "network-read": return [str(input.kind), str(input.ref)].filter(Boolean).join(" ");
@@ -209,6 +212,66 @@ function ChangeSetBody({ card, editable, drafts, onDraft }: ChangeSetBodyProps) 
   );
 }
 
+// ── Run-plan card (Guide) ────────────────────────────────────────────
+
+/** Every lane's command, one per line: what Copy commands puts on the clipboard. */
+export function runPlanCommands(plan: QueuePlan): string {
+  return plan.lanes.map((lane) => lane.command).join("\n");
+}
+
+interface RunPlanBodyProps {
+  card: SidecarCard;
+  /** The first waiting card: Start lane can be chosen. */
+  decidable: boolean;
+  deciding: boolean;
+  onStartLane: (lane: number) => void;
+}
+
+/**
+ * The planner's lanes as it printed them, each task with its exact command.
+ * Copy commands is the page's own clipboard write: no broker call, nothing
+ * starts. Start lane approves the card with that lane; the agent is then
+ * told to raise a work card for the lane's first task alone, so the rest of
+ * the lane is listed here and started one work card at a time.
+ */
+function RunPlanBody({ card, decidable, deciding, onStartLane }: RunPlanBodyProps) {
+  const plan = card.runPlan!;
+  const note = str(card.input.note);
+  return h("div", { class: "sidecar-run-plan" },
+    note ? h("p", { class: "sidecar-run-plan-note" }, note) : null,
+    h("p", { class: "sidecar-run-plan-active" }, `Active runs: ${plan.activeRuns} of ${plan.runLimit}`),
+    h("ol", { class: "sidecar-run-plan-lanes" },
+      plan.lanes.map((lane, index) => {
+        const steps = laneSteps(lane);
+        return h("li", { class: "sidecar-run-plan-lane", "data-lane": index, key: lane.changeId },
+          h("div", { class: "sidecar-run-plan-lane-head" },
+            h("span", { class: "sidecar-run-plan-lane-title" }, `Lane ${index + 1} · change ${lane.changeId}`),
+            decidable
+              ? h("button", {
+                  type: "button",
+                  class: "sidecar-run-plan-start",
+                  disabled: deciding,
+                  onClick: () => onStartLane(index),
+                }, "Start lane")
+              : card.lane === index
+                ? h("span", { class: "sidecar-run-plan-started" }, "Started")
+                : null,
+          ),
+          h("ol", { class: "sidecar-run-plan-tasks" },
+            lane.tasks.map((task, i) => h("li", { class: "sidecar-run-plan-task", key: task.id },
+              h("span", { class: "sidecar-run-plan-task-title" }, `${task.title}${i === 0 ? " (starts first)" : ""}`),
+              h("span", { class: "sidecar-run-plan-task-reason" }, task.reason),
+              h("code", { class: "sidecar-run-plan-command" }, steps[i] ?? lane.command),
+            ))),
+        );
+      })),
+    h("div", { class: "sidecar-run-plan-actions" },
+      h(CopyTextButton, { text: runPlanCommands(plan), class: "sidecar-run-plan-copy", label: "Copy commands", caption: "Copy commands" }),
+      h("span", { class: "sidecar-run-plan-hint" }, "Start lane asks for one work card, for the lane's first task. Nothing runs without it."),
+    ),
+  );
+}
+
 function settledNote(card: SidecarCard, state: SidecarCardState): string {
   switch (state) {
     case "approved": return "Approved";
@@ -262,7 +325,9 @@ function SidecarCardView({ card, cliName, first, manifest, note, onNote, decidin
         h(ChangeSetBody, { card, editable, drafts: editable ? drafts : {}, onDraft }),
         h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
       ]
-    : state === "pending"
+    : card.runPlan
+      ? h(RunPlanBody, { card, decidable: editable, deciding, onStartLane: (lane) => onDecide({ approve: true, lane }) })
+      : state === "pending"
       ? input
       : h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input);
   return h("li", { class: `sidecar-card sidecar-card--${state}`, "data-card": card.id, "data-kind": card.kind },
@@ -288,9 +353,12 @@ function SidecarCardView({ card, cliName, first, manifest, note, onNote, decidin
               onInput: (e: Event) => onNote((e.target as HTMLInputElement).value),
             }),
             h("div", { class: "sidecar-card-actions" },
-              h("button", { type: "button", class: "sidecar-card-approve", disabled: deciding, onClick: () => onDecide({ approve: true }) },
-                card.changeSet ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}` : "Approve"),
-              h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) }, "Deny"),
+              // A run plan is approved by choosing a lane on the card, never by a bare approval.
+              card.runPlan
+                ? null
+                : h("button", { type: "button", class: "sidecar-card-approve", disabled: deciding, onClick: () => onDecide({ approve: true }) },
+                    card.changeSet ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}` : "Approve"),
+              h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) }, card.runPlan ? "Not now" : "Deny"),
               card.allowListKey !== null
                 ? h("button", {
                     type: "button",
@@ -299,7 +367,7 @@ function SidecarCardView({ card, cliName, first, manifest, note, onNote, decidin
                     onClick: () => onDecide({ approve: true, remember: true }),
                   }, "Always allow")
                 : null,
-              h("span", { class: "sidecar-card-keys", "aria-hidden": "true" }, "⌘↵ approve · ⌘⌫ deny"),
+              h("span", { class: "sidecar-card-keys", "aria-hidden": "true" }, card.runPlan ? "⌘⌫ not now" : "⌘↵ approve · ⌘⌫ deny"),
             ),
           )
         : h("p", { class: "sidecar-card-queued" }, "Decided after the card above"),
@@ -325,6 +393,8 @@ export function SidecarCards({ cards, manifest, decide }: SidecarCardsProps) {
 
   const answer = async (decision: SidecarCardDecision) => {
     if (!first || deciding) return;
+    // ⌘↵ is no answer to a run plan: only a lane's Start lane approves it.
+    if (first.runPlan && decision.approve && decision.lane === undefined) return;
     setDeciding(true);
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.

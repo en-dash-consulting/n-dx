@@ -25,7 +25,7 @@
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
  * | POST | `/api/sidecar/sessions/:id/end` | end the session |
  * | GET  | `/api/sidecar/sessions/:id/cards` | the session's permission cards |
- * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits? }`; `edits` only on a change-set approval) |
+ * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane? }`; `edits` only on a change-set approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
  * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | POST | `/api/sidecar/sessions/:id/mcp` | the `ndx-sidecar` broker (MCP, Streamable HTTP), while a turn runs |
  * | GET  | `/api/sidecar/allow-list` | the Sidecar allow-list |
@@ -62,7 +62,8 @@ import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardS
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { startSidecarCommand } from "./routes-commands.js";
-import { runSlotUsage, startTaskExecution } from "./routes-hench.js";
+import { readQueuePlan, runSlotUsage, startTaskExecution } from "./routes-hench.js";
+import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
@@ -96,13 +97,21 @@ const PROPOSALS_PATH = "/api/sidecar/proposals";
  * The registry as the drawer reads it: every lens, what an unavailable one
  * waits on, and the item kind a lens needs attached.
  */
-function sidecarLenses(): Array<{ id: string; available: boolean; needs?: string; target?: LensTarget }> {
+function sidecarLenses(ctx: ServerContext): Array<{ id: string; available: boolean; needs?: string; target?: LensTarget }> {
   return LENS_IDS.map((id) => {
     const plan = LENS_PACKETS[id];
     if (plan.kind === "unavailable") return { id, available: false, needs: plan.needs };
+    // Read per request, like every feature gate: turning the feature on or off needs no restart.
+    if (plan.kind === "packet" && plan.feature && !isFeatureEnabled(ctx.projectDir, plan.feature.key)) {
+      return { id, available: false, needs: plan.feature.needs };
+    }
     return plan.kind === "packet" && plan.target ? { id, available: true, target: plan.target } : { id, available: true };
   });
 }
+
+/** Why a start is refused when every run slot is taken; the refusal and the work card's preview say it alike. */
+const CONCURRENT_LIMIT_REASON = (inUse: number, max: number): string =>
+  `the concurrent run limit is reached (${inUse} of ${max} runs, guard.maxConcurrentProcesses)`;
 
 /** Announces that a card was raised or settled; fetch `…/cards` for it. */
 export interface SidecarCardMessage {
@@ -183,13 +192,24 @@ export function sidecarBrokerEndpoint(ctx: ServerContext, sessionId: string): Si
  */
 export function prepareReads(
   ctx: ServerContext,
-  reads: { resolve: typeof resolveTaskRun; preview: typeof previewTaskRun; diagnose: typeof diagnoseTaskRun } = {
+  reads: {
+    resolve: typeof resolveTaskRun;
+    preview: typeof previewTaskRun;
+    diagnose: typeof diagnoseTaskRun;
+    queuePlan: typeof readQueuePlan;
+  } = {
     resolve: resolveTaskRun,
     preview: previewTaskRun,
     diagnose: diagnoseTaskRun,
+    queuePlan: readQueuePlan,
   },
 ): SpawnedReads {
   return {
+    featureEnabled: (key) => isFeatureEnabled(ctx.projectDir, key),
+    async queuePlan(signal) {
+      const read = await reads.queuePlan(ctx, signal).catch(() => null);
+      return read?.ok ? read.plan : null;
+    },
     async diagnose(runId, signal) {
       const read = await reads.diagnose(ctx, runId, signal).catch(() => null);
       return read?.ok ? readDiagnosis(read.diagnosis) ?? null : null;
@@ -241,7 +261,15 @@ export function sidecarActions(
   return {
     async previewWork(taskId, options) {
       const read = await resolveTaskRun(ctx, taskId, options);
-      return read.ok ? renderWorkPreview(read.resolution) : `ndx work --resolve did not answer: ${read.failure}`;
+      const { inUse, max } = runSlotUsage(ctx);
+      // The limit is where approving is refused (see startWork), so the card says how near it is.
+      const slots = `Active runs: ${inUse} of ${max}${inUse >= max ? ` (the limit: approving now starts nothing, ${CONCURRENT_LIMIT_REASON(inUse, max)})` : ""}`;
+      return `${read.ok ? renderWorkPreview(read.resolution) : `ndx work --resolve did not answer: ${read.failure}`}\n${slots}`;
+    },
+    async readRunPlan(signal) {
+      if (!isFeatureEnabled(ctx.projectDir, "hench.readyNext")) return "the hench.readyNext feature is off";
+      const read = await readQueuePlan(ctx, signal).catch((err: unknown) => ({ ok: false as const, failure: errorMessage(err) }));
+      return read.ok ? read.plan : read.failure;
     },
     runCommand(argv, signal) {
       const started = startSidecarCommand(ctx, argv, broadcast);
@@ -262,9 +290,7 @@ export function sidecarActions(
     },
     async startWork(taskId, options) {
       const { inUse, max } = runSlotUsage(ctx);
-      if (inUse >= max) {
-        return { ok: false, text: `Nothing started: the concurrent run limit is reached (${inUse} of ${max} runs, guard.maxConcurrentProcesses).` };
-      }
+      if (inUse >= max) return { ok: false, text: `Nothing started: ${CONCURRENT_LIMIT_REASON(inUse, max)}.` };
       const answer = await startTaskExecution(ctx, { taskId, ...(options && { options }) }, broadcast);
       if (answer.status !== 202) return { ok: false, text: `Nothing started: ${String(answer.body.error ?? `the execute route answered ${answer.status}`)}.` };
       return { ok: true, text: `Started run ${String(answer.body.runId)} on task ${taskId} (${String(answer.body.taskTitle)}); follow it on Live.` };
@@ -463,7 +489,7 @@ export async function handleSidecarRoute(
 
   if (pathname === LENSES_PATH) {
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${LENSES_PATH}`);
-    jsonResponse(res, 200, { lenses: sidecarLenses() });
+    jsonResponse(res, 200, { lenses: sidecarLenses(ctx) });
     return true;
   }
 
@@ -645,12 +671,14 @@ export async function handleSidecarRoute(
       if (body.remember !== undefined && typeof body.remember !== "boolean") {
         return refuse(res, 400, `"remember" must be a boolean`);
       }
+      if (body.lane !== undefined && typeof body.lane !== "number") return refuse(res, 400, `"lane" must be a number`);
       try {
         const card = broker.decide(id, cardId, {
           approve: body.decision === "approve",
           ...(reason && { reason }),
           ...(body.remember && { remember: true }),
           ...(body.edits !== undefined && { edits: body.edits }),
+          ...(body.lane !== undefined && { lane: body.lane }),
         });
         jsonResponse(res, 200, { card });
       } catch (err) {

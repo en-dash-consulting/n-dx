@@ -132,7 +132,7 @@ import {
 import { endedRunRecord, MARK_STUCK_REASON, writeRunFileAtomic } from "./run-end.js";
 import { validateRunOptions, writeContextNotesFile } from "./run-options.js";
 import { readDiagnosis, type RunDiagnosisSummary } from "./run-diagnosis.js";
-import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type RunOptions, type RunMode } from "../shared/index.js";
+import { resetsDeferred, workCommandArgs, checkRunMode, MAX_DASHBOARD_ITERATIONS, type QueuePlan, type RunOptions, type RunMode } from "../shared/index.js";
 
 const HENCH_PREFIX = "/api/hench/";
 
@@ -1044,23 +1044,38 @@ const PLAN_QUEUE_TIMEOUT_MS = 60_000;
  * nothing and writes nothing; its JSON is passed through as hench printed it.
  */
 async function handlePlanQueue(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const read = await readQueuePlan(ctx);
+  if (read.ok) jsonResponse(res, 200, read.plan);
+  else errorResponse(res, 500, read.failure);
+  return true;
+}
+
+/**
+ * The planner's plan, as `GET /api/hench/plan-queue` reads it: one spawn of
+ * `ndx work --plan-queue --format=json`, its JSON passed through as hench
+ * printed it. The Sidecar Guide lens reads it through here too, so there is
+ * one spawn and one parse. `signal` aborts the spawn.
+ */
+export async function readQueuePlan(
+  ctx: ServerContext,
+  signal?: AbortSignal,
+): Promise<{ ok: true; plan: QueuePlan } | { ok: false; failure: string }> {
   const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const cli = readCliName(ctx.projectDir);
   const result = await exec(
     bin,
     [...prefixArgs, "work", "--plan-queue", "--format=json", ctx.projectDir],
-    { cwd: ctx.projectDir, timeout: PLAN_QUEUE_TIMEOUT_MS },
+    { cwd: ctx.projectDir, timeout: PLAN_QUEUE_TIMEOUT_MS, ...(signal && { signal }) },
   );
   if (!result.launched || result.exitCode !== 0) {
     const detail = (result.stderr.trim() || result.stdout.trim() || "no output").slice(0, 2000);
-    errorResponse(res, 500, `'${readCliName(ctx.projectDir)} work --plan-queue' did not complete: ${detail}`);
-    return true;
+    return { ok: false, failure: `'${cli} work --plan-queue' did not complete: ${detail}` };
   }
   try {
-    jsonResponse(res, 200, JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))));
+    return { ok: true, plan: JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))) as QueuePlan };
   } catch {
-    errorResponse(res, 500, `'${readCliName(ctx.projectDir)} work --plan-queue' printed no plan: ${result.stdout.slice(0, 2000)}`);
+    return { ok: false, failure: `'${cli} work --plan-queue' printed no plan: ${result.stdout.slice(0, 2000)}` };
   }
-  return true;
 }
 
 /** Routes: concurrency */

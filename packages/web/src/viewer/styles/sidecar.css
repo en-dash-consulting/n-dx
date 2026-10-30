@@ -331,6 +331,17 @@
 .sidecar-change-set-fields p, .sidecar-change-set-fields ul { margin: 0; font-size: 12px; }
 .sidecar-change-set-title { font-weight: 600; }
 .sidecar-change-set-written { margin: 0; color: var(--text-muted); font-size: 12px; }
+
+/* Run-plan card (Guide): the planner's lanes, each task with its exact command. */
+.sidecar-run-plan { display: flex; flex-direction: column; gap: var(--space-2); }
+.sidecar-run-plan p { margin: 0; font-size: 12px; }
+.sidecar-run-plan-active, .sidecar-run-plan-hint, .sidecar-run-plan-task-reason { color: var(--text-muted); }
+.sidecar-run-plan-lanes, .sidecar-run-plan-tasks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.sidecar-run-plan-lane { border: 1px solid var(--border); border-radius: 4px; padding: var(--space-1) var(--space-2); }
+.sidecar-run-plan-lane-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); font-size: 11px; font-weight: 600; }
+.sidecar-run-plan-task { display: flex; flex-direction: column; font-size: 12px; }
+.sidecar-run-plan-command { font-size: 11px; overflow-wrap: anywhere; }
+.sidecar-run-plan-actions { display: flex; align-items: center; gap: var(--space-2); }
 .sidecar-card-note, .sidecar-card-queued { margin: 0; color: var(--text-muted); }
 .sidecar-card-decide { display: flex; flex-direction: column; gap: var(--space-1); }
 .sidecar-card-reason { font: inherit; font-size: 12px; }
