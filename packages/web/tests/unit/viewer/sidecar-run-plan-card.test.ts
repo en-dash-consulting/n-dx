@@ -129,11 +129,67 @@ describe("the run-plan card", () => {
     expect(decide).toHaveBeenCalledExactlyOnceWith("p1", { approve: false, reason: "" });
   });
 
-  it("once decided, shows which lane started, offers no Start lane, and still copies", async () => {
-    const { el } = await draw(planCard({ status: "approved", lane: 0 }));
+  const decided = (over: Partial<SidecarCard> = {}) =>
+    planCard({ status: "approved", lane: 0, decidedAt: "2026-10-29T00:00:02.000Z", ...over });
+  const workCard = (over: Partial<SidecarCard> = {}): SidecarCard => ({
+    id: "w1",
+    sessionId: "s1",
+    tool: "start_work",
+    kind: "work",
+    input: { taskId: "t1" },
+    allowListKey: null,
+    status: "pending",
+    raisedAt: "2026-10-29T00:00:03.000Z",
+    ...over,
+  });
+  const badges = (el: HTMLElement) => ({
+    started: el.querySelector(".sidecar-run-plan-started")?.textContent ?? null,
+    raised: el.querySelector(".sidecar-run-plan-raised")?.textContent ?? null,
+  });
+
+  async function drawAll(cards: SidecarCard[]) {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    await act(async () => {
+      render(h(SidecarCards, { cards, manifest: null, decide: vi.fn(async () => {}) }), host!);
+    });
+    return host;
+  }
+
+  it("after Start lane the lane reads Work card raised, not Started, and still copies", async () => {
+    const el = await drawAll([decided()]);
     expect(el.querySelector(".sidecar-run-plan-start")).toBeNull();
-    expect(el.querySelector(".sidecar-run-plan-started")?.textContent).toBe("Started");
+    expect(badges(el)).toEqual({ started: null, raised: "Work card raised" });
     await act(async () => { el.querySelector<HTMLButtonElement>(".sidecar-run-plan-copy")!.click(); });
     expect(writeText).toHaveBeenCalledOnce();
+  });
+
+  it("reads Work card raised while the lane's work card waits", async () => {
+    const el = await drawAll([decided(), workCard()]);
+    expect(badges(el)).toEqual({ started: null, raised: "Work card raised" });
+  });
+
+  it("reads Started only once the work card is approved and its run started", async () => {
+    const el = await drawAll([decided(), workCard({ status: "approved", carriedOut: { ok: true } })]);
+    expect(badges(el)).toEqual({ started: "Started", raised: null });
+    expect(el.querySelectorAll(".sidecar-run-plan-lane")[1].querySelector(".sidecar-run-plan-started")).toBeNull();
+  });
+
+  it.each([
+    ["denied", { status: "denied" }],
+    ["withdrawn", { status: "withdrawn", reason: "the turn stopped" }],
+    ["approved but refused to start", { status: "approved", carriedOut: { ok: false } }],
+  ] as const)("returns to unstarted when the work card is %s", async (_name, over) => {
+    const el = await drawAll([decided(), workCard({ ...over })]);
+    expect(badges(el)).toEqual({ started: null, raised: null });
+  });
+
+  it("ignores a work card for another task or one raised before the plan was decided", async () => {
+    const el = await drawAll([
+      decided(),
+      workCard({ id: "w0", status: "approved", carriedOut: { ok: true }, raisedAt: "2026-10-29T00:00:01.500Z" }),
+      workCard({ id: "w2", input: { taskId: "t2" }, status: "approved", carriedOut: { ok: true } }),
+    ]);
+    expect(badges(el)).toEqual({ started: null, raised: "Work card raised" });
   });
 });

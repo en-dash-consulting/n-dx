@@ -99,7 +99,13 @@ exact commands for a later turn. A first step carrying a flag a work card
 cannot (`--require-unblocked`) is not started from a card. Nothing starts
 without an approved work card, whose preview shows active runs against
 `guard.maxConcurrentProcesses`; approving one that would make a run past the
-limit is refused with that reason.
+limit is refused, naming the limit and the runs that hold it. The count is the
+repository's, not the worktree's: live lock holders in every worktree of
+`git worktree list` (`repositoryRunSlotUsage`), the same locks the planner's
+`activeRuns` reads, plus runs this server spawned that hold no lock yet. On the
+run-plan card a chosen lane reads "Work card raised" until its first task's work
+card is approved and the run started ("Started"); a denied or withdrawn work
+card clears it.
 
 ## HTTP-request concurrency
 

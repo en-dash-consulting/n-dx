@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "0729f8d2-ca98-44ed-a772-ee6e56bd1239":
-    lastModified: "2026-10-30T15:18:14.490Z"
+    status: "completed"
+    startedAt: "2026-10-30T15:19:43.461Z"
+    completedAt: "2026-10-30T15:25:15.493Z"
+    endedAt: "2026-10-30T15:25:15.493Z"
+    activeIntervals: [{"end":"2026-10-30T15:25:15.493Z","start":"2026-10-30T15:19:43.461Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Work card slots count live runs across every worktree; start refused at the limit naming holders; run-plan lane reads Work card raised until its run starts."
+    lastModified: "2026-10-30T15:25:15.493Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2914d715-6f3b-4183-95f2-5ce8f6acd8c0":
     status: "completed"
@@ -28,7 +35,10 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6dcba986-4fe6-4d8d-ab84-54d45db119b1":
     issues: ["https://www.notion.so/3f7a80b71924810aa984d37d94970566","https://www.notion.so/3f7a80b7192481c99690f94435b87799","https://www.notion.so/3f7a80b7192481d190ddd2eea210d9a5"]
-    lastModified: "2026-10-30T15:18:14.490Z"
+    lastModified: "2026-10-30T15:23:37.567Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "793240d0-5f3d-49c7-aff3-9cac77685681":
+    lastModified: "2026-10-30T15:23:37.567Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a08b5226-df96-4c01-8a36-90a48a74a294":
     status: "completed"

@@ -3560,19 +3560,38 @@ export function readConcurrencySlots(ctx: ServerContext): ConcurrencySlots {
 }
 
 /**
- * Runs that count against `guard.maxConcurrentProcesses` now: live lock
- * holders, plus runs this server spawned that hold no lock yet (a run takes
- * its lock a moment after the spawn). An untagged lock cannot be matched to
- * its run, so the count errs toward full.
+ * Runs on the machine against `guard.maxConcurrentProcesses`: live lock holders
+ * in every worktree of the repository, as `GET /api/live` and the queue planner
+ * count them, plus runs this server spawned that hold no lock yet (a run takes
+ * its lock a moment after the spawn). An untagged lock cannot be matched to its
+ * run, so the count errs toward full. Outside a repository, or when git fails,
+ * only this worktree counts.
  */
-export function runSlotUsage(ctx: ServerContext): { inUse: number; max: number } {
-  const slots = readConcurrencySlots(ctx);
-  const locked = new Set(slots.locks.map((lock) => lock.taskId).filter(Boolean));
-  let unlocked = 0;
-  for (const taskId of stateForCtx(ctx).activeExecutions.keys()) {
-    if (!locked.has(taskId)) unlocked++;
+export async function repositoryRunSlotUsage(
+  ctx: ServerContext,
+): Promise<{ inUse: number; max: number; holders: Array<{ taskId: string | null; worktree: string }> }> {
+  const self = ctx.projectDir;
+  const listed = (await listWorktrees(self).catch(() => [])).filter((wt) => !wt.bare).map((wt) => wt.path);
+  const canonicalOf = (p: string): string => {
+    try {
+      return realpathSync.native(p);
+    } catch {
+      return p;
+    }
+  };
+  const paths = new Map(listed.map((p) => [canonicalOf(p), p]));
+  if (!paths.has(canonicalOf(self))) paths.set(canonicalOf(self), self);
+  const holders: Array<{ taskId: string | null; worktree: string }> = [];
+  for (const path of paths.values()) {
+    for (const lock of collectLiveLocks(locksDirOf(resolveLayout(path).henchDir))) {
+      holders.push({ taskId: lock.taskId ?? null, worktree: path });
+    }
   }
-  return { inUse: slots.processCount + unlocked, max: slots.maxConcurrent };
+  const locked = new Set(holders.map((h) => h.taskId).filter(Boolean));
+  for (const taskId of stateForCtx(ctx).activeExecutions.keys()) {
+    if (!locked.has(taskId)) holders.push({ taskId, worktree: self });
+  }
+  return { inUse: holders.length, max: getEffectiveMaxConcurrent(self), holders };
 }
 
 /** How full `inUse` of `max` slots is. */

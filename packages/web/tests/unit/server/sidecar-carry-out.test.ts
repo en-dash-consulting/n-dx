@@ -7,9 +7,10 @@
  * `ndx work --resolve`) and a registry that reports the session's turn running.
  */
 
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { execMock, spawnManagedMock } = vi.hoisted(() => ({ execMock: vi.fn(), spawnManagedMock: vi.fn() }));
@@ -434,13 +435,62 @@ describe("work card run slots", () => {
     const fourth = client.callTool({ name: "start_work", arguments: { taskId: "task-4" } });
     const { cardId } = await cardAnnounced("pending");
     const preview = broker.cards(SESSION).find((c) => c.id === cardId)!.preview!;
-    expect(preview).toMatch(/\nActive runs: 3 of 3 \(the limit: approving now starts nothing, the concurrent run limit is reached \(3 of 3 runs, guard\.maxConcurrentProcesses\)\)$/);
+    expect(preview).toMatch(/\nActive runs: 3 of 3 \(the limit: approving now starts nothing, the concurrent run limit is reached \(3 of 3 runs across the repository, guard\.maxConcurrentProcesses\); held by task task-1 in .+, task task-2 in .+, task task-3 in .+\)$/);
     await decide(cardId, { decision: "approve" });
     const result = await fourth;
     expect(result.isError).toBe(true);
-    expect(resultText(result)).toMatch(/Nothing started: the concurrent run limit is reached \(3 of 3 runs, guard\.maxConcurrentProcesses\)\.$/);
+    expect(resultText(result)).toMatch(/Nothing started: the concurrent run limit is reached \(3 of 3 runs across the repository, guard\.maxConcurrentProcesses\)/);
     expect(spawnManagedMock).toHaveBeenCalledTimes(3);
     await client.close();
+  });
+
+  describe("with runs in a second worktree of the repository", () => {
+    let sibling: string;
+    const git = (cwd: string, ...args: string[]) =>
+      execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd, stdio: "ignore" });
+
+    beforeEach(() => {
+      git(root, "init", "-q");
+      git(root, "commit", "-q", "--allow-empty", "-m", "init");
+      sibling = join(root, "..", `${basename(root)}-sibling`);
+      git(root, "worktree", "add", "-q", sibling);
+    });
+    afterEach(async () => { await removeTestDir(sibling); });
+
+    /** A lock held by this live process, as hench's limiter writes it, in `dir`'s worktree. */
+    function holdLock(dir: string, taskId: string, name: string): void {
+      mkdirSync(join(dir, ".hench", "locks"), { recursive: true });
+      writeFileSync(join(dir, ".hench", "locks", `${name}.lock`), JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString(), taskId }));
+    }
+
+    it("counts the run on the work card, as the queue planner counts live locks in every worktree", async () => {
+      holdLock(sibling, "elsewhere-1", "a");
+      const client = await brokerClient();
+      const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+      const { cardId } = await cardAnnounced("pending");
+      expect(broker.cards(SESSION).find((c) => c.id === cardId)?.preview).toMatch(/\nActive runs: 1 of 3$/);
+      await decide(cardId, { decision: "deny" });
+      await call;
+      await client.close();
+    });
+
+    it("starts nothing when the repository has three live runs, and names the runs that hold the limit", async () => {
+      holdLock(sibling, "elsewhere-1", "a");
+      holdLock(sibling, "elsewhere-2", "b");
+      holdLock(root, "elsewhere-3", "c");
+      const client = await brokerClient();
+      const call = client.callTool({ name: "start_work", arguments: { taskId: "task-1" } });
+      const { cardId } = await cardAnnounced("pending");
+      await decide(cardId, { decision: "approve" });
+      const result = await call;
+      expect(result.isError).toBe(true);
+      const text = resultText(result);
+      expect(text).toMatch(/Nothing started: the concurrent run limit is reached \(3 of 3 runs across the repository, guard\.maxConcurrentProcesses\)/);
+      for (const id of ["elsewhere-1", "elsewhere-2", "elsewhere-3"]) expect(text).toContain(`task ${id}`);
+      expect(text).toContain(basename(sibling));
+      expect(spawnManagedMock).not.toHaveBeenCalled();
+      await client.close();
+    });
   });
 });
 
