@@ -38,14 +38,26 @@ export function countRecentFailures(
   let count = 0;
   for (const run of runs) {
     if (run.taskId !== taskId) continue;
-    if (isReviewGateRefusal(run)) continue;
-    if (FAILURE_STATUSES.has(run.status)) {
+    const counted = isCountedFailure(run);
+    if (counted === undefined) continue;
+    if (counted) {
       count++;
     } else {
       break;
     }
   }
   return count;
+}
+
+/**
+ * How one run bears on a failure streak: true for a hard failure, false for a
+ * run that ends the streak, undefined for one that is skipped outright (a
+ * missing-review refusal, see {@link isReviewGateRefusal}). Shared with
+ * escalation (`escalation.ts`), which walks the same streak.
+ */
+export function isCountedFailure(run: RunRecord): boolean | undefined {
+  if (isReviewGateRefusal(run)) return undefined;
+  return FAILURE_STATUSES.has(run.status);
 }
 
 /**
@@ -70,6 +82,12 @@ export function isStuckTask(
 export function getStuckTaskIds(
   runs: RunRecord[],
   threshold: number,
+  /**
+   * Tasks to hold back from being called stuck whatever their streak: those
+   * still owed an escalated attempt (`hench.escalation`, see
+   * `isEscalationPending`). Absent, every task over the threshold is stuck.
+   */
+  holdBack?: (taskId: string) => boolean,
 ): Set<string> {
   // Collect unique task IDs that have appeared in runs
   const taskIds = new Set<string>();
@@ -79,7 +97,7 @@ export function getStuckTaskIds(
 
   const stuck = new Set<string>();
   for (const taskId of taskIds) {
-    if (isStuckTask(taskId, runs, threshold)) {
+    if (isStuckTask(taskId, runs, threshold) && !holdBack?.(taskId)) {
       stuck.add(taskId);
     }
   }

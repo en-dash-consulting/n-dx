@@ -1,5 +1,13 @@
 # @n-dx/lang-go
 
+## 0.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`de8bc93`](https://github.com/en-dash-consulting/n-dx/commit/de8bc939849ed25a4376dca29ec18646cc906954)]:
+  - @n-dx/lang-runtime@0.10.1
+  - @n-dx/lang-kit@0.10.1
+
 ## 0.10.0
 
 ### Patch Changes

@@ -102,6 +102,7 @@ import {
   loadLLMConfig,
   type LLMVendor,
   resolveLLMVendor,
+  withVendorOverride,
   resolveVendorCliPath,
   resolveVendorCliEnv,
   cliEnvReportLine,
@@ -2294,7 +2295,9 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   const autonomous = opts.autonomous === true || config.autonomous === true;
 
   const model = opts.model ?? config.model;
-  const llmConfig = await loadLLMConfig(henchDir);
+  // An escalated attempt runs on another vendor; making it the active one in
+  // the config means the adapter, the binary and its environment all follow.
+  const llmConfig = withVendorOverride(await loadLLMConfig(henchDir), opts.vendorOverride);
   const vendor = resolveLLMVendor(llmConfig);
   const eventModel = resolveCliEventModel(vendor, llmConfig, model, opts.spawnModel);
 
@@ -2382,6 +2385,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     criteriaCount: brief.task.acceptanceCriteria?.length,
     permissionMode: opts.permissionMode,
     ...(opts.loop ? { loop: opts.loop } : {}),
+    ...(opts.escalation ? { escalation: opts.escalation } : {}),
   });
 
   // The brief as sent: the run's commit trailers included, so the agent's own
