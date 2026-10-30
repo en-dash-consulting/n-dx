@@ -68,5 +68,8 @@ items:
     lastModified: "2026-10-30T15:08:15.328Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd15413c-b43a-4755-8087-7fae64bef710":
-    lastModified: "2026-10-30T14:44:04.242Z"
+    status: "in_progress"
+    startedAt: "2026-10-30T15:50:47.544Z"
+    activeIntervals: [{"start":"2026-10-30T15:50:47.544Z"}]
+    lastModified: "2026-10-30T15:50:50.709Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

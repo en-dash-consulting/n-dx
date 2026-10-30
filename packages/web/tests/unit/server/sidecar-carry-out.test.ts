@@ -580,14 +580,65 @@ describe("propose_run_plan", () => {
     await client.close();
   });
 
-  it("will not start a lane whose first step carries a flag a work card cannot", async () => {
+  it("starts a first step that carries --require-unblocked, naming the equivalent start_work option", async () => {
     plan = { ...PLAN, lanes: [{ ...PLAN.lanes[0], command: "ndx work --task=task-1 --require-unblocked --auto . && ndx work --task=task-2 --auto ." }] };
     const client = await brokerClient();
     const call = client.callTool({ name: "propose_run_plan", arguments: {} });
     await decide((await cardAnnounced("pending")).cardId, { decision: "approve", lane: 0 });
     const result = await call;
+    expect(result.isError).toBeFalsy();
+    expect(resultText(result)).toContain(
+      'Call start_work for its first task only: task-1 Carry it out (`ndx work --task=task-1 --require-unblocked --auto .`) — start_work options {"requireUnblocked":true}.',
+    );
+
+    // Its blockers are all completed (it has none), so the guarded work card starts it.
+    cardMessages = [];
+    const start = client.callTool({ name: "start_work", arguments: { taskId: "task-1", options: { requireUnblocked: true } } });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve" });
+    expect(resultText(await start)).toMatch(/Started run exec-\w+ on task task-1/);
+    expect(spawnedArgs()[0]).toContain("--require-unblocked");
+    await client.close();
+  });
+
+  it("refuses a lane's later task whose in-lane blocker has not completed, naming the blocker on the card and in the result", async () => {
+    plan = { ...PLAN, lanes: [{ ...PLAN.lanes[0], command: "ndx work --task=task-1 --auto . && ndx work --task=task-2 --require-unblocked --auto ." }] };
+    // task-1's run ended without completing it: task-2 still waits on it.
+    writeFileSync(join(root, ".rex", ".cache", "prd.json"), JSON.stringify({
+      schema: "rex/v1",
+      title: "carry out",
+      items: [
+        { id: "task-1", title: "Carry it out", status: "pending", level: "task" },
+        { id: "task-2", title: "And this", status: "pending", level: "task", blockedBy: ["task-1"] },
+      ],
+    }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "propose_run_plan", arguments: {} });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve", lane: 0 });
+    expect(resultText(await call)).toContain(
+      'Its other tasks wait, in order: task-2 And this: ndx work --task=task-2 --require-unblocked --auto . — start_work options {"requireUnblocked":true}.',
+    );
+
+    cardMessages = [];
+    const start = client.callTool({ name: "start_work", arguments: { taskId: "task-2", options: { requireUnblocked: true } } });
+    const { cardId } = await cardAnnounced("pending");
+    const card = broker.cards(SESSION).find((c) => c.id === cardId)!;
+    expect(card.preview).toContain("Waiting on unfinished blockers:\n- Carry it out (task-1, pending)");
+    await decide(cardId, { decision: "approve" });
+    const result = await start;
     expect(result.isError).toBe(true);
-    expect(resultText(result)).toContain("carries --require-unblocked and a work card cannot. Nothing started");
+    expect(resultText(result)).toContain('Nothing started: Task is waiting on unfinished work: "Carry it out" (task-1, pending).');
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("will not start a lane whose first step carries a flag no run option carries", async () => {
+    plan = { ...PLAN, lanes: [{ ...PLAN.lanes[0], command: "ndx work --task=task-1 --mine --auto . && ndx work --task=task-2 --auto ." }] };
+    const client = await brokerClient();
+    const call = client.callTool({ name: "propose_run_plan", arguments: {} });
+    await decide((await cardAnnounced("pending")).cardId, { decision: "approve", lane: 0 });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain("carries --mine and a work card cannot. Nothing started");
     expect(spawnManagedMock).not.toHaveBeenCalled();
     await client.close();
   });

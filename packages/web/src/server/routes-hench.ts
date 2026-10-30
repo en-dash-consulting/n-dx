@@ -1896,10 +1896,26 @@ function findPRDItem(
 }
 
 /** A blocking item as the blocked-task 409 names it. */
-interface BlockerSummary {
+export interface BlockerSummary {
   id: string;
   title: string;
   status: string;
+}
+
+/** `"Title" (id, status)` for each blocker, comma-separated. */
+export function nameBlockers(blockers: readonly BlockerSummary[]): string {
+  return blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ");
+}
+
+/**
+ * The task's blockers that are not completed, as `--require-unblocked` judges
+ * them (a blocker missing from the PRD counts as open). Empty when the PRD or
+ * the task cannot be read.
+ */
+export function openTaskBlockers(ctx: ServerContext, taskId: string): BlockerSummary[] {
+  const items = loadPRDForExecute(ctx)?.items as Array<Record<string, unknown>> | undefined;
+  const task = items ? findPRDItem(items, taskId) : null;
+  return items && task ? describeBlockers(items, task).filter((b) => b.status !== "completed") : [];
 }
 
 /** The task's `blockedBy` items, with titles; an id no longer in the PRD keeps its id as title. */
@@ -2104,14 +2120,24 @@ async function judgeExecuteRequest(
   const status = task.status as string;
   if (status === "blocked") {
     const blockers = describeBlockers(items, task);
-    const named = blockers.length > 0
-      ? blockers.map((b) => `"${b.title}" (${b.id}, ${b.status})`).join(", ")
-      : "no recorded blockers";
+    const named = blockers.length > 0 ? nameBlockers(blockers) : "no recorded blockers";
     return refused(409, {
       error: `Task is blocked by ${named}. Finish or unblock ${blockers.length === 1 ? "it" : "them"} first.`,
       taskId,
       blockedBy: blockers,
     });
+  }
+  // The spawned run would refuse too, but only after this route answered 202:
+  // judged here, a refusal reaches the caller instead of a run that exits at once.
+  if (options.requireUnblocked) {
+    const open = describeBlockers(items, task).filter((b) => b.status !== "completed");
+    if (open.length > 0) {
+      return refused(409, {
+        error: `Task is waiting on unfinished work: ${nameBlockers(open)}. requireUnblocked refuses to start it until ${open.length === 1 ? "that blocker is" : "those blockers are"} completed.`,
+        taskId,
+        blockedBy: open,
+      });
+    }
   }
   if (!ACTIONABLE_STATUSES.has(status)) {
     return refused(409, {

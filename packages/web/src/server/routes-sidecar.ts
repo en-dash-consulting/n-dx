@@ -62,7 +62,7 @@ import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardS
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { startSidecarCommand } from "./routes-commands.js";
-import { readQueuePlan, repositoryRunSlotUsage, startTaskExecution } from "./routes-hench.js";
+import { openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, startTaskExecution } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
@@ -271,7 +271,7 @@ export function sidecarActions(
       const { inUse, max, holders } = await repositoryRunSlotUsage(ctx);
       // The limit is where approving is refused (see startWork), so the card says how near it is.
       const slots = `Active runs: ${inUse} of ${max}${inUse >= max ? ` (the limit: approving now starts nothing, ${CONCURRENT_LIMIT_REASON(inUse, max, holders)})` : ""}`;
-      return `${read.ok ? renderWorkPreview(read.resolution) : `ndx work --resolve did not answer: ${read.failure}`}\n${slots}`;
+      return `${read.ok ? renderWorkPreview(read.resolution, openTaskBlockers(ctx, taskId)) : `ndx work --resolve did not answer: ${read.failure}`}\n${slots}`;
     },
     async readRunPlan(signal) {
       if (!isFeatureEnabled(ctx.projectDir, "hench.readyNext")) return "the hench.readyNext feature is off";

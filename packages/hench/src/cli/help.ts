@@ -154,7 +154,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "  resolved   vendor, model, provider, permissionMode, review,\n" +
           "             reviewMode, reviewVendor, reviewModel, skipTestGate,\n" +
           "             maxTurns, tokenBudget, fresh,\n" +
-          "             allowDirty, resetDeferred — each {value, source}, where\n" +
+          "             allowDirty, requireUnblocked, resetDeferred — each\n" +
+          "             {value, source}, where\n" +
           "             source is the key that supplied it (cli-flag, task.run\n" +
           "             and its task.run.tier / task.run.models /\n" +
           "             task.run.reviewTier / task.run.reviewModels forms,\n" +

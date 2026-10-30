@@ -20,6 +20,7 @@ export function prepFixture(overrides: Partial<PrepResponse> = {}): PrepResponse
       tokenBudget: { value: 0, source: "built-in" },
       fresh: { value: false, source: "built-in" },
       allowDirty: { value: false, source: "built-in" },
+      requireUnblocked: { value: false, source: "built-in" },
     },
     // A task with no saved run block: the common case, and the one every
     // existing assertion was written against. Pass `saved` in `overrides` to

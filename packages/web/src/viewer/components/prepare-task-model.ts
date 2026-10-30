@@ -73,6 +73,7 @@ export interface PrepResolvedSettings {
   tokenBudget: PrepResolved<number>;
   fresh: PrepResolved<boolean>;
   allowDirty: PrepResolved<boolean>;
+  requireUnblocked: PrepResolved<boolean>;
 }
 
 /** `GET /api/hench/prep/:taskId`, as the modal reads it. */
@@ -142,6 +143,7 @@ export interface PrepDefaults {
   tokenBudget: number;
   fresh: boolean;
   allowDirty: boolean;
+  requireUnblocked: boolean;
   contextNotes: string;
 }
 
@@ -161,6 +163,7 @@ export function defaultsOf(prep: PrepResponse): PrepDefaults {
     tokenBudget: r.tokenBudget.value,
     fresh: r.fresh.value,
     allowDirty: r.allowDirty.value,
+    requireUnblocked: r.requireUnblocked.value,
     // Notes have no project default, so the task's own are the starting value:
     // a run with no edit gets them from hench, and a Save with no edit keeps
     // them. Started empty, an unrelated Save would silently delete them.
@@ -318,7 +321,7 @@ export function runOptionsOf(defaults: PrepDefaults, edits: PrepEdits): RunOptio
  * Fields chosen per launch, which a save must never carry: they describe how
  * this one run starts, not how the task should be run.
  */
-const LAUNCH_ONLY: ReadonlySet<RunOptionKey> = new Set(["fresh", "allowDirty"] as RunOptionKey[]);
+const LAUNCH_ONLY: ReadonlySet<RunOptionKey> = new Set(["fresh", "allowDirty", "requireUnblocked"] as RunOptionKey[]);
 
 /**
  * The two fields a saved block spells as a portable tier plus per-vendor pins

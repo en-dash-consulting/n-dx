@@ -34,7 +34,7 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
     input: {
       taskId: z.string().min(1),
       options: z.record(z.string(), z.unknown()).optional()
-        .describe("Run options as the dashboard's execute route takes them (model, review, maxTurns, …)"),
+        .describe("Run options as the dashboard's execute route takes them (model, review, maxTurns, requireUnblocked, …)"),
     },
   },
   propose_prd_change: {

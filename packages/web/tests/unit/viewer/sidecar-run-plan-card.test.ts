@@ -205,6 +205,13 @@ describe("the run-plan card", () => {
     expect(decide).not.toHaveBeenCalled();
   });
 
+  it("asks again with the first step's start_work options when it carries --require-unblocked", () => {
+    const guarded: QueuePlan = { ...PLAN, lanes: [{ ...PLAN.lanes[0], command: "ndx work --task=t1 --require-unblocked --auto . && ndx work --task=t2 --auto ." }] };
+    expect(runPlanRestartPrompt(planCard({ runPlan: guarded }), 0))
+      .toContain('raise start_work for task t1 (Wire the button) with options {"requireUnblocked":true} only');
+    expect(runPlanRestartPrompt(planCard(), 0)).not.toContain("with options");
+  });
+
   it("offers no Start lane while the work card waits, after it started, or before any work card was raised", async () => {
     for (const cards of [[decided(), workCard()], [decided(), workCard({ status: "approved", carriedOut: { ok: true } })], [decided()]]) {
       host = document.createElement("div");

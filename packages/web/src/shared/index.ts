@@ -83,7 +83,7 @@ export {
   isKnownViewPath,
   resolveViewAlias,
 } from "./view-routing.js";
-export { laneSteps, stepExtraFlags } from "./queue-plan.js";
-export type { PlannedLane, PlannedTask, QueuePlan } from "./queue-plan.js";
+export { laneSteps, stepRunOptions } from "./queue-plan.js";
+export type { PlannedLane, PlannedTask, QueuePlan, StepRunOptions } from "./queue-plan.js";
 export { SIDECAR_SESSION_ENDED_REASON } from "./sidecar-card.js";
 export type { SidecarChangeSet, SidecarChangeSetItem, SidecarChangeSetEdit, SidecarChangeSetPlacement } from "./sidecar-card.js";

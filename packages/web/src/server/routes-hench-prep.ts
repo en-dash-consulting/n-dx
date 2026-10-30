@@ -268,7 +268,7 @@ function resetDeferredArgs(entry: PrdEntry | null): string[] {
  * been started yet. Named here rather than inferred from the absence of a rex
  * key so the 400 can say which key it refused and why.
  */
-const LAUNCH_ONLY_KEYS: ReadonlySet<string> = new Set(["fresh", "allowDirty", "resetDeferred"]);
+const LAUNCH_ONLY_KEYS: ReadonlySet<string> = new Set(["fresh", "allowDirty", "requireUnblocked", "resetDeferred"]);
 
 /**
  * A short fingerprint of a task's saved block, used to detect a save racing

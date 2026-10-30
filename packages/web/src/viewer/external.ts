@@ -47,7 +47,7 @@ export type { RunOptions, RunOptionKey, RunMode, HubMemoryPressure } from "../sh
 export { RUN_OPTION_SPECS, checkRunOptions, workCommandArgs, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "../shared/index.js";
 export { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
 export type { SidecarChangeSet, SidecarChangeSetEdit, PlannedLane, PlannedTask, QueuePlan } from "../shared/index.js";
-export { laneSteps, stepExtraFlags } from "../shared/index.js";
+export { laneSteps, stepRunOptions } from "../shared/index.js";
 export { HUB_PATH, detectBasePath, detectViewerBasePath, workspaceKeyFromBasePath, withBasePath, stripBasePath, webSocketUrl } from "../shared/index.js";
 
 // ── Item type (the v1 `level` compatibility shim) ─────────────────────────

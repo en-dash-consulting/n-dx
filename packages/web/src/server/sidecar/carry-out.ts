@@ -17,7 +17,7 @@
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.3, §12.
  */
 
-import { laneSteps, stepExtraFlags } from "../../shared/index.js";
+import { laneSteps, stepRunOptions } from "../../shared/index.js";
 import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import type { BrokerOutcome } from "./broker.js";
@@ -112,10 +112,12 @@ async function carryOut(
 
 /**
  * The result of an approved run-plan card: the operator chose a lane, and
- * the agent is told to raise `start_work` for that lane's first task alone.
- * Nothing starts here; the work card is what the operator approves next. A
- * first step that carries a flag a work card cannot (`--require-unblocked`)
- * is not started from a card, and the result says so.
+ * the agent is told to raise `start_work` for that lane's first task alone,
+ * with the run options that carry its step's extra flags
+ * (`--require-unblocked` is `requireUnblocked: true`, so a later task whose
+ * blocker did not complete is refused rather than started). Nothing starts
+ * here; the work card is what the operator approves next. A first step with a
+ * flag no run option carries is not started from a card, and the result says so.
  */
 function runPlanResult(outcome: BrokerOutcome): CarryOutResult {
   if (outcome.decidedBy === "allow-list") return { ok: false, text: "A run plan is never allowed by the allow-list; nothing ran." };
@@ -124,33 +126,50 @@ function runPlanResult(outcome: BrokerOutcome): CarryOutResult {
   if (!runPlan || !lane || chosen === undefined || lane.tasks.length === 0) return { ok: false, text: "The card carried no lane; nothing started." };
   const steps = laneSteps(lane);
   const [first, ...rest] = lane.tasks;
-  const flags = stepExtraFlags(steps[0] ?? "");
-  const remaining = rest.map((task, i) => `${task.id} ${task.title}: ${steps[i + 1] ?? "(no command)"}`);
-  const later = remaining.length > 0
-    ? ` Its other tasks wait, in order: ${remaining.join("; ")}. Do not start them now: when this task's run has ended, raise the next start_work card in a later turn.`
-    : "";
-  if (flags.length > 0) {
+  const { unmapped } = stepRunOptions(steps[0] ?? "");
+  if (unmapped.length > 0) {
     return {
       ok: false,
-      text: `Lane ${chosen + 1} was chosen, but its first step is \`${steps[0]}\`, which carries ${flags.join(" ")} and a work card cannot. Nothing started; tell the operator to run the lane's command from a terminal.`,
+      text: `Lane ${chosen + 1} was chosen, but its first step is \`${steps[0]}\`, which carries ${unmapped.join(" ")} and a work card cannot. Nothing started; tell the operator to run the lane's command from a terminal.`,
     };
   }
+  const remaining = rest.map((task, i) => `${task.id} ${task.title}: ${steps[i + 1] ?? "(no command)"}${withOptions(steps[i + 1])}`);
+  const later = remaining.length > 0
+    ? ` Its other tasks wait, in order: ${remaining.join("; ")}. Do not start them now: when this task's run has ended, raise the next start_work card in a later turn, with the options named for its step.`
+    : "";
   return {
     ok: true,
-    text: `The operator chose lane ${chosen + 1} (change ${lane.changeId}). Nothing has started. Call start_work for its first task only: ${first.id} ${first.title} (\`${steps[0]}\`).${later}`,
+    text: `The operator chose lane ${chosen + 1} (change ${lane.changeId}). Nothing has started. Call start_work for its first task only: ${first.id} ${first.title} (\`${steps[0]}\`)${withOptions(steps[0])}.${later}`,
   };
+}
+
+/** ` — start_work options {…}` for a step whose extra flags map to run options; empty when it has none. */
+function withOptions(step: string | undefined): string {
+  const { options } = stepRunOptions(step ?? "");
+  return Object.keys(options).length > 0 ? ` — start_work options ${JSON.stringify(options)}` : "";
+}
+
+/** A blocker of the task, as a work card's preview names it. */
+export interface PreviewBlocker {
+  id: string;
+  title: string;
+  status: string;
 }
 
 /**
  * A work card's preview from `ndx work --resolve`'s JSON: the command line,
- * the task, every resolved setting with the key that supplied it, and any
- * refusal or warning hench states.
+ * the task, the task's blockers that are not completed (an explicit task
+ * starts over them unless `requireUnblocked` is set), every resolved setting
+ * with the key that supplied it, and any refusal or warning hench states.
  */
-export function renderWorkPreview(resolution: Record<string, unknown>): string {
+export function renderWorkPreview(resolution: Record<string, unknown>, openBlockers: readonly PreviewBlocker[] = []): string {
   const lines: string[] = [];
   if (typeof resolution.command === "string") lines.push(resolution.command);
   const task = resolution.task as { title?: unknown; status?: unknown } | null | undefined;
   lines.push(task ? `Task: ${String(task.title)} (${String(task.status)})` : "Task: not found in the PRD");
+  if (openBlockers.length > 0) {
+    lines.push("Waiting on unfinished blockers:", ...openBlockers.map((b) => `- ${b.title} (${b.id}, ${b.status})`));
+  }
   const resolved = resolution.resolved;
   if (resolved && typeof resolved === "object") {
     for (const [key, setting] of Object.entries(resolved as Record<string, { value?: unknown; source?: unknown }>)) {

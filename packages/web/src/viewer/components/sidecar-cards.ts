@@ -26,7 +26,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
-import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, itemTypeLabel, laneSteps, workCommandArgs } from "../external.js";
+import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, itemTypeLabel, laneSteps, stepRunOptions, workCommandArgs } from "../external.js";
 import { useCliName } from "../hooks/index.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/index.js";
 import type { QueuePlan, SidecarChangeSetEdit } from "../external.js";
@@ -245,8 +245,11 @@ export function runPlanLaneState(plan: SidecarCard, lane: number, cards: readonl
  * settled plan card cannot be decided again.
  */
 export function runPlanRestartPrompt(plan: SidecarCard, lane: number): string {
-  const first = plan.runPlan?.lanes[lane]?.tasks[0];
-  return `Start lane ${lane + 1} of the approved run plan again: raise start_work for task ${first?.id ?? ""}${first ? ` (${first.title})` : ""} only. Do not propose a new run plan.`;
+  const planned = plan.runPlan?.lanes[lane];
+  const first = planned?.tasks[0];
+  const { options } = stepRunOptions(planned ? laneSteps(planned)[0] ?? "" : "");
+  const withOptions = Object.keys(options).length > 0 ? ` with options ${JSON.stringify(options)}` : "";
+  return `Start lane ${lane + 1} of the approved run plan again: raise start_work for task ${first?.id ?? ""}${first ? ` (${first.title})` : ""}${withOptions} only. Do not propose a new run plan.`;
 }
 
 /**
