@@ -426,6 +426,10 @@ describe("mapErrorReasonToFailureCategory", () => {
     expect(mapErrorReasonToFailureCategory("rate-limit")).toBe("rate_limit");
   });
 
+  it("maps network → transient_exhausted (the provider retried first)", () => {
+    expect(mapErrorReasonToFailureCategory("network")).toBe("transient_exhausted");
+  });
+
   it("maps cli → unknown", () => {
     expect(mapErrorReasonToFailureCategory("cli")).toBe("unknown");
   });

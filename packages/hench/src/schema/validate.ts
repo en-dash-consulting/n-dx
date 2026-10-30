@@ -1,5 +1,6 @@
 import { z, ZodError } from "zod";
 import { DEFAULT_HENCH_CONFIG, DEFAULT_PROMPT_AGENT_TO_MARK_IN_PROGRESS, DEFAULT_PRUNE_CONFIG, DEFAULT_RETRY_CONFIG, MAX_REVIEW_ROUNDS, MIN_PRUNE_PAIRS, MIN_REVIEW_ROUNDS } from "./v1.js";
+import { DEFAULT_WRITE_SHRINK_MIN_BYTES, DEFAULT_WRITE_SHRINK_RATIO } from "./v1.js";
 import type { HenchConfig } from "./v1.js";
 
 export type ValidationResult<T> =
@@ -38,6 +39,8 @@ const GuardConfigSchema = z.object({
     "status", "add", "commit", "diff", "log",
     "branch", "checkout", "stash", "show", "rev-parse",
   ]),
+  writeShrinkRatio: z.number().min(0).max(1).optional().default(DEFAULT_WRITE_SHRINK_RATIO),
+  writeShrinkMinBytes: z.number().int().nonnegative().optional().default(DEFAULT_WRITE_SHRINK_MIN_BYTES),
   policy: PolicyLimitsConfigSchema,
   memoryThrottle: MemoryThrottleConfigSchema,
   memoryMonitor: MemoryMonitorConfigSchema,
@@ -194,6 +197,17 @@ export const HenchConfigSchema = z.object({
       mode: z.enum(["off", "self", "pair"]).optional(),
       vendor: z.enum(["claude", "codex"]).optional(),
       rounds: z.number().int().min(MIN_REVIEW_ROUNDS).max(MAX_REVIEW_ROUNDS).optional(),
+    })
+    .optional(),
+  // No defaults, like review: the escalation resolver applies them.
+  escalation: z
+    .object({
+      enabled: z.boolean().optional(),
+      after: z.number().int().positive().optional(),
+      vendor: z.enum(["claude", "codex", "google", "local"]).optional(),
+      // Blank is accepted and means unset (activeEscalation trims it).
+      model: z.string().optional(),
+      maxAttempts: z.number().int().positive().optional(),
     })
     .optional(),
   promptCache: z.boolean().optional(),
@@ -504,6 +518,11 @@ export const RunRecordSchema = z.object({
   vendor: z.string().optional(),
   weight: z.string().optional(),
   modelSource: z.string().optional(),
+  // Passthrough so a field a later build adds survives this one's load.
+  escalation: z
+    .object({ escalated: z.literal(true), vendor: z.string(), failures: z.number() })
+    .passthrough()
+    .optional(),
   parentSessionId: z.string().optional(),
   session: RunSessionRecordSchema.optional(),
   contextCondensations: z.number().optional(),

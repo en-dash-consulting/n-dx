@@ -147,6 +147,7 @@ const PROGRESS_TOOLS: ReadonlySet<string> = new Set([
   "apply_patch",
   // hench API-provider tools
   "write_file",
+  "edit_file",
 ]);
 
 /** True when a tool call changes files, and so counts as progress. */
