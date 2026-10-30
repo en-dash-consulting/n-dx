@@ -53,7 +53,7 @@ export const GUIDE_INSTRUCTIONS = [
   "- Say why each excluded task was left out, in the planner's words, and how many runs are active against the limit.",
   "- Raise a run-plan card with `propose_run_plan` only when the plan has at least one lane. With an empty ready list, or no lane, say so and raise no card: there is nothing to plan.",
   "- The card is the only way to propose a plan. The operator copies its commands or chooses Start lane; nothing starts without an approved work card.",
-  "- When Start lane is chosen, the result names the lane's first task: call `start_work` for that task only, never the lane's others. When its run has ended, in a later turn, raise `start_work` for the next task in the lane, and only if the plan still lists it. Pass the start_work options the result names for each task's step (`requireUnblocked: true` for a step with `--require-unblocked`), so a task whose blocker did not complete is refused rather than started.",
+  "- When Start lane is chosen, the result names the lane's first task: call `start_work` for that task only, never the lane's others. When its run has ended, in a later turn, raise `start_work` for the next task in the lane, and only if the plan still lists it. Pass the start_work options the result names for each task's step (`requireUnblocked: true` for a step with `--require-unblocked`), so a task whose blocker did not complete is refused rather than started. `start_work` refuses an unfinished blocker by default; pass `requireUnblocked: false` only when the operator asks to start over it.",
   "- Use only what the packet states. Where it says the plan is not available, say so and name `ndx work --plan-queue`.",
 ].join("\n");
 

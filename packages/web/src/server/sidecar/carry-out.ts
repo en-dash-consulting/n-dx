@@ -285,8 +285,15 @@ export function outputTail(output: string): { text: string; cutLines: number; cu
   };
 }
 
-/** A start_work call's run options, when it gave any. */
-export function workOptions(input: Record<string, unknown>): Record<string, unknown> | undefined {
+/**
+ * A start_work call's run options. `requireUnblocked` defaults to true, so a
+ * task with an unfinished blocker is refused unless the call passes `false`
+ * explicitly; an agent that drops the options cannot start over a blocker.
+ * Preview and start both read this, so the card's command and the run agree.
+ */
+export function workOptions(input: Record<string, unknown>): Record<string, unknown> {
   const { options } = input;
-  return options && typeof options === "object" && !Array.isArray(options) ? options as Record<string, unknown> : undefined;
+  const given = options && typeof options === "object" && !Array.isArray(options) ? options as Record<string, unknown> : {};
+  const { requireUnblocked, ...rest } = given;
+  return requireUnblocked === false ? rest : { ...rest, requireUnblocked: true };
 }

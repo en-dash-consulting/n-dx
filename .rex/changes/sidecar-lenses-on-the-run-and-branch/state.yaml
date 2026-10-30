@@ -48,7 +48,14 @@ items:
     lastModified: "2026-10-30T15:42:33.344Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "99f8a9e1-7454-4780-acb6-393062ef0b1a":
-    lastModified: "2026-10-30T16:02:27.435Z"
+    status: "completed"
+    startedAt: "2026-10-30T16:22:30.326Z"
+    completedAt: "2026-10-30T16:26:21.686Z"
+    endedAt: "2026-10-30T16:26:21.686Z"
+    activeIntervals: [{"end":"2026-10-30T16:26:21.686Z","start":"2026-10-30T16:22:30.326Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: workOptions in sidecar/carry-out.ts defaults requireUnblocked true unless passed false; preview and start share it. Tests added."
+    lastModified: "2026-10-30T16:26:21.686Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a08b5226-df96-4c01-8a36-90a48a74a294":
     status: "completed"
@@ -75,8 +82,8 @@ items:
     startedAt: "2026-10-30T15:50:47.544Z"
     completedAt: "2026-10-30T16:19:43.266Z"
     endedAt: "2026-10-30T16:19:43.266Z"
+    activeIntervals: [{"end":"2026-10-30T16:10:11.942Z","start":"2026-10-30T15:50:47.544Z"},{"end":"2026-10-30T16:19:43.266Z","start":"2026-10-30T16:19:43.266Z"}]
     resolutionType: "code-change"
     resolutionDetail: "requireUnblocked as a run option through RUN_OPTION_SPECS and the execute route, work card preview lists open blockers (b29c7b111). Run f0367468 failed its gate only in graview-app-trust tests it did not touch; the same affected gate (649a66dd3) re-run passes all 4 suites. Server-side default tracked by 99f8a9e1."
-    activeIntervals: [{"end":"2026-10-30T16:10:11.942Z","start":"2026-10-30T15:50:47.544Z"},{"end":"2026-10-30T16:19:43.266Z","start":"2026-10-30T16:19:43.266Z"}]
     lastModified: "2026-10-30T16:19:43.266Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

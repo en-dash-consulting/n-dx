@@ -368,7 +368,7 @@ describe("start_work", () => {
     const result = await call;
     expect(result.isError).toBeFalsy();
     expect(spawnedArgs()).toHaveLength(1);
-    expect(spawnedArgs()[0]).toEqual(expect.arrayContaining(["work", "--task=task-1", "--review"]));
+    expect(spawnedArgs()[0]).toEqual(expect.arrayContaining(["work", "--task=task-1", "--review", "--require-unblocked"]));
     expect(resultText(result)).toMatch(/^The operator approved card \S+\. Started run exec-\w+ on task task-1 \(Carry it out\)/);
     await client.close();
   });
@@ -400,6 +400,60 @@ describe("start_work", () => {
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(/Nothing started: Task "missing" not found in PRD\.$/);
     expect(spawnManagedMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+});
+
+describe("start_work over an unfinished blocker", () => {
+  beforeEach(async () => {
+    // The resolved command echoes the flags it was asked for, as hench's does.
+    execMock.mockImplementation(async (_bin: string, args: string[]) =>
+      args.includes("--resolve")
+        ? {
+          exitCode: 0,
+          stdout: JSON.stringify({ ...RESOLUTION, command: `ndx work --task=task-2${args.includes("--require-unblocked") ? " --require-unblocked" : ""} .` }),
+          stderr: "",
+        }
+        : { exitCode: 1, stdout: "", stderr: "unexpected exec in test" });
+    writeFileSync(join(root, ".rex", ".cache", "prd.json"), JSON.stringify({
+      schema: "rex/v1",
+      title: "blocked",
+      items: [
+        { id: "task-1", title: "Carry it out", status: "pending", level: "task" },
+        { id: "task-2", title: "And this", status: "pending", level: "task", blockedBy: ["task-1"] },
+      ],
+    }));
+    await serve();
+  });
+
+  it("starts nothing when the call passes no options, names the blocker, and the card's command carries --require-unblocked", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-2" } });
+    const { cardId } = await cardAnnounced("pending");
+    const preview = broker.cards(SESSION).find((c) => c.id === cardId)!.preview!;
+    expect(preview.split("\n")[0]).toBe("ndx work --task=task-2 --require-unblocked .");
+    expect(preview).toContain("- Carry it out (task-1, pending)");
+
+    await decide(cardId, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain('Nothing started: Task is waiting on unfinished work: "Carry it out" (task-1, pending).');
+    expect(spawnManagedMock).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it("starts the task when the call passes requireUnblocked: false, and neither the card nor the run carries the flag", async () => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "task-2", options: { requireUnblocked: false } } });
+    const { cardId } = await cardAnnounced("pending");
+    const preview = broker.cards(SESSION).find((c) => c.id === cardId)!.preview!;
+    expect(preview.split("\n")[0]).toBe("ndx work --task=task-2 .");
+    expect(preview).not.toContain("--require-unblocked");
+
+    await decide(cardId, { decision: "approve" });
+    expect(resultText(await call)).toMatch(/Started run exec-\w+ on task task-2/);
+    expect(spawnedArgs()).toHaveLength(1);
+    expect(spawnedArgs()[0]).not.toContain("--require-unblocked");
     await client.close();
   });
 });
