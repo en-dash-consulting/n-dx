@@ -56,6 +56,8 @@ export interface PRDViewProps {
   initialTaskId?: string | null;
   /** Navigation callback for URL updates. */
   navigateTo?: NavigateTo;
+  /** Reports the item selected in the tree (null when none), which the route never carries. */
+  onSelectedItemChange?: (id: string | null) => void;
 }
 
 /** The ids of changes rex holds for placement, out of `GET /api/rex/changes`. */
@@ -66,7 +68,7 @@ function pickInboxIds(body: Record<string, unknown>): ReadonlySet<string> {
 
 const NO_INBOX: ReadonlySet<string> = new Set();
 
-export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId, navigateTo }: PRDViewProps) {
+export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId, navigateTo, onSelectedItemChange }: PRDViewProps) {
   // ── Toast notifications ────────────────────────────────────────
   const { toast, toastType, showToast } = useToast();
 
@@ -198,6 +200,13 @@ export function PRDView({ prdData, onSelectItem, onDetailContent, initialTaskId,
       (e.target as HTMLInputElement).blur();
     }
   }, [clearFacets]);
+
+  // ── Selected item, reported for Sidecar ────────────────────────
+  const { selectedItemId } = actions;
+  useEffect(() => {
+    onSelectedItemChange?.(selectedItemId);
+    return () => onSelectedItemChange?.(null);
+  }, [selectedItemId, onSelectedItemChange]);
 
   // ── Deep-link resolution ───────────────────────────────────────
   const { deepLinkError, setDeepLinkError, highlightedTaskId, deepLinkExpandIds } =

@@ -221,8 +221,7 @@ function createSession(
         if (!line.trim()) return;
         // The whole reply: a conversation shows it, where hench's run
         // records keep the driver's 500-character summary.
-        const event = driver.parseLine(line, turn, { textLimit: Infinity });
-        if (event) emit(event);
+        for (const event of driver.parseLineEvents(line, turn, { textLimit: Infinity })) emit(event);
         let raw: unknown;
         try {
           raw = JSON.parse(line);

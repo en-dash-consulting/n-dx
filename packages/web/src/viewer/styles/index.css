@@ -54,8 +54,8 @@
 @import "./active-operations.css";
 @import "./git-status.css";
 @import "./run-command.css";
-@import "./sessions-panel.css";
 @import "./status-dock.css";
+@import "./sidecar.css";
 @import "./stage-tiles.css";
 @import "./search-overlay.css";
 @import "./neolithic-overlay.css";

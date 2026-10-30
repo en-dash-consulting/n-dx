@@ -21,11 +21,14 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import {
   createAnnouncingBroker,
   handleSidecarRoute,
+  sidecarTurnSpendRecorder,
   type SidecarCardMessage,
   type SidecarFramesMessage,
   type SidecarFramesResponse,
 } from "../../../src/server/routes-sidecar.js";
+import { readDashboardUsage } from "../../../src/server/dashboard-usage.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
+import { LENS_IDS } from "../../../src/server/sidecar/lens-packets.js";
 import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../../helpers/server-route-test-support.js";
@@ -68,11 +71,45 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
   stdin.on("data", (chunk: Buffer) => { prompt += chunk.toString(); });
   stdin.on("end", () => {
     out({ type: "system", subtype: "init", session_id: id });
+    if (prompt.includes("SIGNEDOUT")) {
+      // Claude CLI 2.1.309 -p stream-json with an empty config dir: exit 1, and a
+      // result frame whose subtype says "success" although is_error is true.
+      out({
+        type: "assistant", session_id: id, error: "authentication_failed",
+        message: { id: `m-${spawns}`, model: "<synthetic>", content: [{ type: "text", text: "Not logged in · Please run /login" }] },
+      });
+      out({ type: "result", subtype: "success", is_error: true, terminal_reason: "api_error", session_id: id, result: "Not logged in · Please run /login" });
+      setImmediate(() => exit(1, null));
+      return;
+    }
+    if (prompt.includes("TOOLS")) {
+      // Recorded Claude stream-json: a Read call, answered on a `user` line by
+      // a tool_result block naming the call's id.
+      out({
+        type: "assistant", session_id: id, parent_tool_use_id: null,
+        message: {
+          id: `m-${spawns}`, role: "assistant", model: "claude-sonnet-4-5",
+          content: [{ type: "tool_use", id: "toolu_01R", name: "Read", input: { file_path: "/repo/a.ts" } }],
+          usage: { input_tokens: 10, output_tokens: 4 },
+        },
+      });
+      out({
+        type: "user", session_id: id, parent_tool_use_id: null,
+        message: { role: "user", content: [{ tool_use_id: "toolu_01R", type: "tool_result", content: "     1\texport const a = 1;" }] },
+        tool_use_result: { type: "text", file: { filePath: "/repo/a.ts", numLines: 1 } },
+      });
+      out({ type: "result", session_id: id, result: "read it" });
+      setImmediate(() => exit(0, null));
+      return;
+    }
     if (prompt.includes("HANG")) {
       out({ type: "assistant", session_id: id, message: { content: [{ type: "text", text: "working" }] } });
       return;
     }
-    out({ type: "assistant", session_id: id, message: { id: `m-${spawns}`, content: [{ type: "text", text: REPLY }] } });
+    out({
+      type: "assistant", session_id: id,
+      message: { id: `m-${spawns}`, content: [{ type: "text", text: REPLY }], usage: { input_tokens: 10, output_tokens: 4 } },
+    });
     out({ type: "result", session_id: id, result: REPLY });
     setImmediate(() => exit(0, null));
   });
@@ -80,7 +117,11 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
 };
 
 function newRegistry(): SidecarSessionRegistry {
-  return new SidecarSessionRegistry({ dir: join(root, ".hench", "sidecar"), connect: () => ({ spawn: fakeSpawn }) });
+  return new SidecarSessionRegistry({
+    dir: join(root, ".hench", "sidecar"),
+    connect: () => ({ spawn: fakeSpawn }),
+    onTurnSpend: sidecarTurnSpendRecorder(ctx),
+  });
 }
 
 beforeEach(async () => {
@@ -157,11 +198,103 @@ describe("sessions", () => {
     expect((await api("", { method: "POST", body: {} })).status).toBe(400);
   });
 
+  it("accepts a target on create and keeps it across a server restart", async () => {
+    const res = await api("", { method: "POST", body: { vendor: "claude", lens: "describe", target: { ref: "T-1" } } });
+    expect(res.status).toBe(201);
+    const { session } = await res.json();
+    expect(session.target).toEqual({ ref: "T-1" });
+
+    const restarted = newRegistry();
+    expect(restarted.get(session.id)).toMatchObject({ lens: "describe", target: { ref: "T-1" } });
+  });
+
+  it("refuses a target that is not an object with a string ref", async () => {
+    for (const target of ["T-1", null, [], { ref: 3 }, { ref: " " }]) {
+      expect((await api("", { method: "POST", body: { vendor: "claude", target } })).status).toBe(400);
+    }
+  });
+
+  it("renames, re-lenses and re-targets with PATCH, each field optional, and persists it", async () => {
+    const id = await createSession();
+    const renamed = await api(`/${id}`, { method: "PATCH", body: { name: "Review" } });
+    expect(renamed.status).toBe(200);
+    expect((await renamed.json()).session).toMatchObject({ name: "Review" });
+
+    const moved = await api(`/${id}`, { method: "PATCH", body: { lens: "describe", target: { ref: "T-2" } } });
+    expect((await moved.json()).session).toMatchObject({ name: "Review", lens: "describe", target: { ref: "T-2" } });
+    expect(newRegistry().get(id)).toMatchObject({ name: "Review", lens: "describe", target: { ref: "T-2" } });
+
+    expect((await api(`/${id}`, { method: "PATCH", body: {} })).status).toBe(200);
+  });
+
+  it("refuses a bad PATCH body, an unknown session, and a lens or target change once ended", async () => {
+    const id = await createSession();
+    expect((await api(`/${id}`, { method: "PATCH", body: { name: "" } })).status).toBe(400);
+    expect((await api(`/${id}`, { method: "PATCH", body: { target: "T-1" } })).status).toBe(400);
+    expect((await api("/nope", { method: "PATCH", body: { name: "x" } })).status).toBe(404);
+
+    await api(`/${id}/end`, { method: "POST" });
+    expect((await api(`/${id}`, { method: "PATCH", body: { lens: "plan" } })).status).toBe(409);
+    expect((await api(`/${id}`, { method: "PATCH", body: { name: "Done" } })).status).toBe(200);
+  });
+
   it("answers 404 for a session it does not hold and 405 for a wrong method", async () => {
     expect((await api("/nope/frames")).status).toBe(404);
     const id = await createSession();
     expect((await api(`/${id}/turns`)).status).toBe(405);
     expect((await api(`/${id}/frames`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("lens registry", () => {
+  it("lists every lens M1 registers, with what an unavailable one waits on", async () => {
+    const res = await fetch(`${server.baseUrl}/api/sidecar/lenses`);
+    expect(res.status).toBe(200);
+    const { lenses } = await res.json() as { lenses: Array<{ id: string; available: boolean; needs?: string }> };
+    expect(lenses.map((l) => l.id)).toEqual([...LENS_IDS]);
+    expect(lenses.find((l) => l.id === "plan")).toEqual({ id: "plan", available: true });
+    expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: false, needs: "the queue planner" });
+    expect((await fetch(`${server.baseUrl}/api/sidecar/lenses`, { method: "POST" })).status).toBe(405);
+  });
+});
+
+describe("spend", () => {
+  async function runTurn(id: string, prompt: string): Promise<void> {
+    const closed = turnClosed(id);
+    expect((await api(`/${id}/turns`, { method: "POST", body: { prompt } })).status).toBe(202);
+    await closed;
+  }
+
+  it("appends one ledger line per finished turn, with the lens when set", async () => {
+    const lensed = (await (await api("", { method: "POST", body: { vendor: "claude", model: "claude-opus-5", lens: "plan" } })).json()).session.id;
+    await runTurn(lensed, "one");
+    const plain = await createSession();
+    await runTurn(plain, "two");
+
+    const lines = readDashboardUsage(root);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({
+      command: "sidecar", vendor: "claude", model: "claude-opus-5", inputTokens: 10, outputTokens: 4, calls: 1, outcome: "success", lens: "plan",
+    });
+    expect(lines[1]).toMatchObject({ command: "sidecar", model: "unknown", outcome: "success" });
+    expect(lines[1]).not.toHaveProperty("lens");
+  });
+
+  it("records a failed turn as an error outcome", async () => {
+    const id = await createSession();
+    await runTurn(id, "SIGNEDOUT");
+    expect(readDashboardUsage(root)).toEqual([expect.objectContaining({ command: "sidecar", outcome: "error" })]);
+  });
+
+  it("carries each session's estimated cost in the sessions response", async () => {
+    const id = (await (await api("", { method: "POST", body: { vendor: "claude", model: "claude-opus-5" } })).json()).session.id;
+    const fresh = (await (await api(`/${id}`)).json()).estimatedCost;
+    expect(fresh.totalRaw).toBe(0);
+
+    await runTurn(id, "one");
+    const { sessions } = await (await api("")).json();
+    expect(sessions[0].estimatedCost.totalRaw).toBeGreaterThan(0);
+    expect(sessions[0].estimatedCost.byModel[0]).toMatchObject({ model: "claude-opus-5" });
   });
 });
 
@@ -192,6 +325,51 @@ describe("turns", () => {
     const events = (await frames(id, 0)).frames.flatMap((f) => (f.type === "event" ? [f.event] : []));
     expect(events.find((e) => e.type === "assistant")?.text).toBe(REPLY);
     expect(events.find((e) => e.type === "completion")?.completionSummary).toBe(REPLY);
+  });
+
+  it("keeps a Claude tool result in the transcript, naming the call it answers", async () => {
+    const id = await createSession();
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "TOOLS" } });
+    await turnClosed(id);
+    const events = (await frames(id, 0)).frames.flatMap((f) => (f.type === "event" ? [f.event] : []));
+    expect(events.find((e) => e.type === "tool_use")?.toolCall).toMatchObject({ tool: "Read", id: "toolu_01R" });
+    expect(events.filter((e) => e.type === "tool_result").map((e) => e.toolResult)).toEqual([
+      { tool: "unknown", output: "     1\texport const a = 1;", durationMs: 0, callId: "toolu_01R" },
+    ]);
+  });
+
+  it("marks a turn that failed on the vendor's sign-in error, and no other failure", async () => {
+    const id = await createSession();
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "SIGNEDOUT" } });
+    const closing = await turnClosed(id);
+    expect(closing).toMatchObject({ running: false, status: "failed", signedOut: true });
+    expect(closing.error).toContain("Not logged in");
+
+    const ok = await createSession();
+    await api(`/${ok}/turns`, { method: "POST", body: { prompt: "hello" } });
+    expect((await turnClosed(ok)).signedOut).toBeUndefined();
+  });
+
+  it("keeps the signed-out outcome on the session until a later turn clears it", async () => {
+    const id = await createSession();
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "SIGNEDOUT" } });
+    await turnClosed(id);
+    const kept = (await (await api(`/${id}`)).json()).session.lastTurn;
+    expect(kept).toMatchObject({ status: "failed", signedOut: true });
+    expect(kept.error).toContain("Not logged in");
+    expect((await (await api("")).json()).sessions[0].session.lastTurn).toEqual(kept);
+
+    messages.length = 0;
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "hello" } });
+    await turnClosed(id);
+    expect((await (await api(`/${id}`)).json()).session.lastTurn).toEqual({ status: "completed" });
+  });
+
+  it("still closes the turn when saving its outcome fails", async () => {
+    const id = await createSession();
+    registry.recordTurnEnd = () => { throw new Error("ENOSPC: no space left on device"); };
+    await api(`/${id}/turns`, { method: "POST", body: { prompt: "SIGNEDOUT" } });
+    expect(await turnClosed(id)).toMatchObject({ running: false, status: "failed", signedOut: true });
   });
 
   it("refuses a second turn while one runs, and an empty prompt", async () => {
@@ -371,6 +549,20 @@ describe("broker", () => {
     await api(`/${id}/interrupt`, { method: "POST" });
     await cardAnnounced(id, "withdrawn");
     expect(broker.cards(id)[0].status).toBe("withdrawn");
+    expect((await call).isError).toBe(true);
+    await client.close();
+  });
+
+  it("withdraws waiting cards with the note \"session ended\" when the session ends", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const call = client.callTool({ name: "run_command", arguments: { argv: ["ndx", "ci", "."] } });
+    await cardAnnounced(id, "pending");
+    const ended = await api(`/${id}/end`, { method: "POST" });
+    expect(ended.status).toBe(200);
+    await cardAnnounced(id, "withdrawn");
+    const { cards } = await (await api(`/${id}/cards`)).json();
+    expect(cards).toEqual([expect.objectContaining({ status: "withdrawn", reason: "session ended" })]);
     expect((await call).isError).toBe(true);
     await client.close();
   });

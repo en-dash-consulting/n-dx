@@ -89,11 +89,10 @@ describe("app-level stacking order", () => {
 
     // The always-on trays, which are what sat at 996-998 over a z-60 overlay.
     for (const tray of [
-      ".git-status-banner",
+      ".git-status-chip",
       ".active-operations-tray",
       ".refresh-queue-status",
       ".polling-suspension-indicator",
-      ".sessions-panel",
     ]) {
       expect(layer(tray), `${tray} must sit below the settings overlay`).toBeLessThan(settings);
     }

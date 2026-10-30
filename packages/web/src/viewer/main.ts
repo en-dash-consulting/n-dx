@@ -18,8 +18,6 @@ import {
   RefreshQueueStatus,
   PollingSuspensionIndicator,
   ActiveOperationsTray,
-  GitStatusBanner,
-  SessionsPanel,
   type ServerIdentity,
   SearchOverlay,
   useSearchOverlay,
@@ -30,6 +28,7 @@ import {
   initDensity,
   RepoTrustStrip,
   ServerUnavailableNotice,
+  SidecarDock,
 } from "./components/index.js";
 import {
   useRouteState,
@@ -42,12 +41,8 @@ import {
   useActiveOperations,
   useGitStatus,
   useAutoCommitGenerated,
-  useWorktrees,
-  useClaims,
-  useLive,
-  isAnalysisJob,
-  liveRunCount,
   useFeatureToggle,
+  useSidecarShell,
 } from "./hooks/index.js";
 import { startPollingRestart, usePollingSuspension } from "./polling/index.js";
 import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
@@ -138,12 +133,6 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // again — a second caller would mean a second poller and a second socket.
   const jobs = useActiveOperations();
   const { status: gitStatus, refetch: refetchGitStatus } = useGitStatus();
-  const { worktrees } = useWorktrees();
-  const { claims } = useClaims();
-  const liveAvailable = validViews.has("live") && !isDeployedMode();
-  const live = useLive(liveAvailable);
-  const analyses = live?.jobs.filter(isAnalysisJob).length ?? 0;
-  const liveRuns = live ? liveRunCount(live) : null;
   const [searchOpen, openSearch, closeSearch] = useSearchOverlay();
   const [neolithicOpen, openNeolithic, closeNeolithic] = useNeolithicOverlay();
   const handleTripleClick = useMemo(
@@ -158,6 +147,10 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // enrichment gate before their hooks run.
   const askEnabled = useFeatureToggle("sourcevision.ask", false);
   useAutoCommitGenerated(gitStatus, useFeatureToggle("git.autoCommitGenerated", false), refetchGitStatus);
+  // The Product page reports its open capability, which Sidecar attaches.
+  const [openCapability, setOpenCapability] = useState<string | null>(null);
+  // The PRD page reports the task picked in its tree, which the route does not carry.
+  const [openTask, setOpenTask] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -182,6 +175,12 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     fallbackPage(validViews),
   );
   const pageView: ViewId = page.view;
+  // Sidecar: the drawer attaches the page under any settings overlay. The top-nav button, ⌘J and the drawer all read `web.sidecar` here.
+  // A static export has no server to hold a session.
+  const sidecarShell = useSidecarShell(
+    useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability },
+  );
   const stage = stageForView(pageView, validViews);
 
   // The commands sheet is UI state, not a route. Any navigation lowers it —
@@ -253,7 +252,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, setOpenCapability, setOpenTask, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   return h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
@@ -261,7 +260,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
     h(MemoryWarningBanner, { snapshot: memorySnapshot, level: memoryLevel, visible: showMemoryWarning, onDismiss: dismissMemoryWarning }),
     h(DegradationBanner, { tier: degradationTier, isDegraded, summary: degradationSummary, disabledFeatures, visible: showDegradationBanner, onDismiss: () => setDegradationDismissed(true) }),
-    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope }),
+    h(TopNav, { view: pageView, validViews, onNavigate: handleSidebarNav, navigateTo, onOpenSearch: openSearch, scope, sidecar: sidecarShell.button }),
     isLiveView(pageView) && validViews.has("live") && !isDeployedMode()
       ? h(LiveBar, { view: pageView, taskId: page.taskId, navigateTo })
       : null,
@@ -269,23 +268,27 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     // trusted. Server-backed; renders nothing in a standalone viewer. Below
     // LiveBar so the nav chrome stays contiguous — both sit above main content.
     h(RepoTrustStrip, null),
-    h("div", { class: "app-body" },
-      h("main", {
-        id: "main-content",
-        // The Tasks (prd) view manages its own internal scroll region, so the
-        // main column becomes a non-scrolling flex container for it.
-        class: `main${pageView === "prd" ? " main--fill" : ""}${stage && pageView !== "home" ? " main--staged" : ""}`,
-        role: "main",
-        "aria-label": "Main content",
-        onClick: handleTripleClick,
-      },
-        h(PageTitle, { view: pageView }),
-        renderViewContent(pageView, loading, viewCtx),
+    // The Sidecar drawer docks beside the page body, never over it: the body
+    // (and the stage links inside it) narrows by the drawer's width.
+    h(SidecarDock, { open: sidecarShell.drawer.open, sidecar: sidecarShell.sidecar, onClose: sidecarShell.drawer.close },
+      h("div", { class: "app-body" },
+        h("main", {
+          id: "main-content",
+          // The Tasks (prd) view manages its own internal scroll region, so the
+          // main column becomes a non-scrolling flex container for it.
+          class: `main${pageView === "prd" ? " main--fill" : ""}${stage && pageView !== "home" ? " main--staged" : ""}`,
+          role: "main",
+          "aria-label": "Main content",
+          onClick: handleTripleClick,
+        },
+          h(PageTitle, { view: pageView }),
+          renderViewContent(pageView, loading, viewCtx),
+        ),
+        h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),
+        !isFeatureDisabled("detailPanel")
+          ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
+          : null,
       ),
-      h(StageLinks, { stage, validViews, onNavigate: handleSidebarNav }),
-      !isFeatureDisabled("detailPanel")
-        ? h(DetailPanel, { detail, data, navigateTo, onClose: () => { setDetail(null); setPrdDetailContent(null); }, prdDetailContent })
-        : null,
     ),
     h(BottomBar, {
       server,
@@ -295,6 +298,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       settingsOpen,
       onToggleCommands: toggleCommands,
       commandsOpen,
+      gitStatus,
+      onGitCommitted: refetchGitStatus,
     }),
     h(CommandsSheet, { open: commandsOpen, onClose: closeCommands },
       renderActiveView("command-reference", viewCtx),
@@ -310,8 +315,6 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
     h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
     // One bottom-right row for every floating status pill (styles/status-dock.css).
     h("div", { class: "status-dock" },
-      h(SessionsPanel, { worktrees, claims, navigateTo, analyses, liveRuns, liveAvailable }),
-      h(GitStatusBanner, { status: gitStatus, onCommitted: refetchGitStatus }),
       h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
       h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     ),

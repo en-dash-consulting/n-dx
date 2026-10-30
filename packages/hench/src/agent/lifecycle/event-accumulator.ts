@@ -318,6 +318,19 @@ export class EventAccumulator {
           durationMs: 0,
         };
 
+        // A call with a vendor id takes the result that names it, wherever it
+        // lands: several calls can precede their results.
+        const id = event.toolCall.id;
+        if (id) {
+          const answer = this._events.find((e, j) => j > i && e.type === "tool_result" && e.toolResult?.callId === id);
+          if (answer?.toolResult) {
+            record.output = answer.toolResult.output.slice(0, 2000);
+            record.durationMs = answer.toolResult.durationMs;
+          }
+          calls.push(record);
+          continue;
+        }
+
         // Look ahead for a matching tool_result
         for (let j = i + 1; j < this._events.length; j++) {
           const next = this._events[j];

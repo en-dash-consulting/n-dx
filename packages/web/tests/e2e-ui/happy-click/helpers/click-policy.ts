@@ -106,6 +106,14 @@ export const DENY_CLASS: string[] = [
   "prep-btn",
   "workspace-card-stop",
   "iso-hero-btn",
+  // Sidecar: a turn runs the vendor CLI and spends tokens.
+  "sidecar-send",
+  // Sidecar cards: approving lets the agent act; "always allow" writes the allow-list.
+  "sidecar-card-approve",
+  "sidecar-card-always",
+  // Sidecar sessions list: End closes a session for good.
+  "sidecar-session-end",
+  "sidecar-session-end-confirm",
   // Placing or proposing takes a change out of the Inbox; nothing puts it back.
   "cp-place",
   "cp-propose-btn",

@@ -64,10 +64,8 @@ export { PollingSuspensionIndicator } from "./polling-suspension-indicator.js";
 export { RefreshQueueStatus } from "./refresh-queue-status.js";
 export { ActiveOperationsTray } from "./active-operations-tray.js";
 export type { ActiveOperationsTrayProps } from "./active-operations-tray.js";
-export { GitStatusBanner } from "./git-status-banner.js";
-export type { GitStatusBannerProps } from "./git-status-banner.js";
-export { SessionsPanel } from "./sessions-panel.js";
-export type { SessionsPanelProps } from "./sessions-panel.js";
+export { GitStatusChip } from "./git-status-chip.js";
+export type { GitStatusChipProps } from "./git-status-chip.js";
 
 // ── Status indicators ───────────────────────────────────────────────
 
@@ -120,6 +118,8 @@ export { TopNav } from "./top-nav.js";
 export type { TopNavProps } from "./top-nav.js";
 export { StageLinks } from "./stage-links.js";
 export type { StageLinksProps } from "./stage-links.js";
+export { SidecarDock, SidecarDrawer, SidecarButton } from "./sidecar-drawer.js";
+export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";
 export { SettingsOverlay } from "./settings-overlay.js";

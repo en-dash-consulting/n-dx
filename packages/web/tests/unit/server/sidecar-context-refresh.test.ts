@@ -9,9 +9,9 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { recordRepoTrust } from "@n-dx/llm-client";
@@ -29,6 +29,9 @@ import {
   renderLedger,
   type LedgerEntry,
 } from "../../../src/server/sidecar/ledger.js";
+import { loadPrdModel } from "../../../src/server/rex-gateway.js";
+import { buildLensPacket } from "../../../src/server/sidecar/lens-packets.js";
+import type { PacketSources } from "../../../src/server/sidecar/packet-sources.js";
 import {
   SidecarSessionRegistry,
   type SidecarFrame,
@@ -80,6 +83,13 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
     }
     const reply = checkpoint ? "ckpt-reply-marker" : `reply to ${spawn.stdin.split("\n")[0]}`;
     stdout.write(JSON.stringify({ type: "system", subtype: "init", session_id: id }) + "\n");
+    if (spawn.stdin.includes("FAILTURN")) {
+      // A vendor error after the session started: the session id is reported, the turn fails.
+      stdout.write(JSON.stringify({ type: "result", subtype: "error_during_execution", is_error: true, session_id: id, result: "boom" }) + "\n");
+      stdout.end();
+      setImmediate(() => child.emit("close", 1));
+      return;
+    }
     stdout.write(JSON.stringify({
       type: "assistant",
       session_id: id,
@@ -225,15 +235,15 @@ describe("checkpoint at the ceiling", () => {
 
   it("honours an interrupt that arrives while the cold turn builds its packet", async () => {
     let release: ((text: string) => void) | undefined;
-    let builds = 0;
+    let held = false;
     const reg = new SidecarSessionRegistry({
       dir,
       connect: () => ({ spawn: fakeSpawn }),
       context: {
         ceiling: () => 1000,
         ledger: (record) => readLedger(dir, record.id),
-        // The first build waits for the test; later ones answer at once.
-        packet: () => (builds++ === 0
+        // The first cold build waits for the test; every other build answers at once.
+        packet: (record) => (record.refresh && !held && (held = true)
           ? new Promise<string>((resolve) => { release = resolve; })
           : Promise.resolve("## PACKET")),
       },
@@ -330,5 +340,168 @@ describe("cold prompt", () => {
     expect(text).toContain("(no notes were left)");
     expect(text).toContain("## Operator's message\ngo");
     expect(text).not.toContain("exchange");
+  });
+});
+
+describe("the packet opens the first turn", () => {
+  it("sends the packet with turn one only, in front of the operator's message", async () => {
+    const reg = registry(1000, "## PACKET-MARKER");
+    const id = open(reg);
+    await turn(reg, id, "first question", 10);
+    await turn(reg, id, "second question", 10);
+
+    expect(spawns[0]!.stdin).toContain("## PACKET-MARKER");
+    expect(spawns[0]!.stdin.indexOf("## PACKET-MARKER")).toBeLessThan(spawns[0]!.stdin.indexOf("first question"));
+    expect(spawns[1]!.stdin).toBe("second question");
+  });
+
+  it("sends nothing extra when the lens has no packet", async () => {
+    const reg = registry(1000);
+    const id = open(reg);
+    await turn(reg, id, "first question", 10);
+    expect(spawns[0]!.stdin).toBe("first question");
+  });
+
+  it("carries the new packet on the next turn after a re-lens or a new target, once", async () => {
+    const reg = new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      context: {
+        ceiling: () => 1000,
+        ledger: () => [],
+        packet: async (record) => `## PACKET ${record.lens} ${record.target?.ref ?? "-"}`,
+      },
+    });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "explain" });
+    await reg.sendTurn(id, "one");
+    await reg.sendTurn(id, "two");
+    reg.update(id, { name: "Renamed" });
+    await reg.sendTurn(id, "three");
+    reg.update(id, { lens: "describe", target: { ref: "T-1" } });
+    await reg.sendTurn(id, "four");
+    await reg.sendTurn(id, "five");
+
+    expect(spawns.map((s) => s.stdin.split("\n")[0])).toEqual([
+      "## PACKET explain -", "two", "three", "## PACKET describe T-1", "five",
+    ]);
+    expect(reg.get(id)).toMatchObject({ name: "Renamed", lens: "describe", target: { ref: "T-1" } });
+    expect(reg.get(id)?.packetDue).toBeUndefined();
+  });
+
+  /** A registry whose packet names the lens and target, and whose first build waits for `hold` when set. */
+  function lensRegistry(opts: { hold?: () => Promise<void>; now?: () => number; ttlMs?: number } = {}): SidecarSessionRegistry {
+    let held = false;
+    return new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      ...(opts.now && { now: opts.now }),
+      ...(opts.ttlMs !== undefined && { ttlMs: opts.ttlMs }),
+      context: {
+        ceiling: () => 1000,
+        ledger: () => [],
+        packet: async (record) => {
+          // Read before waiting, as a real build reads its sources first.
+          const text = `## PACKET ${record.lens} ${record.target?.ref ?? "-"}`;
+          if (opts.hold && !held) {
+            held = true;
+            await opts.hold();
+          }
+          return text;
+        },
+      },
+    });
+  }
+
+  it("carries the packet again after an opening turn that was stopped before it reached the model", async () => {
+    let release: (() => void) | undefined;
+    const reg = lensRegistry({ hold: () => new Promise<void>((r) => { release = r; }) });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "explain" });
+    const stopped = reg.sendTurn(id, "one");
+    await new Promise((r) => setImmediate(r));
+    expect(await reg.interrupt(id)).toBe(true);
+    release!();
+    expect((await stopped).status).toBe("interrupted");
+
+    await reg.sendTurn(id, "two");
+    expect(spawns.map((s) => s.stdin.split("\n")[0])).toEqual(["## PACKET explain -"]);
+  });
+
+  it("carries the packet again after an opening turn the vendor failed", async () => {
+    const reg = lensRegistry();
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "explain" });
+    expect((await reg.sendTurn(id, "FAILTURN")).status).toBe("failed");
+    await reg.sendTurn(id, "after sign-in");
+    await reg.sendTurn(id, "later");
+
+    expect(spawns.map((s) => s.stdin.split("\n")[0])).toEqual(["## PACKET explain -", "## PACKET explain -", "later"]);
+  });
+
+  it("keeps a re-lens made while a turn runs due for the next turn", async () => {
+    let release: (() => void) | undefined;
+    const reg = lensRegistry({ hold: () => new Promise<void>((r) => { release = r; }) });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "explain" });
+    const first = reg.sendTurn(id, "one");
+    await new Promise((r) => setImmediate(r));
+    reg.update(id, { lens: "plan" });
+    release!();
+    await first;
+    await reg.sendTurn(id, "two");
+
+    expect(spawns.map((s) => s.stdin.split("\n")[0])).toEqual(["## PACKET explain -", "## PACKET plan -"]);
+  });
+
+  it("carries the packet when a forgotten resume id makes the turn open a new vendor session", async () => {
+    let clock = Date.parse("2026-10-28T12:00:00.000Z");
+    const reg = lensRegistry({ now: () => clock, ttlMs: 60_000 });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "explain" });
+    await reg.sendTurn(id, "one");
+    await reg.sendTurn(id, "two");
+    clock += 120_000;
+    await reg.sendTurn(id, "three");
+
+    expect(spawns.map((s) => s.stdin.split("\n")[0])).toEqual(["## PACKET explain -", "two", "## PACKET explain -"]);
+    expect(spawns[2]!.args).not.toContain("--resume");
+  });
+
+  it("sends the task packet on turn one of a Describe session on that task", async () => {
+    const rexDir = join(root, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    cpSync(resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree"), rexDir, { recursive: true });
+    const model = await loadPrdModel(rexDir);
+    const sources: PacketSources = {
+      sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },
+      prd: async () => ({ layout: model.layout, tree: model.tree }),
+      evidence: async () => null,
+      zones: async () => null,
+      resolve: async () => null,
+      preview: async () => null,
+      runs: async () => [],
+    };
+    const task = "c0000000-0000-4000-8000-000000000002";
+    const reg = new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      context: {
+        ceiling: () => 1000,
+        ledger: () => [],
+        packet: async (record) => {
+          const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, "2026-10-28T12:00:00.000Z");
+          return built.status === "ready" ? built.packet.text : undefined;
+        },
+      },
+    });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "describe", target: { ref: task } });
+    await reg.sendTurn(id, "what is this?");
+
+    expect(spawns[0]!.stdin).toContain(`# Sidecar context packet: describe · ${task}`);
+    // The header names any ref; the title proves the task itself was resolved and described.
+    expect(spawns[0]!.stdin).toContain("Wire the button");
+    expect(spawns[0]!.stdin).toContain("what is this?");
   });
 });

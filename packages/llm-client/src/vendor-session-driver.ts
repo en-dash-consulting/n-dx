@@ -133,8 +133,14 @@ export interface VendorSessionDriver {
    *   delivery shape on any host.
    */
   turnSpawn(input: SessionTurnInput, platform?: NodeJS.Platform): SessionTurnSpawn;
-  /** Normalize one stdout line; `null` for lines that carry no event. */
+  /**
+   * Normalize one stdout line; `null` for lines that carry no event. A line
+   * holding several events (a Claude `user` line with two tool results)
+   * yields its first: use {@link parseLineEvents} to keep them all.
+   */
   parseLine(line: string, turn: number, options?: ParseLineOptions): RuntimeEvent | null;
+  /** Every event one stdout line carries, in order; empty for none. */
+  parseLineEvents(line: string, turn: number, options?: ParseLineOptions): RuntimeEvent[];
   /** The session id one parsed line names, if it names one. */
   extractSessionId(rawJson: unknown): string | undefined;
   /**
@@ -213,14 +219,15 @@ function claudeTurnSpawn(
 /** Tool_use blocks embedded in a Claude assistant event. */
 function extractClaudeToolUseBlocks(
   event: Record<string, unknown>,
-): Array<{ name: string; input: Record<string, unknown> }> {
-  const results: Array<{ name: string; input: Record<string, unknown> }> = [];
+): Array<{ name: string; input: Record<string, unknown>; id?: string }> {
+  const results: Array<{ name: string; input: Record<string, unknown>; id?: string }> = [];
   const collect = (blocks: Array<Record<string, unknown>>): void => {
     for (const block of blocks) {
       if (block.type === "tool_use") {
         results.push({
           name: (block.name as string) || "unknown",
           input: (block.input as Record<string, unknown>) || {},
+          ...(typeof block.id === "string" && block.id ? { id: block.id } : {}),
         });
       }
     }
@@ -239,27 +246,103 @@ function extractClaudeToolUseBlocks(
 }
 
 /**
- * Parse one line of Claude `--output-format stream-json` into a RuntimeEvent.
- *
- * Lines that carry no event (empty, non-JSON, unknown types, usage-only
- * assistant messages) return `null`. Token usage is {@link VendorSessionDriver.usageEvent}'s.
+ * A tool result's `content` as text: a string as is, an array of content
+ * blocks as its text blocks joined by newlines (an image block has no text).
+ */
+function claudeToolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .flatMap((block) =>
+      block && typeof block === "object" && (block as Record<string, unknown>).type === "text" &&
+        typeof (block as Record<string, unknown>).text === "string"
+        ? [(block as Record<string, unknown>).text as string]
+        : [])
+    .join("\n");
+}
+
+/**
+ * The tool results in a Claude `user` line, one event per `tool_result`
+ * block. Claude's stream-json answers tool calls this way:
+ * `{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_…","content":…}]}}`.
+ * A result names its call by id, never by tool, so `tool` stays `"unknown"`.
+ */
+function claudeToolResultEvents(
+  event: Record<string, unknown>,
+  turn: number,
+  timestamp: string,
+): RuntimeEvent[] {
+  const message = event.message;
+  if (!message || typeof message !== "object") return [];
+  const blocks = (message as Record<string, unknown>).content;
+  if (!Array.isArray(blocks)) return [];
+  return blocks.flatMap((block): RuntimeEvent[] => {
+    if (!block || typeof block !== "object") return [];
+    const b = block as Record<string, unknown>;
+    if (b.type !== "tool_result") return [];
+    return [{
+      type: "tool_result" as RuntimeEventType,
+      vendor: LLM_VENDOR.CLAUDE,
+      turn,
+      timestamp,
+      toolResult: {
+        tool: "unknown",
+        output: claudeToolResultText(b.content).slice(0, MAX_TOOL_OUTPUT_LENGTH),
+        durationMs: 0,
+        ...(typeof b.tool_use_id === "string" && b.tool_use_id ? { callId: b.tool_use_id } : {}),
+      },
+    }];
+  });
+}
+
+/**
+ * Parse one line of Claude `--output-format stream-json` into its first
+ * RuntimeEvent. See {@link parseClaudeStreamEvents} for every event.
  */
 export function parseClaudeStreamLine(
   line: string,
   turn: number,
-  { textLimit: limit = MAX_SUMMARY_LENGTH }: ParseLineOptions = {},
+  options: ParseLineOptions = {},
 ): RuntimeEvent | null {
-  if (!line.trim()) return null;
+  return parseClaudeStreamEvents(line, turn, options)[0] ?? null;
+}
+
+/**
+ * Parse one line of Claude `--output-format stream-json` into RuntimeEvents.
+ *
+ * Lines that carry no event (empty, non-JSON, unknown types, usage-only
+ * assistant messages) yield none. A `user` line yields one `tool_result` per
+ * tool_result block; every other line at most one event. Token usage is
+ * {@link VendorSessionDriver.usageEvent}'s.
+ */
+export function parseClaudeStreamEvents(
+  line: string,
+  turn: number,
+  { textLimit: limit = MAX_SUMMARY_LENGTH }: ParseLineOptions = {},
+): RuntimeEvent[] {
+  if (!line.trim()) return [];
 
   let event: Record<string, unknown>;
   try {
     event = JSON.parse(line);
   } catch {
-    return null;
+    return [];
   }
+  if (!event || typeof event !== "object") return [];
 
-  const type = event.type as string | undefined;
   const timestamp = new Date().toISOString();
+  if (event.type === "user") return claudeToolResultEvents(event, turn, timestamp);
+  const one = parseClaudeEventObject(event, turn, timestamp, limit);
+  return one ? [one] : [];
+}
+
+function parseClaudeEventObject(
+  event: Record<string, unknown>,
+  turn: number,
+  timestamp: string,
+  limit: number,
+): RuntimeEvent | null {
+  const type = event.type as string | undefined;
   const vendor: LLMVendor = LLM_VENDOR.CLAUDE;
 
   switch (type) {
@@ -298,7 +381,11 @@ export function parseClaudeStreamLine(
           turn,
           timestamp,
           text,
-          toolCall: { tool: firstTool.name, input: firstTool.input },
+          toolCall: {
+            tool: firstTool.name,
+            input: firstTool.input,
+            ...(firstTool.id ? { id: firstTool.id } : {}),
+          },
         };
       }
 
@@ -331,6 +418,7 @@ export function parseClaudeStreamLine(
           tool: "unknown", // Claude's stream carries no tool name on results
           output: output.slice(0, MAX_TOOL_OUTPUT_LENGTH),
           durationMs: 0,
+          ...(typeof event.tool_use_id === "string" && event.tool_use_id ? { callId: event.tool_use_id } : {}),
         },
       };
     }
@@ -419,6 +507,7 @@ export const claudeSessionDriver: VendorSessionDriver = {
   canFork: true,
   turnSpawn: claudeTurnSpawn,
   parseLine: parseClaudeStreamLine,
+  parseLineEvents: parseClaudeStreamEvents,
   extractSessionId: extractClaudeSessionId,
   usageEvent: claudeUsageEvent,
 };
@@ -972,6 +1061,10 @@ export const codexSessionDriver: VendorSessionDriver = {
   canFork: false,
   turnSpawn: codexTurnSpawn,
   parseLine: parseCodexLine,
+  parseLineEvents: (line, turn, options) => {
+    const event = parseCodexLine(line, turn, options);
+    return event ? [event] : [];
+  },
   extractSessionId: extractCodexSessionId,
   usageEvent: codexUsageEvent,
 };

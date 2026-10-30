@@ -30,7 +30,7 @@ export interface SweepReport {
 }
 
 const CONTROLS = 'button, [role="button"], [role="tab"], [role="radio"], summary';
-const NEVER_INSIDE = ["#settings-overlay", ".git-status-banner", ".leave-guard-backdrop"];
+const NEVER_INSIDE = ["#settings-overlay", ".git-status-chip", ".leave-guard-backdrop"];
 
 async function candidates(page: Page, root: string): Promise<Locator[]> {
   const all = page.locator(root).locator(CONTROLS);

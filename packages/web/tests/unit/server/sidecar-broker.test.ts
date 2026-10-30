@@ -95,8 +95,9 @@ describe("cards", () => {
 
   it("settles an allow-listed call at once and raises no card", async () => {
     const first = broker.request("s1", "run_command", { argv: ["ndx", "status", "."] });
-    broker.decide("s1", raised[0].id, { approve: true, remember: true });
+    expect(broker.decide("s1", raised[0].id, { approve: true, remember: true }).remembered).toBe(true);
     await first;
+    expect(broker.cards("s1")[0]).toMatchObject({ status: "approved", remembered: true });
     expect(await broker.request("s1", "run_command", { argv: ["ndx", "status", "."] }))
       .toEqual({ approved: true, decidedBy: "allow-list" });
     expect(raised).toHaveLength(1);

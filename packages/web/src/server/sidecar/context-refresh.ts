@@ -109,3 +109,8 @@ export function composeColdPrompt(input: ColdPromptInput): string {
   parts.push(`## Operator's message\n${input.prompt}`);
   return parts.join("\n\n");
 }
+
+/** A turn that opens with the lens packet: the packet, then the operator's message. */
+export function composeOpeningPrompt(input: { packet: string; prompt: string }): string {
+  return `${input.packet}\n\n## Operator's message\n${input.prompt}`;
+}

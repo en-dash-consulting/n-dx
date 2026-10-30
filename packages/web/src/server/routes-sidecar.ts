@@ -16,8 +16,10 @@
  * | Method | Path | Does |
  * |--------|------|------|
  * | GET  | `/api/sidecar/sessions` | sessions in this worktree |
- * | POST | `/api/sidecar/sessions` | create one (`{ vendor, model?, name?, lens? }`) |
+ * | GET | `/api/sidecar/lenses` | the lens registry: each lens id, whether it can run, what it waits on |
+ * | POST | `/api/sidecar/sessions` | create one (`{ vendor, model?, name?, lens?, target? }`) |
  * | GET  | `/api/sidecar/sessions/:id` | one session and whether a turn runs |
+ * | PATCH | `/api/sidecar/sessions/:id` | rename, re-lens or re-target (`{ name?, lens?, target? }`) |
  * | POST | `/api/sidecar/sessions/:id/turns` | start a turn (`{ prompt }`) |
  * | GET  | `/api/sidecar/sessions/:id/frames?after=N` | transcript frames after N |
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
@@ -41,8 +43,10 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { vendorSessionDriver } from "@n-dx/llm-client";
+import { isAuthError, vendorSessionDriver } from "@n-dx/llm-client";
 import type { SessionTurnStatus } from "@n-dx/llm-client";
+import { SIDECAR_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usage.js";
+import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { errorMessage, errorResponse, jsonResponse, readBody } from "./response-utils.js";
@@ -52,21 +56,34 @@ import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readLedger } from "./sidecar/ledger.js";
-import { buildLensPacket } from "./sidecar/lens-packets.js";
+import { buildLensPacket, LENS_IDS, LENS_PACKETS } from "./sidecar/lens-packets.js";
+import type { PacketTarget } from "./sidecar/packet-builders.js";
 import { createPacketSources } from "./sidecar/packet-sources.js";
 import {
   createWorktreeSidecarRegistry,
   worktreeSidecarDir,
   type SidecarContextOptions,
   type SidecarFrame,
+  type SidecarRegistryOptions,
   type SidecarSessionRecord,
+  type SidecarTurnOutcome,
   type SidecarSessionRegistry,
 } from "./sidecar/session-registry.js";
 import type { SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
 import { WORKSPACE_HEADER } from "./workspaces.js";
+import { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
+const LENSES_PATH = "/api/sidecar/lenses";
+
+/** The registry as the drawer reads it: every lens, and what an unavailable one waits on. */
+function sidecarLenses(): Array<{ id: string; available: boolean; needs?: string }> {
+  return LENS_IDS.map((id) => {
+    const plan = LENS_PACKETS[id];
+    return plan.kind === "unavailable" ? { id, available: false, needs: plan.needs } : { id, available: true };
+  });
+}
 
 /** Announces that a card was raised or settled; fetch `…/cards` for it. */
 export interface SidecarCardMessage {
@@ -89,12 +106,16 @@ export interface SidecarFramesMessage {
   status?: SessionTurnStatus;
   /** Why the turn failed; only on a failed closing announcement. */
   error?: string;
+  /** The failure is the vendor CLI's sign-in error, so the drawer can name the login command. */
+  signedOut?: true;
   timestamp: string;
 }
 
 export interface SidecarSessionResponse {
   session: SidecarSessionRecord;
   running: boolean;
+  /** What the session's tokens cost at the session model's rates. */
+  estimatedCost: CostEstimate;
 }
 
 export interface SidecarTurnStartedResponse extends SidecarSessionResponse {
@@ -147,9 +168,31 @@ export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions
     ledger: (record) => readLedger(dir, record.id),
     packet: async (record) => {
       const sources = createPacketSources(ctx, { resolve: async () => null, preview: async () => null });
-      const built = await buildLensPacket(record.lens ?? "general", {}, sources, new Date().toISOString());
+      const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString());
       return built.status === "ready" ? built.packet.text : undefined;
     },
+  };
+}
+
+/**
+ * Appends each finished turn to the dashboard usage ledger as its own
+ * `sidecar` command, so the spend reaches LLM Utilization in a bucket apart
+ * from Ask. An interrupted turn that never reached the vendor spent nothing
+ * and is not recorded.
+ */
+export function sidecarTurnSpendRecorder(ctx: ServerContext): NonNullable<SidecarRegistryOptions["onTurnSpend"]> {
+  return ({ record, status, tokens }) => {
+    if (status === "interrupted" && tokens.input === 0 && tokens.output === 0) return;
+    recordDashboardUsage(ctx.projectDir, {
+      timestamp: new Date().toISOString(),
+      command: SIDECAR_COMMAND,
+      vendor: record.vendor,
+      model: record.model ?? "unknown",
+      ...tokenFields(tokens),
+      calls: 1,
+      outcome: status === "completed" ? "success" : "error",
+      ...(record.lens && { lens: record.lens }),
+    });
   };
 }
 
@@ -162,6 +205,7 @@ function defaultRegistryFor(ctx: ServerContext): SidecarSessionRegistry {
     registry = createWorktreeSidecarRegistry(ctx.projectDir, {
       broker: (id) => sidecarBrokerEndpoint(ctx, id),
       context: sidecarContextOptions(ctx),
+      onTurnSpend: sidecarTurnSpendRecorder(ctx),
     });
     registries.set(ctx.projectDir, registry);
   }
@@ -224,8 +268,22 @@ function optionalString(body: Record<string, unknown>, key: string): string | un
   return typeof value === "string" && value.trim() ? value.trim() : new Error(`"${key}" must be a non-empty string`);
 }
 
+/** `target` as `{ ref: string }`; absent is undefined. */
+function readTarget(body: Record<string, unknown>): PacketTarget | undefined | Error {
+  const value = body.target;
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return new Error(`"target" must be an object`);
+  const ref = optionalString(value as Record<string, unknown>, "ref");
+  return ref instanceof Error ? ref : ref === undefined ? {} : { ref };
+}
+
 function sessionResponse(registry: SidecarSessionRegistry, session: SidecarSessionRecord): SidecarSessionResponse {
-  return { session, running: registry.isRunning(session.id) };
+  const { input, output, cacheCreationInput = 0, cacheReadInput = 0 } = session.tokens;
+  const totals = { inputTokens: input, outputTokens: output, cacheCreationTokens: cacheCreationInput, cacheReadTokens: cacheReadInput };
+  // A session with no pinned model has none to price by: its tokens reach the
+  // estimate as the unattributed residual, at the labelled fallback rate.
+  const estimatedCost = estimateCostFromTotals(totals, session.model ? { [session.model]: totals } : undefined);
+  return { session, running: registry.isRunning(session.id), estimatedCost };
 }
 
 /**
@@ -248,24 +306,32 @@ function startTurn(
     };
     broadcast(message);
   };
+  // Close the turn on the socket first: a failed save of the outcome (a full
+  // or read-only disk) must not leave the drawer running or reject unhandled.
+  const close = (status: SessionTurnStatus, error?: string): void => {
+    const outcome: SidecarTurnOutcome = {
+      status,
+      ...(error && { error }),
+      ...(status === "failed" && error && isAuthError(error) && { signedOut: true as const }),
+    };
+    announce({ cursor: registry.get(id)?.cursor ?? 0, running: false, ...outcome, status });
+    try {
+      registry.recordTurnEnd(id, outcome);
+    } catch (err) {
+      console.error(`[sidecar] could not save how the turn in session ${id} ended: ${errorMessage(err)}`);
+    }
+  };
   // The user frame is appended synchronously inside sendTurn, before it
   // first awaits, so it is on disk by the time the POST answers.
   registry.sendTurn(id, prompt, (frame) => announce({ cursor: frame.seq, running: true })).finally(() => {
     // Nothing waits on a card once its turn is over.
     broker.withdraw(id, "The turn ended");
   }).then(
-    (result) => {
-      announce({
-        cursor: registry.get(id)?.cursor ?? 0,
-        running: false,
-        status: result.status,
-        ...(result.error && { error: result.error }),
-      });
-    },
+    (result) => close(result.status, result.error),
     (err: unknown) => {
       const error = errorMessage(err);
       console.error(`[sidecar] turn in session ${id} failed: ${error}`);
-      announce({ cursor: registry.get(id)?.cursor ?? 0, running: false, status: "failed", error });
+      close("failed", error);
     },
   );
 }
@@ -286,10 +352,18 @@ export async function handleSidecarRoute(
   opts: SidecarRouteOptions = {},
 ): Promise<boolean> {
   const [pathname, search = ""] = (req.url || "/").split("?");
-  if (pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`) && pathname !== ALLOW_LIST_PATH) return false;
+  if (pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`) && pathname !== ALLOW_LIST_PATH && pathname !== LENSES_PATH) {
+    return false;
+  }
   const method = req.method || "GET";
   const registry = opts.registryFor ? opts.registryFor(ctx.projectDir) : defaultRegistryFor(ctx);
   const broker = opts.brokerFor ? opts.brokerFor(ctx.projectDir) : defaultBrokerFor(ctx.projectDir, broadcast);
+
+  if (pathname === LENSES_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${LENSES_PATH}`);
+    jsonResponse(res, 200, { lenses: sidecarLenses() });
+    return true;
+  }
 
   if (pathname === ALLOW_LIST_PATH) {
     if (method === "GET") {
@@ -329,7 +403,11 @@ export async function handleSidecarRoute(
         if (value instanceof Error) return refuse(res, 400, value.message);
         fields[key] = value;
       }
-      const session = registry.create({ scope: "worktree", worktree: ctx.projectDir, vendor, ...fields });
+      const target = readTarget(body);
+      if (target instanceof Error) return refuse(res, 400, target.message);
+      const session = registry.create({
+        scope: "worktree", worktree: ctx.projectDir, vendor, ...fields, ...(target && { target }),
+      });
       jsonResponse(res, 201, sessionResponse(registry, session));
       return true;
     }
@@ -345,6 +423,25 @@ export async function handleSidecarRoute(
   // One answer for a session this worktree does not hold, whether it does not
   // exist or belongs to another worktree's checkout.
   if (!session || session.worktree !== ctx.projectDir) return refuse(res, 404, `No Sidecar session ${id}`);
+
+  if (action === undefined && method === "PATCH") {
+    const body = await readJsonObject(req, res);
+    if (typeof body === "string") return refuse(res, 400, body);
+    const fields: { name?: string; lens?: string } = {};
+    for (const key of ["name", "lens"] as const) {
+      const value = optionalString(body, key);
+      if (value instanceof Error) return refuse(res, 400, value.message);
+      if (value !== undefined) fields[key] = value;
+    }
+    const target = readTarget(body);
+    if (target instanceof Error) return refuse(res, 400, target.message);
+    if ((fields.lens !== undefined || target) && session.endedAt) {
+      return refuse(res, 409, `Sidecar session ${id} has ended`);
+    }
+    const updated = registry.update(id, { ...fields, ...(target && { target }) }) ?? session;
+    jsonResponse(res, 200, sessionResponse(registry, updated));
+    return true;
+  }
 
   const reads = action === "frames" || action === undefined || (action === "cards" && cardId === undefined);
   const allowed = reads ? "GET" : "POST";
@@ -389,7 +486,7 @@ export async function handleSidecarRoute(
       return true;
 
     case "end":
-      broker.withdraw(id, "The session ended");
+      broker.withdraw(id, SIDECAR_SESSION_ENDED_REASON);
       await registry.end(id);
       jsonResponse(res, 200, sessionResponse(registry, registry.get(id) ?? session));
       return true;

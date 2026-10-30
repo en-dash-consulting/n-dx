@@ -1,0 +1,109 @@
+schema: "rex/v2"
+items:
+  "08d89ce7-c417-4ab9-84ae-7ac29f30270d":
+    status: "completed"
+    startedAt: "2026-10-28T18:35:03.401Z"
+    completedAt: "2026-10-28T18:39:55.120Z"
+    endedAt: "2026-10-28T18:39:55.120Z"
+    activeIntervals: [{"end":"2026-10-28T18:39:55.120Z","start":"2026-10-28T18:35:03.401Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PRDView reports tree selection to main.ts (setOpenTask); Sidecar page selection uses openTask ?? route taskId."
+    lastModified: "2026-10-28T18:39:55.120Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0c8f67c5-719b-4570-9e5a-5296f7c19129":
+    status: "completed"
+    startedAt: "2026-10-28T18:24:20.845Z"
+    completedAt: "2026-10-28T18:32:13.640Z"
+    endedAt: "2026-10-28T18:32:13.640Z"
+    activeIntervals: [{"end":"2026-10-28T18:32:13.640Z","start":"2026-10-28T18:24:20.845Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Session record keeps lastTurn (status, error, signedOut); cleared when next turn starts; drawer seeds lastTurn from session on load."
+    lastModified: "2026-10-28T18:32:13.640Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1eb1ed53-df39-458d-b30d-45484de50a2c":
+    status: "completed"
+    startedAt: "2026-10-28T18:39:55.120Z"
+    completedAt: "2026-10-28T18:39:55.120Z"
+    endedAt: "2026-10-28T18:39:55.120Z"
+    activeIntervals: [{"end":"2026-10-28T18:39:55.120Z","start":"2026-10-28T18:39:55.120Z"}]
+    appliedAt: "2026-10-28T18:39:55.120Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    issues: ["https://www.notion.so/3f7a80b719248143a3cfefa1734efe22","https://www.notion.so/3f7a80b7192481d0bad3fee78325cc7c","https://www.notion.so/3f7a80b7192481018bb3f0fed756c4f0","https://www.notion.so/3f7a80b71924816682dccb222aadb6f3","https://www.notion.so/3f7a80b719248161bde1f381bd30e8ee","https://www.notion.so/3f7a80b7192481fea2d1d0effbc05cec"]
+    lastModified: "2026-10-28T18:39:55.120Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2b5fbdf4-9d8b-4f72-85d1-d5471ad4e5ad":
+    status: "completed"
+    startedAt: "2026-10-28T16:33:07.645Z"
+    completedAt: "2026-10-28T16:56:08.125Z"
+    endedAt: "2026-10-28T16:56:08.125Z"
+    activeIntervals: [{"end":"2026-10-28T16:51:49.380Z","start":"2026-10-28T16:33:07.645Z"},{"end":"2026-10-28T16:56:08.125Z","start":"2026-10-28T16:56:08.125Z"}]
+    lastModified: "2026-10-28T16:56:08.125Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "379faca3-3f85-4e56-92e2-f6d9fd8be796":
+    status: "completed"
+    startedAt: "2026-10-28T17:40:25.626Z"
+    completedAt: "2026-10-28T17:58:45.496Z"
+    endedAt: "2026-10-28T17:58:45.496Z"
+    activeIntervals: [{"end":"2026-10-28T17:58:45.496Z","start":"2026-10-28T17:40:25.626Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Lens chip and attachment chip in the Sidecar drawer; GET /api/sidecar/lenses exposes the M1 registry; sessions follow via PATCH."
+    lastModified: "2026-10-28T17:58:45.496Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4b81ad73-cb56-47c3-9934-204914b4b9ed":
+    status: "completed"
+    startedAt: "2026-10-28T16:56:30.526Z"
+    completedAt: "2026-10-28T17:02:17.524Z"
+    endedAt: "2026-10-28T17:02:17.524Z"
+    activeIntervals: [{"end":"2026-10-28T17:02:17.524Z","start":"2026-10-28T16:56:30.526Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Drawer state A: missing vendor CLI (catalog cli.found) and sign-in failure (server classifies with isAuthError, announces signedOut); composer disabled."
+    lastModified: "2026-10-28T17:02:17.524Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4dd0f364-a55c-462d-88c6-f2437a05ed17":
+    status: "completed"
+    startedAt: "2026-10-28T17:15:09.586Z"
+    completedAt: "2026-10-28T17:21:25.284Z"
+    endedAt: "2026-10-28T17:21:25.284Z"
+    activeIntervals: [{"end":"2026-10-28T17:21:25.284Z","start":"2026-10-28T17:15:09.586Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "onTurnSpend hook on the Sidecar registry writes a sidecar ledger line per finished turn; sidecar package bucket in utilization; estimatedCost on session responses."
+    lastModified: "2026-10-28T17:21:25.284Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4f37d5e4-3cb0-4947-a9df-5c50fc322829":
+    status: "completed"
+    startedAt: "2026-10-28T16:11:48.176Z"
+    completedAt: "2026-10-28T16:21:06.614Z"
+    endedAt: "2026-10-28T16:21:06.614Z"
+    activeIntervals: [{"end":"2026-10-28T16:21:06.614Z","start":"2026-10-28T16:11:48.176Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Agent picker (vendor/model from /api/llm/catalog; change on open session starts a new session, old stays resumable) and expandable tool calls with paired results. Commit a16eb803f."
+    lastModified: "2026-10-28T16:21:06.614Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "a6f9250c-903e-43c0-af9a-bbeb0692d5b9":
+    status: "completed"
+    startedAt: "2026-10-28T17:05:03.685Z"
+    completedAt: "2026-10-28T17:12:21.599Z"
+    endedAt: "2026-10-28T17:12:21.599Z"
+    activeIntervals: [{"end":"2026-10-28T17:12:21.599Z","start":"2026-10-28T17:05:03.685Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "PATCH /api/sidecar/sessions/:id (name, lens, target); target on create and persisted; lens packet opens turn one and the turn after a re-lens/re-target."
+    lastModified: "2026-10-28T17:12:21.599Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e700e599-a431-4059-b920-017492dccea8":
+    status: "completed"
+    startedAt: "2026-10-28T15:11:25.374Z"
+    completedAt: "2026-10-28T15:33:49.878Z"
+    endedAt: "2026-10-28T15:33:49.878Z"
+    activeIntervals: [{"end":"2026-10-28T15:33:49.878Z","start":"2026-10-28T15:11:25.374Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Sidecar drawer shell, transcript and composer behind web.sidecar (useSidecar/useSidecarShell hooks, SidecarDock/SidecarDrawer/SidecarButton, sidecar.css with UX2' tiers); 21 jsdom tests. Browser inspection at 1440/1100/900 not done: Playwright Chromium not installed."
+    lastModified: "2026-10-28T15:33:49.878Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "eed38806-62c2-4dbc-8d1c-791aa350c0be":
+    status: "completed"
+    startedAt: "2026-10-28T17:24:08.266Z"
+    completedAt: "2026-10-28T17:33:27.481Z"
+    endedAt: "2026-10-28T17:33:27.481Z"
+    activeIntervals: [{"end":"2026-10-28T17:33:27.481Z","start":"2026-10-28T17:24:08.266Z"}]
+    lastModified: "2026-10-28T17:33:27.481Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

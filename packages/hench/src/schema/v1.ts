@@ -969,6 +969,8 @@ export interface PersistedRuntimeEvent {
   toolCall?: {
     tool: string;
     input: Record<string, unknown>;
+    /** The vendor's id for this call, when it reports one. */
+    id?: string;
   };
 
   /** Tool execution result (type: "tool_result"). */
@@ -976,6 +978,8 @@ export interface PersistedRuntimeEvent {
     tool: string;
     output: string;
     durationMs: number;
+    /** `toolCall.id` of the call this answers, when known. */
+    callId?: string;
   };
 
   /** Token usage for this turn or cumulative (type: "token_usage"). */

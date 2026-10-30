@@ -30,6 +30,7 @@ import { addTokenUsage, resolveLayout, resumeVendorSession, startVendorSession }
 import type {
   RuntimeEvent,
   SessionTurnResult,
+  SessionTurnStatus,
   TokenUsage,
   VendorSession,
   VendorSessionOptions,
@@ -39,11 +40,13 @@ import {
   CHECKPOINT_PROMPT,
   COLD_EXCHANGES,
   composeColdPrompt,
+  composeOpeningPrompt,
   contextTokens,
   type Exchange,
   type SidecarScope,
 } from "./context-refresh.js";
 import { renderLedger, type LedgerEntry } from "./ledger.js";
+import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 import { sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
@@ -62,6 +65,14 @@ export interface SidecarSessionRecord {
   vendor: string;
   model?: string;
   lens?: string;
+  /** What the lens is pointed at (an item id, display id or alias); absent means no target. */
+  target?: PacketTarget;
+  /**
+   * The next turn carries the packet even though it resumes: the lens or
+   * target changed, or the turn that carried it did not complete. A turn
+   * that opens a vendor session always carries it.
+   */
+  packetDue?: true;
   /** Vendor session id the next turn resumes; absent before the first turn and after the TTL. */
   resumeId?: string;
   /** Sequence number of the last transcript frame. */
@@ -76,6 +87,19 @@ export interface SidecarSessionRecord {
    * cold vendor session instead of resuming. Cleared once that turn completes.
    */
   refresh?: { contextTokens: number; ceiling: number };
+  /**
+   * How the last finished turn ended, kept so a reload or a second tab still
+   * shows a signed-out vendor CLI. Cleared when the next turn starts.
+   */
+  lastTurn?: SidecarTurnOutcome;
+}
+
+/** The outcome of a finished turn, as the drawer reads it. */
+export interface SidecarTurnOutcome {
+  status: string;
+  error?: string;
+  /** The failure was the vendor CLI's sign-in error. */
+  signedOut?: true;
 }
 
 /** One transcript line. */
@@ -93,6 +117,14 @@ export interface CreateSidecarSessionInput {
   model?: string;
   name?: string;
   lens?: string;
+  target?: PacketTarget;
+}
+
+/** The fields {@link SidecarSessionRegistry.update} can change. */
+export interface UpdateSidecarSessionInput {
+  name?: string;
+  lens?: string;
+  target?: PacketTarget;
 }
 
 /** Session options the registry does not own: env policy, LLM config, binary. */
@@ -110,7 +142,17 @@ export interface SidecarContextOptions {
   packet?: (record: SidecarSessionRecord) => Promise<string | undefined>;
 }
 
+/** What one finished turn spent, checkpoint included. */
+export interface SidecarTurnSpend {
+  /** The session as the turn started, so a lens changed mid-turn is not credited with its spend. */
+  record: SidecarSessionRecord;
+  status: SessionTurnStatus;
+  tokens: TokenUsage;
+}
+
 export interface SidecarRegistryOptions {
+  /** Called once per finished turn, after its tokens are added to the session. */
+  onTurnSpend?: (spend: SidecarTurnSpend) => void;
   /** Directory holding `index.json` and the transcripts. */
   dir: string;
   /** Per-session options; called each time a vendor session is opened. */
@@ -126,7 +168,7 @@ interface IndexFile {
   sessions: SidecarSessionRecord[];
 }
 
-export interface WorktreeSidecarRegistryOptions extends Pick<SidecarRegistryOptions, "ttlMs" | "now" | "context"> {
+export interface WorktreeSidecarRegistryOptions extends Pick<SidecarRegistryOptions, "ttlMs" | "now" | "context" | "onTurnSpend"> {
   /** Where a session reaches the `ndx-sidecar` broker; absent gives it no MCP server at all. */
   broker?: (sessionId: string) => SidecarBrokerEndpoint | undefined;
 }
@@ -190,6 +232,7 @@ export class SidecarSessionRegistry {
   private readonly ttlMs: number;
   private readonly now: () => number;
   private readonly context?: SidecarContextOptions;
+  private readonly onTurnSpend?: (spend: SidecarTurnSpend) => void;
   /** Sessions with a turn in progress, from the moment `sendTurn` is called until it settles. */
   private readonly turnOpen = new Set<string>();
   /** Open turns the operator stopped before their vendor call began (a cold turn building its packet). */
@@ -205,6 +248,7 @@ export class SidecarSessionRegistry {
     this.ttlMs = opts.ttlMs ?? DEFAULT_SIDECAR_TTL_MS;
     this.now = opts.now ?? Date.now;
     this.context = opts.context;
+    this.onTurnSpend = opts.onTurnSpend;
     for (const record of this.readIndex()) this.records.set(record.id, record);
   }
 
@@ -218,6 +262,7 @@ export class SidecarSessionRegistry {
       vendor: input.vendor,
       ...(input.model && { model: input.model }),
       ...(input.lens && { lens: input.lens }),
+      ...(input.target && { target: { ...input.target } }),
       cursor: 0,
       turns: 0,
       tokens: { input: 0, output: 0 },
@@ -227,6 +272,32 @@ export class SidecarSessionRegistry {
     this.records.set(record.id, record);
     this.persist();
     return { ...record };
+  }
+
+  /**
+   * Rename a session, point it at another lens or target, or both. A new lens
+   * or target makes the next turn carry its packet, even one made mid-turn.
+   * Returns undefined for an unknown session.
+   */
+  update(id: string, input: UpdateSidecarSessionInput): SidecarSessionRecord | undefined {
+    const record = this.records.get(id);
+    if (!record) return undefined;
+    if (input.name !== undefined) record.name = input.name;
+    const lensChanged = input.lens !== undefined && input.lens !== record.lens;
+    const targetChanged = input.target !== undefined && input.target.ref !== record.target?.ref;
+    if (input.lens !== undefined) record.lens = input.lens;
+    if (input.target !== undefined) record.target = { ...input.target };
+    if (lensChanged || targetChanged) record.packetDue = true;
+    this.persist();
+    return this.view(record);
+  }
+
+  /** Keep how a turn ended on the session. No-op for an unknown session. */
+  recordTurnEnd(id: string, outcome: SidecarTurnOutcome): void {
+    const record = this.records.get(id);
+    if (!record) return;
+    record.lastTurn = outcome;
+    this.persist();
   }
 
   list(filter: { scope?: SidecarScope; worktree?: string } = {}): SidecarSessionRecord[] {
@@ -272,15 +343,26 @@ export class SidecarSessionRegistry {
       this.live.delete(record.id);
       delete record.resumeId;
     }
+    // A turn that opens a vendor session (the first, or after a restart without
+    // a resume id or the TTL) knows nothing yet, so it carries the packet.
+    const fresh = !this.live.has(record.id) && !record.resumeId;
     const live = this.liveSession(record);
 
     this.reconcileCursor(record);
+    // The packet opens a fresh vendor session and the turn after a lens or
+    // target change; a refreshed turn carries it in its cold prompt.
+    const opening = !cold && !!context?.packet && (fresh || record.packetDue === true);
+    // Consumed now, so a lens or target change made while this turn runs
+    // stays due for the next one; restored below unless the turn completes.
+    let delivered = false;
+    if (opening || cold) delete record.packetDue;
     const exchanges = cold ? this.lastExchanges(record.id) : [];
     const append = (frame: SidecarFrame): void => {
       this.appendFrame(record, frame);
       onFrame?.(frame);
     };
     record.lastActivityAt = this.iso();
+    delete record.lastTurn;
     append({ seq: record.cursor + 1, at: record.lastActivityAt, type: "user", text: prompt });
     this.persist();
 
@@ -304,23 +386,39 @@ export class SidecarSessionRegistry {
         }
       }
 
+      if (opening) {
+        const packet = await context?.packet?.(record);
+        if (packet) vendorPrompt = composeOpeningPrompt({ packet, prompt });
+        if (this.stopRequested.has(record.id)) {
+          return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
+        }
+      }
+
       // The context the turn ended with: what its last call sent in.
       let ended = 0;
       live.sink = (event) => {
         if (event.type === "token_usage" && event.tokenUsage) ended = contextTokens(event.tokenUsage);
         append({ seq: record.cursor + 1, at: this.iso(), type: "event", event });
       };
+      const before = record.tokens;
+      // The session as the turn ran: a lens changed mid-turn applies to the next one.
+      const ranAs = { ...record };
       const result = await live.session.sendTurn(vendorPrompt);
       record.turns += 1;
       record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
       if (result.sessionId) record.resumeId = result.sessionId;
       if (cold && result.status === "completed") delete record.refresh;
+      delivered = result.status === "completed";
       if (context && result.status === "completed") {
         const ceiling = context.ceiling(record);
         if (ended > ceiling) await this.checkpoint(record, live, { contextTokens: ended, ceiling }, append);
       }
+      this.onTurnSpend?.({ record: ranAs, status: result.status, tokens: subtractTokenUsage(record.tokens, before) });
       return result;
     } finally {
+      // An opening turn that failed or was stopped may never have reached
+      // the model: the next turn carries the packet again.
+      if (opening && !delivered) record.packetDue = true;
       live.sink = undefined;
       record.lastActivityAt = this.iso();
       this.persist();
@@ -523,3 +621,13 @@ export class SidecarSessionRegistry {
   }
 }
 
+
+/** `after` minus `before`, field by field; both are running totals of the same session. */
+function subtractTokenUsage(after: TokenUsage, before: TokenUsage): TokenUsage {
+  const out: TokenUsage = { input: after.input - before.input, output: after.output - before.output };
+  const cacheCreationInput = (after.cacheCreationInput ?? 0) - (before.cacheCreationInput ?? 0);
+  const cacheReadInput = (after.cacheReadInput ?? 0) - (before.cacheReadInput ?? 0);
+  if (cacheCreationInput) out.cacheCreationInput = cacheCreationInput;
+  if (cacheReadInput) out.cacheReadInput = cacheReadInput;
+  return out;
+}

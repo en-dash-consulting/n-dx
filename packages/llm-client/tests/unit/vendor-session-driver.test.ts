@@ -129,3 +129,70 @@ describe("text length", () => {
     expect(driver.parseLine(line, 1, { textLimit: Infinity })?.[field]).toBe(long);
   });
 });
+
+describe("claude tool results", () => {
+  // Claude CLI stream-json: a call is an assistant tool_use block with an id; its
+  // answer is a `user` line whose tool_result blocks name that id.
+  const call = JSON.stringify({
+    type: "assistant",
+    message: {
+      id: "msg_01", role: "assistant", model: "claude-sonnet-4-5",
+      content: [{ type: "tool_use", id: "toolu_01A", name: "Read", input: { file_path: "/p/a.ts" } }],
+    },
+    parent_tool_use_id: null, session_id: "s1", uuid: "u1",
+  });
+  const twoResults = JSON.stringify({
+    type: "user",
+    message: {
+      role: "user",
+      content: [
+        { tool_use_id: "toolu_01A", type: "tool_result", content: "     1\tconst a = 1;" },
+        {
+          tool_use_id: "toolu_01B", type: "tool_result", is_error: false,
+          content: [
+            { type: "text", text: "line one" },
+            { type: "image", source: { type: "base64", media_type: "image/png", data: "AA==" } },
+            { type: "text", text: "line two" },
+          ],
+        },
+      ],
+    },
+    parent_tool_use_id: null, session_id: "s1", uuid: "u2",
+    tool_use_result: { stdout: "ignored", stderr: "" },
+  });
+
+  it("carries the tool_use block's id on the call", () => {
+    expect(claudeSessionDriver.parseLine(call, 2)?.toolCall).toEqual({
+      tool: "Read", input: { file_path: "/p/a.ts" }, id: "toolu_01A",
+    });
+  });
+
+  it("turns a user line into one tool_result per block, each naming its call", () => {
+    const events = claudeSessionDriver.parseLineEvents(twoResults, 2);
+    expect(events.map((e) => [e.type, e.turn, e.toolResult])).toEqual([
+      ["tool_result", 2, { tool: "unknown", output: "     1\tconst a = 1;", durationMs: 0, callId: "toolu_01A" }],
+      ["tool_result", 2, { tool: "unknown", output: "line one\nline two", durationMs: 0, callId: "toolu_01B" }],
+    ]);
+    expect(claudeSessionDriver.parseLine(twoResults, 2)?.toolResult?.callId).toBe("toolu_01A");
+  });
+
+  it("caps a result's output like any tool output", () => {
+    const big = JSON.stringify({
+      type: "user",
+      message: { role: "user", content: [{ tool_use_id: "toolu_X", type: "tool_result", content: "y".repeat(5000) }] },
+    });
+    expect(claudeSessionDriver.parseLineEvents(big, 1)[0].toolResult?.output).toHaveLength(2000);
+  });
+
+  it("yields nothing for a user line without tool results", () => {
+    const prompt = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "hi" }] } });
+    expect(claudeSessionDriver.parseLineEvents(prompt, 1)).toEqual([]);
+    expect(claudeSessionDriver.parseLine(prompt, 1)).toBeNull();
+  });
+
+  it("lists a single-event line as one event for both vendors", () => {
+    expect(claudeSessionDriver.parseLineEvents(call, 1)).toHaveLength(1);
+    expect(codexSessionDriver.parseLineEvents(JSON.stringify({ type: "summary", result: "ok" }), 1)).toHaveLength(1);
+    expect(codexSessionDriver.parseLineEvents("", 1)).toEqual([]);
+  });
+});

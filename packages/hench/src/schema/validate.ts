@@ -336,11 +336,13 @@ const PersistedRuntimeEventSchema = z.object({
   toolCall: z.object({
     tool: z.string(),
     input: z.record(z.string(), z.unknown()),
+    id: z.string().optional(),
   }).optional(),
   toolResult: z.object({
     tool: z.string(),
     output: z.string(),
     durationMs: z.number(),
+    callId: z.string().optional(),
   }).optional(),
   tokenUsage: TokenUsageSchema.optional(),
   failure: z.object({

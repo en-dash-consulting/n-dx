@@ -91,6 +91,20 @@ describe("restart", () => {
     expect(second.get(id)).toMatchObject({ turns: 2, tokens: { input: 20, output: 8 } });
   });
 
+  it("reports a turn's spend under the lens it ran with, not one set mid-turn", async () => {
+    const spends: Array<{ lens?: string; input: number }> = [];
+    const reg = new SidecarSessionRegistry({
+      dir, connect: () => ({ spawn: fakeSpawn }), now: () => clock,
+      onTurnSpend: ({ record, tokens }) => spends.push({ lens: record.lens, input: tokens.input }),
+    });
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "plan" });
+    const running = reg.sendTurn(id, "one");
+    reg.update(id, { lens: "describe" });
+    await running;
+    await reg.sendTurn(id, "two");
+    expect(spends).toEqual([{ lens: "plan", input: 10 }, { lens: "describe", input: 10 }]);
+  });
+
   it("refuses a second turn while one runs", async () => {
     const reg = registry();
     const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude" });

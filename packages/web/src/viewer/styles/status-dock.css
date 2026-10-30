@@ -1,5 +1,5 @@
 /* Status dock — one bottom-right row for the floating status pills:
- * sessions, uncommitted files, running operations, refresh queue.
+ * running operations, refresh queue.
  *
  * Each pill used to be fixed at its own hard-coded offset, so they collided
  * whenever one was absent, wrapped or opened. In one flex row they are laid
@@ -31,9 +31,7 @@
 }
 
 /* Popovers open above their own pill, right-aligned to it. */
-.status-dock .active-operations-list,
-.status-dock .git-status-panel,
-.status-dock .sessions-list {
+.status-dock .active-operations-list {
   position: absolute;
   bottom: calc(100% + 0.5rem);
   right: 0;
@@ -42,8 +40,6 @@
 
 /* One pill shape for every toggle in the dock. */
 .status-dock .active-operations-toggle,
-.status-dock .git-status-toggle,
-.status-dock .sessions-toggle,
 .status-dock .refresh-queue-status {
   min-height: 32px;
   box-sizing: border-box;
