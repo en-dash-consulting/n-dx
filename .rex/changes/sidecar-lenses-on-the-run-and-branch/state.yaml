@@ -35,7 +35,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6dcba986-4fe6-4d8d-ab84-54d45db119b1":
     issues: ["https://www.notion.so/3f7a80b71924810aa984d37d94970566","https://www.notion.so/3f7a80b7192481c99690f94435b87799","https://www.notion.so/3f7a80b7192481d190ddd2eea210d9a5"]
-    lastModified: "2026-10-30T15:23:37.567Z"
+    lastModified: "2026-10-30T16:02:27.435Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "793240d0-5f3d-49c7-aff3-9cac77685681":
     status: "completed"
@@ -46,6 +46,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option (b): a chosen lane whose work card was denied, withdrawn or refused shows Start lane on the settled run-plan card; it sends a turn naming the lane's first task and forbidding a new plan card."
     lastModified: "2026-10-30T15:42:33.344Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "99f8a9e1-7454-4780-acb6-393062ef0b1a":
+    lastModified: "2026-10-30T16:02:27.435Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a08b5226-df96-4c01-8a36-90a48a74a294":
     status: "completed"
@@ -68,8 +71,7 @@ items:
     lastModified: "2026-10-30T15:08:15.328Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd15413c-b43a-4755-8087-7fae64bef710":
-    status: "in_progress"
     startedAt: "2026-10-30T15:50:47.544Z"
-    activeIntervals: [{"start":"2026-10-30T15:50:47.544Z"}]
-    lastModified: "2026-10-30T15:50:50.709Z"
+    activeIntervals: [{"end":"2026-10-30T16:10:11.942Z","start":"2026-10-30T15:50:47.544Z"}]
+    lastModified: "2026-10-30T16:10:14.315Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
