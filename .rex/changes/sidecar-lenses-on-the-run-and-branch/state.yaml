@@ -1,5 +1,8 @@
 schema: "rex/v2"
 items:
+  "0729f8d2-ca98-44ed-a772-ee6e56bd1239":
+    lastModified: "2026-10-30T15:18:14.490Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2914d715-6f3b-4183-95f2-5ce8f6acd8c0":
     status: "completed"
     startedAt: "2026-10-29T18:45:47.835Z"
@@ -25,7 +28,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6dcba986-4fe6-4d8d-ab84-54d45db119b1":
     issues: ["https://www.notion.so/3f7a80b71924810aa984d37d94970566","https://www.notion.so/3f7a80b7192481c99690f94435b87799","https://www.notion.so/3f7a80b7192481d190ddd2eea210d9a5"]
-    lastModified: "2026-10-30T14:44:04.242Z"
+    lastModified: "2026-10-30T15:18:14.490Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a08b5226-df96-4c01-8a36-90a48a74a294":
     status: "completed"
@@ -42,9 +45,9 @@ items:
     startedAt: "2026-10-30T14:29:44.630Z"
     completedAt: "2026-10-30T15:08:15.328Z"
     endedAt: "2026-10-30T15:08:15.328Z"
+    activeIntervals: [{"end":"2026-10-30T14:51:02.085Z","start":"2026-10-30T14:29:44.630Z"},{"end":"2026-10-30T15:08:15.328Z","start":"2026-10-30T15:08:15.328Z"}]
     resolutionType: "code-change"
     resolutionDetail: "Guide lens and run-plan card (b84f6d01a); viewer gateway cap raised for the shared queue plan (85b223f01). Verified by hand after run 8264b19e failed only architecture-policy: policy and affected gate pass, browser-checked Guide on the ready list."
-    activeIntervals: [{"end":"2026-10-30T14:51:02.085Z","start":"2026-10-30T14:29:44.630Z"},{"end":"2026-10-30T15:08:15.328Z","start":"2026-10-30T15:08:15.328Z"}]
     lastModified: "2026-10-30T15:08:15.328Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd15413c-b43a-4755-8087-7fae64bef710":
