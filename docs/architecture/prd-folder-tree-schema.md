@@ -162,6 +162,12 @@ and currently available for v1 only. Legacy migration commands are the
 explicit exception that can read or create older representations; routine
 mutations never create `prd.md`, `prd_*.md` or `prd.json`.
 
+After a git merge, `rex validate --post-merge` scans the raw v2 files: conflict
+markers, unparseable `state.yaml`, duplicate ids (all refused), `state.yaml`
+rows for an id no node file carries, and `blockedBy` refs to no id, display id
+or alias. `--repair` drops those rows (under the PRD lock) and refs; the
+residue comes from a resolution that kept one side's copy of an item.
+
 ## Verification
 
 - `packages/rex/tests/unit/store/prd-model-writer.test.ts`: byte stability,

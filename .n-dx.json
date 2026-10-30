@@ -299,6 +299,25 @@
   "claude": {
     "model": "claude-opus-5-5"
   },
+  "web": {
+    "generatedFiles": [
+      {
+        "paths": [
+          "docs/analysis/prompt-token-baseline.json",
+          "docs/analysis/prompt-token-baseline.md"
+        ],
+        "command": ["node", "scripts/prompt-census.mjs", "--write"]
+      },
+      {
+        "paths": [".claude/skills/iso-map/scripts/iso-map.mjs"],
+        "command": ["node", "scripts/build-iso-skill.mjs"]
+      },
+      {
+        "paths": ["pnpm-lock.yaml"],
+        "command": ["pnpm", "install", "--lockfile-only"]
+      }
+    ]
+  },
   "hench": {
     "testGate": {
       "command": "node scripts/run-all-tests.mjs affected {base}",

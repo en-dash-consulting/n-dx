@@ -1,0 +1,81 @@
+schema: "rex/v2"
+items:
+  "18f3e71f-7f60-4940-8dbb-2e6f93ed8fe6":
+    status: "completed"
+    startedAt: "2026-10-29T16:12:27.218Z"
+    completedAt: "2026-10-29T16:32:03.326Z"
+    endedAt: "2026-10-29T16:32:03.326Z"
+    activeIntervals: [{"end":"2026-10-29T16:32:03.326Z","start":"2026-10-29T16:12:27.218Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "GET /api/branch-health collector (server/branch-health/), git.branchHealth toggle + route gate, Workspaces health strip, tests, docs, changeset."
+    lastModified: "2026-10-29T16:32:03.326Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "26754ed7-50fa-4181-a0cf-fd2b32e8e423":
+    status: "completed"
+    startedAt: "2026-10-29T16:45:00.205Z"
+    completedAt: "2026-10-29T16:54:22.173Z"
+    endedAt: "2026-10-29T16:54:22.173Z"
+    activeIntervals: [{"end":"2026-10-29T16:54:22.173Z","start":"2026-10-29T16:45:00.205Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Classifier reads whole cleaned log, takes mergeStateStatus and stack for behind-base, matches package-relative test paths by pnpm package prefix; tail drops gh line prefix; route serves local facts unless ?github=1 and the strip asks for GitHub facts only on expansion."
+    lastModified: "2026-10-29T16:54:22.173Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "477c02f8-fba6-46ea-93ef-19fbf9293954":
+    status: "completed"
+    startedAt: "2026-10-29T18:03:17.586Z"
+    completedAt: "2026-10-29T18:03:17.586Z"
+    endedAt: "2026-10-29T18:03:17.586Z"
+    activeIntervals: [{"end":"2026-10-29T18:03:17.586Z","start":"2026-10-29T18:03:17.586Z"}]
+    appliedAt: "2026-10-29T18:03:17.586Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    issues: ["https://www.notion.so/3f7a80b7192481b38426d554c9a1cfa8","https://www.notion.so/3f7a80b7192481c9be12e2721b3bdbb9"]
+    lastModified: "2026-10-29T18:03:17.586Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5b73d052-964f-4145-ab5f-bf6c6b221f01":
+    status: "completed"
+    startedAt: "2026-10-29T16:40:38.791Z"
+    completedAt: "2026-10-29T16:44:54.810Z"
+    endedAt: "2026-10-29T16:44:54.810Z"
+    activeIntervals: [{"end":"2026-10-29T16:44:54.810Z","start":"2026-10-29T16:40:38.791Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): a feature_disabled 403 from a worktree renders a neutral 'off in this worktree' note; documented in web-server.md Branch health."
+    lastModified: "2026-10-29T16:44:54.810Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "87d74c1d-2684-4abc-b1ee-440637a1b751":
+    status: "completed"
+    startedAt: "2026-10-29T16:59:36.691Z"
+    completedAt: "2026-10-29T17:06:26.835Z"
+    endedAt: "2026-10-29T17:06:26.835Z"
+    activeIntervals: [{"end":"2026-10-29T17:06:26.835Z","start":"2026-10-29T16:59:36.691Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "checks.ts: caret-text colour codes stripped, project label allowed in FAILED_TEST_FILE, policy-test only among failing files. collect.ts: PrBaseCache (server memory, per worktree+branch) gives local-only reads baseSource pr-cached and cached stack bases; baseNote says PR base not read yet. Viewer shows the note."
+    lastModified: "2026-10-29T17:06:26.835Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d62623bb-3542-4c31-8461-83eb874fe2c3":
+    status: "completed"
+    startedAt: "2026-10-29T17:10:38.638Z"
+    completedAt: "2026-10-29T17:30:03.900Z"
+    endedAt: "2026-10-29T17:30:03.900Z"
+    activeIntervals: [{"end":"2026-10-29T17:30:03.900Z","start":"2026-10-29T17:10:38.638Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Pure conflict classifier (branch-health/conflicts.ts + unified-diff.ts) wired into the collector, route and Workspaces strip; web.generatedFiles declared in .n-dx.json; unit, integration (real merges, rex validate) and viewer tests."
+    lastModified: "2026-10-29T17:30:03.900Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "ddb6a3b7-e44f-43b6-8291-8f88de0916bd":
+    status: "completed"
+    startedAt: "2026-10-29T17:33:44.137Z"
+    completedAt: "2026-10-29T17:41:32.789Z"
+    endedAt: "2026-10-29T17:41:32.789Z"
+    activeIntervals: [{"end":"2026-10-29T17:41:32.789Z","start":"2026-10-29T17:33:44.137Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "allowlist-union requires list entries on both sides; lockfiles never union; pnpm-lock.yaml declared generated; viewer caps other worktrees at 3."
+    lastModified: "2026-10-29T17:41:32.789Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f2c90a0d-ac38-4bdf-9bfb-45fe667160ec":
+    status: "completed"
+    startedAt: "2026-10-29T17:41:38.568Z"
+    completedAt: "2026-10-29T18:03:17.586Z"
+    endedAt: "2026-10-29T18:03:17.586Z"
+    activeIntervals: [{"end":"2026-10-29T17:56:20.006Z","start":"2026-10-29T17:41:38.568Z"},{"end":"2026-10-29T18:03:17.586Z","start":"2026-10-29T18:03:17.586Z"}]
+    lastModified: "2026-10-29T18:03:17.586Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

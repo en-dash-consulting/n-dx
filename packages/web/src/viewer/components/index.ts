@@ -48,6 +48,7 @@ export {
   buildShareableUrl,
   type CopyLinkButtonProps,
 } from "./copy-link-button.js";
+export { CopyTextButton, type CopyTextButtonProps } from "./copy-text-button.js";
 export { ConfigFooter, installRootLabel, identityLine, identityTooltip } from "./config-footer.js";
 export type { ConfigFooterProps, ServerIdentity } from "./config-footer.js";
 export { ElapsedTime } from "./elapsed-time.js";

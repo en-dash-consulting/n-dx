@@ -35,6 +35,7 @@ import type { ComponentChildren } from "preact";
 import { useState, useEffect, useCallback, useRef, useMemo } from "preact/hooks";
 import { useFocusTrap } from "../hooks/index.js";
 import { BodyPortal } from "./body-portal.js";
+import { CopyTextButton } from "./copy-text-button.js";
 import { QueuedNotice } from "./queued-notice.js";
 import { RUN_OPTION_SPECS } from "../external.js";
 import type { RunOptionKey } from "../external.js";
@@ -674,7 +675,7 @@ function Form(props: FormProps) {
       h(Section, { title: "Command" },
         h("div", { class: "prep-command" },
           h("code", { class: "prep-command-line" }, command),
-          h(CopyButton, { text: command }),
+          h(CopyTextButton, { text: command, class: "prep-btn" }),
         ),
       ),
 
@@ -823,22 +824,6 @@ function Field({ id, label, source, saved, fallback, changed, onReset, note, chi
       note ? h("span", { class: "prep-note" }, note) : null,
     ),
   );
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
-  const copy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setState("copied");
-    } catch {
-      // Clipboard refused (permissions, insecure context): say so; the command stays selectable.
-      setState("failed");
-    }
-    setTimeout(() => setState("idle"), 2000);
-  }, [text]);
-  return h("button", { type: "button", class: "prep-btn", onClick: copy, "aria-label": "Copy the command" },
-    state === "copied" ? "Copied" : state === "failed" ? "Copy failed — select it" : "Copy");
 }
 
 function PreviewPanel({ preview, onBack }: {

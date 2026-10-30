@@ -141,6 +141,97 @@ should move B's card while the viewer sits on A. It reads the `workspace` tag
 itself (`frameWorkspace`) and refreshes only that workspace's slice, falling back
 to a whole-board reload for a `"*"` frame or an unrecognised key.
 
+## Branch health
+
+`GET /api/branch-health` (`routes-branch-health.ts`, logic in
+`server/branch-health/`) reports one worktree's branch by fixed rules, with no
+model: the data the Sidecar's Diagnose branch lens and the hub narrate later.
+The Workspaces board asks it once per card, by header, while `git.branchHealth`
+is on; the route gate refuses it with 403 while the toggle is off.
+
+- **The toggle is per worktree.** The board reads `git.branchHealth` from its
+  own workspace, but the gate reads the addressed worktree's `.n-dx.json`,
+  which is tracked, so each worktree has its own copy. With the anchor's toggle
+  on and a branch worktree's still off, that card answers 403
+  `feature_disabled` and shows a neutral "off in this worktree" note, not an
+  error. Enable the flag in that worktree (or merge the `.n-dx.json` change
+  into its branch) to see its strip. The gate is not widened to follow the
+  viewer's toggle: it always reads the project the request addresses.
+
+- **Local facts need no network.** Branch, head, base, ahead/behind
+  (`rev-list --left-right --count`), predicted conflicts and stack containment
+  come from git alone, so the strip still answers offline.
+- **The base is chosen in a fixed order:** the PR's base when GitHub reads are
+  on, else the PR base a GitHub read cached, else the upstream when it names another branch, else origin's default
+  branch. `baseSource` says which, because a branch whose upstream is its own
+  remote copy has no useful upstream base.
+- **Conflicts are predicted, not rehearsed.** `git merge-tree --write-tree`
+  merges in the object store and returns the conflicted paths with their index
+  stages. It leaves the worktree, the index and HEAD untouched, so a `GET` that
+  predicts a merge stays read-only where it matters; the only trace is
+  unreferenced objects that `git gc` collects. A git older than 2.38 cannot do
+  this, and the answer says so in `conflictsUnavailable`.
+- **Each conflict is classified, with a fix a person runs.**
+  `branch-health/conflicts.ts` is a pure function over each file's stages and
+  the diff3-style conflicted result merge-tree wrote, plus the project config:
+  it reads no file, runs no process and writes nothing. Fixes assume
+  `git merge <base>` on this branch (ours = this branch, theirs = the base).
+  First match wins:
+
+  | Class | When | Fix |
+  |-------|------|-----|
+  | `generated` | the path matches a `web.generatedFiles` glob | `checkout --theirs`, the declared command, `git add`; listed after every other fix |
+  | `prd-state` | a v2 `state.yaml` while `merge.rex-state.driver` is unset | register the driver, `checkout --merge`, `git diff --check HEAD` (stops on markers the driver left, since `checkout --merge` exits 0 regardless), `git add`. With the driver set it is `source` |
+  | `duplicate-capture` | add/add on a PRD item file, same title, different ids | keep the base's id (`checkout --theirs`), `git add`, `rex validate --post-merge --repair` (prunes the state row and `blockedBy` refs naming the dropped id), `git add -u` on the rex directory, `rex validate --post-merge` |
+  | `prd-children-table` | a v1 `prd_tree` `index.md` whose hunks are all `## Children` rows, and the base changed nothing above the table (else `source`: keeping this branch's copy would drop it) | `checkout --ours`, `rex validate --post-merge --repair`, `git add`, `rex validate` |
+  | `allowlist-union` | every hunk only adds list entries on both sides: each line a YAML `- ` scalar item, a quoted string, a number or literal, or a one-line `[…]`/`{…}` element, or the lines together a run of JSON array elements. Never a lockfile (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`); an added code block or mapping is `source` | a unified diff against this branch's copy: ours, then theirs |
+  | `source` | everything else | none; names the other local worktrees whose branch changed the path (the API lists all; the Workspaces expansion shows three and counts the rest) |
+
+  Stage blobs and other worktrees' diffs are read at most eight git processes
+  at a time, and other worktrees only when a `source` conflict needs naming.
+  `web.generatedFiles` is `[{ "paths": [globs], "command": [argv] }]`; with no
+  declaration nothing is `generated`. This repository declares the prompt
+  baseline, the iso-map skill script and `pnpm-lock.yaml`
+  (`pnpm install --lockfile-only`).
+- **A stack is content, not configuration.** Each layer below in the base
+  chain is checked with `merge-base --is-ancestor`. A branch whose base is set
+  to a lower layer but lacks that layer's commits is reported not contained:
+  restacking is the fix, and a base setting alone would hide it. The chain
+  follows each layer's PR base (GitHub reads on) or its upstream, and stops at
+  origin's default branch, which is the trunk and not a layer.
+- **gh runs only with `web.sidecarGithubReads` true.** That one project
+  allowance governs every GitHub read the Sidecar makes. With it off, or gh
+  missing or signed out, `github` is null and `githubReason` says why.
+- **gh runs only on request.** Without `?github=1` the route answers local
+  facts and sets `githubDeferred` when reads are allowed. The board asks that
+  way on mount and adds `?github=1` when a card's strip is first expanded, so
+  opening a board of many worktrees runs no gh command. A GitHub read
+  remembers each PR base it finds, per worktree and branch, in the server's
+  memory; later local-only answers use it for the base (`baseSource:
+  "pr-cached"`) and the stack. Before any GitHub read, a local-only answer
+  falls back to upstreams and origin's default branch, and `baseNote` says the
+  PR base is not read yet, so a stacked branch's strip does not pass off
+  `origin/main` as its base.
+- **A failing check is classed on the whole log.** gh's per-line job, step and
+  timestamp prefix and colour codes are removed first, whether gh wrote the
+  escape as the 0x1b byte or as literal `^[` text. policy-test needs a policy
+  suite among the failing test files: a log names passing suites on its ✓
+  lines too. A failing-file line may carry a vitest project label between
+  `FAIL` and the path (`FAIL  llm-client:shared tests/x.test.ts`). When no
+  policy suite or touched test explains the failure, behind-base also fires when the PR's
+  `mergeStateStatus` is `BEHIND` or a stack layer is not contained, and the
+  evidence names which. A test path printed by a package's
+  runner (`packages/p test: FAIL tests/x.test.ts`) matches only that
+  package's `packages/p/tests/x.test.ts`. Only the stored `logTail` is cut, to
+  the last 80 lines and 8,000 characters.
+- **A failing check gets one class, first rule wins:** `fork-no-ci`,
+  `codeql`, `behind-base`, `policy-test`, `touched-test`, else
+  `unclassified`, each with the fact that decided it (`branch-health/checks.ts`).
+  The order puts what no code change on the branch can fix first.
+- **git and gh run through `@n-dx/llm-client`'s `exec`.** Web imports no
+  `node:child_process`; the collector takes the exec function as an option
+  so tests stub gh and run git for real against temporary repositories.
+
 ## web-server zone stability
 
 `web-server` (composition root — Express routes, gateways, MCP handlers) is prone to dissolving into `web-viewer` in Louvain analysis because server files import from `packages/web/src/shared/` (required by the barrel-import policy), and shared files are also imported by viewer files, creating a Louvain connectivity bridge. If the zone dissolves:

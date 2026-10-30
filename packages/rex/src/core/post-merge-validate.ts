@@ -55,7 +55,10 @@ export type PostMergeIssueClass =
   | "orphaned-directory"
   | "level-mismatch"
   | "dangling-blocked-by"
-  | "children-table-out-of-sync";
+  | "children-table-out-of-sync"
+  // v2 only (post-merge-validate-v2.ts):
+  | "orphaned-state-row"
+  | "malformed-state";
 
 export interface PostMergeIssue {
   class: PostMergeIssueClass;
@@ -104,7 +107,7 @@ interface ScannedEntry {
   childLinks?: string[];
 }
 
-const CONFLICT_MARKERS = /^(<{7} |={7}$|>{7} )/m;
+export const CONFLICT_MARKERS = /^(<{7} |={7}$|>{7} )/m;
 const LEVELS_BY_DEPTH: Record<number, string> = { 1: "epic", 2: "feature", 3: "task" };
 const VALID_LEVELS = new Set(["epic", "feature", "task", "subtask"]);
 
@@ -542,14 +545,14 @@ export async function repairPostMergeIssues(
   return { repaired, refused };
 }
 
-async function rewriteFile(fullPath: string, transform: (text: string) => string): Promise<void> {
+export async function rewriteFile(fullPath: string, transform: (text: string) => string): Promise<void> {
   const text = await readFile(fullPath, "utf-8");
   const next = transform(text);
   if (next !== text) await writeFile(fullPath, next, "utf-8");
 }
 
 /** Remove the given ids from a block-style blockedBy list; drop the field when empty. */
-function dropBlockedByRefs(text: string, dangling: Set<string>): string {
+export function dropBlockedByRefs(text: string, dangling: Set<string>): string {
   const chunk = /^blockedBy:[^\S\n]*\n((?:[ \t]+-[^\n]*\n)*)/m.exec(text);
   if (!chunk) return text;
 
@@ -621,16 +624,16 @@ function replaceChildrenTable(text: string, rows: string[]): string {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toRel(treeRoot: string, fullPath: string): string {
+export function toRel(treeRoot: string, fullPath: string): string {
   return relative(treeRoot, fullPath).split(sep).join("/");
 }
 
-function matchScalar(text: string, key: string): string | undefined {
+export function matchScalar(text: string, key: string): string | undefined {
   const m = new RegExp(`^${key}:[^\\S\\n]*(.+)$`, "m").exec(frontmatterOnly(text));
   return m ? stripQuotes(m[1].trim()) : undefined;
 }
 
-function matchList(text: string, key: string): string[] {
+export function matchList(text: string, key: string): string[] {
   const m = new RegExp(`^${key}:[^\\S\\n]*\\n((?:[ \\t]+-[^\\n]*\\n?)*)`, "m").exec(frontmatterOnly(text));
   if (!m) return [];
   return m[1]
