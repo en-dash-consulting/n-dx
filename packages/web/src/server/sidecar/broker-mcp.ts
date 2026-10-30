@@ -14,9 +14,16 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { SIDECAR_BROKER_NAME, type BrokerToolName } from "./broker-policy.js";
+import { GITHUB_READS_SETTING, SIDECAR_BROKER_NAME, type BrokerToolName } from "./broker-policy.js";
 import type { CardAnnex, SidecarBroker } from "./broker.js";
-import { carryOutDecision, workOptions, type SidecarActions } from "./carry-out.js";
+import {
+  carryOutDecision,
+  GITHUB_POST_KINDS,
+  GITHUB_READ_KINDS,
+  githubReadOf,
+  workOptions,
+  type SidecarActions,
+} from "./carry-out.js";
 import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES } from "./ledger.js";
 
 const BROKER_VERSION = "1.0.0";
@@ -74,12 +81,20 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
     input: { path: z.string().min(1), diff: z.string().min(1) },
   },
   github_read: {
-    description: "Read from GitHub (an issue, pull request, review or check). Waits for a network-read card unless GitHub reads are allow-listed.",
-    input: { kind: z.string().min(1), ref: z.string().min(1) },
+    description: [
+      "Read from GitHub with gh. `pr`: the PR of the worktree the workspace key `ref` names, its checks, each failing check's class and log tail.",
+      "`check`: the newest run of the check named `ref` on branch `base`, which decides whether a failing check is failing on main.",
+      "Runs at once while GitHub reads are on for this project (web.sidecarGithubReads); otherwise waits for the operator's network-read card.",
+    ].join(" "),
+    input: {
+      kind: z.enum(GITHUB_READ_KINDS),
+      ref: z.string().min(1).describe("pr: a workspace key; check: the check's name"),
+      base: z.string().min(1).optional().describe("check: the branch to read the check on, e.g. the PR's base"),
+    },
   },
   draft_github_post: {
-    description: "Draft a GitHub comment, review or issue. It is posted only if the operator approves the draft card.",
-    input: { kind: z.string().min(1), target: z.string().min(1), body: z.string().min(1) },
+    description: "Draft a PR comment (`comment`) or review comment (`review`) on `target` (a PR number, URL or branch). Always waits for the operator's draft card; it is posted under the operator's gh login only on Approve, and Copy or Discard posts nothing.",
+    input: { kind: z.enum(GITHUB_POST_KINDS), target: z.string().min(1), body: z.string().min(1) },
   },
   migration_decision: {
     description: "Record decisions for a v1 to v2 PRD migration. Always waits for the operator's migration-decision card.",
@@ -118,6 +133,17 @@ export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, 
         if (typeof plan === "string") return text(`No card was raised: ${plan}. Nothing started.`, true);
         if (plan.lanes.length === 0) return text(`No card was raised: the planner has no lane (${plan.summary}). Nothing started.`, true);
         annex.runPlan = plan;
+      }
+      if (name === "github_read") {
+        // A read that cannot be carried out raises no card for the operator to approve in vain.
+        const read = githubReadOf(input);
+        if (typeof read === "string") return text(`No card was raised: ${read}. Nothing was read.`, true);
+        // GitHub reads have one allowance, the project's setting: on, the read runs without a card.
+        if (actions?.githubReadsAllowed()) {
+          const allowed = { approved: true as const, decidedBy: "project-allowance" as const, setting: GITHUB_READS_SETTING };
+          const result = await carryOutDecision(name, input, allowed, actions, extra.signal);
+          return text(result.text, !result.ok);
+        }
       }
       const outcome = await broker.request(sessionId, name, input, extra.signal, annex);
       // A stopped turn ends the wait on an effect (a command), never the effect itself.

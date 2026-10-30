@@ -71,11 +71,12 @@ describe("allow-listability", () => {
     }
   });
 
-  it("allow-lists a command by its exact argv, GitHub reads per tool, and every other tool never", () => {
+  it("allow-lists a command by its exact argv and nothing else; GitHub reads are allowed per project, never on the list", () => {
     expect(allowListKey("run_command", { argv: ["ndx", "status", "."] })).toBe('["ndx","status","."]');
-    expect(allowListKey("github_read", SAMPLE.github_read)).toBe("*");
-    const listable = BROKER_TOOL_NAMES.filter((t) => BROKER_TOOL_POLICY[t].allowList !== "never");
-    expect(listable.sort()).toEqual(["github_read", "run_command"]);
+    expect(allowListKey("github_read", SAMPLE.github_read)).toBeNull();
+    expect(BROKER_TOOL_POLICY.github_read.allowList).toBe("per-project");
+    const listable = BROKER_TOOL_NAMES.filter((t) => BROKER_TOOL_POLICY[t].allowList === "per-call");
+    expect(listable).toEqual(["run_command"]);
   });
 
   it("never allow-lists a command that works, resets or pushes", () => {
@@ -123,20 +124,22 @@ describe("cards", () => {
     expect(await isPending(call)).toBe(true);
   });
 
-  it("ignores allow-list rules for never-allow-listed tools and unsafe commands written into the file", async () => {
+  it("ignores allow-list rules for tools that are not allow-listed per call, and unsafe commands written into the file", async () => {
     writeFileSync(join(dir, "allow-list.json"), JSON.stringify({
       schema: "ndx/sidecar-allow-list/v1",
       rules: [
         { tool: "start_work", key: "*" },
         { tool: "draft_github_post", key: "*" },
         { tool: "run_command", key: '["ndx","work","."]' },
+        // A rule from before GitHub reads moved to web.sidecarGithubReads.
         { tool: "github_read", key: "*" },
+        { tool: "run_command", key: '["ndx","status","."]' },
       ],
     }));
-    expect(broker.allowList()).toEqual([{ tool: "github_read", key: "*" }]);
+    expect(broker.allowList()).toEqual([{ tool: "run_command", key: '["ndx","status","."]' }]);
     expect(await isPending(broker.request("s1", "start_work", SAMPLE.start_work))).toBe(true);
     expect(await isPending(broker.request("s2", "run_command", { argv: ["ndx", "work", "."] }))).toBe(true);
-    expect(await broker.request("s3", "github_read", SAMPLE.github_read)).toEqual({ approved: true, decidedBy: "allow-list" });
+    expect(await isPending(broker.request("s3", "github_read", SAMPLE.github_read))).toBe(true);
   });
 
   it("decides cards in order", async () => {

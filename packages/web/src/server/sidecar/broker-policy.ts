@@ -46,9 +46,14 @@ export type SidecarCardKind =
  * How a tool may be allow-listed:
  * - `never`: every call raises a card.
  * - `per-call`: a rule matches one exact call (a command's argv).
- * - `per-tool`: one rule covers every call of the tool (GitHub reads).
+ * - `per-project`: never on the allow-list; one project setting allows every
+ *   call (GitHub reads: `web.sidecarGithubReads`), and with it off every call
+ *   raises a card.
  */
-export type AllowListability = "never" | "per-call" | "per-tool";
+export type AllowListability = "never" | "per-call" | "per-project";
+
+/** The project setting that allows every `github_read`, the one `per-project` tool. */
+export const GITHUB_READS_SETTING = "web.sidecarGithubReads";
 
 export interface BrokerToolPolicy {
   card: SidecarCardKind | null;
@@ -63,7 +68,7 @@ export const BROKER_TOOL_POLICY: Readonly<Record<BrokerToolName, BrokerToolPolic
   propose_run_plan: { card: "run-plan", allowList: "never" },
   place_change_card: { card: "placement", allowList: "never" },
   propose_edit: { card: "edit", allowList: "never" },
-  github_read: { card: "network-read", allowList: "per-tool" },
+  github_read: { card: "network-read", allowList: "per-project" },
   draft_github_post: { card: "draft-post", allowList: "never" },
   migration_decision: { card: "migration-decision", allowList: "never" },
   ledger_append: { card: null, allowList: "never" },
@@ -93,14 +98,14 @@ function commandNeverAllowListed(argv: readonly string[]): boolean {
 /**
  * The allow-list key for a call, or `null` when the call can never be
  * allow-listed. A `per-call` key is the exact argv, JSON-encoded so a token
- * with a space cannot alias two commands.
+ * with a space cannot alias two commands. A `per-project` tool has none: its
+ * project setting is its allowance.
  */
 export function allowListKey(tool: BrokerToolName, input: Readonly<Record<string, unknown>>): string | null {
   switch (BROKER_TOOL_POLICY[tool].allowList) {
     case "never":
+    case "per-project":
       return null;
-    case "per-tool":
-      return "*";
     case "per-call": {
       const argv = input.argv;
       if (!Array.isArray(argv) || argv.length === 0 || !argv.every((t) => typeof t === "string")) return null;

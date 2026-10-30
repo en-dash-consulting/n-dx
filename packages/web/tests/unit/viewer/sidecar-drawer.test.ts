@@ -119,6 +119,7 @@ function stubServer(): void {
         local: { models: [], defaultModel: "" },
       });
     }
+    if (url === "/api/sidecar/settings" && method === "PUT") return json({ githubReads: body.githubReads });
     if (url === "/api/sidecar/lenses") {
       if (server.lensesGate) await server.lensesGate;
       return json({ lenses: server.lenses });
@@ -913,6 +914,62 @@ describe("permission cards", () => {
     expect(root.querySelector(".sidecar-card-always")).toBeNull();
   });
 
+  describe("draft-post card", () => {
+    const draft = (): SidecarCard => card("d1", 1, { kind: "draft-post", tool: "draft_github_post", input: { kind: "comment", target: "931", body: "lint fails on main too" } });
+    const button = (cls: string) => root.querySelector<HTMLButtonElement>(`.${cls}`)!;
+
+    it("shows the draft as it would be posted, and Post approves it", async () => {
+      await openWith([draft()]);
+      expect(root.querySelector(".sidecar-draft-target")?.textContent).toBe("Comment on 931");
+      expect(root.querySelector(".sidecar-draft-text")?.textContent).toBe("lint fails on main too");
+      expect(button("sidecar-card-approve").textContent).toBe("Post under your gh login");
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      await act(async () => { button("sidecar-card-approve").click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    });
+
+    it("Copy puts the draft on the clipboard and denies the card, so nothing is posted", async () => {
+      const writeText = vi.fn(async () => {});
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      await openWith([draft()]);
+      await act(async () => { button("sidecar-card-copy").click(); });
+      await settle();
+      expect(writeText).toHaveBeenCalledWith("lint fails on main too");
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny", reason: "Copied, not posted" }]);
+    });
+
+    it("a refused clipboard leaves the card waiting and says so", async () => {
+      Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => { throw new Error("denied"); }) }, configurable: true });
+      await openWith([draft()]);
+      await act(async () => { button("sidecar-card-copy").click(); });
+      await settle();
+      expect(button("sidecar-card-copy").textContent).toBe("Copy failed — select it");
+      expect(decisions()).toEqual([]);
+    });
+
+    it("Discard denies it", async () => {
+      await openWith([draft()]);
+      expect(button("sidecar-card-deny").textContent).toBe("Discard");
+      await act(async () => { button("sidecar-card-deny").click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny" }]);
+    });
+  });
+
+  it("a network-read card names what gh reads, and \"Allow GitHub reads for this project\" approves it and turns the setting on", async () => {
+    await openWith([card("n1", 1, { kind: "network-read", tool: "github_read", input: { kind: "check", ref: "lint", base: "main" } })]);
+    expect(root.querySelector(".sidecar-network-read")?.textContent).toBe('Reads github.com with your gh login: the newest run of check "lint" on main.');
+    const allow = root.querySelector<HTMLButtonElement>(".sidecar-card-always")!;
+    expect(allow.textContent).toBe("Allow GitHub reads for this project");
+    await act(async () => { allow.click(); });
+    await settle();
+    expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve" }]);
+    expect(server.requests.filter((r) => r.url === "/api/sidecar/settings")).toEqual([
+      { method: "PUT", url: "/api/sidecar/settings", body: { githubReads: true } },
+    ]);
+  });
+
   const INPUTS: Record<SidecarCardKind, { tool: string; input: Record<string, unknown>; title: string }> = {
     command: { tool: "run_command", input: { argv: ["ndx", "status", "."] }, title: "ndx status ." },
     work: { tool: "start_work", input: { taskId: "425819f5", options: { review: true } }, title: "n-dx work --task=425819f5 --auto --review ." },
@@ -1133,6 +1190,18 @@ describe("attachment and lens", () => {
     expect(resolveLens("diagnose-run", diagnose, null)).toEqual({ wanted: "diagnose-run", running: "general", needs: "a task to diagnose" });
     expect(resolveLens("diagnose-run", diagnose, { kind: "live", label: "Live" }).needs).toBe("a task to diagnose");
     expect(resolveLens("diagnose-run", diagnose, { kind: "task", ref: "t1", label: "t1" })).toEqual({ wanted: "diagnose-run", running: "diagnose-run" });
+  });
+
+  it("a Workspaces worktree card attaches as a worktree, keyed by workspace, and defaults to Diagnose branch", () => {
+    const item = pageItemFor({ view: "workspaces", zone: null, taskId: null, worktree: "sidecar-l2" });
+    expect(item).toEqual({ kind: "worktree", ref: "sidecar-l2", label: "sidecar-l2" });
+    expect(wantedLensFor(item, false)).toBe("diagnose-branch");
+    // The Workspaces page with no card attached is about nothing.
+    expect(pageItemFor({ view: "workspaces", zone: null, taskId: null })).toBeNull();
+    const branch = [{ id: "diagnose-branch", available: true, target: { kind: "worktree", needs: "a branch or worktree" } }];
+    expect(resolveLens("diagnose-branch", branch, null)).toEqual({ wanted: "diagnose-branch", running: "general", needs: "a branch or worktree" });
+    expect(resolveLens("diagnose-branch", branch, { kind: "task", ref: "t1", label: "t1" }).needs).toBe("a branch or worktree");
+    expect(resolveLens("diagnose-branch", branch, item)).toEqual({ wanted: "diagnose-branch", running: "diagnose-branch" });
   });
 
   it("a task gives Describe, and the session takes the lens and target through PATCH", async () => {

@@ -326,6 +326,8 @@ export function isSidecarShortcut(e: Pick<KeyboardEvent, "key" | "metaKey" | "ct
 export interface SidecarDrawerState {
   open: boolean;
   toggle: () => void;
+  /** Open it, as a page's "Ask Sidecar" control does after attaching its item. */
+  show: () => void;
   close: () => void;
 }
 
@@ -333,6 +335,7 @@ export interface SidecarDrawerState {
 export function useSidecarDrawerState(enabled: boolean): SidecarDrawerState {
   const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((o) => !o), []);
+  const show = useCallback(() => setOpen(true), []);
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
@@ -346,7 +349,7 @@ export function useSidecarDrawerState(enabled: boolean): SidecarDrawerState {
     return () => document.removeEventListener("keydown", handler);
   }, [enabled, toggle]);
 
-  return { open: enabled && open, toggle, close };
+  return { open: enabled && open, toggle, show, close };
 }
 
 // ---------------------------------------------------------------------------

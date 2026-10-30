@@ -735,8 +735,6 @@ describe("tools carried out by a later batch", () => {
   it.each([
     ["place_change_card", { change: "CH-1", target: "A1", relation: "amends" }, "the L2 Place lens"],
     ["propose_edit", { path: "a.ts", diff: "-a\n+b" }, "a later batch"],
-    ["github_read", { kind: "pr", ref: "#1" }, "L2/H1"],
-    ["draft_github_post", { kind: "comment", target: "#1", body: "hi" }, "L2/H1"],
     ["migration_decision", { entries: [{ id: "x" }] }, "G1"],
   ])("an approved %s reports it is recorded, not carried out yet, and names %s", async (tool, args, batch) => {
     const client = await brokerClient();
@@ -749,6 +747,124 @@ describe("tools carried out by a later batch", () => {
     expect(resultText(result)).toContain(`Recorded, not carried out yet: ${batch}`);
     expect(spawnManagedMock).not.toHaveBeenCalled();
     await client.close();
+  });
+});
+
+describe("github_read and draft_github_post", () => {
+  beforeEach(serve);
+  // These tests answer gh with stubs; later tests get the real exec back.
+  let realExec: ReturnType<typeof execMock.getMockImplementation>;
+  beforeEach(() => { realExec = execMock.getMockImplementation(); });
+  afterEach(() => { if (realExec) execMock.mockImplementation(realExec); });
+
+  /** gh calls, as the llm-client exec saw them: args and the text sent on stdin. */
+  const ghCalls = (): Array<{ args: string[]; input?: string }> =>
+    execMock.mock.calls
+      .filter(([cmd]) => cmd === "gh")
+      .map(([, args, opts]) => ({ args: args as string[], input: (opts as { input?: string }).input }));
+
+  function githubReads(on: boolean): void {
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" }, web: { sidecarGithubReads: on } }));
+  }
+
+  function answerCheckRuns(conclusion: string): void {
+    execMock.mockImplementation(async (cmd: string) => cmd === "gh"
+      ? { launched: true, error: null, exitCode: 0, stderr: "", stdout: JSON.stringify({ check_runs: [{ conclusion, status: "completed", head_sha: "abcdef0123456", html_url: "https://github.com/o/r/runs/1" }] }) }
+      : { launched: true, error: null, exitCode: 1, stdout: "", stderr: "not here" });
+  }
+
+  it("raises a network-read card while web.sidecarGithubReads is off, and reads nothing until it is approved", async () => {
+    githubReads(false);
+    answerCheckRuns("failure");
+    const client = await brokerClient();
+    const call = client.callTool({ name: "github_read", arguments: { kind: "check", ref: "test (ubuntu)", base: "main" } });
+    const { cardId } = await cardAnnounced("pending");
+    expect(broker.cards(SESSION)[0]).toMatchObject({ kind: "network-read", allowListKey: null });
+    expect(ghCalls()).toEqual([]);
+
+    await decide(cardId, { decision: "approve" });
+    const text = resultText(await call);
+    expect(text).toContain(`approved card ${cardId}`);
+    expect(text).toContain("failing on main too. Class: failing on main.");
+    expect(ghCalls()[0].args).toEqual(["api", "repos/{owner}/{repo}/commits/main/check-runs?check_name=test%20(ubuntu)&per_page=1"]);
+    await client.close();
+  });
+
+  it("reads at once, with no card, while web.sidecarGithubReads is on, and keeps the packet's class when main passes", async () => {
+    githubReads(true);
+    answerCheckRuns("success");
+    const client = await brokerClient();
+    const text = resultText(await client.callTool({ name: "github_read", arguments: { kind: "check", ref: "lint", base: "main" } }));
+    expect(text).toContain("Allowed for this project by web.sidecarGithubReads.");
+    expect(text).toContain("it is not failing on main");
+    expect(broker.cards(SESSION)).toEqual([]);
+    await client.close();
+  });
+
+  it("a denied network-read card reads nothing", async () => {
+    githubReads(false);
+    const client = await brokerClient();
+    const call = client.callTool({ name: "github_read", arguments: { kind: "pr", ref: "elsewhere" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "deny" });
+    expect(resultText(await call)).toContain("Nothing ran.");
+    expect(ghCalls()).toEqual([]);
+    await client.close();
+  });
+
+  it("raises no card for a check read without the base to read it on", async () => {
+    githubReads(false);
+    const client = await brokerClient();
+    const result = await client.callTool({ name: "github_read", arguments: { kind: "check", ref: "lint" } });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/^No card was raised: a check read needs the base branch/);
+    expect(broker.cards(SESSION)).toEqual([]);
+    await client.close();
+  });
+
+  it("posts a draft under the operator's gh login only on Approve, with the body on stdin", async () => {
+    githubReads(true);
+    execMock.mockImplementation(async () => ({ launched: true, error: null, exitCode: 0, stderr: "", stdout: "https://github.com/o/r/pull/7#issuecomment-1\n" }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "draft_github_post", arguments: { kind: "comment", target: "7", body: "lint fails on main too" } });
+    const { cardId } = await cardAnnounced("pending");
+    // A draft is never allowed without its card, whatever the GitHub reads setting.
+    expect(broker.cards(SESSION)[0]).toMatchObject({ kind: "draft-post", allowListKey: null });
+    expect(ghCalls()).toEqual([]);
+    await decide(cardId, { decision: "approve" });
+    const text = resultText(await call);
+    expect(text).toContain("Posted the comment on 7 under the operator's gh login: https://github.com/o/r/pull/7#issuecomment-1");
+    expect(ghCalls()).toEqual([{ args: ["pr", "comment", "7", "--body-file", "-"], input: "lint fails on main too" }]);
+    await client.close();
+  });
+
+  it.each([
+    ["Discard", undefined],
+    ["Copy", "Copied, not posted"],
+  ])("%s posts nothing", async (_button, reason) => {
+    const client = await brokerClient();
+    const call = client.callTool({ name: "draft_github_post", arguments: { kind: "review", target: "7", body: "draft" } });
+    const { cardId } = await cardAnnounced("pending");
+    await decide(cardId, { decision: "deny", ...(reason && { reason }) });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain("Nothing was posted.");
+    expect(ghCalls()).toEqual([]);
+    await client.close();
+  });
+
+  it("refuses a draft-post rule written into the allow-list: the card is raised anyway", async () => {
+    writeFileSync(join(root, ".hench", "sidecar", "allow-list.json"), JSON.stringify({
+      schema: "ndx/sidecar-allow-list/v1",
+      rules: [{ tool: "draft_github_post", key: "*" }],
+    }));
+    const client = await brokerClient();
+    const call = client.callTool({ name: "draft_github_post", arguments: { kind: "comment", target: "7", body: "x" } });
+    await cardAnnounced("pending");
+    expect(ghCalls()).toEqual([]);
+    await client.close();
+    // Closing the client ends the call it was waiting on.
+    await expect(call).rejects.toThrow(/Connection closed/);
   });
 });
 

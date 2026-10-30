@@ -4,7 +4,8 @@
  * `collect.ts` reads git (and gh, when allowed); `checks.ts` classifies failing
  * PR checks; `conflicts.ts` classifies predicted merge conflicts and offers
  * each a deterministic fix. `routes-branch-health.ts` serves the result. The Sidecar's
- * Diagnose branch lens and the hub narrate it later; nothing here asks a model.
+ * Diagnose branch lens narrates it (`sidecar/branch-packet.ts`), and the hub
+ * will; nothing here asks a model.
  *
  * @module web/server/branch-health
  */

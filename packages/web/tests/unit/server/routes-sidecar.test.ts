@@ -21,6 +21,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import {
   createAnnouncingBroker,
   handleSidecarRoute,
+  readWorktreeBranchHealth,
   sidecarTurnSpendRecorder,
   type SidecarCardMessage,
   type SidecarFramesMessage,
@@ -125,6 +126,9 @@ const noEffects: SidecarActions = {
   reviewChangeSet: async () => ({ layout: "v1", items: [{ title: "x", type: "epic" }] }),
   writeChangeSet: async () => ({ ok: true, text: "Wrote it.", ids: ["x"] }),
   readRunPlan: async () => "this test plans nothing",
+  githubReadsAllowed: () => false,
+  githubRead: async () => ({ ok: true, text: "Read it." }),
+  postGithub: async () => ({ ok: true, text: "Posted it." }),
 };
 
 function newRegistry(): SidecarSessionRegistry {
@@ -278,6 +282,34 @@ describe("lens registry", () => {
     writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { hench: { readyNext: true } } }));
     const { lenses } = await (await fetch(`${server.baseUrl}/api/sidecar/lenses`)).json() as { lenses: Array<{ id: string }> };
     expect(lenses.find((l) => l.id === "guide")).toEqual({ id: "guide", available: true });
+  });
+
+  it("offers Diagnose branch, needing a worktree attached, only while git.branchHealth is on", async () => {
+    const diagnoseBranch = async () => ((await (await fetch(`${server.baseUrl}/api/sidecar/lenses`)).json()) as { lenses: Array<{ id: string }> })
+      .lenses.find((l) => l.id === "diagnose-branch");
+    expect(await diagnoseBranch()).toEqual({ id: "diagnose-branch", available: false, needs: "the git.branchHealth feature turned on" });
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ features: { git: { branchHealth: true } } }));
+    expect(await diagnoseBranch()).toEqual({
+      id: "diagnose-branch",
+      available: true,
+      target: { kind: "worktree", needs: "a branch or worktree" },
+    });
+  });
+});
+
+describe("readWorktreeBranchHealth", () => {
+  /** A git that knows no commit: the worktree has no branch to report on. */
+  const noGit = async () => ({ launched: true, error: null, exitCode: 128, stdout: "", stderr: "fatal: not a git repository" });
+
+  it("finds the attached worktree in the workspace list, never under another key", async () => {
+    const workspaces = { listWorkspaces: () => [{ key: "other", path: join(root, "other") }] };
+    expect(await readWorktreeBranchHealth(ctx, workspaces, "missing", false, noGit)).toBe('"missing" names no worktree of this repository');
+    expect(await readWorktreeBranchHealth(ctx, workspaces, "other", false, noGit)).toBe("other has no branch to report on: fatal: not a git repository");
+  });
+
+  it("knows the session's own workspace without the list", async () => {
+    const own = { ...ctx, workspace: "here" };
+    expect(await readWorktreeBranchHealth(own, undefined, "here", false, noGit)).toBe("here has no branch to report on: fatal: not a git repository");
   });
 });
 

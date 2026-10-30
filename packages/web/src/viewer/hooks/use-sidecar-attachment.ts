@@ -1,8 +1,8 @@
 /**
  * What the Sidecar drawer is attached to, and the lens it asks with.
  *
- * The page the operator is on names an item (a task, a capability, a zone, or
- * the Plan and Live pages as a whole). That item becomes the session's target,
+ * The page the operator is on names an item (a task, a capability, a zone, a
+ * Workspaces worktree card, or the Plan and Live pages as a whole). That item becomes the session's target,
  * and the page picks the default lens. The lens list is the server's registry
  * (`GET /api/sidecar/lenses`), never a list kept here: a lens the registry
  * reports as unavailable is shown as "not available yet" and the session runs
@@ -23,7 +23,7 @@ export interface SidecarLensInfo {
   target?: { kind: string; needs: string };
 }
 
-export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live";
+export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree";
 
 /** The thing the current page is about. `ref` is what the lens packet is pointed at; Plan and Live have none. */
 export interface SidecarPageItem {
@@ -41,6 +41,8 @@ export interface SidecarPageSelection {
   taskId: string | null;
   /** The capability opened inside the Product page, which has no route of its own. */
   capabilityId?: string | null;
+  /** The worktree card attached on the Workspaces page, by workspace key. */
+  worktree?: string | null;
 }
 
 /** The item the page is about; null when it is about none (Home, Files, …). */
@@ -52,6 +54,7 @@ export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null 
   if (page.view === "product" && page.capabilityId) {
     return { kind: "capability", ref: page.capabilityId, label: page.capabilityId };
   }
+  if (page.view === "workspaces" && page.worktree) return { kind: "worktree", ref: page.worktree, label: page.worktree };
   if (page.view === "plan") return { kind: "plan", label: "Plan" };
   if (page.view === "live" || page.view === "live-analyze") return { kind: "live", label: "Live" };
   return null;
@@ -65,6 +68,7 @@ export function wantedLensFor(item: SidecarPageItem | null, lastRunFailed: boole
     case "zone": return "explain";
     case "plan": return "plan";
     case "live": return "guide";
+    case "worktree": return "diagnose-branch";
     default: return GENERAL_LENS;
   }
 }

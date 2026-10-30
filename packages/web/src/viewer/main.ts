@@ -151,6 +151,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [openCapability, setOpenCapability] = useState<string | null>(null);
   // The PRD page reports the task picked in its tree, which the route does not carry.
   const [openTask, setOpenTask] = useState<string | null>(null);
+  // The Workspaces board reports the worktree card attached to Sidecar (Diagnose branch).
+  const [openWorktree, setOpenWorktree] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -179,7 +181,16 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability },
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree },
+  );
+  const showSidecar = sidecarShell.drawer.show;
+  // Null while Sidecar is off, so the Workspaces cards offer no attach control.
+  const attachWorktree = useMemo(
+    () => (sidecarShell.button ? (key: string | null) => {
+      setOpenWorktree(key);
+      if (key) showSidecar();
+    } : undefined),
+    [sidecarShell.button !== null, showSidecar],
   );
   const stage = stageForView(pageView, validViews);
 
@@ -252,7 +263,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // Show degradation banner when degraded and not already showing the memory warning (avoid stacking)
   const showDegradationBanner = isDegraded && !degradationDismissed && !showMemoryWarning;
 
-  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, setOpenCapability, setOpenTask, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
+  const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
   return h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.

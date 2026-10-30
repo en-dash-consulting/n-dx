@@ -303,8 +303,8 @@ export class SidecarBroker {
     return parsed.rules.filter((rule): rule is AllowListRule => {
       const r = rule as Partial<AllowListRule> | null;
       return !!r && typeof r.tool === "string" && isBrokerTool(r.tool) && typeof r.key === "string"
-        && BROKER_TOOL_POLICY[r.tool].allowList !== "never"
-        && (r.tool !== "run_command" || allowListKey("run_command", { argv: parseArgv(r.key) }) === r.key);
+        && BROKER_TOOL_POLICY[r.tool].allowList === "per-call"
+        && allowListKey(r.tool, { argv: parseArgv(r.key) }) === r.key;
     });
   }
 

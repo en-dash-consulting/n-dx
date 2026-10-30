@@ -20,6 +20,7 @@ import type { QueuePlan } from "../../shared/index.js";
 import { loadCommitFiles, loadPrdModel, loadTrailerCommits, PRD_CACHE_DIRNAME } from "../rex-gateway.js";
 import type { V2Tree } from "../rex-gateway.js";
 import type { Manifest, Zones } from "../domain-gateway.js";
+import type { BranchHealth } from "../branch-health/index.js";
 import { readLiveReviewReport } from "../live-review-report.js";
 import { readDiagnosis, type RunDiagnosisSummary } from "../run-diagnosis.js";
 import { readLogTailLines, resolveRunEventsFile } from "../run-tail.js";
@@ -235,6 +236,17 @@ export interface TaskRunRead {
   events: { path: string; last: RunEventRead[] } | null;
 }
 
+/** One worktree's branch status, read for the Diagnose branch lens. */
+export interface BranchHealthRead {
+  /** The worktree the workspace key names. */
+  worktree: { key: string; path: string };
+  /** The worktree is the session's own, so a fix card runs where the fix applies. */
+  own: boolean;
+  /** `web.sidecarGithubReads`: whether `health` carries GitHub facts, or a `github_read` card must ask for them. */
+  githubReads: boolean;
+  health: BranchHealth;
+}
+
 export interface PacketSources {
   /** Where the zone and run reads look, project-relative, for section provenance. */
   sourcePaths: { zones: string; runs: string };
@@ -256,6 +268,8 @@ export interface PacketSources {
   queuePlan(signal?: AbortSignal): Promise<QueuePlan | null>;
   /** Whether the dashboard feature `key` is on; a lens behind a feature builds no packet while it is off. */
   featureEnabled(key: string): boolean;
+  /** The branch status of the worktree `workspace` names; a string says why there is none. */
+  branchHealth(workspace: string, signal?: AbortSignal): Promise<BranchHealthRead | string>;
 }
 
 /** Most characters of gate text a {@link TaskRunRead} carries, kept from the end. */
@@ -279,6 +293,8 @@ export interface SpawnedReads {
   /** Aborting `signal` kills the spawned `ndx`. */
   resolve(taskId: string, signal?: AbortSignal): Promise<ResolveRead | null>;
   preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
+  /** The worktree's branch status: git, and gh under `web.sidecarGithubReads`. The routes own the workspace list. */
+  branchHealth(workspace: string, signal?: AbortSignal): Promise<BranchHealthRead | string>;
 }
 
 /** Most commits read for one packet; evidence is a sample, and the packet caps it again. */
@@ -521,6 +537,8 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
     // Task titles and reasons come from the PRD, and this text goes to the vendor.
     queuePlan: async (signal) => redactDeep(await spawned.queuePlan(signal)),
     featureEnabled: (key) => spawned.featureEnabled(key),
+    // A failed check's log can quote a secret the job printed, and this text goes to the vendor.
+    branchHealth: async (workspace, signal) => redactDeep(await spawned.branchHealth(workspace, signal)),
 
     async runs(taskId) {
       return taskRunRecords(join(layout.henchDir, "runs"), taskId).map(({ record }) => ({

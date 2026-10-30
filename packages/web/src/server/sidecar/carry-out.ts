@@ -2,13 +2,16 @@
  * What an approved broker call does.
  *
  * The broker decides a call (`broker.ts`); this module carries out the
- * decided call and words the tool result the session's agent reads. Four
+ * decided call and words the tool result the session's agent reads. Six
  * tools run today: `run_command` as the workspace's Sidecar command job,
  * `start_work` through the hench execute route, `propose_prd_change` as
  * its change-set card's PRD write (`change-set.ts`), with the operator's
- * edits, and `propose_run_plan`, which starts nothing: it names the chosen
- * lane's first task for a `start_work` card. Every other approved call is recorded on its card and names the
- * batch that will carry it out.
+ * edits, `propose_run_plan`, which starts nothing: it names the chosen
+ * lane's first task for a `start_work` card, `github_read` as a gh read
+ * (`github.ts`), allowed by the card or by `web.sidecarGithubReads`, and
+ * `draft_github_post`, posted under the operator's gh login only when its
+ * card is approved. Every other approved call is recorded on its card and
+ * names the batch that will carry it out.
  *
  * The effects themselves are injected ({@link SidecarActions}): the command
  * job model and the execute route own their spawns, so this module never
@@ -20,7 +23,7 @@
 import { laneSteps, stepRunOptions } from "../../shared/index.js";
 import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
-import type { BrokerOutcome } from "./broker.js";
+import type { BrokerOutcome, SidecarCard } from "./broker.js";
 
 /** One effect's result, as the tool result states it. */
 export interface CarryOutResult {
@@ -43,50 +46,93 @@ export interface SidecarActions {
   writeChangeSet(changeSet: SidecarChangeSet): Promise<CarryOutResult>;
   /** The queue planner's plan for a run-plan card, or why there is none to raise a card for. Never throws. */
   readRunPlan(signal?: AbortSignal): Promise<QueuePlan | string>;
+  /** `web.sidecarGithubReads`, read per call: on, a `github_read` runs without a card. */
+  githubReadsAllowed(): boolean;
+  /** A `github_read`, run with gh. Never throws. */
+  githubRead(read: GithubRead, signal?: AbortSignal): Promise<CarryOutResult>;
+  /** An approved draft, posted under the operator's gh login. Never throws. */
+  postGithub(draft: GithubDraft): Promise<CarryOutResult>;
+}
+
+/** `pr`: the worktree a workspace key names, its PR and checks. `check`: one check's newest run on a base branch. */
+export const GITHUB_READ_KINDS = ["pr", "check"] as const;
+/** `comment`: a PR comment. `review`: a review comment on a PR. */
+export const GITHUB_POST_KINDS = ["comment", "review"] as const;
+
+/** A `github_read` call: the attached worktree's PR and checks, or one check on a base branch. */
+export type GithubRead = { kind: "pr"; ref: string } | { kind: "check"; ref: string; base: string };
+
+/** A `draft_github_post` call: a PR comment, or a review comment, with its body. */
+export interface GithubDraft {
+  kind: (typeof GITHUB_POST_KINDS)[number];
+  target: string;
+  body: string;
+}
+
+/** A `github_read` call as {@link GithubRead}, or why it cannot be one. */
+export function githubReadOf(input: Record<string, unknown>): GithubRead | string {
+  const ref = typeof input.ref === "string" ? input.ref.trim() : "";
+  if (!ref) return "a github_read needs a ref";
+  if (input.kind === "pr") return { kind: "pr", ref };
+  if (input.kind === "check") {
+    const base = typeof input.base === "string" ? input.base.trim() : "";
+    return base ? { kind: "check", ref, base } : "a check read needs the base branch to read it on (base)";
+  }
+  return `a github_read kind is "pr" or "check", not ${JSON.stringify(input.kind)}`;
 }
 
 /** The tools that are recorded but not carried out yet, and the batch that will carry each out. */
 export const CARRIED_OUT_LATER: Readonly<Partial<Record<BrokerToolName, string>>> = {
   place_change_card: "the L2 Place lens",
   propose_edit: "a later batch",
-  github_read: "L2/H1",
-  draft_github_post: "L2/H1",
   migration_decision: "G1",
 };
+
+/** How a call was settled: by the broker, or by a project setting that allows it without a card. */
+export type CallDecision = BrokerOutcome | { approved: true; decidedBy: "project-allowance"; setting: string };
 
 /** The tool result for a decided call: the effect when approved, else why nothing ran. */
 export async function carryOutDecision(
   tool: BrokerToolName,
   input: Record<string, unknown>,
-  outcome: BrokerOutcome,
+  outcome: CallDecision,
   actions: SidecarActions | undefined,
   signal?: AbortSignal,
 ): Promise<CarryOutResult> {
-  if (outcome.decidedBy !== "allow-list") {
+  if (outcome.decidedBy === "operator" || outcome.decidedBy === "withdrawn") {
     const { card } = outcome;
     const note = card.reason ? ` Operator's note: ${card.reason}` : "";
+    const nothing = tool === "draft_github_post" ? "Nothing was posted." : "Nothing ran.";
     if (outcome.decidedBy === "withdrawn") {
-      return { ok: false, text: `Card ${card.id} was withdrawn: ${card.reason ?? "the turn stopped"}. Nothing ran.` };
+      return { ok: false, text: `Card ${card.id} was withdrawn: ${card.reason ?? "the turn stopped"}. ${nothing}` };
     }
-    if (!outcome.approved) return { ok: false, text: `The operator denied card ${card.id}. Nothing ran.${note}` };
+    if (!outcome.approved) return { ok: false, text: `The operator denied card ${card.id}. ${nothing}${note}` };
   }
   const decided = outcome.decidedBy === "allow-list"
     ? "Allowed by the Sidecar allow-list."
-    : `The operator approved card ${outcome.card.id}.${outcome.card.reason ? ` Operator's note: ${outcome.card.reason}` : ""}`;
+    : outcome.decidedBy === "project-allowance"
+      ? `Allowed for this project by ${outcome.setting}.`
+      : `The operator approved card ${outcome.card.id}.${outcome.card.reason ? ` Operator's note: ${outcome.card.reason}` : ""}`;
   const effect = await carryOut(tool, input, outcome, actions, signal);
   return { ...effect, text: `${decided} ${effect.text}` };
+}
+
+/** The card that decided a call; none when an allowance did. */
+function cardOf(outcome: CallDecision): SidecarCard | undefined {
+  return outcome.decidedBy === "operator" || outcome.decidedBy === "withdrawn" ? outcome.card : undefined;
 }
 
 async function carryOut(
   tool: BrokerToolName,
   input: Record<string, unknown>,
-  outcome: BrokerOutcome,
+  outcome: CallDecision,
   actions: SidecarActions | undefined,
   signal: AbortSignal | undefined,
 ): Promise<CarryOutResult> {
   const later = CARRIED_OUT_LATER[tool];
   if (later !== undefined) return { ok: true, text: `Recorded, not carried out yet: ${later} carries out ${tool} calls.` };
   if (!actions) return { ok: false, text: `This server cannot carry out ${tool} calls; nothing ran.` };
+  const card = cardOf(outcome);
   switch (tool) {
     case "run_command":
       return actions.runCommand((input.argv as unknown[]).map(String), signal);
@@ -94,17 +140,30 @@ async function carryOut(
       return actions.startWork(String(input.taskId), workOptions(input));
     case "propose_prd_change": {
       // The card's change set, with the operator's edits; never the raw input.
-      const changeSet = outcome.decidedBy === "allow-list" ? undefined : outcome.card.changeSet;
+      const changeSet = card?.changeSet;
       if (!changeSet) return { ok: false, text: "The card carried no change set; nothing was written." };
       const written = await actions.writeChangeSet(changeSet);
       // Said only of a write that happened: a failed one wrote no values at all.
-      const edited = written.ok && outcome.decidedBy !== "allow-list" && outcome.card.edited
+      const edited = written.ok && card?.edited
         ? " The operator edited it before approving; the edited values were written."
         : "";
       return { ...written, text: `${written.text}${edited}` };
     }
     case "propose_run_plan":
-      return runPlanResult(outcome);
+      return runPlanResult(card);
+    case "github_read": {
+      const read = githubReadOf(input);
+      return typeof read === "string" ? { ok: false, text: `Nothing was read: ${read}.` } : actions.githubRead(read, signal);
+    }
+    case "draft_github_post": {
+      // Posted only from an approved card, and exactly the draft the operator read on it.
+      if (!card) return { ok: false, text: "A draft is posted only from an approved card; nothing was posted." };
+      const { kind, target, body } = card.input;
+      if (!(GITHUB_POST_KINDS as readonly unknown[]).includes(kind) || typeof target !== "string" || typeof body !== "string") {
+        return { ok: false, text: "The card carried no draft to post; nothing was posted." };
+      }
+      return actions.postGithub({ kind: kind as GithubDraft["kind"], target, body });
+    }
     default:
       return { ok: false, text: `${tool} has no effect to carry out; nothing ran.` };
   }
@@ -119,9 +178,9 @@ async function carryOut(
  * here; the work card is what the operator approves next. A first step with a
  * flag no run option carries is not started from a card, and the result says so.
  */
-function runPlanResult(outcome: BrokerOutcome): CarryOutResult {
-  if (outcome.decidedBy === "allow-list") return { ok: false, text: "A run plan is never allowed by the allow-list; nothing ran." };
-  const { runPlan, lane: chosen } = outcome.card;
+function runPlanResult(card: SidecarCard | undefined): CarryOutResult {
+  if (!card) return { ok: false, text: "A run plan is never allowed without its card; nothing ran." };
+  const { runPlan, lane: chosen } = card;
   const lane = runPlan && chosen !== undefined ? runPlan.lanes[chosen] : undefined;
   if (!runPlan || !lane || chosen === undefined || lane.tasks.length === 0) return { ok: false, text: "The card carried no lane; nothing started." };
   const steps = laneSteps(lane);

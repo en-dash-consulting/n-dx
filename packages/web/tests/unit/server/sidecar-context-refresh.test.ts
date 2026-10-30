@@ -491,6 +491,7 @@ describe("the packet opens the first turn", () => {
       diagnose: async () => null,
       queuePlan: async () => null,
       featureEnabled: () => true,
+      branchHealth: async () => "this test reads no branch",
     };
     const task = "c0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
@@ -552,6 +553,7 @@ describe("the packet opens the first turn", () => {
       diagnose: (id, signal) => spawned.diagnose(id, signal),
       queuePlan: (signal) => spawned.queuePlan(signal),
       featureEnabled: () => true,
+      branchHealth: async () => "this test reads no branch",
     };
     const task = "c0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({
@@ -598,6 +600,7 @@ describe("the packet opens the first turn", () => {
       diagnose: async () => null,
       queuePlan: async () => null,
       featureEnabled: () => true,
+      branchHealth: async () => "this test reads no branch",
     };
     const capability ="a0000000-0000-4000-8000-000000000002";
     const reg = new SidecarSessionRegistry({

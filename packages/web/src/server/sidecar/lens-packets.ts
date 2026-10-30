@@ -1,7 +1,7 @@
 /**
  * Which packet each Sidecar lens opens a turn with.
  *
- * Five lenses have a builder today. General sends no packet. The rest need a
+ * Six lenses have a builder today. General sends no packet. The rest need a
  * data source that does not exist yet, so they register as unavailable and
  * name it: a lens never sends a partial packet in place of the real one, and
  * the drawer can say why it is greyed out. When a source lands, its lens
@@ -29,6 +29,7 @@ import {
   type PacketTarget,
 } from "./packet-builders.js";
 import type { PacketSources } from "./packet-sources.js";
+import { buildDiagnoseBranchPacket, DIAGNOSE_BRANCH_CAP } from "./branch-packet.js";
 
 export const LENS_IDS = [
   "general",
@@ -46,7 +47,7 @@ export type LensId = (typeof LENS_IDS)[number];
 
 /** The item a lens must have attached: its kind as the drawer names it, and what to say when there is none. */
 export interface LensTarget {
-  kind: "task";
+  kind: "task" | "worktree";
   needs: string;
 }
 
@@ -86,7 +87,14 @@ export const LENS_PACKETS: Readonly<Record<LensId, LensPacketPlan>> = {
     build: buildDiagnoseRunPacket,
     target: { kind: "task", needs: "a task to diagnose" },
   },
-  "diagnose-branch": { kind: "unavailable", needs: "the branch status collector" },
+  "diagnose-branch": {
+    kind: "packet",
+    cap: DIAGNOSE_BRANCH_CAP,
+    build: buildDiagnoseBranchPacket,
+    // A Workspaces worktree card attaches it; its ref is the workspace key.
+    target: { kind: "worktree", needs: "a branch or worktree" },
+    feature: { key: "git.branchHealth", needs: "the git.branchHealth feature turned on" },
+  },
   place: { kind: "unavailable", needs: "the Inbox list read" },
   migrate: { kind: "unavailable", needs: "the migration plan reads" },
   hub: { kind: "unavailable", needs: "the hub snapshot" },

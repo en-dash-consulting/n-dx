@@ -319,6 +319,25 @@ describe("WorkspacesView", () => {
       .toBe("PRD · 3 only here / 5 changed here");
   });
 
+  it("offers no Sidecar control while Sidecar is off", async () => {
+    const { fetcher } = makeFetcher();
+    root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));
+    expect(root.querySelector(".workspace-card-sidecar")).toBeNull();
+  });
+
+  it("attaches a worktree card to Sidecar by its workspace key, and detaches it when the page goes", async () => {
+    const { fetcher } = makeFetcher();
+    const attach = vi.fn();
+    root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory, onAttachSidecar: attach, attachedWorktree: "n-dx" }));
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>(".workspace-card-sidecar")];
+    expect(buttons.map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([["Attached to Sidecar", "true"], ["Ask Sidecar", "false"]]);
+    buttons[1].click();
+    expect(attach).toHaveBeenLastCalledWith("feature");
+    cleanupRenderedDiv(root);
+    root = null;
+    expect(attach).toHaveBeenLastCalledWith(null);
+  });
+
   it("names every per-workspace request's workspace", async () => {
     const { fetcher, calls } = makeFetcher();
     root = await mount(h(WorkspacesView, { fetcher, socketFactory: makeSocket().factory }));

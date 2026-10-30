@@ -367,7 +367,8 @@
   padding-top: var(--space-1);
 }
 
-.workspace-card-open {
+.workspace-card-open,
+.workspace-card-sidecar {
   font-size: var(--font-xs);
   font-weight: var(--weight-medium);
   padding: 3px var(--space-3);
@@ -378,12 +379,24 @@
   transition: border-color var(--transition-normal), background var(--transition-normal);
 }
 
-.workspace-card-open:hover {
+.workspace-card-sidecar {
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.workspace-card-sidecar[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.workspace-card-open:hover,
+.workspace-card-sidecar:hover {
   border-color: var(--accent);
   background: var(--bg-hover);
 }
 
-.workspace-card-open:focus-visible {
+.workspace-card-open:focus-visible,
+.workspace-card-sidecar:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

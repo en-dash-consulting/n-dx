@@ -76,6 +76,24 @@ model to pass to `start_work` on a re-run or `--fresh`. The spawned verdict
 passes through `redactDeep` like the recorded one: its evidence quotes the
 run's error.
 
+## Sidecar Diagnose branch and GitHub cards
+
+The Diagnose branch packet (`sidecar/branch-packet.ts`) is the second PK4
+exception: each failing check carries the end of its failed-job log, at most
+1,200 characters of the tail branch health already capped, through
+`redactDeep`. Its target is a workspace key; `SidecarWorkspaces`, injected by
+start.ts, names the worktree, and fix cards are offered only when that
+worktree is the session's own, because a card runs in the session's worktree
+(no cross-workspace write action). A source conflict never gets a card.
+
+GitHub reads have one allowance, `web.sidecarGithubReads`. The packet runs gh
+only under it; `github_read` runs without a card under it and raises a
+network-read card otherwise. `github_read` is `per-project` in the broker
+policy, so an allow-list rule for it is ignored. `draft_github_post` is never
+allowed without its card: Approve posts the card's own input under the
+operator's gh login (`gh pr comment` or `gh pr review --comment`, body on
+stdin); Copy and Discard deny it.
+
 ## Sidecar Guide and the run-plan card
 
 The Guide packet (6k cap) is the queue planner's plan as hench printed it:

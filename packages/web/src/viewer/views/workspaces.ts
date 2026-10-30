@@ -458,12 +458,16 @@ function LiveRun({ card, live, onStop, stopping }: {
   );
 }
 
-function WorkspaceCardView({ card, doFetch, onChanged, branchHealth }: {
+function WorkspaceCardView({ card, doFetch, onChanged, branchHealth, onAttachSidecar, attached }: {
   card: WorkspaceCard;
   doFetch: Fetcher;
   onChanged: () => void;
   /** `git.branchHealth`: show the health strip. Off renders the card unchanged. */
   branchHealth: boolean;
+  /** Attach this card to Sidecar; absent while Sidecar is off. */
+  onAttachSidecar?: (key: string | null) => void;
+  /** This card is the one attached to Sidecar. */
+  attached: boolean;
 }) {
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -545,6 +549,15 @@ function WorkspaceCardView({ card, doFetch, onChanged, branchHealth }: {
         class: "workspace-card-open",
         href: workspaceViewUrl(card, "prd", currentPathname()),
       }, "Open workspace"),
+      onAttachSidecar
+        ? h("button", {
+            type: "button",
+            class: "workspace-card-sidecar",
+            "aria-pressed": attached,
+            onClick: () => onAttachSidecar(card.key),
+            "aria-label": `Ask Sidecar why ${card.key}'s branch fails CI or conflicts`,
+          }, attached ? "Attached to Sidecar" : "Ask Sidecar")
+        : null,
       card.live || !card.nextTask
         ? null
         : h(TaskStartControl, {
@@ -572,10 +585,19 @@ export interface WorkspacesViewProps {
   fetcher?: Fetcher;
   /** Injected for tests; defaults to a live WebSocket. */
   socketFactory?: (url: string) => WebSocket;
+  /**
+   * Attach a worktree card to Sidecar, whose Diagnose branch lens reads that
+   * worktree; null detaches. Absent while Sidecar is off: no card offers it.
+   */
+  onAttachSidecar?: (key: string | null) => void;
+  /** The card attached to Sidecar, by workspace key. */
+  attachedWorktree?: string | null;
 }
 
 /** Board of worktree cards under a machine strip. */
-export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) {
+export function WorkspacesView({ fetcher, socketFactory, onAttachSidecar, attachedWorktree = null }: WorkspacesViewProps) {
+  // The attachment is this page's: leaving it detaches the card.
+  useEffect(() => () => onAttachSidecar?.(null), [onAttachSidecar]);
   const [cards, setCards] = useState<WorkspaceCard[]>([]);
   const [stats, setStats] = useState<MachineStats>({
     agentsRunning: 0, memory: null, uncommittedTrees: 0, prdOnlyOnBranches: 0,
@@ -707,9 +729,11 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
         doFetch,
         onChanged: () => void load(card.key),
         branchHealth,
+        onAttachSidecar,
+        attached: attachedWorktree === card.key,
       })),
     );
-  }, [loading, error, cards, doFetch, load, branchHealth]);
+  }, [loading, error, cards, doFetch, load, branchHealth, onAttachSidecar, attachedWorktree]);
 
   return h("div", { class: "workspaces-container" },
     h("header", { class: "workspaces-header" },

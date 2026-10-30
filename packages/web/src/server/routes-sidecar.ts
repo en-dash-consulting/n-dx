@@ -48,7 +48,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isAuthError, vendorSessionDriver } from "@n-dx/llm-client";
+import { resolve } from "node:path";
+import { exec as llmExec, isAuthError, redactSecrets, vendorSessionDriver } from "@n-dx/llm-client";
 import type { SessionTurnStatus } from "@n-dx/llm-client";
 import { SIDECAR_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usage.js";
 import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
@@ -72,7 +73,11 @@ import { commitSettingsChange } from "./settings-commit.js";
 import { readLedger } from "./sidecar/ledger.js";
 import { buildLensPacket, LENS_IDS, LENS_PACKETS, type LensTarget } from "./sidecar/lens-packets.js";
 import type { PacketTarget } from "./sidecar/packet-builders.js";
-import { createPacketSources, readResolution, type SpawnedReads } from "./sidecar/packet-sources.js";
+import { createPacketSources, readResolution, type BranchHealthRead, type SpawnedReads } from "./sidecar/packet-sources.js";
+import { githubFactsBody } from "./sidecar/branch-packet.js";
+import { baseCheckResult, postGithubDraft, readCheckOnBase } from "./sidecar/github.js";
+import { collectProjectBranchHealth } from "./routes-branch-health.js";
+import { NotAGitBranchError, type BranchHealthExec } from "./branch-health/index.js";
 import {
   createWorktreeSidecarRegistry,
   worktreeSidecarDir,
@@ -165,7 +170,41 @@ export interface SidecarFramesResponse {
   running: boolean;
 }
 
+/**
+ * The repository's worktrees by workspace key, from the server's workspace
+ * registry. Injected by start.ts (`sidecarWorkspacesOf`), so these routes
+ * never import the registry. The Diagnose branch lens reads the worktree its
+ * attached workspace key names.
+ */
+export interface SidecarWorkspaces {
+  listWorkspaces(): ReadonlyArray<{ key: string; path: string }>;
+}
+
+/**
+ * The branch status of the worktree `key` names, as the Diagnose branch lens
+ * and a `github_read` of kind `pr` read it. The session's own workspace is
+ * known without the registry. gh runs only when `githubReads` says it may.
+ */
+export async function readWorktreeBranchHealth(
+  ctx: ServerContext,
+  workspaces: SidecarWorkspaces | undefined,
+  key: string,
+  githubReads: boolean,
+  exec?: BranchHealthExec,
+): Promise<BranchHealthRead | string> {
+  const path = key === ctx.workspace ? ctx.projectDir : workspaces?.listWorkspaces().find((w) => w.key === key)?.path;
+  if (!path) return `"${key}" names no worktree of this repository`;
+  try {
+    const health = await collectProjectBranchHealth(path, { githubReads, localOnly: !githubReads, exec });
+    return { worktree: { key, path }, own: resolve(path) === resolve(ctx.projectDir), githubReads, health };
+  } catch (err) {
+    return err instanceof NotAGitBranchError ? `${key} has no branch to report on: ${err.message}` : `branch health failed for ${key}: ${errorMessage(err)}`;
+  }
+}
+
 export interface SidecarRouteOptions {
+  /** The repository's worktrees, for the Diagnose branch lens; without it only the session's own workspace is known. */
+  workspaces?: SidecarWorkspaces;
   /** The registry for a project directory. Defaults to one per directory, kept for the server's life. */
   registryFor?: (projectDir: string) => SidecarSessionRegistry;
   /** The broker for a project directory. Defaults to one per directory, kept for the server's life. */
@@ -210,9 +249,12 @@ export function prepareReads(
     diagnose: diagnoseTaskRun,
     queuePlan: readQueuePlan,
   },
+  workspaces?: SidecarWorkspaces,
 ): SpawnedReads {
   return {
     featureEnabled: (key) => isFeatureEnabled(ctx.projectDir, key),
+    // gh runs for the packet only under the project's allowance; otherwise the agent asks with a github_read card.
+    branchHealth: (key) => readWorktreeBranchHealth(ctx, workspaces, key, readSidecarSettings(ctx.projectDir).githubReads),
     async queuePlan(signal) {
       const read = await reads.queuePlan(ctx, signal).catch(() => null);
       return read?.ok ? read.plan : null;
@@ -263,9 +305,25 @@ export function sidecarContextOptions(ctx: ServerContext, reads: SpawnedReads = 
 export function sidecarActions(
   ctx: ServerContext,
   broadcast: WebSocketBroadcaster,
-  { commandWaitMs = SIDECAR_COMMAND_WAIT_MS }: { commandWaitMs?: number } = {},
+  {
+    commandWaitMs = SIDECAR_COMMAND_WAIT_MS,
+    workspaces,
+    exec = llmExec,
+  }: { commandWaitMs?: number; workspaces?: SidecarWorkspaces; exec?: BranchHealthExec } = {},
 ): SidecarActions {
   return {
+    githubReadsAllowed: () => readSidecarSettings(ctx.projectDir).githubReads,
+    async githubRead(read) {
+      if (read.kind === "check") return baseCheckResult(await readCheckOnBase(exec, ctx.projectDir, read.ref, read.base), read.ref, read.base);
+      const health = await readWorktreeBranchHealth(ctx, workspaces, read.ref, true, exec);
+      if (typeof health === "string") return { ok: false, text: `Nothing was read: ${health}.` };
+      const { github, githubReason } = health.health;
+      // Failed-check logs can quote a secret the job printed, and this text goes to the vendor.
+      return github
+        ? { ok: true, text: redactSecrets(githubFactsBody(github)) }
+        : { ok: false, text: `No GitHub facts for ${read.ref}: ${githubReason ?? "gh did not answer"}` };
+    },
+    postGithub: (draft) => postGithubDraft(exec, ctx.projectDir, draft),
     async previewWork(taskId, options) {
       const read = await resolveTaskRun(ctx, taskId, options);
       const { inUse, max, holders } = await repositoryRunSlotUsage(ctx);
@@ -330,12 +388,12 @@ export function sidecarTurnSpendRecorder(ctx: ServerContext): NonNullable<Sideca
 const registries = new Map<string, SidecarSessionRegistry>();
 const brokers = new Map<string, SidecarBroker>();
 
-function defaultRegistryFor(ctx: ServerContext): SidecarSessionRegistry {
+function defaultRegistryFor(ctx: ServerContext, workspaces: SidecarWorkspaces | undefined): SidecarSessionRegistry {
   let registry = registries.get(ctx.projectDir);
   if (!registry) {
     registry = createWorktreeSidecarRegistry(ctx.projectDir, {
       broker: (id) => sidecarBrokerEndpoint(ctx, id),
-      context: sidecarContextOptions(ctx),
+      context: sidecarContextOptions(ctx, prepareReads(ctx, undefined, workspaces)),
       ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
       onTurnSpend: sidecarTurnSpendRecorder(ctx),
     });
@@ -491,7 +549,7 @@ export async function handleSidecarRoute(
     return false;
   }
   const method = req.method || "GET";
-  const registry = opts.registryFor ? opts.registryFor(ctx.projectDir) : defaultRegistryFor(ctx);
+  const registry = opts.registryFor ? opts.registryFor(ctx.projectDir) : defaultRegistryFor(ctx, opts.workspaces);
   const broker = opts.brokerFor ? opts.brokerFor(ctx.projectDir) : defaultBrokerFor(ctx.projectDir, broadcast);
 
   if (pathname === LENSES_PATH) {
@@ -701,7 +759,7 @@ export async function handleSidecarRoute(
       if (session.endedAt || !registry.isRunning(id)) {
         return refuse(res, 409, `Sidecar session ${id} has no running turn`);
       }
-      await handleBrokerMcpRequest(req, res, broker, id, opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast));
+      await handleBrokerMcpRequest(req, res, broker, id, opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast, { workspaces: opts.workspaces }));
       return true;
   }
   return false;

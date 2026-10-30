@@ -10,8 +10,10 @@
  *
  * Context ceilings are read by `context-refresh.ts` and the idle window by the
  * session registry, each on every use. `sidecarGithubReads` decides whether
- * `GET /api/branch-health` may run gh (routes-branch-health.ts), and is
- * stored for the GitHub lens (batch L2). Mode has one value, `ask`:
+ * `GET /api/branch-health` and the Diagnose branch packet may run gh, and is
+ * the per-project allowance for the broker's `github_read`: on, a read runs
+ * without a card; off, each read raises a network-read card. It never
+ * allows a post. Mode has one value, `ask`:
  * `auto` is refused until it exists.
  */
 

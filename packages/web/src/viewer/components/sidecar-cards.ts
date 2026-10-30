@@ -17,7 +17,11 @@
  * and done-when, editable while it is the first waiting card and sent with
  * the approval; any existing item it matches; and, on v2, where the change
  * lands — on its target, or in the Inbox needing placement. It never offers
- * to apply the change. Rich edit bodies come later.
+ * to apply the change. A draft-post card shows the draft as it would be
+ * posted, with Post / Copy / Discard: only Post posts, and Copy settles the
+ * card as denied. A network-read card names what gh would read, with "Allow
+ * GitHub reads for this project", which approves it and turns
+ * `web.sidecarGithubReads` on. Rich edit bodies come later.
  *
  * A card withdrawn because its session ended draws as denied with the note
  * "session ended" (UX8); one withdrawn because the turn stopped draws as
@@ -335,6 +339,59 @@ function RunPlanBody({ card, cards, decidable, deciding, onStartLane, onRestartL
   );
 }
 
+// ── Draft post and network read (Diagnose branch) ───────────────────
+
+/** The reason a Copy sends: the draft left the dashboard, and nothing was posted. */
+export const DRAFT_COPIED_REASON = "Copied, not posted";
+
+/** A draft card's body: where it would go and the text exactly as it would be posted. */
+function DraftPostBody({ card }: { card: SidecarCard }) {
+  return h("div", { class: "sidecar-draft-post" },
+    h("p", { class: "sidecar-draft-target" }, `${str(card.input.kind) === "review" ? "Review comment" : "Comment"} on ${str(card.input.target)}`),
+    h("pre", { class: "sidecar-draft-text", "aria-label": "The draft as it would be posted" }, str(card.input.body)),
+  );
+}
+
+/** A network-read card's body: the host and what would be read. */
+function NetworkReadBody({ card }: { card: SidecarCard }) {
+  const { kind, ref, base } = card.input;
+  const what = kind === "check"
+    ? `the newest run of check "${str(ref)}" on ${str(base)}`
+    : `the PR of worktree ${str(ref)}, its checks and failed-check logs`;
+  return h("p", { class: "sidecar-network-read" }, `Reads github.com with your gh login: ${what}.`);
+}
+
+/**
+ * Copy on a draft card: the draft goes to the clipboard and the card settles
+ * as denied, so nothing is posted. A refused clipboard leaves the card
+ * waiting and says so; the draft stays on screen to select by hand.
+ */
+function DraftCopyButton({ text, deciding, onCopied }: { text: string; deciding: boolean; onCopied: () => void }) {
+  const [failed, setFailed] = useState(false);
+  const copy = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      setFailed(true);
+      return;
+    }
+    onCopied();
+  };
+  return h("button", { type: "button", class: "sidecar-card-copy", disabled: deciding, onClick: () => { void copy(); } },
+    failed ? "Copy failed — select it" : "Copy");
+}
+
+/** Puts GitHub reads on for this project (`web.sidecarGithubReads`); later reads run without a card. */
+async function allowGithubReads(): Promise<void> {
+  const res = await fetch("/api/sidecar/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ githubReads: true }),
+  });
+  // This read is approved either way; only later reads still ask. The settings page shows the toggle.
+  if (!res.ok) throw new Error(`Saving web.sidecarGithubReads failed (${res.status})`);
+}
+
 function settledNote(card: SidecarCard, state: SidecarCardState): string {
   switch (state) {
     case "approved": return "Approved";
@@ -392,9 +449,15 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
       ]
     : card.runPlan
       ? h(RunPlanBody, { card, cards, decidable: editable, deciding, onStartLane: (lane) => onDecide({ approve: true, lane }), onRestartLane })
+      : card.kind === "draft-post" || card.kind === "network-read"
+      ? [
+          card.kind === "draft-post" ? h(DraftPostBody, { card }) : h(NetworkReadBody, { card }),
+          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        ]
       : state === "pending"
       ? input
       : h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input);
+  const draft = card.kind === "draft-post";
   return h("li", { class: `sidecar-card sidecar-card--${state}`, "data-card": card.id, "data-kind": card.kind },
     h("div", { class: "sidecar-card-head" },
       h("span", { class: "sidecar-card-kind" }, SIDECAR_CARD_KIND_LABELS[card.kind] ?? card.kind),
@@ -422,8 +485,21 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
               card.runPlan
                 ? null
                 : h("button", { type: "button", class: "sidecar-card-approve", disabled: deciding, onClick: () => onDecide({ approve: true }) },
-                    card.changeSet ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}` : "Approve"),
-              h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) }, card.runPlan ? "Not now" : "Deny"),
+                    card.changeSet
+                      ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}`
+                      : draft ? "Post under your gh login" : "Approve"),
+              // Copy hands the draft to the operator and posts nothing: it settles the card as denied.
+              draft ? h(DraftCopyButton, { text: str(card.input.body), deciding, onCopied: () => onDecide({ approve: false, reason: DRAFT_COPIED_REASON }) }) : null,
+              h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) },
+                card.runPlan ? "Not now" : draft ? "Discard" : "Deny"),
+              card.kind === "network-read"
+                ? h("button", {
+                    type: "button",
+                    class: "sidecar-card-always",
+                    disabled: deciding,
+                    onClick: () => { onDecide({ approve: true }); void allowGithubReads(); },
+                  }, "Allow GitHub reads for this project")
+                : null,
               card.allowListKey !== null
                 ? h("button", {
                     type: "button",

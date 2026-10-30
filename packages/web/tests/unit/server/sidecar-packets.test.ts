@@ -94,6 +94,7 @@ async function sourcesFor(layout: "v1" | "v2", overrides: Partial<PacketSources>
     diagnose: async () => null,
     queuePlan: async () => null,
     featureEnabled: () => true,
+    branchHealth: async () => "this test reads no branch",
     ...overrides,
   };
 }
@@ -737,7 +738,7 @@ describe("lens registry", () => {
     // imports allowed are resolveLayout (a path helper) and redactDeep (a
     // pure scrubber) in packet-sources.ts.
     const SIDECAR = resolve(__dirname, "../../../src/server/sidecar");
-    for (const file of ["packet.ts", "packet-builders.ts", "lens-packets.ts", "packet-sources.ts"]) {
+    for (const file of ["packet.ts", "packet-builders.ts", "branch-packet.ts", "lens-packets.ts", "packet-sources.ts"]) {
       const source = readFileSync(join(SIDECAR, file), "utf-8");
       const imports = [...source.matchAll(/^import[\s\S]*?from\s+"([^"]+)"/gm)].map((m) => m[0]);
       for (const statement of imports) {
@@ -856,7 +857,6 @@ describe("lens registry", () => {
   });
 
   it.each([
-    ["diagnose-branch", "the branch status collector"],
     ["place", "the Inbox list read"],
     ["migrate", "the migration plan reads"],
     ["hub", "the hub snapshot"],

@@ -1,0 +1,5 @@
+---
+"@n-dx/web": patch
+---
+
+The Sidecar Diagnose branch lens now has a packet (8k cap) built from branch health for an attached worktree: branch, base, PR, stack position and containment, ahead/behind, each failing check with its class, evidence and a capped log tail, and each predicted conflict with its class and the card its fix goes on. A Workspaces card's Ask Sidecar attaches the worktree (a new `worktree` item, ref = workspace key) and opens the drawer on Diagnose branch. The lens is unavailable while `git.branchHealth` is off, or with no worktree attached. The broker now carries out `github_read` (`pr`, or `check` on a base branch, which decides "failing on main") and `draft_github_post` (`comment` or `review`, posted under the operator's gh login only on Approve; Copy and Discard post nothing). `web.sidecarGithubReads` is the one allowance for GitHub reads: on, a read runs without a card; off, each read raises a network-read card, whose "Allow GitHub reads for this project" turns it on. A `github_read` rule on the Sidecar allow-list is no longer honoured.

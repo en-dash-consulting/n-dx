@@ -55,7 +55,7 @@ import { handleCliTimeoutRoute } from "./routes-cli-timeout.js";
 import { handleCommandsRoute } from "./routes-commands.js";
 import { handleLlmRoute } from "./routes-llm.js";
 import { handleMergeGraphRoute } from "./routes-merge-graph.js";
-import { handleSidecarRoute } from "./routes-sidecar.js";
+import { handleSidecarRoute, type SidecarWorkspaces } from "./routes-sidecar.js";
 import { isSidecarBrokerRequest } from "./sidecar/broker-credential.js";
 import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { handleRexSettingsRoute } from "./routes-rex-settings.js";
@@ -832,6 +832,11 @@ function liveSourcesOf(registry: WorkspaceRegistry): LiveSources {
   return { listWorkspaces: () => registry.list() };
 }
 
+/** The Sidecar's Diagnose branch lens finds the attached worktree in the registry, never by importing it. */
+function sidecarWorkspacesOf(registry: WorkspaceRegistry): SidecarWorkspaces {
+  return { listWorkspaces: () => registry.list() };
+}
+
 async function handleApiRoutes(
   req: IncomingMessage,
   res: ServerResponse,
@@ -899,7 +904,7 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleTokenUsageRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleMergeGraphRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(true, () => handleSidecarRoute(req, res, ctx, broadcast))) return true;
+  if (await handleScopedRoute(true, () => handleSidecarRoute(req, res, ctx, broadcast, { workspaces: sidecarWorkspacesOf(registry) }))) return true;
   if (handleDataRoute(req, res, ctx, watcher)) return true;
   if (assets && handleStaticRoute(req, res, ctx, assets)) return true;
   return false;

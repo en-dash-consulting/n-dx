@@ -24,6 +24,7 @@ const spawned: SpawnedReads = {
   diagnose: async () => null,
   queuePlan: async () => null,
   featureEnabled: () => true,
+  branchHealth: async () => "this test reads no branch",
 };
 
 let dir: string;
@@ -361,6 +362,7 @@ describe("sidecarContextOptions packet", () => {
       diagnose: async () => null,
       queuePlan: async () => null,
       featureEnabled: () => true,
+      branchHealth: async () => "this test reads no branch",
     });
     const record = { id: "s1", lens: "describe", target: { ref: TASK } } as SidecarSessionRecord;
     const text = await options.packet!(record, new AbortController().signal);

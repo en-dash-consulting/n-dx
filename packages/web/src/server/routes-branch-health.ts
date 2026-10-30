@@ -27,6 +27,7 @@ import {
   NotAGitBranchError,
   parseGeneratedFiles,
   PrBaseCache,
+  type BranchHealth,
   type BranchHealthExec,
 } from "./branch-health/index.js";
 import { readSidecarSettings } from "./sidecar/settings.js";
@@ -44,6 +45,25 @@ export interface BranchHealthRouteOptions {
   prBases?: PrBaseCache;
 }
 
+/**
+ * `projectDir`'s branch health with this server's PR base cache and the
+ * worktree's own `web.generatedFiles`. The caller decides whether gh may run:
+ * the route and the Sidecar packet pass `web.sidecarGithubReads`, an approved
+ * `github_read` card passes true.
+ */
+export function collectProjectBranchHealth(
+  projectDir: string,
+  options: BranchHealthRouteOptions & { githubReads: boolean; localOnly: boolean },
+): Promise<BranchHealth> {
+  return collectBranchHealth(projectDir, {
+    githubReads: options.githubReads,
+    localOnly: options.localOnly,
+    prBases: options.prBases ?? serverPrBases,
+    generatedFiles: readWebValue(projectDir, (web) => parseGeneratedFiles(web.generatedFiles)) ?? [],
+    exec: options.exec,
+  });
+}
+
 export async function handleBranchHealthRoute(
   req: IncomingMessage,
   res: ServerResponse,
@@ -59,12 +79,10 @@ export async function handleBranchHealthRoute(
   const query = new URLSearchParams(queryAt < 0 ? "" : target.slice(queryAt + 1));
 
   try {
-    const health = await collectBranchHealth(ctx.projectDir, {
+    const health = await collectProjectBranchHealth(ctx.projectDir, {
       githubReads: readSidecarSettings(ctx.projectDir).githubReads,
       localOnly: query.get("github") !== "1",
-      prBases: options.prBases ?? serverPrBases,
-      generatedFiles: readWebValue(ctx.projectDir, (web) => parseGeneratedFiles(web.generatedFiles)) ?? [],
-      exec: options.exec,
+      ...options,
     });
     jsonResponse(res, 200, health);
   } catch (err) {

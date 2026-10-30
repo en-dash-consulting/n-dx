@@ -58,6 +58,26 @@ export const GUIDE_INSTRUCTIONS = [
 ].join("\n");
 
 /**
+ * Diagnose branch. Branch health has already classified each failing check
+ * and each predicted conflict and chosen each conflict's fix; the model names
+ * them and offers each fix on the card the packet names. "Failing on main"
+ * is the one class it may add, and only from a `github_read` of the check on
+ * the base. A source conflict is never fixed from a card, and GitHub is
+ * written only through a draft card.
+ */
+export const DIAGNOSE_BRANCH_INSTRUCTIONS = [
+  "## How to diagnose a branch",
+  "Say why the attached branch fails CI or conflicts with its base, and what to do next, from branch health in the packet.",
+  "- Name every failing check with its class, in the packet's words: touched test, behind base, policy test, CodeQL, fork, or unclassified. Quote its evidence and the part of its log tail that shows the failure.",
+  "- Call a check \"failing on main\" only after a `github_read` with `kind: \"check\"` for that check on the base answers that it fails there too; the packet names the call for each check. Never guess it from the log or the check's name.",
+  "- For each predicted conflict, give its class and reason and offer exactly the fix card the packet names: `run_command` cards, one per step in order, for a PRD children table, PRD state or generated file; `propose_edit` with the packet's diff for an allowlist union; `propose_prd_change` for a duplicate capture.",
+  "- A source conflict is never fixed from a card: name the worktree that owns the branch and the other worktrees the packet lists, say a person there resolves it, and raise no card for it.",
+  "- When the packet says the worktree is not this session's, raise no fix card at all: the fixes run in that worktree. Say to open its own Sidecar.",
+  "- Read GitHub only with `github_read` and write to it only with `draft_github_post`, which the operator approves, copies or discards. Never tell the operator to run gh, and never post any other way.",
+  "- Use only what the packet states. Where it says something is not available, say so and name the call or command that would supply it.",
+].join("\n");
+
+/**
  * Describe. The agent cannot judge a model's answer, so the instructions name
  * the check it makes (vague done-when) and the one route for a fix: a
  * change-set card the operator edits and approves, never prose to paste.
