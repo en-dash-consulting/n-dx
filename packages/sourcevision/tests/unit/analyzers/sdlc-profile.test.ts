@@ -69,6 +69,27 @@ jobs:
         run: ./deploy.sh production
 `;
 
+describe("adversarial readiness evidence", () => {
+  it("does not call a GitLab manual deploy automated because its pipeline runs on push", async () => {
+    const root = project("manual-job", { ".gitlab-ci.yml": "deploy:\n  only: main\n  when: manual\n  environment: production\n  script: npm run deploy\n" });
+    expect((await buildSdlcProfile(root)).cd[0]).toMatchObject({ automated: false, requiresApproval: true });
+  });
+  it("records executable coverage configuration and its enforced threshold", async () => {
+    const root = project("coverage-command", { "package.json": JSON.stringify({ scripts: { test: "c8 --check-coverage --lines 85 node --test" } }) });
+    const profile = await buildSdlcProfile(root);
+    expect(profile.tests.coverage).toMatchObject({ tool: "c8", threshold: 85, enforced: true });
+    expect(profile.tests.coverage?.evidence[0].path).toBe("package.json");
+  });
+  it("does not infer coverage from an unused installed dependency", async () => {
+    const root = project("unused-coverage", { "package.json": JSON.stringify({ scripts: { test: "node --test" }, devDependencies: { c8: "^10" } }) });
+    expect((await buildSdlcProfile(root)).tests.coverage).toBeUndefined();
+  });
+  it("records coverage invoked directly in a CI step", async () => {
+    const root = project("coverage-ci", { ".github/workflows/ci.yml": "on: push\njobs:\n  test:\n    steps:\n      - run: pytest --cov=app --cov-fail-under=80\n" });
+    expect((await buildSdlcProfile(root)).tests.coverage).toMatchObject({ tool: "pytest-cov", threshold: 80, enforced: true });
+  });
+});
+
 // ── The walk and its bounds ─────────────────────────────────────────────────
 
 describe("walkProject bounds", () => {

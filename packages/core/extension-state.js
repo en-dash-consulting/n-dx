@@ -27,7 +27,7 @@
 import { createHash } from "node:crypto";
 import * as nodeFs from "node:fs";
 import { join, resolve } from "node:path";
-import { EXTENSIONS_CACHE_FILE, replaceExtensionsFile } from "./extension-discovery.js";
+import { EXTENSIONS_CACHE_FILE, readExtensionsText, replaceExtensionsFile } from "./extension-discovery.js";
 import { escapeControlCharacters, satisfiesSemverRange } from "./extension-manifest.js";
 
 /**
@@ -89,7 +89,7 @@ export function readExtensionsFile(home, fs = nodeFs) {
   const path = join(home, EXTENSIONS_CACHE_FILE);
   let text;
   try {
-    text = fs.readFileSync(path, "utf8");
+    text = readExtensionsText(fs, path);
   } catch (error) {
     if (/** @type {NodeJS.ErrnoException} */ (error).code === "ENOENT") return {};
     throw error;

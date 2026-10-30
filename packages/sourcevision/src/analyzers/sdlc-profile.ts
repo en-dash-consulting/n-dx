@@ -54,6 +54,7 @@ import type {
   SdlcCommand,
   SdlcCommandKind,
   SdlcContainer,
+  SdlcCoverage,
   SdlcDeployment,
   SdlcEvidence,
   SdlcEvidenceList,
@@ -536,7 +537,8 @@ function jobFrom(name: string, raw: YamlValue, stepKeys: string[]): SdlcCiJob {
   const job: SdlcCiJob = { name, steps: stepsFrom(raw, stepKeys) };
   const needs = listAt(raw, "needs");
   if (needs.length > 0) job.needs = needs;
-  const condition = stringAt(raw, "if") ?? stringAt(raw, "only") ?? stringAt(raw, "when");
+  const when = stringAt(raw, "when");
+  const condition = when === "manual" ? when : stringAt(raw, "if") ?? stringAt(raw, "only") ?? when;
   if (condition !== undefined) job.condition = condition;
   const environment = declaredEnvironment(raw);
   if (environment !== undefined) job.environment = environment;
@@ -1017,11 +1019,17 @@ export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
   const observability: SdlcObservability[] = [];
   const migrationDeps: Array<{ tool: string; evidence: SdlcEvidence }> = [];
   const rollback: SdlcRollback[] = [];
+  const coverageSignals: SdlcCoverage[] = [];
 
   for (const file of files.packageJsons) {
     const pkg = reader.json<PackageJson>(file, "package.json");
     if (!pkg || typeof pkg !== "object") continue;
     commands.push(...commandsFromPackageJson(root, file, pkg));
+    for (const [name, body] of Object.entries(pkg.scripts ?? {})) {
+      if (typeof body !== "string") continue;
+      const signal = coverageFromCommand(body, evidence("manifest-script", file.path, "certain", { excerpt: `"${name}": "${body}"` }));
+      if (signal) coverageSignals.push(signal);
+    }
 
     const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
     for (const [dep, name] of TEST_FRAMEWORK_DEPS) {
@@ -1140,12 +1148,12 @@ export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
         evidence: evidence("workflow-job", pipeline.evidence[0].path, "likely", { excerpt: job.name }),
         environment: environmentOf(job),
         mechanism: pipeline.provider,
-        // A condition on the job is a gate of some sort, but whether it means
-        // "a human approves" is a judgement this does not make.
-        ...(job.condition === undefined ? {} : { requiresApproval: false }),
+        // Explicit manual jobs need a person even in push-triggered pipelines.
+        // Other conditions alone say nothing about the approval policy.
+        ...(job.condition === "manual" ? { requiresApproval: true } : {}),
         // A deploy job in a workflow that only a person can start is a deploy
         // button, not a deployment pipeline.
-        automated: hasAutomaticTrigger(pipeline.triggers),
+        automated: hasAutomaticTrigger(pipeline.triggers) && job.condition !== "manual",
       });
     }
   }
@@ -1259,11 +1267,17 @@ export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
       fileCount: count,
     }));
 
+  coverageSignals.push(...[
+    ...commands.map((c) => coverageFromCommand(c.command, c.evidence)),
+    ...ci.flatMap((p) => p.jobs.flatMap((j) => j.steps.map((s) => coverageFromCommand(s.run ?? "", p.evidence)))),
+  ].filter((c): c is SdlcCoverage => c !== undefined));
+  const coverage = coverageSignals.find((c) => c.enforced) ?? coverageSignals[0];
+
   return {
     schemaVersion: "1.0.0",
     projectDir: root,
     commands: dedupeCommands(commands),
-    tests: { frameworks: dedupeBy(frameworks, (f) => f.name), suites },
+    tests: { frameworks: dedupeBy(frameworks, (f) => f.name), suites, ...(coverage ? { coverage } : {}) },
     ci,
     cd,
     rollback: dedupeBy(rollback, (r) => `${r.mechanism}\u0000${r.tool ?? ""}\u0000${r.versioning ?? ""}`),
@@ -1274,6 +1288,24 @@ export async function buildSdlcProfile(root: string): Promise<SdlcProfile> {
     containers,
     iac,
     parseFailures: reader.failures,
+  };
+}
+
+/** Executable measurement commands prove coverage; an installed SDK does not. */
+function coverageFromCommand(command: string, source: SdlcEvidenceList): SdlcCoverage | undefined {
+  let tool: string | undefined;
+  if (/(?:^|\s)c8(?:\s|$)/.test(command)) tool = "c8";
+  else if (/(?:^|\s)nyc(?:\s|$)/.test(command)) tool = "nyc";
+  else if (/\bcoverage(?:\.py)?\s+run\b/.test(command)) tool = "coverage.py";
+  else if (/\bpytest\b/.test(command) && /--cov(?:[=\s]|$)/.test(command)) tool = "pytest-cov";
+  else if (/\bgo\s+test\b/.test(command) && /-cover(?:profile|mode)?(?:[=\s]|$)/.test(command)) tool = "go";
+  else if (/\b(vitest|jest)\b/.test(command) && /--coverage(?:[=\s]|$)/.test(command) && !/--coverage=false\b/.test(command)) tool = /\bvitest\b/.test(command) ? "vitest" : "jest";
+  if (!tool) return undefined;
+  const minimum = /--(?:lines|cov-fail-under)(?:=|\s+)(\d+(?:\.\d+)?)/.exec(command);
+  const threshold = minimum ? Number(minimum[1]) : undefined;
+  const enforced = (/--check-coverage(?:[=\s]|$)/.test(command) && !/--check-coverage=false\b/.test(command)) || /--cov-fail-under(?:[=\s]|$)/.test(command);
+  return { tool, evidence: source, enforced,
+    ...(threshold !== undefined && threshold >= 0 && threshold <= 100 ? { threshold } : {}),
   };
 }
 

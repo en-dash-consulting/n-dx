@@ -2844,7 +2844,8 @@ function parseCloudFormation(content, file) {
       usedBy: [],
       note: `${current.type} declared in ${file}`,
       origin: file,
-      literals: [...current.literals].sort()
+      literals: [...current.literals].sort(),
+      deployedNames: [...current.deployed].sort()
     });
   };
   for (const line of lines.slice(start + 1)) {
@@ -2855,7 +2856,7 @@ function parseCloudFormation(content, file) {
     if (logical && (baseIndent === null || logical[1].length === baseIndent)) {
       baseIndent = logical[1].length;
       flush();
-      current = { name: logical[2], literals: /* @__PURE__ */ new Set([logical[2]]) };
+      current = { name: logical[2], literals: /* @__PURE__ */ new Set([logical[2]]), deployed: /* @__PURE__ */ new Set() };
       continue;
     }
     if (!current) continue;
@@ -2867,6 +2868,7 @@ function parseCloudFormation(content, file) {
     const prop = CFN_NAME_PROP.exec(line);
     if (prop && !prop[1].startsWith("!") && !prop[1].includes("Fn::")) {
       current.literals.add(prop[1].trim());
+      current.deployed.add(prop[1].trim());
     }
   }
   flush();
@@ -2907,9 +2909,10 @@ function discoverFromIaC(root, options = {}) {
       if (!kind) continue;
       const block = content.slice(match.index, match.index + 800);
       TF_NAME_ATTR.lastIndex = 0;
-      const literals = /* @__PURE__ */ new Set([localName]);
+      const deployed = /* @__PURE__ */ new Set();
       let attr;
-      while ((attr = TF_NAME_ATTR.exec(block)) !== null) literals.add(attr[1]);
+      while ((attr = TF_NAME_ATTR.exec(block)) !== null) deployed.add(attr[1]);
+      const literals = /* @__PURE__ */ new Set([localName, ...deployed]);
       add({
         id: `infra:${type}.${localName}`,
         name: localName,
@@ -2917,7 +2920,8 @@ function discoverFromIaC(root, options = {}) {
         usedBy: [],
         note: `${type} declared in ${file}`,
         origin: file,
-        literals: [...literals].sort()
+        literals: [...literals].sort(),
+        deployedNames: [...deployed].sort()
       });
     }
   }
@@ -3023,7 +3027,8 @@ function fromInfrastructureData(data) {
     usedBy: byResource.get(resource.id) ?? [],
     ...resource.note === void 0 ? {} : { note: resource.note },
     origin: resource.origin,
-    ...resource.literals === void 0 ? {} : { literals: resource.literals }
+    ...resource.literals === void 0 ? {} : { literals: resource.literals },
+    ...resource.deployedNames === void 0 ? {} : { deployedNames: resource.deployedNames }
   }));
   return { seams: data.seams, infrastructure, sawIaC: data.sawIaC };
 }

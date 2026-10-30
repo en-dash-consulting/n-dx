@@ -1155,6 +1155,8 @@ export interface InfraResource {
    * zones — the IaC local name plus any `name`-ish attribute.
    */
   literals?: string[];
+  /** The `literals` a `name`-ish attribute gave: deployed names, never the local label. */
+  deployedNames?: string[];
   // The fields below come from the Terraform model, and only when
   // @n-dx/lang-terraform is installed (`analyzers/terraform-infrastructure.ts`).
   // Each is present only when the model supplied a value. Strings are as
