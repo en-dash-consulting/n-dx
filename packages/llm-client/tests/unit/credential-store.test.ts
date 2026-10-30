@@ -207,6 +207,23 @@ describe.skipIf(isWindows)("POSIX permissions", () => {
     expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
   });
 
+  // Root ignores directory permissions, so the EACCES this needs never happens.
+  it.skipIf(process.getuid?.() === 0)("reads an ndx home it cannot search as empty, warning once, never throwing", () => {
+    const dir = join(home, "locked-home");
+    setCredential("typesafe", PLACEHOLDER, { ...options, ndxHome: dir });
+    chmodSync(dir, 0o000);
+    try {
+      expect(resolveCredential("typesafe", { ...options, ndxHome: dir })).toBeUndefined();
+      expect(resolveCredential("typesafe", { ...options, ndxHome: dir })).toBeUndefined();
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("EACCES");
+    } finally {
+      chmodSync(dir, 0o700);
+    }
+    // Once readable again, the key is found without a restart.
+    expect(resolveCredential("typesafe", { ...options, ndxHome: dir })?.value).toBe(PLACEHOLDER);
+  });
+
   it("a write replaces a too-open store with an owner-only one", () => {
     setCredential("typesafe", PLACEHOLDER, options);
     chmodSync(storePath(), 0o644);

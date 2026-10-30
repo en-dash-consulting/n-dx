@@ -167,7 +167,20 @@ function statKey(stats: Stats): string {
 /** The store's contents, or undefined when it is missing, refused or unreadable. */
 function readStore(path: string, options: CredentialStoreOptions): StoreFile | undefined {
   const warn = options.warn ?? defaultWarn;
-  const stats = statSync(path, { throwIfNoEntry: false });
+  let stats: Stats | undefined;
+  try {
+    stats = statSync(path, { throwIfNoEntry: false });
+  } catch (err) {
+    // An ndx home this user cannot search (EACCES, e.g. left root-owned by a
+    // sudo run) must not crash the caller: a key lookup is optional, and Jev
+    // routing calls it on every analysis. Read as empty, warn once per cause.
+    const key = `error:${errorCode(err) ?? "unknown"}`;
+    if (readCache.get(path)?.key !== key) {
+      warn(`Ignoring the credential store ${path}: it cannot be read (${errorCode(err) ?? "unknown error"}).`);
+      readCache.set(path, { key, store: undefined });
+    }
+    return undefined;
+  }
   if (!stats) {
     readCache.delete(path);
     return undefined;
