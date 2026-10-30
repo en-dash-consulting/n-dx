@@ -25,6 +25,7 @@ items:
     startedAt: "2026-10-17T17:01:23.276Z"
     completedAt: "2026-10-17T17:01:23.276Z"
     endedAt: "2026-10-17T17:01:23.276Z"
+    shippedIn: "0.10.1"
     assignee: "Ryan Keith <ryan.k@endash.us>"
     needsPlacement: true
     lastModified: "2026-10-27T15:15:13.675Z"
