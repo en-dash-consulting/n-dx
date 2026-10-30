@@ -76,8 +76,9 @@ describe("ndx init: git preflight", { timeout: TEST_TIMEOUT }, () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-    await rm(binDir, { recursive: true, force: true });
+    // Windows may not have released the exited child's handles on the dirs yet (EBUSY).
+    await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    await rm(binDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   it("emits a persistent auto-commit warning when the target is not a git repo (non-interactive)", () => {
