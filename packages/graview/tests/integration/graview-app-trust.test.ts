@@ -44,6 +44,8 @@ beforeEach(() => {
   mkdirSync(join(repoFace, "bin"), { recursive: true });
   writeFileSync(join(repoFace, "bin", "serve.js"), "process.exit(0);\n");
   vi.stubEnv("NDX_HOME", home);
+  // `ndx work` and `ndx start` export the user's runner here; with none, serve draws the bare store.
+  vi.stubEnv("NDX_CLI_PATH", "");
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
