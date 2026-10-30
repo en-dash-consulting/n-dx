@@ -229,11 +229,47 @@ interface RunSummary {
   /** Invocation context: "cli" for CLI, "api" for HTTP/MCP. */
   invocationContext?: "cli" | "api";
   /**
+   * The run classifier's verdict, copied from the run file as hench wrote it
+   * (`RunRecord.diagnosis`). Absent on completed runs and older records.
+   * Read from the file like every other field here: web never imports hench.
+   */
+  diagnosis?: RunDiagnosisSummary;
+  /**
    * The worktree whose `.hench/runs/` this run was read from. Present only
    * for `?scope=repo` responses; the default (served-directory) listing is
    * unchanged and carries no worktree field.
    */
   worktree?: RunWorktree;
+}
+
+/** The verdict fields the dashboard shows. Mirrors hench's `RunDiagnosis`. */
+interface RunDiagnosisSummary {
+  class: string;
+  summary: string;
+  evidence: string[];
+  actions: Array<{ kind: string; label: string }>;
+  attempt: { n: number; of: number };
+}
+
+/** The run file's `diagnosis`, when it has the shape hench writes; otherwise absent. */
+function readDiagnosis(value: unknown): RunDiagnosisSummary | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const d = value as Record<string, unknown>;
+  const attempt = d.attempt as Record<string, unknown> | undefined;
+  if (typeof d.class !== "string" || typeof d.summary !== "string" || !Array.isArray(d.actions)
+    || typeof attempt?.n !== "number" || typeof attempt?.of !== "number") {
+    return undefined;
+  }
+  return {
+    class: d.class,
+    summary: d.summary,
+    evidence: Array.isArray(d.evidence) ? d.evidence.filter((e): e is string => typeof e === "string") : [],
+    actions: d.actions
+      .filter((a): a is { kind: string; label: string } =>
+        !!a && typeof (a as { kind?: unknown }).kind === "string" && typeof (a as { label?: unknown }).label === "string")
+      .map((a) => ({ kind: a.kind, label: a.label })),
+    attempt: { n: attempt.n, of: attempt.of },
+  };
 }
 
 /** Where a run file lives, for a dashboard serving one worktree of a repository. */
@@ -360,6 +396,7 @@ function toRunSummary(run: Record<string, unknown>): RunSummary {
     vendor: diagnostics?.vendor as string | undefined,
     tokenDiagnosticStatus: diagnostics?.tokenDiagnosticStatus as RunSummary["tokenDiagnosticStatus"],
     invocationContext: run.invocationContext as RunSummary["invocationContext"],
+    diagnosis: readDiagnosis(run.diagnosis),
   };
 }
 
@@ -1015,7 +1052,44 @@ export function handleHenchRoute(
     ?? routeConfig(rc)
     ?? routeTemplates(rc)
     ?? routeConcurrency(rc)
+    ?? routePlanQueue(rc)
     ?? false;
+}
+
+/** Routes: plan-queue (gated by hench.readyNext in route-feature-gates.ts) */
+function routePlanQueue(rc: RouteContext): Promise<boolean> | null {
+  if (rc.path === "plan-queue" && rc.method === "GET") return handlePlanQueue(rc.res, rc.ctx);
+  return null;
+}
+
+/** How long `ndx work --plan-queue` may take: it reads the PRD and the claims, nothing more. */
+const PLAN_QUEUE_TIMEOUT_MS = 60_000;
+
+/**
+ * GET /api/hench/plan-queue — the advisory lane plan for Live's Ready next.
+ *
+ * Spawns `ndx work --plan-queue --format=json` through the same ndx path a run
+ * uses, so the rules stay hench's and web never imports it. The command starts
+ * nothing and writes nothing; its JSON is passed through as hench printed it.
+ */
+async function handlePlanQueue(res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const { bin, args: prefixArgs } = resolveNdxBin(ctx);
+  const result = await exec(
+    bin,
+    [...prefixArgs, "work", "--plan-queue", "--format=json", ctx.projectDir],
+    { cwd: ctx.projectDir, timeout: PLAN_QUEUE_TIMEOUT_MS },
+  );
+  if (!result.launched || result.exitCode !== 0) {
+    const detail = (result.stderr.trim() || result.stdout.trim() || "no output").slice(0, 2000);
+    errorResponse(res, 500, `'${readCliName(ctx.projectDir)} work --plan-queue' did not complete: ${detail}`);
+    return true;
+  }
+  try {
+    jsonResponse(res, 200, JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))));
+  } catch {
+    errorResponse(res, 500, `'${readCliName(ctx.projectDir)} work --plan-queue' printed no plan: ${result.stdout.slice(0, 2000)}`);
+  }
+  return true;
 }
 
 /** Routes: concurrency */

@@ -135,6 +135,7 @@ const HENCH_COMMANDS = [
   "status",
   "show",
   "review",
+  "runs",
   "cache",
   "check-runs",
   "backfill-commits",

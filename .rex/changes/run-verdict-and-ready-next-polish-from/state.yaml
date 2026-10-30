@@ -1,0 +1,22 @@
+schema: "rex/v2"
+items:
+  "27941544-9c93-47cf-afdb-44e87e7a57f5":
+    status: "completed"
+    startedAt: "2026-10-29T00:59:49.505Z"
+    completedAt: "2026-10-29T01:07:25.915Z"
+    endedAt: "2026-10-29T01:07:25.915Z"
+    activeIntervals: [{"end":"2026-10-29T01:07:25.915Z","start":"2026-10-29T00:59:49.505Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "digestFiles collapses suffix paths into the longer one; banner moved to top of task panel with readable class labels; Ready next titles link to tasks."
+    lastModified: "2026-10-29T01:07:25.915Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dc7ef98f-3bcc-4dbb-a006-4913e88dd3c3":
+    status: "completed"
+    startedAt: "2026-10-29T01:07:25.915Z"
+    completedAt: "2026-10-29T01:07:25.915Z"
+    endedAt: "2026-10-29T01:07:25.915Z"
+    activeIntervals: [{"end":"2026-10-29T01:07:25.915Z","start":"2026-10-29T01:07:25.915Z"}]
+    appliedAt: "2026-10-29T01:07:25.915Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-10-29T01:07:25.915Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

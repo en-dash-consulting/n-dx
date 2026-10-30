@@ -1526,6 +1526,9 @@ async function runOne(
     ...(tags ? { tags } : {}),
     ...(assignee ? { assignee } : {}),
     ...(wouldResetIds ? { wouldResetIds } : {}),
+    // A queue-plan lane step: refuse the explicit task while a blocker is open,
+    // so `&&` stops even when the step before exited 0 without completing.
+    ...(taskId && settingsCtx?.flags["require-unblocked"] === "true" ? { requireUnblocked: true } : {}),
     claims,
   });
 

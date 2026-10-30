@@ -53,6 +53,8 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
       { flag: "--reset-deferred", description: "Reset all deferred/failing tasks to pending before running" },
       { flag: "--dry-run", description: "Print the task brief without calling Claude" },
       { flag: "--resolve", description: "With --task: print the settings the run would use, where each came from, and why it would refuse, as JSON. Runs nothing (see below)" },
+      { flag: "--plan-queue", description: "Print lanes of ready tasks that can run side by side, each with its command, and why every other ready task is left out. Advisory: runs nothing (see below)" },
+      { flag: "--require-unblocked", description: "With --task: refuse to start the task while any of its blockers is not completed (an explicit --task otherwise ignores blockers). --plan-queue lane commands pass it on each blocked step" },
       { flag: "--review", description: "Run an adversarial review pass after each task validates: fix must-fix findings in-session, capture the rest to the PRD" },
       { flag: "--review-mode=<off|self|pair>", description: "Who reviews: self (this vendor), pair (another vendor reviews, the executor fixes) or off. --review is self, --no-review is off; overrides a task's saved reviewMode" },
       { flag: "--reviewer=<claude|codex>", description: "The pair reviewer's vendor, over the task's saved reviewVendor and hench.review.vendor. Must differ from the executor's vendor; refused with --review or --no-review" },
@@ -165,6 +167,7 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "  options    the per-run options, with flag, type, values and scope\n" +
           "  refusals   [{code, message}] for each reason the run would not start:\n" +
           "             prd-unreadable (task is null), task-not-found, not-actionable, claimed-elsewhere,\n" +
+          "             blocked (--require-unblocked, a blocker not completed),\n" +
           "             tree-not-conformant, vendor-unset, vendor-cli-missing,\n" +
           "             provider-unsupported, model-vendor-mismatch, dirty-tree\n" +
           "  warnings   [{code, message}] for a condition that does not stop the\n" +
@@ -179,6 +182,26 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
           "\n" +
           "Exits 0 when it reports refusals. Takes no claim, writes nothing (no\n" +
           "--reset-deferred, no commit), and starts no vendor CLI or LLM call.",
+      },
+      {
+        title: "Plan the queue (--plan-queue)",
+        content:
+          "hench run --plan-queue [--format=json] [dir] groups the ready tasks of a\n" +
+          "v2 PRD into lanes that can run side by side, by fixed rules and no model\n" +
+          "call. A lane is up to 3 tasks of one change, each of tier light or\n" +
+          "standard, in dependency order; lanes offered together come from changes\n" +
+          "whose touches do not overlap, and a change with no touches runs alone.\n" +
+          "Tasks tagged review-critical, migration or cross-package are left out.\n" +
+          "At most guard.maxConcurrentProcesses minus the runs active now are\n" +
+          "offered, counting live runs in every worktree of the repository (this\n" +
+          "one alone when git cannot list them; the summary says which).\n" +
+          "JSON: lanes [{command, changeId, tasks [{id, title, reason}]}],\n" +
+          "excluded [{id, title, reason}], activeRuns, activeRunsByWorktree\n" +
+          "[{path, runs}], runLimit, summary.\n" +
+          "Starts no run, takes no claim and writes no file. A lane's command\n" +
+          "chains its steps with &&; the step for a blocked task passes\n" +
+          "--require-unblocked, so it refuses to start while a blocker is open\n" +
+          "even when the step before exited 0 without completing.",
       },
     ],
     examples: [
@@ -347,6 +370,30 @@ const COMMAND_DEFS: Record<string, HelpDefinition> = {
         command: "hench review pending abc123 --format=json",
         description: "Machine-readable output",
       },
+    ],
+    related: ["show", "status"],
+  },
+  runs: {
+    tool: "hench",
+    command: "runs",
+    summary: "classify why a run did not complete and rank the next action",
+    usage: "hench runs diagnose <run-id> [options] [dir]",
+    description:
+      "Classifies a run that did not complete from its record, its events\n" +
+      "and its review report, with fixed rules and no model call. Classes:\n" +
+      "test-gate-new, test-gate-preexisting, completion-held, review-blocked,\n" +
+      "claim-lost, budget-timeout, vendor-transient, no-changes, unclassified.\n" +
+      "\n" +
+      "Prints the evidence the class rests on and the ranked next actions.\n" +
+      "On a task's second failed attempt it stops recommending a re-run and\n" +
+      "leads with a follow-up fix or a split. Read-only; the run-end path\n" +
+      "stores the same verdict on the record as `diagnosis`.",
+    options: [
+      { flag: "--format=json", description: "Output as JSON: runId, taskId, class, summary, evidence, actions, attempt" },
+    ],
+    examples: [
+      { command: "hench runs diagnose abc123", description: "Explain why a run failed" },
+      { command: "hench runs diagnose abc123 --format=json", description: "Machine-readable output" },
     ],
     related: ["show", "status"],
   },
@@ -584,6 +631,7 @@ const RELATED_COMMANDS: Record<string, string[]> = {
   usage: ["record"],
   status: ["show", "run", "check-runs", "validate-tokens"],
   show: ["status"],
+  runs: ["show", "status"],
   config: ["template"],
   template: ["config"],
   cache: ["run", "config"],

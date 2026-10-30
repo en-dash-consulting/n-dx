@@ -29,7 +29,7 @@ import { loadLLMConfig, resolveLLMVendor, resolveVendorCliPath } from "../../sto
 import { resolveHenchPaths } from "../../store/paths.js";
 import { excludeHenchRuntimeArtifacts } from "../../store/artifacts.js";
 import { listDirtyPaths } from "../../agent/lifecycle/uncommitted-work-gate.js";
-import { explicitTaskRefusal } from "../../agent/planning/brief.js";
+import { explicitTaskRefusal, openBlockersRefusal } from "../../agent/planning/brief.js";
 import { changeTasksRefusal, findV2Entry, inboxRefusal, loadV2Tree, namedChangeEntry, notRunnableRefusal } from "../../agent/planning/work-selection.js";
 import { captureRunGitOrigin } from "../../process/git-origin.js";
 import { TaskClaims, TaskClaimedElsewhereError } from "../../process/task-claims.js";
@@ -57,6 +57,7 @@ export type RunRefusalCode =
   | "prd-unreadable"
   | "not-actionable"
   | "claimed-elsewhere"
+  | "blocked"
   | "tree-not-conformant"
   | "vendor-unset"
   | "vendor-cli-missing"
@@ -176,6 +177,7 @@ const PASSTHROUGH_FLAGS: ReadonlyArray<{ flag: string; type: "boolean" | "string
   { flag: "mine", type: "boolean" },
   { flag: "priority", type: "string" },
   { flag: "context-file", type: "string" },
+  { flag: "require-unblocked", type: "boolean" },
 ];
 
 /**
@@ -297,6 +299,10 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     if (named && !(await wouldBeReset(named.item, named.parents, flags, dir))) {
       const changeNotActionable = explicitTaskRefusal(named.item);
       if (changeNotActionable) refuse("not-actionable", changeNotActionable);
+    }
+    if (flags["require-unblocked"] === "true") {
+      const blocked = openBlockersRefusal(entry.item, prdItems, v2Tree);
+      if (blocked) refuse("blocked", blocked);
     }
     if (claim) {
       const heldId = enclosing?.changeId ?? entry.item.id;

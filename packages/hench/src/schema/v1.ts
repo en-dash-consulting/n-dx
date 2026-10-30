@@ -1998,6 +1998,64 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   gateOnlyRetry?: RunGateOnlyRetry;
+  /**
+   * Why a non-completed run failed and what to do next, as classified by the
+   * rule-based run classifier (`agent/analysis/run-verdict.ts`) at run end.
+   * Separate from {@link diagnostics}, which is vendor and token observability.
+   * Absent on completed runs and on records written before the field existed.
+   *
+   * v1 additive field — old records without this field load normally.
+   */
+  diagnosis?: RunDiagnosis;
+}
+
+/** Failure classes the run classifier can assign. See {@link RunDiagnosis}. */
+export const RUN_VERDICT_CLASSES = [
+  "test-gate-new",
+  "test-gate-preexisting",
+  "completion-held",
+  "review-blocked",
+  "claim-lost",
+  "budget-timeout",
+  "vendor-transient",
+  "no-changes",
+  "unclassified",
+] as const;
+export type RunVerdictClass = (typeof RUN_VERDICT_CLASSES)[number];
+
+/** Kinds of next action the classifier ranks. */
+export type RunVerdictActionKind =
+  | "follow-up-run"
+  | "re-run"
+  | "verify-on-main"
+  | "close-verified"
+  | "fresh"
+  | "hand-fix"
+  | "release-claim"
+  | "clean-tree"
+  | "split-task"
+  | "raise-tier"
+  | "retry-later"
+  | "tighten-done-when";
+
+/** One ranked next action. */
+export interface RunVerdictAction {
+  kind: RunVerdictActionKind;
+  /** One plain-language line. */
+  label: string;
+}
+
+/** See {@link RunRecord.diagnosis}. */
+export interface RunDiagnosis {
+  class: RunVerdictClass;
+  /** One line; also written as the task's failureReason when it has none. */
+  summary: string;
+  /** Recorded facts the class rests on. */
+  evidence: string[];
+  /** Ranked, best first. */
+  actions: RunVerdictAction[];
+  /** Finished, non-completed runs of the task so far, capped at `of`. */
+  attempt: { n: number; of: 2 };
 }
 
 /** See {@link RunRecord.gateOnlyRetry}. */

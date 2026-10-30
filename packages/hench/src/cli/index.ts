@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   // `validate-tokens` and `cache` both dispatch below; omitting either here
   // makes the command unreachable, since an unlisted name is rejected as
   // unknown before the switch is ever reached.
-  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review", "cache", "trust", "validate-tokens", "check-runs", "backfill-commits"];
+  const HENCH_COMMANDS = ["init", "run", "record", "usage", "status", "show", "config", "template", "review", "cache", "trust", "validate-tokens", "check-runs", "backfill-commits", "runs"];
 
   // Orchestration commands that belong to ndx, not hench directly
   const NDX_ONLY_COMMANDS: Record<string, string> = {
@@ -151,6 +151,7 @@ async function main(): Promise<void> {
       const dirFor: Record<string, () => string> = {
         usage: usageDir,
         review: reviewDir,
+        runs: reviewDir,
         cache: cacheDir,
       };
       requireHenchDir((dirFor[command] ?? resolveDir)());
@@ -167,6 +168,12 @@ async function main(): Promise<void> {
         if (flags.resolve !== undefined && flags.resolve !== "false") {
           const { cmdResolve } = await import("./commands/run-resolve.js");
           await cmdResolve(resolveDir(), flags);
+          break;
+        }
+        // --plan-queue prints the advisory lane plan and runs nothing.
+        if (flags["plan-queue"] !== undefined && flags["plan-queue"] !== "false") {
+          const { cmdPlanQueue } = await import("./commands/plan-queue.js");
+          await cmdPlanQueue(resolveDir(), flags);
           break;
         }
         const { cmdRun } = await import("./commands/run.js");
@@ -210,6 +217,11 @@ async function main(): Promise<void> {
       case "review": {
         const { cmdReview } = await import("./commands/review.js");
         await cmdReview(reviewDir(), positional, flags);
+        break;
+      }
+      case "runs": {
+        const { cmdRuns } = await import("./commands/runs.js");
+        await cmdRuns(reviewDir(), positional, flags);
         break;
       }
       case "config": {

@@ -1,0 +1,71 @@
+schema: "rex/v2"
+items:
+  "248236d8-2f12-46ed-8b7f-5087eba15d14":
+    status: "completed"
+    startedAt: "2026-10-29T00:42:16.064Z"
+    completedAt: "2026-10-29T00:50:09.039Z"
+    endedAt: "2026-10-29T00:50:09.039Z"
+    activeIntervals: [{"end":"2026-10-29T00:50:09.039Z","start":"2026-10-29T00:42:16.064Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "run-resolve.ts refuses with new RunRefusalCode \"blocked\" via openBlockersRefusal under --require-unblocked; flag kept in printed command; help + changeset updated; integration tests."
+    lastModified: "2026-10-29T00:50:09.039Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5aa5da8f-9587-4ff6-a27a-379525a7fc04":
+    status: "completed"
+    startedAt: "2026-10-29T00:04:58.407Z"
+    completedAt: "2026-10-29T00:21:10.877Z"
+    endedAt: "2026-10-29T00:21:10.877Z"
+    activeIntervals: [{"end":"2026-10-29T00:21:10.877Z","start":"2026-10-29T00:04:58.407Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rule-based queue planner (hench queue/plan-queue.ts) behind ndx work --plan-queue [--format=json]; Live Ready next behind hench.readyNext via GET /api/hench/plan-queue (gated in ROUTE_FEATURE_GATES)."
+    lastModified: "2026-10-29T00:21:10.877Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b571fb36-583c-450c-9e1a-1b5474a253de":
+    status: "completed"
+    startedAt: "2026-10-28T23:55:47.248Z"
+    completedAt: "2026-10-28T23:59:55.083Z"
+    endedAt: "2026-10-28T23:59:55.083Z"
+    activeIntervals: [{"end":"2026-10-28T23:59:55.083Z","start":"2026-10-28T23:55:47.248Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "run-verdict.ts: completion-held only on completionHold not-applied or gateOnlyRetry; uncommitted-work refusal moved to its own completion-held rule right after claimLost; DIGEST_FILE keeps a leading slash so absolute paths under worktreeRoot normalize repo-relative. Tests, docs and changeset updated."
+    lastModified: "2026-10-28T23:59:55.083Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bd1d2e1d-ee6d-4e95-9e53-4cde3d811515":
+    status: "completed"
+    startedAt: "2026-10-29T00:23:07.555Z"
+    completedAt: "2026-10-29T00:31:30.933Z"
+    endedAt: "2026-10-29T00:31:30.933Z"
+    activeIntervals: [{"end":"2026-10-29T00:31:30.933Z","start":"2026-10-29T00:23:07.555Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option 1: new --require-unblocked flag refuses an explicit --task with open blockers; plan-queue lane commands pass it on each blocked step."
+    lastModified: "2026-10-29T00:31:30.933Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bebe402c-225d-4069-bf4a-f44800a1948f":
+    status: "completed"
+    startedAt: "2026-10-29T00:31:39.525Z"
+    completedAt: "2026-10-29T00:41:29.247Z"
+    endedAt: "2026-10-29T00:41:29.247Z"
+    activeIntervals: [{"end":"2026-10-29T00:41:29.247Z","start":"2026-10-29T00:31:39.525Z"}]
+    lastModified: "2026-10-29T00:41:29.247Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "c816a1a3-5786-4e25-aad2-5a432be1e7de":
+    status: "completed"
+    startedAt: "2026-10-28T23:28:51.313Z"
+    completedAt: "2026-10-28T23:52:42.082Z"
+    endedAt: "2026-10-28T23:52:42.082Z"
+    activeIntervals: [{"end":"2026-10-28T23:52:42.082Z","start":"2026-10-28T23:28:51.313Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Pure rule-based run classifier (agent/analysis/run-verdict.ts), hench runs diagnose CLI, optional RunRecord.diagnosis stored at run end with failureReason fill, hench.runVerdict toggle and task-page verdict banner; tests per class, attempts, purity, CLI, server and viewer."
+    lastModified: "2026-10-28T23:52:42.082Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "eef3d129-ffc2-4598-bfce-a30c88faf4ef":
+    status: "completed"
+    startedAt: "2026-10-29T00:50:09.039Z"
+    completedAt: "2026-10-29T00:50:09.039Z"
+    endedAt: "2026-10-29T00:50:09.039Z"
+    activeIntervals: [{"end":"2026-10-29T00:50:09.039Z","start":"2026-10-29T00:50:09.039Z"}]
+    appliedAt: "2026-10-29T00:50:09.039Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    issues: ["https://www.notion.so/3f7a80b7192481cab29eea95b9d8b8c8","https://www.notion.so/3f7a80b719248118bf40ee8742778786"]
+    lastModified: "2026-10-29T00:50:09.039Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

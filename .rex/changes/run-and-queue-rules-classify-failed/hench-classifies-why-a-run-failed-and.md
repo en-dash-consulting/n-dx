@@ -1,0 +1,20 @@
+---
+id: "c816a1a3-5786-4e25-aad2-5a432be1e7de"
+type: "task"
+title: "Hench classifies why a run failed and ranks the next action"
+slug: "hench-classifies-why-a-run-failed-and"
+description: "Rule-based, LLM-free classifier in hench: a pure function over a run record (.hench/runs/<id>.json), its events JSONL (eventsPath) and its review report (.hench/reviews/). New CLI: hench runs diagnose <id> [--format=json], a new runs subcommand group. Classes and signals: test-gate-new (testGate.passed is false and the failure digest names a file the run changed); test-gate-preexisting (the digest names only files the run did not change; evidence says not verified on main); completion-held (completionHold or gateOnlyRetry set); review-blocked (review unrepairedMustFixCount > 0); claim-lost (claimLost, readOnlyRefusal or a dirty-tree refusal); budget-timeout (status budget_exceeded or timeout, or deferred as oversized); vendor-transient (status error_transient, or an auth or rate-limit failure category); no-changes (no commits, or only .rex/ paths changed). Anything else is unclassified, never guessed. Ranked actions: test-gate-new = follow-up run with the digest in the brief, then re-run; test-gate-preexisting = verify on main, then close as verified; completion-held = --fresh, or hand-fix then verify; review-blocked = follow-up run with the findings; claim-lost = release the claim or clean the tree, then re-run; budget-timeout = split the task, or raise the tier; vendor-transient = retry later; no-changes = tighten the done-when. The verdict is stored in a new optional RunRecord field, diagnosis (separate from the existing diagnostics field). The web server reads it from the run file the way routes-hench.ts reads runs and never imports @n-dx/hench. Soft freeze: no rex or sourcevision MCP tool shape changes. CAOS story: https://www.notion.so/3f7a80b7192481cab29eea95b9d8b8c8."
+acceptanceCriteria:
+  - "hench runs diagnose <id> --format=json prints runId, taskId, class, summary, evidence[], actions[] and attempt {n, of: 2}; an unknown run id exits non-zero with a message"
+  - "class is one of test-gate-new, test-gate-preexisting, completion-held, review-blocked, claim-lost, budget-timeout, vendor-transient, no-changes, unclassified"
+  - "A unit test per class classifies a fixture run record (with events and review report where the class needs them) to that class, and a record matching no rule to unclassified"
+  - "The classifier is a pure function with no file, clock or process access; only the CLI and the run-end path read and write files"
+  - "A run that ends in any status other than completed stores its verdict as the optional RunRecord field diagnosis; RunRecord gains no required field and existing run records still validate"
+  - "When the run task has no failureReason, hench writes the one-line verdict summary as its failureReason; an existing failureReason is never overwritten (tested both ways)"
+  - "Attempt n counts finished, non-completed runs of the same task; at n >= 2 no action is a re-run or --fresh, the first action is a follow-up fix or a split, and the output says attempt 2 of 2 (tested at n = 1 and n = 2)"
+  - "With hench.runVerdict on, the task detail panel shows a verdict banner (class, summary, first action, attempt n of 2) when the latest run of the task has a diagnosis, and nothing when the toggle is off or that run completed; viewer tests cover all three without Sidecar code"
+  - "hench.runVerdict is registered in routes-features.ts (package hench, default off, stability experimental); the web server reads diagnosis from the run file and does not import @n-dx/hench"
+  - "The patch changeset carries release-note lines for hench runs diagnose and the verdict banner"
+priority: "high"
+source: "caos"
+---
