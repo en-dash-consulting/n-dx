@@ -31,7 +31,14 @@ export default defineConfig({
     silent: "passed-only",
     // Shared: pin color detection so an ambient FORCE_COLOR in the developer's
     // shell cannot change test verdicts. See tests/setup-color-env.js.
-    setupFiles: ["../../tests/setup-color-env.js", "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js"],
+    setupFiles: [
+      "../../tests/setup-color-env.js",
+      "../../tests/setup-session-env.js", "../../tests/setup-exit-trace.js",
+      // Credential isolation: a temp ndx home and no ambient TYPESAFE_API_KEY.
+      // Required by tests/e2e/credential-isolation-setup-policy.test.js.
+      "../../tests/setup-ndx-home.js",
+      "../../tests/setup-judgment-env.js",
+    ],
     include: ["tests/**/*.test.ts"],
     // Raised from 5000ms: integration tests that spawn mocked CLIs, do dynamic
     // imports of @anthropic-ai/sdk, or call vi.resetModules() take 2-4 seconds

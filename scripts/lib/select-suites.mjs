@@ -49,6 +49,9 @@ export const ROOT_POLICY_TEST_FILES = [
   // Scans every production spawn for windowsHide; a new spawn in any package
   // source is exactly what breaks it. 0.1 s.
   "tests/e2e/windows-hide-policy.test.js",
+  // Reads every package's vitest config and package.json; a package that
+  // gains an llm-client dependency breaks it from a package change alone.
+  "tests/e2e/credential-isolation-setup-policy.test.js",
 ];
 
 /**

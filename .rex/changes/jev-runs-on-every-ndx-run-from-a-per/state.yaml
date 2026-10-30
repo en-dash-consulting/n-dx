@@ -7,7 +7,14 @@ items:
     lastModified: "2026-10-30T14:43:52.838Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "250e6c57-54a5-4d31-815c-720ea268e972":
-    lastModified: "2026-10-30T14:43:46.900Z"
+    status: "completed"
+    startedAt: "2026-10-30T14:52:34.980Z"
+    completedAt: "2026-10-30T15:27:29.043Z"
+    endedAt: "2026-10-30T15:27:29.043Z"
+    activeIntervals: [{"end":"2026-10-30T15:27:29.043Z","start":"2026-10-30T14:52:34.980Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "setup-ndx-home + setup-judgment-env wired into root, web, llm-client, rex, hench, graview vitest configs; root-policy test tests/e2e/credential-isolation-setup-policy.test.js fails any llm-client-dependent package config lacking either."
+    lastModified: "2026-10-30T15:27:29.043Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2f5ce643-1c49-4c70-ab2c-545f956873df":
     lastModified: "2026-10-30T14:43:49.849Z"
