@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { SidecarCards, runPlanCommands } from "../../../src/viewer/components/sidecar-cards.js";
+import { SidecarCards, runPlanCommands, runPlanRestartPrompt } from "../../../src/viewer/components/sidecar-cards.js";
 import type { SidecarCard, SidecarCardDecision } from "../../../src/viewer/hooks/use-sidecar.js";
 import type { QueuePlan } from "../../../src/shared/index.js";
 
@@ -182,6 +182,41 @@ describe("the run-plan card", () => {
   ] as const)("returns to unstarted when the work card is %s", async (_name, over) => {
     const el = await drawAll([decided(), workCard({ ...over })]);
     expect(badges(el)).toEqual({ started: null, raised: null });
+  });
+
+  it.each([
+    ["denied", { status: "denied" }],
+    ["withdrawn", { status: "withdrawn", reason: "the turn stopped" }],
+  ] as const)("offers Start lane again on the chosen lane when its work card is %s, and sends a turn instead of deciding", async (_name, over) => {
+    const send = vi.fn(async (_prompt: string) => true);
+    const decide = vi.fn(async () => {});
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    await act(async () => {
+      render(h(SidecarCards, { cards: [decided(), workCard({ ...over })], manifest: null, decide, send }), host!);
+    });
+    const starts = host.querySelectorAll<HTMLButtonElement>(".sidecar-run-plan-start");
+    expect(starts).toHaveLength(1);
+    expect(host.querySelectorAll(".sidecar-run-plan-lane")[0].contains(starts[0])).toBe(true);
+    await act(async () => { starts[0].click(); });
+    expect(send).toHaveBeenCalledExactlyOnceWith(runPlanRestartPrompt(decided(), 0));
+    expect(send.mock.calls[0][0]).toContain("task t1");
+    expect(send.mock.calls[0][0]).toContain("Do not propose a new run plan");
+    expect(decide).not.toHaveBeenCalled();
+  });
+
+  it("offers no Start lane while the work card waits, after it started, or before any work card was raised", async () => {
+    for (const cards of [[decided(), workCard()], [decided(), workCard({ status: "approved", carriedOut: { ok: true } })], [decided()]]) {
+      host = document.createElement("div");
+      document.body.appendChild(host);
+      await act(async () => {
+        render(h(SidecarCards, { cards, manifest: null, decide: vi.fn(async () => {}), send: vi.fn(async () => true) }), host!);
+      });
+      expect(host.querySelector(".sidecar-run-plan-start")).toBeNull();
+      await act(async () => { render(null, host!); });
+      host.remove();
+      host = null;
+    }
   });
 
   it("ignores a work card for another task or one raised before the plan was decided", async () => {

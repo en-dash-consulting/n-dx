@@ -379,7 +379,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     h("ol", { class: "sidecar-transcript", ref: transcriptRef, "aria-live": "polite", "aria-label": "Transcript" },
       rows.length > 0 ? rows : h("li", { class: "sidecar-empty" }, "Ask about this project. Each turn runs your vendor CLI."),
     ),
-    h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide }),
+    h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide, send: sidecar.send }),
     setupNeed
       ? h("div", { class: "sidecar-setup", role: "alert", "data-reason": setupNeed.reason },
           h("p", { class: "sidecar-setup-title" },

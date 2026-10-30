@@ -239,6 +239,16 @@ export function runPlanLaneState(plan: SidecarCard, lane: number, cards: readonl
   return work.status === "approved" && !work.carriedOut ? "raised" : "open";
 }
 
+/**
+ * The turn Start lane sends when the lane's work card ended without a start:
+ * it names the lane's first task and forbids a second plan card, because the
+ * settled plan card cannot be decided again.
+ */
+export function runPlanRestartPrompt(plan: SidecarCard, lane: number): string {
+  const first = plan.runPlan?.lanes[lane]?.tasks[0];
+  return `Start lane ${lane + 1} of the approved run plan again: raise start_work for task ${first?.id ?? ""}${first ? ` (${first.title})` : ""} only. Do not propose a new run plan.`;
+}
+
 interface RunPlanBodyProps {
   card: SidecarCard;
   /** Every card of the drawer: a lane's state is its work card's. */
@@ -247,6 +257,14 @@ interface RunPlanBodyProps {
   decidable: boolean;
   deciding: boolean;
   onStartLane: (lane: number) => void;
+  /** Asks the agent for a new work card for a chosen lane whose card ended without a start. */
+  onRestartLane?: (lane: number) => void;
+}
+
+/** The chosen lane's work card was denied, withdrawn or refused: the settled plan card cannot be decided again. */
+function startAgain(card: SidecarCard, lane: number, cards: readonly SidecarCard[], restart: ((lane: number) => void) | undefined): boolean {
+  return restart !== undefined && card.status === "approved" && card.lane === lane && runPlanLaneState(card, lane, cards) === "open"
+    && cards.some((c) => c.kind === "work" && c.sessionId === card.sessionId && c.raisedAt >= (card.decidedAt ?? card.raisedAt));
 }
 
 function laneBadge(state: "open" | "raised" | "started") {
@@ -262,7 +280,7 @@ function laneBadge(state: "open" | "raised" | "started") {
  * told to raise a work card for the lane's first task alone, so the rest of
  * the lane is listed here and started one work card at a time.
  */
-function RunPlanBody({ card, cards, decidable, deciding, onStartLane }: RunPlanBodyProps) {
+function RunPlanBody({ card, cards, decidable, deciding, onStartLane, onRestartLane }: RunPlanBodyProps) {
   const plan = card.runPlan!;
   const note = str(card.input.note);
   return h("div", { class: "sidecar-run-plan" },
@@ -281,7 +299,14 @@ function RunPlanBody({ card, cards, decidable, deciding, onStartLane }: RunPlanB
                   disabled: deciding,
                   onClick: () => onStartLane(index),
                 }, "Start lane")
-              : laneBadge(runPlanLaneState(card, index, cards)),
+              : startAgain(card, index, cards, onRestartLane)
+                ? h("button", {
+                    type: "button",
+                    class: "sidecar-run-plan-start sidecar-run-plan-restart",
+                    disabled: deciding,
+                    onClick: () => onRestartLane!(index),
+                  }, "Start lane")
+                : laneBadge(runPlanLaneState(card, index, cards)),
           ),
           h("ol", { class: "sidecar-run-plan-tasks" },
             lane.tasks.map((task, i) => h("li", { class: "sidecar-run-plan-task", key: task.id },
@@ -340,9 +365,10 @@ interface CardProps {
   /** The first waiting change-set card's edits, by item index. */
   drafts: Readonly<Record<number, ChangeSetDraft>>;
   onDraft: (index: number, draft: ChangeSetDraft) => void;
+  onRestartLane?: (lane: number) => void;
 }
 
-function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft }: CardProps) {
+function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, onRestartLane }: CardProps) {
   const state = sidecarCardState(card);
   const input = h("pre", { class: "sidecar-card-input" }, JSON.stringify(card.input, null, 2));
   const editable = first && state === "pending";
@@ -353,7 +379,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
         h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
       ]
     : card.runPlan
-      ? h(RunPlanBody, { card, cards, decidable: editable, deciding, onStartLane: (lane) => onDecide({ approve: true, lane }) })
+      ? h(RunPlanBody, { card, cards, decidable: editable, deciding, onStartLane: (lane) => onDecide({ approve: true, lane }), onRestartLane })
       : state === "pending"
       ? input
       : h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input);
@@ -405,9 +431,11 @@ export interface SidecarCardsProps {
   cards: SidecarCard[];
   manifest: SidecarState["commandManifest"];
   decide: SidecarState["decide"];
+  /** Posts a turn to the session; lets a lane whose work card ended start again. */
+  send?: SidecarState["send"];
 }
 
-export function SidecarCards({ cards, manifest, decide }: SidecarCardsProps) {
+export function SidecarCards({ cards, manifest, decide, send }: SidecarCardsProps) {
   const cliName = useCliName();
   const first = cards.find((c) => c.status === "pending") ?? null;
   const [note, setNote] = useState("");
@@ -466,6 +494,7 @@ export function SidecarCards({ cards, manifest, decide }: SidecarCardsProps) {
       onDecide: (decision: SidecarCardDecision) => { void answer(decision); },
       drafts,
       onDraft: (index: number, draft: ChangeSetDraft) => setDrafts((prev) => ({ ...prev, [index]: draft })),
+      onRestartLane: send ? (lane: number) => { void send(runPlanRestartPrompt(card, lane)); } : undefined,
     })),
   );
 }
