@@ -1,0 +1,43 @@
+schema: "rex/v2"
+items:
+  "10730d82-59f1-4ea2-9594-667318da70d2":
+    lastModified: "2026-10-30T14:44:07.951Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "12d277fe-4308-47dd-9a3e-9634d4b829f6":
+    lastModified: "2026-10-30T14:43:52.838Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "250e6c57-54a5-4d31-815c-720ea268e972":
+    lastModified: "2026-10-30T14:43:46.900Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2f5ce643-1c49-4c70-ab2c-545f956873df":
+    lastModified: "2026-10-30T14:43:49.849Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "534debf3-0b82-43af-adf5-be497be7b85f":
+    lastModified: "2026-10-30T14:43:58.718Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "68b2709d-174e-4ec2-bf3f-163fdda6115c":
+    status: "deferred"
+    lastModified: "2026-10-30T14:44:19.737Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6d70bab8-a6c6-4839-9520-08d407116c79":
+    lastModified: "2026-10-30T14:44:16.756Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "742863c5-989f-4138-8909-9b59bb589fc4":
+    lastModified: "2026-10-30T14:44:04.922Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
+    issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
+    lastModified: "2026-10-30T14:44:38.296Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94e25654-bb3c-4203-a1ab-49267e0ad734":
+    lastModified: "2026-10-30T14:44:01.649Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9da6d298-51b4-4e0d-88df-8efee59a8d06":
+    lastModified: "2026-10-30T14:43:55.805Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e5def056-c6ed-4484-978e-6f4e174bd8bf":
+    lastModified: "2026-10-30T14:44:10.904Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f912174e-96e5-41a3-acd9-5c73bae27c5b":
+    lastModified: "2026-10-30T14:44:13.828Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
