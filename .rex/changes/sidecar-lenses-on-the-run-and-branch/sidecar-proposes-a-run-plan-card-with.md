@@ -10,7 +10,7 @@ acceptanceCriteria:
   - "While hench.readyNext is off, GET /api/sidecar/lenses reports guide unavailable with needs naming hench.readyNext, and no packet is built and no planner is spawned (tested)"
   - "A new broker tool propose_run_plan raises a run-plan card and is never allow-listable; the card lists each lane with its exact ndx work command"
   - "The card's Copy commands copies every lane command without a broker call and without starting anything (tested)"
-  - "The card's Start lane raises one start_work card per lane; nothing starts without an approved work card, and the plan never auto-runs"
+  - "The card's Start lane raises a start_work card for the lane's first task only, with the lane's flags; the card lists the lane's remaining tasks with their exact commands, and the Sidecar raises the next task's card on a later turn once the previous run has ended; nothing starts without an approved work card, and the plan never auto-runs (tested)"
   - "The work card shows active runs against the limit of three, and approving a start that would make a fourth run is refused with that reason (tested)"
 source: "ndx-capture"
 ---
