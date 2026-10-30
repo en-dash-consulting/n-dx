@@ -52,7 +52,6 @@ import {
 } from "node:fs";
 import { userInfo } from "node:os";
 import { dirname, join } from "node:path";
-import { TYPESAFE_API_KEY_ENV } from "./config.js";
 import { execFileSyncCli } from "./exec.js";
 import { resolveNdxHome, type ResolveNdxHomeOptions } from "./layout.js";
 
@@ -61,11 +60,21 @@ export const CREDENTIAL_STORE_VERSION = 1;
 export const CREDENTIAL_NAME_PATTERN = /^[a-z0-9][a-z0-9._:-]*$/;
 
 /**
+ * Environment variable holding the TypeSafe API key; it overrides the store's
+ * {@link TYPESAFE_CREDENTIAL} entry. Defined here rather than in config.ts so
+ * config.ts can import the resolver without a cycle; config.ts re-exports it.
+ */
+export const TYPESAFE_API_KEY_ENV = "TYPESAFE_API_KEY";
+
+/** The store entry holding the TypeSafe (Jev) key. */
+export const TYPESAFE_CREDENTIAL = "typesafe";
+
+/**
  * The environment variable that overrides each named credential. A name with
  * no entry here (a connection) is read from the store alone.
  */
 export const CREDENTIAL_ENV_VARS: Readonly<Record<string, string>> = Object.freeze({
-  typesafe: TYPESAFE_API_KEY_ENV,
+  [TYPESAFE_CREDENTIAL]: TYPESAFE_API_KEY_ENV,
 });
 
 export type CredentialSource = "env" | "file";

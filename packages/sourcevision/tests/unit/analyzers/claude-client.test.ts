@@ -6,8 +6,11 @@
  * configured model propagates uniformly to all sourcevision call sites.
  */
 
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NEWEST_MODELS, TIER_MODELS } from "@n-dx/llm-client";
+import { NEWEST_MODELS, TIER_MODELS, setCredential } from "@n-dx/llm-client";
 
 // ── Mock @n-dx/llm-client so we can intercept client.complete calls ──────────
 
@@ -170,11 +173,30 @@ describe("getJudgmentRoute", () => {
       expect(getJudgmentRoute("zone.judge-noticed")).toBeUndefined();
       expect(getJudgmentRoute("zone.judge-noticed")).toBeUndefined();
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0][0]).toContain("TYPESAFE_API_KEY is not set");
+      expect(warn.mock.calls[0][0]).toContain("no TypeSafe key is set");
+      expect(warn.mock.calls[0][0]).toContain("ndx config credentials.typesafe");
       expect(warn.mock.calls[0][0]).toContain("claude vendor");
     } finally {
       warn.mockRestore();
       vi.unstubAllEnvs();
+    }
+  });
+
+  it("routes on a key held only in the per-user credential store", async () => {
+    const home = mkdtempSync(join(tmpdir(), "sv-judgment-store-"));
+    vi.stubEnv("TYPESAFE_API_KEY", "");
+    vi.stubEnv("NDX_HOME", home);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      setCredential("typesafe", "tsk_placeholder_store", { ndxHome: home });
+      const { getJudgmentRoute } = await import("../../../src/analyzers/claude-client.js");
+      setLLMConfig({ vendor: "claude" });
+      expect(getJudgmentRoute("code.classify")).toBe("typesafe");
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+      rmSync(home, { recursive: true, force: true });
     }
   });
 });

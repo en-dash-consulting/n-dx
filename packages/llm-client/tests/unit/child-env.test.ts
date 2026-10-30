@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveVendorCliEnv } from "../../src/child-env.js";
+import { setCredential } from "../../src/credential-store.js";
 import type { LLMConfig } from "../../src/llm-types.js";
 
 const source: NodeJS.ProcessEnv = Object.freeze({
@@ -155,6 +156,24 @@ describe("resolveVendorCliEnv", () => {
     }
     expect(source.CLAUDECODE).toBe("nested");
     expect(source.GITHUB_TOKEN).toBe("github-secret");
+  });
+
+  it("never carries the Jev key into a vendor CLI child, whether exported or stored", () => {
+    // The store is read in-process by the resolver; resolveVendorCliEnv must
+    // neither read it nor pass the exported variable through.
+    const ndxHome = mkdtempSync(join(tmpdir(), "ndx-child-env-store-"));
+    try {
+      setCredential("typesafe", "tsk_placeholder_stored_value", { ndxHome });
+      const withStore = { ...source, N_DX_HOME: ndxHome };
+      for (const vendor of ["claude", "codex", "google"] as const) {
+        const env = resolveVendorCliEnv({ vendor }, undefined, withStore);
+        expect(env.TYPESAFE_API_KEY, vendor).toBeUndefined();
+        expect(Object.values(env), vendor).not.toContain("tsk_placeholder_stored_value");
+        expect(Object.values(env), vendor).not.toContain("jev-secret");
+      }
+    } finally {
+      rmSync(ndxHome, { recursive: true, force: true });
+    }
   });
 
   it("retains Codex login and key authentication, not another vendor's credentials", () => {
