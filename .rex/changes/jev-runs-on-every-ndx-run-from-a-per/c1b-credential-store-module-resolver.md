@@ -19,4 +19,5 @@ run: {"models":{"claude":"claude-opus-5-5"},"review":true,"reviewModels":{"claud
 source: "credential-injection-design"
 blockedBy:
   - "250e6c57-54a5-4d31-815c-720ea268e972"
+  - "b72a668d-4bf6-4c1c-9caf-a2a25f96e6ea"
 ---
