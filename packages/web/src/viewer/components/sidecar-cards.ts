@@ -249,6 +249,15 @@ export function runPlanRestartPrompt(plan: SidecarCard, lane: number): string {
   return `Start lane ${lane + 1} of the approved run plan again: raise start_work for task ${first?.id ?? ""}${first ? ` (${first.title})` : ""} only. Do not propose a new run plan.`;
 }
 
+/**
+ * The `send` a card may use: none on an ended session (its transcript is
+ * read-only) or while a turn runs or is being sent, so Start lane is offered
+ * only when a new turn can start — and is not clicked twice into two turns.
+ */
+export function cardTurnSender(s: Pick<SidecarState, "readOnly" | "running" | "sending" | "send">): SidecarState["send"] | undefined {
+  return s.readOnly || s.running || s.sending ? undefined : s.send;
+}
+
 interface RunPlanBodyProps {
   card: SidecarCard;
   /** Every card of the drawer: a lane's state is its work card's. */

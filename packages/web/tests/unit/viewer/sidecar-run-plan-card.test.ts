@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { h, render } from "preact";
 import { act } from "preact/test-utils";
-import { SidecarCards, runPlanCommands, runPlanRestartPrompt } from "../../../src/viewer/components/sidecar-cards.js";
+import { SidecarCards, cardTurnSender, runPlanCommands, runPlanRestartPrompt } from "../../../src/viewer/components/sidecar-cards.js";
 import type { SidecarCard, SidecarCardDecision } from "../../../src/viewer/hooks/use-sidecar.js";
 import type { QueuePlan } from "../../../src/shared/index.js";
 
@@ -217,6 +217,15 @@ describe("the run-plan card", () => {
       host.remove();
       host = null;
     }
+  });
+
+  it("lends cards no send on an ended session, or while a turn runs or is being sent", () => {
+    const send = vi.fn(async (_prompt: string) => true);
+    const base = { readOnly: false, running: false, sending: false, send };
+    expect(cardTurnSender(base)).toBe(send);
+    expect(cardTurnSender({ ...base, readOnly: true })).toBeUndefined();
+    expect(cardTurnSender({ ...base, running: true })).toBeUndefined();
+    expect(cardTurnSender({ ...base, sending: true })).toBeUndefined();
   });
 
   it("ignores a work card for another task or one raised before the plan was decided", async () => {

@@ -38,7 +38,14 @@ items:
     lastModified: "2026-10-30T15:23:37.567Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "793240d0-5f3d-49c7-aff3-9cac77685681":
-    lastModified: "2026-10-30T15:23:37.567Z"
+    status: "completed"
+    startedAt: "2026-10-30T15:37:34.670Z"
+    completedAt: "2026-10-30T15:42:33.344Z"
+    endedAt: "2026-10-30T15:42:33.344Z"
+    activeIntervals: [{"end":"2026-10-30T15:42:33.344Z","start":"2026-10-30T15:37:34.670Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option (b): a chosen lane whose work card was denied, withdrawn or refused shows Start lane on the settled run-plan card; it sends a turn naming the lane's first task and forbidding a new plan card."
+    lastModified: "2026-10-30T15:42:33.344Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a08b5226-df96-4c01-8a36-90a48a74a294":
     status: "completed"

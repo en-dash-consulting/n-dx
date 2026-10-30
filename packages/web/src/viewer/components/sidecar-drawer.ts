@@ -21,7 +21,7 @@ import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/index.js";
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
-import { SidecarCards } from "./sidecar-cards.js";
+import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
 
 export const SIDECAR_WIDTH_DEFAULT = 440;
@@ -379,7 +379,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
     h("ol", { class: "sidecar-transcript", ref: transcriptRef, "aria-live": "polite", "aria-label": "Transcript" },
       rows.length > 0 ? rows : h("li", { class: "sidecar-empty" }, "Ask about this project. Each turn runs your vendor CLI."),
     ),
-    h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide, send: sidecar.send }),
+    h(SidecarCards, { cards: sidecar.cards, manifest: sidecar.commandManifest, decide: sidecar.decide, send: cardTurnSender(sidecar) }),
     setupNeed
       ? h("div", { class: "sidecar-setup", role: "alert", "data-reason": setupNeed.reason },
           h("p", { class: "sidecar-setup-title" },
