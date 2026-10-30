@@ -20,6 +20,7 @@ vi.mock("@n-dx/llm-client", async (importOriginal) => {
   return { ...actual, exec: execMock, spawnManaged: spawnManagedMock };
 });
 
+import { recordRepoTrust } from "@n-dx/llm-client";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { commandJobsOf, handleCommandsRoute } from "../../../src/server/routes-commands.js";
@@ -763,8 +764,10 @@ describe("github_read and draft_github_post", () => {
       .filter(([cmd]) => cmd === "gh")
       .map(([, args, opts]) => ({ args: args as string[], input: (opts as { input?: string }).input }));
 
-  function githubReads(on: boolean): void {
-    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" }, web: { sidecarGithubReads: on } }));
+  /** The allowance in the user's own local config, or with `file` in the repository's shared config. */
+  function githubReads(on: boolean, file = ".n-dx.local.json"): void {
+    writeFileSync(join(root, ".n-dx.json"), JSON.stringify({ llm: { vendor: "claude" } }));
+    writeFileSync(join(root, file), JSON.stringify({ ...(file === ".n-dx.json" ? { llm: { vendor: "claude" } } : {}), web: { sidecarGithubReads: on } }));
   }
 
   function answerCheckRuns(conclusion: string): void {
@@ -797,6 +800,31 @@ describe("github_read and draft_github_post", () => {
     const text = resultText(await client.callTool({ name: "github_read", arguments: { kind: "check", ref: "lint", base: "main" } }));
     expect(text).toContain("Allowed for this project by web.sidecarGithubReads.");
     expect(text).toContain("it is not failing on main");
+    expect(broker.cards(SESSION)).toEqual([]);
+    await client.close();
+  });
+
+  it("still raises a network-read card when only the untrusted repository's .n-dx.json turns reads on", async () => {
+    githubReads(true, ".n-dx.json");
+    answerCheckRuns("failure");
+    const client = await brokerClient();
+    const call = client.callTool({ name: "github_read", arguments: { kind: "check", ref: "lint", base: "main" } });
+    const { cardId } = await cardAnnounced("pending");
+    expect(broker.cards(SESSION)[0]).toMatchObject({ kind: "network-read" });
+    expect(ghCalls()).toEqual([]);
+    await decide(cardId, { decision: "deny" });
+    expect(resultText(await call)).toContain("Nothing ran.");
+    expect(ghCalls()).toEqual([]);
+    await client.close();
+  });
+
+  it("reads at once under the repository's .n-dx.json once the checkout is trusted", async () => {
+    githubReads(true, ".n-dx.json");
+    recordRepoTrust(root);
+    answerCheckRuns("success");
+    const client = await brokerClient();
+    const text = resultText(await client.callTool({ name: "github_read", arguments: { kind: "check", ref: "lint", base: "main" } }));
+    expect(text).toContain("Allowed for this project by web.sidecarGithubReads.");
     expect(broker.cards(SESSION)).toEqual([]);
     await client.close();
   });

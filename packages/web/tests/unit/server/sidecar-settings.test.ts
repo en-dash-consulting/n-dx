@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { evaluateRepoTrust, recordRepoTrust } from "@n-dx/llm-client";
 import { handleSidecarRoute } from "../../../src/server/routes-sidecar.js";
 import { SidecarBroker } from "../../../src/server/sidecar/broker.js";
 import { DEFAULT_CONTEXT_CEILINGS, resolveContextCeiling } from "../../../src/server/sidecar/context-refresh.js";
@@ -70,8 +71,9 @@ describe("settings route", () => {
     expect(written().web).toEqual({
       sidecarContextCeiling: { worktree: 150_000, hub: 20_000 },
       sidecarIdleMs: 30 * 60_000,
-      sidecarGithubReads: true,
     });
+    // The user's allowance for their own gh login lands in their local config.
+    expect(JSON.parse(readFileSync(join(root, ".n-dx.local.json"), "utf-8"))).toEqual({ web: { sidecarGithubReads: true } });
     expect(resolveContextCeiling(root, "worktree")).toBe(150_000);
     expect(resolveContextCeiling(root, "hub")).toBe(20_000);
     expect(resolveSidecarIdleMs(root)).toBe(30 * 60_000);
@@ -84,6 +86,21 @@ describe("settings route", () => {
     expect(written().web).toBeUndefined();
     expect(resolveContextCeiling(root, "hub")).toBe(DEFAULT_CONTEXT_CEILINGS.hub);
     expect(resolveSidecarIdleMs(root)).toBe(DEFAULT_SIDECAR_TTL_MS);
+  });
+
+  it("applies the repository's own GitHub reads allowance only once the checkout is trusted", () => {
+    writeFileSync(config(), JSON.stringify({ web: { sidecarGithubReads: true } }));
+    expect(readSidecarSettings(root).githubReads).toBe(false);
+    expect(evaluateRepoTrust(root).findings.map((f) => f.code)).toContain("network-reads");
+    recordRepoTrust(root);
+    expect(readSidecarSettings(root).githubReads).toBe(true);
+  });
+
+  it("lets the user's local config turn reads off over a trusted repository's allowance", () => {
+    writeFileSync(config(), JSON.stringify({ web: { sidecarGithubReads: true } }));
+    recordRepoTrust(root);
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ web: { sidecarGithubReads: false } }));
+    expect(readSidecarSettings(root).githubReads).toBe(false);
   });
 
   it("writes to the local config when that is where the value comes from", async () => {

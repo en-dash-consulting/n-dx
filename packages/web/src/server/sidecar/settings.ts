@@ -13,14 +13,15 @@
  * `GET /api/branch-health` and the Diagnose branch packet may run gh, and is
  * the per-project allowance for the broker's `github_read`: on, a read runs
  * without a card; off, each read raises a network-read card. It never
- * allows a post. Mode has one value, `ask`:
+ * allows a post, it is saved to the local config, and the shared config's
+ * `true` applies only in a trusted checkout. Mode has one value, `ask`:
  * `auto` is refused until it exists.
  */
 
-import { relativeToRoot, resolveLayout } from "@n-dx/llm-client";
+import { evaluateRepoTrust, isLocalConfigTracked, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
 import { DEFAULT_CONTEXT_CEILINGS, type SidecarScope } from "./context-refresh.js";
 import { DEFAULT_SIDECAR_TTL_MS } from "./session-registry.js";
-import { positiveInteger, readWebValue, writeWebValues, type WebChange } from "./web-config.js";
+import { positiveInteger, readWebValue, readWebValueWithSource, writeWebValues, type WebChange } from "./web-config.js";
 
 export const SIDECAR_MODES = ["ask"] as const;
 export type SidecarMode = (typeof SIDECAR_MODES)[number];
@@ -61,10 +62,24 @@ export function readSidecarSettings(projectDir: string): SidecarSettings {
       hub: readWebValue(projectDir, (web) => ceiling(web, "hub")) ?? DEFAULT_CONTEXT_CEILINGS.hub,
     },
     idleMs: resolveSidecarIdleMs(projectDir),
-    githubReads: readWebValue(projectDir, (web) => (typeof web.sidecarGithubReads === "boolean" ? web.sidecarGithubReads : undefined)) ?? false,
+    githubReads: resolveGithubReads(projectDir),
     defaults: { contextCeiling: { ...DEFAULT_CONTEXT_CEILINGS }, idleMs: DEFAULT_SIDECAR_TTL_MS },
     configFile: relativeToRoot(layout, layout.configFile),
   };
+}
+
+/**
+ * `web.sidecarGithubReads` in force. The user's own (untracked) local config
+ * always applies. Anywhere else the repository ships it: `false` applies, and
+ * `true` only once the user has trusted the checkout (`ndx trust accept .`),
+ * since it lets gh run with the user's login without a card. The trust
+ * digest covers the key, so trusting it is a deliberate act.
+ */
+function resolveGithubReads(projectDir: string): boolean {
+  const found = readWebValueWithSource(projectDir, (web) => (typeof web.sidecarGithubReads === "boolean" ? web.sidecarGithubReads : undefined));
+  if (!found?.value) return false;
+  if (found.local && !isLocalConfigTracked(projectDir)) return true;
+  return !evaluateRepoTrust(projectDir).restricted;
 }
 
 function ceiling(web: Record<string, unknown>, scope: SidecarScope): number | undefined {
@@ -107,7 +122,8 @@ export function planSidecarSettings(patch: SidecarSettingsPatch): { changes: Web
 
   if (patch.githubReads !== undefined) {
     if (patch.githubReads !== null && typeof patch.githubReads !== "boolean") return { error: "githubReads must be true or false" };
-    changes.push({ path: ["sidecarGithubReads"], value: patch.githubReads === null ? undefined : patch.githubReads });
+    // The user's choice, so it lands in their local config: the shared config's `true` waits for trust.
+    changes.push({ path: ["sidecarGithubReads"], value: patch.githubReads === null ? undefined : patch.githubReads, local: true });
   }
   return { changes };
 }

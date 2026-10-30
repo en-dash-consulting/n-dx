@@ -34,17 +34,31 @@ export function positiveInteger(value: unknown): number | undefined {
 
 /** The first value `pick` accepts from the local then shared `web` section, else `undefined`. */
 export function readWebValue<T>(projectDir: string, pick: (web: Json) => T | undefined): T | undefined {
-  for (const { web } of sources(projectDir)) {
+  return readWebValueWithSource(projectDir, pick)?.value;
+}
+
+/** {@link readWebValue}, and whether the value came from the local config file. */
+export function readWebValueWithSource<T>(
+  projectDir: string,
+  pick: (web: Json) => T | undefined,
+): { value: T; local: boolean } | undefined {
+  const { localConfigFile } = resolveLayout(projectDir);
+  for (const { file, web } of sources(projectDir)) {
     const value = pick(web);
-    if (value !== undefined) return value;
+    if (value !== undefined) return { value, local: file === localConfigFile };
   }
   return undefined;
 }
 
-/** One change to the `web` section: `path` under `web`, and its value (`undefined` removes the key). */
+/**
+ * One change to the `web` section: `path` under `web`, and its value
+ * (`undefined` removes the key). `local` writes it to the local config file
+ * whichever file supplies the key now.
+ */
 export interface WebChange {
   path: readonly string[];
   value: unknown;
+  local?: boolean;
 }
 
 function getAt(root: Json, path: readonly string[]): unknown {
@@ -82,11 +96,13 @@ function prune(root: Json, path: readonly string[]): void {
 
 /** Apply `changes` to the config files that own their keys; returns the files written. */
 export function writeWebValues(projectDir: string, changes: readonly WebChange[]): string[] {
-  const { configFile } = resolveLayout(projectDir);
+  const { configFile, localConfigFile } = resolveLayout(projectDir);
   const owners = sources(projectDir);
   const byFile = new Map<string, WebChange[]>();
   for (const change of changes) {
-    const owner = owners.find(({ web }) => getAt(web, change.path) !== undefined)?.file ?? configFile;
+    const owner = change.local
+      ? localConfigFile
+      : owners.find(({ web }) => getAt(web, change.path) !== undefined)?.file ?? configFile;
     byFile.set(owner, [...(byFile.get(owner) ?? []), change]);
   }
   for (const [file, fileChanges] of byFile) {

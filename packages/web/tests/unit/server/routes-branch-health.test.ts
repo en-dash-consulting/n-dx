@@ -35,7 +35,7 @@ describe("GET /api/branch-health", () => {
     git("add", "-A");
     git("commit", "-q", "-m", "init");
     git("checkout", "-q", "-b", "feat");
-    writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ web: { sidecarGithubReads: true } }));
+    writeFileSync(join(dir, ".n-dx.local.json"), JSON.stringify({ web: { sidecarGithubReads: true } }));
 
     ghCalls = [];
     prJson = null;
@@ -89,6 +89,16 @@ describe("GET /api/branch-health", () => {
     expect(ghCalls[0]?.slice(0, 2)).toEqual(["pr", "view"]);
     expect(body).toMatchObject({ githubDeferred: false });
     expect(body.githubReason).toContain("no pull requests found");
+  });
+
+  it("runs no gh command when only the untrusted repository's .n-dx.json allows GitHub reads", async () => {
+    rmSync(join(dir, ".n-dx.local.json"));
+    writeFileSync(join(dir, ".n-dx.json"), JSON.stringify({ web: { sidecarGithubReads: true } }));
+    const body = await (await fetch(`${started.baseUrl}/api/branch-health?github=1`)).json();
+
+    expect(ghCalls).toEqual([]);
+    expect(body).toMatchObject({ github: null });
+    expect(body.githubReason).toContain("web.sidecarGithubReads");
   });
 
   it("reuses the PR base a GitHub read found in later local-only answers", async () => {
