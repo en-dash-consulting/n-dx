@@ -1,5 +1,14 @@
 # @n-dx/sourcevision
 
+## 0.10.2
+
+### Patch Changes
+
+- [#891](https://github.com/en-dash-consulting/n-dx/pull/891) [`19816b7`](https://github.com/en-dash-consulting/n-dx/commit/19816b719a347f36cb8c96831089836cc62584f7) Thanks [@endash-shal](https://github.com/endash-shal)! - Correct outbound and workspace connection evidence: respect JavaScript scopes, retain configured HTTP paths, ignore Go documentation strings and SQL/cache payloads, and withhold ambiguous endpoints or repository-local infrastructure identities. Preserve YAML script bodies and nested flow collections, record executable coverage configuration, and recognize explicitly manual deployment jobs.
+- Updated dependencies [[`19816b7`](https://github.com/en-dash-consulting/n-dx/commit/19816b719a347f36cb8c96831089836cc62584f7), [`e147a8f`](https://github.com/en-dash-consulting/n-dx/commit/e147a8fd658bb12dd687592b9d983a88697ebdfc), [`c5a6067`](https://github.com/en-dash-consulting/n-dx/commit/c5a6067cfe5db0239e428ecb218a0dc8f92c3a98), [`95875df`](https://github.com/en-dash-consulting/n-dx/commit/95875df8e3ddd5fb6a931df791fa6891c1c0fc07)]:
+  - @n-dx/lang-kit@0.10.2
+  - @n-dx/llm-client@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes

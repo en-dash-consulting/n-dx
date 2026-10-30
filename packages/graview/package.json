@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/graview",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Projects an n-dx project (PRD tree, code analysis, agent runs) into a Graview declaration document and seed snapshot, and drives the graview CLI on them",
   "publishConfig": {
     "access": "public"
