@@ -6,6 +6,7 @@ export type { RuntimePoolConfig } from "../process/pool.js";
 import type { MemoryThrottleConfig } from "../process/memory-throttle.js";
 import type { MemoryMonitorConfig } from "../process/memory-monitor.js";
 import type { RuntimePoolConfig } from "../process/pool.js";
+export { DEFAULT_WRITE_SHRINK_RATIO, DEFAULT_WRITE_SHRINK_MIN_BYTES } from "../guard/contracts.js";
 
 export const HENCH_SCHEMA_VERSION = "hench/v1";
 
@@ -57,6 +58,15 @@ export interface GuardConfig {
   maxConcurrentProcesses: number;
   /** Allowed git subcommands. Centralizes the git safety allowlist in guard config. */
   allowedGitSubcommands: string[];
+  /**
+   * `write_file` refuses to replace an existing file with content smaller than
+   * this share of its size (0-1) unless the call passes `rewrite: true`, so a
+   * model cannot blank a file it meant to change one line of. 0 disables the
+   * check. Default {@link DEFAULT_WRITE_SHRINK_RATIO}.
+   */
+  writeShrinkRatio?: number;
+  /** Existing files at or below this many bytes are exempt from the shrink check. */
+  writeShrinkMinBytes?: number;
   /** Policy limits for session-aware rate limiting and resource tracking. */
   policy?: PolicyLimitsConfig;
   /** Memory-based execution throttling configuration. */
@@ -321,6 +331,34 @@ export interface ReviewConfig {
   rounds?: number;
 }
 
+/** Default {@link EscalationConfig.after}. */
+export const DEFAULT_ESCALATION_AFTER = 2;
+/** Default {@link EscalationConfig.maxAttempts}. */
+export const DEFAULT_ESCALATION_MAX_ATTEMPTS = 1;
+
+/**
+ * `hench.escalation.*` — run a task that keeps failing on a stronger vendor
+ * or model before it is skipped as stuck. No zod defaults, like `review`: the
+ * resolver applies {@link DEFAULT_ESCALATION_AFTER} and
+ * {@link DEFAULT_ESCALATION_MAX_ATTEMPTS}, so `--resolve` can tell a set value
+ * from an absent one. See `agent/analysis/escalation.ts`.
+ */
+export interface EscalationConfig {
+  /** Off (default) leaves stuck-task handling exactly as before. */
+  enabled?: boolean;
+  /** Consecutive failed attempts before the next one is escalated. Default 2. */
+  after?: number;
+  /** The vendor an escalated attempt runs on. Required for escalation to happen. */
+  vendor?: LLMVendor;
+  /**
+   * The model an escalated attempt runs on. Unset means the escalation
+   * vendor's own configured model (`hench.models.<vendor>`, then `llm.*`).
+   */
+  model?: string;
+  /** Escalated attempts allowed before the task is treated as stuck. Default 1. */
+  maxAttempts?: number;
+}
+
 export interface HenchConfig {
   schema: string;
   provider: Provider;
@@ -579,6 +617,8 @@ export interface HenchConfig {
   testGate?: TestGateConfig;
   /** The project's review pass. See {@link ReviewConfig}. */
   review?: ReviewConfig;
+  /** Escalating a failing task before it is skipped as stuck. See {@link EscalationConfig}. */
+  escalation?: EscalationConfig;
   /**
    * Whether the Anthropic API loop marks `cache_control` breakpoints on the
    * request (see `agent/lifecycle/prompt-cache.ts`). Default: true.
@@ -1574,6 +1614,21 @@ export interface RunProtectedConfigWrite {
   restored: boolean;
 }
 
+/** How an escalated attempt ran — see {@link RunRecord.escalation}. */
+export interface RunEscalation {
+  escalated: true;
+  /** Vendor the attempt ran on. */
+  vendor: string;
+  /** Model the attempt ran on, as resolved for that vendor. */
+  model?: string;
+  /** The vendor the task would have run on without escalation. */
+  fromVendor?: string;
+  /** Consecutive failed attempts that triggered it. */
+  failures: number;
+  /** One line saying why, as logged. */
+  reason: string;
+}
+
 export interface RunRecord {
   id: string;
   taskId: string;
@@ -1697,6 +1752,13 @@ export interface RunRecord {
    * v1 additive field — old records without this field load normally.
    */
   modelSource?: string;
+  /**
+   * Set when this attempt ran on `hench.escalation.*` because the task had
+   * failed {@link RunEscalation.failures} times in a row. Its presence is what
+   * counts the attempt against `hench.escalation.maxAttempts`.
+   * v1 additive field — old records without this field load normally.
+   */
+  escalation?: RunEscalation;
   /**
    * Orientation session this run's task spawn was forked from, when the
    * warm-parent strategy was active. Its presence is what makes the saving

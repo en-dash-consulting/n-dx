@@ -37,10 +37,13 @@ import { CLIError, requireLLMCLI } from "../errors.js";
 import { result as output, warn } from "../output.js";
 import { VENDOR_PROVIDERS } from "./provider-support.js";
 import { readTreeConformanceRefusal } from "./run.js";
+import { listRuns } from "../../store/runs.js";
+import { decideEscalation } from "../../agent/analysis/escalation.js";
 import {
   parseBudgetFlags,
   parsePermissionModeFlag,
   parseReviewOptions,
+  planEscalation,
   resolveTaskRunSettings,
   reviewProviderError,
   selectCliModelOverride,
@@ -159,6 +162,23 @@ export interface RunResolution {
   review: {
     rounds: Resolved<number>;
   };
+  /**
+   * `hench.escalation` as it bears on this task: its current failure streak,
+   * and whether the run would be escalated — in which case {@link resolved}
+   * already describes the escalated attempt (vendor, model, provider).
+   */
+  escalation: {
+    enabled: boolean;
+    failures: number;
+    escalatedFailures: number;
+    escalated: boolean;
+    vendor?: string;
+    model?: string;
+    fromVendor?: string;
+    reason?: string;
+    /** Why an escalation that was due does not apply (an explicit model flag). */
+    skipped?: string;
+  };
   options: RunOption[];
   refusals: RunRefusal[];
   warnings: RunWarning[];
@@ -231,8 +251,8 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
   const config = await loadConfig(henchDir, { onInvalid: "use-defaults", onWarning: (m) => warn(m) });
   const configured = await loadConfiguredHenchKeys(henchDir);
   const rexDir = join(dir, config.rexDir);
-  const llmConfig = await loadLLMConfig(henchDir);
-  const vendor = resolveLLMVendor(llmConfig);
+  const baseLlmConfig = await loadLLMConfig(henchDir);
+  const baseVendor = resolveLLMVendor(baseLlmConfig);
   const refusals: RunRefusal[] = [];
   const refuse = (code: RunRefusalCode, err: CLIError, extra: Partial<RunRefusal> = {}): void => {
     refusals.push({ code, message: err.message, ...(err.suggestion ? { hint: err.suggestion } : {}), ...extra });
@@ -305,6 +325,20 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     }
   }
 
+  // ── Escalation ──────────────────────────────────────────
+  // Whether this task's next attempt would be escalated (hench.escalation),
+  // decided from the run history exactly as a run decides it. When it would,
+  // everything below resolves for the escalation vendor, as the run does.
+  const decision = entry
+    ? decideEscalation(entry.item.id, await listRuns(henchDir), config.escalation, config.maxFailedAttempts)
+    : undefined;
+  const { plan, skipped } = decision
+    ? planEscalation({ decision, flags, vendor: baseVendor, llmConfig: baseLlmConfig })
+    : {};
+  const llmConfig = plan?.llmConfig ?? baseLlmConfig;
+  const vendor = plan?.vendor ?? baseVendor;
+  const escalationInput = plan ? { escalation: plan.model ? { model: plan.model } : {} } : {};
+
   const treeRefusal = prdItems ? await readTreeConformanceRefusal(rexDir) : null;
   if (treeRefusal) {
     refusals.push({ code: "tree-not-conformant", message: treeRefusal.message, migratable: treeRefusal.migratable });
@@ -324,6 +358,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     vendor,
     autonomous: true,
     ...(entry ? { item: entry.item } : {}),
+    ...escalationInput,
     clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
   });
 
@@ -340,6 +375,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
         llmConfig,
         vendor,
         autonomous: true,
+        ...escalationInput,
         clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
       })
     : undefined;
@@ -423,7 +459,7 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     flags[flag] === "true" ? { value: true, source: "cli-flag" } : { value: false, source: "built-in" };
 
   const resolved: ResolvedSettings = {
-    vendor: { value: vendor, source: llmConfig.vendor ? "llm.vendor" : "built-in" },
+    vendor: { value: vendor, source: plan ? "hench.escalation.vendor" : llmConfig.vendor ? "llm.vendor" : "built-in" },
     model: withFallback({ value: settings.model.value, source: settings.model.source }, "model"),
     provider: withFallback({ value: provider.value, source: provider.source }, "provider"),
     // `dropped` is the resolver's signal to the caller that prints the warning,
@@ -456,6 +492,16 @@ export async function resolveRun(dir: string, flags: Record<string, string>): Pr
     saved: settings.saved ?? null,
     resolved,
     review: { rounds: settings.reviewRounds },
+    escalation: {
+      enabled: config.escalation?.enabled === true,
+      failures: decision?.failures ?? 0,
+      escalatedFailures: decision?.escalatedFailures ?? 0,
+      escalated: plan !== undefined,
+      ...(plan
+        ? { vendor: plan.vendor, model: settings.model.value, fromVendor: plan.fromVendor, reason: plan.reason }
+        : {}),
+      ...(skipped ? { skipped } : {}),
+    },
     options: RUN_OPTIONS.map((option) =>
       option.key === "provider" ? { ...option, values: VENDOR_PROVIDERS[vendor] } : { ...option },
     ),

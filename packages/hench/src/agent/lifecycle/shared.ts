@@ -16,13 +16,13 @@
 
 import { randomUUID } from "node:crypto";
 import { trustSummaryForRun } from "../../store/trust.js";
-import { evaluateRepoTrust } from "../../prd/llm-gateway.js";
+import { evaluateRepoTrust, redactSecrets } from "../../prd/llm-gateway.js";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { PRDStore, SaveFileReport, SelectionExplanation } from "../../prd/rex-gateway.js";
 import { explainSelection, collectCompletedIds, computeTimestampUpdates, enclosingChangeIds, findItem, findParentResets, indexTree, isAppliedChange, isChangeLayerStore, loadPrdModel, takeSaveFileReport, PRD_TREE_DIRNAME, TREE_META_FILENAME } from "../../prd/rex-gateway.js";
-import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunLoopPosition, RunMemoryStats, RunReviewPlan, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
+import type { HenchConfig, RunRecord, RunCommitRecord, RunCommitItemMismatch,RunCompletionHold, RunLoopPosition, RunMemoryStats, RunReviewPlan, RunEscalation, RunSessionRecord, TaskBrief, TurnTokenUsage, TestGateResult } from "../../schema/index.js";
 import { DEFAULT_CHECKPOINT_THRESHOLD, DEFAULT_GIT_COMMIT_MESSAGE_SOURCE } from "../../schema/index.js";
 import type { GitCommitMessageSource, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
 import { measureChangeMagnitude } from "../analysis/change-magnitude.js";
@@ -37,7 +37,7 @@ import type { ClaimLostEvent, TaskClaims } from "../../process/task-claims.js";
 import { assembleTaskBrief, formatTaskBrief } from "../planning/brief.js";
 import type { AssembleBriefOptions } from "../planning/brief.js";
 import { buildSystemPrompt, buildPromptEnvelope } from "../planning/prompt.js";
-import type { PromptEnvelope } from "../../prd/llm-gateway.js";
+import type { LLMVendor, PromptEnvelope } from "../../prd/llm-gateway.js";
 import {
   excludeHenchRuntimeArtifacts,
   matchesProjectPath,
@@ -72,7 +72,8 @@ import type { ReviewDiff } from "../analysis/review.js";
 import { LLM_VENDOR, defaultRegistry, resolveVendorModel, resolveTaskModel } from "../../prd/llm-gateway.js";
 import { runPostTaskTests, runTestGate, DEFAULT_TEST_GATE_TIMEOUT_MS, OUTPUT_TAIL_LINES } from "../../tools/test-runner.js";
 import { resolveTestCommand } from "../../tools/test-command-resolver.js";
-import { toolRexUpdateStatus, toolRexAppendLog } from "../../tools/rex.js";
+import { toolRexUpdateStatus, toolRexAppendLog, toolRexSetFailureReason } from "../../tools/rex.js";
+import { buildGateFailureReason } from "../analysis/gate-failure-reason.js";
 import { section, subsection, stream, detail, info, getCapturedLines, resetCapturedLines, setCapturedLineSink } from "../../types/output.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
@@ -248,6 +249,15 @@ export interface SharedLoopOptions {
    */
   modelWeight?: string;
   modelSource?: string;
+  /**
+   * Run on this vendor instead of the project's `llm.vendor` — set only for an
+   * escalated attempt (`hench.escalation`), whose {@link model} the caller
+   * resolved for this vendor. The loop makes it the active vendor in the LLM
+   * config it loads, so the adapter, binary and provider all follow.
+   */
+  vendorOverride?: LLMVendor;
+  /** Recorded on the run as {@link RunRecord.escalation} when the attempt is escalated. */
+  escalation?: RunEscalation;
   /**
    * Show the diff and prompt for approval before finalizing (`--approve-diff`).
    *
@@ -583,6 +593,8 @@ export interface InitRunOptions {
   permissionMode?: string;
   /** The review pass the run was launched with (`--review`), recorded on the run from its first save. */
   reviewPlan?: RunReviewPlan;
+  /** Set for an escalated attempt; see {@link RunRecord.escalation}. */
+  escalation?: RunEscalation;
   /**
    * Where this run sits in a `--iterations`/`--loop`/`--epic-by-epic`
    * invocation — see {@link RunRecord.loop}. Absent for a run started on its
@@ -770,6 +782,7 @@ export async function initRunRecord(opts: InitRunOptions): Promise<{ run: RunRec
     modelSource: opts.modelSource,
     session: opts.session,
     ...(opts.reviewPlan ? { reviewPlan: opts.reviewPlan } : {}),
+    ...(opts.escalation ? { escalation: opts.escalation } : {}),
     ...(opts.loop ? { loop: opts.loop } : {}),
     actor: await resolveActor(opts.projectDir ?? "."),
     host: resolveHost(),
@@ -3200,7 +3213,8 @@ export async function updateCompletedTaskStatus(
     // Check current status to avoid redundant updates
     const existingItem = await store.getItem(taskId);
     if (existingItem?.status === "completed") {
-      // Already completed — no-op
+      // Already completed — no-op, beyond dropping a failure this run fixed.
+      await clearFailureReason(store, taskId);
       return false;
     }
 
@@ -3211,6 +3225,9 @@ export async function updateCompletedTaskStatus(
       ...(resolution?.resolutionType ? { resolutionType: resolution.resolutionType } : {}),
       ...(resolution?.resolutionDetail ? { resolutionDetail: resolution.resolutionDetail } : {}),
     });
+
+    // A completed task has no previous failure for the next brief to report.
+    await clearFailureReason(store, taskId);
 
     // Log the completion event
     await toolRexAppendLog(store, taskId, {
@@ -3228,6 +3245,19 @@ export async function updateCompletedTaskStatus(
       run.diagnostics.notes.push(`cascade_failure: ${msg}`);
     }
     return false;
+  }
+}
+
+/**
+ * Drop the `failureReason` an earlier failed attempt left, once the task has
+ * completed. Best-effort: the completion is what matters, and a stale reason
+ * is only shown to a run that would never be briefed on a completed task.
+ */
+async function clearFailureReason(store: PRDStore, taskId: string): Promise<void> {
+  try {
+    await toolRexSetFailureReason(store, taskId, undefined);
+  } catch (err) {
+    detail(`Warning: could not clear the task's previous failure reason: ${(err as Error).message}`);
   }
 }
 
@@ -3913,6 +3943,44 @@ async function settleAfterTestGateFailure(
   noteUncommittedRepairs(run, repairs);
 }
 
+/**
+ * Leave on the task why the gate failed, so the next attempt's brief carries
+ * it under "Previous attempt failed" instead of the retry starting blind.
+ *
+ * Built from what the gate kept — its failure digest, each package's failure
+ * output and the output tail — with the files the run changed, so a failing
+ * test the task wrote itself is marked as possibly wrong
+ * (agent/analysis/gate-failure-reason.ts). Redacted like the run log.
+ *
+ * Best-effort, like the completion withdrawal before it: the run has already
+ * failed, and a PRD write that fails here is reported, never thrown.
+ */
+async function recordGateFailureReason(opts: FinalizeRunOptions, run: RunRecord): Promise<void> {
+  if (!opts.store || !run.taskId) return;
+  const gate = run.testGate;
+  const output = [
+    gate?.failureDigest,
+    ...(gate?.packages ?? []).map((p) => p.failureOutput),
+    gate?.outputTail,
+  ].filter((part): part is string => typeof part === "string" && part.trim() !== "").join("\n");
+  const reason = buildGateFailureReason({
+    output,
+    filesChanged: run.structuredSummary?.filesChanged,
+    headline: run.error,
+    redact: redactSecrets,
+  });
+  try {
+    if (await toolRexSetFailureReason(opts.store, run.taskId, reason)) {
+      detail("Recorded the gate failure on the task for the next attempt's brief.");
+    }
+  } catch (err) {
+    const msg = (err as Error).message;
+    detail(`Warning: could not record the gate failure on the task: ${msg}`);
+    run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
+    run.diagnostics.notes.push(`failure_reason_not_recorded: ${msg}`);
+  }
+}
+
 /** Record on the run which review repairs no commit owns, for the retry and the dashboard. */
 function noteUncommittedRepairs(run: RunRecord, repairs: string[]): void {
   run.diagnostics ??= { tokenDiagnosticStatus: "unavailable", parseMode: "unknown", notes: [] };
@@ -4496,6 +4564,7 @@ export async function finalizeRun(opts: FinalizeRunOptions): Promise<void> {
 
   if (testGateFailed) {
     await settleAfterTestGateFailure(opts, run, completionHold);
+    await recordGateFailureReason(opts, run);
   }
 
   // Missing-review gate. `--review` is sold as a gate, and an opt-in gate that

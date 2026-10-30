@@ -76,7 +76,7 @@ export function classifyFile(filePath: string): FileCategory {
 /**
  * Extract modified file paths from tool call records and classify them.
  *
- * Scans tool calls for write_file operations (which contain file paths in
+ * Scans tool calls for write_file and edit_file operations (which contain file paths in
  * input.path) and rex_update/rex_add operations (which modify PRD metadata).
  * Each path is classified and returned grouped by category.
  *
@@ -87,7 +87,7 @@ export function classifyChangedFiles(toolCalls: ToolCallRecord[]): Map<FileCateg
   const changedFiles = new Set<string>();
 
   for (const call of toolCalls) {
-    if (call.tool === "write_file") {
+    if (call.tool === "write_file" || call.tool === "edit_file") {
       const path = call.input.path as string | undefined;
       if (path) changedFiles.add(path);
     }

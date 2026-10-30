@@ -25,6 +25,7 @@ import {
   isPermissionMode,
 } from "../../schema/index.js";
 import { reviewModelSource } from "../../agent/analysis/adversarial-review.js";
+import type { EscalationDecision } from "../../agent/analysis/escalation.js";
 import { CLIError } from "../errors.js";
 import { checkAgentModel } from "./agent-model.js";
 import type { AgentModelSource } from "./agent-model.js";
@@ -514,7 +515,9 @@ export type SettingWarningCode =
   /** `reviewMode: "pair"` has no usable reviewer or provider here; the next source decides. */
   | "saved-review-mode-skipped"
   /** `reviewVendor` is the executor's own vendor, or the executor has no CLI to pair with. */
-  | "saved-review-vendor-skipped";
+  | "saved-review-vendor-skipped"
+  /** `hench.escalation.model` names a model the escalation vendor cannot run. */
+  | "escalation-model-incompatible";
 
 export interface SettingWarning {
   code: SettingWarningCode;
@@ -589,6 +592,16 @@ export interface TaskRunSettingsInput {
   clampPermissionMode?: (mode: PermissionMode | undefined) => PermissionMode | undefined;
   /** `--context-file` text, already read and trimmed by the caller. */
   contextFileText?: string;
+  /**
+   * Set when this attempt is escalated (`hench.escalation`, see
+   * `agent/analysis/escalation.ts`). {@link vendor} and {@link llmConfig}
+   * are then already the escalation vendor's; this adds the two rungs that
+   * belong to escalation alone: `hench.escalation.model`, below the CLI flag
+   * and the task's saved model or tier and above `hench.models` / `llm.*`, and
+   * the provider default — the CLI where the vendor has one, since
+   * `hench.provider` was chosen for the project's own vendor.
+   */
+  escalation?: { model?: string };
 }
 
 /**
@@ -671,6 +684,26 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   const savedTier = vendor === LLM_VENDOR.LOCAL ? undefined : saved?.tier;
   const savedTierModel = savedTier ? modelForTier(vendor, llmConfig, savedTier) || undefined : undefined;
 
+  // `hench.escalation.model`, normalized and checked the way a saved pin is: a
+  // model the escalation vendor cannot run is skipped with a warning rather
+  // than failing the attempt that was meant to rescue the task.
+  const escalationModelRaw = input.escalation?.model?.trim();
+  const escalationModel = escalationModelRaw
+    ? resolveTaskModel(AGENT_TASK_CLASS, llmConfig, { vendor, model: escalationModelRaw }).model
+    : undefined;
+  const escalationModelUsable =
+    escalationModel !== undefined
+    && escalationModel.length > 0
+    && (vendor === LLM_VENDOR.LOCAL || isModelCompatibleWithVendor(vendor, escalationModel));
+  if (escalationModelRaw && !escalationModelUsable) {
+    warnings.push({
+      code: "escalation-model-incompatible",
+      message:
+        `hench.escalation.model "${escalationModelRaw}" cannot run on vendor="${vendor}" — ` +
+        `escalating to that vendor's configured model instead.`,
+    });
+  }
+
   const agentModel = checkAgentModel({
     vendor,
     cliModelOverride: cliModel,
@@ -698,6 +731,9 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
       weight: savedTier as string,
       headerSource: "configured",
     };
+  } else if (escalationModelUsable) {
+    const value = escalationModel as string;
+    model = { value, source: "hench.escalation.model", weight: weightOf(value, false), headerSource: "configured" };
   } else {
     model = {
       value: agentModel.model,
@@ -742,13 +778,22 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
         `CLI provider, and the flag outranks a saved setting.`,
     });
   }
-  const requestedProvider = flags.provider ?? (savedProviderUsable ? savedProvider : config.provider);
+  // An escalated attempt runs on another vendor than `hench.provider` was
+  // chosen for (often `api`, because the project's vendor is local): it takes
+  // that vendor's CLI when there is one, else its API.
+  const escalationProvider: HenchProvider | undefined = input.escalation
+    ? isProviderSupported(vendor, "cli") ? "cli" : "api"
+    : undefined;
+  const requestedProvider =
+    flags.provider ?? (savedProviderUsable ? savedProvider : escalationProvider ?? config.provider);
   const providerSource =
     flags.provider !== undefined
       ? "cli-flag"
       : savedProviderUsable
         ? "task.run"
-        : henchSource("provider");
+        : escalationProvider !== undefined
+          ? "hench.escalation"
+          : henchSource("provider");
   const resolvedProvider = resolveRunProvider(requestedProvider as string, vendor);
 
   // -- Permission mode -----------------------------------------------------
@@ -980,4 +1025,61 @@ export function reviewModelKey(vendor: LLMVendor, source: ReturnType<typeof revi
   if (source === "vendor-config") return `llm.${vendor}.reviewModel`;
   if (source === "shared-config") return "llm.reviewModel";
   return "vendor-default";
+}
+
+// ---------------------------------------------------------------------------
+// Escalation
+// ---------------------------------------------------------------------------
+
+/** What an escalated attempt changes before the per-task resolution runs. */
+export interface EscalationPlan {
+  /** The vendor the attempt runs on, and the LLM config with it made active. */
+  vendor: LLMVendor;
+  llmConfig: LLMConfig;
+  /** `hench.escalation.model`, for the resolver's escalation rung. */
+  model?: string;
+  /** The vendor the task would otherwise have run on. */
+  fromVendor: LLMVendor;
+  failures: number;
+  reason: string;
+}
+
+/**
+ * Turn an escalation decision into the inputs the shared resolver runs with,
+ * or say why it does not apply. One function for the run (`runOne`) and
+ * `ndx work --resolve`, so the report cannot name a vendor the run does not use.
+ *
+ * An explicit model flag (`--model`, `--<vendor>-model`) pins what this run
+ * uses, so it wins over escalation: the attempt is not escalated, and
+ * `skipped` says so. A task's saved `run` block still applies under the
+ * escalation vendor — its `models[vendor]` pin and portable tier outrank
+ * `hench.escalation.model` exactly as they outrank `hench.models`.
+ */
+export function planEscalation(params: {
+  decision: EscalationDecision;
+  flags: Record<string, string>;
+  vendor: LLMVendor;
+  llmConfig: LLMConfig | undefined;
+}): { plan?: EscalationPlan; skipped?: string } {
+  const { decision, flags, vendor, llmConfig } = params;
+  if (!decision.escalate || !decision.escalation) return {};
+  const pinned = selectCliModelOverride(flags, vendor);
+  if (pinned.value !== undefined) {
+    return {
+      skipped:
+        `Not escalating: --${pinned.flag}=${pinned.value} pins this run's model ` +
+        `(${decision.reason ?? `${decision.failures} consecutive failed attempts`}).`,
+    };
+  }
+  const target = decision.escalation.vendor as LLMVendor;
+  return {
+    plan: {
+      vendor: target,
+      llmConfig: { ...(llmConfig ?? {}), vendor: target } as LLMConfig,
+      ...(decision.escalation.model ? { model: decision.escalation.model } : {}),
+      fromVendor: vendor,
+      failures: decision.failures,
+      reason: decision.reason ?? `${decision.failures} consecutive failed attempts`,
+    },
+  };
 }

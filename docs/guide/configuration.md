@@ -241,6 +241,20 @@ Configuration is stored in `.hench/config.json`.
 
 The test gate can be scoped and its flakes absorbed with `hench.testGate.command` (with `{base}`) and `hench.testGate.rerunCommand` (with `{suites}`). Set them in `.n-dx.json`; see [Completion Waits for the Test Gate](../packages/hench.md#completion-waits-for-the-test-gate).
 
+### Escalating a stuck task
+
+After `hench.maxFailedAttempts` consecutive failures a task is skipped as stuck. With escalation on, a task that keeps failing first gets an attempt on a stronger vendor or model:
+
+```sh
+ndx config hench.escalation.enabled true .
+ndx config hench.escalation.vendor claude .     # claude, codex, google or local
+ndx config hench.escalation.model <model> .     # optional; unset means that vendor's configured model
+ndx config hench.escalation.after 2 .           # failures before escalating (default 2)
+ndx config hench.escalation.maxAttempts 1 .     # escalated attempts before the task is stuck (default 1)
+```
+
+The escalated attempt runs on the vendor's CLI when it has one, else its API, and logs one line naming the task, the reason and the vendor/model. Only when the escalated attempts also fail is the task skipped as stuck. An explicit `--model` flag turns escalation off for that run, and a task's saved `run` block still outranks `hench.escalation.model`. The run record carries an `escalation` entry, and `ndx work --task=<id> --resolve .` reports whether the next attempt would be escalated.
+
 ### Review modes
 
 `hench.review.mode` sets how `ndx work` reviews a task's diff before it is committed.

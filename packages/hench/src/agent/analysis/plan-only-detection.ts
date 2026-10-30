@@ -14,6 +14,7 @@ import type { ToolCallRecord } from "../../schema/index.js";
  */
 const CODE_MODIFYING_TOOLS = new Set([
   "write_file",        // Direct file modification
+  "edit_file",         // In-place file modification
   "git",               // Commit, stage changes
   "run_command",       // May run build/test/script that modifies state
   "rex_update_status", // Task status changes (completion claim)
@@ -81,7 +82,7 @@ export function createExecutionReminder(
 
   return (
     reminder +
-    "Please now EXECUTE the plan. Use write_file, git, or run_command to make the actual changes. " +
+    "Please now EXECUTE the plan. Use edit_file, write_file, git, or run_command to make the actual changes. " +
     "Do not just repeat the plan — take concrete action."
   );
 }

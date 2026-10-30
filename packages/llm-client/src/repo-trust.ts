@@ -657,6 +657,8 @@ const HENCH_FIELD_CHECKS = {
     spawnTimeout: optional(nonNegative),
     maxConcurrentProcesses: optional((v) => positive(v) && Number.isSafeInteger(v)),
     allowedGitSubcommands: optional(strings),
+    writeShrinkRatio: optional((v) => nonNegative(v) && (v as number) <= 1),
+    writeShrinkMinBytes: optional(nonNegativeInt),
     policy: optional(shape({
       maxCommandsPerMinute: optional(nonNegativeInt),
       maxWritesPerMinute: optional(nonNegativeInt),

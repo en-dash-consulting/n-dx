@@ -631,7 +631,7 @@ function coerceValue(newValue, existingValue) {
  * and wrong for a host: `ndx config llm.local.host 127.1` would store the
  * number 127.1, and every reader of the URL would then refuse it.
  */
-const STRING_SETTINGS = new Set(["llm.local.host", "llm.local.verifier.host"]);
+const STRING_SETTINGS = new Set(["llm.local.host", "llm.local.verifier.host", "hench.escalation.model"]);
 
 /**
  * Settings that are numbers whatever the file holds today. `coerceValue` keeps
@@ -1246,7 +1246,29 @@ const HENCH_VALIDATORS = {
       );
     }
   },
+  "escalation.enabled": (value) => {
+    if (typeof value !== "boolean") {
+      throw new Error(`Invalid escalation.enabled "${value}". Expected true or false.`);
+    }
+  },
+  "escalation.after": (value) => requirePositiveInteger("escalation.after", value),
+  "escalation.maxAttempts": (value) => requirePositiveInteger("escalation.maxAttempts", value),
+  "escalation.vendor": (value) => {
+    if (!ESCALATION_VENDORS.includes(value)) {
+      throw new Error(`Invalid escalation vendor "${value}". Expected one of: ${ESCALATION_VENDORS.join(", ")}.`);
+    }
+  },
 };
+
+/** Vendors `hench.escalation.vendor` accepts: every vendor hench can run on. */
+const ESCALATION_VENDORS = ["claude", "codex", "google", "local"];
+
+/** Refuse anything but a whole number of at least 1, as hench's schema does. */
+function requirePositiveInteger(key, value) {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`Invalid ${key} "${value}". Expected a whole number of at least 1.`);
+  }
+}
 
 /**
  * Validators for specific claude config keys.
@@ -1353,6 +1375,16 @@ function validateLocalPort(key) {
   };
 }
 
+/** Validator for a key that takes a non-negative integer; `hint` is shown in the refusal. */
+function validateNonNegativeInteger(key, hint) {
+  return (v) => {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) {
+      throw new Error(`Invalid ${key} "${v}". Expected a non-negative integer (${hint}).`);
+    }
+  };
+}
+
 /**
  * Validators for llm.* config keys in .n-dx.json.
  * Keys are setting paths relative to the llm section.
@@ -1390,6 +1422,10 @@ const LLM_VALIDATORS = {
       );
     }
   },
+  "local.maxRetries": validateNonNegativeInteger("local.maxRetries", "e.g. 10, or 0 to fail on the first refused connection"),
+  "local.retryBaseDelayMs": validateNonNegativeInteger("local.retryBaseDelayMs", "milliseconds, e.g. 2000"),
+  "local.retryMaxDelayMs": validateNonNegativeInteger("local.retryMaxDelayMs", "milliseconds, e.g. 60000"),
+  "local.maxFormatRetries": validateNonNegativeInteger("local.maxFormatRetries", "e.g. 5, or 0 to fail on the first malformed reply"),
   "local.verifier.host": validateLocalHost("local.verifier.host"),
   "local.verifier.port": validateLocalPort("local.verifier.port"),
   "local.verifier.model": validateModel,
@@ -2224,6 +2260,24 @@ Hench review settings (the review pass after a task validates):
                                      The reviewer's model stays llm.<vendor>.reviewModel, then
                                      llm.reviewModel, then the vendor default.
 
+Hench escalation settings (a failing task gets a stronger model before it is skipped):
+  hench.escalation.enabled boolean   Escalate a task that keeps failing before skipping it as
+                                     stuck (default: false). Off leaves hench.maxFailedAttempts
+                                     exactly as before.
+  hench.escalation.after   number    Consecutive failed attempts before the next attempt is
+                                     escalated (default: 2; never later than
+                                     hench.maxFailedAttempts)
+  hench.escalation.vendor  string    Vendor an escalated attempt runs on: "claude", "codex",
+                                     "google" or "local". Required for escalation. It runs on
+                                     that vendor's CLI when it has one, else its API.
+  hench.escalation.model   string    Model an escalated attempt runs on. Unset means the
+                                     escalation vendor's own configured model. An explicit
+                                     --model flag disables escalation for that run, and a
+                                     task's saved run block still outranks this.
+  hench.escalation.maxAttempts
+                           number    Escalated attempts before the task is skipped as stuck
+                                     (default: 1)
+
 Hench guard settings (security boundaries):
   hench.guard.blockedPaths       string[]  Glob patterns for blocked file paths
                                            (default: .hench/**, .rex/**, .git/**, **/node_modules/**, …)
@@ -2231,6 +2285,14 @@ Hench guard settings (security boundaries):
                                            (default: npm, npx, node, git, tsc, vitest)
   hench.guard.commandTimeout     number    Command timeout in ms (default: 30000)
   hench.guard.maxFileSize        number    Max file size in bytes (default: 1048576)
+  hench.guard.writeShrinkRatio   number    write_file (API and local agents) refuses to replace an
+                                           existing file with content under this share of its
+                                           size unless the call passes rewrite: true; the model
+                                           is pointed at edit_file instead. 0-1 (default: 0.5,
+                                           0 disables)
+  hench.guard.writeShrinkMinBytes
+                                 number    Existing files at or below this size are exempt from
+                                           the shrink check (default: 1024)
   hench.guard.spawnTimeout       number    Timeout for a spawned vendor process in ms
                                            (default: 300000)
   hench.guard.maxConcurrentProcesses
@@ -2364,7 +2426,22 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
                                     e.g. 7200000 for 2 hours. This is separate from
                                     cli.timeoutMs / the CLI timeouts on the Workflow settings
                                     page, which bound the whole command rather than one
-                                    HTTP request.
+                                    HTTP request. It also sets how long to wait for the
+                                    server's response headers, which Node otherwise caps
+                                    at 300 s.
+  llm.local.maxRetries     number    Retries after the local server refuses or drops the
+                                    connection (or answers 429/5xx) before the request fails
+                                    (default: 6; 0 = fail on the first). With the default
+                                    delays that rides out about two minutes — long enough for
+                                    LM Studio to reload a model. After that hench.retry.*
+                                    retries the turn again before the task fails.
+  llm.local.retryBaseDelayMs number  First wait in ms before a retry; each later one doubles
+                                    (default: 2000)
+  llm.local.retryMaxDelayMs number   Cap on one wait in ms (default: 60000)
+  llm.local.maxFormatRetries number  Resends of a turn the server rejects because the model's
+                                    output was malformed — a broken tool call or channel
+                                    ("does not match the expected … format") — before the
+                                    run fails (default: 3; 0 = fail on the first)
   llm.local.verifier.host  string    Hostname of a second local server used to review the
                                     primary model's output before finalizing a run (optional)
   llm.local.verifier.port  number    Port of the verifier server (optional)
@@ -2630,6 +2707,8 @@ Examples:
   n-dx config llm.local.port 1234              Set local server port (default: 1234)
   n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
   n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
+  n-dx config llm.local.maxRetries 10          Wait longer for a restarting local server
+  n-dx config llm.local.maxFormatRetries 5     Resend malformed model replies more often
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config llm.claude.model claude-opus-5-5 Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex

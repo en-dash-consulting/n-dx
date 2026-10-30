@@ -68,6 +68,16 @@ export function resolveLLMVendor(llmConfig: LLMConfig): LLMVendor {
 }
 
 /**
+ * `llmConfig` with `vendor` made the active vendor, or unchanged without one.
+ * For an escalated attempt (`hench.escalation`): the loops read everything
+ * vendor-specific (adapter, binary, environment, provider) off the active
+ * vendor, so switching it here is what switches the attempt.
+ */
+export function withVendorOverride(llmConfig: LLMConfig, vendor: LLMVendor | undefined): LLMConfig {
+  return vendor ? { ...llmConfig, vendor } : llmConfig;
+}
+
+/**
  * Resolve active vendor CLI binary.
  *
  * Priority for Claude:

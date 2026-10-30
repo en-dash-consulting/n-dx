@@ -375,9 +375,10 @@ const EDIT_TOOLS = new Set([
   "MultiEdit",
   "Write",
   "NotebookEdit",
-  // tools/dispatch.ts — the only writer in the neutral set; `run_command` and
+  // tools/dispatch.ts — the file writers in the neutral set; `run_command` and
   // `git` can both change files, and neither says which, so neither is here.
   "write_file",
+  "edit_file",
 ]);
 
 /**

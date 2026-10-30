@@ -7,6 +7,16 @@
 
 import type { EnvPolicyConfig } from "../prd/llm-gateway.js";
 
+/**
+ * Default share of an existing file's size below which `write_file` refuses to
+ * replace it without `rewrite: true`. Shared with `schema/` so the loaded
+ * config and a hand-built GuardConfig agree.
+ */
+export const DEFAULT_WRITE_SHRINK_RATIO = 0.5;
+
+/** Existing files at or below this many bytes are exempt from the shrink check. */
+export const DEFAULT_WRITE_SHRINK_MIN_BYTES = 1024;
+
 /** Configurable subset of policy limits (all optional, defaults applied at runtime). */
 export interface PolicyLimitsConfig {
   /** Maximum commands per minute (0 = unlimited). */
@@ -42,6 +52,15 @@ export interface GuardConfig {
   maxConcurrentProcesses: number;
   /** Allowed git subcommands. Centralizes the git safety allowlist in guard config. */
   allowedGitSubcommands: string[];
+  /**
+   * `write_file` refuses to replace an existing file with content smaller than
+   * this share of its size (0-1) unless the call passes `rewrite: true`, so a
+   * model cannot blank a file it meant to change one line of. 0 disables the
+   * check. Default {@link DEFAULT_WRITE_SHRINK_RATIO}.
+   */
+  writeShrinkRatio?: number;
+  /** Existing files at or below this many bytes are exempt from the shrink check. */
+  writeShrinkMinBytes?: number;
   /** Policy limits for session-aware rate limiting and resource tracking. */
   policy?: PolicyLimitsConfig;
 }

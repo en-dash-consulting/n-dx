@@ -40,6 +40,14 @@ interface LocalVendorConfig {
   maxContextTokens: number | null;
   /** Per-request timeout in ms for local completions; 0 = no timeout, null = 5 min default. */
   timeoutMs: number | null;
+  /** llm.local connection retries; null = default 6. */
+  maxRetries: number | null;
+  /** First connection-retry wait in ms; null = default 2000. */
+  retryBaseDelayMs: number | null;
+  /** Cap on one connection-retry wait in ms; null = default 60000. */
+  retryMaxDelayMs: number | null;
+  /** Resends after malformed model output; null = default 3. */
+  maxFormatRetries: number | null;
   verifier: LocalVerifierVendorConfig;
 }
 
@@ -816,6 +824,10 @@ const FIELD_LABEL: Record<string, string> = {
   "local.port": "Local port",
   "local.maxContextTokens": "Context budget",
   "local.timeoutMs": "Request timeout",
+  "local.maxRetries": "Connection retries",
+  "local.retryBaseDelayMs": "First retry wait",
+  "local.retryMaxDelayMs": "Longest retry wait",
+  "local.maxFormatRetries": "Malformed-output resends",
   "local.verifier.host": "Verifier host",
   "local.verifier.port": "Verifier port",
   "local.verifier.model": "Verifier model",
@@ -1583,6 +1595,45 @@ function timeoutSummary(raw: string): string {
   return `${ms} ms`;
 }
 
+/** The llm.local retry settings, each with what it is for, in the order the Retries row shows them. */
+const LOCAL_RETRY_FIELDS = [
+  {
+    key: "local.maxRetries",
+    label: "Connection retries",
+    placeholder: "6",
+    desc: "How many times to retry when the local server refuses or drops the connection (or answers 429/5xx) before the request fails. With the default waits, 6 rides out about two minutes — long enough for a model reload. 0 fails on the first refusal.",
+  },
+  {
+    key: "local.retryBaseDelayMs",
+    label: "First retry wait (ms)",
+    placeholder: "2000",
+    desc: "Wait before the first connection retry; each later wait doubles.",
+  },
+  {
+    key: "local.retryMaxDelayMs",
+    label: "Longest retry wait (ms)",
+    placeholder: "60000",
+    desc: "Cap on any one wait between connection retries.",
+  },
+  {
+    key: "local.maxFormatRetries",
+    label: "Malformed-output resends",
+    placeholder: "3",
+    desc: "How many times to resend a turn the server rejected because the model's output was malformed (a broken tool call — \"does not match the expected format\"). 0 fails on the first.",
+  },
+] as const;
+
+/** The retry settings in one line: connection retries and malformed-output resends, defaults filled in. */
+function retrySummary(values: Record<string, string>): string {
+  const conn = values["local.maxRetries"].trim();
+  const format = values["local.maxFormatRetries"].trim();
+  const allBlank = LOCAL_RETRY_FIELDS.every((f) => values[f.key].trim() === "");
+  const c = conn || "6";
+  const f = format || "3";
+  return `${c} connection ${c === "1" ? "retry" : "retries"} · ${f} malformed-output ${f === "1" ? "resend" : "resends"}` +
+    (allBlank ? " (default)" : "");
+}
+
 /** The verifier in one line: its endpoint, model and review cycles, or Off when no endpoint is set. */
 function verifierSummary(host: string, port: string, model: string, maxCycles: string): string {
   if (!host.trim() && !port.trim()) return "Off";
@@ -1633,6 +1684,18 @@ function LocalSection({
     ?? (config.maxContextTokens !== null ? String(config.maxContextTokens) : "");
   const timeoutMs = editValues["local.timeoutMs"]
     ?? (config.timeoutMs !== null ? String(config.timeoutMs) : "");
+  const savedRetry: Record<string, number | null | undefined> = {
+    "local.maxRetries": config.maxRetries,
+    "local.retryBaseDelayMs": config.retryBaseDelayMs,
+    "local.retryMaxDelayMs": config.retryMaxDelayMs,
+    "local.maxFormatRetries": config.maxFormatRetries,
+  };
+  const retryValues: Record<string, string> = {};
+  for (const f of LOCAL_RETRY_FIELDS) {
+    const saved = savedRetry[f.key];
+    retryValues[f.key] = editValues[f.key] ?? (saved !== null && saved !== undefined ? String(saved) : "");
+  }
+  const retryDirty = LOCAL_RETRY_FIELDS.some((f) => dirtyKeys.has(f.key));
   const verifierHost = editValues["local.verifier.host"] ?? config.verifier.host ?? "";
   const verifierPort = editValues["local.verifier.port"]
     ?? (config.verifier.port !== null ? String(config.verifier.port) : "");
@@ -1741,6 +1804,28 @@ function LocalSection({
             placeholder: "e.g. 7200000 (0 = no limit)",
             onInput: (e: Event) => onChange("local.timeoutMs", (e.target as HTMLInputElement).value),
           }),
+        ),
+      ),
+
+      h(AdvancedRow, {
+        name: "Retries",
+        value: retrySummary(retryValues),
+        dirty: retryDirty,
+      },
+        ...LOCAL_RETRY_FIELDS.map((f) =>
+          h("div", { class: `llm-field${dirtyKeys.has(f.key) ? " llm-field-dirty" : ""}` },
+            h("label", { class: "llm-field-label", htmlFor: f.key }, f.label),
+            h("p", { class: "llm-field-desc" }, f.desc),
+            h("input", {
+              id: f.key,
+              type: "text",
+              inputMode: "numeric",
+              class: "llm-text-input",
+              value: retryValues[f.key],
+              placeholder: `${f.placeholder} (default)`,
+              onInput: (e: Event) => onChange(f.key, (e.target as HTMLInputElement).value),
+            }),
+          ),
         ),
       ),
 
@@ -1931,6 +2016,12 @@ export function RobotWranglerView() {
       if ("local.timeoutMs" in editValues) {
         const saved = data.local.timeoutMs !== null ? String(data.local.timeoutMs) : "";
         if (editValues["local.timeoutMs"] !== saved) dirtyKeys.add("local.timeoutMs");
+      }
+      for (const f of ["maxRetries", "retryBaseDelayMs", "retryMaxDelayMs", "maxFormatRetries"] as const) {
+        const k = `local.${f}`;
+        if (!(k in editValues)) continue;
+        const v = data.local[f];
+        if (editValues[k] !== (v !== null && v !== undefined ? String(v) : "")) dirtyKeys.add(k);
       }
       for (const f of ["host", "model"] as const) {
         const k = `local.verifier.${f}`;
@@ -2150,6 +2241,7 @@ export function RobotWranglerView() {
           config: data.local ?? {
             model: null, lightModel: null, host: null, port: null,
             maxContextTokens: null, timeoutMs: null,
+            maxRetries: null, retryBaseDelayMs: null, retryMaxDelayMs: null, maxFormatRetries: null,
             verifier: { host: null, port: null, model: null, maxCycles: null },
           },
           editValues,

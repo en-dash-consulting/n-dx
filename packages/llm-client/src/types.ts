@@ -114,8 +114,11 @@ export interface CompletionResult {
   tokenUsage?: TokenUsage;
 }
 
-/** Error classification for structured error handling. */
-export type ErrorReason = "auth" | "timeout" | "rate-limit" | "not-found" | "cli" | "unknown";
+/**
+ * Error classification for structured error handling. Why a call failed. `"network"`: the server could not be reached, or dropped
+ * the connection, after the provider's own retries — transient, so retryable.
+ */
+export type ErrorReason = "auth" | "timeout" | "rate-limit" | "not-found" | "network" | "cli" | "unknown";
 
 /** A classified error from a Claude call or CLI operation. */
 export class ClaudeClientError extends Error {
