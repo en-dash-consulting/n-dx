@@ -82,7 +82,7 @@ so replacing one with a direct import breaks nothing a test can see.
 | `start.ts` | `task-usage.ts` — the barrel facade, re-exporting `task-usage/register-scheduler.ts`; import the facade, never the subdirectory file | `broadcast`, `collectAllIds`, `loadPRD`, `getAggregator` | `RegisterSchedulerOptions` |
 | `start.ts` | `workspaces.ts` (`WorkspaceRegistry`) — hooks built by `createWorkspaceHooks` in start.ts, which owns the watcher registration; the registry must not import start.ts | `setup(ctx)` → watchers + PRD cache for a worktree, `teardown(handles)` | `WorkspaceHooks` |
 | `start.ts` | `routes-live.ts`, and through it `routes-live-analyze.ts` — built by `liveSourcesOf` in start.ts so the Live routes never import the workspace registry | `listWorkspaces()`, `memoryFloorBytes()` (optional; defaults to the hub config) | `LiveSources` |
-| `start.ts` | `routes-sidecar.ts` — built by `sidecarWorkspacesOf` in start.ts; the Diagnose branch lens and `github_read` find the attached worktree by workspace key | `listWorkspaces()` | `SidecarWorkspaces` |
+| `start.ts` | `routes-sidecar.ts` — built by `sidecarWorkspacesOf` in start.ts | `listWorkspaces()` | `SidecarWorkspaces` |
 
 - **Prefer injection over import** when the target would otherwise import from a
   higher-tier zone.

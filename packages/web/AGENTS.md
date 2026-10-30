@@ -74,10 +74,9 @@ by `boundary-check.test.ts`.
 
 ## Web injection seam registry
 
-The table lives in `src/server/AGENTS.md`, beside the code it governs. Four
-seams in `start.ts` inject callbacks rather than importing — the scheduler
-(`RegisterSchedulerOptions`), the workspace registry (`WorkspaceHooks`), the
-Live routes (`LiveSources`) and the Sidecar routes (`SidecarWorkspaces`). Static analysis cannot see them, so a new one needs
+The table lives in `src/server/AGENTS.md`, beside the code it governs. Seams in
+`start.ts` (`RegisterSchedulerOptions` and the rest) inject callbacks
+rather than importing. Static analysis cannot see them; a new one needs
 a row there and a named interface type in the target module.
 
 A package other than web or core that grows an injection seam puts its registry
