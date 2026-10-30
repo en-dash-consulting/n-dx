@@ -6,7 +6,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { BranchHealth, FailingCheck, PredictedConflict } from "../../../src/server/branch-health/index.js";
-import { BRANCH_LOG_TAIL_CHARS, buildDiagnoseBranchPacket, DIAGNOSE_BRANCH_CAP } from "../../../src/server/sidecar/branch-packet.js";
+import { BRANCH_LOG_TAIL_CHARS, buildDiagnoseBranchPacket, cardArgv, DIAGNOSE_BRANCH_CAP } from "../../../src/server/sidecar/branch-packet.js";
 import { DIAGNOSE_BRANCH_INSTRUCTIONS } from "../../../src/server/sidecar/lens-instructions.js";
 import { buildLensPacket, LENS_PACKETS } from "../../../src/server/sidecar/lens-packets.js";
 import type { BranchHealthRead, PacketSources } from "../../../src/server/sidecar/packet-sources.js";
@@ -156,6 +156,16 @@ describe("Diagnose branch in the lens registry", () => {
   });
 });
 
+describe("cardArgv", () => {
+  it("gives every argv a card carries one startSidecarCommand starts, and null for any other program", () => {
+    expect(cardArgv(["git", "add", "--", "a"])).toEqual(["git", "add", "--", "a"]);
+    expect(cardArgv(["ndx", "status", "."])).toEqual(["ndx", "status", "."]);
+    expect(cardArgv(["rex", "validate"])).toEqual(["ndx", "rex", "validate"]);
+    expect(cardArgv(["pnpm", "install"])).toBeNull();
+    expect(cardArgv(["node", "scripts/build-iso-skill.mjs"])).toBeNull();
+  });
+});
+
 describe("the Diagnose branch packet", () => {
   it("carries the instructions, branch, base, PR, stack position and containment, and ahead/behind, within its cap", async () => {
     const packet = await buildDiagnoseBranchPacket(sources(async () => read()), { ref: WORKTREE.key }, NOW);
@@ -190,8 +200,12 @@ describe("the Diagnose branch packet", () => {
     expect(text).toContain('raise run_command ["git","merge","origin/feat/sidecar-r2"] first');
     expect(text).toContain("- .rex/prd_tree/epic/index.md [prd-children-table]");
     expect(text).toContain('  1. ["git","checkout","--ours","--",".rex/prd_tree/epic/index.md"]');
+    // A Sidecar command job starts ndx and git only: rex runs as ndx rex, anything else by hand.
+    expect(text).toContain('  2. ["ndx","rex","validate","--post-merge","--repair"]');
+    expect(text).not.toContain('["rex",');
     expect(text).toContain("- docs/analysis/prompt-token-baseline.md [generated]");
-    expect(text).toContain('  2. ["pnpm","prompt-census"]');
+    expect(text).toContain("  2. by hand, no card (Sidecar runs only ndx and git): `pnpm prompt-census`");
+    expect(text).not.toContain('["pnpm"');
     expect(text).toMatch(/\[prd-children-table\].*\n  Cards: run_command, one per step in order/);
     expect(text).toMatch(/\[generated\].*\n  Cards: run_command, one per step in order/);
     expect(text).toMatch(/\[allowlist-union\].*\n  Card: propose_edit \{"path": "tests\/allow.json"/);

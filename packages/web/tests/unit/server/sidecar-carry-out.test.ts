@@ -838,6 +838,15 @@ describe("github_read and draft_github_post", () => {
     await client.close();
   });
 
+  it.each(["--repo=someone/else", "-R", "7 --repo=x"])("raises no card for a draft whose target gh would read as a flag (%s)", async (target) => {
+    const client = await brokerClient();
+    const result = await client.callTool({ name: "draft_github_post", arguments: { kind: "comment", target, body: "x" } });
+    expect(result.isError).toBe(true);
+    expect(broker.cards(SESSION)).toEqual([]);
+    expect(ghCalls()).toEqual([]);
+    await client.close();
+  });
+
   it.each([
     ["Discard", undefined],
     ["Copy", "Copied, not posted"],

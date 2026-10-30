@@ -72,6 +72,26 @@ function argvText(argv: readonly string[]): string {
   return JSON.stringify(argv);
 }
 
+/**
+ * A fix step as a `run_command` card runs it, or null when no card can:
+ * a Sidecar command job starts `ndx` and `git` only (`startSidecarCommand`),
+ * so `rex` runs as `ndx rex` and any other program is run by hand.
+ */
+export function cardArgv(argv: readonly string[]): string[] | null {
+  const [program, ...rest] = argv;
+  if (program === "ndx" || program === "git") return [...argv];
+  if (program === "rex") return ["ndx", "rex", ...rest];
+  return null;
+}
+
+/** One numbered fix step: the argv its card carries, or the command to run by hand. */
+function stepLine(argv: readonly string[], i: number): string {
+  const card = cardArgv(argv);
+  return card
+    ? `  ${i + 1}. ${argvText(card)}`
+    : `  ${i + 1}. by hand, no card (Sidecar runs only ndx and git): \`${argv.join(" ")}\``;
+}
+
 function worktreeBody(read: BranchHealthRead): string {
   const { health } = read;
   return [
@@ -117,11 +137,11 @@ function conflictLines(c: PredictedConflict, read: BranchHealthRead): string[] {
   if ("diff" in c.fix) {
     return [head, `  Card: ${card} {"path": ${JSON.stringify(c.path)}, "diff": the diff below}`, ...c.fix.diff.replace(/\n$/, "").split("\n").map((l) => `  ${l}`)];
   }
-  const steps = c.fix.steps.map((argv, i) => `  ${i + 1}. ${argvText(argv)}`);
   if (card === "propose_prd_change") {
+    const steps = c.fix.steps.map((argv, i) => `  ${i + 1}. ${argv.join(" ")}`);
     return [head, "  Card: propose_prd_change, one task to resolve the duplicate in the merge, its done-when these steps in order:", ...steps];
   }
-  return [head, "  Cards: run_command, one per step in order, inside the merge:", ...steps];
+  return [head, "  Cards: run_command, one per step in order, inside the merge:", ...c.fix.steps.map(stepLine)];
 }
 
 function conflictsBody(read: BranchHealthRead): string {

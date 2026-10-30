@@ -94,7 +94,12 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
   },
   draft_github_post: {
     description: "Draft a PR comment (`comment`) or review comment (`review`) on `target` (a PR number, URL or branch). Always waits for the operator's draft card; it is posted under the operator's gh login only on Approve, and Copy or Discard posts nothing.",
-    input: { kind: z.enum(GITHUB_POST_KINDS), target: z.string().min(1), body: z.string().min(1) },
+    input: {
+      kind: z.enum(GITHUB_POST_KINDS),
+      // gh would read a leading "-" as a flag (`--repo=…` posts to another repository).
+      target: z.string().regex(/^[^-\s]\S*$/, "a PR number, URL or branch, not a flag").describe("A PR number, URL or branch"),
+      body: z.string().min(1),
+    },
   },
   migration_decision: {
     description: "Record decisions for a v1 to v2 PRD migration. Always waits for the operator's migration-decision card.",

@@ -159,7 +159,8 @@ async function carryOut(
       // Posted only from an approved card, and exactly the draft the operator read on it.
       if (!card) return { ok: false, text: "A draft is posted only from an approved card; nothing was posted." };
       const { kind, target, body } = card.input;
-      if (!(GITHUB_POST_KINDS as readonly unknown[]).includes(kind) || typeof target !== "string" || typeof body !== "string") {
+      // A target gh would read as a flag is never passed to it, whatever raised the card.
+      if (!(GITHUB_POST_KINDS as readonly unknown[]).includes(kind) || typeof target !== "string" || !/^[^-\s]\S*$/.test(target) || typeof body !== "string") {
         return { ok: false, text: "The card carried no draft to post; nothing was posted." };
       }
       return actions.postGithub({ kind: kind as GithubDraft["kind"], target, body });
