@@ -73,6 +73,7 @@
  * - `repo-command-env.ts` — the sanitized environment for repository-owned commands
  * - `redact.ts` — credential redaction for run records, logs and live output
  * - `auth-token.ts` — per-user dashboard token file (`<ndx home>/auth.token`)
+ * - `credential-store.ts` — per-user credential store (`<ndx home>/credentials.json`)
  * - `output.ts` — CLI output control (quiet mode)
  * - `suggest.ts` — CLI typo correction
  * - `help-format.ts` — CLI help formatting and color output
@@ -480,6 +481,28 @@ export type { ParsedGitRemote, RemoteHostKind } from "./git-remote-url.js";
 // Per-user dashboard token file (`<ndx home>/auth.token`); the request check lives in web/shared/auth.ts
 export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken } from "./auth-token.js";
 export type { AuthTokenPathOptions } from "./auth-token.js";
+
+// Per-user credential store (`<ndx home>/credentials.json`). The orchestration
+// tier spawns dist/cli/credentials.js rather than importing these.
+export {
+  CREDENTIALS_FILENAME,
+  CREDENTIAL_STORE_VERSION,
+  CREDENTIAL_NAME_PATTERN,
+  CREDENTIAL_ENV_VARS,
+  credentialStorePath,
+  credentialFingerprint,
+  resolveCredential,
+  setCredential,
+  unsetCredential,
+  credentialStatus,
+} from "./credential-store.js";
+export type {
+  CredentialSource,
+  CredentialStatus,
+  CredentialStoreOptions,
+  CredentialWriteOptions,
+  ResolvedCredential,
+} from "./credential-store.js";
 
 // Project-level config utilities (.n-dx.json overrides)
 export {

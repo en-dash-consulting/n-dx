@@ -17,7 +17,14 @@ items:
     lastModified: "2026-10-30T15:27:29.043Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2f5ce643-1c49-4c70-ab2c-545f956873df":
-    lastModified: "2026-10-30T15:27:55.967Z"
+    status: "completed"
+    startedAt: "2026-10-30T15:54:09.159Z"
+    completedAt: "2026-10-30T16:13:02.576Z"
+    endedAt: "2026-10-30T16:13:02.576Z"
+    activeIntervals: [{"end":"2026-10-30T16:13:02.576Z","start":"2026-10-30T15:54:09.159Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client src/credential-store.ts (resolve/set/unset/status, v1 format, O_EXCL pid lock with dead-holder takeover, temp+rename, POSIX 0600/0700 + refusal, win32 icacls port) and src/cli/credentials.ts (set via stdin, unset, status [--json], typesafe only); re-exported from public.ts. No hench gateway change."
+    lastModified: "2026-10-30T16:13:02.576Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "534debf3-0b82-43af-adf5-be497be7b85f":
     lastModified: "2026-10-30T14:43:58.718Z"

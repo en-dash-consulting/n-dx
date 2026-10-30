@@ -1,0 +1,603 @@
+/**
+ * The per-user credential store: `<ndx home>/credentials.json`.
+ *
+ * One store per user, shared by every project and worktree, for credentials
+ * n-dx must hold itself (the TypeSafe key now; vendor keys and connection
+ * tokens later). This module is the store's only reader and writer: format,
+ * lock, atomic replace and owner-only permissions all live here. The
+ * orchestration tier reaches it by spawning `dist/cli/credentials.js`.
+ *
+ * ## Lookup order
+ *
+ * {@link resolveCredential} reads the credential's environment variable first
+ * (`TYPESAFE_API_KEY` for `typesafe`), then the store. An exported key always
+ * wins, so a CI job or a one-off shell override never has to touch the file.
+ *
+ * ## Format
+ *
+ * ```json
+ * { "version": 1,
+ *   "entries": { "typesafe": { "backend": "file", "value": "…", "updatedAt": "…" } } }
+ * ```
+ *
+ * Entry names are open (`connection:<id>` is reserved for connections) and
+ * match {@link CREDENTIAL_NAME_PATTERN}. Unknown top-level and entry fields are
+ * preserved on every write, so a newer n-dx can add fields an older one keeps.
+ * A file with an unknown `version` is never overwritten and reads as empty.
+ *
+ * ## Safety
+ *
+ * - Writes go to a temp file in the same directory, then rename, under a
+ *   cross-process lock (`credentials.json.lock`), so two writers lose nothing.
+ * - POSIX: the file is 0600 and its directory 0700. A store readable by group
+ *   or others is refused with a warning naming the fix. Windows: the writer
+ *   breaks ACL inheritance and grants the owner alone (`icacls`), verified.
+ * - No function here prints or logs a credential value. Status reports an
+ *   8-character SHA-256 fingerprint instead.
+ */
+
+import { createHash, randomUUID } from "node:crypto";
+import {
+  chmodSync,
+  closeSync,
+  linkSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeSync,
+  type Stats,
+} from "node:fs";
+import { userInfo } from "node:os";
+import { dirname, join } from "node:path";
+import { TYPESAFE_API_KEY_ENV } from "./config.js";
+import { execFileSyncCli } from "./exec.js";
+import { resolveNdxHome, type ResolveNdxHomeOptions } from "./layout.js";
+
+export const CREDENTIALS_FILENAME = "credentials.json";
+export const CREDENTIAL_STORE_VERSION = 1;
+export const CREDENTIAL_NAME_PATTERN = /^[a-z0-9][a-z0-9._:-]*$/;
+
+/**
+ * The environment variable that overrides each named credential. A name with
+ * no entry here (a connection) is read from the store alone.
+ */
+export const CREDENTIAL_ENV_VARS: Readonly<Record<string, string>> = Object.freeze({
+  typesafe: TYPESAFE_API_KEY_ENV,
+});
+
+export type CredentialSource = "env" | "file";
+
+export interface ResolvedCredential {
+  value: string;
+  source: CredentialSource;
+}
+
+export interface CredentialStoreOptions extends ResolveNdxHomeOptions {
+  /** Override the per-user directory entirely (tests). */
+  ndxHome?: string;
+  /** Where warnings go. Defaults to stderr. Never receives a credential value. */
+  warn?: (message: string) => void;
+  /** Platform whose permission rules apply. Defaults to `process.platform`. */
+  platform?: NodeJS.Platform;
+}
+
+export interface CredentialWriteOptions extends CredentialStoreOptions {
+  /** How long to wait for another writer's lock, in ms. Default 10 s. */
+  lockTimeoutMs?: number;
+  /** Runs `icacls` on win32; injectable so the ACL path is testable anywhere. */
+  execFileSyncImpl?: typeof execFileSyncCli;
+  /** The current user's name for the ACL grant; injectable for tests. */
+  username?: string;
+}
+
+export interface CredentialStatus {
+  name: string;
+  /** Where {@link resolveCredential} finds the value, or null when nowhere. */
+  source: CredentialSource | null;
+  /** The stored entry's backend, or null when the store has no entry. */
+  backend: string | null;
+  /** First 8 hex characters of the SHA-256 of the resolved value. */
+  fingerprint: string | null;
+  /** The environment variable that overrides the store, when there is one. */
+  envVar: string | null;
+  storePath: string;
+}
+
+interface StoreEntry {
+  backend?: unknown;
+  value?: unknown;
+  updatedAt?: unknown;
+  [field: string]: unknown;
+}
+
+interface StoreFile {
+  version: number;
+  entries: Record<string, StoreEntry>;
+  [field: string]: unknown;
+}
+
+/** Where this user's store lives, whether or not it exists yet. */
+export function credentialStorePath(options: CredentialStoreOptions = {}): string {
+  return join(options.ndxHome ?? resolveNdxHome(options), CREDENTIALS_FILENAME);
+}
+
+/** Throws when `name` cannot be a store entry name. */
+export function assertCredentialName(name: string): void {
+  if (!CREDENTIAL_NAME_PATTERN.test(name)) {
+    throw new Error(
+      `Invalid credential name ${JSON.stringify(name)}: names match ${CREDENTIAL_NAME_PATTERN.source}`,
+    );
+  }
+}
+
+/** First 8 hex characters of the value's SHA-256 — identifies, never reveals. */
+export function credentialFingerprint(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 8);
+}
+
+const defaultWarn = (message: string): void => {
+  process.stderr.write(`${message}\n`);
+};
+
+// ── Reading ──────────────────────────────────────────────────────────────────
+
+/**
+ * Per-process read cache, keyed by path. A hit needs the same mtime, ctime and
+ * size: a rewrite changes the first, a chmod the second, so fixing a refused
+ * store's mode is seen without a restart. A cached refusal does not warn again.
+ */
+const readCache = new Map<string, { key: string; store: StoreFile | undefined }>();
+
+function statKey(stats: Stats): string {
+  return `${stats.mtimeMs}:${stats.ctimeMs}:${stats.size}`;
+}
+
+/** The store's contents, or undefined when it is missing, refused or unreadable. */
+function readStore(path: string, options: CredentialStoreOptions): StoreFile | undefined {
+  const warn = options.warn ?? defaultWarn;
+  const stats = statSync(path, { throwIfNoEntry: false });
+  if (!stats) {
+    readCache.delete(path);
+    return undefined;
+  }
+  const key = statKey(stats);
+  const cached = readCache.get(path);
+  if (cached?.key === key) return cached.store;
+
+  const store = loadStore(path, stats, options.platform ?? process.platform, warn);
+  readCache.set(path, { key, store });
+  return store;
+}
+
+function loadStore(
+  path: string,
+  stats: Stats,
+  platform: NodeJS.Platform,
+  warn: (message: string) => void,
+): StoreFile | undefined {
+  if (platform !== "win32" && (stats.mode & 0o077) !== 0) {
+    warn(
+      `Refusing to read the credential store ${path}: it is readable by other users ` +
+        `(mode 0${(stats.mode & 0o777).toString(8)}). Fix it with: chmod 600 ${path}`,
+    );
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf-8"));
+  } catch (err) {
+    // The message names the file, never its contents: a JSON parse error can
+    // quote the text around the fault, which may be part of a key.
+    warn(`Ignoring the credential store ${path}: it is not valid JSON (${errorCode(err) ?? "parse error"}).`);
+    return undefined;
+  }
+  const versionError = checkVersion(parsed);
+  if (versionError) {
+    warn(`Ignoring the credential store ${path}: ${versionError}`);
+    return undefined;
+  }
+  return parsed as StoreFile;
+}
+
+/** Why `parsed` is not a store this version understands, or null when it is. */
+function checkVersion(parsed: unknown): string | null {
+  if (!isRecord(parsed)) return "it is not a JSON object.";
+  if (parsed.version !== CREDENTIAL_STORE_VERSION) {
+    return `version ${JSON.stringify(parsed.version)} is not one this n-dx understands (expected ${CREDENTIAL_STORE_VERSION}); upgrade n-dx.`;
+  }
+  if (parsed.entries !== undefined && !isRecord(parsed.entries)) return "its entries field is not an object.";
+  return null;
+}
+
+/** The stored entry's value when its backend is `file` and the value is usable. */
+function fileValue(entry: StoreEntry | undefined): string | undefined {
+  if (!entry || entry.backend !== "file" || typeof entry.value !== "string") return undefined;
+  const value = entry.value.trim();
+  return value.length > 0 ? value : undefined;
+}
+
+/**
+ * The credential named `name`: its environment variable when non-blank, else
+ * the store's `file` entry. Undefined when neither holds one.
+ */
+export function resolveCredential(
+  name: string,
+  options: CredentialStoreOptions = {},
+): ResolvedCredential | undefined {
+  assertCredentialName(name);
+  const env = options.env ?? process.env;
+  const envVar = CREDENTIAL_ENV_VARS[name];
+  const fromEnv = envVar ? env[envVar]?.trim() : undefined;
+  if (fromEnv) return { value: fromEnv, source: "env" };
+
+  const store = readStore(credentialStorePath(options), options);
+  const value = fileValue(store?.entries?.[name]);
+  return value ? { value, source: "file" } : undefined;
+}
+
+/** What {@link resolveCredential} would find for `name`, without the value. */
+export function credentialStatus(name: string, options: CredentialStoreOptions = {}): CredentialStatus {
+  assertCredentialName(name);
+  const storePath = credentialStorePath(options);
+  const entry = readStore(storePath, options)?.entries?.[name];
+  const resolved = resolveCredential(name, options);
+  return {
+    name,
+    source: resolved?.source ?? null,
+    backend: entry && typeof entry.backend === "string" ? entry.backend : null,
+    fingerprint: resolved ? credentialFingerprint(resolved.value) : null,
+    envVar: CREDENTIAL_ENV_VARS[name] ?? null,
+    storePath,
+  };
+}
+
+// ── Writing ──────────────────────────────────────────────────────────────────
+
+/** Store `value` under `name` with the `file` backend. */
+export function setCredential(name: string, value: string, options: CredentialWriteOptions = {}): void {
+  assertCredentialName(name);
+  const trimmed = value.trim();
+  if (trimmed.length === 0) throw new Error(`Refusing to store an empty value for ${name}.`);
+  if (/[\r\n]/.test(trimmed)) throw new Error(`Refusing to store a multi-line value for ${name}.`);
+  updateStore(options, (store) => {
+    // Spread first: fields a newer n-dx added to the entry survive.
+    store.entries[name] = {
+      ...store.entries[name],
+      backend: "file",
+      value: trimmed,
+      updatedAt: new Date().toISOString(),
+    };
+    return true;
+  });
+}
+
+/** Remove `name` from the store. Returns whether an entry was removed. */
+export function unsetCredential(name: string, options: CredentialWriteOptions = {}): boolean {
+  assertCredentialName(name);
+  let removed = false;
+  updateStore(options, (store) => {
+    if (!Object.hasOwn(store.entries, name)) return false;
+    delete store.entries[name];
+    removed = true;
+    return true;
+  });
+  return removed;
+}
+
+/**
+ * Read-modify-write the store under its lock. `mutate` returns false when it
+ * changed nothing, and then nothing is written.
+ */
+function updateStore(options: CredentialWriteOptions, mutate: (store: StoreFile) => boolean): void {
+  const path = credentialStorePath(options);
+  const dir = dirname(path);
+  const platform = options.platform ?? process.platform;
+  ensurePrivateDir(dir, platform);
+
+  withStoreLock(path, options.lockTimeoutMs ?? 10_000, () => {
+    const store = readStoreForWrite(path);
+    if (!mutate(store)) return;
+    writeStoreAtomic(path, store, options);
+  });
+  readCache.delete(path);
+}
+
+function ensurePrivateDir(dir: string, platform: NodeJS.Platform): void {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  if (platform === "win32") return;
+  // An ndx home created by an older n-dx, or by hand, may be 0755. The store
+  // is the reason the directory must be private, so it is tightened here.
+  if ((statSync(dir).mode & 0o077) !== 0) chmodSync(dir, 0o700);
+}
+
+/**
+ * The store as it is on disk right now (never the cache: a writer must see
+ * the previous writer's update). A missing file is an empty store; an unknown
+ * version or unparseable file throws, so it is never overwritten.
+ */
+function readStoreForWrite(path: string): StoreFile {
+  let text: string;
+  try {
+    text = readFileSync(path, "utf-8");
+  } catch (err) {
+    if (errorCode(err) === "ENOENT") return { version: CREDENTIAL_STORE_VERSION, entries: {} };
+    throw err;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`The credential store ${path} is not valid JSON; fix or remove it before storing a credential.`);
+  }
+  const versionError = checkVersion(parsed);
+  if (versionError) throw new Error(`Refusing to overwrite the credential store ${path}: ${versionError}`);
+  const store = parsed as StoreFile;
+  return { ...store, entries: { ...(store.entries ?? {}) } };
+}
+
+function writeStoreAtomic(path: string, store: StoreFile, options: CredentialWriteOptions): void {
+  const platform = options.platform ?? process.platform;
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  const fd = openSync(temporary, "wx", 0o600);
+  try {
+    writeSync(fd, `${JSON.stringify(store, null, 2)}\n`);
+  } finally {
+    closeSync(fd);
+  }
+  try {
+    if (platform === "win32") {
+      // Restrict before the rename, so the store is never in place unrestricted.
+      const result = restrictToOwnerWindows(temporary, {
+        execFileSyncImpl: options.execFileSyncImpl ?? execFileSyncCli,
+        username: options.username,
+        env: options.env,
+      });
+      if (!result.restricted) {
+        (options.warn ?? defaultWarn)(
+          `Warning: could not restrict permissions on ${path}: ${result.detail}. ` +
+            `It may be readable by other users of this machine.`,
+        );
+      }
+    } else {
+      // The process umask can only remove bits from 0600, but be explicit.
+      chmodSync(temporary, 0o600);
+    }
+    renameSync(temporary, path);
+  } catch (err) {
+    rmSync(temporary, { force: true });
+    throw err;
+  }
+}
+
+// ── Windows owner-only ACL ───────────────────────────────────────────────────
+
+export interface AclResult {
+  restricted: boolean;
+  detail: string;
+}
+
+/**
+ * Parse `icacls <path>` output into access-control entries. Identities and
+ * flags are symbolic and not localized, so this is locale-safe.
+ *
+ * TWIN: packages/core/file-permissions.js parseIcaclsOutput.
+ */
+export function parseIcaclsOutput(output: string, path: string): Array<{ identity: string; flags: string[] }> {
+  const aces: Array<{ identity: string; flags: string[] }> = [];
+  for (const rawLine of String(output).split(/\r?\n/)) {
+    const line = rawLine.replace(path, "").trim();
+    if (!line) continue;
+    // Flag groups exclude "(" so the match stays linear on pathological lines.
+    const match = line.match(/^(.*?):((?:\([^()]*\))+)$/);
+    if (!match) continue;
+    const identity = match[1].trim();
+    if (!identity) continue;
+    aces.push({ identity, flags: [...match[2].matchAll(/\(([^()]*)\)/g)].map((m) => m[1]) });
+  }
+  return aces;
+}
+
+function sameIdentity(a: string, b: string): boolean {
+  const bare = (s: string): string => s.toLowerCase().split("\\").pop()!.trim();
+  return bare(a) === bare(b);
+}
+
+/**
+ * Break inheritance on `path` and grant the current user alone, then verify
+ * the DACL rather than trusting icacls's exit code. Never throws.
+ *
+ * Ported from packages/core/file-permissions.js restrictFileToOwner (its win32
+ * branch); `fs.chmod` on Windows changes only the read-only attribute and
+ * leaves every inherited ACE in place.
+ */
+export function restrictToOwnerWindows(
+  path: string,
+  options: { execFileSyncImpl?: typeof execFileSyncCli; username?: string; env?: NodeJS.ProcessEnv } = {},
+): AclResult {
+  const run = options.execFileSyncImpl ?? execFileSyncCli;
+  let username: string;
+  try {
+    username = options.username ?? userInfo().username;
+  } catch (err) {
+    return { restricted: false, detail: `could not determine the current user: ${errorMessage(err)}` };
+  }
+  // Fully qualified when the domain is known: a bare name can be ambiguous.
+  const domain = (options.env ?? process.env).USERDOMAIN;
+  const grantee = domain ? `${domain}\\${username}` : username;
+
+  try {
+    run("icacls", [path, "/inheritance:r", "/grant:r", `${grantee}:F`], { stdio: "ignore" });
+  } catch (err) {
+    return { restricted: false, detail: `icacls failed: ${errorMessage(err)}` };
+  }
+
+  let aces: Array<{ identity: string; flags: string[] }>;
+  try {
+    aces = parseIcaclsOutput(String(run("icacls", [path], { encoding: "utf-8" })), path);
+  } catch (err) {
+    return { restricted: false, detail: `could not read back the ACL: ${errorMessage(err)}` };
+  }
+
+  // Inheritance removal leaves other principals' EXPLICIT ACEs (some temp
+  // directories start files with them); remove each, then re-verify.
+  const leftover = [...new Set(
+    aces.filter((a) => !a.flags.includes("I") && !sameIdentity(a.identity, username)).map((a) => a.identity),
+  )];
+  if (leftover.length > 0) {
+    try {
+      run("icacls", [path, ...leftover.flatMap((identity) => ["/remove", identity])], { stdio: "ignore" });
+      aces = parseIcaclsOutput(String(run("icacls", [path], { encoding: "utf-8" })), path);
+    } catch (err) {
+      return { restricted: false, detail: `icacls failed removing ${leftover.join(", ")}: ${errorMessage(err)}` };
+    }
+  }
+
+  if (aces.length === 0) return { restricted: false, detail: "could not parse the ACL from icacls output" };
+  const inherited = aces.filter((a) => a.flags.includes("I"));
+  if (inherited.length > 0) {
+    return { restricted: false, detail: `inheritance is still in effect (${inherited.map((a) => a.identity).join(", ")})` };
+  }
+  const foreign = aces.filter((a) => !sameIdentity(a.identity, username));
+  if (foreign.length > 0) {
+    return { restricted: false, detail: `other principals still have access: ${foreign.map((a) => a.identity).join(", ")}` };
+  }
+  return { restricted: true, detail: `DACL restricted to ${grantee}` };
+}
+
+// ── Cross-process lock ───────────────────────────────────────────────────────
+
+const LOCK_POLL_MS = 25;
+
+/**
+ * Run `fn` holding `<store>.lock`. The lock file records the holder's PID; a
+ * lock whose PID is dead is taken over. A live holder is waited for up to
+ * `timeoutMs`, then the call fails naming it.
+ */
+function withStoreLock<T>(storePath: string, timeoutMs: number, fn: () => T): T {
+  const lockPath = `${storePath}.lock`;
+  const token = randomUUID();
+  const content = JSON.stringify({ pid: process.pid, token, since: new Date().toISOString() });
+  const deadline = Date.now() + timeoutMs;
+
+  for (;;) {
+    if (tryCreateLock(lockPath, content)) break;
+    const holder = readLock(lockPath);
+    if (holder !== undefined && !pidAlive(holder.pid)) {
+      takeOverStale(lockPath, holder.raw, token);
+      continue;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for the credential store lock ${lockPath}` +
+          (holder ? ` (held by PID ${holder.pid} since ${holder.since}).` : ".") +
+          ` If no n-dx process is running, delete ${lockPath}.`,
+      );
+    }
+    sleepSync(LOCK_POLL_MS);
+  }
+
+  try {
+    return fn();
+  } finally {
+    // Remove only our own lock: a stale-lock takeover by another writer must
+    // not be undone by this one.
+    if (readLock(lockPath)?.raw === content) rmSync(lockPath, { force: true });
+  }
+}
+
+function tryCreateLock(lockPath: string, content: string): boolean {
+  let fd: number;
+  try {
+    fd = openSync(lockPath, "wx", 0o600);
+  } catch (err) {
+    if (errorCode(err) === "EEXIST") return false;
+    throw err;
+  }
+  try {
+    writeSync(fd, content);
+  } finally {
+    closeSync(fd);
+  }
+  return true;
+}
+
+/**
+ * The lock's holder, or undefined when there is no lock or it is still being
+ * written (empty or partial content). A partial lock is waited for, never
+ * judged stale: its writer is alive by definition.
+ */
+function readLock(lockPath: string): { pid: number; since: string; raw: string } | undefined {
+  let raw: string;
+  try {
+    raw = readFileSync(lockPath, "utf-8");
+  } catch (err) {
+    if (errorCode(err) === "ENOENT") return undefined;
+    throw err;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (isRecord(parsed) && typeof parsed.pid === "number") {
+      return { pid: parsed.pid, since: String(parsed.since ?? "unknown"), raw };
+    }
+  } catch {
+    // Mid-write: the holder opened the file and has not written it yet.
+  }
+  return undefined;
+}
+
+/**
+ * Rename a dead holder's lock aside and drop it. When the renamed file is not
+ * the one judged dead, another writer recovered it and took the lock in
+ * between: put it back, and the caller retries.
+ */
+function takeOverStale(lockPath: string, judged: string, token: string): void {
+  const aside = `${lockPath}.${token}.stale`;
+  try {
+    renameSync(lockPath, aside);
+  } catch (err) {
+    if (errorCode(err) === "ENOENT") return;
+    throw err;
+  }
+  const moved = readFileSync(aside, "utf-8");
+  try {
+    // Put a live lock back. A hard link, not a rename: rename would replace a
+    // lock a third writer took in the meantime, and two writers would hold it.
+    if (moved !== judged) linkSync(aside, lockPath);
+  } catch (err) {
+    if (errorCode(err) !== "EEXIST") throw err;
+  } finally {
+    rmSync(aside, { force: true });
+  }
+}
+
+/** `kill(pid, 0)`; EPERM means the process exists but is not ours to signal. */
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return errorCode(err) === "EPERM";
+  }
+}
+
+const sleepCell = new Int32Array(new SharedArrayBuffer(4));
+function sleepSync(ms: number): void {
+  Atomics.wait(sleepCell, 0, 0, ms);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function errorCode(err: unknown): string | undefined {
+  return (err as NodeJS.ErrnoException | null)?.code;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
