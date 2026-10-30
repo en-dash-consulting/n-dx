@@ -31,10 +31,9 @@ items:
     lastModified: "2026-10-30T14:21:01.594Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "55faa034-3df0-41a1-9aef-67d1dc896340":
-    status: "in_progress"
     startedAt: "2026-10-30T16:36:46.602Z"
-    activeIntervals: [{"start":"2026-10-30T16:36:46.602Z"}]
-    lastModified: "2026-10-30T16:36:50.655Z"
+    activeIntervals: [{"end":"2026-10-30T18:11:21.215Z","start":"2026-10-30T16:36:46.602Z"}]
+    lastModified: "2026-10-30T18:11:25.518Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6dcba986-4fe6-4d8d-ab84-54d45db119b1":
     issues: ["https://www.notion.so/3f7a80b71924810aa984d37d94970566","https://www.notion.so/3f7a80b7192481c99690f94435b87799","https://www.notion.so/3f7a80b7192481d190ddd2eea210d9a5"]
