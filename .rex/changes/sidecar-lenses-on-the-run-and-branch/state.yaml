@@ -31,13 +31,25 @@ items:
     lastModified: "2026-10-30T14:21:01.594Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "55faa034-3df0-41a1-9aef-67d1dc896340":
+    status: "completed"
     startedAt: "2026-10-30T16:36:46.602Z"
-    activeIntervals: [{"end":"2026-10-30T18:11:21.215Z","start":"2026-10-30T16:36:46.602Z"}]
-    lastModified: "2026-10-30T18:11:25.518Z"
+    completedAt: "2026-10-30T18:35:37.118Z"
+    endedAt: "2026-10-30T18:35:37.118Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Diagnose branch lens with worktree attach, github_read and draft_github_post carried out (9e9959745, review repairs c13f74681). Run 7e3a28f9 failed its gate only on agents-md-size-budget (+215); trimmed in 21755076d, then the affected gate and policy tests pass. Browser-checked on R1 (#907): toggle-off, worktree attach, source conflicts with no card, network-read card and PR read. Trust bypass tracked by c7e09da1."
+    activeIntervals: [{"end":"2026-10-30T18:11:21.215Z","start":"2026-10-30T16:36:46.602Z"},{"end":"2026-10-30T18:35:37.118Z","start":"2026-10-30T18:35:37.118Z"}]
+    lastModified: "2026-10-30T18:35:37.118Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6dcba986-4fe6-4d8d-ab84-54d45db119b1":
+    status: "completed"
+    startedAt: "2026-10-30T18:35:37.118Z"
+    completedAt: "2026-10-30T18:35:37.118Z"
+    endedAt: "2026-10-30T18:35:37.118Z"
+    activeIntervals: [{"end":"2026-10-30T18:35:37.118Z","start":"2026-10-30T18:35:37.118Z"}]
+    appliedAt: "2026-10-30T18:35:37.118Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     issues: ["https://www.notion.so/3f7a80b71924810aa984d37d94970566","https://www.notion.so/3f7a80b7192481c99690f94435b87799","https://www.notion.so/3f7a80b7192481d190ddd2eea210d9a5"]
-    lastModified: "2026-10-30T16:02:27.435Z"
+    lastModified: "2026-10-30T18:35:37.118Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "793240d0-5f3d-49c7-aff3-9cac77685681":
     status: "completed"
