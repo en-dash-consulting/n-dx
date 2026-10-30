@@ -118,10 +118,13 @@ function coerceScalar(raw: string): YamlValue {
 /** A single-line `[a, b]` or `{k: v}`, which CI files use constantly. */
 function parseFlow(raw: string, lineNumber: number): YamlValue {
   const text = raw.trim();
+  for (const [pattern, message] of UNSUPPORTED) {
+    if (pattern.test(text) && /^(?:<<\s*:|[&*!])/.test(text)) throw new YamlSubsetError(message, lineNumber);
+  }
   if (text.startsWith("[") && text.endsWith("]")) {
     const inner = text.slice(1, -1).trim();
     if (inner === "") return [];
-    return splitFlow(inner, lineNumber).map((part) => coerceScalar(part));
+    return splitFlow(inner, lineNumber).map((part) => parseFlow(part, lineNumber));
   }
   if (text.startsWith("{") && text.endsWith("}")) {
     const inner = text.slice(1, -1).trim();
@@ -130,7 +133,7 @@ function parseFlow(raw: string, lineNumber: number): YamlValue {
     for (const part of splitFlow(inner, lineNumber)) {
       const colon = findKeyColon(part);
       if (colon === -1) throw new YamlSubsetError("Malformed inline mapping", lineNumber);
-      map[unquote(part.slice(0, colon))] = coerceScalar(part.slice(colon + 1));
+      map[unquote(part.slice(0, colon))] = parseFlow(part.slice(colon + 1), lineNumber);
     }
     return map;
   }
@@ -192,9 +195,18 @@ function readLines(source: string): Line[] {
   // counting it as a leading character would indent the first line by one,
   // which parses the rest of the document as a stray block.
   const raw = (source.startsWith("﻿") ? source.slice(1) : source).split(/\r?\n|\r/);
+  let scalarParent: number | undefined;
   for (let i = 0; i < raw.length; i++) {
     const original = raw[i];
     const lineNumber = i + 1;
+    const indent = original.length - original.trimStart().length;
+    if (scalarParent !== undefined) {
+      if (/^\s*$/.test(original) || indent > scalarParent) {
+        lines.push({ number: lineNumber, indent: /^\s*$/.test(original) ? scalarParent + 1 : indent, text: original.trim(), raw: original, tab: false });
+        continue;
+      }
+      scalarParent = undefined;
+    }
     if (/^\s*$/.test(original)) continue;
     if (/^\s*#/.test(original)) continue;
     if (/^---\s*$/.test(original) || /^\.\.\.\s*$/.test(original)) {
@@ -204,13 +216,10 @@ function readLines(source: string): Line[] {
       continue;
     }
     const tab = /^[ \t]*\t/.test(original);
-    const indent = original.length - original.trimStart().length;
     const text = stripComment(original.trim());
     if (text === "") continue;
-    for (const [pattern, message] of UNSUPPORTED) {
-      if (pattern.test(text)) throw new YamlSubsetError(message, lineNumber);
-    }
     lines.push({ number: lineNumber, indent, text, raw: original, tab });
+    if (/:\s*[|>][+-]?\s*$/.test(text)) scalarParent = indent + (text.startsWith("- ") ? 2 : 0);
   }
   return lines;
 }
@@ -224,6 +233,7 @@ function readLines(source: string): Line[] {
  */
 function requireSpaces(line: Line): void {
   if (line.tab) throw new YamlSubsetError("Tab indentation is not valid YAML", line.number);
+  if (/^(?:-\s+)?<<\s*:/.test(line.text)) throw new YamlSubsetError("merge keys are not supported", line.number);
 }
 
 /**
@@ -235,12 +245,15 @@ function requireSpaces(line: Line): void {
 function readBlockScalar(lines: Line[], start: number, parentIndent: number, fold: boolean): [string, number] {
   const body: string[] = [];
   let i = start;
-  const bodyIndent = i < lines.length ? lines[i].indent : 0;
+  let first = start;
+  while (first < lines.length && lines[first].indent > parentIndent && lines[first].raw.trim() === "") first++;
+  const bodyIndent = first < lines.length ? lines[first].indent : 0;
   while (i < lines.length && lines[i].indent > parentIndent) {
     const line = lines[i];
     body.push(line.raw.slice(Math.min(bodyIndent, line.indent)).trimEnd());
     i++;
   }
+  while (body.length && body[body.length - 1] === "") body.pop();
   return [fold ? body.join(" ") : body.join("\n"), i];
 }
 
@@ -293,6 +306,7 @@ function parseSequence(lines: Line[], start: number, indent: number): [YamlValue
 
     while (i < lines.length && lines[i].indent >= keyIndent && !lines[i].text.startsWith("- ")) {
       const inner = lines[i];
+      requireSpaces(inner);
       const innerColon = findKeyColon(inner.text);
       if (innerColon === -1) break;
       const key = unquote(inner.text.slice(0, innerColon));
