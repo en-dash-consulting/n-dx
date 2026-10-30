@@ -1,5 +1,15 @@
 # @n-dx/graview-face
 
+## 0.10.1
+
+### Patch Changes
+
+- [#881](https://github.com/en-dash-consulting/n-dx/pull/881) [`880364e`](https://github.com/en-dash-consulting/n-dx/commit/880364ecf2ae30529d9230116c6935217ead2642) Thanks [@endash-shal](https://github.com/endash-shal)! - The Graview product face is an n-dx extension. `@n-dx/graview-face` declares an `ndx.extension` block with the `graview-face` sidecar, and `ndx graview serve` runs the launch plan `ndx extensions sidecar graview-face --json` prints instead of looking for the face itself. The flags and environment the face gets are unchanged. Run `ndx extensions enable graview-face` once to approve the face; until then `serve` exits 2 naming that command, and `--no-face` serves the bare store. A disabled or missing face gets the bare store. `graview.app` is retired: list a face checkout under `extensions.paths` in `<ndx home>/config.json` instead. The face honours the hub's `PORT` when no `--port` is given. A sidecar launch plan now includes the extension's `dir`, and a refusal includes its `state`.
+  
+  The hub-only mount has no project binding: it explains how to run ndx graview serve <project-directory>, rather than loading absent or stale data. The project-bound command serves the fresh projection. Hub launches require the per-launch secret and exit when their stdin lifetime pipe closes. See packages/graview/AGENTS.md for one-time checkout registration.
+
+- [#867](https://github.com/en-dash-consulting/n-dx/pull/867) [`de8bc93`](https://github.com/en-dash-consulting/n-dx/commit/de8bc939849ed25a4376dca29ec18646cc906954) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dependency updates: `@anthropic-ai/sdk` ^0.133.0 → ^0.137.0 (llm-client, hench), `web-tree-sitter` 0.27.0 → 0.27.1 (lang-runtime), and `react` / `react-dom` ^19.3.0 → ^19.3.1 (core, graview-face).
+
 ## 0.10.0
 
 No changes in this release.

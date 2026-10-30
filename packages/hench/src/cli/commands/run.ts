@@ -4,7 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolveStore, findNextTask, findActionableTasks as findActionable, findItem, collectCompletedIds, isRootLevel, isWorkItem, checkTreeConformance, takeSaveFileReport, matchesAssignee, PRD_TREE_DIRNAME, SCHEMA_VERSION, SELF_HEAL_TAG, resolveActor, traversalBlock, prdLayout } from "../../prd/rex-gateway.js";
 import type { PRDItem, PRDStore, TraversalBlock } from "../../prd/rex-gateway.js";
 import { collectEpicTaskIds as collectEpicTasks, selectTaskEntry } from "../../agent/planning/brief.js";
-import type { PermissionMode, RunLoopPosition, RunRecord, ToolCallRecord } from "../../schema/index.js";
+import type { EscalationConfig, PermissionMode, RunEscalation, RunLoopPosition, RunRecord, ToolCallRecord } from "../../schema/index.js";
 import { classifyChangedFiles } from "../../store/file-classifier.js";
 import type { FileCategory } from "../../store/file-classifier.js";
 import { loadConfig, loadConfiguredHenchKeys } from "../../store/config.js";
@@ -32,6 +32,7 @@ import { resolveLauncherCli } from "../../process/agent-mcp-config.js";
 import { getActionableTasks, collectEpicTaskIds } from "../../agent/planning/brief.js";
 import { actionableV2Entries, findV2Entry, loadV2Tree, nextV2Entry, v2RefPriority, V2_HAS_NO_EPICS } from "../../agent/planning/work-selection.js";
 import { getStuckTaskIds } from "../../agent/analysis/stuck.js";
+import { decideEscalation, isEscalationPending } from "../../agent/analysis/escalation.js";
 import { formatRunReviewStatus } from "../../agent/analysis/adversarial-review.js";
 import { safeParseInt } from "./constants.js";
 import { resolveHenchPaths } from "../../store/paths.js";
@@ -54,6 +55,7 @@ import { LLM_VENDOR, printVendorModelHeader, resolveModel, bold, green, red, col
 import {
   parseBudgetFlags,
   parseReviewOptions,
+  planEscalation,
   resolveTaskRunSettings,
   reviewProviderError,
 } from "./run-settings.js";
@@ -107,6 +109,8 @@ export interface TaskRunContext {
   autonomous: boolean;
   /** `--context-file` text, already read and trimmed; replaces saved notes. */
   contextFileText?: string;
+  /** `hench.escalation`, so stuck-task detection between tasks can hold back a task still owed one. */
+  escalation?: EscalationConfig;
 }
 
 const MAX_TASK_ATTEMPTS = 3;
@@ -949,10 +953,20 @@ export async function emitQuotaLog(): Promise<void> {
 export async function loadStuckTaskIds(
   henchDir: string,
   threshold: number,
+  /**
+   * `hench.escalation`. A task still owed an escalated attempt is not stuck
+   * yet: its next attempt runs on the escalation vendor, and only when those
+   * attempts fail too is it skipped. Absent, or off, nothing changes.
+   */
+  escalation?: EscalationConfig,
 ): Promise<Set<string>> {
   if (threshold <= 0) return new Set();
   const runs = await listRuns(henchDir);
-  const stuck = getStuckTaskIds(runs, threshold);
+  const stuck = getStuckTaskIds(
+    runs,
+    threshold,
+    escalation?.enabled ? (taskId) => isEscalationPending(taskId, runs, escalation) : undefined,
+  );
   if (stuck.size > 0) {
     info(`Stuck tasks detected (${stuck.size}): ${[...stuck].join(", ")}`);
   }
@@ -1433,6 +1447,13 @@ export function formatTaskSettingsLines(taskTitle: string, settings: TaskRunSett
   return [`Run settings saved on "${taskTitle}": ${changed.join(", ")}`];
 }
 
+/** The line an escalated attempt logs before it starts. */
+export function formatEscalationLine(taskTitle: string, taskId: string, escalation: RunEscalation): string {
+  const target = escalation.model ? `${escalation.vendor}/${escalation.model}` : escalation.vendor;
+  const from = escalation.fromVendor && escalation.fromVendor !== escalation.vendor ? ` instead of ${escalation.fromVendor}` : "";
+  return `Escalating "${taskTitle}" (${taskId}): ${escalation.reason}. Running this attempt on ${target}${from}.`;
+}
+
 /** Print {@link formatTaskSettingsLines}, if the task saved anything. */
 function printTaskSettings(taskTitle: string, settings: TaskRunSettings): void {
   for (const line of formatTaskSettingsLines(taskTitle, settings)) info(line);
@@ -1532,13 +1553,29 @@ async function runOne(
   // The task's own settings, resolved by the same function `cmdRun` resolved
   // the invocation's defaults with. Without a context (a caller that has not
   // been taught to pass one) the arguments stand as they were.
+  // A task that keeps failing may be owed an attempt on a stronger vendor or
+  // model before it is skipped as stuck (hench.escalation). Decided from the
+  // run history, so a later invocation reaches the same answer as this loop.
+  const escalation = settingsCtx
+    ? planEscalation({
+        decision: decideEscalation(selected.item.id, runs, config.escalation, config.maxFailedAttempts),
+        flags: settingsCtx.flags,
+        vendor: settingsCtx.vendor,
+        llmConfig: settingsCtx.llmConfig,
+      })
+    : {};
+  if (escalation.skipped) info(colorWarn(escalation.skipped));
+  const escalationPlan = escalation.plan;
+  const taskVendor = escalationPlan?.vendor ?? settingsCtx?.vendor;
+
   const settings = settingsCtx
     ? resolveTaskRunSettings({
         flags: settingsCtx.flags,
         config,
         configuredHenchKeys: settingsCtx.configuredHenchKeys,
-        llmConfig: settingsCtx.llmConfig,
-        vendor: settingsCtx.vendor,
+        llmConfig: escalationPlan?.llmConfig ?? settingsCtx.llmConfig,
+        vendor: escalationPlan?.vendor ?? settingsCtx.vendor,
+        ...(escalationPlan ? { escalation: { ...(escalationPlan.model ? { model: escalationPlan.model } : {}) } } : {}),
         autonomous: autonomous === true,
         item: selected.item,
         clampPermissionMode: (mode) => applyRepoTrust(config, dir, mode).permissionMode,
@@ -1557,7 +1594,7 @@ async function runOne(
       if (settings.provider.error) throw settings.provider.error;
       if (settings.reviewPairError) throw settings.reviewPairError;
       if (reviewPass) {
-        const reviewError = reviewProviderError(settingsCtx.vendor, settings.provider.value);
+        const reviewError = reviewProviderError(taskVendor ?? settingsCtx.vendor, settings.provider.value);
         if (reviewError) throw reviewError;
       }
     }
@@ -1577,6 +1614,19 @@ async function runOne(
     };
     printTaskSettings(selected.item.title, settings);
   }
+
+  // One line per escalated attempt: which task, why, and what it runs on.
+  const runEscalation: RunEscalation | undefined = escalationPlan && settings
+    ? {
+        escalated: true,
+        vendor: escalationPlan.vendor,
+        model: settings.model.value,
+        fromVendor: escalationPlan.fromVendor,
+        failures: escalationPlan.failures,
+        reason: escalationPlan.reason,
+      }
+    : undefined;
+  if (runEscalation) info(colorWarn(formatEscalationLine(selected.item.title, selected.item.id, runEscalation)));
 
   // Apply CLI overrides (--token-budget, --skip-test-gate) to config
   const effectiveConfig = {
@@ -1627,6 +1677,7 @@ async function runOne(
         claims,
         wouldResetIds,
         configBackstop,
+        ...(runEscalation ? { vendorOverride: escalationPlan!.vendor, escalation: runEscalation } : {}),
       })
     : await agentLoop({
         config: effectiveConfig as typeof config & { provider: "api" },
@@ -1655,6 +1706,7 @@ async function runOne(
         claims,
         wouldResetIds,
         configBackstop,
+        ...(runEscalation ? { vendorOverride: escalationPlan!.vendor, escalation: runEscalation } : {}),
       });
   } finally {
     const unreported = configBackstop?.restore() ?? [];
@@ -2362,6 +2414,7 @@ export async function cmdRun(
       vendor: llmVendor,
       autonomous,
       ...(extraContext !== undefined ? { contextFileText: extraContext } : {}),
+      ...(config.escalation ? { escalation: config.escalation } : {}),
     };
 
     if (epicByEpic) {
@@ -2522,7 +2575,7 @@ async function runIterations(
     // For autoselected iterations, skip stuck tasks
     const isAutoselect = i > 0 || !taskId;
     const stuckIds = isAutoselect
-      ? await loadStuckTaskIds(henchDir, maxFailedAttempts)
+      ? await loadStuckTaskIds(henchDir, maxFailedAttempts, settingsCtx?.escalation)
       : undefined;
 
     // Combine stuck tasks with tasks that reached max attempts
@@ -2685,7 +2738,7 @@ async function runLoop(
       // recently-stuck tasks are automatically skipped
       const isAutoselect = completed > 1 || !taskId;
       const stuckIds = isAutoselect
-        ? await loadStuckTaskIds(henchDir, maxFailedAttempts)
+        ? await loadStuckTaskIds(henchDir, maxFailedAttempts, settingsCtx?.escalation)
         : undefined;
 
       let status: string;
@@ -3057,7 +3110,7 @@ async function runEpicByEpic(
         // Show queue status if there are pending tasks
         if (queue) logQueueStatus(queue);
 
-        const stuckIds = await loadStuckTaskIds(henchDir, maxFailedAttempts);
+        const stuckIds = await loadStuckTaskIds(henchDir, maxFailedAttempts, settingsCtx?.escalation);
 
         let status: string;
         try {

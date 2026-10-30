@@ -325,10 +325,14 @@ export async function selectTaskEntry(
   const claimedElsewhere = new Set<string>(claims ? (await claims.foreignClaims()).keys() : []);
 
   for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt++) {
+    // rex's collectActionable reads `skipIds` only as "done" for dependency
+    // checks, so an excluded (stuck) task is still a candidate unless it is
+    // also named here — the v2 branch below already passes both.
+    const passOver = new Set<string>([...claimedElsewhere, ...(excludeIds ?? [])]);
     const selectOptions = {
       ...(tags?.length ? { tags } : {}),
       ...(assignee ? { assignee } : {}),
-      ...(claimedElsewhere.size > 0 ? { excludeIds: claimedElsewhere } : {}),
+      ...(passOver.size > 0 ? { excludeIds: passOver } : {}),
     };
     let candidate: TreeEntry | null;
     if (tree) {

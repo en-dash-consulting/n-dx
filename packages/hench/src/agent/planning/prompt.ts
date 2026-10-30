@@ -240,6 +240,9 @@ export function buildSystemPrompt(
   if (!isCli) {
     lines.push("## Tool Notes");
     lines.push("- File paths are relative to the project root.");
+    // API and local models have only whole-file write_file otherwise, and a
+    // small model asked to change one line sends back a stub or nothing.
+    lines.push("- To change an existing file, use edit_file (replace an exact old_string with new_string). Use write_file only to create a file or to rewrite one completely.");
     lines.push(`- Allowed shell commands: ${config.guard.allowedCommands.join(", ")}`);
     lines.push(`- Max file size: ${config.guard.maxFileSize} bytes`);
     lines.push("- If a tool returns [GUARD], you hit a safety constraint. Adjust your approach.");
