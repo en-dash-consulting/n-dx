@@ -71,7 +71,12 @@ items:
     lastModified: "2026-10-30T15:08:15.328Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd15413c-b43a-4755-8087-7fae64bef710":
+    status: "completed"
     startedAt: "2026-10-30T15:50:47.544Z"
-    activeIntervals: [{"end":"2026-10-30T16:10:11.942Z","start":"2026-10-30T15:50:47.544Z"}]
-    lastModified: "2026-10-30T16:10:14.315Z"
+    completedAt: "2026-10-30T16:19:43.266Z"
+    endedAt: "2026-10-30T16:19:43.266Z"
+    resolutionType: "code-change"
+    resolutionDetail: "requireUnblocked as a run option through RUN_OPTION_SPECS and the execute route, work card preview lists open blockers (b29c7b111). Run f0367468 failed its gate only in graview-app-trust tests it did not touch; the same affected gate (649a66dd3) re-run passes all 4 suites. Server-side default tracked by 99f8a9e1."
+    activeIntervals: [{"end":"2026-10-30T16:10:11.942Z","start":"2026-10-30T15:50:47.544Z"},{"end":"2026-10-30T16:19:43.266Z","start":"2026-10-30T16:19:43.266Z"}]
+    lastModified: "2026-10-30T16:19:43.266Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
