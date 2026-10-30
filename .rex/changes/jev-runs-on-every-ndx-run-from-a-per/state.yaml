@@ -44,7 +44,12 @@ items:
     lastModified: "2026-10-30T14:44:16.756Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "742863c5-989f-4138-8909-9b59bb589fc4":
-    lastModified: "2026-10-30T14:44:04.922Z"
+    status: "completed"
+    startedAt: "2026-10-30T18:21:31.342Z"
+    completedAt: "2026-10-30T18:32:00.867Z"
+    endedAt: "2026-10-30T18:32:00.867Z"
+    activeIntervals: [{"end":"2026-10-30T18:32:00.867Z","start":"2026-10-30T18:21:31.342Z"}]
+    lastModified: "2026-10-30T18:32:00.867Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]

@@ -3876,15 +3876,24 @@ async function handleCredentials(positional, flags) {
     return;
   }
 
+  // `ndx config <key> [dir]`: a trailing existing directory is the ignored
+  // directory argument, never the value — `credentials.typesafe .` must not
+  // store "." over a good key.
+  const valueArgs = positional.slice(1);
+  if (valueArgs.length > 0) {
+    const last = await stat(resolve(valueArgs[valueArgs.length - 1])).catch(() => null);
+    if (last?.isDirectory()) valueArgs.pop();
+  }
+
   let value;
   if (flags.stdin === "true") {
     value = await readAllStdin();
-  } else if (positional.length > 1) {
+  } else if (valueArgs.length > 0) {
     console.error(
       "Warning: a value on the command line lands in your shell history and the process list. " +
         "Prefer the hidden prompt or --stdin.",
     );
-    value = positional[1];
+    value = valueArgs[0];
   } else if (process.stdin.isTTY && process.stderr.isTTY) {
     value = await readHiddenLine(`${name} key (input hidden): `);
     if (value === null) return fail("Cancelled; nothing stored.");

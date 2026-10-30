@@ -9,14 +9,17 @@ const isWin = process.platform === "win32";
 // Placeholder only: any real-looking key would trip secret scanners.
 const SECRET = "tsk-placeholder-credential-0123456789";
 
+let root;
 let home;
 let cwd;
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), "ndx-cfg-cred-home-"));
+  root = await mkdtemp(join(tmpdir(), "ndx-cfg-cred-home-"));
+  // Not created here: mkdtemp is already 0700, so the store must create it.
+  home = join(root, "ndx-home");
   cwd = await mkdtemp(join(tmpdir(), "ndx-cfg-cred-cwd-"));
 });
 afterEach(async () => {
-  await rm(home, { recursive: true, force: true });
+  await rm(root, { recursive: true, force: true });
   await rm(cwd, { recursive: true, force: true });
 });
 
@@ -80,6 +83,16 @@ describe("ndx config credentials", () => {
 
     expect(config(["credentials.typesafe", "--unset"]).code).toBe(0);
     expect(config(["credentials"]).out).toMatch(/typesafe: not set/);
+  }, DEFAULT_TIMEOUT);
+
+  it("treats a trailing directory as the ignored dir argument, not the value", () => {
+    expect(config(["credentials.typesafe", SECRET, "."]).code).toBe(0);
+    const before = config(["credentials"]).out;
+
+    const dirOnly = config(["credentials.typesafe", "."]);
+    expect(dirOnly.code).not.toBe(0);
+    expect(dirOnly.err).toMatch(/--stdin/);
+    expect(config(["credentials"]).out).toBe(before);
   }, DEFAULT_TIMEOUT);
 
   it("refuses vendor credentials", () => {
