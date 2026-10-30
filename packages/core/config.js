@@ -18,6 +18,7 @@ import {
   rename,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { createRequire } from "node:module";
 import { execFileSyncCli } from "./win-spawn.js";
 import { relativeToRoot, resolveLayout, resolveNdxHome } from "./layout.js";
 import {
@@ -2589,9 +2590,21 @@ Local overrides (.n-dx.local.json):
   are automatically written to .n-dx.local.json instead of .n-dx.json. A
   cli_path in .n-dx.json applies only once the repository is trusted.
 
+Credentials (per-user, not per-project; a directory argument is ignored):
+  credentials              Show each credential's backend, source in effect and
+                           fingerprint. Never prints a value.
+  credentials.typesafe     Store the TypeSafe (Jev) key: hidden prompt on a terminal,
+                           --stdin to read a piped value, --unset to remove it.
+                           A value on the command line works but lands in shell
+                           history and the process list. An exported
+                           TYPESAFE_API_KEY still wins over the stored key.
+  Other credentials.<name> are refused; vendor keys come in a later release.
+
 Options:
   --json                   Output as JSON
-  --force                  Skip validation when setting claude/llm/extensions config values
+  --stdin                  With credentials.<name>: read the value from stdin
+  --unset                  With credentials.<name>: remove the stored value
+  --force                 Skip validation when setting claude/llm/extensions config values
   --user                   Write an extensions.<name>.<key> value to the user config
                            (<ndx home>/config.json) instead of .n-dx.json
   --test-connection        Test configured claude.api_key and/or claude.cli_path
@@ -2631,6 +2644,8 @@ Examples:
   n-dx config llm.local.model qwen2.5-14b      Set local model ID (optional)
   n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
+  n-dx config credentials                      Show stored credentials (no values)
+  n-dx config credentials.typesafe             Store the Jev key (hidden prompt)
   n-dx config llm.claude.model claude-opus-5-5 Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
@@ -3760,6 +3775,130 @@ async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flag
  *   to set an `extensions.<name>` key; setting one without it throws.
  */
 
+// ── credentials namespace ────────────────────────────────────────────────────
+
+/** Credential names `ndx config credentials.<name>` accepts. */
+const CREDENTIAL_NAMES = new Set(["typesafe"]);
+
+/**
+ * Run llm-client's credential CLI. The store is owned by llm-client; this tier
+ * only spawns it, and a value travels on stdin — never argv, so it is in no
+ * process list and no spawn log.
+ *
+ * @returns {{ code: number, stdout: string, stderr: string }}
+ */
+function spawnCredentialsCli(args, input) {
+  const script = createRequire(import.meta.url).resolve(
+    "@n-dx/llm-client/dist/cli/credentials.js",
+  );
+  try {
+    const stdout = execFileSyncCli(process.execPath, [script, ...args], {
+      encoding: "utf-8",
+      input: input ?? "",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return { code: 0, stdout, stderr: "" };
+  } catch (err) {
+    return {
+      code: typeof err.status === "number" ? err.status : 1,
+      stdout: String(err.stdout ?? ""),
+      stderr: String(err.stderr ?? err.message ?? ""),
+    };
+  }
+}
+
+/** Read one line from a TTY with echo off. Resolves null on Ctrl-C. */
+function readHiddenLine(promptText) {
+  return new Promise((resolveLine) => {
+    const stdin = process.stdin;
+    let value = "";
+    process.stderr.write(promptText);
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf-8");
+    const finish = (result) => {
+      stdin.removeListener("data", onData);
+      stdin.setRawMode(false);
+      stdin.pause();
+      process.stderr.write("\n");
+      resolveLine(result);
+    };
+    const onData = (chunk) => {
+      for (const ch of chunk) {
+        if (ch === "\u0003" || ch === "\u0004") return finish(null);
+        if (ch === "\r" || ch === "\n") return finish(value);
+        if (ch === "\u007f" || ch === "\b") value = value.slice(0, -1);
+        else value += ch;
+      }
+    };
+    stdin.on("data", onData);
+  });
+}
+
+async function readAllStdin() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
+/**
+ * `ndx config credentials[.<name>]`: the per-user credential store.
+ * Never prints a value. The directory argument is ignored: the store is
+ * per-user, not per-project.
+ */
+async function handleCredentials(positional, flags) {
+  const keyArg = positional[0];
+  const fail = (message) => {
+    console.error(message);
+    process.exit(1);
+  };
+
+  if (keyArg === "credentials") {
+    const result = spawnCredentialsCli(["status"]);
+    if (result.code !== 0) return fail(result.stderr.trim() || "Could not read the credential store.");
+    console.log("Credentials (per-user: shared by every project; a directory argument is ignored)");
+    console.log(result.stdout.trimEnd());
+    console.log("Set one with: ndx config credentials.typesafe");
+    return;
+  }
+
+  const name = keyArg.slice("credentials.".length);
+  if (!CREDENTIAL_NAMES.has(name)) {
+    return fail(
+      `Unknown credential "${name}". Only credentials.typesafe can be stored today; vendor keys come in a later release.`,
+    );
+  }
+
+  if (flags.unset === "true") {
+    const result = spawnCredentialsCli(["unset", name]);
+    if (result.code !== 0) return fail(result.stderr.trim());
+    console.log(result.stdout.trimEnd());
+    return;
+  }
+
+  let value;
+  if (flags.stdin === "true") {
+    value = await readAllStdin();
+  } else if (positional.length > 1) {
+    console.error(
+      "Warning: a value on the command line lands in your shell history and the process list. " +
+        "Prefer the hidden prompt or --stdin.",
+    );
+    value = positional[1];
+  } else if (process.stdin.isTTY && process.stderr.isTTY) {
+    value = await readHiddenLine(`${name} key (input hidden): `);
+    if (value === null) return fail("Cancelled; nothing stored.");
+  } else {
+    return fail(
+      `No value given. Run on a terminal for a hidden prompt, or pipe it: printf %s "$KEY" | ndx config credentials.${name} --stdin`,
+    );
+  }
+
+  const result = spawnCredentialsCli(["set", name], value);
+  if (result.code !== 0) return fail(result.stderr.trim());
+  console.log(result.stdout.trimEnd());
+}
+
 /**
  * @param {string[]} args
  * @param {ConfigCommandDeps} [deps]
@@ -3769,6 +3908,12 @@ export async function runConfig(args, deps = {}) {
 
   if (flags.help) {
     console.log(HELP_TEXT);
+    return;
+  }
+
+  // User-scoped: needs no project, and a directory argument means nothing.
+  if (positional[0] === "credentials" || positional[0]?.startsWith("credentials.")) {
+    await handleCredentials(positional, flags);
     return;
   }
 
