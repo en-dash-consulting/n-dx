@@ -1,5 +1,11 @@
 # @n-dx/lang-kit
 
+## 0.10.2
+
+### Patch Changes
+
+- [#891](https://github.com/en-dash-consulting/n-dx/pull/891) [`19816b7`](https://github.com/en-dash-consulting/n-dx/commit/19816b719a347f36cb8c96831089836cc62584f7) Thanks [@endash-shal](https://github.com/endash-shal)! - Correct outbound and workspace connection evidence: respect JavaScript scopes, retain configured HTTP paths, ignore Go documentation strings and SQL/cache payloads, and withhold ambiguous endpoints or repository-local infrastructure identities. Preserve YAML script bodies and nested flow collections, record executable coverage configuration, and recognize explicitly manual deployment jobs.
+
 ## 0.10.1
 
 No changes in this release.

@@ -1,5 +1,15 @@
 # @n-dx/graview
 
+## 0.10.2
+
+### Patch Changes
+
+- Updated dependencies [[`19816b7`](https://github.com/en-dash-consulting/n-dx/commit/19816b719a347f36cb8c96831089836cc62584f7), [`e288e41`](https://github.com/en-dash-consulting/n-dx/commit/e288e419d950d53f3e8266c3a4b6b2e0a94e854e), [`0e063a2`](https://github.com/en-dash-consulting/n-dx/commit/0e063a218622a3aa856c3d854fbbcc2552459b81), [`75005d4`](https://github.com/en-dash-consulting/n-dx/commit/75005d43e70d932c1e298906604aba6979fd81bd), [`e147a8f`](https://github.com/en-dash-consulting/n-dx/commit/e147a8fd658bb12dd687592b9d983a88697ebdfc), [`c5a6067`](https://github.com/en-dash-consulting/n-dx/commit/c5a6067cfe5db0239e428ecb218a0dc8f92c3a98), [`95875df`](https://github.com/en-dash-consulting/n-dx/commit/95875df8e3ddd5fb6a931df791fa6891c1c0fc07), [`2f058c3`](https://github.com/en-dash-consulting/n-dx/commit/2f058c31d7d95ff2703709872cb7ec2d83757685)]:
+  - @n-dx/sourcevision@0.10.2
+  - @n-dx/hench@0.10.2
+  - @n-dx/llm-client@0.10.2
+  - @n-dx/rex@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes
