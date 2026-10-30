@@ -26,6 +26,7 @@ items:
     activeIntervals: [{"end":"2026-10-26T18:00:24.192Z","start":"2026-10-26T18:00:24.192Z"}]
     appliedAt: "2026-10-26T18:00:24.192Z"
     appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    shippedIn: "0.10.1"
     lastModified: "2026-10-26T18:00:24.192Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "e9435b47-1ab2-4739-9338-ab00f1c518d6":
