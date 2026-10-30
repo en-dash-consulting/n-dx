@@ -38,7 +38,8 @@ export type SettingsArea =
   | "hench"
   | "llm"
   | "features"
-  | "cli";
+  | "cli"
+  | "sidecar";
 
 /** Commit subjects, fixed per area. */
 const SUBJECT: Record<SettingsArea, string> = {
@@ -48,6 +49,7 @@ const SUBJECT: Record<SettingsArea, string> = {
   llm: "chore(settings): update model settings",
   features: "chore(settings): update feature toggles",
   cli: "chore(settings): update CLI timeouts",
+  sidecar: "chore(settings): update Sidecar settings",
 };
 
 /**

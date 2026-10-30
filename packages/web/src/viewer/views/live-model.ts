@@ -142,6 +142,7 @@ const JOB_LABELS: Record<string, string> = {
   reshape: "Reshape",
   refresh: "Refresh",
   recommend: "Recommendations",
+  "sidecar-command": "Sidecar command",
 };
 
 export function jobLabel(job: Pick<LiveJobFull, "kind">): string {

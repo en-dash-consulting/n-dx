@@ -6293,3 +6293,21 @@
   align-items: center;
   min-height: 24px;
 }
+
+/* Sidecar ghost rows (UX5): a waiting change-set card's proposed items. */
+.prd-node-row.prd-ghost-row {
+  opacity: 0.55;
+  font-style: italic;
+  cursor: default;
+  border-left: 2px dashed var(--border);
+}
+.prd-ghost-badge {
+  font-size: 10px;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 var(--space-1);
+  border: 1px dashed var(--border);
+  border-radius: 3px;
+}
+.prd-ghost-duplicate { font-size: 11px; color: var(--text-muted); }

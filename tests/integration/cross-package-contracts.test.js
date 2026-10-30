@@ -1001,7 +1001,9 @@ describe("gateway export auto-detection", () => {
         // rex's own parsers so the chooser cannot offer a value the CLI would
         // silently fall back from.
         "parseApplyOn", "parsePlacementSettings",
-        "suggestPlacement", "recordPlacement", "recordProposal", "ChangePlacementError", "placementStrength", "draftChangePlacement"],
+        "suggestPlacement", "recordPlacement", "recordProposal", "ChangePlacementError", "placementStrength", "draftChangePlacement",
+        // The Sidecar change-set card flags proposed items with smart add's own matcher.
+        "findDuplicateItem"],
       ...["SCHEMA_VERSION", "PRD_TREE_DIRNAME", "checkTreeConformance",
         "APPLY_ON", "DEFAULT_APPLY_ON", "PLACEMENT_AUTO_ACCEPT", "DEFAULT_PLACEMENT_SETTINGS"],
     ]);

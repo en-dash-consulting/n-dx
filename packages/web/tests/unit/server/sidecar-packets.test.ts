@@ -9,7 +9,8 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadPrdModel } from "../../../src/server/rex-gateway.js";
+import { indexTree, loadPrdModel, nodeSpec, specHash } from "../../../src/server/rex-gateway.js";
+import { DESCRIBE_INSTRUCTIONS } from "../../../src/server/sidecar/lens-instructions.js";
 import { assemblePacket, type PacketSection } from "../../../src/server/sidecar/packet.js";
 import {
   buildDescribePacket,
@@ -57,6 +58,21 @@ async function sourcesFor(layout: "v1" | "v2", overrides: Partial<PacketSources>
       zones: [{ id: "pay", name: "Payments", description: "Card and wallet payment.", cohesion: 0.8, coupling: 0.2, fileCount: 12, matched: 2 }],
       unzoned: 0,
     }),
+    zone: async (ref) =>
+      ref === "pay"
+        ? {
+            analyzedAt: "2026-10-21T00:00:00.000Z",
+            id: "pay",
+            name: "Payments",
+            description: "Card and wallet payment.",
+            cohesion: 0.8,
+            coupling: 0.2,
+            fileCount: 12,
+            files: ["src/pay/button.ts", "src/pay/wallet.ts"],
+            entryPoints: ["src/pay/index.ts"],
+            insights: ["Wallet code is shared with refunds."],
+          }
+        : null,
     resolve: async () => ({
       settings: [
         { key: "vendor", value: "claude", source: "llm.vendor" },
@@ -184,7 +200,120 @@ describe("Explain", () => {
 
   it("reports an unresolvable target instead of guessing", async () => {
     const packet = await buildExplainPacket(await sourcesFor("v2"), { ref: "nope" }, NOW);
-    expect(packet.text).toContain('"nope" names no capability, epic or feature');
+    expect(packet.text).toContain('"nope" names no product area, capability, zone, epic or feature');
+  });
+
+  const AREA = "a0000000-0000-4000-8000-000000000001";
+
+  /** The v2 fixture with the capability met: its spec hash stored as `metAt`. */
+  async function metSources(overrides: Partial<PacketSources> = {}): Promise<PacketSources> {
+    const sources = await sourcesFor("v2", overrides);
+    const prd = (await sources.prd())!;
+    const node = indexTree(prd.tree).resolve(CAPABILITY)!;
+    node.metAt = specHash(nodeSpec(node));
+    return sources;
+  }
+
+  it("capability: lists each capability criterion with its label and evidence", async () => {
+    // The fixture's open change amends the capability, so it reads changing.
+    const changing = await buildExplainPacket(await sourcesFor("v2"), { ref: CAPABILITY }, NOW);
+    expect(changing.text).toContain("- c1 [not verified] A valid card is charged once");
+    expect(changing.text).toContain("- c2 [not verified] A declined card shows why");
+    expect(changing.text).toContain("because an open change is amending it. Evidence: change CH-1 Add Apple Pay: open");
+
+    // With no open change and no `metAt`, nothing has ever satisfied it.
+    const sources = await sourcesFor("v2");
+    for (const change of (await sources.prd())!.tree.changes) change.status = "deleted";
+    const proposed = await buildExplainPacket(sources, { ref: CAPABILITY }, NOW);
+    expect(proposed.text).toContain("- c1 [not met] A valid card is charged once");
+    expect(proposed.text).toContain("because no applied change has satisfied it yet. Evidence: none on record");
+  });
+
+  it("capability: met needs a passing check or an applied change as evidence", async () => {
+    const sources = await metSources();
+    const node = indexTree((await sources.prd())!.tree).resolve(CAPABILITY)!;
+    // Nothing open amends it, and one passing check is on record.
+    const open = (await sources.prd())!.tree.changes;
+    for (const change of open) change.status = "deleted";
+    node.requirements = [{ id: "r1", title: "Charge once", category: "functional", validationType: "automated", acceptanceCriteria: [] }];
+    node.checks = [{ requirementId: "r1", result: "pass", at: "2026-10-22T10:00:00.000Z", commit: "abcdef1234567" }];
+    const packet = await buildExplainPacket(sources, { ref: CAPABILITY }, NOW);
+    expect(packet.text).toContain("- c1 [met] A valid card is charged once");
+    expect(packet.text).toContain('check "Charge once": pass on 2026-10-22 at abcdef123');
+
+    node.checks = [];
+    const bare = await buildExplainPacket(sources, { ref: CAPABILITY }, NOW);
+    expect(bare.text).toContain("- c1 [not verified] A valid card is charged once");
+    expect(bare.text).toContain("no passing check or applied change is on record");
+
+    node.checks = [{ requirementId: "r1", result: "fail", at: "2026-10-22T10:00:00.000Z" }];
+    const failed = await buildExplainPacket(sources, { ref: CAPABILITY }, NOW);
+    expect(failed.text).toContain("- c1 [not met] A valid card is charged once");
+    expect(failed.text).toContain('check "Charge once": fail on 2026-10-22');
+  });
+
+  it("area: carries the area's capabilities with their derived status", async () => {
+    const packet = await buildExplainPacket(await sourcesFor("v2"), { ref: AREA }, NOW);
+    expect(packet.text).toContain("Summary: Taking payment for a basket.");
+    expect(packet.text).toContain("Capabilities in the area");
+    expect(packet.text).toMatch(/- capability A1\.1 Pay by card \(\w+, \w+\)/);
+  });
+
+  it("resolves an area or capability by alias, and does not throw on a deleted capability", async () => {
+    const sources = await sourcesFor("v2");
+    const tree = (await sources.prd())!.tree;
+    indexTree(tree).resolve(AREA)!.aliases = ["shop-checkout"];
+    const capability = indexTree(tree).resolve(CAPABILITY)!;
+    capability.aliases = ["card-pay"];
+    expect((await buildExplainPacket(sources, { ref: "shop-checkout" }, NOW)).text).toContain("Capabilities in the area");
+    expect((await buildExplainPacket(sources, { ref: "card-pay" }, NOW)).text).toContain("- c1 [not verified] A valid card is charged once");
+
+    capability.status = "deleted";
+    const deleted = await buildExplainPacket(sources, { ref: CAPABILITY }, NOW);
+    expect(deleted.text).not.toContain("[met]");
+  });
+
+  it("zone: carries the zone's summary, metrics, entry points and insights", async () => {
+    const packet = await buildExplainPacket(await sourcesFor("v2"), { ref: "pay" }, NOW);
+    expect(packet.text).toContain("pay (Payments)");
+    expect(packet.text).toContain("Cohesion 0.8, coupling 0.2, 12 files.");
+    expect(packet.text).toContain("Summary: Card and wallet payment.");
+    expect(packet.text).toContain("- src/pay/index.ts");
+    expect(packet.text).toContain("- Wallet code is shared with refunds.");
+    expect(packet.text).toContain("_source: .sourcevision/zones.json · generated: 2026-10-21T00:00:00.000Z");
+  });
+
+  it("zone: says the analysis is missing when the zone read has nothing", async () => {
+    const packet = await buildExplainPacket(await sourcesFor("v2"), { ref: "pay-x" }, NOW);
+    expect(packet.text).toContain('"pay-x" names no product area, capability, zone, epic or feature');
+  });
+
+  it("v1: says there is no product layer and explains from the PRD and zones", async () => {
+    const epic = await buildExplainPacket(await sourcesFor("v1"), { ref: V1_EPIC }, NOW);
+    expect(epic.text).toContain("There is no product layer on this tree");
+    expect(epic.text).toContain("Done when (acceptance criteria, not capability criteria):");
+    expect(epic.text).not.toContain("[met]");
+    const zone = await buildExplainPacket(await sourcesFor("v1"), { ref: "pay" }, NOW);
+    expect(zone.text).toContain("There is no product layer on this tree");
+    expect(zone.text).toContain("pay (Payments)");
+  });
+
+  it("instructions require the three labels with evidence, and keep capability criteria apart from done when", async () => {
+    const { text } = await buildExplainPacket(await sourcesFor("v2"), { ref: CAPABILITY }, NOW);
+    expect(text).toContain("`met`, `not met` or `not verified`");
+    expect(text).toContain("cite its evidence");
+    expect(text).toContain('"capability criteria" for the standing requirements on the product layer');
+    expect(text).toContain('"done when" for a change\'s or task\'s acceptance criteria');
+  });
+
+  it("keeps instructions and a long criteria list within the Explain bound, cutting from the end", async () => {
+    const sources = await sourcesFor("v2");
+    const node = indexTree((await sources.prd())!.tree).resolve(CAPABILITY)!;
+    node.criteria = Array.from({ length: 80 }, (_, i) => ({ id: `c${i + 1}`, text: `Criterion ${i + 1} ${"x".repeat(120)}` }));
+    const packet = await buildExplainPacket(sources, { ref: CAPABILITY }, NOW);
+    expect(packet.chars).toBeLessThanOrEqual(EXPLAIN_CAP);
+    expect(packet.text).toContain("## How to explain");
+    expect(packet.text).toContain("## Cut to fit");
   });
 });
 
@@ -199,6 +328,76 @@ describe("Describe", () => {
   it("v1: carries a blocked task with its blocker named", async () => {
     const packet = await buildDescribePacket(await sourcesFor("v1"), { ref: V1_TASK }, NOW);
     expect(packet.text).toMatchSnapshot();
+  });
+
+  it("carries done-when as checks, likely files, and the tier with its reason", async () => {
+    const sources = await sourcesFor("v2", {
+      resolve: async () => ({
+        savedTier: "deep",
+        settings: [{ key: "model", value: "opus", source: "task.run.tier" }],
+        refusals: [],
+        warnings: [],
+      }),
+    });
+    const text = (await buildDescribePacket(sources, { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).toMatch(/Done when \(checks\):\n- \[ \] /);
+    expect(text).toContain("## Likely files");
+    expect(text).toContain("- src/pay/button.ts");
+    expect(text).toContain("Tier: deep");
+    expect(text).toContain('model "opus" comes from task.run.tier');
+  });
+
+  it("carries the resolved settings and the dry-run digest from the reads, not a gap", async () => {
+    const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).toContain("model = \"opus\" (from task.run)");
+    expect(text).toContain("## Brief preview digest");
+    expect(text).toContain("# Task brief");
+    expect(text).not.toContain("Not available: the dry run");
+  });
+
+  it("starts the resolve and dry-run reads together, before either answers", async () => {
+    const started: string[] = [];
+    const answers: Record<string, (value: never) => void> = {};
+    const sources = await sourcesFor("v2", {
+      resolve: () => new Promise((done) => { started.push("resolve"); answers.resolve = done as (v: never) => void; }),
+      preview: () => new Promise((done) => { started.push("preview"); answers.preview = done as (v: never) => void; }),
+    });
+    const building = buildDescribePacket(sources, { ref: CHANGE_TASK }, NOW);
+    // Let the builder run until it waits on its reads.
+    for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
+    expect(started.sort()).toEqual(["preview", "resolve"]);
+
+    answers.resolve!(null as never);
+    answers.preview!("# Task brief\n" as never);
+    expect((await building).text).toContain("## Brief preview digest");
+  });
+
+  it("hands its AbortSignal to both reads", async () => {
+    const seen: Array<AbortSignal | undefined> = [];
+    const sources = await sourcesFor("v2", {
+      resolve: async (_id, signal) => { seen.push(signal); return null; },
+      preview: async (_id, signal) => { seen.push(signal); return null; },
+    });
+    const controller = new AbortController();
+    await buildDescribePacket(sources, { ref: CHANGE_TASK }, NOW, controller.signal);
+    expect(seen).toEqual([controller.signal, controller.signal]);
+  });
+
+  it("marks each failed Prepare read unavailable and still builds the packet", async () => {
+    const down = await sourcesFor("v2", { resolve: async () => null, preview: async () => null });
+    const text = (await buildDescribePacket(down, { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).toContain("Not available: the resolve command did not answer");
+    expect(text).toContain("Not available: the dry run did not answer");
+    expect(text).toContain("## Prior runs");
+    expect(text).toContain("## Task");
+  });
+
+  it("tells the agent to flag vague done-when and propose tightened ones through a change-set card", async () => {
+    const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE_TASK }, NOW)).text;
+    expect(text).toContain(DESCRIBE_INSTRUCTIONS);
+    expect(DESCRIBE_INSTRUCTIONS).toMatch(/flag any that is vague/);
+    expect(DESCRIBE_INSTRUCTIONS).toContain("propose_prd_change");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("change-set card");
   });
 
   it("names each refusal and marks an unanswered resolve as unavailable", async () => {
@@ -266,8 +465,8 @@ describe("lens registry", () => {
     const resolveRead = vi.fn(async () => null);
     const previewRead = vi.fn(async () => null);
     await buildLensPacket("describe", { ref: CHANGE_TASK }, await sourcesFor("v2", { resolve: resolveRead, preview: previewRead }), NOW);
-    expect(resolveRead).toHaveBeenCalledWith(CHANGE_TASK);
-    expect(previewRead).toHaveBeenCalledWith(CHANGE_TASK);
+    expect(resolveRead).toHaveBeenCalledWith(CHANGE_TASK, undefined);
+    expect(previewRead).toHaveBeenCalledWith(CHANGE_TASK, undefined);
   });
 
   it("sends no packet for General and does not read anything", async () => {

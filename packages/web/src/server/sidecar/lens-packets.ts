@@ -38,7 +38,7 @@ export type LensId = (typeof LENS_IDS)[number];
 
 export type LensPacketPlan =
   | { kind: "none" }
-  | { kind: "packet"; cap: number; build: (sources: PacketSources, target: PacketTarget, now: string) => Promise<Packet> }
+  | { kind: "packet"; cap: number; build: (sources: PacketSources, target: PacketTarget, now: string, signal?: AbortSignal) => Promise<Packet> }
   | { kind: "unavailable"; needs: string };
 
 export const LENS_PACKETS: Readonly<Record<LensId, LensPacketPlan>> = {
@@ -73,10 +73,11 @@ export async function buildLensPacket(
   target: PacketTarget,
   sources: PacketSources,
   now: string,
+  signal?: AbortSignal,
 ): Promise<LensPacketResult> {
   if (!isLensId(lens)) return { status: "unavailable", lens, needs: "a lens this build knows" };
   const plan = LENS_PACKETS[lens];
   if (plan.kind === "none") return { status: "none", lens };
   if (plan.kind === "unavailable") return { status: "unavailable", lens, needs: plan.needs };
-  return { status: "ready", lens, packet: await plan.build(sources, target, now) };
+  return { status: "ready", lens, packet: await plan.build(sources, target, now, signal) };
 }

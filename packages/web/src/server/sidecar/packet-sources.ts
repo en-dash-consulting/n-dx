@@ -61,6 +61,22 @@ export interface ZoneRead {
   unzoned: number;
 }
 
+/** One zone in full, for the Explain lens: what the analysis says it is. */
+export interface ZoneDetail {
+  /** The analysis stamp (`manifest.analyzedAt`). */
+  analyzedAt: string;
+  id: string;
+  name: string;
+  description: string;
+  cohesion: number;
+  coupling: number;
+  fileCount: number;
+  /** A bounded sample, in analysis order. */
+  files: string[];
+  entryPoints: string[];
+  insights: string[];
+}
+
 export interface ResolvedSetting {
   key: string;
   value: unknown;
@@ -70,9 +86,30 @@ export interface ResolvedSetting {
 
 export interface ResolveRead {
   settings: ResolvedSetting[];
+  /** The tier saved on the task (`run.tier`), or `null` when none is saved. */
+  savedTier?: string | null;
   /** Why a run would be refused, as hench states it. */
   refusals: Array<{ code: string; message: string }>;
   warnings: Array<{ code: string; message: string }>;
+}
+
+/**
+ * `ndx work --resolve`'s JSON as a {@link ResolveRead}. Only entries that
+ * carry a `source` are settings; anything else in `resolved` is skipped.
+ */
+export function readResolution(resolution: Record<string, unknown>): ResolveRead {
+  const resolved = resolution.resolved && typeof resolution.resolved === "object" ? (resolution.resolved as Record<string, unknown>) : {};
+  const settings: ResolvedSetting[] = Object.entries(resolved).flatMap(([key, entry]) => {
+    const setting = entry as { value?: unknown; source?: unknown } | null;
+    return setting && typeof setting.source === "string" ? [{ key, value: setting.value ?? null, source: setting.source }] : [];
+  });
+  const notes = (field: string): Array<{ code: string; message: string }> =>
+    (Array.isArray(resolution[field]) ? (resolution[field] as Array<{ code?: unknown; message?: unknown }>) : []).map((n) => ({
+      code: String(n.code),
+      message: String(n.message),
+    }));
+  const saved = resolution.saved as { tier?: unknown } | null | undefined;
+  return { settings, savedTier: typeof saved?.tier === "string" ? saved.tier : null, refusals: notes("refusals"), warnings: notes("warnings") };
 }
 
 export interface RunStatusRead {
@@ -87,21 +124,27 @@ export interface PacketSources {
   prd(): Promise<PrdRead | null>;
   evidence(itemIds: string[]): Promise<EvidenceRead | null>;
   zones(files: string[]): Promise<ZoneRead | null>;
+  /** The zone `ref` names (id, name, or an id it was known by), or `null` when there is none or no analysis. */
+  zone(ref: string): Promise<ZoneDetail | null>;
   /** `ndx work --task=<id> --resolve`, parsed. */
-  resolve(taskId: string): Promise<ResolveRead | null>;
+  resolve(taskId: string, signal?: AbortSignal): Promise<ResolveRead | null>;
   /** `ndx work --task=<id> --dry-run` output: the brief hench would send. */
-  preview(taskId: string): Promise<string | null>;
+  preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
   runs(taskId: string): Promise<RunStatusRead[] | null>;
 }
 
 /** The two reads that spawn `ndx`; the Prepare route owns that spawn, so it is injected. */
 export interface SpawnedReads {
-  resolve(taskId: string): Promise<ResolveRead | null>;
-  preview(taskId: string): Promise<string | null>;
+  /** Aborting `signal` kills the spawned `ndx`. */
+  resolve(taskId: string, signal?: AbortSignal): Promise<ResolveRead | null>;
+  preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
 }
 
 /** Most commits read for one packet; evidence is a sample, and the packet caps it again. */
 const MAX_EVIDENCE_COMMITS = 40;
+
+/** Most files, entry points and insights one zone read carries; the packet is a summary, not an inventory. */
+const ZONE_SAMPLE = 20;
 
 /** Most run records parsed for one packet, newest file first; older runs are not read. */
 const MAX_RUN_FILES = 200;
@@ -190,8 +233,32 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
       return { analyzedAt: manifest.analyzedAt, zones: summaries, unzoned: wanted.size - zoned.size };
     },
 
-    resolve: (taskId) => spawned.resolve(taskId),
-    preview: (taskId) => spawned.preview(taskId),
+    async zone(ref) {
+      const manifest = readJson<Manifest>(join(ctx.svDir, DATA_FILES.manifest));
+      const zones = readJson<Zones>(join(ctx.svDir, DATA_FILES.zones));
+      if (!manifest || !zones || !Array.isArray(zones.zones)) return null;
+      const wanted = ref.trim().toLowerCase();
+      const zone =
+        zones.zones.find((z) => z.id === ref) ??
+        zones.zones.find((z) => z.previousIds?.includes(ref)) ??
+        zones.zones.find((z) => z.name.toLowerCase() === wanted);
+      if (!zone) return null;
+      return {
+        analyzedAt: manifest.analyzedAt,
+        id: zone.id,
+        name: zone.name,
+        description: zone.description,
+        cohesion: zone.cohesion,
+        coupling: zone.coupling,
+        fileCount: zone.files.length,
+        files: zone.files.slice(0, ZONE_SAMPLE),
+        entryPoints: (zone.entryPoints ?? []).slice(0, ZONE_SAMPLE),
+        insights: (zone.insights ?? []).slice(0, 5),
+      };
+    },
+
+    resolve: (taskId, signal) => spawned.resolve(taskId, signal),
+    preview: (taskId, signal) => spawned.preview(taskId, signal),
 
     async runs(taskId) {
       const dir = join(layout.henchDir, "runs");

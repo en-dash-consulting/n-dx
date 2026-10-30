@@ -15,7 +15,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { SIDECAR_BROKER_NAME, type BrokerToolName } from "./broker-policy.js";
-import type { SidecarBroker } from "./broker.js";
+import type { CardAnnex, SidecarBroker } from "./broker.js";
+import { carryOutDecision, workOptions, type SidecarActions } from "./carry-out.js";
 import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES } from "./ledger.js";
 
 const BROKER_VERSION = "1.0.0";
@@ -29,12 +30,32 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
     input: { argv: z.array(z.string()).min(1).describe("The command and its arguments, one token each") },
   },
   start_work: {
-    description: "Propose starting `ndx work` on a task. Always waits for the operator's work card.",
-    input: { taskId: z.string().min(1), flags: z.array(z.string()).optional() },
+    description: "Propose starting `ndx work` on a task. Always waits for the operator's work card, which shows the run's `ndx work --resolve` settings.",
+    input: {
+      taskId: z.string().min(1),
+      options: z.record(z.string(), z.unknown()).optional()
+        .describe("Run options as the dashboard's execute route takes them (model, review, maxTurns, …)"),
+    },
   },
   propose_prd_change: {
-    description: "Propose PRD items to add or change. Always waits for the operator's change-set card.",
-    input: { items: objects },
+    description: [
+      "Propose PRD items to add. Always waits for the operator's change-set card, on which the operator can edit each item's title, description and done-when before approving; the result lists the ids written.",
+      "On a v2 PRD (product/ and changes/): item 1 is one change and every later item is one of its tasks; give `target` (a capability or constraint id) to place the change, or omit it and the change lands in the Inbox awaiting placement.",
+      "On a v1 PRD: each item is added as add_item adds it, at the root or under `parentId` (an existing item) or `parent` (the index of an earlier item on this card); `type` defaults to the parent's child type.",
+      "Nothing is applied: a change is never applied from a card.",
+    ].join(" "),
+    input: {
+      items: z.array(z.object({
+        title: z.string().min(1),
+        type: z.string().optional().describe("v1: epic, feature, task or subtask; v2: change (item 1) or task"),
+        description: z.string().optional(),
+        acceptanceCriteria: z.array(z.string()).optional().describe("Done-when: what must be true for the item to be complete"),
+        priority: z.enum(["critical", "high", "medium", "low"]).optional(),
+        parentId: z.string().optional().describe("v1: an existing item to add under"),
+        parent: z.number().int().min(0).optional().describe("v1: the index of an earlier item on this card to add under"),
+      })).min(1),
+      target: z.string().optional().describe("v2: the capability or constraint the change touches"),
+    },
   },
   place_change_card: {
     description: "Propose placing a change on a capability or constraint. Always waits for the operator's placement card.",
@@ -62,21 +83,38 @@ function text(message: string, isError = false): CallToolResult {
   return { content: [{ type: "text", text: message }], ...(isError && { isError: true }) };
 }
 
-/** The broker MCP server for one Sidecar session. */
-export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string): McpServer {
+/**
+ * The broker MCP server for one Sidecar session. `actions` carries out an
+ * approved call (see `carry-out.ts`); without it an approved call that has
+ * an effect reports that nothing ran.
+ */
+export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, actions?: SidecarActions): McpServer {
   const server = new McpServer({ name: SIDECAR_BROKER_NAME, version: BROKER_VERSION });
 
   for (const [name, tool] of Object.entries(CARD_TOOLS) as Array<[keyof typeof CARD_TOOLS, (typeof CARD_TOOLS)[keyof typeof CARD_TOOLS]]>) {
     server.registerTool(name, { description: tool.description, inputSchema: tool.input }, async (args, extra) => {
-      const outcome = await broker.request(sessionId, name, args as Record<string, unknown>, extra.signal);
-      if (outcome.decidedBy === "allow-list") {
-        return text(`Allowed by the Sidecar allow-list. The dashboard carries out ${name} calls; nothing has run yet.`);
+      const input = args as Record<string, unknown>;
+      const annex: CardAnnex = {};
+      // A work card shows what the run would be before the operator decides it.
+      if (name === "start_work" && actions) annex.preview = await actions.previewWork(String(input.taskId), workOptions(input));
+      // A change-set card shows its items read against the PRD; one that cannot be written raises no card.
+      if (name === "propose_prd_change" && actions) {
+        const changeSet = await actions.reviewChangeSet(input);
+        if (typeof changeSet === "string") return text(`No card was raised: ${changeSet}. Nothing was written.`, true);
+        annex.changeSet = changeSet;
       }
-      const { card } = outcome;
-      const note = card.reason ? ` Operator's note: ${card.reason}` : "";
-      if (outcome.decidedBy === "withdrawn") return text(`Card ${card.id} was withdrawn: ${card.reason ?? "the turn stopped"}.`, true);
-      if (!outcome.approved) return text(`The operator denied card ${card.id}.${note}`, true);
-      return text(`The operator approved card ${card.id}. The dashboard carries out ${name} calls; nothing has run yet.${note}`);
+      const outcome = await broker.request(sessionId, name, input, extra.signal, annex);
+      // A stopped turn ends the wait on an effect (a command), never the effect itself.
+      const carrying = broker.carryOutSignal(sessionId, extra.signal);
+      try {
+        const result = await carryOutDecision(name, input, outcome, actions, carrying.signal);
+        if (outcome.decidedBy !== "allow-list" && outcome.approved) {
+          broker.recordCarriedOut(sessionId, outcome.card.id, { ok: result.ok, ...(result.ids && { ids: result.ids }) });
+        }
+        return text(result.text, !result.ok);
+      } finally {
+        carrying.release();
+      }
     });
   }
 
@@ -101,8 +139,9 @@ export async function handleBrokerMcpRequest(
   res: ServerResponse,
   broker: SidecarBroker,
   sessionId: string,
+  actions?: SidecarActions,
 ): Promise<void> {
-  const server = createBrokerMcpServer(broker, sessionId);
+  const server = createBrokerMcpServer(broker, sessionId, actions);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on("close", () => {
     void transport.close();

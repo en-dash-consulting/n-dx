@@ -30,7 +30,11 @@ import {
   type LedgerEntry,
 } from "../../../src/server/sidecar/ledger.js";
 import { loadPrdModel } from "../../../src/server/rex-gateway.js";
+import type { previewTaskRun, resolveTaskRun } from "../../../src/server/routes-hench-prep.js";
+import { prepareReads } from "../../../src/server/routes-sidecar.js";
+import type { ServerContext } from "../../../src/server/types.js";
 import { buildLensPacket } from "../../../src/server/sidecar/lens-packets.js";
+import { EXPLAIN_CAP } from "../../../src/server/sidecar/packet-builders.js";
 import type { PacketSources } from "../../../src/server/sidecar/packet-sources.js";
 import {
   SidecarSessionRegistry,
@@ -478,8 +482,9 @@ describe("the packet opens the first turn", () => {
       prd: async () => ({ layout: model.layout, tree: model.tree }),
       evidence: async () => null,
       zones: async () => null,
-      resolve: async () => null,
-      preview: async () => null,
+      zone: async () => null,
+      resolve: async () => ({ savedTier: "deep", settings: [{ key: "model", value: "opus", source: "task.run.tier" }], refusals: [], warnings: [] }),
+      preview: async () => "# Task brief\n## Acceptance\n",
       runs: async () => [],
     };
     const task = "c0000000-0000-4000-8000-000000000002";
@@ -503,5 +508,107 @@ describe("the packet opens the first turn", () => {
     // The header names any ref; the title proves the task itself was resolved and described.
     expect(spawns[0]!.stdin).toContain("Wire the button");
     expect(spawns[0]!.stdin).toContain("what is this?");
+    // The instructions and the Prepare reads reach the first turn, ahead of the operator's message.
+    const first = spawns[0]!.stdin;
+    expect(first).toContain("## How to describe");
+    expect(first).toContain("propose_prd_change");
+    expect(first).toContain("model = \"opus\" (from task.run.tier)");
+    expect(first).toContain("## Brief preview digest");
+    expect(first.indexOf("## How to describe")).toBeLessThan(first.indexOf("## Operator's message"));
+  });
+
+  it("a stop while the Describe packet builds aborts the resolve and dry-run spawns", async () => {
+    const rexDir = join(root, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    cpSync(resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree"), rexDir, { recursive: true });
+    const model = await loadPrdModel(rexDir);
+    const signals: Record<string, AbortSignal | undefined> = {};
+    const hang = (name: string) => (_ctx: unknown, _id: string, _options: unknown, signal?: AbortSignal) =>
+      new Promise<{ ok: false; failure: string }>((done) => {
+        signals[name] = signal;
+        signal?.addEventListener("abort", () => done({ ok: false, failure: "Cancelled" }));
+      });
+    const spawned = prepareReads({} as ServerContext, {
+      resolve: hang("resolve") as typeof resolveTaskRun,
+      preview: hang("preview") as typeof previewTaskRun,
+    });
+    const sources: PacketSources = {
+      sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },
+      prd: async () => ({ layout: model.layout, tree: model.tree }),
+      evidence: async () => null,
+      zones: async () => null,
+      zone: async () => null,
+      resolve: (id, signal) => spawned.resolve(id, signal),
+      preview: (id, signal) => spawned.preview(id, signal),
+      runs: async () => [],
+    };
+    const task = "c0000000-0000-4000-8000-000000000002";
+    const reg = new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      context: {
+        ceiling: () => 1000,
+        ledger: () => [],
+        packet: async (record, signal) => {
+          const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, "2026-10-28T12:00:00.000Z", signal);
+          return built.status === "ready" ? built.packet.text : undefined;
+        },
+      },
+    });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "describe", target: { ref: task } });
+    const turn = reg.sendTurn(id, "what is this?");
+    for (let i = 0; i < 50 && !(signals.resolve && signals.preview); i++) await new Promise((r) => setImmediate(r));
+    expect(signals.resolve).toBeDefined();
+    expect(signals.resolve).toBe(signals.preview);
+    expect(signals.resolve!.aborted).toBe(false);
+
+    expect(await reg.interrupt(id)).toBe(true);
+    expect(signals.resolve!.aborted).toBe(true);
+    expect((await turn).status).toBe("interrupted");
+    expect(spawns).toHaveLength(0);
+  });
+
+  it("sends the Explain packet and its instructions on turn one, within the lens's bound", async () => {
+    const rexDir = join(root, ".rex");
+    mkdirSync(rexDir, { recursive: true });
+    cpSync(resolve(__dirname, "../../../../rex/tests/fixtures/v2-tree"), rexDir, { recursive: true });
+    const model = await loadPrdModel(rexDir);
+    const sources: PacketSources = {
+      sourcePaths: { zones: ".sourcevision/zones.json", runs: ".hench/runs/" },
+      prd: async () => ({ layout: model.layout, tree: model.tree }),
+      evidence: async () => null,
+      zones: async () => null,
+      zone: async () => null,
+      resolve: async () => null,
+      preview: async () => null,
+      runs: async () => [],
+    };
+    const capability = "a0000000-0000-4000-8000-000000000002";
+    const reg = new SidecarSessionRegistry({
+      dir,
+      connect: () => ({ spawn: fakeSpawn }),
+      context: {
+        ceiling: () => 1000,
+        ledger: () => [],
+        packet: async (record) => {
+          const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, "2026-10-28T12:00:00.000Z");
+          return built.status === "ready" ? built.packet.text : undefined;
+        },
+      },
+    });
+    recordRepoTrust(root);
+    const { id } = reg.create({ scope: "worktree", worktree: root, vendor: "claude", lens: "explain", target: { ref: capability } });
+    await reg.sendTurn(id, "explain this");
+    await reg.sendTurn(id, "and the second criterion?");
+
+    const first = spawns[0]!.stdin;
+    expect(first).toContain("## How to explain");
+    expect(first).toContain("- c1 [not verified] A valid card is charged once");
+    expect(first).toContain("## Operator's message\nexplain this");
+    expect(first.indexOf("## How to explain")).toBeLessThan(first.indexOf("## Operator's message"));
+    // Everything before the operator's message is the packet, and it fits Explain's cap.
+    expect(first.split("\n\n## Operator's message")[0]!.length).toBeLessThanOrEqual(EXPLAIN_CAP);
+    expect(spawns[1]!.stdin).toBe("and the second criterion?");
   });
 });

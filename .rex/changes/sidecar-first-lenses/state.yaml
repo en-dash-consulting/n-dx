@@ -1,0 +1,105 @@
+schema: "rex/v2"
+items:
+  "123bf048-b90c-4bc2-9ead-1ab2ca059e5d":
+    status: "completed"
+    startedAt: "2026-10-29T01:27:19.862Z"
+    completedAt: "2026-10-29T01:32:37.029Z"
+    endedAt: "2026-10-29T01:32:37.029Z"
+    activeIntervals: [{"end":"2026-10-29T01:32:37.029Z","start":"2026-10-29T01:27:19.862Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added POST /api/sidecar/allow-list?dryRun=1 (broker.checkAllow). Add checks with the server and never stages a refused command; Save checks all staged adds before any write; a failed Save re-reads the allow-list file."
+    lastModified: "2026-10-29T01:32:37.029Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "21fe75a3-8af7-4ce7-9fbd-08549905bb5b":
+    status: "completed"
+    startedAt: "2026-10-29T02:02:01.803Z"
+    completedAt: "2026-10-29T02:02:01.803Z"
+    endedAt: "2026-10-29T02:02:01.803Z"
+    activeIntervals: [{"end":"2026-10-29T02:02:01.803Z","start":"2026-10-29T02:02:01.803Z"}]
+    lastModified: "2026-10-29T02:02:01.803Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "27eab993-7418-46e3-bdb0-52d868031058":
+    status: "completed"
+    startedAt: "2026-10-29T01:35:14.962Z"
+    completedAt: "2026-10-29T01:42:21.737Z"
+    endedAt: "2026-10-29T01:42:21.737Z"
+    activeIntervals: [{"end":"2026-10-29T01:42:21.737Z","start":"2026-10-29T01:35:14.962Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Explain packet: per-criterion met / not met / not verified with evidence (capability), area capabilities, zone summary via new PacketSources.zone, v1 no-product-layer note; EXPLAIN_INSTRUCTIONS in the packet header (inside the cap)."
+    lastModified: "2026-10-29T01:42:21.737Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2f15d421-fa29-4464-9ab1-6131e80728a3":
+    status: "completed"
+    startedAt: "2026-10-28T21:57:23.949Z"
+    completedAt: "2026-10-28T22:16:08.341Z"
+    endedAt: "2026-10-28T22:16:08.341Z"
+    activeIntervals: [{"end":"2026-10-28T22:16:08.341Z","start":"2026-10-28T21:57:23.949Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sidecar/carry-out.ts carries out approved broker calls: run_command as a sidecar-command job (tray + Live), start_work through the hench execute route under maxConcurrentProcesses with a --resolve preview on the card; other tools report recorded-not-carried-out with their batch."
+    lastModified: "2026-10-28T22:16:08.341Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "30921544-26cb-49a6-bac2-cee4e10902f3":
+    status: "completed"
+    startedAt: "2026-10-29T00:01:14.706Z"
+    completedAt: "2026-10-29T00:15:13.228Z"
+    endedAt: "2026-10-29T00:15:13.228Z"
+    activeIntervals: [{"end":"2026-10-29T00:10:14.171Z","start":"2026-10-29T00:01:14.706Z"},{"end":"2026-10-29T00:15:13.228Z","start":"2026-10-29T00:15:13.228Z"}]
+    lastModified: "2026-10-29T00:15:13.228Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "613fc6f0-e46a-4278-bf2e-9dbe2263ecf2":
+    status: "completed"
+    startedAt: "2026-10-29T01:05:07.466Z"
+    completedAt: "2026-10-29T01:27:06.023Z"
+    endedAt: "2026-10-29T01:27:06.023Z"
+    activeIntervals: [{"end":"2026-10-29T01:21:43.647Z","start":"2026-10-29T01:05:07.466Z"},{"end":"2026-10-29T01:27:06.023Z","start":"2026-10-29T01:27:06.023Z"}]
+    lastModified: "2026-10-29T01:27:06.023Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7da01445-1d7e-48ed-9d26-cf303ce98d72":
+    status: "completed"
+    startedAt: "2026-10-29T01:54:10.866Z"
+    completedAt: "2026-10-29T01:59:18.038Z"
+    endedAt: "2026-10-29T01:59:18.038Z"
+    activeIntervals: [{"end":"2026-10-29T01:59:18.038Z","start":"2026-10-29T01:54:10.866Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Describe builder runs resolve and preview via Promise.all; the turn's AbortSignal flows registry → context.packet → buildLensPacket → builder → prepareReads → resolveTaskRun/previewTaskRun → runNdx. Commit e77e45b06."
+    lastModified: "2026-10-29T01:59:18.038Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9559114b-dfe3-466e-9158-c3bc6c626462":
+    status: "completed"
+    startedAt: "2026-10-29T01:44:57.761Z"
+    completedAt: "2026-10-29T01:51:08.972Z"
+    endedAt: "2026-10-29T01:51:08.972Z"
+    activeIntervals: [{"end":"2026-10-29T01:51:08.972Z","start":"2026-10-29T01:44:57.761Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Describe reads wired to Prepare resolve/dry-run seams; packet carries checks, likely files, tier+reason; lens instructions added; tested. Commit b3055dc5a."
+    lastModified: "2026-10-29T01:51:08.972Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9637b970-57b6-4306-afc6-63e4a213b19a":
+    status: "completed"
+    startedAt: "2026-10-29T00:15:33.882Z"
+    completedAt: "2026-10-29T00:58:14.797Z"
+    endedAt: "2026-10-29T00:58:14.797Z"
+    activeIntervals: [{"end":"2026-10-29T00:43:52.259Z","start":"2026-10-29T00:15:33.882Z"},{"end":"2026-10-29T00:58:14.797Z","start":"2026-10-29T00:58:14.797Z"}]
+    lastModified: "2026-10-29T00:58:14.797Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b1ee136b-d88d-4f2f-848d-70db805df38b":
+    status: "completed"
+    startedAt: "2026-10-29T02:02:01.803Z"
+    completedAt: "2026-10-29T02:02:01.803Z"
+    endedAt: "2026-10-29T02:02:01.803Z"
+    activeIntervals: [{"end":"2026-10-29T02:02:01.803Z","start":"2026-10-29T02:02:01.803Z"}]
+    appliedAt: "2026-10-29T02:02:01.803Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    issues: ["https://www.notion.so/3f7a80b7192481f8b679c82db62c39f5","https://www.notion.so/3f7a80b7192481a1ace0c96947b08d57","https://www.notion.so/3f7a80b71924816398f4d93e0d38edd2","https://www.notion.so/3f7a80b7192481f88060ea9e55cdbf00","https://www.notion.so/3f7a80b7192481ee9289c4d0f14f3609"]
+    lastModified: "2026-10-29T02:02:01.803Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "d4f33bf0-b520-43d8-962e-c2269bbf7b39":
+    status: "completed"
+    startedAt: "2026-10-29T00:58:33.195Z"
+    completedAt: "2026-10-29T01:02:11.950Z"
+    endedAt: "2026-10-29T01:02:11.950Z"
+    activeIntervals: [{"end":"2026-10-29T01:02:11.950Z","start":"2026-10-29T00:58:33.195Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "reviewChangeSet awaits setImmediate before each item's duplicate scan; matcher unchanged. Ordering test spies on findDuplicateItem and asserts event-loop work runs between scans."
+    lastModified: "2026-10-29T01:02:11.950Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -25,10 +25,14 @@
  * | POST | `/api/sidecar/sessions/:id/interrupt` | stop the running turn |
  * | POST | `/api/sidecar/sessions/:id/end` | end the session |
  * | GET  | `/api/sidecar/sessions/:id/cards` | the session's permission cards |
- * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember? }`) |
+ * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits? }`; `edits` only on a change-set approval) |
+ * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
  * | POST | `/api/sidecar/sessions/:id/mcp` | the `ndx-sidecar` broker (MCP, Streamable HTTP), while a turn runs |
  * | GET  | `/api/sidecar/allow-list` | the Sidecar allow-list |
+ * | POST | `/api/sidecar/allow-list` | add a rule (`{ tool, argv }`); refused for work, reset, push and every never-allow-listed tool; `?dryRun=1` gives the same verdict and writes nothing |
  * | DELETE | `/api/sidecar/allow-list` | revoke a rule (`{ tool, key }`) |
+ * | GET  | `/api/sidecar/settings` | mode, context ceilings, idle window, GitHub reads (`sidecar/settings.ts`) |
+ * | PUT  | `/api/sidecar/settings` | save them; `null` resets a value, an invalid one answers 400 and writes nothing |
  *
  * Sessions are the addressed workspace's: `ctx.projectDir` picks the registry
  * and broker (`<henchDir>/sidecar/`) and is the worktree a new session runs in.
@@ -37,7 +41,8 @@
  * `sidecar/broker.ts`): a raised or settled card is announced as
  * `sidecar:card`, and the client fetches `…/cards`. The session's vendor CLI
  * reaches the broker at this server's own loopback port, with the dashboard
- * token and the workspace in headers (`sidecar/spawn-policy.ts`).
+ * token and the workspace in headers (`sidecar/spawn-policy.ts`). An approved
+ * call is carried out by {@link sidecarActions} (`sidecar/carry-out.ts`).
  *
  * @module web/server/routes-sidecar
  */
@@ -54,11 +59,18 @@ import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/br
 import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
+import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
+import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
+import { startSidecarCommand } from "./routes-commands.js";
+import { runSlotUsage, startTaskExecution } from "./routes-hench.js";
+import { previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { resolveContextCeiling } from "./sidecar/context-refresh.js";
+import { readSidecarSettings, resolveSidecarIdleMs, saveSidecarSettings } from "./sidecar/settings.js";
+import { commitSettingsChange } from "./settings-commit.js";
 import { readLedger } from "./sidecar/ledger.js";
 import { buildLensPacket, LENS_IDS, LENS_PACKETS } from "./sidecar/lens-packets.js";
 import type { PacketTarget } from "./sidecar/packet-builders.js";
-import { createPacketSources } from "./sidecar/packet-sources.js";
+import { createPacketSources, readResolution, type SpawnedReads } from "./sidecar/packet-sources.js";
 import {
   createWorktreeSidecarRegistry,
   worktreeSidecarDir,
@@ -75,7 +87,9 @@ import { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
+const SETTINGS_PATH = "/api/sidecar/settings";
 const LENSES_PATH = "/api/sidecar/lenses";
+const PROPOSALS_PATH = "/api/sidecar/proposals";
 
 /** The registry as the drawer reads it: every lens, and what an unavailable one waits on. */
 function sidecarLenses(): Array<{ id: string; available: boolean; needs?: string }> {
@@ -135,6 +149,8 @@ export interface SidecarRouteOptions {
   registryFor?: (projectDir: string) => SidecarSessionRegistry;
   /** The broker for a project directory. Defaults to one per directory, kept for the server's life. */
   brokerFor?: (projectDir: string) => SidecarBroker;
+  /** What an approved broker call does. Defaults to {@link sidecarActions}. */
+  actionsFor?: (ctx: ServerContext) => SidecarActions;
 }
 
 /**
@@ -155,21 +171,90 @@ export function sidecarBrokerEndpoint(ctx: ServerContext, sessionId: string): Si
 }
 
 /**
+ * The two Describe reads, through the Prepare route's own seams: `ndx work
+ * --resolve` and `--dry-run` with no run options, as the modal opens. A read
+ * that fails answers `null`, so the packet marks that part unavailable and the
+ * session still starts.
+ */
+export function prepareReads(
+  ctx: ServerContext,
+  reads: { resolve: typeof resolveTaskRun; preview: typeof previewTaskRun } = { resolve: resolveTaskRun, preview: previewTaskRun },
+): SpawnedReads {
+  return {
+    async resolve(taskId, signal) {
+      const read = await reads.resolve(ctx, taskId, {}, signal).catch(() => null);
+      return read?.ok ? readResolution(read.resolution) : null;
+    },
+    async preview(taskId, signal) {
+      const read = await reads.preview(ctx, taskId, {}, signal).catch(() => null);
+      return read?.ok ? read.brief : null;
+    },
+  };
+}
+
+/**
  * Checkpoint wiring for `ctx`'s workspace: the project's ceiling for the
  * session's scope (read per turn), its ledger, and its lens's packet rebuilt
- * from disk. The two reads that spawn `ndx` answer nothing here — the Prepare
- * route that owns that spawn is not part of Sidecar — so a Plan packet says
- * those sections are missing rather than leaving a gap unmarked.
+ * from disk. The two reads that spawn `ndx` go through the Prepare route's
+ * seams ({@link prepareReads}).
  */
-export function sidecarContextOptions(ctx: ServerContext): SidecarContextOptions {
+export function sidecarContextOptions(ctx: ServerContext, reads: SpawnedReads = prepareReads(ctx)): SidecarContextOptions {
   const dir = worktreeSidecarDir(ctx.projectDir);
   return {
     ceiling: (record) => resolveContextCeiling(ctx.projectDir, record.scope),
     ledger: (record) => readLedger(dir, record.id),
-    packet: async (record) => {
-      const sources = createPacketSources(ctx, { resolve: async () => null, preview: async () => null });
-      const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString());
+    packet: async (record, signal) => {
+      const sources = createPacketSources(ctx, reads);
+      const built = await buildLensPacket(record.lens ?? "general", record.target ?? {}, sources, new Date().toISOString(), signal);
       return built.status === "ready" ? built.packet.text : undefined;
+    },
+  };
+}
+
+/**
+ * The effects of an approved broker call in `ctx`'s workspace: a command
+ * runs as the workspace's Sidecar command job (job tray, Live) and the agent
+ * waits up to `commandWaitMs` for its output, work starts through the hench
+ * execute route under `guard.maxConcurrentProcesses`, and a work card's
+ * preview is the Prepare route's `ndx work --resolve`. A change-set card is
+ * read against the workspace's PRD before it is raised and written there,
+ * under the PRD lock, on approval (`sidecar/change-set.ts`).
+ */
+export function sidecarActions(
+  ctx: ServerContext,
+  broadcast: WebSocketBroadcaster,
+  { commandWaitMs = SIDECAR_COMMAND_WAIT_MS }: { commandWaitMs?: number } = {},
+): SidecarActions {
+  return {
+    async previewWork(taskId, options) {
+      const read = await resolveTaskRun(ctx, taskId, options);
+      return read.ok ? renderWorkPreview(read.resolution) : `ndx work --resolve did not answer: ${read.failure}`;
+    },
+    runCommand(argv, signal) {
+      const started = startSidecarCommand(ctx, argv, broadcast);
+      return started.started
+        ? awaitSidecarCommand(started, commandWaitMs, signal)
+        : { ok: false, text: `Nothing ran: ${started.reason}.` };
+    },
+    reviewChangeSet(input) {
+      return reviewChangeSet(ctx.rexDir, input);
+    },
+    async writeChangeSet(changeSet) {
+      try {
+        const written = await writeChangeSet(ctx, changeSet, broadcast);
+        return { ok: true, text: written.text, ids: written.ids };
+      } catch (err) {
+        return { ok: false, text: `Nothing was written: ${errorMessage(err)}.` };
+      }
+    },
+    async startWork(taskId, options) {
+      const { inUse, max } = runSlotUsage(ctx);
+      if (inUse >= max) {
+        return { ok: false, text: `Nothing started: the concurrent run limit is reached (${inUse} of ${max} runs, guard.maxConcurrentProcesses).` };
+      }
+      const answer = await startTaskExecution(ctx, { taskId, ...(options && { options }) }, broadcast);
+      if (answer.status !== 202) return { ok: false, text: `Nothing started: ${String(answer.body.error ?? `the execute route answered ${answer.status}`)}.` };
+      return { ok: true, text: `Started run ${String(answer.body.runId)} on task ${taskId} (${String(answer.body.taskTitle)}); follow it on Live.` };
     },
   };
 }
@@ -205,6 +290,7 @@ function defaultRegistryFor(ctx: ServerContext): SidecarSessionRegistry {
     registry = createWorktreeSidecarRegistry(ctx.projectDir, {
       broker: (id) => sidecarBrokerEndpoint(ctx, id),
       context: sidecarContextOptions(ctx),
+      ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
       onTurnSpend: sidecarTurnSpendRecorder(ctx),
     });
     registries.set(ctx.projectDir, registry);
@@ -352,7 +438,10 @@ export async function handleSidecarRoute(
   opts: SidecarRouteOptions = {},
 ): Promise<boolean> {
   const [pathname, search = ""] = (req.url || "/").split("?");
-  if (pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`) && pathname !== ALLOW_LIST_PATH && pathname !== LENSES_PATH) {
+  if (
+    pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`)
+    && pathname !== ALLOW_LIST_PATH && pathname !== SETTINGS_PATH && pathname !== LENSES_PATH && pathname !== PROPOSALS_PATH
+  ) {
     return false;
   }
   const method = req.method || "GET";
@@ -363,6 +452,29 @@ export async function handleSidecarRoute(
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${LENSES_PATH}`);
     jsonResponse(res, 200, { lenses: sidecarLenses() });
     return true;
+  }
+
+  if (pathname === PROPOSALS_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${PROPOSALS_PATH}`);
+    jsonResponse(res, 200, { cards: broker.proposals() });
+    return true;
+  }
+
+  if (pathname === SETTINGS_PATH) {
+    if (method === "GET") {
+      jsonResponse(res, 200, readSidecarSettings(ctx.projectDir));
+      return true;
+    }
+    if (method === "PUT") {
+      const body = await readJsonObject(req, res);
+      if (typeof body === "string") return refuse(res, 400, body);
+      const saved = saveSidecarSettings(ctx.projectDir, body);
+      if ("error" in saved) return refuse(res, 400, saved.error);
+      for (const file of saved.files) await commitSettingsChange(ctx.projectDir, file, "sidecar");
+      jsonResponse(res, 200, readSidecarSettings(ctx.projectDir));
+      return true;
+    }
+    return refuse(res, 405, `${method} is not supported on ${SETTINGS_PATH}`);
   }
 
   if (pathname === ALLOW_LIST_PATH) {
@@ -378,6 +490,20 @@ export async function handleSidecarRoute(
         return refuse(res, 400, `"tool" must be a broker tool and "key" a string`);
       }
       jsonResponse(res, 200, { removed: broker.revoke({ tool, key }) });
+      return true;
+    }
+    if (method === "POST") {
+      const body = await readJsonObject(req, res);
+      if (typeof body === "string") return refuse(res, 400, body);
+      const { tool, argv } = body;
+      if (typeof tool !== "string" || !isBrokerTool(tool)) return refuse(res, 400, `"tool" must be a broker tool`);
+      try {
+        const dryRun = new URLSearchParams(search).get("dryRun") === "1";
+        jsonResponse(res, 200, { rule: dryRun ? broker.checkAllow(tool, { argv }) : broker.allow(tool, { argv }) });
+      } catch (err) {
+        if (err instanceof BrokerDecisionError) return refuse(res, err.status, err.message);
+        throw err;
+      }
       return true;
     }
     return refuse(res, 405, `${method} is not supported on ${ALLOW_LIST_PATH}`);
@@ -511,6 +637,7 @@ export async function handleSidecarRoute(
           approve: body.decision === "approve",
           ...(reason && { reason }),
           ...(body.remember && { remember: true }),
+          ...(body.edits !== undefined && { edits: body.edits }),
         });
         jsonResponse(res, 200, { card });
       } catch (err) {
@@ -526,7 +653,7 @@ export async function handleSidecarRoute(
       if (session.endedAt || !registry.isRunning(id)) {
         return refuse(res, 409, `Sidecar session ${id} has no running turn`);
       }
-      await handleBrokerMcpRequest(req, res, broker, id);
+      await handleBrokerMcpRequest(req, res, broker, id, opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast));
       return true;
   }
   return false;

@@ -28,6 +28,7 @@ import {
 } from "../../../src/server/routes-sidecar.js";
 import { readDashboardUsage } from "../../../src/server/dashboard-usage.js";
 import type { SidecarBroker, SidecarCard } from "../../../src/server/sidecar/broker.js";
+import type { SidecarActions } from "../../../src/server/sidecar/carry-out.js";
 import { LENS_IDS } from "../../../src/server/sidecar/lens-packets.js";
 import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
@@ -116,6 +117,15 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
   return child as unknown as ChildProcess;
 };
 
+/** Approved calls spawn nothing here; sidecar-carry-out.test.ts covers their effects. */
+const noEffects: SidecarActions = {
+  previewWork: async () => "preview",
+  runCommand: () => ({ ok: true, text: "Ran it." }),
+  startWork: async () => ({ ok: true, text: "Started it." }),
+  reviewChangeSet: async () => ({ layout: "v1", items: [{ title: "x", type: "epic" }] }),
+  writeChangeSet: async () => ({ ok: true, text: "Wrote it.", ids: ["x"] }),
+};
+
 function newRegistry(): SidecarSessionRegistry {
   return new SidecarSessionRegistry({
     dir: join(root, ".hench", "sidecar"),
@@ -133,7 +143,7 @@ beforeEach(async () => {
   registry = newRegistry();
   broker = createAnnouncingBroker(join(root, ".hench", "sidecar"), broadcast);
   server = await startRouteTestServer((req, res) =>
-    handleSidecarRoute(req, res, ctx, broadcast, { registryFor: () => registry, brokerFor: () => broker }));
+    handleSidecarRoute(req, res, ctx, broadcast, { registryFor: () => registry, brokerFor: () => broker, actionsFor: () => noEffects }));
 });
 
 afterEach(async () => {
@@ -539,6 +549,22 @@ describe("broker", () => {
 
     await client.close();
     await api(`/${id}/interrupt`, { method: "POST" });
+  });
+
+  it("answers an allow-list dry run with the verdict and writes nothing", async () => {
+    const post = (query: string, argv: string[]) => fetch(`${server.baseUrl}/api/sidecar/allow-list${query}`, {
+      method: "POST",
+      body: JSON.stringify({ tool: "run_command", argv }),
+    });
+    const ok = await post("?dryRun=1", ["ndx", "status", "."]);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ rule: { tool: "run_command", key: JSON.stringify(["ndx", "status", "."]) } });
+    for (const argv of [["ndx", "work", "."], ["git", "reset", "--hard"], ["git", "push"]]) {
+      const refused = await post("?dryRun=1", argv);
+      expect(refused.status).toBe(409);
+      expect(((await refused.json()) as { error: string }).error).toMatch(/can never be allow-listed/);
+    }
+    expect(await (await fetch(`${server.baseUrl}/api/sidecar/allow-list`)).json()).toEqual({ rules: [] });
   });
 
   it("withdraws a pending card when the operator stops the turn", async () => {
