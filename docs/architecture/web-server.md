@@ -42,6 +42,14 @@ Consequences for new code:
   unit tests, which default `Host` to the socket so origin tests exercise the
   origin rule.
 
+## Sidecar broker key
+
+A Sidecar session's CLI reaches the broker with a per-session key minted in
+`sidecar/broker-credential.ts`, not the dashboard token. The gate accepts it
+only on a `POST` to that session's raw `/api/sidecar/sessions/<id>/mcp` target;
+every other route, method or session answers 401. The session can read its own
+MCP config file, so that file never carries the token.
+
 ## HTTP-request concurrency
 
 When `ndx start` is running, the web server holds in-process caches (aggregation cache, PRD tree snapshot) that are populated from disk on demand. External CLI commands that write to the same files can cause stale or partial reads:

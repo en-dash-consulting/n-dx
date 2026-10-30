@@ -56,6 +56,13 @@ export interface RequestSecurityOptions {
    * runs without one — a bare `web serve`, or a test harness.
    */
   token?: string | null;
+  /**
+   * A narrower credential accepted in place of the token: true when the
+   * request presents one that is valid for this exact request. The predicate
+   * owns the scope; the gate only skips the token rule for it. Used for a
+   * Sidecar session's broker (`sidecar/broker-credential.ts`).
+   */
+  scopedCredential?: (req: IncomingMessage) => boolean;
 }
 
 /** Whether the request presents the token in a header or the cookie. Used by the upgrade path too. */
@@ -146,7 +153,7 @@ export function handleRequestSecurity(
   options: RequestSecurityOptions = {},
 ): boolean {
   if (!isTrustedHost(req)) return rejectMisdirected(res);
-  if (options.token && enforceToken(req, res, options.token)) return true;
+  if (options.token && !options.scopedCredential?.(req) && enforceToken(req, res, options.token)) return true;
 
   const method = (req.method || "GET").toUpperCase();
 

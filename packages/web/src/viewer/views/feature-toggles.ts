@@ -41,12 +41,17 @@ export const PACKAGE_META: Record<string, { label: string; icon: string; descrip
     icon: "◈",
     description: "How n-dx commits the files it generates",
   },
+  web: {
+    label: "{cli} start",
+    icon: "◧",
+    description: "Dashboard surfaces that run work from the browser",
+  },
 };
 
 // Order the settings page renders package sections in. A package missing
 // from this list is silently dropped by the filter below, so every key in
 // PACKAGE_META belongs here — that omission is what hid the git toggles.
-export const PACKAGE_ORDER = ["sourcevision", "rex", "hench", "git"];
+export const PACKAGE_ORDER = ["sourcevision", "rex", "hench", "git", "web"];
 
 const STABILITY_META: Record<string, { label: string; class: string }> = {
   experimental: { label: "Experimental", class: "ft-badge-experimental" },

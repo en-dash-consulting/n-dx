@@ -240,6 +240,7 @@ export { usageMessageId, UsageMessageFilter } from "./usage-dedup.js";
 export {
   emptyAggregateTokenUsage,
   accumulateTokenUsage,
+  addTokenUsage,
 } from "./token-usage.js";
 
 export type {
@@ -579,6 +580,36 @@ export {
   classifyVendorError,
   failureCategoryLabel,
 } from "./runtime-contract.js";
+
+// Resumable multi-turn vendor CLI sessions — shared by hench and the Sidecar
+export type {
+  SessionResume,
+  SessionTurnInput,
+  SessionTurnSpawn,
+  ClaudeTurnFlags,
+  CodexTurnFlags,
+  VendorSessionDriver,
+  NormalizedCodexResponse,
+  NormalizedCodexToolEvent,
+  ParseLineOptions,
+} from "./vendor-session-driver.js";
+export {
+  claudeSessionDriver,
+  codexSessionDriver,
+  vendorSessionDriver,
+  normalizeCodexResponse,
+  parseMaybeJson,
+  WINDOWS_STDIN_PROMPT_SEPARATOR,
+} from "./vendor-session-driver.js";
+export type {
+  VendorSession,
+  VendorSessionOptions,
+  ResumeVendorSessionOptions,
+  VendorSessionState,
+  SessionTurnResult,
+  SessionTurnStatus,
+} from "./vendor-session.js";
+export { startVendorSession, resumeVendorSession } from "./vendor-session.js";
 
 // Per-section prompt measurement — shared by rex, sourcevision, and hench
 export type {

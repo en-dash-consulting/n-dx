@@ -1,0 +1,221 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Describe > v1: carries a blocked task with its blocker named 1`] = `
+"# Sidecar context packet: describe · 33333333-3333-3333-3333-333333333333
+Built by code from the repository's own records. No model wrote it.
+
+## Task
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Password Login
+Status: blocked · priority critical
+Description: Build password-based authentication.
+Done when:
+- Valid passwords authenticate users
+- Invalid passwords show a generic error
+
+## Parent chain
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- epic Auth Platform (in_progress)
+- feature Login Flow (pending)
+
+## Blockers and dependencies
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Blocked by:
+- dep-password-policy: not found
+
+## Run settings (ndx work --resolve)
+_source: ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- vendor = "claude" (from llm.vendor)
+- model = "opus" (from task.run)
+Refusals:
+- dirty-tree: The working tree has uncommitted changes.
+
+## Brief preview digest
+_source: ndx work --dry-run · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+37 characters, 5 lines.
+Headings:
+- # Task brief
+- ## Acceptance
+
+## Prior runs
+_source: .hench/runs/ · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- 11111111 2026-10-10T08:00 completed
+- 22222222 2026-10-09T08:00 failed"
+`;
+
+exports[`Describe > v2: carries the task, parents, blockers, resolved settings with sources, brief digest and runs 1`] = `
+"# Sidecar context packet: describe · c0000000-0000-4000-8000-000000000002
+Built by code from the repository's own records. No model wrote it.
+
+## Task
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Wire the button
+Status: pending
+Description: (none)
+Done when:
+- The button appears on Safari only
+
+## Parent chain
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- change CH-1 Add Apple Pay (in_progress)
+
+## Blockers and dependencies
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Blocked by:
+nothing
+
+## Run settings (ndx work --resolve)
+_source: ndx work --resolve · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- vendor = "claude" (from llm.vendor)
+- model = "opus" (from task.run)
+Refusals:
+- dirty-tree: The working tree has uncommitted changes.
+
+## Brief preview digest
+_source: ndx work --dry-run · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+37 characters, 5 lines.
+Headings:
+- # Task brief
+- ## Acceptance
+
+## Prior runs
+_source: .hench/runs/ · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- 11111111 2026-10-10T08:00 completed
+- 22222222 2026-10-09T08:00 failed"
+`;
+
+exports[`Explain > v1: states the epic with its acceptance criteria, evidence and zone 1`] = `
+"# Sidecar context packet: explain · 11111111-1111-1111-1111-111111111111
+Built by code from the repository's own records. No model wrote it.
+
+## epic
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Auth Platform
+Status: in_progress
+Description: Authentication platform rollout.
+Acceptance criteria:
+(none)
+
+## Parent chain
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+(top level)
+
+## Children
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- feature Login Flow: pending
+
+## Trailer-commit evidence
+_source: git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- aaaaaaaaa 2026-10-20 feat(web): wallet button (2 files)
+- bbbbbbbbb 2026-10-22 fix(web): safari only (1 file)
+
+## Sourcevision zones for the touched files
+_source: .sourcevision/zones.json · generated: 2026-10-21T00:00:00.000Z · stale: analysis 2026-10-21 predates the newest evidence commit 2026-10-22_
+
+- pay (Payments): 2 of 2 touched files; cohesion 0.8, coupling 0.2. Card and wallet payment."
+`;
+
+exports[`Explain > v2: states the capability, its derived status, linked changes, evidence and zone 1`] = `
+"# Sidecar context packet: explain · a0000000-0000-4000-8000-000000000002
+Built by code from the repository's own records. No model wrote it.
+
+## Capability
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+A1.1 Pay by card
+Statement: A shopper can pay for a basket with a card.
+Criteria:
+- c1: A valid card is charged once
+- c2: A declined card shows why
+
+## Derived status and health
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+status changing, health ok (rex's derivation, not stored)
+
+## Linked changes
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- CH-1 Add Apple Pay: amends, open, release 1.2.0
+
+## Trailer-commit evidence
+_source: git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- aaaaaaaaa 2026-10-20 feat(web): wallet button (2 files)
+- bbbbbbbbb 2026-10-22 fix(web): safari only (1 file)
+
+## Sourcevision zones for the touched files
+_source: .sourcevision/zones.json · generated: 2026-10-21T00:00:00.000Z · stale: analysis 2026-10-21 predates the newest evidence commit 2026-10-22_
+
+- pay (Payments): 2 of 2 touched files; cohesion 0.8, coupling 0.2. Card and wallet payment."
+`;
+
+exports[`Plan > v1: the epic subtree around the target 1`] = `
+"# Sidecar context packet: plan · 33333333-3333-3333-3333-333333333333
+Built by code from the repository's own records. No model wrote it.
+
+## Epic subtree around the target
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- epic Auth Platform (in_progress)
+  - feature Login Flow (pending)
+    - task Password Login (blocked)
+      - subtask Add password form (completed)
+
+## Inbox and items needing placement
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Nothing awaits placement.
+
+## Recent changes
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+No change has been applied or completed.
+
+## Sibling titles (dedupe against these)
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- Password Login"
+`;
+
+exports[`Plan > v2: the product-map slice, placement queue, recent changes and sibling titles 1`] = `
+"# Sidecar context packet: plan · a0000000-0000-4000-8000-000000000002
+Built by code from the repository's own records. No model wrote it.
+
+## Product map around the target
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- area A1 Checkout
+  - capability A1.1 Pay by card (changing, ok)
+
+## Inbox and items needing placement
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+Nothing awaits placement.
+
+## Recent changes
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+No change has been applied or completed.
+
+## Sibling titles (dedupe against these)
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- A1.1 Pay by card"
+`;

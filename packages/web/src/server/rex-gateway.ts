@@ -49,6 +49,11 @@ export type { V2Tree, RuleNode, ChangeNode, TreeIndex } from "@n-dx/rex";
 // re-stamp or a drafted change), inside rex's own v2 transaction (routes-rex/product.ts).
 export { handleProductEdit, ProductEditError, withPrdModelTransaction } from "@n-dx/rex";
 
+// ---- Rex trailer-commit evidence ---------------------------------------------
+// The commits whose `N-DX-Item` trailer names an item, and the files each
+// changed: the code evidence a Sidecar lens packet quotes (sidecar/packet-sources.ts).
+export { loadTrailerCommits, loadCommitFiles } from "@n-dx/rex";
+
 // ---- Rex change placement ---------------------------------------------------
 // The Inbox routes read a change's placement shortlist and place or propose it
 // through rex's own rule (the one `rex change place` and MCP `place_change`

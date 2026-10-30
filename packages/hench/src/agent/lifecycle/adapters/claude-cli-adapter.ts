@@ -1,26 +1,17 @@
 /**
  * Claude CLI adapter — VendorAdapter implementation for the Claude CLI.
  *
- * Encapsulates all Claude CLI-specific logic:
- * - `buildSpawnConfig()` — compiles a PromptEnvelope + ExecutionPolicy into
- *   the `claude` binary's CLI args, environment, and stdin content.
- * - `parseEvent()` — parses a single line from Claude's `--output-format stream-json`
- *   output into a normalized RuntimeEvent.
- * - `classifyError()` — delegates to the shared `classifyVendorError` taxonomy.
- *
- * ## Extraction provenance
- *
- * The three core functions were extracted from `cli-loop.ts`:
- * - `buildSpawnConfig` ← `buildClaudeCliArgs` + `spawnClaude` spawn config
- * - `parseEvent` ← `processStreamLine` (adapted from CliRunResult mutation to RuntimeEvent return)
- * - `classifyError` ← direct delegation to `classifyVendorError`
- *
- * The original functions remain in `cli-loop.ts` as thin wrappers for
- * backward compatibility until the "Refactor cli-loop.ts to use adapter-based
- * dispatch" task replaces them.
+ * Hench's policy on top of llm-client's Claude session driver:
+ * - `buildSpawnConfig()` — maps a PromptEnvelope + ExecutionPolicy to the
+ *   driver's turn (allowed tools from the policy, effort, permission mode,
+ *   MCP config, resume/fork) and wraps it as a SpawnConfig.
+ * - `parseEvent()` / `extractSessionId()` — the driver's stream-json parser
+ *   and session-id capture, shared with the Sidecar's sessions.
+ * - `detectBackgroundWait()` — which Claude tools wait on a notification.
+ * - `classifyError()` — the shared `classifyVendorError` taxonomy.
  *
  * @see packages/hench/src/agent/lifecycle/vendor-adapter.ts — VendorAdapter interface
- * @see packages/llm-client/src/runtime-contract.ts — RuntimeEvent, FailureCategory
+ * @see packages/llm-client/src/vendor-session-driver.ts — argv, parsing, session ids
  * @see docs/architecture/phase2-vendor-normalization.md — design rationale
  */
 
@@ -34,25 +25,24 @@ import type {
   PromptEnvelope,
   ExecutionPolicy,
   RuntimeEvent,
-  RuntimeEventType,
   FailureCategory,
-  LLMVendor,
 } from "../../../prd/llm-gateway.js";
 import {
   LLM_VENDOR,
   NDX_CONFIG_BLOCKED_PATHS,
   assemblePrompt,
   classifyVendorError,
+  claudeSessionDriver,
 } from "../../../prd/llm-gateway.js";
 import type { PermissionMode } from "../../../schema/index.js";
 import { AGENT_REX_MCP_TOOLS } from "../../../process/agent-mcp-config.js";
+
+export { WINDOWS_STDIN_PROMPT_SEPARATOR } from "../../../prd/llm-gateway.js";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
 /** File tools that Claude CLI should auto-approve (scoped to cwd). */
 const CLI_FILE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep"];
-
-const MAX_SUMMARY_LENGTH = 500;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -107,13 +97,7 @@ export function buildDisallowedTools(): string[] {
 }
 
 /**
- * Build the Claude CLI args and stdin content from envelope + policy.
- *
- * On Windows, system prompt and allowed-tools are adapted for cmd.exe:
- * the system prompt is embedded in stdin (avoiding arg-length limits and
- * special-char hazards), and allowed-tools are joined as a single
- * comma-separated token. Quoting is handled exclusively by
- * spawnCli/quoteWindowsToken — no pre-quoting is done here.
+ * Input to {@link buildClaudeCliArgs}.
  *
  * @internal Exported for snapshot testing — not part of the adapter's public API.
  */
@@ -134,31 +118,23 @@ export interface ClaudeCliInput {
    */
   effort?: string;
   /**
-   * Permission posture for the spawned session.
-   *
-   * When present, appended as `--permission-mode <mode>` to the CLI args.
-   * When undefined, the flag is omitted entirely so Claude CLI uses its
-   * built-in default mode.
+   * Permission posture for the spawned session (`--permission-mode <mode>`).
+   * Undefined omits the flag, so Claude CLI uses its built-in default mode.
    */
   permissionMode?: PermissionMode;
   /**
    * When set, resume this Claude CLI session instead of starting a new one
    * (`--resume <id>`). The prompt on stdin becomes the next turn of that
    * conversation, so the model still has the task context in its window.
-   *
-   * The flag is appended last so it cannot be shadowed by an earlier
-   * occurrence, and it is orthogonal to `modelOverride` — resuming with a
-   * different model is exactly what the review pass does.
+   * Orthogonal to `modelOverride` — resuming with a different model is
+   * exactly what the review pass does.
    */
   resumeSessionId?: string;
   /**
    * Fork the resumed session instead of continuing it (`--fork-session`),
    * so the spawn inherits the parent transcript under a new session id and
    * leaves the parent unmutated. That is what makes one orientation session
-   * reusable across many task spawns.
-   *
-   * Ignored without {@link resumeSessionId} — forking is a modifier on
-   * resume, and emitting it alone would claim a fork that never happened.
+   * reusable across many task spawns. Ignored without {@link resumeSessionId}.
    */
   forkSession?: boolean;
   /**
@@ -170,277 +146,50 @@ export interface ClaudeCliInput {
    * project directory absolutely. Without it the session inherits whatever
    * Claude Code has registered for the repository, and a local-scope
    * registration pinning another worktree silently redirects the agent's PRD
-   * writes there.
-   *
-   * `--strict-mcp-config` is what makes the file authoritative rather than
-   * additive; it also drops the operator's user-scope MCP servers from the
-   * spawned session.
-   *
-   * Omitted when no usable launcher CLI could be identified — the session then
-   * inherits, which is the behaviour that predates this flag.
+   * writes there. Omitted when no usable launcher CLI could be identified.
    *
    * @see packages/hench/src/process/agent-mcp-config.ts — builds the file
    */
   mcpConfigPath?: string;
 }
 
-/** Separates the system prompt from the task prompt when both travel via stdin. */
-export const WINDOWS_STDIN_PROMPT_SEPARATOR = "\n\n---\n\n";
-
 /**
+ * Build the Claude CLI args and stdin content for one spawn.
+ *
+ * The argv itself is llm-client's Claude session driver, so a hench spawn and
+ * a Sidecar turn resume and fork with the same flags. On Windows the system
+ * prompt travels in stdin and allowed-tools are joined as one token.
+ *
  * @param platform Overridable ONLY so tests can exercise both delivery shapes on
- *   any host. Defaults to the real platform, so runtime behaviour is unchanged —
- *   every production caller passes one argument. Without this seam the Windows
- *   branch below could only ever be executed on Windows, and CI runs on Linux, so
- *   the branch that exists specifically for Windows shipped unverified.
+ *   any host. Defaults to the real platform; every production caller passes one
+ *   argument.
  */
 export function buildClaudeCliArgs(
   input: ClaudeCliInput,
   platform: NodeJS.Platform = process.platform,
 ): { args: string[]; stdinContent: string } {
-  const isWindows = platform === "win32";
-
-  // On Windows, cmd.exe can't handle multi-line strings or special chars
-  // like ( ) & | in CLI args. Embed system prompt in stdin instead.
-  const stdinContent = isWindows
-    ? `${input.systemPrompt}${WINDOWS_STDIN_PROMPT_SEPARATOR}${input.promptText}`
-    : input.promptText;
-
-  const args = [
-    "-p",  // print mode; prompt is read from stdin
-    "--output-format", "stream-json",
-    "--verbose",
-    ...(isWindows ? [] : ["--system-prompt", input.systemPrompt]),
-    "--allowed-tools",
-    // On Windows: join as a single comma-separated arg. spawnCli/quoteWindowsToken
-    // is the sole quoting authority — no manual wrapping here.
-    ...(isWindows ? [input.allowedTools.join(",")] : input.allowedTools),
-    ...(input.disallowedTools?.length
-      ? ["--disallowed-tools", ...(isWindows ? [input.disallowedTools.join(",")] : input.disallowedTools)]
-      : []),
-    ...(input.modelOverride ? ["--model", input.modelOverride] : []),
-    ...(input.effort ? ["--effort", input.effort] : []),
-    ...(input.permissionMode ? ["--permission-mode", input.permissionMode] : []),
-    // A file path, never inline JSON: an inline document would have to survive
-    // cmd.exe quoting on Windows, the hazard the isWindows branches above work
-    // around. --strict-mcp-config makes the file the session's only source of
-    // MCP servers, so an absolute-path local-scope registration pinning another
-    // worktree cannot shadow it.
-    ...(input.mcpConfigPath ? ["--mcp-config", input.mcpConfigPath, "--strict-mcp-config"] : []),
-    ...(input.resumeSessionId ? ["--resume", input.resumeSessionId] : []),
-    ...(input.resumeSessionId && input.forkSession ? ["--fork-session"] : []),
-  ];
-
-  return { args, stdinContent };
+  const { args, stdin } = claudeSessionDriver.turnSpawn(
+    {
+      systemPrompt: input.systemPrompt,
+      prompt: input.promptText,
+      model: input.modelOverride,
+      resume: input.resumeSessionId
+        ? { sessionId: input.resumeSessionId, fork: input.forkSession }
+        : undefined,
+      claude: {
+        allowedTools: input.allowedTools,
+        disallowedTools: input.disallowedTools,
+        effort: input.effort,
+        permissionMode: input.permissionMode,
+        mcpConfigPath: input.mcpConfigPath,
+      },
+    },
+    platform,
+  );
+  return { args, stdinContent: stdin };
 }
 
-// ── parseStreamLine (RuntimeEvent adapter) ───────────────────────────────
-
-/**
- * Parse a single line of Claude stream-json output into a RuntimeEvent.
- *
- * Adapted from `processStreamLine` in cli-loop.ts. The original mutates
- * a CliRunResult; this version returns a normalized RuntimeEvent or null.
- *
- * Lines that don't represent a meaningful event (empty, non-JSON, unknown
- * types) return `null`.
- */
-function parseStreamLine(
-  line: string,
-  turn: number,
-  metadata: Record<string, unknown>,
-): RuntimeEvent | null {
-  if (!line.trim()) return null;
-
-  let event: Record<string, unknown>;
-  try {
-    event = JSON.parse(line);
-  } catch {
-    // Not JSON — no RuntimeEvent
-    return null;
-  }
-
-  const type = event.type as string | undefined;
-  const timestamp = new Date().toISOString();
-  const vendor: LLMVendor = LLM_VENDOR.CLAUDE;
-
-  switch (type) {
-    case "assistant": {
-      // Extract text from message content blocks
-      const message = event.message;
-      let text: string | undefined;
-
-      if (typeof message === "string") {
-        text = message.slice(0, MAX_SUMMARY_LENGTH);
-      } else if (message && typeof message === "object") {
-        const msg = message as Record<string, unknown>;
-        const blocks = msg.content as Array<{ type: string; text?: string }> | undefined;
-        if (Array.isArray(blocks)) {
-          const textBlock = blocks.find((b) => b.type === "text" && b.text);
-          if (textBlock?.text) {
-            text = textBlock.text;
-          }
-        }
-
-        // Check for token usage
-        if (msg.usage && typeof msg.usage === "object") {
-          const usage = msg.usage as Record<string, unknown>;
-          const input = typeof usage.input_tokens === "number" ? usage.input_tokens : 0;
-          const output = typeof usage.output_tokens === "number" ? usage.output_tokens : 0;
-
-          // If we have token usage, emit it alongside the text
-          if (input > 0 || output > 0) {
-            // Return assistant event with token info in metadata
-            // (The caller can emit a separate token_usage event if needed)
-          }
-        }
-      }
-
-      // Also check top-level content (some event shapes put it here)
-      if (!text) {
-        const content = event.content as Array<{ type: string; text?: string }> | undefined;
-        if (Array.isArray(content) && !event.message) {
-          const textBlock = content.find((b) => b.type === "text" && b.text);
-          if (textBlock?.text) {
-            text = textBlock.text;
-          }
-        }
-      }
-
-      // Check for tool_use blocks embedded in the assistant message
-      const toolBlocks = extractToolUseBlocks(event);
-      if (toolBlocks.length > 0) {
-        // Return the first tool_use as a tool_use event
-        // (Multi-tool-use is handled by the caller iterating)
-        const firstTool = toolBlocks[0];
-        return {
-          type: "tool_use" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          text,
-          toolCall: {
-            tool: firstTool.name,
-            input: firstTool.input,
-          },
-        };
-      }
-
-      if (text) {
-        return {
-          type: "assistant" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          text,
-        };
-      }
-
-      // Assistant event with no extractable text (e.g. only usage)
-      return null;
-    }
-
-    case "tool_use": {
-      const toolName = (event.tool as string) || (event.name as string) || "unknown";
-      const toolInput = (event.input as Record<string, unknown>) || {};
-      return {
-        type: "tool_use" as RuntimeEventType,
-        vendor,
-        turn,
-        timestamp,
-        toolCall: {
-          tool: toolName,
-          input: toolInput,
-        },
-      };
-    }
-
-    case "tool_result": {
-      const output = (event.output as string) || (event.content as string) || "";
-      return {
-        type: "tool_result" as RuntimeEventType,
-        vendor,
-        turn,
-        timestamp,
-        toolResult: {
-          tool: "unknown", // Claude stream doesn't include tool name in result events
-          output: output.slice(0, 2000),
-          durationMs: 0,
-        },
-      };
-    }
-
-    case "result": {
-      if (event.is_error) {
-        return {
-          type: "failure" as RuntimeEventType,
-          vendor,
-          turn,
-          timestamp,
-          failure: {
-            category: "unknown" as FailureCategory,
-            message: (event.result as string) || "Unknown error",
-          },
-        };
-      }
-
-      return {
-        type: "completion" as RuntimeEventType,
-        vendor,
-        turn,
-        timestamp,
-        completionSummary: event.result
-          ? (event.result as string).slice(0, MAX_SUMMARY_LENGTH)
-          : undefined,
-      };
-    }
-
-    default:
-      return null;
-  }
-}
-
-/**
- * Extract tool_use blocks from an assistant event's content/message.
- */
-function extractToolUseBlocks(
-  event: Record<string, unknown>,
-): Array<{ name: string; input: Record<string, unknown> }> {
-  const results: Array<{ name: string; input: Record<string, unknown> }> = [];
-
-  const message = event.message;
-  if (message && typeof message === "object") {
-    const msg = message as Record<string, unknown>;
-    const blocks = msg.content as Array<Record<string, unknown>> | undefined;
-    if (Array.isArray(blocks)) {
-      for (const block of blocks) {
-        if (block.type === "tool_use") {
-          results.push({
-            name: (block.name as string) || "unknown",
-            input: (block.input as Record<string, unknown>) || {},
-          });
-        }
-      }
-    }
-  }
-
-  // Also check top-level content
-  const content = event.content as Array<Record<string, unknown>> | undefined;
-  if (Array.isArray(content) && !event.message) {
-    for (const block of content) {
-      if (block.type === "tool_use") {
-        results.push({
-          name: (block.name as string) || "unknown",
-          input: (block.input as Record<string, unknown>) || {},
-        });
-      }
-    }
-  }
-
-  return results;
-}
-
-// ── ClaudeCliAdapter ─────────────────────────────────────────────────────
+// ── Background waits ─────────────────────────────────────────────────────
 
 /** Claude CLI tools whose only purpose is to wait for a later notification. */
 const CLAUDE_WAIT_TOOLS = new Set(["ScheduleWakeup", "Monitor"]);
@@ -474,11 +223,12 @@ export function detectClaudeBackgroundWait(toolCall: {
   return undefined;
 }
 
+// ── ClaudeCliAdapter ─────────────────────────────────────────────────────
+
 /**
  * VendorAdapter implementation for the Claude CLI.
  *
  * Stateless — all method inputs are passed as parameters.
- * Thread-safe — no mutable state.
  */
 export const claudeCliAdapter: VendorAdapter = {
   vendor: LLM_VENDOR.CLAUDE,
@@ -515,12 +265,8 @@ export const claudeCliAdapter: VendorAdapter = {
     };
   },
 
-  parseEvent(
-    line: string,
-    turn: number,
-    metadata: Record<string, unknown>,
-  ): RuntimeEvent | null {
-    return parseStreamLine(line, turn, metadata);
+  parseEvent(line: string, turn: number): RuntimeEvent | null {
+    return claudeSessionDriver.parseLine(line, turn);
   },
 
   /**
@@ -528,9 +274,7 @@ export const claudeCliAdapter: VendorAdapter = {
    * first one wins — see the run loop, which keeps only the first value.
    */
   extractSessionId(rawJson: unknown): string | undefined {
-    if (!rawJson || typeof rawJson !== "object") return undefined;
-    const id = (rawJson as Record<string, unknown>).session_id;
-    return typeof id === "string" && id ? id : undefined;
+    return claudeSessionDriver.extractSessionId(rawJson);
   },
 
   detectBackgroundWait: detectClaudeBackgroundWait,

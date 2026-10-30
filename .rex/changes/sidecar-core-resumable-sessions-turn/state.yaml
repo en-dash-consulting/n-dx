@@ -1,0 +1,179 @@
+schema: "rex/v2"
+items:
+  "1042b913-0c63-4f01-9fa7-122a93f2a8eb":
+    status: "completed"
+    startedAt: "2026-10-27T15:50:30.750Z"
+    completedAt: "2026-10-27T16:12:02.020Z"
+    endedAt: "2026-10-27T16:12:02.020Z"
+    activeIntervals: [{"end":"2026-10-27T16:12:02.020Z","start":"2026-10-27T15:50:30.750Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx-sidecar broker MCP served in-process at /api/sidecar/sessions/:id/mcp; cards, allow-list and ledger in sidecar/broker.ts; read-only spawn flags in sidecar/spawn-policy.ts; ClaudeTurnFlags.tools/settingSources in llm-client."
+    lastModified: "2026-10-27T16:12:02.020Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "21fe75a3-8af7-4ce7-9fbd-08549905bb5b":
+    lastModified: "2026-10-27T16:03:05.819Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "273928bb-8ac9-4b7a-acc7-79e568fb3995":
+    status: "completed"
+    startedAt: "2026-10-28T04:11:46.006Z"
+    completedAt: "2026-10-28T04:13:54.680Z"
+    endedAt: "2026-10-28T04:13:54.680Z"
+    activeIntervals: [{"end":"2026-10-28T04:13:54.680Z","start":"2026-10-28T04:11:46.006Z"}]
+    lastModified: "2026-10-28T04:13:54.680Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "287eab75-fe67-4039-b6a2-a14a6f39041b":
+    status: "completed"
+    startedAt: "2026-10-26T21:37:51.402Z"
+    completedAt: "2026-10-26T21:53:44.373Z"
+    endedAt: "2026-10-26T21:53:44.373Z"
+    activeIntervals: [{"end":"2026-10-26T21:53:44.373Z","start":"2026-10-26T21:37:51.402Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "web/src/server/routes-sidecar.ts: POST /api/sidecar/sessions/:id/turns (202) + sidecar:frames announcements with cursor + GET …/frames?after=; list/create/get/interrupt/end. web.sidecar flag (default off) gates the /api/sidecar prefix. llm-client: parseLine textLimit (sessions keep full text, hench keeps 500), interrupt grace 500 ms."
+    lastModified: "2026-10-26T21:53:44.373Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "31307b89-23f6-452a-bd9d-b765e4c23901":
+    lastModified: "2026-10-27T16:03:01.931Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3c3f21c2-b454-4968-8817-f5e6f12855b0":
+    status: "completed"
+    startedAt: "2026-10-26T22:21:27.200Z"
+    completedAt: "2026-10-26T22:26:18.906Z"
+    endedAt: "2026-10-26T22:26:18.906Z"
+    activeIntervals: [{"end":"2026-10-26T22:26:18.906Z","start":"2026-10-26T22:21:27.200Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option (a): scanTimeoutMs on TerminateTreeOptions; vendor-session passes INTERRUPT_SCAN_MS (1 s) with the 500 ms grace."
+    lastModified: "2026-10-26T22:26:18.906Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3c9bb178-cf51-4543-9c90-61036b4d4f6f":
+    status: "completed"
+    startedAt: "2026-10-28T04:56:27.100Z"
+    completedAt: "2026-10-28T04:58:30.981Z"
+    endedAt: "2026-10-28T04:58:30.981Z"
+    activeIntervals: [{"end":"2026-10-28T04:58:30.981Z","start":"2026-10-28T04:56:27.100Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added sidecar-packet-sources.test.ts asserting createPacketSources sourcePaths on legacy and .ndx layouts."
+    lastModified: "2026-10-28T04:58:30.981Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "425819f5-821e-41ce-aaca-56fb84c3427e":
+    status: "completed"
+    startedAt: "2026-10-26T18:31:04.702Z"
+    completedAt: "2026-10-26T18:54:22.139Z"
+    endedAt: "2026-10-26T18:54:22.139Z"
+    activeIntervals: [{"end":"2026-10-26T18:54:22.139Z","start":"2026-10-26T18:31:04.702Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client startVendorSession/resumeVendorSession (start, sendTurn, interrupt, end, resume; Claude + Codex CLIs; RuntimeEvents with token usage) built on new vendor session drivers lifted from hench's adapters; hench adapters and fork-strategy capability check delegate to the drivers; existing hench adapter tests pass unchanged; createLLMClient untouched."
+    lastModified: "2026-10-26T18:54:22.139Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "44762a96-1caa-4c16-92a3-cd356b5801d1":
+    lastModified: "2026-10-28T05:00:48.680Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5845d911-1724-41f8-8376-267f917a0fa0":
+    status: "completed"
+    startedAt: "2026-10-27T16:26:39.443Z"
+    completedAt: "2026-10-27T16:34:43.963Z"
+    endedAt: "2026-10-27T16:34:43.963Z"
+    activeIntervals: [{"end":"2026-10-27T16:34:43.963Z","start":"2026-10-27T16:26:39.443Z"}]
+    lastModified: "2026-10-27T16:34:43.963Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6a764d20-2e7a-4fe3-9c16-47e29fb658cc":
+    status: "completed"
+    startedAt: "2026-10-27T16:22:17.381Z"
+    completedAt: "2026-10-27T16:22:17.381Z"
+    endedAt: "2026-10-27T16:22:17.381Z"
+    activeIntervals: [{"end":"2026-10-27T16:22:17.381Z","start":"2026-10-27T16:22:17.381Z"}]
+    lastModified: "2026-10-27T16:22:17.381Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "777869b8-d76a-4cc1-8906-65f2d7d327aa":
+    status: "completed"
+    startedAt: "2026-10-28T04:37:07.044Z"
+    completedAt: "2026-10-28T04:47:17.821Z"
+    endedAt: "2026-10-28T04:47:17.821Z"
+    activeIntervals: [{"end":"2026-10-28T04:47:17.821Z","start":"2026-10-28T04:37:07.044Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Context ceiling per scope, checkpoint ledger turn, cold start from packet+ledger(3k)+last two exchanges, context-refreshed frame; commit edc89ea16"
+    lastModified: "2026-10-28T04:47:17.821Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7961018b-a81d-4b39-9bdb-fe54d0b81c28":
+    status: "completed"
+    startedAt: "2026-10-26T22:08:49.938Z"
+    completedAt: "2026-10-26T22:12:11.636Z"
+    endedAt: "2026-10-26T22:12:11.636Z"
+    activeIntervals: [{"end":"2026-10-26T22:12:11.636Z","start":"2026-10-26T22:08:49.938Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "session-registry.ts: list()/get() apply the TTL in memory via view(); only sendTurn sweeps and persists. Tests added."
+    lastModified: "2026-10-26T22:12:11.636Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "92c2fda1-e21b-47f4-9cc6-5ec5e0298248":
+    status: "completed"
+    startedAt: "2026-10-26T22:18:28.712Z"
+    completedAt: "2026-10-26T22:21:12.210Z"
+    endedAt: "2026-10-26T22:21:12.210Z"
+    activeIntervals: [{"end":"2026-10-26T22:21:12.210Z","start":"2026-10-26T22:18:28.712Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "readFrames skips an unterminated final line and throws naming the file on a malformed complete line; first turn per session moves a trailing fragment to .corrupt and truncates it."
+    lastModified: "2026-10-26T22:21:12.210Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9753d37a-2e7e-4950-8eba-3015eee08734":
+    issues: ["https://www.notion.so/3f7a80b71924810fb66ac7fbdc9bc4db","https://www.notion.so/3f7a80b719248165891cff1c8f0d0ace","https://www.notion.so/3f7a80b7192481c5a8fef7faf77e11e0","https://www.notion.so/3f7a80b7192481e0a645e0c1b1b7f2b7","https://www.notion.so/3f7a80b71924810492a8ca3948c3f474","https://www.notion.so/3f7a80b71924810499c9f380e11f53fd"]
+    lastModified: "2026-10-28T05:00:48.680Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9e47fb80-238b-4cff-a0df-254bce7a8da1":
+    status: "completed"
+    startedAt: "2026-10-28T04:53:37.816Z"
+    completedAt: "2026-10-28T04:56:21.941Z"
+    endedAt: "2026-10-28T04:56:21.941Z"
+    activeIntervals: [{"end":"2026-10-28T04:56:21.941Z","start":"2026-10-28T04:53:37.816Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added tests/integration/sidecar-broker-key-server.test.ts; boots real startServer with a token in a child process."
+    lastModified: "2026-10-28T04:56:21.941Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9faecb67-51f5-4a01-b68f-4088716bd0f0":
+    status: "completed"
+    startedAt: "2026-10-28T04:58:36.197Z"
+    completedAt: "2026-10-28T05:02:18.806Z"
+    endedAt: "2026-10-28T05:02:18.806Z"
+    activeIntervals: [{"end":"2026-10-28T05:02:18.806Z","start":"2026-10-28T04:58:36.197Z"}]
+    lastModified: "2026-10-28T05:02:18.806Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "adba5290-d3e8-4d4c-89e0-bfcf456f0c85":
+    status: "completed"
+    startedAt: "2026-10-26T20:54:48.681Z"
+    completedAt: "2026-10-26T21:35:56.603Z"
+    endedAt: "2026-10-26T21:35:56.603Z"
+    activeIntervals: [{"end":"2026-10-26T21:10:30.633Z","start":"2026-10-26T20:54:48.681Z"},{"end":"2026-10-26T21:35:56.603Z","start":"2026-10-26T21:35:56.603Z"}]
+    lastModified: "2026-10-26T21:35:56.603Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "aed63f9f-0142-49fa-8ba0-be62b6b5ada9":
+    status: "completed"
+    startedAt: "2026-10-28T04:29:15.604Z"
+    completedAt: "2026-10-28T04:34:14.699Z"
+    endedAt: "2026-10-28T04:34:14.699Z"
+    activeIntervals: [{"end":"2026-10-28T04:34:14.699Z","start":"2026-10-28T04:29:15.604Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Packet provenance paths come from resolveLayout via PacketSources.sourcePaths; cache dir uses PRD_CACHE_DIRNAME; contract test names loadTrailerCommits/loadCommitFiles. Commit ab850174c."
+    lastModified: "2026-10-28T04:34:14.699Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "afc0a661-2cf4-42a6-9bc6-72cfc3e6d3ce":
+    status: "completed"
+    startedAt: "2026-10-28T04:14:29.686Z"
+    completedAt: "2026-10-28T04:34:54.908Z"
+    endedAt: "2026-10-28T04:34:54.908Z"
+    activeIntervals: [{"end":"2026-10-28T04:28:15.354Z","start":"2026-10-28T04:14:29.686Z"},{"end":"2026-10-28T04:34:54.908Z","start":"2026-10-28T04:34:54.908Z"}]
+    lastModified: "2026-10-28T04:34:54.908Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e18b93c0-a4b0-4f46-b4d9-9ce2d4ef0d6c":
+    status: "completed"
+    startedAt: "2026-10-28T04:49:53.841Z"
+    completedAt: "2026-10-28T04:53:32.863Z"
+    endedAt: "2026-10-28T04:53:32.863Z"
+    activeIntervals: [{"end":"2026-10-28T04:52:42.728Z","start":"2026-10-28T04:49:53.841Z"},{"end":"2026-10-28T04:53:32.863Z","start":"2026-10-28T04:53:32.863Z"}]
+    lastModified: "2026-10-28T04:53:32.863Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "fc4ad798-1565-4492-98dc-0d9be53d57d5":
+    status: "completed"
+    startedAt: "2026-10-28T04:34:57.756Z"
+    completedAt: "2026-10-28T04:34:57.756Z"
+    endedAt: "2026-10-28T04:34:57.756Z"
+    activeIntervals: [{"end":"2026-10-28T04:34:57.756Z","start":"2026-10-28T04:34:57.756Z"}]
+    lastModified: "2026-10-28T04:34:57.756Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
