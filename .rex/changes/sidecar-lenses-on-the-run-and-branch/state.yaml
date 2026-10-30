@@ -38,9 +38,14 @@ items:
     lastModified: "2026-10-29T19:43:59.553Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "c5b1bbf2-6528-40f9-94bc-f504cd9d05b0":
+    status: "completed"
     startedAt: "2026-10-30T14:29:44.630Z"
-    activeIntervals: [{"end":"2026-10-30T14:51:02.085Z","start":"2026-10-30T14:29:44.630Z"}]
-    lastModified: "2026-10-30T14:51:02.671Z"
+    completedAt: "2026-10-30T15:08:15.328Z"
+    endedAt: "2026-10-30T15:08:15.328Z"
+    resolutionType: "code-change"
+    resolutionDetail: "Guide lens and run-plan card (b84f6d01a); viewer gateway cap raised for the shared queue plan (85b223f01). Verified by hand after run 8264b19e failed only architecture-policy: policy and affected gate pass, browser-checked Guide on the ready list."
+    activeIntervals: [{"end":"2026-10-30T14:51:02.085Z","start":"2026-10-30T14:29:44.630Z"},{"end":"2026-10-30T15:08:15.328Z","start":"2026-10-30T15:08:15.328Z"}]
+    lastModified: "2026-10-30T15:08:15.328Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "fd15413c-b43a-4755-8087-7fae64bef710":
     lastModified: "2026-10-30T14:44:04.242Z"
