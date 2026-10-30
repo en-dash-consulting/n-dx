@@ -159,7 +159,7 @@ export function discoverExtensions(options) {
   /** @type {DiscoveryError[]} */
   const errors = [];
   const cachePath = join(home, EXTENSIONS_CACHE_FILE);
-  const cacheFile = readJson(fs, cachePath, errors);
+  const cacheFile = readJson(fs, cachePath, errors, true, true);
   const cache = isObject(cacheFile.value) ? cacheFile.value : {};
   const cached = isObject(cache.discovery) && cache.discovery.version === CACHE_VERSION && isObject(cache.discovery.sources)
     ? /** @type {Record<string, SourceEntry>} */ (cache.discovery.sources)
@@ -547,12 +547,13 @@ function listDir(fs, dir) {
  * @param {string} path
  * @param {DiscoveryError[] | null} errors
  * @param {boolean} [report]
+ * @param {boolean} [shared]  `extensions.json`, which other processes replace: retry transient opens.
  * @returns {{ok: boolean, value: unknown}}
  */
-function readJson(fs, path, errors, report = true) {
+function readJson(fs, path, errors, report = true, shared = false) {
   let text;
   try {
-    text = fs.readFileSync(path, "utf8");
+    text = shared ? readExtensionsText(fs, path) : fs.readFileSync(path, "utf8");
   } catch (error) {
     const code = /** @type {NodeJS.ErrnoException} */ (error).code;
     if (code === "ENOENT" || code === "ENOTDIR") return { ok: true, value: undefined };
@@ -585,7 +586,7 @@ function readJson(fs, path, errors, report = true) {
  * @param {DiscoveryError[]} errors
  */
 function writeCache(fs, path, recomputed, errors) {
-  const current = readJson(fs, path, errors);
+  const current = readJson(fs, path, errors, true, true);
   if (!current.ok) return;
   const file = isObject(current.value) ? current.value : {};
   const sources = isObject(file.discovery) && file.discovery.version === CACHE_VERSION && isObject(file.discovery.sources)
@@ -601,6 +602,9 @@ function writeCache(fs, path, recomputed, errors) {
 
 /** Rename errors Windows raises while another process has the target open. */
 const TRANSIENT_RENAME_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
+
+/** Elsewhere EPERM and EACCES on a read are permanent (a root-owned file): fail at once. */
+const TRANSIENT_POSIX_READ_CODES = new Set(["EBUSY"]);
 
 /** Total time a rename keeps retrying, and the longest single wait. */
 const RENAME_RETRY_BUDGET_MS = 2000;
@@ -628,20 +632,48 @@ export function replaceExtensionsFile(fs, path, text, { sleep = sleepSync, isAli
   const tmp = `${path}.${process.pid}.tmp`;
   try {
     fs.writeFileSync(tmp, text);
-    for (let waited = 0, wait = 5; ; wait = Math.min(wait * 2, RENAME_RETRY_MAX_WAIT_MS)) {
-      try {
-        fs.renameSync(tmp, path);
-        return;
-      } catch (error) {
-        const code = /** @type {NodeJS.ErrnoException} */ (error).code;
-        if (!code || !TRANSIENT_RENAME_CODES.has(code) || waited >= RENAME_RETRY_BUDGET_MS) throw error;
-      }
-      sleep(wait);
-      waited += wait;
-    }
+    retryTransient(() => fs.renameSync(tmp, path), sleep, TRANSIENT_RENAME_CODES);
   } catch (error) {
     fs.rmSync(tmp, { force: true });
     throw error;
+  }
+}
+
+/**
+ * Read `extensions.json`. Windows also refuses to open the file while another
+ * process's rename is replacing it, so there the same transient codes the
+ * rename retries are retried here. Elsewhere only EBUSY is.
+ *
+ * @param {Pick<typeof nodeFs, "readFileSync">} fs
+ * @param {string} path
+ * @param {{sleep?: (ms: number) => void, platform?: NodeJS.Platform}} [options]
+ * @returns {string}
+ */
+export function readExtensionsText(fs, path, { sleep = sleepSync, platform = process.platform } = {}) {
+  const codes = platform === "win32" ? TRANSIENT_RENAME_CODES : TRANSIENT_POSIX_READ_CODES;
+  return retryTransient(() => fs.readFileSync(path, "utf8"), sleep, codes);
+}
+
+/**
+ * Run `op`, retrying an error whose code is in `codes` with backoff until
+ * {@link RENAME_RETRY_BUDGET_MS} is spent; anything else is thrown at once.
+ *
+ * @template T
+ * @param {() => T} op
+ * @param {(ms: number) => void} sleep
+ * @param {ReadonlySet<string>} codes
+ * @returns {T}
+ */
+function retryTransient(op, sleep, codes) {
+  for (let waited = 0, wait = 5; ; wait = Math.min(wait * 2, RENAME_RETRY_MAX_WAIT_MS)) {
+    try {
+      return op();
+    } catch (error) {
+      const code = /** @type {NodeJS.ErrnoException} */ (error).code;
+      if (!code || !codes.has(code) || waited >= RENAME_RETRY_BUDGET_MS) throw error;
+    }
+    sleep(wait);
+    waited += wait;
   }
 }
 

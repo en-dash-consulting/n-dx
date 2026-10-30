@@ -488,9 +488,13 @@ const DECL_RE =
 /** Every call occurrence in `text`, with its arguments and assignment targets. */
 function collectCallSites(text: string): CallSite[] {
   const sites: CallSite[] = [];
+  // Hide strings from the call-name scanner while retaining offsets. Real
+  // calls still take their arguments and line numbers from the original text.
+  const code = text.replace(/"(?:\\.|[^"\\])*"|`[^`]*`|'(?:\\.|[^'\\])*'/g,
+    (literal) => literal.replace(/[^\r\n]/g, " "));
   CALL_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
-  while ((match = CALL_RE.exec(text)) !== null) {
+  while ((match = CALL_RE.exec(code)) !== null) {
     const open = match.index + match[0].length - 1;
     const close = matchingClose(text, open);
     if (close === -1) continue;
@@ -646,6 +650,8 @@ export function detectGoOutboundCalls(
 
   /** The first argument that states a target, or nothing. */
   const targetFromArgs = (args: readonly string[], spec: GoClientSpec): TargetInfo => {
+    // SQL and cache keys are payloads; the receiver supplies the connection.
+    if (spec.kind === "database" || spec.kind === "cache") return NO_TARGET;
     for (const arg of args) {
       const info = extractGoTarget(arg, consts, spec.targetKeys);
       if (info.targetSource !== "unknown") return info;
