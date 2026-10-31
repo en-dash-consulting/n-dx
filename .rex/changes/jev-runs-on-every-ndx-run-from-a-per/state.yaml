@@ -59,7 +59,14 @@ items:
     lastModified: "2026-10-30T14:44:01.649Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9da6d298-51b4-4e0d-88df-8efee59a8d06":
-    lastModified: "2026-10-30T14:43:55.805Z"
+    status: "completed"
+    startedAt: "2026-10-30T23:59:43.044Z"
+    completedAt: "2026-10-31T00:10:49.305Z"
+    endedAt: "2026-10-31T00:10:49.305Z"
+    activeIntervals: [{"end":"2026-10-31T00:10:49.305Z","start":"2026-10-30T23:59:43.044Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "buildDisallowedTools adds Read/Edit(//<store>) from credentialStorePath() at spawn (win32 //c/... form, comma-joined); GuardRails adds a store pattern when the ndx home is inside the project; validatePath also refuses cross-drive absolute rel; tests cover argv, both guard cases, and child env. Codex sandbox gap noted in code comment and changeset."
+    lastModified: "2026-10-31T00:10:49.305Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b72a668d-4bf6-4c1c-9caf-a2a25f96e6ea":
     status: "completed"

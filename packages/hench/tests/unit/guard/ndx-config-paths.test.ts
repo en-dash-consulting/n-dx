@@ -10,12 +10,19 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { GuardRails } from "../../../src/guard/index.js";
+import { GuardRails, credentialStorePattern } from "../../../src/guard/index.js";
 import { GuardError, validatePath } from "../../../src/guard/paths.js";
-import { DEFAULT_EXECUTION_POLICY, createPromptEnvelope, guardBaselineForLanguage } from "../../../src/prd/llm-gateway.js";
+import {
+  DEFAULT_EXECUTION_POLICY,
+  createPromptEnvelope,
+  credentialStorePath,
+  guardBaselineForLanguage,
+} from "../../../src/prd/llm-gateway.js";
+import { setCredential } from "@n-dx/llm-client";
 import {
   buildClaudeCliArgs,
   buildDisallowedTools,
+  claudeAbsolutePattern,
   claudeCliAdapter,
 } from "../../../src/agent/lifecycle/adapters/claude-cli-adapter.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
@@ -120,5 +127,77 @@ describe("n-dx config files are outside what the agent may write", () => {
     expect(existsSync(join(repo, localConfig))).toBe(false);
 
     expect((await envNames()).names).toEqual(before.names);
+  });
+});
+
+describe("the agent is kept out of the per-user credential store", () => {
+  /** The `--disallowed-tools` rules in `args`: one comma-joined value on Windows, one value each elsewhere. */
+  function deniedRules(args: readonly string[], platform: NodeJS.Platform, count: number): string[] {
+    const at = args.indexOf("--disallowed-tools") + 1;
+    return platform === "win32" ? args[at].split(",") : args.slice(at, at + count);
+  }
+
+  it.each([
+    ["darwin", "/Users/me/.ndx/credentials.json", "//Users/me/.ndx/credentials.json"],
+    ["linux", "/home/me/.ndx/credentials.json", "//home/me/.ndx/credentials.json"],
+    ["win32", "C:\\Users\\me\\.ndx\\credentials.json", "//c/Users/me/.ndx/credentials.json"],
+  ] as const)("the Claude CLI is denied reads and edits of the store (%s)", (platform, storePath, pattern) => {
+    const disallowedTools = buildDisallowedTools({ storePath, platform });
+    const { args } = buildClaudeCliArgs({ systemPrompt: "s", promptText: "p", allowedTools: ["Read"], disallowedTools }, platform);
+    const rules = deniedRules(args, platform, disallowedTools.length);
+    expect(rules).toContain(`Read(${pattern})`);
+    expect(rules).toContain(`Edit(${pattern})`);
+    expect(rules).toContain("Edit(./.n-dx.local.json)");
+    if (platform === "win32") expect(args[args.indexOf("--disallowed-tools") + 1]).toBe(disallowedTools.join(","));
+  });
+
+  it("the spawn denies the store under the ndx home resolved at spawn time", () => {
+    const previous = process.env.NDX_HOME;
+    process.env.NDX_HOME = join(repo, "home-at-spawn");
+    try {
+      const config = claudeCliAdapter.buildSpawnConfig(createPromptEnvelope([]), DEFAULT_EXECUTION_POLICY, {});
+      const expected = claudeAbsolutePattern(join(repo, "home-at-spawn", "credentials.json"));
+      expect(config.args.join("\n")).toContain(`Read(${expected})`);
+      expect(config.args.join("\n")).toContain(`Edit(${expected})`);
+    } finally {
+      if (previous === undefined) delete process.env.NDX_HOME;
+      else process.env.NDX_HOME = previous;
+    }
+  });
+
+  it("the guard refuses the store as an escape when the ndx home is outside the project", () => {
+    const ndxHome = mkdtempSync(join(tmpdir(), "hench-ndx-home-"));
+    try {
+      const store = credentialStorePath({ ndxHome });
+      const guard = new GuardRails(repo, DEFAULT_HENCH_CONFIG().guard, { shellKind: "posix", credentialStorePath: store });
+      expect(() => guard.checkPath(store)).toThrow(/escapes project directory/);
+      expect(credentialStorePattern(repo, store)).toEqual([]);
+    } finally {
+      rmSync(ndxHome, { recursive: true, force: true });
+    }
+  });
+
+  it("the guard refuses the store, its lock and temp files when the ndx home is inside the project", () => {
+    const store = credentialStorePath({ ndxHome: join(repo, "tools", "ndx-home") });
+    const guard = new GuardRails(repo, { ...DEFAULT_HENCH_CONFIG().guard, blockedPaths: [] }, { shellKind: "posix", credentialStorePath: store });
+    for (const p of [store, "tools/ndx-home/credentials.json", "tools/ndx-home/credentials.json.lock", "tools/ndx-home/credentials.json.1.x.tmp", "TOOLS/ndx-home/Credentials.json"]) {
+      expect(() => guard.checkPath(p), p).toThrow(/blocked pattern/);
+    }
+    expect(() => guard.checkPath("tools/ndx-home/hub.json")).not.toThrow();
+  });
+
+  it("no stored value reaches a child environment", () => {
+    const ndxHome = mkdtempSync(join(tmpdir(), "hench-ndx-home-"));
+    try {
+      setCredential("typesafe", "tsk_placeholder_stored_value", { ndxHome });
+      const env = { ...FAKE_CREDENTIALS, NDX_HOME: ndxHome };
+      const guard = new GuardRails(repo, DEFAULT_HENCH_CONFIG().guard, { env, shellKind: "posix" });
+      expect(Object.values(guard.childEnv)).not.toContain("tsk_placeholder_stored_value");
+      const config = claudeCliAdapter.buildSpawnConfig(createPromptEnvelope([]), DEFAULT_EXECUTION_POLICY, {});
+      expect(Object.values(config.env)).not.toContain("tsk_placeholder_stored_value");
+      expect(config.args.join("\n")).not.toContain("tsk_placeholder_stored_value");
+    } finally {
+      rmSync(ndxHome, { recursive: true, force: true });
+    }
   });
 });

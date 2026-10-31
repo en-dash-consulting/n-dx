@@ -110,6 +110,11 @@ export type {
 export { redactDeep, redactSecrets, createLineRedactor } from "@n-dx/llm-client";
 export type { LineRedactor } from "@n-dx/llm-client";
 
+// ---- Credential store -------------------------------------------------------
+// Where the per-user store lives, so the agent's file tools and the Claude
+// CLI's deny rules can keep the agent out of it. hench never reads it.
+export { credentialStorePath } from "@n-dx/llm-client";
+
 // ---- CLI output control -----------------------------------------------------
 export {
   setQuiet,

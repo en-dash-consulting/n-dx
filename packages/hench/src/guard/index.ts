@@ -30,6 +30,9 @@
  *    - n-dx's own config files (`NDX_CONFIG_BLOCKED_PATHS`), blocked whatever
  *      the configured patterns say: an agent that wrote `.n-dx.local.json`
  *      would hand itself an unreviewed guard for every later command
+ *    - The per-user credential store, with its lock and temp files: an escape
+ *      when the ndx home is outside the project, and a pattern added at
+ *      construction when it is inside
  *
  * 5. **Git subcommand allowlisting** (centralized in guard config)
  *    Only explicitly permitted git subcommands can run. Dangerous operations
@@ -65,7 +68,8 @@ import type { ShellKind } from "./commands.js";
 import { PolicyEngine } from "./policy.js";
 import type { AuditEntry, SessionCounters } from "./policy.js";
 import { compileEnvPolicy, sanitizeChildEnv } from "./env.js";
-import { NDX_CONFIG_BLOCKED_PATHS } from "../prd/llm-gateway.js";
+import { isAbsolute, relative, resolve } from "node:path";
+import { NDX_CONFIG_BLOCKED_PATHS, credentialStorePath } from "../prd/llm-gateway.js";
 
 export { GuardError, validatePath, simpleGlobMatch } from "./paths.js";
 export { validateCommand, resolveShellKind } from "./commands.js";
@@ -99,6 +103,19 @@ export interface GuardRailsOptions {
   shellKind?: ShellKind;
   /** The environment to filter for child processes. Defaults to `process.env`; inject for tests. */
   env?: NodeJS.ProcessEnv;
+  /** The credential store's path. Defaults to `credentialStorePath()`; inject for tests. */
+  credentialStorePath?: string;
+}
+
+/**
+ * The guard pattern for the credential store when the ndx home is inside the
+ * project, or none when it is outside: {@link validatePath} refuses that as an
+ * escape. The trailing `*` covers the store's `.lock` and `.tmp` siblings.
+ */
+export function credentialStorePattern(projectDir: string, storePath: string): string[] {
+  const rel = relative(resolve(projectDir), resolve(storePath));
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return [];
+  return [`${rel.replace(/\\/g, "/")}*`];
 }
 
 /**
@@ -117,7 +134,7 @@ export interface GuardRailsOptions {
 export class GuardRails {
   private projectDir: string;
   private config: GuardConfig;
-  /** The configured blocked paths plus n-dx's own config files. */
+  /** The configured blocked paths plus n-dx's own config files and, inside the project, the credential store. */
   private blockedPaths: string[];
   /** Resolved once: the probe behind it costs a subprocess on win32. */
   readonly shellKind: ShellKind;
@@ -132,7 +149,11 @@ export class GuardRails {
   constructor(projectDir: string, config: GuardConfig, options: GuardRailsOptions = {}) {
     this.projectDir = projectDir;
     this.config = config;
-    this.blockedPaths = [...new Set([...config.blockedPaths, ...NDX_CONFIG_BLOCKED_PATHS])];
+    this.blockedPaths = [...new Set([
+      ...config.blockedPaths,
+      ...NDX_CONFIG_BLOCKED_PATHS,
+      ...credentialStorePattern(projectDir, options.credentialStorePath ?? credentialStorePath()),
+    ])];
     this.shellKind = options.shellKind ?? resolveShellKind();
     this.policy = new PolicyEngine(config.policy);
     this.childEnv = sanitizeChildEnv(options.env ?? process.env, compileEnvPolicy(config.env));

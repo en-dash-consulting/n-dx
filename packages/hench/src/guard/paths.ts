@@ -19,7 +19,7 @@
  * @module
  */
 
-import { resolve, relative } from "node:path";
+import { isAbsolute, resolve, relative } from "node:path";
 import { ClaudeClientError } from "../prd/llm-gateway.js";
 
 /**
@@ -107,8 +107,10 @@ export function validatePath(
   const resolved = resolve(projectDir, filepath);
   const rel = relative(projectDir, resolved);
 
-  // Reject paths that escape the project directory
-  if (rel.startsWith("..")) {
+  // Reject paths that escape the project directory — the per-user credential
+  // store included, whenever the ndx home is outside the project. On Windows a
+  // path on another drive has no relative form: `relative` returns it absolute.
+  if (rel.startsWith("..") || isAbsolute(rel)) {
     throw new GuardError(
       `Path escapes project directory: ${filepath}`,
     );

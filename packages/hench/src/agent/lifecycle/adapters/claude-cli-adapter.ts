@@ -42,6 +42,7 @@ import {
   LLM_VENDOR,
   NDX_CONFIG_BLOCKED_PATHS,
   assemblePrompt,
+  credentialStorePath,
   classifyVendorError,
 } from "../../../prd/llm-gateway.js";
 import type { PermissionMode } from "../../../schema/index.js";
@@ -96,14 +97,46 @@ export function buildAllowedTools(
 }
 
 /**
- * The `--disallowed-tools` list: n-dx's own config files, which hench's guard
- * refuses its own tools too (#686). A deny rule outranks the bare `Edit` and
- * `Write` grants above, and Claude Code applies `Edit(...)` rules to every
- * built-in tool that edits a file. `./` anchors each pattern at the session's
- * cwd, the project root.
+ * A path as a Claude Code absolute-path permission pattern: `//` plus the path,
+ * and on Windows the drive as a lower-case segment (`C:\x` → `//c/x`).
  */
-export function buildDisallowedTools(): string[] {
-  return NDX_CONFIG_BLOCKED_PATHS.map((p) => `Edit(./${p})`);
+export function claudeAbsolutePattern(path: string, platform: NodeJS.Platform = process.platform): string {
+  if (platform !== "win32") return `/${path}`;
+  const slashed = path.replace(/\\/g, "/");
+  const drive = /^([A-Za-z]):\//.exec(slashed);
+  return drive ? `//${drive[1].toLowerCase()}/${slashed.slice(3)}` : slashed;
+}
+
+export interface DisallowedToolsOptions {
+  /** The credential store's path. Defaults to {@link credentialStorePath} at call time. */
+  storePath?: string;
+  /** Overridable only so tests can build the Windows form on any host. */
+  platform?: NodeJS.Platform;
+}
+
+/**
+ * The `--disallowed-tools` list.
+ *
+ * - n-dx's own config files, which hench's guard refuses its own tools too
+ *   (#686). `./` anchors each pattern at the session's cwd, the project root.
+ * - The per-user credential store, which sits outside the project root, so no
+ *   `./` rule reaches it while `Read`, `Glob` and `Grep` are granted bare.
+ *   Resolved at spawn so an `NDX_HOME` set for this run is the one denied.
+ *
+ * A deny rule outranks the bare grants above, and Claude Code applies
+ * `Read(...)` and `Edit(...)` rules to every built-in tool that reads or edits
+ * a file.
+ *
+ * The Codex CLI has no path deny: its sandbox can still read the store, a gap
+ * only the OS keystore backends (C10) close.
+ */
+export function buildDisallowedTools(options: DisallowedToolsOptions = {}): string[] {
+  const store = claudeAbsolutePattern(options.storePath ?? credentialStorePath(), options.platform);
+  return [
+    ...NDX_CONFIG_BLOCKED_PATHS.map((p) => `Edit(./${p})`),
+    `Read(${store})`,
+    `Edit(${store})`,
+  ];
 }
 
 /**
