@@ -39,10 +39,9 @@ on:
           - publish
           - validate-oidc
 
-# Deny by default at the file level; the release job below grants itself
-# exactly what it needs. A job added here later starts with nothing rather
-# than inheriting the repository default, which is write — and this is the
-# workflow that holds the OIDC identity npm trusts.
+# Deny by default at the file level; each job grants itself what it needs.
+# A job added here starts with nothing rather than inheriting write access.
+# Only publishing and the OIDC probe receive the identity npm trusts.
 permissions: {}
 
 concurrency:
@@ -50,13 +49,95 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Independent runners avoid competing package test pools. Each group uses
+  # the sequential suite runner and must pass before publishing can start.
+  validate:
+    name: Release tests (${{ matrix.group }})
+    if: github.event_name == 'push' || inputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: root+llm-client
+            suites: root,llm-client,lang-kit,lang-runtime,lang-java,lang-go,lang-sql,lang-terraform,lang-python
+          - group: rex+sourcevision
+            suites: rex,sourcevision,graview,graview-face
+          - group: hench+web
+            suites: hench,web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check obfuscated code policy
+        run: pnpm security:obfuscation
+
+      # Root e2e tests spawn the built CLIs and reject stale dist/ files.
+      - name: Build
+        run: pnpm build
+
+      # Grammar-dependent suites must build and require grammars in this job;
+      # GITHUB_ENV exports cannot carry over from another runner. Use the same
+      # manifest-derived decision and download cache as CI.
+      - name: Decide whether this group needs grammars
+        id: grammars
+        shell: bash
+        # Fail on anything but true/false: an empty answer would skip the
+        # grammar steps below and leave every grammar test skipping, green.
+        run: |
+          build=$(node scripts/grammar-suites.mjs ${{ matrix.suites }})
+          case "$build" in true|false) ;; *) echo "grammar-suites.mjs printed '$build'"; exit 1 ;; esac
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
+      - name: Cache grammar build downloads
+        if: steps.grammars.outputs.build == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packages/lang-runtime/build/cache
+          key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
+
+      # Every language pack builds its own grammar (`build:grammars`) into its
+      # own build/grammars; sourcevision has none. One at a time, since they
+      # share the download cache.
+      - name: Build tree-sitter grammars
+        if: steps.grammars.outputs.build == 'true'
+        run: pnpm -r --workspace-concurrency=1 run build:grammars
+
+      - name: Require built grammars in tests
+        if: steps.grammars.outputs.build == 'true'
+        shell: bash
+        run: echo "SV_REQUIRE_GRAMMARS=1" >> "$GITHUB_ENV"
+
+      # Reuse compiled CLI bytecode across the many e2e child processes.
+      - name: Run ${{ matrix.suites }}
+        env:
+          NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
+        run: node scripts/run-all-tests.mjs ${{ matrix.suites }}
+
   release:
     name: Release
+    needs: validate
+    if: github.event_name == 'push' || inputs.mode == 'publish'
     runs-on: ubuntu-latest
     environment: npm
-    # Covers the verify step's bounded npm wait (scripts/verify-release-sync.mjs,
-    # about 9 minutes at worst) on top of install, build, tests and publish, so
-    # a version that never appears fails with the script's error, not a timeout.
+    # Validation has its own runners and deadlines. This budget covers builds,
+    # publishing and the bounded npm verification wait (about 9 minutes).
     timeout-minutes: 30
     permissions:
       contents: write
@@ -70,6 +151,118 @@ jobs:
           # rex release stamp needs full history and release tags.
           fetch-depth: 0
 
+      - name: Install pnpm
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm for Trusted Publishing
+        # OIDC trusted publishing and provenance attestation require npm
+        # >= 11.5.1. Node 22 ships with npm 10.x by default.
+        #
+        # Pinned to 11.15.0: npm 11.16.0 (released 2026-05-27) regressed
+        # `npm info` with "Invalid time value" against npmjs.org metadata,
+        # breaking `changeset publish`. Revisit when npm ships a fix.
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: npm install -g npm@11.15.0
+
+      - name: Install dependencies
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: pnpm install --frozen-lockfile
+
+      - name: Check obfuscated code policy
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: pnpm security:obfuscation
+
+      - name: Build
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: pnpm build
+
+      # Publishing builds fresh grammar assets from the validated commit;
+      # each pack ships its own build/grammars/*.wasm. Validation runners build
+      # and require their own grammars before testing the packed packages.
+      - name: Cache grammar build downloads
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packages/lang-runtime/build/cache
+          key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
+
+      - name: Build tree-sitter grammars
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        run: pnpm -r --workspace-concurrency=1 run build:grammars
+
+      - name: Create Release PR or Publish
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        id: changesets
+        # v2 is the line compatible with @changesets/cli v3 (v1 only
+        # understands CLI v2 output). v2 renamed every input: version →
+        # version-script, publish → publish-script, title → pr-title,
+        # commit → commit-message, commitMode → push-with-git-cli.
+        #
+        # v2 learns which packages were published from the NDJSON file the
+        # CLI writes to $CHANGESETS_OUTPUT — the action sets that variable in
+        # the publish-script's environment and `pnpm exec` passes it through,
+        # so nothing extra is needed here. It then pushes each tag and creates
+        # a GitHub release per package (defaults: create-github-releases=true,
+        # push-git-tags=true, push-with-git-cli=false — tags and the version
+        # commit are pushed through the GitHub API and signed by GitHub; set
+        # push-with-git-cli: true to go back to plain `git push`).
+        #
+        # The version script also runs `rex release stamp <version>`, so the
+        # Version Packages PR carries shippedIn on every change the release
+        # ships. The action runs version-script without a shell, so the
+        # chaining lives in the root `version-packages` script. The stamp never
+        # blocks a release: if it fails, the script prints a warning and
+        # versioning continues (release tags remain the shippedIn fallback).
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2 branch head, 2026-10-09 — upstream ships no v2 tag
+        with:
+          version-script: pnpm run version-packages
+          publish-script: pnpm exec changeset publish
+          pr-title: "chore: version packages"
+          commit-message: "chore: version packages"
+          # v2 ignores a GITHUB_TOKEN env var; the token must arrive through
+          # this input. This is the default value, spelled out on purpose.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          # No NODE_AUTH_TOKEN / NPM_TOKEN — auth comes from GitHub OIDC.
+          # id-token: write above grants the runner permission to mint the
+          # OIDC token that pnpm/npm exchange with the registry for a
+          # short-lived publish credential. (v2 also dropped v1's .npmrc
+          # handling, so an NPM_TOKEN would be ignored anyway.)
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Verify tags and GitHub releases match npm
+        # Decides from the changesets action's `published` output, not from an
+        # npm lookup: the registry can lag a publish by minutes. When this run
+        # published, scripts/verify-release-sync.mjs waits (bounded) for every
+        # package to appear on npm, then fails if origin lacks a tag or GitHub
+        # lacks a release for any of them: the symptom that stayed green for
+        # five releases before this step existed. When it did not publish
+        # (the Version-PR path), the script exits 0.
+        if: github.event_name == 'push' || inputs.mode == 'publish'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED: ${{ steps.changesets.outputs.published }}
+          PACKAGES: "core rex lang-kit lang-runtime lang-java lang-go lang-sql lang-terraform lang-python sourcevision hench llm-client web"
+        run: node scripts/verify-release-sync.mjs
+
+  validate-oidc:
+    name: Validate trusted publisher
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'validate-oidc'
+    runs-on: ubuntu-latest
+    environment: npm
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+    steps:
       - name: Validate trusted publisher OIDC exchange
         # Runs only when manually dispatched with mode=validate-oidc. Mints
         # the same GitHub OIDC token the publish step would, then POSTs it
@@ -77,7 +270,6 @@ jobs:
         # means the package's Trusted Publisher config matches this
         # workflow + environment exactly; any other status means publish
         # would fail. No upload happens — purely a config probe.
-        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'validate-oidc'
         env:
           REGISTRY: https://registry.npmjs.org
           # Space-separated list of package names (without @n-dx/ prefix)
@@ -147,118 +339,3 @@ jobs:
             exit 1
           fi
           echo "All packages validated successfully."
-
-      - name: Install pnpm
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-
-      - name: Setup Node
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-          cache: pnpm
-          registry-url: https://registry.npmjs.org
-
-      - name: Upgrade npm for Trusted Publishing
-        # OIDC trusted publishing and provenance attestation require npm
-        # >= 11.5.1. Node 22 ships with npm 10.x by default.
-        #
-        # Pinned to 11.15.0: npm 11.16.0 (released 2026-05-27) regressed
-        # `npm info` with "Invalid time value" against npmjs.org metadata,
-        # breaking `changeset publish`. Revisit when npm ships a fix.
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        run: npm install -g npm@11.15.0
-
-      - name: Install dependencies
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        run: pnpm install --frozen-lockfile
-
-      - name: Check obfuscated code policy
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        run: pnpm security:obfuscation
-
-      - name: Build
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        run: pnpm build
-
-      # Each language pack (@n-dx/lang-*) ships its own build/grammars/*.wasm
-      # (package.json "files"); sourcevision ships none. Grammars are never
-      # committed, so they must be built here or a published pack degrades its
-      # language to inventory-only. SV_REQUIRE_GRAMMARS=1 makes the tests
-      # below — including sourcevision's tests/e2e/packed-tarball.test.ts,
-      # which packs each pack and loads it from a pack directory — fail rather
-      # than skip when a grammar is missing. Same cache as ci.yml.
-      - name: Cache grammar build downloads
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: packages/lang-runtime/build/cache
-          key: grammars-${{ runner.os }}-${{ hashFiles('packages/lang-runtime/scripts/build-grammars.mjs') }}
-
-      - name: Build tree-sitter grammars
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        run: pnpm -r --workspace-concurrency=1 run build:grammars
-
-      - name: Require built grammars in tests
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        run: echo "SV_REQUIRE_GRAMMARS=1" >> "$GITHUB_ENV"
-
-      - name: Run unit tests
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        run: pnpm -r run test
-
-      - name: Create Release PR or Publish
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        id: changesets
-        # v2 is the line compatible with @changesets/cli v3 (v1 only
-        # understands CLI v2 output). v2 renamed every input: version →
-        # version-script, publish → publish-script, title → pr-title,
-        # commit → commit-message, commitMode → push-with-git-cli.
-        #
-        # v2 learns which packages were published from the NDJSON file the
-        # CLI writes to $CHANGESETS_OUTPUT — the action sets that variable in
-        # the publish-script's environment and `pnpm exec` passes it through,
-        # so nothing extra is needed here. It then pushes each tag and creates
-        # a GitHub release per package (defaults: create-github-releases=true,
-        # push-git-tags=true, push-with-git-cli=false — tags and the version
-        # commit are pushed through the GitHub API and signed by GitHub; set
-        # push-with-git-cli: true to go back to plain `git push`).
-        #
-        # The version script also runs `rex release stamp <version>`, so the
-        # Version Packages PR carries shippedIn on every change the release
-        # ships. The action runs version-script without a shell, so the
-        # chaining lives in the root `version-packages` script. The stamp never
-        # blocks a release: if it fails, the script prints a warning and
-        # versioning continues (release tags remain the shippedIn fallback).
-        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2 branch head, 2026-10-09 — upstream ships no v2 tag
-        with:
-          version-script: pnpm run version-packages
-          publish-script: pnpm exec changeset publish
-          pr-title: "chore: version packages"
-          commit-message: "chore: version packages"
-          # v2 ignores a GITHUB_TOKEN env var; the token must arrive through
-          # this input. This is the default value, spelled out on purpose.
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          # No NODE_AUTH_TOKEN / NPM_TOKEN — auth comes from GitHub OIDC.
-          # id-token: write above grants the runner permission to mint the
-          # OIDC token that pnpm/npm exchange with the registry for a
-          # short-lived publish credential. (v2 also dropped v1's .npmrc
-          # handling, so an NPM_TOKEN would be ignored anyway.)
-          NPM_CONFIG_PROVENANCE: true
-
-      - name: Verify tags and GitHub releases match npm
-        # Decides from the changesets action's `published` output, not from an
-        # npm lookup: the registry can lag a publish by minutes. When this run
-        # published, scripts/verify-release-sync.mjs waits (bounded) for every
-        # package to appear on npm, then fails if origin lacks a tag or GitHub
-        # lacks a release for any of them: the symptom that stayed green for
-        # five releases before this step existed. When it did not publish
-        # (the Version-PR path), the script exits 0.
-        if: github.event_name == 'push' || inputs.mode == 'publish'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISHED: ${{ steps.changesets.outputs.published }}
-          PACKAGES: "core rex lang-kit lang-runtime lang-java lang-go lang-sql lang-terraform lang-python sourcevision hench llm-client web"
-        run: node scripts/verify-release-sync.mjs

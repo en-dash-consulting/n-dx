@@ -1,11 +1,11 @@
 /**
- * Every CI leg that runs a suite with skipUnlessGrammar tests must build the
+ * Every CI or release leg running skipUnlessGrammar tests must build the
  * grammars and set SV_REQUIRE_GRAMMARS=1 first, in the same job (a GITHUB_ENV
  * export reaches only later steps of its own job). Without them those tests
  * skip and CI stays green — the #762 defect, and the PR 12a one where the
  * packs' suites moved to a group the steps did not cover.
  *
- * ci.yml is read as text (no YAML dependency at the root), so this parses only
+ * Workflows are read as text (no YAML dependency at the root), parsing only
  * the shapes the workflow uses and fails loudly on any `if:` it cannot evaluate.
  */
 
@@ -16,7 +16,10 @@ import { grammarSuites, needsGrammars } from "../../scripts/grammar-suites.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
 // A Windows checkout (core.autocrlf=true) gives ci.yml CRLF line endings.
-const CI = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf-8").replace(/\r\n/g, "\n");
+const WORKFLOWS = ["ci.yml", "release.yml"].map((file) => ({
+  file,
+  text: readFileSync(join(ROOT, ".github/workflows", file), "utf-8").replace(/\r\n/g, "\n"),
+}));
 const RUNNER = "scripts/run-all-tests.mjs";
 const DECIDER = "scripts/grammar-suites.mjs";
 
@@ -235,7 +238,7 @@ function packagesUsingGrammarGate() {
   return found.sort();
 }
 
-describe("ci.yml grammar steps", () => {
+describe.each(WORKFLOWS)("$file grammar steps", ({ file, text }) => {
   it("derives the grammar suites from every package whose tests use the grammar gate", () => {
     const gated = packagesUsingGrammarGate();
     expect(gated.length).toBeGreaterThan(0);
@@ -243,9 +246,9 @@ describe("ci.yml grammar steps", () => {
   });
 
   it("builds grammars and requires them before every run that includes a grammar suite", () => {
-    const jobs = parseJobs(CI);
+    const jobs = parseJobs(text);
     const runningJobs = Object.entries(jobs).filter(([, lines]) => parseSteps(lines).some((s) => s.run.includes(RUNNER)));
-    expect(runningJobs.length, `no ci.yml job runs ${RUNNER}`).toBeGreaterThan(0);
+    expect(runningJobs.length, `no ${file} job runs ${RUNNER}`).toBeGreaterThan(0);
     const problems = runningJobs.flatMap(([name, lines]) => grammarStepProblems(name, lines));
     expect(problems).toEqual([]);
   });
