@@ -46,7 +46,8 @@ export function buildRunSummary(toolCalls: ToolCallRecord[]): RunSummaryData {
 
   for (const call of toolCalls) {
     switch (call.tool) {
-      case "write_file": {
+      case "write_file":
+      case "edit_file": {
         const path = call.input.path as string | undefined;
         if (path) changedSet.add(path);
         break;

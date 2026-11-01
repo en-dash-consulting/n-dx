@@ -279,6 +279,28 @@ async function completeOnV2(
   return lines.join("\n");
 }
 
+/**
+ * Set or clear a task's `failureReason` without touching its status.
+ *
+ * The status a failed run leaves is decided elsewhere (reset to pending, kept
+ * for a retry); this records only why it failed, which the next brief shows
+ * under "Previous attempt failed". `undefined` clears it, which a run that
+ * ends completed does, so a fixed failure is not reported to the next run.
+ * Returns false, writing nothing, when the task is missing or the value would
+ * not change. Authorship is preserved: hench records a run outcome, it does
+ * not edit the item on anyone's behalf.
+ */
+export async function toolRexSetFailureReason(
+  store: PRDStore,
+  taskId: string,
+  reason: string | undefined,
+): Promise<boolean> {
+  const existing = await store.getItem(taskId);
+  if (!existing || existing.failureReason === reason) return false;
+  await store.updateItem(taskId, { failureReason: reason }, { preserveModifiedBy: true });
+  return true;
+}
+
 export async function toolRexAppendLog(
   store: PRDStore,
   taskId: string,
