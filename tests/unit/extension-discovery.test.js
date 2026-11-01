@@ -20,6 +20,7 @@ import { pathToFileURL } from "node:url";
 import {
   discoverExtensions,
   findGlobalRoot,
+  readExtensionsText,
   replaceExtensionsFile,
   EXTENSIONS_CACHE_FILE,
   MAX_PROJECT_ENTRIES,
@@ -454,6 +455,30 @@ describe("writing extensions.json", () => {
 
     expect(waits).toEqual([]);
     expect(tempFiles()).toEqual([]);
+  });
+
+  it("retries a read refused while another process replaces the file", () => {
+    writeFileSync(cachePath(), "{}\n");
+    let calls = 0;
+    const flaky = {
+      ...fs,
+      readFileSync: (...args) => {
+        if (++calls <= 2) throw errno("EPERM");
+        return fs.readFileSync(...args);
+      },
+    };
+    const waits = [];
+
+    expect(readExtensionsText(flaky, cachePath(), { sleep: (ms) => waits.push(ms), platform: "win32" })).toBe("{}\n");
+    expect(waits).toHaveLength(2);
+  });
+
+  it.each(["EPERM", "EACCES"])("fails a %s read at once outside Windows, where it is permanent", (code) => {
+    const denied = { ...fs, readFileSync: () => { throw errno(code); } };
+    const waits = [];
+
+    expect(() => readExtensionsText(denied, cachePath(), { sleep: (ms) => waits.push(ms), platform: "linux" })).toThrow(code);
+    expect(waits).toEqual([]);
   });
 
   it("removes the temp file when discovery's cache write fails", () => {

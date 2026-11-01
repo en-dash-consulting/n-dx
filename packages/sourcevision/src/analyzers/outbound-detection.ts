@@ -417,6 +417,11 @@ function isConstructorName(binding: LocalBinding, localName: string): boolean {
 /** Everything the declaration pass learned about one source file. */
 interface FileBindings {
   locals: Map<string, LocalBinding>;
+  scopes: Map<ts.Node, Map<string, LocalBinding | undefined>>;
+  grpcScopes: Map<ts.Node, Set<string>>;
+  grpcPackageScopes: Map<ts.Node, Set<string>>;
+  constScopes: Map<ts.Node, Map<string, ts.Expression>>;
+  declared: Set<string>;
   /** Locals bound to a gRPC module object. */
   grpcModules: Set<string>;
   /** Locals holding a `loadPackageDefinition` result — their members are stubs. */
@@ -604,16 +609,70 @@ function extractTarget(
  *
  * Separate pass rather than one interleaved walk so a client aliased below its
  * use — a `const` hoisted by a later refactor, a re-export at the foot of the
- * file — is still resolved. Scope is flat: a detector gains nothing from
- * modelling shadowing that it does not lose to a false negative elsewhere.
+ * file — is still resolved. Lexical scopes also retain unrelated declarations
+ * so a local function cannot silently become global fetch or an outer client.
  */
+function visibleFileBindings(node: ts.Node, file: FileBindings): FileBindings {
+  const locals = new Map<string, LocalBinding>();
+  const consts = new Map<string, ts.Expression>();
+  const declared = new Set<string>();
+  const grpcModules = new Set<string>();
+  const grpcPackages = new Set<string>();
+  for (let scope: ts.Node | undefined = node; scope; scope = scope.parent) {
+    for (const [name, client] of file.scopes.get(scope) ?? []) {
+      if (declared.has(name)) continue;
+      declared.add(name);
+      if (client) locals.set(name, client);
+      const value = file.constScopes.get(scope)?.get(name);
+      if (value) consts.set(name, value);
+      if (file.grpcScopes.get(scope)?.has(name)) grpcModules.add(name);
+      if (file.grpcPackageScopes.get(scope)?.has(name)) grpcPackages.add(name);
+    }
+  }
+  return { ...file, locals, consts, declared, grpcModules, grpcPackages };
+}
+
 function collectBindings(sf: ts.SourceFile): FileBindings {
-  const bindings: FileBindings = {
+  const fileBindings: FileBindings = {
     locals: new Map(),
+    scopes: new Map(),
+    grpcScopes: new Map(),
+    grpcPackageScopes: new Map(),
+    constScopes: new Map(),
+    declared: new Set(),
     grpcModules: new Set(),
     grpcPackages: new Set(),
     grpcImported: false,
     consts: new Map(),
+  };
+  let bindings = fileBindings;
+
+  const namesOf = (name: ts.BindingName): string[] => ts.isIdentifier(name)
+    ? [name.text] : name.elements.flatMap((el) => ts.isBindingElement(el) ? namesOf(el.name) : []);
+  const scopeOf = (node: ts.Node, functionScoped = false): ts.Node => {
+    let parent = node.parent;
+    while (parent && !ts.isSourceFile(parent) && !ts.isFunctionLike(parent) &&
+      (functionScoped || (!ts.isBlock(parent) && !ts.isForStatement(parent) && !ts.isForOfStatement(parent) && !ts.isForInStatement(parent) && !ts.isCatchClause(parent)))) parent = parent.parent;
+    return parent ?? sf;
+  };
+  const declare = (node: ts.Node, names: string[], recognised: boolean, functionScoped = false): void => {
+    const scope = scopeOf(node, functionScoped);
+    let locals = bindings.scopes.get(scope);
+    if (!locals) bindings.scopes.set(scope, locals = new Map());
+    for (const name of names) {
+      locals.set(name, recognised ? bindings.locals.get(name) : undefined);
+      if (ts.isVariableDeclaration(node) && node.initializer && ts.isIdentifier(node.name)) {
+        let values = bindings.constScopes.get(scope);
+        if (!values) bindings.constScopes.set(scope, values = new Map());
+        values.set(name, node.initializer);
+      }
+      for (const [all, scoped] of [[bindings.grpcModules, bindings.grpcScopes], [bindings.grpcPackages, bindings.grpcPackageScopes]] as const) {
+        if (!recognised || !all.has(name)) continue;
+        let set = scoped.get(scope);
+        if (!set) scoped.set(scope, set = new Set());
+        set.add(name);
+      }
+    }
   };
 
   /** Bind every name introduced by `import X`/`{ a }`/`* as ns` from one module. */
@@ -636,25 +695,43 @@ function collectBindings(sf: ts.SourceFile): FileBindings {
     if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier)) {
       const module = node.moduleSpecifier.text;
       const clause = node.importClause;
+      if (clause?.isTypeOnly) return;
       if (clause?.name) bindModuleObject(module, clause.name.text);
       const named = clause?.namedBindings;
       if (named && ts.isNamespaceImport(named)) bindModuleObject(module, named.name.text);
       if (named && ts.isNamedImports(named)) {
         for (const el of named.elements) {
+          if (el.isTypeOnly) continue;
           bindModuleMember(module, (el.propertyName ?? el.name).text, el.name.text);
         }
       }
+      declare(node, [
+        ...(clause?.name ? [clause.name.text] : []),
+        ...(named && ts.isNamespaceImport(named) ? [named.name.text] : []),
+        ...(named && ts.isNamedImports(named) ? named.elements.filter((el) => !el.isTypeOnly).map((el) => el.name.text) : []),
+      ], true);
     }
 
-    if (ts.isVariableDeclaration(node) && node.initializer) {
-      collectFromDeclaration(node, node.initializer, bindings, bindModuleObject, bindModuleMember);
+    if (ts.isVariableDeclaration(node)) {
+      const outer = bindings;
+      bindings = visibleFileBindings(node, fileBindings);
+      const names = namesOf(node.name);
+      const previous = names.map((name) => bindings.locals.get(name));
+      const previousGrpc = names.map((name) => bindings.grpcModules.has(name) || bindings.grpcPackages.has(name));
+      if (node.initializer) collectFromDeclaration(node, node.initializer, bindings, bindModuleObject, bindModuleMember);
+      const functionScoped = ts.isVariableDeclarationList(node.parent) && !(node.parent.flags & ts.NodeFlags.BlockScoped);
+      names.forEach((name, i) => declare(node, [name], bindings.locals.get(name) !== previous[i] || (!previousGrpc[i] && (bindings.grpcModules.has(name) || bindings.grpcPackages.has(name))), functionScoped));
+      fileBindings.grpcImported ||= bindings.grpcImported;
+      bindings = outer;
     }
+    if (ts.isParameter(node)) declare(node, namesOf(node.name), false);
+    if ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) && node.name) declare(node, [node.name.text], false);
 
     ts.forEachChild(node, visit);
   };
 
   visit(sf);
-  return bindings;
+  return fileBindings;
 }
 
 /** One `const x = …` — a require, an alias, a factory result, or a plain value. */
@@ -810,7 +887,16 @@ export function detectJsOutboundCalls(
     scriptKindFor(filePath),
   );
 
-  const bindings = collectBindings(sf);
+  const fileBindings = collectBindings(sf);
+  let bindings = fileBindings;
+  const visibleScopes = new Map<ts.Node, FileBindings>();
+  const bindingsAt = (node: ts.Node): FileBindings => {
+    let scope = node;
+    while (scope.parent && !fileBindings.scopes.has(scope)) scope = scope.parent;
+    let visible = visibleScopes.get(scope);
+    if (!visible) visibleScopes.set(scope, visible = visibleFileBindings(scope, fileBindings));
+    return visible;
+  };
   const found: OutboundDependency[] = [];
   const seen = new Set<string>();
 
@@ -861,7 +947,9 @@ export function detectJsOutboundCalls(
     // does. A queue's own target is never a fragment, so it is never displaced.
     if (binding.base && binding.base.targetSource !== "unknown") {
       const incomplete = binding.spec.relativeToBase && !isAbsoluteTarget(info);
-      if (info.targetSource === "unknown" || incomplete) info = binding.base;
+      if (incomplete && info.targetSource === "literal" && binding.base.targetSource === "literal") {
+        info = { target: `${binding.base.target.replace(/\/+$/, "")}/${info.target.replace(/^\/+/, "")}`, targetSource: "literal" };
+      } else if (info.targetSource === "unknown" || incomplete) info = binding.base;
     }
     record(node, binding.spec.kind, binding.spec.client, info,
       confidenceFor(binding.reach, dynamic));
@@ -871,7 +959,7 @@ export function detectJsOutboundCalls(
     const callee = node.expression;
 
     // `fetch(url)` — the global, only when nothing has bound the name.
-    if (ts.isIdentifier(callee) && callee.text === "fetch" && !bindings.locals.has("fetch")) {
+    if (ts.isIdentifier(callee) && callee.text === "fetch" && !bindings.declared.has("fetch")) {
       record(node, "http", "fetch", extractTarget(node.arguments[0], bindings, ["url"]), "certain");
       return;
     }
@@ -881,6 +969,7 @@ export function detectJsOutboundCalls(
       ts.isPropertyAccessExpression(callee) &&
       callee.name.text === "fetch" &&
       ts.isIdentifier(callee.expression) &&
+      !bindings.declared.has(callee.expression.text) &&
       (callee.expression.text === "globalThis" || callee.expression.text === "window")
     ) {
       record(node, "http", "fetch", extractTarget(node.arguments[0], bindings, ["url"]), "certain");
@@ -975,8 +1064,11 @@ export function detectJsOutboundCalls(
   };
 
   const walk = (node: ts.Node): void => {
-    if (ts.isCallExpression(node)) visitCall(node);
-    else if (ts.isNewExpression(node)) visitNew(node);
+    if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+      bindings = bindingsAt(node);
+      if (ts.isCallExpression(node)) visitCall(node);
+      else visitNew(node);
+    }
     ts.forEachChild(node, walk);
   };
   walk(sf);
