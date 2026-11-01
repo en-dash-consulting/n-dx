@@ -1,5 +1,13 @@
 # @n-dx/sourcevision
 
+## 0.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`3668341`](https://github.com/en-dash-consulting/n-dx/commit/3668341ec83e50ded68f9697fb5880833235d8fc), [`fd0913b`](https://github.com/en-dash-consulting/n-dx/commit/fd0913b4cae9d925f39ed90b9479bdf99b974e1e), [`de8bc93`](https://github.com/en-dash-consulting/n-dx/commit/de8bc939849ed25a4376dca29ec18646cc906954), [`c101993`](https://github.com/en-dash-consulting/n-dx/commit/c101993d87650ef58470c03e85584a0ecc3a4481), [`916ed4e`](https://github.com/en-dash-consulting/n-dx/commit/916ed4e7925e23a5f0bd2c059340f733f0a975ab)]:
+  - @n-dx/llm-client@0.10.1
+  - @n-dx/lang-kit@0.10.1
+
 ## 0.10.0
 
 ### Patch Changes

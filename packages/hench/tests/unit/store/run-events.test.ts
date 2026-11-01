@@ -281,7 +281,7 @@ describe("classifyFileTool", () => {
       .filter((name) => classifyFileTool(name) !== null)
       .sort();
 
-    expect(classified).toEqual(["list_directory", "read_file", "search_files", "write_file"]);
+    expect(classified).toEqual(["edit_file", "list_directory", "read_file", "search_files", "write_file"]);
   });
 
   it("classifies searches as reads, since they are how the agent looks around", () => {
