@@ -2681,7 +2681,7 @@ Options:
   --json                   Output as JSON
   --stdin                  With credentials.<name>: read the value from stdin
   --unset                  With credentials.<name>: remove the stored value
-  --force                 Skip validation when setting claude/llm/extensions config values
+  --force                  Skip validation when setting claude/llm/extensions config values
   --user                   Write an extensions.<name>.<key> value to the user config
                            (<ndx home>/config.json) instead of .n-dx.json
   --test-connection        Test configured claude.api_key and/or claude.cli_path
