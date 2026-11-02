@@ -972,7 +972,7 @@ describe("permission cards", () => {
 
   const INPUTS: Record<SidecarCardKind, { tool: string; input: Record<string, unknown>; title: string }> = {
     command: { tool: "run_command", input: { argv: ["ndx", "status", "."] }, title: "ndx status ." },
-    work: { tool: "start_work", input: { taskId: "425819f5", options: { review: true } }, title: "n-dx work --task=425819f5 --auto --review ." },
+    work: { tool: "start_work", input: { taskId: "425819f5", options: { review: true } }, title: "n-dx work --task=425819f5 --auto --review --require-unblocked ." },
     "change-set": { tool: "propose_prd_change", input: { items: [{ title: "a" }, { title: "b" }] }, title: "2 items" },
     // Without its plan (a card from before the plan was read) the title falls back to the tool.
     "run-plan": { tool: "propose_run_plan", input: { note: "two lanes" }, title: "propose_run_plan" },
@@ -982,6 +982,21 @@ describe("permission cards", () => {
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
     "migration-decision": { tool: "migration_decision", input: { entries: [{ id: "x" }] }, title: "1 decision" },
   };
+  it("titles a work card with the options the run uses: requireUnblocked defaults on, an explicit false drops it", async () => {
+    const titleOf = async (input: Record<string, unknown>): Promise<string> => {
+      const host = document.createElement("div");
+      await act(async () => {
+        render(h(SidecarCards, {
+          cards: [card("w", 1, { kind: "work", tool: "start_work", input })],
+          manifest: { cliNames: ["ndx"], effects: {}, layoutPaths: {} },
+          decide: vi.fn(async () => {}),
+        }), host);
+      });
+      return host.querySelector(".sidecar-card-title")?.textContent ?? "";
+    };
+    expect(await titleOf({ taskId: "t1" })).toBe("n-dx work --task=t1 --auto --require-unblocked .");
+    expect(await titleOf({ taskId: "t1", options: { requireUnblocked: false } })).toBe("n-dx work --task=t1 --auto .");
+  });
   const STATES: Array<[string, Partial<SidecarCard>, RegExp | null]> = [
     ["pending", { status: "pending" }, null],
     ["approved", { status: "approved" }, /^Approved$/],

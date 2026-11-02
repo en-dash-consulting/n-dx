@@ -30,7 +30,7 @@
 
 import { h } from "preact";
 import { useState, useEffect, useRef } from "preact/hooks";
-import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, itemTypeLabel, laneSteps, stepRunOptions, workCommandArgs } from "../external.js";
+import { SIDECAR_SESSION_ENDED_REASON, checkRunOptions, defaultedWorkOptions, itemTypeLabel, laneSteps, stepRunOptions, workCommandArgs } from "../external.js";
 import { useCliName } from "../hooks/index.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/index.js";
 import type { QueuePlan, SidecarChangeSetEdit } from "../external.js";
@@ -75,7 +75,7 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       case "work": {
         // The execute route's own argv builder, so the title is the command approval spawns.
         // Options that fail the shape check would be refused there; the title then leaves them out.
-        const checked = checkRunOptions(input.options);
+        const checked = checkRunOptions(defaultedWorkOptions(input.options));
         const options = checked.ok ? checked.options : {};
         return str(input.taskId) ? [cliName, ...workCommandArgs({ taskId: str(input.taskId), options, dir: "." })].join(" ") : "";
       }
