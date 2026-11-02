@@ -87,7 +87,10 @@ describe("ndx init: git preflight", { timeout: TEST_TIMEOUT }, () => {
     const skipped = await writeFakeBinary(join(binDir, "private-claude"), { stdout: "SHOULD_NOT_RUN" });
     await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ cli: { claudePath: skipped } }));
     await writeFakeBinary(join(binDir, "git"), { stdout: "fatal: detected dubious ownership", exitCode: 128 });
-    const env = { ...initEnv, HOME: tmpDir, USERPROFILE: tmpDir, PATH: binDir };
+    // Only git is broken: on Windows the classifier reaches hench through
+    // cmd.exe, which a real PATH always finds in System32.
+    const system32 = process.platform === "win32" ? `${PATH_SEP}${join(process.env.SystemRoot ?? "C:\\Windows", "System32")}` : "";
+    const env = { ...initEnv, HOME: tmpDir, USERPROFILE: tmpDir, PATH: `${binDir}${system32}` };
     delete env.CLAUDE_CLI_PATH;
     const moduleUrl = pathToFileURL(join(import.meta.dirname, "../../packages/core/claude-integration.js")).href;
     const probe = `import { discoverClaudeCli } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(discoverClaudeCli(${JSON.stringify(tmpDir)})));`;
