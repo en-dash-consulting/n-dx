@@ -13,6 +13,7 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  CREDENTIAL_HELPER_RETRY_MS,
   CREDENTIAL_HELPER_TIMEOUT_MS,
   agentCredentialDenials,
   clearCredentialHelperCache,
@@ -273,5 +274,126 @@ describe("status and denials never run a helper", () => {
     ]));
     expect(denials.commandPrefixes).toHaveLength(6);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("an interpreter helper denies its script, not the interpreter", () => {
+  const prefixes = (argv: string[]): string[][] => {
+    setHelperCredential("typesafe", argv, options);
+    return agentCredentialDenials(options).commandPrefixes.filter((p) => p[0] !== "security");
+  };
+
+  it("node <script> yields node <script>, never bare node", () => {
+    expect(prefixes(["node", "/x/get-key.mjs"])).toEqual([["node", "/x/get-key.mjs"]]);
+  });
+
+  it("options before the script stay in the prefix, which is also denied without them", () => {
+    expect(prefixes(["node", "--no-warnings", "/x/get-key.mjs", "--vault", "v"])).toEqual([
+      ["node", "--no-warnings", "/x/get-key.mjs"],
+      ["node", "/x/get-key.mjs"],
+    ]);
+  });
+
+  it("every spelling of the interpreter carries the script", () => {
+    expect(prefixes(["C:\\Program Files\\nodejs\\node.exe", "C:\\x\\get-key.mjs"])).toEqual([
+      ["C:\\Program Files\\nodejs\\node.exe", "C:\\x\\get-key.mjs"],
+      ["node.exe", "C:\\x\\get-key.mjs"],
+      ["node", "C:\\x\\get-key.mjs"],
+    ]);
+  });
+
+  it.each([
+    [["python3", "-I", "get-key.py"], ["python3", "-I", "get-key.py"]],
+    [["python3.12", "-m", "getkey"], ["python3.12", "-m", "getkey"]],
+    [["bash", "get-key.sh"], ["bash", "get-key.sh"]],
+    [["deno", "run", "--allow-env", "get-key.ts"], ["deno", "run", "--allow-env", "get-key.ts"]],
+    [["pwsh", "-File", "get-key.ps1"], ["pwsh", "-File", "get-key.ps1"]],
+  ])("%j yields the prefix %j", (argv, prefix) => {
+    expect(prefixes(argv)).toContainEqual(prefix);
+    expect(prefixes(argv)).not.toContainEqual([argv[0]]);
+  });
+
+  it("a non-interpreter helper keeps its argv[0] prefixes", () => {
+    expect(prefixes(["op", "read", "op://vault/item/field"])).toEqual([["op"]]);
+  });
+
+  it.each([
+    [["bash", "-c", "op read x"]],
+    [["sh", "-xc", "op read x"]],
+    [["node", "-e", "1"]],
+    [["node", "--eval=1"]],
+    [["python3", "-c", "print(1)"]],
+    [["perl", "-le", "print 1"]],
+    [["pwsh", "-Command", "Get-Secret"]],
+    [["deno", "eval", "1"]],
+    [["node"]],
+    [["bash", "-x"]],
+  ])("refuses to store %j, which has no script", (argv) => {
+    expect(() => setHelperCredential("typesafe", argv, options)).toThrow(/is a shell, not a helper/);
+  });
+
+  it("an older store's scriptless interpreter helper still denies the bare interpreter", () => {
+    writeFileSync(
+      join(home, "credentials.json"),
+      JSON.stringify({ version: 1, entries: { typesafe: { backend: "helper", argv: ["bash", "-c", "op read x"] } } }),
+      { mode: 0o600 },
+    );
+    expect(agentCredentialDenials(options).commandPrefixes).toContainEqual(["bash"]);
+  });
+});
+
+describe("a failed helper is retried after the window", () => {
+  let now: number;
+  const clock = (): number => now;
+  beforeEach(() => {
+    now = 1_000_000;
+  });
+
+  /** A helperExec that fails until `unlocked` is set, then prints the placeholder. */
+  function lockedExec() {
+    const state = { unlocked: false, calls: 0 };
+    const exec = (() => {
+      state.calls++;
+      if (!state.unlocked) throw Object.assign(new Error("locked"), { status: 1 });
+      return SECRET;
+    }) as unknown as typeof execFileSyncNoShell;
+    return { exec, state };
+  }
+
+  it("keeps a failure for 60 s, then runs the helper again and keeps the success", () => {
+    const { exec, state } = lockedExec();
+    const opts = { ...options, helperExec: exec, clock };
+    setHelperCredential("typesafe", ["op", "read", "x"], options);
+    expect(resolveCredential("typesafe", opts)).toBeUndefined();
+    now += CREDENTIAL_HELPER_RETRY_MS - 1;
+    expect(resolveCredential("typesafe", opts)).toBeUndefined();
+    expect(state.calls).toBe(1);
+
+    state.unlocked = true;
+    now += 1;
+    expect(resolveCredential("typesafe", opts)).toEqual({ value: SECRET, source: "helper" });
+    expect(state.calls).toBe(2);
+
+    now += 10 * CREDENTIAL_HELPER_RETRY_MS;
+    expect(resolveCredential("typesafe", opts)).toEqual({ value: SECRET, source: "helper" });
+    expect(state.calls).toBe(2);
+  });
+
+  it.each([
+    ["exit code", { status: 1 }],
+    ["timeout", { code: "ETIMEDOUT", signal: "SIGTERM", status: null }],
+    ["missing command", { code: "ENOENT" }],
+  ])("warns once per failure streak (%s), not on every retry", (_label, error) => {
+    const { exec, calls } = recordingExec({ error });
+    const opts = { ...options, helperExec: exec, clock };
+    setHelperCredential("typesafe", ["op", "read", "x"], options);
+    for (let i = 0; i < 3; i++) {
+      expect(resolveCredential("typesafe", opts)).toBeUndefined();
+      now += CREDENTIAL_HELPER_RETRY_MS;
+    }
+    expect(calls).toHaveLength(3);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/retrying after 60 s/);
+    expect(warnings[0]).not.toContain(SECRET);
   });
 });

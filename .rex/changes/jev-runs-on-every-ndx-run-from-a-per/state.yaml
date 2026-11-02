@@ -60,7 +60,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-02T20:45:20.108Z"
+    lastModified: "2026-11-02T21:12:58.166Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
@@ -83,7 +83,14 @@ items:
     lastModified: "2026-10-31T00:10:49.305Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9dd5658d-a708-473b-acb0-63c8df1cc127":
-    lastModified: "2026-11-02T20:55:58.769Z"
+    status: "completed"
+    startedAt: "2026-11-02T21:04:25.443Z"
+    completedAt: "2026-11-02T21:20:50.706Z"
+    endedAt: "2026-11-02T21:20:50.706Z"
+    activeIntervals: [{"end":"2026-11-02T21:20:50.706Z","start":"2026-11-02T21:04:25.443Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Interpreter helpers deny argv through the script; scriptless interpreters refused at --helper; failed helpers retried after 60 s with one warning per streak."
+    lastModified: "2026-11-02T21:20:50.706Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b72a668d-4bf6-4c1c-9caf-a2a25f96e6ea":
     status: "completed"
@@ -95,6 +102,9 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e5def056-c6ed-4484-978e-6f4e174bd8bf":
     lastModified: "2026-11-02T18:47:34.394Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f5efde56-48b6-4a78-a891-fcda1d312e46":
+    lastModified: "2026-11-02T21:12:58.166Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f912174e-96e5-41a3-acd9-5c73bae27c5b":
     lastModified: "2026-11-02T18:47:48.407Z"

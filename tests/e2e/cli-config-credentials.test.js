@@ -198,6 +198,25 @@ describe("ndx config credentials.<name> --helper", () => {
     }
   }, DEFAULT_TIMEOUT);
 
+  it("says the agent can still run the interpreter of an interpreter helper", async () => {
+    const { command, script } = await fakeHelper();
+    const set = config(["credentials.typesafe", "--helper", command]);
+    expect(set.code, set.err).toBe(0);
+    const notes = set.out.split("\n").filter((line) => line.startsWith("Note:"));
+    expect(notes).toEqual([`Note: agents can still run node itself; only "${process.execPath} ${script}" is denied to them.`]);
+  }, DEFAULT_TIMEOUT);
+
+  it.each([
+    ["bash -c", "bash -c 'op read x'"],
+    ["node -e", "node -e 1"],
+    ["python3 -c", "python3 -c 'print(1)'"],
+  ])("refuses %s, an interpreter with no script, as a usage error and stores nothing", (_label, command) => {
+    const r = config(["credentials.typesafe", "--helper", command]);
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/is a shell, not a helper/);
+    expect(existsSync(join(home, "credentials.json"))).toBe(false);
+  }, DEFAULT_TIMEOUT);
+
   it("accepts the --helper=<cmd> form", async () => {
     const { command } = await fakeHelper();
     expect(config(["credentials.claude", `--helper=${command}`]).code).toBe(0);

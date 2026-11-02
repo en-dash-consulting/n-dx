@@ -2713,10 +2713,12 @@ Credentials (per-user, not per-project):
   credentials.<name> --helper "<cmd>"
                            Store a password-manager command instead of a value,
                            e.g. --helper "op read op://vault/item/field". It runs
-                           without a shell, at most once per process, when the
-                           key is needed; its one line of output is the value.
-                           Quoting as in a shell, with no expansion; | ; & > <
-                           $( and backticks are refused.
+                           without a shell when the key is needed; its one line
+                           of output is the value, kept for the process (a
+                           failure is retried after 60 s). Quoting as in a
+                           shell, with no expansion; | ; & > < $( and backticks
+                           are refused, and so is bash -c or node -e: an
+                           interpreter needs a script to run.
 
 Vendor auth (llm.<vendor>.auth, written to .n-dx.local.json):
   auto (default)           API when a key is configured or exported, else the CLI

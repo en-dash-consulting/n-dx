@@ -261,6 +261,31 @@ describe("the agent may not run a command that reads a stored credential", () =>
     expect(rules).toHaveLength(disallowedTools.length);
   });
 
+  describe("an interpreter helper", () => {
+    beforeEach(() => {
+      setHelperCredential("google", ["node", "/x/get-key.mjs"], { ndxHome });
+    });
+
+    it("refuses its script and still allows the interpreter", () => {
+      const guard = widenedGuard();
+      expect(() => guard.checkCommand("node /x/get-key.mjs")).toThrow(/reads a stored credential/);
+      expect(() => guard.checkCommand("/usr/local/bin/node /x/get-key.mjs --vault v")).toThrow(/reads a stored credential/);
+      expect(() => guard.checkCommand("node -e 1")).not.toThrow();
+      expect(() => guard.checkCommand("node scripts/build.mjs")).not.toThrow();
+    });
+
+    it.each(["darwin", "linux", "win32"] as const)("the Claude CLI denies the script, not bare node (%s)", (platform) => {
+      const { storePath, commandPrefixes } = agentCredentialDenials({ ndxHome });
+      const disallowedTools = buildDisallowedTools({ storePath, commandPrefixes, platform });
+      const { args } = buildClaudeCliArgs({ systemPrompt: "s", promptText: "p", allowedTools: ["Bash"], disallowedTools }, platform);
+      const at = args.indexOf("--disallowed-tools") + 1;
+      const rules = platform === "win32" ? args[at]!.split(",") : args.slice(at, at + disallowedTools.length);
+      expect(rules).toContain("Bash(node /x/get-key.mjs:*)");
+      expect(rules).not.toContain("Bash(node:*)");
+      expect(rules).toHaveLength(disallowedTools.length);
+    });
+  });
+
   it("the spawn reads the helpers stored in the ndx home at spawn time", () => {
     const previous = process.env.NDX_HOME;
     process.env.NDX_HOME = ndxHome;

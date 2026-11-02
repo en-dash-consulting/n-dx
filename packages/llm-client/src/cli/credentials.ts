@@ -26,6 +26,8 @@ import {
   CREDENTIAL_ENV_VARS,
   credentialStatus,
   helperArgvError,
+  interpreterHelperError,
+  interpreterHelperPrefix,
   setCredential,
   setHelperCredential,
   unsetCredential,
@@ -157,10 +159,16 @@ export async function runCredentialsCli(argv: readonly string[], io: Credentials
         } catch {
           return usage("The argv on stdin is not valid JSON: it must be a JSON array of strings.");
         }
-        const argvError = helperArgvError(argv);
+        const argvError = helperArgvError(argv) ?? interpreterHelperError(argv as string[]);
         if (argvError) return usage(`Refusing the helper: ${argvError}`);
         setHelperCredential(name!, argv as string[], store);
         io.stdout(`Stored ${name}: helper (${(argv as string[])[0]}).\n`);
+        const interpreted = interpreterHelperPrefix(argv as string[]);
+        if (interpreted?.prefix) {
+          io.stdout(
+            `Note: agents can still run ${interpreted.interpreter} itself; only "${interpreted.prefix.join(" ")}" is denied to them.\n`,
+          );
+        }
         return 0;
       }
       case "unset": {

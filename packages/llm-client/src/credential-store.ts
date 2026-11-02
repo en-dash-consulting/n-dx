@@ -20,9 +20,11 @@
  * - `file`: the value is in the entry.
  * - `helper`: the entry holds an argv for a password-manager command (`op`,
  *   `pass`, `bw`, `gopass`) and {@link resolveCredential} runs it, without a
- *   shell, once per process; its one line of stdout is the value. A failure
- *   reads as no credential and warns once, naming the command, never its
- *   output. {@link credentialStatus} reports a helper without running it.
+ *   shell; its one line of stdout is the value, kept for the process. A
+ *   failure reads as no credential, warns once per failure streak, naming the
+ *   command, never its output, and is retried after
+ *   {@link CREDENTIAL_HELPER_RETRY_MS}. {@link credentialStatus} reports a
+ *   helper without running it.
  *
  * ## Format
  *
@@ -99,6 +101,12 @@ export type CredentialSource = "env" | "file" | "helper";
 /** How long a credential helper may run before it counts as failed. */
 export const CREDENTIAL_HELPER_TIMEOUT_MS = 10_000;
 
+/**
+ * How long a failed helper stays failed before it is run again, so a hub or
+ * MCP server picks the key up once the password manager is unlocked.
+ */
+export const CREDENTIAL_HELPER_RETRY_MS = 60_000;
+
 export interface ResolvedCredential {
   value: string;
   source: CredentialSource;
@@ -123,6 +131,8 @@ export interface CredentialStoreOptions extends ResolveNdxHomeOptions {
   helperExec?: typeof execFileSyncNoShell;
   /** False: a helper entry resolves to nothing instead of running (status without --check). */
   runHelpers?: boolean;
+  /** Milliseconds now, for a failed helper's retry window. Defaults to `Date.now`; injectable for tests. */
+  clock?: () => number;
 }
 
 export interface CredentialWriteOptions extends CredentialStoreOptions {
@@ -306,11 +316,114 @@ export function helperArgvError(argv: unknown): string | null {
   return null;
 }
 
+// ── Interpreter helpers ──────────────────────────────────────────────────────
+
+/** A program token reduced to what names it: base name, no `.exe`/`.cmd`, lower case. */
+function programName(token: string): string {
+  return posix.basename(token.split("\\").join("/")).replace(/\.(exe|cmd|bat|com)$/i, "").toLowerCase();
+}
+
+type InterpreterFamily = "shell" | "js" | "python" | "perl" | "powershell";
+
+const INTERPRETERS: Readonly<Record<string, InterpreterFamily>> = {
+  sh: "shell",
+  bash: "shell",
+  zsh: "shell",
+  node: "js",
+  deno: "js",
+  bun: "js",
+  python: "python",
+  ruby: "perl",
+  perl: "perl",
+  pwsh: "powershell",
+  powershell: "powershell",
+};
+
+function interpreterFamily(command: string): InterpreterFamily | undefined {
+  const name = programName(command);
+  return INTERPRETERS[name] ?? (/^python\d+(\.\d+)?$/.test(name) ? "python" : undefined);
+}
+
+/** Whether `option` runs code given on the command line rather than a script. */
+function isInlineCodeOption(family: InterpreterFamily, option: string): boolean {
+  switch (family) {
+    // `-c`, also inside a cluster (`-xc`, `-Ic`).
+    case "shell":
+    case "python":
+      return /^-[A-Za-z]*c[A-Za-z]*$/.test(option);
+    // `-e`/`-E`, also inside a cluster (`-le`, `-nE`).
+    case "perl":
+      return /^-[A-Za-z]*[eE][A-Za-z]*$/.test(option);
+    case "js":
+      return /^(-e|-p|-pe|--eval|--print)(=|$)/.test(option);
+    // `-Command`, `-EncodedCommand`, `-CommandWithArgs` and their abbreviations.
+    case "powershell": {
+      const o = option.replace(/^-+/, "").toLowerCase();
+      return o.length > 0 && ["command", "encodedcommand", "commandwithargs", "ec", "cwa"].some((f) => f.startsWith(o));
+    }
+  }
+}
+
 /**
- * Per-process helper results, keyed by entry name and argv: a helper runs at
- * most once per process, and a failure warns once and is not retried.
+ * What a helper's argv runs when `argv[0]` is a known interpreter: `prefix`
+ * is the argv up to and including the script (its first non-option
+ * argument), or null when it has none — inline code (`bash -c`, `node -e`)
+ * or no argument at all, which makes the helper a shell. Undefined when
+ * `argv[0]` is not an interpreter.
  */
-const helperCache = new Map<string, string | undefined>();
+export function interpreterHelperPrefix(argv: readonly string[]): { interpreter: string; prefix: string[] | null } | undefined {
+  const family = interpreterFamily(argv[0] ?? "");
+  if (!family) return undefined;
+  const interpreter = programName(argv[0]!);
+  for (let i = 1; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--") return { interpreter, prefix: i + 1 < argv.length ? argv.slice(0, i + 2) : null };
+    if (arg.startsWith("-")) {
+      if (isInlineCodeOption(family, arg)) return { interpreter, prefix: null };
+      continue;
+    }
+    // `deno run <script>` / `bun run <script>`; `deno eval` is inline code.
+    if ((interpreter === "deno" || interpreter === "bun") && i === firstPositional(argv)) {
+      if (arg === "eval") return { interpreter, prefix: null };
+      if (arg === "run") continue;
+    }
+    return { interpreter, prefix: argv.slice(0, i + 1) };
+  }
+  return { interpreter, prefix: null };
+}
+
+function firstPositional(argv: readonly string[]): number {
+  return argv.findIndex((a, i) => i > 0 && !a.startsWith("-"));
+}
+
+/**
+ * Why an interpreter helper cannot be stored, or null when it can (or
+ * `argv[0]` is not an interpreter). Without a script the agent could not be
+ * denied the helper without being denied the interpreter. The script prefix
+ * is spelled into Claude CLI deny rules, so it may not hold a comma or a
+ * parenthesis either.
+ */
+export function interpreterHelperError(argv: readonly string[]): string | null {
+  const found = interpreterHelperPrefix(argv);
+  if (!found) return null;
+  if (!found.prefix) {
+    return (
+      `${found.interpreter} with inline code or no script is a shell, not a helper; ` +
+      `put the command in a script and store "${found.interpreter} <script>".`
+    );
+  }
+  if (found.prefix.some((a) => /[,()]/.test(a))) {
+    return "the interpreter's options and script may not contain a comma or a parenthesis.";
+  }
+  return null;
+}
+
+/**
+ * Per-process helper results, keyed by entry name and argv. A success is kept
+ * for the process. A failure is kept for {@link CREDENTIAL_HELPER_RETRY_MS},
+ * then the helper runs again; only the first failure of a streak warns.
+ */
+const helperCache = new Map<string, { value: string } | { failedAt: number }>();
 
 /** Forget every helper result. For tests: a process otherwise keeps them. */
 export function clearCredentialHelperCache(): void {
@@ -337,7 +450,10 @@ export function clearCredentialHelperCache(): void {
  */
 function runHelper(name: string, argv: string[], options: CredentialStoreOptions): string | undefined {
   const key = JSON.stringify([name, argv]);
-  if (helperCache.has(key)) return helperCache.get(key);
+  const now = (options.clock ?? Date.now)();
+  const cached = helperCache.get(key);
+  if (cached && "value" in cached) return cached.value;
+  if (cached && now - cached.failedAt < CREDENTIAL_HELPER_RETRY_MS) return undefined;
   const run = options.helperExec ?? execFileSyncNoShell;
   let value: string | undefined;
   let failure: string | undefined;
@@ -361,13 +477,19 @@ function runHelper(name: string, argv: string[], options: CredentialStoreOptions
   } catch (err) {
     failure = helperFailure(err);
   }
-  if (failure !== undefined) {
+  if (value !== undefined) {
+    helperCache.set(key, { value });
+    return value;
+  }
+  // A retry that fails again is the same streak: warned already.
+  if (!cached) {
     (options.warn ?? defaultWarn)(
-      `Credential ${name}: its helper ${JSON.stringify(argv[0])} failed (${failure}); continuing without it.`,
+      `Credential ${name}: its helper ${JSON.stringify(argv[0])} failed (${failure}); ` +
+        `continuing without it, and retrying after ${CREDENTIAL_HELPER_RETRY_MS / 1000} s.`,
     );
   }
-  helperCache.set(key, value);
-  return value;
+  helperCache.set(key, { failedAt: now });
+  return undefined;
 }
 
 /** A helper's failure as an exit code, a timeout or a launch error — never its output. */
@@ -466,6 +588,8 @@ export interface AgentCredentialDenials {
    * Command prefixes, as tokens, an agent may not run: macOS Keychain's
    * `security find-generic-password`, and every configured helper's command
    * spelled as stored, by its base name, and by that name without `.exe`.
+   * For an interpreter helper (`node get-key.mjs`) the prefix runs through
+   * the script, so the interpreter itself stays allowed.
    */
   commandPrefixes: string[][];
 }
@@ -494,9 +618,18 @@ export function agentCredentialDenials(options: CredentialStoreOptions = {}): Ag
     if (!argv) continue;
     const command = argv[0]!;
     const base = posix.basename(command.split("\\").join("/"));
-    add([command]);
-    add([base]);
-    add([base.replace(/\.(exe|cmd|bat|com)$/i, "")]);
+    // An interpreter's script is the helper, not the interpreter: denying
+    // `node` would refuse every node command to every agent run. A stored
+    // interpreter helper without a usable script (refused by `set-helper`,
+    // but an older store may hold one) keeps the bare interpreter denied.
+    const interpreted = interpreterHelperError(argv) === null ? interpreterHelperPrefix(argv)?.prefix : undefined;
+    const rest = interpreted ? interpreted.slice(1) : [];
+    // `node --no-warnings get-key.mjs` is also denied without its options.
+    const scriptOnly = interpreted && rest.length > 1 ? [rest[rest.length - 1]!] : undefined;
+    for (const spelling of [command, base, base.replace(/\.(exe|cmd|bat|com)$/i, "")]) {
+      add([spelling, ...rest]);
+      if (scriptOnly) add([spelling, ...scriptOnly]);
+    }
   }
   return { storePath, commandPrefixes: [...prefixes.values()] };
 }
@@ -529,7 +662,7 @@ export function setCredential(name: string, value: string, options: CredentialWr
  */
 export function setHelperCredential(name: string, argv: readonly string[], options: CredentialWriteOptions = {}): void {
   assertCredentialName(name);
-  const argvError = helperArgvError(argv);
+  const argvError = helperArgvError(argv) ?? interpreterHelperError(argv);
   if (argvError) throw new Error(`Refusing to store a helper for ${name}: ${argvError}`);
   updateStore(options, (store) => {
     // As in setCredential: unknown fields survive, the file backend's value does not.

@@ -56,6 +56,25 @@ describe("set-helper", () => {
     expect(err).toMatch(message);
   });
 
+  it.each([
+    [["bash", "-c", "op read x"]],
+    [["node", "-e", "1"]],
+    [["python3", "-c", "print(1)"]],
+    [["node"]],
+  ])("refuses the interpreter helper %j, which has no script, and stores nothing", async (argv) => {
+    expect(await run(["set-helper", "typesafe"], JSON.stringify(argv))).toBe(2);
+    expect(err).toMatch(/is a shell, not a helper/);
+    expect(resolveCredential("typesafe", { ndxHome: home, env: {}, runHelpers: false })).toBeUndefined();
+  });
+
+  it("stores an interpreter helper with a script and says the interpreter stays allowed", async () => {
+    expect(await run(["set-helper", "typesafe"], JSON.stringify(["node", "/x/get-key.mjs", "--vault"]))).toBe(0);
+    expect(out).toBe(
+      "Stored typesafe: helper (node).\n" +
+        'Note: agents can still run node itself; only "node /x/get-key.mjs" is denied to them.\n',
+    );
+  });
+
   it("refuses an argv on the command line", async () => {
     expect(await run(["set-helper", "typesafe", "op"], "[\"op\"]")).toBe(2);
   });
