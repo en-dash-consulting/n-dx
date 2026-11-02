@@ -1,10 +1,14 @@
 schema: "rex/v2"
 items:
   "0e769946-9b91-4d17-9376-c691ba7f41ea":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-02T23:12:12.433Z"
-    activeIntervals: [{"start":"2026-11-02T23:12:12.433Z"}]
-    lastModified: "2026-11-02T23:12:13.069Z"
+    completedAt: "2026-11-02T23:35:35.731Z"
+    endedAt: "2026-11-02T23:35:35.731Z"
+    activeIntervals: [{"end":"2026-11-02T23:26:09.484Z","start":"2026-11-02T23:12:12.433Z"},{"end":"2026-11-02T23:35:35.731Z","start":"2026-11-02T23:35:35.731Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Placement card in 0bda1cef6 with review repair 739f8bcf4 (run 002f12ee) and barrel fix 6483ec01b: Place with Sidecar on the Inbox triage page and a change awaiting placement attaches a change item and opens Place; the card shows the shortlist radios, a propose row, touches/amends, an amendment editor and rex dry-run line, re-checked through placement/check with Place disabled until it returns; the server dry-runs the operator edit before approval and writes it. Gate failed on the server/client boundary test (main.ts imported place-with-sidecar.js directly); fixed by importing through components/index.js, after which the affected gate passes 3/3 suites. Browser-checked with web.sidecar and rex.placementDraft on locally (not committed): attach, card, amends re-check refusal, deny writes nothing, an approved touches placement written and logged (via Sidecar), then reverted. That check found the Place packet cutting the shortlist for long intents, fixed in 4483f8f76 under 23eb7360."
+    lastModified: "2026-11-02T23:35:35.731Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "23eb7360-bb32-40cf-b670-988fd545d4bb":
     status: "completed"
