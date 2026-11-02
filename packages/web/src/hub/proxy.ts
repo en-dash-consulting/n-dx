@@ -21,9 +21,18 @@
  * first request (sidecars.ts) and forwarded with the prefix stripped. The
  * token was checked at the hub's boundary (request-guard.ts) and is removed
  * from what the sidecar receives — extension code never sees the per-user
- * credential — and `X-Ndx-Base-Path: /x/<name>/` tells the app its mount.
+ * credential — and `X-Ndx-Base-Path` tells the app its mount.
  * The bare `/x/<name>` redirects to `/x/<name>/` so the app's relative links
  * resolve under the mount.
+ *
+ * A browser cannot put a header on a page's scripts, styles and images, so
+ * with the token on, a sidecar is also mounted under a key:
+ * `/x/<name>/~<key>/…` ({@link SidecarManager.mountBase}), and that path is
+ * its own credential for that one sidecar. A navigation to `/x/<name>/…`
+ * without a credential gets {@link sidecarBootstrapPage} — the hub's page,
+ * not the extension's — which signs in, asks `POST /api/hub/mounts/<name>`
+ * for the keyed mount, and moves there. The extension's own pages are never
+ * given the session script.
  *
  * `/hub` is the exception to both: it is the hub's own, and it serves the
  * chooser whatever is registered. That matters because `/` is overloaded —
@@ -60,6 +69,7 @@ import {
   splitQueryParam,
   authRequiredPage,
   wantsHtml,
+  injectSessionScript,
   AUTH_HINT,
   TICKET_QUERY_PARAM,
   removeTokenParam,
@@ -93,14 +103,20 @@ const PREP_PATH = /^\/api\/hench\/prep\/[^/]+$/;
 /** `/x/<name>` and everything under it: an extension's sidecar. */
 const SIDECAR_PATH_PREFIX = "/x/";
 const SIDECAR_PATH = /^\/x\/([^/]*)(\/.*)?$/;
+/** The mount-key segment right after `/x/<name>`: `/~<key>` and the rest of the path. */
+const MOUNT_KEY_SEGMENT = /^\/~([A-Za-z0-9_-]{16,})(\/.*)?$/;
 /** Tells a sidecar the mount it is served under, trailing slash included, so it can build links. */
 export const SIDECAR_BASE_PATH_HEADER = "x-ndx-base-path";
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
   | { kind: "proxy"; project: ProjectView; path: string; prefix: string }
-  /** An extension sidecar, started on demand by the hub's {@link SidecarManager}. */
-  | { kind: "sidecar"; name: string; path: string; prefix: string }
+  /**
+   * An extension sidecar, started on demand by the hub's {@link SidecarManager}.
+   * `mountKey` is the key the path carried (`/x/<name>/~<key>/…`), not yet
+   * checked; {@link mountKeyAdmits} checks it.
+   */
+  | { kind: "sidecar"; name: string; path: string; prefix: string; mountKey?: string }
   /** The bare `/x/<name>`: the mount with its trailing slash. */
   | { kind: "redirect"; location: string }
   | { kind: "json"; status: number; body: unknown }
@@ -133,6 +149,12 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
     const sidecarQuery = withoutTokenParam(query);
     if (!SidecarManager.isName(name)) {
       return { kind: "json", status: 404, body: { error: `No extension sidecar is named "${name}"`, reason: "none" } };
+    }
+    const keyed = sidecar[2] === undefined ? null : MOUNT_KEY_SEGMENT.exec(sidecar[2]);
+    if (keyed) {
+      const mount = `${SIDECAR_PATH_PREFIX}${name}/~${keyed[1]}`;
+      if (keyed[2] === undefined && !upgrade) return { kind: "redirect", location: `${mount}/${sidecarQuery}` };
+      return { kind: "sidecar", name, path: (keyed[2] || "/") + sidecarQuery, prefix: mount, mountKey: keyed[1] };
     }
     // A WebSocket has no page to resolve relative links in, so it is served as "/".
     if (sidecar[2] === undefined && !upgrade) {
@@ -521,6 +543,56 @@ function upstreamAuth(hub: Hub): OutgoingHttpHeaders {
   return hub.token ? { "x-ndx-token": hub.token } : {};
 }
 
+/**
+ * Whether `url` addresses a sidecar under its valid mount key — the
+ * credential a browser's subresource requests to that sidecar carry. The gate
+ * (request-guard.ts) admits such a request, of any method and on an upgrade,
+ * for that sidecar alone.
+ */
+export function mountKeyAdmits(hub: Pick<Hub, "sidecars">, url: string): boolean {
+  const pathname = url.split("?")[0];
+  const sidecar = SIDECAR_PATH.exec(pathname);
+  if (!sidecar || sidecar[2] === undefined) return false;
+  const keyed = MOUNT_KEY_SEGMENT.exec(sidecar[2]);
+  return keyed !== null && hub.sidecars.isMountKey(sidecar[1], keyed[1]);
+}
+
+/**
+ * The hub's page for a navigation to `/x/<name>/…` that carries no
+ * credential: sign in (the session script, from this tab or another signed-in
+ * one), ask for the keyed mount, and move there with the rest of the path.
+ * A page of the hub's own, so the session script on it hands nothing to the
+ * extension; the extension's pages are served without it. No backslash in
+ * the script: it is a template literal, which would eat it.
+ */
+export function sidecarBootstrapPage(name: string): string {
+  return injectSessionScript(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>n-dx extension</title></head>
+<body><p id="ndx-status" style="font:15px system-ui,sans-serif;margin:2rem">Signing in…</p>
+<script>
+(function () {
+  var auth = window.ndxAuth;
+  if (!auth) return;
+  var name = ${JSON.stringify(name)};
+  function say(text) { var el = document.getElementById("ndx-status"); if (el) el.textContent = text; }
+  auth.ready.then(function (state) {
+    if (!state.ok) return;
+    return fetch("/api/hub/mounts/" + encodeURIComponent(name), { method: "POST", cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) { say("This extension cannot be opened (HTTP " + res.status + ")."); return null; }
+        return res.json();
+      })
+      .then(function (body) {
+        if (!body || typeof body.path !== "string") return;
+        var prefix = "/x/" + name + "/";
+        var rest = location.pathname.indexOf(prefix) === 0 ? location.pathname.slice(prefix.length) : "";
+        if (rest.charAt(0) === "~") { var cut = rest.indexOf("/"); rest = cut === -1 ? "" : rest.slice(cut + 1); }
+        location.replace(body.path + rest + location.search + location.hash);
+      });
+  });
+})();
+</script></body></html>`);
+}
+
 function refusePublic(req: IncomingMessage, res: ServerResponse): void {
   const html = wantsHtml(req.headers);
   res.writeHead(401, {
@@ -547,6 +619,19 @@ export async function handlePublicHubRequest(req: IncomingMessage, res: ServerRe
   const decision = decideProxy(hub, req.url || "/");
   if (decision.kind === "proxy") {
     proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix);
+    return;
+  }
+  // A page navigation to an extension: the hub's sign-in page, which moves
+  // on to the keyed mount. Anything else under `/x/` needs a credential.
+  const sidecarName = SIDECAR_PATH.exec(path)?.[1];
+  if (
+    sidecarName !== undefined
+    && SidecarManager.isName(sidecarName)
+    && (decision.kind === "sidecar" || decision.kind === "redirect")
+    && wantsHtml(req.headers)
+  ) {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(req.method === "HEAD" ? undefined : sidecarBootstrapPage(sidecarName));
     return;
   }
   if (decision.kind === "home") {
@@ -795,7 +880,10 @@ async function handleExecuteAdmission(
 }
 
 function sidecarForward(hub: Hub, decision: Extract<ProxyDecision, { kind: "sidecar" }>): SidecarForward {
-  return { basePath: `${decision.prefix}/`, token: hub.token, credentials: hub.credentials, secret: hub.sidecars.secret(decision.name) ?? "" };
+  // The keyed mount whenever there is one, whichever address this request
+  // used: links the app builds from it must work in a browser, which has
+  // nothing else to authenticate a stylesheet or an image with.
+  return { basePath: hub.sidecars.mountBase(decision.name), token: hub.token, credentials: hub.credentials, secret: hub.sidecars.secret(decision.name) ?? "" };
 }
 
 /** The JSON a refused `/x/<name>/` answers with: the message, core's reason, and the log file when there is one. */

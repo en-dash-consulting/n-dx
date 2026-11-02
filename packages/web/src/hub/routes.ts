@@ -22,6 +22,9 @@
  *                                     its resolved dashboard links
  *   POST   /api/hub/extensions/:name/stop
  *                                   — stop that extension's sidecar
+ *   POST   /api/hub/mounts/:name    — where a browser opens that sidecar:
+ *                                     `/x/<name>/~<key>/` with the token on
+ *                                     (the sign-in page asks for it)
  *
  * **Versioned.** `GET`/`POST /projects` and both `/extensions` routes are the
  * extension API (docs/architecture/extensions.md, "Versioned hub API"): each
@@ -426,6 +429,20 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
     // Stopping one that is not running is not an error: the caller wants it
     // stopped, and it is. The next request to `/x/<name>/` starts it again.
     json(res, 200, { apiVersion: EXTENSION_API_VERSION, name, stopped: await hub.sidecars.stop(name) });
+    return true;
+  }
+
+  // The sign-in page at `/x/<name>/` asks for the keyed mount here, with the
+  // session it holds. Not part of the versioned extension API: it is the
+  // browser's route into a sidecar, and a script with the token needs none.
+  const mountMatch = path.match(/^\/mounts\/([^/]+)$/);
+  if (mountMatch && method === "POST") {
+    const name = safeDecodeSegment(mountMatch[1]);
+    if (!SidecarManager.isName(name)) {
+      error(res, 404, `No extension is named "${name}"`);
+      return true;
+    }
+    json(res, 200, { name, path: hub.sidecars.mountBase(name) });
     return true;
   }
 

@@ -15,4 +15,4 @@ Approvals live in `<ndx home>/extensions.json`, beside the discovery cache. `dis
 
 An approved extension runs as the user, with the user's own environment and file access. n-dx adds no sandbox beyond the separate process and the scoped variables ([Environment](./environment.md)). What it does guarantee is that the per-user hub token never appears in an extension's environment or forwarded requests.
 
-Sidecar pages run on the hub origin. Their JavaScript can call the hub APIs with the browser session cookie, including mutations. Approving a sidecar grants this browser authority too; an XSS in its page can exercise it. The proxy stripping credentials does not isolate browser scripts.
+Sidecar pages run on the hub origin. The hub does not give them its session script, but their JavaScript can obtain a signed-in hub tab's session over the same-origin `ndx-auth` channel and call the hub APIs with it, including mutations. Approving a sidecar grants this browser authority too; an XSS in its page can exercise it. The proxy stripping credentials does not isolate browser scripts.

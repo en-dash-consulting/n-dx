@@ -136,8 +136,19 @@ export function hostAllowed(req: Pick<IncomingMessage, "headers">, hubPort: numb
 }
 
 /**
+ * A path that carries its own credential: an extension sidecar under its
+ * mount key (proxy.ts `mountKeyAdmits`). Injected so this module keeps no
+ * knowledge of the sidecar table.
+ */
+export type PathCredential = (url: string) => boolean;
+
+/**
  * Apply the gate. Returns true when the request has been answered (rejected,
  * or a preflight) and must not be routed further.
+ *
+ * `pathCredential` admits a request with no header credential whose path
+ * names a sidecar under its mount key; every other rule (Host, Origin on
+ * mutations) still applies to it.
  */
 export function guardHubRequest(
   req: IncomingMessage,
@@ -145,6 +156,7 @@ export function guardHubRequest(
   hubPort: number | undefined,
   token: string | null = null,
   credentials: CredentialStore | null = null,
+  pathCredential: PathCredential | null = null,
 ): boolean {
   // Same headers, same moment as the project server's gate: before any
   // verdict is written, from the shared helper, so the two cannot drift.
@@ -154,7 +166,7 @@ export function guardHubRequest(
   const method = (req.method || "GET").toUpperCase();
   const route = authRouteOf(hubRoutePath(req.url ?? "/"));
   const access: RequestAccess = requestAccess(req.headers, token, credentials);
-  if (access === "public" && route === null) {
+  if (access === "public" && route === null && !pathCredential?.(req.url ?? "/")) {
     if (method !== "GET" && method !== "HEAD") return rejectUnauthenticated(res);
     publicOnly.add(req);
   }
@@ -220,9 +232,10 @@ export function upgradeRefusal(
   hubPort: number | undefined,
   token: string | null = null,
   credentials: CredentialStore | null = null,
+  pathCredential: PathCredential | null = null,
 ): "421 Misdirected Request" | "401 Unauthorized" | "403 Forbidden" | null {
   if (!hostAllowed(req, hubPort)) return "421 Misdirected Request";
-  if (token && !authorizeUpgrade(req, token, credentials).ok) return "401 Unauthorized";
+  if (token && !pathCredential?.(req.url ?? "/") && !authorizeUpgrade(req, token, credentials).ok) return "401 Unauthorized";
   if (classifyOrigin(req, hubPort) === "untrusted") return "403 Forbidden";
   return null;
 }

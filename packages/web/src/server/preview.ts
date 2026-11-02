@@ -65,7 +65,11 @@ const DEFAULT_RELOAD_INTERVAL_MS = 600;
 const SESSION_PATH_PREFIX = "/__preview/s/";
 const SESSION_PATH_ROUTE = "/__preview/session-path";
 
-/** The page a navigation without a credential gets: sign in, then move to a capability path. */
+/**
+ * The page a navigation without a credential gets: sign in, then move to a
+ * capability path. No backslash in the script: this is a template literal,
+ * which cooks `\/` to `/` and broke the regex that once stood here.
+ */
 const BOOTSTRAP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>n-dx preview</title></head>
 <body><p style="font:15px system-ui,sans-serif;margin:2rem">Signing in…</p>
 <script>
@@ -77,7 +81,7 @@ const BOOTSTRAP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-
     return fetch(${JSON.stringify(SESSION_PATH_ROUTE)}, { method: "POST", cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (body) {
-        if (body && body.path) location.replace(body.path + location.pathname.replace(/^\//, "") + location.search + location.hash);
+        if (body && body.path) location.replace(body.path + location.pathname.slice(1) + location.search + location.hash);
       });
   });
 })();

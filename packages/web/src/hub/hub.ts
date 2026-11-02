@@ -40,7 +40,7 @@ import {
 } from "./registry.js";
 import type { HealedRecord, HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
-import { handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest } from "./proxy.js";
+import { handleProxyRequest, handleProxyUpgrade, handlePublicHubRequest, mountKeyAdmits } from "./proxy.js";
 import { guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "./request-guard.js";
 import { CredentialStore } from "../shared/index.js";
 import { NO_NDX_CLI, SidecarManager, ndxCliPlanner } from "./sidecars.js";
@@ -306,6 +306,7 @@ export class Hub {
       memoryFloorBytes: this.admission.limits.memoryFloorBytes,
       freeMemory: () => this.admission.availableMemoryBytes(),
       log: this.log,
+      mountKeys: this.token !== null,
       ...options.sidecars,
     });
     this.listExtensions = options.listExtensions
@@ -604,7 +605,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // The origin gate is the hub's outer boundary and runs before any routing:
     // registration spawns a process, and the project servers behind the proxy
     // see a rewritten Origin, so this is where a browser request is judged.
-    if (guardHubRequest(req, res, hub.listeningPort, hub.token, hub.credentials)) return;
+    if (guardHubRequest(req, res, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url))) return;
     // No credential: only what is public — the home page shell and proxied
     // requests the project server answers with its own public shell or a 401.
     if (isPublicOnlyHubRequest(req)) {
@@ -635,7 +636,7 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // Each refusal keeps its own status line, as on the HTTP path and on the
     // project server's own upgrade path: a `Host` that does not name this hub
     // is 421 Misdirected Request, a missing token 401, a foreign `Origin` 403.
-    const refusal = upgradeRefusal(req, hub.listeningPort, hub.token, hub.credentials);
+    const refusal = upgradeRefusal(req, hub.listeningPort, hub.token, hub.credentials, (url) => mountKeyAdmits(hub, url));
     if (refusal !== null) {
       socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();

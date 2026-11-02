@@ -210,6 +210,11 @@ describe("preview layout endpoint", () => {
     const shellHtml = await shell.text();
     expect(shellHtml).not.toContain("secret-doc");
     expect(shellHtml).toContain("ndxAuth");
+    // Valid JavaScript: the page is a template literal, which cooks a regex's
+    // backslashes away, and a script that fails to parse signs nobody in.
+    for (const [, script] of shellHtml.matchAll(/<script>([^]*?)<[/]script>/g)) {
+      expect(() => new Function(script)).not.toThrow();
+    }
     expect((await fetch(base + "/style.css")).status).toBe(401);
     expect((await fetch(base + "/__preview/state")).status).toBe(401);
     // The old cookie is no credential.

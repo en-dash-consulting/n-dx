@@ -44,7 +44,8 @@ re-attached, because nothing records them for the next hub.
 The proxy treats a sidecar as untrusted code: the token is checked at the hub's
 boundary like any request, then `sidecarHeaderValue` (proxy.ts) drops every place
 it rides — `X-Ndx-Token`, the `ndx_token` cookie, a bearer carrying it — from
-HTTP and WebSocket requests alike, and `X-Ndx-Base-Path: /x/<name>/` is added.
+HTTP and WebSocket requests alike, and `X-Ndx-Base-Path` (with the token,
+the keyed `/x/<name>/~<key>/`; docs/extensions/hub-api.md) is added.
 Unknown, disabled and unapproved names are all 404, with core's `reason` in the
 body. `x` is reserved as a project id (`isReservedProjectId`, twinned in
 `packages/core/web.js`): registration refuses it and derivation hashes it.
