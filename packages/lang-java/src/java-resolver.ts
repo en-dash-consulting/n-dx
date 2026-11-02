@@ -315,9 +315,16 @@ interface JavaIndex {
   readonly locations: ReadonlyMap<string, SourceLocation>;
   /** Other modules' test sets each module's tests see, from the build files. */
   readonly testGrants: TestArtifactGrants;
-  /** Qualified type → its directly declared project supertypes. */
+  /**
+   * {@link declarationKey} of each declaration → its directly declared project
+   * supertypes. Keyed by file as well as name: two modules may each declare
+   * `com.acme.Application`, each with its own supertypes.
+   */
   readonly bases: ReadonlyMap<string, ReadonlySet<string>>;
 }
+
+/** One declaration of a qualified type: the file declaring it and the name. */
+const declarationKey = (path: string, qualified: string): string => `${path}\0${qualified}`;
 
 function buildIndex(facts: readonly JavaFileFacts[], testGrants: TestArtifactGrants): JavaIndex {
   const types = new Multimap();
@@ -336,7 +343,7 @@ function buildIndex(facts: readonly JavaFileFacts[], testGrants: TestArtifactGra
   const bases = new Map<string, Set<string>>();
   for (const file of facts) {
     for (const declaration of file.heritage) {
-      const owner = file.pkg ? `${file.pkg}.${declaration.name}` : declaration.name;
+      const owner = declarationKey(file.path, file.pkg ? `${file.pkg}.${declaration.name}` : declaration.name);
       const direct = bases.get(owner) ?? new Set<string>();
       for (const segments of declaration.bases) {
         const head = segments[0]!;
@@ -457,12 +464,16 @@ const JDK_OTHER_PACKAGES = [
   "sun.misc", "sun.reflect",
 ];
 
+/** Packages under a {@link JDK_OTHER_PACKAGES} root that no JDK module exports: the SVG and SMIL DOM (xml-apis-ext, Batik). */
+const NON_JDK_UNDER_JDK_ROOTS = ["org.w3c.dom.svg", "org.w3c.dom.smil"];
+
 const isUnder = (pkg: string, root: string): boolean => pkg === root || pkg.startsWith(`${root}.`);
 
 /** `java.*` and `jdk.*` (reserved to the JDK), `javax.xml`, and the {@link JDK_JAVAX_PACKAGES} and their subpackages. */
 function isJdkPackage(pkg: string): boolean {
   if (isUnder(pkg, "java") || isUnder(pkg, "jdk") || pkg === "javax.xml") return true;
   if (JAVA_EE_UNDER_JDK_ROOTS.some((root) => isUnder(pkg, root))) return false;
+  if (NON_JDK_UNDER_JDK_ROOTS.some((root) => isUnder(pkg, root))) return false;
   return [...JDK_JAVAX_PACKAGES, ...JDK_OTHER_PACKAGES].some((root) => isUnder(pkg, root));
 }
 
@@ -527,28 +538,35 @@ function resolveFile(index: JavaIndex, file: JavaFileFacts): FileReferences {
     else out.externalPackage(packageOf(imp.isWildcard ? [...segments, "*"] : segments), symbol);
   }
 
-  /** Resolve a simple name; true when it named something (in the project or not). */
+  /**
+   * The files declaring `name` as a member type of the nearest supertype of
+   * `owner` that has one. Of a supertype declared in several files, only the
+   * declarations this file can see ({@link visibleCandidates}) give members
+   * and are followed further up; `owner` itself is this file's declaration.
+   */
   const inherited = new Map<string, ReadonlySet<string>>();
   const inheritedFiles = (owner: string, name: string): ReadonlySet<string> => {
     const key = `${owner}\0${name}`;
     const cached = inherited.get(key);
     if (cached) return cached;
     const seen = new Set<string>([owner]);
-    let next = [...(index.bases.get(owner) ?? [])];
+    let next = [...(index.bases.get(declarationKey(file.path, owner)) ?? [])];
     const found = new Set<string>();
     while (next.length > 0 && found.size === 0) {
       const following: string[] = [];
       for (const base of next) {
         if (seen.has(base)) continue;
         seen.add(base);
-        for (const path of index.types.get(`${base}.${name}`) ?? []) found.add(path);
-        following.push(...(index.bases.get(base) ?? []));
+        const declaring = new Set(visibleCandidates(index, file.path, index.types.get(base) ?? new Set()));
+        for (const path of index.types.get(`${base}.${name}`) ?? []) if (declaring.has(path)) found.add(path);
+        for (const path of declaring) following.push(...(index.bases.get(declarationKey(path, base)) ?? []));
       }
       next = following;
     }
     inherited.set(key, found);
     return found;
   };
+  /** Resolve a simple name; true when it named something (in the project or not). */
   const resolveSimple = (name: string, owner?: string): boolean => {
     if (declaredHere.has(name)) return true;
     if (owner && out.file(inheritedFiles(owner, name), name)) return true;

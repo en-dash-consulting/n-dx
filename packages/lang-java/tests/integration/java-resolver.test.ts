@@ -75,6 +75,33 @@ describe("java resolver", () => {
     expect(targets(await resolveSources(ctx, sources, "src/use/Container.java"))).toEqual({ "src/base/Root.java": ["Root", "Token"] });
   });
 
+  it("follows only the supertypes of the declaration in the referencing file when two modules declare the same type", async (ctx) => {
+    const sources = {
+      "svc-a/src/main/java/com/acme/Application.java": "package com.acme; public class Application extends BaseA { Config c; }",
+      "svc-a/src/main/java/com/acme/BaseA.java": "package com.acme; public class BaseA {}",
+      "svc-a/src/main/java/com/acme/Config.java": "package com.acme; class Config {}",
+      "svc-b/src/main/java/com/acme/Application.java": "package com.acme; public class Application extends BaseB { Config c; }",
+      "svc-b/src/main/java/com/acme/BaseB.java": "package com.acme; public class BaseB extends RootB { public static class Config {} }",
+      "svc-b/src/main/java/com/acme/RootB.java": "package com.acme; public class RootB { public static class Token {} }",
+      // A supertype declared in two modules: only the copy this module sees gives members or is followed.
+      "svc-a/src/main/java/com/acme/Shared.java": "package com.acme; public class Shared {}",
+      "svc-b/src/main/java/com/acme/Shared.java": "package com.acme; public class Shared extends RootB {}",
+      "svc-a/src/main/java/com/acme/Token.java": "package com.acme; class Token {}",
+      "svc-a/src/main/java/com/acme/Sub.java": "package com.acme; class Sub extends Shared { Token t; }",
+    };
+    expect(targets(await resolveSources(ctx, sources, "svc-a/src/main/java/com/acme/Application.java"))).toEqual({
+      "svc-a/src/main/java/com/acme/BaseA.java": ["BaseA"],
+      "svc-a/src/main/java/com/acme/Config.java": ["Config"],
+    });
+    expect(targets(await resolveSources(ctx, sources, "svc-b/src/main/java/com/acme/Application.java"))).toEqual({
+      "svc-b/src/main/java/com/acme/BaseB.java": ["BaseB", "Config"],
+    });
+    expect(targets(await resolveSources(ctx, sources, "svc-a/src/main/java/com/acme/Sub.java"))).toEqual({
+      "svc-a/src/main/java/com/acme/Shared.java": ["Shared"],
+      "svc-a/src/main/java/com/acme/Token.java": ["Token"],
+    });
+  });
+
   it.each(["main", "test"])("falls through invisible same-package declarations to wildcard imports from %s", async (set, ctx) => {
     const path = `svc-a/src/${set}/java/a/Use.java`;
     const refs = await resolveSources(ctx, {
@@ -94,11 +121,14 @@ describe("java resolver", () => {
   });
 
   it("names non-javax JDK packages as stdlib while preserving third-party com.sun packages", async (ctx) => {
-    const refs = await resolveSources(ctx, { "Uses.java": "import org.w3c.dom.Document; import org.xml.sax.SAXException; import org.ietf.jgss.GSSContext; import com.sun.net.httpserver.HttpServer; import sun.misc.Unsafe; import com.sun.mail.Mail; class Uses {}" }, "Uses.java");
+    const refs = await resolveSources(ctx, { "Uses.java": "import org.w3c.dom.Document; import org.xml.sax.SAXException; import org.ietf.jgss.GSSContext; import com.sun.net.httpserver.HttpServer; import sun.misc.Unsafe; import com.sun.mail.Mail; import org.w3c.dom.svg.SVGDocument; import org.w3c.dom.smil.ElementTimeControl; import org.w3c.dom.events.Event; class Uses {}" }, "Uses.java");
     expect(externals(refs)).toEqual({
       "java:stdlib:org.w3c.dom": ["Document"], "java:stdlib:org.xml.sax": ["SAXException"],
       "java:stdlib:org.ietf.jgss": ["GSSContext"], "java:stdlib:com.sun.net.httpserver": ["HttpServer"],
       "java:stdlib:sun.misc": ["Unsafe"], "java:com.sun.mail": ["Mail"],
+      // SVG and SMIL DOM: xml-apis-ext and Batik, not packages the JDK exports.
+      "java:org.w3c.dom.svg": ["SVGDocument"], "java:org.w3c.dom.smil": ["ElementTimeControl"],
+      "java:stdlib:org.w3c.dom.events": ["Event"],
     });
   });
   it("resolves every import form and bare name in Java's lookup order", async (ctx) => {
