@@ -68,8 +68,11 @@ export const DENY_NAME: RegExp[] = [
   /^i understand/i,
   /^clear all$/i,
   // PRD status picker options: the name is the icon, the label and, on the
-  // current status, a check mark. Each one writes the item's status.
-  /^\S \s*(pending|in progress|completed|failing|blocked|deferred|deleted)( ✓)?$/i,
+  // current status, a check mark. They are adjacent spans, so identify()'s
+  // textContent reads "●Completed" / "●Completed✓" with no spaces. Each one
+  // writes the item's status. The icon is a symbol, not a word character, so
+  // a count such as "1 completed" stays clickable.
+  /^[^\w\s]\s*(pending|in progress|completed|failing|blocked|deferred|deleted)(\s*✓)?$/i,
   // Leaves the page or the browser sandbox.
   /^copy/i,
   /^download/i,
