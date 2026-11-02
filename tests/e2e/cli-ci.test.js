@@ -541,8 +541,16 @@ describe("n-dx ci", () => {
       for (const { dir } of results.values()) await removeTmpDir(dir);
     });
 
-    it("fails for a tracked case variant and names git's actual path", () => {
-      const { step } = results.get("case-variant tracked local file");
+    it("fails for a tracked case variant on a case-insensitive filesystem and names git's actual path", () => {
+      const { dir, step } = results.get("case-variant tracked local file");
+      // The fixture wrote only `.N-DX.local.json`. Where the filesystem is
+      // case-sensitive (Linux) the name n-dx opens does not exist, so n-dx
+      // never reads the variant and "untracked" is the right answer; the
+      // refusal can only be asserted where the lowercase name resolves to it.
+      if (!existsSync(join(dir, ".n-dx.local.json"))) {
+        expect(step.ok).toBe(true);
+        return;
+      }
       expect(step.ok).toBe(false);
       expect(step.detail).toContain(".N-DX.local.json");
       expect(step.detail).toContain("git rm --cached");
