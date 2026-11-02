@@ -268,9 +268,11 @@ describe("buildHubSnapshot", () => {
     expect(over.text.length).toBeLessThanOrEqual(HUB_SNAPSHOT_CAP);
     expect(over.text).not.toContain("feat/a");
     expect(over.text).not.toContain("feat/b");
+    expect(over.changed).not.toContain("worktree:ndx:/repo/wt/b");
 
     const under = build([idle("a"), idle("b", 4)], over.state);
     expect(under.text).toMatch(/Δ [^\n]*feat\/b/);
+    expect(under.changed).toEqual(["worktree:ndx:/repo/wt/b"]);
     expect(under.text).toContain("feat/a");
     expect(under.text).not.toMatch(/Δ [^\n]*feat\/a/);
   });

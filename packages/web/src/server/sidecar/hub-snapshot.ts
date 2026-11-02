@@ -376,6 +376,7 @@ export function buildHubSnapshot(input: HubSnapshotInput, previous?: HubSnapshot
   // the first build that shows it again then marks it Δ if it changed in between.
   for (const item of dropped) {
     if (item.key === null) continue;
+    changed.delete(item.key);
     const shown = previous?.fingerprints[item.key];
     if (shown === undefined) delete fingerprints[item.key];
     else fingerprints[item.key] = shown;
