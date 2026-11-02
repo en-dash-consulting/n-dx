@@ -40,7 +40,7 @@ import { loadTrailerCommits, loadCommitFiles } from "../../core/change-commits.j
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { execStdout, resolveLayout } from "@n-dx/llm-client";
+import { execStdout, layoutStateNames, resolveLayout } from "@n-dx/llm-client";
 import type { PRDItem } from "../../schema/v1.js";
 import { extractKeywords, scoreMatch } from "../../core/keywords.js";
 import { DEFAULT_MIN_TEST_SCORE, indexItems, isTestFile, linkedTests } from "./capability-spec.js";
@@ -311,7 +311,8 @@ const BOOKKEEPING_FILES = new Set([
   "composer.lock",
   "CHANGELOG.md",
 ]);
-const BOOKKEEPING_DIRS = [".changeset", ".rex", ".ndx", ".hench", ".sourcevision", "dist", "node_modules"];
+// n-dx's own state, in both layouts (the classifier form the layout resolver gives).
+const BOOKKEEPING_DIRS = [".changeset", ...layoutStateNames().dirNames, "dist", "node_modules"];
 
 /** True for a path {@link BOOKKEEPING_FILES} names by basename or that lies under a {@link BOOKKEEPING_DIRS} segment. */
 export function isBookkeepingPath(path: string): boolean {
