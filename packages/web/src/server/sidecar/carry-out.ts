@@ -20,7 +20,7 @@
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.3, §12.
  */
 
-import { defaultedWorkOptions, laneSteps, stepRunOptions } from "../../shared/index.js";
+import { laneSteps, stepRunOptions } from "../../shared/index.js";
 import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import type { BrokerOutcome, SidecarCard } from "./broker.js";
@@ -345,7 +345,16 @@ export function outputTail(output: string): { text: string; cutLines: number; cu
   };
 }
 
-/** A start_work call's run options, defaulted by the definition the card's title also reads. */
+/**
+ * A start_work call's run options. `requireUnblocked` defaults to true, so a
+ * task with an unfinished blocker is refused unless the call passes `false`
+ * explicitly; an agent that drops the options cannot start over a blocker.
+ * The broker puts the result on the work card, so its preview, its title and
+ * the start all read one set of options and the card's command is the run.
+ */
 export function workOptions(input: Record<string, unknown>): Record<string, unknown> {
-  return defaultedWorkOptions(input.options);
+  const { options } = input;
+  const given = options && typeof options === "object" && !Array.isArray(options) ? options as Record<string, unknown> : {};
+  const { requireUnblocked, ...rest } = given;
+  return requireUnblocked === false ? rest : { ...rest, requireUnblocked: true };
 }

@@ -556,6 +556,8 @@ describe("broker", () => {
     expect(cards).toEqual([
       expect.objectContaining({ id: cardId, tool: "start_work", kind: "work", allowListKey: null, status: "pending" }),
     ]);
+    // The card carries the options start will use, so its title shows the defaulted --require-unblocked.
+    expect(cards[0]!.runOptions).toEqual({ requireUnblocked: true });
 
     // Work can never be allow-listed, whatever the operator asks.
     const remember = await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "approve", remember: true } });
@@ -567,6 +569,20 @@ describe("broker", () => {
     expect(result.isError).toBe(true);
     expect(resultText(result)).toMatch(/denied card .*later/);
 
+    await client.close();
+    await api(`/${id}/interrupt`, { method: "POST" });
+  });
+
+  it("puts the options start will use on a work card: an explicit requireUnblocked false drops the default", async () => {
+    const id = await runningSession();
+    const client = await brokerClient(id);
+    const call = client.callTool({ name: "start_work", arguments: { taskId: "t1", options: { requireUnblocked: false, review: true } } });
+    const { cardId } = await cardAnnounced(id, "pending");
+    const { cards } = await (await api(`/${id}/cards`)).json() as { cards: SidecarCard[] };
+    expect(cards.find((c) => c.id === cardId)?.runOptions).toEqual({ review: true });
+
+    await api(`/${id}/cards/${cardId}`, { method: "POST", body: { decision: "deny" } });
+    await call;
     await client.close();
     await api(`/${id}/interrupt`, { method: "POST" });
   });

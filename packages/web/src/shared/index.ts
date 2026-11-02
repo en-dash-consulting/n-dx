@@ -57,7 +57,7 @@ export {
 export type { ItemType, ItemTypeCarrier, V1Level, ProductType, ChangeType } from "./item-type.js";
 export { HUB_ADMISSION_HEADER, MAX_HEADER_QUEUE_ENTRIES, formatHubAdmissionHeader, parseHubAdmissionHeader } from "./hub-admission.js";
 export type { HubAdmissionHeader, HubMemoryPressure, HubQueuedRequest } from "./hub-admission.js";
-export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, defaultedWorkOptions, resetsDeferred, runOptionArgs, workCommandArgs, checkRunMode, RUN_MODES, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "./run-options.js";
+export { RUN_OPTION_SPECS, CONTEXT_NOTES_MAX_BYTES, checkRunOptions, resetsDeferred, runOptionArgs, workCommandArgs, checkRunMode, RUN_MODES, MAX_DASHBOARD_ITERATIONS, MIN_DASHBOARD_ITERATIONS } from "./run-options.js";
 export type { RunOptionSpec, RunOptions, RunOptionKey, RunOptionsCheck, WorkCommand, RunMode, RunModeCheck } from "./run-options.js";
 export {
   AUTH_COOKIE_NAME,

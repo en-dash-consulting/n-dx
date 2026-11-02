@@ -334,19 +334,6 @@ export function resetsDeferred(status: string | null | undefined): boolean {
 }
 
 /**
- * A Sidecar start_work call's run options. `requireUnblocked` defaults to
- * true, so a task with an unfinished blocker is refused unless the call passes
- * `false` explicitly; an agent that drops the options cannot start over a
- * blocker. The server's preview and start and the card's title all read this,
- * so the title, the resolve line and the run's argv agree.
- */
-export function defaultedWorkOptions(options: unknown): Record<string, unknown> {
-  const given = options && typeof options === "object" && !Array.isArray(options) ? options as Record<string, unknown> : {};
-  const { requireUnblocked, ...rest } = given;
-  return requireUnblocked === false ? rest : { ...rest, requireUnblocked: true };
-}
-
-/**
  * The `ndx work` argv (without the `ndx` itself) a dashboard execute spawns.
  * The server spawns exactly this and the Prepare task modal prints it, so the
  * command a reader copies is the run they are about to start.

@@ -123,8 +123,11 @@ export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, 
     server.registerTool(name, { description: tool.description, inputSchema: tool.input }, async (args, extra) => {
       const input = args as Record<string, unknown>;
       const annex: CardAnnex = {};
-      // A work card shows what the run would be before the operator decides it.
-      if (name === "start_work" && actions) annex.preview = await actions.previewWork(String(input.taskId), workOptions(input));
+      // A work card shows what the run would be before the operator decides it, from the options start will use.
+      if (name === "start_work") {
+        annex.runOptions = workOptions(input);
+        if (actions) annex.preview = await actions.previewWork(String(input.taskId), annex.runOptions);
+      }
       // A change-set card shows its items read against the PRD; one that cannot be written raises no card.
       if (name === "propose_prd_change" && actions) {
         const changeSet = await actions.reviewChangeSet(input);

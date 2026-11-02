@@ -46,6 +46,8 @@ export interface SidecarCard {
   allowListKey: string | null;
   /** What the call would do, read before the card was raised: a work card's `ndx work --resolve`. */
   preview?: string;
+  /** A work card's run options as start uses them (`workOptions`), defaults applied; the viewer titles the card from these. */
+  runOptions?: Record<string, unknown>;
   /** A change-set card's items as approval writes them, read against the PRD before the card was raised. */
   changeSet?: SidecarChangeSet;
   /** A run-plan card's plan as the planner printed it when the card was raised; its commands are never the model's. */
@@ -68,6 +70,7 @@ export interface SidecarCard {
 /** What the broker reads before raising a card, for the operator to see on it. */
 export interface CardAnnex {
   preview?: string;
+  runOptions?: Record<string, unknown>;
   changeSet?: SidecarChangeSet;
   runPlan?: QueuePlan;
 }
@@ -154,6 +157,7 @@ export class SidecarBroker {
       input,
       allowListKey: key,
       ...(annex.preview !== undefined && { preview: annex.preview }),
+      ...(annex.runOptions !== undefined && { runOptions: annex.runOptions }),
       ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
       ...(annex.runPlan !== undefined && { runPlan: annex.runPlan }),
       status: "pending",

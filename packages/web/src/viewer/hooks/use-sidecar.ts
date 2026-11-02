@@ -97,6 +97,8 @@ export interface SidecarCard {
   allowListKey: string | null;
   /** What the call would do, read before the card was raised: a work card's `ndx work --resolve`. */
   preview?: string;
+  /** A work card's run options as the server will start them, defaults applied. */
+  runOptions?: Record<string, unknown>;
   /** A change-set card's items as approval writes them. */
   changeSet?: SidecarChangeSet;
   /** A run-plan card's plan, as the planner printed it when the card was raised. */
