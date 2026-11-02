@@ -10,7 +10,7 @@ import { createClient, detectAuthMode, type CreateClientOptions } from "./create
 import type { AuthMode, ClaudeClient, ClaudeConfig } from "./types.js";
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, type LLMVendor, type LLMConfig } from "./llm-types.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
-import { resolveOpenAiApiKey } from "./openai-api-provider.js";
+import { resolveVendorAuth } from "./vendor-auth.js";
 import { createGoogleApiProvider, resolveGoogleApiKey } from "./google-api-provider.js";
 import { createLocalApiProvider } from "./local-api-provider.js";
 
@@ -39,20 +39,16 @@ function resolveVendor(options: CreateLLMClientOptions): LLMVendor {
 }
 
 /**
- * Detect auth mode for the resolved vendor.
- *
- * Delegates to vendor-specific auth detection:
- * - Claude: API key presence check (config or `ANTHROPIC_API_KEY` env)
- * - Codex: OpenAI API key presence check (config or `OPENAI_API_KEY` env)
+ * Detect auth mode for the resolved vendor under `llm.<vendor>.auth`
+ * ({@link resolveVendorAuth}):
+ * - Claude, Codex: `cli`/`api` as set; `auto` is "api" only for a configured
+ *   or exported key, never for one held only in the credential store
+ * - Google: "api" when a key resolves from any source (Gemini has no CLI login)
  */
 export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
   const vendor = resolveVendor(options);
   if (vendor === LLM_VENDOR.CODEX) {
-    const apiKey = resolveOpenAiApiKey(
-      options.llmConfig?.codex,
-      options.apiKeyEnv ?? "OPENAI_API_KEY",
-    );
-    return apiKey ? "api" : "cli";
+    return resolveVendorAuth(vendor, options.llmConfig ?? {}, { apiKeyEnv: options.apiKeyEnv }).mode;
   }
 
   if (vendor === LLM_VENDOR.GOOGLE) {

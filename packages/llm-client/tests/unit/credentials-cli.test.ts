@@ -104,14 +104,16 @@ describe("status", () => {
     await run(["set", "typesafe"], VALUE);
     out = "";
     expect(await run(["status", "--json"], null, { TYPESAFE_API_KEY: "placeholder-env-key" })).toBe(0);
-    expect(JSON.parse(out)).toEqual([{
+    const statuses = JSON.parse(out) as Array<{ name: string }>;
+    expect(statuses.map((s) => s.name)).toEqual(["typesafe", "claude", "codex", "google"]);
+    expect(statuses[0]).toEqual({
       name: "typesafe",
       source: "env",
       backend: "file",
       fingerprint: credentialFingerprint("placeholder-env-key"),
       envVar: "TYPESAFE_API_KEY",
       storePath: join(home, "credentials.json"),
-    }]);
+    });
     expect(out).not.toContain(VALUE);
     expect(out).not.toContain("placeholder-env-key");
   });

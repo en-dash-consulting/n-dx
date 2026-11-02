@@ -14,7 +14,7 @@
  * dependencies.
  */
 
-import type { ClaudeClient, ClaudeConfig } from "./types.js";
+import type { ClaudeClient, ClaudeConfig, VendorAuth } from "./types.js";
 
 // LLMVendor is defined in provider-interface.ts (its natural home as part of
 // the provider contract). Re-exported here so consumers can import it from
@@ -76,6 +76,8 @@ export interface CodexConfig {
    * default in `REVIEW_MODELS`. The `--review-model` CLI flag outranks it.
    */
   reviewModel?: string;
+  /** `llm.codex.auth`: which credential Codex gets. See {@link VendorAuth}. */
+  auth?: VendorAuth;
 }
 
 /**
@@ -208,6 +210,11 @@ export interface GoogleConfig {
    * Override to use a custom env var name (e.g. `"MY_GOOGLE_KEY"`).
    */
   apiKeyEnv?: string;
+  /**
+   * `llm.google.auth`: `api` or `auto` (the same thing: Gemini has no CLI
+   * login, so `cli` is never accepted). See {@link VendorAuth}.
+   */
+  auth?: Exclude<VendorAuth, "cli">;
 }
 
 /** Vendor-neutral config shape loaded from `.n-dx.json`. */

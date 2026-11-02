@@ -142,6 +142,7 @@ export type {
   TokenUsage,
   ClaudeConfig,
   AuthMode,
+  VendorAuth,
   ClaudeClientOptions,
   CompletionRequest,
   CompletionResult,
@@ -506,6 +507,7 @@ export {
   setCredential,
   unsetCredential,
   credentialStatus,
+  storedCredential,
 } from "./credential-store.js";
 export type {
   CredentialSource,
@@ -514,6 +516,32 @@ export type {
   CredentialWriteOptions,
   ResolvedCredential,
 } from "./credential-store.js";
+
+// `llm.<vendor>.auth`: which credential a vendor gets (CLI login or API key),
+// and its key from config, the environment or the credential store.
+export {
+  VENDOR_AUTH_VALUES,
+  DEFAULT_VENDOR_AUTH,
+  KEYED_VENDORS,
+  isKeyedVendor,
+  hasVendorCliLogin,
+  vendorKeyEnv,
+  vendorAuthSetting,
+  resolveVendorKey,
+  resolveVendorAuth,
+  resolveVendorApiKey,
+  requireVendorApiKey,
+  missingVendorKeyError,
+  cliAuthConflictError,
+  describeVendorAuth,
+} from "./vendor-auth.js";
+export type {
+  KeyedVendor,
+  VendorKeySource,
+  ResolvedVendorKey,
+  VendorKeyOptions,
+  VendorAuthDecision,
+} from "./vendor-auth.js";
 
 // Project-level config utilities (.n-dx.json overrides)
 export {

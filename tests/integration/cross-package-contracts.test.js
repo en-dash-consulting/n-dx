@@ -333,7 +333,7 @@ describe("hench → llm-client gateway contract", () => {
     "strippedEnvNames",
     "resolveVendorCliEnv",
     "repoCommandEnv",
-    "resolveApiKey",
+    "resolveVendorAuth",
     "resolveCliPath",
     "loadProjectOverrides",
     "mergeWithOverrides",
@@ -868,7 +868,10 @@ describe("gateway export auto-detection", () => {
     const sourceExports = parseRuntimeExports(gwPath);
 
     const testedSymbols = new Set([
-      ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
+      ...["loadClaudeConfig", "loadLLMConfig", "resolveCliPath",
+        // llm.<vendor>.auth: the key hench's API loop sends, and whether
+        // provider=api may start (replaced resolveApiKey, which knew no auth).
+        "resolveVendorAuth",
         "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv", "repoCommandEnv",
         "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
         // Repository trust: the guard baseline and the per-user trust store

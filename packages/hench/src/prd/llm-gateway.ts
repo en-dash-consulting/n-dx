@@ -42,7 +42,7 @@
 export {
   loadClaudeConfig,
   loadLLMConfig,
-  resolveApiKey,
+  resolveVendorAuth,
   resolveCliPath,
   deepMerge,
   loadProjectOverrides,

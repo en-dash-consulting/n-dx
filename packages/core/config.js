@@ -118,6 +118,10 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *   repository is trusted (llm-client `credential-routing.ts`, hench
  *   `applyRepoTrust`), so writing the user's own choice there would have it
  *   ignored and mark their repository untrusted.
+ * - **Credential choice** (`llm.<vendor>.auth`): which of the user's own
+ *   credentials a vendor gets. `api` from the shared file is credential
+ *   routing too (it sends the user's stored key), so it goes where the
+ *   user's other credential settings go.
  *
  * Keyed by section, then by the setting path within that section. `llm`
  * entries are matched by suffix so `llm.claude.api_key`, `llm.codex.api_key`
@@ -129,7 +133,7 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
 const LOCAL_ONLY_SETTINGS = {
   cli: new Set(["claudePath"]),
   claude: new Set(["cli_path", "api_key", "api_endpoint"]),
-  llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
+  llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv", ".auth"] },
   hench: new Set(["apiKeyEnv", "claudePath"]),
 };
 
@@ -1293,6 +1297,29 @@ function validateLLMVendor(value) {
   }
 }
 
+/** Values `llm.<vendor>.auth` accepts. Mirrors llm-client's `VENDOR_AUTH_VALUES`; core imports no package. */
+const VENDOR_AUTH_VALUES = ["cli", "api", "auto"];
+
+/**
+ * Validate llm.<vendor>.auth: cli, api or auto. Gemini has no CLI login, so
+ * `cli` is refused for google, naming the value that works.
+ * @param {"claude" | "codex" | "google"} vendor
+ */
+function validateVendorAuth(vendor) {
+  return (value) => {
+    if (vendor === "google" && value === "cli") {
+      throw new Error(
+        `Invalid llm.google.auth "cli": Gemini has no CLI login. Use "api" (or "auto", the same for google).`,
+      );
+    }
+    if (!VENDOR_AUTH_VALUES.includes(value)) {
+      throw new Error(
+        `Invalid llm.${vendor}.auth "${value}". Expected one of: ${VENDOR_AUTH_VALUES.join(", ")}.`,
+      );
+    }
+  };
+}
+
 /**
  * Validate llm.autoFailover.
  */
@@ -1392,6 +1419,9 @@ function validateNonNegativeInteger(key, hint) {
  */
 const LLM_VALIDATORS = {
   vendor: validateLLMVendor,
+  "claude.auth": validateVendorAuth("claude"),
+  "codex.auth": validateVendorAuth("codex"),
+  "google.auth": validateVendorAuth("google"),
   "claude.cli_path": validateCliPath,
   "claude.api_endpoint": validateApiEndpoint,
   "claude.model": validateModel,
@@ -2667,15 +2697,28 @@ Local overrides (.n-dx.local.json):
   are automatically written to .n-dx.local.json instead of .n-dx.json. A
   cli_path in .n-dx.json applies only once the repository is trusted.
 
-Credentials (per-user, not per-project; a directory argument is ignored):
-  credentials              Show each credential's backend, source in effect and
-                           fingerprint. Never prints a value.
+Credentials (per-user, not per-project):
+  credentials [dir]        Show each credential's backend, source in effect and
+                           fingerprint, and each vendor's auth mode and key source
+                           for the project in dir (default: here). Never prints a value.
   credentials.typesafe     Store the TypeSafe (Jev) key: hidden prompt on a terminal,
                            --stdin to read a piped value, --unset to remove it.
                            A value on the command line works but lands in shell
                            history and the process list. An exported
                            TYPESAFE_API_KEY still wins over the stored key.
-  Other credentials.<name> are refused; vendor keys come in a later release.
+  credentials.claude       Store a vendor API key (same input rules). It is used
+  credentials.codex        only under llm.<vendor>.auth api: storing a key never
+  credentials.google       moves a vendor off its CLI login. Google (no CLI) uses
+                           it under auto too. A configured or exported key wins.
+
+Vendor auth (llm.<vendor>.auth, written to .n-dx.local.json):
+  auto (default)           API when a key is configured or exported, else the CLI
+                           login; a key held only in the credential store is unused
+  cli                      The vendor CLI login; no API key is used or passed on
+  api                      An API key from config, the environment or the store;
+                           a run with none stops with an error
+  hench.provider (cli|api) still chooses hench's loop; hench refuses provider=api
+  under auth cli, and under auto with only a stored key.
 
 Options:
   --json                   Output as JSON
@@ -2725,6 +2768,9 @@ Examples:
   n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config credentials                      Show stored credentials (no values)
   n-dx config credentials.typesafe             Store the Jev key (hidden prompt)
+  n-dx config credentials.claude               Store a Claude API key (hidden prompt)
+  n-dx config llm.claude.auth api              Use the API key, from any source
+  n-dx config llm.claude.auth cli              Use the claude CLI login only
   n-dx config llm.claude.model claude-opus-5-5 Set Claude model (llm namespace)
   n-dx config llm.codex.cli_path /usr/local/bin/codex
                                                Set Codex CLI path
@@ -2896,6 +2942,9 @@ async function loadVendorCheckEnv(dir, vendor) {
   try {
     return await loadVendorCliEnv(dir, vendor, { subject });
   } catch (err) {
+    // llm.<vendor>.auth "api" with no key: a credential problem the check
+    // reports as one, not a malformed env policy.
+    if (err?.reason === "auth") throw err;
     const { loadLLMConfig, repoEnvPolicy, resolveVendorCliEnv } = await import("@n-dx/llm-client");
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`hench.guard.env is not a usable policy (${reason}); ${subject} ignores the malformed field.`);
@@ -3856,8 +3905,12 @@ async function handleSetExtensionConfig(dir, settingPath, keyArg, valueArg, flag
 
 // ── credentials namespace ────────────────────────────────────────────────────
 
-/** Credential names `ndx config credentials.<name>` accepts. */
-const CREDENTIAL_NAMES = new Set(["typesafe"]);
+/**
+ * Credential names `ndx config credentials.<name>` accepts: the TypeSafe (Jev)
+ * key and the vendor keys. Mirrors llm-client's `CLI_CREDENTIAL_NAMES`, which
+ * the spawned CLI checks again.
+ */
+const CREDENTIAL_NAMES = new Set(["typesafe", "claude", "codex", "google"]);
 
 /**
  * Run llm-client's credential CLI. The store is owned by llm-client; this tier
@@ -3922,8 +3975,9 @@ async function readAllStdin() {
 
 /**
  * `ndx config credentials[.<name>]`: the per-user credential store.
- * Never prints a value. The directory argument is ignored: the store is
- * per-user, not per-project.
+ * Never prints a value. The store is per-user, not per-project; the directory
+ * argument (default: the current one) only chooses whose `llm.<vendor>.auth`
+ * the status reports.
  */
 async function handleCredentials(positional, flags) {
   const keyArg = positional[0];
@@ -3933,18 +3987,19 @@ async function handleCredentials(positional, flags) {
   };
 
   if (keyArg === "credentials") {
-    const result = spawnCredentialsCli(["status"]);
+    const project = resolve(positional[1] ?? ".");
+    const result = spawnCredentialsCli(["status", `--project=${project}`]);
     if (result.code !== 0) return fail(result.stderr.trim() || "Could not read the credential store.");
-    console.log("Credentials (per-user: shared by every project; a directory argument is ignored)");
+    console.log("Credentials (per-user: shared by every project)");
     console.log(result.stdout.trimEnd());
-    console.log("Set one with: ndx config credentials.typesafe");
+    console.log(`Set one with: ndx config credentials.<${[...CREDENTIAL_NAMES].join("|")}>`);
     return;
   }
 
   const name = keyArg.slice("credentials.".length);
   if (!CREDENTIAL_NAMES.has(name)) {
     return fail(
-      `Unknown credential "${name}". Only credentials.typesafe can be stored today; vendor keys come in a later release.`,
+      `Unknown credential "${name}". Known: ${[...CREDENTIAL_NAMES].map((n) => `credentials.${n}`).join(", ")}.`,
     );
   }
 

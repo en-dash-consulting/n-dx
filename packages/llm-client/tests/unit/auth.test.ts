@@ -265,7 +265,7 @@ describe("detectAvailableAuth", () => {
       expect(clientErr.reason).toBe("auth");
       expect(clientErr.retryable).toBe(false);
       expect(clientErr.message).toContain("No authentication method available");
-      expect(clientErr.message).toContain("n-dx config claude.api_key");
+      expect(clientErr.message).toContain("ndx config credentials.claude");
       expect(clientErr.message).toContain("npm install -g @anthropic-ai/claude-code");
     }
   });

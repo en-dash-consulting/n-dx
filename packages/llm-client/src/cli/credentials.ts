@@ -6,33 +6,50 @@
  *
  *   set <name>         value read from stdin, never from argv
  *   unset <name>
- *   status [--json]    source, backend and fingerprint; never the value
+ *   status [--json] [--project=<dir>]
+ *                      source, backend and fingerprint; never the value. With
+ *                      a project, each vendor's `llm.<vendor>.auth` mode and
+ *                      the key it uses, read from that project's config.
  *
- * Only `typesafe` is accepted for now; vendor keys and connections come later.
+ * Names: `typesafe` and the vendor keys `claude`, `codex`, `google`.
  * Nothing this file prints contains a credential value.
  *
  * Exit codes: 0 done, 1 the operation failed, 2 usage error.
  */
 
 import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  CREDENTIAL_ENV_VARS,
   credentialStatus,
   setCredential,
   unsetCredential,
   type CredentialStatus,
   type CredentialWriteOptions,
 } from "../credential-store.js";
+import { loadLLMConfig } from "../llm-config.js";
+import type { LLMConfig } from "../llm-types.js";
+import {
+  KEYED_VENDORS,
+  describeVendorAuth,
+  resolveVendorAuth,
+  vendorKeyEnv,
+  type KeyedVendor,
+  type VendorAuthDecision,
+} from "../vendor-auth.js";
 
 /** Names this entry accepts. */
-export const CLI_CREDENTIAL_NAMES: readonly string[] = ["typesafe"];
+export const CLI_CREDENTIAL_NAMES: readonly string[] = ["typesafe", ...KEYED_VENDORS];
 
 const USAGE = [
   "Usage: credentials <command>",
   "",
   "  set <name>        store the value read from stdin",
   "  unset <name>      remove a stored credential",
-  "  status [--json]   show where each credential resolves from",
+  "  status [--json] [--project=<dir>]",
+  "                    show where each credential resolves from; with a",
+  "                    project, each vendor's auth mode and the key it uses",
   "",
   `Names: ${CLI_CREDENTIAL_NAMES.join(", ")}`,
 ].join("\n");
@@ -44,6 +61,38 @@ export interface CredentialsCliIo {
   stderr: (text: string) => void;
   /** Store options (tests point these at a temp ndx home). */
   store?: CredentialWriteOptions;
+}
+
+/** One vendor's auth line for `status --project`, never the value. */
+export interface VendorAuthStatus {
+  vendor: KeyedVendor;
+  auth: VendorAuthDecision["auth"];
+  authSource: string;
+  mode: VendorAuthDecision["mode"];
+  /** Where the key the mode uses came from; null when it uses none. */
+  keySource: "config" | "env" | "file" | null;
+  storedKeyHeld: boolean;
+  envVar: string;
+  line: string;
+}
+
+/** Each vendor's mode and key source under `config`, never a value. */
+export function vendorAuthStatuses(config: LLMConfig, store: CredentialWriteOptions = {}): VendorAuthStatus[] {
+  return KEYED_VENDORS.map((vendor) => {
+    const decision = resolveVendorAuth(vendor, config, store);
+    const envVar = vendorKeyEnv(vendor, config);
+    const used = decision.mode === "api" ? decision.key : undefined;
+    return {
+      vendor,
+      auth: decision.auth,
+      authSource: decision.authSource,
+      mode: decision.mode,
+      keySource: used?.source ?? null,
+      storedKeyHeld: decision.storedKeyHeld,
+      envVar,
+      line: describeVendorAuth(decision, envVar),
+    };
+  });
 }
 
 /** Run the CLI and return its exit code. */
@@ -95,10 +144,25 @@ export async function runCredentialsCli(argv: readonly string[], io: Credentials
       }
       case "status": {
         const json = rest.includes("--json");
-        const unknown = rest.filter((a) => a !== "--json");
+        const projectArg = rest.find((a) => a.startsWith("--project="));
+        const unknown = rest.filter((a) => a !== "--json" && a !== projectArg);
         if (unknown.length > 0) return usage(`Unknown argument for status.`);
-        const statuses = CLI_CREDENTIAL_NAMES.map((name) => credentialStatus(name, store));
-        io.stdout(json ? `${JSON.stringify(statuses, null, 2)}\n` : formatStatus(statuses));
+        const project = projectArg?.slice("--project=".length);
+        if (projectArg !== undefined && !project) return usage("--project needs a directory.");
+        const config = project ? await loadLLMConfig(resolve(project)) : undefined;
+        const statuses = CLI_CREDENTIAL_NAMES.map((name) =>
+          credentialStatus(name, {
+            ...store,
+            // google's variable is the project's llm.google.apiKeyEnv when set.
+            ...(config && name === "google" ? { envVar: vendorKeyEnv("google", config) } : {}),
+          }),
+        );
+        const vendors = config ? vendorAuthStatuses(config, store) : undefined;
+        if (json) {
+          io.stdout(`${JSON.stringify(vendors ? { credentials: statuses, vendors } : statuses, null, 2)}\n`);
+        } else {
+          io.stdout(formatStatus(statuses) + (vendors ? formatVendors(vendors) : ""));
+        }
         return 0;
       }
       case undefined:
@@ -120,11 +184,15 @@ export async function runCredentialsCli(argv: readonly string[], io: Credentials
 function formatStatus(statuses: CredentialStatus[]): string {
   const lines = statuses.map((s) => {
     if (s.source === null) return `${s.name}: not set`;
-    const where = s.source === "env" ? `environment (${s.envVar})` : `credential store (${s.backend})`;
+    const where = s.source === "env" ? `environment (${s.envVar ?? CREDENTIAL_ENV_VARS[s.name]})` : `credential store (${s.backend})`;
     return `${s.name}: ${where}, fingerprint ${s.fingerprint}`;
   });
   const storePath = statuses[0]?.storePath;
   return `${lines.join("\n")}\n${storePath ? `Store: ${storePath}\n` : ""}`;
+}
+
+function formatVendors(vendors: VendorAuthStatus[]): string {
+  return `\nAuth (llm.<vendor>.auth: cli, api or auto)\n${vendors.map((v) => v.line).join("\n")}\n`;
 }
 
 async function readProcessStdin(): Promise<string | null> {

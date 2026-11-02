@@ -35,6 +35,7 @@ import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js
 import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { GoogleConfig } from "./llm-types.js";
+import { requireVendorApiKey, resolveVendorKey } from "./vendor-auth.js";
 import type { GeminiFunctionDeclaration } from "./tool-schema.js";
 import { classifyAuthError } from "./llm-error-classifier.js";
 
@@ -157,11 +158,10 @@ export function parseGeminiTokenUsage(
 // ── Auth resolution ───────────────────────────────────────────────────────
 
 /**
- * Resolve the Google API key from config or environment.
- *
- * Priority:
+ * Resolve the Google API key ({@link resolveVendorKey}):
  * 1. `googleConfig.api_key` from unified config (`.n-dx.json`)
  * 2. Environment variable named by `apiKeyEnv` (default: `"GEMINI_API_KEY"`)
+ * 3. The per-user credential store's `google` entry
  *
  * The `apiKeyEnv` default matches the canonical env var documented in
  * `GoogleConfig.apiKeyEnv` and used by the config preflight check.
@@ -172,7 +172,7 @@ export function resolveGoogleApiKey(
   googleConfig?: GoogleConfig,
   apiKeyEnv = "GEMINI_API_KEY",
 ): string | undefined {
-  return googleConfig?.api_key ?? process.env[apiKeyEnv];
+  return resolveVendorKey(LLM_VENDOR.GOOGLE, googleConfig ? { google: googleConfig } : {}, { apiKeyEnv })?.value;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -285,19 +285,13 @@ export function createGoogleApiProvider(
   // "GEMINI_API_KEY" is the canonical default, matching GoogleConfig.apiKeyEnv
   // documentation and the config preflight check (runGoogleApiPreflight).
   const apiKeyEnv = options.apiKeyEnv ?? googleConfig?.apiKeyEnv ?? "GEMINI_API_KEY";
-  const apiKey = resolveGoogleApiKey(googleConfig, apiKeyEnv);
-
-  if (!apiKey) {
-    throw new ClaudeClientError(
-      `Google API key not found. Set it via 'n-dx config llm.google.api_key <key>' or the ${apiKeyEnv} environment variable.`,
-      "auth",
-      false,
-    );
-  }
-  // The guard above narrows apiKey to string, but that narrowing does not flow
-  // into the nested closures below (a closure sees the declared type). Capture
-  // it so authHeaders/validateAuth can put it in a string-typed header value.
-  const resolvedApiKey: string = apiKey;
+  // Config, then the variable, then the credential store; throws naming
+  // `ndx config credentials.google` when none holds a key.
+  const resolvedApiKey: string = requireVendorApiKey(
+    LLM_VENDOR.GOOGLE,
+    googleConfig ? { google: googleConfig } : {},
+    { apiKeyEnv },
+  ).value;
 
   const defaultModel = googleConfig?.model ?? DEFAULT_MODEL;
   // Validate the configured default model at construction time.

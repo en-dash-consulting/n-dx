@@ -18,8 +18,8 @@ import {
   listVendorModels,
   loadLLMConfig,
   repoEnvPolicy,
-  resolveApiKey,
   resolveGoogleApiKey,
+  resolveVendorAuth,
   resolveVendorCliEnv,
 } from "@n-dx/llm-client";
 import type { LLMConfig, ListableVendor } from "@n-dx/llm-client";
@@ -88,7 +88,10 @@ function parseVersion(output: string): string | null {
  */
 async function probeCli(vendor: ListableVendor, projectDir: string, config: LLMConfig): Promise<CliInfo> {
   const binary = resolveBinary(vendor, config);
-  const env = resolveVendorCliEnv({ ...config, vendor }, repoEnvPolicy(projectDir));
+  // `--version` needs no credential, so the probe runs as `llm.<vendor>.auth
+  // cli`: no API key in the child, and no refusal when `api` has none to give.
+  const probeConfig: LLMConfig = { ...config, vendor, [vendor]: { ...config[vendor], auth: "cli" } };
+  const env = resolveVendorCliEnv(probeConfig, repoEnvPolicy(projectDir));
   const result = await exec(binary, ["--version"], { cwd: projectDir, timeout: CLI_PROBE_TIMEOUT_MS, env });
   if (!result.launched || result.exitCode !== 0) return { found: false, version: null, path: null };
   return { found: true, version: parseVersion(result.stdout) ?? parseVersion(result.stderr), path: binary };
@@ -151,7 +154,10 @@ export function claudeReadiness(
   cli: CliInfo,
   config: LLMConfig,
 ): VendorReadiness {
-  const hasKey = Boolean(resolveApiKey(config.claude ?? {}));
+  // A key `llm.claude.auth` lets an API run use: a stored key counts only
+  // under `api`, as hench and the client factory count it.
+  const auth = resolveVendorAuth(LLM_VENDOR.CLAUDE, config);
+  const hasKey = auth.mode === "api" && auth.key !== undefined;
   if (provider === "api") return apiKeyReadiness(hasKey);
   return { ...cliReadiness(cli), apiKey: hasKey };
 }

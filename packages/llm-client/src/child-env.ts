@@ -19,6 +19,7 @@
 import type { LLMConfig } from "./llm-types.js";
 import { codexUserEnvKey } from "./codex-user-config.js";
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, isLLMVendor, type LLMVendor } from "./provider-interface.js";
+import { isKeyedVendor, missingVendorKeyError, resolveVendorKey, vendorAuthSetting } from "./vendor-auth.js";
 
 export interface EnvPolicyConfig {
   /** Additional case-insensitive variable-name globs to strip. */
@@ -230,6 +231,14 @@ const VENDOR_ENV: Record<LLMVendor, VendorEnvSpec> = {
  * `onStripped` receives names only, never values: once for the names removed,
  * and once more (kind `missing-credentials`) when a mode in `VENDOR_MODES` is
  * on but none of that mode's credential names reached the child.
+ *
+ * `llm.<vendor>.auth` decides the vendor key ({@link vendorAuthSetting}):
+ * `cli` removes it, so the CLI uses its own login; `api` sets it from config,
+ * the environment or the credential store, and throws when none holds one;
+ * `auto` sets a configured key and passes an exported one through, never a
+ * stored one. Bedrock and Vertex credentials are untouched in every mode.
+ *
+ * @throws {ClaudeClientError} reason `auth` when `auth` is `api` and no key resolves.
  */
 export function resolveVendorCliEnv(
   config: LLMConfig,
@@ -256,14 +265,34 @@ export function resolveVendorCliEnv(
   for (const [name, value] of Object.entries(source)) {
     if (value !== undefined && authSet.has(name.toUpperCase())) env[name] = value;
   }
-  const apiKey = spec.configKey(config);
-  if (keyName && apiKey) {
-    // Windows treats environment names case-insensitively. Avoid duplicate keys
-    // with different casing that could shadow the configured credential.
-    for (const name of Object.keys(env)) {
-      if (name.toUpperCase() === keyName.toUpperCase()) delete env[name];
+  if (keyName && isKeyedVendor(vendor)) {
+    // Windows treats environment names case-insensitively, so every casing of
+    // the key's name goes: none may shadow (or smuggle) the chosen credential.
+    const dropKeyName = (): void => {
+      for (const name of Object.keys(env)) {
+        if (name.toUpperCase() === keyName.toUpperCase()) delete env[name];
+      }
+    };
+    const auth = vendorAuthSetting(vendor, config);
+    if (auth === "cli") {
+      // The CLI login, and nothing that would outrank it.
+      dropKeyName();
+    } else if (auth === "api") {
+      // Any source, the credential store included; the store is found through
+      // the environment this child is built from. Only this vendor's key name
+      // carries it.
+      const key = resolveVendorKey(vendor, config, { env: source });
+      if (!key) throw missingVendorKeyError(vendor, config);
+      dropKeyName();
+      env[keyName] = key.value;
+    } else {
+      // auto: a configured key, else whatever was exported. Never the store.
+      const apiKey = spec.configKey(config);
+      if (apiKey) {
+        dropKeyName();
+        env[keyName] = apiKey;
+      }
     }
-    env[keyName] = apiKey;
   }
   for (const name of Object.keys(env)) {
     if (name.toUpperCase() === "CLAUDECODE") delete env[name];

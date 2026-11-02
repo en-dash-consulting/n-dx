@@ -2,8 +2,9 @@
  * The per-user credential store: `<ndx home>/credentials.json`.
  *
  * One store per user, shared by every project and worktree, for credentials
- * n-dx must hold itself (the TypeSafe key now; vendor keys and connection
- * tokens later). This module is the store's only reader and writer: format,
+ * n-dx must hold itself (the TypeSafe key and vendor keys now; connection
+ * tokens later). A stored vendor key is used only under `llm.<vendor>.auth`
+ * `api` (see vendor-auth.ts). This module is the store's only reader and writer: format,
  * lock, atomic replace and owner-only permissions all live here. The
  * orchestration tier reaches it by spawning `dist/cli/credentials.js`.
  *
@@ -12,6 +13,7 @@
  * {@link resolveCredential} reads the credential's environment variable first
  * (`TYPESAFE_API_KEY` for `typesafe`), then the store. An exported key always
  * wins, so a CI job or a one-off shell override never has to touch the file.
+ * Vendor keys add `llm.<vendor>.api_key` ahead of both (`resolveVendorKey`).
  *
  * ## Format
  *
@@ -71,10 +73,15 @@ export const TYPESAFE_CREDENTIAL = "typesafe";
 
 /**
  * The environment variable that overrides each named credential. A name with
- * no entry here (a connection) is read from the store alone.
+ * no entry here (a connection) is read from the store alone. Vendor entries
+ * are named after the vendor; `llm.google.apiKeyEnv` overrides google's
+ * variable through {@link CredentialStoreOptions.envVar}.
  */
 export const CREDENTIAL_ENV_VARS: Readonly<Record<string, string>> = Object.freeze({
   [TYPESAFE_CREDENTIAL]: TYPESAFE_API_KEY_ENV,
+  claude: "ANTHROPIC_API_KEY",
+  codex: "OPENAI_API_KEY",
+  google: "GEMINI_API_KEY",
 });
 
 export type CredentialSource = "env" | "file";
@@ -91,6 +98,11 @@ export interface CredentialStoreOptions extends ResolveNdxHomeOptions {
   warn?: (message: string) => void;
   /** Platform whose permission rules apply. Defaults to `process.platform`. */
   platform?: NodeJS.Platform;
+  /**
+   * The variable that overrides this credential, in place of its
+   * {@link CREDENTIAL_ENV_VARS} entry (google's `llm.google.apiKeyEnv`).
+   */
+  envVar?: string;
 }
 
 export interface CredentialWriteOptions extends CredentialStoreOptions {
@@ -251,10 +263,21 @@ export function resolveCredential(
 ): ResolvedCredential | undefined {
   assertCredentialName(name);
   const env = options.env ?? process.env;
-  const envVar = CREDENTIAL_ENV_VARS[name];
+  const envVar = options.envVar ?? CREDENTIAL_ENV_VARS[name];
   const fromEnv = envVar ? env[envVar]?.trim() : undefined;
   if (fromEnv) return { value: fromEnv, source: "env" };
+  return storedCredential(name, options);
+}
 
+/**
+ * The store's `file` entry for `name`, ignoring any environment variable.
+ * Undefined when the store holds none.
+ */
+export function storedCredential(
+  name: string,
+  options: CredentialStoreOptions = {},
+): ResolvedCredential | undefined {
+  assertCredentialName(name);
   const store = readStore(credentialStorePath(options), options);
   const value = fileValue(store?.entries?.[name]);
   return value ? { value, source: "file" } : undefined;
@@ -271,7 +294,7 @@ export function credentialStatus(name: string, options: CredentialStoreOptions =
     source: resolved?.source ?? null,
     backend: entry && typeof entry.backend === "string" ? entry.backend : null,
     fingerprint: resolved ? credentialFingerprint(resolved.value) : null,
-    envVar: CREDENTIAL_ENV_VARS[name] ?? null,
+    envVar: options.envVar ?? CREDENTIAL_ENV_VARS[name] ?? null,
     storePath,
   };
 }

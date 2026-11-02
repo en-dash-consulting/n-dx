@@ -26,7 +26,7 @@ afterEach(async () => {
 function config(args, input) {
   const env = { ...process.env, NDX_HOME: home };
   delete env.N_DX_HOME;
-  delete env.TYPESAFE_API_KEY;
+  for (const name of ["TYPESAFE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"]) delete env[name];
   const r = spawnSync(process.execPath, [CLI_PATH, "config", ...args], {
     cwd,
     env,
@@ -62,7 +62,6 @@ describe("ndx config credentials", () => {
     expect(status.out).toContain("typesafe");
     expect(status.out).toMatch(/fingerprint/);
     expect(status.out).toMatch(/per-user/);
-    expect(status.out).toMatch(/directory argument is ignored/);
 
     // The value is in the store file alone: no output, no log under the cwd or home.
     for (const text of [set.out, set.err, status.out, status.err]) {
@@ -95,11 +94,46 @@ describe("ndx config credentials", () => {
     expect(config(["credentials"]).out).toBe(before);
   }, DEFAULT_TIMEOUT);
 
-  it("refuses vendor credentials", () => {
-    const r = config(["credentials.claude", "--stdin"], `${SECRET}\n`);
+  it("stores a vendor key that stays unused until llm.<vendor>.auth is api", async () => {
+    const set = config(["credentials.claude", "--stdin"], `${SECRET}\n`);
+    expect(set.code).toBe(0);
+
+    const auto = config(["credentials", cwd]);
+    expect(auto.code).toBe(0);
+    expect(auto.out).toContain("claude: cli (store key held, unused)");
+    expect(auto.out).toContain("codex: cli");
+
+    // The auth choice is the user's own: it goes to .n-dx.local.json.
+    expect(config(["llm.claude.auth", "api", cwd]).code).toBe(0);
+    expect(JSON.parse(await readFile(join(cwd, ".n-dx.local.json"), "utf-8")).llm.claude.auth).toBe("api");
+    const api = config(["credentials", cwd]);
+    expect(api.out).toContain("claude: api (llm.claude.auth api; key from the credential store)");
+
+    for (const text of [set.out, set.err, auto.out, auto.err, api.out, api.err]) {
+      expect(text).not.toContain(SECRET);
+    }
+  }, DEFAULT_TIMEOUT);
+
+  it("refuses an unknown credential name", () => {
+    const r = config(["credentials.github", "--stdin"], `${SECRET}\n`);
     expect(r.code).not.toBe(0);
-    expect(r.err).toMatch(/later release/);
+    expect(r.err).toMatch(/credentials\.claude/);
     expect(r.err).not.toContain(SECRET);
+  }, DEFAULT_TIMEOUT);
+
+  it("accepts cli, api and auto for llm.<vendor>.auth, and cli for google names api", () => {
+    for (const vendor of ["claude", "codex"]) {
+      for (const value of ["cli", "api", "auto"]) {
+        expect(config([`llm.${vendor}.auth`, value, cwd]).code, `${vendor} ${value}`).toBe(0);
+      }
+      const bad = config([`llm.${vendor}.auth`, "sometimes", cwd]);
+      expect(bad.code).not.toBe(0);
+      expect(bad.err).toMatch(/cli, api, auto/);
+    }
+    expect(config(["llm.google.auth", "api", cwd]).code).toBe(0);
+    const googleCli = config(["llm.google.auth", "cli", cwd]);
+    expect(googleCli.code).not.toBe(0);
+    expect(googleCli.err).toMatch(/"api"/);
   }, DEFAULT_TIMEOUT);
 
   it("refuses to wait on a non-TTY with no value", () => {

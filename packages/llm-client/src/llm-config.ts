@@ -19,9 +19,13 @@ import {
   type LocalConfig,
   type LocalVerifierConfig,
 } from "./llm-types.js";
-import type { ClaudeConfig } from "./types.js";
+import type { ClaudeConfig, VendorAuth } from "./types.js";
 import { normalizeCodexModel } from "./config.js";
 
+/** `llm.<vendor>.auth` when it is one of the accepted values. */
+function extractAuth(value: unknown): VendorAuth | undefined {
+  return value === "cli" || value === "api" || value === "auto" ? value : undefined;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
@@ -89,6 +93,9 @@ function extractGoogleConfig(value: unknown): GoogleConfig | undefined {
   if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
   if (typeof v.reviewModel === "string" && v.reviewModel) cfg.reviewModel = v.reviewModel;
   if (typeof v.apiKeyEnv === "string" && v.apiKeyEnv) cfg.apiKeyEnv = v.apiKeyEnv;
+  // Gemini has no CLI login, so `cli` names nothing and is dropped.
+  const auth = extractAuth(v.auth);
+  if (auth && auth !== "cli") cfg.auth = auth;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
@@ -103,6 +110,8 @@ function extractClaudeConfig(value: unknown): ClaudeConfig | undefined {
   if (typeof v.model === "string" && v.model) cfg.model = v.model;
   if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = v.lightModel;
   if (typeof v.reviewModel === "string" && v.reviewModel) cfg.reviewModel = v.reviewModel;
+  const auth = extractAuth(v.auth);
+  if (auth) cfg.auth = auth;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
@@ -118,7 +127,7 @@ export interface ResolvedClaudeConfig {
 }
 
 /** The fields a Claude config carries, and which both locations may set. */
-const CLAUDE_FIELDS = ["cli_path", "api_key", "api_endpoint", "model", "lightModel", "reviewModel"] as const;
+const CLAUDE_FIELDS = ["cli_path", "api_key", "api_endpoint", "model", "lightModel", "reviewModel", "auth"] as const;
 
 /**
  * Resolve the modern `llm.claude` block against the legacy top-level `claude`
@@ -148,13 +157,13 @@ export function resolveClaudeConfig(modern: unknown, legacy: unknown): ResolvedC
   for (const field of CLAUDE_FIELDS) {
     const fromLlm = llmBlock?.[field];
     if (fromLlm !== undefined) {
-      config[field] = fromLlm;
+      (config as Record<string, unknown>)[field] = fromLlm;
       sources[field] = "llm";
       continue;
     }
     const fromLegacy = legacyBlock?.[field];
     if (fromLegacy !== undefined) {
-      config[field] = fromLegacy;
+      (config as Record<string, unknown>)[field] = fromLegacy;
       sources[field] = "legacy";
     }
   }
@@ -173,6 +182,8 @@ function extractCodexConfig(value: unknown): CodexConfig | undefined {
   if (typeof v.model === "string" && v.model) cfg.model = normalizeCodexModel(v.model);
   if (typeof v.lightModel === "string" && v.lightModel) cfg.lightModel = normalizeCodexModel(v.lightModel);
   if (typeof v.reviewModel === "string" && v.reviewModel) cfg.reviewModel = normalizeCodexModel(v.reviewModel);
+  const auth = extractAuth(v.auth);
+  if (auth) cfg.auth = auth;
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 

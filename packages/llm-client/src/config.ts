@@ -10,6 +10,7 @@ import { resolveLayout } from "./layout.js";
 import { deepMerge } from "./project-config.js";
 import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import type { ClaudeConfig } from "./types.js";
+import { resolveVendorKey } from "./vendor-auth.js";
 import {
   resolveCredential,
   TYPESAFE_API_KEY_ENV,
@@ -895,6 +896,9 @@ function extractClaudeConfig(data: Record<string, unknown>): ClaudeConfig | null
   if (typeof claude.reviewModel === "string" && claude.reviewModel) {
     result.reviewModel = claude.reviewModel;
   }
+  if (claude.auth === "cli" || claude.auth === "api" || claude.auth === "auto") {
+    result.auth = claude.auth;
+  }
   return Object.keys(result).length > 0 ? result : null;
 }
 
@@ -935,9 +939,13 @@ export async function loadClaudeConfig(dir: string): Promise<ClaudeConfig> {
 }
 
 /**
- * Resolve the API key with the following priority:
+ * Resolve the Claude API key ({@link resolveVendorKey}):
  * 1. claude.api_key from unified config (.n-dx.json)
  * 2. Environment variable specified by apiKeyEnv (default: ANTHROPIC_API_KEY)
+ * 3. The per-user credential store's `claude` entry
+ *
+ * Whether a key may be used is `llm.claude.auth`'s decision
+ * ({@link resolveVendorAuth}); this only finds one.
  *
  * @returns The resolved API key, or undefined if not found.
  */
@@ -945,7 +953,7 @@ export function resolveApiKey(
   claudeConfig: ClaudeConfig,
   apiKeyEnv = "ANTHROPIC_API_KEY",
 ): string | undefined {
-  return claudeConfig.api_key ?? process.env[apiKeyEnv];
+  return resolveVendorKey(LLM_VENDOR.CLAUDE, { claude: claudeConfig }, { apiKeyEnv })?.value;
 }
 
 /**

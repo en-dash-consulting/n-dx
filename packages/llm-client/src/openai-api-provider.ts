@@ -29,6 +29,7 @@ import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js
 import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { CodexConfig } from "./llm-types.js";
+import { requireVendorApiKey, resolveVendorKey } from "./vendor-auth.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 const DEFAULT_MAX_RETRIES = 3;
@@ -75,11 +76,10 @@ export function parseOpenAiTokenUsage(
 // ── Auth resolution ───────────────────────────────────────────────────────
 
 /**
- * Resolve the OpenAI API key from config or environment.
- *
- * Priority:
+ * Resolve the OpenAI API key ({@link resolveVendorKey}):
  * 1. `codexConfig.api_key` from unified config (`.n-dx.json`)
  * 2. Environment variable (default: `OPENAI_API_KEY`)
+ * 3. The per-user credential store's `codex` entry
  *
  * @returns The resolved API key, or undefined if not found.
  */
@@ -87,7 +87,7 @@ export function resolveOpenAiApiKey(
   codexConfig?: CodexConfig,
   apiKeyEnv = "OPENAI_API_KEY",
 ): string | undefined {
-  return codexConfig?.api_key ?? process.env[apiKeyEnv];
+  return resolveVendorKey(LLM_VENDOR.CODEX, codexConfig ? { codex: codexConfig } : {}, { apiKeyEnv })?.value;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -134,15 +134,8 @@ export function createOpenAiApiProvider(
 ): LLMProvider {
   const apiKeyEnv = options.apiKeyEnv ?? "OPENAI_API_KEY";
   const codexConfig = options.codexConfig;
-  const apiKey = resolveOpenAiApiKey(codexConfig, apiKeyEnv);
-
-  if (!apiKey) {
-    throw new ClaudeClientError(
-      `OpenAI API key not found. Set it via 'n-dx config codex.api_key <key>' or the ${apiKeyEnv} environment variable.`,
-      "auth",
-      false,
-    );
-  }
+  // Throws when llm.codex.auth rules the API out or no key may be used.
+  const apiKey = requireVendorApiKey(LLM_VENDOR.CODEX, codexConfig ? { codex: codexConfig } : {}, { apiKeyEnv }).value;
 
   const baseUrl = resolveBaseUrl(codexConfig);
   const headers = buildHeaders(apiKey);

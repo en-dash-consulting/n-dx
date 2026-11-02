@@ -33,7 +33,8 @@ import type {
   CompletionResult,
 } from "./types.js";
 import { ClaudeClientError } from "./types.js";
-import { resolveApiKey, resolveModel } from "./config.js";
+import { resolveModel } from "./config.js";
+import { requireVendorApiKey } from "./vendor-auth.js";
 import { parseApiTokenUsage } from "./token-usage.js";
 import { resolveClaudeApiEffort } from "./claude-effort.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo } from "./provider-interface.js";
@@ -110,16 +111,12 @@ export interface ApiProviderOptions extends ClaudeClientOptions {
  * @throws {ClaudeClientError} with reason "auth" if no API key is available.
  */
 export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLMProvider {
-  const apiKeyEnv = options.apiKeyEnv ?? "ANTHROPIC_API_KEY";
-  const apiKey = resolveApiKey(options.claudeConfig, apiKeyEnv);
-
-  if (!apiKey) {
-    throw new ClaudeClientError(
-      `API key not found. Set it via 'n-dx config claude.api_key <key>' or the ${apiKeyEnv} environment variable.`,
-      "auth",
-      false,
-    );
-  }
+  // Throws when llm.claude.auth rules the API out or no key may be used.
+  const apiKey = requireVendorApiKey(
+    LLM_VENDOR.CLAUDE,
+    { claude: options.claudeConfig },
+    { apiKeyEnv: options.apiKeyEnv ?? "ANTHROPIC_API_KEY" },
+  ).value;
 
   const clientOpts: Record<string, unknown> = { apiKey };
   if (options.claudeConfig.api_endpoint) {

@@ -7,9 +7,11 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import type { AuthMode, ClaudeClientOptions } from "./types.js";
+import type { AuthMode, ClaudeClientOptions, VendorAuth } from "./types.js";
 import { ClaudeClientError } from "./types.js";
 import { DEFAULT_CLAUDE_MODEL, resolveApiKey, resolveCliPath } from "./config.js";
+import { LLM_VENDOR } from "./provider-interface.js";
+import { resolveVendorAuth, resolveVendorKey, type VendorKeySource } from "./vendor-auth.js";
 import { exec } from "./exec.js";
 
 // ── CLI availability ─────────────────────────────────────────────────────────
@@ -51,7 +53,7 @@ export async function validateApiKey(
 
   if (!apiKey) {
     throw new ClaudeClientError(
-      `API key not found. Set it via 'n-dx config claude.api_key <key>' or the ${apiKeyEnv} environment variable.`,
+      `API key not found. Store one with 'ndx config credentials.claude' or export ${apiKeyEnv}.`,
       "auth",
       false,
     );
@@ -107,7 +109,8 @@ export interface AuthDetectionResult {
  * caller gets a complete picture.
  *
  * Priority:
- * 1. API key present (from config or env) → "api"
+ * 1. `llm.claude.auth` selects the API and a key it may use resolves → "api"
+ *    (`auto` takes a configured or exported key, never a stored one)
  * 2. CLI binary reachable → "cli"
  * 3. Neither available → throws with a helpful error message
  *
@@ -118,8 +121,8 @@ export async function detectAvailableAuth(
   options: ClaudeClientOptions,
 ): Promise<AuthDetectionResult> {
   const apiKeyEnv = options.apiKeyEnv ?? "ANTHROPIC_API_KEY";
-  const apiKey = resolveApiKey(options.claudeConfig, apiKeyEnv);
-  const apiKeyAvailable = !!apiKey;
+  const decision = resolveVendorAuth(LLM_VENDOR.CLAUDE, { claude: options.claudeConfig }, { apiKeyEnv });
+  const apiKeyAvailable = decision.mode === "api" && decision.key !== undefined;
 
   if (apiKeyAvailable) {
     // API key takes priority — don't even check CLI
@@ -136,7 +139,7 @@ export async function detectAvailableAuth(
   // Neither method is available
   throw new ClaudeClientError(
     "No authentication method available. Either:\n" +
-      `  - Set an API key: n-dx config claude.api_key <key> (or export ${apiKeyEnv}=<key>)\n` +
+      `  - Use an API key: export ${apiKeyEnv}=<key>, or store one with 'ndx config credentials.claude' and set 'ndx config llm.claude.auth api'\n` +
       "  - Install the Claude Code CLI: npm install -g @anthropic-ai/claude-code",
     "auth",
     false,
@@ -149,8 +152,12 @@ export async function detectAvailableAuth(
  * Diagnostic details about the current authentication setup.
  */
 export interface AuthDiagnostics {
-  /** The API key source, if available. */
-  apiKeySource: "config" | "env" | "none";
+  /** `llm.claude.auth` in force. */
+  mode: VendorAuth;
+  /** Where a key resolves from (config, env, the credential store), whether or not `mode` uses it. */
+  keySource: VendorKeySource | "none";
+  /** The API key source, if available. Same as `keySource`. */
+  apiKeySource: VendorKeySource | "none";
   /** Whether the resolved API key passed validation (undefined if skipped). */
   apiKeyValid?: boolean;
   /** Whether the CLI binary was found. */
@@ -177,23 +184,28 @@ export async function diagnoseAuth(
   const apiKeyEnv = options.apiKeyEnv ?? "ANTHROPIC_API_KEY";
   const messages: string[] = [];
 
-  // ── API key ──
-  const configKey = options.claudeConfig.api_key;
-  const envKey = process.env[apiKeyEnv];
-  let apiKeySource: AuthDiagnostics["apiKeySource"] = "none";
+  // ── Auth setting and key ──
+  const decision = resolveVendorAuth(LLM_VENDOR.CLAUDE, { claude: options.claudeConfig }, { apiKeyEnv });
+  const resolvedKey = resolveVendorKey(LLM_VENDOR.CLAUDE, { claude: options.claudeConfig }, { apiKeyEnv });
+  const keySource: AuthDiagnostics["keySource"] = resolvedKey?.source ?? "none";
+  // The key the selected mode would send; a held key it ignores is not one.
+  const usableKey = decision.mode === "api" && decision.key !== undefined;
   let apiKeyValid: boolean | undefined;
 
-  if (configKey) {
-    apiKeySource = "config";
+  messages.push(`Auth: llm.claude.auth ${decision.auth} → ${decision.mode}`);
+  if (keySource === "config") {
     messages.push(`API key: found in .n-dx.json (claude.api_key)`);
-  } else if (envKey) {
-    apiKeySource = "env";
+  } else if (keySource === "env") {
     messages.push(`API key: found in environment (${apiKeyEnv})`);
+  } else if (keySource === "file") {
+    messages.push(
+      usableKey ? "API key: found in the credential store" : "API key: held in the credential store, unused",
+    );
   } else {
     messages.push("API key: not configured");
   }
 
-  if (apiKeySource !== "none" && options.validateKey) {
+  if (usableKey && options.validateKey) {
     try {
       apiKeyValid = await validateApiKey(options);
       messages.push(apiKeyValid ? "API key: validated successfully" : "API key: rejected by API (invalid or expired)");
@@ -214,17 +226,29 @@ export async function diagnoseAuth(
 
   // ── Recommendation ──
   let recommendedMode: AuthDiagnostics["recommendedMode"] = "none";
-  if (apiKeySource !== "none" && apiKeyValid !== false) {
+  if (usableKey && apiKeyValid !== false) {
     recommendedMode = "api";
-  } else if (cliAvailable) {
+  } else if (decision.auth !== "api" && cliAvailable) {
     recommendedMode = "cli";
   }
 
   if (recommendedMode === "none") {
-    messages.push("No authentication method available. Set an API key or install the Claude Code CLI.");
+    messages.push(
+      decision.auth === "api"
+        ? "No authentication method available: llm.claude.auth is api and no usable API key resolves."
+        : "No authentication method available. Set an API key or install the Claude Code CLI.",
+    );
   } else {
     messages.push(`Recommended mode: ${recommendedMode}`);
   }
 
-  return { apiKeySource, apiKeyValid, cliAvailable, recommendedMode, messages };
+  return {
+    mode: decision.auth,
+    keySource,
+    apiKeySource: keySource,
+    apiKeyValid,
+    cliAvailable,
+    recommendedMode,
+    messages,
+  };
 }

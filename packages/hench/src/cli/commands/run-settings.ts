@@ -14,6 +14,7 @@ import {
   isModelCompatibleWithVendor,
   resolveReviewModel,
   resolveTaskModel,
+  resolveVendorAuth,
 } from "../../prd/llm-gateway.js";
 import { validateRunSettings } from "../../prd/rex-gateway.js";
 import type { PRDItem, RunSettings } from "../../prd/rex-gateway.js";
@@ -347,6 +348,47 @@ export function resolveRunProvider(
   };
 }
 
+/** `llm.<vendor>.auth`'s decision for one vendor (llm-client's `VendorAuthDecision`). */
+type VendorAuthDecision = ReturnType<typeof resolveVendorAuth>;
+type VendorAuth = VendorAuthDecision["auth"];
+
+/** A vendor whose credential `llm.<vendor>.auth` chooses; `local` takes none. */
+type KeyedVendor = Exclude<LLMVendor, typeof LLM_VENDOR.LOCAL>;
+
+function isKeyedVendor(vendor: LLMVendor): vendor is KeyedVendor {
+  return vendor === LLM_VENDOR.CLAUDE || vendor === LLM_VENDOR.CODEX || vendor === LLM_VENDOR.GOOGLE;
+}
+
+/**
+ * Why hench's API loop must not start under `llm.<vendor>.auth`, or undefined:
+ * - `cli`: the project chose the CLI login, so an API loop contradicts it;
+ *   the refusal names both `hench.provider` and `llm.<vendor>.auth`.
+ * - `api` with no key, or `auto` with a key held only in the credential store:
+ *   the missing-key error, which names `ndx config credentials.<vendor>`.
+ *
+ * `auto` with no key anywhere is left to the loop, which fails as it always
+ * has: a stored key must never be what turns a run into an API run.
+ */
+export function apiProviderAuthError(decision: VendorAuthDecision): CLIError | undefined {
+  const refusal = decision.apiRefusal;
+  if (!refusal) return undefined;
+  const { vendor } = decision;
+  if (decision.auth === "cli") {
+    return new CLIError(
+      `hench.provider "api" calls the ${vendor} API, but llm.${vendor}.auth is "cli" (the ${vendor} CLI login).`,
+      `Run hench on the CLI with 'ndx config hench.provider cli' (or --provider=cli), ` +
+        `or use an API key with 'ndx config llm.${vendor}.auth api'.`,
+    );
+  }
+  if (decision.auth === "api" || decision.storedKeyHeld) {
+    return new CLIError(
+      refusal.message,
+      vendor === LLM_VENDOR.GOOGLE ? undefined : "Or run hench on the CLI: 'ndx config hench.provider cli'.",
+    );
+  }
+  return undefined;
+}
+
 /**
  * The adversarial review pass spawns a second vendor CLI session, so it exists
  * only on the CLI provider. Refused rather than accepted and ignored: a silent
@@ -538,6 +580,12 @@ export interface TaskRunSettings {
     mismatch?: CLIError;
   };
   provider: Resolved<HenchProvider> & { switched: boolean; error?: CLIError };
+  /**
+   * `llm.<vendor>.auth` (cli, api or auto): which credential the vendor gets.
+   * Null for a vendor that takes none (local). No per-run flag or saved form:
+   * it is the project's, and `provider` is refused when it contradicts it.
+   */
+  auth: Resolved<VendorAuth | null>;
   permissionMode: Resolved<PermissionMode | null> & {
     /** The mode a non-Claude vendor cannot honour; set when it was dropped. */
     dropped?: PermissionMode;
@@ -602,6 +650,12 @@ export interface TaskRunSettingsInput {
    * `hench.provider` was chosen for the project's own vendor.
    */
   escalation?: { model?: string };
+  /**
+   * `llm.<vendor>.auth`'s decision for `vendor`. Defaults to llm-client's
+   * `resolveVendorAuth` (config, the environment, then the per-user credential
+   * store); tests inject one.
+   */
+  vendorAuth?: (vendor: KeyedVendor, llmConfig: LLMConfig) => VendorAuthDecision;
 }
 
 /**
@@ -752,8 +806,23 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // saved under Claude is meant to run under Codex. A provider that only needs
   // switching (`cli` on google, which has no CLI binary) is not this case:
   // `resolveRunProvider` switches it silently and reports no error.
+  // `llm.<vendor>.auth`, read once: it can rule the API loop out.
+  const authDecision = isKeyedVendor(vendor)
+    ? (input.vendorAuth ?? ((v, c) => resolveVendorAuth(v, c, v === LLM_VENDOR.CLAUDE ? { apiKeyEnv: config.apiKeyEnv } : {})))(
+        vendor,
+        llmConfig ?? {},
+      )
+    : undefined;
+  const apiAuthError = authDecision ? apiProviderAuthError(authDecision) : undefined;
+
   const savedProvider = saved?.provider;
-  const savedProviderCheck = savedProvider ? resolveRunProvider(savedProvider, vendor) : undefined;
+  const savedProviderResolved = savedProvider ? resolveRunProvider(savedProvider, vendor) : undefined;
+  // A saved `api` the project's auth setting rules out is skipped like any
+  // saved provider this vendor cannot run: warned about, never loop-ending.
+  const savedProviderCheck =
+    savedProviderResolved && !savedProviderResolved.error && savedProviderResolved.provider === "api" && apiAuthError
+      ? { ...savedProviderResolved, error: apiAuthError }
+      : savedProviderResolved;
   // `--review` is an operator-typed gate that refuses rather than no-ops, so a
   // saved provider that would make the review impossible loses to it — again a
   // warning rather than a throw, for the same reason.
@@ -767,8 +836,11 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     warnings.push({
       code: "saved-provider-unavailable",
       message:
-        `The provider "${savedProvider}" saved on "${item?.title}" is not available for ` +
-        `vendor="${vendor}" — running on this project's configured provider instead.`,
+        savedProviderCheck.error === apiAuthError
+          ? `Ignoring the provider "api" saved on "${item?.title}": ${apiAuthError.message} ` +
+            `Running on this project's configured provider instead.`
+          : `The provider "${savedProvider}" saved on "${item?.title}" is not available for ` +
+            `vendor="${vendor}" — running on this project's configured provider instead.`,
     });
   } else if (savedProviderBlocksReview) {
     warnings.push({
@@ -794,7 +866,13 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
         : escalationProvider !== undefined
           ? "hench.escalation"
           : henchSource("provider");
-  const resolvedProvider = resolveRunProvider(requestedProvider as string, vendor);
+  const providerResolution = resolveRunProvider(requestedProvider as string, vendor);
+  // Refused before the run starts: the run path and --resolve both refuse on
+  // `provider.error`.
+  const resolvedProvider =
+    !providerResolution.error && providerResolution.provider === "api" && apiAuthError
+      ? { ...providerResolution, error: apiAuthError }
+      : providerResolution;
 
   // -- Permission mode -----------------------------------------------------
   const permission = resolveRunPermissionMode({
@@ -953,6 +1031,9 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
       switched: resolvedProvider.switched,
       ...(resolvedProvider.error ? { error: resolvedProvider.error } : {}),
     },
+    auth: authDecision
+      ? { value: authDecision.auth, source: authDecision.authSource }
+      : { value: null, source: "built-in" },
     permissionMode: {
       ...(permission.dropped !== undefined ? { dropped: permission.dropped } : {}),
       value: clamped ?? null,

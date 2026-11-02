@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveVendorCliEnv } from "../../src/child-env.js";
@@ -158,18 +158,42 @@ describe("resolveVendorCliEnv", () => {
     expect(source.GITHUB_TOKEN).toBe("github-secret");
   });
 
-  it("never carries the Jev key into a vendor CLI child, whether exported or stored", () => {
-    // The store is read in-process by the resolver; resolveVendorCliEnv must
-    // neither read it nor pass the exported variable through.
+  it("carries a stored value only as the api-mode vendor key, in that vendor's CLI child", () => {
+    // The one stored value a child may get is its own vendor's key, under
+    // llm.<vendor>.auth "api" and its own variable name. The Jev key, exported
+    // or stored, and a helper entry never reach any child.
     const ndxHome = mkdtempSync(join(tmpdir(), "ndx-child-env-store-"));
     try {
       setCredential("typesafe", "tsk_placeholder_stored_value", { ndxHome });
-      const withStore = { ...source, N_DX_HOME: ndxHome };
-      for (const vendor of ["claude", "codex", "google"] as const) {
-        const env = resolveVendorCliEnv({ vendor }, undefined, withStore);
-        expect(env.TYPESAFE_API_KEY, vendor).toBeUndefined();
-        expect(Object.values(env), vendor).not.toContain("tsk_placeholder_stored_value");
-        expect(Object.values(env), vendor).not.toContain("jev-secret");
+      const vendorKeys = { claude: "ANTHROPIC_API_KEY", codex: "OPENAI_API_KEY", google: "GEMINI_API_KEY" } as const;
+      for (const vendor of Object.keys(vendorKeys) as Array<keyof typeof vendorKeys>) {
+        setCredential(vendor, `placeholder_stored_${vendor}_key`, { ndxHome });
+      }
+      const storePath = join(ndxHome, "credentials.json");
+      const raw = JSON.parse(readFileSync(storePath, "utf-8"));
+      raw.entries["connection:helper"] = { backend: "helper", value: "placeholder_helper_value", updatedAt: "2026-11-02T00:00:00Z" };
+      writeFileSync(storePath, JSON.stringify(raw), { mode: 0o600 });
+
+      // No vendor key exported, so api mode falls through to the store.
+      const withStore: NodeJS.ProcessEnv = { ...source, N_DX_HOME: ndxHome };
+      for (const name of Object.values(vendorKeys)) delete withStore[name];
+      const stored =(vendor: string) => `placeholder_stored_${vendor}_key`;
+      for (const vendor of Object.keys(vendorKeys) as Array<keyof typeof vendorKeys>) {
+        for (const auth of vendor === "google" ? ["auto", "api"] as const : ["auto", "cli", "api"] as const) {
+          const env = resolveVendorCliEnv({ vendor, [vendor]: { auth } }, undefined, withStore);
+          const label = `${vendor} ${auth}`;
+          expect(env.TYPESAFE_API_KEY, label).toBeUndefined();
+          expect(Object.values(env), label).not.toContain("tsk_placeholder_stored_value");
+          expect(Object.values(env), label).not.toContain("jev-secret");
+          expect(Object.values(env), label).not.toContain("placeholder_helper_value");
+          // Another vendor's stored key, never.
+          for (const other of Object.keys(vendorKeys).filter((v) => v !== vendor)) {
+            expect(Object.values(env), label).not.toContain(stored(other));
+          }
+          const own = Object.entries(env).filter(([, value]) => value === stored(vendor)).map(([name]) => name);
+          // Its own stored key only in api mode, and only under its own name.
+          expect(own, label).toEqual(auth === "api" ? [vendorKeys[vendor]] : []);
+        }
       }
     } finally {
       rmSync(ndxHome, { recursive: true, force: true });
