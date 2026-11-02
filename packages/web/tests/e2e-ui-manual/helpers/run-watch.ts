@@ -82,6 +82,21 @@ export async function listRuns(baseUrl: string, timeoutMs = 10_000): Promise<Run
   return body.runs;
 }
 
+/**
+ * One poll of the run list for a waiter. `expect.poll` does not retry a
+ * callback that throws, so a single 5xx or slow listing would end a
+ * multi-minute vendor leg; a failed listing becomes a "list failed: ..."
+ * value instead, which keeps the poll going and names the last error in the
+ * timeout message. Only {@link snapshotRunIds} lets a failure throw.
+ */
+async function pollRuns(baseUrl: string, timeoutMs?: number): Promise<{ runs: RunSummary[] } | { failure: string }> {
+  try {
+    return { runs: await listRuns(baseUrl, timeoutMs) };
+  } catch (error) {
+    return { failure: `list failed: ${(error as Error).message}` };
+  }
+}
+
 /** Call before Start now, so a previous leg can never satisfy the waiter. */
 export async function snapshotRunIds(baseUrl: string): Promise<ReadonlySet<string>> {
   return new Set((await listRuns(baseUrl)).map((run) => run.id));
@@ -107,7 +122,9 @@ export async function openLiveTask(page: Page, expectedTaskId: string, knownRunI
     await expect
       .poll(
         async () => {
-          observed = await listRuns(baseUrl, Math.max(1, Math.ceil(deadline - performance.now())));
+          const listed = await pollRuns(baseUrl, Math.max(1, Math.ceil(deadline - performance.now())));
+          if ("failure" in listed) return listed.failure;
+          observed = listed.runs;
           const runs = observed.filter((run) => !knownRunIds.has(run.id));
           const expected = runs.find((r) => r.taskId === expectedTaskId);
           const latest = expected ?? runs.find((r) => r.taskId && (ACTIVE.has(r.status) || TERMINAL.includes(r.status)));
@@ -134,7 +151,9 @@ export async function waitForCompletedRunCount(baseUrl: string, n: number, timeo
   await expect
     .poll(
       async () => {
-        runs = await listRuns(baseUrl);
+        const listed = await pollRuns(baseUrl);
+        if ("failure" in listed) return listed.failure;
+        runs = listed.runs;
         const completed = runs.filter((r) => r.status === "completed").length;
         const running = runs.some((r) => ACTIVE.has(r.status));
         const failed = runs.some((r) => FAILED.has(r.status));

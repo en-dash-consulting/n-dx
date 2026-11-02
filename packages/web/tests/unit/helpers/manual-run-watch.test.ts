@@ -10,7 +10,7 @@ vi.mock("@playwright/test", async (importOriginal) => {
   }), { poll: actual.expect.poll }) };
 });
 
-import { listRuns, openLiveTask, snapshotRunIds } from "../../e2e-ui-manual/helpers/run-watch.js";
+import { listRuns, openLiveTask, snapshotRunIds, waitForCompletedRunCount } from "../../e2e-ui-manual/helpers/run-watch.js";
 
 afterEach(() => { vi.unstubAllGlobals(); });
 const respond = (runs: unknown) => new Response(JSON.stringify({ runs }), { status: 200 });
@@ -86,4 +86,30 @@ describe("manual started-run selection", () => {
     })));
     await expect(listRuns("http://fixture.local", 20)).rejects.toThrow(/timeout|timed out/i);
   });
+  it("keeps polling for the started run through a failed listing", async () => {
+    const browser = page();
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response("busy", { status: 503 }))
+      .mockResolvedValueOnce(respond([{ id: "new", taskId: "expected", status: "running" }]));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(openLiveTask(browser as unknown as Page, "expected", new Set(), 5_000)).resolves.toBe("expected");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("names the last listing failure when the started-run wait times out", async () => {
+    const browser = page();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 500 })));
+    await expect(openLiveTask(browser as unknown as Page, "expected", new Set(), 50)).rejects.toThrow(/list failed: .*HTTP 500/);
+    expect(browser.goto).not.toHaveBeenCalled();
+  });
+
+  it("keeps counting completed runs through a failed listing", async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response("busy", { status: 503 }))
+      .mockResolvedValueOnce(respond([{ id: "a", taskId: "t", status: "completed" }]));
+    vi.stubGlobal("fetch", fetcher);
+    const runs = await waitForCompletedRunCount("http://fixture.local", 1, 15_000);
+    expect(runs.map((r) => r.id)).toEqual(["a"]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  }, 20_000);
 });
