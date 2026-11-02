@@ -321,6 +321,16 @@ describe("resolveAuthEnabled", () => {
     expect(result.warning).toContain("/p/.n-dx.json");
     expect(result.warning).toContain("/p/.n-dx.local.json");
   });
+
+  it("ignores web.auth=false in a machine-local file the repository commits", () => {
+    const result = resolveAuthEnabled({ ...files, noAuthFlag: false, local: false, localTracked: true });
+    expect(result.enabled).toBe(true);
+    expect(result.warning).toContain("/p/.n-dx.local.json");
+    expect(result.warning).toContain("/home/.ndx/config.json");
+    // The user's own config and the flag still turn it off.
+    expect(resolveAuthEnabled({ ...files, noAuthFlag: false, local: false, localTracked: true, user: false }).enabled).toBe(false);
+    expect(resolveAuthEnabled({ ...files, noAuthFlag: true, local: false, localTracked: true }).enabled).toBe(false);
+  });
 });
 
 describe("hubAuthMismatchMessage", () => {
@@ -433,4 +443,26 @@ describe("loadAuthEnabled", () => {
       rmSync(home, { recursive: true, force: true });
     }
   });
+
+  it("ignores web.auth=false in a .n-dx.local.json the repository commits", async () => {
+    const { vi } = await import("vitest");
+    const dir = mkdtempSync(join(tmpdir(), "auth-tracked-local-"));
+    const home = mkdtempSync(join(tmpdir(), "auth-home-"));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      git(dir, "init", "--quiet", "--initial-branch=main");
+      writeFileSync(join(dir, ".n-dx.local.json"), JSON.stringify({ web: { auth: false } }));
+      git(dir, "add", "-f", ".n-dx.local.json");
+      git(dir, "commit", "--quiet", "-m", "ship a local config");
+
+      expect(await loadAuthEnabled(dir, false, home)).toBe(true);
+      expect(errors.mock.calls.flat().join("\n")).toContain("commits that file");
+      // --no-auth is still the operator's own way out.
+      expect(await loadAuthEnabled(dir, true, home)).toBe(false);
+    } finally {
+      errors.mockRestore();
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  }, 60_000);
 });

@@ -120,6 +120,11 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *   `applyRepoTrust`), so writing the user's own choice there would have it
  *   ignored and mark their repository untrusted.
  *
+ * - **Security posture** (`web.auth`): whether the dashboard requires the
+ *   per-user token is the user's decision, not the repository's, so `ndx
+ *   start` ignores `web.auth: false` in the shared file. Writing it there
+ *   would leave auth on and print a warning on every start.
+ *
  * Keyed by section, then by the setting path within that section. `llm`
  * entries are matched by suffix so `llm.claude.api_key`, `llm.codex.api_key`
  * and `llm.google.api_key` all route without listing each vendor. `hench` is
@@ -132,6 +137,7 @@ const LOCAL_ONLY_SETTINGS = {
   claude: new Set(["cli_path", "api_key", "api_endpoint"]),
   llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv"] },
   hench: new Set(["apiKeyEnv", "claudePath"]),
+  web: new Set(["auth"]),
 };
 
 /**
@@ -2674,7 +2680,10 @@ Web dashboard settings (.n-dx.json):
                                     dashboard and preview servers (default: true).
                                     'ndx start' creates <ndx home>/auth.token and prints
                                     a one-time sign-in URL (never the token); false,
-                                    or --no-auth, runs the servers without it
+                                    or --no-auth, runs the servers without it.
+                                    Stored in .n-dx.local.json (or set web.auth in
+                                    <ndx home>/config.json for every project); a
+                                    false in .n-dx.json is ignored with a warning
   web.mode                 string    "here" makes 'ndx start' run the single-project
                                     server that owns the port; "hub" registers with
                                     the per-user hub (served at /p/<id>/) — the
@@ -2737,8 +2746,9 @@ Local overrides (.n-dx.local.json):
   settings without conflicts. Deep-merged over .n-dx.json (local wins).
 
   Machine-specific keys (claude.cli_path, llm.claude.cli_path, llm.codex.cli_path)
-  are automatically written to .n-dx.local.json instead of .n-dx.json. A
-  cli_path in .n-dx.json applies only once the repository is trusted.
+  and web.auth are automatically written to .n-dx.local.json instead of
+  .n-dx.json. A cli_path in .n-dx.json applies only once the repository is
+  trusted; web.auth there is ignored.
 
 Options:
   --json                   Output as JSON

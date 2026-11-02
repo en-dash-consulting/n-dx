@@ -754,6 +754,21 @@ describe("n-dx config", () => {
       expect(shared.cli?.claudePath).toBeUndefined();
     });
 
+    it("sets web.auth in .n-dx.local.json and moves a shared copy out of .n-dx.json", async () => {
+      // `ndx start` ignores web.auth=false in the shared file, so writing it
+      // there would leave auth on and warn on every start.
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify({ web: { auth: false, port: 4000 } }, null, 2) + "\n",
+      );
+      run(["web.auth", "false", tmpDir]);
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.web.auth).toBe(false);
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.web.auth).toBeUndefined();
+      expect(shared.web.port).toBe(4000);
+    });
+
     it("sets hench.apiKeyEnv in .n-dx.local.json, so the checkout stays at baseline", async () => {
       // The trust review reads a non-default apiKeyEnv in .hench/config.json
       // or .n-dx.json as the repository's credential routing: written there,

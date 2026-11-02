@@ -509,7 +509,7 @@ function readConfiguredClaudePath(dir) {
  * @param {string} root
  * @returns {boolean}
  */
-function localConfigIsRepositoryConfig(root) {
+export function localConfigIsRepositoryConfig(root) {
   try {
     const out = execFileSyncCli(
       process.execPath,

@@ -58,6 +58,7 @@ import { fileURLToPath } from "url";
 import { NDX_HOME_ENV, resolveLayout, resolveNdxHome } from "./layout.js";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
+import { localConfigIsRepositoryConfig } from "./claude-integration.js";
 
 /**
  * Core's own CLI, beside this file. Not `join(__dir, "cli.js")`: callers pass
@@ -1156,20 +1157,32 @@ const NO_NONCE_NOTE = "  (could not get a sign-in link from the server; run 'ndx
  * `web.auth: false` in the user's own `<ndx home>/config.json` each turn the
  * token off. The shared project config file is the one a repository ships, so
  * a `false` there is ignored and reported: a checkout must not be able to
- * serve itself without the token to whoever clones it.
+ * serve itself without the token to whoever clones it. The same holds for a
+ * machine-local file the repository commits (`localTracked`): ignoring it in
+ * `.gitignore` does not untrack it, so it is repository content too.
  *
  * @param {object} args
  * @param {unknown} args.shared     `web.auth` from the shared project config file
  * @param {unknown} args.local      `web.auth` from the machine-local config file
  * @param {unknown} args.user       `web.auth` from `<ndx home>/config.json`
  * @param {boolean} args.noAuthFlag `--no-auth` on the command line
+ * @param {boolean} [args.localTracked] The machine-local file is in the repository's index
  * @param {string}  args.sharedFile Path of the shared config file, for the warning
  * @param {string}  args.localFile  Path of the machine-local config file, for the warning
  * @param {string}  args.userFile   Path of the user config file, for the warning
  * @returns {{ enabled: boolean, warning: string | null }}
  */
-export function resolveAuthEnabled({ shared, local, user, noAuthFlag, sharedFile, localFile, userFile }) {
-  if (noAuthFlag || local === false || user === false) return { enabled: false, warning: null };
+export function resolveAuthEnabled({ shared, local, user, noAuthFlag, localTracked = false, sharedFile, localFile, userFile }) {
+  if (noAuthFlag || user === false) return { enabled: false, warning: null };
+  if (local === false && !localTracked) return { enabled: false, warning: null };
+  if (local === false) {
+    return {
+      enabled: true,
+      warning:
+        `Warning: web.auth=false in ${localFile} was ignored — the repository commits that file. ` +
+        `Untrack it (git rm --cached), set web.auth in ${userFile}, or pass --no-auth.`,
+    };
+  }
   if (shared === false) {
     return {
       enabled: true,
@@ -1194,11 +1207,16 @@ async function loadUserWebConfig(home = hubHome()) {
 /** Apply {@link resolveAuthEnabled} to the project's config files, printing its warning. */
 export async function loadAuthEnabled(dir, noAuthFlag = false, home = hubHome()) {
   const layout = resolveLayout(dir);
+  const local = (await loadWebConfigFrom(layout.localConfigFile)).auth;
   const { enabled, warning } = resolveAuthEnabled({
     shared: (await loadWebConfig(dir)).auth,
-    local: (await loadWebConfigFrom(layout.localConfigFile)).auth,
+    local,
     user: (await loadUserWebConfig(home)).auth,
     noAuthFlag,
+    // Asked only when the local file would turn auth off: it spawns `hench
+    // trust status`, which owns the tracked-file rules (case variants, git
+    // unable to answer), so core does not grow a second copy of them.
+    localTracked: !noAuthFlag && local === false ? localConfigIsRepositoryConfig(layout.root) : false,
     sharedFile: layout.configFile,
     localFile: layout.localConfigFile,
     userFile: join(home, HUB_CONFIG_FILE),
