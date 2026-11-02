@@ -79,11 +79,24 @@ interface Rule {
 //   break resume. `session_key` is matched through the `…key` branch.
 // - a bare `pass` — Go's test runner prints `--- PASS: TestName`, so `pass`
 //   needs a prefix (`DB_PASS`, `db-pass`) to count as a key.
+//
+// The prefix is bounded at KEY_PREFIX_MAX characters, and a lookahead first
+// requires the `=` or `:` an assignment needs within reach. Unbounded, the
+// lazy prefix was tried from every word boundary to the end of its identifier
+// run, which is quadratic on a long hyphenated, dotted or base64url line: a
+// 100 KB line took tens of seconds, synchronously, in hench's record writer
+// and again in the dashboard. With both, each boundary costs a bounded scan
+// that fails fast on a line with no separator. A key whose name runs longer
+// than the bound before its sensitive suffix is still caught from the last
+// `-` or `.` inside it.
+const KEY_PREFIX_MAX = 64;
+/** Longest key the gate looks across: the prefix plus the longest suffix word. */
+const KEY_MAX = KEY_PREFIX_MAX + 32;
 const ASSIGNMENT_KEY =
-  "\\b(?:" +
-  "[A-Za-z0-9_.-]*?(?:token|secret|password|passwd|pwd|auth|cookie|signature|sig|dsn|api[_-]?key|apikey|credentials?" +
+  `\\b(?=[A-Za-z0-9_.-]{1,${KEY_MAX}}["']?\\s*[=:])(?:` +
+  `[A-Za-z0-9_.-]{0,${KEY_PREFIX_MAX}}?(?:token|secret|password|passwd|pwd|auth|cookie|signature|sig|dsn|api[_-]?key|apikey|credentials?` +
   "|(?:secret|access|encryption|signing|master|session|stripe|private)[_-]?key)" +
-  "|[A-Za-z0-9_.-]+?pass" +
+  `|[A-Za-z0-9_.-]{1,${KEY_PREFIX_MAX}}?pass` +
   ")\\b";
 
 /** Keys that name a password: the value floor is lowered for these (a PIN). */
@@ -173,7 +186,10 @@ const RULES: readonly Rule[] = [
       [
         "sk-ant-[A-Za-z0-9_-]{20,}",
         "sk-proj-[A-Za-z0-9_-]{20,}",
-        "sk-[A-Za-z0-9]{32,}",
+        // OpenAI's newer shapes (`sk-svcacct-…`, `sk-admin-…`) carry `-` and
+        // `_` in the body, which an alphanumeric class stopped at. The word
+        // boundary keeps `task-…` and `desk-…` identifiers alone.
+        "\\bsk-[A-Za-z0-9_-]{32,}",
         "gh[pousr]_[A-Za-z0-9]{36}",
         "github_pat_[A-Za-z0-9_]{22,}",
         "glpat-[A-Za-z0-9_-]{20,}",
@@ -183,6 +199,16 @@ const RULES: readonly Rule[] = [
         "ya29\\.[A-Za-z0-9_-]{20,}",
         "npm_[A-Za-z0-9]{36}",
         "hf_[A-Za-z0-9]{30,}",
+        // gitleaks `gcp-client-secret` (Google OAuth): `GOCSPX-[a-zA-Z0-9_-]{28}`.
+        "GOCSPX-[A-Za-z0-9_-]{20,}",
+        // gitleaks `slack-app-token`: `xapp-\\d-[A-Z0-9]+-\\d+-[a-z0-9]+`.
+        "xapp-[0-9]-[A-Za-z0-9-]{10,}",
+        // gitleaks `grafana-service-account-token`:
+        // `glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}`.
+        "glsa_[A-Za-z0-9_]{24,}",
+        // gitleaks `pypi-upload-token`: `pypi-AgEIcHlwaS5vcmc[\\w-]{50,1000}`
+        // — every PyPI token is a macaroon whose base64 opens that way.
+        "pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{32,}",
         // Atlassian stamps a fixed prefix on each credential kind: ATBB on a
         // Bitbucket Cloud app password, ATCTT on a scoped Bitbucket access
         // token (repository, project or workspace), ATATT on an Atlassian API
@@ -320,8 +346,12 @@ const RULES: readonly Rule[] = [
     // name — and only the password goes. A userinfo that an earlier rule has
     // already replaced (`https://[redacted:token]@github.com/…`) is left as
     // it is, rather than being wrapped in a second marker.
+    //
+    // The scheme is bounded at 32 characters (real ones are short): unbounded,
+    // it was scanned from every word boundary to the end of a long hyphenated
+    // or dotted run, the same quadratic cost as the assignment key above.
     kind: "url-password",
-    pattern: /(\b[a-z][a-z0-9+.-]*:\/\/(?!\[redacted:)[^/\s:@]+:)([^/\s@]+)(@)/gi,
+    pattern: /(\b[a-z][a-z0-9+.-]{0,31}:\/\/(?!\[redacted:)[^/\s:@]+:)([^/\s@]+)(@)/gi,
     replace: (_m: string, before: string, _pw: string, at: string) => `${before}${REDACTED_PASSWORD}${at}`,
   },
   {

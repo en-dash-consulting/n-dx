@@ -334,6 +334,12 @@ const PROBE: ProbeCase[] = [
   { name: "anthropic key", input: "x-api-key: sk-ant-api03-" + K.slice(0, 40) + "AA", output: `x-api-key: ${REDACTED_TOKEN}` },
   { name: "openai legacy", input: "export OPENAI_API_KEY=sk-" + K.slice(0, 48), output: `export OPENAI_API_KEY=${REDACTED_TOKEN}` },
   { name: "openai proj bare", input: "sk-proj-" + K.slice(0, 30) + "_-" + K.slice(0, 20), output: REDACTED_TOKEN },
+  { name: "openai service account bare", input: "sk-" + "svcacct-" + K.slice(0, 30) + "_-" + K.slice(10, 40), output: REDACTED_TOKEN },
+  { name: "openai admin key bare", input: "sk-" + "admin-" + K.slice(0, 30) + "-" + K.slice(20, 50), output: REDACTED_TOKEN },
+  { name: "google oauth client secret", input: "GOCSPX" + "-" + K.slice(0, 20) + "_-" + K.slice(30, 36), output: REDACTED_TOKEN },
+  { name: "slack app token", input: "xapp" + "-1-A0" + K.slice(26, 34).toUpperCase() + "-1234567890123-" + K.slice(26, 50), output: REDACTED_TOKEN },
+  { name: "grafana service account token", input: "glsa" + "_" + K.slice(0, 32) + "_" + "0123abcd", output: REDACTED_TOKEN },
+  { name: "pypi upload token", input: "pypi" + "-AgEIcHlwaS5vcmc" + K.slice(0, 50) + "_-", output: REDACTED_TOKEN },
   { name: "github ghp", input: "ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8", output: REDACTED_TOKEN },
   { name: "github pat", input: "github_pat_11ABCDEFG0" + K.slice(0, 59), output: REDACTED_TOKEN },
   { name: "aws akid bare", input: "AKIAIOSFODNN7EXAMPLE", output: REDACTED_TOKEN },
@@ -584,6 +590,7 @@ describe("redactSecrets — prose and lookalikes stay readable", () => {
     "The Twilio SKU is SK-200 and ships Monday",
     "SG. Smith reviewed the pull request.",
     "hvs. is a prefix, not a token",
+    "the task-runner-configuration-loader-module-name changed",
   ];
   for (const line of PROSE) {
     it(`leaves "${line}"`, () => {
@@ -602,6 +609,34 @@ describe("redactSecrets — prose and lookalikes stay readable", () => {
   it("does not take a JSON object as a value when the key is sensitive", () => {
     const text = '{"auth": {"token": "' + K.slice(0, 20) + '"}, "next": 1}';
     expect(redactSecrets(text)).toBe(`{"auth": {"token": "${REDACTED_VALUE}"}, "next": 1}`);
+  });
+});
+
+describe("redactSecrets — long lines stay linear", () => {
+  // The assignment key and the URL scheme were scanned from every word
+  // boundary to the end of their run, so a 100 KB hyphenated or dotted line
+  // took tens of seconds; hench redacts each record line synchronously. The
+  // budget is generous for a loaded CI host and still far below that.
+  const LINE = 100_000;
+  const LINES: Array<[string, string]> = [
+    ["hyphenated", "a-".repeat(LINE / 2)],
+    ["dotted", "ab.".repeat(LINE / 3)],
+    ["base64url", body(LINE, "-_")],
+    ["sensitive words", "token-".repeat(LINE / 6)],
+    ["pass suffixes", "db-pass-".repeat(LINE / 8)],
+  ];
+  for (const [name, text] of LINES) {
+    it(`redacts a 100 KB ${name} line in well under a second`, () => {
+      const started = performance.now();
+      redactSecrets(text);
+      expect(performance.now() - started).toBeLessThan(1_500);
+    });
+  }
+
+  it("still redacts a key whose name is longer than the prefix bound", () => {
+    const key = "SERVICE." + "X".repeat(100) + ".API_TOKEN";
+    const value = K.slice(0, 24);
+    expect(redactSecrets(`${key}=${value}`)).toBe(`${key}=${REDACTED_VALUE}`);
   });
 });
 
