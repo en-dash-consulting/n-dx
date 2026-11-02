@@ -13,11 +13,11 @@ import type { PRDItemData, ItemStatus, Priority, RequirementData, RequirementCat
 import type { NavigateTo } from "../../types.js";
 import { formatTimestamp } from "./compute.js";
 import { formatTokenCount, fmtDuration } from "../../utils/format.js";
-import { findItemById, getAncestorIds } from "./tree-utils.js";
+import { findItemById, parentTypeIn } from "./tree-utils.js";
 import { CopyLinkButton } from "../copy-link-button.js";
 import { TaskStartControl } from "../task-start-control.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
-import { type ItemType, canAddChildType, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
+import { type ItemType, canAddChildType, childCarriesPriority, childTypeOf, criteriaLabel, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { useIndexMd } from "../../hooks/index.js";
 import { IndexMdSectionsPanel } from "./index-md-sections.js";
 import { CriteriaEditor } from "./criteria-editor.js";
@@ -464,19 +464,11 @@ export interface AddChildData {
 }
 
 /**
- * Whether the child the add form makes keeps a priority.
- *
- * A v2 subtask carries none — rex's change-add rule refuses one, and
- * `POST /api/rex/items` leaves it off — so offering the select would drop the
- * user's pick without a word. The parent task's own parent tells the layouts
- * apart: a change on v2, a feature (or epic) on v1.
+ * Whether the child the add form makes keeps a priority: the shared rule
+ * (`childCarriesPriority`), asked with this item's own parent type.
  */
-function childCarriesPriority(item: PRDItemData, itemType: ItemType, allItems: PRDItemData[]): boolean {
-  if (childTypeOf(itemType) !== "subtask") return true;
-  const ancestors = getAncestorIds(allItems, item.id);
-  const parentId = ancestors[ancestors.length - 1];
-  const parent = parentId ? findItemById(allItems, parentId) : null;
-  return !(parent && itemTypeOf(parent) === "change");
+function addedChildCarriesPriority(item: PRDItemData, itemType: ItemType, allItems: PRDItemData[]): boolean {
+  return childCarriesPriority(itemType, parentTypeIn(allItems, item.id));
 }
 
 /** Inline form for adding a child item within the detail panel. */
@@ -1142,7 +1134,7 @@ export function TaskDetail({ item, taskUsage, weeklyBudget, showTokenBudget, all
 
   // Determine if this item can have children added
   const canAddChild = onAddChild != null && canAddChildType(itemType);
-  const offerChildPriority = childCarriesPriority(item, itemType, allItems);
+  const offerChildPriority = addedChildCarriesPriority(item, itemType, allItems);
 
   // A change in the Inbox: its tasks won't run until it is placed. The
   // placement section reports it, on mount and whenever it changes.

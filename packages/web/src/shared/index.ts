@@ -47,6 +47,7 @@ export {
   isWorkItemType,
   isContainerType,
   childTypeOf,
+  childCarriesPriority,
   parentTypesOf,
   isValidParentType,
   itemTypeLabel,
