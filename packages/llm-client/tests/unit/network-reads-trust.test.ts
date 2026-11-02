@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { collectRepoExecutionConfig, evaluateRepoTrust, recordRepoTrust, repoTrustStateOf } from "../../src/repo-trust.js";
+
+// Pass-through readdirSync spy: the inventory walk is the only directory
+// listing under .rex/ and .hench/ that a trust evaluation makes.
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, readdirSync: vi.fn(actual.readdirSync) };
+});
 
 /**
  * `web.sidecarGithubReads: true` lets the Sidecar run gh with the user's login
@@ -55,6 +62,23 @@ describe("web.sidecarGithubReads in the project config", () => {
     expect(repoTrustStateOf(repo)).toBe("untrusted");
     recordRepoTrust(repo);
     expect(repoTrustStateOf(repo)).toBe("trusted");
+  });
+
+  it("lists no PRD or run directory in repoTrustStateOf, unlike the full evaluation", () => {
+    mkdirSync(join(repo, ".rex", "changes", "a-change"), { recursive: true });
+    mkdirSync(join(repo, ".hench", "runs"), { recursive: true });
+    writeProject({ web: { sidecarGithubReads: true } });
+    const listed = () => vi.mocked(readdirSync).mock.calls
+      .map(([path]) => String(path))
+      .filter((path) => path.startsWith(join(repo, ".rex")) || path.startsWith(join(repo, ".hench")));
+
+    vi.mocked(readdirSync).mockClear();
+    evaluateRepoTrust(repo);
+    expect(listed()).not.toEqual([]);
+
+    vi.mocked(readdirSync).mockClear();
+    repoTrustStateOf(repo);
+    expect(listed()).toEqual([]);
   });
 
   it("leaves the digest and state alone when false", () => {
