@@ -321,6 +321,24 @@
 .sidecar-change-set { display: flex; flex-direction: column; gap: var(--space-1); }
 .sidecar-change-set-placement { margin: 0; font-size: 12px; }
 .sidecar-change-set-inbox { color: var(--orange, var(--text-muted)); }
+/* Placement card (story 29) */
+.sidecar-place { display: flex; flex-direction: column; gap: var(--space-2); font-size: 12px; }
+.sidecar-place-reasons { margin: 0; padding-left: var(--space-3); color: var(--text-muted); }
+.sidecar-place-shortlist { display: flex; flex-direction: column; gap: var(--space-1); border: 0; margin: 0; padding: 0; }
+.sidecar-place-shortlist legend { padding: 0; font-weight: 600; }
+.sidecar-place-row { display: grid; grid-template-columns: auto 1fr; column-gap: var(--space-2); border: 1px solid var(--border); border-radius: 4px; padding: var(--space-1) var(--space-2); cursor: pointer; }
+.sidecar-place-row.is-chosen { border-color: var(--accent, var(--text)); }
+.sidecar-place-row-title { font-weight: 600; }
+.sidecar-place-row-meta, .sidecar-place-row-reasons { grid-column: 2; color: var(--text-muted); }
+.sidecar-place-form, .sidecar-place-amend { display: flex; flex-direction: column; gap: var(--space-1); }
+.sidecar-place-relation { display: flex; gap: var(--space-3); }
+.sidecar-place-statement, .sidecar-place-title { width: 100%; box-sizing: border-box; }
+.sidecar-place-criteria { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+.sidecar-place-criterion { display: flex; gap: var(--space-1); align-items: center; }
+.sidecar-place-criterion-text, .sidecar-place-added-text { flex: 1; min-width: 0; }
+.sidecar-place-added-id { width: 4em; }
+.sidecar-place-check { margin: 0; }
+.sidecar-place-check.is-refused { color: var(--red, var(--text)); }
 .sidecar-change-set-items { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
 .sidecar-change-set-item { border: 1px solid var(--border); border-radius: 4px; padding: var(--space-1) var(--space-2); }
 .sidecar-change-set-item-head { display: flex; gap: var(--space-2); font-size: 11px; color: var(--text-muted); }

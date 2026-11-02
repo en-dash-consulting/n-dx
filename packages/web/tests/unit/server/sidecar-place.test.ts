@@ -375,6 +375,45 @@ describe("place_change_card", () => {
     await client.close();
   });
 
+  it("the operator's edit is what approval writes: the card proposed touches, the edit amends with a criteria delta", async () => {
+    const { tree } = await changeNode();
+    const base = specHash(nodeSpec(indexTree(tree).resolve(CAPABILITY_ID)!));
+    const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "touches" });
+    const criteria = { add: [{ id: "c3", text: "A declined card can be retried" }] };
+
+    const res = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "amends", criteria } });
+    expect(res.status).toBe(200);
+    const result = await call;
+    expect(result.isError).toBeFalsy();
+    expect(resultText(result)).toContain(`it amends Pay by card (${CAPABILITY_ID})`);
+    const { change } = await changeNode();
+    expect(change.touches ?? []).toEqual([]);
+    expect(change.amends).toEqual([expect.objectContaining({ target: CAPABILITY_ID, delta: "modified", criteria, base })]);
+    const decided = broker.cards(SESSION).find((c) => c.id === card.id)!;
+    expect(decided).toMatchObject({ edited: true, placement: { request: { action: "place", relation: "amends" }, check: { ok: true, relation: "amends", base } } });
+    await client.close();
+  });
+
+  it("an edit rex refuses, or that cannot be read, is a 400 that leaves the card waiting and writes nothing", async () => {
+    const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "touches" });
+    const before = treeHash();
+    // amends with no amendment: rex's nothing-to-modify.
+    const refused = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "amends" } });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error: string }).error).toContain("nothing-to-modify");
+    expect((await decide(card.id, { decision: "approve", edits: "touches" })).status).toBe(400);
+    expect((await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, propose: { type: "capability", under: AREA_ID, title: "x" } } })).status).toBe(400);
+    expect(treeHash()).toBe(before);
+    expect(broker.cards(SESSION).find((c) => c.id === card.id)!.status).toBe("pending");
+
+    // A denial carries no edit, and Leave in Inbox (a denial) writes nothing.
+    expect((await decide(card.id, { decision: "deny", edits: { target: CAPABILITY_ID } })).status).toBe(409);
+    await decide(card.id, { decision: "deny", reason: "Left in the Inbox" });
+    expect((await call).isError).toBe(true);
+    expect(treeHash()).toBe(before);
+    await client.close();
+  });
+
   it("raises no card for a change that does not exist, or a call that gives both a target and a proposal", async () => {
     const client = await brokerClient();
     const missing = await client.callTool({ name: "place_change_card", arguments: { change: "no-such", target: CAPABILITY_ID, reasons: ["r"] } });

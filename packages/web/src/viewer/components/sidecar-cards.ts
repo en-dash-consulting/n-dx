@@ -35,6 +35,10 @@ import { useCliName } from "../hooks/index.js";
 import type { SidecarCard, SidecarCardDecision, SidecarCardKind, SidecarState } from "../hooks/index.js";
 import type { QueuePlan, SidecarChangeSetEdit } from "../external.js";
 import { CopyTextButton } from "./copy-text-button.js";
+import { PlacementBody, placementDecidable, placementTitle, type PlacementEdit } from "./sidecar-placement.js";
+
+/** A placement card's decision note when the operator leaves the change in the Inbox: nothing is written. */
+export const LEFT_IN_INBOX_REASON = "Left in the Inbox by the operator; nothing was written";
 
 export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>> = {
   command: "Command",
@@ -83,7 +87,9 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       }
       case "change-set": return count(input.items, "item", "items");
       case "run-plan": return card.runPlan ? count(card.runPlan.lanes, "lane", "lanes") : "";
-      case "placement": return str(input.change) && str(input.target) ? `${str(input.change)} → ${str(input.target)}` : "";
+      // The card's own placement, as approval will write it; the call's input only when the card carries none.
+      case "placement":
+        return card.placement ? placementTitle(card.placement) : str(input.change) && str(input.target) ? `${str(input.change)} → ${str(input.target)}` : "";
       case "edit": return str(input.path);
       case "network-read": return [str(input.kind), str(input.ref)].filter(Boolean).join(" ");
       case "draft-post": return [str(input.kind), str(input.target)].filter(Boolean).join(" · ");
@@ -436,10 +442,13 @@ interface CardProps {
   /** The first waiting change-set card's edits, by item index. */
   drafts: Readonly<Record<number, ChangeSetDraft>>;
   onDraft: (index: number, draft: ChangeSetDraft) => void;
+  /** The first waiting placement card's edit and its re-check. */
+  placementEdit: PlacementEdit | null;
+  onPlacementEdit: (edit: PlacementEdit | null) => void;
   onRestartLane?: (lane: number) => void;
 }
 
-function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, onRestartLane }: CardProps) {
+function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, placementEdit, onPlacementEdit, onRestartLane }: CardProps) {
   const state = sidecarCardState(card);
   const input = h("pre", { class: "sidecar-card-input" }, JSON.stringify(card.input, null, 2));
   const editable = first && state === "pending";
@@ -449,6 +458,11 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
         h(ChangeSetBody, { card, editable, drafts: editable ? drafts : {}, onDraft }),
         h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
       ]
+    : card.placement
+      ? [
+          h(PlacementBody, { card, editable, onEdit: onPlacementEdit }),
+          h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
+        ]
     : card.runPlan
       ? h(RunPlanBody, { card, cards, decidable: editable, deciding, onStartLane: (lane) => onDecide({ approve: true, lane }), onRestartLane })
       : card.kind === "draft-post" || card.kind === "network-read"
@@ -486,10 +500,20 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
               // A run plan is approved by choosing a lane on the card, never by a bare approval.
               card.runPlan
                 ? null
-                : h("button", { type: "button", class: "sidecar-card-approve", disabled: deciding, onClick: () => onDecide({ approve: true }) },
+                : h("button", {
+                    type: "button", class: "sidecar-card-approve",
+                    // Place waits for the dry-run line of the placement as edited.
+                    disabled: deciding || (!!card.placement && !placementDecidable(card, placementEdit)),
+                    onClick: () => onDecide({ approve: true }),
+                  },
                     card.changeSet
                       ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}`
+                      : card.placement ? "Place"
                       : draft ? "Post under your gh login" : "Approve"),
+              // Leaving the change in the Inbox settles the card as denied and writes nothing.
+              card.placement
+                ? h("button", { type: "button", class: "sidecar-card-leave", disabled: deciding, onClick: () => onDecide({ approve: false, reason: LEFT_IN_INBOX_REASON }) }, "Leave in Inbox")
+                : null,
               // Copy hands the draft to the operator and posts nothing: it settles the card as denied.
               draft ? h(DraftCopyButton, { text: str(card.input.body), deciding, onCopied: () => onDecide({ approve: false, reason: DRAFT_COPIED_REASON }) }) : null,
               h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) },
@@ -530,19 +554,26 @@ export function SidecarCards({ cards, manifest, decide, send }: SidecarCardsProp
   const first = cards.find((c) => c.status === "pending") ?? null;
   const [note, setNote] = useState("");
   const [drafts, setDrafts] = useState<Record<number, ChangeSetDraft>>({});
+  const [placementEdit, setPlacementEdit] = useState<PlacementEdit | null>(null);
   const [deciding, setDeciding] = useState(false);
   const firstId = first?.id ?? null;
 
-  // A note, and a change set's edits, belong to the card they were typed on.
-  useEffect(() => { setNote(""); setDrafts({}); }, [firstId]);
+  // A note, and a change set's or placement's edits, belong to the card they were typed on.
+  useEffect(() => { setNote(""); setDrafts({}); setPlacementEdit(null); }, [firstId]);
 
   const answer = async (decision: SidecarCardDecision) => {
     if (!first || deciding) return;
     // ⌘↵ is no answer to a run plan: only a lane's Start lane approves it.
     if (first.runPlan && decision.approve && decision.lane === undefined) return;
+    // Nor of a placement until the dry-run line for the placement shown is back.
+    if (first.placement && decision.approve && !placementDecidable(first, placementEdit)) return;
     setDeciding(true);
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.
+      if (decision.approve && first.placement && placementEdit) {
+        await decide(first.id, { ...decision, edits: placementEdit.body });
+        return;
+      }
       const edits = decision.approve && first.changeSet ? changeSetEdits(first, drafts) : [];
       await decide(first.id, edits.length > 0 ? { ...decision, edits } : decision);
     } finally {
@@ -583,6 +614,8 @@ export function SidecarCards({ cards, manifest, decide, send }: SidecarCardsProp
       deciding,
       onDecide: (decision: SidecarCardDecision) => { void answer(decision); },
       drafts,
+      placementEdit: card.id === firstId ? placementEdit : null,
+      onPlacementEdit: setPlacementEdit,
       onDraft: (index: number, draft: ChangeSetDraft) => setDrafts((prev) => ({ ...prev, [index]: draft })),
       onRestartLane: send ? (lane: number) => { void send(runPlanRestartPrompt(card, lane)); } : undefined,
     })),

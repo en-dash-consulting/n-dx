@@ -30,6 +30,7 @@ import {
   ServerUnavailableNotice,
   SidecarDock,
 } from "./components/index.js";
+import { PlaceWithSidecarContext } from "./components/place-with-sidecar.js";
 import {
   useRouteState,
   usePageEntry,
@@ -153,6 +154,8 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   const [openTask, setOpenTask] = useState<string | null>(null);
   // The Workspaces board reports the worktree card attached to Sidecar (Diagnose branch).
   const [openWorktree, setOpenWorktree] = useState<string | null>(null);
+  // The change "Place with Sidecar" attached (Place lens); dropped when the operator leaves the page.
+  const [openChange, setOpenChange] = useState<string | null>(null);
   const {
     showRecovery,
     crashLoop,
@@ -181,9 +184,15 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
   // A static export has no server to hold a session.
   const sidecarShell = useSidecarShell(
     useFeatureToggle("web.sidecar", false) && !isDeployedMode(),
-    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree },
+    { view: pageView, zone: page.zone, taskId: openTask ?? page.taskId, capabilityId: openCapability, worktree: openWorktree, changeId: openChange },
   );
   const showSidecar = sidecarShell.drawer.show;
+  useEffect(() => { setOpenChange(null); }, [pageView]);
+  // Null while Sidecar is off, so no change offers "Place with Sidecar".
+  const placeWithSidecar = useMemo(
+    () => (sidecarShell.button ? { place: (id: string) => { setOpenChange(id); showSidecar(); }, attached: openChange } : null),
+    [sidecarShell.button !== null, showSidecar, openChange],
+  );
   // Null while Sidecar is off, so the Workspaces cards offer no attach control.
   const attachWorktree = useMemo(
     () => (sidecarShell.button ? (key: string | null) => {
@@ -265,7 +274,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
   const viewCtx = { data, setDetail, setPrdDetailContent, detailOpen: detail !== null && !isFeatureDisabled("detailPanel"), selectedFile: page.file, setSelectedFile, selectedZone: page.zone, selectedRunId: page.runId, selectedTaskId: page.taskId, setOpenCapability, setOpenTask, attachWorktree, attachedWorktree: openWorktree, askSeed, navigateTo, isFeatureDisabled, askEnabled, validViews, jobs };
 
-  return h(Fragment, null,
+  return h(PlaceWithSidecarContext.Provider, { value: placeWithSidecar }, h(Fragment, null,
     // Skip link must be the first focusable element so keyboard users can bypass navigation.
     h("a", { href: "#main-content", class: "skip-link" }, "Skip to main content"),
     h(CrashRecoveryBanner, { visible: showRecovery, crashLoop, recentCrashCount, recoveredState, onDismiss: dismissRecovery, onRestore: handleRestore }),
@@ -344,7 +353,7 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
       : null,
     h(SearchOverlay, { visible: searchOpen, onClose: closeSearch, navigateTo }),
     h(NeolithicOverlay, { visible: neolithicOpen, onClose: closeNeolithic }),
-  );
+  ));
 }
 
 const root = document.getElementById("app");

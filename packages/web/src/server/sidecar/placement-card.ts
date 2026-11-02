@@ -55,6 +55,30 @@ export async function readPlacementCall(rexDir: string, input: Record<string, un
   return { change: change.trim(), request, reasons: (reasons as string[]).map((r) => r.trim()), check };
 }
 
+/**
+ * The operator's edit of a placement card, as the body `POST …/placement/check`
+ * takes, read and dry-run on the PRD as loaded. Approval writes this placement
+ * in place of the card's own; a string says why the edit cannot be approved
+ * (unreadable, or refused by rex), and nothing is changed.
+ */
+export async function readPlacementEdit(
+  rexDir: string,
+  change: string,
+  edits: unknown,
+): Promise<Pick<SidecarPlacement, "request" | "check"> | string> {
+  if (!edits || typeof edits !== "object" || Array.isArray(edits)) return "a placement card's edit must be a placement object";
+  const request = parsePlacementRequest(edits as Record<string, unknown>);
+  if (typeof request === "string") return request;
+  let check: SidecarPlacement["check"];
+  try {
+    check = await checkPlacementOnDisk(rexDir, change, request);
+  } catch (err) {
+    return errorMessage(err);
+  }
+  if (!check.ok) return `Rex would refuse the edited placement (kind: ${check.kind}): ${check.error}`;
+  return { request, check };
+}
+
 /** An approved placement card's write and its tool result. Never throws. */
 export async function writePlacementCard(
   ctx: ServerContext,

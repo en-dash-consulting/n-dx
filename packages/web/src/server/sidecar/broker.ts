@@ -63,7 +63,7 @@ export interface SidecarCard {
   reason?: string;
   /** Approved with "always allow": its rule went onto the allow-list. */
   remembered?: true;
-  /** The operator edited the change set before approving it. */
+  /** The operator edited the change set or the placement before approving it. */
   edited?: true;
   /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote. */
   carriedOut?: { ok: boolean; ids?: string[] };
@@ -90,6 +90,12 @@ export interface CardDecision {
   remember?: boolean;
   /** A change-set card's item edits, written by the approval. Refused on any other card or decision. */
   edits?: unknown;
+  /**
+   * A placement card's edited placement, already read and dry-run against the
+   * PRD (`readPlacementEdit`): approval writes it in place of the card's own.
+   * Only on a placement approval, and only a placement rex accepted.
+   */
+  placement?: Pick<SidecarPlacement, "request" | "check">;
   /** A run-plan card's Start lane: the lane (0-based) whose first task is to be started. Only on a run-plan approval, and required there. */
   lane?: number;
 }
@@ -238,6 +244,11 @@ export class SidecarBroker {
       if (typeof applied === "string") throw new BrokerDecisionError(400, applied);
       edited = applied;
     }
+    if (decision.placement !== undefined) {
+      if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries an edited placement");
+      if (!card.placement) throw new BrokerDecisionError(409, `A ${card.kind} card takes no placement`);
+      if (!decision.placement.check.ok) throw new BrokerDecisionError(400, "An edited placement rex refuses cannot be approved");
+    }
     if (card.kind === "run-plan" && decision.approve) {
       const lanes = card.runPlan?.lanes.length ?? 0;
       if (decision.lane === undefined) throw new BrokerDecisionError(400, "A run-plan card is approved by choosing a lane to start");
@@ -257,6 +268,10 @@ export class SidecarBroker {
     }
     if (edited) {
       card.changeSet = edited;
+      card.edited = true;
+    }
+    if (decision.placement && card.placement) {
+      card.placement = { ...card.placement, ...decision.placement };
       card.edited = true;
     }
     if (decision.lane !== undefined) card.lane = decision.lane;
