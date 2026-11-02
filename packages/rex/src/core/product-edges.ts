@@ -225,15 +225,17 @@ export function sharedFilePairs(filesById: ReadonlyMap<string, readonly string[]
 export interface AreaLink {
   /** The other area's id. */
   id: string;
-  /** Summed over capability pairs across the two areas: how many changes amend or touch both. */
+  /** How many distinct changes amend or touch a capability in each of the two areas. */
   coChanges: number;
   /** Test files run by a capability in each area, sorted. */
   sharedTests: string[];
 }
 
 /**
- * Area → the other areas its capabilities are tied to, rolled up from
- * capability `coChanges` and from test files capabilities in both areas run
+ * Area → the other areas its capabilities are tied to, rolled up from the
+ * changes that amend or touch a capability in both areas (`changedBy`, each
+ * change counted once per area pair however many of its capabilities it
+ * touches) and from test files capabilities in both areas run
  * ({@link capabilityTestFiles}). Computed, never stored: no schema field holds
  * it. Live capabilities only; a capability's area is its nearest area
  * ancestor, and pairs inside one area add nothing. Strongest link first (more
@@ -259,11 +261,12 @@ export function computeAreaLinks(tree: V2Tree, edges: ProductEdges = computeEdge
     const row = links.get(a) ?? links.set(a, new Map()).get(a)!;
     return row.get(b) ?? row.set(b, { coChanges: 0, tests: new Set() }).get(b)!;
   };
+  const areasOfChange = new Map<string, Set<string>>();
   for (const [capability, area] of areaOf) {
-    for (const { id, changes } of edges.coChanges[capability] ?? []) {
-      const other = areaOf.get(id);
-      if (other !== undefined && other !== area) link(area, other).coChanges += changes;
-    }
+    for (const change of edges.changedBy[capability] ?? []) (areasOfChange.get(change) ?? areasOfChange.set(change, new Set()).get(change)!).add(area);
+  }
+  for (const areas of areasOfChange.values()) {
+    for (const a of areas) for (const b of areas) if (a !== b) link(a, b).coChanges += 1;
   }
   for (const { a, b, files } of sharedFilePairs(tests)) {
     const [areaA, areaB] = [areaOf.get(a)!, areaOf.get(b)!];

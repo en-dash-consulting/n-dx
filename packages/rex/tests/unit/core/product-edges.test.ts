@@ -214,6 +214,16 @@ describe("computeAreaLinks", () => {
     expect(changes.y).toEqual([{ id: "x", coChanges: 1, sharedTests: [] }]);
   });
 
+  it("counts a change once per area pair, however many capabilities in one area it touches", () => {
+    const t = tree(
+      [area("x", [cap("cx1"), cap("cx2")]), area("y", [cap("cy")])],
+      [change("c", { touches: ["cx1", "cx2", "cy"] }), change("d", { amends: [amend("cx2", "modified")], touches: ["cy"] })],
+    );
+    const links = computeAreaLinks(t);
+    expect(links.x).toEqual([{ id: "y", coChanges: 2, sharedTests: [] }]);
+    expect(links.y).toEqual([{ id: "x", coChanges: 2, sharedTests: [] }]);
+  });
+
   it("gives no link to areas whose capabilities share nothing, or share only within one area", () => {
     const t = tree(
       [

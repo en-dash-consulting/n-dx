@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import { formatPlanFile, parsePlanFile } from "../../../../src/migrations/plan-file.js";
 import { findMigration, MIGRATIONS } from "../../../../src/migrations/registry.js";
-import { v1ToV2, v1TreeSource, V1_TREE_SOURCE_KIND } from "../../../../src/migrations/v1-to-v2/index.js";
+import { MAX_DEPENDS_ON_TEST_HOLDERS, proposeDependsOn, v1ToV2, v1TreeSource, V1_TREE_SOURCE_KIND, type V1ToV2Entry } from "../../../../src/migrations/v1-to-v2/index.js";
 
 function item(id: string, level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
   return { id, level, title, status, children, ...extra };
@@ -112,7 +112,22 @@ describe("migration registry", () => {
       expect(plan.entries.fb?.dependsOn).toEqual([{ capability: "fa", tests: [SHARED] }]);
       expect(plan.entries.fa?.dependsOn).toBeUndefined();
       expect(plan.entries.fc?.dependsOn).toBeUndefined();
+      expect(plan.summary.proposedDependsOn).toBe(1);
       expect(parsePlanFile(formatPlanFile(plan))).toEqual(JSON.parse(formatPlanFile(plan)));
+    });
+
+    it("proposes nothing from a test more than MAX_DEPENDS_ON_TEST_HOLDERS capabilities link", () => {
+      const capability = (id: string, tests: string[]) => ({ id, target: "capability", spec: { tests } }) as unknown as V1ToV2Entry;
+      const broad = "tests/suite.test.ts";
+      const ids = Array.from({ length: MAX_DEPENDS_ON_TEST_HOLDERS + 1 }, (_, i) => `c${i}`);
+      const entries = Object.fromEntries(ids.map((id) => [id, capability(id, id === "c2" ? [broad, "tests/narrow.test.ts"] : id === "c3" ? [broad, "tests/narrow.test.ts"] : [broad])]));
+      const out = proposeDependsOn(entries);
+      expect(Object.values(out).flatMap((e) => e.dependsOn ?? [])).toEqual([{ capability: "c2", tests: ["tests/narrow.test.ts"] }]);
+      expect(out.c3?.dependsOn).toEqual([{ capability: "c2", tests: ["tests/narrow.test.ts"] }]);
+
+      const few = Object.fromEntries(ids.slice(0, MAX_DEPENDS_ON_TEST_HOLDERS).map((id) => [id, capability(id, [broad])]));
+      const proposals = Object.values(proposeDependsOn(few)).flatMap((e) => e.dependsOn ?? []);
+      expect(proposals).toHaveLength((MAX_DEPENDS_ON_TEST_HOLDERS * (MAX_DEPENDS_ON_TEST_HOLDERS - 1)) / 2);
     });
 
     it("proposes no dependsOn for capabilities that share no test", async () => {
@@ -121,6 +136,7 @@ describe("migration registry", () => {
       expect(plan.entries.fa?.spec?.tests).toEqual([SHARED]);
       expect(plan.entries.fb?.spec?.tests).toEqual([OTHER]);
       expect(Object.values(plan.entries).some((e) => e.dependsOn !== undefined)).toBe(false);
+      expect(plan.summary.proposedDependsOn).toBeUndefined();
     });
   });
 });

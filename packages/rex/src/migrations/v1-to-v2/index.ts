@@ -8,8 +8,8 @@
  * hold (`./placement-pass.ts`); the template specs are drafted again from the
  * settled placements; the text pass redrafts them (`./spec-pass.ts`); Jev
  * reviews the plan (`./jev-review-pass.ts`); last, each capability is proposed
- * a `dependsOn` on every earlier capability it shares a linked test file with
- * ({@link proposeDependsOn}). The caller supplies the seams
+ * a `dependsOn` on every earlier capability it shares a linked test file with,
+ * a test too many capabilities link aside ({@link proposeDependsOn}). The caller supplies the seams
  * with `planSeams` (`./seams.ts`). The summary ends with the review queue.
  * `./apply.ts` applies a reviewed plan (`rex migrate-apply`).
  *
@@ -118,6 +118,8 @@ export interface V1ToV2Summary {
   evidenceDigest?: string;
   /** Held items first, then entries Jev judged by ascending confidence: reviewers start with the weakest calls. */
   reviewQueue: ReviewQueueItem[];
+  /** How many `dependsOn` the plan proposes for review (each entry's `dependsOn`); absent when none. */
+  proposedDependsOn?: number;
   /** What the Jev review flagged and dropped; absent when Jev reviewed nothing. */
   jevReview?: JevReviewSummary;
 }
@@ -150,12 +152,22 @@ function draftSettledSpecs(
 }
 
 /**
+ * A test file more capabilities than this link is broad (a suite-wide or
+ * integration test), not evidence that two of them depend on each other: it
+ * proposes no `dependsOn`, as a test matching too many criteria links none.
+ * k holders would otherwise yield k(k-1)/2 proposals and bury the useful ones.
+ */
+export const MAX_DEPENDS_ON_TEST_HOLDERS = 3;
+
+/**
  * Propose `dependsOn` where two capabilities' settled specs link a test file
  * in common: a shared test exercises both, so a change to one can break the
  * other. Shared tests are symmetric and `dependsOn` is not, so the capability
  * later in plan order depends on the earlier one; every edge points back in
- * plan order, so the proposals cannot form a cycle. A proposal for review: the
- * apply does not write it. Re-derived from scratch on every run.
+ * plan order, so the proposals cannot form a cycle. A test linked by more than
+ * {@link MAX_DEPENDS_ON_TEST_HOLDERS} capabilities proposes nothing. A
+ * proposal for review: the apply does not write it. Re-derived from scratch
+ * on every run.
  */
 export function proposeDependsOn(entries: Readonly<Record<string, V1ToV2Entry>>): Record<string, V1ToV2Entry> {
   const out: Record<string, V1ToV2Entry> = {};
@@ -163,11 +175,10 @@ export function proposeDependsOn(entries: Readonly<Record<string, V1ToV2Entry>>)
     const { dependsOn: _stale, ...rest } = entry;
     out[id] = rest;
   }
-  const tests = new Map(
-    Object.values(out)
-      .filter((e) => e.target === "capability" && e.spec !== undefined)
-      .map((e) => [e.id, e.spec!.tests] as const),
-  );
+  const linked = Object.values(out).filter((e) => e.target === "capability" && e.spec !== undefined);
+  const holders = new Map<string, number>();
+  for (const e of linked) for (const file of new Set(e.spec!.tests)) holders.set(file, (holders.get(file) ?? 0) + 1);
+  const tests = new Map(linked.map((e) => [e.id, e.spec!.tests.filter((f) => holders.get(f)! <= MAX_DEPENDS_ON_TEST_HOLDERS)] as const));
   for (const { a, b, files } of sharedFilePairs(tests)) {
     const entry = out[b]!;
     out[b] = { ...entry, dependsOn: [...(entry.dependsOn ?? []), { capability: a, tests: files }] };
@@ -228,8 +239,10 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
   summarize(entries, summary, context) {
     const threshold = flagThresholdOf(context.options);
     const jevReview = jevReviewSummary(entries, threshold);
+    const proposedDependsOn = Object.values(entries).reduce((n, e) => n + (e.dependsOn?.length ?? 0), 0);
     return {
       ...summary,
+      ...(proposedDependsOn > 0 ? { proposedDependsOn } : {}),
       areas: summary.areas.map((a) => withJevArea(a, Object.hasOwn(entries, a.id) ? entries[a.id] : undefined, threshold)),
       reviewQueue: reviewQueue(entries, threshold),
       ...(jevReview ? { jevReview } : {}),
