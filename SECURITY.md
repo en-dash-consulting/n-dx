@@ -72,7 +72,12 @@ HTTP, DNS rebinding, and so on). Safe methods are not exempt: a `GET` that
 leaks data or has a side effect counts. So is any way to obtain or bypass the
 token or a session credential — including from another server on a different
 loopback port the operator has open — or to make the hub spawn something other
-than its own project server.
+than its own project server. Every URL n-dx prints, opens or offers for MCP
+registration names `127.0.0.1`, not `localhost`: the servers bind only
+`127.0.0.1`, and `localhost` may resolve to `[::1]` first, where another
+account could listen on the same port. A path that still sends the nonce, the
+token or a session to `[::1]` or another listener not identified as the
+operator's own n-dx server is in scope.
 
 **The agent stays inside the project directory.** Hench's guard rejects path
 traversal, null bytes and symlink escapes, blocks `.hench/`, `.rex/`, `.git/`
@@ -82,6 +87,22 @@ the project, modify its own guard configuration or PRD state through its
 tools, or run a command the allowlist should have refused is in scope. This
 includes prompt-injection paths (a crafted file, PRD item, or tool result)
 when they cross a guard boundary.
+
+**Agent commands run inside the OS sandbox.** On macOS (Seatbelt) and Linux
+(bubblewrap), the processes an agent run starts — hench's tool children, the
+vendor CLI and the hooks of commits hench makes — may read and write only the
+project and a private scratch directory, read the toolchain, reach nothing in
+the operator's home beyond what the policy names, and not touch hench's masked
+state. Tool children get no network by default; on macOS the vendor CLI gets
+outbound HTTPS and the loopback services it needs. `sandbox.mode` and
+`sandbox.network` are read only from `NDX_SANDBOX` / `NDX_SANDBOX_NETWORK`,
+the operator's git-ignored `.n-dx.local.json` and `<ndx home>/config.json`,
+and an autonomous run refuses to start when no backend is usable. A sandbox
+escape — a confined process reading or writing outside those paths, reaching
+masked state or the operator's credentials, getting network beyond the stated
+scope, or starting something outside the sandbox — is in scope, as is a way
+for repository content to switch confinement off or to get an autonomous run
+to start unconfined without the operator's opt-out.
 
 **Repository configuration is reviewed before it is obeyed.** The files that
 decide what n-dx may execute — the hench guard in `.hench/config.json`, the
@@ -120,7 +141,15 @@ in scope.
   not a vulnerability.
 - **Running with `--no-auth` or `web.auth: false`.** Turning the per-user
   token off is an operator decision; what another local account can then do
-  is the documented consequence, not a vulnerability.
+  is the documented consequence, not a vulnerability. (`web.auth: false` is
+  honoured only from `.n-dx.local.json` and `<ndx home>/config.json`; a way
+  for the repository's own files to turn it off is in scope.)
+- **Running without the sandbox.** `NDX_SANDBOX=off`, `sandbox.mode: "off"`,
+  `sandbox.network: "allow"`, and attended runs on a host with no backend
+  (Windows today) execute agent commands with the operator's full
+  permissions, as the run's posture line says. So does the vendor CLI's
+  network on Linux, which bubblewrap cannot filter and which is documented as
+  unrestricted. These are stated limits, not escapes.
 - **Exposing a server beyond loopback.** Running the dashboard, hub or MCP
   endpoints behind a tunnel, a port-forward or on a non-loopback interface is
   unsupported. There is no authentication layer to defeat.
@@ -187,6 +216,9 @@ date rather than go quiet.
 - Review `guard` settings in `.hench/config.json` before loosening them, and
   re-read the [Security section of the README](README.md#security) for what the
   defaults protect.
+- Leave the OS sandbox on, and install bubblewrap on Linux. Read the
+  `sandbox:` line each run prints; `OFF` or `unavailable` means agent
+  commands ran with your full permissions.
 - Know what the OS sandbox leaves reachable on macOS. The Claude CLI's
   Seatbelt profile keeps `~/Library/Keychains` readable, never writable, so
   the CLI can read its login (the agent's own commands and the test gate get

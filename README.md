@@ -355,7 +355,7 @@ claude mcp add --transport http sourcevision http://127.0.0.1:3117/p/<id>/mcp/so
   --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
 ```
 
-**Per-user token.** Loopback is shared by every account on a machine, so the hub, the project servers and the preview server require a token that `ndx start` creates in your ndx home (`~/.ndx/auth.token`, mode 0600). The browser never holds the token: the URL `ndx start` prints carries a single-use sign-in nonce (`?ndx_nonce=…`, valid for about a minute), which the page exchanges for a session credential of its own, kept in that tab's `sessionStorage` and scoped to that port. Reloading the tab keeps it; a tab opened from a signed-in one is handed it; anything else shows a sign-in notice — run `ndx start` again for a fresh link. No cookie is set. Scripts and MCP clients send it as `X-Ndx-Token` or `Authorization: Bearer`. A request without it is answered 401. Disable with `ndx start --no-auth` or `"web": { "auth": false }` in `.n-dx.json`; a bare `web serve` without `--token-file` also runs without one.
+**Per-user token.** Loopback is shared by every account on a machine, so the hub, the project servers and the preview server require a token that `ndx start` creates in your ndx home (`~/.ndx/auth.token`, mode 0600). The browser never holds the token: the URL `ndx start` prints carries a single-use sign-in nonce (`?ndx_nonce=…`, valid for about a minute), which the page exchanges for a session credential of its own, kept in that tab's `sessionStorage` and scoped to that port. Reloading the tab keeps it; a tab opened from a signed-in one is handed it; anything else shows a sign-in notice — run `ndx start` again for a fresh link. No cookie is set. Scripts and MCP clients send it as `X-Ndx-Token` or `Authorization: Bearer`. A request without it is answered 401. Disable with `ndx start --no-auth`, or with `"web": { "auth": false }` in your git-ignored `.n-dx.local.json` (`ndx config web.auth false` writes it there) or in `<ndx home>/config.json` for every project. The same setting in the shared `.n-dx.json`, or in a `.n-dx.local.json` the repository commits, is ignored with a warning: a checkout cannot turn the token off for whoever clones it. A bare `web serve` without `--token-file` also runs without one. Printed URLs and the registration lines above use `127.0.0.1` rather than `localhost`, because the servers bind only `127.0.0.1` and `localhost` may resolve to `[::1]` first, where another account could be listening.
 
 Sessions (`Mcp-Session-Id`), SSE responses and `DELETE` for session close are handled by the project's own server; the hub only proxies. Two registered projects have independent sessions, and a tool call on `/p/A/mcp/rex` writes to A's tree only. `GET /api/hub/projects` lists the registered ids.
 
@@ -449,7 +449,18 @@ Shell commands are restricted to an allowlist of executables: `npm`, `npx`, `nod
 
 ### Network access
 
-The only outbound network connections are to the configured LLM API (Anthropic by default) through `@n-dx/llm-client`. No other HTTP clients, fetch calls, or socket connections exist in the agent runtime.
+The only outbound network connections hench itself makes are to the configured LLM API (Anthropic by default) through `@n-dx/llm-client`. What the commands an agent runs may reach is set by the OS sandbox below.
+
+### OS sandbox
+
+The allowlist decides *which* commands run; it cannot bound what an allowlisted interpreter such as `node` does once it runs. So the processes an agent run starts — hench's own tool children (shell, git, the test runner) on the API loop, the vendor CLI on the CLI loop, and the git hooks of commits hench makes — run inside an operating-system sandbox: Seatbelt (`sandbox-exec`, built in) on macOS, [bubblewrap](https://github.com/containers/bubblewrap) (`bwrap`, install the `bubblewrap` package) on Linux. Windows has no backend yet.
+
+- **Filesystem.** Read-write: the project directory and a private scratch directory (`TMPDIR`). Read-only: the toolchain (system directories, the Node install, the package store). Your home directory is unreachable except for what the policy names (the vendor CLI's own config and credentials). Hench's state (`.hench/`, the `.ndx/` container and, for tool children, `.rex/`) is masked or read-only to the agent's commands.
+- **Network.** `sandbox.network` sets it for tool children: `none` (the default — a build or test suite has no business on the network) or `allow`. The vendor CLI needs its API: on macOS it gets outbound HTTPS (port 443) and the loopback services it needs, nothing else; **on Linux the vendor CLI's network is unrestricted**, because bubblewrap cannot filter by host or port.
+- **Setting it.** `sandbox.mode` is `on` (the default) or `off`. Both settings are read only from places the repository cannot write: the `NDX_SANDBOX` / `NDX_SANDBOX_NETWORK` environment variables, your git-ignored `.n-dx.local.json`, and `<ndx home>/config.json` — never from `.n-dx.json` or `.hench/config.json`, so a clone cannot switch confinement off. Each run prints and records its posture (`sandbox: on (bwrap, tool network none)`).
+- **When confinement is unavailable** (Windows, Linux without `bwrap` or with user namespaces disabled, or already inside a sandbox), an attended run proceeds with a warning that commands have your full user permissions, and an autonomous run (`ndx work --auto`, `--loop`, `--epic-by-epic`) refuses to start. Install the backend, run attended, or opt out explicitly with `NDX_SANDBOX=off` or `"sandbox": { "mode": "off" }`.
+
+A way out of the sandbox — reading or writing outside the paths above, reaching state it masks, or network beyond the stated scope — is in scope for a security report; see [SECURITY.md](SECURITY.md#what-is-in-scope).
 
 ### Rate limiting
 
@@ -465,7 +476,7 @@ Until a repository is trusted, `ndx work` runs under the **default guard** (the 
 
 A task's saved `run` block can only *tighten* a run: it may lower the permission mode, re-enable a test gate, or cap turns and tokens below the project's values, never the reverse; `bypassPermissions` cannot be saved on an item at all, and the rex MCP tools refuse to save a `run` block from inside an agent run.
 
-Two limits to know. With `provider: cli`, the vendor CLI (Claude Code, Codex) executes tools under its own permission system; hench's guard governs only hench's own tool loop, so the permission-mode clamp is what reaches a CLI run. And the command allowlist bounds accidents, not adversaries: `node` and `npx` are in it, so an agent that wants to run arbitrary code can. The trust review is what tells you the repository asked for more than the defaults.
+Two limits to know. With `provider: cli`, the vendor CLI (Claude Code, Codex) executes tools under its own permission system; hench's guard governs only hench's own tool loop, so the permission-mode clamp and the [OS sandbox](#os-sandbox) are what reach a CLI run. And the command allowlist bounds accidents, not adversaries: `node` and `npx` are in it, so an agent that wants to run arbitrary code can. The OS sandbox is the boundary that holds against that code; with it off or unavailable, the allowlist is all there is. The trust review is what tells you the repository asked for more than the defaults.
 
 ### Child-process environment
 
