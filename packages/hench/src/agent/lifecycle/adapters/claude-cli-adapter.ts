@@ -127,7 +127,8 @@ export interface DisallowedToolsOptions {
  *
  * - The commands that read a stored credential: `security
  *   find-generic-password` and each configured helper's command, as
- *   `Bash(<command>:*)` prefix rules.
+ *   `Bash(<command>:*)` prefix rules, plus quoted spellings when a token has
+ *   whitespace.
  *
  * A deny rule outranks the bare grants above, and Claude Code applies
  * `Read(...)` and `Edit(...)` rules to every built-in tool that reads or edits
@@ -148,8 +149,20 @@ export function buildDisallowedTools(options: DisallowedToolsOptions = {}): stri
     ...NDX_CONFIG_BLOCKED_PATHS.map((p) => `Edit(./${p})`),
     `Read(${store})`,
     `Edit(${store})`,
-    ...commands.map((prefix) => `Bash(${prefix.join(" ")}:*)`),
+    ...commands.flatMap(bashPrefixRules),
   ];
+}
+
+/**
+ * `Bash(<prefix>:*)` rules for one command prefix. Claude matches the literal
+ * command, and an agent must quote a token with whitespace to run it, so such a
+ * prefix also gets its double- and single-quoted spellings. A backslash-escaped
+ * space stays unmatched.
+ */
+function bashPrefixRules(prefix: readonly string[]): string[] {
+  const rule = (quote: string) =>
+    `Bash(${prefix.map((token) => (quote && /\s/.test(token) ? `${quote}${token}${quote}` : token)).join(" ")}:*)`;
+  return prefix.some((token) => /\s/.test(token)) ? [rule(""), rule('"'), rule("'")] : [rule("")];
 }
 
 /**

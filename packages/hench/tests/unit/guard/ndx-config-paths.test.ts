@@ -286,6 +286,43 @@ describe("the agent may not run a command that reads a stored credential", () =>
     });
   });
 
+  // An agent must quote a path with a space to run it, and Claude's prefix match
+  // is on the literal command, so the unquoted rule alone never matches.
+  describe("a helper path with a space", () => {
+    function deniedRules(platform: NodeJS.Platform): string[] {
+      const { storePath, commandPrefixes } = agentCredentialDenials({ ndxHome });
+      const disallowedTools = buildDisallowedTools({ storePath, commandPrefixes, platform });
+      const { args } = buildClaudeCliArgs({ systemPrompt: "s", promptText: "p", allowedTools: ["Bash"], disallowedTools }, platform);
+      const at = args.indexOf("--disallowed-tools") + 1;
+      const rules = platform === "win32" ? args[at]!.split(",") : args.slice(at, at + disallowedTools.length);
+      expect(rules).toHaveLength(disallowedTools.length);
+      return rules;
+    }
+
+    it.each(["darwin", "linux", "win32"] as const)("denies the quoted spellings of an interpreter's script (%s)", (platform) => {
+      setHelperCredential("google", ["node", "/x/my dir/get-key.mjs"], { ndxHome });
+      expect(deniedRules(platform)).toEqual(expect.arrayContaining([
+        "Bash(node /x/my dir/get-key.mjs:*)",
+        `Bash(node "/x/my dir/get-key.mjs":*)`,
+        "Bash(node '/x/my dir/get-key.mjs':*)",
+      ]));
+    });
+
+    it.each(["darwin", "linux", "win32"] as const)("denies the quoted spellings of a command whose argv[0] has a space (%s)", (platform) => {
+      setHelperCredential("google", ["/Applications/My Tools/op", "read", "x"], { ndxHome });
+      expect(deniedRules(platform)).toEqual(expect.arrayContaining([
+        "Bash(/Applications/My Tools/op:*)",
+        `Bash("/Applications/My Tools/op":*)`,
+        "Bash('/Applications/My Tools/op':*)",
+      ]));
+    });
+
+    it("adds no quoted spelling when no token has a space", () => {
+      expect(buildDisallowedTools({ storePath: "/s", commandPrefixes: [["node", "/x/get-key.mjs"]], platform: "linux" }))
+        .toEqual(expect.not.arrayContaining([expect.stringMatching(/["']/)]));
+    });
+  });
+
   it("the spawn reads the helpers stored in the ndx home at spawn time", () => {
     const previous = process.env.NDX_HOME;
     process.env.NDX_HOME = ndxHome;

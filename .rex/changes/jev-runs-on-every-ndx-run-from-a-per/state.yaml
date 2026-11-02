@@ -104,7 +104,14 @@ items:
     lastModified: "2026-11-02T18:47:34.394Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5efde56-48b6-4a78-a891-fcda1d312e46":
-    lastModified: "2026-11-02T21:12:58.166Z"
+    status: "completed"
+    startedAt: "2026-11-02T23:12:36.130Z"
+    completedAt: "2026-11-02T23:15:31.974Z"
+    endedAt: "2026-11-02T23:15:31.974Z"
+    activeIntervals: [{"end":"2026-11-02T23:15:31.974Z","start":"2026-11-02T23:12:36.130Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "buildDisallowedTools emits double- and single-quoted spellings for prefixes with a whitespace token (commit 4a119131b)"
+    lastModified: "2026-11-02T23:15:31.974Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f912174e-96e5-41a3-acd9-5c73bae27c5b":
     lastModified: "2026-11-02T18:47:48.407Z"
