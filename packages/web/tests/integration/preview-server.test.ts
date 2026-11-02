@@ -228,6 +228,10 @@ describe("preview layout endpoint", () => {
     expect(await (await fetch(base + path)).text()).toContain("secret-doc");
     expect(await (await fetch(base + path + "style.css")).text()).toBe("body{color:red}");
     expect((await fetch(base + "/__preview/s/forged/style.css", { redirect: "manual" })).status).toBe(302);
+    // A capability path is confined to the document's directory like the plain one.
+    for (const escape of ["%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd", "..%2f..%2f..%2fetc%2fpasswd"]) {
+      expect((await fetch(base + path + escape)).status).toBe(404);
+    }
     // The capability path reads files; it is not a credential for anything else.
     expect((await fetch(base + "/__preview/state", { headers: { "X-Ndx-Token": path.split("/")[3] } })).status).toBe(401);
 
