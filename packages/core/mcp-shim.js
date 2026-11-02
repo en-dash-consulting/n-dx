@@ -34,7 +34,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { getMcpServers } from "./assistant-assets.js";
-import { hubHome, hubRequest, identifyTokenTarget, isHubMarker, loadHubPort, readAuthTokenFile, readHubRegistry, readPidFile, resolveRepo } from "./web.js";
+import { authTokenPath, credentialedHubRequest, hubHome, hubRequest, identifyTokenTarget, isHubMarker, loadHubPort, readAuthTokenFile, readHubRegistry, readPidFile, resolveRepo } from "./web.js";
 
 /** How long a single JSON-RPC round trip may take before it is abandoned. */
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -540,21 +540,29 @@ export async function resolveHubTarget(server, dir) {
   const marker = (await readHubMarker(repo.worktree)) ?? (await readHubMarker(repo.repoRoot));
   const port = marker?.port ?? (await loadHubPort(home));
 
-  const health = await hubRequest(port, "GET", "/api/hub/health", undefined, HEALTH_TIMEOUT_MS);
-  if (health.status !== 200 || health.body?.ok !== true) {
+  // Anonymous first, and only to learn whether anything answers: a hub that
+  // requires the token refuses it with 401, which still says "someone is here".
+  const reachable = await hubRequest(port, "GET", "/api/hub/health", undefined, HEALTH_TIMEOUT_MS);
+  if (reachable.status === 0) {
     if (marker) logStderr(`no hub answering on port ${port} — serving MCP in-process`);
     return null;
   }
 
   // Every bridged request carries the per-user token, and the port may come
   // from a marker file inside the repository: bridge only to a listener
-  // identified as this user's hub.
-  if (readAuthTokenFile()) {
+  // identified as this user's hub, and only then ask it, with the token,
+  // whether it is healthy.
+  if (readAuthTokenFile(authTokenPath(home))) {
     const target = await identifyTokenTarget(port, null, { home });
     if (!target.ok) {
       logStderr(`port ${port} is not this user's n-dx hub (${target.reason}) — serving MCP in-process`);
       return null;
     }
+  }
+  const health = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, HEALTH_TIMEOUT_MS, { home });
+  if (health.status !== 200 || health.body?.ok !== true) {
+    logStderr(`the hub on port ${port} did not answer its health check (HTTP ${health.status}) — serving MCP in-process`);
+    return null;
   }
 
   const id = marker?.projectId ?? findRegisteredProject(await readHubRegistry(home), repo.repoRoot);

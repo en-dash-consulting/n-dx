@@ -52,7 +52,7 @@ import { get as httpGet, request as httpRequest } from "http";
 import { createConnection } from "net";
 import { createHash, randomBytes } from "crypto";
 import { readFile, writeFile, unlink, access } from "fs/promises";
-import { realpathSync, readFileSync, mkdirSync, writeFileSync, chmodSync, statSync } from "fs";
+import { realpathSync, readFileSync, readdirSync, readlinkSync, mkdirSync, writeFileSync, chmodSync, statSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { NDX_HOME_ENV, resolveLayout, resolveNdxHome } from "./layout.js";
@@ -467,35 +467,147 @@ export async function probeHubEndpoint(port) {
  * @returns {number[]} Distinct listener pids.
  */
 export function listenerPidsOnPort(port) {
-  const pids = new Set();
-  try {
-    if (process.platform === "win32") {
-      // netstat -ano lists TCP listeners; grep for ":PORT " at the local address
-      const out = execFileSyncCli("netstat", ["-ano"], { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
-      for (const line of out.split("\n")) {
-        // Look for lines like "  TCP    127.0.0.1:3117    0.0.0.0:0    LISTENING    12345"
-        const m = line.match(/TCP\s+[\d.]+:(\d+)\s+[\d.:]+\s+LISTENING\s+(\d+)/i);
-        if (m && parseInt(m[1], 10) === port) pids.add(parseInt(m[2], 10));
-      }
-    } else {
-      // lsof is available on macOS and most Linux distros. -sTCP:LISTEN drops
-      // the clients. An lsof too old to support it errors out, which lands in
-      // the catch below and reads as "nobody" — a refusal to kill, not a guess.
-      const out = execFileSyncCli(
-        "lsof",
-        ["-t", "-sTCP:LISTEN", "-i", `tcp:${port}`],
-        { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
-      ).trim();
-      for (const line of out.split("\n")) {
-        const pid = parseInt(line.trim(), 10);
-        if (!isNaN(pid)) pids.add(pid);
-      }
+  return queryPortListeners(port).pids;
+}
+
+/**
+ * @typedef {object} PortListenerQuery
+ * @property {number[]} pids          Distinct listener pids that could be attributed.
+ * @property {boolean} unattributed   A listening socket was seen whose owner could not
+ *                                    be named (another user's process, under `ss` or /proc).
+ * @property {string[]} missing       Query tools that are not installed here.
+ */
+
+/**
+ * Who listens on `port`, and how sure the answer is.
+ *
+ * Windows asks `netstat -ano`. Elsewhere `lsof -sTCP:LISTEN` answers first;
+ * on Linux, where lsof is often absent (Debian slim, Docker images) or a
+ * busybox build without `-sTCP`, `ss -ltnp` and then `/proc/net/tcp{,6}` plus
+ * `/proc/<pid>/fd` answer instead. The fallbacks see a socket even when they
+ * cannot see its owner (another account's process), and report that as
+ * `unattributed` so an identity check can refuse rather than take an empty
+ * list for "nobody".
+ *
+ * @param {number} port
+ * @param {{ platform?: string, run?: typeof execFileSyncCli, procRoot?: string }} [deps]
+ * @returns {PortListenerQuery}
+ */
+export function queryPortListeners(port, { platform = process.platform, run = execFileSyncCli, procRoot = "/proc" } = {}) {
+  const missing = [];
+  const capture = (cmd, args) => {
+    try {
+      return run(cmd, args, { encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] });
+    } catch (err) {
+      if (err?.code === "ENOENT") missing.push(cmd);
+      // Otherwise a non-zero exit: lsof exits 1 on no match.
+      return null;
     }
-  } catch {
-    // No listener (lsof exits non-zero on no match), or no query tool at all.
-    return [];
+  };
+
+  if (platform === "win32") {
+    const out = capture("netstat", ["-ano"]);
+    const pids = new Set();
+    for (const line of (out ?? "").split("\n")) {
+      // Look for lines like "  TCP    127.0.0.1:3117    0.0.0.0:0    LISTENING    12345"
+      const m = line.match(/TCP\s+[\d.]+:(\d+)\s+[\d.:]+\s+LISTENING\s+(\d+)/i);
+      if (m && parseInt(m[1], 10) === port) pids.add(parseInt(m[2], 10));
+    }
+    return { pids: [...pids], unattributed: false, missing };
   }
-  return [...pids];
+
+  // -sTCP:LISTEN drops the clients. An lsof too old to support it errors out,
+  // which reads as "no answer" and moves on to the next query.
+  const lsof = capture("lsof", ["-t", "-sTCP:LISTEN", "-i", `tcp:${port}`]);
+  const fromLsof = [...new Set((lsof ?? "").split("\n").map((l) => parseInt(l.trim(), 10)).filter((n) => !isNaN(n)))];
+  if (fromLsof.length > 0 || platform !== "linux") return { pids: fromLsof, unattributed: false, missing };
+
+  const ss = capture("ss", ["-ltnp"]);
+  if (ss !== null) {
+    const parsed = parseSsListeners(ss, port);
+    if (parsed.pids.length > 0 || parsed.unattributed) return { ...parsed, missing };
+  }
+
+  return { ...procNetListeners(port, procRoot), missing };
+}
+
+/**
+ * Listeners on `port` from `ss -ltnp` output. A LISTEN line with no
+ * `users:(…)` is a socket whose owner `ss` was not allowed to see.
+ *
+ * @param {string} text
+ * @param {number} port
+ * @returns {{ pids: number[], unattributed: boolean }}
+ */
+export function parseSsListeners(text, port) {
+  const pids = new Set();
+  let unattributed = false;
+  for (const line of text.split("\n")) {
+    const cols = line.trim().split(/\s+/);
+    if (cols[0] !== "LISTEN" || cols.length < 4) continue;
+    const local = cols[3];
+    const cut = local.lastIndexOf(":");
+    if (cut === -1 || parseInt(local.slice(cut + 1), 10) !== port) continue;
+    const found = [...line.matchAll(/pid=(\d+)/g)].map((m) => parseInt(m[1], 10));
+    if (found.length === 0) unattributed = true;
+    for (const pid of found) pids.add(pid);
+  }
+  return { pids: [...pids], unattributed };
+}
+
+/**
+ * Listening socket inodes on `port` from the text of `/proc/net/tcp` or
+ * `/proc/net/tcp6` (state `0A` is LISTEN; the port is hex after the colon).
+ *
+ * @param {string} text
+ * @param {number} port
+ * @returns {string[]} Socket inodes.
+ */
+export function parseProcNetTcp(text, port) {
+  const inodes = [];
+  for (const line of text.split("\n").slice(1)) {
+    const cols = line.trim().split(/\s+/);
+    if (cols.length < 10 || cols[3] !== "0A") continue;
+    const cut = cols[1].lastIndexOf(":");
+    if (cut === -1 || parseInt(cols[1].slice(cut + 1), 16) !== port) continue;
+    inodes.push(cols[9]);
+  }
+  return inodes;
+}
+
+/**
+ * Listeners on `port` read straight from /proc: the listening inodes, then
+ * whichever process this user can see holding each one as an fd.
+ *
+ * @param {number} port
+ * @param {string} procRoot
+ * @returns {{ pids: number[], unattributed: boolean }}
+ */
+function procNetListeners(port, procRoot) {
+  const inodes = new Set();
+  for (const table of ["tcp", "tcp6"]) {
+    try {
+      for (const inode of parseProcNetTcp(readFileSync(join(procRoot, "net", table), "utf-8"), port)) inodes.add(inode);
+    } catch { /* no such table (IPv6 off) */ }
+  }
+  if (inodes.size === 0) return { pids: [], unattributed: false };
+
+  const owners = new Map();
+  let entries = [];
+  try { entries = readdirSync(procRoot); } catch { entries = []; }
+  for (const entry of entries) {
+    if (!/^\d+$/.test(entry)) continue;
+    let fds;
+    try { fds = readdirSync(join(procRoot, entry, "fd")); } catch { continue; }
+    for (const fd of fds) {
+      let target;
+      try { target = readlinkSync(join(procRoot, entry, "fd", fd)); } catch { continue; }
+      const m = /^socket:\[(\d+)\]$/.exec(target);
+      if (m && inodes.has(m[1])) owners.set(m[1], parseInt(entry, 10));
+    }
+  }
+  const pids = [...new Set(owners.values())];
+  return { pids, unattributed: owners.size < inodes.size };
 }
 
 /**
@@ -1334,14 +1446,20 @@ export function probeProcessOwnership(pid) {
  * @param {number[]} args.listeners         Pids listening on the port ({@link listenerPidsOnPort})
  * @param {number | null} args.uid          Owner uid of the recorded pid from `ps`, or null when unreadable
  * @param {number | null} args.ownUid       This process's uid, or null where the platform has none
+ * @param {boolean} [args.unattributed]     A listener was seen whose owner could not be named
+ * @param {string[]} [args.missing]         Listener query tools that are not installed
  * @returns {{ ok: true, pid: number } | { ok: false, reason: string }}
  */
-export function judgeHubIdentity({ recordedPid, ownership, listeners, uid, ownUid }) {
+export function judgeHubIdentity({ recordedPid, ownership, listeners, uid, ownUid, unattributed = false, missing = [] }) {
   if (!recordedPid) return { ok: false, reason: "no hub is recorded in this user's ndx home" };
   if (ownership === "gone") return { ok: false, reason: `the recorded hub (PID ${recordedPid}) is not running` };
   if (ownership !== "ours") return { ok: false, reason: `the recorded hub pid (${recordedPid}) belongs to another user` };
+  if (unattributed) {
+    return { ok: false, reason: "the port is also held by a process this user cannot identify" };
+  }
   if (listeners.length === 0) {
-    return { ok: false, reason: "no listener could be identified on the port (is lsof installed?)" };
+    const tools = missing.length > 0 ? ` (${missing.join(", ")} not installed${missing.includes("lsof") ? "; install lsof, or ss from iproute2" : ""})` : "";
+    return { ok: false, reason: `no listener could be identified on the port${tools}` };
   }
   const others = listeners.filter((pid) => pid !== recordedPid);
   if (others.length > 0 || listeners.length !== 1) {
@@ -1365,10 +1483,13 @@ export function judgeHubIdentity({ recordedPid, ownership, listeners, uid, ownUi
 export async function identifyOwnHub(port, home = hubHome()) {
   const recordedPid = await readHubPid(home);
   const identity = recordedPid ? readProcessIdentity(recordedPid) : null;
+  const query = queryPortListeners(port);
   return judgeHubIdentity({
     recordedPid,
     ownership: recordedPid ? probeProcessOwnership(recordedPid) : "gone",
-    listeners: listenerPidsOnPort(port),
+    listeners: query.pids,
+    unattributed: query.unattributed,
+    missing: query.missing,
     uid: identity?.uid ?? null,
     ownUid: process.getuid?.() ?? null,
   });
@@ -1444,10 +1565,13 @@ export async function identifyTokenTarget(port, absDir, { home = hubHome(), flag
   return { ok: false, reason: hubReason ?? `port ${port} is not identified as this user's n-dx server` };
 }
 
-/** Whether this user's hub answers on `port`. */
+/**
+ * Whether this user's hub answers on `port`: `{ ok: true }`, or `{ ok: false }`
+ * with the reason the listener was not identified, when that was the cause.
+ */
 async function hubIsHealthy(port, home) {
-  const { status, body } = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
-  return status === 200 && body?.ok === true;
+  const { status, body, foreign } = await credentialedHubRequest(port, "GET", "/api/hub/health", undefined, PROBE_TIMEOUT_MS, { home });
+  return status === 200 && body?.ok === true ? { ok: true } : { ok: false, reason: foreign ?? null };
 }
 
 /**
@@ -1531,12 +1655,18 @@ async function ensureHub(port, { tools, __dir, home, tokenFile = null }) {
   child.unref();
 
   const deadline = Date.now() + HUB_START_TIMEOUT_MS;
+  let lastReason = null;
   while (Date.now() < deadline) {
-    if (await hubIsHealthy(port, home)) return { spawned: true, pid: child.pid };
+    const healthy = await hubIsHealthy(port, home);
+    if (healthy.ok) return { spawned: true, pid: child.pid };
+    lastReason = healthy.reason ?? lastReason;
     if (!isProcessRunning(child.pid)) break;
     await new Promise((r) => setTimeout(r, 200));
   }
-  throw new Error(`n-dx hub did not start on port ${port} within ${HUB_START_TIMEOUT_MS}ms`);
+  // A hub that came up but could not be identified as ours answers nothing
+  // credentialed; say why, rather than reporting it as never started.
+  const why = lastReason ? `: ${lastReason}` : "";
+  throw new Error(`n-dx hub did not start on port ${port} within ${HUB_START_TIMEOUT_MS}ms${why}`);
 }
 
 /**

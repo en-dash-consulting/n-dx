@@ -20,6 +20,9 @@ import {
   loadAuthEnabled,
   loadHubPort,
   parseMainWorktree,
+  parseProcNetTcp,
+  parseSsListeners,
+  queryPortListeners,
   readHubRegistry,
   resolveAuthEnabled,
   resolveRepo,
@@ -227,6 +230,75 @@ describe("judgeHubIdentity", () => {
     // No `ps` (Windows, a sandbox): the null signal's verdict stands on its own.
     expect(judgeHubIdentity({ ...base, uid: null })).toEqual({ ok: true, pid: 4242 });
     expect(judgeHubIdentity({ ...base, uid: null, ownUid: null })).toEqual({ ok: true, pid: 4242 });
+  });
+
+  it("names the missing query tool, and refuses a listener it cannot attribute", () => {
+    expect(judgeHubIdentity({ ...base, listeners: [], missing: ["lsof", "ss"] }))
+      .toMatchObject({ ok: false, reason: expect.stringContaining("lsof, ss not installed") });
+    expect(judgeHubIdentity({ ...base, unattributed: true }))
+      .toMatchObject({ ok: false, reason: expect.stringContaining("cannot identify") });
+  });
+});
+
+describe("listener query fallbacks (Linux without lsof)", () => {
+  const SS = [
+    "State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process",
+    'LISTEN 0      511        127.0.0.1:3117      0.0.0.0:*    users:(("node",pid=4242,fd=21))',
+    "LISTEN 0      128        127.0.0.1:3118      0.0.0.0:*",
+    'LISTEN 0      128             [::1]:3117         [::]:*    users:(("node",pid=4243,fd=5))',
+    "",
+  ].join("\n");
+
+  it("reads listener pids from ss, and flags a socket whose owner it cannot see", () => {
+    expect(parseSsListeners(SS, 3117)).toEqual({ pids: [4242, 4243], unattributed: false });
+    expect(parseSsListeners(SS, 3118)).toEqual({ pids: [], unattributed: true });
+    expect(parseSsListeners(SS, 9999)).toEqual({ pids: [], unattributed: false });
+  });
+
+  it("reads listening inodes for the port from /proc/net/tcp", () => {
+    const table = [
+      "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode",
+      "   0: 0100007F:0C2D 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 55501 1 0",
+      "   1: 0100007F:0C2D 0100007F:D431 01 00000000:00000000 00:00000000 00000000  1000        0 55502 1 0",
+      "   2: 0100007F:0C2E 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1001        0 55503 1 0",
+    ].join("\n");
+    // 0x0C2D is 3117; the ESTABLISHED (01) row is a client, not a listener.
+    expect(parseProcNetTcp(table, 3117)).toEqual(["55501"]);
+    expect(parseProcNetTcp(table, 3118)).toEqual(["55503"]);
+  });
+
+  it("falls back from a missing lsof to ss on Linux, and reports what was missing", () => {
+    const run = (cmd) => {
+      if (cmd === "lsof") throw Object.assign(new Error("spawn lsof ENOENT"), { code: "ENOENT" });
+      if (cmd === "ss") return SS;
+      throw new Error(`unexpected ${cmd}`);
+    };
+    expect(queryPortListeners(3117, { platform: "linux", run, procRoot: "/nonexistent" }))
+      .toEqual({ pids: [4242, 4243], unattributed: false, missing: ["lsof"] });
+  });
+
+  it("falls back to /proc when neither lsof nor ss is installed", () => {
+    const proc = mkdtempSync(join(tmpdir(), "ndx-proc-"));
+    try {
+      mkdirSync(join(proc, "net"));
+      writeFileSync(join(proc, "net", "tcp"), [
+        "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode",
+        "   0: 0100007F:0C2D 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 55501 1 0",
+      ].join("\n"));
+      const run = (cmd) => { throw Object.assign(new Error(`spawn ${cmd} ENOENT`), { code: "ENOENT" }); };
+      // The socket is there but no fd this user can read names it.
+      expect(queryPortListeners(3117, { platform: "linux", run, procRoot: proc }))
+        .toEqual({ pids: [], unattributed: true, missing: ["lsof", "ss"] });
+    } finally {
+      rmSync(proc, { recursive: true, force: true });
+    }
+  });
+
+  it("stays with lsof alone on macOS", () => {
+    const calls = [];
+    const run = (cmd) => { calls.push(cmd); return ""; };
+    expect(queryPortListeners(3117, { platform: "darwin", run }).pids).toEqual([]);
+    expect(calls).toEqual(["lsof"]);
   });
 });
 
