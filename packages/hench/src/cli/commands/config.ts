@@ -105,7 +105,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
   {
     path: "maxCostUsdPerRun",
     label: "Max Cost per Run (USD)",
-    description: "USD spend cap for one run, checked before every vendor spawn. 0 = unlimited",
+    description: "USD spend cap for one run, checked before every vendor spawn or API request. 0 = unlimited",
     type: "number",
     category: "execution",
     impact: (v) =>
@@ -116,7 +116,7 @@ export const CONFIG_FIELDS: ConfigFieldMeta[] = [
   {
     path: "maxCostUsdPerDay",
     label: "Max Cost per Day (USD)",
-    description: "USD spend cap across runs started today, read from .hench/runs before every vendor spawn. 0 = unlimited",
+    description: "USD spend cap across runs started today, read from .hench/runs before every vendor spawn or API request. 0 = unlimited",
     type: "number",
     category: "execution",
     impact: (v) =>

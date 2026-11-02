@@ -30,6 +30,8 @@ import type {
 } from "../../prd/llm-gateway.js";
 import type { TokenUsage } from "../../schema/index.js";
 import { checkTokenBudget } from "./token-budget.js";
+import { createSpendGate, priceRunUsd } from "./spend-cap.js";
+import type { SpendGate } from "./spend-cap.js";
 import { buildCachedMessageRequest } from "./prompt-cache.js";
 import { resolveAgentApiEffort } from "./agent-effort.js";
 import {
@@ -418,6 +420,48 @@ async function failOnLivelock(
   run.error = detection.message;
   stream("Warning", run.error);
   await handleRunFailure(store, taskId, "deferred", "livelock_detected", run.error);
+  return true;
+}
+
+/**
+ * The USD spend gate for an API, Gemini or local run: the same
+ * `hench.maxCostUsdPerRun` / `hench.maxCostUsdPerDay` check the CLI loop runs
+ * before each vendor spawn, run here before each model request. Without it a
+ * task moved to an API provider (a saved `run.provider`, which PRD content can
+ * set) escaped the operator's caps. This run's spend is priced from its own
+ * record, which every turn updates; undefined when neither cap is set.
+ */
+function apiSpendGate(
+  config: HenchConfig,
+  henchDir: string,
+  run: RunRecord,
+  model: string,
+): SpendGate | undefined {
+  return createSpendGate({
+    limits: { maxCostUsdPerRun: config.maxCostUsdPerRun, maxCostUsdPerDay: config.maxCostUsdPerDay },
+    henchDir,
+    runId: run.id,
+    currentRunUsd: () => priceRunUsd({ tokenUsage: run.tokenUsage, turnTokenUsage: run.turnTokenUsage, model }),
+  });
+}
+
+/**
+ * Stop the run when a spend cap is reached, before the next request is sent.
+ * Returns true if it did, so callers read as `if (await stopOnSpendCap(...)) break;`.
+ */
+async function stopOnSpendCap(
+  gate: SpendGate | undefined,
+  run: RunRecord,
+  store: PRDStore,
+  taskId: string,
+): Promise<boolean> {
+  if (!gate) return false;
+  const exceeded = await gate();
+  if (!exceeded) return false;
+  run.status = "budget_exceeded";
+  run.error = exceeded.message;
+  stream("Budget", run.error);
+  await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
   return true;
 }
 
@@ -838,12 +882,14 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         config.prune,
       );
 
+      const spendGate = apiSpendGate(config, henchDir, run, model);
       for (let turn = 0; turn < maxTurns; turn++) {
         if (cancelled) {
           run.status = "cancelled";
           stream("Cancelled", "Run interrupted by user");
           break;
         }
+        if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
         run.turns = turn + 1;
         subsection(`Turn ${turn + 1}/${maxTurns}`);
@@ -1530,6 +1576,7 @@ async function runLocalToolLoop(params: {
     }
   }
 
+  const spendGate = apiSpendGate(config, henchDir, run, model);
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
       if (cancelled) {
@@ -1537,6 +1584,7 @@ async function runLocalToolLoop(params: {
         stream("Cancelled", "Run interrupted by user");
         break;
       }
+      if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
       run.turns = turn + 1;
       subsection(`Turn ${turn + 1}/${maxTurns}`);
@@ -2060,6 +2108,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const heartbeat = startHeartbeat(henchDir, run);
 
   // API-specific: turn-based execution loop
+  const spendGate = apiSpendGate(config, henchDir, run, model);
   let consecutiveEmptyTurns = 0;
   let planOnlyRetryCount = 0;
   const planOnlyMaxRetries = config.planOnlyMaxRetries ?? 2;
@@ -2083,6 +2132,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         stream("Cancelled", "Run interrupted by user");
         break;
       }
+      if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
       run.turns = turn + 1;
 

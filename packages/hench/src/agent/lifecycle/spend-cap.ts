@@ -1,8 +1,10 @@
 /**
  * USD spend caps: `hench.maxCostUsdPerRun` and `hench.maxCostUsdPerDay`.
  *
- * Checked before every vendor spawn, so a run stops before it starts another
- * session it cannot afford rather than learning afterwards that it overspent.
+ * Checked before every vendor spawn (CLI providers) and before every model
+ * request (the API, Gemini and local loops), so a run stops before it starts
+ * another session or turn it cannot afford rather than learning afterwards
+ * that it overspent.
  * Spend is priced with llm-client's model table — the arithmetic `ndx usage`
  * quotes — from the token counts the run ledger (`.hench/runs`) records.
  *

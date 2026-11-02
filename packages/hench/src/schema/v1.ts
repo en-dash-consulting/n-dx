@@ -535,14 +535,14 @@ export interface HenchConfig {
   livelockThreshold?: number;
   /**
    * USD spend cap for one run (one task), priced from its token usage with
-   * llm-client's model table. Checked before every vendor spawn; a run that
-   * has reached it stops with status `budget_exceeded`. 0 or absent =
+   * llm-client's model table. Checked before every vendor spawn and every
+   * API-provider model request; a run that has reached it stops with status `budget_exceeded`. 0 or absent =
    * unlimited. A task's saved `run` block cannot set or raise it.
    */
   maxCostUsdPerRun?: number;
   /**
    * USD spend cap across every run started today (local calendar day), read
-   * from `.hench/runs` before every vendor spawn. Same pricing, status and
+   * from `.hench/runs` before every vendor spawn or API request. Same pricing, status and
    * saved-block rule as {@link maxCostUsdPerRun}. 0 or absent = unlimited.
    */
   maxCostUsdPerDay?: number;
