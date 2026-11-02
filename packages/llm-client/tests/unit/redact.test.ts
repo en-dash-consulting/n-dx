@@ -615,8 +615,13 @@ describe("redactSecrets — prose and lookalikes stay readable", () => {
 describe("redactSecrets — long lines stay linear", () => {
   // The assignment key and the URL scheme were scanned from every word
   // boundary to the end of their run, so a 100 KB hyphenated or dotted line
-  // took tens of seconds; hench redacts each record line synchronously. The
-  // budget is generous for a loaded CI host and still far below that.
+  // took tens of seconds; hench redacts each record line synchronously.
+  // Measured on one Windows host: 7.5–28 s per shape before the bound, 21–84 ms
+  // after. The budget is 100 ms scaled by NDX_TEST_TIME_MULTIPLIER (2 s at the
+  // default), a hang bound that still fails every pre-fix shape; counting is
+  // not available, because the regressed cost is backtracking inside the regex
+  // engine. Listed in tests/wall-clock-assertion-inventory.md.
+  const BUDGET_MS = 100 * Number(process.env["NDX_TEST_TIME_MULTIPLIER"] ?? 20);
   const LINE = 100_000;
   const LINES: Array<[string, string]> = [
     ["hyphenated", "a-".repeat(LINE / 2)],
@@ -626,10 +631,10 @@ describe("redactSecrets — long lines stay linear", () => {
     ["pass suffixes", "db-pass-".repeat(LINE / 8)],
   ];
   for (const [name, text] of LINES) {
-    it(`redacts a 100 KB ${name} line in well under a second`, () => {
+    it(`redacts a 100 KB ${name} line within the linear budget`, () => {
       const started = performance.now();
       redactSecrets(text);
-      expect(performance.now() - started).toBeLessThan(1_500);
+      expect(performance.now() - started).toBeLessThan(BUDGET_MS);
     });
   }
 
