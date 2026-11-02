@@ -392,6 +392,11 @@ export {
   HOME_SECRET_DIRS,
   maskedProjectPathsFor,
   readOnlyProjectPathsFor,
+  gitControlPathsFor,
+  removeSandboxPlaceholders,
+  SANDBOX_MACH_SERVICES,
+  SANDBOX_MACH_SERVICES_DNS,
+  SANDBOX_MACH_SERVICES_VENDOR,
 } from "./sandbox.js";
 export type {
   SandboxPolicy,
@@ -402,6 +407,8 @@ export type {
   SandboxedInvocation,
   OsSandboxMode,
   SandboxSetting,
+  SandboxPathKind,
+  GitControlPaths,
 } from "./sandbox.js";
 
 // Process-tree termination — a kill that reaches descendants, not just the child.

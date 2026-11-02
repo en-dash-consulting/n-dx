@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -6,11 +7,14 @@ import {
   buildBwrapArgs,
   buildSeatbeltProfile,
   detectSandboxBackend,
+  gitControlPathsFor,
   maskedProjectPathsFor,
   nodeToolchainRoots,
   readOnlyProjectPathsFor,
+  removeSandboxPlaceholders,
   resolveSandboxSetting,
   wrapInSandbox,
+  wrapShellInSandbox,
   type SandboxPolicy,
 } from "../../src/sandbox.js";
 
@@ -78,7 +82,7 @@ describe("buildSeatbeltProfile", () => {
     expect(denyLine).toContain('"/private/tmp/proj/.hench/config.json"');
     expect(vendor).toContain('(subpath "/Users/op/.claude")');
     expect(vendor).toContain('(allow network-outbound (remote tcp "*:443"))');
-    expect(vendor).toContain('(allow network* (local ip "localhost:*"))');
+    expect(vendor).toContain('(allow network-bind network-inbound (local ip "localhost:*"))');
     expect(vendor).not.toContain("(deny network*)");
   });
   it("opens the network only when asked", () => {
@@ -261,5 +265,291 @@ describe("git-hook policy", () => {
     expect(joined).not.toContain("--tmpfs /private/tmp/proj/.hench");
     expect(joined).not.toContain("/private/tmp/proj/.rex");
     expect(joined.indexOf("--ro-bind /private/tmp/proj/.hench")).toBeGreaterThan(joined.indexOf("--bind /private/tmp/proj "));
+  });
+});
+
+/** A real, realpath'd temp directory: Seatbelt and the git walk see resolved paths. */
+function realTemp(prefix: string): string {
+  return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+}
+
+function denyWriteLines(profile: string): string {
+  return profile.split("\n").filter((l) => l.startsWith("(deny file-write* ")).join("\n");
+}
+
+describe("git control files", () => {
+  function mainRepo(): string {
+    const dir = realTemp("sbx-git-");
+    mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+    writeFileSync(join(dir, ".git", "config"), "[core]\n");
+    return dir;
+  }
+
+  /** A linked worktree: `<wt>/.git` names `<common>/worktrees/wt`, whose `commondir` leads back. */
+  function linkedWorktree(): { wt: string; common: string; own: string } {
+    const root = realTemp("sbx-wt-");
+    const common = join(root, "main", ".git");
+    const own = join(common, "worktrees", "wt");
+    mkdirSync(own, { recursive: true });
+    writeFileSync(join(common, "config"), "[core]\n");
+    writeFileSync(join(own, "commondir"), "../..\n");
+    const wt = join(root, "wt");
+    mkdirSync(wt);
+    writeFileSync(join(wt, ".git"), `gitdir: ${own}\n`);
+    return { wt, common, own };
+  }
+
+  it("finds the project's git directory and its control files", () => {
+    const dir = mainRepo();
+    const git = gitControlPathsFor(dir);
+    expect(git.dirs).toEqual([join(dir, ".git")]);
+    expect(git.readOnly).toEqual(expect.arrayContaining([
+      join(dir, ".git", "config"),
+      join(dir, ".git", "config.worktree"),
+      join(dir, ".git", "commondir"),
+      join(dir, ".git", "hooks"),
+      join(dir, ".git", "info", "attributes"),
+    ]));
+  });
+
+  it("follows a linked worktree's .git file to its own and the common git directory", () => {
+    const { wt, common, own } = linkedWorktree();
+    const git = gitControlPathsFor(wt);
+    expect(git.dirs).toEqual([own, common]);
+    expect(git.readOnly).toEqual(expect.arrayContaining([
+      join(wt, ".git"),
+      join(own, "commondir"),
+      join(common, "config"),
+      join(common, "hooks"),
+    ]));
+  });
+
+  it.each(["tool", "vendor-cli", "git-hook"] as const)("keeps .git/config read-only to a %s child under Seatbelt", (kind) => {
+    const dir = mainRepo();
+    const profile = buildSeatbeltProfile({ ...policy, kind, projectDir: dir });
+    const denies = denyWriteLines(profile);
+    expect(denies).toContain(`(subpath "${dir}/.git/config")`);
+    expect(denies).toContain(`(subpath "${dir}/.git/hooks")`);
+    expect(denies).toContain(`(subpath "${dir}/.git/commondir")`);
+    expect(denies).toContain(`(subpath "${dir}/.git/info/attributes")`);
+    // The directory entry itself cannot be renamed away, but stays writable inside.
+    expect(denies).toContain(`(literal "${dir}/.git")`);
+    expect(denies).not.toContain(`(subpath "${dir}/.git")`);
+    // The deny comes after the project grant, so it wins.
+    expect(profile.indexOf(`(subpath "${dir}/.git/config")`)).toBeGreaterThan(profile.indexOf(`(allow file-read* file-write* (subpath "${dir}")`));
+  });
+
+  it("protects the common directory's config for a vendor CLI granted a linked worktree's git directory", () => {
+    const { wt, common } = linkedWorktree();
+    const vendorPolicy: SandboxPolicy = { ...policy, kind: "vendor-cli", network: "vendor", projectDir: wt, readWriteRoots: [common] };
+    const denies = denyWriteLines(buildSeatbeltProfile(vendorPolicy));
+    expect(denies).toContain(`(subpath "${common}/config")`);
+    expect(denies).toContain(`(subpath "${wt}/.git")`);
+
+    const args = buildBwrapArgs(vendorPolicy).join(" ");
+    expect(args).toContain(`--ro-bind ${common}/config ${common}/config`);
+    expect(args).toContain(`--ro-bind ${wt}/.git ${wt}/.git`);
+    expect(args).toContain(`--bind ${common} ${common}`);
+  });
+
+  it("pins the git directory and binds its config read-only under bubblewrap", () => {
+    const dir = mainRepo();
+    const args = buildBwrapArgs({ ...policy, projectDir: dir });
+    const joined = args.join(" ");
+    expect(joined).toContain(`--bind ${dir}/.git ${dir}/.git`);
+    expect(joined).toContain(`--ro-bind ${dir}/.git/config ${dir}/.git/config`);
+    expect(joined).toContain(`--ro-bind ${dir}/.git/hooks ${dir}/.git/hooks`);
+    expect(joined.indexOf(`--ro-bind ${dir}/.git/config`)).toBeGreaterThan(joined.indexOf(`--bind ${dir} `));
+    // An absent commondir gets no empty placeholder: git refuses an empty one.
+    expect(joined).not.toContain(`${dir}/.git/commondir`);
+  });
+
+  it("does not grant a git directory outside every writable root", () => {
+    const { wt, common } = linkedWorktree();
+    const joined = buildBwrapArgs({ ...policy, projectDir: wt }).join(" ");
+    expect(joined).not.toContain(common);
+  });
+
+  const backend = detectSandboxBackend();
+  it.skipIf(!backend.available)("refuses a confined child's write to .git/config", () => {
+    const dir = mainRepo();
+    const scratch = realTemp("sbx-scratch-");
+    const confined: SandboxPolicy = { ...policy, projectDir: dir, tmpDir: scratch, readOnlyRoots: [] };
+    const run = (command: string) => {
+      const inv = wrapShellInSandbox(command, confined, backend);
+      return spawnSync(inv.file, inv.args, { cwd: dir, env: { ...process.env, ...inv.env } }).status;
+    };
+    // The control: the same sandbox writes the project and git's own state.
+    expect(run("echo ok > ok.txt && echo ref > .git/ORIG_HEAD")).toBe(0);
+    expect(run("printf '[core]\\n\\tfsmonitor = evil\\n' >> .git/config")).not.toBe(0);
+    expect(run("mv .git .git-moved")).not.toBe(0);
+    expect(readFileSync(join(dir, ".git", "config"), "utf-8")).toBe("[core]\n");
+    expect(readFileSync(join(dir, "ok.txt"), "utf-8")).toBe("ok\n");
+  });
+});
+
+describe("vendor network profile", () => {
+  const vendorNet: SandboxPolicy = { ...policy, kind: "vendor-cli", network: "vendor" };
+  const profile = buildSeatbeltProfile(vendorNet);
+
+  it("resolves through the system resolver's socket, not raw UDP 53", () => {
+    expect(profile).not.toContain("udp");
+    expect(profile).toContain('(remote unix-socket (subpath "/private/var/run/mDNSResponder"))');
+  });
+  it("limits Unix sockets to the project and scratch directories", () => {
+    expect(profile).not.toMatch(/\(remote unix-socket\)/);
+    expect(profile).toContain('(remote unix-socket (subpath "/private/tmp/proj"))');
+    expect(profile).toContain('(remote unix-socket (subpath "/private/tmp/scratch"))');
+    expect(profile).not.toContain("docker.sock");
+  });
+  it("never puts a local-address filter on outbound, which would admit all egress", () => {
+    expect(profile).not.toMatch(/\(allow network\* \(local ip/);
+    expect(profile).not.toMatch(/\(allow network-outbound \(local ip/);
+    expect(profile).toContain('(allow network-outbound (remote ip "localhost:*"))');
+  });
+});
+
+describe("mach-lookup", () => {
+  it("allows named services only", () => {
+    const profile = buildSeatbeltProfile(policy);
+    expect(profile).not.toMatch(/\(allow mach-lookup\)/);
+    expect(profile).toContain('(global-name "com.apple.system.opendirectoryd.libinfo")');
+    expect(profile).toContain('(global-name "com.apple.logd")');
+    expect(profile).toContain('(global-name "com.apple.trustd.agent")');
+    expect(profile).not.toContain("pasteboard");
+  });
+  it("keeps the keychain service for the vendor CLI only", () => {
+    expect(buildSeatbeltProfile(policy)).not.toContain('"com.apple.SecurityServer"');
+    expect(buildSeatbeltProfile({ ...policy, kind: "vendor-cli", network: "vendor" })).toContain('(global-name "com.apple.SecurityServer")');
+  });
+  it("gives a network-none child no resolver to leak names through", () => {
+    expect(buildSeatbeltProfile(policy)).not.toContain("mDNSResponder");
+    expect(buildSeatbeltProfile({ ...policy, network: "allow" })).toContain('(global-name "com.apple.mDNSResponder")');
+  });
+  it("never allows Apple Events or Launch Services opens", () => {
+    const profile = buildSeatbeltProfile({ ...policy, kind: "vendor-cli", network: "vendor" });
+    expect(profile).not.toContain("appleevent-send");
+    expect(profile).not.toContain("lsopen");
+    expect(profile).not.toContain("com.apple.coreservices.appleevents");
+  });
+});
+
+describe("toolchain roots and credentials", () => {
+  const roots: SandboxPolicy = { ...policy, readOnlyRoots: ["/Users/op", "/Users", "/", "/Users/op/go"], ndxHome: "/Users/op/.ndx" };
+
+  it("drops a read-only root equal to or above the home directory", () => {
+    const profile = buildSeatbeltProfile(roots);
+    const grant = profile.split("\n").find((l) => l.startsWith("(allow file-read* (subpath \"/usr\")"))!;
+    expect(grant).toContain('(subpath "/Users/op/go")');
+    expect(grant).not.toContain('(subpath "/Users/op")');
+    expect(grant).not.toContain('(subpath "/Users")');
+    expect(grant).not.toContain('(subpath "/")');
+    const args = buildBwrapArgs(roots, () => true).join(" ");
+    expect(args).toContain("--ro-bind-try /Users/op/go /Users/op/go");
+    expect(args).not.toContain("--ro-bind-try /Users/op /Users/op");
+    expect(args).not.toContain("--ro-bind-try / /");
+  });
+
+  it("denies the added credential files and ndx home", () => {
+    const deny = buildSeatbeltProfile(roots).split("\n").find((l) => l.startsWith("(deny file-read* file-write*"))!;
+    for (const p of [".git-credentials", ".cargo/credentials.toml", ".codex/auth.json", ".pypirc"]) {
+      expect(deny).toContain(`(subpath "/Users/op/${p}")`);
+    }
+    expect(deny).toContain('(subpath "/Users/op/.ndx")');
+  });
+
+  it("denies the vendor CLI only the dashboard token in ndx home", () => {
+    const deny = buildSeatbeltProfile({ ...roots, kind: "vendor-cli", network: "vendor" }).split("\n").find((l) => l.startsWith("(deny file-read* file-write*"))!;
+    expect(deny).toContain('(literal "/Users/op/.ndx/auth.token")');
+    expect(deny).not.toContain('(subpath "/Users/op/.ndx")');
+  });
+
+  it("masks a credential file under bubblewrap with an empty file, not a tmpfs", () => {
+    const secrets = new Set(["/Users/op/.npmrc", "/Users/op/.ssh"]);
+    const args = buildBwrapArgs(roots, (p) => secrets.has(p) || p === "/usr", (p) => p !== "/Users/op/.npmrc").join(" ");
+    expect(args).toContain("--ro-bind /dev/null /Users/op/.npmrc");
+    expect(args).not.toContain("--tmpfs /Users/op/.npmrc");
+    expect(args).toContain("--tmpfs /Users/op/.ssh");
+  });
+});
+
+describe("bubblewrap absent paths", () => {
+  const absent = () => false;
+
+  it("covers an absent .ndx container with a read-only placeholder when asked", () => {
+    const joined = buildBwrapArgs({ ...policy, placeholders: true }, absent).join(" ");
+    expect(joined).toContain("--ro-bind /dev/null /private/tmp/proj/.ndx");
+    // Placed after the project bind, so the mount lands inside it.
+    expect(joined.indexOf("--ro-bind /dev/null /private/tmp/proj/.ndx")).toBeGreaterThan(joined.indexOf("--bind /private/tmp/proj "));
+  });
+
+  it("covers the container for every kind, the vendor CLI and hooks included", () => {
+    for (const kind of ["vendor-cli", "git-hook"] as const) {
+      const joined = buildBwrapArgs({ ...policy, kind, network: "vendor", placeholders: true }, absent).join(" ");
+      expect(joined).toContain("--ro-bind /dev/null /private/tmp/proj/.ndx");
+      expect(joined.split("/private/tmp/proj/.ndx ").length - 1).toBe(1);
+    }
+  });
+
+  it("creates nothing on the host unless the caller opts in", () => {
+    expect(buildBwrapArgs(policy, absent).join(" ")).not.toContain("/dev/null /private/tmp/proj");
+  });
+
+  it("leaves the unused legacy paths alone once .ndx exists", () => {
+    const ndxOnly = (p: string) => p === "/private/tmp/proj/.ndx";
+    const joined = buildBwrapArgs({ ...policy, kind: "vendor-cli", network: "vendor", placeholders: true }, ndxOnly).join(" ");
+    expect(joined).not.toContain("/private/tmp/proj/.hench");
+    // The ndx layout's hench config is absent: its highest missing ancestor is covered.
+    expect(joined).toContain("--ro-bind /dev/null /private/tmp/proj/.ndx/hench");
+  });
+
+  it("reports the placeholders it made and removes only empty files", () => {
+    const dir = realTemp("sbx-ph-");
+    const scratch = realTemp("sbx-ph-scratch-");
+    const inv = wrapInSandbox("true", [], { ...policy, projectDir: dir, tmpDir: scratch, placeholders: true }, { name: "bwrap", available: true });
+    expect(inv.placeholders).toEqual(expect.arrayContaining([join(dir, ".ndx")]));
+    // What bwrap leaves behind: an empty regular file at the mount point.
+    writeFileSync(join(dir, ".ndx"), "");
+    writeFileSync(join(dir, "kept"), "content");
+    removeSandboxPlaceholders([join(dir, ".ndx"), join(dir, "kept"), join(dir, "missing")]);
+    expect(existsSync(join(dir, ".ndx"))).toBe(false);
+    expect(existsSync(join(dir, "kept"))).toBe(true);
+  });
+
+  const host = detectSandboxBackend();
+  it.skipIf(host.name !== "bwrap" || !host.available)("stops a confined child creating .ndx in a legacy project, and leaves nothing behind", () => {
+    const dir = realTemp("sbx-ph-real-");
+    const scratch = realTemp("sbx-ph-real-scratch-");
+    mkdirSync(join(dir, ".rex"));
+    const inv = wrapShellInSandbox("mkdir -p .ndx/rex", { ...policy, projectDir: dir, tmpDir: scratch, readOnlyRoots: [], placeholders: true }, host);
+    expect(spawnSync(inv.file, inv.args, { cwd: dir }).status).not.toBe(0);
+    removeSandboxPlaceholders(inv.placeholders);
+    expect(existsSync(join(dir, ".ndx"))).toBe(false);
+  });
+
+  it("binds the resolver's run directory read-only for a networked child", () => {
+    expect(buildBwrapArgs({ ...policy, network: "vendor" }, absent).join(" ")).toContain("--ro-bind-try /run/systemd/resolve /run/systemd/resolve");
+    expect(buildBwrapArgs(policy, absent).join(" ")).not.toContain("/run/systemd/resolve");
+  });
+});
+
+describe("resolveSandboxSetting and a committed local config", () => {
+  function repoWithLocal(): { dir: string; home: string } {
+    const dir = mkdtempSync(join(tmpdir(), "sbx-tracked-"));
+    const home = mkdtempSync(join(tmpdir(), "sbx-tracked-home-"));
+    writeFileSync(join(dir, ".n-dx.local.json"), JSON.stringify({ sandbox: { mode: "off", network: "allow" } }));
+    execFileSync("git", ["init", "-q"], { cwd: dir, stdio: "ignore" });
+    return { dir, home };
+  }
+
+  it("ignores a .n-dx.local.json the repository commits", () => {
+    const { dir, home } = repoWithLocal();
+    execFileSync("git", ["add", "-f", ".n-dx.local.json"], { cwd: dir, stdio: "ignore" });
+    expect(resolveSandboxSetting(dir, { env: {}, ndxHome: home })).toEqual({ mode: "on", toolNetwork: "none", source: "default" });
+  });
+
+  it("still honours an untracked one inside a git work tree", () => {
+    const { dir, home } = repoWithLocal();
+    expect(resolveSandboxSetting(dir, { env: {}, ndxHome: home })).toMatchObject({ mode: "off", toolNetwork: "allow", source: "local-config" });
   });
 });
