@@ -14,7 +14,8 @@
  * 3. **Real-path containment** — the target is resolved through symbolic
  *    links (the nearest existing ancestor stands in for a path that does not
  *    exist yet) and that real location must also lie inside the real project
- *    directory. A link inside the project that points elsewhere is refused.
+ *    directory. A link inside the project that points elsewhere is refused,
+ *    and so is a dangling one: its target is where a write would land.
  *    Callers receive the real path, so the I/O they then perform happens at
  *    the location that was checked.
  *
@@ -28,7 +29,7 @@
  */
 
 import { resolve, relative, dirname, basename, join, isAbsolute, sep } from "node:path";
-import { realpathSync } from "node:fs";
+import { lstatSync, readlinkSync, realpathSync } from "node:fs";
 import { ClaudeClientError } from "../prd/llm-gateway.js";
 
 /**
@@ -105,28 +106,64 @@ function escapes(rel: string): boolean {
   return rel === ".." || rel.startsWith(`..${sep}`) || rel.startsWith("../") || isAbsolute(rel);
 }
 
+/** Link hops followed before a chain is treated as a loop, as the kernel does. */
+const MAX_LINK_HOPS = 40;
+
+/** Whether `err` is a "does not exist" error that lets resolution walk up. */
+function isMissing(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException).code;
+  return code === "ENOENT" || code === "ENOTDIR";
+}
+
 /**
  * The real path of `target`, with every symbolic link resolved.
  *
  * When `target` (or a trailing part of it) does not exist yet, the nearest
  * existing ancestor is resolved and the missing segments are appended again,
  * so a file about to be created is checked at the location it will land in.
+ *
+ * A dangling link is not a missing file: `realpath` fails on it, but a write
+ * through it lands at the link's target. So every segment that `realpath`
+ * cannot resolve is `lstat`ed, and a link found there is replaced by its
+ * `readlink` target and resolved again — a committed
+ * `notes.md -> ~/Library/LaunchAgents/x.plist` is checked at the plist, and
+ * `x -> .git/hooks/pre-commit` at the hook.
+ *
  * Only "does not exist" errors walk up; anything else (a link loop, a
  * permission refusal) propagates, because the real location could not be
  * established.
  */
 export function resolveRealPath(target: string): string {
-  const missing: string[] = [];
-  let current = target;
-  for (;;) {
-    try {
-      const real = realpathSync.native(current);
-      return missing.length ? join(real, ...missing) : real;
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
+  let hops = 0;
+  let pending = target;
+  outer: for (;;) {
+    const missing: string[] = [];
+    let current = pending;
+    for (;;) {
+      try {
+        const real = realpathSync.native(current);
+        return missing.length ? join(real, ...missing) : real;
+      } catch (err) {
+        if (!isMissing(err)) throw err;
+      }
+      let isLink = false;
+      try {
+        isLink = lstatSync(current).isSymbolicLink();
+      } catch (err) {
+        if (!isMissing(err)) throw err;
+      }
+      if (isLink) {
+        if (++hops > MAX_LINK_HOPS) {
+          const loop = new Error(`too many levels of symbolic links: ${target}`) as NodeJS.ErrnoException;
+          loop.code = "ELOOP";
+          throw loop;
+        }
+        const linked = resolve(dirname(current), readlinkSync(current));
+        pending = missing.length ? join(linked, ...missing) : linked;
+        continue outer;
+      }
       const parent = dirname(current);
-      if (parent === current) return target;
+      if (parent === current) return pending;
       missing.unshift(basename(current));
       current = parent;
     }

@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
+import { existsSync, symlinkSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import type { ToolGuard } from "../../../src/tools/contracts.js";
 import { toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles } from "../../../src/tools/files.js";
 import { GuardRails } from "../../../src/guard/index.js";
 import { guardDefaultsForLanguage } from "../../../src/schema/v1.js";
+import { symlinksSupported } from "../../helpers/symlinks.js";
 
 function createToolGuard(projectDir: string): ToolGuard {
   const maxFileSize = 1024 * 1024;
@@ -85,6 +87,29 @@ describe("file tools", () => {
       });
       const content = await toolReadFile(guard, { path: "src/deep/nested/file.ts" });
       expect(content).toBe("hello");
+    });
+
+    it("replaces an existing file's content whole", async () => {
+      await toolWriteFile(guard, { path: "README.md", content: "# T", rewrite: true });
+      expect(await readFile(join(projectDir, "README.md"), "utf-8")).toBe("# T");
+    });
+
+    // A link that appears at the checked location after checkPath ran is
+    // refused by the write itself (this guard does no real-path resolution).
+    // Skipped where the test user cannot create links (Windows without
+    // Developer Mode).
+    it.skipIf(!symlinksSupported())("refuses to write through a link at the final segment", async () => {
+      const outsideDir = await mkdtemp(join(tmpdir(), "hench-test-files-outside-"));
+      try {
+        const target = join(outsideDir, "x.plist");
+        symlinkSync(target, join(projectDir, "notes.md"), "file");
+        await expect(
+          toolWriteFile(guard, { path: "notes.md", content: "payload" }),
+        ).rejects.toThrow(/symbolic link/);
+        expect(existsSync(target)).toBe(false);
+      } finally {
+        await rm(outsideDir, { recursive: true, force: true });
+      }
     });
   });
 

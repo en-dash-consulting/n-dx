@@ -238,5 +238,34 @@ describe("validatePath real-path resolution", () => {
       symlinkSync(join(projectDir, "src"), join(projectDir, ".git"), "dir");
       expect(() => validatePath(".git/main.ts", projectDir, blockedPaths)).toThrow(/blocked pattern/);
     });
+
+    it("refuses a dangling link whose target lies outside the project", () => {
+      // The target does not exist: realpath fails, but a write through the
+      // link would create it outside the project.
+      symlinkSync(join(outside, "LaunchAgents", "x.plist"), join(projectDir, "notes.md"), "file");
+      expect(() => validatePath("notes.md", projectDir, blockedPaths)).toThrow(/outside project/);
+    });
+
+    it("applies blocked patterns to a dangling link's target", () => {
+      mkdirSync(join(projectDir, ".git", "hooks"), { recursive: true });
+      symlinkSync(join(projectDir, ".git", "hooks", "pre-commit"), join(projectDir, "x"), "file");
+      expect(() => validatePath("x", projectDir, blockedPaths)).toThrow(/blocked pattern/);
+    });
+
+    it("refuses a path under a dangling directory link that leaves the project", () => {
+      symlinkSync(join(outside, "not-yet"), join(projectDir, "gone"), "dir");
+      expect(() => validatePath("gone/new/file.txt", projectDir, blockedPaths)).toThrow(/outside project/);
+    });
+
+    it("resolves a dangling link that stays inside the project to its target", () => {
+      symlinkSync(join(projectDir, "src", "later.ts"), join(projectDir, "alias.ts"), "file");
+      expect(validatePath("alias.ts", projectDir, blockedPaths)).toBe(join(realProject, "src", "later.ts"));
+    });
+
+    it("refuses a chain of links that loops", () => {
+      symlinkSync(join(projectDir, "loop-b"), join(projectDir, "loop-a"), "file");
+      symlinkSync(join(projectDir, "loop-a"), join(projectDir, "loop-b"), "file");
+      expect(() => validatePath("loop-a", projectDir, blockedPaths)).toThrow(GuardError);
+    });
   });
 });
