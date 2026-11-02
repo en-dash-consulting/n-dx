@@ -1,4 +1,4 @@
-import { checkBranchGuard, branchGuardRefusal } from "../rex-gateway.js";
+import { checkBranchGuard } from "../rex-gateway.js";
 /**
  * Health and reorganize routes: structure health score, reorganization proposals.
  */
@@ -9,6 +9,7 @@ import { jsonResponse, errorResponse, readBody } from "../response-utils.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { loadPRDSync, refreshPRDCache } from "../prd-io.js";
 import { resolveStore, isChangeLayerStore, prdLayout } from "../rex-gateway.js";
+import { dashboardBranchRefusal } from "./rex-route-helpers.js";
 
 import {
   computeHealthScore,
@@ -95,7 +96,7 @@ export function routeHealthReorganize(
     return (async () => {
       const guard = checkBranchGuard(ctx.projectDir, {});
       if (guard.blocked) {
-        errorResponse(res, 409, branchGuardRefusal("reorganize", guard.branch).message);
+        errorResponse(res, 409, dashboardBranchRefusal("reorganize", guard.branch, "rex reorganize --accept --allow-on-branch"));
         return true;
       }
       const body = await readBody(req, res);

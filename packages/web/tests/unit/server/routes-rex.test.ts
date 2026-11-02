@@ -126,7 +126,11 @@ describe("Rex API routes", () => {
     for (const route of ["prune", "reorganize/apply"]) {
       const res = await fetch(`http://127.0.0.1:${port}/api/rex/${route}`, { method: "POST", body: "{}" });
       expect(res.status).toBe(409);
-      expect((await res.json()).error).toContain("feature/bulk-guard");
+      const { error } = await res.json();
+      expect(error).toContain("feature/bulk-guard");
+      // No dashboard opt-in exists, so the refusal says so rather than
+      // pointing at a flag the dashboard cannot pass.
+      expect(error).toContain("The dashboard cannot override this");
     }
     for (const route of ["prune/preview", "reorganize?mode=fast"]) {
       const res = await fetch(`http://127.0.0.1:${port}/api/rex/${route}`);
