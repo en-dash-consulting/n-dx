@@ -131,6 +131,38 @@ describe("isLocalConfigTracked", () => {
   );
 });
 
+describe("a tracked local config path with no file behind it", () => {
+  /** False where this machine cannot create a symlink (Windows without Developer Mode). */
+  function danglingLink(): boolean {
+    try {
+      symlinkSync("missing-target.json", join(repo, ".n-dx.local.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  it("counts a committed dangling symlink as tracked", (ctx) => {
+    if (!danglingLink()) ctx.skip();
+    git("init", "-q");
+    git("add", "-f", ".n-dx.local.json");
+    expect(isLocalConfigTracked(repo)).toBe(true);
+  });
+
+  it("asks git for a deleted tracked file only when a writer says evenIfAbsent", () => {
+    writeLocal();
+    trackLocal();
+    rmSync(join(repo, ".n-dx.local.json"));
+    expect(isLocalConfigTracked(repo)).toBe(false);
+    expect(isLocalConfigTracked(repo, { evenIfAbsent: true })).toBe(true);
+  });
+
+  it("with evenIfAbsent, an untracked or never-written path stays the user's", () => {
+    git("init", "-q");
+    expect(isLocalConfigTracked(repo, { evenIfAbsent: true })).toBe(false);
+  });
+});
+
 describe("a tracked .n-dx.local.json in an untrusted checkout", () => {
   beforeEach(() => {
     writeLocal();

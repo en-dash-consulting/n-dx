@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, lstatSync, symlinkSync } from "node:fs";
 import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const isWin = process.platform === "win32";
@@ -2386,5 +2387,41 @@ describe("writes to git-tracked machine-local configuration", () => {
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toContain("repository config");
     expect(result.stderr).toContain("trust-gated");
+  });
+  // Nothing on disk, but git still has the entry: saveJSON would recreate the
+  // committed path holding the key, ready for `git commit -a`.
+  it("refuses a credential when the tracked file was deleted from the work tree", async () => {
+    await rm(LOCAL_CONFIG_PATH(dir));
+    const key = "sk-ant-fixture-deleted-tracked";
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.stdout + result.stderr).not.toContain(key);
+    expect(existsSync(LOCAL_CONFIG_PATH(dir))).toBe(false);
+  });
+});
+
+describe("writes through a committed dangling symlink at the local config path", () => {
+  let dir;
+  let linked = false;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "ndx-dangling-local-write-"));
+    await setupProject(dir);
+    // Windows without Developer Mode cannot create a symlink; the case is then
+    // not reachable on this machine and the test skips itself.
+    try { symlinkSync("missing-target.json", LOCAL_CONFIG_PATH(dir)); linked = true; } catch { linked = false; }
+    if (!linked) return;
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["add", ".n-dx.local.json"], { cwd: dir });
+  });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
+  it("refuses a credential and leaves the link in place", async (ctx) => {
+    if (!linked) ctx.skip();
+    const key = "sk-ant-fixture-dangling-link";
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.stdout + result.stderr).not.toContain(key);
+    expect(lstatSync(LOCAL_CONFIG_PATH(dir)).isSymbolicLink()).toBe(true);
   });
 });

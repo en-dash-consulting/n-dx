@@ -3341,9 +3341,15 @@ async function handleSetProjectSection(
   const configPath = projectConfigPath(dir, targetFile);
   if (targetFile === LOCAL_CONFIG_FILE) {
     // config.js already uses this foundation reader for trust-aware config I/O.
-    const { collectRepoExecutionConfig } = await import("@n-dx/llm-client");
+    const { collectRepoExecutionConfig, isLocalConfigTracked } = await import("@n-dx/llm-client");
     const config = collectRepoExecutionConfig(dir);
-    const status = { tracked: config.localConfigTracked, unanswered: Boolean(config.localConfigUnanswered) };
+    // The reader's answer covers what is on disk. A write must also ask git
+    // when nothing is: a deleted tracked file or a sparse checkout still has
+    // the index entry, and saveJSON's rename would put the path back holding
+    // the key, ready for `git commit -a`.
+    const status = config.localConfigTracked
+      ? { tracked: true, unanswered: Boolean(config.localConfigUnanswered) }
+      : { tracked: isLocalConfigTracked(dir, { evenIfAbsent: true }), unanswered: false };
     if (status.tracked) {
       const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
       const reason = status.unanswered ? "git could not confirm it is untracked" : "the file is repository config tracked by git";

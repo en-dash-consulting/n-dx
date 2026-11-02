@@ -593,15 +593,43 @@ function sectionOf(config: Record<string, unknown> | null, key: string): Record<
  * but ignoring does not untrack a committed file, and a repository can commit
  * one on purpose. A tracked file is repository content, not the user's.
  *
- * False when the file is absent (nothing to apply), when git answers "not in
+ * False when nothing is at the path (nothing to apply; a dangling symlink is
+ * something, see `evenIfAbsent` for a writer), when git answers "not in
  * the index", and outside any git work tree (no `.git` walking up), so the
  * file keeps applying there as the user's own. When git cannot answer inside a
  * work tree (dubious ownership, git missing, a corrupt index, a timeout) a
  * committed file would be indistinguishable from the user's, so it counts as
- * tracked and waits for trust. Spawns git only when the file exists.
+ * tracked and waits for trust. Spawns git only when an entry exists, unless
+ * `evenIfAbsent`.
  */
-export function isLocalConfigTracked(projectDir: string): boolean {
-  return localConfigTrackState(projectDir).tracked;
+export function isLocalConfigTracked(projectDir: string, options: LocalConfigTrackOptions = {}): boolean {
+  return localConfigTrackState(projectDir, options).tracked;
+}
+
+/** How {@link isLocalConfigTracked} treats a file that is not on disk. */
+export interface LocalConfigTrackOptions {
+  /**
+   * Ask git even when nothing is on disk at the path. A writer needs this: a
+   * deleted tracked file or a sparse checkout leaves an index entry with no
+   * file, and a write would put the repository's path back with the user's
+   * content in it, ready for `git commit -a`. Only git's "tracked" counts
+   * then; an unanswered git with no file is a new file, not a committed one.
+   */
+  evenIfAbsent?: boolean;
+}
+
+/**
+ * Something is at `path` as `lstat` sees it: a file, or a symlink even when
+ * its target is gone. A committed dangling symlink is still the repository's
+ * path, and a write through it would replace the link with a regular file.
+ */
+function entryPresent(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -613,10 +641,12 @@ export function isLocalConfigTracked(projectDir: string): boolean {
  */
 function localConfigTrackState(
   projectDir: string,
+  options: LocalConfigTrackOptions = {},
 ): { tracked: boolean; unanswered: string | null; paths: string[]; nestedIn: string | null } {
   const untracked = { tracked: false, unanswered: null, paths: [], nestedIn: null };
   const layout = resolveLayout(projectDir);
-  if (!existsSync(layout.localConfigFile)) return untracked;
+  const present = existsSync(layout.localConfigFile) || entryPresent(layout.localConfigFile);
+  if (!present && !options.evenIfAbsent) return untracked;
   const shipped = shippedPathsOf(layout.root, layout.localConfigFile);
   const answers = shipped.map((rel) => gitTracksPath(layout.root, rel, { ignoreCase: true }));
   const paths = [...new Set(answers.flatMap((a) => (a.state === "tracked" ? a.paths : [])))];
@@ -624,7 +654,7 @@ function localConfigTrackState(
   const nested = nestedRepositoryAbove(layout.root, shipped);
   if (nested.dir) return { tracked: true, unanswered: null, paths: [], nestedIn: nested.dir };
   const failed = answers.find((a) => a.state === "unanswered")?.reason ?? nested.unanswered;
-  if (!failed) return untracked;
+  if (!failed || !present) return untracked;
   return insideGitWorkTree(layout.root)
     ? { tracked: true, unanswered: failed, paths: [], nestedIn: null }
     : untracked;

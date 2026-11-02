@@ -482,6 +482,7 @@ export {
   HENCH_OVERRIDE_FIELD_CHECKS,
 } from "./repo-trust.js";
 export type {
+  LocalConfigTrackOptions,
   GuardBaseline,
   DetectedRepoLanguage,
   RepoMcpServer,
