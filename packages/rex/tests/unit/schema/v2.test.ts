@@ -441,7 +441,8 @@ describe("isolation", () => {
     // policy, product-edit handler, computed edges, product status, change
     // landing, placement and its policy, change selection, change completion,
     // agent brief, migration plan and its specs, migration apply, code owners and `rex codeowners`,
-    // release stamp and `rex release`) may import each other; nothing else may
+    // release stamp and `rex release`, change-layer store, layer projection,
+    // change add and place, next-task selection) may import each other; nothing else may
     // import them until the v2 store
     // wires them in. The exceptions are the `rex merge-state` git driver,
     // which imports state-merge (branches merge state.yaml before any rex
@@ -487,7 +488,19 @@ describe("isolation", () => {
     // placement passes and seams (migrations/v1-to-v2/placement-pass.ts,
     // jev-review-pass.ts, seams.ts) and `rex migrate plan`, which reads the
     // placement settings (cli/commands/migrate-plan.ts), and the claim tools,
-    // which skip a task whose change is claimed (cli/mcp-tools/claims.ts).
+    // which skip a task whose change is claimed (cli/mcp-tools/claims.ts),
+    // and the callers of the v2 modules a hand-kept module list left out:
+    // `rex migrate-apply`, which applies a reviewed plan and refuses beside a
+    // v2 tree (cli/commands/migrate-apply.ts), the migration registry, which
+    // lists the v1-to-v2 migration (migrations/registry.ts), the spec draft
+    // reason pass, which takes the spec pass's question types
+    // (analyze/spec-draft-reason.ts), the stats and analytics roll-ups, which
+    // count a change as an epic through the layer projection's type
+    // (core/stats.ts, core/analytics.ts), and the store entry, which resolves
+    // a v2 tree to the change-layer store (store/index.ts); the merge-state
+    // driver, export / import-bundle, next and get_next_task, and prune,
+    // reorganize and reshape are the exceptions named above. Every module in
+    // migrations/v1-to-v2/ counts as a v2 module.
     // `public.ts` re-exports the reader, the node and tree types, the index
     // and the derived product computations: consumers of the product layer
     // (the dashboard's Product and Changes views, the Graview projection) read
@@ -574,6 +587,23 @@ describe("isolation", () => {
         "migrations/v1-to-v2/jev-review-pass.ts",
         "migrations/v1-to-v2/seams.ts",
         "cli/mcp-tools/claims.ts",
+        "cli/commands/migrate-apply.ts",
+        "migrations/registry.ts",
+        "analyze/spec-draft-reason.ts",
+        "core/stats.ts",
+        "core/analytics.ts",
+        "store/index.ts",
+        "cli/commands/merge-state.ts",
+        "cli/commands/export.ts",
+        "cli/commands/import-bundle.ts",
+        "cli/commands/next.ts",
+        "cli/mcp-tools/get-next-task.ts",
+        "cli/commands/prune.ts",
+        "cli/commands/reorganize.ts",
+        "cli/commands/reshape.ts",
+        ...readdirSync(join(srcRoot, "migrations/v1-to-v2"))
+          .filter((f) => f.endsWith(".ts"))
+          .map((f) => `migrations/v1-to-v2/${f}`),
       ].map(
         (f) => join(srcRoot, f),
       ),
@@ -601,6 +631,17 @@ describe("isolation", () => {
         "core/change-completion.ts",
         "core/change-brief.ts",
         "codeowners/plan.ts",
+        "store/state-merge.ts",
+        "store/prd-bundle-v2.ts",
+        "store/change-layer-store.ts",
+        "core/change-next-task.ts",
+        "core/release-stamp.ts",
+        "core/layer-projection.ts",
+        "core/change-add.ts",
+        "core/change-place.ts",
+        ...readdirSync(join(srcRoot, "migrations/v1-to-v2"))
+          .filter((f) => f.endsWith(".ts"))
+          .map((f) => `migrations/v1-to-v2/${f}`),
       ].map((f) => join(srcRoot, f)),
     );
     for (const module of v2Modules) expect(v2Files.has(module), relative(srcRoot, module)).toBe(true);
