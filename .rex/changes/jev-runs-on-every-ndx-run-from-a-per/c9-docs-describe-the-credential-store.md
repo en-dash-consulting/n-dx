@@ -3,7 +3,7 @@ id: "6d70bab8-a6c6-4839-9520-08d407116c79"
 type: "task"
 title: "C9: docs describe the credential store and auth modes"
 slug: "c9-docs-describe-the-credential-store"
-description: "PR 3. Pages re-grounded in 02-reground-2026-10-30.md: README.md, docs/guide/configuration.md, getting-started.md, troubleshooting.md, commands.md, packages/core/README.md. Keep AGENTS.md within budget: reasoning goes to docs/."
+description: "PR 3. Re-ground before it runs, after T8 lands. Pages from the 2026-10-30 re-ground: README.md, docs/guide/configuration.md, getting-started.md, troubleshooting.md, commands.md, packages/core/README.md. Keep AGENTS.md within budget: reasoning goes to docs/."
 acceptanceCriteria:
   - "Every page in 02-reground's docs table is updated to the store and auth-mode model, and no page advises guard.env.allow for TypeSafe"
   - "docs/archive/ is untouched and tests/e2e/agents-md-size-budget.test.js passes"
