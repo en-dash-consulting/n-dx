@@ -515,7 +515,7 @@ describe("repository trust under project overrides", () => {
   it("lists every guard field hench validates", () => {
     expect(guardKeys.sort()).toEqual([
       "allowedCommands", "allowedGitSubcommands", "blockedPaths", "commandTimeout", "env", "maxConcurrentProcesses",
-      "maxFileSize", "memoryMonitor", "memoryThrottle", "policy", "spawnTimeout",
+      "maxFileSize", "memoryMonitor", "memoryThrottle", "policy", "spawnTimeout", "writeShrinkMinBytes", "writeShrinkRatio",
     ]);
   });
 

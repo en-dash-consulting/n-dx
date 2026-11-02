@@ -149,6 +149,21 @@ export interface LocalConfig {
    */
   timeoutMs?: number;
   /**
+   * Retries after a refused or dropped connection (and a 429/5xx) before a
+   * local request fails. Default 6. With the default delays that waits about
+   * two minutes, long enough for LM Studio to reload a model. 0 disables.
+   */
+  maxRetries?: number;
+  /** First backoff delay in ms before a retry; each later one doubles. Default 2000. */
+  retryBaseDelayMs?: number;
+  /** Cap on one backoff delay in ms. Default 60000. */
+  retryMaxDelayMs?: number;
+  /**
+   * Resends of a turn the server rejected because the model's output was
+   * malformed (a broken tool call or channel). Default 3. 0 disables.
+   */
+  maxFormatRetries?: number;
+  /**
    * Second-model verifier. When set, hench sends the primary model's completed
    * solution to this endpoint for review before finalizing the run.
    *

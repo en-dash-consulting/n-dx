@@ -33,6 +33,7 @@ function localConfig(local: Json = {}, overrides: Json = {}): Json {
     local: {
       model: "qwen3-coder-30b", lightModel: null, host: "localhost", port: 1234,
       maxContextTokens: null, timeoutMs: null,
+      maxRetries: null, retryBaseDelayMs: null, retryMaxDelayMs: null, maxFormatRetries: null,
       verifier: { host: null, port: null, model: null, maxCycles: null },
       ...local,
     },
@@ -334,20 +335,23 @@ describe("Robot Wrangler — Local vendor layout", () => {
   });
 
   describe("advanced settings", () => {
-    it("holds three collapsed rows, each summarising its current value", async () => {
+    it("holds four collapsed rows, each summarising its current value", async () => {
       stubApi({
         config: localConfig({
           maxContextTokens: 32768,
           timeoutMs: 7_200_000,
+          maxRetries: 10,
+          maxFormatRetries: 1,
           verifier: { host: "localhost", port: 1235, model: "gemma-3-12b", maxCycles: 3 },
         }),
       });
       await mount();
       const rows = advanced();
-      expect(rows.map((d) => d.open)).toEqual([false, false, false]);
+      expect(rows.map((d) => d.open)).toEqual([false, false, false, false]);
       expect(rows.map(summary)).toEqual([
         "Context budget 32768 tokens",
         "Request timeout 2 h",
+        "Retries 10 connection retries · 1 malformed-output resend",
         "Second-model verifier localhost:1235 · gemma-3-12b · 3 review cycles",
       ]);
     });
@@ -358,6 +362,7 @@ describe("Robot Wrangler — Local vendor layout", () => {
       expect(advanced().map(summary)).toEqual([
         "Context budget Not set",
         "Request timeout 5 min (default)",
+        "Retries 6 connection retries · 3 malformed-output resends (default)",
         "Second-model verifier Off",
       ]);
     });
@@ -380,6 +385,10 @@ describe("Robot Wrangler — Local vendor layout", () => {
       await mount();
       await type(input("local.maxContextTokens"), "32768");
       await type(input("local.timeoutMs"), "0");
+      await type(input("local.maxRetries"), "10");
+      await type(input("local.retryBaseDelayMs"), "3000");
+      await type(input("local.retryMaxDelayMs"), "90000");
+      await type(input("local.maxFormatRetries"), "0");
       await type(input("local.verifier.host"), "localhost");
       await type(input("local.verifier.port"), "1235");
       await type(input("local.verifier.model"), "gemma-3-12b");
@@ -389,6 +398,10 @@ describe("Robot Wrangler — Local vendor layout", () => {
         changes: {
           "llm.local.maxContextTokens": "32768",
           "llm.local.timeoutMs": "0",
+          "llm.local.maxRetries": "10",
+          "llm.local.retryBaseDelayMs": "3000",
+          "llm.local.retryMaxDelayMs": "90000",
+          "llm.local.maxFormatRetries": "0",
           "llm.local.verifier.host": "localhost",
           "llm.local.verifier.port": "1235",
           "llm.local.verifier.model": "gemma-3-12b",
@@ -401,7 +414,9 @@ describe("Robot Wrangler — Local vendor layout", () => {
       stubApi({ config: localConfig() });
       await mount();
       await type(input("local.verifier.port"), "1235");
-      expect(advanced().map((d) => d.querySelector(".llm-dirty-dot") !== null)).toEqual([false, false, true]);
+      expect(advanced().map((d) => d.querySelector(".llm-dirty-dot") !== null)).toEqual([false, false, false, true]);
+      await type(input("local.maxFormatRetries"), "5");
+      expect(advanced().map((d) => d.querySelector(".llm-dirty-dot") !== null)).toEqual([false, false, true, true]);
     });
   });
 });
