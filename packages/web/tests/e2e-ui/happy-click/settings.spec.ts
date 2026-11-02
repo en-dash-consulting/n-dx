@@ -123,11 +123,14 @@ test("robot wrangler: vendor cards, model select, dirty → discard, and the lea
   expect(tracker.errors.filter((e) => !/status of [45]\d\d/.test(e))).toEqual([]);
 });
 
-test("project: a feature toggle saved here unhides the Ask section on the Analysis stage; pins add and remove", async ({ page }) => {
+test("project: a feature toggle saved here unhides the Ask tile on the Analysis stage; pins add and remove", async ({ page }) => {
   test.setTimeout(60_000);
   const tracker = trackConsoleErrors(page);
   await gotoView(page, "analyze");
-  await expect(page.locator('section.stage-section[data-view="ask"]')).toHaveCount(0);
+  // Analysis is a tiled stage (stages.ts): Ask is a tile, keyed by its view.
+  const askTile = page.locator('section.stage-tile[data-tile="ask"]');
+  await expect(page.locator("section.stage-tile").first()).toBeVisible();
+  await expect(askTile).toHaveCount(0);
 
   const overlay = await openSettings(page, "Project");
   // The input is visually hidden behind its switch label; the label is the click target.
@@ -146,7 +149,7 @@ test("project: a feature toggle saved here unhides the Ask section on the Analys
   expect(features.toggles?.find((t) => t.key === "sourcevision.ask")?.enabled, "the saved Ask toggle should read enabled").toBe(true);
 
   await page.getByRole("button", { name: "Close settings" }).click();
-  await expect(page.locator('section.stage-section[data-view="ask"]')).toHaveCount(1, { timeout: 10_000 });
+  await expect(askTile).toHaveCount(1, { timeout: 10_000 });
 
   await openSettings(page, "Project");
   await overlay.locator("button.ps-pin-add").click();
