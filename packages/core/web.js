@@ -23,7 +23,7 @@
  *   ndx start --preview [dir]        Serve the UI layout preview (:3118, live reload)
  *   ndx start --preview stop [dir]   Stop a background preview server
  *   ndx start [dir]                  Register with the per-user hub (0.7.0) and
- *                                    serve at http://localhost:3117/p/<id>/
+ *                                    serve at http://127.0.0.1:3117/p/<id>/
  *   ndx start --here [dir]           Force the single-project server above
  *
  * ## Hub mode (0.7.0)
@@ -980,10 +980,10 @@ async function showStatus(dir, port, label = "n-dx server", files = DASHBOARD_FI
 
   if (running && portActive) {
     log(`${label} is running (PID ${info.pid}, port ${actualPort}).`);
-    log(`  URL: http://localhost:${actualPort}`);
+    log(`  URL: http://127.0.0.1:${actualPort}`);
     if (showMcp) {
-      log(`  MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
-      log(`  MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
+      log(`  MCP (rex):          http://127.0.0.1:${actualPort}/mcp/rex`);
+      log(`  MCP (sourcevision): http://127.0.0.1:${actualPort}/mcp/sourcevision`);
     }
     log(`  Started: ${info.startedAt}`);
   } else if (running) {
@@ -1114,7 +1114,7 @@ export function urlWithNonce(base, nonce) {
  * link.
  */
 export function hubDashboardUrl(hubPort, projectId, nonce) {
-  return urlWithNonce(`http://localhost:${hubPort}/p/${encodeURIComponent(projectId)}/`, nonce);
+  return urlWithNonce(`http://127.0.0.1:${hubPort}/p/${encodeURIComponent(projectId)}/`, nonce);
 }
 
 /**
@@ -1714,7 +1714,7 @@ function uptimePhrase(startedAt, now) {
  * @returns {string[]}
  */
 export function formatHubStatus({ label, marker, health, project, now = Date.now() }) {
-  const base = `http://localhost:${marker.port}/p/${encodeURIComponent(marker.projectId)}`;
+  const base = `http://127.0.0.1:${marker.port}/p/${encodeURIComponent(marker.projectId)}`;
 
   if (health.status !== 200) {
     if (health.foreign) {
@@ -1819,7 +1819,7 @@ export function formatHubOverview({ port, health, projects, now = Date.now() }) 
  * @returns {string[]}
  */
 export function formatUnregister({ label, projectId, port, worktree, result }) {
-  const base = `http://localhost:${port}/p/${encodeURIComponent(projectId)}`;
+  const base = `http://127.0.0.1:${port}/p/${encodeURIComponent(projectId)}`;
   if (result.projectRemoved) {
     const lines = [`${label}: unregistered "${projectId}" from the n-dx hub and stopped its server.`];
     if (result.hubExiting) lines.push("  That was the hub's last project, so the hub exited too.");
@@ -2030,7 +2030,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
     console.error(err.message);
     return 1;
   }
-  if (hub.spawned) log(`n-dx hub started on http://localhost:${hubPort} (PID ${hub.pid}).`);
+  if (hub.spawned) log(`n-dx hub started on http://127.0.0.1:${hubPort} (PID ${hub.pid}).`);
 
   // `ndxBin` is still sent for older hubs; a current hub ignores it and
   // spawns its own CLI entry point.
@@ -2062,7 +2062,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
     // Non-fatal: the marker files are a convenience for other commands.
   }
 
-  const base = `http://localhost:${hubPort}/p/${encodeURIComponent(id)}`;
+  const base = `http://127.0.0.1:${hubPort}/p/${encodeURIComponent(id)}`;
   // The printed and opened URL carries a single-use nonce the hub minted for
   // this run — never the token itself.
   const nonce = token
@@ -2357,7 +2357,7 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       await writePidFile(absDir, child.pid, port, files);
       log(`${label} started in background (PID ${child.pid}).`);
       const fallbackNonce = hereToken ? await mintNonceFromSpawnedServer(port, child.pid) : null;
-      log(`  URL: ${urlWithNonce(`http://localhost:${port}/`, fallbackNonce)}`);
+      log(`  URL: ${urlWithNonce(`http://127.0.0.1:${port}/`, fallbackNonce)}`);
       if (hereToken && !fallbackNonce) log(NO_NONCE_NOTE);
       log(`Use '${stopCmd}' to stop it.`);
       return 0;
@@ -2367,13 +2367,13 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
 
     if (actualPort !== port) {
       console.error(`Warning: requested port ${port} was taken; server bound to ${actualPort}.`);
-      console.error(`  URL: http://localhost:${actualPort}`);
+      console.error(`  URL: http://127.0.0.1:${actualPort}`);
     }
 
     log(`${label} started in background (PID ${child.pid}).`);
     // Asked of the server just spawned, once its listener is that process.
     const hereNonce = hereToken ? await mintNonceFromSpawnedServer(actualPort, child.pid) : null;
-    log(`  URL: ${urlWithNonce(`http://localhost:${actualPort}/`, hereNonce)}`);
+    log(`  URL: ${urlWithNonce(`http://127.0.0.1:${actualPort}/`, hereNonce)}`);
     if (hereToken && !hereNonce) log(NO_NONCE_NOTE);
 
     // The preview serves one HTML document — no MCP endpoints to advertise.
@@ -2382,13 +2382,13 @@ export async function runWeb(dir, rest, { exit, flushExit, run, tools, __dir, co
       return 0;
     }
 
-    log(`  MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
-    log(`  MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
+    log(`  MCP (rex):          http://127.0.0.1:${actualPort}/mcp/rex`);
+    log(`  MCP (sourcevision): http://127.0.0.1:${actualPort}/mcp/sourcevision`);
     log("");
     log("MCP setup:");
     const hereHeaderFlag = hereToken ? ` --header "X-Ndx-Token: $(cat ${hereTokenFile})"` : "";
-    log(`  Claude:  claude mcp add --transport http rex http://localhost:${actualPort}/mcp/rex${hereHeaderFlag}`);
-    log(`           claude mcp add --transport http sourcevision http://localhost:${actualPort}/mcp/sourcevision${hereHeaderFlag}`);
+    log(`  Claude:  claude mcp add --transport http rex http://127.0.0.1:${actualPort}/mcp/rex${hereHeaderFlag}`);
+    log(`           claude mcp add --transport http sourcevision http://127.0.0.1:${actualPort}/mcp/sourcevision${hereHeaderFlag}`);
     log("  Codex:   configured automatically via .codex/config.toml (stdio)");
     if (hereToken) log(`  Token:   ${hereTokenFile} (for MCP and scripts; the URL above is a one-time sign-in link; disable with --no-auth or web.auth=false in .n-dx.local.json)`);
     log("");

@@ -574,7 +574,7 @@ export async function startPreviewServer(
   await writeFile(portFilePath, String(boundPort) + "\n", "utf-8").catch(() => {});
 
   // With a token the URL carries a single-use landing nonce — never the token.
-  console.log(`n-dx UI preview running at ${credentials ? urlWithNonce(`http://localhost:${boundPort}/`, credentials.mintNonce().nonce) : `http://localhost:${boundPort}`}`);
+  console.log(`n-dx UI preview running at ${credentials ? urlWithNonce(`http://127.0.0.1:${boundPort}/`, credentials.mintNonce().nonce) : `http://127.0.0.1:${boundPort}`}`);
   console.log(`  Document: ${docPath}`);
   console.log(`  Layout:   ${layoutPath}`);
   console.log(`  Shuffle in the browser (saves to the layout file), or edit either file directly.`);

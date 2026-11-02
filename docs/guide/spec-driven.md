@@ -214,7 +214,7 @@ Shows the full PRD tree with per-item status (`pending`, `in_progress`, `complet
 ndx start .
 ```
 
-Open `http://localhost:3117`. On a v1 project the PRD view shows the item tree with completion percentages per top-level item. Use this to track spec coverage over time without running commands.
+Open `http://127.0.0.1:3117`. On a v1 project the PRD view shows the item tree with completion percentages per top-level item. Use this to track spec coverage over time without running commands.
 
 Filter to one top-level item to see how a specific spec section is progressing. The status updates in real time as the agent completes tasks (the dashboard polls and self-corrects within seconds of each task completion).
 

@@ -45,8 +45,8 @@ See [Web Zone Governance](/contributing/web-zone-governance) for internal govern
 
 The server exposes MCP over Streamable HTTP:
 
-- `http://localhost:3117/mcp/rex` — Rex MCP tools
-- `http://localhost:3117/mcp/sourcevision` — SourceVision MCP tools
+- `http://127.0.0.1:3117/mcp/rex` — Rex MCP tools
+- `http://127.0.0.1:3117/mcp/sourcevision` — SourceVision MCP tools
 
 See [MCP Integration](/guide/mcp) for setup instructions.
 

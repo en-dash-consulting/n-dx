@@ -1121,7 +1121,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     summary: "serve this repository through the n-dx hub",
     description:
       "Registers this repository with the per-user hub and serves it at\n" +
-      "http://localhost:3117/p/<id>/ — dashboard UI and MCP HTTP endpoints for\n" +
+      "http://127.0.0.1:3117/p/<id>/ — dashboard UI and MCP HTTP endpoints for\n" +
       "Rex and SourceVision. The hub starts on first use and runs one server per\n" +
       "repository, so several projects share the port without colliding.\n\n" +
       "--here opts out to the single-project server, which owns the port itself.",

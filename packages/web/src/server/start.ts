@@ -1048,8 +1048,8 @@ function logStartup(
 ): void {
   const label = ctx.scope ? `${ctx.scope} viewer` : "n-dx dashboard";
   // With a token the URL carries a single-use landing nonce — never the token.
-  const base = `http://localhost:${actualPort}/`;
-  console.log(`${label} running at ${token && credentials ? urlWithNonce(base, credentials.mintNonce().nonce) : `http://localhost:${actualPort}`}`);
+  const base = `http://127.0.0.1:${actualPort}/`;
+  console.log(`${label} running at ${token && credentials ? urlWithNonce(base, credentials.mintNonce().nonce) : `http://127.0.0.1:${actualPort}`}`);
   if (token) console.log("  The link signs in one browser tab, once, within a minute; run `ndx start` again for a fresh one.");
   if (isInScope(ctx.scope, "sourcevision")) {
     console.log(`Serving data from: ${ctx.svDir}`);
@@ -1072,16 +1072,16 @@ function logStartup(
   } catch {
     // Never block startup on the trust store.
   }
-  console.log(`MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
-  console.log(`MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
-  console.log(`WebSocket available at ws://localhost:${actualPort}`);
+  console.log(`MCP (rex):          http://127.0.0.1:${actualPort}/mcp/rex`);
+  console.log(`MCP (sourcevision): http://127.0.0.1:${actualPort}/mcp/sourcevision`);
+  console.log(`WebSocket available at ws://127.0.0.1:${actualPort}`);
   if (ctx.scope) console.log(`Scope: ${ctx.scope} (standalone mode)`);
   if (ctx.dev) console.log("Dev mode: live reload enabled");
   console.log("");
   console.log("MCP setup:");
   const headerFlag = token ? ' --header "X-Ndx-Token: <token from <ndx home>/auth.token>"' : "";
-  console.log("  Claude:  claude mcp add --transport http rex http://localhost:" + actualPort + "/mcp/rex" + headerFlag);
-  console.log("           claude mcp add --transport http sourcevision http://localhost:" + actualPort + "/mcp/sourcevision" + headerFlag);
+  console.log("  Claude:  claude mcp add --transport http rex http://127.0.0.1:" + actualPort + "/mcp/rex" + headerFlag);
+  console.log("           claude mcp add --transport http sourcevision http://127.0.0.1:" + actualPort + "/mcp/sourcevision" + headerFlag);
   console.log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   console.log("");
   console.log("Press Ctrl+C to stop.");

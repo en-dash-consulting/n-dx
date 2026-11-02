@@ -214,7 +214,7 @@ function runningHub(home, fs, isAlive) {
   if (!Number.isInteger(pid) || pid <= 0 || !Number.isInteger(port) || port <= 0 || port > 65535) return null;
   if (!isAlive(pid)) return null;
   const tokenFile = join(home, AUTH_TOKEN_FILE);
-  return { url: `http://localhost:${port}`, tokenFile: fs.existsSync(tokenFile) ? tokenFile : undefined };
+  return { url: `http://127.0.0.1:${port}`, tokenFile: fs.existsSync(tokenFile) ? tokenFile : undefined };
 }
 
 /** @param {number} pid */

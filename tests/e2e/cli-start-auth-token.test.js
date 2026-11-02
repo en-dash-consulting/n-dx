@@ -127,7 +127,7 @@ describe("ndx start — per-user token (e2e)", { timeout: 180_000 }, () => {
     // The printed URL carries a nonce and never the token; the MCP lines carry the header.
     expect(result.stdout).not.toContain(token);
     expect(result.stdout).not.toContain("ndx_token=");
-    const match = new RegExp(`http://localhost:${hubPort}/p/gamma-app/\\?ndx_nonce=([A-Za-z0-9_%-]+)`).exec(result.stdout);
+    const match = new RegExp(`http://127.0.0.1:${hubPort}/p/gamma-app/\\?ndx_nonce=([A-Za-z0-9_%-]+)`).exec(result.stdout);
     expect(match, result.stdout).not.toBeNull();
     const nonce = decodeURIComponent(match[1]);
     expect(result.stdout).toContain(`--header "X-Ndx-Token: $(cat ${tokenFile})"`);

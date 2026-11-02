@@ -348,17 +348,17 @@ describe("hubAuthMismatchMessage", () => {
 describe("hubDashboardUrl", () => {
   it("carries the landing nonce so --open and the printed URL cannot diverge", () => {
     expect(hubDashboardUrl(3117, "my app", "non/ce")).toBe(
-      "http://localhost:3117/p/my%20app/?ndx_nonce=non%2Fce",
+      "http://127.0.0.1:3117/p/my%20app/?ndx_nonce=non%2Fce",
     );
   });
 
   it("is the plain URL when there is no nonce", () => {
-    expect(hubDashboardUrl(3117, "alpha", null)).toBe("http://localhost:3117/p/alpha/");
+    expect(hubDashboardUrl(3117, "alpha", null)).toBe("http://127.0.0.1:3117/p/alpha/");
   });
 });
 
 describe("browserOpenCommand", () => {
-  const url = "http://localhost:3117/p/my%20app/?ndx_nonce=a%PATH%b%2F";
+  const url = "http://127.0.0.1:3117/p/my%20app/?ndx_nonce=a%PATH%b%2F";
 
   it("opens on win32 through rundll32, with no cmd.exe, shell or verbatim arguments", () => {
     const { command, args, options } = browserOpenCommand(url, "win32");

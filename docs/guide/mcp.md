@@ -45,7 +45,7 @@ stdio spawns a separate process per MCP server. No `ndx start` required. Both Cl
 
 ### HTTP — through the hub
 
-`ndx start .` registers the repository with the per-user hub and serves it at `http://localhost:3117/p/<id>/`. Each project's MCP endpoints are `…/p/<id>/mcp/rex` and `…/p/<id>/mcp/sourcevision`, so several projects share the port without collision. Register them with your assistant:
+`ndx start .` registers the repository with the per-user hub and serves it at `http://127.0.0.1:3117/p/<id>/`. Each project's MCP endpoints are `…/p/<id>/mcp/rex` and `…/p/<id>/mcp/sourcevision`, so several projects share the port without collision. Register them with your assistant:
 
 ```sh
 # 1. Start the server (dashboard + MCP on one port)
@@ -54,9 +54,9 @@ ndx start .
 # 2. Read the project id from the URL it prints (or run `ndx hub status`)
 
 # 3. Register HTTP MCP servers (Claude example)
-claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex \
+claude mcp add --transport http rex http://127.0.0.1:3117/p/<id>/mcp/rex \
   --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
-claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision \
+claude mcp add --transport http sourcevision http://127.0.0.1:3117/p/<id>/mcp/sourcevision \
   --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
 ```
 
@@ -68,7 +68,7 @@ HTTP transport uses [Streamable HTTP](https://modelcontextprotocol.io/) with ses
 
 **Benefits of HTTP:** single process, shared port with dashboard, session management, no per-tool process overhead.
 
-**Bare aliases.** While exactly one project is registered, `http://localhost:3117/mcp/rex` and `/mcp/sourcevision` still alias to it. With several projects registered, root MCP calls answer `409` listing the ids, so register the `/p/<id>/` form.
+**Bare aliases.** While exactly one project is registered, `http://127.0.0.1:3117/mcp/rex` and `/mcp/sourcevision` still alias to it. With several projects registered, root MCP calls answer `409` listing the ids, so register the `/p/<id>/` form.
 
 **Per-user token.** `ndx start` creates `<ndx home>/auth.token` (mode 0600), normally `~/.ndx/auth.token`. Every hub, dashboard and preview request must present it as an `X-Ndx-Token` header or an `Authorization: Bearer` header (a browser presents a session credential obtained from the one-time link `ndx start` prints instead; no cookie is involved). Without it a request is refused with `401`. Disable the check with `ndx start --no-auth` or `web.auth: false` in `.n-dx.local.json` (a tracked `.n-dx.json` cannot turn it off); the `--header` flags above are then unnecessary.
 
@@ -150,9 +150,9 @@ claude mcp remove rex
 claude mcp remove sourcevision
 
 # 3. Add HTTP servers
-claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex \
+claude mcp add --transport http rex http://127.0.0.1:3117/p/<id>/mcp/rex \
   --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
-claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision \
+claude mcp add --transport http sourcevision http://127.0.0.1:3117/p/<id>/mcp/sourcevision \
   --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
 ```
 

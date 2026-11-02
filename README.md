@@ -19,7 +19,7 @@ ndx install-sample .
 ndx start .
 ```
 
-Open the dashboard (default `http://localhost:3117`) to explore the generated PRD items, view codebase analysis, and use the autonomous agent to fix bugs in the sample app.
+Open the dashboard (default `http://127.0.0.1:3117`) to explore the generated PRD items, view codebase analysis, and use the autonomous agent to fix bugs in the sample app.
 
 When you're done, you can cleanly remove the sample app and its PRD items:
 ```sh
@@ -202,7 +202,7 @@ ndx start --preview .       # editable UI layout mock-up on :3118, runs alongsid
 ndx usage .                 # token usage analytics
 ```
 
-The hub's chooser at `http://localhost:3117/hub` lists every registered project — and starts new ones: **New project** asks for a folder name and the directory to put it in, shows the exact absolute path it will create (checked against the filesystem as you type), creates and registers it, then opens its setup page. That page is the same setup wizard an empty folder gets, so the new project picks its assistants, its LLM vendor and whether to create a git repository there, and lands on its dashboard.
+The hub's chooser at `http://127.0.0.1:3117/hub` lists every registered project — and starts new ones: **New project** asks for a folder name and the directory to put it in, shows the exact absolute path it will create (checked against the filesystem as you type), creates and registers it, then opens its setup page. That page is the same setup wizard an empty folder gets, so the new project picks its assistants, its LLM vendor and whether to create a git repository there, and lands on its dashboard.
 
 ## LLM Configuration
 
@@ -349,9 +349,9 @@ ndx start .                     # starts the hub if needed and registers this re
 ndx hub status                  # the hub's pid, port and every registered project
 # Claude example, for the project registered as <id>. The hub requires the
 # per-user token (see below), so pass it as a header:
-claude mcp add --transport http rex http://localhost:3117/p/<id>/mcp/rex \
+claude mcp add --transport http rex http://127.0.0.1:3117/p/<id>/mcp/rex \
   --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
-claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/sourcevision \
+claude mcp add --transport http sourcevision http://127.0.0.1:3117/p/<id>/mcp/sourcevision \
   --header "X-Ndx-Token: $(cat ~/.ndx/auth.token)"
 ```
 
@@ -359,7 +359,7 @@ claude mcp add --transport http sourcevision http://localhost:3117/p/<id>/mcp/so
 
 Sessions (`Mcp-Session-Id`), SSE responses and `DELETE` for session close are handled by the project's own server; the hub only proxies. Two registered projects have independent sessions, and a tool call on `/p/A/mcp/rex` writes to A's tree only. `GET /api/hub/projects` lists the registered ids.
 
-While exactly one project is registered, the root `http://localhost:3117/mcp/rex` still aliases to it, so a single-project registration keeps working unchanged. With several registered, root MCP calls answer `409` with the list of ids — register the `/p/<id>/` URL instead.
+While exactly one project is registered, the root `http://127.0.0.1:3117/mcp/rex` still aliases to it, so a single-project registration keeps working unchanged. With several registered, root MCP calls answer `409` with the list of ids — register the `/p/<id>/` URL instead.
 
 The tracked `.mcp.json` (stdio, above) remains the recommended path: it needs no running server and resolves the project from the directory Claude Code launched in. Use HTTP when you want one long-lived server shared by several assistant sessions.
 
