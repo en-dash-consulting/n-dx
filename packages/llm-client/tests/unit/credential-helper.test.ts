@@ -9,7 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -48,6 +48,7 @@ beforeEach(() => {
       'if (mode === "ok") process.stdout.write("  " + secret + "\\n");',
       'if (mode === "fail") { process.stdout.write(secret); process.exit(3); }',
       'if (mode === "multi") process.stdout.write(secret + "\\nsecond\\n");',
+      'if (mode === "cwd") process.stdout.write(process.cwd());',
       'if (mode === "stdin") process.stdout.write(readFileSync(0, "utf-8") || "stdin-closed");',
     ].join("\n"),
   );
@@ -141,6 +142,16 @@ describe("resolveCredential with a helper", () => {
       ...({ shell: true } as object),
     });
     expect(String(out).trim()).toBe(arg);
+  });
+
+  it("runs the helper in the ndx home, never the caller's (possibly untrusted) cwd", () => {
+    const { exec, calls } = recordingExec({ stdout: SECRET });
+    setHelperCredential("typesafe", ["op", "read", "cwd-check"], options);
+    resolveCredential("typesafe", { ...options, helperExec: exec });
+    expect(calls[0]!.opts.cwd).toBe(home);
+
+    setHelperCredential("claude", fakeArgv("cwd"), options);
+    expect(realpathSync(resolveCredential("claude", options)!.value)).toBe(realpathSync(home));
   });
 
   it("gives the real helper a closed stdin", () => {

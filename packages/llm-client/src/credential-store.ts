@@ -343,6 +343,11 @@ function runHelper(name: string, argv: string[], options: CredentialStoreOptions
   let failure: string | undefined;
   try {
     const stdout = run(argv[0]!, argv.slice(1), {
+      // The ndx home, never the caller's cwd: on Windows a bare command name
+      // is looked up in the working directory before PATH, so a checkout that
+      // ships `op.exe` would otherwise be run in place of the user's `op`. A
+      // relative PATH entry likewise resolves against the user's own directory.
+      cwd: dirname(credentialStorePath(options)),
       stdio: ["ignore", "pipe", "pipe"],
       timeout: CREDENTIAL_HELPER_TIMEOUT_MS,
       encoding: "utf-8",

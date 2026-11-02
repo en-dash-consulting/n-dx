@@ -34,10 +34,14 @@ items:
     lastModified: "2026-10-30T16:13:02.576Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "534debf3-0b82-43af-adf5-be497be7b85f":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-02T20:29:39.083Z"
-    activeIntervals: [{"start":"2026-11-02T20:29:39.083Z"}]
-    lastModified: "2026-11-02T20:29:39.759Z"
+    completedAt: "2026-11-02T20:51:36.470Z"
+    endedAt: "2026-11-02T20:51:36.470Z"
+    activeIntervals: [{"end":"2026-11-02T20:51:36.470Z","start":"2026-11-02T20:29:39.083Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Helper backend in llm-client's credential store (setHelperCredential, shell-less runner, per-process cache, quiet failures); set-helper and status --check in the credentials CLI; ndx config --helper parsing with refusals; hench guard and Claude CLI deny rules for the Keychain read and helper commands via agentCredentialDenials (gateway count unchanged at 226)."
+    lastModified: "2026-11-02T20:51:36.470Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "68b2709d-174e-4ec2-bf3f-163fdda6115c":
     status: "deferred"
@@ -56,7 +60,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-10-30T15:27:43.823Z"
+    lastModified: "2026-11-02T20:45:20.108Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
@@ -77,6 +81,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "buildDisallowedTools adds Read/Edit(//<store>) from credentialStorePath() at spawn (win32 //c/... form, comma-joined); GuardRails adds a store pattern when the ndx home is inside the project; validatePath also refuses cross-drive absolute rel; tests cover argv, both guard cases, and child env. Codex sandbox gap noted in code comment and changeset."
     lastModified: "2026-10-31T00:10:49.305Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9dd5658d-a708-473b-acb0-63c8df1cc127":
+    lastModified: "2026-11-02T20:45:20.108Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b72a668d-4bf6-4c1c-9caf-a2a25f96e6ea":
     status: "completed"
