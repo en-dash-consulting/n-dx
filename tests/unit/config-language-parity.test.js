@@ -13,7 +13,7 @@ describe("config language parity", () => {
   });
 
   it("documents the same accepted values in help", () => {
-    const list = /Valid values: ([^\n]+)/.exec(config.slice(config.indexOf("Language detection override")));
+    const list = /Valid values: ([^\r\n]+)/.exec(config.slice(config.indexOf("Language detection override")));
     expect(list).not.toBeNull();
     expect(list[1].split(/,\s*/).sort()).toEqual([...VALID_LANGUAGE_IDS].sort());
   });
