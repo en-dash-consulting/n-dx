@@ -312,6 +312,28 @@ describe("place_change_card", () => {
     await client.close();
   });
 
+  it("amends: a spec edited while the card waits is not overwritten by the approval, which writes nothing", async () => {
+    const criteria = { replace: [{ id: "c2", text: "A declined card shows the bank's reason" }] };
+    const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "amends", criteria });
+    expect(card.placement?.check).toMatchObject({ ok: true, base: expect.any(String) });
+    // Someone rewords the capability's criteria while the operator reads the card.
+    await withPrdModelTransaction(rexDir, ({ tree }) => {
+      const capability = indexTree(tree).resolve(CAPABILITY_ID)! as RuleNode & { criteria: Array<{ id: string; text: string }> };
+      capability.criteria = capability.criteria.map((c) => (c.id === "c2" ? { ...c, text: "A declined card names the decline code" } : c));
+      return { tree, result: undefined };
+    });
+    const before = treeHash();
+
+    await decide(card.id, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toMatch(/^The operator approved card .*Nothing was written: the spec of "Pay by card" changed since the card was raised/);
+    expect(treeHash()).toBe(before);
+    const { change } = await changeNode();
+    expect(change.amends ?? []).toEqual([]);
+    await client.close();
+  });
+
   it("propose: records the new node only as the change's added amendment, never on the product layer", async () => {
     const { tree: before } = await changeNode();
     const productIds = (t: V2Tree) => indexTree(t).entries.filter((e) => e.root === "product").map((e) => e.node.id).sort();

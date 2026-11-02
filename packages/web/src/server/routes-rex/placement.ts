@@ -442,11 +442,40 @@ export async function checkPlacementOnDisk(rexDir: string, changeRef: string, re
 /** Who wrote a placement, as the log entry names it. */
 export type PlacementVia = "web" | "Sidecar";
 
+/** A write refused because the PRD moved since the dry run it was approved on; nothing was written. */
+export class PlacementMovedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PlacementMovedError";
+  }
+}
+
+/**
+ * Why `now` is not the placement `then` described (same node, same relation,
+ * same spec hash), or undefined when it is. An approval read the earlier one.
+ */
+function movedSince(then: Extract<SidecarPlacementCheck, { ok: true }>, now: Extract<SidecarPlacementCheck, { ok: true }>): string | undefined {
+  if (then.action === "place" && now.action === "place") {
+    if (now.target !== then.target) return `"${then.title}" (${then.target}) is no longer the node the placement names; it now resolves to ${now.target}`;
+    if (now.relation !== then.relation) return `the relation is now ${now.relation}, not ${then.relation}`;
+    if (now.base !== then.base) return `the spec of "${then.title}" changed since the card was raised, so its amendment was drafted against a statement and criteria that are no longer there`;
+    return undefined;
+  }
+  if (then.action === "propose" && now.action === "propose") {
+    return now.under === then.under ? undefined : `the area the proposal goes under now resolves to ${now.under}, not ${then.under}`;
+  }
+  return "the placement is no longer the one that was reviewed";
+}
+
 /**
  * Write `request` through rex's rule under the PRD model transaction, then
  * refresh the PRD cache, log and announce it. The routes `POST …/place` and
  * `…/propose` and an approved Sidecar placement card all write through here.
  * Throws rex's {@link ChangePlacementError} on a refusal, writing nothing.
+ *
+ * `expect` is the dry run an approval was given on: when the write would
+ * record anything else (another node, relation, area or spec hash), it throws
+ * {@link PlacementMovedError} inside the transaction and writes nothing.
  */
 export async function writePlacement(
   ctx: ServerContext,
@@ -454,11 +483,14 @@ export async function writePlacement(
   request: SidecarPlacementRequest,
   via: PlacementVia,
   broadcast?: WebSocketBroadcaster,
+  expect?: Extract<SidecarPlacementCheck, { ok: true }>,
 ): Promise<WrittenPlacement> {
   if ((await prdLayout(ctx.rexDir)) !== "v2") throw new Error(V1_REFUSAL);
   const now = new Date();
   const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => {
     const recorded = recordRequest(model.tree, changeRef, request, now);
+    const moved = expect ? movedSince(expect, recorded.check) : undefined;
+    if (moved) throw new PlacementMovedError(moved);
     return { tree: recorded.tree, result: recorded };
   });
   const { change, check, proposedTarget } = result;

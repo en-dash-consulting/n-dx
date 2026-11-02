@@ -11,7 +11,9 @@
  *
  * On approval: {@link writePlacementCard} writes through `writePlacement`,
  * the function `POST …/place` and `…/propose` write through, under the PRD
- * model transaction. A proposed node is recorded only as the change's added
+ * model transaction, and only the placement the card's dry run described: if
+ * its target, relation, area or the target's spec hash moved while the card
+ * waited, nothing is written. A proposed node is recorded only as the change's added
  * amendment: it reaches the product layer when the change is applied, and
  * nothing here applies it.
  *
@@ -19,7 +21,7 @@
  */
 
 import { ChangePlacementError } from "../rex-gateway.js";
-import { checkPlacementOnDisk, parsePlacementRequest, writePlacement } from "../routes-rex/placement.js";
+import { checkPlacementOnDisk, parsePlacementRequest, PlacementMovedError, writePlacement } from "../routes-rex/placement.js";
 import { errorMessage } from "../response-utils.js";
 import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
@@ -60,7 +62,9 @@ export async function writePlacementCard(
   broadcast?: WebSocketBroadcaster,
 ): Promise<CarryOutResult> {
   try {
-    const { change, check } = await writePlacement(ctx, placement.change, placement.request, "Sidecar", broadcast);
+    // The operator approved the dry run on the card: write only that placement, never one the PRD has moved to since.
+    const expect = placement.check.ok ? placement.check : undefined;
+    const { change, check } = await writePlacement(ctx, placement.change, placement.request, "Sidecar", broadcast, expect);
     const warnings = check.warnings.length ? ` Warnings: ${check.warnings.join(" ")}` : "";
     const text = check.action === "place"
       ? `Placed change ${change}: it ${check.relation} ${check.title} (${check.target}).${warnings}`
@@ -69,6 +73,9 @@ export async function writePlacementCard(
   } catch (err) {
     if (err instanceof ChangePlacementError) {
       return { ok: false, text: `Rex refused the placement (kind: ${err.kind}): ${err.plain}. Nothing was written.` };
+    }
+    if (err instanceof PlacementMovedError) {
+      return { ok: false, text: `Nothing was written: ${err.message}. Read the change's placement again and raise a new card.` };
     }
     return { ok: false, text: `Nothing was written: ${errorMessage(err)}.` };
   }
