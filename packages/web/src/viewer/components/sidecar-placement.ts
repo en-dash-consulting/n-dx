@@ -49,16 +49,23 @@ export interface PlacementDraft {
   title: string;
 }
 
-export function draftFromRequest(request: SidecarPlacementRequest): PlacementDraft {
+/**
+ * The draft a request opens as. With rex's accepted dry run, the target and
+ * relation are the ones rex resolved (a display id becomes the node's id, a
+ * relation the agent left out becomes the one rex's rules chose), so the
+ * radio rows and toggle show what approval would write.
+ */
+export function draftFromRequest(request: SidecarPlacementRequest, check?: SidecarPlacementCheck): PlacementDraft {
   const blank = { target: "", relation: "touches" as const, statement: null, replace: {}, remove: [], add: [], type: "capability" as const, under: "", title: "" };
   if (request.action === "propose") {
     return { ...blank, mode: "propose", type: request.type, under: request.under, title: request.title };
   }
+  const resolved = check?.ok && check.action === "place" ? check : undefined;
   return {
     ...blank,
     mode: "place",
-    target: request.target,
-    relation: request.relation ?? "touches",
+    target: resolved?.target ?? request.target,
+    relation: request.relation ?? resolved?.relation ?? "touches",
     statement: request.proposed ?? null,
     replace: Object.fromEntries((request.criteria?.replace ?? []).map((c) => [c.id, c.text])),
     remove: request.criteria?.remove ?? [],
@@ -129,6 +136,8 @@ export function dryRunLine(check: SidecarPlacementCheck): string {
 
 /** An edit of the card's placement and where its re-check stands; `check` is null until the line is back. */
 export interface PlacementEdit {
+  /** The card it was made on; an edit is never sent with another card's approval. */
+  cardId: string;
   request: SidecarPlacementRequest;
   body: PlacementEditBody;
   check: SidecarPlacementCheck | null;
@@ -136,7 +145,7 @@ export interface PlacementEdit {
 
 /** Place is pressable only when the placement shown has a dry run that rex accepts. */
 export function placementDecidable(card: SidecarCard, edit: PlacementEdit | null): boolean {
-  const check = edit ? edit.check : card.placement?.check;
+  const check = edit?.cardId === card.id ? edit.check : card.placement?.check;
   return !!check?.ok;
 }
 
@@ -209,28 +218,33 @@ export interface PlacementBodyProps {
 export function PlacementBody({ card, editable, onEdit }: PlacementBodyProps) {
   const placement = card.placement!;
   const original = placement.request;
-  const originalKey = JSON.stringify(placementBody(original));
-  const [draft, setDraft] = useState<PlacementDraft>(() => draftFromRequest(original));
+  // Unedited is the draft the card opened as, not the agent's raw call: a
+  // relation rex filled in or a display id rex resolved is no operator edit.
+  const [opened] = useState<PlacementDraft>(() => draftFromRequest(original, placement.check));
+  const originalKey = JSON.stringify(placementBody(requestFromDraft(opened, original)));
+  const [draft, setDraft] = useState<PlacementDraft>(opened);
   const shortlist = useShortlist(placement.change, editable);
   const product = useProductRead<ProductMap>("/api/rex/product", (body) => body.map as ProductMap);
   const areas = product.state === "ready" ? product.data.areas : [];
   const [edit, setEdit] = useState<PlacementEdit | null>(null);
   const latest = useRef(0);
+  useEffect(() => () => { latest.current += 1; }, []);
 
   const request = requestFromDraft(draft, original);
   const body = placementBody(request);
   const key = JSON.stringify(body);
 
-  // Re-check on every edit; a response for a placement edited since is dropped.
+  // Re-check on every edit; a response for a placement edited since, or for a
+  // card decided or gone since, is dropped, so it can never land on the next card.
   useEffect(() => {
-    if (!editable) return;
     const mine = ++latest.current;
+    if (!editable) return;
     if (key === originalKey) {
       setEdit(null);
       onEdit(null);
       return;
     }
-    const pending: PlacementEdit = { request, body, check: null };
+    const pending: PlacementEdit = { cardId: card.id, request, body, check: null };
     setEdit(pending);
     onEdit(pending);
     const timer = setTimeout(() => {

@@ -244,6 +244,59 @@ describe("placement card", () => {
     expect(decide.mock.calls.every(([, d]) => d.edits === undefined && d.approve === false)).toBe(true);
   });
 
+  it("opens on what rex resolved: a display id and an omitted relation are no edit, and Place sends none", async () => {
+    const resolved: SidecarPlacement = {
+      ...placement,
+      request: { action: "place", target: "A1.1" },
+      check: { ok: true, action: "place", target: "cap-pay", title: "Pay by card", relation: "amends", base: "4f1c9", warnings: [] },
+    };
+    const { el, decide } = await draw(placementCard({ placement: resolved }));
+    await recheck();
+    expect(checks).toEqual([]);
+    const rows = [...el.querySelectorAll<HTMLElement>(".sidecar-place-shortlist .sidecar-place-row[data-target]")];
+    expect(rows.map((r) => r.dataset.target)).toEqual(["cap-pay", "cap-refund"]);
+    expect(q<HTMLInputElement>(rows[0], "input").checked).toBe(true);
+    expect(q<HTMLInputElement>(el, 'input[name="place-p1-relation"][value="amends"]').checked).toBe(true);
+    expect(button(el, "sidecar-card-approve").disabled).toBe(false);
+    await click(button(el, "sidecar-card-approve"));
+    expect(decide).toHaveBeenCalledWith("p1", { approve: true });
+  });
+
+  it("a re-check still in flight when its card is decided never lands on the next card", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      const json = (b: unknown) => ({ ok: true, status: 200, statusText: "OK", json: async () => b });
+      if (url.endsWith("/placement/check")) {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        checks.push(body);
+        await gate;
+        return json({ layout: "v2", change: CHANGE, check: answerCheck(body) });
+      }
+      return url.endsWith("/placement") ? json(SHORTLIST) : json(PRODUCT);
+    }));
+    const decide = vi.fn(async (_id: string, _d: SidecarCardDecision) => {});
+    const second = placementCard({ id: "p2", raisedAt: "2026-11-02T00:00:02.000Z" });
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    const drawCards = (cards: SidecarCard[]) => act(async () => { render(h(SidecarCards, { cards, manifest: null, decide }), host!); });
+    await drawCards([placementCard(), second]);
+    await settle();
+
+    // Edit the first card, and leave it in the Inbox while its re-check is out.
+    await click(q(host, '[data-card="p1"] input[name="place-p1"][value="cap-refund"]'));
+    await settle(400);
+    expect(checks).toHaveLength(1);
+    await click(q(host, '[data-card="p1"] .sidecar-card-leave'));
+    await drawCards([placementCard({ status: "denied", reason: LEFT_IN_INBOX_REASON }), second]);
+    release();
+    await settle();
+
+    // The second card is its own, unedited: Place sends no edit.
+    await click(q(host, '[data-card="p2"] .sidecar-card-approve'));
+    expect(decide).toHaveBeenLastCalledWith("p2", { approve: true });
+  });
+
   it("a settled card shows its placement read-only", async () => {
     const { el } = await draw(placementCard({ status: "approved" }));
     expect(el.querySelector(".sidecar-place-shortlist")).toBeNull();

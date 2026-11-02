@@ -570,7 +570,7 @@ export function SidecarCards({ cards, manifest, decide, send }: SidecarCardsProp
     setDeciding(true);
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.
-      if (decision.approve && first.placement && placementEdit) {
+      if (decision.approve && first.placement && placementEdit?.cardId === first.id) {
         await decide(first.id, { ...decision, edits: placementEdit.body });
         return;
       }
