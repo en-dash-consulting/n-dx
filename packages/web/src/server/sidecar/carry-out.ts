@@ -46,11 +46,11 @@ export interface SidecarActions {
   /** A proposal read against the PRD for its change-set card, or why it cannot be written. */
   reviewChangeSet(input: Record<string, unknown>): Promise<SidecarChangeSet | string>;
   /** An approved change-set card's write, under the PRD lock. Never throws. */
-  writeChangeSet(changeSet: SidecarChangeSet): Promise<CarryOutResult>;
+  writeChangeSet(changeSet: SidecarChangeSet, sessionId: string): Promise<CarryOutResult>;
   /** A placement call read and dry-run through rex on the PRD as loaded, for its card; a string says why no card can be raised. Writes nothing. */
   checkPlacement(input: Record<string, unknown>): Promise<SidecarPlacement | string>;
   /** An approved placement card's write through rex's rule, under the PRD lock. Never throws; a refusal names rex's kind. */
-  writePlacement(placement: SidecarPlacement): Promise<CarryOutResult>;
+  writePlacement(placement: SidecarPlacement, sessionId: string): Promise<CarryOutResult>;
   /** The queue planner's plan for a run-plan card, or why there is none to raise a card for. Never throws. */
   readRunPlan(signal?: AbortSignal): Promise<QueuePlan | string>;
   /** `web.sidecarGithubReads`, read per call: on, a `github_read` runs without a card. */
@@ -148,7 +148,7 @@ async function carryOut(
       // The card's change set, with the operator's edits; never the raw input.
       const changeSet = card?.changeSet;
       if (!changeSet) return { ok: false, text: "The card carried no change set; nothing was written." };
-      const written = await actions.writeChangeSet(changeSet);
+      const written = await actions.writeChangeSet(changeSet, card.sessionId);
       // Said only of a write that happened: a failed one wrote no values at all.
       const edited = written.ok && card?.edited
         ? " The operator edited it before approving; the edited values were written."
@@ -160,7 +160,7 @@ async function carryOut(
     case "place_change_card": {
       // The card's placement, read and dry-run when it was raised; never the raw input.
       if (!card?.placement) return { ok: false, text: "A placement is written only from its approved card; nothing was written." };
-      return actions.writePlacement(card.placement);
+      return actions.writePlacement(card.placement, card.sessionId);
     }
     case "github_read": {
       const read = githubReadOf(input);

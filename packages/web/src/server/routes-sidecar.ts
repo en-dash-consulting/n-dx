@@ -351,9 +351,9 @@ export function sidecarActions(
     reviewChangeSet(input) {
       return reviewChangeSet(ctx.rexDir, input);
     },
-    async writeChangeSet(changeSet) {
+    async writeChangeSet(changeSet, sessionId) {
       try {
-        const written = await writeChangeSet(ctx, changeSet, broadcast);
+        const written = await writeChangeSet(ctx, changeSet, sessionId, broadcast);
         return { ok: true, text: written.text, ids: written.ids };
       } catch (err) {
         return { ok: false, text: `Nothing was written: ${errorMessage(err)}.` };
@@ -362,8 +362,8 @@ export function sidecarActions(
     checkPlacement(input) {
       return readPlacementCall(ctx.rexDir, input);
     },
-    writePlacement(placement) {
-      return writePlacementCard(ctx, placement, broadcast);
+    writePlacement(placement, sessionId) {
+      return writePlacementCard(ctx, placement, sessionId, broadcast);
     },
     async startWork(taskId, options) {
       const { inUse, max, holders } = await repositoryRunSlotUsage(ctx);

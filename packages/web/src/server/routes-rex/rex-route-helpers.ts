@@ -22,6 +22,8 @@ import {
   findNextTask as rexFindNextTask,
   collectCompletedIds,
   computeTimestampUpdates,
+  indexTree,
+  loadPrdModel,
 } from "../rex-gateway.js";
 
 /**
@@ -95,6 +97,30 @@ export function appendLog(ctx: ServerContext, entry: Record<string, unknown>): v
   } catch {
     // Best-effort logging
   }
+}
+
+/** Who decided a placement a Sidecar card carried out, and why. */
+export interface SidecarDecision {
+  sessionId: string;
+  /** The agent's reasons, when the card carried them. */
+  reasons?: readonly string[];
+}
+
+/**
+ * The optional decision fields a Sidecar placement's log entry carries:
+ * `decidedBy` the session, `approvedBy` the operator and `reasons` the agent's.
+ * The operator is read as the PRD stamped it (the change's `lastModifiedBy`,
+ * which the write just set), so the log names the same identity as the node.
+ * An unreadable PRD drops `approvedBy`; the decision is still worth logging.
+ */
+export async function sidecarDecisionFields(rexDir: string, changeId: string, decision: SidecarDecision): Promise<Record<string, unknown>> {
+  const fields: Record<string, unknown> = { decidedBy: `sidecar:${decision.sessionId}` };
+  const approvedBy = await loadPrdModel(rexDir)
+    .then(({ tree }) => indexTree(tree).resolve(changeId)?.lastModifiedBy)
+    .catch(() => undefined);
+  if (approvedBy) fields.approvedBy = approvedBy;
+  if (decision.reasons?.length) fields.reasons = [...decision.reasons];
+  return fields;
 }
 
 // Re-export collectCompletedIds for use in reads.ts

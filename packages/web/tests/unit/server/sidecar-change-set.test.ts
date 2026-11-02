@@ -367,6 +367,10 @@ describe("on a v2 PRD", () => {
     expect(node?.children?.find((c) => c.id === ids[1])).toMatchObject({ type: "task", acceptanceCriteria: ["The button appears on Chrome"] });
     const log = readFileSync(join(ctx.rexDir, "execution-log.jsonl"), "utf-8");
     expect(log).toContain(`"event":"change_placed","itemId":"${ids[0]}"`);
+    const placed = log.trim().split("\n").map((l) => JSON.parse(l)).find((e) => e.event === "change_placed");
+    expect(placed).toMatchObject({ decidedBy: `sidecar:${SESSION}`, approvedBy: (node as { lastModifiedBy?: string }).lastModifiedBy });
+    expect(placed.approvedBy).toEqual(expect.any(String));
+    expect(placed).not.toHaveProperty("reasons");
     await client.close();
   });
 

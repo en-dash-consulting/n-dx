@@ -20,10 +20,20 @@ items:
     resolutionDetail: "Place lens in fe857f1c0 with review repair b9dff1479 (run db9c913f): 6k Place packet over buildChangePlacement (the GET placement builder), PLACE_INSTRUCTIONS, place_change_card dry-run on raise and written on approval through the shared writePlacement under the PRD model transaction, refusing a placement that moved while the card waited; POST placement/check writes nothing (tree-hash test). Rex suggestPlacement gains relationRule and per-candidate amendedBy. Gate failed only on graview-app-trust, pre-existing (NDX_CLI_PATH inherited under ndx work; fix in #940); the affected gate outside hench passes 6/6 suites. The review finding that no drawer entry attaches a change is task 0e769946."
     lastModified: "2026-11-02T23:11:05.862Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8ca54c75-dc5d-4a34-88da-c13b51ffc90c":
+    lastModified: "2026-11-02T23:45:30.235Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a2f27dcc-4c2d-4dd0-9b22-89c5a0956a00":
     issues: ["https://www.notion.so/3f7a80b7192481a09ce5d406106f8408","https://www.notion.so/3f7a80b71924816794b4d9312cd470ed"]
-    lastModified: "2026-11-02T20:53:01.267Z"
+    lastModified: "2026-11-02T23:45:30.235Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dc9f6945-8db1-466b-8857-fee10b03c5f6":
-    lastModified: "2026-11-02T20:52:57.830Z"
+    status: "completed"
+    startedAt: "2026-11-02T23:40:48.460Z"
+    completedAt: "2026-11-02T23:48:13.371Z"
+    endedAt: "2026-11-02T23:48:13.371Z"
+    activeIntervals: [{"end":"2026-11-02T23:48:13.371Z","start":"2026-11-02T23:40:48.460Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Sidecar placement writes (placement card, Plan-lens change set) add decidedBy/approvedBy/reasons to change_placed/change_proposed; CLI, MCP, dashboard unchanged; log readers tested with the fields."
+    lastModified: "2026-11-02T23:48:13.371Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

@@ -32,7 +32,7 @@ import type { ServerContext } from "../types.js";
 import type { WebSocketBroadcaster } from "../websocket.js";
 import { jsonResponse, errorResponse, readBody, errorMessage } from "../response-utils.js";
 import { refreshPRDCache } from "../prd-io.js";
-import { appendLog } from "./rex-route-helpers.js";
+import { appendLog, sidecarDecisionFields, type SidecarDecision } from "./rex-route-helpers.js";
 import { isFeatureEnabled } from "../routes-features.js";
 import { featureDisabledBody } from "../route-feature-gates.js";
 import {
@@ -476,6 +476,9 @@ function movedSince(then: Extract<SidecarPlacementCheck, { ok: true }>, now: Ext
  * `expect` is the dry run an approval was given on: when the write would
  * record anything else (another node, relation, area or spec hash), it throws
  * {@link PlacementMovedError} inside the transaction and writes nothing.
+ *
+ * `decision` is set only for a placement a Sidecar card carries out: the log
+ * entry then also names who decided it, who approved it and the agent's reasons.
  */
 export async function writePlacement(
   ctx: ServerContext,
@@ -484,6 +487,7 @@ export async function writePlacement(
   via: PlacementVia,
   broadcast?: WebSocketBroadcaster,
   expect?: Extract<SidecarPlacementCheck, { ok: true }>,
+  decision?: SidecarDecision,
 ): Promise<WrittenPlacement> {
   if ((await prdLayout(ctx.rexDir)) !== "v2") throw new Error(V1_REFUSAL);
   const now = new Date();
@@ -497,7 +501,8 @@ export async function writePlacement(
   const entry = check.action === "place"
     ? { event: "change_placed", detail: `${check.relation} ${check.target} (via ${via})` }
     : { event: "change_proposed", detail: `${check.type} under ${check.under}: ${check.title} (via ${via})` };
-  await publish(ctx, { timestamp: now.toISOString(), itemId: change, ...entry }, broadcast);
+  const decided = decision ? await sidecarDecisionFields(ctx.rexDir, change, decision) : {};
+  await publish(ctx, { timestamp: now.toISOString(), itemId: change, ...entry, ...decided }, broadcast);
   return { change, check, ...(proposedTarget !== undefined ? { proposedTarget } : {}) };
 }
 
@@ -517,7 +522,7 @@ function refuse(res: ServerResponse, err: unknown): void {
 }
 
 /** After a write: refresh the PRD cache, log, and tell connected clients. */
-async function publish(ctx: ServerContext, entry: { timestamp: string; event: string; itemId: string; detail: string }, broadcast?: WebSocketBroadcaster): Promise<void> {
+async function publish(ctx: ServerContext, entry: { timestamp: string; event: string; itemId: string; detail: string; [field: string]: unknown }, broadcast?: WebSocketBroadcaster): Promise<void> {
   refreshPRDCache(ctx.rexDir, await (await resolveStore(ctx.rexDir)).loadDocument());
   appendLog(ctx, entry);
   broadcast?.({ type: "rex:prd-changed", timestamp: entry.timestamp });

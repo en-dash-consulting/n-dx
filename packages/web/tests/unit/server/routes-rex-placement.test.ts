@@ -154,6 +154,8 @@ describe("placement routes on a v2 project", () => {
     expect(item?.needsPlacement).toBeUndefined();
     expect(folderOf(inboxId)?.split(sep)[0]).not.toBe("inbox");
     expect(logEvents().at(-1)).toMatchObject({ event: "change_placed", itemId: inboxId });
+    // A dashboard placement logs what it always did: no decision fields.
+    expect(Object.keys(logEvents().at(-1)!).sort()).toEqual(["detail", "event", "itemId", "timestamp"]);
     expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
   });
 
@@ -183,6 +185,7 @@ describe("placement routes on a v2 project", () => {
     expect(item?.needsPlacement).toBeUndefined();
     expect(folderOf(inboxId)?.split(sep)[0]).not.toBe("inbox");
     expect(logEvents().at(-1)).toMatchObject({ event: "change_proposed", itemId: inboxId });
+    expect(Object.keys(logEvents().at(-1)!).sort()).toEqual(["detail", "event", "itemId", "timestamp"]);
     expect(frames).toEqual([expect.objectContaining({ type: "rex:prd-changed" })]);
   });
 

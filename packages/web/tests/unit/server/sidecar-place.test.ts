@@ -306,6 +306,9 @@ describe("place_change_card", () => {
     expect(change.touches).toEqual([CAPABILITY_ID]);
     expect(change.needsPlacement).toBeUndefined();
     expect(logEvents().at(-1)).toMatchObject({ event: "change_placed", itemId: inboxId, detail: `touches ${CAPABILITY_ID} (via Sidecar)` });
+    // Who decided and why: the session, the operator as the PRD stamped them, and the agent's reasons.
+    expect(change.lastModifiedBy).toEqual(expect.any(String));
+    expect(logEvents().at(-1)).toMatchObject({ decidedBy: `sidecar:${SESSION}`, approvedBy: change.lastModifiedBy, reasons: ["The change retries a declined card."] });
     expect(messages).toContainEqual(expect.objectContaining({ type: "rex:prd-changed" }));
     // The dashboard's PRD cache was refreshed from the written tree.
     expect(readFileSync(join(rexDir, ".cache", "prd.json"), "utf-8")).toContain(inboxId);
@@ -361,7 +364,13 @@ describe("place_change_card", () => {
     expect(change.amends).toEqual([expect.objectContaining({ delta: "added", type: "capability", under: AREA_ID, title: "Retry a declined card" })]);
     expect(change.appliedAt).toBeUndefined();
     expect(productIds(tree)).toEqual(productIds(before));
-    expect(logEvents().at(-1)).toMatchObject({ event: "change_proposed", itemId: inboxId });
+    expect(logEvents().at(-1)).toMatchObject({
+      event: "change_proposed",
+      itemId: inboxId,
+      decidedBy: `sidecar:${SESSION}`,
+      approvedBy: change.lastModifiedBy,
+      reasons: ["The change retries a declined card."],
+    });
     await client.close();
   });
 

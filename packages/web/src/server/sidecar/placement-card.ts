@@ -83,12 +83,13 @@ export async function readPlacementEdit(
 export async function writePlacementCard(
   ctx: ServerContext,
   placement: SidecarPlacement,
+  sessionId: string,
   broadcast?: WebSocketBroadcaster,
 ): Promise<CarryOutResult> {
   try {
     // The operator approved the dry run on the card: write only that placement, never one the PRD has moved to since.
     const expect = placement.check.ok ? placement.check : undefined;
-    const { change, check } = await writePlacement(ctx, placement.change, placement.request, "Sidecar", broadcast, expect);
+    const { change, check } = await writePlacement(ctx, placement.change, placement.request, "Sidecar", broadcast, expect, { sessionId, reasons: placement.reasons });
     const warnings = check.warnings.length ? ` Warnings: ${check.warnings.join(" ")}` : "";
     const text = check.action === "place"
       ? `Placed change ${change}: it ${check.relation} ${check.title} (${check.target}).${warnings}`
