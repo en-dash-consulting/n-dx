@@ -27,3 +27,9 @@ node packages/sourcevision/scripts/python-routes-report.mjs --json
 ```
 
 The task-to-regression links are `278055d7` (conditional rebinding), `5b2ea100` (constructor/import order), `2d8ed30f` (local URL patterns), and `452790b2` (package-local imports). Each new regression failed before the implementation change.
+
+## Review follow-up, 2026-11-02
+
+Review of #934 found three regressions of the exact-position check and one of the conditional rebinding rule: a Flask factory module ending in `app = create_app()`, an application wrapped again under its own name (`app = VersionedFastAPI(app)`, middleware) and a module router sharing its name with a function-local one each lost every route, and an `except ImportError:` fallback replaced the import its `try` body makes. The position check now applies only when an import and a later module-level binding compete for a name, and an `except` fallback does not replace the import it guards. A function-local re-import in `__init__.py` no longer hides the module-level import either.
+
+The pinned corpus has none of these shapes: the report is unchanged against the `#934` head (django 725, netbox 70, ctfd 88, dispatch 290, full-stack-fastapi-template 23, poetry and home-assistant-core 0, same routes and notices). Against the pack before `#934`, the only difference is still the 15 method-local Django URL patterns described above.

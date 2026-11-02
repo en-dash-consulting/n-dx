@@ -388,6 +388,67 @@ describe("an imported name rebound at module level", () => {
       "Flask: 1 mount names no application or router the rules can follow and was not followed: app/site.py:5 (register_blueprint bp).",
     ]);
   });
+
+  it("follows the import a try body binds over the except ImportError fallback", async (ctx) => {
+    write("app/fast.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/items")\ndef items(): ...\n');
+    write(
+      "app/main.py",
+      'from fastapi import FastAPI, APIRouter\ntry:\n    from .fast import router\nexcept ImportError:\n    router = APIRouter()\napp = FastAPI()\napp.include_router(router, prefix="/api")\n',
+    );
+    // The fallback's own routes stay its own: inside the except clause, its name is the fallback router.
+    write(
+      "app/guarded.py",
+      'from fastapi import FastAPI, APIRouter\ntry:\n    from .fast import router\nexcept ImportError:\n    router = APIRouter(prefix="/f")\n    @router.get("/y")\n    def y(): ...\nother = FastAPI()\nother.include_router(router, prefix="/other")\n',
+    );
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/fast.py")?.sort()).toEqual(["GET /api/items items", "GET /other/items items"]);
+    expect(routesOf(facts, "app/guarded.py")).toEqual(["GET /f/y y"]);
+    expect(notices).toBeUndefined();
+  });
+});
+
+describe("an application or router the file binds more than once", () => {
+  let dir: string;
+  const write = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text);
+  };
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "lang-python-rebinds-"));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it("keeps a Flask factory's routes when the module ends in app = create_app()", async (ctx) => {
+    write(
+      "app.py",
+      'from flask import Flask, Blueprint\nbp = Blueprint("b", __name__)\n@bp.route("/bp")\ndef in_bp(): ...\ndef create_app():\n    app = Flask(__name__)\n    app.register_blueprint(bp, url_prefix="/v1")\n    @app.route("/ping")\n    def ping(): ...\n    return app\napp = create_app()\n@app.route("/health")\ndef health(): ...\n',
+    );
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app.py")).toEqual(["GET /v1/bp in_bp", "GET /ping ping", "GET /health health"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("keeps an application's routes when it is wrapped again under its own name", async (ctx) => {
+    write("items.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/items")\ndef items(): ...\n');
+    write(
+      "main.py",
+      'from fastapi import FastAPI\nfrom items import router\napp = FastAPI()\napp.include_router(router, prefix="/api")\n@app.get("/health")\ndef health(): ...\napp = VersionedFastAPI(app)\napp = SentryAsgiMiddleware(app)\n',
+    );
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "main.py")).toEqual(["GET /health health"]);
+    expect(routesOf(facts, "items.py")).toEqual(["GET /api/items items"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("keeps a module router and a function-local router of the same name apart", async (ctx) => {
+    write(
+      "routes.py",
+      'from fastapi import APIRouter\nrouter = APIRouter(prefix="/mod")\n@router.get("/a")\ndef a(): ...\ndef build():\n    router = APIRouter(prefix="/local")\n    @router.get("/b")\n    def b(): ...\n    return router\n',
+    );
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "routes.py")).toEqual(["GET /mod/a a", "GET /local/b b"]);
+    expect(notices).toBeUndefined();
+  });
 });
 
 describe("a name an Object.prototype member has", () => {
@@ -536,6 +597,15 @@ describe("a module a package's __init__.py re-exports under another name", () =>
     const { facts, notices } = await analyze(ctx, dir);
     expect(routesOf(facts, "app/api/endpoints.py")).toEqual(["GET /api/y y"]);
     expect(routesOf(facts, "app/api/legacy.py")).toEqual(["GET /z z"]);
+    expect(notices).toBeUndefined();
+  });
+
+  it("is followed through a module-level import that a function re-imports by the same name", async (ctx) => {
+    write("app/api/inner.py", 'from fastapi import APIRouter\nrouter = APIRouter()\n@router.get("/items")\ndef items(): ...\n');
+    write("app/api/__init__.py", "from .inner import router\ndef get_router():\n    from .inner import router\n    return router\n");
+    write("app/main.py", 'from fastapi import FastAPI\nfrom app.api import router\napp = FastAPI()\napp.include_router(router, prefix="/api")\n');
+    const { facts, notices } = await analyze(ctx, dir);
+    expect(routesOf(facts, "app/api/inner.py")).toEqual(["GET /api/items items"]);
     expect(notices).toBeUndefined();
   });
 });

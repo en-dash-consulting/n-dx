@@ -110,3 +110,10 @@
 
 ; Rebindings outside def/class also count under module-level if/try blocks.
 (assignment left: (identifier) @django.binding right: (_))
+
+; A `try` (@django.try) with its body (@django.tried) and each `except` clause
+; (@django.excepted): a name an except clause binds is the fallback for an
+; import in the body, which is what runs, not a later binding replacing it.
+(try_statement
+  body: (_) @django.tried
+  (except_clause) @django.excepted) @django.try
