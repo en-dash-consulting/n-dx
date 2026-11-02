@@ -11,7 +11,7 @@ acceptanceCriteria:
   - "The hub session's context ceiling is 40k unless web.sidecarContextCeiling.hub sets it; a turn that ends above it checkpoints and the next turn starts cold from a fresh snapshot"
   - "The Claude spawn for hub scope passes an empty tool list (no Read, Grep or Glob) and an MCP config holding only ndx-sidecar; a test asserts the argv, with a win32 branch for comma-joined lists and stdin prompts"
   - "A hub create with the Codex vendor is refused with a reason naming that its read-only sandbox can still read repositories"
-  - "src/hub/ imports nothing from src/server/ or src/viewer/ and no new hub route skips the token check or request-guard; the project server learns the hub's URL from the hub at spawn"
+  - "src/hub/ imports nothing from src/server/ or src/viewer/ and no new hub route skips the token check or request-guard; the host finds the hub only through resolveHubAccess (the hub pid file and auth.token under ndx home, as the T1 fetcher does), never a hand-spelled port"
 priority: "high"
 source: "caos"
 ---
