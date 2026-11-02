@@ -4,10 +4,14 @@ items:
     lastModified: "2026-11-02T20:52:55.966Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "23eb7360-bb32-40cf-b670-988fd545d4bb":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-02T20:59:16.033Z"
-    activeIntervals: [{"start":"2026-11-02T20:59:16.033Z"}]
-    lastModified: "2026-11-02T20:59:18.432Z"
+    completedAt: "2026-11-02T23:11:05.862Z"
+    endedAt: "2026-11-02T23:11:05.862Z"
+    activeIntervals: [{"end":"2026-11-02T21:26:23.502Z","start":"2026-11-02T20:59:16.033Z"},{"end":"2026-11-02T23:11:05.862Z","start":"2026-11-02T23:11:05.862Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Place lens in fe857f1c0 with review repair b9dff1479 (run db9c913f): 6k Place packet over buildChangePlacement (the GET placement builder), PLACE_INSTRUCTIONS, place_change_card dry-run on raise and written on approval through the shared writePlacement under the PRD model transaction, refusing a placement that moved while the card waited; POST placement/check writes nothing (tree-hash test). Rex suggestPlacement gains relationRule and per-candidate amendedBy. Gate failed only on graview-app-trust, pre-existing (NDX_CLI_PATH inherited under ndx work; fix in #940); the affected gate outside hench passes 6/6 suites. The review finding that no drawer entry attaches a change is task 0e769946."
+    lastModified: "2026-11-02T23:11:05.862Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a2f27dcc-4c2d-4dd0-9b22-89c5a0956a00":
     issues: ["https://www.notion.so/3f7a80b7192481a09ce5d406106f8408","https://www.notion.so/3f7a80b71924816794b4d9312cd470ed"]
