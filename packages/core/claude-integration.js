@@ -727,8 +727,12 @@ export function discoverClaudeCli(dir = null) {
 
   if (dir) {
     const layout = resolveLayout(dir);
-    if (typeof readJsonObject(layout.localConfigFile)?.cli?.claudePath === "string" && localConfigStatus(layout.root).unanswered) {
-      searched.push(`cli.claudePath in ${relative(layout.root, layout.localConfigFile)} was not run: git could not confirm the local file is untracked; check git safe.directory, then run ndx trust status .`);
+    const status = typeof readJsonObject(layout.localConfigFile)?.cli?.claudePath === "string" ? localConfigStatus(layout.root) : null;
+    const file = relative(layout.root, layout.localConfigFile);
+    if (status?.classifierError) {
+      searched.push(`cli.claudePath in ${file} was not run: n-dx could not classify the local file (${status.classifierError}); check that @n-dx/hench is installed and built, then run ndx trust status .`);
+    } else if (status?.unanswered) {
+      searched.push(`cli.claudePath in ${file} was not run: git could not confirm the local file is untracked; check git safe.directory, then run ndx trust status .`);
     }
   }
   const ignored = ignoredSharedClaudePathNote(dir);

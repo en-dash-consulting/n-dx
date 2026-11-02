@@ -1460,7 +1460,9 @@ async function checkConfigSecrets(dir) {
     return {
       ok: false,
       detail:
-        (localStatus.unanswered
+        (localStatus.classifierError
+          ? `${localFile}: n-dx could not classify the local config (${localStatus.classifierError}); check that @n-dx/hench is installed and built, run \`ndx trust status .\` to see why, then rerun. `
+          : localStatus.unanswered
           ? `${localFile}: git could not confirm the local config is untracked; check git safe.directory and rerun. `
           : localStatus.nestedIn
             ? `${localFile} is repository config in nested work tree ${localStatus.nestedIn}; untrack it there. `
