@@ -99,9 +99,23 @@ describe("Place lens packet", () => {
     expect(packet.text).toContain("None: no other open change amends a candidate.");
     expect(packet.text).toContain("- fin: Finance");
     expect(packet.text).not.toMatch(/Tied:|No strong pick/);
-    expect(packet.sections.map((s) => s.id)).toEqual(["change", "relation", "shortlist", "blockers", "candidates", "areas"]);
+    expect(packet.sections.map((s) => s.id)).toEqual(["change", "relation", "shortlist", "blockers", "intent", "candidates", "areas"]);
     for (const s of packet.sections) expect(s.provenance).toMatchObject({ source: expect.any(String), generatedAt: NOW });
     expect(packet.sections.find((s) => s.id === "shortlist")!.provenance.source).toContain("GET /api/rex/changes/:id/placement");
+  });
+
+  it("trims a long intent before any shortlist row, so the whole shortlist fits the cap", async () => {
+    const intent = Array.from({ length: 120 }, (_, i) => `Paragraph ${i} of a long intent about the quarterly ledger export.`).join("\n");
+    const packet = await placePacket(productTree({ title: `Quarterly ${SHARED}`, intent }, [ledger]));
+    const route = buildChangePlacement(productTree({ title: `Quarterly ${SHARED}`, intent }, [ledger]), "ch");
+
+    expect(intent.length).toBeGreaterThan(PLACE_CAP);
+    expect(packet.chars).toBeLessThanOrEqual(PLACE_CAP);
+    expect(packet.cut.map((c) => c.section)).not.toContain("shortlist");
+    for (const [i, c] of route.shortlist.entries()) expect(packet.text).toContain(`${i + 1}. ${c.title} (${c.target}`);
+    expect(packet.text).toContain("Paragraph 0 of a long intent");
+    expect(packet.text).not.toContain("Paragraph 119 of a long intent");
+    expect(packet.cut).toContainEqual(expect.objectContaining({ section: "intent", kind: "trimmed" }));
   });
 
   it("says a tied shortlist is tied, so the order is no pick", async () => {

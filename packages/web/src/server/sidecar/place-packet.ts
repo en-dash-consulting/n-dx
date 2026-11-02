@@ -38,9 +38,12 @@ function changeBody(placement: ChangePlacementWire): string {
     `Change ${change.id}: ${change.title}`,
     `Status: ${change.status} · ${change.taskCount} ${change.taskCount === 1 ? "task" : "tasks"}`,
     `Tags: ${change.tags?.length ? change.tags.join(", ") : "none"}`,
-    "Intent:",
-    change.intent?.trim() || "(none written)",
   ].join("\n");
+}
+
+/** The change's intent: its own section, after the shortlist, so a long one is trimmed before a shortlist row is. */
+function intentBody(placement: ChangePlacementWire): string {
+  return placement.change.intent?.trim() || "(none written)";
 }
 
 function relationBody(placement: ChangePlacementWire): string {
@@ -97,7 +100,10 @@ function areasBody(tree: V2Tree): string {
 
 /**
  * The Place lens packet for the change `target.ref`. Sections run in order of
- * importance, so the areas list is trimmed first and the change never is.
+ * importance and are trimmed from the end: the areas list goes first, then the
+ * candidates and the intent (the instructions already take a third of the cap,
+ * and an intent can run to thousands of characters), so the change's title
+ * and the shortlist are the last to go.
  */
 export async function buildPlacePacket(sources: PacketSources, target: PacketTarget, now: string): Promise<Packet> {
   const header = [
@@ -124,6 +130,7 @@ export async function buildPlacePacket(sources: PacketSources, target: PacketTar
     section("relation", "Relation default", relationBody(placement), "rex placementRelation (rules)", now),
     section("shortlist", `Rules shortlist (top ${placement.shortlist.length})`, shortlistBody(placement), SHORTLIST_SOURCE, now),
     section("blockers", "Open changes that would block apply", blockersBody(placement), "rex suggestPlacement (open changes amending each candidate)", now),
+    section("intent", "Intent", intentBody(placement), PRD_SOURCE, now),
     section("candidates", "Candidates' statements and capability criteria", candidatesBody(placement), PRD_SOURCE, now),
     section("areas", "Areas (for a proposal's under)", areasBody(prd.tree), PRD_SOURCE, now),
   ]);
