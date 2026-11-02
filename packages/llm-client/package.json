@@ -1,6 +1,6 @@
 {
   "name": "@n-dx/llm-client",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "publishConfig": {
     "access": "public"
   },

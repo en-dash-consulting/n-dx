@@ -1,5 +1,13 @@
 # @n-dx/lang-sql
 
+## 0.10.2
+
+### Patch Changes
+
+- Updated dependencies [[`19816b7`](https://github.com/en-dash-consulting/n-dx/commit/19816b719a347f36cb8c96831089836cc62584f7)]:
+  - @n-dx/lang-kit@0.10.2
+  - @n-dx/lang-runtime@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes
