@@ -496,12 +496,12 @@ export async function writePlacement(
     const moved = expect ? movedSince(expect, recorded.check) : undefined;
     if (moved) throw new PlacementMovedError(moved);
     return { tree: recorded.tree, result: recorded };
-  });
+  }, { now: () => now });
   const { change, check, proposedTarget } = result;
   const entry = check.action === "place"
     ? { event: "change_placed", detail: `${check.relation} ${check.target} (via ${via})` }
     : { event: "change_proposed", detail: `${check.type} under ${check.under}: ${check.title} (via ${via})` };
-  const decided = decision ? await sidecarDecisionFields(ctx.rexDir, change, decision) : {};
+  const decided = decision ? await sidecarDecisionFields(ctx.rexDir, change, decision, now) : {};
   await publish(ctx, { timestamp: now.toISOString(), itemId: change, ...entry, ...decided }, broadcast);
   return { change, check, ...(proposedTarget !== undefined ? { proposedTarget } : {}) };
 }

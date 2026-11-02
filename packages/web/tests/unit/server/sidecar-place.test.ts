@@ -14,7 +14,7 @@ import { join, relative, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { addChangeNode, indexTree, loadPrdModel, nodeSpec, specHash, withPrdModelTransaction, type RuleNode, type V2Tree } from "@n-dx/rex";
+import { addChangeNode, indexTree, loadPrdModel, nodeSpec, recordPlacement, specHash, withPrdModelTransaction, type RuleNode, type V2Tree } from "@n-dx/rex";
 import { createAnnouncingBroker, handleSidecarRoute, sidecarActions, type SidecarCardMessage } from "../../../src/server/routes-sidecar.js";
 import { buildChangePlacement } from "../../../src/server/routes-rex/placement.js";
 import { BROKER_TOOL_POLICY } from "../../../src/server/sidecar/broker-policy.js";
@@ -312,6 +312,27 @@ describe("place_change_card", () => {
     expect(messages).toContainEqual(expect.objectContaining({ type: "rex:prd-changed" }));
     // The dashboard's PRD cache was refreshed from the written tree.
     expect(readFileSync(join(rexDir, ".cache", "prd.json"), "utf-8")).toContain(inboxId);
+    await client.close();
+  });
+
+  it("touches a target the change already touches: rex stamps nothing, so approvedBy is not the previous editor", async () => {
+    await withPrdModelTransaction(rexDir, ({ tree }) => ({ tree: recordPlacement(tree, inboxId, { target: CAPABILITY_ID, relation: "touches" }, new Date(NOW)).tree, result: null }));
+    // A teammate's stamp: bookkeeping only, so the next write sees no content change to restamp.
+    await withPrdModelTransaction(rexDir, ({ tree }) => {
+      const node = indexTree(tree).resolve(inboxId)!;
+      node.lastModifiedBy = "teammate@elsewhere";
+      return { tree, result: null };
+    });
+    expect((await changeNode()).change.lastModifiedBy).toBe("teammate@elsewhere");
+
+    const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "touches" });
+    await decide(card.id, { decision: "approve" });
+    expect((await call).isError).toBeFalsy();
+    const { change } = await changeNode();
+    expect(change.lastModifiedBy).toBe("teammate@elsewhere");
+    const entry = logEvents().at(-1)!;
+    expect(entry).toMatchObject({ event: "change_placed", itemId: inboxId, decidedBy: `sidecar:${SESSION}` });
+    expect(entry).not.toHaveProperty("approvedBy");
     await client.close();
   });
 

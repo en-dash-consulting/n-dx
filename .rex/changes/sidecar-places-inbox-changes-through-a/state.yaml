@@ -21,11 +21,25 @@ items:
     lastModified: "2026-11-02T23:11:05.862Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8ca54c75-dc5d-4a34-88da-c13b51ffc90c":
-    lastModified: "2026-11-02T23:45:30.235Z"
+    status: "completed"
+    startedAt: "2026-11-02T23:48:56.209Z"
+    completedAt: "2026-11-02T23:52:22.527Z"
+    endedAt: "2026-11-02T23:52:22.527Z"
+    activeIntervals: [{"end":"2026-11-02T23:52:22.527Z","start":"2026-11-02T23:48:56.209Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "writePlacement passes now to the transaction; sidecarDecisionFields keeps approvedBy only when lastModified equals that stamp."
+    lastModified: "2026-11-02T23:52:22.527Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a2f27dcc-4c2d-4dd0-9b22-89c5a0956a00":
+    status: "completed"
+    startedAt: "2026-11-02T23:52:22.527Z"
+    completedAt: "2026-11-02T23:52:22.527Z"
+    endedAt: "2026-11-02T23:52:22.527Z"
+    activeIntervals: [{"end":"2026-11-02T23:52:22.527Z","start":"2026-11-02T23:52:22.527Z"}]
+    appliedAt: "2026-11-02T23:52:22.527Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     issues: ["https://www.notion.so/3f7a80b7192481a09ce5d406106f8408","https://www.notion.so/3f7a80b71924816794b4d9312cd470ed"]
-    lastModified: "2026-11-02T23:45:30.235Z"
+    lastModified: "2026-11-02T23:52:22.527Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "dc9f6945-8db1-466b-8857-fee10b03c5f6":
     status: "completed"
