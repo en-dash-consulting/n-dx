@@ -307,6 +307,7 @@ Waiting on a server, hub or daemon:
 - `packages/web/tests/integration/hub-admission.test.ts`
 - `packages/web/tests/integration/hub-admission-auth.test.ts`
 - `packages/web/tests/integration/hub-daemon.test.ts`
+- `packages/web/tests/integration/hub-registry-heal.test.ts`
 - `packages/web/tests/integration/workspace-scoped-prd-writes.test.ts`
 - `packages/web/tests/integration/workspace-slot-dispatch.test.ts`
 
