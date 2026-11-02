@@ -19,7 +19,9 @@
  * - **modified** edits a live capability or constraint: `proposed`, when
  *   present, replaces the statement (it is the reviewed text by the time a
  *   change is applied); `criteria.remove`, `replace` and `add` edit criteria
- *   by id, in that order.
+ *   by id, in that order. A requirement linked to a replaced criterion takes
+ *   its new text, and one linked to a removed criterion goes, so the
+ *   requirements never restate a rule the criteria dropped.
  * - **removed** retires the node: its status becomes `deleted`, the tombstone
  *   status every v2 rule skips. The file stays, with its History. The rules
  *   skip a tombstone's whole subtree, so a node with live descendants is
@@ -527,12 +529,40 @@ const applyModified: DeltaApply =({ product }, amendment, _options, fail) => {
 
   if (amendment.proposed !== undefined) node.statement = amendment.proposed;
   if (node.type === "capability" && hasCriteriaDelta) {
+    followCriteria(node, node.criteria ?? [], delta!);
     if (criteria.length) node.criteria = criteria;
     else delete node.criteria;
   }
   stampMet(node);
   return node;
 };
+
+/**
+ * Keep a capability's requirements in step with a criteria delta: the
+ * requirement linked to a replaced criterion takes its new text as title and
+ * acceptance criterion (its linked tests and command stay), and the one linked
+ * to a removed criterion goes. A criterion's requirement is the one its
+ * `requirement` field names, else `<capability id>:<criterion id>`, the id the
+ * migration gives it. Requirements linked to no criterion are left alone.
+ */
+function followCriteria(node: RuleNode, before: readonly Criterion[], delta: CriteriaDelta): void {
+  const requirements = node.requirements as Requirement[] | undefined;
+  if (!requirements?.length) return;
+  const linked = (id: string): string => {
+    const named = before.find((c) => c.id === id)?.requirement;
+    return typeof named === "string" ? named : `${node.id}:${id}`;
+  };
+  const removed = new Set((delta.remove ?? []).map(linked));
+  const replaced = new Map((delta.replace ?? []).map((c) => [linked(c.id), c.text] as const));
+  const next = requirements
+    .filter((r) => !removed.has(r.id))
+    .map((r) => {
+      const text = replaced.get(r.id);
+      return text === undefined ? r : { ...r, title: text.trim().replace(/[.;:,]+$/, ""), acceptanceCriteria: [text] };
+    });
+  if (next.length) node.requirements = next;
+  else delete node.requirements;
+}
 
 const applyRemoved: DeltaApply = ({ product }, amendment, { removing }, fail) => {
   // An earlier amendment may have retired an ancestor of a target this change also removes.

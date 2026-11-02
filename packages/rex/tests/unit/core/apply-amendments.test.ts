@@ -176,6 +176,49 @@ describe("applyAmendments: modified", () => {
     expect(get(out, CAP).criteria).toEqual([{ id: "c1", text: "Charged once" }]);
   });
 
+  describe("requirements linked to criteria", () => {
+    const linked = (criterion: string, text: string) => ({
+      id: `${CAP}:${criterion}`,
+      title: text,
+      description: "Linked to: tests/pay.test.ts",
+      category: "technical",
+      validationType: "automated",
+      acceptanceCriteria: [`${text}.`],
+      validationCommand: "pnpm vitest run tests/pay.test.ts",
+    });
+    function withRequirements(amends: Amendment[]): V2Tree {
+      const t = tree(amends);
+      get(t, CAP).requirements = [linked("c1", "Charged once"), linked("c2", "Declines show why"), { ...linked("c1", "Unlinked"), id: "standalone" }];
+      return t;
+    }
+
+    it("rewrites the requirement linked to a replaced criterion, keeping its tests", () => {
+      const { tree: out } = applyAmendments(withRequirements([modify({ criteria: { replace: [{ id: "c1", text: "Charged exactly once." }] } })]), CHANGE, OPTS);
+      const requirements = get(out, CAP).requirements as ReturnType<typeof linked>[];
+      expect(requirements.find((r) => r.id === `${CAP}:c1`)).toEqual({
+        ...linked("c1", "Charged once"),
+        title: "Charged exactly once",
+        acceptanceCriteria: ["Charged exactly once."],
+      });
+      expect(requirements.find((r) => r.id === `${CAP}:c2`)).toEqual(linked("c2", "Declines show why"));
+      expect(requirements.find((r) => r.id === "standalone")?.title).toBe("Unlinked");
+    });
+
+    it("follows a criterion's own requirement field over the id convention", () => {
+      const t = withRequirements([modify({ criteria: { replace: [{ id: "c2", text: "Declines name the reason" }] } })]);
+      get(t, CAP).criteria = [{ id: "c1", text: "Charged once" }, { id: "c2", text: "Declines show why", requirement: "standalone" }];
+      const { tree: out } = applyAmendments(t, CHANGE, OPTS);
+      const requirements = get(out, CAP).requirements as ReturnType<typeof linked>[];
+      expect(requirements.find((r) => r.id === "standalone")?.acceptanceCriteria).toEqual(["Declines name the reason"]);
+      expect(requirements.find((r) => r.id === `${CAP}:c2`)?.title).toBe("Declines show why");
+    });
+
+    it("drops the requirement linked to a removed criterion", () => {
+      const { tree: out } = applyAmendments(withRequirements([modify({ criteria: { remove: ["c2"] } })]), CHANGE, OPTS);
+      expect((get(out, CAP).requirements as { id: string }[]).map((r) => r.id)).toEqual([`${CAP}:c1`, "standalone"]);
+    });
+  });
+
   it("writes the proposed statement, stamps metAt, clears revisedAt and appends History", () => {
     const { tree: out } = applyAmendments(tree([modify({ proposed: "A shopper can pay by card or wallet." })]), CHANGE, OPTS);
     const cap = get(out, CAP);
