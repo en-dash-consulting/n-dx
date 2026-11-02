@@ -491,6 +491,7 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
     stack,
     github,
     githubReason,
+    githubReads: options.githubReads,
     githubDeferred,
   };
 }

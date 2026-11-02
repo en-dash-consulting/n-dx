@@ -126,6 +126,8 @@ export interface BranchHealth {
   github: GithubFacts | null;
   /** Why `github` is null; null when it is not. */
   githubReason: string | null;
+  /** Whether this project lets gh run (`web.sidecarGithubReads`): false means no GitHub fact was read or will be. */
+  githubReads: boolean;
   /**
    * True when GitHub reads are allowed but only local facts were asked for:
    * asking again with `?github=1` reads the PR, its checks and the stack's PR bases.

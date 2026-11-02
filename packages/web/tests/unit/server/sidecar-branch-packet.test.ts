@@ -89,6 +89,7 @@ function health(over: Partial<BranchHealth> = {}): BranchHealth {
       ],
     },
     githubReason: null,
+    githubReads: true,
     githubDeferred: false,
     ...over,
   };

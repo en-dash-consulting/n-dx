@@ -31,6 +31,7 @@ import { createSourcevisionMcpServer } from "./domain-gateway.js";
 import { handleProjectRoute } from "./routes-project.js";
 import { handleGitRoute } from "./routes-git.js";
 import { handleBranchHealthRoute } from "./routes-branch-health.js";
+import { handleChangesetsRoute } from "./routes-changesets.js";
 import { handleRunCommandsRoute, shutdownRunCommands } from "./routes-run-commands.js";
 import { handleWorktreesRoute, invalidateWorktreesAnswer } from "./routes-worktrees.js";
 import { handleLiveRoute, startLiveMonitor, type LiveSources } from "./routes-live.js";
@@ -863,6 +864,7 @@ async function handleApiRoutes(
   if (await handleScopedRoute(true, () => handleBranchHealthRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleRunCommandsRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(true, () => handleWorktreesRoute(req, res, ctx, { broadcast, onStatusInvalidate: invalidateRunCaches }))) return true;
+  if (handleChangesetsRoute(req, res, ctx)) return true;
   if (await handleLiveRoute(req, res, ctx, liveSourcesOf(registry))) return true;
   if (isInScope(ctx.scope, "hench") && await handleLiveTaskRoute(req, res, ctx)) return true;
   if (isInScope(ctx.scope, "sourcevision") && (await handleLiveAnalyzeRoute(req, res, ctx, liveSourcesOf(registry)))) return true;
