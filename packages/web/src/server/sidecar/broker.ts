@@ -29,7 +29,7 @@ import {
   type BrokerToolName,
   type SidecarCardKind,
 } from "./broker-policy.js";
-import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
+import type { QueuePlan, SidecarChangeSet, SidecarPlacement } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
 import { appendLedgerEntry, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
@@ -52,6 +52,8 @@ export interface SidecarCard {
   changeSet?: SidecarChangeSet;
   /** A run-plan card's plan as the planner printed it when the card was raised; its commands are never the model's. */
   runPlan?: QueuePlan;
+  /** A placement card's placement as approval writes it, with rex's dry run from when the card was raised. */
+  placement?: SidecarPlacement;
   /** The lane (0-based) the operator chose to start on a run-plan card. */
   lane?: number;
   status: SidecarCardStatus;
@@ -73,6 +75,7 @@ export interface CardAnnex {
   runOptions?: Record<string, unknown>;
   changeSet?: SidecarChangeSet;
   runPlan?: QueuePlan;
+  placement?: SidecarPlacement;
 }
 
 /** How a broker call was settled. */
@@ -160,6 +163,7 @@ export class SidecarBroker {
       ...(annex.runOptions !== undefined && { runOptions: annex.runOptions }),
       ...(annex.changeSet !== undefined && { changeSet: annex.changeSet }),
       ...(annex.runPlan !== undefined && { runPlan: annex.runPlan }),
+      ...(annex.placement !== undefined && { placement: annex.placement }),
       status: "pending",
       raisedAt: this.iso(),
     };

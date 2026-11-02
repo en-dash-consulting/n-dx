@@ -11,10 +11,16 @@
  *                                       → { layout: "v2", change, relation, tied, shortlist, pick?, proposal?, model?, warnings }
  *                                         the `prd.place` model's draft; writes nothing. Spends tokens, so it
  *                                         answers 403 unless `rex.placementDraft` is on, read per call.
+ *   POST /api/rex/changes/:id/placement/check
+ *                                       → { layout: "v2", change, check }
+ *                                         rex's dry run of `{ target, relation?, … }` or `{ propose: { type, under, title, … } }`
+ *                                         on the loaded tree: what it would record, or the refusal kind. Writes nothing.
  *
  * Rex decides everything (`suggestPlacement`, `recordPlacement`,
  * `recordProposal`); this module enriches the shortlist with what the viewer
  * shows and writes through rex's v2 transaction, as `place_change` does.
+ * {@link writePlacement} is the one write: the two POST routes and an
+ * approved Sidecar placement card (`sidecar/carry-out.ts`) all go through it.
  *
  * A v1 tree answers 409, an unknown change 404, and any other rex refusal 422
  * `{ error, kind }`. The wire types mirror `viewer/views/product-model.ts`;
@@ -46,6 +52,7 @@ import {
   withPrdModelTransaction,
 } from "../rex-gateway.js";
 import type { RuleNode, V2Tree, RecordPlacementInput, RecordProposalInput } from "../rex-gateway.js";
+import type { SidecarPlacementCheck, SidecarPlacementRequest } from "../../shared/index.js";
 
 // ── Wire types (mirror viewer/views/product-model.ts) ────────────────
 
@@ -62,12 +69,16 @@ export interface PlacementCandidateWire {
   score: number;
   strength: PlacementStrengthWire;
   reasons: string[];
+  /** Other open changes that already amend this candidate; apply refuses an amends placement here once one of them applies. */
+  amendedBy?: string[];
 }
 
 export interface ChangePlacementWire {
   layout: "v2";
   change: { id: string; title: string; intent?: string; status: string; taskCount: number; tags?: string[] };
   relation: PlacementRelationWire;
+  /** The rule that set `relation`, in rex's words. */
+  relationRule: string;
   tied: boolean;
   shortlist: PlacementCandidateWire[];
 }
@@ -108,6 +119,13 @@ export interface ProposeChangeResultWire {
   warnings?: string[];
 }
 
+/** `POST /api/rex/changes/:id/placement/check`: rex's dry run of a placement, which writes nothing. */
+export interface PlacementCheckWire {
+  layout: "v2";
+  change: string;
+  check: SidecarPlacementCheck;
+}
+
 /** `POST /api/rex/changes/:id/placement/draft`: the model's draft, which fills the form and writes nothing. */
 export interface PlacementDraftWire {
   layout: "v2";
@@ -140,7 +158,7 @@ function areaTitles(index: ReturnType<typeof indexTree>): (id: string) => string
 /** Rex's shortlist rows, each with the target's title, area, statement and criteria. */
 function enrichShortlist(
   index: ReturnType<typeof indexTree>,
-  candidates: ReadonlyArray<{ target: string; score: number; strength: PlacementStrengthWire; reasons: string[] }>,
+  candidates: ReadonlyArray<{ target: string; score: number; strength: PlacementStrengthWire; reasons: string[]; amendedBy?: string[] }>,
 ): PlacementCandidateWire[] {
   const areaOf = areaTitles(index);
   return candidates.flatMap((candidate): PlacementCandidateWire[] => {
@@ -157,6 +175,7 @@ function enrichShortlist(
       score: candidate.score,
       strength: candidate.strength,
       reasons: candidate.reasons,
+      ...(candidate.amendedBy?.length ? { amendedBy: candidate.amendedBy } : {}),
     }];
   });
 }
@@ -181,6 +200,7 @@ export function buildChangePlacement(tree: V2Tree, changeRef: string): ChangePla
       ...(change.tags?.length ? { tags: change.tags } : {}),
     },
     relation: suggestion.relation,
+    relationRule: suggestion.relationRule,
     tied: suggestion.tied,
     shortlist,
   };
@@ -320,6 +340,135 @@ function parseProposeBody(body: Json): ProposeChangeRequestWire | string {
   return body as unknown as ProposeChangeRequestWire;
 }
 
+/** Only these fields of a body reach rex, so an extra key (an agent's `reasons`) never does. */
+const PLACE_FIELDS = ["target", "relation", "summary", "proposed", "criteria"] as const;
+const PROPOSE_FIELDS = ["type", "under", "title", "summary", "proposed", "criteria"] as const;
+
+function pick<K extends string>(body: Json, keys: readonly K[]): Partial<Record<K, unknown>> {
+  return Object.fromEntries(keys.filter((k) => body[k] !== undefined).map((k) => [k, body[k]])) as Partial<Record<K, unknown>>;
+}
+
+/**
+ * A placement as one body: `{ target, relation?, summary?, proposed?, criteria? }`
+ * places the change on an existing node, `{ propose: { type, under, title, … } }`
+ * proposes a new one. The Sidecar card and `POST …/placement/check` take it.
+ */
+export function parsePlacementRequest(body: Json): SidecarPlacementRequest | string {
+  if (body.propose !== undefined) {
+    if (body.target !== undefined) return "Give either target or propose, not both";
+    const propose = body.propose;
+    if (!propose || typeof propose !== "object" || Array.isArray(propose)) return "propose must be { type, under, title }";
+    const parsed = parseProposeBody(pick(propose as Json, PROPOSE_FIELDS));
+    return typeof parsed === "string" ? parsed : { action: "propose", ...parsed };
+  }
+  const parsed = parsePlaceBody(pick(body, PLACE_FIELDS));
+  return typeof parsed === "string" ? `${parsed} (or propose a new node with propose)` : { action: "place", ...parsed };
+}
+
+// ── Dry run and write ────────────────────────────────────────────────
+
+/** Rex's answer to a placement: the new tree, and what the card and the routes report. */
+interface RecordedPlacement {
+  tree: V2Tree;
+  change: string;
+  check: Extract<SidecarPlacementCheck, { ok: true }>;
+  /** A proposal's freshly minted node id; a dry run's is thrown away with its tree. */
+  proposedTarget?: string;
+}
+
+/** What a written placement reports. */
+export interface WrittenPlacement {
+  change: string;
+  check: Extract<SidecarPlacementCheck, { ok: true }>;
+  /** The id a written proposal's new node will have once the change is applied. */
+  proposedTarget?: string;
+}
+
+/** Record `request` on `tree` through rex's own rule; pure, and throws rex's refusal. */
+function recordRequest(tree: V2Tree, changeRef: string, request: SidecarPlacementRequest, now: Date): RecordedPlacement {
+  if (request.action === "place") {
+    const { action: _action, criteria, ...rest } = request;
+    const input: RecordPlacementInput = { ...rest, ...(criteria !== undefined ? { criteria: { ...criteria } } : {}) };
+    const placed = recordPlacement(tree, changeRef, input, now);
+    const index = indexTree(placed.tree);
+    const target = index.resolve(placed.placement.target)!;
+    const change = index.resolve(placed.change);
+    const amendment = change?.type === "change" ? (change.amends ?? []).find((a) => a.target === target.id) : undefined;
+    return {
+      tree: placed.tree,
+      change: placed.change,
+      check: {
+        ok: true,
+        action: "place",
+        target: target.id,
+        title: target.title,
+        relation: placed.placement.relation,
+        ...(placed.placement.relation === "amends" && amendment?.base !== undefined ? { base: amendment.base } : {}),
+        warnings: placed.warnings,
+      },
+    };
+  }
+  const { action: _action, ...input } = request;
+  const recorded = recordProposal(tree, changeRef, input as RecordProposalInput, now);
+  const { proposal } = recorded;
+  return {
+    tree: recorded.tree,
+    change: recorded.change,
+    check: { ok: true, action: "propose", type: proposal.type, under: proposal.under, title: proposal.title, warnings: recorded.warnings },
+    proposedTarget: proposal.target,
+  };
+}
+
+/**
+ * Rex's dry run of `request` on `tree`: what it would record, or its refusal
+ * kind and message. Writes nothing; any error other than rex's refusal throws.
+ */
+export function checkPlacement(tree: V2Tree, changeRef: string, request: SidecarPlacementRequest, now: Date = new Date()): SidecarPlacementCheck {
+  try {
+    return recordRequest(tree, changeRef, request, now).check;
+  } catch (err) {
+    if (err instanceof ChangePlacementError) return { ok: false, kind: err.kind, error: err.plain };
+    throw err;
+  }
+}
+
+/** The PRD as loaded, dry-run for `request`; a v1 tree throws {@link V1_REFUSAL}. */
+export async function checkPlacementOnDisk(rexDir: string, changeRef: string, request: SidecarPlacementRequest): Promise<SidecarPlacementCheck> {
+  if ((await prdLayout(rexDir)) !== "v2") throw new Error(V1_REFUSAL);
+  const { tree } = await loadPrdModel(rexDir);
+  return checkPlacement(tree, changeRef, request);
+}
+
+/** Who wrote a placement, as the log entry names it. */
+export type PlacementVia = "web" | "Sidecar";
+
+/**
+ * Write `request` through rex's rule under the PRD model transaction, then
+ * refresh the PRD cache, log and announce it. The routes `POST …/place` and
+ * `…/propose` and an approved Sidecar placement card all write through here.
+ * Throws rex's {@link ChangePlacementError} on a refusal, writing nothing.
+ */
+export async function writePlacement(
+  ctx: ServerContext,
+  changeRef: string,
+  request: SidecarPlacementRequest,
+  via: PlacementVia,
+  broadcast?: WebSocketBroadcaster,
+): Promise<WrittenPlacement> {
+  if ((await prdLayout(ctx.rexDir)) !== "v2") throw new Error(V1_REFUSAL);
+  const now = new Date();
+  const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => {
+    const recorded = recordRequest(model.tree, changeRef, request, now);
+    return { tree: recorded.tree, result: recorded };
+  });
+  const { change, check, proposedTarget } = result;
+  const entry = check.action === "place"
+    ? { event: "change_placed", detail: `${check.relation} ${check.target} (via ${via})` }
+    : { event: "change_proposed", detail: `${check.type} under ${check.under}: ${check.title} (via ${via})` };
+  await publish(ctx, { timestamp: now.toISOString(), itemId: change, ...entry }, broadcast);
+  return { change, check, ...(proposedTarget !== undefined ? { proposedTarget } : {}) };
+}
+
 // ── Responses ────────────────────────────────────────────────────────
 
 const V1_REFUSAL = "This project's PRD uses the v1 layout, which has no product layer to place changes on. Migrate it first.";
@@ -391,39 +540,50 @@ async function handlePlacementWrite(
   }
 
   try {
-    const now = new Date();
-    const timestamp = now.toISOString();
-    if (action === "place") {
-      const { criteria, ...rest } = parsed as PlaceChangeRequestWire;
-      const input: RecordPlacementInput = { ...rest, ...(criteria !== undefined ? { criteria: { ...criteria } } : {}) };
-      const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => {
-        const placed = recordPlacement(model.tree, changeRef, input, now);
-        return { tree: placed.tree, result: placed };
-      });
-      const { change, placement, warnings } = result;
-      await publish(ctx, { timestamp, event: "change_placed", itemId: change, detail: `${placement.relation} ${placement.target} (via web)` }, broadcast);
-      const answer: PlaceChangeResultWire = { change, target: placement.target, relation: placement.relation, ...(warnings.length ? { warnings } : {}) };
+    const request: SidecarPlacementRequest = action === "place"
+      ? { action, ...pick(parsed as unknown as Json, PLACE_FIELDS) } as SidecarPlacementRequest
+      : { action, ...pick(parsed as unknown as Json, PROPOSE_FIELDS) } as SidecarPlacementRequest;
+    const { change, check, proposedTarget } = await writePlacement(ctx, changeRef, request, "web", broadcast);
+    const warnings = check.warnings.length ? { warnings: check.warnings } : {};
+    if (check.action === "place") {
+      const answer: PlaceChangeResultWire = { change, target: check.target, relation: check.relation, ...warnings };
       jsonResponse(res, 200, answer);
     } else {
-      const input: RecordProposalInput = parsed as ProposeChangeRequestWire;
-      const { result } = await withPrdModelTransaction(ctx.rexDir, (model) => {
-        const recorded = recordProposal(model.tree, changeRef, input, now);
-        return { tree: recorded.tree, result: recorded };
-      });
-      const { change, proposal, warnings } = result;
-      await publish(ctx, {
-        timestamp,
-        event: "change_proposed",
-        itemId: change,
-        detail: `${proposal.type} under ${proposal.under}: ${proposal.title} (via web)`,
-      }, broadcast);
       const answer: ProposeChangeResultWire = {
         change,
-        proposed: { target: proposal.target, under: proposal.under, title: proposal.title, type: proposal.type },
-        ...(warnings.length ? { warnings } : {}),
+        proposed: { target: proposedTarget!, under: check.under, title: check.title, type: check.type },
+        ...warnings,
       };
       jsonResponse(res, 200, answer);
     }
+  } catch (err) {
+    refuse(res, err);
+  }
+  return true;
+}
+
+/** `POST /api/rex/changes/:id/placement/check`: rex's dry run of an edited placement; writes nothing. */
+async function handlePlacementCheck(changeRef: string, req: IncomingMessage, res: ServerResponse, ctx: ServerContext): Promise<boolean> {
+  const json = parseJson(await readBody(req, res));
+  const request = typeof json === "string" ? json : parsePlacementRequest(json);
+  if (typeof request === "string") {
+    errorResponse(res, 400, request);
+    return true;
+  }
+  if ((await prdLayout(ctx.rexDir)) !== "v2") {
+    errorResponse(res, 409, V1_REFUSAL);
+    return true;
+  }
+  try {
+    const { tree } = await loadPrdModel(ctx.rexDir);
+    const check = checkPlacement(tree, changeRef, request);
+    // An unknown change is the route's 404, as on every placement route; any other refusal is the answer.
+    if (!check.ok && check.kind === "no-such-change") {
+      errorResponse(res, 404, check.error);
+      return true;
+    }
+    const body: PlacementCheckWire = { layout: "v2", change: changeRef, check };
+    jsonResponse(res, 200, body);
   } catch (err) {
     refuse(res, err);
   }
@@ -466,7 +626,7 @@ async function handlePlacementDraft(changeRef: string, res: ServerResponse, ctx:
 
 // ── Router ───────────────────────────────────────────────────────────
 
-const PLACEMENT_PATH = /^changes\/([^/]+)\/(placement|place|propose|placement\/draft)$/;
+const PLACEMENT_PATH = /^changes\/([^/]+)\/(placement|place|propose|placement\/draft|placement\/check)$/;
 
 /** Handle the placement routes. Returns false when the path is not one of them. */
 export function routePlacement(
@@ -485,5 +645,6 @@ export function routePlacement(
   if (action === "placement") return method === "GET" ? handlePlacementRead(changeRef, res, ctx) : false;
   if (method !== "POST") return false;
   if (action === "placement/draft") return handlePlacementDraft(changeRef, res, ctx);
+  if (action === "placement/check") return handlePlacementCheck(changeRef, req, res, ctx);
   return handlePlacementWrite(action as "place" | "propose", changeRef, req, res, ctx, broadcast);
 }

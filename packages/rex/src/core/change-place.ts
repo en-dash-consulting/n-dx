@@ -47,6 +47,7 @@ import {
   PLACEMENT_SHORTLIST_SIZE,
   placeChange,
   placementRelation,
+  placementRelationRule,
   placementStrength,
   rankPlacementCandidates,
   type PlacementArea,
@@ -103,18 +104,30 @@ export interface SuggestedPlacementCandidate extends PlacementCandidate {
   strength: PlacementStrength;
 }
 
+/** A {@link SuggestedPlacementCandidate} as {@link suggestPlacement} returns it. */
+export interface SuggestedPlacementRow extends SuggestedPlacementCandidate {
+  /**
+   * Other open changes (display id or id) that already amend this candidate.
+   * Whichever of them applies first moves the spec an amendment's `base` pins,
+   * so apply then refuses an amends placement made here. Empty when none.
+   */
+  amendedBy: string[];
+}
+
 export interface PlacementSuggestion {
   /** Id of the change placed. */
   change: string;
   /** The rules' relation for this change; every candidate carries it. */
   relation: PlacementRelation;
+  /** The rule that set {@link relation}, in words. */
+  relationRule: string;
   /**
    * The top two candidates share a score: their order is the id tiebreak, not
    * the rules, so the first is no better a pick than the second.
    */
   tied: boolean;
   /** Rules ranking, best first. Empty when no rule fired. */
-  shortlist: SuggestedPlacementCandidate[];
+  shortlist: SuggestedPlacementRow[];
 }
 
 /**
@@ -125,16 +138,40 @@ export interface PlacementSuggestion {
 export function suggestPlacement(tree: V2Tree, changeRef: string, shortlistSize = PLACEMENT_SHORTLIST_SIZE): PlacementSuggestion {
   const change = placeableChange(tree, changeRef);
   const input = placementInput(change);
-  const relation = defaultRelation(change);
+  const { relation, rule } = defaultRelationRule(change);
   // Rank at least two, so a tie shows even when the caller asks for one.
   const ranked = rankPlacementCandidates(input, placementNodes(tree), Math.max(shortlistSize, 2)).map((c) => ({ ...c, relation }));
   const [top, next] = ranked;
+  const amendedBy = openAmenders(tree, change);
   return {
     change: change.id,
     relation,
+    relationRule: rule,
     tied: top !== undefined && next !== undefined && top.score === next.score,
-    shortlist: ranked.slice(0, shortlistSize).map((c) => ({ ...c, strength: placementStrength(c.score) })),
+    shortlist: ranked.slice(0, shortlistSize).map((c) => ({
+      ...c,
+      strength: placementStrength(c.score),
+      amendedBy: amendedBy.get(c.target) ?? [],
+    })),
   };
+}
+
+/** Per product node id, the open changes other than `change` that amend it (modified or removed), by display id or id. */
+function openAmenders(tree: V2Tree, change: RuleNode): Map<string, string[]> {
+  const index = indexTree(tree);
+  const out = new Map<string, string[]>();
+  for (const { node } of index.entries) {
+    if (node.type !== "change" || node.id === change.id || !isOpenChange(node)) continue;
+    for (const amendment of node.amends ?? []) {
+      if (amendment.delta === "added") continue;
+      const target = index.resolve(amendment.target);
+      if (!target) continue;
+      const label = node.displayId ?? node.id;
+      const list = out.get(target.id) ?? [];
+      if (!list.includes(label)) out.set(target.id, [...list, label]);
+    }
+  }
+  return out;
 }
 
 export interface RecordPlacementInput {
@@ -451,7 +488,13 @@ function appliedChangeAmends(change: RuleNode): ChangePlacementError {
 
 /** The rules' relation for an open change; touches for an applied one. */
 function defaultRelation(change: RuleNode): PlacementRelation {
-  return isAppliedChange(change) ? "touches" : placementRelation(placementInput(change));
+  return defaultRelationRule(change).relation;
+}
+
+/** {@link defaultRelation} and the rule that set it. */
+function defaultRelationRule(change: RuleNode): { relation: PlacementRelation; rule: string } {
+  if (isAppliedChange(change)) return { relation: "touches", rule: "the change is applied, and an applied change only touches" };
+  return placementRelationRule(placementInput(change));
 }
 
 function placementInput(node: RuleNode): PlacementChange {

@@ -55,7 +55,7 @@ import {
 export const CHANGE_SET_MAX_ITEMS = 50;
 
 /** Said on a card, and in its tool result, when a v2 change has no target. */
-export const INBOX_NOTE = "It lands in the Inbox awaiting placement; placing it from Sidecar comes with the Place lens (batch L2).";
+export const INBOX_NOTE = "It lands in the Inbox awaiting placement; place it from Sidecar with the Place lens, which raises a placement card.";
 
 type Raw = Record<string, unknown>;
 

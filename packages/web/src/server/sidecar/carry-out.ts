@@ -2,12 +2,15 @@
  * What an approved broker call does.
  *
  * The broker decides a call (`broker.ts`); this module carries out the
- * decided call and words the tool result the session's agent reads. Six
+ * decided call and words the tool result the session's agent reads. Seven
  * tools run today: `run_command` as the workspace's Sidecar command job,
  * `start_work` through the hench execute route, `propose_prd_change` as
  * its change-set card's PRD write (`change-set.ts`), with the operator's
  * edits, `propose_run_plan`, which starts nothing: it names the chosen
- * lane's first task for a `start_work` card, `github_read` as a gh read
+ * lane's first task for a `start_work` card, `place_change_card` as its
+ * placement card's write through rex's place or propose rule (the one
+ * `POST /api/rex/changes/:id/place` and `/propose` write through),
+ * `github_read` as a gh read
  * (`github.ts`), allowed by the card or by `web.sidecarGithubReads`, and
  * `draft_github_post`, posted under the operator's gh login only when its
  * card is approved. Every other approved call is recorded on its card and
@@ -21,7 +24,7 @@
  */
 
 import { laneSteps, stepRunOptions } from "../../shared/index.js";
-import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
+import type { QueuePlan, SidecarChangeSet, SidecarPlacement } from "../../shared/index.js";
 import type { BrokerToolName } from "./broker-policy.js";
 import type { BrokerOutcome, SidecarCard } from "./broker.js";
 
@@ -44,6 +47,10 @@ export interface SidecarActions {
   reviewChangeSet(input: Record<string, unknown>): Promise<SidecarChangeSet | string>;
   /** An approved change-set card's write, under the PRD lock. Never throws. */
   writeChangeSet(changeSet: SidecarChangeSet): Promise<CarryOutResult>;
+  /** A placement call read and dry-run through rex on the PRD as loaded, for its card; a string says why no card can be raised. Writes nothing. */
+  checkPlacement(input: Record<string, unknown>): Promise<SidecarPlacement | string>;
+  /** An approved placement card's write through rex's rule, under the PRD lock. Never throws; a refusal names rex's kind. */
+  writePlacement(placement: SidecarPlacement): Promise<CarryOutResult>;
   /** The queue planner's plan for a run-plan card, or why there is none to raise a card for. Never throws. */
   readRunPlan(signal?: AbortSignal): Promise<QueuePlan | string>;
   /** `web.sidecarGithubReads`, read per call: on, a `github_read` runs without a card. */
@@ -83,7 +90,6 @@ export function githubReadOf(input: Record<string, unknown>): GithubRead | strin
 
 /** The tools that are recorded but not carried out yet, and the batch that will carry each out. */
 export const CARRIED_OUT_LATER: Readonly<Partial<Record<BrokerToolName, string>>> = {
-  place_change_card: "the L2 Place lens",
   propose_edit: "a later batch",
   migration_decision: "G1",
 };
@@ -151,6 +157,11 @@ async function carryOut(
     }
     case "propose_run_plan":
       return runPlanResult(card);
+    case "place_change_card": {
+      // The card's placement, read and dry-run when it was raised; never the raw input.
+      if (!card?.placement) return { ok: false, text: "A placement is written only from its approved card; nothing was written." };
+      return actions.writePlacement(card.placement);
+    }
     case "github_read": {
       const read = githubReadOf(input);
       return typeof read === "string" ? { ok: false, text: `Nothing was read: ${read}.` } : actions.githubRead(read, signal);
