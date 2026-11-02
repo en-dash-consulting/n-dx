@@ -543,8 +543,21 @@ async function assertStaleRemovable(
 }
 
 /**
+ * Files an operating system drops into a folder once it has been shown
+ * (Finder's `.DS_Store`, Explorer's `Thumbs.db` and `desktop.ini`). They are
+ * nobody's content: a stale folder loses them with its tree files, so they
+ * never keep it alive. Matched case-insensitively.
+ */
+const OS_JUNK_FILES: ReadonlySet<string> = new Set([".ds_store", "thumbs.db", "ehthumbs.db", "desktop.ini"]);
+
+function isOsJunk(entry: Dirent): boolean {
+  return entry.isFile() && OS_JUNK_FILES.has(entry.name.toLowerCase());
+}
+
+/**
  * Delete a stale entry. A folder loses only its tree files (`.md`, `state.yaml`)
- * and is removed once empty, so anything else kept there survives and the
+ * and any OS junk ({@link OS_JUNK_FILES}, deleted but not reported), and is
+ * removed once empty, so anything else kept there survives and the
  * folder stays. `removed` is the folder itself when it went, else the files;
  * `files` is every file deleted.
  */
@@ -565,8 +578,12 @@ interface Removal {
 async function removeTreeFiles(dir: string): Promise<Removal> {
   const out: Removal = { removed: [], files: [] };
   for (const entry of (await listDir(dir)) ?? []) {
-    if (entry.name.startsWith(".")) continue;
     const path = join(dir, entry.name);
+    if (isOsJunk(entry)) {
+      await rm(path, { force: true });
+      continue;
+    }
+    if (entry.name.startsWith(".")) continue;
     if (entry.isDirectory()) {
       const inner = await removeTreeFiles(path);
       out.removed.push(...((await removeIfEmpty(path)) ? [path] : inner.removed));
@@ -602,13 +619,18 @@ async function assertNoStrandedFiles(plan: Plan, productDir: string): Promise<vo
   }
 }
 
-/** Every file under `dir` that is not a tree file (`.md`, `state.yaml`); dot entries are ignored, as the reader does. */
+/**
+ * Every entry under `dir` that would keep it from being removed: files that
+ * are not tree files (`.md`, `state.yaml`) or OS junk, and any dot entry
+ * (`.gitkeep`, `.notes/`), which the removal leaves alone.
+ */
 async function nonTreeFilesUnder(dir: string): Promise<string[]> {
   const out: string[] = [];
   for (const entry of (await listDir(dir)) ?? []) {
-    if (entry.name.startsWith(".")) continue;
+    if (isOsJunk(entry)) continue;
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...(await nonTreeFilesUnder(path)));
+    if (entry.name.startsWith(".")) out.push(path);
+    else if (entry.isDirectory()) out.push(...(await nonTreeFilesUnder(path)));
     else if (!entry.name.endsWith(".md") && entry.name !== STATE_FILE_NAME) out.push(path);
   }
   return out;

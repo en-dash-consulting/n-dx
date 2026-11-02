@@ -477,6 +477,28 @@ describe("writePrdModel", () => {
       expect(await snapshot(rexDir)).toEqual(before);
     });
 
+    it.each([".DS_Store", "Thumbs.db", "desktop.ini"])("deletes %s beside index.md with the tree files, so the folder goes", async (junk) => {
+      const rexDir = await copyFixture();
+      await writeFile(join(rexDir, "product/checkout", junk), "junk");
+      const model = await loadPrdModel(rexDir, quiet);
+      find(all(model), AREA).children = [];
+      const result = await write(rexDir, model, { removed: new Set([CAPABILITY]) });
+      expect(result.deletedFiles.some((f) => f.endsWith(junk))).toBe(false);
+      expect((await readdir(join(rexDir, "product"))).includes("checkout")).toBe(false);
+      const reread = await loadPrdModel(rexDir, quiet);
+      expect(reread.warnings.filter((w) => /no index\.md/.test(w.message))).toEqual([]);
+    });
+
+    it("refuses while the folder holds a dot entry that is not OS junk, naming it", async () => {
+      const rexDir = await copyFixture();
+      await writeFile(join(rexDir, "product/checkout/.gitkeep"), "");
+      const model = await loadPrdModel(rexDir, quiet);
+      const before = await snapshot(rexDir);
+      find(all(model), AREA).children = [];
+      await expect(write(rexDir, model, { removed: new Set([CAPABILITY]) })).rejects.toThrow(/\.gitkeep/);
+      expect(await snapshot(rexDir)).toEqual(before);
+    });
+
     it("leaves no product folder without an index.md for the next read to warn about", async () => {
       const { rexDir, model } = await withNotes();
       find(all(model), AREA).children = [];
