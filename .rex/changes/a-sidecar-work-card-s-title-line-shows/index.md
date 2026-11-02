@@ -10,7 +10,7 @@ acceptanceCriteria:
   - "The title and the server's carry-out read the defaulted options from one shared definition, not two copies"
 touches:
   - "a6a5ac6a-ca47-435e-8749-91505acad43f"
-discoveredFrom: {"item":"6dcba986-4fe6-4d8d-ab84-54d45db119b1"}
 priority: "low"
+discoveredFrom: {"item":"6dcba986-4fe6-4d8d-ab84-54d45db119b1"}
 source: "ndx-capture"
 ---

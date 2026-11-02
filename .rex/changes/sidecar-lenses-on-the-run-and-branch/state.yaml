@@ -35,9 +35,9 @@ items:
     startedAt: "2026-10-30T16:36:46.602Z"
     completedAt: "2026-10-30T18:35:37.118Z"
     endedAt: "2026-10-30T18:35:37.118Z"
+    activeIntervals: [{"end":"2026-10-30T18:11:21.215Z","start":"2026-10-30T16:36:46.602Z"},{"end":"2026-10-30T18:35:37.118Z","start":"2026-10-30T18:35:37.118Z"}]
     resolutionType: "code-change"
     resolutionDetail: "Diagnose branch lens with worktree attach, github_read and draft_github_post carried out (9e9959745, review repairs c13f74681). Run 7e3a28f9 failed its gate only on agents-md-size-budget (+215); trimmed in 21755076d, then the affected gate and policy tests pass. Browser-checked on R1 (#907): toggle-off, worktree attach, source conflicts with no card, network-read card and PR read. Trust bypass tracked by c7e09da1."
-    activeIntervals: [{"end":"2026-10-30T18:11:21.215Z","start":"2026-10-30T16:36:46.602Z"},{"end":"2026-10-30T18:35:37.118Z","start":"2026-10-30T18:35:37.118Z"}]
     lastModified: "2026-10-30T18:35:37.118Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6dcba986-4fe6-4d8d-ab84-54d45db119b1":

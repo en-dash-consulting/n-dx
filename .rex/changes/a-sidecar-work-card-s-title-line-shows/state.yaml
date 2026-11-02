@@ -6,9 +6,9 @@ items:
     completedAt: "2026-11-02T18:50:26.911Z"
     endedAt: "2026-11-02T18:50:26.911Z"
     activeIntervals: [{"end":"2026-11-02T18:42:19.511Z","start":"2026-11-02T18:36:41.591Z"},{"end":"2026-11-02T18:50:26.911Z","start":"2026-11-02T18:50:26.911Z"}]
-    appliedAt: "2026-11-02T18:50:26.911Z"
-    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     resolutionType: "code-change"
     resolutionDetail: "Title from server-attached run options (bc9263899, over run 2b85a41c e3ffcc391): the broker puts workOptions(input) on the work card as runOptions and sidecarCardTitle builds from them, so preview, title and start share one value. Run 2b85a41c failed its gate only on the external.ts export cap (67 > 66) from a new defaultedWorkOptions export; the rework removes that export instead of raising the cap. Root policy, affected gate (3/3), web typecheck and the two required tests pass."
+    appliedAt: "2026-11-02T18:50:26.911Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     lastModified: "2026-11-02T18:50:26.911Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
