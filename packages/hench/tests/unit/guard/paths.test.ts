@@ -262,6 +262,21 @@ describe("validatePath real-path resolution", () => {
       expect(validatePath("alias.ts", projectDir, blockedPaths)).toBe(join(realProject, "src", "later.ts"));
     });
 
+    it("reads a dangling link's relative target from the link's real directory", () => {
+      // a/b/to-src -> src. Inside src, "up" -> "../../escaped" climbs from
+      // src to the project's parent, although spelled through a/b/to-src it
+      // reads lexically as a/escaped, inside the project.
+      mkdirSync(join(projectDir, "a", "b"), { recursive: true });
+      symlinkSync(join(projectDir, "src"), join(projectDir, "a", "b", "to-src"), "dir");
+      symlinkSync(join("..", "..", "escaped"), join(projectDir, "src", "up"), "file");
+      expect(() => validatePath("a/b/to-src/up", projectDir, blockedPaths)).toThrow(/outside project/);
+      // Spelled through an in-project link, a relative target still lands
+      // where the kernel would put it.
+      mkdirSync(join(projectDir, "src", "nested"));
+      symlinkSync("../later.ts", join(projectDir, "src", "nested", "rel.ts"), "file");
+      expect(validatePath("link-in/nested/rel.ts", projectDir, blockedPaths)).toBe(join(realProject, "src", "later.ts"));
+    });
+
     it("refuses a chain of links that loops", () => {
       symlinkSync(join(projectDir, "loop-b"), join(projectDir, "loop-a"), "file");
       symlinkSync(join(projectDir, "loop-a"), join(projectDir, "loop-b"), "file");

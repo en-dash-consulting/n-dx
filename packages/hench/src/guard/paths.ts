@@ -158,7 +158,11 @@ export function resolveRealPath(target: string): string {
           loop.code = "ELOOP";
           throw loop;
         }
-        const linked = resolve(dirname(current), readlinkSync(current));
+        // A relative target is relative to the link's real directory, as the
+        // kernel reads it: `..` from under a linked directory climbs from the
+        // link's target, not from the spelling that reached it. The directory
+        // exists — the link is an entry in it — so it resolves.
+        const linked = resolve(realpathSync.native(dirname(current)), readlinkSync(current));
         pending = missing.length ? join(linked, ...missing) : linked;
         continue outer;
       }
