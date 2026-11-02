@@ -139,8 +139,12 @@ adds `https:` sources, since a design document may load from a CDN.
 A repository's tracked config can widen what n-dx executes. The dashboard
 follows the same decision as `ndx work` (`isRepoRestricted`): routes that spawn
 from repository content answer 403 with `hint: "ndx trust accept ."` until the
-operator accepts the config, and the LLM catalog skips the probes that config
-would steer (reporting a tracked CLI path as not verified). CLIs are never
+operator accepts the config. The LLM catalog needs no gate of its own: it
+reads config through `loadLLMConfig`, which drops the shared config's
+`cli_path` until then, so its `--version` probe runs only a binary the
+operator chose, and its live model list always calls the vendor's own models
+URL, never a configured `api_endpoint`. A restricted answer is not cached, so
+accepting the config shows the probed result at once. CLIs are never
 resolved from the analyzed project — it is what the dashboard serves, not what
 it runs.
 

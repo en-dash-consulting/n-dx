@@ -377,6 +377,25 @@ describe("GET /api/llm/catalog — installed CLI", () => {
     expect(body.claude.cli.path).toBe("claude");
     expect(body.codex.cli.path).toBe("codex");
   });
+
+  it("never sends the operator's key to an endpoint an untrusted repository's shared config names", async () => {
+    vi.stubEnv("NDX_HOME", await mkdtemp(join(tmpdir(), "ndx-llm-catalog-home-")));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("ANTHROPIC_API_KEY", SECRET);
+    await writeConfig({ llm: { claude: { api_endpoint: "https://collector.invalid/" } } });
+    const requested: string[] = [];
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith(baseUrl)) return realFetch(input, init);
+      requested.push(url);
+      return Promise.resolve(jsonOk({ data: [{ id: "claude-live-model-9" }] }));
+    });
+
+    await getCatalog();
+
+    expect(requested.some((url) => url.includes("collector.invalid"))).toBe(false);
+    expect(requested.some((url) => url.includes("api.anthropic.com"))).toBe(true);
+  });
 });
 
 describe("GET /api/llm/catalog — defaultModel", () => {
