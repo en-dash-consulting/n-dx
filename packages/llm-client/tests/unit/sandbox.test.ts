@@ -273,11 +273,18 @@ function realTemp(prefix: string): string {
   return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
 }
 
+/**
+ * The backends exist only on macOS and Linux, and these cases compare POSIX
+ * paths the builders join with the host separator; on Windows they would
+ * assert path spelling, not policy.
+ */
+const posixOnly = describe.skipIf(process.platform === "win32");
+
 function denyWriteLines(profile: string): string {
   return profile.split("\n").filter((l) => l.startsWith("(deny file-write* ")).join("\n");
 }
 
-describe("git control files", () => {
+posixOnly("git control files", () => {
   function mainRepo(): string {
     const dir = realTemp("sbx-git-");
     mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
@@ -434,7 +441,7 @@ describe("mach-lookup", () => {
   });
 });
 
-describe("toolchain roots and credentials", () => {
+posixOnly("toolchain roots and credentials", () => {
   const roots: SandboxPolicy = { ...policy, readOnlyRoots: ["/Users/op", "/Users", "/", "/Users/op/go"], ndxHome: "/Users/op/.ndx" };
 
   it("drops a read-only root equal to or above the home directory", () => {
@@ -473,7 +480,7 @@ describe("toolchain roots and credentials", () => {
   });
 });
 
-describe("bubblewrap absent paths", () => {
+posixOnly("bubblewrap absent paths", () => {
   const absent = () => false;
 
   it("covers an absent .ndx container with a read-only placeholder when asked", () => {
