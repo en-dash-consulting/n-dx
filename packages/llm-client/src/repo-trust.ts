@@ -800,12 +800,19 @@ export function scanFrontMatterRunBlock(content: string): unknown {
   return undefined;
 }
 
-/** Every `run` block saved on an item under the PRD directories, in path order. */
+/**
+ * Every `run` block saved on an item under the PRD directories, in path order.
+ *
+ * Every Markdown file is read, not only `index.md`: a folder node keeps its
+ * front matter in `index.md`, but a leaf task or subtask is a `<slug>.md`
+ * file with the same front matter, and the serializer writes `run` into
+ * either. Only the front matter is consulted.
+ */
 function scanPrdRunBlocks(root: string, rexDir: string): RepoPrdRunBlock[] {
   const blocks: RepoPrdRunBlock[] = [];
   for (const sub of ["changes", "prd_tree", "product"]) {
     for (const file of listFilesUnder(join(rexDir, sub))) {
-      if (!file.endsWith(`${sep}index.md`)) continue;
+      if (!file.toLowerCase().endsWith(".md")) continue;
       let content: string;
       try {
         content = readFileSync(file, "utf-8");

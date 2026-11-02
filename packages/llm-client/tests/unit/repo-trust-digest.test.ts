@@ -209,6 +209,15 @@ describe("PRD run blocks", () => {
     expect(collectRepoExecutionConfig(repo).sources).toContain(".rex/product/cap/index.md");
   });
 
+  it("reads a leaf task's <slug>.md as well as a folder's index.md", () => {
+    // Leaf tasks and subtasks carry the same front matter in <slug>.md.
+    write(".rex/changes/inbox/feat/leaf-task.md", ITEM('{"provider":"api"}'));
+    write(".rex/changes/inbox/feat/notes.txt", ITEM('{"provider":"api"}'));
+    expect(collectRepoExecutionConfig(repo).prdRunBlocks).toEqual([
+      { path: ".rex/changes/inbox/feat/leaf-task.md", run: { provider: "api" } },
+    ]);
+  });
+
   it("warns only on blocks that set execution posture", () => {
     write(".rex/changes/inbox/model/index.md", ITEM('{"tier":"heavy","models":{"claude":"x"}}'));
     expect(codes()).not.toContain("run-settings");
@@ -241,6 +250,7 @@ describe("digest movement", () => {
     [".claude/hooks/*", () => write(".claude/hooks/a.sh", "echo\n")],
     [".codex/config.toml", () => write(".codex/config.toml", "x = 1\n")],
     ["a PRD run block", () => write(".rex/changes/inbox/c/index.md", '---\nid: c\nrun: {"tier":"light"}\n---\n')],
+    ["a leaf task's PRD run block", () => write(".rex/changes/inbox/c/leaf.md", '---\nid: l\nrun: {"provider":"api"}\n---\n')],
   ];
 
   for (const [name, mutate] of MUTATIONS) {
