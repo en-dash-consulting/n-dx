@@ -52,9 +52,9 @@ import { get as httpGet, request as httpRequest } from "http";
 import { createConnection } from "net";
 import { createHash, randomBytes } from "crypto";
 import { readFile, writeFile, unlink, access } from "fs/promises";
-import { realpathSync, readFileSync, readdirSync, readlinkSync, mkdirSync, writeFileSync, chmodSync, statSync } from "fs";
+import { realpathSync, readFileSync, readdirSync, readlinkSync, mkdirSync, writeFileSync, chmodSync, renameSync, statSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { NDX_HOME_ENV, resolveLayout, resolveNdxHome } from "./layout.js";
 import { terminateTreeByPid } from "./child-lifecycle.js";
 import { execFileSyncCli } from "./win-spawn.js";
@@ -2001,6 +2001,78 @@ export function browserOpenCommand(url, platform) {
   return { command: "xdg-open", args: [url], options };
 }
 
+/** Name of the redirect page `--open` writes in the ndx home. */
+export const LANDING_REDIRECT_FILENAME = "open-dashboard.html";
+
+/**
+ * A page that moves straight on to `url`. The URL is in the markup twice —
+ * a meta refresh, and `location.replace` so the file does not stay in the
+ * tab's history — escaped for an attribute and for a script string.
+ *
+ * @param {string} url
+ * @returns {string}
+ */
+export function landingRedirectHtml(url) {
+  const attr = url.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const script = JSON.stringify(url).replace(/</g, "\\u003c");
+  return [
+    "<!doctype html>",
+    '<html><head><meta charset="utf-8">',
+    '<meta name="referrer" content="no-referrer">',
+    `<meta http-equiv="refresh" content="0;url=${attr}">`,
+    "<title>Opening the n-dx dashboard</title></head>",
+    `<body><script>location.replace(${script});</script>`,
+    `<p><a href="${attr}">Open the n-dx dashboard</a></p></body></html>`,
+    "",
+  ].join("\n");
+}
+
+/**
+ * Write the redirect page for `url` into the ndx home, owner-only, and return
+ * its path. `--open` hands the browser this file rather than the URL: the URL
+ * carries the sign-in nonce, and an opener's argv is readable by every
+ * account through `ps` for as long as the browser takes to start — long
+ * enough for another user to exchange the nonce first. The ndx home is 0700
+ * and the file 0600, so only this user can read it (Jupyter's approach).
+ *
+ * Written under a unique name and renamed into place, so a concurrent
+ * `--open` never reads half a page.
+ *
+ * @param {string} url
+ * @param {string} [home]
+ * @returns {string} Path of the page.
+ */
+export function writeLandingRedirect(url, home = hubHome()) {
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  const target = join(home, LANDING_REDIRECT_FILENAME);
+  const temp = `${target}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+  writeFileSync(temp, landingRedirectHtml(url), { encoding: "utf-8", mode: 0o600 });
+  try { chmodSync(temp, 0o600); } catch { /* modes are advisory on some filesystems */ }
+  renameSync(temp, target);
+  return target;
+}
+
+/**
+ * Open the dashboard at `url`. A URL with a sign-in nonce goes through
+ * {@link writeLandingRedirect} so the nonce never appears in a process's
+ * argv; one without (auth off) is opened directly.
+ */
+function openDashboard(url, home = hubHome()) {
+  if (!url.includes("ndx_nonce=")) {
+    openBrowser(url);
+    return;
+  }
+  let page;
+  try {
+    page = writeLandingRedirect(url, home);
+  } catch (err) {
+    // Never fall back to the URL itself: that is the exposure this avoids.
+    console.error(`Could not write the sign-in page for --open (${err.message}); open the URL above by hand.`);
+    return;
+  }
+  openBrowser(pathToFileURL(page).href);
+}
+
 /** Open a URL in the default browser, best-effort. */
 function openBrowser(url) {
   const { command, args, options } = browserOpenCommand(url, process.platform);
@@ -2104,7 +2176,7 @@ async function runHubMode(absDir, flags, { tools, __dir, label, stopCmd }) {
   log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   log("");
   log(`Stop: ${stopCmd} .   (or 'ndx hub stop' for every project)`);
-  if (flags.open) openBrowser(dashboardUrl);
+  if (flags.open) openDashboard(dashboardUrl, home);
   return 0;
 }
 

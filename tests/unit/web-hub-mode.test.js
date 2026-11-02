@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdtempSync, mkdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { platform, tmpdir } from "node:os";
 import {
@@ -17,6 +17,8 @@ import {
   hubAuthState,
   hubDashboardUrl,
   judgeHubIdentity,
+  LANDING_REDIRECT_FILENAME,
+  landingRedirectHtml,
   loadAuthEnabled,
   loadHubPort,
   parseMainWorktree,
@@ -27,6 +29,7 @@ import {
   resolveAuthEnabled,
   resolveRepo,
   slugifyProjectId,
+  writeLandingRedirect,
 } from "../../packages/core/web.js";
 
 /** TESTING.md, Family 2: every absolute time budget is scaled through this. */
@@ -364,6 +367,34 @@ describe("hubDashboardUrl", () => {
 
   it("is the plain URL when there is no nonce", () => {
     expect(hubDashboardUrl(3117, "alpha", null)).toBe("http://127.0.0.1:3117/p/alpha/");
+  });
+});
+
+describe("writeLandingRedirect", () => {
+  const url = "http://127.0.0.1:3117/p/my%20app/?ndx_nonce=a\"b<c>&d";
+
+  it("writes an owner-only page in the ndx home that moves on to the URL", () => {
+    const home = mkdtempSync(join(tmpdir(), "ndx-landing-"));
+    try {
+      const page = writeLandingRedirect(url, home);
+      expect(page).toBe(join(home, LANDING_REDIRECT_FILENAME));
+      const html = readFileSync(page, "utf-8");
+      // Escaped for the attribute and for the script string: no markup breaks out.
+      expect(html).toContain('content="0;url=http://127.0.0.1:3117/p/my%20app/?ndx_nonce=a&quot;b&lt;c&gt;&amp;d"');
+      expect(html).toContain("location.replace(");
+      expect(html).not.toContain("<c>");
+      if (platform() !== "win32") expect(statSync(page).mode & 0o777).toBe(0o600);
+      // A second --open replaces the page rather than leaving a pile of them.
+      writeLandingRedirect("http://127.0.0.1:3117/p/other/?ndx_nonce=x", home);
+      expect(readFileSync(page, "utf-8")).toContain("/p/other/");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("puts no part of the URL in the script unescaped", () => {
+    const html = landingRedirectHtml("http://127.0.0.1:1/?ndx_nonce=</script><script>alert(1)</script>");
+    expect(html.match(/<script>/g)).toHaveLength(1);
   });
 });
 

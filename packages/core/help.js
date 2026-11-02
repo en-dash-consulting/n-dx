@@ -1185,7 +1185,7 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--here", description: "Single-project server instead of the hub (also: web.mode \"here\" in .n-dx.json)" },
       { flag: "--hub", description: "Register with the hub — the default since 0.7.0; accepted for compatibility" },
       { flag: "--background", description: "With --here, run as a background daemon" },
-      { flag: "--open", description: "Open the project URL in the browser" },
+      { flag: "--open", description: "Open the project URL in the browser (through an owner-only sign-in page in the ndx home, so the one-time link never appears in a process list)" },
       { flag: "--preview", description: "Serve the UI layout preview document instead of the dashboard" },
       { flag: "--file=<path>", description: "With --preview: serve this HTML document instead of the default" },
       { flag: "--no-auth", description: "Run without the per-user dashboard token (also: web.auth false in .n-dx.local.json; the tracked .n-dx.json cannot turn it off). Loopback is shared by every account on the host; the token is what keeps another account out" },
