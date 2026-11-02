@@ -111,6 +111,14 @@ export interface V1ToV2Summary {
     offHistory?: boolean;
   };
   /**
+   * Items the commit evidence covered: files changed by the commits their
+   * N-DX-Item trailers and hench runs name. Kept apart from `codeEvidence`,
+   * which is the analysis's and carries its date. Absent when there was none.
+   */
+  commitEvidence?: {
+    items: number;
+  };
+  /**
    * Hash of the code evidence the plan read, empty evidence included. The
    * source digest covers PRD items only, so a re-analysis changes this alone;
    * a re-plan compares it before reusing the earlier cut time.

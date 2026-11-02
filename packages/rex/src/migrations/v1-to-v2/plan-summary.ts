@@ -104,6 +104,9 @@ export function renderPlanSummary(plan: V1ToV2Plan): string {
     const warn = offHistory ? " — **not an ancestor of HEAD**" : "";
     lines.push(`- Code evidence: ${items} item(s), ${when}${at}${warn}`);
   }
+  if (summary.commitEvidence) {
+    lines.push(`- Commit evidence: ${summary.commitEvidence.items} item(s), from N-DX-Item trailers and hench runs`);
+  }
   lines.push("");
 
   const incomplete = header.passes.filter((p) => p.incomplete);

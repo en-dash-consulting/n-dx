@@ -288,11 +288,76 @@ export async function readCapabilityCodeFiles(
 }
 
 
-/** Commit evidence collected by the CLI before running the pure migration. */
-export async function readCommitCodeFiles(dir: string): Promise<Record<string, string[]>> {
+/**
+ * Paths a commit touches as bookkeeping rather than as the work: lockfiles,
+ * manifests, changelogs and changesets, and the tool state n-dx itself writes
+ * (the PRD tree, hench runs, the analysis). Nearly every commit carries one,
+ * so as evidence they tie every change to every capability: placement scores
+ * each shared file, and a lockfile hit moved a held change out of the Inbox.
+ */
+const BOOKKEEPING_FILES = new Set([
+  "package.json",
+  "pnpm-lock.yaml",
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "yarn.lock",
+  "bun.lockb",
+  "bun.lock",
+  "Cargo.lock",
+  "go.sum",
+  "poetry.lock",
+  "uv.lock",
+  "Gemfile.lock",
+  "composer.lock",
+  "CHANGELOG.md",
+]);
+const BOOKKEEPING_DIRS = [".changeset", ".rex", ".ndx", ".hench", ".sourcevision", "dist", "node_modules"];
+
+/** True for a path {@link BOOKKEEPING_FILES} names by basename or that lies under a {@link BOOKKEEPING_DIRS} segment. */
+export function isBookkeepingPath(path: string): boolean {
+  // git spells paths with forward slashes on every platform.
+  const parts = path.split("/").filter(Boolean);
+  const base = parts.at(-1) ?? "";
+  if (BOOKKEEPING_FILES.has(base)) return true;
+  return parts.slice(0, -1).some((part) => BOOKKEEPING_DIRS.includes(part));
+}
+
+/**
+ * A file in more items' commit evidence than this share of the items that
+ * have any is common ground, not any one item's: a barrel, a shared config, a
+ * test helper. Never below {@link MIN_COMMON_FILE_ITEMS}, so a small history
+ * is not emptied by its own overlap.
+ */
+const COMMON_FILE_SHARE = 0.2;
+const MIN_COMMON_FILE_ITEMS = 3;
+
+export interface CommitCodeFilesOptions {
+  /**
+   * The tree being planned: evidence is collected for its items, at any depth,
+   * and no others. Trailers and runs name items from all of history; one
+   * outside the tree is never read, and would otherwise change the evidence
+   * (and so the plan's evidence digest and cut time) whenever an unrelated
+   * commit lands. Omitted: every id history names.
+   */
+  items?: readonly PRDItem[];
+  /** Most files one item keeps; defaults to {@link DEFAULT_MAX_FILES}. */
+  maxFiles?: number;
+}
+
+/**
+ * Commit evidence collected by the CLI before running the pure migration: the
+ * files the commits each item's trailers and hench runs name have changed.
+ * Bookkeeping paths ({@link isBookkeepingPath}) are dropped, so are files
+ * common to many items' histories ({@link COMMON_FILE_SHARE}), and each item
+ * keeps its {@link DEFAULT_MAX_FILES} most-touched files.
+ */
+export async function readCommitCodeFiles(dir: string, options: CommitCodeFilesOptions = {}): Promise<Record<string, string[]>> {
   const layout = resolveLayout(dir);
+  const wanted = options.items ? new Set(indexItems(options.items).keys()) : null;
+  const maxFiles = options.maxFiles ?? DEFAULT_MAX_FILES;
   const commitsFor = new Map<string, Set<string>>();
   const add = (id: string, sha: string) => {
+    if (wanted && !wanted.has(id)) return;
     const commits = commitsFor.get(id) ?? new Set<string>();
     commits.add(sha);
     commitsFor.set(id, commits);
@@ -315,6 +380,7 @@ export async function readCommitCodeFiles(dir: string): Promise<Record<string, s
       } catch { /* A damaged run must not prevent planning. */ }
     }
   } catch { /* Projects without runs have no run evidence. */ }
+  let changed: Map<string, string[]>;
   try {
     const candidates = [...new Set([...commitsFor.values()].flatMap((commits) => [...commits]))].filter((sha) => /^[a-f0-9]{40}$/i.test(sha));
     const known: string[] = [];
@@ -322,7 +388,43 @@ export async function readCommitCodeFiles(dir: string): Promise<Record<string, s
       const output = await execStdout("git", ["log", "--no-walk=unsorted", "--ignore-missing", "--format=%H", ...candidates.slice(offset, offset + 256), "--"], { cwd: dir, timeout: 60_000 });
       known.push(...output.trim().split("\n").filter(Boolean));
     }
-    const changed = await loadCommitFiles(dir, cacheDir, known);
-    return Object.fromEntries([...commitsFor].map(([id, commits]) => [id, [...new Set([...commits].flatMap((sha) => changed.get(sha) ?? []))].sort()]));
+    changed = await loadCommitFiles(dir, cacheDir, known);
   } catch { return {}; }
+  return rankCommitFiles(commitsFor, changed, maxFiles);
+}
+
+/**
+ * Per item, how many of its commits touched each non-bookkeeping file; then
+ * the files common to many items dropped and the rest ranked by that count.
+ */
+function rankCommitFiles(
+  commitsFor: ReadonlyMap<string, ReadonlySet<string>>,
+  changed: ReadonlyMap<string, readonly string[]>,
+  maxFiles: number,
+): Record<string, string[]> {
+  const touches = new Map<string, Map<string, number>>();
+  const itemsWith = new Map<string, number>();
+  for (const [id, commits] of commitsFor) {
+    const counts = new Map<string, number>();
+    for (const sha of commits) {
+      for (const file of changed.get(sha) ?? []) {
+        if (!isBookkeepingPath(file)) counts.set(file, (counts.get(file) ?? 0) + 1);
+      }
+    }
+    if (counts.size === 0) continue;
+    touches.set(id, counts);
+    for (const file of counts.keys()) itemsWith.set(file, (itemsWith.get(file) ?? 0) + 1);
+  }
+  const commonAbove = Math.max(MIN_COMMON_FILE_ITEMS, Math.ceil(COMMON_FILE_SHARE * touches.size));
+  const out: Record<string, string[]> = {};
+  for (const [id, counts] of touches) {
+    const files = [...counts]
+      .filter(([file]) => (itemsWith.get(file) ?? 0) <= commonAbove)
+      .sort((a, b) => b[1] - a[1] || (itemsWith.get(a[0]) ?? 0) - (itemsWith.get(b[0]) ?? 0) || a[0].localeCompare(b[0]))
+      .slice(0, maxFiles)
+      .map(([file]) => file)
+      .sort();
+    if (files.length > 0) out[id] = files;
+  }
+  return out;
 }
