@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ServerContext } from "../../../src/server/types.js";
-import { handleChangesetsRoute, parseChangeset } from "../../../src/server/routes-changesets.js";
+import { handleChangesetsRoute, MAX_CHANGESET_BYTES, parseChangeset } from "../../../src/server/routes-changesets.js";
 import { startRouteTestServer, type RouteTestServer } from "../../helpers/server-route-test-support.js";
 
 describe("parseChangeset", () => {
@@ -24,6 +24,11 @@ describe("parseChangeset", () => {
       ],
       summary: "Ship 1.0.0.",
     });
+  });
+
+  it("reads an empty changeset (`changeset --empty`) as bumping nothing, not as unreadable", () => {
+    expect(parseChangeset("e.md", "---\n---\n")).toEqual({ file: "e.md", packages: [], summary: "" });
+    expect(parseChangeset("e.md", "---\r\n---\r\nNo release.")).toEqual({ file: "e.md", packages: [], summary: "No release." });
   });
 
   it("reports a file without frontmatter or with an unknown bump instead of skipping it", () => {
@@ -63,5 +68,16 @@ describe("GET /api/changesets", () => {
     const body = (await (await fetch(`${started.baseUrl}/api/changesets`)).json()) as { changesets: Array<{ file: string; packages: unknown[] }> };
     expect(body.changesets.map((c) => c.file)).toEqual(["alpha.md", "zebra.md"]);
     expect(body.changesets[0].packages).toEqual([{ name: "@n-dx/core", bump: "major" }]);
+  });
+
+  it("reads no entry that is not a regular file of a changeset's size", async () => {
+    mkdirSync(join(dir, ".changeset", "dir.md"), { recursive: true });
+    writeFileSync(join(dir, ".changeset", "huge.md"), `---\n"@n-dx/web": patch\n---\n${"x".repeat(MAX_CHANGESET_BYTES)}`);
+
+    const body = (await (await fetch(`${started.baseUrl}/api/changesets`)).json()) as { changesets: Array<{ file: string; summary: string; error?: string }> };
+    expect(body.changesets).toEqual([
+      { file: "dir.md", packages: [], summary: "", error: "Not a regular file." },
+      { file: "huge.md", packages: [], summary: "", error: `Larger than ${MAX_CHANGESET_BYTES} bytes.` },
+    ]);
   });
 });

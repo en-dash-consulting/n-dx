@@ -16,7 +16,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerContext } from "./types.js";
 import { jsonResponse } from "./response-utils.js";
@@ -39,6 +39,9 @@ export interface PendingChangeset {
   error?: string;
 }
 
+/** A changeset is a few lines of prose; anything past this is not one. */
+export const MAX_CHANGESET_BYTES = 64 * 1024;
+
 const BUMPS: ReadonlySet<string> = new Set(["major", "minor", "patch", "none"]);
 
 function unquote(text: string): string {
@@ -48,10 +51,11 @@ function unquote(text: string): string {
 
 /** One changeset file's packages, bumps and summary. Pure. */
 export function parseChangeset(file: string, text: string): PendingChangeset {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(text.replace(/^﻿/, ""));
+  // The block may be empty: `changeset --empty` writes `---\n---\n`.
+  const match = /^---\r?\n(?:([\s\S]*?)\r?\n)?---(?:\r?\n|$)([\s\S]*)$/.exec(text.replace(/^﻿/, ""));
   if (!match) return { file, packages: [], summary: text.trim(), error: "No frontmatter block." };
   const packages: PendingChangeset["packages"] = [];
-  for (const line of match[1].split(/\r?\n/)) {
+  for (const line of (match[1] ?? "").split(/\r?\n/)) {
     if (line.trim() === "") continue;
     const colon = line.lastIndexOf(":");
     const bump = colon < 0 ? "" : unquote(line.slice(colon + 1));
@@ -73,8 +77,15 @@ export function readPendingChangesets(projectDir: string): PendingChangeset[] {
     return [];
   }
   return files.sort().map((file) => {
+    const path = join(dir, file);
     try {
-      return parseChangeset(file, readFileSync(join(dir, file), "utf-8"));
+      // Repository content is untrusted: a name ending in .md may be a symlink
+      // to a device or a huge file, and reading either would hang or exhaust
+      // the server. Read only regular files of a changeset's size.
+      const info = statSync(path);
+      if (!info.isFile()) return { file, packages: [], summary: "", error: "Not a regular file." };
+      if (info.size > MAX_CHANGESET_BYTES) return { file, packages: [], summary: "", error: `Larger than ${MAX_CHANGESET_BYTES} bytes.` };
+      return parseChangeset(file, readFileSync(path, "utf-8"));
     } catch (err) {
       return { file, packages: [], summary: "", error: `Unreadable: ${(err as Error).message}` };
     }

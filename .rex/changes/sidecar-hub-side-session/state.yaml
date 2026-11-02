@@ -14,10 +14,14 @@ items:
     lastModified: "2026-11-02T23:08:39.085Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a5beb47d-a6c2-47da-a926-3078533e060d":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-02T23:13:12.933Z"
-    activeIntervals: [{"start":"2026-11-02T23:13:12.933Z"}]
-    lastModified: "2026-11-02T23:13:13.813Z"
+    completedAt: "2026-11-02T23:30:29.668Z"
+    endedAt: "2026-11-02T23:30:29.668Z"
+    activeIntervals: [{"end":"2026-11-02T23:30:29.668Z","start":"2026-11-02T23:13:12.933Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "buildHubSnapshot (pure, 8k cap, priority drops, Δ fingerprints) + HTTP-only fetcher via hub; GET /api/changesets; additive status rex.layout, worktrees diagnosisClass, branch-health githubReads."
+    lastModified: "2026-11-02T23:30:29.668Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ea48bb24-27cc-4224-9e09-2d6ab4a54cc2":
     lastModified: "2026-11-02T23:08:50.548Z"
