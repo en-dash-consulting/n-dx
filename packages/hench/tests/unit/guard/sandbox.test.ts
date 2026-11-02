@@ -14,6 +14,7 @@ import type { ToolSandbox } from "../../../src/guard/index.js";
 import { guardDefaultsForLanguage } from "../../../src/schema/v1.js";
 import { toolRunCommand } from "../../../src/tools/shell.js";
 import { detectSandboxBackend } from "../../../src/prd/llm-gateway.js";
+import { execRepoShellCmd } from "../../../src/guard/sandbox.js";
 
 const seatbelt = { name: "seatbelt" as const, available: true };
 const missing = { name: "bwrap" as const, available: false, reason: "bwrap is not on PATH" };
@@ -160,10 +161,51 @@ describe.skipIf(!live.available)(`live ${live.name} confinement`, () => {
     expect(out).toMatch(/denied:(EPERM|EACCES|ENOENT)/);
   });
 
+  it("confines the test gate's command the same way", async () => {
+    const project = tempProject();
+    const outside = tempProject();
+    const result = await execRepoShellCmd(
+      `node -e "require('fs').writeFileSync('${join(outside, "escaped")}', 'x')"`,
+      { cwd: project, timeout: 30_000 },
+      { setting: on },
+    );
+    expect(result.launched).toBe(true);
+    expect(existsSync(join(outside, "escaped"))).toBe(false);
+  });
+
   it("cannot open a network connection", async () => {
     const project = tempProject();
     const out = await confinedRun(project, `node -e "require('net').connect(443,'1.1.1.1').on('connect',()=>console.log('connected')).on('error',e=>console.log('blocked:'+e.code))"`);
     expect(out).not.toContain("connected");
+  });
+});
+
+describe("execRepoShellCmd", () => {
+  it("runs the command unconfined when the operator turned the sandbox off", async () => {
+    const project = tempProject();
+    const result = await execRepoShellCmd(
+      `node -e "require('fs').writeFileSync('gate.txt', 'ran')"`,
+      { cwd: project, timeout: 30_000 },
+      { setting: off, backend: seatbelt },
+    );
+    expect(result.launched).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(readFileSync(join(project, "gate.txt"), "utf-8")).toBe("ran");
+  });
+
+  it("reports a wrapped command that never launched instead of throwing", async () => {
+    // A backend binary that cannot be found: the wrapped spawn fails, and the
+    // result says so the way execShellCmd would.
+    const project = tempProject();
+    const bogus = { name: "bwrap" as const, available: true };
+    const prevPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await execRepoShellCmd("true", { cwd: project, timeout: 10_000, env: { PATH: "" } }, { setting: on, backend: bogus });
+      expect(result.launched).toBe(false);
+    } finally {
+      process.env.PATH = prevPath;
+    }
   });
 });
 
@@ -189,8 +231,12 @@ describe("createVendorCliSandbox", () => {
       expect(profile).toContain(`(subpath "${project}")`);
       expect(profile).toContain(`(subpath "${join(home, ".claude")}")`);
       if (process.platform === "darwin") {
-        // The CLI's login lives in the keychain; it must be granted, not merely left undenied.
-        expect(profile).toContain(`(subpath "${join(home, "Library", "Keychains")}")`);
+        // The CLI's login lives in the keychain; it must be granted, not merely
+        // left undenied — and only for reading, since securityd does the writes.
+        const keychains = `(subpath "${join(home, "Library", "Keychains")}")`;
+        const lines = profile.split("\n");
+        expect(lines.some((l) => l.startsWith("(allow file-read* ") && !l.includes("file-write*") && l.includes(keychains))).toBe(true);
+        expect(lines.some((l) => l.includes("file-write*") && l.startsWith("(allow") && l.includes(keychains))).toBe(false);
       }
       expect(profile).toContain(".claude\\.json");
       expect(profile).toContain('(remote tcp "*:443")');

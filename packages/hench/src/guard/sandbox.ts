@@ -35,6 +35,9 @@ import type {
   SandboxSetting,
   SandboxedInvocation,
 } from "../prd/llm-gateway.js";
+// Through hench's exec module, so a test that stubs it stubs these spawns too.
+import { exec, execShellCmd } from "../process/exec.js";
+import type { ExecOptions, ExecResult } from "../process/exec.js";
 import { GuardError } from "./paths.js";
 
 /** What a tool spawn site needs: wrap one argv, and say what it is running under. */
@@ -140,6 +143,45 @@ export function createToolSandbox(
   return sandbox;
 }
 
+/**
+ * Run a shell command from the repository — the test gate, the completion
+ * check's test command, a requirement's validation command, a transformation
+ * batch's typecheck — inside the same `tool`-kind sandbox the agent's own
+ * `run_command` gets.
+ *
+ * These commands execute code the agent wrote (its tests, its build scripts)
+ * or chose (a requirement command stored in the PRD), but hench starts them
+ * itself, after the agent's turn, so without this they ran with the
+ * operator's full filesystem and network access: a test that reads `~/.ssh`
+ * and posts it out was blocked when the agent ran it and succeeded in the
+ * gate. The same posture applies — when the operator turned the sandbox off,
+ * or the host has no backend, the command runs unconfined, which the run's
+ * posture line already reports.
+ *
+ * The sandbox is built per call and removed afterwards. npm's cache moves
+ * into its scratch directory, because the home directory is not writable.
+ * Never throws for a command failure; the result is `execShellCmd`'s.
+ */
+export async function execRepoShellCmd(
+  command: string,
+  opts: ExecOptions,
+  sandboxOptions: CreateToolSandboxOptions = {},
+): Promise<ExecResult> {
+  const sandbox = createToolSandbox(opts.cwd, sandboxOptions);
+  if (!sandbox) return execShellCmd(command, opts);
+  try {
+    const inv = sandbox.wrapShell(command);
+    const env = {
+      ...(opts.env ?? process.env),
+      ...inv.env,
+      npm_config_cache: join(sandbox.tmpDir, "npm-cache"),
+    };
+    return await exec(inv.file, inv.args, { ...opts, env });
+  } finally {
+    sandbox.dispose();
+  }
+}
+
 /** Sandboxes whose scratch directory still exists; removed at process exit. */
 const openSandboxes = new Set<ToolSandbox>();
 let exitHookInstalled = false;
@@ -187,9 +229,10 @@ export interface CreateVendorCliSandboxOptions extends CreateToolSandboxOptions 
  *
  * The Claude CLI gets the project read-write (except hench's own config),
  * its config directory and `~/.claude.json`, the git common directory when
- * the project is a linked worktree, read-only access to the toolchain and the
- * n-dx install its MCP servers start from, TLS and loopback network, and no
- * access to the operator's other credential directories.
+ * the project is a linked worktree, read-only access to the toolchain, the
+ * n-dx install its MCP servers start from and (macOS) the keychain
+ * directory, the vendor network profile, and no access to the operator's
+ * other credential directories.
  */
 export function createVendorCliSandbox(
   projectDir: string,
@@ -206,11 +249,6 @@ export function createVendorCliSandbox(
   const tmpDir = realOr(mkdtempSync(join(tmpdir(), "hench-cli-sbx-")));
   const configDir = env.CLAUDE_CONFIG_DIR ? realOr(env.CLAUDE_CONFIG_DIR) : join(home, ".claude");
   const readWriteRoots = [configDir];
-  // On macOS the CLI reads its login with `security find-generic-password`,
-  // which opens the login keychain under ~/Library/Keychains. Items there are
-  // guarded per application by the keychain's own access lists, so granting
-  // the directory exposes only what the operator's `claude` could already read.
-  if (process.platform === "darwin") readWriteRoots.push(join(home, "Library", "Keychains"));
   const common = getGitCommonDir(realProject);
   if (common) {
     const realCommon = realOr(common);
@@ -222,6 +260,20 @@ export function createVendorCliSandbox(
     join(home, ".gitconfig"),
     join(home, ".config", "git"),
   ];
+  // On macOS the CLI reads and refreshes its login with `security`, which
+  // locates the login keychain under ~/Library/Keychains and then reaches the
+  // items through securityd, which owns the keychain files and does the
+  // writes. The directory is therefore readable and never writable: a
+  // confined process cannot replace or append to the keychain files.
+  //
+  // Residual risk: securityd still answers this process and every Bash child
+  // the CLI starts, so `security find-generic-password -w` returns any item
+  // whose access list trusts `/usr/bin/security` or allows all applications
+  // (go-keyring, which `gh` uses, stores its token that way), whatever the
+  // file permissions. Keep such tokens out of the login keychain, or run
+  // with a vendor that confines itself, where that matters. SECURITY.md
+  // states the same.
+  if (process.platform === "darwin") readOnlyRoots.push(join(home, "Library", "Keychains"));
   const ndxCli = env.NDX_CLI_PATH ?? env.N_DX_CLI_PATH;
   if (ndxCli) readOnlyRoots.push(installRoot(realOr(ndxCli), home));
 

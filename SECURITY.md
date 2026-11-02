@@ -187,6 +187,16 @@ date rather than go quiet.
 - Review `guard` settings in `.hench/config.json` before loosening them, and
   re-read the [Security section of the README](README.md#security) for what the
   defaults protect.
+- Know what the OS sandbox leaves reachable on macOS. The Claude CLI's
+  Seatbelt profile keeps `~/Library/Keychains` readable, never writable, so
+  the CLI can read its login (the agent's own commands and the test gate get
+  no keychain access at all). The keychain's items are served by `securityd`,
+  not read from the files, so the CLI or any Bash child it starts can still
+  run `security find-generic-password -w` and read an item whose access list
+  trusts `/usr/bin/security` or every application; go-keyring, which `gh`
+  uses, can store its token that way. Keep such tokens out of the login
+  keychain on a machine that runs autonomous sessions, or use a CLI vendor
+  that confines itself.
 - Stop the hub when you are not using it (`ndx start stop`). A server that is
   not running has no attack surface.
 
