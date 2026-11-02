@@ -264,6 +264,8 @@ describe("credentialStatus", () => {
       source: "file",
       backend: "file",
       fingerprint: fingerprint(PLACEHOLDER),
+      helperCommand: null,
+      helperResult: null,
       envVar: "TYPESAFE_API_KEY",
       storePath: storePath(),
     });

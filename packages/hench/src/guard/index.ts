@@ -21,7 +21,11 @@
  *
  * 3. **Dangerous pattern detection** (`commands.ts`)
  *    Known-hazardous patterns (sudo, eval, rm -rf /, chmod 777) are blocked
- *    even when the base command is allowed.
+ *    even when the base command is allowed, and so are the commands that read
+ *    a stored credential (`security find-generic-password`, each configured
+ *    helper's command) — checked first, whatever `allowedCommands` lists. An
+ *    allowed interpreter (`node -e`) can still read the store or run a
+ *    helper; no command filter can stop that.
  *
  * 4. **Path validation** (`paths.ts`)
  *    - Null-byte rejection (defense against poison-null-byte attacks)
@@ -63,16 +67,16 @@
 import type { GuardConfig } from "./contracts.js";
 import { DEFAULT_WRITE_SHRINK_MIN_BYTES, DEFAULT_WRITE_SHRINK_RATIO } from "./contracts.js";
 import { validatePath, simpleGlobMatch, GuardError } from "./paths.js";
-import { validateCommand, resolveShellKind } from "./commands.js";
+import { assertNotCredentialCommand, validateCommand, resolveShellKind } from "./commands.js";
 import type { ShellKind } from "./commands.js";
 import { PolicyEngine } from "./policy.js";
 import type { AuditEntry, SessionCounters } from "./policy.js";
 import { compileEnvPolicy, sanitizeChildEnv } from "./env.js";
 import { isAbsolute, relative, resolve } from "node:path";
-import { NDX_CONFIG_BLOCKED_PATHS, credentialStorePath } from "../prd/llm-gateway.js";
+import { NDX_CONFIG_BLOCKED_PATHS, agentCredentialDenials } from "../prd/llm-gateway.js";
 
 export { GuardError, validatePath, simpleGlobMatch } from "./paths.js";
-export { validateCommand, resolveShellKind } from "./commands.js";
+export { assertNotCredentialCommand, validateCommand, resolveShellKind } from "./commands.js";
 export type { ShellKind } from "./commands.js";
 export { PolicyEngine } from "./policy.js";
 export {
@@ -103,9 +107,15 @@ export interface GuardRailsOptions {
   shellKind?: ShellKind;
   /** The environment to filter for child processes. Defaults to `process.env`; inject for tests. */
   env?: NodeJS.ProcessEnv;
-  /** The credential store's path. Defaults to `credentialStorePath()`; inject for tests. */
-  credentialStorePath?: string;
+  /**
+   * The credential store's path and the commands that read a credential.
+   * Defaults to `agentCredentialDenials()` at construction; inject for tests.
+   */
+  credentialDenials?: CredentialDenials;
 }
+
+/** What {@link GuardRails} keeps the agent from: `agentCredentialDenials()`'s shape. */
+export type CredentialDenials = ReturnType<typeof agentCredentialDenials>;
 
 /**
  * The guard pattern for the credential store when the ndx home is inside the
@@ -136,6 +146,8 @@ export class GuardRails {
   private config: GuardConfig;
   /** The configured blocked paths plus n-dx's own config files and, inside the project, the credential store. */
   private blockedPaths: string[];
+  /** Commands that read a credential, refused whatever the allowlist says. */
+  private deniedCommands: readonly (readonly string[])[];
   /** Resolved once: the probe behind it costs a subprocess on win32. */
   readonly shellKind: ShellKind;
   readonly policy: PolicyEngine;
@@ -149,11 +161,13 @@ export class GuardRails {
   constructor(projectDir: string, config: GuardConfig, options: GuardRailsOptions = {}) {
     this.projectDir = projectDir;
     this.config = config;
+    const denials = options.credentialDenials ?? agentCredentialDenials();
     this.blockedPaths = [...new Set([
       ...config.blockedPaths,
       ...NDX_CONFIG_BLOCKED_PATHS,
-      ...credentialStorePattern(projectDir, options.credentialStorePath ?? credentialStorePath()),
+      ...credentialStorePattern(projectDir, denials.storePath),
     ])];
+    this.deniedCommands = denials.commandPrefixes;
     this.shellKind = options.shellKind ?? resolveShellKind();
     this.policy = new PolicyEngine(config.policy);
     this.childEnv = sanitizeChildEnv(options.env ?? process.env, compileEnvPolicy(config.env));
@@ -164,6 +178,7 @@ export class GuardRails {
   }
 
   checkCommand(command: string): void {
+    assertNotCredentialCommand(command, this.deniedCommands);
     validateCommand(command, this.config.allowedCommands, this.shellKind);
     this.policy.checkPolicy("command", command);
   }

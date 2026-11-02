@@ -42,7 +42,7 @@ import {
   LLM_VENDOR,
   NDX_CONFIG_BLOCKED_PATHS,
   assemblePrompt,
-  credentialStorePath,
+  agentCredentialDenials,
   classifyVendorError,
 } from "../../../prd/llm-gateway.js";
 import type { PermissionMode } from "../../../schema/index.js";
@@ -108,8 +108,10 @@ export function claudeAbsolutePattern(path: string, platform: NodeJS.Platform = 
 }
 
 export interface DisallowedToolsOptions {
-  /** The credential store's path. Defaults to {@link credentialStorePath} at call time. */
+  /** The credential store's path. Defaults to {@link agentCredentialDenials}'s at call time. */
   storePath?: string;
+  /** Commands that read a credential, as token lists. Defaults to {@link agentCredentialDenials}'s. */
+  commandPrefixes?: readonly (readonly string[])[];
   /** Overridable only so tests can build the Windows form on any host. */
   platform?: NodeJS.Platform;
 }
@@ -123,19 +125,30 @@ export interface DisallowedToolsOptions {
  *   `./` rule reaches it while `Read`, `Glob` and `Grep` are granted bare.
  *   Resolved at spawn so an `NDX_HOME` set for this run is the one denied.
  *
+ * - The commands that read a stored credential: `security
+ *   find-generic-password` and each configured helper's command, as
+ *   `Bash(<command>:*)` prefix rules.
+ *
  * A deny rule outranks the bare grants above, and Claude Code applies
  * `Read(...)` and `Edit(...)` rules to every built-in tool that reads or edits
  * a file.
  *
- * The Codex CLI has no path deny: its sandbox can still read the store, a gap
- * only the OS keystore backends (C10) close.
+ * Not a complete barrier: a granted interpreter (`Bash(node:*)` running
+ * `node -e`) can still read the store or run a helper. The Codex CLI has no
+ * path or command deny at all: its sandbox can still read the store. Only the
+ * OS keystore backends (C10) close those gaps.
  */
 export function buildDisallowedTools(options: DisallowedToolsOptions = {}): string[] {
-  const store = claudeAbsolutePattern(options.storePath ?? credentialStorePath(), options.platform);
+  // Read at spawn, so an NDX_HOME set for this run and a helper stored since
+  // the last one are the ones denied.
+  const denials = agentCredentialDenials();
+  const store = claudeAbsolutePattern(options.storePath ?? denials.storePath, options.platform);
+  const commands = options.commandPrefixes ?? denials.commandPrefixes;
   return [
     ...NDX_CONFIG_BLOCKED_PATHS.map((p) => `Edit(./${p})`),
     `Read(${store})`,
     `Edit(${store})`,
+    ...commands.map((prefix) => `Bash(${prefix.join(" ")}:*)`),
   ];
 }
 

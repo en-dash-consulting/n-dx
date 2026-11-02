@@ -186,10 +186,14 @@ export async function diagnoseAuth(
 
   // ── Auth setting and key ──
   const decision = resolveVendorAuth(LLM_VENDOR.CLAUDE, { claude: options.claudeConfig }, { apiKeyEnv });
-  const resolvedKey = resolveVendorKey(LLM_VENDOR.CLAUDE, { claude: options.claudeConfig }, { apiKeyEnv });
-  const keySource: AuthDiagnostics["keySource"] = resolvedKey?.source ?? "none";
   // The key the selected mode would send; a held key it ignores is not one.
   const usableKey = decision.mode === "api" && decision.key !== undefined;
+  // A helper runs only when the mode uses its key (then it already ran, cached).
+  const resolvedKey = resolveVendorKey(LLM_VENDOR.CLAUDE, { claude: options.claudeConfig }, {
+    apiKeyEnv,
+    runHelpers: decision.mode === "api",
+  });
+  const keySource: AuthDiagnostics["keySource"] = resolvedKey?.source ?? "none";
   let apiKeyValid: boolean | undefined;
 
   messages.push(`Auth: llm.claude.auth ${decision.auth} → ${decision.mode}`);
@@ -200,6 +204,15 @@ export async function diagnoseAuth(
   } else if (keySource === "file") {
     messages.push(
       usableKey ? "API key: found in the credential store" : "API key: held in the credential store, unused",
+    );
+  } else if (keySource === "helper") {
+    messages.push("API key: from the credential store's helper");
+  } else if (decision.storedKeyHeld) {
+    // Only a helper entry can be held yet unresolved: not run, or it failed.
+    messages.push(
+      decision.mode === "api"
+        ? "API key: the credential store's helper failed"
+        : "API key: held in the credential store (helper), unused",
     );
   } else {
     messages.push("API key: not configured");

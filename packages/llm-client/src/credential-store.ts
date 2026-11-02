@@ -15,11 +15,21 @@
  * wins, so a CI job or a one-off shell override never has to touch the file.
  * Vendor keys add `llm.<vendor>.api_key` ahead of both (`resolveVendorKey`).
  *
+ * ## Backends
+ *
+ * - `file`: the value is in the entry.
+ * - `helper`: the entry holds an argv for a password-manager command (`op`,
+ *   `pass`, `bw`, `gopass`) and {@link resolveCredential} runs it, without a
+ *   shell, once per process; its one line of stdout is the value. A failure
+ *   reads as no credential and warns once, naming the command, never its
+ *   output. {@link credentialStatus} reports a helper without running it.
+ *
  * ## Format
  *
  * ```json
  * { "version": 1,
- *   "entries": { "typesafe": { "backend": "file", "value": "…", "updatedAt": "…" } } }
+ *   "entries": { "typesafe": { "backend": "file", "value": "…", "updatedAt": "…" },
+ *                "claude": { "backend": "helper", "argv": ["op", "read", "op://…"], "updatedAt": "…" } } }
  * ```
  *
  * Entry names are open (`connection:<id>` is reserved for connections) and
@@ -53,8 +63,8 @@ import {
   type Stats,
 } from "node:fs";
 import { userInfo } from "node:os";
-import { dirname, join } from "node:path";
-import { execFileSyncCli } from "./exec.js";
+import { dirname, join, posix } from "node:path";
+import { execFileSyncCli, execFileSyncNoShell } from "./exec.js";
 import { resolveNdxHome, type ResolveNdxHomeOptions } from "./layout.js";
 
 export const CREDENTIALS_FILENAME = "credentials.json";
@@ -84,7 +94,10 @@ export const CREDENTIAL_ENV_VARS: Readonly<Record<string, string>> = Object.free
   google: "GEMINI_API_KEY",
 });
 
-export type CredentialSource = "env" | "file";
+export type CredentialSource = "env" | "file" | "helper";
+
+/** How long a credential helper may run before it counts as failed. */
+export const CREDENTIAL_HELPER_TIMEOUT_MS = 10_000;
 
 export interface ResolvedCredential {
   value: string;
@@ -103,6 +116,13 @@ export interface CredentialStoreOptions extends ResolveNdxHomeOptions {
    * {@link CREDENTIAL_ENV_VARS} entry (google's `llm.google.apiKeyEnv`).
    */
   envVar?: string;
+  /**
+   * Runs a helper entry's command; injectable for tests. Called as
+   * `execFileSyncNoShell(argv[0], argv.slice(1), options)`.
+   */
+  helperExec?: typeof execFileSyncNoShell;
+  /** False: a helper entry resolves to nothing instead of running (status without --check). */
+  runHelpers?: boolean;
 }
 
 export interface CredentialWriteOptions extends CredentialStoreOptions {
@@ -116,12 +136,22 @@ export interface CredentialWriteOptions extends CredentialStoreOptions {
 
 export interface CredentialStatus {
   name: string;
-  /** Where {@link resolveCredential} finds the value, or null when nowhere. */
+  /**
+   * Where {@link resolveCredential} finds the value, or null when nowhere.
+   * `helper` is reported without running the helper unless `check` was set.
+   */
   source: CredentialSource | null;
   /** The stored entry's backend, or null when the store has no entry. */
   backend: string | null;
-  /** First 8 hex characters of the SHA-256 of the resolved value. */
+  /** First 8 hex characters of the SHA-256 of the resolved value; null when not resolved. */
   fingerprint: string | null;
+  /** A helper entry's command (`argv[0]`); null for any other entry. */
+  helperCommand: string | null;
+  /**
+   * A helper's outcome: `not-run` without `check`, `ok` or `failed` with it.
+   * Null when no helper entry is in play.
+   */
+  helperResult: "not-run" | "ok" | "failed" | null;
   /** The environment variable that overrides the store, when there is one. */
   envVar: string | null;
   storePath: string;
@@ -130,6 +160,7 @@ export interface CredentialStatus {
 interface StoreEntry {
   backend?: unknown;
   value?: unknown;
+  argv?: unknown;
   updatedAt?: unknown;
   [field: string]: unknown;
 }
@@ -253,50 +284,216 @@ function fileValue(entry: StoreEntry | undefined): string | undefined {
   return value.length > 0 ? value : undefined;
 }
 
+/** The stored entry's argv when its backend is `helper` and the argv is usable. */
+function helperArgv(entry: StoreEntry | undefined): string[] | undefined {
+  if (!entry || entry.backend !== "helper") return undefined;
+  return helperArgvError(entry.argv) === null ? (entry.argv as string[]) : undefined;
+}
+
+/**
+ * Why `argv` cannot be a helper command, or null when it can. `argv[0]` is
+ * also spelled into a Claude CLI deny rule (`Bash(<argv0>:*)`, comma-joined on
+ * Windows), so it may not hold a comma or a parenthesis, nor start with `-`.
+ */
+export function helperArgvError(argv: unknown): string | null {
+  if (!Array.isArray(argv) || argv.length === 0) return "a helper needs a command: a non-empty argv array.";
+  if (!argv.every((a): a is string => typeof a === "string")) return "every helper argument must be a string.";
+  if (argv.some((a) => /[\0\r\n]/.test(a))) return "a helper argument may not contain a line break or NUL.";
+  const command = argv[0] as string;
+  if (command.trim().length === 0) return "the helper command is empty.";
+  if (command.startsWith("-")) return 'the helper command may not start with "-".';
+  if (/[,()]/.test(command)) return "the helper command may not contain a comma or a parenthesis.";
+  return null;
+}
+
+/**
+ * Per-process helper results, keyed by entry name and argv: a helper runs at
+ * most once per process, and a failure warns once and is not retried.
+ */
+const helperCache = new Map<string, string | undefined>();
+
+/** Forget every helper result. For tests: a process otherwise keeps them. */
+export function clearCredentialHelperCache(): void {
+  helperCache.clear();
+}
+
+/**
+ * Run a helper entry's command and return its value, or undefined on failure.
+ *
+ * `execFileSync` with no shell ({@link execFileSyncNoShell}): `argv[0]` is the
+ * program and the rest its arguments, never parsed by a shell. stdin is closed (`ignore`), so a helper
+ * that would prompt fails instead of hanging the caller, and the timeout
+ * bounds one that blocks anyway. Synchronous because the resolver is: Jev
+ * routing and `askJev` call it inline. stdout and stderr are captured and
+ * never printed — stdout is the secret, and a password manager's stderr can
+ * echo it. On Windows `argv[0]` must be an executable (`op.exe`); a `.cmd`
+ * shim needs a shell and fails here.
+ *
+ * Nothing here keeps an agent from running the helper itself: an agent
+ * allowed an interpreter (`node -e`) can read the store or run the helper
+ * from inside it. hench denies the helper's command by name
+ * ({@link agentCredentialDenials}); only the OS keystore backends close the
+ * interpreter gap.
+ */
+function runHelper(name: string, argv: string[], options: CredentialStoreOptions): string | undefined {
+  const key = JSON.stringify([name, argv]);
+  if (helperCache.has(key)) return helperCache.get(key);
+  const run = options.helperExec ?? execFileSyncNoShell;
+  let value: string | undefined;
+  let failure: string | undefined;
+  try {
+    const stdout = run(argv[0]!, argv.slice(1), {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: CREDENTIAL_HELPER_TIMEOUT_MS,
+      encoding: "utf-8",
+      windowsHide: true,
+      env: options.env ?? process.env,
+    });
+    const text = String(stdout).trim();
+    if (text.length === 0) failure = "it printed nothing";
+    else if (/[\r\n]/.test(text)) failure = "it printed more than one line";
+    else value = text;
+  } catch (err) {
+    failure = helperFailure(err);
+  }
+  if (failure !== undefined) {
+    (options.warn ?? defaultWarn)(
+      `Credential ${name}: its helper ${JSON.stringify(argv[0])} failed (${failure}); continuing without it.`,
+    );
+  }
+  helperCache.set(key, value);
+  return value;
+}
+
+/** A helper's failure as an exit code, a timeout or a launch error — never its output. */
+function helperFailure(err: unknown): string {
+  const e = err as (NodeJS.ErrnoException & { status?: number | null; signal?: string | null }) | null;
+  if (e?.code === "ETIMEDOUT") return `timed out after ${CREDENTIAL_HELPER_TIMEOUT_MS / 1000} s`;
+  if (e?.code === "ENOENT") return "command not found";
+  if (typeof e?.status === "number") return `exit code ${e.status}`;
+  if (e?.signal) return `killed by ${e.signal}`;
+  return e?.code ? `could not start: ${e.code}` : "could not start";
+}
+
 /**
  * The credential named `name`: its environment variable when non-blank, else
- * the store's `file` entry. Undefined when neither holds one.
+ * the store's entry (a helper is run). Undefined when neither holds one.
  */
 export function resolveCredential(
   name: string,
   options: CredentialStoreOptions = {},
 ): ResolvedCredential | undefined {
   assertCredentialName(name);
-  const env = options.env ?? process.env;
-  const envVar = options.envVar ?? CREDENTIAL_ENV_VARS[name];
-  const fromEnv = envVar ? env[envVar]?.trim() : undefined;
+  const fromEnv = envCredential(name, options);
   if (fromEnv) return { value: fromEnv, source: "env" };
   return storedCredential(name, options);
 }
 
+function envCredential(name: string, options: CredentialStoreOptions): string | undefined {
+  const envVar = options.envVar ?? CREDENTIAL_ENV_VARS[name];
+  return envVar ? (options.env ?? process.env)[envVar]?.trim() || undefined : undefined;
+}
+
 /**
- * The store's `file` entry for `name`, ignoring any environment variable.
- * Undefined when the store holds none.
+ * The store's entry for `name`, ignoring any environment variable: a `file`
+ * value, or a helper's output (the helper is run). Undefined when the store
+ * holds none or the helper fails.
  */
 export function storedCredential(
   name: string,
   options: CredentialStoreOptions = {},
 ): ResolvedCredential | undefined {
   assertCredentialName(name);
-  const store = readStore(credentialStorePath(options), options);
-  const value = fileValue(store?.entries?.[name]);
-  return value ? { value, source: "file" } : undefined;
+  const entry = readStore(credentialStorePath(options), options)?.entries?.[name];
+  const value = fileValue(entry);
+  if (value) return { value, source: "file" };
+  const argv = helperArgv(entry);
+  const fromHelper = argv && options.runHelpers !== false ? runHelper(name, argv, options) : undefined;
+  return fromHelper ? { value: fromHelper, source: "helper" } : undefined;
+}
+
+/**
+ * Whether the store holds a usable entry for `name` — a `file` value or a
+ * helper command — without running a helper.
+ */
+export function hasStoredCredential(name: string, options: CredentialStoreOptions = {}): boolean {
+  assertCredentialName(name);
+  const entry = readStore(credentialStorePath(options), options)?.entries?.[name];
+  return fileValue(entry) !== undefined || helperArgv(entry) !== undefined;
+}
+
+export interface CredentialStatusOptions extends CredentialStoreOptions {
+  /** Run a helper entry to fingerprint its value. Off: a helper is reported, not run. */
+  check?: boolean;
 }
 
 /** What {@link resolveCredential} would find for `name`, without the value. */
-export function credentialStatus(name: string, options: CredentialStoreOptions = {}): CredentialStatus {
+export function credentialStatus(name: string, options: CredentialStatusOptions = {}): CredentialStatus {
   assertCredentialName(name);
   const storePath = credentialStorePath(options);
   const entry = readStore(storePath, options)?.entries?.[name];
-  const resolved = resolveCredential(name, options);
-  return {
+  const argv = helperArgv(entry);
+  const base = {
     name,
-    source: resolved?.source ?? null,
     backend: entry && typeof entry.backend === "string" ? entry.backend : null,
-    fingerprint: resolved ? credentialFingerprint(resolved.value) : null,
+    helperCommand: argv ? argv[0]! : null,
     envVar: options.envVar ?? CREDENTIAL_ENV_VARS[name] ?? null,
     storePath,
   };
+  const fromEnv = envCredential(name, options);
+  if (fromEnv) return { ...base, source: "env", fingerprint: credentialFingerprint(fromEnv), helperResult: null };
+  const value = fileValue(entry);
+  if (value) return { ...base, source: "file", fingerprint: credentialFingerprint(value), helperResult: null };
+  if (!argv) return { ...base, source: null, fingerprint: null, helperResult: null };
+  if (!options.check) return { ...base, source: "helper", fingerprint: null, helperResult: "not-run" };
+  const fromHelper = runHelper(name, argv, options);
+  return fromHelper
+    ? { ...base, source: "helper", fingerprint: credentialFingerprint(fromHelper), helperResult: "ok" }
+    : { ...base, source: null, fingerprint: null, helperResult: "failed" };
+}
+
+// ── Agent denials ────────────────────────────────────────────────────────────
+
+/** What an agent must not reach: the store file and the commands that read a credential. */
+export interface AgentCredentialDenials {
+  storePath: string;
+  /**
+   * Command prefixes, as tokens, an agent may not run: macOS Keychain's
+   * `security find-generic-password`, and every configured helper's command
+   * spelled as stored, by its base name, and by that name without `.exe`.
+   */
+  commandPrefixes: string[][];
+}
+
+/** macOS Keychain's read, which a keystore backend (C10) would hold keys behind. */
+const KEYCHAIN_READ = ["security", "find-generic-password"];
+
+/**
+ * The store's path and the commands an agent is denied, read from the store
+ * now, without running a helper. hench's command guard and its Claude CLI
+ * deny rules are built from this.
+ *
+ * A deny list cannot be complete: an agent allowed an interpreter (`node -e`,
+ * `python -c`) can still read the store or run a helper from inside it. Only
+ * the OS keystore backends (C10) close that.
+ */
+export function agentCredentialDenials(options: CredentialStoreOptions = {}): AgentCredentialDenials {
+  const storePath = credentialStorePath(options);
+  const prefixes = new Map<string, string[]>();
+  const add = (tokens: string[]): void => {
+    if (tokens[0]) prefixes.set(JSON.stringify(tokens), tokens);
+  };
+  add(KEYCHAIN_READ);
+  for (const entry of Object.values(readStore(storePath, options)?.entries ?? {})) {
+    const argv = helperArgv(entry);
+    if (!argv) continue;
+    const command = argv[0]!;
+    const base = posix.basename(command.split("\\").join("/"));
+    add([command]);
+    add([base]);
+    add([base.replace(/\.(exe|cmd|bat|com)$/i, "")]);
+  }
+  return { storePath, commandPrefixes: [...prefixes.values()] };
 }
 
 // ── Writing ──────────────────────────────────────────────────────────────────
@@ -308,11 +505,34 @@ export function setCredential(name: string, value: string, options: CredentialWr
   if (trimmed.length === 0) throw new Error(`Refusing to store an empty value for ${name}.`);
   if (/[\r\n]/.test(trimmed)) throw new Error(`Refusing to store a multi-line value for ${name}.`);
   updateStore(options, (store) => {
-    // Spread first: fields a newer n-dx added to the entry survive.
+    // Spread first: fields a newer n-dx added to the entry survive. The
+    // helper backend's argv does not: switching backends drops it.
+    const { argv: _helperArgv, ...kept } = store.entries[name] ?? {};
     store.entries[name] = {
-      ...store.entries[name],
+      ...kept,
       backend: "file",
       value: trimmed,
+      updatedAt: new Date().toISOString(),
+    };
+    return true;
+  });
+}
+
+/**
+ * Store `name` with the `helper` backend: `argv` is run, without a shell,
+ * whenever the value is needed. Nothing is run here.
+ */
+export function setHelperCredential(name: string, argv: readonly string[], options: CredentialWriteOptions = {}): void {
+  assertCredentialName(name);
+  const argvError = helperArgvError(argv);
+  if (argvError) throw new Error(`Refusing to store a helper for ${name}: ${argvError}`);
+  updateStore(options, (store) => {
+    // As in setCredential: unknown fields survive, the file backend's value does not.
+    const { value: _fileValue, ...kept } = store.entries[name] ?? {};
+    store.entries[name] = {
+      ...kept,
+      backend: "helper",
+      argv: [...argv],
       updatedAt: new Date().toISOString(),
     };
     return true;

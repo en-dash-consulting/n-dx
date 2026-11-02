@@ -15,10 +15,9 @@ import { GuardError, validatePath } from "../../../src/guard/paths.js";
 import {
   DEFAULT_EXECUTION_POLICY,
   createPromptEnvelope,
-  credentialStorePath,
   guardBaselineForLanguage,
 } from "../../../src/prd/llm-gateway.js";
-import { setCredential } from "@n-dx/llm-client";
+import { agentCredentialDenials, credentialStorePath, setCredential, setHelperCredential } from "@n-dx/llm-client";
 import {
   buildClaudeCliArgs,
   buildDisallowedTools,
@@ -169,7 +168,7 @@ describe("the agent is kept out of the per-user credential store", () => {
     const ndxHome = mkdtempSync(join(tmpdir(), "hench-ndx-home-"));
     try {
       const store = credentialStorePath({ ndxHome });
-      const guard = new GuardRails(repo, DEFAULT_HENCH_CONFIG().guard, { shellKind: "posix", credentialStorePath: store });
+      const guard = new GuardRails(repo, DEFAULT_HENCH_CONFIG().guard, { shellKind: "posix", credentialDenials: { storePath: store, commandPrefixes: [] } });
       expect(() => guard.checkPath(store)).toThrow(/escapes project directory/);
       expect(credentialStorePattern(repo, store)).toEqual([]);
     } finally {
@@ -179,7 +178,7 @@ describe("the agent is kept out of the per-user credential store", () => {
 
   it("the guard refuses the store, its lock and temp files when the ndx home is inside the project", () => {
     const store = credentialStorePath({ ndxHome: join(repo, "tools", "ndx-home") });
-    const guard = new GuardRails(repo, { ...DEFAULT_HENCH_CONFIG().guard, blockedPaths: [] }, { shellKind: "posix", credentialStorePath: store });
+    const guard = new GuardRails(repo, { ...DEFAULT_HENCH_CONFIG().guard, blockedPaths: [] }, { shellKind: "posix", credentialDenials: { storePath: store, commandPrefixes: [] } });
     for (const p of [store, "tools/ndx-home/credentials.json", "tools/ndx-home/credentials.json.lock", "tools/ndx-home/credentials.json.1.x.tmp", "TOOLS/ndx-home/Credentials.json"]) {
       expect(() => guard.checkPath(p), p).toThrow(/blocked pattern/);
     }
@@ -198,6 +197,80 @@ describe("the agent is kept out of the per-user credential store", () => {
       expect(config.args.join("\n")).not.toContain("tsk_placeholder_stored_value");
     } finally {
       rmSync(ndxHome, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the agent may not run a command that reads a stored credential", () => {
+  let ndxHome: string;
+  beforeEach(() => {
+    ndxHome = mkdtempSync(join(tmpdir(), "hench-ndx-home-"));
+    setHelperCredential("typesafe", ["/opt/homebrew/bin/op", "read", "op://vault/item/field"], { ndxHome });
+    setHelperCredential("claude", ["C:\\Tools\\bw.exe", "get", "password", "x"], { ndxHome });
+  });
+  afterEach(() => rmSync(ndxHome, { recursive: true, force: true }));
+
+  /** A guard whose allowlist names every denied program, as a user who widened it would. */
+  function widenedGuard(): GuardRails {
+    const base = DEFAULT_HENCH_CONFIG().guard;
+    const allowedCommands = [...base.allowedCommands, "security", "op", "bw", "node"];
+    return new GuardRails(repo, { ...base, allowedCommands }, {
+      shellKind: "posix",
+      credentialDenials: agentCredentialDenials({ ndxHome }),
+    });
+  }
+
+  it.each([
+    "security find-generic-password -s ndx -w",
+    "/usr/bin/security find-generic-password -w",
+    "op read op://vault/item/field",
+    "/opt/homebrew/bin/op read x",
+    "'/opt/homebrew/bin/op' item list",
+    "bw get password x",
+    "bw.exe get password x",
+    "BW.EXE list items",
+  ])("refuses %j even when guard.allowedCommands lists it", (command) => {
+    expect(() => widenedGuard().checkCommand(command)).toThrow(/reads a stored credential/);
+  });
+
+  it("still allows other subcommands of security and other allowed commands", () => {
+    const guard = widenedGuard();
+    expect(() => guard.checkCommand("security list-keychains")).not.toThrow();
+    expect(() => guard.checkCommand("npm test")).not.toThrow();
+    // The documented gap: an allowed interpreter is not a command this list can see.
+    expect(() => guard.checkCommand("node -e 'process.exit(0)'")).not.toThrow();
+  });
+
+  it.each(["darwin", "linux", "win32"] as const)("the Claude CLI denies them as Bash rules beside the store rules (%s)", (platform) => {
+    const { storePath, commandPrefixes } = agentCredentialDenials({ ndxHome });
+    const disallowedTools = buildDisallowedTools({ storePath, commandPrefixes, platform });
+    const { args } = buildClaudeCliArgs({ systemPrompt: "s", promptText: "p", allowedTools: ["Bash"], disallowedTools }, platform);
+    const at = args.indexOf("--disallowed-tools") + 1;
+    const rules = platform === "win32" ? args[at]!.split(",") : args.slice(at, at + disallowedTools.length);
+    const store = claudeAbsolutePattern(storePath, platform);
+    expect(rules).toEqual(expect.arrayContaining([
+      `Read(${store})`,
+      `Edit(${store})`,
+      "Bash(security find-generic-password:*)",
+      "Bash(/opt/homebrew/bin/op:*)",
+      "Bash(op:*)",
+      "Bash(C:\\Tools\\bw.exe:*)",
+      "Bash(bw.exe:*)",
+      "Bash(bw:*)",
+    ]));
+    expect(rules).toHaveLength(disallowedTools.length);
+  });
+
+  it("the spawn reads the helpers stored in the ndx home at spawn time", () => {
+    const previous = process.env.NDX_HOME;
+    process.env.NDX_HOME = ndxHome;
+    try {
+      const config = claudeCliAdapter.buildSpawnConfig(createPromptEnvelope([]), DEFAULT_EXECUTION_POLICY, {});
+      expect(config.args.join("\n")).toContain("Bash(op:*)");
+      expect(config.args.join("\n")).toContain("Bash(security find-generic-password:*)");
+    } finally {
+      if (previous === undefined) delete process.env.NDX_HOME;
+      else process.env.NDX_HOME = previous;
     }
   });
 });

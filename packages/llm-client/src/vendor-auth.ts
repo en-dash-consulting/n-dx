@@ -19,8 +19,8 @@
 
 import {
   CREDENTIAL_ENV_VARS,
+  hasStoredCredential,
   resolveCredential,
-  storedCredential,
   type CredentialStoreOptions,
 } from "./credential-store.js";
 import { ClaudeClientError, type AuthMode, type VendorAuth } from "./types.js";
@@ -46,14 +46,15 @@ export function hasVendorCliLogin(vendor: KeyedVendor): boolean {
 }
 
 /** Where a vendor key came from. */
-export type VendorKeySource = "config" | "env" | "file";
+export type VendorKeySource = "config" | "env" | "file" | "helper";
 
 export interface ResolvedVendorKey {
   value: string;
   source: VendorKeySource;
 }
 
-export interface VendorKeyOptions extends Pick<CredentialStoreOptions, "env" | "ndxHome" | "home" | "warn"> {
+export interface VendorKeyOptions
+  extends Pick<CredentialStoreOptions, "env" | "ndxHome" | "home" | "warn" | "runHelpers" | "helperExec"> {
   /** The variable read in place of the vendor's default (hench's `apiKeyEnv`). */
   apiKeyEnv?: string;
 }
@@ -78,8 +79,18 @@ function storeOptions(vendor: KeyedVendor, config: LLMConfig, options: VendorKey
     ...(options.ndxHome ? { ndxHome: options.ndxHome } : {}),
     ...(options.home ? { home: options.home } : {}),
     ...(options.warn ? { warn: options.warn } : {}),
+    ...(options.runHelpers !== undefined ? { runHelpers: options.runHelpers } : {}),
+    ...(options.helperExec ? { helperExec: options.helperExec } : {}),
     envVar: vendorKeyEnv(vendor, config, options.apiKeyEnv),
   };
+}
+
+/** `vendor`'s key from `llm.<vendor>.api_key` or its environment variable: never the store. */
+function declaredVendorKey(vendor: KeyedVendor, config: LLMConfig, options: VendorKeyOptions): ResolvedVendorKey | undefined {
+  const configured = config[vendor]?.api_key;
+  if (configured) return { value: configured, source: "config" };
+  const exported = (options.env ?? process.env)[vendorKeyEnv(vendor, config, options.apiKeyEnv)]?.trim();
+  return exported ? { value: exported, source: "env" } : undefined;
 }
 
 /**
@@ -128,17 +139,20 @@ export function resolveVendorAuth(
 ): VendorAuthDecision {
   const auth = vendorAuthSetting(vendor, config);
   const authSource = config[vendor]?.auth === auth ? `llm.${vendor}.auth` : "built-in";
-  const stored = storedCredential(vendor, storeOptions(vendor, config, options));
-  const base = { vendor, auth, authSource, storedKeyHeld: stored !== undefined };
+  // Held, not resolved: a helper entry runs only when its key is used.
+  const storedKeyHeld = hasStoredCredential(vendor, storeOptions(vendor, config, options));
+  const base = { vendor, auth, authSource, storedKeyHeld };
   if (auth === "cli") return { ...base, mode: "cli", apiRefusal: cliAuthConflictError(vendor, `the ${vendor} API`) };
 
   const missing = (): ClaudeClientError => missingVendorKeyError(vendor, config, options.apiKeyEnv);
-  const key = resolveVendorKey(vendor, config, options);
   if (auth === "api" || !hasVendorCliLogin(vendor)) {
+    const key = resolveVendorKey(vendor, config, options);
     return key ? { ...base, mode: "api", key } : { ...base, mode: "api", apiRefusal: missing() };
   }
-  // auto: only a key someone configured or exported selects the API.
-  if (key && key.source !== "file") return { ...base, mode: "api", key };
+  // auto: only a key someone configured or exported selects the API, so the
+  // store (and any helper) is not consulted.
+  const key = declaredVendorKey(vendor, config, options);
+  if (key) return { ...base, mode: "api", key };
   return { ...base, mode: "cli", apiRefusal: missing() };
 }
 
@@ -202,22 +216,32 @@ export function missingVendorKeyError(
   return new ClaudeClientError(message, "auth", false);
 }
 
-/** One line describing `decision`, never the value: `claude: cli (store key held, unused)`. */
-export function describeVendorAuth(decision: VendorAuthDecision, envVar: string): string {
+/**
+ * One line describing `decision`, never the value: `claude: cli (store key held, unused)`.
+ * `helpersRun: false` says the decision was made with helpers not run, so a
+ * key held only behind a helper reads as not run rather than missing.
+ */
+export function describeVendorAuth(decision: VendorAuthDecision, envVar: string, helpersRun = true): string {
   const parts: string[] = [];
   if (decision.authSource !== "built-in") parts.push(`llm.${decision.vendor}.auth ${decision.auth}`);
   const key = decision.mode === "api" ? decision.key : undefined;
+  const fromStore = key?.source === "file" || key?.source === "helper";
   if (key) {
     parts.push(
       key.source === "config"
         ? `key from llm.${decision.vendor}.api_key`
         : key.source === "env"
           ? `key from ${envVar}`
-          : "key from the credential store",
+          : key.source === "helper"
+            ? "key from the credential store's helper"
+            : "key from the credential store",
     );
+  } else if (decision.mode === "api" && decision.storedKeyHeld) {
+    // A held file key always resolves, so this is a helper.
+    parts.push(helpersRun ? "the stored key's helper failed" : "key from the credential store's helper, not run (--check runs it)");
   } else if (decision.mode === "api") {
     parts.push(`no key: store one with ndx config credentials.${decision.vendor}`);
   }
-  if (decision.storedKeyHeld && key?.source !== "file") parts.push("store key held, unused");
+  if (decision.storedKeyHeld && !fromStore && !(decision.mode === "api" && !key)) parts.push("store key held, unused");
   return `${decision.vendor}: ${decision.mode}${parts.length > 0 ? ` (${parts.join("; ")})` : ""}`;
 }

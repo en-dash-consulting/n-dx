@@ -2710,6 +2710,13 @@ Credentials (per-user, not per-project):
   credentials.codex        only under llm.<vendor>.auth api: storing a key never
   credentials.google       moves a vendor off its CLI login. Google (no CLI) uses
                            it under auto too. A configured or exported key wins.
+  credentials.<name> --helper "<cmd>"
+                           Store a password-manager command instead of a value,
+                           e.g. --helper "op read op://vault/item/field". It runs
+                           without a shell, at most once per process, when the
+                           key is needed; its one line of output is the value.
+                           Quoting as in a shell, with no expansion; | ; & > <
+                           $( and backticks are refused.
 
 Vendor auth (llm.<vendor>.auth, written to .n-dx.local.json):
   auto (default)           API when a key is configured or exported, else the CLI
@@ -2724,6 +2731,8 @@ Options:
   --json                   Output as JSON
   --stdin                  With credentials.<name>: read the value from stdin
   --unset                  With credentials.<name>: remove the stored value
+  --helper "<cmd>"         With credentials.<name>: store a helper command (above)
+  --check                  With credentials: run each helper to fingerprint its value
   --force                  Skip validation when setting claude/llm/extensions config values
   --user                   Write an extensions.<name>.<key> value to the user config
                            (<ndx home>/config.json) instead of .n-dx.json
@@ -3939,6 +3948,72 @@ function spawnCredentialsCli(args, input) {
   }
 }
 
+/**
+ * Characters `--helper` refuses anywhere in the command, quoted or not. No
+ * shell ever runs the helper, so they would be passed on literally; refusing
+ * them means a command written for a shell (a pipe, a redirect, a
+ * substitution) fails here instead of failing obscurely on every run.
+ */
+const HELPER_REFUSED = [
+  ["|", "a pipe"],
+  [";", "a command separator"],
+  ["&", "a command separator"],
+  [">", "a redirect"],
+  ["<", "a redirect"],
+  ["$(", "a command substitution"],
+  ["`", "a command substitution"],
+];
+
+/**
+ * Split a `--helper` command into argv with shell-style quoting and no
+ * expansion: whitespace separates words; single quotes keep everything
+ * literally; double quotes keep everything but `\"` and `\\`; outside quotes
+ * a backslash keeps the next character. `$VAR`, `~` and globs stay literal.
+ * The helper later runs with `execFileSync(argv[0], argv.slice(1))`, no shell.
+ *
+ * @param {string} text
+ * @returns {{ argv: string[] } | { error: string }}
+ */
+export function parseHelperCommand(text) {
+  for (const [token, what] of HELPER_REFUSED) {
+    if (text.includes(token)) {
+      return { error: `the command contains ${JSON.stringify(token)} (${what}). It runs without a shell, so write a single command; wrap anything more in a script.` };
+    }
+  }
+  if (/[\0\r\n]/.test(text)) return { error: "the command contains a line break." };
+  const argv = [];
+  let word = null;
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+      else word += ch;
+      continue;
+    }
+    if (quote === '"') {
+      if (ch === '"') quote = null;
+      else if (ch === "\\" && (text[i + 1] === '"' || text[i + 1] === "\\")) word += text[++i];
+      else word += ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (word !== null) argv.push(word);
+      word = null;
+      continue;
+    }
+    word ??= "";
+    if (ch === "'" || ch === '"') quote = ch;
+    else if (ch === "\\" && i + 1 < text.length) word += text[++i];
+    else word += ch;
+  }
+  if (quote) return { error: `the command has an unterminated ${quote} quote.` };
+  if (word !== null) argv.push(word);
+  if (argv.length === 0 || argv[0] === "") return { error: "the command is empty." };
+  if (argv[0].startsWith("-")) return { error: `the command may not start with "-" (${JSON.stringify(argv[0])}).` };
+  return { argv };
+}
+
 /** Read one line from a TTY with echo off. Resolves null on Ctrl-C. */
 function readHiddenLine(promptText) {
   return new Promise((resolveLine) => {
@@ -3985,10 +4060,15 @@ async function handleCredentials(positional, flags) {
     console.error(message);
     process.exit(1);
   };
+  const usageFail = (message) => {
+    console.error(message);
+    process.exit(2);
+  };
 
   if (keyArg === "credentials") {
     const project = resolve(positional[1] ?? ".");
-    const result = spawnCredentialsCli(["status", `--project=${project}`]);
+    const check = flags.check === "true" ? ["--check"] : [];
+    const result = spawnCredentialsCli(["status", `--project=${project}`, ...check]);
     if (result.code !== 0) return fail(result.stderr.trim() || "Could not read the credential store.");
     console.log("Credentials (per-user: shared by every project)");
     console.log(result.stdout.trimEnd());
@@ -4017,6 +4097,19 @@ async function handleCredentials(positional, flags) {
   if (valueArgs.length > 0) {
     const last = await stat(resolve(valueArgs[valueArgs.length - 1])).catch(() => null);
     if (last?.isDirectory()) valueArgs.pop();
+  }
+
+  if (flags.helper !== undefined) {
+    // `--helper "<cmd>"` arrives as a bare flag and the next positional;
+    // `--helper=<cmd>` as the flag's value.
+    const text = flags.helper === "true" ? valueArgs[0] : flags.helper;
+    if (!text) return usageFail(`--helper needs a command, e.g. ndx config credentials.${name} --helper "op read op://vault/item/field"`);
+    const parsed = parseHelperCommand(text);
+    if ("error" in parsed) return usageFail(`Refusing --helper: ${parsed.error}`);
+    const result = spawnCredentialsCli(["set-helper", name], JSON.stringify(parsed.argv));
+    if (result.code !== 0) return result.code === 2 ? usageFail(result.stderr.trim()) : fail(result.stderr.trim());
+    console.log(result.stdout.trimEnd());
+    return;
   }
 
   let value;

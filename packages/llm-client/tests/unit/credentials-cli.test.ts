@@ -39,6 +39,28 @@ function run(argv: string[], stdin: string | null = null, env: Record<string, st
 
 const stored = () => resolveCredential("typesafe", { ndxHome: home, env: {} });
 
+describe("set-helper", () => {
+  it("stores the argv read from stdin as JSON and names argv[0]", async () => {
+    expect(await run(["set-helper", "typesafe"], JSON.stringify(["pass", "show", "ndx/typesafe"]))).toBe(0);
+    expect(out).toBe("Stored typesafe: helper (pass).\n");
+    expect(resolveCredential("typesafe", { ndxHome: home, env: {}, runHelpers: false })).toBeUndefined();
+  });
+
+  it.each([
+    ["not JSON", "op read x", /not valid JSON/],
+    ["not an array", JSON.stringify({ argv: ["op"] }), /non-empty argv array/],
+    ["empty", "[]", /non-empty argv array/],
+    ["a leading dash", JSON.stringify(["-c", "x"]), /start with "-"/],
+  ])("refuses %s as a usage error", async (_label, stdin, message) => {
+    expect(await run(["set-helper", "typesafe"], stdin)).toBe(2);
+    expect(err).toMatch(message);
+  });
+
+  it("refuses an argv on the command line", async () => {
+    expect(await run(["set-helper", "typesafe", "op"], "[\"op\"]")).toBe(2);
+  });
+});
+
 describe("set", () => {
   it("stores the value read from stdin, trailing newline dropped, and does not print it", async () => {
     expect(await run(["set", "typesafe"], `${VALUE}\n`)).toBe(0);
@@ -111,11 +133,38 @@ describe("status", () => {
       source: "env",
       backend: "file",
       fingerprint: credentialFingerprint("placeholder-env-key"),
+      helperCommand: null,
+      helperResult: null,
       envVar: "TYPESAFE_API_KEY",
       storePath: join(home, "credentials.json"),
     });
     expect(out).not.toContain(VALUE);
     expect(out).not.toContain("placeholder-env-key");
+  });
+
+  it("names a helper without running it, and runs it only with --check", async () => {
+    const calls: string[] = [];
+    const helperExec = ((file: string) => {
+      calls.push(file);
+      return VALUE;
+    }) as never;
+    const runWith = (argv: string[]) =>
+      runCredentialsCli(argv, {
+        readStdin: async () => null,
+        stdout: (t) => { out += t; },
+        stderr: (t) => { err += t; },
+        store: { ndxHome: home, env: {}, helperExec },
+      });
+    expect(await run(["set-helper", "typesafe"], JSON.stringify(["op", "read", "op://v/i/f"]))).toBe(0);
+    out = "";
+    expect(await runWith(["status"])).toBe(0);
+    expect(out).toContain("typesafe: credential store, helper (op), not run (--check runs it)");
+    expect(calls).toEqual([]);
+    out = "";
+    expect(await runWith(["status", "--check"])).toBe(0);
+    expect(out).toContain(`typesafe: credential store, helper (op), fingerprint ${credentialFingerprint(VALUE)}`);
+    expect(calls).toEqual(["op"]);
+    expect(out + err).not.toContain(VALUE);
   });
 
   it("says not set when nothing is", async () => {

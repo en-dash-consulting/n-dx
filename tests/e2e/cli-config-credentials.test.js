@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, readdir, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdtemp, rm, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -147,5 +148,75 @@ describe("ndx config credentials", () => {
     expect(r.out).toMatch(/credentials\.typesafe/);
     expect(r.out).toMatch(/--stdin/);
     expect(r.out).toMatch(/--unset/);
+    expect(r.out).toMatch(/--helper/);
+    expect(r.out).toMatch(/--check/);
+  }, DEFAULT_TIMEOUT);
+});
+
+describe("ndx config credentials.<name> --helper", () => {
+  /**
+   * A fake password manager: prints the placeholder and leaves a marker file,
+   * so a test can tell whether it ran. Single-quoted paths: the command is
+   * parsed with shell-style quoting, and temp paths can hold spaces.
+   */
+  async function fakeHelper() {
+    const script = join(root, "fake-helper.mjs");
+    const marker = join(root, "helper-ran");
+    await writeFile(
+      script,
+      `import { writeFileSync } from "node:fs";\n` +
+        `writeFileSync(${JSON.stringify(marker)}, "ran");\n` +
+        `process.stderr.write(${JSON.stringify(`stderr ${SECRET}\n`)});\n` +
+        `process.stdout.write(${JSON.stringify(`${SECRET}\n`)});\n`,
+    );
+    return { command: `'${process.execPath}' '${script}' --vault ndx`, script, marker };
+  }
+
+  it("stores the argv, names the helper in status, and runs it only with --check", async () => {
+    const { command, script, marker } = await fakeHelper();
+    const set = config(["credentials.typesafe", "--helper", command]);
+    expect(set.code, set.err).toBe(0);
+    expect(set.out).toContain("Stored typesafe: helper (");
+    expect(existsSync(marker)).toBe(false);
+
+    const entry = JSON.parse(await readFile(join(home, "credentials.json"), "utf-8")).entries.typesafe;
+    expect(entry).toMatchObject({ backend: "helper", argv: [process.execPath, script, "--vault", "ndx"] });
+    expect(entry).not.toHaveProperty("value");
+
+    const status = config(["credentials"]);
+    expect(status.code).toBe(0);
+    expect(status.out).toContain(`typesafe: credential store, helper (${process.execPath}), not run (--check runs it)`);
+    expect(existsSync(marker)).toBe(false);
+
+    const checked = config(["credentials", "--check"]);
+    expect(checked.code).toBe(0);
+    expect(checked.out).toMatch(/typesafe: credential store, helper \(.+\), fingerprint [0-9a-f]{8}/);
+    expect(existsSync(marker)).toBe(true);
+
+    for (const text of [set.out, set.err, status.out, status.err, checked.out, checked.err]) {
+      expect(text).not.toContain(SECRET);
+    }
+  }, DEFAULT_TIMEOUT);
+
+  it("accepts the --helper=<cmd> form", async () => {
+    const { command } = await fakeHelper();
+    expect(config(["credentials.claude", `--helper=${command}`]).code).toBe(0);
+    expect(config(["credentials"]).out).toContain(`claude: credential store, helper (${process.execPath})`);
+  }, DEFAULT_TIMEOUT);
+
+  it.each([
+    ["a pipe", "op read x | cat"],
+    ["a separator", "op read x; rm -rf y"],
+    ["an ampersand", "op read x & y"],
+    ["a redirect out", "op read x > out"],
+    ["a redirect in", "op read < in"],
+    ["a substitution", "op read $(whoami)"],
+    ["a backtick", "op read `whoami`"],
+    ["a leading dash", "-e x"],
+  ])("refuses %s as a usage error and stores nothing", (_label, command) => {
+    const r = config(["credentials.typesafe", "--helper", command]);
+    expect(r.code).toBe(2);
+    expect(r.err).toMatch(/Refusing --helper/);
+    expect(existsSync(join(home, "credentials.json"))).toBe(false);
   }, DEFAULT_TIMEOUT);
 });

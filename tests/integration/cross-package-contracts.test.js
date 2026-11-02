@@ -349,7 +349,7 @@ describe("hench → llm-client gateway contract", () => {
     "redactDeep",
     "redactSecrets",
     "createLineRedactor",
-    "credentialStorePath",
+    "agentCredentialDenials",
     "setQuiet",
     "isQuiet",
     "setVerbose",
@@ -882,8 +882,9 @@ describe("gateway export auto-detection", () => {
         // trust review does not read them as the repository's routing.
         "HENCH_LOCAL_ONLY_SETTINGS", "writeHenchLocalSetting",
         "redactDeep", "redactSecrets", "createLineRedactor",
-        // The guard and the Claude CLI deny rules keep the agent out of the store.
-        "credentialStorePath",
+        // The guard and the Claude CLI deny rules keep the agent out of the
+        // store and away from the commands that read a credential.
+        "agentCredentialDenials",
         "setQuiet", "isQuiet", "setVerbose", "isVerbose", "setDebug", "isDebug",
         "info", "result", "verbose", "debug", "warn", "suppressKnownDeprecations",
         "printVendorModelHeader", "isColorEnabled", "bold", "dim", "cyan", "carolinaBlue", "yellow",

@@ -11,7 +11,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CREDENTIAL_ENV_VARS, setCredential } from "../../src/credential-store.js";
+import {
+  CREDENTIAL_ENV_VARS,
+  clearCredentialHelperCache,
+  setCredential,
+  setHelperCredential,
+} from "../../src/credential-store.js";
 import {
   describeVendorAuth,
   missingVendorKeyError,
@@ -164,6 +169,48 @@ describe("auth api", () => {
     store("claude");
     const auto = () => requireVendorApiKey("claude", { claude: {} }, { env: {}, ndxHome: home });
     expect(auto).toThrow(missingVendorKeyError("claude", {}).message);
+  });
+});
+
+describe("a helper-backed vendor key", () => {
+  /** A helperExec counting its runs; it prints the placeholder. */
+  function countingExec() {
+    let runs = 0;
+    const helperExec = (() => {
+      runs += 1;
+      return HELPER;
+    }) as never;
+    return { helperExec, runs: () => runs };
+  }
+
+  beforeEach(() => {
+    setHelperCredential("claude", ["op", "read", `op://v/claude/${Math.random()}`], { ndxHome: home });
+  });
+  afterEach(() => clearCredentialHelperCache());
+
+  it("auto and cli never run the helper, and count the key as held", () => {
+    const { helperExec, runs } = countingExec();
+    expect(resolveVendorAuth("claude", {}, { env: {}, ndxHome: home, helperExec }))
+      .toMatchObject({ mode: "cli", storedKeyHeld: true });
+    expect(resolveVendorAuth("claude", withAuth("claude", "cli"), { env: {}, ndxHome: home, helperExec }))
+      .toMatchObject({ mode: "cli", storedKeyHeld: true });
+    expect(runs()).toBe(0);
+  });
+
+  it("api runs it and uses its output", () => {
+    const { helperExec, runs } = countingExec();
+    expect(requireVendorApiKey("claude", withAuth("claude", "api"), { env: {}, ndxHome: home, helperExec }))
+      .toEqual({ value: HELPER, source: "helper" });
+    expect(runs()).toBe(1);
+  });
+
+  it("status without running helpers says the helper was not run", () => {
+    const { helperExec, runs } = countingExec();
+    const decision = resolveVendorAuth("claude", withAuth("claude", "api"), { env: {}, ndxHome: home, helperExec, runHelpers: false });
+    expect(describeVendorAuth(decision, "ANTHROPIC_API_KEY", false)).toBe(
+      "claude: api (llm.claude.auth api; key from the credential store's helper, not run (--check runs it))",
+    );
+    expect(runs()).toBe(0);
   });
 });
 

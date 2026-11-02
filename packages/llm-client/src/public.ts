@@ -505,13 +505,18 @@ export {
   credentialFingerprint,
   resolveCredential,
   setCredential,
+  setHelperCredential,
   unsetCredential,
   credentialStatus,
   storedCredential,
+  hasStoredCredential,
+  agentCredentialDenials,
 } from "./credential-store.js";
 export type {
+  AgentCredentialDenials,
   CredentialSource,
   CredentialStatus,
+  CredentialStatusOptions,
   CredentialStoreOptions,
   CredentialWriteOptions,
   ResolvedCredential,
