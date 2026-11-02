@@ -196,6 +196,12 @@ interface EditedProposalTask {
   source?: string;
   /** The proposal's LoE decomposition, carried through unedited. */
   decomposition?: ProposalDecomposition;
+  /**
+   * The proposal's status, carried through unedited. `completed` marks a
+   * baseline proposal describing code that already exists; on v2 it creates
+   * no change, as on Accept.
+   */
+  status?: string;
   description?: string;
   acceptanceCriteria?: string[];
   priority?: string;
@@ -912,6 +918,7 @@ async function handleAcceptProposals(
     // the legacy prd.md that the watcher overwrites.
     const store = await resolveStore(ctx.rexDir);
     let addedCount = 0;
+    let v2Outcome: V2AcceptOutcome | undefined;
 
     if (isChangeLayerStore(store)) {
       const outcome = await acceptAsChanges(ctx, store, toAccept.map((p) => ({
@@ -926,6 +933,7 @@ async function handleAcceptProposals(
         })),
       })));
       addedCount = outcome.changeCount + outcome.taskCount;
+      v2Outcome = outcome;
     } else {
       for (const p of toAccept) {
         const epicId = randomUUID();
@@ -994,7 +1002,9 @@ async function handleAcceptProposals(
     appendLog(ctx, {
       timestamp: new Date().toISOString(),
       event: "analyze_accept",
-      detail: `Accepted ${toAccept.length} proposals (${addedCount} items) via web`,
+      detail: v2Outcome
+        ? `Accepted ${toAccept.length} proposals via web: ${v2AcceptSummary(v2Outcome)}`
+        : `Accepted ${toAccept.length} proposals (${addedCount} items) via web`,
     });
 
     if (broadcast) {
@@ -1004,7 +1014,18 @@ async function handleAcceptProposals(
       });
     }
 
-    jsonResponse(res, 200, { ok: true, acceptedCount: toAccept.length, addedCount });
+    // On v2 the counts say why an accept may add nothing: every proposal
+    // described code that already exists (skippedCount).
+    jsonResponse(res, 200, {
+      ok: true,
+      acceptedCount: toAccept.length,
+      addedCount,
+      ...(v2Outcome ? {
+        changeCount: v2Outcome.changeCount,
+        taskCount: v2Outcome.taskCount,
+        skippedCount: v2Outcome.skippedCount,
+      } : {}),
+    });
   } catch (err) {
     errorResponse(res, 400, errorMessage(err));
   }
@@ -1213,7 +1234,9 @@ async function acceptEditedAsChanges(
     epic.children = epic.children?.filter((f) => f.children?.length);
   }
   const outcome = await acceptAsChanges(ctx, store, work.filter((e) => e.children?.length));
-  if (outcome.changeCount === 0) {
+  // Selected baseline proposals are an accept that adds nothing, answered
+  // with its counts as Accept does; only an empty selection is refused.
+  if (outcome.changeCount === 0 && outcome.skippedCount === 0) {
     errorResponse(res, 400, "No items selected for acceptance");
     return true;
   }
@@ -1234,6 +1257,7 @@ async function acceptEditedAsChanges(
     addedCount: outcome.changeCount + outcome.taskCount,
     changeCount: outcome.changeCount,
     taskCount: outcome.taskCount,
+    skippedCount: outcome.skippedCount,
   });
   return true;
 }

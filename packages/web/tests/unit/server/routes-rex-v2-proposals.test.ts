@@ -139,7 +139,40 @@ describe("proposal accept routes on a v2 project", () => {
 
     const res = await send("proposals/accept", {});
     expect(res.status).toBe(200);
-    expect((await res.json()).addedCount).toBe(0);
+    expect(await res.json()).toMatchObject({ ok: true, addedCount: 0, changeCount: 0, taskCount: 0, skippedCount: 1 });
+    expect((await roots()).length).toBe(before);
+    const log = readFileSync(join(rexDir, "execution-log.jsonl"), "utf-8");
+    expect(log).toContain("1 describing existing code not created");
+  });
+
+  it("POST /proposals/accept-edited creates no change for a completed (baseline) task", async () => {
+    const res = await send("proposals/accept-edited", { proposals: [{
+      epic: { title: "Billing" },
+      features: [{ title: "Payments", selected: true, tasks: [
+        { title: "Card payments work", source: "llm", status: "completed", selected: true },
+        { title: "Refund to the wallet", source: "llm", selected: true },
+      ] }],
+      selected: true,
+    }] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, addedCount: 1, changeCount: 1, taskCount: 0, skippedCount: 1 });
+    const items = await roots();
+    expect(items.some((i) => i.title === "Card payments work")).toBe(false);
+    expect(items.find((i) => i.title === "Refund to the wallet")).toMatchObject({ needsPlacement: true });
+  });
+
+  it("POST /proposals/accept-edited with only baseline tasks selected answers with the skipped count", async () => {
+    writeFileSync(join(rexDir, "pending-proposals.json"), JSON.stringify([PROPOSAL]));
+    const before = (await roots()).length;
+    const res = await send("proposals/accept-edited", { proposals: [{
+      epic: { title: "Done" },
+      features: [{ title: "Already built", selected: true, tasks: [
+        { title: "Card payments work", source: "llm", status: "completed", selected: true },
+      ] }],
+      selected: true,
+    }] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, addedCount: 0, changeCount: 0, skippedCount: 1 });
     expect((await roots()).length).toBe(before);
   });
 
