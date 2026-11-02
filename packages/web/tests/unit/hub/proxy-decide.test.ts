@@ -16,7 +16,7 @@ import type { Hub, ProjectView } from "../../../src/hub/index.js";
 function view(id: string): ProjectView {
   return {
     id, name: id, repoRoot: `/repo/${id}`, worktrees: [`/repo/${id}`], 
-    port: 4000, pid: 1, lastSeen: null,
+    port: 4000, pid: 1, lastSeen: null, ndxBin: "/hub/ndx.js",
     status: { state: "healthy", pid: 1, port: 4000, attached: false, respawns: 0, lastHealthAt: null, lastError: null },
   };
 }
