@@ -88,6 +88,14 @@ describe("provider=api against llm.<vendor>.auth", () => {
     expect(resolveFor({ provider: "api" }).provider.error).toBeUndefined();
   });
 
+  it("refuses provider=cli under auth api with no key before the run starts", () => {
+    const r = resolveFor({ provider: "cli", llm: claudeAuth("api") });
+    expect(r.provider.value).toBe("cli");
+    expect(r.provider.error?.message).toContain("ndx config credentials.claude");
+    setCredential("claude", STORED, { ndxHome: home });
+    expect(resolveFor({ provider: "cli", llm: claudeAuth("api") }).provider.error).toBeUndefined();
+  });
+
   it("refuses the --provider=api flag too", () => {
     expect(resolveFor({ flags: { provider: "api" }, llm: claudeAuth("cli") }).provider.error).toBeDefined();
   });

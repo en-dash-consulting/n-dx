@@ -414,6 +414,8 @@ export const CREDENTIAL_ROUTING_FIELDS: readonly (readonly string[])[] = [
  * send, so they apply whether or not the repository is trusted.
  */
 export const VENDOR_AUTH_FIELDS: readonly (readonly string[])[] = [
+  // Both loaders read the legacy top-level `claude` block too.
+  ["claude", "auth"],
   ["llm", "claude", "auth"],
   ["llm", "codex", "auth"],
   ["llm", "google", "auth"],

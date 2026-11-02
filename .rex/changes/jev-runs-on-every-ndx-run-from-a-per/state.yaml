@@ -56,10 +56,14 @@ items:
     lastModified: "2026-10-30T15:27:43.823Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-02T19:00:14.177Z"
-    activeIntervals: [{"start":"2026-11-02T19:00:14.177Z"}]
-    lastModified: "2026-11-02T19:00:14.753Z"
+    completedAt: "2026-11-02T19:31:36.661Z"
+    endedAt: "2026-11-02T19:31:36.661Z"
+    activeIntervals: [{"end":"2026-11-02T19:31:36.661Z","start":"2026-11-02T19:00:14.177Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client vendor-auth.ts (resolveVendorKey config→env→store, resolveVendorAuth with apiRefusal, requireVendorApiKey), llm.<vendor>.auth parsed and trust-gated (api only), CREDENTIAL_ENV_VARS + vendor names in the credentials CLI with status --project; providers, detectAuthMode, child env and diagnoseAuth follow auth; core validators, local-only routing and credentials status; hench refuses provider=api via run-settings, --resolve reports auth; gateway resolveApiKey swapped for resolveVendorAuth (cap unchanged)."
+    lastModified: "2026-11-02T19:31:36.661Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9da6d298-51b4-4e0d-88df-8efee59a8d06":
     status: "completed"

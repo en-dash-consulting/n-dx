@@ -139,6 +139,14 @@ describe("llm.<vendor>.auth from the project config", () => {
     expect((await loadLLMConfig(repo)).claude?.auth).toBe("api");
   });
 
+  it("gates the legacy top-level claude.auth api too", async () => {
+    writeJson(".n-dx.json", { llm: { vendor: "claude" }, claude: { auth: "api" } });
+    expect(evaluateRepoTrust(repo).findings.find((f) => f.code === "credential-routing")?.values)
+      .toEqual(["claude.auth = api"]);
+    expect((await loadLLMConfig(repo)).claude?.auth).toBeUndefined();
+    expect((await loadClaudeConfig(repo)).auth).toBeUndefined();
+  });
+
   it("cli and auto only tighten: no finding, applied untrusted", async () => {
     writeJson(".n-dx.json", { llm: { vendor: "claude", claude: { auth: "cli" }, codex: { auth: "auto" } } });
     expect(evaluateRepoTrust(repo).state).toBe("baseline");

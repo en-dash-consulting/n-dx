@@ -867,12 +867,16 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
           ? "hench.escalation"
           : henchSource("provider");
   const providerResolution = resolveRunProvider(requestedProvider as string, vendor);
+  // `auth: api` with no key also stops the CLI loop: the vendor CLI child
+  // needs the key (resolveVendorCliEnv throws), and finding that out after the
+  // run record exists would file a config problem as a failed task.
+  const cliAuthError =
+    authDecision?.auth === "api" && authDecision.apiRefusal ? new CLIError(authDecision.apiRefusal.message) : undefined;
+  const authError = providerResolution.provider === "api" ? apiAuthError : cliAuthError;
   // Refused before the run starts: the run path and --resolve both refuse on
   // `provider.error`.
   const resolvedProvider =
-    !providerResolution.error && providerResolution.provider === "api" && apiAuthError
-      ? { ...providerResolution, error: apiAuthError }
-      : providerResolution;
+    !providerResolution.error && authError ? { ...providerResolution, error: authError } : providerResolution;
 
   // -- Permission mode -----------------------------------------------------
   const permission = resolveRunPermissionMode({
