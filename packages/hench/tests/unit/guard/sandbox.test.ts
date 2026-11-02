@@ -31,6 +31,13 @@ afterEach(() => {
   for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
+/**
+ * Seatbelt and bubblewrap exist only on macOS and Linux: these cases build their
+ * POSIX profiles from real temp paths (and hook files' exec bits), which on
+ * Windows would assert path spelling, not policy.
+ */
+const posixOnly = describe.skipIf(process.platform === "win32");
+
 describe("resolveSandboxPosture", () => {
   it("is confined when the setting is on and the backend is usable", () => {
     expect(resolveSandboxPosture("/p", { setting: on, backend: seatbelt }).posture).toEqual({
@@ -69,7 +76,7 @@ describe("formatSandboxPosture", () => {
   });
 });
 
-describe("createToolSandbox", () => {
+posixOnly("createToolSandbox", () => {
   it("returns null when off or unavailable", () => {
     expect(createToolSandbox("/p", { setting: off, backend: seatbelt })).toBeNull();
     expect(createToolSandbox("/p", { setting: on, backend: missing })).toBeNull();
@@ -209,7 +216,7 @@ describe("execRepoShellCmd", () => {
   });
 });
 
-describe("createVendorCliSandbox", () => {
+posixOnly("createVendorCliSandbox", () => {
   it("leaves Codex to its own sandbox, and respects off/unavailable", () => {
     expect(createVendorCliSandbox("/p", "codex", { cliBinary: "/bin/codex", setting: on, backend: seatbelt })).toBeNull();
     expect(createVendorCliSandbox("/p", "claude", { cliBinary: "/bin/claude", setting: off, backend: seatbelt })).toBeNull();

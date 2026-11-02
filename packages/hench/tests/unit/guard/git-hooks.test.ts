@@ -49,7 +49,14 @@ function repoWithHooks(hooks: Record<string, string>, hooksRel = ".husky"): stri
   return project;
 }
 
-describe("prepareConfinedHooks", () => {
+/**
+ * Seatbelt and bubblewrap exist only on macOS and Linux: these cases build their
+ * POSIX profiles from real temp paths (and hook files' exec bits), which on
+ * Windows would assert path spelling, not policy.
+ */
+const posixOnly = describe.skipIf(process.platform === "win32");
+
+posixOnly("prepareConfinedHooks", () => {
   it("confines nothing when the sandbox is off or unavailable", async () => {
     const project = repoWithHooks({ "pre-commit": "#!/bin/sh\nexit 0\n" });
     expect(await prepareConfinedHooks(project, { setting: off, backend: seatbelt })).toBeNull();

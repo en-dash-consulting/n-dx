@@ -27,6 +27,13 @@ const policy: SandboxPolicy = {
   readOnlyRoots: ["/Users/op/.nvm/versions/node/v22"],
 };
 
+/**
+ * The backends exist only on macOS and Linux, and these cases compare POSIX
+ * paths the builders join with the host separator; on Windows they would
+ * assert path spelling, not policy.
+ */
+const posixOnly = describe.skipIf(process.platform === "win32");
+
 describe("detectSandboxBackend", () => {
   it("picks Seatbelt on macOS when sandbox-exec exists", () => {
     expect(detectSandboxBackend("darwin", { exists: (p) => p === "/usr/bin/sandbox-exec", usable: () => true })).toEqual({ name: "seatbelt", available: true });
@@ -52,7 +59,7 @@ describe("detectSandboxBackend", () => {
   });
 });
 
-describe("buildSeatbeltProfile", () => {
+posixOnly("buildSeatbeltProfile", () => {
   const profile = buildSeatbeltProfile(policy);
 
   it("denies by default and grants the project and scratch read-write", () => {
@@ -94,7 +101,7 @@ describe("buildSeatbeltProfile", () => {
   });
 });
 
-describe("buildBwrapArgs", () => {
+posixOnly("buildBwrapArgs", () => {
   const exists = (p: string) => ["/usr", "/bin", "/lib", "/etc", "/private/tmp/proj/.hench", "/Users/op/.ssh"].includes(p);
   const args = buildBwrapArgs(policy, exists);
 
@@ -139,7 +146,7 @@ describe("wrapInSandbox", () => {
   });
 });
 
-describe("nodeToolchainRoots", () => {
+posixOnly("nodeToolchainRoots", () => {
   it("derives the install prefix from the node binary and adds known store variables", () => {
     const roots = nodeToolchainRoots({ PNPM_HOME: "/Users/op/Library/pnpm", NVM_DIR: "/Users/op/.nvm" }, "/Users/op/.nvm/versions/node/v22.1.0/bin/node");
     expect(roots).toEqual(["/Users/op/.nvm/versions/node/v22.1.0", "/Users/op/Library/pnpm", "/Users/op/.nvm"]);
@@ -187,7 +194,7 @@ describe("resolveSandboxSetting", () => {
   });
 });
 
-describe("vendor-CLI policy", () => {
+posixOnly("vendor-CLI policy", () => {
   const vendor: SandboxPolicy = {
     kind: "vendor-cli",
     projectDir: "/private/tmp/proj",
@@ -222,7 +229,7 @@ describe("vendor-CLI policy", () => {
   });
 });
 
-describe("git-hook policy", () => {
+posixOnly("git-hook policy", () => {
   const hook: SandboxPolicy = { ...policy, kind: "git-hook", readWriteRoots: ["/private/tmp/repo/.git"] };
 
   it("masks no project state, so the hook can read and rewrite the PRD it is committing", () => {
@@ -272,13 +279,6 @@ describe("git-hook policy", () => {
 function realTemp(prefix: string): string {
   return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
 }
-
-/**
- * The backends exist only on macOS and Linux, and these cases compare POSIX
- * paths the builders join with the host separator; on Windows they would
- * assert path spelling, not policy.
- */
-const posixOnly = describe.skipIf(process.platform === "win32");
 
 function denyWriteLines(profile: string): string {
   return profile.split("\n").filter((l) => l.startsWith("(deny file-write* ")).join("\n");
