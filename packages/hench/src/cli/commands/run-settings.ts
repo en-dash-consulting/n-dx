@@ -661,6 +661,9 @@ export interface TaskRunSettingsInput {
   escalation?: { model?: string };
 }
 
+/** How hard each review mode reviews: a saved mode may raise this, never lower it. */
+const REVIEW_MODE_STRENGTH: Readonly<Record<ReviewMode, number>> = { off: 0, self: 1, pair: 2 };
+
 /**
  * Every per-task setting a run uses, with the key that supplied it.
  *
@@ -675,9 +678,10 @@ export interface TaskRunSettingsInput {
  * because somebody hand-edited one field of one item's front matter.
  *
  * The execution-posture settings — `permissionMode`, `skipTestGate`,
- * `maxTurns`, `tokenBudget` — are the exception to "saved beats config": a
- * saved value is honoured only when it *tightens* what the operator's own
- * flags and config allow. The PRD is repository content, and the agent can
+ * `maxTurns`, `tokenBudget`, the spend caps, the review mode (`review`,
+ * `reviewMode`) and `reviewOptional` — are the exception to "saved beats
+ * config": a saved value is honoured only when it *tightens* what the
+ * operator's own flags and config allow. The PRD is repository content, and the agent can
  * write it through the rex MCP tools, so a block that could raise the
  * permission mode or lift a budget would be a way for a run to widen the next
  * one. A saved value that would widen is ignored with a
@@ -957,10 +961,11 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
   // precondition — dropping it with a warning beats ending the loop. The
   // caller refuses the flag case; this only decides the saved one.
   // Mode precedence: flag > the task's saved `run.reviewMode` > its saved
-  // `run.review` > `hench.review.mode`. `--review` and a saved `review: true`
-  // both mean self review; a saved `false` beats a project that reviews, which
-  // is what lets a task opt out. `reviewMode` is the finer statement of the
-  // same thing, so it wins when both are saved.
+  // `run.review` > `hench.review.mode`, except that a saved mode may only
+  // review harder than the operator's (see below). `--review` and a saved
+  // `review: true` both mean self review; a saved `false` cannot switch off a
+  // review the project runs — only `--no-review` can. `reviewMode` is the
+  // finer statement of the same thing, so it wins when both are saved.
   const configuredMode = config.review?.mode;
 
   // The pair reviewer, before any flag: a saved `reviewVendor` that is the
@@ -990,15 +995,34 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     });
   }
 
+  // The review is execution posture too: the agent can save `review: false`
+  // or `reviewMode: "off"` on the next task through rex's `edit_item`. So a
+  // flag stands either way, and otherwise the operator's mode is the floor: a
+  // saved mode is honoured when it reviews at least as hard (off < self <
+  // pair), and a saved mode that would review less is ignored with a
+  // `saved-setting-widens` warning.
   let reviewMode: Resolved<ReviewMode>;
   if (reviewOpts.reviewModeFlag) reviewMode = { value: reviewOpts.reviewModeFlag, source: "cli-flag" };
   else if (reviewOpts.reviewPass) reviewMode = { value: "self", source: "cli-flag" };
   else if (reviewOpts.noReview) reviewMode = { value: "off", source: "cli-flag" };
-  else if (saved?.reviewMode !== undefined && !savedPairError) {
-    reviewMode = { value: saved.reviewMode, source: "task.run" };
-  } else if (saved?.review !== undefined) reviewMode = { value: saved.review ? "self" : "off", source: "task.run" };
-  else if (configuredMode !== undefined) reviewMode = { value: configuredMode, source: "hench.review.mode" };
-  else reviewMode = { value: DEFAULT_REVIEW_MODE, source: "built-in" };
+  else {
+    const operatorMode: Resolved<ReviewMode> = configuredMode !== undefined
+      ? { value: configuredMode, source: "hench.review.mode" }
+      : { value: DEFAULT_REVIEW_MODE, source: "built-in" };
+    const savedMode: { key: "reviewMode" | "review"; value: ReviewMode; raw: unknown } | undefined =
+      saved?.reviewMode !== undefined && !savedPairError
+        ? { key: "reviewMode", value: saved.reviewMode, raw: saved.reviewMode }
+        : saved?.review !== undefined
+          ? { key: "review", value: saved.review ? "self" : "off", raw: saved.review }
+          : undefined;
+    if (savedMode === undefined) reviewMode = operatorMode;
+    else if (REVIEW_MODE_STRENGTH[savedMode.value] >= REVIEW_MODE_STRENGTH[operatorMode.value]) {
+      reviewMode = { value: savedMode.value, source: "task.run" };
+    } else {
+      widenWarning(savedMode.key, savedMode.raw, operatorMode);
+      reviewMode = operatorMode;
+    }
+  }
 
   // Only a flag states a precondition. A saved or configured self review is an
   // addition, so on the API provider it is dropped with a warning rather than
@@ -1077,6 +1101,21 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     };
   }
 
+  // `reviewOptional: true` lets a reviewer that cannot start pass with a
+  // warning, so it relaxes the review. A task may relax a review it added
+  // itself (its saved mode is what turned it on); a review the operator asked
+  // for is relaxed only by the operator's `--review-optional`.
+  let reviewOptional: Resolved<boolean>;
+  if (reviewOpts.reviewOptional) reviewOptional = { value: true, source: "cli-flag" };
+  else if (reviewOpts.noReview) reviewOptional = { value: false, source: "cli-flag" };
+  else if (saved?.reviewOptional === undefined) reviewOptional = { value: false, source: "built-in" };
+  else if (!saved.reviewOptional || reviewMode.source === "task.run") {
+    reviewOptional = { value: saved.reviewOptional, source: "task.run" };
+  } else {
+    reviewOptional = { value: false, source: "built-in" };
+    if (review.value) widenWarning("reviewOptional", true, { value: false, source: reviewMode.source });
+  }
+
   return {
     model,
     provider: {
@@ -1105,13 +1144,7 @@ export function resolveTaskRunSettings(input: TaskRunSettingsInput): TaskRunSett
     reviewModel,
     // `--no-review` carries the saved companion settings with it: there is no
     // reviewer left for them to relax.
-    reviewOptional: reviewOpts.reviewOptional
-      ? { value: true, source: "cli-flag" }
-      : reviewOpts.noReview
-        ? { value: false, source: "cli-flag" }
-        : saved?.reviewOptional !== undefined
-          ? { value: saved.reviewOptional, source: "task.run" }
-          : { value: false, source: "built-in" },
+    reviewOptional,
     // Resolved above: the operator's value, tightened by the saved block when
     // the saved block is tighter. Either flag outranks it; an absent flag says
     // nothing, which is why the gate pair exists rather than one flag with
