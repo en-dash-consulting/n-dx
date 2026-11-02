@@ -121,6 +121,7 @@ export { StageLinks } from "./stage-links.js";
 export type { StageLinksProps } from "./stage-links.js";
 export { SidecarDock, SidecarDrawer, SidecarButton } from "./sidecar-drawer.js";
 export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
+export { PlaceWithSidecarContext } from "./place-with-sidecar.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";
 export { SettingsOverlay } from "./settings-overlay.js";

@@ -29,8 +29,8 @@ import {
   RepoTrustStrip,
   ServerUnavailableNotice,
   SidecarDock,
+  PlaceWithSidecarContext,
 } from "./components/index.js";
-import { PlaceWithSidecarContext } from "./components/place-with-sidecar.js";
 import {
   useRouteState,
   usePageEntry,
