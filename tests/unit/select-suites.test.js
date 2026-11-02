@@ -37,30 +37,31 @@ function rootTestFiles() {
 /** A quoted or bare `*.md` path anywhere in a source: what a test mentions. */
 const MD_PATH = /(?<![\w./-])((?:[\w.-]+\/)*[\w.-]+\.md)(?![\w/-])/g;
 
-/** A docs page or directory, or the root README: what the doc groups map. */
-const DOCS_PATH = /^(?:README\.md|docs(?:\/.+)?)$/;
+/** A docs page or directory, or a root or package README: what the doc groups map. */
+const DOCS_PATH = /^(?:(?:packages\/[\w.-]+\/)?README\.md|docs(?:\/.+)?)$/;
 
 /** A page inside `path` when it is a directory a test walks; the path itself otherwise. */
 const pageIn = (path) => (path.endsWith(".md") ? path : `${path}/any-page.md`);
 
-/**
- * The docs pages and directories a test reads from the repository root,
- * root-relative and sorted. A read is `join`/`resolve` of a root anchor (a
- * `const *ROOT*` built from `import.meta` or `process.cwd()`), or of a `const`
- * built that way, with literal segments; or `new URL("<relative>",
- * import.meta.url)`. A directory that is only the base of another read (as
- * `DOCS` in `join(DOCS, "guide")`) is dropped. Comment lines are skipped; a
- * path under any other base (a temp fixture's `README.md`) is not a read.
- */
-function docsReads(source, testFile) {
-  const code = source
+const stripComments = (source) =>
+  source
     .split("\n")
     .filter((line) => !/^\s*(?:\*|\/\/|\/\*)/.test(line))
     .join("\n");
-  const SEGMENTS = String.raw`((?:\s*,\s*["'\x60][^"'\x60$]+["'\x60])+)\s*\)`;
+
+/**
+ * The root-relative paths a module's `const`s hold (`bases`) and the paths its
+ * `join`/`resolve` calls build (`calls`). A root anchor is a `const` whose name
+ * contains `ROOT` or `Root` and whose value comes from `import.meta` or
+ * `process.cwd()`; every other base is a `const` built from one. Literal
+ * segments count up to the first non-literal one, so `join(ROOT, "docs", name)`
+ * is the `docs` directory.
+ */
+function rootPaths(code) {
+  const SEGMENTS = String.raw`((?:\s*,\s*["'\x60][^"'\x60$]+["'\x60])*)(?:\s*,[^)]*)?\)`;
   const segments = (list) => [...list.matchAll(/["'`]([^"'`]+)["'`]/g)].map((m) => m[1]);
   const bases = new Map();
-  for (const [, name, init] of code.matchAll(/\bconst\s+(\w*ROOT\w*)\s*=\s*([^;\n]+)/g)) {
+  for (const [, name, init] of code.matchAll(/\bconst\s+(\w*(?:ROOT|Root|root)\w*)\s*=\s*([^;\n]+)/g)) {
     if (/import\.meta|process\.cwd\(\)/.test(init)) bases.set(name, "");
   }
   for (const [, name, base, list] of code.matchAll(
@@ -68,9 +69,39 @@ function docsReads(source, testFile) {
   )) {
     if (bases.has(base)) bases.set(name, posix.join(bases.get(base), ...segments(list)));
   }
-  const paths = new Set();
+  const calls = [];
   for (const [, base, list] of code.matchAll(new RegExp(String.raw`\b(?:join|resolve)\(\s*(\w+)` + SEGMENTS, "g"))) {
-    if (bases.has(base)) paths.add(posix.join(bases.get(base), ...segments(list)));
+    if (bases.has(base)) calls.push(posix.join(bases.get(base), ...segments(list)));
+  }
+  return { bases, calls };
+}
+
+/**
+ * The docs pages and directories (and root or package READMEs) a test reads
+ * from the repository root, root-relative and sorted. A read is a
+ * `join`/`resolve` of a root anchor or of a base built from one (see
+ * `rootPaths`), a `const` holding such a path, a path `const` the test imports
+ * by name from a relative module (as `DOC_PATH` from
+ * `scripts/build-cli-ui-gap.mjs`), or `new URL("<relative>", import.meta.url)`.
+ * A directory that is only the base of another read (as `DOCS` in
+ * `join(DOCS, "guide")`) is dropped. Comment lines are skipped; a path under
+ * any other base (a temp fixture's `README.md`) is not a read, and neither is a
+ * path built in a helper the test calls or passed through a function argument.
+ */
+function docsReads(source, testFile, readModule = (rel) => readFileSync(resolve(ROOT, rel), "utf8")) {
+  const code = stripComments(source);
+  const { bases, calls } = rootPaths(code);
+  const paths = new Set([...bases.values(), ...calls]);
+  for (const [, names, spec] of code.matchAll(/\bimport\s*\{([^}]*)\}\s*from\s*["'`](\.{1,2}\/[^"'`]+)["'`]/g)) {
+    let exported;
+    try {
+      exported = rootPaths(stripComments(readModule(posix.join(posix.dirname(testFile), spec)))).bases;
+    } catch {
+      continue;
+    }
+    for (const name of names.split(",").map((n) => n.trim().split(/\s+as\s+/)[0])) {
+      if (exported.has(name)) paths.add(exported.get(name));
+    }
   }
   for (const [, rel] of code.matchAll(/new URL\(\s*["'`]([^"'`]+)["'`]\s*,\s*import\.meta\.url\s*\)/g)) {
     paths.add(posix.normalize(posix.join(posix.dirname(testFile), rel)));
@@ -506,6 +537,9 @@ describe("validated docs pages", () => {
       expect.arrayContaining([
         { test: "tests/e2e/command-docs-parity.test.js", path: "README.md" },
         { test: "tests/e2e/command-docs-parity.test.js", path: "docs/guide/commands.md" },
+        { test: "tests/e2e/command-docs-parity.test.js", path: "packages/core/README.md" },
+        { test: "tests/e2e/assistant-parity-smoke.test.js", path: "packages/web/README.md" },
+        { test: "tests/e2e/cli-ui-gap-drift.test.js", path: "docs/cli-ui-gap.md" },
         { test: "tests/e2e/docs-skill-refs.test.js", path: "docs/guide" },
         { test: "tests/e2e/docs-command-refs.test.js", path: "docs/index.md" },
         { test: "tests/e2e/docs-command-refs.test.js", path: "docs/packages" },
@@ -533,6 +567,32 @@ describe("validated docs pages", () => {
         'readFileSync(join(ROOT, "packages/web/x.md"));',
       ].join("\n");
       expect(docsReads(source, "tests/unit/x.test.js")).toEqual(["README.md", "docs/a/b.md", "docs/guide"]);
+    });
+
+    it("sees a *root* anchor, a const read, a variable segment, package READMEs and imported path consts", () => {
+      const source = [
+        'import { DOC_PATH, other } from "../../scripts/build-x.mjs";',
+        "const repoRoot = process.cwd();",
+        'const PAGE = join(repoRoot, "docs/one.md");',
+        "readFileSync(PAGE);",
+        'for (const name of names) readFileSync(join(repoRoot, "docs", "packages", name));',
+        'readFileSync(join(repoRoot, "packages/core/README.md"));',
+      ].join("\n");
+      const modules = {
+        "scripts/build-x.mjs": [
+          'const ROOT = resolve(import.meta.dirname, "..");',
+          'export const DOC_PATH = join(ROOT, "docs/x.md");',
+          'export const other = join(ROOT, "docs/also-imported.md");',
+          'const HIDDEN = join(ROOT, "docs/hidden.md");',
+        ].join("\n"),
+      };
+      expect(docsReads(source, "tests/unit/x.test.js", (rel) => modules[rel])).toEqual([
+        "docs/also-imported.md",
+        "docs/one.md",
+        "docs/packages",
+        "docs/x.md",
+        "packages/core/README.md",
+      ]);
     });
   });
 
