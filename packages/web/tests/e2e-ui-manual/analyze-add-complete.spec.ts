@@ -17,6 +17,7 @@ import {
   startRealDashboard,
   commitAll,
   headSha,
+  workCommitsSince,
   moduleTask,
   toolDir,
   KEEP_FIXTURE,
@@ -127,7 +128,7 @@ test("full analysis, then a task added through the form, completed by the agent"
   await caption(page, "5/5 Watching the run until it completes");
   await waitForLiveTaskCompleted(page);
   expect(prdItem(project.dir, task.id).status).toBe("completed");
-  expect(headSha(project.dir)).not.toBe(baseSha);
+  expect(workCommitsSince(project.dir, baseSha), "the agent should commit work outside the n-dx tool directories").not.toEqual([]);
 
   await page.goto(`${dashboard.baseUrl}/hench-runs`, { waitUntil: "domcontentloaded" });
   await caption(page, "Done — the run is listed as completed");

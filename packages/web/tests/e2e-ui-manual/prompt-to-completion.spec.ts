@@ -16,6 +16,7 @@ import {
   startRealDashboard,
   commitAll,
   headSha,
+  workCommitsSince,
   KEEP_FIXTURE,
   type RealVendorProject,
 } from "./helpers/real-vendor-project.js";
@@ -104,7 +105,7 @@ test("a typed prompt becomes a task the agent completes", async ({ page }, testI
 
   // The PRD, the run list and git all agree.
   expect(prdItem(project.dir, startedTaskId).status).toBe("completed");
-  expect(headSha(project.dir)).not.toBe(baseSha);
+  expect(workCommitsSince(project.dir, baseSha), "the agent should commit work outside the n-dx tool directories").not.toEqual([]);
   await page.goto(`${dashboard.baseUrl}/hench-runs`, { waitUntil: "domcontentloaded" });
   await caption(page, "Done — the run is listed as completed");
   await expect(page.locator(".status-badge--completed").first()).toBeVisible({ timeout: 15_000 });
