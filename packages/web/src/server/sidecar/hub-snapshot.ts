@@ -372,6 +372,14 @@ export function buildHubSnapshot(input: HubSnapshotInput, previous?: HubSnapshot
     dropped.push(item);
     kept = items.filter((i) => !droppedSet.has(i));
   }
+  // A dropped item was not shown, so it keeps the fingerprint of when it last was (or none):
+  // the first build that shows it again then marks it Δ if it changed in between.
+  for (const item of dropped) {
+    if (item.key === null) continue;
+    const shown = previous?.fingerprints[item.key];
+    if (shown === undefined) delete fingerprints[item.key];
+    else fingerprints[item.key] = shown;
+  }
   const lines = kept.map(render);
   if (dropped.length > 0) lines.push(omissionNote(dropped));
   let text = lines.join("\n");

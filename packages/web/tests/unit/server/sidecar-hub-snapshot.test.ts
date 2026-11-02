@@ -13,6 +13,7 @@ import {
   buildHubSnapshot,
   HUB_SNAPSHOT_CAP,
   type HubSnapshotInput,
+  type HubSnapshotState,
   type ProjectReads,
   type SnapshotWorktree,
 } from "../../../src/server/sidecar/hub-snapshot.js";
@@ -253,5 +254,24 @@ describe("buildHubSnapshot", () => {
     expect(text).toContain("- feat-x: feat/x · 3 dirty");
     expect(text).toContain("- #945 feat/x");
     expect(text).not.toContain("feat/branch-number-119");
+  });
+
+  it("marks Δ on an item that changed while it was dropped for the cap, and only that item", () => {
+    const idle = (name: string, dirtyFiles = 1) =>
+      worktree({ path: `/repo/wt/${name}`, branch: `feat/${name}`, isAnchor: false, dirtyFiles, runs: { running: 0, latest: null } });
+    const build = (worktrees: SnapshotWorktree[], previous?: HubSnapshotState) =>
+      buildHubSnapshot(input({ projects: { ndx: reads({ worktrees: ok(worktrees) }) } }), previous);
+
+    const shown = build([idle("a"), idle("b")]);
+    const fillers = Array.from({ length: 300 }, (_, i) => idle(`filler-${i}`));
+    const over = build([idle("a"), ...fillers, idle("b", 4)], shown.state);
+    expect(over.text.length).toBeLessThanOrEqual(HUB_SNAPSHOT_CAP);
+    expect(over.text).not.toContain("feat/a");
+    expect(over.text).not.toContain("feat/b");
+
+    const under = build([idle("a"), idle("b", 4)], over.state);
+    expect(under.text).toMatch(/Δ [^\n]*feat\/b/);
+    expect(under.text).toContain("feat/a");
+    expect(under.text).not.toMatch(/Δ [^\n]*feat\/a/);
   });
 });
