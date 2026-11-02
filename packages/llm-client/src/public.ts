@@ -433,6 +433,8 @@ export {
   recordRepoTrust,
   clearRepoTrust,
   evaluateRepoTrust,
+  repoTrustStateOf,
+  isRestrictedState,
   formatRepoTrustReport,
   escapeTerminalControls,
   isLocalConfigTracked,

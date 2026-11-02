@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { collectRepoExecutionConfig, evaluateRepoTrust, recordRepoTrust } from "../../src/repo-trust.js";
+import { collectRepoExecutionConfig, evaluateRepoTrust, recordRepoTrust, repoTrustStateOf } from "../../src/repo-trust.js";
 
 /**
  * `web.sidecarGithubReads: true` lets the Sidecar run gh with the user's login
@@ -46,6 +46,15 @@ describe("web.sidecarGithubReads in the project config", () => {
     const before = collectRepoExecutionConfig(repo).digest;
     writeProject({ web: { sidecarGithubReads: true } });
     expect(collectRepoExecutionConfig(repo).digest).not.toBe(before);
+  });
+
+  it("reports the same state through repoTrustStateOf as the full evaluation", () => {
+    writeProject({ web: { sidecarGithubReads: false } });
+    expect(repoTrustStateOf(repo)).toBe("baseline");
+    writeProject({ web: { sidecarGithubReads: true } });
+    expect(repoTrustStateOf(repo)).toBe("untrusted");
+    recordRepoTrust(repo);
+    expect(repoTrustStateOf(repo)).toBe("trusted");
   });
 
   it("leaves the digest and state alone when false", () => {

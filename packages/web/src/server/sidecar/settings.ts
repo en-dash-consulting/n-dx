@@ -18,7 +18,7 @@
  * `auto` is refused until it exists.
  */
 
-import { evaluateRepoTrust, isLocalConfigTracked, relativeToRoot, resolveLayout } from "@n-dx/llm-client";
+import { isLocalConfigTracked, isRestrictedState, relativeToRoot, repoTrustStateOf, resolveLayout } from "@n-dx/llm-client";
 import { DEFAULT_CONTEXT_CEILINGS, type SidecarScope } from "./context-refresh.js";
 import { DEFAULT_SIDECAR_TTL_MS } from "./session-registry.js";
 import { positiveInteger, readWebValue, readWebValueWithSource, writeWebValues, type WebChange } from "./web-config.js";
@@ -79,7 +79,7 @@ function resolveGithubReads(projectDir: string): boolean {
   const found = readWebValueWithSource(projectDir, (web) => (typeof web.sidecarGithubReads === "boolean" ? web.sidecarGithubReads : undefined));
   if (!found?.value) return false;
   if (found.local && !isLocalConfigTracked(projectDir)) return true;
-  return !evaluateRepoTrust(projectDir).restricted;
+  return !isRestrictedState(repoTrustStateOf(projectDir));
 }
 
 function ceiling(web: Record<string, unknown>, scope: SidecarScope): number | undefined {

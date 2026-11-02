@@ -1400,6 +1400,16 @@ export function isRestrictedState(state: RepoTrustState): boolean {
 }
 
 /**
+ * The state {@link evaluateRepoTrust} reports, without the PRD/analysis
+ * inventory walk it also does. For callers that only gate on trust and may
+ * run per request.
+ */
+export function repoTrustStateOf(projectDir: string, options: RepoTrustStoreOptions = {}): RepoTrustState {
+  const config = collectRepoExecutionConfig(projectDir);
+  return repoTrustState(config, assessRepoExecutionConfig(config), readRepoTrustRecord(projectDir, options));
+}
+
+/**
  * Evaluate a repository against the user's trust store.
  *
  * A repository with no `warning` findings is `baseline` whatever the store

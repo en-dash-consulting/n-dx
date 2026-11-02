@@ -7,8 +7,19 @@ import { createServer, type Server } from "node:http";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { evaluateRepoTrust, recordRepoTrust } from "@n-dx/llm-client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { collectRepoInventory, evaluateRepoTrust, recordRepoTrust } from "@n-dx/llm-client";
+
+// Pass-through spies: the trust gate must not walk the PRD inventory, which
+// only evaluateRepoTrust and collectRepoInventory do.
+vi.mock("@n-dx/llm-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@n-dx/llm-client")>();
+  return {
+    ...actual,
+    evaluateRepoTrust: vi.fn(actual.evaluateRepoTrust),
+    collectRepoInventory: vi.fn(actual.collectRepoInventory),
+  };
+});
 import { handleSidecarRoute } from "../../../src/server/routes-sidecar.js";
 import { SidecarBroker } from "../../../src/server/sidecar/broker.js";
 import { DEFAULT_CONTEXT_CEILINGS, resolveContextCeiling } from "../../../src/server/sidecar/context-refresh.js";
@@ -94,6 +105,16 @@ describe("settings route", () => {
     expect(evaluateRepoTrust(root).findings.map((f) => f.code)).toContain("network-reads");
     recordRepoTrust(root);
     expect(readSidecarSettings(root).githubReads).toBe(true);
+  });
+
+  it("decides the repository's allowance without walking the PRD inventory", () => {
+    writeFileSync(config(), JSON.stringify({ web: { sidecarGithubReads: true } }));
+    recordRepoTrust(root);
+    vi.mocked(evaluateRepoTrust).mockClear();
+    vi.mocked(collectRepoInventory).mockClear();
+    expect(readSidecarSettings(root).githubReads).toBe(true);
+    expect(evaluateRepoTrust).not.toHaveBeenCalled();
+    expect(collectRepoInventory).not.toHaveBeenCalled();
   });
 
   it("lets the user's local config turn reads off over a trusted repository's allowance", () => {
