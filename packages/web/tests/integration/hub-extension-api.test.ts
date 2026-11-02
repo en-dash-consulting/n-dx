@@ -46,8 +46,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   while (hubs.length) await hubs.pop()!.close({ stopChildren: true });
-  rmSync(dir, { recursive: true, force: true });
-  rmSync(repo, { recursive: true, force: true });
+  rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  rmSync(repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 function listing(name: string, state: ExtensionListing["state"], extra: Partial<ExtensionListing> = {}): ExtensionListing {
