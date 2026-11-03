@@ -337,6 +337,34 @@ describe("FileStore", () => {
       const entries = await store.readLog();
       expect(entries).toEqual([]);
     });
+
+    it("scrubs credentials and control characters from what reaches the log", async () => {
+      // `append_log` is agent-callable, so `detail` can be whatever a tool printed.
+      const key = "sk-ant-api03-" + "A".repeat(40);
+      const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----";
+      await store.appendLog({
+        timestamp: "2024-01-01T00:00:00Z",
+        event: "tool\u001b[31m_output",
+        detail: `ANTHROPIC_API_KEY=${key}\n\u001b[2J${pem}\ttab kept`,
+      });
+
+      const raw = await readFile(join(rexDir, "execution-log.jsonl"), "utf-8");
+      expect(raw).not.toContain(key);
+      expect(raw).not.toContain("MIIEow");
+      // An escape byte survives JSON encoding as `\u001b`; it must not be there.
+      expect(raw).not.toContain("\\u001b");
+
+      const [entry] = await store.readLog();
+      expect(entry.event).toBe("tool[31m_output");
+      expect(entry.detail).toBe("ANTHROPIC_API_KEY=[redacted:token]\n[2J[redacted:private-key]\ttab kept");
+    });
+
+    it("redacts before truncating, so a long key block is not cut into a half that no rule matches", async () => {
+      const pem = `-----BEGIN RSA PRIVATE KEY-----\n${"MIIEow".repeat(600)}\n-----END RSA PRIVATE KEY-----`;
+      await store.appendLog({ timestamp: "2024-01-01T00:00:00Z", event: "test", detail: pem });
+      const [entry] = await store.readLog();
+      expect(entry.detail).toBe("[redacted:private-key]");
+    });
   });
 
   describe("workflow", () => {

@@ -10,6 +10,7 @@
  */
 
 import type { PRDItemData } from "./types.js";
+import { type ItemType, itemTypeOf } from "../../external.js";
 
 /**
  * Walk the tree to find an item by ID.
@@ -60,6 +61,14 @@ export function getAncestorIds(items: PRDItemData[], targetId: string): string[]
 
   walk(items);
   return path;
+}
+
+/** The type of `targetId`'s parent in `items`; null for a root item or an id not in the tree. */
+export function parentTypeIn(items: PRDItemData[], targetId: string): ItemType | null {
+  const ancestors = getAncestorIds(items, targetId);
+  const parentId = ancestors[ancestors.length - 1];
+  const parent = parentId ? findItemById(items, parentId) : null;
+  return parent ? itemTypeOf(parent) : null;
 }
 
 /**

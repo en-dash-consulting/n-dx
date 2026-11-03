@@ -31,7 +31,7 @@ features:
       width: 48
       height: 48
     title: Rex
-    details: PRD management — hierarchical epics/features/tasks/subtasks, LLM-powered analysis that turns codebase findings into actionable work items.
+    details: PRD management — a product layer of areas, capabilities and constraints, plus a change layer of changes, tasks and subtasks. LLM analysis turns findings into proposed changes.
     link: /packages/rex
   - icon:
       src: /hench-f.png

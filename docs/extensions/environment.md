@@ -26,10 +26,10 @@ Every extension process, command or sidecar, gets the user's own environment plu
 | `NDX_EXTENSION_NAME` | The manifest `name` |
 | `NDX_EXTENSION_STATE_DIR` | `<ndx home>/ext/<name>/`, created before the process starts. Persistent extension storage. Reserved n-dx names are listed below |
 | `NDX_EXTENSION_CONFIG` | A JSON file holding the config section ([Config](./config.md)). A command gets a file of its own, removed when it exits; a sidecar gets `sidecar-config.json` |
-| `NDX_HUB_URL` | The running hub's base URL, such as `http://localhost:3117`. Unset when no hub runs |
+| `NDX_HUB_URL` | The running hub's base URL, such as `http://127.0.0.1:3117`. Unset when no hub runs |
 | `NDX_TOKEN_FILE` | The per-user token file. Set only with `NDX_HUB_URL`, and only when the file exists |
 
-A hub sidecar also gets `PORT`, the loopback port it must listen on, and `NDX_SIDECAR_SECRET`, a random launch credential. Require the matching `X-Ndx-Sidecar-Secret` header on every HTTP request and WebSocket upgrade, including health probes. Never return the secret to a browser. Exit when the hub's stdin lifetime pipe closes.
+A hub sidecar also gets `PORT`, the loopback port it must listen on, `NDX_BASE_PATH`, the mount a browser reaches it under (`/x/<name>/`, or `/x/<name>/~<key>/` when the hub requires the per-user token; see [Hub API](./hub-api.md)), and `NDX_SIDECAR_SECRET`, a random launch credential. Require the matching `X-Ndx-Sidecar-Secret` header on every HTTP request and WebSocket upgrade, including health probes. Never return the secret to a browser. Exit when the hub's stdin lifetime pipe closes.
 
 Within `NDX_EXTENSION_STATE_DIR`, n-dx reserves `ndx-config-<pid>-*.json`, `ndx-config.json`, `sidecar-config.json`, `*.json.<pid>-<hex>.tmp`, and `logs/`. Extensions must use other names; n-dx writes and sweeps the reserved files.
 

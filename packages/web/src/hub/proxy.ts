@@ -21,9 +21,18 @@
  * first request (sidecars.ts) and forwarded with the prefix stripped. The
  * token was checked at the hub's boundary (request-guard.ts) and is removed
  * from what the sidecar receives — extension code never sees the per-user
- * credential — and `X-Ndx-Base-Path: /x/<name>/` tells the app its mount.
+ * credential — and `X-Ndx-Base-Path` tells the app its mount.
  * The bare `/x/<name>` redirects to `/x/<name>/` so the app's relative links
  * resolve under the mount.
+ *
+ * A browser cannot put a header on a page's scripts, styles and images, so
+ * with the token on, a sidecar is also mounted under a key:
+ * `/x/<name>/~<key>/…` ({@link SidecarManager.mountBase}), and that path is
+ * its own credential for that one sidecar. A navigation to `/x/<name>/…`
+ * without a credential gets {@link sidecarBootstrapPage} — the hub's page,
+ * not the extension's — which signs in, asks `POST /api/hub/mounts/<name>`
+ * for the keyed mount, and moves there. The extension's own pages are never
+ * given the session script.
  *
  * `/hub` is the exception to both: it is the hub's own, and it serves the
  * chooser whatever is registered. That matters because `/` is overloaded —
@@ -44,7 +53,6 @@ import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { Duplex } from "node:stream";
 import {
-  AUTH_COOKIE_NAME,
   AUTH_HEADER_NAME,
   HUB_ADMISSION_HEADER,
   HUB_PATH,
@@ -52,15 +60,22 @@ import {
   detectBasePath,
   formatHubAdmissionHeader,
   isHubChooserPath,
+  isLoopbackOriginOnPort,
   loopbackOrigin,
   projectIdFromBasePath,
   stripBasePath,
   stripWorkspaceSlot,
   checkRunMode,
+  splitQueryParam,
+  authRequiredPage,
+  wantsHtml,
+  injectSessionScript,
+  AUTH_HINT,
+  TICKET_QUERY_PARAM,
   removeTokenParam,
   tokensEqual,
 } from "../shared/index.js";
-import type { RunMode, RunOptions } from "../shared/index.js";
+import type { RunMode, RunOptions, CredentialStore } from "../shared/index.js";
 import type { Hub, ProjectView } from "./hub.js";
 import { buildHubOverview, fetchChildSnapshot } from "./overview.js";
 import { homedir } from "node:os";
@@ -68,6 +83,7 @@ import { HOME_EXTENSIONS_WAIT_MS, renderHomePage } from "./home.js";
 import { buildExtensionsAnswer } from "./extensions.js";
 import type { ExtensionView } from "./extensions.js";
 import { defaultParentDir } from "./new-project.js";
+import { hubRoutePath } from "./request-guard.js";
 import { SidecarManager } from "./sidecars.js";
 import type { EnsureResult } from "./sidecars.js";
 
@@ -87,14 +103,20 @@ const PREP_PATH = /^\/api\/hench\/prep\/[^/]+$/;
 /** `/x/<name>` and everything under it: an extension's sidecar. */
 const SIDECAR_PATH_PREFIX = "/x/";
 const SIDECAR_PATH = /^\/x\/([^/]*)(\/.*)?$/;
+/** The mount-key segment right after `/x/<name>`: `/~<key>` and the rest of the path. */
+const MOUNT_KEY_SEGMENT = /^\/~([A-Za-z0-9_-]{16,})(\/.*)?$/;
 /** Tells a sidecar the mount it is served under, trailing slash included, so it can build links. */
 export const SIDECAR_BASE_PATH_HEADER = "x-ndx-base-path";
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
   | { kind: "proxy"; project: ProjectView; path: string; prefix: string }
-  /** An extension sidecar, started on demand by the hub's {@link SidecarManager}. */
-  | { kind: "sidecar"; name: string; path: string; prefix: string }
+  /**
+   * An extension sidecar, started on demand by the hub's {@link SidecarManager}.
+   * `mountKey` is the key the path carried (`/x/<name>/~<key>/…`), not yet
+   * checked; {@link mountKeyAdmits} checks it.
+   */
+  | { kind: "sidecar"; name: string; path: string; prefix: string; mountKey?: string }
   /** The bare `/x/<name>`: the mount with its trailing slash. */
   | { kind: "redirect"; location: string }
   | { kind: "json"; status: number; body: unknown }
@@ -127,6 +149,12 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
     const sidecarQuery = withoutTokenParam(query);
     if (!SidecarManager.isName(name)) {
       return { kind: "json", status: 404, body: { error: `No extension sidecar is named "${name}"`, reason: "none" } };
+    }
+    const keyed = sidecar[2] === undefined ? null : MOUNT_KEY_SEGMENT.exec(sidecar[2]);
+    if (keyed) {
+      const mount = `${SIDECAR_PATH_PREFIX}${name}/~${keyed[1]}`;
+      if (keyed[2] === undefined && !upgrade) return { kind: "redirect", location: `${mount}/${sidecarQuery}` };
+      return { kind: "sidecar", name, path: (keyed[2] || "/") + sidecarQuery, prefix: mount, mountKey: keyed[1] };
     }
     // A WebSocket has no page to resolve relative links in, so it is served as "/".
     if (sidecar[2] === undefined && !upgrade) {
@@ -308,8 +336,22 @@ async function handleReloadSignal(req: IncomingMessage, res: ServerResponse, hub
     writeJson(res, 503, { error: `Project "${project.id}" has no running server`, status: project.status });
     return true;
   }
-  proxyHttp(req, res, project.port, RELOAD_PATH, "", body);
+  proxyHttp(req, res, project.port, RELOAD_PATH, "", body, upstreamAuth(hub));
   return true;
+}
+
+/**
+ * The Origin to forward to the child on `childPort`: this hub's own origin
+ * (loopback on `hubPort`) becomes the child's, anything else passes unchanged
+ * so the child can still tell a foreign page from the dashboard.
+ */
+export function forwardedOrigin(origin: string | undefined, hubPort: number | undefined, childPort: number): string | undefined {
+  if (origin === undefined) return undefined;
+  return isLoopbackOriginOnPort(origin, hubPort) ? loopbackOrigin(childPort) : origin;
+}
+
+function restateOrigin(origin: string | string[] | number | undefined, req: IncomingMessage, port: number): string | undefined {
+  return forwardedOrigin(origin === undefined ? undefined : String(origin), req.socket?.localPort, port);
 }
 
 /**
@@ -323,6 +365,8 @@ export interface SidecarForward {
   basePath: string;
   /** The hub's token; an `Authorization: Bearer` carrying it is dropped. */
   token: string | null;
+  /** Browser sessions belong to the hub and must not reach extension code. */
+  credentials?: CredentialStore | null;
 }
 
 /**
@@ -337,12 +381,12 @@ export function sidecarHeaderValue(lowerName: string, value: string, forward: Si
     const kept = value
       .split(";")
       .map((part) => part.trim())
-      .filter((part) => part && part.split("=", 1)[0].trim() !== AUTH_COOKIE_NAME);
+      .filter((part) => part && !["ndx_session", "ndx_token"].includes(part.split("=", 1)[0].trim()));
     return kept.length > 0 ? kept.join("; ") : null;
   }
-  if (lowerName === "authorization" && forward.token) {
+  if (lowerName === "authorization") {
     const bearer = /^Bearer\s+(\S+)\s*$/i.exec(value);
-    if (bearer && tokensEqual(bearer[1], forward.token)) return null;
+    if (bearer && ((forward.token !== null && tokensEqual(bearer[1], forward.token)) || forward.credentials?.isSession(bearer[1]))) return null;
   }
   return value;
 }
@@ -367,6 +411,14 @@ export function proxyHttp(
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
   // Only the hub states its admission state; a client's copy never reaches the child.
   delete headers[HUB_ADMISSION_HEADER];
+  if (!sidecar) {
+  // The hub judged the client's credential already. A browser session is the
+  // hub's, and means nothing to the child, so it never travels; an
+  // authenticated request goes on with the per-user token instead (passed in
+  // `extraHeaders` by the caller, see upstreamAuth), a public one with none.
+  delete headers.authorization;
+  delete headers["x-ndx-token"];
+  }
   if (sidecar) {
     for (const [name, value] of Object.entries(headers)) {
       if (typeof value !== "string") continue;
@@ -381,12 +433,14 @@ export function proxyHttp(
   if (prefix) headers[FORWARDED_PREFIX_HEADER] = prefix;
   // The browser's Origin names the HUB's port, and the child compares Origin
   // against its own ephemeral one — so a verbatim forward made the child read
-  // every dashboard mutation as cross-origin and answer 403. The origin has
-  // already been judged at the hub's boundary (request-guard.ts), so what
-  // reaches here is either trusted or absent; restate a trusted one as the
-  // child's own origin, which is what it is once the proxy hop is accounted
-  // for. Absent stays absent: a CLI request must not acquire one here.
-  if (headers.origin !== undefined) headers.origin = loopbackOrigin(port);
+  // every dashboard mutation as cross-origin and answer 403. A trusted origin
+  // (this hub's own) is restated as the child's, which is what it is once the
+  // proxy hop is accounted for. Any other origin is forwarded unchanged: the
+  // hub's gate lets a foreign origin through on safe methods, and a child
+  // route that judges its own GETs must still see it. Absent stays absent: a
+  // CLI request must not acquire one here.
+  headers.origin = restateOrigin(headers.origin, req, port);
+  if (headers.origin === undefined) delete headers.origin;
   if (body) {
     headers["content-length"] = String(body.length);
     delete headers["transfer-encoding"];
@@ -431,8 +485,10 @@ export function proxyUpgrade(
   port: number,
   path: string,
   prefix: string,
-  sidecar?: SidecarForward,
+  credential: string | SidecarForward | null = null,
 ): void {
+  const sidecar = credential && typeof credential === "object" ? credential : undefined;
+  const upstreamToken = typeof credential === "string" ? credential : null;
   const upstream = connect(port, UPSTREAM_HOST);
 
   const fail = (): void => {
@@ -452,16 +508,20 @@ export function proxyUpgrade(
       const lower = name.toLowerCase();
       if (lower === "host") {
         lines.push(`Host: ${UPSTREAM_HOST}:${port}`);
+      } else if (!sidecar && (lower === "authorization" || lower === "x-ndx-token")) {
+        // Judged by the hub already (upgradeRefusal); restated below.
+        continue;
       } else if (lower === "origin") {
-        // Same restatement as proxyHttp: the child's origin check is against
-        // its own port, and the handshake carries no preflight to fall back on.
-        lines.push(`Origin: ${loopbackOrigin(port)}`);
+        // Same rule as proxyHttp: a trusted origin is restated as the child's
+        // own, an untrusted one is forwarded as it came.
+        lines.push(`Origin: ${restateOrigin(value, req, port) ?? value}`);
       } else {
         const kept = sidecar ? sidecarHeaderValue(lower, value, sidecar) : value;
         if (kept !== null) lines.push(`${name}: ${kept}`);
       }
     }
     if (prefix) lines.push(`X-Forwarded-Prefix: ${prefix}`);
+    if (upstreamToken) lines.push(`X-Ndx-Token: ${upstreamToken}`);
     if (sidecar) {
       lines.push(`X-Ndx-Base-Path: ${sidecar.basePath}`);
       if (sidecar.secret) lines.push(`X-Ndx-Sidecar-Secret: ${sidecar.secret}`);
@@ -476,6 +536,111 @@ export function proxyUpgrade(
   socket.once("error", () => upstream.destroy());
   socket.once("close", () => upstream.destroy());
   upstream.once("close", () => socket.destroy());
+}
+
+/** The credential an authenticated request carries on to a project server: the per-user token. */
+function upstreamAuth(hub: Hub): OutgoingHttpHeaders {
+  return hub.token ? { "x-ndx-token": hub.token } : {};
+}
+
+/**
+ * Whether `url` addresses a sidecar under its valid mount key — the
+ * credential a browser's subresource requests to that sidecar carry. The gate
+ * (request-guard.ts) admits such a request, of any method and on an upgrade,
+ * for that sidecar alone.
+ */
+export function mountKeyAdmits(hub: Pick<Hub, "sidecars">, url: string): boolean {
+  const pathname = url.split("?")[0];
+  const sidecar = SIDECAR_PATH.exec(pathname);
+  if (!sidecar || sidecar[2] === undefined) return false;
+  const keyed = MOUNT_KEY_SEGMENT.exec(sidecar[2]);
+  return keyed !== null && hub.sidecars.isMountKey(sidecar[1], keyed[1]);
+}
+
+/**
+ * The hub's page for a navigation to `/x/<name>/…` that carries no
+ * credential: sign in (the session script, from this tab or another signed-in
+ * one), ask for the keyed mount, and move there with the rest of the path.
+ * A page of the hub's own, so the session script on it hands nothing to the
+ * extension; the extension's pages are served without it. No backslash in
+ * the script: it is a template literal, which would eat it.
+ */
+export function sidecarBootstrapPage(name: string): string {
+  return injectSessionScript(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>n-dx extension</title></head>
+<body><p id="ndx-status" style="font:15px system-ui,sans-serif;margin:2rem">Signing in…</p>
+<script>
+(function () {
+  var auth = window.ndxAuth;
+  if (!auth) return;
+  var name = ${JSON.stringify(name)};
+  function say(text) { var el = document.getElementById("ndx-status"); if (el) el.textContent = text; }
+  auth.ready.then(function (state) {
+    if (!state.ok) return;
+    return fetch("/api/hub/mounts/" + encodeURIComponent(name), { method: "POST", cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) { say("This extension cannot be opened (HTTP " + res.status + ")."); return null; }
+        return res.json();
+      })
+      .then(function (body) {
+        if (!body || typeof body.path !== "string") return;
+        var prefix = "/x/" + name + "/";
+        var rest = location.pathname.indexOf(prefix) === 0 ? location.pathname.slice(prefix.length) : "";
+        if (rest.charAt(0) === "~") { var cut = rest.indexOf("/"); rest = cut === -1 ? "" : rest.slice(cut + 1); }
+        location.replace(body.path + rest + location.search + location.hash);
+      });
+  });
+})();
+</script></body></html>`);
+}
+
+function refusePublic(req: IncomingMessage, res: ServerResponse): void {
+  const html = wantsHtml(req.headers);
+  res.writeHead(401, {
+    "Content-Type": html ? "text/html; charset=utf-8" : "application/json",
+    "Cache-Control": "no-store",
+    "WWW-Authenticate": 'Bearer realm="n-dx"',
+  });
+  res.end(html ? authRequiredPage() : JSON.stringify({ error: "Authentication required", hint: AUTH_HINT }));
+}
+
+/**
+ * A request the gate passed without a credential (a GET or HEAD). The hub's
+ * own API, and any answer that names projects, needs a credential; the home
+ * page is sent as a shell whose script signs in and then loads the cards; a
+ * project path is proxied with no credential at all, so the project server
+ * answers it with its own public shell or a 401.
+ */
+export async function handlePublicHubRequest(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<void> {
+  const path = hubRoutePath(req.url || "/");
+  if (path === "/api/hub" || path.startsWith("/api/hub/")) {
+    refusePublic(req, res);
+    return;
+  }
+  const decision = decideProxy(hub, req.url || "/");
+  if (decision.kind === "proxy") {
+    proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix);
+    return;
+  }
+  // A page navigation to an extension: the hub's sign-in page, which moves
+  // on to the keyed mount. Anything else under `/x/` needs a credential.
+  const sidecarName = SIDECAR_PATH.exec(path)?.[1];
+  if (
+    sidecarName !== undefined
+    && SidecarManager.isName(sidecarName)
+    && (decision.kind === "sidecar" || decision.kind === "redirect")
+    && wantsHtml(req.headers)
+  ) {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+    res.end(req.method === "HEAD" ? undefined : sidecarBootstrapPage(sidecarName));
+    return;
+  }
+  if (decision.kind === "home") {
+    const html = renderHomePage({ projects: [], generatedAt: new Date().toISOString() }, "", [], { deferred: true });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+    res.end(html);
+    return;
+  }
+  refusePublic(req, res);
 }
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
@@ -511,7 +676,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       return;
     case "proxy":
       if (await handleExecuteAdmission(req, res, hub, decision)) return;
-      proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, undefined, await admissionHeadersFor(req, hub, decision));
+      proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, undefined, { ...upstreamAuth(hub), ...(await admissionHeadersFor(req, hub, decision)) });
       return;
     case "html":
       res.writeHead(decision.status, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
@@ -669,7 +834,7 @@ async function handleExecuteAdmission(
   // server's 400 into a run silently dropped minutes later, when its turn came
   // — or, worse for a mode, into a run that starts and does less than it said.
   if (!taskId || !optionsValid) {
-    proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
+    proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body, upstreamAuth(hub));
     return true;
   }
 
@@ -686,7 +851,7 @@ async function handleExecuteAdmission(
     ...(iterations !== undefined ? { iterations } : {}),
   });
   if (result.admitted) {
-    proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body);
+    proxyHttp(req, res, decision.project.port!, decision.path, decision.prefix, body, upstreamAuth(hub));
     return true;
   }
   // The server would refuse it when its turn came: say so now, in its words.
@@ -715,7 +880,10 @@ async function handleExecuteAdmission(
 }
 
 function sidecarForward(hub: Hub, decision: Extract<ProxyDecision, { kind: "sidecar" }>): SidecarForward {
-  return { basePath: `${decision.prefix}/`, token: hub.token, secret: hub.sidecars.secret(decision.name) ?? "" };
+  // The keyed mount whenever there is one, whichever address this request
+  // used: links the app builds from it must work in a browser, which has
+  // nothing else to authenticate a stylesheet or an image with.
+  return { basePath: hub.sidecars.mountBase(decision.name), token: hub.token, credentials: hub.credentials, secret: hub.sidecars.secret(decision.name) ?? "" };
 }
 
 /** The JSON a refused `/x/<name>/` answers with: the message, core's reason, and the log file when there is one. */
@@ -767,7 +935,9 @@ export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: B
     return;
   }
   if (decision.kind === "proxy") {
-    proxyUpgrade(req, socket, head, decision.project.port!, decision.path, decision.prefix);
+    // The ticket was spent by upgradeRefusal; the child gets the token instead.
+    const path = splitQueryParam(decision.path, TICKET_QUERY_PARAM).url;
+    proxyUpgrade(req, socket, head, decision.project.port!, path, decision.prefix, hub.token);
     return;
   }
   const status = decision.kind === "json" ? decision.status : 404;

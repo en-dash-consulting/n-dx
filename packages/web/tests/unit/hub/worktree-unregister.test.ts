@@ -30,7 +30,6 @@ function record(id: string, worktrees: string[]): ProjectRecord {
     name: id,
     repoRoot: worktrees[0],
     worktrees,
-    ndxBin: "/nonexistent/ndx",
     port: null,
     pid: null,
     lastSeen: null,

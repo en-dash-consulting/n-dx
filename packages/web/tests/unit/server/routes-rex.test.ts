@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm, unlink } from "node:fs/promises";
 import { readFileSync } from "node:fs";
@@ -116,6 +117,26 @@ describe("Rex API routes", () => {
   afterEach(async () => {
     await closeRouteTestServer(server);
     await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("refuses bulk prune and reshape accepts on a feature branch while previews remain readable", async () => {
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: tmpDir });
+    execFileSync("git", ["checkout", "-b", "feature/bulk-guard"], { cwd: tmpDir });
+    for (const route of ["prune", "reorganize/apply"]) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/${route}`, { method: "POST", body: "{}" });
+      expect(res.status).toBe(409);
+      const { error } = await res.json();
+      expect(error).toContain("feature/bulk-guard");
+      // No dashboard opt-in exists, so the refusal says so rather than
+      // pointing at a flag the dashboard cannot pass.
+      expect(error).toContain("The dashboard cannot override this");
+    }
+    for (const route of ["prune/preview", "reorganize?mode=fast"]) {
+      const res = await fetch(`http://127.0.0.1:${port}/api/rex/${route}`);
+      expect(res.status).toBe(200);
+    }
+    expect((await readPRDFromStore(rexDir)).items).toHaveLength(1);
   });
 
   it("GET /api/rex/prd returns full PRD document", async () => {

@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, realpathSync, utimesSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import type { ServerContext } from "../../src/server/types.js";
@@ -32,6 +32,7 @@ import { setAvailableMemoryReaderForTests } from "../../src/server/routes-hench.
 import { HUB_ADMISSION_HEADER, formatHubAdmissionHeader } from "../../src/shared/index.js";
 import { startRouteTestServer, type RouteTestServer } from "../helpers/server-route-test-support.js";
 import { removeTempDir } from "../helpers/temp-dir.js";
+import { resolveStore, loadPrdModel } from "../../src/server/rex-gateway.js";
 
 const MINUTE = 60_000;
 const GIB = 1024 ** 3;
@@ -294,6 +295,35 @@ describe("GET /api/live", () => {
     expect(live.counts.servedStale).toBe(status.hench.staleRuns);
     expect(live.counts.servedRunning).toBe(status.hench.activeRuns);
     expect(live.counts.stale).toBe(1);
+  });
+});
+
+describe("v2 next work", () => {
+  it("uses v2 selection on the fixture, excluding the Inbox and ordering by change priority", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ndx-live-v2-"));
+    try {
+      const rexDir = join(root, ".rex");
+      cpSync(join(import.meta.dirname, "../../../rex/tests/fixtures/v2-tree"), rexDir, { recursive: true });
+      const store = await resolveStore(rexDir);
+      const doc = await store.loadDocument();
+      const pending = (id: string, title: string, priority: string, needsPlacement = false) => ({ id, title, type: "change", level: "epic", status: "pending", priority, needsPlacement });
+      doc.items.push(
+        pending("low", "Low priority", "low") as never,
+        pending("inbox", "Do it (Inbox)", "critical", true) as never,
+        pending("high", "High priority", "high") as never,
+      );
+      mkdirSync(join(rexDir, ".cache"));
+      writeFileSync(join(rexDir, ".cache/prd.json"), JSON.stringify({ ...doc, product: (await loadPrdModel(rexDir)).tree.product }));
+      clearLiveCaches();
+      const live = buildLiveSnapshot(ctxFor(root), { listWorkspaces: () => [], memoryFloorBytes: () => null });
+      const ids = live.queue.next.map((item) => item.id);
+      expect(ids).not.toContain("inbox");
+      expect(ids).toContain("high");
+      expect(ids.indexOf("high")).toBeLessThan(ids.indexOf("low"));
+    } finally {
+      clearLiveCaches();
+      await removeTempDir(root);
+    }
   });
 });
 

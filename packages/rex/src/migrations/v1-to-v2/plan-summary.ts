@@ -104,6 +104,9 @@ export function renderPlanSummary(plan: V1ToV2Plan): string {
     const warn = offHistory ? " — **not an ancestor of HEAD**" : "";
     lines.push(`- Code evidence: ${items} item(s), ${when}${at}${warn}`);
   }
+  if (summary.commitEvidence) {
+    lines.push(`- Commit evidence: ${summary.commitEvidence.items} item(s), from N-DX-Item trailers and hench runs`);
+  }
   lines.push("");
 
   const incomplete = header.passes.filter((p) => p.incomplete);
@@ -182,6 +185,24 @@ export function renderPlanSummary(plan: V1ToV2Plan): string {
           ];
           return [`\`${q.id}\``, cell(titles.get(q.id)), cell(why.join("; "))];
         }),
+      ),
+      "",
+    );
+  }
+
+  const dependents = entries.filter((e) => (e.dependsOn?.length ?? 0) > 0);
+  if (dependents.length > 0) {
+    lines.push("## Proposed dependsOn", "");
+    lines.push(
+      `${summary.proposedDependsOn ?? 0} proposal(s), for review: apply does not write them. Each capability depends on an earlier one it shares a linked test file with.`,
+      "",
+    );
+    lines.push(
+      ...table(
+        ["Capability", "Depends on", "Shared tests"],
+        dependents.flatMap((e) =>
+          e.dependsOn!.map((d) => [`${cell(e.title)} \`${e.id}\``, `${cell(titles.get(d.capability))} \`${d.capability}\``, cell(d.tests.join(", "))]),
+        ),
       ),
       "",
     );

@@ -64,7 +64,7 @@ Display full details of a specific run including tool calls, token usage, and ou
 {
   "schema": "hench/v1",
   "provider": "cli",
-  "maxTurns": 50,
+  "maxTurns": 200,
   "maxTokens": 8192,
   "rexDir": ".rex"
 }
@@ -74,7 +74,7 @@ Display full details of a specific run including tool calls, token usage, and ou
 |-------|---------|-------------|
 | `provider` | `"cli"` | `"cli"` (Claude CLI) or `"api"` (Anthropic SDK) |
 | `model` | — | Model override (omit to use provider default) |
-| `maxTurns` | `50` | Maximum agent turns per run |
+| `maxTurns` | `200` | Maximum agent turns per run |
 | `maxTokens` | `8192` | Max tokens per turn |
 | `rexDir` | `".rex"` | Path to Rex directory |
 | `apiKeyEnv` | `"ANTHROPIC_API_KEY"` | Env var for API key (api provider only) |

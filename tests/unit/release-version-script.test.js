@@ -26,7 +26,10 @@ describe("version-packages", () => {
   it("runs in a full-history checkout", () => {
     // A Windows checkout may carry CRLF; release.yml has no eol pin.
     const workflow = readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf-8").replace(/\r\n/g, "\n");
-    const checkout = workflow.match(/^ {6}- name: Checkout\n((?: {8}.*\n|\s*\n)*)/m);
+    // Validation has its own checkout; the publisher is the one stamping releases.
+    const publisher = workflow.split(/^  release:\s*$/m)[1]?.split(/^  [\w-]+:\s*$/m)[0];
+    expect(publisher).toBeDefined();
+    const checkout = publisher.match(/^ {6}- name: Checkout\n((?: {8}.*\n|\s*\n)*)/m);
     expect(checkout).not.toBeNull();
     expect(checkout[1]).toMatch(/^ {8}uses: actions\/checkout@/m);
     expect(checkout[1]).toMatch(/^ {8}with:\n(?: {10}#.*\n)* {10}fetch-depth: 0\s*$/m);

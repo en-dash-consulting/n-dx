@@ -107,7 +107,7 @@ Run this procedure before any release that touches dashboard UI components.
 
 1. Install NVDA (Windows) or use built-in VoiceOver (macOS/iOS).
 2. Start the n-dx dashboard: `ndx start .`
-3. Open `http://localhost:3117` in the target browser.
+3. Open `http://127.0.0.1:3117` in the target browser.
 
 ### Checklist
 

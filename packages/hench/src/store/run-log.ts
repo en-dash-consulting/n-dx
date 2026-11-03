@@ -63,7 +63,8 @@ export function runLogPath(projectDir: string, runId: string, startedAt: string)
  */
 async function prepareLogDir(projectDir: string): Promise<void> {
   const dir = join(projectDir, LOG_DIR_NAME);
-  await mkdir(dir, { recursive: true });
+  // Owner-only: a run log is the agent's whole terminal output.
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   try {
     await writeFile(join(dir, ".gitignore"), "*\n", { encoding: "utf-8", flag: "wx" });
   } catch (error) {
@@ -97,7 +98,7 @@ export async function persistRunLog(
   const redactor = createLineRedactor();
   const scrubbed = [...lines.flatMap((line) => redactor.push(line)), ...redactor.flush()];
   const content = scrubbed.length > 0 ? scrubbed.join("\n") + "\n" : "";
-  await writeFile(logPath, content, "utf-8");
+  await writeFile(logPath, content, { encoding: "utf-8", mode: 0o600 });
 
   return logPath;
 }
@@ -163,7 +164,7 @@ export async function openRunLog(
   // open() first, so an unwritable path rejects here — where the caller can
   // still decide what to do — rather than as an async 'error' event later.
   // Closing the stream closes the handle.
-  const handle = await open(path, "w");
+  const handle = await open(path, "w", 0o600);
   const stream: WriteStream = handle.createWriteStream({ encoding: "utf-8" });
 
   let failure: Error | null = null;

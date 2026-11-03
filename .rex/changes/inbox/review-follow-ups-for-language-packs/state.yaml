@@ -13,11 +13,21 @@ items:
     lastModified: "2026-10-12T03:00:18.506Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "278055d7-6995-4a91-8995-51d43aa7e4e6":
-    lastModified: "2026-10-16T17:18:07.619Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:31:03.714Z"
+    completedAt: "2026-10-29T22:51:54.216Z"
+    endedAt: "2026-10-29T22:51:54.216Z"
+    activeIntervals: [{"end":"2026-10-29T22:51:54.216Z","start":"2026-10-29T18:31:03.714Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Four regressions fail before the fix; all138 Python tests pass with fixture goldens unchanged. Seven pinned corpus repositories (25,337 files) compared; documented Django740→725 routes and NetBox147→146 DRF notices, other results unchanged. See docs/analysis/python-framework-scope-2026-10-29.md. Task2d8ed30f stays in progress for its incompatible byte-identical-corpus criterion."
+    lastModified: "2026-10-29T22:51:54.216Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "2d8ed30f-928b-48a9-8a13-5e0b20baf11a":
-    lastModified: "2026-10-17T08:53:35.743Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "in_progress"
+    startedAt: "2026-10-29T18:31:16.219Z"
+    activeIntervals: [{"start":"2026-10-29T18:31:16.219Z"}]
+    lastModified: "2026-10-29T18:31:16.799Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "2d9f8f9b-75d3-4920-8dba-bf091950f6f8":
     lastModified: "2026-10-17T08:11:40.387Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
@@ -34,8 +44,15 @@ items:
     lastModified: "2026-10-17T07:40:54.572Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "452790b2-6514-426b-99f9-9ba9a45326e9":
-    lastModified: "2026-10-17T07:47:22.074Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:31:22.536Z"
+    completedAt: "2026-10-29T22:52:06.510Z"
+    endedAt: "2026-10-29T22:52:06.510Z"
+    activeIntervals: [{"end":"2026-10-29T22:52:06.510Z","start":"2026-10-29T18:31:22.536Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Four regressions fail before the fix; all138 Python tests pass with fixture goldens unchanged. Seven pinned corpus repositories (25,337 files) compared; documented Django740→725 routes and NetBox147→146 DRF notices, other results unchanged. See docs/analysis/python-framework-scope-2026-10-29.md. Task2d8ed30f stays in progress for its incompatible byte-identical-corpus criterion."
+    lastModified: "2026-10-29T22:52:06.510Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "468a2c2f-ab25-48a3-9d75-a85fe22ce178":
     status: "completed"
     startedAt: "2026-10-12T03:24:13.613Z"
@@ -68,8 +85,15 @@ items:
     lastModified: "2026-10-12T03:39:41.850Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "53d7c570-7aca-49b9-b265-a2228a6dc894":
-    lastModified: "2026-10-12T02:10:30.122Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:29:19.335Z"
+    completedAt: "2026-10-29T18:29:36.744Z"
+    endedAt: "2026-10-29T18:29:36.744Z"
+    activeIntervals: [{"end":"2026-10-29T18:29:36.744Z","start":"2026-10-29T18:29:19.335Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Go and SQL grammar-pin tests check the declared version and every version-bearing provenance entry against GRAMMARS. Both pin suites pass (4 tests)."
+    lastModified: "2026-10-29T18:29:36.744Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "5ab436bd-5f7b-4973-a6cf-e5dd221ba8fc":
     status: "completed"
     startedAt: "2026-10-16T16:47:33.158Z"
@@ -80,8 +104,15 @@ items:
     lastModified: "2026-10-16T16:53:09.327Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5b2ea100-4790-4834-9309-9e3d3f221f44":
-    lastModified: "2026-10-16T17:18:15.606Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:31:09.960Z"
+    completedAt: "2026-10-29T22:51:59.967Z"
+    endedAt: "2026-10-29T22:51:59.967Z"
+    activeIntervals: [{"end":"2026-10-29T22:51:59.967Z","start":"2026-10-29T18:31:09.960Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Four regressions fail before the fix; all138 Python tests pass with fixture goldens unchanged. Seven pinned corpus repositories (25,337 files) compared; documented Django740→725 routes and NetBox147→146 DRF notices, other results unchanged. See docs/analysis/python-framework-scope-2026-10-29.md. Task2d8ed30f stays in progress for its incompatible byte-identical-corpus criterion."
+    lastModified: "2026-10-29T22:51:59.967Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "69ec8bf2-b1c6-480d-8060-df5a3bc680ba":
     status: "completed"
     startedAt: "2026-10-12T02:02:07.613Z"
@@ -107,8 +138,15 @@ items:
     lastModified: "2026-10-16T04:09:47.146Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82784841-557f-4bc6-bde9-c17cd0f35bbd":
-    lastModified: "2026-10-17T10:38:04.139Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T22:50:18.223Z"
+    completedAt: "2026-10-29T22:51:15.333Z"
+    endedAt: "2026-10-29T22:51:15.333Z"
+    activeIntervals: [{"end":"2026-10-29T22:51:15.333Z","start":"2026-10-29T22:50:18.223Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "A root test compares every published package name and license to the Included components table, rejects extra rows, and runs on metadata and scope-document changes."
+    lastModified: "2026-10-29T22:51:15.333Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "92a4e1ed-adff-4386-8bf2-a0737945f204":
     status: "completed"
     startedAt: "2026-10-16T16:42:17.010Z"
@@ -132,8 +170,15 @@ items:
     lastModified: "2026-10-16T03:30:52.687Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9b692c8a-208f-4676-952e-1674631a3a4c":
-    lastModified: "2026-10-08T06:48:15.306Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:39:28.096Z"
+    completedAt: "2026-10-29T18:55:29.501Z"
+    endedAt: "2026-10-29T18:55:29.501Z"
+    activeIntervals: [{"end":"2026-10-29T18:55:29.501Z","start":"2026-10-29T18:39:28.096Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rex uses the lang-kit Go module parser; versioned workspace replacements compare against the originally required version. Regression and existing Go scanner/resolver tests pass."
+    lastModified: "2026-10-29T18:55:29.501Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "a1e02321-b162-4fc0-bd5b-b7bdcbacacf4":
     status: "completed"
     startedAt: "2026-10-12T02:09:29.092Z"
@@ -147,8 +192,15 @@ items:
     lastModified: "2026-10-08T05:43:26.020Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "beb90979-827d-40a1-80ac-a9b82edeca09":
-    lastModified: "2026-10-11T07:17:22.036Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:18:55.450Z"
+    completedAt: "2026-10-29T18:28:45.983Z"
+    endedAt: "2026-10-29T18:28:45.983Z"
+    activeIntervals: [{"end":"2026-10-29T18:28:45.983Z","start":"2026-10-29T18:18:55.450Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "The agreement test derives every configured filename and its uppercase variant. Baseline 51 tests and updated 53 tests pass; required startup tests pass (14)."
+    lastModified: "2026-10-29T18:28:45.983Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "bfc8e82b-0f2c-4731-911e-1f5cdc9c5474":
     status: "completed"
     startedAt: "2026-10-16T02:49:31.772Z"
@@ -178,8 +230,15 @@ items:
     lastModified: "2026-10-08T07:09:51.367Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e45ebbf3-0d40-4bf2-b34d-19c7161c0ea7":
-    lastModified: "2026-10-08T06:40:18.908Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    status: "completed"
+    startedAt: "2026-10-29T18:39:33.731Z"
+    completedAt: "2026-10-29T18:55:46.438Z"
+    endedAt: "2026-10-29T18:55:46.438Z"
+    activeIntervals: [{"end":"2026-10-29T18:55:46.438Z","start":"2026-10-29T18:39:33.731Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Rex uses the lang-kit Go module parser; versioned workspace replacements compare against the originally required version. Regression and existing Go scanner/resolver tests pass."
+    lastModified: "2026-10-29T18:55:46.438Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "e894d040-e93a-4d12-9f56-1a48e6af22eb":
     lastModified: "2026-10-17T07:21:02.089Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

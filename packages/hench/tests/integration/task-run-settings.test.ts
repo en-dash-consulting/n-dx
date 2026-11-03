@@ -177,22 +177,24 @@ describe("precedence: CLI flag > task run > hench.* > llm.* > default", () => {
     expect(r.model).toMatchObject({ value: TIER_MODELS.claude.light, source: "hench.models.claude" });
   });
 
-  it("carries provider, permission mode, budgets and gates off the saved block", () => {
+  it("carries provider, permission mode, budgets and gates off the saved block when they tighten", () => {
     const r = resolveFor({
+      config: { skipFullTestGate: true },
       item: task({
         provider: "api",
-        permissionMode: "bypassPermissions",
+        permissionMode: "default",
         maxTurns: 7,
         tokenBudget: 1234,
-        skipTestGate: true,
+        skipTestGate: false,
       }),
     });
 
     expect(r.provider).toMatchObject({ value: "api", source: "task.run" });
-    expect(r.permissionMode).toMatchObject({ value: "bypassPermissions", source: "task.run" });
+    expect(r.permissionMode).toMatchObject({ value: "default", source: "task.run" });
     expect(r.maxTurns).toEqual({ value: 7, source: "task.run" });
     expect(r.tokenBudget).toEqual({ value: 1234, source: "task.run" });
-    expect(r.skipTestGate).toEqual({ value: true, source: "task.run" });
+    expect(r.skipTestGate).toEqual({ value: false, source: "task.run" });
+    expect(r.warnings).toEqual([]);
   });
 
   it("lets a CLI flag outrank each of them", () => {
@@ -254,6 +256,128 @@ describe("precedence: CLI flag > task run > hench.* > llm.* > default", () => {
   });
 });
 
+describe("a saved block can only tighten the run's execution posture", () => {
+  // The PRD is repository content and the agent can write it through the rex
+  // MCP tools, so a saved value that would widen the operator's own is
+  // ignored with a warning, and the operator's value is reported as the source.
+  const widenings = (r: TaskRunSettings) => r.warnings.filter((w) => w.code === "saved-setting-widens");
+
+  it("never carries bypassPermissions off a saved block: rex's validator refuses it, so the block is ignored whole", () => {
+    const r = resolveFor({ item: task({ permissionMode: "bypassPermissions" }) });
+    expect(r.permissionMode).toMatchObject({ value: "acceptEdits", source: "autonomous-default" });
+    expect(r.warnings.map((w) => w.code)).toEqual(["saved-settings-ignored"]);
+    expect(r.warnings[0].message).toContain("bypassPermissions");
+  });
+
+  it("never raises permissionMode above the autonomous default", () => {
+    // acceptEdits is the autonomous default, so a saved acceptEdits changes
+    // nothing — and with hench.permissionMode at default it would widen.
+    const equal = resolveFor({ item: task({ permissionMode: "acceptEdits" }) });
+    expect(equal.permissionMode).toMatchObject({ value: "acceptEdits", source: "autonomous-default" });
+    expect(widenings(equal)).toEqual([]);
+
+    const raised = resolveFor({ config: { permissionMode: "default" }, item: task({ permissionMode: "acceptEdits" }) });
+    expect(raised.permissionMode).toMatchObject({ value: "default", source: "hench.permissionMode" });
+    expect(widenings(raised)).toHaveLength(1);
+    expect(widenings(raised)[0].message).toContain('permissionMode "acceptEdits"');
+    expect(widenings(raised)[0].message).toContain("hench.permissionMode");
+  });
+
+  it("lowers permissionMode below hench.permissionMode and the autonomous default", () => {
+    const belowConfig = resolveFor({ config: { permissionMode: "acceptEdits" }, item: task({ permissionMode: "default" }) });
+    expect(belowConfig.permissionMode).toMatchObject({ value: "default", source: "task.run" });
+    expect(widenings(belowConfig)).toEqual([]);
+
+    const belowDefault = resolveFor({ item: task({ permissionMode: "default" }) });
+    expect(belowDefault.permissionMode).toMatchObject({ value: "default", source: "task.run" });
+    expect(widenings(belowDefault)).toEqual([]);
+  });
+
+  it("treats the Claude CLI's own default as the ceiling on an attended run", () => {
+    const r = resolveFor({ autonomous: false, item: task({ permissionMode: "acceptEdits" }) });
+    expect(r.permissionMode).toMatchObject({ value: null, source: "built-in" });
+    expect(widenings(r)).toHaveLength(1);
+    expect(widenings(r)[0].message).toContain('"default" from built-in');
+  });
+
+  it("says nothing about a widening permission mode on a vendor that has none", () => {
+    const r = resolveFor({ vendor: "codex", item: task({ permissionMode: "bypassPermissions" }) });
+    expect(r.permissionMode.value).toBeNull();
+    expect(widenings(r)).toEqual([]);
+  });
+
+  it("never turns a test gate off that the operator has on", () => {
+    const r = resolveFor({ item: task({ skipTestGate: true }) });
+    expect(r.skipTestGate).toEqual({ value: false, source: "built-in" });
+    expect(widenings(r)).toHaveLength(1);
+    expect(widenings(r)[0].message).toContain("skipTestGate");
+
+    const configured = resolveFor({ config: { skipFullTestGate: false }, item: task({ skipTestGate: true }) });
+    expect(configured.skipTestGate).toEqual({ value: false, source: "hench.skipFullTestGate" });
+  });
+
+  it("never lifts maxTurns above the operator's cap", () => {
+    const r = resolveFor({ config: { maxTurns: 10 }, item: task({ maxTurns: 40 }) });
+    expect(r.maxTurns).toEqual({ value: 10, source: "hench.maxTurns" });
+    expect(widenings(r)[0].message).toContain("maxTurns 40");
+
+    expect(resolveFor({ config: { maxTurns: 10 }, item: task({ maxTurns: 3 }) }).maxTurns).toEqual({ value: 3, source: "task.run" });
+    expect(resolveFor({ config: { maxTurns: 10 }, item: task({ maxTurns: 10 }) }).maxTurns).toEqual({ value: 10, source: "hench.maxTurns" });
+  });
+
+  it("never lifts tokenBudget above the operator's cap, and a saved 0 never replaces one", () => {
+    // 0 is unlimited, so it is the widest value: a cap tightens it, nothing loosens a cap to it.
+    expect(resolveFor({ item: task({ tokenBudget: 5000 }) }).tokenBudget).toEqual({ value: 5000, source: "task.run" });
+
+    const unlimited = resolveFor({ config: { tokenBudget: 5000 }, item: task({ tokenBudget: 0 }) });
+    expect(unlimited.tokenBudget).toEqual({ value: 5000, source: "hench.tokenBudget" });
+    expect(widenings(unlimited)[0].message).toContain("tokenBudget 0");
+
+    const higher = resolveFor({ config: { tokenBudget: 5000 }, item: task({ tokenBudget: 9000 }) });
+    expect(higher.tokenBudget).toEqual({ value: 5000, source: "hench.tokenBudget" });
+    expect(resolveFor({ config: { tokenBudget: 5000 }, item: task({ tokenBudget: 100 }) }).tokenBudget).toEqual({ value: 100, source: "task.run" });
+  });
+
+  it("takes the USD spend caps from the operator's config only — a saved block cannot raise them", () => {
+    const configured = resolveFor({ config: { maxCostUsdPerRun: 5, maxCostUsdPerDay: 40 } });
+    expect(configured.maxCostUsdPerRun).toEqual({ value: 5, source: "hench.maxCostUsdPerRun" });
+    expect(configured.maxCostUsdPerDay).toEqual({ value: 40, source: "hench.maxCostUsdPerDay" });
+
+    // Unset means unlimited.
+    expect(resolveFor().maxCostUsdPerRun).toEqual({ value: 0, source: "built-in" });
+
+    // rex's run-block schema has no spend-cap key: a block naming one is
+    // rejected whole, so the operator's caps stand and nothing else from the
+    // block applies either.
+    const raised = resolveFor({
+      config: { maxCostUsdPerRun: 5, maxCostUsdPerDay: 40 },
+      item: task({ maxTurns: 3, maxCostUsdPerRun: 500, maxCostUsdPerDay: 0 }),
+    });
+    expect(raised.maxCostUsdPerRun).toEqual({ value: 5, source: "hench.maxCostUsdPerRun" });
+    expect(raised.maxCostUsdPerDay).toEqual({ value: 40, source: "hench.maxCostUsdPerDay" });
+    expect(raised.saved).toBeUndefined();
+    expect(raised.warnings.map((w) => w.code)).toContain("saved-settings-ignored");
+  });
+
+  it("still lets a saved provider choose the loop — that is not a widening", () => {
+    const r = resolveFor({ item: task({ provider: "api" }) });
+    expect(r.provider).toMatchObject({ value: "api", source: "task.run" });
+    expect(widenings(r)).toEqual([]);
+  });
+
+  it("lets an explicit flag stand either way: it is the operator's instruction for this run", () => {
+    const r = resolveFor({
+      flags: { "permission-mode": "bypassPermissions", "max-turns": "100", "token-budget": "0", "skip-test-gate": "true" },
+      item: task({ permissionMode: "default", maxTurns: 3, tokenBudget: 10, skipTestGate: false }),
+    });
+    expect(r.permissionMode).toMatchObject({ value: "bypassPermissions", source: "cli-flag" });
+    expect(r.maxTurns).toEqual({ value: 100, source: "cli-flag" });
+    expect(r.tokenBudget).toEqual({ value: 0, source: "cli-flag" });
+    expect(r.skipTestGate).toEqual({ value: true, source: "cli-flag" });
+    expect(widenings(r)).toEqual([]);
+  });
+});
+
 describe("--no-review and --no-skip-test-gate turn a saved setting off for one run", () => {
   it("suppresses a review the task saved, as a cli-flag false", () => {
     const saved = resolveFor({ item: task({ review: true }) });
@@ -274,10 +398,16 @@ describe("--no-review and --no-skip-test-gate turn a saved setting off for one r
   });
 
   it("runs the gate the task asked to skip, as a cli-flag false", () => {
-    const saved = resolveFor({ item: task({ skipTestGate: true }) });
-    expect(saved.skipTestGate).toEqual({ value: true, source: "task.run" });
+    // A saved skip only takes effect where the project already skips (it
+    // cannot turn a gate off the operator has on); the flag outranks it.
+    const saved = resolveFor({ config: { skipFullTestGate: true }, item: task({ skipTestGate: true }) });
+    expect(saved.skipTestGate).toEqual({ value: true, source: "hench.skipFullTestGate" });
 
-    const off = resolveFor({ flags: { "no-skip-test-gate": "true" }, item: task({ skipTestGate: true }) });
+    const off = resolveFor({
+      flags: { "no-skip-test-gate": "true" },
+      config: { skipFullTestGate: true },
+      item: task({ skipTestGate: true }),
+    });
     expect(off.skipTestGate).toEqual({ value: false, source: "cli-flag" });
   });
 
@@ -307,10 +437,10 @@ describe("--no-review and --no-skip-test-gate turn a saved setting off for one r
   });
 
   it("leaves a saved setting alone when neither flag is passed", () => {
-    const r = resolveFor({ item: task({ review: true, skipTestGate: true }) });
+    const r = resolveFor({ config: { skipFullTestGate: true }, item: task({ review: true, skipTestGate: false }) });
 
     expect(r.review.source).toBe("task.run");
-    expect(r.skipTestGate.source).toBe("task.run");
+    expect(r.skipTestGate).toEqual({ value: false, source: "task.run" });
   });
 });
 
@@ -420,10 +550,12 @@ describe("a saved block that cannot be honoured never wedges a run", () => {
   });
 
   it("says so when a saved permission mode cannot apply to the active vendor", () => {
+    // "default" tightens the autonomous default, so the saved mode would have
+    // won on Claude; on codex there is nothing for it to apply to.
     const r = resolveFor({
       vendor: "codex",
       llm: { vendor: "codex" },
-      item: task({ permissionMode: "bypassPermissions" }, "Mode-on-codex"),
+      item: task({ permissionMode: "default" }, "Mode-on-codex"),
     });
 
     expect(r.permissionMode.value).toBeNull();
@@ -602,7 +734,7 @@ describe("ndx work --resolve reports the task's saved settings", () => {
       value: resolveModel(NEWEST_MODELS.claude),
       source: "vendor-default",
     });
-    expect(r.resolved.maxTurns.fallback).toEqual({ value: 50, source: "hench.maxTurns" });
+    expect(r.resolved.maxTurns.fallback).toEqual({ value: 200, source: "hench.maxTurns" });
     expect(r.resolved.review.fallback).toEqual({ value: false, source: "built-in" });
   });
 
@@ -647,7 +779,7 @@ describe("ndx work --resolve reports the task's saved settings", () => {
     expect(r.warnings.map((w) => w.code)).toEqual(["saved-settings-ignored"]);
     expect(r.warnings[0].message).toContain("Task with a hand-edited block");
     // And it resolves as though the block were absent.
-    expect(r.resolved.maxTurns).toEqual({ value: 50, source: "hench.maxTurns" });
+    expect(r.resolved.maxTurns).toEqual({ value: 200, source: "hench.maxTurns" });
   });
 
   it("reports a CLI flag as the winner over the saved value, as a run would apply it", async () => {

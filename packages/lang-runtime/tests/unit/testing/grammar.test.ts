@@ -25,6 +25,12 @@ describe("skipUnlessGrammar", () => {
     expect(skip).toHaveBeenCalledWith(expect.stringContaining("build-grammars.mjs"));
   });
 
+  it("names a serial build: packs building at once share the toolchain cache", () => {
+    const skip = vi.fn();
+    skipUnlessGrammar({ skip }, missing, {});
+    expect(skip).toHaveBeenCalledWith(expect.stringContaining("pnpm -r --workspace-concurrency=1 run build:grammars"));
+  });
+
   it("fails a missing grammar when SV_REQUIRE_GRAMMARS=1", () => {
     const skip = vi.fn();
     expect(() => skipUnlessGrammar({ skip }, missing, { SV_REQUIRE_GRAMMARS: "1" })).toThrow(/forbids skipping/);

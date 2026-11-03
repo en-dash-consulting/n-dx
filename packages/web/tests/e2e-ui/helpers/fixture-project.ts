@@ -63,8 +63,8 @@ export async function createUninitializedFixtureProject(): Promise<string> {
  * vendor) with one pending epic and one pending task under it, ready for
  * PRD and Hench Runs workflow tests.
  *
- * Vendor is deliberately "local" pointing at a port nothing listens on —
- * PRD/navigation tests never invoke the LLM, and the one Hench Runs test
+ * Vendor is deliberately "local" pointing at a free port nothing listens on,
+ * with no connection retries — PRD/navigation tests never invoke the LLM, and the one Hench Runs test
  * that does start a task exercises the UI's live-feedback path for a
  * process that fails fast, without risking a real autonomous agent run
  * against test fixture files.
@@ -106,6 +106,14 @@ export async function createFixtureProject(options: FixtureOptions = {}): Promis
     // The fixture is a v1 epic and task; init alone gives a new project v2.
     { stdio: "pipe", env: { ...process.env, NDX_INIT_LAYOUT: "v1" } },
   );
+  // The local vendor must be a port nothing listens on, not the default 1234
+  // (LM Studio's, so a developer machine running it would answer), and must
+  // fail on the first refused connection: by default a refused local
+  // connection is retried for about two minutes, longer than any spec waits
+  // for Generate's error alert.
+  const deadPort = await getFreePort();
+  execFileSync("node", [CORE_CLI, "config", "llm.local.port", String(deadPort), dir], { stdio: "pipe" });
+  execFileSync("node", [CORE_CLI, "config", "llm.local.maxRetries", "0", dir], { stdio: "pipe" });
 
   const epicOut = execFileSync(
     "node",
