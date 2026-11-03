@@ -500,5 +500,6 @@
 .sidecar-ext-status { margin: 0; padding: var(--space-3); font-size: 12px; color: var(--text-muted); }
 .sidecar-ext-error { color: var(--red, var(--text)); overflow-wrap: anywhere; }
 .sidecar-ext-reload { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
-.sidecar-ext-popout { flex: none; align-self: flex-end; padding: var(--space-1) var(--space-3); font-size: 12px; }
+.sidecar-ext-bar { flex: none; display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-1) var(--space-3); font-size: 12px; }
+.sidecar-ext-reload-frame { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
 .sidecar-ext-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--bg-surface); }

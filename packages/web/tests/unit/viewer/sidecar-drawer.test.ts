@@ -1523,6 +1523,19 @@ describe("extension tabs", () => {
     expect(link.getAttribute("rel")).toContain("noopener");
   });
 
+  it("offers Reload on a ready tab, which asks for a new key and reloads the frame", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    const before = iframe()!.getAttribute("src");
+    expect(frameKeyPosts()).toHaveLength(1);
+
+    await press(root.querySelector(".sidecar-ext-reload-frame")!);
+    expect(frameKeyPosts()).toHaveLength(2);
+    expect(iframe()!.getAttribute("src")).not.toBe(before);
+  });
+
   it("says \"Starting <label>…\" until the sidecar answers", async () => {
     server.hubTabs = [{ name: "alpha", label: "Alpha" }];
     let release!: () => void;

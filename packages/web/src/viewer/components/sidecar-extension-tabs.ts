@@ -207,13 +207,15 @@ export function ExtensionTabPanel({ tab, framePath, visible, fetcher }: Extensio
       : null,
     state.kind === "ready"
       ? [
-          h("a", {
-            key: "pop",
-            class: "sidecar-ext-popout",
-            href: state.url,
-            target: "_blank",
-            rel: "noopener noreferrer",
-          }, "Pop out"),
+          h("div", { key: "bar", class: "sidecar-ext-bar" },
+            // The frame cannot report an expired key, so Reload is always on offer.
+            h("button", { type: "button", class: "sidecar-ext-reload-frame", onClick: () => setAttempt((n) => n + 1) }, "Reload"),
+            h("a", {
+              class: "sidecar-ext-popout",
+              href: state.url,
+              target: "_blank",
+              rel: "noopener noreferrer",
+            }, "Pop out")),
           h("iframe", {
             key: "frame",
             class: "sidecar-ext-frame",

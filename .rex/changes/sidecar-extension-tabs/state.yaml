@@ -11,8 +11,15 @@ items:
     lastModified: "2026-11-03T20:34:42.522Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1adb4370-bc12-4322-9e21-e375e70e2131":
+    status: "completed"
+    startedAt: "2026-11-03T20:38:57.709Z"
+    completedAt: "2026-11-03T20:38:57.709Z"
+    endedAt: "2026-11-03T20:38:57.709Z"
+    activeIntervals: [{"end":"2026-11-03T20:38:57.709Z","start":"2026-11-03T20:38:57.709Z"}]
+    appliedAt: "2026-11-03T20:38:57.709Z"
+    appliedAmendsHash: "41dfdf4d305481893e4651dfba45de55ffbf1c82febe80318093855ce7b9931d"
     issues: ["https://www.notion.so/407a80b719248169b6beef5b0e83a89f","https://www.notion.so/407a80b71924817193ebfb12d8062f7b"]
-    lastModified: "2026-11-03T20:32:29.647Z"
+    lastModified: "2026-11-03T20:38:57.709Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "4a463baa-a59a-4432-8708-bb066fed91a0":
     status: "completed"
@@ -57,5 +64,12 @@ items:
     lastModified: "2026-11-03T20:21:17.471Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ed2982c1-4e8b-41d9-b027-11c71598f963":
-    lastModified: "2026-11-03T20:32:29.647Z"
+    status: "completed"
+    startedAt: "2026-11-03T20:35:20.007Z"
+    completedAt: "2026-11-03T20:38:57.709Z"
+    endedAt: "2026-11-03T20:38:57.709Z"
+    activeIntervals: [{"end":"2026-11-03T20:38:57.709Z","start":"2026-11-03T20:35:20.007Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Ready extension tab shows a Reload control beside Pop out; it bumps attempt, re-requests the frame key and reloads the iframe with the new keyed URL."
+    lastModified: "2026-11-03T20:38:57.709Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
