@@ -62,8 +62,12 @@ items:
     lastModified: "2026-11-02T23:30:29.668Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "ea48bb24-27cc-4224-9e09-2d6ab4a54cc2":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-03T00:28:24.666Z"
-    activeIntervals: [{"start":"2026-11-03T00:28:24.666Z"}]
-    lastModified: "2026-11-03T00:28:25.253Z"
+    completedAt: "2026-11-03T00:55:59.409Z"
+    endedAt: "2026-11-03T00:55:59.409Z"
+    activeIntervals: [{"end":"2026-11-03T00:55:59.409Z","start":"2026-11-03T00:28:24.666Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub home toggle (⌘J) gated by probeHubLens docks an iframe of /hub/session/drawer, a drawer-only viewer entry (viewer/hub-session.ts) built beside the dashboard; host routes /api/sidecar/hub/{drawer,lens,snapshot}; head chips + read-only · drafts + ceiling meter; tests for both home states and the drawer."
+    lastModified: "2026-11-03T00:55:59.409Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

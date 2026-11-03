@@ -101,6 +101,20 @@ describe("probeHubLens", () => {
     expect(picker.pick(projects)?.port).toBe(4003);
   });
 
+  it("leaves a host that answers too slowly where it is, rather than moving the session off it", async () => {
+    const asked: number[] = [];
+    const fetch = (async (url: string) => {
+      asked.push(Number(new URL(url).port));
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    }) as typeof globalThis.fetch;
+    const picker = new HubSessionHostPicker(home);
+    const projects = [project("a", 4001), project("b", 4002)];
+    expect(await probeHubLens(picker, projects, { fetch })).toBe(false);
+    // One wait, not one per project, and the slow host still gets the session's requests.
+    expect(asked).toEqual([4001]);
+    expect(picker.pick(projects)?.port).toBe(4001);
+  });
+
   it("is false when every host has web.sidecar off", async () => {
     const fetch = (async () => new Response("{}", { status: 403, headers: { [FEATURE_DISABLED_HEADER]: "web.sidecar" } })) as unknown as typeof globalThis.fetch;
     const picker = new HubSessionHostPicker(home);

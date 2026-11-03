@@ -197,7 +197,11 @@ export async function probeHubLens(
         signal: AbortSignal.timeout(opts.timeoutMs ?? 2_000),
         headers: opts.token ? { "X-Ndx-Token": opts.token } : {},
       });
-    } catch {
+    } catch (err) {
+      // Slow is not down: the proxy marks a host only when it cannot connect, and
+      // marking a slow lock holder would send the session's own requests to a
+      // server that refuses them (409) until the next health check.
+      if (err instanceof Error && err.name === "TimeoutError") return false;
       picker.markUnreachable(host.project);
       continue;
     }
