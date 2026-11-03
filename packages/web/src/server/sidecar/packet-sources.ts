@@ -21,6 +21,7 @@ import { loadCommitFiles, loadPrdModel, loadTrailerCommits, PRD_CACHE_DIRNAME } 
 import type { V2Tree } from "../rex-gateway.js";
 import type { Manifest, Zones } from "../domain-gateway.js";
 import type { BranchHealth } from "../branch-health/index.js";
+import type { HubSnapshotWorktreeRef } from "./hub-snapshot.js";
 import { readLiveReviewReport } from "../live-review-report.js";
 import { readDiagnosis, type RunDiagnosisSummary } from "../run-diagnosis.js";
 import { readLogTailLines, resolveRunEventsFile } from "../run-tail.js";
@@ -283,6 +284,8 @@ export interface HubSnapshotRead {
   changed: string[];
   /** Items left out to fit the cap. */
   omitted: number;
+  /** The worktrees it read, which the drawer offers "Open in worktree sidecar" on. */
+  worktrees: HubSnapshotWorktreeRef[];
   /** Persists the fingerprints this snapshot was built with; call it once the model has received the text. */
   commit: () => void;
 }

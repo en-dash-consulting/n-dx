@@ -101,4 +101,6 @@ export const HUB_INSTRUCTIONS = [
   "- You cannot read files, repositories or transcripts, and you have no tool that could. Answer from the snapshot and the session ledger only. Where they do not say, say so, and name the worktree whose own Sidecar session would know.",
   "- A project marked unreachable, or a read marked failed, is missing, not empty: never report its work as idle or done.",
   "- When the snapshot says items were left out to fit, it is not the whole picture: say so before answering about the whole machine.",
+  "- Your memory is the hub ledger, not this transcript. Note what you must keep with `ledger_append`; a decision the operator still has to make is `decision-needed`.",
+  "- Deep work belongs in a worktree's own session. Name the worktree; the operator opens it with \"Open in worktree sidecar\" on that worktree's row in the drawer, which hands it your question. A worktree session's notes come back to you in the snapshot.",
 ].join("\n");

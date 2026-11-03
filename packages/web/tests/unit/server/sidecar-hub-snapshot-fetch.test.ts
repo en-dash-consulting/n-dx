@@ -59,6 +59,22 @@ describe("fetchHubSnapshotInput", () => {
     expect(text).toContain("PRD v1 (not migrated)");
   });
 
+  it("reads each worktree's Sidecar notes, and takes a web.sidecar refusal as no sessions rather than a failed read", async () => {
+    const notes = { sessions: [{ id: "s-1", name: "n", unfinished: { at: "", type: "unfinished", text: "u" } }] };
+    const fake = (async (url: string) => {
+      const path = url.slice(BASE.length);
+      if (path === "/p/a/api/sidecar/ledger/latest") return new Response(JSON.stringify(notes), { status: 200 });
+      if (path === "/p/a/w/wt-1/api/sidecar/ledger/latest") {
+        return new Response(JSON.stringify({ error: "off" }), { status: 403, headers: { "X-Ndx-Feature-Disabled": "web.sidecar" } });
+      }
+      if (!(path in ANSWERS)) return new Response("nope", { status: 404 });
+      return new Response(JSON.stringify(ANSWERS[path]), { status: 200 });
+    }) as typeof fetch;
+
+    const got = await fetchHubSnapshotInput({ baseUrl: BASE, token: null }, { fetch: fake });
+    expect(got.projects.a.sessionNotes).toEqual({ main: { ok: true, value: notes }, "wt-1": { ok: true, value: null } });
+  });
+
   it("records a refused connection as that read's error rather than throwing", async () => {
     const fake = (async () => { throw new Error("connect ECONNREFUSED"); }) as typeof fetch;
     const got = await fetchHubSnapshotInput({ baseUrl: BASE, token: null }, { fetch: fake });

@@ -9,7 +9,9 @@
  * last turn, and the Hub lens. There is no vendor picker and no lens menu: the
  * session is Claude on the hub lens, for good. The composer says the session
  * reads and drafts, never does, and meters the context against the hub
- * ceiling.
+ * ceiling. Under the head, the snapshot's worktrees each offer "Open in
+ * worktree sidecar", which hands the latest question to that worktree's own
+ * session and opens its dashboard with the drawer on it.
  *
  * The transcript rows and the cards are the worktree drawer's own
  * (sidecar-drawer.ts, sidecar-cards.ts), so both drawers draw a turn alike.
@@ -19,7 +21,7 @@ import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { DEFAULT_CLI_NAME, latestContextTokens, lensLabel, sidecarSetupNeed } from "../hooks/index.js";
-import type { HubSessionInfo, SidecarState } from "../hooks/index.js";
+import type { HubSessionInfo, HubSnapshotWorktree, SidecarState } from "../hooks/index.js";
 import { SidecarFrameRow, pairToolResults } from "./sidecar-drawer.js";
 import { SidecarCardList, cardTurnSender } from "./sidecar-cards.js";
 
@@ -61,13 +63,59 @@ export function HubCeilingMeter({ used, ceiling }: { used: number; ceiling: numb
   );
 }
 
+/**
+ * The snapshot's worktrees, each with "Open in worktree sidecar": the drill
+ * down (Design §6). It hands the session's latest question to that
+ * worktree's own session; `onHandoff` answers why it could not, or null once
+ * the page is on its way there.
+ */
+export function HubWorktreeList({ worktrees, onHandoff }: {
+  worktrees: readonly HubSnapshotWorktree[];
+  onHandoff: (worktree: HubSnapshotWorktree) => Promise<string | null>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (worktrees.length === 0) return null;
+  const open = async (wt: HubSnapshotWorktree) => {
+    const id = `${wt.project}\0${wt.key}`;
+    setBusy(id);
+    setError(null);
+    const failed = await onHandoff(wt);
+    setBusy(null);
+    if (failed) setError(failed);
+  };
+  return h("details", { class: "hub-worktrees" },
+    h("summary", { class: "hub-worktrees-summary" }, `Worktrees · ${worktrees.length}`),
+    h("ul", { class: "hub-worktrees-list", "aria-label": "Worktrees in the snapshot" },
+      worktrees.map((wt) => {
+        const id = `${wt.project}\0${wt.key}`;
+        const label = `${wt.projectName} · ${wt.branch ?? wt.key}`;
+        return h("li", { key: id, class: "hub-worktree" },
+          h("span", { class: "hub-worktree-name", title: `${wt.project} / ${wt.key}` },
+            wt.changed ? h("span", { class: "hub-worktree-delta", title: "Changed since your last turn" }, "Δ ") : null,
+            label),
+          h("button", {
+            type: "button",
+            class: "hub-worktree-open",
+            disabled: busy !== null,
+            "aria-label": `Open in worktree sidecar: ${label}`,
+            title: "Open this worktree's own Sidecar session, handed your latest question",
+            onClick: () => { void open(wt); },
+          }, busy === id ? "Opening…" : "Open in worktree sidecar"));
+      })),
+    error ? h("p", { class: "sidecar-error", role: "alert" }, error) : null,
+  );
+}
+
 export interface HubSessionDrawerProps {
   sidecar: SidecarState;
   info: HubSessionInfo;
   onClose: () => void;
+  /** "Open in worktree sidecar"; without it the drawer lists no worktrees. */
+  onHandoff?: (worktree: HubSnapshotWorktree) => Promise<string | null>;
 }
 
-export function HubSessionDrawer({ sidecar, info, onClose }: HubSessionDrawerProps) {
+export function HubSessionDrawer({ sidecar, info, onClose, onHandoff }: HubSessionDrawerProps) {
   const [draft, setDraft] = useState("");
   const transcriptRef = useRef<HTMLOListElement>(null);
 
@@ -113,6 +161,9 @@ export function HubSessionDrawer({ sidecar, info, onClose }: HubSessionDrawerPro
           lensNeeds ? h("span", { class: "sidecar-chip-note" }, "not available") : null),
       ),
     ),
+    onHandoff && info.snapshot && info.snapshot !== "loading" && info.snapshot.worktrees
+      ? h(HubWorktreeList, { worktrees: info.snapshot.worktrees, onHandoff })
+      : null,
     h("ol", { class: "sidecar-transcript", ref: transcriptRef, "aria-live": "polite", "aria-label": "Transcript" },
       rows.length > 0
         ? rows

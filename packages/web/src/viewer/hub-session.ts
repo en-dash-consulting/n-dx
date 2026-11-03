@@ -22,9 +22,11 @@ import {
   hubSidecarEndpoint,
   isSidecarShortcut,
   readHubSessionPageConfig,
+  requestHubHandoff,
   useHubSessionInfo,
   useSidecar,
   type HubSessionPageConfig,
+  type HubSnapshotWorktree,
 } from "./hooks/index.js";
 import { HubSessionDrawer } from "./components/index.js";
 
@@ -37,11 +39,26 @@ export function requestClose(closeMessage: string, win: Window = window): void {
   win.parent.postMessage({ type: closeMessage }, win.location.origin);
 }
 
+/**
+ * Go to the worktree's dashboard, which opens its drawer on the handed-off
+ * session. The page that frames this drawer navigates, so the operator leaves
+ * the hub home for the worktree rather than nesting it in the frame.
+ */
+export function openWorktreeDashboard(url: string, win: Window = window): void {
+  (win.parent === win ? win : win.parent).location.assign(url);
+}
+
 export function HubSessionApp({ config }: { config: HubSessionPageConfig }) {
   const endpoint = useMemo(() => hubSidecarEndpoint(config), [config]);
   const sidecar = useSidecar(true, true, NO_PAGE, endpoint);
   const info = useHubSessionInfo(config, true, sidecar.session?.id ?? null, sidecar.running);
   const close = useCallback(() => requestClose(config.closeMessage), [config.closeMessage]);
+  const handoff = useCallback(async (worktree: HubSnapshotWorktree): Promise<string | null> => {
+    const answer = await requestHubHandoff(config, worktree);
+    if ("error" in answer) return answer.error;
+    openWorktreeDashboard(answer.url);
+    return null;
+  }, [config]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -65,7 +82,7 @@ export function HubSessionApp({ config }: { config: HubSessionPageConfig }) {
     };
   }, [close]);
 
-  return h(HubSessionDrawer, { sidecar, info, onClose: close });
+  return h(HubSessionDrawer, { sidecar, info, onClose: close, onHandoff: handoff });
 }
 
 /** Mount on `root`; a page the host did not serve has no config and says where the drawer lives. */

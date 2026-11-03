@@ -50,3 +50,23 @@
 .hub-ceiling[data-level="mid"] .hub-ceiling-fill { background: var(--orange); }
 .hub-ceiling[data-level="high"] .hub-ceiling-fill { background: var(--red); }
 .hub-ceiling-text { font-variant-numeric: tabular-nums; }
+
+/* The snapshot's worktrees, each with "Open in worktree sidecar". */
+.hub-worktrees { border-bottom: 1px solid var(--border); padding: var(--space-1) var(--space-3); font-size: 12px; }
+.hub-worktrees-summary { cursor: pointer; color: var(--text-dim); padding: var(--space-1) 0; }
+.hub-worktrees-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.hub-worktree { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) 0; border-top: 1px solid var(--border); }
+.hub-worktree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-worktree-delta { color: var(--orange); font-weight: 700; }
+.hub-worktree-open {
+  flex: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px var(--space-2);
+  cursor: pointer;
+}
+.hub-worktree-open:disabled { color: var(--text-muted); cursor: default; }

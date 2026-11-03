@@ -816,12 +816,32 @@ export interface SidecarShell {
 }
 
 /**
+ * The session `?sidecar=<id>` names: the hub's "Open in worktree sidecar"
+ * sends the operator to this dashboard with the session it handed off to.
+ */
+export function handedOffSessionParam(search: string): string | null {
+  const id = new URLSearchParams(search).get("sidecar");
+  return id && /^[\w-]+$/.test(id) ? id : null;
+}
+
+/**
  * `enabled`: `web.sidecar`, read by main.ts through `useFeatureToggle`, and a
- * server to hold a session (not a static export).
+ * server to hold a session (not a static export). A page loaded with
+ * `?sidecar=<id>` opens the drawer on that session once enabled.
  */
 export function useSidecarShell(enabled: boolean, page: SidecarPageSelection = NO_PAGE): SidecarShell {
   const drawer = useSidecarDrawerState(enabled);
   const sidecar = useSidecar(enabled, drawer.open, page);
+  const handedOffRef = useRef(typeof location === "undefined" ? null : handedOffSessionParam(location.search));
+  const { show } = drawer;
+  const { openSession } = sidecar;
+  useEffect(() => {
+    const id = handedOffRef.current;
+    if (!enabled || !id) return;
+    handedOffRef.current = null;
+    show();
+    void openSession(id);
+  }, [enabled, show, openSession]);
   const button = enabled ? { open: drawer.open, waiting: sidecar.waiting, onToggle: drawer.toggle } : null;
   return { drawer, sidecar, button };
 }

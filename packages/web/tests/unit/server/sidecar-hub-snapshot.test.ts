@@ -256,6 +256,52 @@ describe("buildHubSnapshot", () => {
     expect(text).not.toContain("feat/branch-number-119");
   });
 
+  describe("worktree session notes", () => {
+    const at = "2026-11-02T00:00:00.000Z";
+    const notes = (unfinished: string) => ok({
+      sessions: [
+        { id: "s-1", name: "broker tool shapes", unfinished: { at, type: "unfinished" as const, text: unfinished }, decision: { at, type: "decision" as const, text: "start_work is never allow-listed" } },
+        { id: "s-2", name: "zone questions", decision: { at, type: "decision" as const, text: "keep the cursor in the index" } },
+      ],
+    });
+
+    it("shows each session's latest unfinished and decision notes under its worktree, and marks a change Δ", () => {
+      const first = buildHubSnapshot(input({ projects: { ndx: reads({ sessionNotes: { "feat-x": notes("decide the card timeout"), main: ok(null) } }) } }));
+      expect(first.text).toContain(
+        "  - Sidecar \"broker tool shapes\": unfinished: decide the card timeout · decision: start_work is never allow-listed",
+      );
+      expect(first.text).toContain("  - Sidecar \"zone questions\": decision: keep the cursor in the index");
+      // Under feat-x's own line, not the anchor's.
+      expect(first.text.indexOf("Sidecar \"broker tool shapes\"")).toBeGreaterThan(first.text.indexOf("- feat-x:"));
+
+      const next = buildHubSnapshot(
+        input({ projects: { ndx: reads({ sessionNotes: { "feat-x": notes("write the divider"), main: ok(null) } }) } }),
+        first.state,
+      );
+      expect(next.text).toContain("  - Δ Sidecar \"broker tool shapes\": unfinished: write the divider");
+      expect(next.changed).toEqual(["notes:ndx:/repo/wt/x:s-1"]);
+      expect(next.worktrees.find((w) => w.key === "feat-x")).toMatchObject({ project: "ndx", branch: "feat/x", changed: true });
+      expect(next.worktrees.find((w) => w.key === "main")).toMatchObject({ changed: false });
+    });
+
+    it("names a notes read that failed, and drops notes before the worktrees to stay within the cap", () => {
+      const failed = buildHubSnapshot(input({ projects: { ndx: reads({ sessionNotes: { "feat-x": fail("HTTP 500") } }) } }));
+      expect(failed.text).toContain("  - Sidecar notes not read: HTTP 500");
+
+      const worktrees = Array.from({ length: 30 }, (_, i) =>
+        worktree({ path: `/repo/wt/${i}`, branch: `feat/${i}`, isAnchor: false, dirtyFiles: 1, runs: { running: 0, latest: null } }));
+      const workspaces = ok({ anchor: "main", workspaces: worktrees.map((w, i) => ({ key: `k${i}`, path: w.path })) });
+      const long = "x".repeat(230);
+      const sessionNotes = Object.fromEntries(worktrees.map((_, i) => [`k${i}`, notes(long)]));
+      const { text, omitted } = buildHubSnapshot(input({ projects: { ndx: reads({ worktrees: ok(worktrees), workspaces, sessionNotes, branchHealth: {} }) } }));
+      expect(text.length).toBeLessThanOrEqual(HUB_SNAPSHOT_CAP);
+      expect(omitted).toBeGreaterThan(0);
+      expect(text).toMatch(/left out to stay within 8,000 characters: .*\d+ session notes/);
+      // Every busy worktree's line outlasts the notes.
+      for (let i = 0; i < 30; i += 1) expect(text).toContain(`- k${i}: feat/${i}`);
+    });
+  });
+
   it("marks Δ on an item that changed while it was dropped for the cap, and only that item", () => {
     const idle = (name: string, dirtyFiles = 1) =>
       worktree({ path: `/repo/wt/${name}`, branch: `feat/${name}`, isAnchor: false, dirtyFiles, runs: { running: 0, latest: null } });

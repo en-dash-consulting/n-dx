@@ -1,6 +1,7 @@
 /**
- * The hub snapshot: every registered project's worktrees, runs, open PRs and
- * pending changesets, as text of at most {@link HUB_SNAPSHOT_CAP} characters.
+ * The hub snapshot: every registered project's worktrees (with their Sidecar
+ * sessions' latest unfinished and decision notes), runs, open PRs and pending
+ * changesets, as text of at most {@link HUB_SNAPSHOT_CAP} characters.
  *
  * Pure. The input is what the hub's HTTP API and each project's server
  * answered (`hub-snapshot-fetch.ts` asks for it); the output is the text a
@@ -19,6 +20,7 @@
 import type { ProjectCard, QueueSnapshot } from "../../hub/index.js";
 import type { BranchHealth, ConflictClass } from "../branch-health/index.js";
 import type { PendingChangeset } from "../routes-changesets.js";
+import type { SidecarLedgerLatestResponse } from "./ledger.js";
 
 export const HUB_SNAPSHOT_CAP = 8_000;
 
@@ -78,6 +80,12 @@ export interface ProjectReads {
   changesets: Fetched<{ changesets: PendingChangeset[] }>;
   /** `GET /w/<key>/api/branch-health?github=1`, by workspace key. */
   branchHealth: Record<string, Fetched<BranchHealth>>;
+  /**
+   * `GET /w/<key>/api/sidecar/ledger/latest`, by workspace key: each Sidecar
+   * session's latest unfinished and decision notes. `null` where the
+   * worktree has web.sidecar off, so it has no sessions to report.
+   */
+  sessionNotes?: Record<string, Fetched<SidecarLedgerLatestResponse | null>>;
 }
 
 export interface HubSnapshotInput {
@@ -104,6 +112,19 @@ export interface HubSnapshot {
   changed: string[];
   /** How many items were left out to stay within the cap. */
   omitted: number;
+  /** Every worktree the snapshot read with a workspace key, the drawer's drill-down targets. */
+  worktrees: HubSnapshotWorktreeRef[];
+}
+
+/** A worktree the hub can hand off to: its project and workspace key. */
+export interface HubSnapshotWorktreeRef {
+  project: string;
+  projectName: string;
+  /** The workspace key; the project's anchor has its own. */
+  key: string;
+  branch: string | null;
+  /** The worktree, or one of its session notes, is marked Δ in this snapshot. */
+  changed: boolean;
 }
 
 /** Lower is kept longer; 0 is never dropped. */
@@ -215,6 +236,36 @@ function worktreeItem(id: string, wt: SnapshotWorktree, key: string | undefined,
   };
 }
 
+/** The worktree's notes item key prefix; each session's note item adds its id. */
+function notesKeyPrefix(id: string, path: string): string {
+  return `notes:${id}:${path}:`;
+}
+
+/**
+ * Under a worktree, each of its Sidecar sessions' latest unfinished and
+ * decision notes: what deep work left for the hub to see. Dropped before the
+ * worktree line itself.
+ */
+function sessionNoteItems(id: string, wt: SnapshotWorktree, key: string | undefined, reads: ProjectReads): Item[] {
+  const notes = key === undefined ? undefined : reads.sessionNotes?.[key];
+  if (!notes) return [];
+  if (!notes.ok) return [{ key: null, priority: 3, kind: "session note", text: `  - Sidecar notes not read: ${clip(notes.error, 80)}` }];
+  if (notes.value === null) return [];
+  return notes.value.sessions.flatMap((s) => {
+    const parts = [
+      ...(s.unfinished ? [`unfinished: ${s.unfinished.text}`] : []),
+      ...(s.decision ? [`decision: ${s.decision.text}`] : []),
+    ];
+    if (parts.length === 0) return [];
+    return [{
+      key: `${notesKeyPrefix(id, wt.path)}${s.id}`,
+      priority: 2 as const,
+      kind: "session note",
+      text: `  - Sidecar "${clip(s.name, 40)}": ${parts.join(" · ")}`,
+    }];
+  });
+}
+
 function conflictSummary(h: BranchHealth): string {
   if (h.conflictsUnavailable) return `conflicts not predicted: ${clip(h.conflictsUnavailable, 80)}`;
   if (h.conflicts.length === 0) return "no conflicts";
@@ -302,7 +353,10 @@ function projectItems(card: ProjectCard, reads: ProjectReads | undefined, queue:
     items.push(line(`Worktrees: not read: ${clip(reads.worktrees.error, 120)}`));
   } else {
     items.push(line(`Worktrees: ${reads.worktrees.value.length}`));
-    for (const wt of reads.worktrees.value) items.push(worktreeItem(id, wt, keyByPath.get(wt.path), reads));
+    for (const wt of reads.worktrees.value) {
+      const key = keyByPath.get(wt.path);
+      items.push(worktreeItem(id, wt, key, reads), ...sessionNoteItems(id, wt, key, reads));
+    }
   }
   items.push(...prItems(id, reads, [...keyByPath.values()]));
   items.push(...changesetItems(id, reads));
@@ -389,5 +443,26 @@ export function buildHubSnapshot(input: HubSnapshotInput, previous?: HubSnapshot
     const tag = "\n[cut at the character cap]";
     text = text.slice(0, HUB_SNAPSHOT_CAP - tag.length) + tag;
   }
-  return { text, state: { fingerprints }, changed: [...changed], omitted: dropped.length };
+  return { text, state: { fingerprints }, changed: [...changed], omitted: dropped.length, worktrees: worktreeRefs(input, changed) };
+}
+
+function worktreeRefs(input: HubSnapshotInput, changed: ReadonlySet<string>): HubSnapshotWorktreeRef[] {
+  if (!input.overview.ok) return [];
+  return input.overview.value.projects.flatMap((card) => {
+    const reads = input.projects[card.id];
+    if (!reads?.worktrees.ok || !reads.workspaces.ok) return [];
+    const keyByPath = new Map(reads.workspaces.value.workspaces.map((w) => [w.path, w.key]));
+    return reads.worktrees.value.flatMap((wt) => {
+      const key = keyByPath.get(wt.path);
+      if (key === undefined) return [];
+      const notes = notesKeyPrefix(card.id, wt.path);
+      return [{
+        project: card.id,
+        projectName: card.name,
+        key,
+        branch: wt.branch,
+        changed: changed.has(`worktree:${card.id}:${wt.path}`) || [...changed].some((k) => k.startsWith(notes)),
+      }];
+    });
+  });
 }

@@ -24,7 +24,7 @@ import {
   workOptions,
   type SidecarActions,
 } from "./carry-out.js";
-import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES } from "./ledger.js";
+import { LEDGER_ENTRY_MAX_CHARS, type LedgerEntryType } from "./ledger.js";
 
 const BROKER_VERSION = "1.0.0";
 
@@ -172,7 +172,11 @@ export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, 
     "ledger_append",
     {
       description: `Append a typed note to this session's ledger, carried over when the session's context is refreshed. At most ${LEDGER_ENTRY_MAX_CHARS} characters. Raises no card.`,
-      inputSchema: { type: z.enum(LEDGER_ENTRY_TYPES), text: z.string().min(1).max(LEDGER_ENTRY_MAX_CHARS) },
+      // Only the types this scope's agent writes: a handoff is the hub's drill-down, never the agent's.
+      inputSchema: {
+        type: z.enum(broker.ledgerTypes as [LedgerEntryType, ...LedgerEntryType[]]),
+        text: z.string().min(1).max(LEDGER_ENTRY_MAX_CHARS),
+      },
     },
     async ({ type, text: note }) => {
       broker.appendLedger(sessionId, type, note);

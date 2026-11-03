@@ -12,11 +12,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "preact";
 import { act } from "preact/test-utils";
-import { mountHubSession, requestClose } from "../../../src/viewer/hub-session.js";
+import { mountHubSession, openWorktreeDashboard, requestClose } from "../../../src/viewer/hub-session.js";
 import { HUB_SESSION_PAGE_CONFIG_ID, hubSessionPageConfig } from "../../../src/server/routes-sidecar.js";
 import { HUB_SESSION_CLOSE_MESSAGE } from "../../../src/shared/index.js";
 import { formatTokens, snapshotChipLabel } from "../../../src/viewer/components/hub-session-drawer.js";
-import { latestContextTokens, type SidecarFrame, type SidecarSessionEntry } from "../../../src/viewer/hooks/use-sidecar.js";
+import type { HubSnapshotWorktree } from "../../../src/viewer/hooks/use-hub-session.js";
+import { handedOffSessionParam, latestContextTokens, type SidecarFrame, type SidecarSessionEntry } from "../../../src/viewer/hooks/use-sidecar.js";
 
 interface Hub {
   lensAvailable: boolean;
@@ -26,6 +27,10 @@ interface Hub {
   sessions: SidecarSessionEntry[];
   frames: SidecarFrame[];
   requests: Array<{ method: string; url: string; body?: unknown }>;
+  /** The snapshot's worktrees; absent answers as before a delivered turn. */
+  worktrees?: HubSnapshotWorktree[];
+  /** What POST /hub/session/handoff refuses with. */
+  handoffRefusal?: string;
 }
 
 let hub: Hub;
@@ -58,8 +63,9 @@ function stubHub(): void {
     }
     if (url === "/hub/session/snapshot") {
       const open = hub.sessions[0]?.session.id ?? null;
-      return json({ session: open, changed: open ? hub.changed : null });
+      return json({ session: open, changed: open ? hub.changed : null, ...(open && hub.worktrees && { worktrees: hub.worktrees }) });
     }
+    if (url === "/hub/session/handoff" && method === "POST") return json({ error: hub.handoffRefusal }, 502);
     if (url === "/hub/session/sessions" && method === "GET") return json({ sessions: hub.sessions });
     if (url === "/hub/session/sessions" && method === "POST") {
       const created = hubSession();
@@ -191,6 +197,58 @@ describe("the hub session drawer", () => {
     await mount();
     expect(chips()[2].textContent).toBe("Hubnot available");
     expect(chips()[2].getAttribute("title")).toContain("web.sidecar");
+  });
+});
+
+describe("Open in worktree sidecar", () => {
+  const worktrees: HubSnapshotWorktree[] = [
+    { project: "app", projectName: "app", key: "feat", branch: "feat/sidecar-api", changed: true },
+    { project: "app", projectName: "app", key: "main", branch: "main", changed: false },
+  ];
+
+  it("lists the snapshot's worktrees, Δ on a changed one, each with Open in worktree sidecar", async () => {
+    hub.sessions = [hubSession()];
+    hub.worktrees = worktrees;
+    await mount();
+    const rows = [...root.querySelectorAll(".hub-worktree")];
+    expect(root.querySelector(".hub-worktrees-summary")?.textContent).toBe("Worktrees · 2");
+    expect(rows.map((r) => r.querySelector(".hub-worktree-name")?.textContent)).toEqual(["Δ app · feat/sidecar-api", "app · main"]);
+    expect(rows[0]!.querySelector("button")?.getAttribute("aria-label")).toBe("Open in worktree sidecar: app · feat/sidecar-api");
+  });
+
+  it("posts the worktree to the hub's handoff route and shows why it was refused", async () => {
+    hub.sessions = [hubSession()];
+    hub.worktrees = worktrees;
+    hub.handoffRefusal = "The worktree's server refused the handoff: HTTP 403";
+    await mount();
+    await act(async () => { root.querySelector<HTMLButtonElement>(".hub-worktree-open")!.click(); });
+    await settle();
+    expect(hub.requests.find((r) => r.url === "/hub/session/handoff")).toEqual({
+      method: "POST", url: "/hub/session/handoff", body: { project: "app", worktree: "feat" },
+    });
+    expect(root.querySelector(".hub-worktrees [role=alert]")?.textContent).toBe("The worktree's server refused the handoff: HTTP 403");
+  });
+
+  it("lists nothing before a turn has read the snapshot", async () => {
+    hub.sessions = [hubSession()];
+    await mount();
+    expect(root.querySelector(".hub-worktrees")).toBeNull();
+  });
+
+  it("sends the framing hub home, or the page itself when unframed, to the worktree's dashboard", () => {
+    const went: string[] = [];
+    const parent = { location: { assign: (url: string) => went.push(`parent ${url}`) } };
+    openWorktreeDashboard("/p/app/w/feat/?sidecar=s-1", { parent } as unknown as Window);
+    const alone = { location: { assign: (url: string) => went.push(`self ${url}`) } } as unknown as Window & { parent: Window };
+    alone.parent = alone;
+    openWorktreeDashboard("/p/app/?sidecar=s-2", alone);
+    expect(went).toEqual(["parent /p/app/w/feat/?sidecar=s-1", "self /p/app/?sidecar=s-2"]);
+  });
+
+  it("reads the session a worktree dashboard opens its drawer on from ?sidecar=", () => {
+    expect(handedOffSessionParam("?sidecar=0b2c-44")).toBe("0b2c-44");
+    expect(handedOffSessionParam("?view=prd")).toBeNull();
+    expect(handedOffSessionParam("?sidecar=../x")).toBeNull();
   });
 });
 

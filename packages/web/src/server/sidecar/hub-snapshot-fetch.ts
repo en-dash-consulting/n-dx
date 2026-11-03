@@ -18,6 +18,8 @@ import { hubPidPath, readHubPidFile, resolveHubHome, type ProjectCard, type Queu
 import type { BranchHealth } from "../branch-health/index.js";
 import { errorMessage } from "../response-utils.js";
 import type { PendingChangeset } from "../routes-changesets.js";
+import { FEATURE_DISABLED_HEADER } from "../../shared/index.js";
+import { SIDECAR_LEDGER_LATEST_PATH, type SidecarLedgerLatestResponse } from "./ledger.js";
 import type {
   Fetched,
   HubSnapshotInput,
@@ -62,7 +64,7 @@ export interface FetchHubSnapshotOptions {
 /** Every read the snapshot is built from. Never throws: a failed read is recorded where it failed. */
 export async function fetchHubSnapshotInput(access: HubAccess, options: FetchHubSnapshotOptions = {}): Promise<HubSnapshotInput> {
   const doFetch = options.fetch ?? fetch;
-  const get = async <T>(path: string): Promise<Fetched<T>> => {
+  const get: Get = async <T>(path: string, featureOff?: { feature: string; value: T }): Promise<Fetched<T>> => {
     try {
       const signal = options.signal
         ? AbortSignal.any([options.signal, AbortSignal.timeout(READ_TIMEOUT_MS)])
@@ -71,6 +73,9 @@ export async function fetchHubSnapshotInput(access: HubAccess, options: FetchHub
         headers: access.token ? { "X-Ndx-Token": access.token } : {},
         signal,
       });
+      if (featureOff && res.status === 403 && res.headers.get(FEATURE_DISABLED_HEADER) === featureOff.feature) {
+        return { ok: true, value: featureOff.value };
+      }
       if (!res.ok) {
         const body = await res.text().catch((err: unknown) => `(body unreadable: ${errorMessage(err)})`);
         return { ok: false, error: `HTTP ${res.status} from ${path}${body ? `: ${body.slice(0, 200)}` : ""}` };
@@ -95,7 +100,11 @@ export async function fetchHubSnapshotInput(access: HubAccess, options: FetchHub
   return { overview, queue, projects, generatedAt: (options.now ?? (() => new Date()))().toISOString() };
 }
 
-type Get = <T>(path: string) => Promise<Fetched<T>>;
+/** A read through the hub; `featureOff` is the answer when the route's feature gate refuses for that feature. */
+type Get = <T>(path: string, featureOff?: { feature: string; value: T }) => Promise<Fetched<T>>;
+
+/** A worktree with web.sidecar off has no sessions, which is not a failed read. */
+const SIDECAR_OFF = { feature: "web.sidecar", value: null };
 
 async function readProject(get: Get, id: string, github: boolean): Promise<ProjectReads> {
   const prefix = `/p/${encodeURIComponent(id)}`;
@@ -108,12 +117,21 @@ async function readProject(get: Get, id: string, github: boolean): Promise<Proje
     get<{ changesets: PendingChangeset[] }>(`${prefix}/api/changesets`),
   ]);
   const branchHealth: Record<string, Fetched<BranchHealth>> = {};
+  const sessionNotes: Record<string, Fetched<SidecarLedgerLatestResponse | null>> = {};
   if (workspaces.ok) {
     const query = github ? "?github=1" : "";
     await Promise.all(workspaces.value.workspaces.map(async ({ key }) => {
-      const slot = key === workspaces.value.anchor ? "" : `/w/${encodeURIComponent(key)}`;
-      branchHealth[key] = await get<BranchHealth>(`${prefix}${slot}/api/branch-health${query}`);
+      const slot = workspaceSlot(workspaces.value, key);
+      [branchHealth[key], sessionNotes[key]] = await Promise.all([
+        get<BranchHealth>(`${prefix}${slot}/api/branch-health${query}`),
+        get<SidecarLedgerLatestResponse | null>(`${prefix}${slot}${SIDECAR_LEDGER_LATEST_PATH}`, SIDECAR_OFF),
+      ]);
     }));
   }
-  return { status, concurrency, workspaces, worktrees, claims, changesets, branchHealth };
+  return { status, concurrency, workspaces, worktrees, claims, changesets, branchHealth, sessionNotes };
+}
+
+/** The path segment that addresses workspace `key` behind `/p/<id>`: none for the anchor, `/w/<key>` otherwise. */
+export function workspaceSlot(workspaces: SnapshotWorkspaces, key: string): string {
+  return key === workspaces.anchor ? "" : `/w/${encodeURIComponent(key)}`;
 }

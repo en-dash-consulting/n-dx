@@ -31,7 +31,7 @@ import {
 } from "./broker-policy.js";
 import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
-import { appendLedgerEntry, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
+import { appendLedgerEntryAt, sessionLedgerPath, WORKTREE_LEDGER_TYPES, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 
 export type SidecarCardStatus = "pending" | "approved" | "denied" | "withdrawn";
@@ -104,6 +104,17 @@ export interface SidecarBrokerOptions {
   /** Called when a card is raised or settled. */
   onCard?: (card: SidecarCard) => void;
   now?: () => number;
+  /**
+   * Where a session's ledger is and what its agent may write there. Defaults
+   * to a worktree's: `<dir>/<session>.ledger.jsonl`, {@link WORKTREE_LEDGER_TYPES}.
+   */
+  ledger?: SidecarLedgerTarget;
+}
+
+export interface SidecarLedgerTarget {
+  path: (sessionId: string) => string;
+  /** The types `ledger_append` accepts. */
+  types: readonly LedgerEntryType[];
 }
 
 interface PendingCard {
@@ -123,11 +134,18 @@ export class SidecarBroker {
   private readonly pending = new Map<string, PendingCard>();
   /** Per session, the decided calls still carrying out their effect; `withdraw` aborts them. */
   private readonly carrying = new Map<string, Set<AbortController>>();
+  private readonly ledger: SidecarLedgerTarget;
 
   constructor(opts: SidecarBrokerOptions) {
     this.dir = opts.dir;
     this.onCard = opts.onCard;
     this.now = opts.now ?? Date.now;
+    this.ledger = opts.ledger ?? { path: (sessionId) => sessionLedgerPath(opts.dir, sessionId), types: WORKTREE_LEDGER_TYPES };
+  }
+
+  /** The types a session's agent may write through `ledger_append`. */
+  get ledgerTypes(): readonly LedgerEntryType[] {
+    return this.ledger.types;
   }
 
   /**
@@ -339,10 +357,25 @@ export class SidecarBroker {
     return true;
   }
 
-  /** Append a typed entry to the session's ledger. Raises no card: the ledger is session-local. */
+  /**
+   * The agent's `ledger_append`: a typed entry in the session's ledger.
+   * Raises no card, since the ledger is the session's own; throws on a type
+   * this scope's agent may not write.
+   */
   appendLedger(sessionId: string, type: LedgerEntryType, text: string): LedgerEntry {
+    if (!this.ledger.types.includes(type)) throw new Error(`A ${type} ledger entry is not one this session writes`);
+    return this.writeLedger(sessionId, type, text);
+  }
+
+  /** The hub's drill-down: a `handoff` entry naming the hub's question, which no agent can write. */
+  appendHandoff(sessionId: string, text: string): LedgerEntry {
+    return this.writeLedger(sessionId, "handoff", text);
+  }
+
+  private writeLedger(sessionId: string, type: LedgerEntryType, text: string): LedgerEntry {
     const entry: LedgerEntry = { at: this.iso(), type, text };
-    appendLedgerEntry(this.dir, sessionId, entry);
+    ensureSidecarDir(this.dir);
+    appendLedgerEntryAt(this.ledger.path(sessionId), entry);
     return entry;
   }
 

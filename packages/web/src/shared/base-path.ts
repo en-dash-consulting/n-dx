@@ -51,12 +51,14 @@ export const HUB_SIDECAR_API_PREFIX = "/api/sidecar/hub";
  * - `lens`: whether the host can run the hub lens, and its context ceiling.
  * - `snapshot`: how many snapshot items changed since the session's last turn.
  * - `sessions`: the session routes.
+ * - `handoff`: "Open in worktree sidecar" — hand the hub's question to a worktree's session.
  */
 export const HUB_SESSION_ROUTES = {
   drawer: "/drawer",
   lens: "/lens",
   snapshot: "/snapshot",
   sessions: "/sessions",
+  handoff: "/handoff",
 } as const;
 
 /**

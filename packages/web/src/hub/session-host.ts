@@ -35,6 +35,15 @@ export function hubSidecarDir(hubHome: string): string {
   return join(hubHome, ...HUB_SIDECAR_HOST_LOCK_SEGMENTS.slice(0, -1));
 }
 
+/**
+ * `<hubHome>/hub/ledger.jsonl`: the hub session's ledger. It sits beside the
+ * session directory, not in it, because it is the machine's memory rather
+ * than one session's: a hub session opened after another ended reads it.
+ */
+export function hubLedgerPath(hubHome: string): string {
+  return join(dirname(hubSidecarDir(hubHome)), "ledger.jsonl");
+}
+
 export function hubSessionHostLockPath(hubHome: string): string {
   return join(hubHome, ...HUB_SIDECAR_HOST_LOCK_SEGMENTS);
 }

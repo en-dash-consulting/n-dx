@@ -9,7 +9,14 @@ items:
     lastModified: "2026-11-02T23:39:32.141Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "26ddda60-dd72-4d59-b529-2570bbd13a32":
-    lastModified: "2026-11-02T23:09:05.095Z"
+    status: "completed"
+    startedAt: "2026-11-03T00:59:02.745Z"
+    completedAt: "2026-11-03T01:19:11.637Z"
+    endedAt: "2026-11-03T01:19:11.637Z"
+    activeIntervals: [{"end":"2026-11-03T01:19:11.637Z","start":"2026-11-03T00:59:02.745Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub ledger at <ndx home>/hub/ledger.jsonl (decision-needed, handoff types), carried on every hub turn; hub handoff route + worktree handoff and ledger/latest routes; snapshot shows session notes; drawer lists worktrees with Open in worktree sidecar; ?sidecar= opens the worktree drawer."
+    lastModified: "2026-11-03T01:19:11.637Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2b2b2441-2c3d-43c9-85a1-99049f429b7b":
     status: "completed"
@@ -24,9 +31,12 @@ items:
   "314d8fa3-ea8c-4950-8a02-bd836a646b39":
     lastModified: "2026-11-03T00:02:34.404Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "702e743b-b4b4-4956-b7c3-9672a024963f":
+    lastModified: "2026-11-03T01:17:18.963Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "73f42fbb-cc9b-4c44-8798-06959e234fe2":
     issues: ["https://www.notion.so/3f7a80b7192481b59c3ed5aa3573b938","https://www.notion.so/3f7a80b7192481298930ed402a873f0b","https://www.notion.so/3f7a80b719248188879ff674aea13f31"]
-    lastModified: "2026-11-03T00:02:34.404Z"
+    lastModified: "2026-11-03T01:17:18.963Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "771fdf69-d81a-483e-8108-7d1c1be810cb":
     status: "completed"

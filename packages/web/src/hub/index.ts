@@ -97,6 +97,7 @@ export {
   claimHubSessionHost,
   hubSessionHostLockPath,
   hubSidecarDir,
+  hubLedgerPath,
   readHubSessionHostLock,
 } from "./session-host.js";
 export type { ClaimHubSessionHostInput, HubLensProbeOptions, HubSessionHostClaim, HubSessionHostLock } from "./session-host.js";

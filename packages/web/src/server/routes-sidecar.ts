@@ -27,6 +27,8 @@
  * | GET  | `/api/sidecar/sessions/:id/cards` | the session's permission cards |
  * | POST | `/api/sidecar/sessions/:id/cards/:cardId` | decide a card (`{ decision: "approve" \| "deny", reason?, remember?, edits?, lane? }`; `edits` only on a change-set approval; `lane`, the 0-based lane to start, only on a run-plan approval and required there) |
  * | GET  | `/api/sidecar/proposals` | change-set cards whose items are not in the PRD yet (the Plan tree's ghost rows) |
+ * | GET  | `/api/sidecar/ledger/latest` | each open session's latest `unfinished` and `decision` notes, which the hub snapshot shows per worktree |
+ * | POST | `/api/sidecar/handoff` | the hub's drill-down (`{ question, vendor }`): resume the latest open session or create one, leave a `handoff` entry naming the question, carry the ledger on its next turn |
  * | POST | `/api/sidecar/sessions/:id/mcp` | the `ndx-sidecar` broker (MCP, Streamable HTTP), while a turn runs |
  * | GET  | `/api/sidecar/allow-list` | the Sidecar allow-list |
  * | POST | `/api/sidecar/allow-list` | add a rule (`{ tool, argv }`); refused for work, reset, push and every never-allow-listed tool; `?dryRun=1` gives the same verdict and writes nothing |
@@ -46,7 +48,11 @@
  * `GET /api/sidecar/hub/drawer` (the drawer-only viewer page the hub home
  * docks) and `GET /api/sidecar/hub/lens` (whether it can run the hub lens,
  * and the hub ceiling); the host answers `GET /api/sidecar/hub/snapshot`, how
- * many snapshot items the open session's next turn marks Δ.
+ * many snapshot items the open session's next turn marks Δ and the worktrees
+ * it read, and `POST /api/sidecar/hub/handoff { project, worktree }`, "Open in
+ * worktree sidecar": the open session's latest question handed, through the
+ * hub, to that worktree's `/api/sidecar/handoff`. The hub session's ledger is
+ * `<ndx home>/hub/ledger.jsonl`, written only by its `ledger_append`.
  *
  * Sessions are the addressed workspace's: `ctx.projectDir` picks the registry
  * and broker (`<henchDir>/sidecar/`) and is the worktree a new session runs in.
@@ -73,7 +79,7 @@ import { errorMessage, errorResponse, jsonResponse, readBody } from "./response-
 import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/broker-credential.js";
 import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
-import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
+import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus, type SidecarLedgerTarget } from "./sidecar/broker.js";
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { startSidecarCommand } from "./routes-commands.js";
@@ -81,10 +87,21 @@ import { openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, startTaskExecu
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
-import { resolveContextCeiling } from "./sidecar/context-refresh.js";
+import { HUB_CHECKPOINT_PROMPT, resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readSidecarSettings, resolveSidecarIdleMs, saveSidecarSettings } from "./sidecar/settings.js";
 import { commitSettingsChange } from "./settings-commit.js";
-import { readLedger } from "./sidecar/ledger.js";
+import {
+  HUB_LEDGER_TYPES,
+  LEDGER_ENTRY_MAX_CHARS,
+  latestLedgerEntries,
+  readLedger,
+  readLedgerAt,
+  SIDECAR_LEDGER_LATEST_PATH,
+  type SidecarLedgerLatestResponse,
+} from "./sidecar/ledger.js";
+import { handOffToWorktree, SIDECAR_HANDOFF_PATH, type SidecarHandoffResponse } from "./sidecar/hub-handoff.js";
+import { resolveHubAccess } from "./sidecar/hub-snapshot-fetch.js";
+import type { HubSnapshotWorktreeRef } from "./sidecar/hub-snapshot.js";
 import { buildLensPacket, HUB_SCOPE_NEEDS, LENS_IDS, LENS_PACKETS, type LensTarget } from "./sidecar/lens-packets.js";
 import type { PacketTarget } from "./sidecar/packet-builders.js";
 import { createPacketSources, readResolution, type BranchHealthRead, type PacketSources, type SpawnedReads } from "./sidecar/packet-sources.js";
@@ -113,7 +130,7 @@ import {
   HUB_SIDECAR_API_PREFIX,
   SIDECAR_SESSION_ENDED_REASON,
 } from "../shared/index.js";
-import { claimHubSessionHost, hubSidecarDir, resolveHubHome } from "../hub/index.js";
+import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, resolveHubHome } from "../hub/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
@@ -448,10 +465,11 @@ function defaultRegistryFor(ctx: ServerContext, workspaces: SidecarWorkspaces | 
   return registry;
 }
 
-/** Build a broker for `projectDir` that announces its cards through `broadcast`. */
-export function createAnnouncingBroker(dir: string, broadcast: WebSocketBroadcaster): SidecarBroker {
+/** Build a broker for `dir` that announces its cards through `broadcast`; `ledger` defaults to a worktree's. */
+export function createAnnouncingBroker(dir: string, broadcast: WebSocketBroadcaster, ledger?: SidecarLedgerTarget): SidecarBroker {
   return new SidecarBroker({
     dir,
+    ...(ledger && { ledger }),
     onCard: (card: SidecarCard) => {
       const message: SidecarCardMessage = {
         type: "sidecar:card",
@@ -586,6 +604,7 @@ const HUB_SESSIONS = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.sessions}`;
 const HUB_DRAWER = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.drawer}`;
 const HUB_LENS_PATH = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.lens}`;
 const HUB_SNAPSHOT = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.snapshot}`;
+const HUB_HANDOFF = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.handoff}`;
 const HUB_LENS = "hub";
 const HUB_NO_EFFECT = "a hub session drafts and never acts, so this call does nothing from the hub";
 
@@ -618,18 +637,30 @@ export function hubSidecarBrokerEndpoint(ctx: ServerContext, sessionId: string):
 }
 
 /**
+ * The hub session's ledger: `<ndx home>/hub/ledger.jsonl`, the machine's
+ * rather than one session's, written only by the agent's `ledger_append`,
+ * which may also record a `decision-needed`.
+ */
+export function hubLedgerTarget(homeDir?: string): SidecarLedgerTarget {
+  const path = hubLedgerPath(resolveHubHome(homeDir));
+  return { path: () => path, types: HUB_LEDGER_TYPES };
+}
+
+/**
  * Checkpoint wiring for the hub session: the host project's hub ceiling
- * (`web.sidecarContextCeiling.hub`, default 40k, read per turn), the
- * session's ledger, and the hub lens's packet rebuilt from a fresh snapshot
- * on every turn.
+ * (`web.sidecarContextCeiling.hub`, default 40k, read per turn), the hub
+ * ledger (carried by every turn, since every turn carries the packet), and
+ * the hub lens's packet rebuilt from a fresh snapshot on every turn.
  */
 export function hubSidecarContextOptions(ctx: ServerContext, dir: string, opts: HubSidecarRouteOptions = {}): SidecarContextOptions {
   // The fingerprints of the snapshot each session's latest packet was built
   // from, written only once a turn carrying it completes.
   const pending = new Map<string, () => void>();
+  const ledger = hubLedgerTarget(opts.homeDir);
   return {
     ceiling: () => resolveContextCeiling(ctx.projectDir, "hub"),
-    ledger: (record) => readLedger(dir, record.id),
+    ledger: (record) => readLedgerAt(ledger.path(record.id)),
+    checkpointPrompt: HUB_CHECKPOINT_PROMPT,
     packetEveryTurn: true,
     packetDelivered: (record) => {
       const commit = pending.get(record.id);
@@ -694,7 +725,7 @@ function hubHostState(
             ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
             onTurnSpend: sidecarTurnSpendRecorder(ctx),
           }),
-      broker: opts.brokerFor ? opts.brokerFor(dir) : createAnnouncingBroker(dir, broadcast),
+      broker: opts.brokerFor ? opts.brokerFor(dir) : createAnnouncingBroker(dir, broadcast, hubLedgerTarget(opts.homeDir)),
     };
     hubHosts.set(key, state);
   }
@@ -713,6 +744,8 @@ export interface HubSessionPageConfig {
   sessions: string;
   lens: string;
   snapshot: string;
+  /** POST `{ project, worktree }`: "Open in worktree sidecar". */
+  handoff: string;
   /** The WebSocket path: the hub forwards an upgrade under it to the host. */
   socket: string;
   closeMessage: string;
@@ -725,6 +758,7 @@ export function hubSessionPageConfig(): HubSessionPageConfig {
     sessions: `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.sessions}`,
     lens: `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.lens}`,
     snapshot: `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.snapshot}`,
+    handoff: `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.handoff}`,
     socket: HUB_SESSION_PATH,
     closeMessage: HUB_SESSION_CLOSE_MESSAGE,
   };
@@ -765,6 +799,8 @@ export interface HubSnapshotDeltaResponse {
   omitted?: number;
   generatedAt?: string;
   error?: string;
+  /** The worktrees the snapshot read, each one a drawer row with "Open in worktree sidecar". */
+  worktrees?: HubSnapshotWorktreeRef[];
 }
 
 async function hubSnapshotDelta(
@@ -774,11 +810,58 @@ async function hubSnapshotDelta(
 ): Promise<HubSnapshotDeltaResponse> {
   const open = openHubSession(registry);
   if (!open) return { session: null, changed: null };
-  // Before a turn has delivered one there is nothing to be Δ against: the first turn reads the snapshot whole.
+  // Before a turn has delivered one there is nothing to be Δ against: the
+  // first turn reads the snapshot whole. Until then nothing is asked either,
+  // so there is no question to hand off and no row to offer it on.
   if (!hasHubSnapshotBaseline(dir, open.id)) return { session: open.id, changed: null };
   const read = await hubSnapshotReader(dir, open.id, { homeDir: opts.homeDir, ...(opts.fetch && { fetch: opts.fetch }) })();
   if (typeof read === "string") return { session: open.id, changed: null, error: read };
-  return { session: open.id, changed: read.changed.length, omitted: read.omitted, generatedAt: read.generatedAt };
+  return { session: open.id, changed: read.changed.length, omitted: read.omitted, generatedAt: read.generatedAt, worktrees: read.worktrees };
+}
+
+/** `POST /api/sidecar/hub/handoff`: the worktree session the hub's question went to, and the address that opens its drawer. */
+export interface HubHandoffResponse extends SidecarHandoffResponse {
+  url: string;
+}
+
+/** The operator's latest message to the hub session: the question a handoff names. */
+function latestHubQuestion(registry: SidecarSessionRegistry, id: string): string | null {
+  const frames = registry.readFrames(id);
+  for (let i = frames.length - 1; i >= 0; i -= 1) {
+    const frame = frames[i]!;
+    if (frame.type === "user") return frame.text;
+  }
+  return null;
+}
+
+/**
+ * "Open in worktree sidecar": hand the open hub session's latest question to
+ * the worktree `{ project, worktree }` names, through the hub. The hub ledger
+ * is not written: that is the agent's, through `ledger_append`.
+ */
+async function hubHandoff(
+  req: IncomingMessage,
+  res: ServerResponse,
+  registry: SidecarSessionRegistry,
+  opts: HubSidecarRouteOptions,
+): Promise<true> {
+  const body = await readJsonObject(req, res);
+  if (typeof body === "string") return refuse(res, 400, body);
+  const project = optionalString(body, "project");
+  const worktree = optionalString(body, "worktree");
+  if (typeof project !== "string" || typeof worktree !== "string") {
+    return refuse(res, 400, `"project" and "worktree" must name a project id and one of its workspace keys`);
+  }
+  const open = openHubSession(registry);
+  if (!open) return refuse(res, 409, "There is no open hub session to hand off from");
+  const question = latestHubQuestion(registry, open.id);
+  if (!question) return refuse(res, 409, "Ask the hub session something first: a handoff names the hub's question");
+  const access = resolveHubAccess(opts.homeDir);
+  if (!access) return refuse(res, 503, "No hub is running (no hub pid file names a port)");
+  const handed = await handOffToWorktree(access, { project, worktree, question, vendor: open.vendor }, opts.fetch ? { fetch: opts.fetch } : {});
+  if (!handed.ok) return refuse(res, handed.status, handed.error);
+  jsonResponse(res, 200, { session: handed.session, created: handed.created, url: handed.url } satisfies HubHandoffResponse);
+  return true;
 }
 
 /** The machine's open hub session, if there is one. */
@@ -873,6 +956,10 @@ async function handleHubSidecarRoute(
     jsonResponse(res, 200, await hubSnapshotDelta(registry, dir, opts));
     return true;
   }
+  if (pathname === HUB_HANDOFF) {
+    if (method !== "POST") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    return hubHandoff(req, res, registry, opts);
+  }
   return handleSessionRoutes(req, res, pathname, search, {
     prefix: HUB_SESSIONS,
     worktree: dir,
@@ -899,6 +986,7 @@ export async function handleSidecarRoute(
   if (
     pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`)
     && pathname !== ALLOW_LIST_PATH && pathname !== SETTINGS_PATH && pathname !== LENSES_PATH && pathname !== PROPOSALS_PATH
+    && pathname !== SIDECAR_LEDGER_LATEST_PATH && pathname !== SIDECAR_HANDOFF_PATH
   ) {
     return false;
   }
@@ -915,6 +1003,22 @@ export async function handleSidecarRoute(
   if (pathname === PROPOSALS_PATH) {
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${PROPOSALS_PATH}`);
     jsonResponse(res, 200, { cards: broker.proposals() });
+    return true;
+  }
+
+  if (pathname === SIDECAR_LEDGER_LATEST_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${SIDECAR_LEDGER_LATEST_PATH}`);
+    jsonResponse(res, 200, latestSessionNotes(registry, ctx.projectDir));
+    return true;
+  }
+
+  if (pathname === SIDECAR_HANDOFF_PATH) {
+    if (method !== "POST") return refuse(res, 405, `${method} is not supported on ${SIDECAR_HANDOFF_PATH}`);
+    const body = await readJsonObject(req, res);
+    if (typeof body === "string") return refuse(res, 400, body);
+    const handed = receiveHandoff(registry, broker, ctx.projectDir, body);
+    if ("error" in handed) return refuse(res, handed.status, handed.error);
+    jsonResponse(res, handed.created ? 201 : 200, handed);
     return true;
   }
 
@@ -976,6 +1080,60 @@ export async function handleSidecarRoute(
     actions: () => (opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast, { workspaces: opts.workspaces })),
     create: (body) => createWorktreeSession(registry, ctx.projectDir, body),
   });
+}
+
+/** The notes the hub snapshot shows per worktree session. */
+const SNAPSHOT_NOTE_TYPES = ["unfinished", "decision"] as const;
+
+/** `GET /api/sidecar/ledger/latest`: each open session's latest unfinished and decision notes, sessions with neither left out. */
+function latestSessionNotes(registry: SidecarSessionRegistry, worktree: string): SidecarLedgerLatestResponse {
+  const dir = worktreeSidecarDir(worktree);
+  const sessions = registry.list({ scope: "worktree", worktree })
+    .filter((session) => !session.endedAt)
+    .flatMap((session) => {
+      const latest = latestLedgerEntries(readLedger(dir, session.id), SNAPSHOT_NOTE_TYPES);
+      return latest.unfinished || latest.decision ? [{ id: session.id, name: session.name, ...latest }] : [];
+    });
+  return { sessions };
+}
+
+/** The open session a handoff resumes: the worktree's most recently active one that has not ended. */
+function latestOpenSession(registry: SidecarSessionRegistry, worktree: string): SidecarSessionRecord | undefined {
+  return registry.list({ scope: "worktree", worktree })
+    .filter((session) => !session.endedAt)
+    .sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt))[0];
+}
+
+/** The handoff entry: the hub's question, cut to the ledger's entry cap. */
+function handoffText(question: string): string {
+  const text = `The hub session handed this over. Its question: ${question.replace(/\s+/g, " ").trim()}`;
+  return text.length <= LEDGER_ENTRY_MAX_CHARS ? text : `${text.slice(0, LEDGER_ENTRY_MAX_CHARS - 1)}…`;
+}
+
+/**
+ * `POST /api/sidecar/handoff { question, vendor }`, which the hub session's
+ * "Open in worktree sidecar" sends through the hub: resume this worktree's
+ * latest open session, or create one on `vendor`, leave a `handoff` entry
+ * naming the question in its ledger, and make its next turn carry the ledger.
+ */
+function receiveHandoff(
+  registry: SidecarSessionRegistry,
+  broker: SidecarBroker,
+  worktree: string,
+  body: Record<string, unknown>,
+): SidecarHandoffResponse | { status: 400; error: string } {
+  const question = optionalString(body, "question");
+  if (typeof question !== "string") return { status: 400, error: `"question" must be a non-empty string` };
+  let session = latestOpenSession(registry, worktree);
+  const created = !session;
+  if (!session) {
+    const made = createWorktreeSession(registry, worktree, { vendor: body.vendor, name: "From the hub" });
+    if ("error" in made) return { status: 400, error: made.error };
+    session = made.session;
+  }
+  broker.appendHandoff(session.id, handoffText(question));
+  registry.carryContextNext(session.id);
+  return { session: { id: session.id, name: session.name }, created };
 }
 
 /** What a create answers: the session and its status, or a refusal. */

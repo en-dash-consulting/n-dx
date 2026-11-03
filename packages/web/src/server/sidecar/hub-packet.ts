@@ -87,7 +87,14 @@ export function hubSnapshotReader(
       const commit = (): void => {
         writeRunFileAtomic(dir, `${sessionId}.snapshot`, snapshot.state as unknown as Record<string, unknown>);
       };
-      return { text: snapshot.text, generatedAt: input.generatedAt, changed: snapshot.changed, omitted: snapshot.omitted, commit };
+      return {
+        text: snapshot.text,
+        generatedAt: input.generatedAt,
+        changed: snapshot.changed,
+        omitted: snapshot.omitted,
+        worktrees: snapshot.worktrees,
+        commit,
+      };
     } catch (err) {
       return `the hub snapshot could not be built: ${errorMessage(err)}`;
     }

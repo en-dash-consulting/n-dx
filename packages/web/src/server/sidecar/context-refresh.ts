@@ -17,7 +17,7 @@
  */
 
 import type { TokenUsage } from "@n-dx/llm-client";
-import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES } from "./ledger.js";
+import { HUB_LEDGER_TYPES, LEDGER_ENTRY_MAX_CHARS, WORKTREE_LEDGER_TYPES, type LedgerEntryType } from "./ledger.js";
 import { positiveInteger, readWebValue } from "./web-config.js";
 
 export type SidecarScope = "worktree" | "hub";
@@ -56,13 +56,26 @@ export function resolveContextCeiling(projectDir: string, scope: SidecarScope): 
   return value ?? DEFAULT_CONTEXT_CEILINGS[scope];
 }
 
-/** The checkpoint turn's prompt: ask for the ledger, nothing else. */
-export const CHECKPOINT_PROMPT = [
-  "Your context is full and this session is about to start over with a clean one.",
-  "Before it does, record what the next session must not lose: call `ledger_append` once per note.",
-  `Types: ${LEDGER_ENTRY_TYPES.join(", ")}. At most ${LEDGER_ENTRY_MAX_CHARS} characters each; keep only what is not recoverable from the repository.`,
-  "Make no other tool calls, then reply with the single word: done.",
-].join("\n");
+/**
+ * The checkpoint turn's prompt: ask for the ledger, nothing else.
+ *
+ * @param types        what this scope's agent may write
+ * @param recoverable  where the next session can read again what it need not note
+ */
+export function checkpointPrompt(types: readonly LedgerEntryType[], recoverable: string): string {
+  return [
+    "Your context is full and this session is about to start over with a clean one.",
+    "Before it does, record what the next session must not lose: call `ledger_append` once per note.",
+    `Types: ${types.join(", ")}. At most ${LEDGER_ENTRY_MAX_CHARS} characters each; keep only what is not recoverable from ${recoverable}.`,
+    "Make no other tool calls, then reply with the single word: done.",
+  ].join("\n");
+}
+
+/** A worktree session's checkpoint prompt. */
+export const CHECKPOINT_PROMPT = checkpointPrompt(WORKTREE_LEDGER_TYPES, "the repository");
+
+/** The hub session's: it may also note a decision the operator still has to make. */
+export const HUB_CHECKPOINT_PROMPT = checkpointPrompt(HUB_LEDGER_TYPES, "the hub snapshot");
 
 export interface ColdPromptInput {
   /** The rebuilt lens packet text; absent for a lens that sends none. */
@@ -96,7 +109,15 @@ export function composeColdPrompt(input: ColdPromptInput): string {
   return parts.join("\n\n");
 }
 
-/** A turn that opens with the lens packet: the packet, then the operator's message. */
-export function composeOpeningPrompt(input: { packet: string; prompt: string }): string {
-  return `${input.packet}\n\n## Operator's message\n${input.prompt}`;
+/**
+ * A turn that carries the lens packet, the ledger, or both, then the
+ * operator's message. The ledger rides with the packet: a session opened
+ * fresh, re-lensed or handed off to still has its notes.
+ */
+export function composeOpeningPrompt(input: { packet?: string; ledger?: string; prompt: string }): string {
+  const parts: string[] = [];
+  if (input.packet) parts.push(input.packet);
+  if (input.ledger) parts.push(`## Session ledger\n${input.ledger}`);
+  parts.push(`## Operator's message\n${input.prompt}`);
+  return parts.join("\n\n");
 }

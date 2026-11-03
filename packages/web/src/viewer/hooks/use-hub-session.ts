@@ -22,6 +22,7 @@ export interface HubSessionPageConfig {
   sessions: string;
   lens: string;
   snapshot: string;
+  handoff: string;
   socket: string;
   closeMessage: string;
 }
@@ -39,7 +40,7 @@ export function readHubSessionPageConfig(doc: Document = document): HubSessionPa
   } catch {
     return null;
   }
-  const keys = ["sessions", "lens", "snapshot", "socket", "closeMessage"] as const;
+  const keys = ["sessions", "lens", "snapshot", "handoff", "socket", "closeMessage"] as const;
   return keys.every((k) => typeof parsed[k] === "string") ? (parsed as HubSessionPageConfig) : null;
 }
 
@@ -65,6 +66,40 @@ export interface HubSnapshotDelta {
   omitted?: number;
   generatedAt?: string;
   error?: string;
+  /** The worktrees the snapshot read; absent before the session's first delivered turn. */
+  worktrees?: HubSnapshotWorktree[];
+}
+
+/** Mirrors `HubSnapshotWorktreeRef` in server/sidecar/hub-snapshot.ts. */
+export interface HubSnapshotWorktree {
+  project: string;
+  projectName: string;
+  key: string;
+  branch: string | null;
+  changed: boolean;
+}
+
+/**
+ * "Open in worktree sidecar": the host hands the session's latest question to
+ * that worktree's session through the hub. Answers the dashboard address that
+ * opens the worktree's drawer on it, or why it could not.
+ */
+export async function requestHubHandoff(
+  config: HubSessionPageConfig,
+  target: Pick<HubSnapshotWorktree, "project" | "key">,
+): Promise<{ url: string } | { error: string }> {
+  try {
+    const res = await fetch(config.handoff, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project: target.project, worktree: target.key }),
+    });
+    const body = (await res.json().catch(() => null)) as { url?: unknown; error?: unknown } | null;
+    if (res.ok && typeof body?.url === "string") return { url: body.url };
+    return { error: typeof body?.error === "string" ? body.error : `The host answered ${res.status}` };
+  } catch (err) {
+    return { error: `The host did not answer: ${err instanceof Error ? err.message : String(err)}` };
+  }
 }
 
 export interface HubSessionInfo {

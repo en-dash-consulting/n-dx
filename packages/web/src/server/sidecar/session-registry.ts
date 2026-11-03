@@ -70,9 +70,10 @@ export interface SidecarSessionRecord {
   /** What the lens is pointed at (an item id, display id or alias); absent means no target. */
   target?: PacketTarget;
   /**
-   * The next turn carries the packet even though it resumes: the lens or
-   * target changed, or the turn that carried it did not complete. A turn
-   * that opens a vendor session always carries it.
+   * The next turn carries the packet and the ledger even though it resumes:
+   * the lens or target changed, the hub handed the session off, or the turn
+   * that carried them did not complete. A turn that opens a vendor session
+   * always carries them.
    */
   packetDue?: true;
   /** Vendor session id the next turn resumes; absent before the first turn and after the TTL. */
@@ -138,8 +139,10 @@ export type SidecarSessionConnect = (
 export interface SidecarContextOptions {
   /** Tokens of context above which a turn checkpoints. */
   ceiling: (record: SidecarSessionRecord) => number;
-  /** The session's ledger, oldest first. */
+  /** The session's ledger, oldest first. A turn carrying the packet carries it too. */
   ledger: (record: SidecarSessionRecord) => LedgerEntry[];
+  /** What the checkpoint turn asks; defaults to a worktree session's {@link CHECKPOINT_PROMPT}. */
+  checkpointPrompt?: string;
   /** The lens packet rebuilt fresh; `undefined` for a lens that sends none. */
   packet?: (record: SidecarSessionRecord, signal: AbortSignal) => Promise<string | undefined>;
   /**
@@ -337,6 +340,20 @@ export class SidecarSessionRegistry {
     return this.view(record);
   }
 
+  /**
+   * Make the session's next turn carry its packet and ledger even though it
+   * resumes: the hub just left a handoff in the ledger. Bumps its activity,
+   * so the drawer opens it first. Returns undefined for an unknown session.
+   */
+  carryContextNext(id: string): SidecarSessionRecord | undefined {
+    const record = this.records.get(id);
+    if (!record) return undefined;
+    record.packetDue = true;
+    record.lastActivityAt = this.iso();
+    this.persist();
+    return this.view(record);
+  }
+
   /** Keep how a turn ended on the session. No-op for an unknown session. */
   recordTurnEnd(id: string, outcome: SidecarTurnOutcome): void {
     const record = this.records.get(id);
@@ -398,9 +415,10 @@ export class SidecarSessionRegistry {
     const live = this.liveSession(record);
 
     this.reconcileCursor(record);
-    // The packet opens a fresh vendor session and the turn after a lens or
-    // target change; a refreshed turn carries it in its cold prompt.
-    const opening = !cold && !!context?.packet && (fresh || record.packetDue === true || context.packetEveryTurn === true);
+    // The packet and the ledger open a fresh vendor session and the turn after
+    // a lens or target change or a handoff; a refreshed turn carries both in
+    // its cold prompt.
+    const opening = !cold && !!context && (fresh || record.packetDue === true || context.packetEveryTurn === true);
     // Consumed now, so a lens or target change made while this turn runs
     // stays due for the next one; restored below unless the turn completes.
     let delivered = false;
@@ -435,9 +453,10 @@ export class SidecarSessionRegistry {
         }
       }
 
-      if (opening) {
-        const packet = await context?.packet?.(record, signal);
-        if (packet) vendorPrompt = composeOpeningPrompt({ packet, prompt });
+      if (opening && context) {
+        const packet = await context.packet?.(record, signal);
+        const ledger = renderLedger(context.ledger(record)).text;
+        if (packet || ledger) vendorPrompt = composeOpeningPrompt({ packet, ledger, prompt });
         if (this.stopRequested.has(record.id)) {
           return { turn: live.session.turns, status: "interrupted", events: [], tokenUsage: { input: 0, output: 0 }, exitCode: null };
         }
@@ -490,7 +509,7 @@ export class SidecarSessionRegistry {
     record.refresh = measured;
     this.persist();
     live.sink = (event) => append({ seq: record.cursor + 1, at: this.iso(), type: "event", event, checkpoint: true });
-    const result = await live.session.sendTurn(CHECKPOINT_PROMPT);
+    const result = await live.session.sendTurn(this.context?.checkpointPrompt ?? CHECKPOINT_PROMPT);
     record.tokens = addTokenUsage(record.tokens, result.tokenUsage);
   }
 
