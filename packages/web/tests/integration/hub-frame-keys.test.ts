@@ -227,7 +227,11 @@ describe("a frame key is refused with 401 everywhere but its own extension's pat
 
   it("on another extension's /x/<other>/ path, with an unknown key, and with an expired one", async () => {
     const { key } = await keyedUrl();
-    expect((await fetch(`${base()}/x/other/~f/${key}/`)).status).toBe(401);
+    const wrongExtension = await fetch(`${base()}/x/other/~f/${key}/`);
+    expect(wrongExtension.status).toBe(401);
+    // A keyed refusal is a keyed response: sandboxed and Referer-free like the rest.
+    expect(wrongExtension.headers.get("content-security-policy")).toBe(FRAME_CSP);
+    expect(wrongExtension.headers.get("referrer-policy")).toBe("no-referrer");
     expect((await fetch(`${base()}/x/recon/~f/${"A".repeat(43)}/`)).status).toBe(401);
     // Without the key, the plain mount still needs the token.
     expect((await fetch(`${base()}/x/recon/`)).status).toBe(401);
@@ -280,7 +284,9 @@ describe("a keyed request", () => {
   it("accepts the sandboxed page's Origin: null, and refuses a foreign Origin", async () => {
     const { key } = await keyedUrl();
     expect((await fetch(`${base()}/x/recon/~f/${key}/form`, { method: "POST", headers: { Origin: "null" } })).status).toBe(200);
-    expect((await fetch(`${base()}/x/recon/~f/${key}/form`, { method: "POST", headers: { Origin: "http://evil.example" } })).status).toBe(403);
+    const foreign = await fetch(`${base()}/x/recon/~f/${key}/form`, { method: "POST", headers: { Origin: "http://evil.example" } });
+    expect(foreign.status).toBe(403);
+    expect(foreign.headers.get("content-security-policy")).toBe(FRAME_CSP);
   });
 
   it("slides the key's window with use, and the key goes stale after idleStopMinutes without it", async () => {

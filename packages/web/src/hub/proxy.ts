@@ -110,6 +110,11 @@ export const FRAME_CSP = "sandbox allow-scripts allow-forms allow-popups allow-d
 /** Headers a frame-keyed response carries; the key in the URL must not leave in a Referer. */
 const FRAME_RESPONSE_HEADERS = { "Content-Security-Policy": FRAME_CSP, "Referrer-Policy": "no-referrer" } as const;
 
+/** Put {@link FRAME_RESPONSE_HEADERS} on a keyed response before anything answers it, refusals included. */
+export function setFrameResponseHeaders(res: ServerResponse): void {
+  for (const [name, value] of Object.entries(FRAME_RESPONSE_HEADERS)) res.setHeader(name, value);
+}
+
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
   | { kind: "proxy"; project: ProjectView; path: string; prefix: string }
@@ -551,9 +556,7 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
   if (await handleReloadSignal(req, res, hub)) return;
   const decision = decideProxy(hub, req.url || "/");
   // Every keyed answer — redirect, refusal or the sidecar's own — is sandboxed.
-  if (parseKeyedPath((req.url || "/").split("?")[0])) {
-    for (const [name, value] of Object.entries(FRAME_RESPONSE_HEADERS)) res.setHeader(name, value);
-  }
+  if (parseKeyedPath((req.url || "/").split("?")[0])) setFrameResponseHeaders(res);
   switch (decision.kind) {
     case "sidecar": {
       // A cold start can take seconds; a client gone by its end is neither

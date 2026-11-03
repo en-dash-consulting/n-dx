@@ -40,7 +40,7 @@ import {
 } from "./registry.js";
 import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
-import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
+import { handleProxyRequest, handleProxyUpgrade, setFrameResponseHeaders } from "./proxy.js";
 import { frameKeyUpgradeRefusal, guardFrameKeyRequest, guardHubRequest, upgradeRefusal } from "./request-guard.js";
 import { FrameKeys, parseKeyedPath } from "./frame-keys.js";
 import type { FrameKeyOptions } from "./frame-keys.js";
@@ -591,6 +591,8 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // A frame-keyed sidecar path presents its key in place of the token.
     const keyed = parseKeyedPath((req.url || "/").split("?")[0]);
     if (keyed) {
+      // Before the guard, so its refusals are sandboxed and Referer-free too.
+      setFrameResponseHeaders(res);
       if (guardFrameKeyRequest(req, res, hub.listeningPort, hub.frameKeys.accept(keyed.name, keyed.key))) return;
     } else if (guardHubRequest(req, res, hub.listeningPort, hub.token)) return;
     void handleHubRoute(req, res, hub)
