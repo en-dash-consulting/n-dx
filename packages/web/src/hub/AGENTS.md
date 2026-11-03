@@ -44,7 +44,8 @@ re-attached, because nothing records them for the next hub.
 The proxy treats a sidecar as untrusted code: the token is checked at the hub's
 boundary like any request, then `sidecarHeaderValue` (proxy.ts) drops every place
 it rides — `X-Ndx-Token`, the `ndx_token` cookie, a bearer carrying it — from
-HTTP and WebSocket requests alike, and `X-Ndx-Base-Path: /x/<name>/` is added.
+HTTP and WebSocket requests alike, and `X-Ndx-Base-Path` (with the token,
+the keyed `/x/<name>/~<key>/`; docs/extensions/hub-api.md) is added.
 Unknown, disabled and unapproved names are all 404, with core's `reason` in the
 body. `x` is reserved as a project id (`isReservedProjectId`, twinned in
 `packages/core/web.js`): registration refuses it and derivation hashes it.
@@ -64,11 +65,30 @@ stripped (HTTP streamed, WebSocket upgrades piped over `node:net`), and aliases
 the root to the sole registered project; with several registered, `/` is a
 project list and other root paths answer 409 with the ids.
 
+**Origin.** The proxy restates this hub's own `Origin` as the child's (the
+child judges origins against its own port) and forwards any other `Origin`
+unchanged, so a child route that refuses foreign-site GETs still sees it.
+
+**Credentials.** The hub answers `/api/auth/*` itself (root or any `/p/<id>/`),
+so landing nonces, browser sessions and WebSocket tickets are the hub's and
+die with it. The proxy strips the client's `Authorization`/`X-Ndx-Token` and,
+for an authenticated request, sends the per-user token instead; a public-only
+request (`isPublicOnlyHubRequest`) is proxied with none, and the hub's own API
+refuses it. See [web-server.md](../../../../docs/architecture/web-server.md#authentication).
+
+**Spawned binary.** Project servers are spawned from `hub.selfBin`, the hub's
+own entry point, passed to every supervisor as `SupervisorOptions.ndxBin`. A
+registration body's `ndxBin` is ignored, and a registry record has no binary
+field: one saved by an older hub is stripped on load (`loadRegistryHealing`),
+logged, and `hub.json` rewritten before anything spawns; a live server such a
+record left running is replaced rather than adopted. `resolveSelfBin` never
+falls back to the registry.
+
 The viewer derives the same prefix from `location.pathname` at boot
 (`viewer/base-path.ts`), and both sides use `src/shared/base-path.ts`, so where
 the prefix ends is defined once. **New viewer code must not hand-build
 `ws://…${location.host}` or `location.origin + "/api/…"`** — go through
-`installBasePathFetch()`, `getWebSocketUrl()` and `appUrl()`.
+`installBasePathFetch()`, `openWebSocket()` and `appUrl()`.
 
 **Workspace slot.** The viewer's base path also carries `/w/<key>` when it
 addresses a worktree other than the anchor (`detectViewerBasePath`), so

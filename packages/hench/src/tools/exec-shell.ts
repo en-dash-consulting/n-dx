@@ -1,5 +1,6 @@
 import { exec, execShellCmd } from "../process/exec.js";
 import { isVerbose, verbose } from "../types/output.js";
+import type { ToolSandbox } from "../guard/sandbox.js";
 
 export interface ExecShellOptions {
   /** Shell command string to execute. */
@@ -12,6 +13,8 @@ export interface ExecShellOptions {
   maxBuffer?: number;
   /** Spread into the child process env. Defaults to process.env. */
   env?: NodeJS.ProcessEnv;
+  /** When set, the shell runs inside this OS sandbox. */
+  sandbox?: ToolSandbox | null;
 }
 
 /** Options for {@link execArgv} — a shell-free spawn of one binary with argv. */
@@ -28,6 +31,8 @@ export interface ExecArgvOptions {
   maxBuffer?: number;
   /** Spread into the child process env. Defaults to process.env. */
   env?: NodeJS.ProcessEnv;
+  /** When set, the binary runs inside this OS sandbox. */
+  sandbox?: ToolSandbox | null;
 }
 
 /**
@@ -75,9 +80,17 @@ export async function execShell(opts: ExecShellOptions): Promise<string> {
     timeout,
     maxBuffer = 1024 * 1024,
     env = { ...process.env },
+    sandbox,
   } = opts;
 
   const liveTail = createLiveTail();
+  if (sandbox) {
+    // The same shell execShellCmd would pick, wrapped by the backend.
+    const inv = sandbox.wrapShell(command);
+    const result = await exec(inv.file, inv.args, { cwd, timeout, maxBuffer, env: { ...env, ...inv.env }, onData: liveTail.onData });
+    liveTail.flush();
+    return formatExecOutcome(result, timeout);
+  }
   // execShellCmd, not exec("sh", ...) — `sh` does not resolve on Windows
   // outside a POSIX environment, and the resulting ENOENT reported as
   // exitCode 1 with no output looked exactly like a failing command.
@@ -105,10 +118,12 @@ export async function execArgv(opts: ExecArgvOptions): Promise<string> {
     timeout,
     maxBuffer = 1024 * 1024,
     env = { ...process.env },
+    sandbox,
   } = opts;
 
   const liveTail = createLiveTail();
-  const result = await exec(file, args, { cwd, timeout, maxBuffer, env, onData: liveTail.onData });
+  const inv = sandbox ? sandbox.wrap(file, args) : { file, args, env: {} };
+  const result = await exec(inv.file, inv.args, { cwd, timeout, maxBuffer, env: { ...env, ...inv.env }, onData: liveTail.onData });
   liveTail.flush();
   return formatExecOutcome(result, timeout);
 }

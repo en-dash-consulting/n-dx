@@ -223,3 +223,51 @@ test("the Live tab peeks on hover and navigates on click", async ({ page }) => {
   await expect(page.locator('nav[aria-label="Running now"]')).toHaveCount(1);
   expect(tracker.errors).toEqual([]);
 });
+
+
+test("top bar preserves brand and project at intermediate widths", async ({ page }) => {
+  await gotoView(page, "home");
+  await page.locator(".breadcrumb-project").evaluate((el) => { el.textContent = "A particularly long project name for layout coverage"; });
+  for (const width of [1024, 1150, 1280, 1400]) {
+    await page.setViewportSize({ width, height: 900 });
+    const sizes = await page.evaluate(() => ({
+      bar: document.querySelector(".topnav")!.getBoundingClientRect().width,
+      brand: document.querySelector(".topnav-brand")!.getBoundingClientRect().width,
+      project: document.querySelector(".project-context")!.getBoundingClientRect().width,
+      page: document.documentElement.scrollWidth,
+    }));
+    expect(sizes.bar).toBeLessThanOrEqual(width);
+    expect(sizes.page).toBeLessThanOrEqual(width);
+    expect(sizes.brand).toBeGreaterThanOrEqual(100);
+    expect(sizes.project).toBeGreaterThanOrEqual(100);
+  }
+});
+
+
+test("floating notices and expanded panels share vertical space at phone width", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoView(page, "home");
+  await page.locator(".status-dock").evaluate((stack) => {
+    stack.replaceChildren();
+    for (const className of ["refresh-toast", "rex-toast", "audit-toast", "wf-toast", "hench-template-toast", "polling-suspension-indicator"]) {
+      const notice = document.createElement("div");
+      notice.className = className;
+      notice.textContent = "A status message with enough text to wrap on a narrow screen";
+      stack.append(notice);
+    }
+    const tray = document.createElement("div");
+    tray.className = "sessions-panel";
+    tray.innerHTML = '<button class="sessions-toggle">Sessions</button><ul class="sessions-list"><li>Running a task</li></ul>';
+    stack.append(tray);
+  });
+  const boxes = await page.locator(".status-dock > *").evaluateAll((items) => items.map((item) => {
+    const rect = item.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
+  }));
+  for (let i = 0; i < boxes.length; i++) {
+    expect(boxes[i]!.left).toBeGreaterThanOrEqual(0);
+    expect(boxes[i]!.right).toBeLessThanOrEqual(390);
+    expect(boxes[i]!.bottom).toBeLessThan(804);
+    if (i > 0) expect(boxes[i]!.bottom).toBeLessThanOrEqual(boxes[i - 1]!.top);
+  }
+});

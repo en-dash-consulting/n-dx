@@ -228,7 +228,7 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     if (!canBindPorts) return;
     const result = runStart(["--hub", `--port=${hubPort}`, worktreeA]);
     expect(result.code, result.stderr + result.stdout).toBe(0);
-    expect(result.stdout).toContain(`http://localhost:${hubPort}/p/alpha-app/`);
+    expect(result.stdout).toContain(`http://127.0.0.1:${hubPort}/p/alpha-app/`);
     expect(result.stdout).toContain(`/p/alpha-app/mcp/rex`);
     expect(result.stdout).toContain("n-dx hub started");
     expect(result.stdout).toContain("Stop: ndx start stop .   (or 'ndx hub stop' for every project)");
@@ -304,7 +304,7 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
     expect(status.stdout).toContain(`Hub:        PID ${hubHealth.body.pid}, port ${hubPort}`);
     expect(status.stdout).toContain('Project:    "alpha-app" is healthy');
     expect(status.stdout).toContain("Worktrees:  2 registered");
-    expect(status.stdout).toContain(`http://localhost:${hubPort}/p/alpha-app/`);
+    expect(status.stdout).toContain(`http://127.0.0.1:${hubPort}/p/alpha-app/`);
   });
 
   it("--here still starts the single-project server on the requested port", async () => {
@@ -316,7 +316,7 @@ describe("ndx start --hub (e2e)", { timeout: 180_000 }, () => {
       const status = await getJsonWhenListening(`http://127.0.0.1:${herePort}/api/status`);
       expect(status.status).toBe(200);
       expect(status.body.projectDir).toBe(repoB);
-      expect(result.stdout).toContain(`http://localhost:${herePort}`);
+      expect(result.stdout).toContain(`http://127.0.0.1:${herePort}`);
       expect(result.stdout).not.toContain("/p/");
     } finally {
       runStart(["stop", repoB]);

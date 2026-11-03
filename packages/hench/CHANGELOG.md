@@ -1,5 +1,48 @@
 # @n-dx/hench
 
+## 0.10.2
+
+### Patch Changes
+
+- [#878](https://github.com/en-dash-consulting/n-dx/pull/878) [`e288e41`](https://github.com/en-dash-consulting/n-dx/commit/e288e419d950d53f3e8266c3a4b6b2e0a94e854e) Thanks [@endash-shal](https://github.com/endash-shal)! - Pin the existing CLI invocation log discount at the completion gate and full
+  run finalizer, including the rotated log and the case where genuine agent
+  work remains uncommitted beside it. Reconcile the original PRD item with
+  the runtime fix already on main.
+
+- [#931](https://github.com/en-dash-consulting/n-dx/pull/931) [`0e063a2`](https://github.com/en-dash-consulting/n-dx/commit/0e063a218622a3aa856c3d854fbbcc2552459b81) Thanks [@endash-shal](https://github.com/endash-shal)! - Escalate a task that keeps failing to a stronger vendor or model before it is
+  skipped as stuck. New settings, off by default: `hench.escalation.enabled`
+  (false), `hench.escalation.after` (2 consecutive failures), `hench.escalation.vendor`,
+  an optional `hench.escalation.model`, and `hench.escalation.maxAttempts` (1).
+  When a task reaches `after` failures (or `hench.maxFailedAttempts`, if lower),
+  its next attempt runs on the escalation vendor and model through the per-task
+  settings resolution, on that vendor's CLI when it has one; an explicit
+  `--model` flag and a task's saved `run` block keep their precedence. Hench
+  logs one line per escalated attempt, records `escalation` on the run record,
+  and `ndx work --resolve` reports it. Only when the escalated attempts also
+  fail is the task skipped as stuck. `ndx config`, `hench config` and the
+  dashboard offer the new keys.
+  
+  Stuck and forced-advancement exclusions now also apply when selecting from a
+  v1 PRD, where they had stopped taking effect.
+
+- [#931](https://github.com/en-dash-consulting/n-dx/pull/931) [`75005d4`](https://github.com/en-dash-consulting/n-dx/commit/75005d43e70d932c1e298906604aba6979fd81bd) Thanks [@endash-shal](https://github.com/endash-shal)! - A test-gate failure now tells the next attempt what failed. When the full test
+  gate fails a run, hench records a short `failureReason` on the task: the
+  failing tests (vitest, jest and node:test output) with the first assertion or
+  error line of each, or the last 20 lines of gate output when none can be read,
+  capped and redacted like the run log. A failing test in a file the run itself
+  added or changed carries a hint that the test may be wrong and should be fixed
+  rather than the code. The next brief shows it under "Previous attempt failed",
+  and a run that completes the task clears it. Works for every vendor.
+
+- [#931](https://github.com/en-dash-consulting/n-dx/pull/931) [`e147a8f`](https://github.com/en-dash-consulting/n-dx/commit/e147a8fd658bb12dd687592b9d983a88697ebdfc) Thanks [@endash-shal](https://github.com/endash-shal)! - API and local agents edit files without rewriting them whole. hench's tool set for the API, local and Gemini loops gains `edit_file` (replace an exact `old_string` with `new_string`; it must match once unless `replace_all` is set, the error names the count, and CRLF files keep their line endings), and the system prompt tells those agents to use it for existing files. `write_file` now refuses to replace an existing file larger than `hench.guard.writeShrinkMinBytes` (default 1024) with content under `hench.guard.writeShrinkRatio` of its size (default 0.5, 0 disables) unless the call passes `rewrite: true`, and points the model at `edit_file`. Livelock, plan-only and completion checks, run summaries and run events count `edit_file` as a file change. Both keys are documented in `ndx config --help`, offered by `hench config` and the dashboard, and checked by the repository trust review.
+
+- [#931](https://github.com/en-dash-consulting/n-dx/pull/931) [`c5a6067`](https://github.com/en-dash-consulting/n-dx/commit/c5a6067cfe5db0239e428ecb218a0dc8f92c3a98) Thanks [@endash-shal](https://github.com/endash-shal)! - Local-model runs survive a dropped LM Studio connection. A refused or dropped connection to the local server (`fetch failed`, `ECONNREFUSED`, `ECONNRESET`, `UND_ERR_SOCKET`, …) is retried with capped exponential backoff on the provider's blocking and streaming paths and in hench's local tool loop, configured by the new `llm.local.maxRetries` (default 6), `llm.local.retryBaseDelayMs` (default 2000) and `llm.local.retryMaxDelayMs` (default 60000) — about two minutes, long enough for a model reload. When those run out the error is a retryable `ClaudeClientError` with the new reason `"network"`, naming the server, the attempts made and the settings to raise, and hench's local loop retries the turn again on `hench.retry.*` before failing the task. A request that hits `llm.local.timeoutMs` still fails without a retry. The settings are listed and validated by `ndx config`.
+
+- [#931](https://github.com/en-dash-consulting/n-dx/pull/931) [`95875df`](https://github.com/en-dash-consulting/n-dx/commit/95875df8e3ddd5fb6a931df791fa6891c1c0fc07) Thanks [@endash-shal](https://github.com/endash-shal)! - Local-model runs no longer die on a slow turn or a malformed reply. Node's fetch waits at most 300 s for response headers, and LM Studio sends none for a non-streamed completion until generation finishes, so a slow model's turn failed with `UND_ERR_HEADERS_TIMEOUT` whatever `llm.local.timeoutMs` said — and the connection retries then resent the same slow request. Local completions (the provider's blocking path, and hench's local tool loop, context summarizer and verifier) are now requested with `stream: true` and `stream_options.include_usage`, so the headers arrive at once, and the server-sent chunks are assembled back into the non-streamed response — content and reasoning concatenated, tool calls merged by index, the finish reason and the usage chunk — so tool-call parsing and token accounting read the same shape as before. `llm.local.timeoutMs` still bounds the whole request (0 = no limit), and a connection dropped mid-stream is retried like a refused one. No new dependency. A 400/500 from the local server saying the model produced malformed output (LM Studio: "The model produced output that does not match the expected … format", and similar) — or the same error arriving inside the stream as an error event — is now resent up to the new `llm.local.maxFormatRetries` times (default 3; 0 disables), one log line per resend; ordinary 400s such as a context-length error, streamed or not, are not resent. When the resends run out the error says what happened and names the setting. `parseLmStudioError` reads LM Studio's string-valued `error`. `ndx config` validates and documents `llm.local.maxFormatRetries`, and the dashboard's Local server settings gain a Retries row for it and the three connection-retry settings.
+- Updated dependencies [[`e147a8f`](https://github.com/en-dash-consulting/n-dx/commit/e147a8fd658bb12dd687592b9d983a88697ebdfc), [`c5a6067`](https://github.com/en-dash-consulting/n-dx/commit/c5a6067cfe5db0239e428ecb218a0dc8f92c3a98), [`95875df`](https://github.com/en-dash-consulting/n-dx/commit/95875df8e3ddd5fb6a931df791fa6891c1c0fc07), [`2f058c3`](https://github.com/en-dash-consulting/n-dx/commit/2f058c31d7d95ff2703709872cb7ec2d83757685)]:
+  - @n-dx/llm-client@0.10.2
+  - @n-dx/rex@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes

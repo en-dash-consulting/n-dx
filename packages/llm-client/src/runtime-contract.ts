@@ -200,7 +200,11 @@ export interface RuntimeEvent {
   readonly toolCall?: {
     readonly tool: string;
     readonly input: Record<string, unknown>;
-    /** The vendor's id for this call (Claude `tool_use.id`), when it reports one. */
+    /**
+     * The vendor's id for this invocation, when its stream carries one (the
+     * Claude CLI's `tool_use.id`). Lets a later result be paired with the call
+     * it answers rather than with whichever call came last.
+     */
     readonly id?: string;
   };
 
@@ -209,8 +213,8 @@ export interface RuntimeEvent {
     readonly tool: string;
     readonly output: string;
     readonly durationMs: number;
-    /** {@link RuntimeEvent.toolCall}`.id` of the call this answers (Claude `tool_use_id`), when known. */
-    readonly callId?: string;
+    /** The id of the {@link RuntimeEvent.toolCall} this answers, when known. */
+    readonly id?: string;
   };
 
   /** Token usage for this turn or cumulative (type: "token_usage"). */

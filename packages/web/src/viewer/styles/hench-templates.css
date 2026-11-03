@@ -356,9 +356,6 @@
 
 /* Toast */
 .hench-template-toast {
-  position: fixed;
-  bottom: calc(20px + var(--bottombar-h, 0px));
-  right: 20px;
   background: var(--green);
   color: var(--bg);
   padding: 10px 18px;
@@ -369,7 +366,6 @@
   align-items: center;
   gap: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  animation: toast-in 0.2s ease-out;
   z-index: var(--z-toast);
 }
 

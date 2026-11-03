@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import { formatPlanFile, parsePlanFile } from "../../../../src/migrations/plan-file.js";
 import { findMigration, MIGRATIONS } from "../../../../src/migrations/registry.js";
-import { v1ToV2, v1TreeSource, V1_TREE_SOURCE_KIND } from "../../../../src/migrations/v1-to-v2/index.js";
+import { MAX_DEPENDS_ON_TEST_HOLDERS, proposeDependsOn, v1ToV2, v1TreeSource, V1_TREE_SOURCE_KIND, type V1ToV2Entry } from "../../../../src/migrations/v1-to-v2/index.js";
 
 function item(id: string, level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
   return { id, level, title, status, children, ...extra };
@@ -50,6 +50,18 @@ describe("v1-to-v2 migration", () => {
     expect(JSON.stringify(Object.values(plan.entries).map((e) => e.data))).not.toContain('"e2"');
   });
 
+  it("feeds the same file evidence to placement and capability spec drafting", async () => {
+    const items = tree();
+    items[1]!.children![0]!.title = "Polish zebra";
+    const filesOf = (id: string) => id === "t1" || id === "f3" ? ["src/ledger.ts"] : [];
+    const plan = await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT, options: { filesOf } });
+    expect(plan.entries.f3?.placement).toBe("f1");
+    expect(plan.entries.f1?.spec?.codeFiles).toEqual(["src/ledger.ts"]);
+    const cliPlan = await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT, options: { codeFiles: { t1: ["src/ledger.ts"], f3: ["src/ledger.ts"] } } });
+    expect(cliPlan.entries.f3?.placement).toBe("f1");
+    expect(cliPlan.entries.f1?.spec?.codeFiles).toEqual(["src/ledger.ts"]);
+  });
+
   it("passes the caller's product names to classification", async () => {
     const acme = [item("a1", "epic", "Acme 2.0", [item("a2", "feature", "Billing", [], "pending")])];
     expect((await v1ToV2.plan(v1TreeSource(acme), { cutAt: CUT })).entries.a1?.target).toBe("area");
@@ -91,5 +103,52 @@ describe("migration registry", () => {
 
   it("has no apply yet", () => {
     expect(v1ToV2.apply).toBeUndefined();
+  });
+
+  describe("proposed dependsOn", () => {
+    const SHARED = "packages/rex/tests/unit/core/blocked-tasks-skipped.test.ts";
+    const OTHER = "packages/rex/tests/unit/core/release-claims-exit.test.ts";
+    const capabilities = (criteria: [string, string, string]): PRDItem[] => [
+      item("ea", "epic", "Plan work", [item("fa", "feature", "Task selection", [], "completed", { acceptanceCriteria: [criteria[0]] })]),
+      item("eb", "epic", "Run work", [
+        item("fb", "feature", "Blocked handling", [], "completed", { acceptanceCriteria: [criteria[1]] }),
+        item("fc", "feature", "Claims", [], "completed", { acceptanceCriteria: [criteria[2]] }),
+      ]),
+    ];
+
+    it("proposes dependsOn from the later capability to the earlier one when both link a test file", async () => {
+      const items = capabilities(["Blocked tasks are skipped", "Blocked tasks stay skipped", "Claims release on exit"]);
+      const plan = await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT, options: { testFiles: [SHARED, OTHER] } });
+      expect(plan.entries.fa?.spec?.tests).toEqual([SHARED]);
+      expect(plan.entries.fb?.spec?.tests).toEqual([SHARED]);
+      expect(plan.entries.fb?.dependsOn).toEqual([{ capability: "fa", tests: [SHARED] }]);
+      expect(plan.entries.fa?.dependsOn).toBeUndefined();
+      expect(plan.entries.fc?.dependsOn).toBeUndefined();
+      expect(plan.summary.proposedDependsOn).toBe(1);
+      expect(parsePlanFile(formatPlanFile(plan))).toEqual(JSON.parse(formatPlanFile(plan)));
+    });
+
+    it("proposes nothing from a test more than MAX_DEPENDS_ON_TEST_HOLDERS capabilities link", () => {
+      const capability = (id: string, tests: string[]) => ({ id, target: "capability", spec: { tests } }) as unknown as V1ToV2Entry;
+      const broad = "tests/suite.test.ts";
+      const ids = Array.from({ length: MAX_DEPENDS_ON_TEST_HOLDERS + 1 }, (_, i) => `c${i}`);
+      const entries = Object.fromEntries(ids.map((id) => [id, capability(id, id === "c2" ? [broad, "tests/narrow.test.ts"] : id === "c3" ? [broad, "tests/narrow.test.ts"] : [broad])]));
+      const out = proposeDependsOn(entries);
+      expect(Object.values(out).flatMap((e) => e.dependsOn ?? [])).toEqual([{ capability: "c2", tests: ["tests/narrow.test.ts"] }]);
+      expect(out.c3?.dependsOn).toEqual([{ capability: "c2", tests: ["tests/narrow.test.ts"] }]);
+
+      const few = Object.fromEntries(ids.slice(0, MAX_DEPENDS_ON_TEST_HOLDERS).map((id) => [id, capability(id, [broad])]));
+      const proposals = Object.values(proposeDependsOn(few)).flatMap((e) => e.dependsOn ?? []);
+      expect(proposals).toHaveLength((MAX_DEPENDS_ON_TEST_HOLDERS * (MAX_DEPENDS_ON_TEST_HOLDERS - 1)) / 2);
+    });
+
+    it("proposes no dependsOn for capabilities that share no test", async () => {
+      const items = capabilities(["Blocked tasks are skipped", "Claims release on exit", "Something unrelated entirely"]);
+      const plan = await v1ToV2.plan(v1TreeSource(items), { cutAt: CUT, options: { testFiles: [SHARED, OTHER] } });
+      expect(plan.entries.fa?.spec?.tests).toEqual([SHARED]);
+      expect(plan.entries.fb?.spec?.tests).toEqual([OTHER]);
+      expect(Object.values(plan.entries).some((e) => e.dependsOn !== undefined)).toBe(false);
+      expect(plan.summary.proposedDependsOn).toBeUndefined();
+    });
   });
 });

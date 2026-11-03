@@ -29,7 +29,7 @@ function writeJson(rel: string, data: unknown): void {
 }
 
 const DEFAULT_GUARD = {
-  blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"],
+  blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**", ".env"],
   allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"],
   allowedGitSubcommands: ["status", "add", "commit", "diff", "log", "branch", "checkout", "stash", "show", "rev-parse"],
 };
@@ -216,7 +216,11 @@ describe("collectRepoExecutionConfig", () => {
   // configuration produced before guard.env.allow was collected — a new field
   // that is not omitted when empty will fail here.
   it("keeps the digest a repository without guard.env.allow already had", () => {
-    writeJson(".hench/config.json", { guard: DEFAULT_GUARD, permissionMode: "acceptEdits", provider: "cli" });
+    // The guard exactly as the literal was produced from: the fields added
+    // since (run posture, llm endpoints, assistant files, PRD run blocks)
+    // are omitted when unset, so this digest must still come out.
+    const guardAtTheTime = { ...DEFAULT_GUARD, blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"] };
+    writeJson(".hench/config.json", { guard: guardAtTheTime, permissionMode: "acceptEdits", provider: "cli" });
     writeJson(".rex/config.json", { test: "npm test" });
     writeJson(".mcp.json", { mcpServers: { rex: { command: "ndx", args: ["rex", "mcp", "."] } } });
     expect(collectRepoExecutionConfig(repo).digest).toBe("f1b6efeb00de4176918dc3a74f0b92be6b48d8953ac0fa1a877058f15659737d");
@@ -288,11 +292,18 @@ describe("collectRepoExecutionConfig", () => {
 });
 
 describe("assessRepoExecutionConfig", () => {
-  it("reports nothing for the defaults beyond the secret-paths note", () => {
+  it("reports nothing for the defaults", () => {
     writeJson(".hench/config.json", { guard: DEFAULT_GUARD });
+    expect(assessRepoExecutionConfig(collectRepoExecutionConfig(repo))).toEqual([]);
+  });
+
+  it("warns, and so restricts, when the credential-file blocks are removed", () => {
+    // Dropping `.env` from the blocked paths is wider than the baseline; an
+    // informational note let it pass as "baseline", so nothing restricted it.
+    writeJson(".hench/config.json", { guard: { ...DEFAULT_GUARD, blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"] } });
     const findings = assessRepoExecutionConfig(collectRepoExecutionConfig(repo));
-    expect(findings.map((f) => f.code)).toEqual(["secret-paths-unblocked"]);
-    expect(findings[0].severity).toBe("info");
+    expect(findings.map((f) => [f.code, f.severity])).toEqual([["secret-paths-unblocked", "warning"]]);
+    expect(evaluateRepoTrust(repo, { ndxHome: home }).restricted).toBe(true);
   });
 
   it("reports every way a repository widens execution", () => {
@@ -449,11 +460,12 @@ describe("assessRepoExecutionConfig", () => {
     expect(codes).not.toContain("dependency-paths-removed");
   });
 
-  it("leaves this repository's own config at its current trust state", () => {
+  it("requires review of this repository's own run posture and assistant grants", () => {
     const own = fileURLToPath(new URL("../../../..", import.meta.url));
     const ev = evaluateRepoTrust(own, { ndxHome: home });
     expect(ev.findings.map((f) => f.code)).not.toContain("dependency-paths-removed");
-    expect(ev.state).toBe("baseline");
+    expect(ev.findings.map((f) => f.code)).toEqual(expect.arrayContaining(["run-posture", "assistant-settings"]));
+    expect(ev.state).toBe("untrusted");
   });
 
   it("accepts the .ndx container layout's blocked path as covering hench and rex", () => {
