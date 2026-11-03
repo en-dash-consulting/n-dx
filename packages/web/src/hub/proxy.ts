@@ -376,11 +376,19 @@ export interface SidecarForward {
  * sandbox one — the browser enforces both, so it can only narrow — and its
  * Referrer-Policy is replaced.
  */
-function withFrameHeaders(headers: IncomingHttpHeaders): OutgoingHttpHeaders {
+function withFrameHeaders(headers: IncomingHttpHeaders, opaqueOrigin: boolean): OutgoingHttpHeaders {
   const own = headers["content-security-policy"];
   // A comma separates policies in one header value (CSP3, serialized-policy-list).
   const policies = own ? `${FRAME_CSP}, ${own}` : FRAME_CSP;
-  return { ...headers, "content-security-policy": policies, "referrer-policy": "no-referrer" };
+  const out: OutgoingHttpHeaders = { ...headers, "content-security-policy": policies, "referrer-policy": "no-referrer" };
+  if (!opaqueOrigin) return out;
+  // The hub owns CORS for a page with an opaque origin (guardFrameKeyRequest):
+  // the sidecar's own allow-origin and credentials headers are replaced.
+  const vary = headers.vary;
+  out["access-control-allow-origin"] = "null";
+  out.vary = vary && vary !== "*" ? `${vary}, Origin` : "Origin";
+  delete out["access-control-allow-credentials"];
+  return out;
 }
 
 /**
@@ -457,7 +465,7 @@ export function proxyHttp(
     { host: UPSTREAM_HOST, port, method: req.method, path, headers },
     (upstreamRes) => {
       onUpstreamHeaders?.(upstreamRes.statusCode ?? 502, upstreamRes.headers);
-      const outHeaders = sidecar?.frame ? withFrameHeaders(upstreamRes.headers) : { ...upstreamRes.headers };
+      const outHeaders = sidecar?.frame ? withFrameHeaders(upstreamRes.headers, req.headers.origin === "null") : { ...upstreamRes.headers };
       // A redirect the project server issues is root-relative from its point
       // of view; the client is under the prefix. A sidecar's may already be
       // under it, built from X-Ndx-Base-Path as the extension docs advise.

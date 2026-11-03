@@ -184,14 +184,29 @@ function frameOriginRefused(req: Pick<IncomingMessage, "headers" | "method">, hu
  * The gate for a frame-keyed request, in place of {@link guardHubRequest}:
  * the Host rule, then the key in place of the token (`live` says whether it
  * is live and bound to the path's extension — 401 otherwise), then the Origin
- * rule above. No CORS headers are reflected and a preflight is the sidecar's
- * to answer. Returns true when the request has been answered.
+ * rule above. A page with an opaque origin (`Origin: null`) can read a
+ * response only if it names that origin, so the hub adds the CORS headers
+ * here and the extension needs none: `Access-Control-Allow-Origin: null` and
+ * `Vary: Origin`, never `Allow-Credentials` (the key in the path is the
+ * credential; no cookie is involved). A preflight from such a page is
+ * answered here, 204, and never reaches the sidecar. Returns true when the
+ * request has been answered.
  */
 export function guardFrameKeyRequest(req: IncomingMessage, res: ServerResponse, hubPort: number | undefined, live: boolean): boolean {
   if (!hostAllowed(req, hubPort)) return rejectHost(res);
   if (!live) return rejectUnauthenticated(res);
   if (frameOriginRefused(req, hubPort, false)) return reject(res);
-  return false;
+  if (singleHeader(req.headers.origin) !== "null") return false;
+  res.setHeader("Access-Control-Allow-Origin", "null");
+  res.setHeader("Vary", "Origin");
+  const requested = singleHeader(req.headers["access-control-request-method"]);
+  if ((req.method || "GET").toUpperCase() !== "OPTIONS" || requested === undefined) return false;
+  res.setHeader("Access-Control-Allow-Methods", requested);
+  const headers = singleHeader(req.headers["access-control-request-headers"]);
+  if (headers !== undefined) res.setHeader("Access-Control-Allow-Headers", headers);
+  res.setHeader("Access-Control-Max-Age", "600");
+  res.writeHead(204).end();
+  return true;
 }
 
 /** {@link guardFrameKeyRequest} for a WebSocket handshake, as {@link upgradeRefusal} reports it. */

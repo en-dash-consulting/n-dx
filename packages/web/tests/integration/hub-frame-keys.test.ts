@@ -29,6 +29,8 @@ const SIDECAR = [
   `const server = http.createServer((req, res) => {`,
   `  if (req.url === "/healthz") { res.writeHead(200); res.end("ok"); return; }`,
   `  const own = req.url.startsWith("/own-csp") ? { "Content-Security-Policy": "default-src 'self'", "Referrer-Policy": "unsafe-url" } : {};`,
+  `  if (req.url.startsWith("/own-cors")) Object.assign(own, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Credentials": "true", "Vary": "Accept-Encoding" });`,
+  `  if (req.method === "OPTIONS") own["X-Reached-Sidecar"] = "yes";`,
   `  res.writeHead(200, { "Content-Type": "application/json", ...own });`,
   `  res.end(JSON.stringify({ path: req.url, name: process.env.NDX_EXTENSION_NAME, headers: req.headers }));`,
   `});`,
@@ -287,6 +289,48 @@ describe("a keyed request", () => {
     const foreign = await fetch(`${base()}/x/recon/~f/${key}/form`, { method: "POST", headers: { Origin: "http://evil.example" } });
     expect(foreign.status).toBe(403);
     expect(foreign.headers.get("content-security-policy")).toBe(FRAME_CSP);
+  });
+
+  it("makes the sandboxed page's response readable: Allow-Origin null, Vary: Origin, never credentials, whatever the sidecar sent", async () => {
+    const { key } = await keyedUrl();
+    const plain = await fetch(`${base()}/x/recon/~f/${key}/data`, { headers: { Origin: "null" } });
+    expect(plain.status).toBe(200);
+    expect(plain.headers.get("access-control-allow-origin")).toBe("null");
+    expect(plain.headers.get("vary")).toBe("Origin");
+    expect(plain.headers.get("access-control-allow-credentials")).toBeNull();
+    await plain.body?.cancel();
+
+    const own = await fetch(`${base()}/x/recon/~f/${key}/own-cors`, { headers: { Origin: "null" } });
+    expect(own.headers.get("access-control-allow-origin")).toBe("null");
+    expect(own.headers.get("vary")).toBe("Accept-Encoding, Origin");
+    expect(own.headers.get("access-control-allow-credentials")).toBeNull();
+    await own.body?.cancel();
+
+    // No Origin: nothing added.
+    const none = await fetch(`${base()}/x/recon/~f/${key}/data`);
+    expect(none.headers.get("access-control-allow-origin")).toBeNull();
+    await none.body?.cancel();
+  });
+
+  it("answers a keyed preflight with Origin: null itself, 204, without reaching the sidecar", async () => {
+    const { key } = await keyedUrl();
+    const res = await fetch(`${base()}/x/recon/~f/${key}/data`, {
+      method: "OPTIONS",
+      headers: { Origin: "null", "Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "content-type, x-custom" },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe("null");
+    expect(res.headers.get("vary")).toBe("Origin");
+    expect(res.headers.get("access-control-allow-methods")).toBe("PUT");
+    expect(res.headers.get("access-control-allow-headers")).toBe("content-type, x-custom");
+    expect(res.headers.get("access-control-max-age")).toBe("600");
+    expect(res.headers.get("access-control-allow-credentials")).toBeNull();
+    expect(res.headers.get("x-reached-sidecar")).toBeNull();
+    expect(res.headers.get("content-security-policy")).toBe(FRAME_CSP);
+
+    // A bad key is 401, not a preflight answer.
+    const stale = await fetch(`${base()}/x/recon/~f/nope/data`, { method: "OPTIONS", headers: { Origin: "null", "Access-Control-Request-Method": "PUT" } });
+    expect(stale.status).toBe(401);
   });
 
   it("slides the key's window with use, and the key goes stale after idleStopMinutes without it", async () => {

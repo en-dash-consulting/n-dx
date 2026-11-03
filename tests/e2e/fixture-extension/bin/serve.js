@@ -32,7 +32,17 @@ const server = createServer((req, res) => {
     // The drawer tab page: shows the base path the hub gave it.
     const base = String(req.headers["x-ndx-base-path"] ?? "");
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(`<!doctype html><title>Fixture tab</title><p id="base-path">${base.replace(/[<&]/g, "")}</p>`);
+    // The page runs with an opaque origin, so its fetch is cross-origin: the
+    // hub adds the CORS headers, and this sidecar sets none.
+    res.end(
+      `<!doctype html><title>Fixture tab</title><p id="base-path">${base.replace(/[<&]/g, "")}</p><p id="data"></p>` +
+      `<script>fetch("api/data").then((r) => r.json()).then((d) => { document.getElementById("data").textContent = d.greeting; });</script>`,
+    );
+    return;
+  }
+  if (req.url === "/api/data") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ greeting: "hello from the fixture sidecar" }));
     return;
   }
   res.writeHead(200, { "Content-Type": "application/json" });
