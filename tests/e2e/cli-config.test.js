@@ -2132,7 +2132,7 @@ describe("n-dx config", () => {
 
       expect(stderr).toContain("No API key configured for Google");
       expect(stderr).toContain("ndx config credentials.google");
-      expect(stderr).toContain("ndx config llm.google.auth api");
+      expect(stderr).not.toContain("llm.google.auth");
       expect(stderr).toContain("GEMINI_API_KEY");
       expect(stderr).not.toContain("{");
       expect(stderr).toContain("[NDX_GOOGLE_PREFLIGHT_NO_KEY]");

@@ -63,7 +63,7 @@ describe("classifyLLMError", () => {
     expect(r.category).toBe("auth");
     expect(r.message).toContain("Authentication failed for Google");
     expect(r.suggestion).toContain("credentials.google");
-    expect(r.suggestion).toContain("llm.google.auth api");
+    expect(r.suggestion).not.toContain("llm.google.auth");
     expect(r.suggestion).toContain("GEMINI_API_KEY");
   });
 

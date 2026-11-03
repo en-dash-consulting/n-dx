@@ -33,7 +33,7 @@ describe("authFailureGuidance", () => {
     expect(g.headline).toContain("Google");
     const joined = g.remediation.join(" ");
     expect(joined).toContain("ndx config credentials.google");
-    expect(joined).toContain("ndx config llm.google.auth api");
+    expect(joined).not.toContain("llm.google.auth");
     expect(joined).toContain("GEMINI_API_KEY");
   });
 

@@ -324,7 +324,7 @@ describe("diagnoseAuth", () => {
     expect(result.recommendedMode).toBe("api");
     expect(result.messages).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("credentials.claude --import"),
+        expect.stringContaining("ndx config credentials --import"),
       ]),
     );
   });

@@ -328,23 +328,18 @@ describe("describeUnrestrictedFile", () => {
     const msg = describeUnrestrictedFile(
       WIN_PATH,
       { restricted: false, detail: "inheritance is still in effect" },
-      "win32",
     );
 
     expect(msg).toContain(WIN_PATH);
     expect(msg).toContain("inheritance is still in effect");
     expect(msg).toContain("API key");
-    expect(msg).toContain("Credential Manager");
   });
 
-  it("omits the Windows-only advice on POSIX", () => {
-    const msg = describeUnrestrictedFile(
-      "/p/.n-dx.json",
-      { restricted: false, detail: "mode is 0666" },
-      "linux",
-    );
+  it("puts the CLI login first and points at the credential store", () => {
+    const msg = describeUnrestrictedFile("/p/.n-dx.json", { restricted: false, detail: "mode is 0666" });
 
-    expect(msg).toContain("ANTHROPIC_API_KEY");
-    expect(msg).not.toContain("Credential Manager");
+    expect(msg).toMatch(/CLI login.*credential store/);
+    expect(msg).toContain("ndx config credentials --import");
+    expect(msg).toContain("ndx config credentials.<vendor>");
   });
 });

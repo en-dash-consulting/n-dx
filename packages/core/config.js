@@ -884,8 +884,7 @@ async function runGoogleApiPreflight(dir) {
       vendor: LLM_VENDOR.GOOGLE,
       apiKeyEnv: apiKeyEnvVar,
       detail:
-        `No API key found. Export ${apiKeyEnvVar} or store the key with: ndx config credentials.google. ` +
-        "Storing it does not switch modes; ndx config llm.google.auth api does.",
+        `No API key found. Export ${apiKeyEnvVar} or store the key with: ndx config credentials.google`,
       errorCode: "NDX_GOOGLE_PREFLIGHT_NO_KEY",
     };
   }
@@ -1937,7 +1936,7 @@ async function printVendorPreflightFailure(vendor, preflight, llmConfig) {
     // No key configured yet → distinct "missing API key" root cause.
     if (errorCode === "NDX_GOOGLE_PREFLIGHT_NO_KEY") {
       console.error(red("✗ No API key configured for Google."));
-      console.error(yellow("  Store your API key: ndx config credentials.google (storing it does not switch modes; ndx config llm.google.auth api does)"));
+      console.error(yellow("  Store your API key: ndx config credentials.google"));
       console.error(yellow(`  Or set the env var: export ${apiKeyEnvVar}`));
       console.error("  Get a key: https://aistudio.google.com/apikey");
       console.error(dim(`  [${errorCode}]`));
@@ -4171,7 +4170,7 @@ async function showVendorApiKey(dir, vendor, flags) {
   }
   console.log(result.stdout.split("\n").find((l) => l.startsWith(`${vendor}: `)) ?? `${vendor}: not set`);
   for (const which of shadowedBy) {
-    const move = which === LOCAL_CONFIG_FILE ? "ndx config credentials --import" : `ndx config llm.${vendor}.api_key <key>`;
+    const move = which === LOCAL_CONFIG_FILE ? "ndx config credentials --import" : `ndx config credentials.${vendor}, then delete llm.${vendor}.api_key from that file`;
     console.log(`${projectConfigLabel(dir, which)} also holds a ${vendor} key, which is used instead. Move it: ${move}`);
   }
 }

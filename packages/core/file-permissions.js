@@ -260,15 +260,14 @@ async function restrictViaAcl(path, { execFileSyncCliImpl, userInfoImpl }) {
  *
  * @param {string} path
  * @param {{ restricted: boolean, detail: string }} result
- * @param {NodeJS.Platform} [platform]
  * @returns {string | null}
  */
-export function describeUnrestrictedFile(path, result, platform = process.platform) {
+export function describeUnrestrictedFile(path, result) {
   if (result.restricted) return null;
 
-  const alternative = platform === "win32"
-    ? "Prefer the vendor's CLI login, or the ANTHROPIC_API_KEY environment variable."
-    : "Prefer the vendor's CLI login, or the ANTHROPIC_API_KEY environment variable.";
+  const alternative =
+    "Prefer the vendor's CLI login, or move the key to the credential store: ndx config credentials --import " +
+    "(.n-dx.local.json) or ndx config credentials.<vendor> (.n-dx.json).";
 
   return (
     `Warning: could not restrict permissions on ${path}\n` +

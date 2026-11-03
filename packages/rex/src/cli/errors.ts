@@ -107,7 +107,7 @@ const ERROR_HINTS: Array<[RegExp, CLIErrorCode, string, string]> = [
     /\b401\b|invalid.*api.*key|authentication.*(fail|error|invalid|expired)|unauthorized.*(request|access|error)/i,
     CLI_ERROR_CODES.AUTH_FAILED,
     "Authentication failed — Invalid or expired credentials.",
-    "Re-authenticate: claude logout && claude login (or codex logout && codex login); for Google store a key with ndx config credentials.google (or export GEMINI_API_KEY); storing it does not switch modes, ndx config llm.google.auth api does.",
+    "Re-authenticate: claude logout && claude login (or codex logout && codex login); for Google store a key with ndx config credentials.google (or export GEMINI_API_KEY).",
   ],
   [
     /etimedout|timeout|timed?\s*out/i,

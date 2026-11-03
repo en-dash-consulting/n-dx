@@ -198,7 +198,7 @@ export async function diagnoseAuth(
 
   messages.push(`Auth: llm.claude.auth ${decision.auth} → ${decision.mode}`);
   if (keySource === "config") {
-    messages.push(`API key: found in the project config (claude.api_key); move it with 'ndx config credentials.claude --import'`);
+    messages.push(`API key: found in a project config file (claude.api_key); move it to the credential store with 'ndx config credentials --import' (.n-dx.local.json) or 'ndx config credentials.claude' (.n-dx.json)`);
   } else if (keySource === "env") {
     messages.push(`API key: found in environment (${apiKeyEnv})`);
   } else if (keySource === "file") {

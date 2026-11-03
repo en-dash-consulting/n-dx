@@ -18,7 +18,7 @@ const SKIP_DIRS = new Set(["node_modules", "dist", "tests", "coverage", ".cache"
 const SOURCE = /\.(?:ts|tsx|js|mjs)$/;
 
 /** `config <anything>api_key|apiKey <value>`: a key given as an argument. */
-const KEY_AS_ARGV = /\bconfig\s+[\w.]*(?:api_key|apiKey)\b[ \t]+(?!--)[^\s`'")]/;
+const KEY_AS_ARGV = /\bconfig\s+(?:[\w.]|\$\{[^}]*\})*(?:api_key|apiKey)\b[ \t]+(?!--)[^\s`'")]/;
 
 function sourceFiles(dir) {
   const out = [];
@@ -39,6 +39,7 @@ describe("key-as-argv message policy", () => {
       "n-dx config claude.apiKey <key>",
       "n-dx config claude.api_key sk-ant-...",
       "'ndx config llm.codex.api_key $KEY'",
+      "`ndx config llm.${vendor}.api_key <key>`",
     ]) {
       expect(KEY_AS_ARGV.test(bad), bad).toBe(true);
     }
