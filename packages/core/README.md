@@ -234,8 +234,8 @@ Rex and SourceVision expose MCP servers for any MCP-compatible assistant (Claude
 ```sh
 ndx start .
 # Claude example:
-claude mcp add --transport http rex http://localhost:3117/mcp/rex
-claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
+claude mcp add --transport http rex http://127.0.0.1:3117/mcp/rex
+claude mcp add --transport http sourcevision http://127.0.0.1:3117/mcp/sourcevision
 ```
 
 ### stdio transport

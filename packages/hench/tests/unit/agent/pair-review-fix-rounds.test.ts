@@ -15,8 +15,9 @@ import {
   countFixedFindings,
   carryForwardFindings,
   formatRunReviewStatus,
+  mergeDispositionsIntoRaw,
 } from "../../../src/agent/analysis/adversarial-review.js";
-import type { PairReviewPromptContext, ReviewFinding } from "../../../src/agent/analysis/adversarial-review.js";
+import type { PairReviewPromptContext, ReviewFinding, ReviewReport } from "../../../src/agent/analysis/adversarial-review.js";
 
 const finding = (over: Partial<ReviewFinding> = {}): ReviewFinding => ({
   title: "Count is never validated",
@@ -154,6 +155,44 @@ describe("carryForwardFindings", () => {
     const before = await readFile(current, "utf-8");
     expect(await carryForwardFindings(join(dir, "missing.json"), current)).toBe(false);
     expect(await readFile(current, "utf-8")).toBe(before);
+  });
+
+  it("scrubs a credential quoted in a finding before the report is written back", async () => {
+    const key = "ghp_" + "b".repeat(36);
+    const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----";
+    const previous = await write("a.json", [
+      { ...finding({ title: "Leaks", verdict: "should-fix" }), scenario: `the diff adds GITHUB_TOKEN=${key}`, expected: pem },
+    ]);
+    const current = await write("b.json", []);
+
+    expect(await carryForwardFindings(previous, current)).toBe(true);
+
+    const raw = await readFile(current, "utf-8");
+    expect(raw).not.toContain(key);
+    expect(raw).not.toContain("MIIEow");
+    const merged = JSON.parse(raw) as { findings: Array<Record<string, unknown>> };
+    expect(merged.findings[0]!.scenario).toBe("the diff adds GITHUB_TOKEN=[redacted:token]");
+    expect(merged.findings[0]!.expected).toBe("[redacted:private-key]");
+  });
+});
+
+describe("mergeDispositionsIntoRaw", () => {
+  it("scrubs a credential from the text it hands back for the report file", () => {
+    const key = "sk-ant-api03-" + "A".repeat(40);
+    const raw = JSON.stringify({
+      taskId: "t",
+      fixesApplied: false,
+      summary: "s",
+      findings: [{ ...finding({ verdict: "should-fix" }), scenario: `x-api-key: ${key}` }],
+    });
+    const parked = { findings: [{ ...finding({ verdict: "should-fix" }), disposition: "deferred" }] } as unknown as ReviewReport;
+
+    const out = mergeDispositionsIntoRaw(raw, parked);
+    expect(out).not.toBeNull();
+    expect(out).not.toContain(key);
+    const data = JSON.parse(out!) as { findings: Array<Record<string, unknown>> };
+    expect(data.findings[0]!.scenario).toBe("x-api-key: [redacted:token]");
+    expect(data.findings[0]!.disposition).toBe("deferred");
   });
 });
 

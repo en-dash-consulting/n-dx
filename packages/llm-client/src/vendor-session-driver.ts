@@ -86,6 +86,11 @@ export interface ClaudeTurnFlags {
   readonly permissionMode?: string;
   /** `--mcp-config <file> --strict-mcp-config`. */
   readonly mcpConfigPath?: string;
+  /**
+   * `--max-turns <n>`. Omitted when undefined, 0 or not a positive integer, so
+   * the CLI's own (unbounded) default applies only when no cap was asked for.
+   */
+  readonly maxTurns?: number;
 }
 
 /** Codex-only flags. Other drivers ignore them. */
@@ -203,6 +208,9 @@ function claudeTurnSpawn(
     ...(input.model ? ["--model", input.model] : []),
     ...(flags.effort ? ["--effort", flags.effort] : []),
     ...(flags.permissionMode ? ["--permission-mode", flags.permissionMode] : []),
+    ...(flags.maxTurns !== undefined && Number.isInteger(flags.maxTurns) && flags.maxTurns > 0
+      ? ["--max-turns", String(flags.maxTurns)]
+      : []),
     // A file path, never inline JSON: an inline document would have to survive
     // cmd.exe quoting on Windows. --strict-mcp-config makes the file the
     // session's only source of MCP servers.
@@ -265,7 +273,7 @@ function claudeToolResultText(content: unknown): string {
  * The tool results in a Claude `user` line, one event per `tool_result`
  * block. Claude's stream-json answers tool calls this way:
  * `{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_…","content":…}]}}`.
- * A result names its call by id, never by tool, so `tool` stays `"unknown"`.
+ * A result names its call by id, never by tool, so `tool` stays empty.
  */
 function claudeToolResultEvents(
   event: Record<string, unknown>,
@@ -286,10 +294,13 @@ function claudeToolResultEvents(
       turn,
       timestamp,
       toolResult: {
-        tool: "unknown",
-        output: claudeToolResultText(b.content).slice(0, MAX_TOOL_OUTPUT_LENGTH),
+        // Empty rather than a guess: the block names the call by id only,
+        // and an empty name is what hench's accumulator pairs sequentially
+        // when no id matches.
+        tool: "",
+        output: (b.is_error === true ? "[error] " : "") + claudeToolResultText(b.content).slice(0, MAX_TOOL_OUTPUT_LENGTH),
         durationMs: 0,
-        ...(typeof b.tool_use_id === "string" && b.tool_use_id ? { callId: b.tool_use_id } : {}),
+        ...(typeof b.tool_use_id === "string" && b.tool_use_id ? { id: b.tool_use_id } : {}),
       },
     }];
   });
@@ -418,7 +429,7 @@ function parseClaudeEventObject(
           tool: "unknown", // Claude's stream carries no tool name on results
           output: output.slice(0, MAX_TOOL_OUTPUT_LENGTH),
           durationMs: 0,
-          ...(typeof event.tool_use_id === "string" && event.tool_use_id ? { callId: event.tool_use_id } : {}),
+          ...(typeof event.tool_use_id === "string" && event.tool_use_id ? { id: event.tool_use_id } : {}),
         },
       };
     }

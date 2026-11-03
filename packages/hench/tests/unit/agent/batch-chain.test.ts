@@ -38,6 +38,7 @@ import {
   type BatchChainRejection,
   type PolicyFingerprintInput,
 } from "../../../src/agent/lifecycle/session-cache.js";
+import { guardBaselineForLanguage } from "../../../src/prd/llm-gateway.js";
 
 const IDENTITY: BatchChainIdentity = {
   worktreeRoot: "/repo/main",
@@ -493,14 +494,15 @@ describe("policyFingerprint", () => {
     }
   });
 
-  it("separates unscoped git from no git subcommands at all", () => {
-    // Absent means "git granted unscoped"; empty means "no subcommand
-    // permitted". Hashing them alike would let the loosest policy resume a
-    // chain opened under the strictest.
+  it("hashes an absent or empty git list as the baseline grant it produces", () => {
+    // Absent and empty both mean the language baseline to the Claude CLI
+    // adapter, so they are the same policy and must resume the same chain;
+    // an explicit list that differs from the baseline is a different one.
     const { allowedGitSubcommands: _omitted, ...withoutKey } = POLICY;
-    expect(policyFingerprint(withoutKey)).not.toBe(
-      policyFingerprint({ ...POLICY, allowedGitSubcommands: [] }),
-    );
+    const baseline = guardBaselineForLanguage().allowedGitSubcommands;
+    expect(policyFingerprint(withoutKey)).toBe(policyFingerprint({ ...POLICY, allowedGitSubcommands: [] }));
+    expect(policyFingerprint(withoutKey)).toBe(policyFingerprint({ ...POLICY, allowedGitSubcommands: baseline }));
+    expect(policyFingerprint(withoutKey)).not.toBe(policyFingerprint(POLICY));
   });
 });
 

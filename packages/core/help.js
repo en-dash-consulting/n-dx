@@ -1124,7 +1124,7 @@ const ORCHESTRATOR_HELP_DEFS = {
     summary: "serve this repository through the n-dx hub",
     description:
       "Registers this repository with the per-user hub and serves it at\n" +
-      "http://localhost:3117/p/<id>/ — dashboard UI and MCP HTTP endpoints for\n" +
+      "http://127.0.0.1:3117/p/<id>/ — dashboard UI and MCP HTTP endpoints for\n" +
       "Rex and SourceVision. The hub starts on first use and runs one server per\n" +
       "repository, so several projects share the port without colliding.\n\n" +
       "--here opts out to the single-project server, which owns the port itself.",
@@ -1159,12 +1159,13 @@ const ORCHESTRATOR_HELP_DEFS = {
         content:
           "Every account on a machine can reach 127.0.0.1, so the hub, the project\n" +
           "servers and the preview server require a per-user token. 'ndx start'\n" +
-          "creates it at <ndx home>/auth.token (mode 0600), prints a URL that\n" +
-          "carries it once (the server sets an HttpOnly cookie and redirects to the\n" +
-          "clean URL), and passes it to every server it starts. Scripts and MCP\n" +
+          "creates it at <ndx home>/auth.token (mode 0600) and passes it to every\n" +
+          "server it starts. The URL it prints carries a one-time sign-in nonce,\n" +
+          "never the token: valid once, for about a minute, it signs that browser\n" +
+          "tab in (run 'ndx start' again for a fresh link). Scripts and MCP\n" +
           "clients send it as 'X-Ndx-Token: <token>' or 'Authorization: Bearer\n" +
           "<token>'; the printed 'claude mcp add' lines include the header.\n" +
-          "--no-auth, or web.auth false in .n-dx.json, turns it off.",
+          "--no-auth, or web.auth false in .n-dx.local.json, turns it off.",
       },
       {
         title: "Preview mode (--preview)",
@@ -1187,10 +1188,10 @@ const ORCHESTRATOR_HELP_DEFS = {
       { flag: "--here", description: "Single-project server instead of the hub (also: web.mode \"here\" in .n-dx.json)" },
       { flag: "--hub", description: "Register with the hub — the default since 0.7.0; accepted for compatibility" },
       { flag: "--background", description: "With --here, run as a background daemon" },
-      { flag: "--open", description: "Open the project URL in the browser" },
+      { flag: "--open", description: "Open the project URL in the browser (through an owner-only sign-in page in the ndx home, so the one-time link never appears in a process list)" },
       { flag: "--preview", description: "Serve the UI layout preview document instead of the dashboard" },
       { flag: "--file=<path>", description: "With --preview: serve this HTML document instead of the default" },
-      { flag: "--no-auth", description: "Run without the per-user dashboard token (also: web.auth false in .n-dx.json). Loopback is shared by every account on the host; the token is what keeps another account out" },
+      { flag: "--no-auth", description: "Run without the per-user dashboard token (also: web.auth false in .n-dx.local.json; the tracked .n-dx.json cannot turn it off). Loopback is shared by every account on the host; the token is what keeps another account out" },
     ],
     examples: [
       { command: "ndx start .", description: "Register with the hub; several repos share port 3117" },
@@ -1775,8 +1776,11 @@ const ORCHESTRATOR_HELP_DEFS = {
       "lists what is wider, plus what else came with the checkout (PRD items,\n" +
       "analysis, run records). 'ndx init' runs the same review at the end.\n\n" +
       "Until you accept, 'ndx work' runs under the default guard (the\n" +
-      "repository's config can only tighten it), lowers bypassPermissions to\n" +
-      "acceptEdits, and verify_criteria does not run the repository's test\n" +
+      "repository's allowlists are intersected with it, its blocked paths added,\n" +
+      "its guard.env.allow ignored), lowers bypassPermissions to acceptEdits,\n" +
+      "ignores the cli_path, claudePath, api_endpoint, local host and apiKeyEnv\n" +
+      "the checkout sets (your .n-dx.local.json still applies), and neither\n" +
+      "verify_criteria nor 'ndx pair-programming' runs the repository's test\n" +
       "command. The dashboard shows the same warning as a strip.\n\n" +
       "'accept' records the configuration's digest in your ndx home, not in the\n" +
       "repository, so another account on the machine cannot pre-approve it for\n" +

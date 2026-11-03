@@ -655,8 +655,12 @@ async function addV2Child(
           description: input.description || undefined,
           acceptanceCriteria: Array.isArray(input.acceptanceCriteria) ? input.acceptanceCriteria : undefined,
           tags: Array.isArray(input.tags) ? input.tags : undefined,
-          // A subtask carries no priority.
-          priority: type === "task" && input.priority && isPriority(input.priority) ? input.priority : undefined,
+          // A subtask carries no priority: a sent one goes through so rex's add
+          // rule refuses it (400, "A subtask does not carry priority") rather
+          // than the route answering 201 with the pick silently dropped.
+          priority: type === "subtask"
+            ? (input.priority ? input.priority as Parameters<typeof addChangeNode>[1]["priority"] : undefined)
+            : input.priority && isPriority(input.priority) ? input.priority : undefined,
         },
         { now: new Date() },
       );

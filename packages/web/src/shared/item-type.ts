@@ -174,6 +174,21 @@ export function childTypeOf(type: string): ItemType | null {
 }
 
 /**
+ * Whether the child an add form makes under a `parentType` node keeps a
+ * priority. A v2 subtask carries none — rex's change-add rule refuses one,
+ * and `POST /api/rex/items` answers 400 — so a form offering the select would
+ * only collect a pick that cannot be stored. The parent task's own parent
+ * tells the layouts apart: a change on v2, a feature (or epic) on v1, where a
+ * subtask does keep its priority.
+ *
+ * Named once here because the tree's inline add form and the detail panel's
+ * add-child form both gate on it.
+ */
+export function childCarriesPriority(parentType: ItemType, grandparentType: ItemType | null): boolean {
+  return !(childTypeOf(parentType) === "subtask" && grandparentType === "change");
+}
+
+/**
  * Types the dashboard offers an inline "add child" on.
  *
  * Narrower than `CHILD_TYPE` having an entry: rex allows a subtask under a

@@ -24,6 +24,7 @@ import {
   computeTimestampUpdates,
   indexTree,
   loadPrdModel,
+  branchGuardRefusal,
 } from "../rex-gateway.js";
 
 /**
@@ -138,3 +139,14 @@ export async function sidecarDecisionFields(
 
 // Re-export collectCompletedIds for use in reads.ts
 export { collectCompletedIds };
+
+/**
+ * The 409 text for a whole-tree rewrite the branch guard refused from the
+ * dashboard. rex's refusal names the branch; the rest says what the dashboard
+ * cannot do, because it has no opt-in: the CLI's `--allow-on-branch` (and MCP's
+ * `allowOnBranch`) are deliberate per-run choices, and a dashboard on a
+ * worktree, a detached HEAD or a renamed default stays refused.
+ */
+export function dashboardBranchRefusal(command: "reorganize" | "prune", branch: string, terminalCommand: string): string {
+  return `${branchGuardRefusal(command, branch).message} The dashboard cannot override this: switch this checkout to the default branch, or run \`${terminalCommand}\` from a terminal.`;
+}

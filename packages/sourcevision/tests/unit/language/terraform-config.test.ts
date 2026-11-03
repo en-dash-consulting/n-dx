@@ -221,6 +221,7 @@ describe("terraform language config", () => {
 
   describe("one Terraform file set", () => {
     const names = [
+      ...[...terraformConfig.configFilenames].flatMap((name) => [name, name.toUpperCase()]),
       "main.tf", "MAIN.TF", "prod.tfvars", "prod.TFVARS", "terragrunt.hcl", "Terragrunt.hcl", "plan.tftest.hcl", "PLAN.TFTEST.HCL",
       "main.tf.json", "prod.tfvars.json", "main.tf.bak", "foo.hcl", "tftest.hcl", "terragrunt.hcl.bak",
       "main.ts", "README.md",

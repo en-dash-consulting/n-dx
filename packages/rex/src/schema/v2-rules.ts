@@ -658,19 +658,22 @@ const capabilityDepth: Rule = ({ entries }) => {
   });
 };
 
-const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
+/**
+ * The strongly connected components of the live capabilities' `dependsOn`
+ * graph that hold a cycle (a self-dependency included), each sorted by id.
+ * Tarjan, so which elementary cycles a DFS happens to walk cannot change them.
+ */
+function dependsOnCycleComponents({ entries, resolve }: TreeIndex): RuleNode[][] {
   const capabilities = entries.map((e) => e.node).filter((n) => n.type === "capability");
   const edges = (node: RuleNode): RuleNode[] =>
     node.type === "capability"
       ? (node.dependsOn ?? []).map(resolve).filter((n): n is RuleNode => n?.type === "capability")
       : [];
-  // Tarjan: one finding per strongly connected component that holds a cycle,
-  // so which elementary cycles a DFS happens to walk cannot change the report.
   const order = new Map<RuleNode, number>();
   const low = new Map<RuleNode, number>();
   const onStack = new Set<RuleNode>();
   const stack: RuleNode[] = [];
-  const findings: RuleFinding[] = [];
+  const components: RuleNode[][] = [];
   const byId = (x: RuleNode, y: RuleNode) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0);
   const visit = (node: RuleNode): void => {
     order.set(node, order.size);
@@ -694,11 +697,25 @@ const dependsOnAcyclic: Rule = ({ entries, resolve }) => {
       members.push(member);
     } while (member !== node);
     if (members.length === 1 && !edges(node).includes(node)) return;
-    members.sort(byId);
-    const names = members.map((n) => `"${n.title}"`).join(", ");
-    findings.push(finding("depends-on-acyclic", members[0], `dependsOn cycle among ${names}`));
+    components.push(members.sort(byId));
   };
   for (const node of capabilities) if (!order.has(node)) visit(node);
+  return components;
+}
+
+/**
+ * The ids in each `dependsOn` cycle of `tree`'s live capabilities, one sorted
+ * list per strongly connected component: the members a `depends-on-acyclic`
+ * finding names (its `nodeId` is the first).
+ */
+export function dependsOnCycles(tree: V2Tree): string[][] {
+  return dependsOnCycleComponents(indexTree(tree)).map((members) => members.map((n) => n.id));
+}
+
+const dependsOnAcyclic: Rule = (index) => {
+  const findings = dependsOnCycleComponents(index).map((members) =>
+    finding("depends-on-acyclic", members[0], `dependsOn cycle among ${members.map((n) => `"${n.title}"`).join(", ")}`),
+  );
   return findings.sort((x, y) => (x.nodeId < y.nodeId ? -1 : x.nodeId > y.nodeId ? 1 : 0));
 };
 

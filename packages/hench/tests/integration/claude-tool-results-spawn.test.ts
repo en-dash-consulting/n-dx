@@ -126,7 +126,7 @@ describe("Claude tool results in spawnWithAdapter", () => {
     const result = await replay(TURN, acc);
     const baseline = await replay(withoutResults, baselineAcc);
 
-    expect(acc.events.filter((e) => e.type === "tool_result").map((e) => e.toolResult?.callId))
+    expect(acc.events.filter((e) => e.type === "tool_result").map((e) => e.toolResult?.id))
       .toEqual(["toolu_01A", "toolu_01B"]);
     expect(acc.events.filter((e) => e.type === "tool_use").map((e) => e.toolCall?.id))
       .toEqual(["toolu_01A", "toolu_01B"]);

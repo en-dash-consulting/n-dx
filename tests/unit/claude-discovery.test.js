@@ -118,6 +118,21 @@ describe("discoverClaudeCli — step 2: cli.claudePath from .n-dx.local.json", (
     }
   });
 
+  it("names an unanswered git classification without exposing or running the local binary", () => {
+    files({ [LOCAL]: { cli: { claudePath: "/private/install/claude" } } });
+    existsSync.mockImplementation((p) => p === LOCAL || p === "/private/install/claude");
+    execFileSyncCli.mockImplementation((binary, args) => {
+      if (args.includes("trust")) return JSON.stringify({ config: { localConfigTracked: true, localConfigUnanswered: "fatal: detected dubious ownership" } });
+      throw new Error("not found");
+    });
+    const result = discoverClaudeCli(dir);
+    expect(result.found).toBe(false);
+    expect(result.searched.join("\n")).toContain("cli.claudePath in .n-dx.local.json");
+    expect(result.searched.join("\n")).toContain("git could not confirm the local file is untracked");
+    expect(result.searched.join("\n")).not.toContain("/private/install/claude");
+    expect(execFileSyncCli.mock.calls.map(([bin]) => bin)).not.toContain("/private/install/claude");
+  });
+
   it("returns configured path when file exists and runs", () => {
     files({ [LOCAL]: { cli: { claudePath: "/cfg/claude" } } });
     existsSync.mockImplementation((p) => p === LOCAL || p === "/cfg/claude");

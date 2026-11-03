@@ -4,7 +4,8 @@
  * The hub does not serve any repository itself. For each registered project
  * it runs today's `web serve` unchanged as a child on an ephemeral loopback
  * port, so every single-project assumption in that server stays intact and
- * each repository can run its own n-dx version (`ndxBin` is per project).
+ * every child is spawned from the hub's own entry (`SupervisorOptions.ndxBin`,
+ * which the hub sets to `Hub.selfBin`). A registry record names no binary.
  *
  * ## Lifecycle
  *
@@ -15,7 +16,9 @@
  *   previous run is removed before spawning.
  * - **attach** — on hub restart, a project whose recorded pid is alive and
  *   whose port answers `GET /api/status` for the right directory is adopted
- *   as-is. The hub has no child handle for it, so stopping goes through
+ *   as-is — unless the hub asks for a replacement (`attach({ adopt: false })`),
+ *   which it does for a record an older hub saved with its own binary: that
+ *   server is stopped and respawned from the hub's entry. The hub has no child handle for it, so stopping goes through
  *   `process.kill` with the same SIGTERM→SIGKILL escalation.
  * - **health** — every interval the hub asks each child `GET /api/status`.
  *   A child that stops answering is marked unreachable and respawned once;
@@ -56,6 +59,12 @@ export interface ChildStatus {
 }
 
 export interface SupervisorOptions {
+  /**
+   * The `@n-dx/web` CLI entry every child is spawned from — the hub's own
+   * (`Hub.selfBin`). Empty or absent means the hub could not identify one, and
+   * starting a child fails with that reason instead of spawning anything.
+   */
+  ndxBin?: string;
   /** How long to wait for the child to publish its port. */
   portFileTimeoutMs?: number;
   /** Per-request timeout for `GET /api/status`. */
@@ -69,7 +78,7 @@ export interface SupervisorOptions {
   token?: string | null;
 }
 
-const DEFAULTS: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token">> = {
+const DEFAULTS: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin">> = {
   portFileTimeoutMs: 20_000,
   healthTimeoutMs: 3_000,
   stopGraceMs: 5_000,
@@ -171,7 +180,7 @@ async function stopForeignPid(pid: number, graceMs: number): Promise<void> {
 /** Supervises the server process for one registered project. */
 export class ProjectSupervisor {
   readonly record: ProjectRecord;
-  private readonly opts: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token">> & Pick<SupervisorOptions, "log" | "tokenFile" | "token">;
+  private readonly opts: Required<Omit<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin">> & Pick<SupervisorOptions, "log" | "tokenFile" | "token" | "ndxBin">;
 
   private handle: ManagedChild | null = null;
   private state: ChildState = "stopped";
@@ -216,12 +225,23 @@ export class ProjectSupervisor {
   /**
    * Adopt the recorded process if it is alive and answering for this
    * repository; otherwise spawn a fresh one. Used on hub restart.
+   *
+   * `adopt: false` replaces a live recorded server instead of adopting it:
+   * the hub asks for that when the record was saved with a binary other than
+   * its own, so whatever that binary started does not keep serving.
    */
-  attach(): Promise<void> {
+  attach(options: { adopt?: boolean } = {}): Promise<void> {
+    const adopt = options.adopt ?? true;
     return this.serialize(async () => {
       const { pid, port } = this.record;
       if (pid && port && isPidAlive(pid)) {
         const health = await checkProjectHealth(port, this.opts.healthTimeoutMs, this.opts.token ?? null);
+        if (health.ok && !adopt) {
+          this.opts.log?.(`[hub] ${this.record.id}: replacing server pid ${pid} started from a recorded binary`);
+          await this.stopNow();
+          await this.spawnAndWait();
+          return;
+        }
         if (health.ok) {
           this.attached = true;
           this.state = "healthy";
@@ -274,7 +294,12 @@ export class ProjectSupervisor {
   private async spawnAndWait(): Promise<void> {
     if (this.state !== "stopped" && this.record.pid && isPidAlive(this.record.pid)) return;
 
-    const { cmd, args } = buildServeCommand(this.record.ndxBin, this.record.repoRoot, this.opts.tokenFile);
+    if (!this.opts.ndxBin) {
+      this.state = "stopped";
+      this.lastError = "the hub cannot tell which n-dx binary to run; restart it with `ndx start`";
+      return;
+    }
+    const { cmd, args } = buildServeCommand(this.opts.ndxBin, this.record.repoRoot, this.opts.tokenFile);
     removePortFile(this.record.repoRoot);
     this.stopping = false;
     this.attached = false;

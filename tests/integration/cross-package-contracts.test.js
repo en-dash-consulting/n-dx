@@ -332,6 +332,13 @@ describe("hench → llm-client gateway contract", () => {
     "sanitizeChildEnv",
     "strippedEnvNames",
     "resolveVendorCliEnv",
+    "detectSandboxBackend",
+    "resolveSandboxSetting",
+    "wrapInSandbox",
+    "wrapShellInSandbox",
+    "nodeToolchainRoots",
+    "resolveModelPricing",
+    "priceTokens",
     "repoCommandEnv",
     "resolveApiKey",
     "resolveCliPath",
@@ -875,6 +882,10 @@ describe("gateway export auto-detection", () => {
     const testedSymbols = new Set([
       ...["loadClaudeConfig", "loadLLMConfig", "resolveApiKey", "resolveCliPath",
         "compileEnvPolicy", "envNameAllowed", "sanitizeChildEnv", "strippedEnvNames", "resolveVendorCliEnv", "repoCommandEnv",
+        // OS sandbox for tool children and the vendor CLI (guard/sandbox.ts).
+        "detectSandboxBackend", "resolveSandboxSetting", "wrapInSandbox", "wrapShellInSandbox", "nodeToolchainRoots",
+        // Spend caps price a run's tokens before each vendor spawn (agent/lifecycle/spend-cap.ts).
+        "resolveModelPricing", "priceTokens",
         "deepMerge", "loadProjectOverrides", "loadProjectOverrideSources", "mergeWithOverrides", "toCanonicalJSON",
         // Repository trust: the guard baseline and the per-user trust store
         // are one evaluation shared by hench, the dashboard and ndx init.
@@ -977,7 +988,7 @@ describe("gateway export auto-detection", () => {
       ...["createRexMcpServer", "ensureLegacyPrdMigrated", "isCompatibleSchema", "findItem", "walkTree",
         "diffTrees",
         "insertChild", "updateInTree", "removeFromTree", "computeStats",
-        "collectAllIds", "findNextTask", "findActionableTasks", "collectCompletedIds",
+        "collectAllIds", "findNextTask", "findNextWorkTask", "checkBranchGuard", "branchGuardRefusal", "findActionableTasks", "collectCompletedIds",
         "openClaimsStore", "resolveClaimHolder",
         "computeTimestampUpdates", "validateMerge", "previewMerge", "mergeItems",
         "validateChangesMerge", "mergeChanges",
@@ -992,7 +1003,7 @@ describe("gateway export auto-detection", () => {
         "isRequirementCategory", "isValidationType",
         "handleEditItem", "aggregateItemTokenUsage", "aggregateItemDurations",
         "serializeDocument", "parseDocument",
-        "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "addChangeNode", "cascadeParentReset", "cascadeParentCompletion",
+        "parseFolderTree", "resolveSiblingSlugs", "resolveStore", "prdLayout", "isChangeLayerStore", "completeV2Work", "addChangeNode", "changeInputsFromProposals", "addProposedChanges", "cascadeParentReset", "cascadeParentCompletion",
         "getAvailableBackups", "restoreFromBackup", "isValidSnapshotId", "V2RestoreRefusedError",
         "VALID_STATUSES", "VALID_REQUIREMENT_CATEGORIES",
         "VALID_VALIDATION_TYPES", "PRD_CACHE_DIRNAME",

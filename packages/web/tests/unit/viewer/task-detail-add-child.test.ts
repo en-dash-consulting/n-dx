@@ -69,3 +69,40 @@ describe("TaskDetail add child on a v2 change", () => {
     expect(onAddChild.mock.calls[0][0]).not.toHaveProperty("acceptanceCriteria");
   });
 });
+
+// A v2 subtask carries no priority (rex's change-add rule), so the form must
+// not offer one the server would drop without a word. The tree tells the two
+// layouts apart: on v2 a task sits under a change, on v1 under a feature.
+describe("TaskDetail add subtask: priority only where a subtask keeps it", () => {
+  function mountUnder(parent: PRDItemData, task: PRDItemData) {
+    const root = document.createElement("div");
+    const onAddChild = vi.fn().mockResolvedValue(undefined);
+    const tree = [{ ...parent, children: [task] }] as PRDItemData[];
+    act(() => { render(h(TaskDetail, { item: task, allItems: tree, onUpdate: vi.fn(), onAddChild }), root); });
+    click(root.querySelector(".task-add-child-btn"));
+    setValue(root.querySelector(".task-add-child-title"), "Check the button");
+    click(root.querySelector(".task-add-child-more"));
+    return { root, onAddChild };
+  }
+
+  it("on a v2 task, shows no priority control and sends none", async () => {
+    const v2Task = { id: "t-1", title: "Wire the button", status: "pending", level: "task", type: "task" } as PRDItemData;
+    const { root, onAddChild } = mountUnder(change, v2Task);
+    expect(root.querySelector(".task-add-child-form")?.textContent).toContain("Add Subtask");
+    expect(root.querySelector(".task-add-child-priority")).toBeNull();
+    expect(root.querySelector(".task-add-child-more")?.getAttribute("title")).not.toMatch(/priority/i);
+    await act(async () => { root.querySelector(".task-add-child-submit")!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    expect(onAddChild).toHaveBeenCalledTimes(1);
+    expect(onAddChild.mock.calls[0][0]).toMatchObject({ type: "subtask", parentId: "t-1" });
+    expect(onAddChild.mock.calls[0][0].priority).toBeUndefined();
+  });
+
+  it("on a v1 task, still offers priority and sends it", async () => {
+    const feature = { id: "f-1", title: "Checkout", status: "pending", level: "feature" } as PRDItemData;
+    const v1Task = { id: "t-2", title: "Split the god file", status: "pending", level: "task" } as PRDItemData;
+    const { root, onAddChild } = mountUnder(feature, v1Task);
+    setValue(root.querySelector(".task-add-child-priority"), "high", "change");
+    await act(async () => { root.querySelector(".task-add-child-submit")!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    expect(onAddChild.mock.calls[0][0]).toMatchObject({ type: "subtask", parentId: "t-2", priority: "high" });
+  });
+});

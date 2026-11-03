@@ -23,6 +23,7 @@ import {
   resolveVendorCliEnv,
 } from "@n-dx/llm-client";
 import type { LLMConfig, ListableVendor } from "@n-dx/llm-client";
+import { isProjectRestricted } from "./trust-gate.js";
 
 /** How long a live list and CLI probe are served before they are fetched again. */
 export const CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -94,6 +95,15 @@ async function probeCli(vendor: ListableVendor, projectDir: string, config: LLMC
   return { found: true, version: parseVersion(result.stdout) ?? parseVersion(result.stderr), path: binary };
 }
 
+/**
+ * The live list and the CLI probe, from `config` as `loadLLMConfig` returns
+ * it. Neither needs a trust check of its own: the loader drops the `cli_path`
+ * the shared project config sets until the repository is accepted (and clamps
+ * a committed `.n-dx.local.json` the same way), so the probe runs only a
+ * binary the operator chose; and the listing always goes to the vendor's own
+ * models URL, never a configured `api_endpoint`, so the repository cannot
+ * redirect the operator's key.
+ */
 async function probeVendor(
   vendor: ListableVendor,
   projectDir: string,
@@ -119,8 +129,11 @@ export async function getLiveVendorProbe(
   const hit = cache.get(key);
   if (!options.refresh && hit && hit.expiresAt > Date.now()) return hit.probe;
 
+  const restricted = isProjectRestricted(projectDir);
   const probe = await probeVendor(vendor, projectDir, await loadLLMConfig(projectDir));
-  cache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, probe });
+  // A restricted answer is not cached: accepting the config must show the
+  // probed result on the next request, not ten minutes later.
+  if (!restricted) cache.set(key, { expiresAt: Date.now() + CATALOG_CACHE_TTL_MS, probe });
   return probe;
 }
 
