@@ -383,6 +383,34 @@ describe("the top-nav button", () => {
 
 // ── Transcript ─────────────────────────────────────────────────────────────
 
+describe("a page handed off with ?sidecar=<id>", () => {
+  beforeEach(() => {
+    // "recent" is the session the drawer would pick on its own.
+    server.sessions = [
+      { session: session({ id: "handed", lastActivityAt: "2026-10-28T09:00:00.000Z" }), running: false },
+      { session: session({ id: "recent", lastActivityAt: "2026-10-28T11:00:00.000Z" }), running: false },
+    ];
+    server.frames = [user(1, "Handed-off question")];
+    history.replaceState(null, "", "/?sidecar=handed");
+  });
+  afterEach(() => history.replaceState(null, "", "/"));
+
+  it("opens the drawer on that session and reads its frames, though another is more recent", async () => {
+    await mount();
+    expect(drawer()).not.toBeNull();
+    expect(rows()).toEqual(["Handed-off question"]);
+    expect(frameFetches()).toContain("/api/sidecar/sessions/handed/frames?after=0");
+    expect(frameFetches().some((u) => u.includes("/sessions/recent/"))).toBe(false);
+  });
+
+  it("leaves the drawer closed and reads no session with web.sidecar off", async () => {
+    server.enabled = false;
+    await mount();
+    expect(drawer()).toBeNull();
+    expect(server.requests.some((r) => r.url.startsWith("/api/sidecar"))).toBe(false);
+  });
+});
+
 describe("the transcript", () => {
   beforeEach(() => {
     server.sessions = [{ session: session({ cursor: 2 }), running: false }];
