@@ -182,6 +182,42 @@ describe("commands route — init (setup wizard)", () => {
     expect(created.gitInitialized).toBe(true);
   });
 
+  const KEY = "AIza-placeholder-key";
+  const storeCall = () =>
+    execMock.mock.calls.find((c) => (c[1] as string[]).includes("credentials.google"));
+
+  it("stores a Google key on stdin, never on argv", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    await postInit({ provider: "google", googleApiKey: KEY });
+    await waitForInit();
+
+    const call = storeCall();
+    expect(call).toBeDefined();
+    expect(call![1]).toEqual(expect.arrayContaining(["config", "credentials.google", "--stdin"]));
+    expect((call![2] as { input?: string }).input).toBe(KEY);
+    for (const [, args] of [...execMock.mock.calls, ...spawnManagedMock.mock.calls]) {
+      expect((args as string[]).join(" ")).not.toContain(KEY);
+    }
+  });
+
+  it("stays non-fatal when the store write fails", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    execMock.mockImplementation(async (_bin: string, args: string[]) => {
+      if (args.includes("credentials.google")) throw new Error("store unavailable");
+      return { stdout: "git version 2.45.0", stderr: "", exitCode: 0, error: null, launched: true };
+    });
+    await postInit({ provider: "google", googleApiKey: KEY });
+    const status = await waitForInit();
+    expect(status.error).toBeNull();
+  });
+
+  it("runs no store command when no Google key was entered", async () => {
+    stubManagedRun({ stdout: "n-dx initialized" });
+    await postInit({ provider: "google" });
+    await waitForInit();
+    expect(storeCall()).toBeUndefined();
+  });
+
   it("leaves gitInitialized null when no repository was requested", async () => {
     stubManagedRun({ stdout: "n-dx initialized" });
     await postInit({ provider: "claude", git: false });
