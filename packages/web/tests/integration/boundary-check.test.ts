@@ -95,7 +95,45 @@ function extractRuntimeImportPaths(filePath: string): string[] {
   return paths;
 }
 
+/**
+ * Every module specifier in `source`: any `… from "x"` (named, default,
+ * namespace, mixed, `export * as`, multi-line), bare `import "x"`, and
+ * dynamic `import("x")`. Wider than extractImportPaths, which misses all but
+ * the first of those after `from`.
+ */
+function extractModuleSpecifiers(source: string): string[] {
+  const re = /\bfrom\s*["']([^"']+)["']|\bimport\s*\(?\s*["']([^"']+)["']/g;
+  return [...source.matchAll(re)].map((m) => (m[1] ?? m[2])!);
+}
+
 describe("server/client boundary", () => {
+  it("extractModuleSpecifiers sees every import and re-export form", () => {
+    const source = [
+      'import { a } from "./named.js";',
+      'import {\n  b,\n} from "./multi.js";',
+      'import * as ns from "./namespace.js";',
+      'import d, { e } from "./mixed.js";',
+      'import type { T } from "./type.js";',
+      'import "./bare.js";',
+      'const m = await import("./dynamic.js");',
+      'export { f } from "./reexport.js";',
+      'export * as g from "./star-as.js";',
+      'export * from "./star.js";',
+    ].join("\n");
+    expect(extractModuleSpecifiers(source)).toEqual([
+      "./named.js",
+      "./multi.js",
+      "./namespace.js",
+      "./mixed.js",
+      "./type.js",
+      "./bare.js",
+      "./dynamic.js",
+      "./reexport.js",
+      "./star-as.js",
+      "./star.js",
+    ]);
+  });
+
   it("no server file imports from viewer", () => {
     const serverDir = join(WEB_SRC, "server");
     const violations: string[] = [];
@@ -125,7 +163,7 @@ describe("server/client boundary", () => {
 
     for (const file of collectTsFiles(hubDir)) {
       const rel = relPosix(file);
-      for (const imp of extractImportPaths(file)) {
+      for (const imp of extractModuleSpecifiers(readFileSync(file, "utf-8"))) {
         if (imp === "preact" || imp.startsWith("preact/")) {
           violations.push(`${rel} imports "${imp}"`);
         } else if (imp.startsWith(".")) {
