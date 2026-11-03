@@ -258,11 +258,14 @@ const REFRESH_SCRIPT = `
   var list = document.getElementById("cards");
   if (!list) return;
   var count = document.getElementById("project-count");
-  function tick() {
-    fetch("/api/hub/overview", { headers: { accept: "application/json" } })
+  function tick(withSession) {
+    fetch("/api/hub/overview" + (withSession ? "?hubSession=1" : ""), { headers: { accept: "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data || typeof data.html !== "string") return;
+        // The deferred page's toggle waits, hidden, for the host's answer.
+        var session = document.getElementById("hub-session-toggle");
+        if (session && typeof data.hubSession === "boolean") session.hidden = !data.hubSession;
         if (count && data.projects) {
           var n = data.projects.length;
           count.textContent = n === 1 ? "1 project" : n + " projects";
@@ -277,9 +280,9 @@ const REFRESH_SCRIPT = `
   // no cards yet: load them as soon as the session script has signed in.
   if (list.hasAttribute("data-deferred")) {
     var ready = window.ndxAuth ? window.ndxAuth.ready : Promise.resolve({ ok: true });
-    ready.then(function (state) { if (state.ok) tick(); });
+    ready.then(function (state) { if (state.ok) tick(true); });
   }
-  setInterval(tick, 5000);
+  setInterval(function () { tick(false); }, 5000);
 })();
 `;
 
@@ -441,6 +444,8 @@ const HUB_SESSION_SCRIPT = `
   toggle.addEventListener("click", function () { setOpen(drawer.hidden); });
   document.addEventListener("keydown", function (e) {
     if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "j") {
+      // A hidden toggle (the deferred page before the host said yes) offers nothing to open.
+      if (toggle.hidden && drawer.hidden) return;
       e.preventDefault();
       setOpen(drawer.hidden);
     }
@@ -452,14 +457,19 @@ const HUB_SESSION_SCRIPT = `
 })();
 `;
 
-/** The header's Hub session toggle; nothing unless the host reports the hub lens available. */
-export function renderHubSessionToggle(hubSession: boolean): string {
+/**
+ * The header's Hub session toggle; nothing unless the host reports the hub
+ * lens available. `"pending"` (the deferred page) renders it hidden, for the
+ * page's script to show once the host has answered.
+ */
+export function renderHubSessionToggle(hubSession: boolean | "pending"): string {
   if (!hubSession) return "";
-  return `<button class="theme-toggle hub-session-btn" type="button" id="hub-session-toggle" aria-expanded="false" aria-controls="hub-session-drawer" aria-keyshortcuts="Meta+J Control+J" title="Hub session (⌘J)">Hub session<kbd aria-hidden="true">⌘J</kbd></button>`;
+  const hidden = hubSession === "pending" ? " hidden" : "";
+  return `<button class="theme-toggle hub-session-btn" type="button" id="hub-session-toggle"${hidden} aria-expanded="false" aria-controls="hub-session-drawer" aria-keyshortcuts="Meta+J Control+J" title="Hub session (⌘J)">Hub session<kbd aria-hidden="true">⌘J</kbd></button>`;
 }
 
 /** The docked drawer: a frame for the drawer-only viewer page the host serves through the hub. */
-export function renderHubSessionDrawer(hubSession: boolean): string {
+export function renderHubSessionDrawer(hubSession: boolean | "pending"): string {
   if (!hubSession) return "";
   const src = `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.drawer}`;
   return `<aside class="hub-drawer" id="hub-session-drawer" aria-label="Hub session" hidden>
@@ -629,7 +639,8 @@ export function renderHomePage(
   extensions: ExtensionView[] = [],
   options: HomePageOptions = {},
 ): string {
-  const hubSession = options.hubSession === true;
+  // A deferred page cannot know yet: its first read after sign-in asks.
+  const hubSession = options.deferred ? "pending" : options.hubSession === true;
   const { projects } = overview;
   const body = options.deferred
     ? `<ul class="cards" id="cards" data-deferred><li class="empty">Loading…</li></ul>`

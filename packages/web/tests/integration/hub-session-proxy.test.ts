@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   HubSessionHostPicker,
+  handleHubRoute,
   handleProxyRequest,
   handleProxyUpgrade,
   hubSessionHostLockPath,
@@ -36,6 +37,8 @@ interface Upstream {
   upgrades: string[];
   /** Answer as a project whose web.sidecar gate is closed. */
   sidecarOff: boolean;
+  /** What the host's hub-lens read reports. */
+  lensAvailable: boolean;
 }
 
 let home: string;
@@ -54,7 +57,7 @@ async function listen(server: Server): Promise<number> {
 async function startUpstream(): Promise<Upstream> {
   const seen: Upstream["seen"] = [];
   const upgrades: string[] = [];
-  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, sidecarOff: false };
+  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, sidecarOff: false, lensAvailable: false };
   const server = createServer((req: IncomingMessage, res) => {
     seen.push({ url: req.url ?? "", token: req.headers["x-ndx-token"] as string | undefined });
     if (upstream.sidecarOff) {
@@ -63,6 +66,10 @@ async function startUpstream(): Promise<Upstream> {
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
+    if (req.url === "/api/sidecar/hub/lens") {
+      res.end(JSON.stringify({ lens: { id: "hub", available: upstream.lensAvailable }, ceiling: 1 }));
+      return;
+    }
     res.end(JSON.stringify({ port: (server.address() as { port: number }).port }));
   });
   server.on("upgrade", (req, socket) => {
@@ -124,7 +131,9 @@ beforeEach(async () => {
       void handlePublicHubRequest(req, res, hub);
       return;
     }
-    void handleProxyRequest(req, res, hub);
+    void handleHubRoute(req, res, hub).then((handled) => {
+      if (!handled) void handleProxyRequest(req, res, hub);
+    });
   });
   hubServer.on("upgrade", (req, socket, head) => {
     const refusal = upgradeRefusal(req, hubPort, TOKEN);
@@ -151,6 +160,45 @@ describe("/hub/session/ through the hub", () => {
     projects = [project("a", a.port)];
     expect((await hubGet("/hub/session/sessions", null)).status).toBe(401);
     expect(await wsHandshake("/hub/session/ws", null)).toBe("HTTP/1.1 401 Unauthorized");
+    expect(a.seen).toEqual([]);
+    expect(a.upgrades).toEqual([]);
+  });
+
+  it("serves a credential-less navigation to the drawer page from the host, with the per-user token and no query", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    const res = await fetch(`http://127.0.0.1:${hubPort}/hub/session/drawer?x=1`, { headers: { accept: "text/html" } });
+    expect(res.status).toBe(200);
+    expect(a.seen).toEqual([{ url: "/api/sidecar/hub/drawer", token: TOKEN }]);
+  });
+
+  it("says whether the hub session can run only on the overview read that asks, as the host's lens reports", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    expect((await (await hubGet("/api/hub/overview")).json()).hubSession).toBeUndefined();
+    expect(a.seen.some((s) => s.url.endsWith("/lens"))).toBe(false);
+    expect((await (await hubGet("/api/hub/overview?hubSession=1")).json()).hubSession).toBe(false);
+    a.lensAvailable = true;
+    expect((await (await hubGet("/api/hub/overview?hubSession=1")).json()).hubSession).toBe(true);
+    expect((await hubGet("/api/hub/overview?hubSession=1", null)).status).toBe(401);
+  });
+
+  it("refuses every other credential-less hub-session request and forwards nothing", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    const base = `http://127.0.0.1:${hubPort}`;
+    const html = { accept: "text/html" };
+    const refused = [
+      await fetch(`${base}/hub/session/drawer`), // not a navigation
+      await fetch(`${base}/hub/session/drawer`, { method: "HEAD", headers: html }),
+      await fetch(`${base}/hub/session/drawer/x`, { headers: html }),
+      await fetch(`${base}/hub/session/lens`, { headers: html }),
+      await fetch(`${base}/hub/session/snapshot`),
+      await fetch(`${base}/hub/session`, { headers: html }),
+      await fetch(`${base}/hub/session/sessions`, { method: "POST", headers: { ...html, "content-type": "application/json" }, body: "{}" }),
+    ];
+    expect(refused.map((r) => r.status)).toEqual([401, 401, 401, 401, 401, 401, 401]);
+    expect(await wsHandshake("/hub/session/drawer", null)).toBe("HTTP/1.1 401 Unauthorized");
     expect(a.seen).toEqual([]);
     expect(a.upgrades).toEqual([]);
   });

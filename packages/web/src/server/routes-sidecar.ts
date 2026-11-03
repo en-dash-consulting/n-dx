@@ -135,6 +135,7 @@ import {
   HUB_SESSION_ROUTES,
   HUB_SIDECAR_API_PREFIX,
   SIDECAR_SESSION_ENDED_REASON,
+  injectSessionScript,
 } from "../shared/index.js";
 import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, resolveHubHome } from "../hub/index.js";
 
@@ -952,7 +953,8 @@ async function handleHubSidecarRoute(
     const html = opts.drawerHtml?.() ?? null;
     if (html === null) return refuse(res, 404, "The hub session drawer is not built; run the web package's build");
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-    res.end(withHubSessionPageConfig(html));
+    // The session script signs the frame in from its tab, so its fetches carry the credential and its socket a ticket.
+    res.end(injectSessionScript(withHubSessionPageConfig(html)));
     return true;
   }
   if (!ctx.port) return refuse(res, 503, "This server has no port, so it cannot host the hub session");

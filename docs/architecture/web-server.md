@@ -222,7 +222,12 @@ iframe of `/hub/session/drawer`, the drawer-only viewer page the host builds
 beside the dashboard (`viewer/hub-session.ts`). `hub/home.ts` stays
 server-rendered with no Preact; the frame posts `HUB_SESSION_CLOSE_MESSAGE` to
 undock. The host injects the page's paths into it, so they do not cross
-`viewer/external.ts`.
+`viewer/external.ts`, and the session script, so the frame signs in from its
+tab. With auth on, a navigation gets the deferred home with the toggle hidden;
+its first overview read after sign-in (`?hubSession=1`) runs the same probe and
+shows it. The frame's navigation is the one credential-less `/hub/session/`
+request the hub serves: a GET wanting HTML of `/drawer`, fetched from the host
+with the token. That page holds only static paths; everything else there is 401.
 
 ### Hub session: drafts only
 
