@@ -24,10 +24,10 @@ import type {
   SidecarPlacement,
   SidecarPlacementCheck,
   SidecarPlacementRequest,
-} from "../hooks/index.js";
+} from "../hooks/sidecar.js";
+import { useProductRead } from "../hooks/sidecar.js";
 import type { ChangePlacement, PlacementCandidate, ProductMap } from "../views/product-model.js";
-import { StrengthChip } from "../views/inbox.js";
-import { useProductRead } from "../views/product-pages.js";
+import { StrengthChip } from "./strength-chip.js";
 
 export const PROPOSE_ROW = "__propose__";
 

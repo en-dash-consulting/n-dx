@@ -19,8 +19,8 @@
 import { h } from "preact";
 import type { ComponentChildren } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
-import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/index.js";
-import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
+import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed } from "../hooks/sidecar.js";
+import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/sidecar.js";
 import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
 

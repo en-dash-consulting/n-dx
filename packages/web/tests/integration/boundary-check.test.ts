@@ -32,6 +32,21 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 const WEB_SRC = join(import.meta.dirname!, "..", "..", "src");
 
 /**
+ * The narrow Sidecar barrels that keep the hub session page (hub-session.ts)
+ * drawer-sized. The full hooks/ and components/ barrels pull zod and the
+ * loader, which esbuild cannot drop (the package is not side-effect free), so
+ * the drawer chain goes around them:
+ *   - `viewer/hooks/sidecar.ts` — only the hooks the drawer chain uses; the
+ *     one hooks/ import the hooks rule allows besides hooks/index.ts, and only
+ *     from SIDECAR_DRAWER_CHAIN.
+ *   - `viewer/sidecar/index.ts` — hooks/sidecar.ts plus HubSessionDrawer; the
+ *     one file the components rule lets import a component leaf.
+ * `hub-session-bundle.test.ts` fails if either barrel regrows the dashboard.
+ */
+const SIDECAR_BARREL = "viewer/sidecar/index.ts";
+const SIDECAR_DRAWER_CHAIN = ["viewer/components/", "viewer/sidecar/"];
+
+/**
  * Path of `file` relative to src/, always POSIX-style regardless of host OS.
  *
  * Every zone rule below compares this against a literal like "viewer/crash/".
@@ -389,6 +404,10 @@ describe("server/client boundary", () => {
 
         // Files inside components/ can import freely from siblings
         if (rel.startsWith("viewer/components/")) continue;
+
+        // The narrow Sidecar barrel re-exports the drawer on purpose: it is
+        // how hub-session.ts mounts it without the full components/ barrel.
+        if (rel === SIDECAR_BARREL) continue;
 
         for (const imp of extractImportPaths(file)) {
           for (const component of componentFiles) {
@@ -809,7 +828,12 @@ describe("server/client boundary", () => {
         // Files inside hooks/ can import from siblings freely
         if (rel.startsWith("viewer/hooks/")) continue;
 
+        // The Sidecar drawer chain imports hooks through the narrow
+        // hooks/sidecar.ts barrel, not the full one (see SIDECAR_BARREL).
+        const mayUseNarrowBarrel = SIDECAR_DRAWER_CHAIN.some((dir) => rel.startsWith(dir));
+
         for (const imp of extractImportPaths(file)) {
+          if (mayUseNarrowBarrel && /\/hooks\/sidecar(\.js)?$/.test(imp)) continue;
           for (const hook of hookLeafFiles) {
             // Match direct imports like "./hooks/use-polling" or "../hooks/use-polling.js"
             // but not "./hooks/index" or "./hooks"

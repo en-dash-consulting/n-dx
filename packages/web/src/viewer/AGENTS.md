@@ -47,3 +47,15 @@ Never hand-build a URL. `installBasePathFetch()` prefixes root-relative `fetch`,
 share links and the logo. All three derive the hub prefix and the `/w/<key>` workspace
 slot from `location.pathname` at boot (`viewer/base-path.ts`), over the same
 `src/shared/base-path.ts` the server uses, so where the prefix ends is defined once.
+
+## The hub session page imports through narrow barrels
+
+`hub-session.ts` is its own esbuild entry (`dist/viewer/hub-session.html`), and
+the full `hooks/index.ts` and `components/index.ts` barrels would carry zod, the
+loader and the top nav into it: esbuild cannot drop barrel members while the
+package is not declared side-effect free. It imports through `sidecar/index.ts`,
+and the drawer chain imports hooks through `hooks/sidecar.ts`. Both are named in
+the rules in `boundary-check.test.ts`; add a hook there only when the drawer
+chain uses it. `hub-session-bundle.test.ts` builds the entry with `build.js`'s
+options and fails when zod or `loader/` returns. Do not solve this with
+`sideEffects` in `package.json`: a wrong entry silently drops dashboard code.

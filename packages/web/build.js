@@ -89,7 +89,7 @@ async function bundleCss() {
 
 // ── Hub session drawer build helpers ──
 
-const hubSessionJsOptions = { ...commonJsOptions, entryPoints: [hubSessionJsEntryPoint] };
+export const hubSessionJsOptions = { ...commonJsOptions, entryPoints: [hubSessionJsEntryPoint] };
 
 function buildHubSessionHtml(jsCode, cssCode) {
   const inlinedHtml = readFileSync(hubSessionHtmlTemplatePath, "utf-8")
@@ -317,14 +317,18 @@ async function buildWatch() {
   console.log("[esbuild] Watching for changes...");
 }
 
-if (watchMode) {
-  buildWatch().catch((err) => {
-    console.error("Watch failed:", err);
-    process.exit(1);
-  });
-} else {
-  buildProduction().catch((err) => {
-    console.error("Build failed:", err);
-    process.exit(1);
-  });
+// Importing this file (tests/integration/hub-session-bundle.test.ts reads
+// `hubSessionJsOptions`) must not start a build.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (watchMode) {
+    buildWatch().catch((err) => {
+      console.error("Watch failed:", err);
+      process.exit(1);
+    });
+  } else {
+    buildProduction().catch((err) => {
+      console.error("Build failed:", err);
+      process.exit(1);
+    });
+  }
 }

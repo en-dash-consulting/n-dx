@@ -27,9 +27,10 @@
 
 import { h, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { useCliName, useFeatureToggle } from "../../hooks/index.js";
-import { StrengthChip, isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox.js";
-import { Pending, useProductRead } from "../../views/product-pages.js";
+import { useCliName, useFeatureToggle, useProductRead } from "../../hooks/index.js";
+import { isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox.js";
+import { Pending } from "../../views/product-pages.js";
+import { StrengthChip } from "../strength-chip.js";
 import { PlaceWithSidecarButton } from "../place-with-sidecar.js";
 import type {
   CapabilityDetail,
