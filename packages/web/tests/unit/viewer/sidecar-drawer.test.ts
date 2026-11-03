@@ -66,6 +66,10 @@ interface Server {
   lensesGate?: Promise<void>;
   /** Status of the newest hench run of any task, per GET /api/hench/runs?taskId=; unset means no runs. */
   lastRunStatus?: string;
+  /** Drawer tabs the hub lists for project p1; unset means no hub answers. */
+  hubTabs?: Array<{ name: string; label: string }>;
+  /** The keyed page's answer; unset is a 200. A pending promise is a sidecar still starting. */
+  pageAnswer?: () => Response | Promise<Response>;
 }
 
 /** A card as the server sends it; `n` orders its raisedAt. */
@@ -178,6 +182,15 @@ function stubServer(): void {
         return json({ session: session({ id }), running: true, from: 0 }, 202);
       }
       if (action === "interrupt") return json({ interrupted: true });
+    }
+    if (server.hubTabs) {
+      if (url === "/api/hub/projects") return json({ projects: [{ id: "p1", name: "P1", status: { state: "running" } }] });
+      if (url === "/api/hub/extensions?project=p1") {
+        return json({ extensions: server.hubTabs.map((t) => ({ name: t.name, tab: { label: t.label, url: `/x/${t.name}/tab` } })) });
+      }
+      const frame = /^\/api\/hub\/extensions\/([\w-]+)\/frame\?project=p1$/.exec(url);
+      if (frame && method === "POST") return json({ url: `/x/${frame[1]}/~f/key${server.requests.length}/tab?project=p1` });
+      if (url.startsWith("/x/")) return server.pageAnswer ? await server.pageAnswer() : new Response("<p>tab</p>");
     }
     return json({});
   }));
@@ -1421,5 +1434,140 @@ describe("attachment and lens", () => {
     await click(root.querySelector(".sidecar-chip-remove"));
     expect(itemChip()).toBeNull();
     expect(patches().map((r) => r.body)).toEqual([{ target: {} }]);
+  });
+});
+
+// ── Extension tabs (Sidecar design §17.1) ─────────────────────────────────
+
+describe("extension tabs", () => {
+  const tabButtons = () => [...root.querySelectorAll<HTMLButtonElement>(".sidecar-tab")];
+  const tab = (id: string) => root.querySelector<HTMLButtonElement>(`.sidecar-tab[data-tab="${id}"]`)!;
+  const frameKeyPosts = () => server.requests.filter((r) => r.method === "POST" && r.url.includes("/frame"));
+  const iframe = () => root.querySelector<HTMLIFrameElement>("iframe.sidecar-ext-frame");
+  const composer = () => root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+  const press = async (el: Element) => {
+    await act(async () => { (el as HTMLElement).click(); });
+    await settle();
+  };
+  const status = () => root.querySelector(".sidecar-ext-status")?.textContent;
+
+  it("shows no strip without a hub, or with no tabs", async () => {
+    await mount();
+    await pressCmdJ();
+    expect(root.querySelector(".sidecar-tabs")).toBeNull();
+    await unmount();
+
+    server.hubTabs = [];
+    await mount();
+    await pressCmdJ();
+    expect(root.querySelector(".sidecar-tabs")).toBeNull();
+  });
+
+  it("lists Sidecar first, then each tab in the hub's order, and asks for no key yet", async () => {
+    server.hubTabs = [{ name: "zeta", label: "Zeta" }, { name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    expect(tabButtons().map((b) => b.textContent)).toEqual(["Sidecar", "Zeta", "Alpha"]);
+    expect(frameKeyPosts()).toEqual([]);
+    expect(iframe()).toBeNull();
+  });
+
+  it("loads the page on first open in an iframe sandboxed exactly, and keeps it across tab switches", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    server.frames = [user(1, "hello"), said(2, "hi there")];
+    server.sessions = [{ session: session(), running: false }];
+    await mount();
+    await pressCmdJ();
+    await act(async () => {
+      composer().value = "half a thought";
+      composer().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    await press(tab("alpha"));
+    expect(frameKeyPosts().map((r) => r.url)).toEqual(["/api/hub/extensions/alpha/frame?project=p1"]);
+    const frame = iframe()!;
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-popups allow-downloads");
+    expect(frame.getAttribute("src")).toMatch(/^\/x\/alpha\/~f\/key\d+\/tab\?project=p1$/);
+
+    await press(tab("sidecar"));
+    await press(tab("alpha"));
+    expect(frameKeyPosts()).toHaveLength(1);
+    expect(iframe()).toBe(frame);
+    expect(rows()).toEqual(["hello", "hi there"]);
+    expect(composer().value).toBe("half a thought");
+  });
+
+  it("hides the other tab rather than unmounting it", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    expect(root.querySelector<HTMLElement>(".sidecar-chat-panel")!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>("#sidecar-tab-alpha")!.hidden).toBe(false);
+    await press(tab("sidecar"));
+    expect(root.querySelector<HTMLElement>(".sidecar-chat-panel")!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>("#sidecar-tab-alpha")!.hidden).toBe(true);
+  });
+
+  it("opens the keyed URL in a new window from the pop-out link", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    const link = root.querySelector<HTMLAnchorElement>(".sidecar-ext-popout")!;
+    expect(link.getAttribute("href")).toBe(iframe()!.getAttribute("src"));
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toContain("noopener");
+  });
+
+  it("says \"Starting <label>…\" until the sidecar answers", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    let release!: () => void;
+    server.pageAnswer = () => new Promise<Response>((r) => { release = () => r(new Response("<p>tab</p>")); });
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    expect(status()).toBe("Starting Alpha…");
+    expect(iframe()).toBeNull();
+    await act(async () => { release(); });
+    await settle();
+    expect(status()).toBeUndefined();
+    expect(iframe()).not.toBeNull();
+  });
+
+  it("shows the hub's 503 with the log file it names", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    server.pageAnswer = () => json({ error: "The alpha sidecar did not answer within 20 s", log: "/home/u/.ndx/logs/alpha.log" }, 503);
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    expect(root.querySelector(".sidecar-ext-error")?.textContent).toBe(
+      "The alpha sidecar did not answer within 20 s Log: /home/u/.ndx/logs/alpha.log",
+    );
+    expect(iframe()).toBeNull();
+  });
+
+  it("shows \"Expired · Reload\" on a 401, and Reload asks for a new key", async () => {
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    server.pageAnswer = () => json({ error: "The frame key is no longer valid" }, 401);
+    await mount();
+    await pressCmdJ();
+    await press(tab("alpha"));
+    expect(status()).toBe("Expired · Reload");
+    expect(frameKeyPosts()).toHaveLength(1);
+
+    server.pageAnswer = undefined;
+    await press(root.querySelector(".sidecar-ext-reload")!);
+    expect(frameKeyPosts()).toHaveLength(2);
+    expect(iframe()).not.toBeNull();
+  });
+
+  it("renders no tab and asks for no key while web.sidecar is off", async () => {
+    server.enabled = false;
+    server.hubTabs = [{ name: "alpha", label: "Alpha" }];
+    await mount();
+    await pressCmdJ();
+    expect(root.querySelector(".sidecar-tabs")).toBeNull();
+    expect(server.requests.some((r) => r.url.includes("/frame") || r.url.startsWith("/x/"))).toBe(false);
   });
 });

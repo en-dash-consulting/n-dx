@@ -477,3 +477,28 @@
 .sidecar-allow-rule[data-state="locked"] {
   opacity: 0.7;
 }
+
+/* Tabs: Sidecar first, then the extensions' pages (sidecar-extension-tabs.ts). */
+.sidecar-tabs {
+  flex: none;
+  display: flex;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.sidecar-tab {
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sidecar-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.sidecar-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sidecar-panel[hidden] { display: none; }
+.sidecar-ext-status { margin: 0; padding: var(--space-3); font-size: 12px; color: var(--text-muted); }
+.sidecar-ext-error { color: var(--red, var(--text)); overflow-wrap: anywhere; }
+.sidecar-ext-reload { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; }
+.sidecar-ext-popout { flex: none; align-self: flex-end; padding: var(--space-1) var(--space-3); font-size: 12px; }
+.sidecar-ext-frame { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--bg-surface); }

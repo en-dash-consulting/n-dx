@@ -23,6 +23,11 @@ import { GENERAL_LENS, SIDECAR_VENDORS, lensLabel, resolveLens, sidecarSetupNeed
 import type { SidecarFrame, SidecarRuntimeEvent, SidecarState } from "../hooks/index.js";
 import { SidecarCards, cardTurnSender } from "./sidecar-cards.js";
 import { SidecarSessions } from "./sidecar-sessions.js";
+import { useHubProjects } from "./project-switcher.js";
+import {
+  ExtensionTabPanel, ExtensionTabStrip, SIDECAR_TAB, extensionFramePath, useExtensionTabs,
+} from "./sidecar-extension-tabs.js";
+import { getBasePath } from "../base-path.js";
 
 export const SIDECAR_WIDTH_DEFAULT = 440;
 export const SIDECAR_WIDTH_MIN = 360;
@@ -264,6 +269,16 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
   const [listing, setListing] = useState(false);
   const [lensMenu, setLensMenu] = useState(false);
   const transcriptRef = useRef<HTMLOListElement>(null);
+  const hub = useHubProjects();
+  const tabs = useExtensionTabs(hub);
+  const [selected, setSelected] = useState(SIDECAR_TAB);
+  // A tab asks for its frame key on its first open and is kept after that.
+  const [opened, setOpened] = useState<string[]>([]);
+  const active = tabs.some((t) => t.name === selected) ? selected : SIDECAR_TAB;
+  const selectTab = (id: string) => {
+    setSelected(id);
+    if (id !== SIDECAR_TAB) setOpened((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
 
   const applyWidth = useCallback((next: number) => {
     const w = clampSidecarWidth(next);
@@ -356,6 +371,17 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       }, "Sessions"),
       h("button", { type: "button", class: "sidecar-close", onClick: onClose, "aria-label": "Close Sidecar", title: "Close (⌘J)" }, "×"),
     ),
+    h(ExtensionTabStrip, { tabs, active, onSelect: selectTab }),
+    ...tabs.filter((t) => opened.includes(t.name)).map((t) =>
+      h(ExtensionTabPanel, {
+        key: t.name,
+        tab: t,
+        framePath: extensionFramePath(getBasePath(), hub.projects, t.name),
+        visible: active === t.name,
+      })),
+    // Hidden, not unmounted, while an extension tab shows: the conversation
+    // and the composer's text survive the switch.
+    h("div", { class: "sidecar-panel sidecar-chat-panel", hidden: active !== SIDECAR_TAB },
     listing ? h(SidecarSessions, { sidecar, onOpened: () => setListing(false) }) : null,
     ...(listing ? [] : [
     agent
@@ -436,6 +462,7 @@ export function SidecarDrawer({ sidecar, onClose }: SidecarDrawerProps) {
       ),
     ),
     ]),
+    ),
   );
 }
 
