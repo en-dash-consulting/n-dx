@@ -3424,19 +3424,10 @@ async function handleSetProjectSection(
     : PROJECT_CONFIG_FILE;
   const configPath = projectConfigPath(dir, targetFile);
   if (targetFile === LOCAL_CONFIG_FILE) {
-    // config.js already uses this foundation reader for trust-aware config I/O.
-    const { collectRepoExecutionConfig, isLocalConfigTracked } = await import("@n-dx/llm-client");
-    const config = collectRepoExecutionConfig(dir);
-    // The reader's answer covers what is on disk. A write must also ask git
-    // when nothing is: a deleted tracked file or a sparse checkout still has
-    // the index entry, and saveJSON's rename would put the path back holding
-    // the key, ready for `git commit -a`.
-    const status = config.localConfigTracked
-      ? { tracked: true, unanswered: Boolean(config.localConfigUnanswered) }
-      : { tracked: isLocalConfigTracked(dir, { evenIfAbsent: true }), unanswered: false };
+    const status = await localConfigTrackedStatus(dir);
     if (status.tracked) {
       const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
-      const reason = status.unanswered ? "git could not confirm it is untracked" : "the file is repository config tracked by git";
+      const reason = status.reason;
       if (storageSettingPath.split(".").at(-1) === SECRET_SETTING_LEAF) {
         throw new Error(`Refusing to write a credential to ${label}: ${reason}. Untrack the local config before storing credentials.`);
       }
@@ -4214,16 +4205,26 @@ const CLI_VENDORS = new Set(["claude", "codex"]);
  * say so. A store-only key never selects the API (auth `auto`), but writing
  * `llm.<vendor>.api_key` always has, so the alias keeps that effect visible.
  * An explicit auth, `cli` included, is never overwritten. google has no CLI
- * login, so there is no mode to switch.
+ * login, so there is no mode to switch. When git tracks the local file, the
+ * switch is not written as a side effect: it would reach everyone who checks
+ * the repository out, so the user is told to set it.
  */
 async function setApiAuthIfUnset(dir, vendor) {
   if (!CLI_VENDORS.has(vendor)) return;
   for (const which of [PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE]) {
     if ((await loadProjectConfigFile(dir, which)).llm?.[vendor]?.auth !== undefined) return;
   }
+  const status = await localConfigTrackedStatus(dir);
+  if (status.tracked) {
+    console.log(
+      `llm.${vendor}.auth is unset and left so: ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)} is not machine-local (${status.reason}). ` +
+        `To use the stored key in this checkout: ndx config llm.${vendor}.auth api`,
+    );
+    return;
+  }
   const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
   setByPath(local, `llm.${vendor}.auth`, "api", "llm");
-  await saveProjectJSON(projectConfigPath(dir, LOCAL_CONFIG_FILE), local);
+  await saveProjectJSON(projectConfigPath(dir, LOCAL_CONFIG_FILE), local, { ownerOnly: true });
   console.log(
     `llm.${vendor}.auth = api (it was unset, so ${vendor} now uses the stored key; set it to cli or auto to change that)`,
   );
@@ -4242,8 +4243,30 @@ async function removeFileApiKey(dir, which, vendor) {
       changed = true;
     }
   }
-  if (changed) await saveProjectJSON(projectConfigPath(dir, which), data);
+  if (changed) await saveProjectJSON(projectConfigPath(dir, which), data, { ownerOnly: which === LOCAL_CONFIG_FILE });
   return changed;
+}
+
+/**
+ * Whether git tracks `.n-dx.local.json`, which makes it repository config
+ * rather than machine-local. The reader's answer covers what is on disk; a
+ * write must also ask git when nothing is: a deleted tracked file or a sparse
+ * checkout still has the index entry, and saveJSON's rename would put the
+ * path back, ready for `git commit -a`.
+ *
+ * @param {string} dir
+ * @returns {Promise<{ tracked: boolean, reason: string }>}
+ */
+async function localConfigTrackedStatus(dir) {
+  // config.js already uses this foundation reader for trust-aware config I/O.
+  const { collectRepoExecutionConfig, isLocalConfigTracked } = await import("@n-dx/llm-client");
+  const config = collectRepoExecutionConfig(dir);
+  const tracked = config.localConfigTracked || isLocalConfigTracked(dir, { evenIfAbsent: true });
+  const unanswered = Boolean(config.localConfigTracked && config.localConfigUnanswered);
+  return {
+    tracked: Boolean(tracked),
+    reason: unanswered ? "git could not confirm it is untracked" : "the file is repository config tracked by git",
+  };
 }
 
 /**

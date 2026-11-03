@@ -833,17 +833,22 @@ describe("n-dx config", () => {
       expect((await stat(LOCAL_CONFIG_PATH(tmpDir))).mode & 0o777).toBe(0o600);
     });
 
-    it("refuses to write an api_key into a file git tracks", async () => {
+    // The key goes to the credential store, so a tracked local file never
+    // receives it, and the implicit `auth api` is not written there either.
+    it("stores an api_key and leaves a file git tracks untouched", async () => {
       spawnSync("git", ["init", "-q"], { cwd: tmpDir, stdio: "pipe" });
       await writeFile(LOCAL_CONFIG_PATH(tmpDir), "{}\n");
       spawnSync("git", ["add", "-f", "--", ".n-dx.local.json"], { cwd: tmpDir, stdio: "pipe" });
 
-      const stderr = runFail(["claude.api_key", "sk-ant-test-key", tmpDir]);
-      expect(stderr).toContain("tracked by git");
+      const out = run(["claude.api_key", "sk-ant-test-key", tmpDir]);
+      expect(out).toContain("stored in the credential store");
+      expect(out).toContain("tracked by git");
+      expect(out).toContain("ndx config llm.claude.auth api");
+      expect(out).not.toContain("sk-ant-test-key");
       expect(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8")).toBe("{}\n");
     });
 
-    it("warns when the key file is not ignored by git, and still writes", async () => {
+    it("keeps the key out of a local file git does not ignore", async () => {
       spawnSync("git", ["init", "-q"], { cwd: tmpDir, stdio: "pipe" });
 
       const result = spawnSync("node", [CLI_PATH, "config", "claude.api_key", "sk-ant-test-key", tmpDir], {
@@ -852,19 +857,10 @@ describe("n-dx config", () => {
         stdio: "pipe",
       });
       expect(result.status).toBe(0);
-      expect(result.stderr).toContain("not ignored by git");
       const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
-      expect(local.llm.claude.api_key).toBe("sk-ant-test-key");
-
-      // Once ignored, the write is silent about git.
-      await writeFile(join(tmpDir, ".gitignore"), ".n-dx.local.json\n");
-      const quiet = spawnSync("node", [CLI_PATH, "config", "claude.api_key", "sk-ant-test-key", tmpDir], {
-        encoding: "utf-8",
-        timeout: DEFAULT_TIMEOUT,
-        stdio: "pipe",
-      });
-      expect(quiet.status).toBe(0);
-      expect(quiet.stderr).not.toContain("not ignored by git");
+      expect(local.llm.claude.api_key).toBeUndefined();
+      expect(local.llm.claude.auth).toBe("api");
+      expect(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8")).not.toContain("sk-ant-test-key");
     });
 
     it("writes claude.<field> to llm.claude.<field> and notes the redirect on stderr", () => {
@@ -2360,11 +2356,13 @@ describe("writes to git-tracked machine-local configuration", () => {
     execFileSync("git", ["add", ".n-dx.local.json"], { cwd: dir });
   });
   afterEach(async () => { await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
-  it("refuses a credential without printing or persisting its value", async () => {
+  // A key goes to the credential store, never to this file, and the implicit
+  // `auth api` is not written into repository config.
+  it("stores a credential without printing it or persisting it in the tracked file", async () => {
     const key = "sk-ant-fixture-never-print";
     const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
-    expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("stored in the credential store");
     expect(result.stdout + result.stderr).not.toContain(key);
     expect(JSON.parse(await readFile(LOCAL_CONFIG_PATH(dir), "utf8"))).toEqual({});
   });
@@ -2376,12 +2374,12 @@ describe("writes to git-tracked machine-local configuration", () => {
   });
   // Nothing on disk, but git still has the entry: saveJSON would recreate the
   // committed path holding the key, ready for `git commit -a`.
-  it("refuses a credential when the tracked file was deleted from the work tree", async () => {
+  it("stores a credential and does not recreate the tracked file deleted from the work tree", async () => {
     await rm(LOCAL_CONFIG_PATH(dir));
     const key = "sk-ant-fixture-deleted-tracked";
     const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
-    expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("tracked by git");
     expect(result.stdout + result.stderr).not.toContain(key);
     expect(existsSync(LOCAL_CONFIG_PATH(dir))).toBe(false);
   });
@@ -2401,13 +2399,13 @@ describe("writes through a committed dangling symlink at the local config path",
     execFileSync("git", ["add", ".n-dx.local.json"], { cwd: dir });
   });
   afterEach(async () => { await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
-  it("refuses a credential and leaves the link in place", async (ctx) => {
+  it("stores a credential and leaves the link in place, writing nothing through it", async (ctx) => {
     if (!linked) ctx.skip();
     const key = "sk-ant-fixture-dangling-link";
     const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
-    expect(result.status).not.toBe(0);
-    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.status, result.stderr).toBe(0);
     expect(result.stdout + result.stderr).not.toContain(key);
     expect(lstatSync(LOCAL_CONFIG_PATH(dir)).isSymbolicLink()).toBe(true);
+    expect(existsSync(join(dir, "missing-target.json"))).toBe(false);
   });
 });
