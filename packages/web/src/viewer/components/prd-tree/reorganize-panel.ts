@@ -58,6 +58,17 @@ const RISK_CLASSES: Record<string, string> = {
   high: "reorg-risk-high",
 };
 
+/**
+ * The message for a refused apply: the server's `error` text (the branch
+ * guard's refusal names the branch), else the status code.
+ */
+async function applyFailure(res: Response): Promise<string> {
+  const body = await res.json().catch(() => null) as { error?: unknown } | null;
+  return typeof body?.error === "string" && body.error
+    ? body.error
+    : `Apply failed (${res.status})`;
+}
+
 // ── Component ────────────────────────────────────────────────────
 
 export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelProps) {
@@ -138,7 +149,7 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
         }),
       });
       if (!res.ok) {
-        setError(`Apply failed (${res.status})`);
+        setError(await applyFailure(res));
         return;
       }
       const data = await res.json();
@@ -166,7 +177,7 @@ export function ReorganizePanel({ open, onClose, onApplied }: ReorganizePanelPro
         body: JSON.stringify({ proposalIds: lowRiskIds }),
       });
       if (!res.ok) {
-        setError(`Apply failed (${res.status})`);
+        setError(await applyFailure(res));
         return;
       }
       const data = await res.json();

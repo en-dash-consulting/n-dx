@@ -49,6 +49,7 @@ describe("v2 PRD cache", () => {
     expect(doc).not.toBeNull();
     expect(doc!.items.map((i) => i.title)).toContain(JSON.parse(readFileSync(join(rexDir, PRD_CACHE_DIR, PRD_CACHE_JSON), "utf-8")).items[0].title);
     expect(doc!.items.length).toBeGreaterThan(0);
+    expect(doc!.product?.some((node) => node.type === "area")).toBe(true);
   });
 
   it("prdMaxMtimeMs follows edits under changes/", () => {

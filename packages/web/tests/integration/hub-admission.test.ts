@@ -137,10 +137,9 @@ function record(id: string, dir: string, port: number): ProjectRecord {
     name: id,
     repoRoot: dir,
     worktrees: [dir],
-    ndxBin: "/nonexistent/ndx",
     port,
     // A pid the hub will find alive, so `attach` adopts the child rather than
-    // trying to respawn it with the bogus ndxBin above.
+    // trying to respawn it.
     pid: process.pid,
     lastSeen: new Date().toISOString(),
   };

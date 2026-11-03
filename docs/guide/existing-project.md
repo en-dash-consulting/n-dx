@@ -181,7 +181,7 @@ ndx start .
 
 ![ndx start example](../../documentation/ndx_start.png)
 
-The dashboard runs at `http://localhost:3117` with interactive views of zones, the PRD, and agent runs.
+The dashboard runs at `http://127.0.0.1:3117` with interactive views of zones, the PRD, and agent runs.
 
 For teammates: after they pull the repo, they only need `pnpm add -g @n-dx/core` and `ndx start .` — no re-analysis, no re-init. The committed `.sourcevision/` and PRD give them the same baseline you just built.
 

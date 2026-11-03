@@ -1,5 +1,13 @@
 # @n-dx/rex
 
+## 0.10.2
+
+### Patch Changes
+
+- [#880](https://github.com/en-dash-consulting/n-dx/pull/880) [`2f058c3`](https://github.com/en-dash-consulting/n-dx/commit/2f058c31d7d95ff2703709872cb7ec2d83757685) Thanks [@endash-shal](https://github.com/endash-shal)! - Add a read-only migrate-diff command to compare migration plan decisions in sentences, with counts per kind and corrupt metadata counted once.
+- Updated dependencies [[`e147a8f`](https://github.com/en-dash-consulting/n-dx/commit/e147a8fd658bb12dd687592b9d983a88697ebdfc), [`c5a6067`](https://github.com/en-dash-consulting/n-dx/commit/c5a6067cfe5db0239e428ecb218a0dc8f92c3a98), [`95875df`](https://github.com/en-dash-consulting/n-dx/commit/95875df8e3ddd5fb6a931df791fa6891c1c0fc07)]:
+  - @n-dx/llm-client@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes

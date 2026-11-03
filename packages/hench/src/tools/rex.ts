@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { PRDStore, PRDItem, ItemStatus, ResolutionType, CommandExecutor } from "../prd/rex-gateway.js";
 import { PROJECT_DIRS, repoCommandEnv } from "../prd/llm-gateway.js";
-import { execShellCmd } from "../process/exec.js";
+import { execRepoShellCmd } from "../guard/sandbox.js";
 import { completeV2Work, computeTimestampUpdates, isChangeLayerStore, reconcileAutoCompletions,validateAutomatedRequirements, formatRequirementsValidation, loadAcknowledged, saveAcknowledged, acknowledgeFinding, openClaimsStore, resolveClaimHolder } from "../prd/rex-gateway.js";
 import { validateCompletion, formatValidationResult } from "../validation/completion.js";
 import { isFinalizeReadyParent } from "../validation/finalize-ready.js";
@@ -379,7 +379,9 @@ const REQ_CMD_TIMEOUT = 30_000;
  */
 export function createCommandExecutor(projectDir: string): CommandExecutor {
   return async (command: string) => {
-    const result = await execShellCmd(command, {
+    // A requirement's command is PRD content the agent can edit, and it runs
+    // the project's code: confined like the agent's own run_command.
+    const result = await execRepoShellCmd(command, {
       cwd: projectDir,
       timeout: REQ_CMD_TIMEOUT,
       env: repoCommandEnv(projectDir),

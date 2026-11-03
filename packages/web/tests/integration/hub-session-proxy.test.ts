@@ -24,7 +24,8 @@ import {
   type Hub,
   type ProjectView,
 } from "../../src/hub/index.js";
-import { guardHubRequest, upgradeRefusal } from "../../src/hub/request-guard.js";
+import { handlePublicHubRequest } from "../../src/hub/proxy.js";
+import { guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "../../src/hub/request-guard.js";
 import { FEATURE_DISABLED_HEADER } from "../../src/shared/index.js";
 
 const TOKEN = "per-user-token";
@@ -135,6 +136,11 @@ beforeEach(async () => {
   } as unknown as Hub;
   hubServer = createServer((req, res) => {
     if (guardHubRequest(req, res, hubPort, TOKEN)) return;
+    // As hub.ts: a request with no credential gets only what is public.
+    if (isPublicOnlyHubRequest(req)) {
+      void handlePublicHubRequest(req, res, hub);
+      return;
+    }
     void handleProxyRequest(req, res, hub);
   });
   hubServer.on("upgrade", (req, socket, head) => {

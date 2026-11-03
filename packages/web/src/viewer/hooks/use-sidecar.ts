@@ -25,6 +25,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { openWebSocket } from "../session.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useSidecarSessions } from "./use-sidecar-sessions.js";
 import type { SidecarSessionsState } from "./use-sidecar-sessions.js";
@@ -65,7 +66,7 @@ export interface SidecarRuntimeEvent {
   type: "assistant" | "tool_use" | "tool_result" | "completion" | "failure" | "token_usage";
   text?: string;
   toolCall?: { tool: string; input: Record<string, unknown>; id?: string };
-  toolResult?: { tool: string; output: string; durationMs: number; callId?: string };
+  toolResult?: { tool: string; output: string; durationMs: number; id?: string };
   failure?: { message?: string };
   /** On `token_usage`: what the call sent in and got back. */
   tokenUsage?: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
@@ -648,7 +649,7 @@ export function useSidecar(
       coalescerWindowMs: 100,
     });
     try {
-      ws = new WebSocket(endpointRef.current.socketUrl());
+      ws = openWebSocket(endpointRef.current.socketUrl());
       ws.onmessage = (event) => {
         try {
           pipeline.push(JSON.parse(event.data));

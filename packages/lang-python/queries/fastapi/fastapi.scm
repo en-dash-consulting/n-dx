@@ -44,3 +44,13 @@
 ; of the aliased import @fastapi.aliased, whose name the imports query captures.
 (aliased_import
   alias: (identifier) @fastapi.alias) @fastapi.aliased
+
+; Rebindings outside def/class also count under module-level if/try blocks.
+(assignment left: (identifier) @fastapi.binding right: (_))
+
+; A `try` (@fastapi.try) with its body (@fastapi.tried) and each `except` clause
+; (@fastapi.excepted): a name an except clause binds is the fallback for an
+; import in the body, which is what runs, not a later binding replacing it.
+(try_statement
+  body: (_) @fastapi.tried
+  (except_clause) @fastapi.excepted) @fastapi.try

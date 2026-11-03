@@ -48,6 +48,12 @@ share links and the logo. All three derive the hub prefix and the `/w/<key>` wor
 slot from `location.pathname` at boot (`viewer/base-path.ts`), over the same
 `src/shared/base-path.ts` the server uses, so where the prefix ends is defined once.
 
+**Sockets open through `openWebSocket()`** (`viewer/session.ts`), never
+`new WebSocket(...)`: on a token-protected server the handshake needs a
+single-use ticket (`socket-guard.test.ts`). A link to a server-generated
+document uses `credentialedLinkClick`, since a navigation carries no credential
+([why](../../../../docs/architecture/web-server.md#authentication)).
+
 ## The hub session page imports through narrow barrels
 
 `hub-session.ts` is its own esbuild entry (`dist/viewer/hub-session.html`), and

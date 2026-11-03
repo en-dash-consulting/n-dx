@@ -1,3 +1,5 @@
+import { FloatingNotice } from "../components/index.js";
+import { useToast } from "../hooks/index.js";
 /**
  * Workflow Optimization view — displays analysis of run history with
  * actionable suggestions that users can preview, accept, reject, or defer.
@@ -338,12 +340,7 @@ export function WorkflowOptimizationView() {
   const [previewDiff, setPreviewDiff] = useState<PreviewDiff[] | null>(null);
   const [applying, setApplying] = useState(false);
   const [decidingId, setDecidingId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  }, []);
+  const { toast, showToast } = useToast();
 
   const fetchAnalysis = useCallback(async () => {
     try {
@@ -591,9 +588,9 @@ export function WorkflowOptimizationView() {
 
     // Toast
     toast
-      ? h("div", { class: "wf-toast" },
+      ? h(FloatingNotice, null, h("div", { class: "wf-toast", role: "status", "aria-live": "polite" },
           h("span", null, toast),
-        )
+        ))
       : null,
   );
 }

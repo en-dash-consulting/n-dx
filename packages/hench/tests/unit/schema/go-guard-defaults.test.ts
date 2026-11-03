@@ -156,7 +156,7 @@ describe("DEFAULT_HENCH_CONFIG", () => {
       const config = DEFAULT_HENCH_CONFIG("go");
       expect(config.schema).toBe(HENCH_SCHEMA_VERSION);
       expect(config.provider).toBe("cli");
-      expect(config.maxTurns).toBe(50);
+      expect(config.maxTurns).toBe(200);
     });
   });
 
@@ -179,7 +179,7 @@ describe("DEFAULT_HENCH_CONFIG", () => {
       expect(config.schema).toBe(HENCH_SCHEMA_VERSION);
       expect(config.provider).toBe("cli");
       expect(config.model).toBe("sonnet");
-      expect(config.maxTurns).toBe(50);
+      expect(config.maxTurns).toBe(200);
       expect(config.maxTokens).toBe(8192);
       expect(config.tokenBudget).toBe(0);
       expect(config.retry.maxRetries).toBe(3);

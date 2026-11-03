@@ -184,6 +184,12 @@ describe("Go scanner support", () => {
   // ── parseGoMod ──────────────────────────────────────────────────────
 
   describe("parseGoMod", () => {
+    it("uses Go token rules for quoted modules, comments and compact require blocks", async () => {
+      const file = join(tempDir, "go.mod");
+      await writeFile(file, 'module "example.com/service" // service\ngo 1.23 // language\nrequire(\nexample.com/lib v1.2.3 // indirect\n)\n');
+      expect(await parseGoMod(file)).toEqual({ module: "example.com/service", goVersion: "1.23", dependencies: [{ path: "example.com/lib", version: "v1.2.3" }] });
+    });
+
     it("extracts module name, Go version, and dependencies", async () => {
       const goModContent = [
         "module github.com/example/myproject",

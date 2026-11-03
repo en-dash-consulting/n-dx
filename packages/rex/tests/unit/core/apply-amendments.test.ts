@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, bodyNotes, applyAmendmentsProblems, resolve } from "../../../src/core/apply-amendments.js";
+import { ApplyAmendmentsError, NOTHING_TO_MODIFY, amendsEditedAfterApply, amendsHash, appendHistory, applyAmendments, bodyNotes, applyAmendmentsProblems, newErrors, resolve } from "../../../src/core/apply-amendments.js";
 import { checkV2Rules, specHash, type RuleNode, type V2Tree } from "../../../src/schema/v2-rules.js";
 import type { Amendment } from "../../../src/schema/v2.js";
 import { isWindowsSafeSegment } from "../../../src/store/folder-tree-serializer.js";
@@ -176,6 +176,49 @@ describe("applyAmendments: modified", () => {
     expect(get(out, CAP).criteria).toEqual([{ id: "c1", text: "Charged once" }]);
   });
 
+  describe("requirements linked to criteria", () => {
+    const linked = (criterion: string, text: string) => ({
+      id: `${CAP}:${criterion}`,
+      title: text,
+      description: "Linked to: tests/pay.test.ts",
+      category: "technical",
+      validationType: "automated",
+      acceptanceCriteria: [`${text}.`],
+      validationCommand: "pnpm vitest run tests/pay.test.ts",
+    });
+    function withRequirements(amends: Amendment[]): V2Tree {
+      const t = tree(amends);
+      get(t, CAP).requirements = [linked("c1", "Charged once"), linked("c2", "Declines show why"), { ...linked("c1", "Unlinked"), id: "standalone" }];
+      return t;
+    }
+
+    it("rewrites the requirement linked to a replaced criterion, keeping its tests", () => {
+      const { tree: out } = applyAmendments(withRequirements([modify({ criteria: { replace: [{ id: "c1", text: "Charged exactly once." }] } })]), CHANGE, OPTS);
+      const requirements = get(out, CAP).requirements as ReturnType<typeof linked>[];
+      expect(requirements.find((r) => r.id === `${CAP}:c1`)).toEqual({
+        ...linked("c1", "Charged once"),
+        title: "Charged exactly once",
+        acceptanceCriteria: ["Charged exactly once."],
+      });
+      expect(requirements.find((r) => r.id === `${CAP}:c2`)).toEqual(linked("c2", "Declines show why"));
+      expect(requirements.find((r) => r.id === "standalone")?.title).toBe("Unlinked");
+    });
+
+    it("follows a criterion's own requirement field over the id convention", () => {
+      const t = withRequirements([modify({ criteria: { replace: [{ id: "c2", text: "Declines name the reason" }] } })]);
+      get(t, CAP).criteria = [{ id: "c1", text: "Charged once" }, { id: "c2", text: "Declines show why", requirement: "standalone" }];
+      const { tree: out } = applyAmendments(t, CHANGE, OPTS);
+      const requirements = get(out, CAP).requirements as ReturnType<typeof linked>[];
+      expect(requirements.find((r) => r.id === "standalone")?.acceptanceCriteria).toEqual(["Declines name the reason"]);
+      expect(requirements.find((r) => r.id === `${CAP}:c2`)?.title).toBe("Declines show why");
+    });
+
+    it("drops the requirement linked to a removed criterion", () => {
+      const { tree: out } = applyAmendments(withRequirements([modify({ criteria: { remove: ["c2"] } })]), CHANGE, OPTS);
+      expect((get(out, CAP).requirements as { id: string }[]).map((r) => r.id)).toEqual([`${CAP}:c1`, "standalone"]);
+    });
+  });
+
   it("writes the proposed statement, stamps metAt, clears revisedAt and appends History", () => {
     const { tree: out } = applyAmendments(tree([modify({ proposed: "A shopper can pay by card or wallet." })]), CHANGE, OPTS);
     const cap = get(out, CAP);
@@ -279,6 +322,48 @@ describe("applyAmendments: pre-existing dependsOn cycle", () => {
     get(t, AREA).children = [capNode("d", ["a"]), capNode("c", ["a"]), capNode("a", ["b", "c"]), capNode("b", ["c"])];
     const { tree: out } = applyAmendments(t, CHANGE, OPTS);
     expect(get(out, "d").status).toBe("deleted");
+  });
+
+  it("applies removing one member of a knot that stays cyclic without it", () => {
+    const t = tree([{ target: "b", delta: "removed", summary: "gone" }]);
+    get(t, AREA).children = [capNode("a", ["b", "c"]), capNode("b", ["c"]), capNode("c", ["a"])];
+    expect(checkV2Rules(t, { now: NOW }).filter((f) => f.rule === "depends-on-acyclic").map((f) => f.message)).toEqual([
+      'dependsOn cycle among "A", "B", "C"',
+    ]);
+    const { tree: out } = applyAmendments(t, CHANGE, OPTS);
+    expect(get(out, "b").status).toBe("deleted");
+    expect(checkV2Rules(out, { now: NOW }).filter((f) => f.rule === "depends-on-acyclic").map((f) => f.message)).toEqual([
+      'dependsOn cycle among "A", "C"',
+    ]);
+  });
+
+  it("applies a removal that splits a knot into separate cycles", () => {
+    const t = tree([{ target: "x", delta: "removed", summary: "gone" }]);
+    get(t, AREA).children = [
+      capNode("a", ["b", "x"]),
+      capNode("b", ["a"]),
+      capNode("c", ["d"]),
+      capNode("d", ["c", "x"]),
+      capNode("x", ["a", "c"]),
+    ];
+    const { tree: out } = applyAmendments(t, CHANGE, OPTS);
+    expect(get(out, "x").status).toBe("deleted");
+    expect(checkV2Rules(out, { now: NOW }).filter((f) => f.rule === "depends-on-acyclic")).toHaveLength(2);
+  });
+
+  it("still reports a cycle whose members were not all in one cycle before", () => {
+    const before = tree();
+    get(before, AREA).children = [capNode("a", ["b"]), capNode("b", ["a"]), capNode("c", ["d"]), capNode("d", ["c"])];
+    const joined = structuredClone(before);
+    get(joined, "b").dependsOn = ["a", "c"];
+    get(joined, "d").dependsOn = ["c", "a"];
+    expect(newErrors(before, joined, NOW).map((f) => f.message)).toEqual(['dependsOn cycle among "A", "B", "C", "D"']);
+
+    const fresh = tree();
+    get(fresh, AREA).children = [capNode("a", []), capNode("b", ["a"])];
+    const cyclicNow = structuredClone(fresh);
+    get(cyclicNow, "a").dependsOn = ["b"];
+    expect(newErrors(fresh, cyclicNow, NOW).map((f) => f.message)).toEqual(['dependsOn cycle among "A", "B"']);
   });
 });
 
