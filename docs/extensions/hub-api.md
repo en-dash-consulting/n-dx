@@ -29,6 +29,7 @@ The hub keeps a stdin pipe open for the lifetime of each sidecar. Exit when stdi
 
 - **Hub home:** one card per enabled extension that declares `hub`, linking to `/x/<name>/`. Unapproved and incompatible extensions are shown greyed out with their reason.
 - **Project dashboards:** each `projectLinks` entry becomes a link in the dashboard header, resolved to `/x/<name>/<path>` with `{projectId}` and `{repoRoot}` filled in. A dashboard served without the hub shows no links. No extension code ever reaches the dashboard bundle.
+- **Sidecar drawer:** an extension that declares `sidecarTab` gets one tab. The hub reports it per project as `tab` on `GET /api/hub/extensions?project=<id>`.
 
 ## Versioned API
 
@@ -38,7 +39,7 @@ These endpoints are experimental under the current `apiVersion` 1 contract, not 
 | --- | --- |
 | `GET /api/hub/projects` | `{ apiVersion, projects }`. Each project has `id`, `name`, `repoRoot`, `worktrees`, `ndxBin`, `port`, `pid`, `lastSeen` and `status`. `status` holds `state`, `pid`, `port`, `attached`, `respawns`, `lastHealthAt` and `lastError` |
 | `POST /api/hub/projects` | Takes `{ id, repoRoot, ndxBin, worktree?, name? }`. Answers `{ apiVersion, project }`: 201 when registered, 200 when it was already registered, 400 for a bad body |
-| `GET /api/hub/extensions[?project=<id>]` | `{ apiVersion, extensions, errors }`. Each extension has `name`, `packageName`, `version`, `source`, `state`, `reason`, `compatible`, `manifest` (null when invalid), `mount` (`/x/<name>/` or null) and `sidecar` (`state`, `recentCrashes`, `lastError`, or null). With `project` set, each entry adds `links: [{ label, url }]`, which is empty unless the extension is enabled. An unknown project answers 404. A 503 means n-dx could not be asked |
+| `GET /api/hub/extensions[?project=<id>]` | `{ apiVersion, extensions, errors }`. Each extension has `name`, `packageName`, `version`, `source`, `state`, `reason`, `compatible`, `manifest` (null when invalid), `mount` (`/x/<name>/` or null) and `sidecar` (`state`, `recentCrashes`, `lastError`, or null). With `project` set, each entry adds `links: [{ label, url }]`, which is empty unless the extension is enabled, and `tab: { label, url } | null`. `url` is the manifest's `sidecarTab.path` under `/x/<name>/` with `{projectId}` and `{repoRoot}` URL-encoded; `tab` is null unless the extension is enabled, compatible and has a sidecar and a `sidecarTab`. Without `project` there is neither `links` nor `tab`. An unknown project answers 404. A 503 means n-dx could not be asked |
 | `POST /api/hub/extensions/:name/stop` | `{ apiVersion, name, stopped }`. `stopped` is false when no sidecar was running. A name no extension could have answers 404 |
 
 A project's own API and MCP endpoints sit under `/p/<id>/`, using the `id` from `GET /api/hub/projects`. While exactly one project is registered, `/` also aliases to it.

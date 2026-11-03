@@ -18,7 +18,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
-import { EXTENSION_API_VERSION, ndxCliLister, startHub } from "../../src/hub/index.js";
+import { EXTENSION_API_VERSION, buildExtensionsAnswer, ndxCliLister, startHub } from "../../src/hub/index.js";
 import type { ExtensionListing, HubHandle, HubOptions, ListResult } from "../../src/hub/index.js";
 
 const WEB_PKG = resolve(fileURLToPath(import.meta.url), "../../..");
@@ -67,6 +67,7 @@ function listing(name: string, state: ExtensionListing["state"], extra: Partial<
       sidecar: { bin: "serve.cjs", health: "/" },
       hub: { label: `${name} card` },
       projectLinks: [{ label: "Report", path: "/project/{projectId}?root={repoRoot}" }],
+      sidecarTab: { label: "Tab", path: "/tab?project={projectId}&root={repoRoot}" },
     },
     ...extra,
   };
@@ -183,6 +184,7 @@ describe("GET /api/hub/extensions", () => {
     for (const e of body.extensions) {
       expect(Object.keys(e)).toEqual(expect.arrayContaining(EXTENSION_KEYS));
       expect(e).not.toHaveProperty("links");
+      expect(e).not.toHaveProperty("tab");
     }
     expect(byName.recon).toMatchObject({
       state: "enabled",
@@ -228,7 +230,28 @@ describe("GET /api/hub/extensions", () => {
       expect(byName.later.links).toEqual([]);
       expect(byName.future.links).toEqual([]);
       expect(byName.broken.links).toEqual([]);
+      expect(byName.recon.tab).toEqual({
+        label: "Tab",
+        url: `/x/recon/tab?project=alpha&root=${encodeURIComponent(repo)}`,
+      });
+      expect(byName.later.tab).toBeNull();
+      expect(byName.future.tab).toBeNull();
+      expect(byName.broken.tab).toBeNull();
     }
+  });
+
+  it("with a project, tab is null for an enabled extension that declares none or has no sidecar", () => {
+    const project = { id: "alpha", repoRoot: "/r o/ot" };
+    const noTab = listing("plain", "enabled");
+    delete noTab.manifest!.sidecarTab;
+    const noSidecar = listing("cmd", "enabled");
+    delete noSidecar.manifest!.sidecar;
+    const answer = buildExtensionsAnswer({ extensions: [noTab, noSidecar, listing("recon", "enabled")], errors: [] }, [], project);
+    expect(answer.extensions.map((e) => e.tab ?? null)).toEqual([
+      null,
+      null,
+      { label: "Tab", url: "/x/recon/tab?project=alpha&root=%2Fr%20o%2Fot" },
+    ]);
   });
 
   it("is 503 with { error } when n-dx cannot be asked", async () => {

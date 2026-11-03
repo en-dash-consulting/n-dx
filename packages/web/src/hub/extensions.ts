@@ -33,6 +33,7 @@ export interface ExtensionManifest {
   sidecar?: { bin: string; health?: string; idleStopMinutes?: number };
   hub?: { label: string; description?: string };
   projectLinks?: Array<{ label: string; path: string }>;
+  sidecarTab?: { label: string; path: string };
   [key: string]: unknown;
 }
 
@@ -110,6 +111,11 @@ export interface ExtensionView {
   sidecar: ExtensionSidecarView | null;
   /** Only with `?project=<id>`: its project links for that project, empty unless enabled. */
   links?: ExtensionLinkView[];
+  /**
+   * Only with `?project=<id>`: its Sidecar drawer tab for that project. Null
+   * unless the extension is enabled, compatible and has a sidecar and a tab.
+   */
+  tab?: ExtensionLinkView | null;
 }
 
 export interface ExtensionsAnswer {
@@ -153,9 +159,13 @@ export function buildExtensionsAnswer(
         : null,
     };
     if (project) {
-      view.links = ext.state === "enabled" && hasSidecar && name !== null
+      const served = ext.state === "enabled" && hasSidecar && name !== null;
+      view.links = served
         ? (m?.projectLinks ?? []).map((l) => ({ label: l.label, url: resolveProjectLink(name, l.path, project) }))
         : [];
+      view.tab = served && m?.sidecarTab
+        ? { label: m.sidecarTab.label, url: resolveProjectLink(name, m.sidecarTab.path, project) }
+        : null;
     }
     return view;
   });
