@@ -41,7 +41,9 @@ import {
 import type { HubConfigProblem, HubRegistry, ProjectRecord } from "./registry.js";
 import { handleHubRoute, isAcceptableNdxBin } from "./routes.js";
 import { handleProxyRequest, handleProxyUpgrade } from "./proxy.js";
-import { guardHubRequest, upgradeRefusal } from "./request-guard.js";
+import { frameKeyUpgradeRefusal, guardFrameKeyRequest, guardHubRequest, upgradeRefusal } from "./request-guard.js";
+import { FrameKeys, parseKeyedPath } from "./frame-keys.js";
+import type { FrameKeyOptions } from "./frame-keys.js";
 import { NO_NDX_CLI, SidecarManager, ndxCliPlanner } from "./sidecars.js";
 import { ndxCliLister } from "./extensions.js";
 import type { ListExtensions } from "./extensions.js";
@@ -113,6 +115,8 @@ export interface HubOptions {
   sidecarSweepMs?: number;
   /** Replaces asking `ndx extensions list --json` (tests). */
   listExtensions?: ListExtensions;
+  /** Overrides for the {@link FrameKeys} store (tests inject the clock). */
+  frameKeys?: FrameKeyOptions;
   log?: (message: string) => void;
 }
 
@@ -268,6 +272,8 @@ export class Hub {
   readonly sessionHosts: HubSessionHostPicker;
   /** Installed extensions as n-dx reports them, for `GET /api/hub/extensions`. */
   readonly listExtensions: ListExtensions;
+  /** Keys a Sidecar drawer tab is served through at `/x/<name>/~f/<key>/`; memory only. */
+  readonly frameKeys: FrameKeys;
   private readonly registry: HubRegistry;
   private readonly supervisors = new Map<string, ProjectSupervisor>();
   private readonly supervisorOptions: SupervisorOptions;
@@ -311,6 +317,7 @@ export class Hub {
       log: this.log,
       ...options.sidecars,
     });
+    this.frameKeys = new FrameKeys(options.frameKeys);
     this.listExtensions = options.listExtensions
       ?? (options.ndxCli ? ndxCliLister(options.ndxCli, this.hubHome) : async () => ({ ok: false, error: NO_NDX_CLI }));
   }
@@ -581,7 +588,11 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // The origin gate is the hub's outer boundary and runs before any routing:
     // registration spawns a process, and the project servers behind the proxy
     // see a rewritten Origin, so this is where a browser request is judged.
-    if (guardHubRequest(req, res, hub.listeningPort, hub.token)) return;
+    // A frame-keyed sidecar path presents its key in place of the token.
+    const keyed = parseKeyedPath((req.url || "/").split("?")[0]);
+    if (keyed) {
+      if (guardFrameKeyRequest(req, res, hub.listeningPort, hub.frameKeys.accept(keyed.name, keyed.key))) return;
+    } else if (guardHubRequest(req, res, hub.listeningPort, hub.token)) return;
     void handleHubRoute(req, res, hub)
       .then((handled) => {
         // Everything that is not the hub's own API belongs to a project server:
@@ -602,7 +613,10 @@ export async function startHub(options: HubOptions = {}): Promise<HubHandle> {
     // Each refusal keeps its own status line, as on the HTTP path and on the
     // project server's own upgrade path: a `Host` that does not name this hub
     // is 421 Misdirected Request, a missing token 401, a foreign `Origin` 403.
-    const refusal = upgradeRefusal(req, hub.listeningPort, hub.token);
+    const keyed = parseKeyedPath((req.url || "/").split("?")[0]);
+    const refusal = keyed
+      ? frameKeyUpgradeRefusal(req, hub.listeningPort, hub.frameKeys.accept(keyed.name, keyed.key))
+      : upgradeRefusal(req, hub.listeningPort, hub.token);
     if (refusal !== null) {
       socket.write(`HTTP/1.1 ${refusal}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
       socket.destroy();

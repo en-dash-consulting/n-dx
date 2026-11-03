@@ -75,7 +75,9 @@ export type {
   SidecarStatus,
   SidecarManagerOptions,
 } from "./sidecars.js";
-export { EXTENSION_API_VERSION, ndxCliLister, buildExtensionsAnswer, resolveProjectLink } from "./extensions.js";
+export { EXTENSION_API_VERSION, ndxCliLister, buildExtensionsAnswer, resolveProjectLink, resolveFrameUrl } from "./extensions.js";
+export { FrameKeys, parseKeyedPath, FRAME_KEY_SEGMENT, FRAME_KEY_HARD_CAP_MS, DEFAULT_IDLE_STOP_MINUTES } from "./frame-keys.js";
+export type { FrameKeyOptions, IssuedFrameKey } from "./frame-keys.js";
 export type {
   ExtensionStateName,
   ExtensionManifest,
@@ -87,7 +89,7 @@ export type {
   ExtensionView,
   ExtensionsAnswer,
 } from "./extensions.js";
-export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER } from "./proxy.js";
+export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER, FRAME_CSP } from "./proxy.js";
 export type { ProxyDecision, SidecarForward } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";
 export {

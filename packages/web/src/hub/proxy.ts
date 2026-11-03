@@ -23,7 +23,10 @@
  * from what the sidecar receives — extension code never sees the per-user
  * credential — and `X-Ndx-Base-Path: /x/<name>/` tells the app its mount.
  * The bare `/x/<name>` redirects to `/x/<name>/` so the app's relative links
- * resolve under the mount.
+ * resolve under the mount. `/x/<name>/~f/<key>/…` is the same sidecar reached
+ * by a Sidecar drawer tab: the key stood in for the token at the boundary
+ * (frame-keys.ts), the mount includes it, and every answer is sandboxed
+ * ({@link FRAME_CSP}).
  *
  * `/hub` is the exception to both: it is the hub's own, and it serves the
  * chooser whatever is registered. That matters because `/` is overloaded —
@@ -78,6 +81,7 @@ import { defaultParentDir } from "./new-project.js";
 import { SidecarManager } from "./sidecars.js";
 import { HUB_SESSION_FEATURE, probeHubLens } from "./session-host.js";
 import type { EnsureResult } from "./sidecars.js";
+import { FRAME_KEY_SEGMENT, parseKeyedPath } from "./frame-keys.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
 /** `ndx refresh --live-server` posts here; with several projects the body's `dir` picks one. */
@@ -97,12 +101,24 @@ const SIDECAR_PATH_PREFIX = "/x/";
 const SIDECAR_PATH = /^\/x\/([^/]*)(\/.*)?$/;
 /** Tells a sidecar the mount it is served under, trailing slash included, so it can build links. */
 export const SIDECAR_BASE_PATH_HEADER = "x-ndx-base-path";
+/**
+ * On every frame-keyed response: an opaque origin even when the page is opened
+ * full-window, so it never runs same-origin with a dashboard or the hub. No
+ * `allow-same-origin`, no `allow-top-navigation`.
+ */
+export const FRAME_CSP = "sandbox allow-scripts allow-forms allow-popups allow-downloads";
+/** Headers a frame-keyed response carries; the key in the URL must not leave in a Referer. */
+const FRAME_RESPONSE_HEADERS = { "Content-Security-Policy": FRAME_CSP, "Referrer-Policy": "no-referrer" } as const;
 
 /** What to do with a request that is not the hub's own API. */
 export type ProxyDecision =
   | { kind: "proxy"; project: ProjectView; path: string; prefix: string }
   /** An extension sidecar, started on demand by the hub's {@link SidecarManager}. */
-  | { kind: "sidecar"; name: string; path: string; prefix: string }
+  | {
+    kind: "sidecar"; name: string; path: string; prefix: string;
+    /** Set for `/x/<name>/~f/<key>/…`; the prefix then ends with `/~f/<key>`. Checked at the hub's boundary. */
+    frameKey?: string;
+  }
   /**
    * `/hub/session/…`: the hub-scope Sidecar, on the project server the hub
    * picks as its host (session-host.ts). `path` is the host's path for it.
@@ -141,11 +157,16 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
     if (!SidecarManager.isName(name)) {
       return { kind: "json", status: 404, body: { error: `No extension sidecar is named "${name}"`, reason: "none" } };
     }
+    // A drawer tab's page: the key is part of the mount, so the app's
+    // relative links keep it, and it is stripped before forwarding.
+    const keyed = parseKeyedPath(pathname);
+    const prefix = keyed ? `${SIDECAR_PATH_PREFIX}${name}/${FRAME_KEY_SEGMENT}/${keyed.key}` : `${SIDECAR_PATH_PREFIX}${name}`;
+    const rest = keyed ? keyed.rest : sidecar[2];
     // A WebSocket has no page to resolve relative links in, so it is served as "/".
-    if (sidecar[2] === undefined && !upgrade) {
-      return { kind: "redirect", location: `${SIDECAR_PATH_PREFIX}${name}/${sidecarQuery}` };
+    if (rest === undefined && !upgrade) {
+      return { kind: "redirect", location: `${prefix}/${sidecarQuery}` };
     }
-    return { kind: "sidecar", name, path: (sidecar[2] || "/") + sidecarQuery, prefix: `${SIDECAR_PATH_PREFIX}${name}` };
+    return { kind: "sidecar", name, path: (rest || "/") + sidecarQuery, prefix, ...(keyed ? { frameKey: keyed.key } : {}) };
   }
 
   const prefix = detectBasePath(pathname);
@@ -341,6 +362,20 @@ export interface SidecarForward {
   basePath: string;
   /** The hub's token; an `Authorization: Bearer` carrying it is dropped. */
   token: string | null;
+  /** A frame-keyed request: the response gets {@link FRAME_CSP} and `Referrer-Policy: no-referrer`. */
+  frame?: boolean;
+}
+
+/**
+ * A frame-keyed response's headers. The sidecar's own CSP is kept beside the
+ * sandbox one — the browser enforces both, so it can only narrow — and its
+ * Referrer-Policy is replaced.
+ */
+function withFrameHeaders(headers: IncomingHttpHeaders): OutgoingHttpHeaders {
+  const own = headers["content-security-policy"];
+  // A comma separates policies in one header value (CSP3, serialized-policy-list).
+  const policies = own ? `${FRAME_CSP}, ${own}` : FRAME_CSP;
+  return { ...headers, "content-security-policy": policies, "referrer-policy": "no-referrer" };
 }
 
 /**
@@ -417,7 +452,7 @@ export function proxyHttp(
     { host: UPSTREAM_HOST, port, method: req.method, path, headers },
     (upstreamRes) => {
       onUpstreamHeaders?.(upstreamRes.statusCode ?? 502, upstreamRes.headers);
-      const outHeaders = { ...upstreamRes.headers };
+      const outHeaders = sidecar?.frame ? withFrameHeaders(upstreamRes.headers) : { ...upstreamRes.headers };
       // A redirect the project server issues is root-relative from its point
       // of view; the client is under the prefix. A sidecar's may already be
       // under it, built from X-Ndx-Base-Path as the extension docs advise.
@@ -515,6 +550,10 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
 export async function handleProxyRequest(req: IncomingMessage, res: ServerResponse, hub: Hub): Promise<void> {
   if (await handleReloadSignal(req, res, hub)) return;
   const decision = decideProxy(hub, req.url || "/");
+  // Every keyed answer — redirect, refusal or the sidecar's own — is sandboxed.
+  if (parseKeyedPath((req.url || "/").split("?")[0])) {
+    for (const [name, value] of Object.entries(FRAME_RESPONSE_HEADERS)) res.setHeader(name, value);
+  }
   switch (decision.kind) {
     case "sidecar": {
       // A cold start can take seconds; a client gone by its end is neither
@@ -525,7 +564,13 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       const started = await hub.sidecars.ensure(decision.name);
       if (gone) return;
       if (!started.ok) {
+        revokeOnRefusal(hub, decision.name, started);
         writeJson(res, started.status, sidecarRefusalBody(started));
+        return;
+      }
+      // The key was live at the boundary; a disable during the start dropped it.
+      if (decision.frameKey !== undefined && !hub.frameKeys.isLive(decision.name, decision.frameKey)) {
+        writeJson(res, 401, { error: "The frame key is no longer valid" });
         return;
       }
       res.once("close", hub.sidecars.beginRequest(decision.name));
@@ -768,7 +813,21 @@ async function handleExecuteAdmission(
 }
 
 function sidecarForward(hub: Hub, decision: Extract<ProxyDecision, { kind: "sidecar" }>): SidecarForward {
-  return { basePath: `${decision.prefix}/`, token: hub.token, secret: hub.sidecars.secret(decision.name) ?? "" };
+  return {
+    basePath: `${decision.prefix}/`,
+    token: hub.token,
+    secret: hub.sidecars.secret(decision.name) ?? "",
+    ...(decision.frameKey !== undefined ? { frame: true } : {}),
+  };
+}
+
+/**
+ * n-dx refusing the plan (`none`, `refused`: removed, disabled, unapproved)
+ * means nothing may be mounted at the name, so its frame keys go too —
+ * which is how a revoked approval reaches a key no management command named.
+ */
+function revokeOnRefusal(hub: Hub, name: string, result: Extract<EnsureResult, { ok: false }>): void {
+  if (result.reason === "none" || result.reason === "refused") hub.frameKeys.revoke(name);
 }
 
 /** The JSON a refused `/x/<name>/` answers with: the message, core's reason, and the log file when there is one. */
@@ -804,8 +863,13 @@ async function upgradeSidecar(
     return;
   }
   if (!started.ok) {
+    revokeOnRefusal(hub, decision.name, started);
     const reason = started.status === 404 ? "Not Found" : "Service Unavailable";
     socket.end(`HTTP/1.1 ${started.status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    return;
+  }
+  if (decision.frameKey !== undefined && !hub.frameKeys.isLive(decision.name, decision.frameKey)) {
+    socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
     return;
   }
   socket.once("close", hub.sidecars.openSocket(decision.name));

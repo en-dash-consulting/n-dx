@@ -169,6 +169,44 @@ export function guardHubRequest(
 }
 
 /**
+ * The Origin rule for a frame-keyed request (`/x/<name>/~f/<key>/…`). Its page
+ * is sandboxed without `allow-same-origin`, so a browser sends `Origin: null`
+ * from it; that, no Origin, and the hub's own are accepted. Any other origin
+ * on a mutating method is refused, as on every other path.
+ */
+function frameOriginRefused(req: Pick<IncomingMessage, "headers" | "method">, hubPort: number | undefined, upgrade: boolean): boolean {
+  const method = (req.method || "GET").toUpperCase();
+  if (!upgrade && SAFE_METHODS.has(method)) return false;
+  return classifyOrigin(req, hubPort) === "untrusted" && singleHeader(req.headers.origin) !== "null";
+}
+
+/**
+ * The gate for a frame-keyed request, in place of {@link guardHubRequest}:
+ * the Host rule, then the key in place of the token (`live` says whether it
+ * is live and bound to the path's extension — 401 otherwise), then the Origin
+ * rule above. No CORS headers are reflected and a preflight is the sidecar's
+ * to answer. Returns true when the request has been answered.
+ */
+export function guardFrameKeyRequest(req: IncomingMessage, res: ServerResponse, hubPort: number | undefined, live: boolean): boolean {
+  if (!hostAllowed(req, hubPort)) return rejectHost(res);
+  if (!live) return rejectUnauthenticated(res);
+  if (frameOriginRefused(req, hubPort, false)) return reject(res);
+  return false;
+}
+
+/** {@link guardFrameKeyRequest} for a WebSocket handshake, as {@link upgradeRefusal} reports it. */
+export function frameKeyUpgradeRefusal(
+  req: Pick<IncomingMessage, "headers" | "method">,
+  hubPort: number | undefined,
+  live: boolean,
+): "421 Misdirected Request" | "401 Unauthorized" | "403 Forbidden" | null {
+  if (!hostAllowed(req, hubPort)) return "421 Misdirected Request";
+  if (!live) return "401 Unauthorized";
+  if (frameOriginRefused(req, hubPort, true)) return "403 Forbidden";
+  return null;
+}
+
+/**
  * Why a WebSocket handshake is refused, as the status line to answer with, or
  * null when it may proceed.
  *

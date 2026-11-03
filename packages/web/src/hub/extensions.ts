@@ -13,6 +13,7 @@
 
 import { exec } from "./exec-gateway.js";
 import type { SidecarState, SidecarStatus } from "./sidecars.js";
+import { FRAME_KEY_SEGMENT } from "./frame-keys.js";
 
 /**
  * The extension contract version this hub speaks, carried as `apiVersion` by
@@ -126,10 +127,18 @@ export interface ExtensionsAnswer {
 
 /** Fill a link path's `{projectId}` and `{repoRoot}`, each URL-encoded. */
 export function resolveProjectLink(name: string, path: string, project: { id: string; repoRoot: string }): string {
-  const filled = path
+  return `/x/${name}${fillLinkPath(path, project)}`;
+}
+
+/** A `sidecarTab` path resolved for one project under a frame key's mount, `/x/<name>/~f/<key>/…`. */
+export function resolveFrameUrl(name: string, key: string, path: string, project: { id: string; repoRoot: string }): string {
+  return `/x/${name}/${FRAME_KEY_SEGMENT}/${key}${fillLinkPath(path, project)}`;
+}
+
+function fillLinkPath(path: string, project: { id: string; repoRoot: string }): string {
+  return path
     .replace(/\{projectId\}/g, encodeURIComponent(project.id))
     .replace(/\{repoRoot\}/g, encodeURIComponent(project.repoRoot));
-  return `/x/${name}${filled}`;
 }
 
 /** Join core's listing with the running sidecars; with `project`, resolve each enabled extension's links. */

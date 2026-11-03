@@ -29,7 +29,16 @@ The hub keeps a stdin pipe open for the lifetime of each sidecar. Exit when stdi
 
 - **Hub home:** one card per enabled extension that declares `hub`, linking to `/x/<name>/`. Unapproved and incompatible extensions are shown greyed out with their reason.
 - **Project dashboards:** each `projectLinks` entry becomes a link in the dashboard header, resolved to `/x/<name>/<path>` with `{projectId}` and `{repoRoot}` filled in. A dashboard served without the hub shows no links. No extension code ever reaches the dashboard bundle.
-- **Sidecar drawer:** an extension that declares `sidecarTab` gets one tab. The hub reports it per project as `tab` on `GET /api/hub/extensions?project=<id>`.
+- **Sidecar drawer:** an extension that declares `sidecarTab` gets one tab. The hub reports it per project as `tab` on `GET /api/hub/extensions?project=<id>`, and serves it only through a frame key (below).
+
+## Frame keys
+
+A drawer tab is an iframe sandboxed without `allow-same-origin`, so it carries neither the token nor the cookie. `POST /api/hub/extensions/:name/frame?project=<id>` issues a key for it, and the hub answers with the finished URL: `/x/<name>/~f/<key>/<sidecarTab path>`.
+
+- **The key.** 32 random bytes, base64url, held only in the hub's memory. It is bound to one extension; the project it was issued for fills the URL. It goes stale after the extension's `idleStopMinutes` without use (each accepted request slides the window), and 8 hours after issue in any case. Disable, removal, a changed approval and a refused launch plan drop the extension's keys, and so does a hub restart. Ask for a new one when a keyed request answers 401.
+- **Where it works.** Only on its own extension's `/x/<name>/~f/<key>/…` paths, HTTP and WebSocket, in place of the token. Anywhere else — `/p/<id>/…`, `/api/hub/…`, another extension's mount — it is not a credential, and the request answers 401 before any sidecar starts. A keyed request may send `Origin: null` (the sandboxed page) or no Origin; any other non-loopback Origin on a mutating request answers 403.
+- **What the sidecar sees.** `~f/<key>` is stripped like the rest of the mount, `X-Ndx-Base-Path` is `/x/<name>/~f/<key>/`, and every hub credential is removed as on any proxied request. Build links from the base path, or use relative links, so they keep the key.
+- **What the browser sees.** Every keyed response carries `Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups allow-downloads` and `Referrer-Policy: no-referrer`. The page therefore has an opaque origin even when opened full-window (the drawer's pop-out opens the same URL), and the key never leaves in a `Referer`. A sidecar's own CSP is kept beside the sandbox, so it can only narrow it.
 
 ## Versioned API
 
@@ -40,10 +49,11 @@ These endpoints are experimental under the current `apiVersion` 1 contract, not 
 | `GET /api/hub/projects` | `{ apiVersion, projects }`. Each project has `id`, `name`, `repoRoot`, `worktrees`, `ndxBin`, `port`, `pid`, `lastSeen` and `status`. `status` holds `state`, `pid`, `port`, `attached`, `respawns`, `lastHealthAt` and `lastError` |
 | `POST /api/hub/projects` | Takes `{ id, repoRoot, ndxBin, worktree?, name? }`. Answers `{ apiVersion, project }`: 201 when registered, 200 when it was already registered, 400 for a bad body |
 | `GET /api/hub/extensions[?project=<id>]` | `{ apiVersion, extensions, errors }`. Each extension has `name`, `packageName`, `version`, `source`, `state`, `reason`, `compatible`, `manifest` (null when invalid), `mount` (`/x/<name>/` or null) and `sidecar` (`state`, `recentCrashes`, `lastError`, or null). With `project` set, each entry adds `links: [{ label, url }]`, which is empty unless the extension is enabled, and `tab: { label, url } | null`. `url` is the manifest's `sidecarTab.path` under `/x/<name>/` with `{projectId}` and `{repoRoot}` URL-encoded; `tab` is null unless the extension is enabled, compatible and has a sidecar and a `sidecarTab`. Without `project` there is neither `links` nor `tab`. An unknown project answers 404. A 503 means n-dx could not be asked |
-| `POST /api/hub/extensions/:name/stop` | `{ apiVersion, name, stopped }`. `stopped` is false when no sidecar was running. A name no extension could have answers 404 |
+| `POST /api/hub/extensions/:name/stop` | `{ apiVersion, name, stopped }`. `stopped` is false when no sidecar was running. It also drops the extension's frame keys. A name no extension could have answers 404 |
+| `POST /api/hub/extensions/:name/frame?project=<id>` | `{ apiVersion, url, expiresAt }`: a [frame key](#frame-keys) for the extension's drawer tab, inside `url`; `expiresAt` is ISO 8601 and moves with use. Also answered under `/p/<id>/` without the query. 404 for an unregistered project, an unknown extension, one that is not enabled (approved and compatible), and one without a sidecar and a `sidecarTab`. 400 without a project, 503 when n-dx could not be asked |
 
 A project's own API and MCP endpoints sit under `/p/<id>/`, using the `id` from `GET /api/hub/projects`. While exactly one project is registered, `/` also aliases to it.
 
-The contract tests are `packages/web/tests/integration/hub-extension-api.test.ts`.
+The contract tests are `packages/web/tests/integration/hub-extension-api.test.ts`, and for frame keys `hub-frame-keys.test.ts` beside it.
 
-Sidecar pages share the hub origin. Their JavaScript can call hub APIs using the browser session cookie even though it cannot read that HttpOnly cookie. Approving a sidecar therefore grants browser-side hub authority as well as permission to run local code; extensions must treat repository content as untrusted input and prevent script injection.
+Sidecar pages served at `/x/<name>/` share the hub origin (a page served through a frame key does not). Their JavaScript can call hub APIs using the browser session cookie even though it cannot read that HttpOnly cookie. Approving a sidecar therefore grants browser-side hub authority as well as permission to run local code; extensions must treat repository content as untrusted input and prevent script injection.
