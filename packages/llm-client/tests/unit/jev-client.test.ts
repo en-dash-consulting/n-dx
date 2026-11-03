@@ -1,4 +1,9 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { resolveJudgmentRoute } from "../../src/config.js";
+import { setCredential } from "../../src/credential-store.js";
 import {
   askJev,
   choice,
@@ -79,12 +84,43 @@ describe("askJev — request and response mapping", () => {
   });
 });
 
+describe("askJev — key resolution", () => {
+  let ndxHome: string;
+  beforeEach(() => {
+    ndxHome = mkdtempSync(join(tmpdir(), "ndx-jev-key-"));
+  });
+  afterEach(() => rmSync(ndxHome, { recursive: true, force: true }));
+
+  function sentKey(fetchImpl: ReturnType<typeof vi.fn>): string {
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    return (init.headers as Record<string, string>).Authorization;
+  }
+
+  it("sends the stored key when the environment has none", async () => {
+    setCredential("typesafe", "tsk_placeholder_store", { ndxHome });
+    expect(resolveJudgmentRoute("code.classify", {}, { env: {}, ndxHome })).toBe("typesafe");
+    const fetchImpl = vi.fn(async () => jsonResponse(200, okBody));
+    await askJev(request, { fetchImpl, env: {}, ndxHome, sleep: noSleep });
+    expect(sentKey(fetchImpl)).toBe("Bearer tsk_placeholder_store");
+  });
+
+  it("sends an exported key over a different stored one", async () => {
+    setCredential("typesafe", "tsk_placeholder_store", { ndxHome });
+    const fetchImpl = vi.fn(async () => jsonResponse(200, okBody));
+    await askJev(request, { fetchImpl, env: { TYPESAFE_API_KEY: "tsk_placeholder_env" }, ndxHome, sleep: noSleep });
+    expect(sentKey(fetchImpl)).toBe("Bearer tsk_placeholder_env");
+  });
+});
+
 describe("askJev — error mapping", () => {
-  it("fails with reason auth and never calls fetch when the key is absent", async () => {
+  it("fails with reason auth naming the store command, and never calls fetch, when no key resolves", async () => {
+    const ndxHome = mkdtempSync(join(tmpdir(), "ndx-jev-nokey-"));
     const fetchImpl = vi.fn();
-    const err = await askJev(request, { fetchImpl, env: {} as NodeJS.ProcessEnv }).catch((e) => e);
+    const err = await askJev(request, { fetchImpl, env: {}, ndxHome }).catch((e) => e);
+    rmSync(ndxHome, { recursive: true, force: true });
     expect(err).toBeInstanceOf(ClaudeClientError);
     expect(err.reason).toBe("auth");
+    expect(err.message).toContain("ndx config credentials.typesafe");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

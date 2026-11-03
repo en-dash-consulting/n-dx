@@ -18,6 +18,10 @@
  * {@link trustedProjectConfig} and the local one through
  * {@link trustedLocalConfig}.
  *
+ * `llm.<vendor>.auth = "api"` is credential routing too: it sends the user's
+ * stored vendor key to the vendor's API and into the vendor CLI's environment.
+ * A repository's `cli` or `auto` only tightens, so it always applies.
+ *
  * hench's `apiKeyEnv` (the variable its API loop sends as the Anthropic key)
  * is credential routing too. It lives in hench's config rather than the LLM
  * loaders', so the review lists it and hench's `applyRepoTrust` drops it.
@@ -34,6 +38,8 @@
 import { warn } from "./output.js";
 import {
   CREDENTIAL_ROUTING_FIELDS,
+  ROUTING_VENDOR_AUTH,
+  VENDOR_AUTH_FIELDS,
   VENDOR_CLI_PATH_FIELDS,
   assessRepoExecutionConfig,
   collectRepoExecutionConfig,
@@ -51,24 +57,25 @@ const TRUST_GATED_FIELDS: readonly (readonly string[])[] = [...CREDENTIAL_ROUTIN
 
 /**
  * A copy of `config` without any {@link CREDENTIAL_ROUTING_FIELDS} or
- * {@link VENDOR_CLI_PATH_FIELDS}. The input is not modified.
+ * {@link VENDOR_CLI_PATH_FIELDS}, and without a {@link VENDOR_AUTH_FIELDS}
+ * entry set to `api` (`cli` and `auto` only tighten, so they stay). The input
+ * is not modified.
  */
 export function withoutTrustGatedFields(config: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...config };
-  for (const path of TRUST_GATED_FIELDS) {
+  const remove = (path: readonly string[], when: (value: unknown) => boolean): void => {
     let node = out;
     for (const key of path.slice(0, -1)) {
       const child = node[key];
-      if (!child || typeof child !== "object" || Array.isArray(child)) {
-        node = {};
-        break;
-      }
+      if (!child || typeof child !== "object" || Array.isArray(child)) return;
       // Copy on the way down so the caller's object is never mutated.
       node[key] = { ...(child as Record<string, unknown>) };
       node = node[key] as Record<string, unknown>;
     }
-    delete node[path[path.length - 1]];
-  }
+    if (when(node[path[path.length - 1]])) delete node[path[path.length - 1]];
+  };
+  for (const path of TRUST_GATED_FIELDS) remove(path, () => true);
+  for (const path of VENDOR_AUTH_FIELDS) remove(path, (value) => value === ROUTING_VENDOR_AUTH);
   return out;
 }
 

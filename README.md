@@ -209,11 +209,15 @@ The hub's chooser at `http://127.0.0.1:3117/hub` lists every registered project 
 **Claude (recommended):**
 ```sh
 ndx config llm.vendor claude .
-# API mode (recommended):
-ndx config llm.claude.api_key sk-ant-... .
-# CLI mode (no API key):
+# CLI login (default): sign in with the vendor CLI
+claude login
 ndx config llm.claude.cli_path claude .
+# API key, only if you want API mode: hidden prompt, stored per user
+ndx config credentials.claude
+ndx config llm.claude.auth api .
 ```
+
+A key never goes on the command line. See [API keys and auth modes](docs/guide/configuration.md#api-keys-and-auth-modes).
 
 **Codex:**
 ```sh
@@ -508,14 +512,16 @@ cross-vendor reviewer. The one-shot completions rex, sourcevision and the
 dashboard make (analysis, proposals, Ask) need no project credentials and
 always use the default filter; `guard.env.allow` does not reach them.
 
-CLI-started MCP servers inherit this filtered environment. `TYPESAFE_API_KEY`
-is stripped by default: rex placement's `both` mode falls back to text and
-`jev` mode falls back to rules, with the existing unavailable-key warning.
-To opt those MCP calls into Jev, add `TYPESAFE_API_KEY` to
+CLI-started MCP servers inherit this filtered environment, so an exported
+`TYPESAFE_API_KEY` never reaches them. Store the key once with
+`ndx config credentials.typesafe` instead: Jev reads it from the per-user
+credential store (`credentials.json` in the ndx home) in-process, so MCP
+servers inside a hench run, the hub and a fresh shell all find it while no
+child environment carries it. An exported key still takes precedence over the
+stored one. Test-suite credentials such as `GITHUB_TOKEN` still need
 `hench.guard.env.allow` in `.n-dx.json` (or `guard.env.allow` in the hench
-config). The same opt-in applies to test-suite credentials such as
-`GITHUB_TOKEN`. Allowed credentials are then accessible to the vendor CLI's
-tools too. Each hench run logs stripped names once, never their values.
+config); allowed credentials are then accessible to the vendor CLI's tools
+too. Each hench run logs stripped names once, never their values.
 
 ### No install-time hooks
 

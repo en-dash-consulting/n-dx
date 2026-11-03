@@ -42,6 +42,7 @@ import {
   LLM_VENDOR,
   NDX_CONFIG_BLOCKED_PATHS,
   assemblePrompt,
+  agentCredentialDenials,
   classifyVendorError,
 } from "../../../prd/llm-gateway.js";
 import type { PermissionMode } from "../../../schema/index.js";
@@ -98,14 +99,72 @@ export function buildAllowedTools(
 }
 
 /**
- * The `--disallowed-tools` list: n-dx's own config files, which hench's guard
- * refuses its own tools too (#686). A deny rule outranks the bare `Edit` and
- * `Write` grants above, and Claude Code applies `Edit(...)` rules to every
- * built-in tool that edits a file. `./` anchors each pattern at the session's
- * cwd, the project root.
+ * A path as a Claude Code absolute-path permission pattern: `//` plus the path,
+ * and on Windows the drive as a lower-case segment (`C:\x` → `//c/x`).
  */
-export function buildDisallowedTools(): string[] {
-  return NDX_CONFIG_BLOCKED_PATHS.map((p) => `Edit(./${p})`);
+export function claudeAbsolutePattern(path: string, platform: NodeJS.Platform = process.platform): string {
+  if (platform !== "win32") return `/${path}`;
+  const slashed = path.replace(/\\/g, "/");
+  const drive = /^([A-Za-z]):\//.exec(slashed);
+  return drive ? `//${drive[1].toLowerCase()}/${slashed.slice(3)}` : slashed;
+}
+
+export interface DisallowedToolsOptions {
+  /** The credential store's path. Defaults to {@link agentCredentialDenials}'s at call time. */
+  storePath?: string;
+  /** Commands that read a credential, as token lists. Defaults to {@link agentCredentialDenials}'s. */
+  commandPrefixes?: readonly (readonly string[])[];
+  /** Overridable only so tests can build the Windows form on any host. */
+  platform?: NodeJS.Platform;
+}
+
+/**
+ * The `--disallowed-tools` list.
+ *
+ * - n-dx's own config files, which hench's guard refuses its own tools too
+ *   (#686). `./` anchors each pattern at the session's cwd, the project root.
+ * - The per-user credential store, which sits outside the project root, so no
+ *   `./` rule reaches it while `Read`, `Glob` and `Grep` are granted bare.
+ *   Resolved at spawn so an `NDX_HOME` set for this run is the one denied.
+ *
+ * - The commands that read a stored credential: `security
+ *   find-generic-password` and each configured helper's command, as
+ *   `Bash(<command>:*)` prefix rules, plus quoted spellings when a token has
+ *   whitespace.
+ *
+ * A deny rule outranks the bare grants above, and Claude Code applies
+ * `Read(...)` and `Edit(...)` rules to every built-in tool that reads or edits
+ * a file.
+ *
+ * Not a complete barrier: a granted interpreter (`Bash(node:*)` running
+ * `node -e`) can still read the store or run a helper. The Codex CLI has no
+ * path or command deny at all: its sandbox can still read the store. Only the
+ * OS keystore backends (C10) close those gaps.
+ */
+export function buildDisallowedTools(options: DisallowedToolsOptions = {}): string[] {
+  // Read at spawn, so an NDX_HOME set for this run and a helper stored since
+  // the last one are the ones denied.
+  const denials = agentCredentialDenials();
+  const store = claudeAbsolutePattern(options.storePath ?? denials.storePath, options.platform);
+  const commands = options.commandPrefixes ?? denials.commandPrefixes;
+  return [
+    ...NDX_CONFIG_BLOCKED_PATHS.map((p) => `Edit(./${p})`),
+    `Read(${store})`,
+    `Edit(${store})`,
+    ...commands.flatMap(bashPrefixRules),
+  ];
+}
+
+/**
+ * `Bash(<prefix>:*)` rules for one command prefix. Claude matches the literal
+ * command, and an agent must quote a token with whitespace to run it, so such a
+ * prefix also gets its double- and single-quoted spellings. A backslash-escaped
+ * space stays unmatched.
+ */
+function bashPrefixRules(prefix: readonly string[]): string[] {
+  const rule = (quote: string) =>
+    `Bash(${prefix.map((token) => (quote && /\s/.test(token) ? `${quote}${token}${quote}` : token)).join(" ")}:*)`;
+  return prefix.some((token) => /\s/.test(token)) ? [rule(""), rule('"'), rule("'")] : [rule("")];
 }
 
 /**

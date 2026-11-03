@@ -1,0 +1,187 @@
+schema: "rex/v2"
+items:
+  "0f3163d9-7548-4ff5-abfa-d62d7640c42f":
+    status: "completed"
+    startedAt: "2026-11-03T18:34:02.653Z"
+    completedAt: "2026-11-03T19:36:04.383Z"
+    endedAt: "2026-11-03T19:36:04.383Z"
+    activeIntervals: [{"end":"2026-11-03T19:07:11.767Z","start":"2026-11-03T18:34:02.653Z"},{"end":"2026-11-03T19:36:04.383Z","start":"2026-11-03T19:36:04.383Z"}]
+    lastModified: "2026-11-03T19:36:04.383Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "10730d82-59f1-4ea2-9594-667318da70d2":
+    status: "completed"
+    startedAt: "2026-11-03T15:33:50.948Z"
+    completedAt: "2026-11-03T15:45:14.829Z"
+    endedAt: "2026-11-03T15:45:14.829Z"
+    activeIntervals: [{"end":"2026-11-03T15:45:14.829Z","start":"2026-11-03T15:33:50.948Z"}]
+    lastModified: "2026-11-03T15:45:14.829Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "12d277fe-4308-47dd-9a3e-9634d4b829f6":
+    status: "completed"
+    startedAt: "2026-10-30T16:24:11.604Z"
+    completedAt: "2026-10-30T16:40:18.734Z"
+    endedAt: "2026-10-30T16:40:18.734Z"
+    activeIntervals: [{"end":"2026-10-30T16:40:18.734Z","start":"2026-10-30T16:24:11.604Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "resolveJudgmentRoute (options: env/ndxHome) and askJev resolve the typesafe credential env-first then store; new configuredJudgmentRoute replaces sourcevision's fake-env probe; rex migrate-plan jevAvailable via resolver; messages and README name ndx config credentials.typesafe."
+    lastModified: "2026-10-30T16:40:18.734Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "250e6c57-54a5-4d31-815c-720ea268e972":
+    status: "completed"
+    startedAt: "2026-10-30T14:52:34.980Z"
+    completedAt: "2026-10-30T15:27:29.043Z"
+    endedAt: "2026-10-30T15:27:29.043Z"
+    activeIntervals: [{"end":"2026-10-30T15:27:29.043Z","start":"2026-10-30T14:52:34.980Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "setup-ndx-home + setup-judgment-env wired into root, web, llm-client, rex, hench, graview vitest configs; root-policy test tests/e2e/credential-isolation-setup-policy.test.js fails any llm-client-dependent package config lacking either."
+    lastModified: "2026-10-30T15:27:29.043Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2f5ce643-1c49-4c70-ab2c-545f956873df":
+    status: "completed"
+    startedAt: "2026-10-30T15:54:09.159Z"
+    completedAt: "2026-10-30T16:13:02.576Z"
+    endedAt: "2026-10-30T16:13:02.576Z"
+    activeIntervals: [{"end":"2026-10-30T16:13:02.576Z","start":"2026-10-30T15:54:09.159Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client src/credential-store.ts (resolve/set/unset/status, v1 format, O_EXCL pid lock with dead-holder takeover, temp+rename, POSIX 0600/0700 + refusal, win32 icacls port) and src/cli/credentials.ts (set via stdin, unset, status [--json], typesafe only); re-exported from public.ts. No hench gateway change."
+    lastModified: "2026-10-30T16:13:02.576Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3da75c2f-d41c-42dd-8e42-4d80380aa796":
+    status: "completed"
+    startedAt: "2026-11-03T20:34:51.348Z"
+    completedAt: "2026-11-03T20:35:43.178Z"
+    endedAt: "2026-11-03T20:35:43.178Z"
+    activeIntervals: [{"end":"2026-11-03T20:35:43.178Z","start":"2026-11-03T20:34:51.348Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Soft freeze paragraph appended to the three PR 3 changesets (commit 1e7d9402d); frontmatter untouched, all bumps patch. changeset status not run locally (approval denied)."
+    lastModified: "2026-11-03T20:35:43.178Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "534debf3-0b82-43af-adf5-be497be7b85f":
+    status: "completed"
+    startedAt: "2026-11-02T20:29:39.083Z"
+    completedAt: "2026-11-02T20:51:36.470Z"
+    endedAt: "2026-11-02T20:51:36.470Z"
+    activeIntervals: [{"end":"2026-11-02T20:51:36.470Z","start":"2026-11-02T20:29:39.083Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Helper backend in llm-client's credential store (setHelperCredential, shell-less runner, per-process cache, quiet failures); set-helper and status --check in the credentials CLI; ndx config --helper parsing with refusals; hench guard and Claude CLI deny rules for the Keychain read and helper commands via agentCredentialDenials (gateway count unchanged at 226)."
+    lastModified: "2026-11-02T20:51:36.470Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "68b2709d-174e-4ec2-bf3f-163fdda6115c":
+    status: "deferred"
+    lastModified: "2026-10-30T14:44:19.737Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6d70bab8-a6c6-4839-9520-08d407116c79":
+    status: "completed"
+    startedAt: "2026-11-03T20:26:56.135Z"
+    completedAt: "2026-11-03T20:30:59.869Z"
+    endedAt: "2026-11-03T20:30:59.869Z"
+    activeIntervals: [{"end":"2026-11-03T20:30:59.869Z","start":"2026-11-03T20:26:56.135Z"}]
+    lastModified: "2026-11-03T20:30:59.869Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "742863c5-989f-4138-8909-9b59bb589fc4":
+    status: "completed"
+    startedAt: "2026-10-30T18:21:31.342Z"
+    completedAt: "2026-10-30T18:32:00.867Z"
+    endedAt: "2026-10-30T18:32:00.867Z"
+    activeIntervals: [{"end":"2026-10-30T18:32:00.867Z","start":"2026-10-30T18:21:31.342Z"}]
+    lastModified: "2026-10-30T18:32:00.867Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
+    issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
+    lastModified: "2026-11-03T20:34:37.959Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "94e25654-bb3c-4203-a1ab-49267e0ad734":
+    status: "completed"
+    startedAt: "2026-11-02T19:00:14.177Z"
+    completedAt: "2026-11-02T19:31:36.661Z"
+    endedAt: "2026-11-02T19:31:36.661Z"
+    activeIntervals: [{"end":"2026-11-02T19:31:36.661Z","start":"2026-11-02T19:00:14.177Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "llm-client vendor-auth.ts (resolveVendorKey config→env→store, resolveVendorAuth with apiRefusal, requireVendorApiKey), llm.<vendor>.auth parsed and trust-gated (api only), CREDENTIAL_ENV_VARS + vendor names in the credentials CLI with status --project; providers, detectAuthMode, child env and diagnoseAuth follow auth; core validators, local-only routing and credentials status; hench refuses provider=api via run-settings, --resolve reports auth; gateway resolveApiKey swapped for resolveVendorAuth (cap unchanged)."
+    lastModified: "2026-11-02T19:31:36.661Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9da6d298-51b4-4e0d-88df-8efee59a8d06":
+    status: "completed"
+    startedAt: "2026-10-30T23:59:43.044Z"
+    completedAt: "2026-10-31T00:10:49.305Z"
+    endedAt: "2026-10-31T00:10:49.305Z"
+    activeIntervals: [{"end":"2026-10-31T00:10:49.305Z","start":"2026-10-30T23:59:43.044Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "buildDisallowedTools adds Read/Edit(//<store>) from credentialStorePath() at spawn (win32 //c/... form, comma-joined); GuardRails adds a store pattern when the ndx home is inside the project; validatePath also refuses cross-drive absolute rel; tests cover argv, both guard cases, and child env. Codex sandbox gap noted in code comment and changeset."
+    lastModified: "2026-10-31T00:10:49.305Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9dd5658d-a708-473b-acb0-63c8df1cc127":
+    status: "completed"
+    startedAt: "2026-11-02T21:04:25.443Z"
+    completedAt: "2026-11-02T21:20:50.706Z"
+    endedAt: "2026-11-02T21:20:50.706Z"
+    activeIntervals: [{"end":"2026-11-02T21:20:50.706Z","start":"2026-11-02T21:04:25.443Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Interpreter helpers deny argv through the script; scriptless interpreters refused at --helper; failed helpers retried after 60 s with one warning per streak."
+    lastModified: "2026-11-02T21:20:50.706Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b52513b3-58a0-4a2b-9e36-d116bdcf6a54":
+    status: "completed"
+    startedAt: "2026-11-03T17:37:09.499Z"
+    completedAt: "2026-11-03T17:44:45.983Z"
+    endedAt: "2026-11-03T17:44:45.983Z"
+    activeIntervals: [{"end":"2026-11-03T17:44:45.983Z","start":"2026-11-03T17:37:09.499Z"}]
+    lastModified: "2026-11-03T17:44:45.983Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b72a668d-4bf6-4c1c-9caf-a2a25f96e6ea":
+    status: "completed"
+    startedAt: "2026-10-30T15:40:16.396Z"
+    completedAt: "2026-10-30T15:44:38.472Z"
+    endedAt: "2026-10-30T15:44:38.472Z"
+    activeIntervals: [{"end":"2026-10-30T15:44:38.472Z","start":"2026-10-30T15:40:16.396Z"}]
+    lastModified: "2026-10-30T15:44:38.472Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "bfee741f-343a-4a2c-b12f-50aa262811ef":
+    status: "completed"
+    startedAt: "2026-11-03T16:24:28.530Z"
+    completedAt: "2026-11-03T16:29:52.353Z"
+    endedAt: "2026-11-03T16:29:52.353Z"
+    activeIntervals: [{"end":"2026-11-03T16:29:52.353Z","start":"2026-11-03T16:24:28.530Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option A: importLocalApiKeys skips vendors whose store entry is a helper, keeps the file key, prints one line naming vendor and file."
+    lastModified: "2026-11-03T16:29:52.353Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dbc9c046-3fcc-43bc-a290-87d7ab5f4565":
+    status: "completed"
+    startedAt: "2026-11-03T20:31:38.268Z"
+    completedAt: "2026-11-03T20:33:31.565Z"
+    endedAt: "2026-11-03T20:33:31.565Z"
+    activeIntervals: [{"end":"2026-11-03T20:33:31.565Z","start":"2026-11-03T20:31:38.268Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "docs/guide/configuration.md: --helper paragraph says agents are denied the helper's script and keep the interpreter; store paragraph names the deny rules, hench's guard and both gaps (node -e, Codex CLI)."
+    lastModified: "2026-11-03T20:33:31.565Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e5def056-c6ed-4484-978e-6f4e174bd8bf":
+    status: "completed"
+    startedAt: "2026-11-03T17:08:59.840Z"
+    completedAt: "2026-11-03T17:28:25.718Z"
+    endedAt: "2026-11-03T17:28:25.718Z"
+    activeIntervals: [{"end":"2026-11-03T17:28:25.718Z","start":"2026-11-03T17:08:59.840Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx status jev line, jev {available, source} in get_capabilities and manifest lastAnalysis, llm.typesafe.required warn-once, credentials.typesafe --test via mocked fetch"
+    lastModified: "2026-11-03T17:28:25.718Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f5efde56-48b6-4a78-a891-fcda1d312e46":
+    status: "completed"
+    startedAt: "2026-11-02T23:12:36.130Z"
+    completedAt: "2026-11-02T23:15:31.974Z"
+    endedAt: "2026-11-02T23:15:31.974Z"
+    activeIntervals: [{"end":"2026-11-02T23:15:31.974Z","start":"2026-11-02T23:12:36.130Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "buildDisallowedTools emits double- and single-quoted spellings for prefixes with a whitespace token (commit 4a119131b)"
+    lastModified: "2026-11-02T23:15:31.974Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "f912174e-96e5-41a3-acd9-5c73bae27c5b":
+    status: "completed"
+    startedAt: "2026-11-03T17:50:02.094Z"
+    completedAt: "2026-11-03T19:36:13.293Z"
+    endedAt: "2026-11-03T19:36:13.293Z"
+    activeIntervals: [{"end":"2026-11-03T18:15:54.465Z","start":"2026-11-03T17:50:02.094Z"},{"end":"2026-11-03T18:18:20.060Z","start":"2026-11-03T18:18:17.187Z"},{"end":"2026-11-03T18:31:46.028Z","start":"2026-11-03T18:19:05.082Z"},{"end":"2026-11-03T19:36:13.293Z","start":"2026-11-03T19:36:13.293Z"}]
+    failureReason: "The messages are done and committed (cfdc67c6c, 1dcedacaf). The test gate failed on one stale assertion: tests/e2e/cli-auth.test.js:185 ('ndx auth does not send the variable an untrusted repository names') still expects 'export GEMINI_API_KEY=', but the Google preflight now prints 'Or set the env var: export GEMINI_API_KEY'. Update that assertion to the new text and also assert stderr does not contain SENTINEL_VAR, which is the point of the test. Do not redo the message work; run tests/e2e/cli-auth.test.js and tests/e2e/key-argv-message-policy.test.js."
+    lastModified: "2026-11-03T19:36:13.293Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

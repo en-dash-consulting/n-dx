@@ -56,7 +56,7 @@ import { computeAnalysisFingerprint, generatePrimer, PRIMER_FILE } from "../../a
 import { callClaude } from "../../analyzers/claude-client.js";
 import { startRunLedger, recordPhaseDuration, snapshotRunLedger, formatRunLedger, recordLLMCall, recordJudgmentCache } from "../../analyzers/run-ledger.js";
 import { readAnalysisOutcome } from "../../analyzers/analysis-outcome.js";
-import { configureJudgmentCache, setJevObserver } from "@n-dx/llm-client";
+import { configureJudgmentCache, jevAvailability, setJevObserver } from "@n-dx/llm-client";
 import { configureRerunLog } from "../../analyzers/rerun-judge.js";
 import { configureRuleCache } from "../../analyzers/declared-rules.js";
 import {
@@ -347,6 +347,7 @@ function finalizeTokenUsage(
   // compared against, and the only moment it is both complete and still known.
   const outcome = readAnalysisOutcome(ctx.svDir);
   if (outcome) run.outcome = outcome;
+  run.jev = jevAvailability();
 
   const manifest = readManifest(ctx.absDir);
   if (ctx.tokenUsage.calls > 0) {

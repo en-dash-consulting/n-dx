@@ -73,6 +73,7 @@
  * - `repo-command-env.ts` — the sanitized environment for repository-owned commands
  * - `redact.ts` — credential redaction for run records, logs and live output
  * - `auth-token.ts` — per-user dashboard token file (`<ndx home>/auth.token`)
+ * - `credential-store.ts` — per-user credential store (`<ndx home>/credentials.json`)
  * - `output.ts` — CLI output control (quiet mode)
  * - `suggest.ts` — CLI typo correction
  * - `help-format.ts` — CLI help formatting and color output
@@ -141,6 +142,7 @@ export type {
   TokenUsage,
   ClaudeConfig,
   AuthMode,
+  VendorAuth,
   ClaudeClientOptions,
   CompletionRequest,
   CompletionResult,
@@ -172,6 +174,7 @@ export {
   resolveTaskModel,
   DEFAULT_ROUTES,
   resolveJudgmentRoute,
+  configuredJudgmentRoute,
   routesToTier,
   DEFAULT_JUDGMENT_ROUTES,
   JUDGMENT_ROUTE_TYPESAFE,
@@ -537,6 +540,63 @@ export type { ParsedGitRemote, RemoteHostKind } from "./git-remote-url.js";
 export { AUTH_TOKEN_FILENAME, resolveAuthTokenPath, readAuthToken, ensureAuthToken, hasAuthToken } from "./auth-token.js";
 export type { AuthTokenPathOptions } from "./auth-token.js";
 
+// Per-user credential store (`<ndx home>/credentials.json`). The orchestration
+// tier spawns dist/cli/credentials.js rather than importing these.
+export {
+  CREDENTIALS_FILENAME,
+  CREDENTIAL_STORE_VERSION,
+  CREDENTIAL_NAME_PATTERN,
+  CREDENTIAL_ENV_VARS,
+  TYPESAFE_CREDENTIAL,
+  credentialStorePath,
+  credentialFingerprint,
+  resolveCredential,
+  setCredential,
+  setHelperCredential,
+  unsetCredential,
+  credentialStatus,
+  jevAvailability,
+  storedCredential,
+  hasStoredCredential,
+  agentCredentialDenials,
+} from "./credential-store.js";
+export type {
+  AgentCredentialDenials,
+  CredentialSource,
+  CredentialStatus,
+  CredentialStatusOptions,
+  CredentialStoreOptions,
+  CredentialWriteOptions,
+  JevAvailability,
+  ResolvedCredential,
+} from "./credential-store.js";
+
+// `llm.<vendor>.auth`: which credential a vendor gets (CLI login or API key),
+// and its key from config, the environment or the credential store.
+export {
+  VENDOR_AUTH_VALUES,
+  DEFAULT_VENDOR_AUTH,
+  KEYED_VENDORS,
+  isKeyedVendor,
+  hasVendorCliLogin,
+  vendorKeyEnv,
+  vendorAuthSetting,
+  resolveVendorKey,
+  resolveVendorAuth,
+  resolveVendorApiKey,
+  requireVendorApiKey,
+  missingVendorKeyError,
+  cliAuthConflictError,
+  describeVendorAuth,
+} from "./vendor-auth.js";
+export type {
+  KeyedVendor,
+  VendorKeySource,
+  ResolvedVendorKey,
+  VendorKeyOptions,
+  VendorAuthDecision,
+} from "./vendor-auth.js";
+
 // Project-level config utilities (.n-dx.json overrides)
 export {
   deepMerge,
@@ -775,6 +835,7 @@ export type {
 // import each other; per-call accounting is inverted through setJevObserver.
 export {
   askJev,
+  probeJevKey,
   choice,
   noul,
   score,
@@ -789,6 +850,7 @@ export type {
   JevAnswer,
   JevCallRecord,
   JevObserver,
+  JevProbeResult,
   JevQuestion,
   JevRequest,
   JevResponse,

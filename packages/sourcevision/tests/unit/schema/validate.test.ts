@@ -53,6 +53,42 @@ describe("validateManifest", () => {
   });
 });
 
+describe("validateManifest lastAnalysis.jev", () => {
+  const manifestWith = (jev: unknown) => ({
+    schemaVersion: "1.0.0",
+    toolVersion: "0.1.0",
+    analyzedAt: "2024-01-01T00:00:00Z",
+    targetPath: "/test",
+    modules: {},
+    lastAnalysis: {
+      at: "2024-01-01T00:00:00Z",
+      mode: "fast",
+      durationMs: 1,
+      phases: {},
+      llm: { byTaskClass: {} },
+      ...(jev === undefined ? {} : { jev }),
+    },
+  });
+
+  it("is optional", () => {
+    expect(validateManifest(manifestWith(undefined)).ok).toBe(true);
+  });
+
+  it.each([
+    [{ available: true, source: "env" }],
+    [{ available: true, source: "file" }],
+    [{ available: true, source: "helper" }],
+    [{ available: false, source: null }],
+  ])("accepts %j", (jev) => {
+    expect(validateManifest(manifestWith(jev)).ok).toBe(true);
+  });
+
+  it("rejects an unknown source and a missing availability", () => {
+    expect(validateManifest(manifestWith({ available: true, source: "keychain" })).ok).toBe(false);
+    expect(validateManifest(manifestWith({ source: "env" })).ok).toBe(false);
+  });
+});
+
 describe("validateInventory", () => {
   it("accepts valid inventory", () => {
     const result = validateInventory({
