@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   HubSessionHostPicker,
+  MAX_HUB_SESSION_BODY_BYTES,
   handleProxyRequest,
   handleProxyUpgrade,
   hubSessionHostLockPath,
@@ -33,6 +34,8 @@ interface Upstream {
   port: number;
   seen: Array<{ url: string; token: string | undefined }>;
   upgrades: string[];
+  /** Every request that arrived, with its body. */
+  requests: Array<{ method: string; url: string; headers: IncomingMessage["headers"]; body: string }>;
   /** Answer as a project whose web.sidecar gate is closed. */
   sidecarOff: boolean;
 }
@@ -53,19 +56,33 @@ async function listen(server: Server): Promise<number> {
 async function startUpstream(): Promise<Upstream> {
   const seen: Upstream["seen"] = [];
   const upgrades: string[] = [];
-  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, sidecarOff: false };
+  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, requests: [], sidecarOff: false };
+  const requests: Upstream["requests"] = [];
+  upstream.requests = requests;
   const server = createServer((req: IncomingMessage, res) => {
     seen.push({ url: req.url ?? "", token: req.headers["x-ndx-token"] as string | undefined });
-    if (upstream.sidecarOff) {
-      res.writeHead(403, { "Content-Type": "application/json", [FEATURE_DISABLED_HEADER]: "web.sidecar" });
-      res.end(JSON.stringify({ kind: "feature_disabled", feature: "web.sidecar" }));
-      return;
-    }
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ port: (server.address() as { port: number }).port }));
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      requests.push({ method: req.method ?? "", url: req.url ?? "", headers: req.headers, body: Buffer.concat(chunks).toString() });
+      if (upstream.sidecarOff) {
+        res.writeHead(403, { "Content-Type": "application/json", [FEATURE_DISABLED_HEADER]: "web.sidecar" });
+        res.end(JSON.stringify({ kind: "feature_disabled", feature: "web.sidecar" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ port: (server.address() as { port: number }).port }));
+    });
   });
   server.on("upgrade", (req, socket) => {
     upgrades.push(req.url ?? "");
+    if (upstream.sidecarOff) {
+      const body = JSON.stringify({ kind: "feature_disabled", feature: "web.sidecar" });
+      socket.end(
+        `HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\n${FEATURE_DISABLED_HEADER}: web.sidecar\r\nConnection: close\r\nContent-Length: ${body.length}\r\n\r\n${body}`,
+      );
+      return;
+    }
     socket.end("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n");
   });
   upstream.server = server;
@@ -204,29 +221,88 @@ describe("/hub/session/ through the hub", () => {
     const b = await startUpstream();
     a.sidecarOff = true;
     projects = [project("a", a.port), project("b", b.port)];
-    // The first request is refused by a's gate and marks it; the next moves on.
+    // a refuses the first request, is marked, and the same request goes to b.
     const first = await hubGet("/hub/session/sessions");
-    expect(first.status).toBe(403);
-    expect((await first.json()).feature).toBe("web.sidecar");
-    const second = await hubGet("/hub/session/sessions");
-    expect(second.status).toBe(200);
+    expect(first.status).toBe(200);
+    expect((await first.json()).port).toBe(b.port);
     expect(b.seen).toEqual([{ url: "/api/sidecar/hub/sessions", token: TOKEN }]);
     expect(a.seen).toHaveLength(1);
+    // a is skipped from then on.
+    expect((await hubGet("/hub/session/sessions")).status).toBe(200);
+    expect(a.seen).toHaveLength(1);
+    expect(b.seen).toHaveLength(2);
   });
 
-  it("answers a refusal naming web.sidecar when no project has it on", async () => {
+  it("replays a POST's method, headers and body on the next host after a sidecar-off refusal", async () => {
+    const a = await startUpstream();
+    const b = await startUpstream();
+    a.sidecarOff = true;
+    projects = [project("a", a.port), project("b", b.port)];
+    const payload = JSON.stringify({ text: "hello", pad: "x".repeat(5000) });
+    const res = await fetch(`http://127.0.0.1:${hubPort}/hub/session/sessions/s-1/turns`, {
+      method: "POST",
+      headers: { "X-Ndx-Token": TOKEN, "Content-Type": "application/json", "X-Custom": "kept" },
+      body: payload,
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).port).toBe(b.port);
+    expect(a.requests).toHaveLength(1);
+    expect(b.requests).toHaveLength(1);
+    const replay = b.requests[0];
+    expect(replay).toMatchObject({ method: "POST", url: "/api/sidecar/hub/sessions/s-1/turns", body: payload });
+    expect(replay.headers["content-type"]).toBe("application/json");
+    expect(replay.headers["x-custom"]).toBe("kept");
+    expect(a.requests[0].body).toBe(payload);
+  });
+
+  it("refuses a body over the buffering limit with 413 and forwards nothing", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    const res = await fetch(`http://127.0.0.1:${hubPort}/hub/session/sessions/s-1/turns`, {
+      method: "POST",
+      headers: { "X-Ndx-Token": TOKEN, "Content-Type": "text/plain" },
+      body: "x".repeat(MAX_HUB_SESSION_BODY_BYTES + 1),
+    });
+    expect(res.status).toBe(413);
+    expect(a.seen).toEqual([]);
+  });
+
+  it("retries a WebSocket upgrade a sidecar-off host refused on the next host before answering the client", async () => {
+    const a = await startUpstream();
+    const b = await startUpstream();
+    a.sidecarOff = true;
+    projects = [project("a", a.port), project("b", b.port)];
+    expect(await wsHandshake("/hub/session/ws")).toBe("HTTP/1.1 101 Switching Protocols");
+    expect(a.upgrades).toEqual(["/api/sidecar/hub/ws"]);
+    expect(b.upgrades).toEqual(["/api/sidecar/hub/ws"]);
+    // a stays skipped.
+    expect(await wsHandshake("/hub/session/ws")).toBe("HTTP/1.1 101 Switching Protocols");
+    expect(a.upgrades).toHaveLength(1);
+    expect(b.upgrades).toHaveLength(2);
+  });
+
+  it("answers 403 to an upgrade when no project has web.sidecar on", async () => {
+    const a = await startUpstream();
+    a.sidecarOff = true;
+    projects = [project("a", a.port)];
+    expect(await wsHandshake("/hub/session/ws")).toBe("HTTP/1.1 403 Forbidden");
+  });
+
+  it("answers a refusal naming web.sidecar only when no healthy host remains", async () => {
     const a = await startUpstream();
     const b = await startUpstream();
     a.sidecarOff = true;
     b.sidecarOff = true;
     projects = [project("a", a.port), project("b", b.port)];
-    expect((await hubGet("/hub/session/sessions")).status).toBe(403); // a refuses, is marked
-    expect((await hubGet("/hub/session/sessions")).status).toBe(403); // b refuses, is marked
-    const res = await hubGet("/hub/session/sessions");
+    const res = await hubGet("/hub/session/sessions"); // a refuses, then b refuses: nobody left
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.feature).toBe("web.sidecar");
     expect(body.error).toContain("web.sidecar");
+    expect(a.seen).toHaveLength(1);
+    expect(b.seen).toHaveLength(1);
+    // Both are skipped now: the next request is answered without reaching either.
+    expect((await hubGet("/hub/session/sessions")).status).toBe(403);
     expect(a.seen).toHaveLength(1);
     expect(b.seen).toHaveLength(1);
   });

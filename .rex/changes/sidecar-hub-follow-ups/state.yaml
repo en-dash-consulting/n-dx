@@ -4,8 +4,18 @@ items:
     lastModified: "2026-11-03T16:50:55.164Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "87b82506-45db-4b52-bd8c-30e1c46807d2":
-    lastModified: "2026-11-03T16:50:28.146Z"
+    status: "completed"
+    startedAt: "2026-11-03T17:24:21.995Z"
+    completedAt: "2026-11-03T17:34:25.298Z"
+    endedAt: "2026-11-03T17:34:25.298Z"
+    activeIntervals: [{"end":"2026-11-03T17:34:25.298Z","start":"2026-11-03T17:24:21.995Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "proxy.ts retries web.sidecar refusals (HTTP with 1 MiB buffered body, 413 above; WebSocket via UpgradeGate) on the next healthy host; 403 only when none remains."
+    lastModified: "2026-11-03T17:34:25.298Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "89e6dabf-b024-45bb-9be1-b09796a724d3":
-    lastModified: "2026-11-03T16:51:11.864Z"
+    lastModified: "2026-11-03T17:30:12.067Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "9f3e974d-5eea-43c4-8706-0c745d01fcb7":
+    lastModified: "2026-11-03T17:30:12.067Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

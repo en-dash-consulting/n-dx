@@ -87,8 +87,8 @@ export type {
   ExtensionView,
   ExtensionsAnswer,
 } from "./extensions.js";
-export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER } from "./proxy.js";
-export type { ProxyDecision, SidecarForward } from "./proxy.js";
+export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, MAX_HUB_SESSION_BODY_BYTES, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER } from "./proxy.js";
+export type { ProxyDecision, SidecarForward, UpgradeGate } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";
 export {
   HubSessionHostPicker,

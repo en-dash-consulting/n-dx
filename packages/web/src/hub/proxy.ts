@@ -86,6 +86,8 @@ const MAX_RELOAD_BODY_BYTES = 64 * 1024;
 /** The execute request the admission gate stands in front of. */
 const EXECUTE_PATH = "/api/hench/execute";
 const MAX_EXECUTE_BODY_BYTES = 64 * 1024;
+/** A hub session request is buffered so it can be replayed on the next host; a larger body is refused with 413. */
+export const MAX_HUB_SESSION_BODY_BYTES = 1024 * 1024;
 /** Header telling the project server which prefix the client used, for anything that builds absolute links. */
 const FORWARDED_PREFIX_HEADER = "x-forwarded-prefix";
 /** The Live overview: its agent-slots tile reports the machine's admission state when served through the hub. */
@@ -264,15 +266,23 @@ export function matchProjectByDir(projects: ProjectView[], dir: string): Project
   return best?.project ?? null;
 }
 
-function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
+/**
+ * @param destroyOnLimit False keeps the socket open past the limit (the rest of
+ *   the body is drained and dropped) so the caller can still answer the client.
+ */
+function readBody(req: IncomingMessage, limit: number, destroyOnLimit = true): Promise<Buffer> {
   return new Promise((resolvePromise, reject) => {
     const chunks: Buffer[] = [];
     let bytes = 0;
+    let over = false;
     req.on("data", (chunk: Buffer) => {
+      if (over) return;
       bytes += chunk.length;
       if (bytes > limit) {
+        over = true;
+        chunks.length = 0;
         reject(new Error(`request body exceeds ${limit} bytes`));
-        req.destroy();
+        if (destroyOnLimit) req.destroy();
         return;
       }
       chunks.push(chunk);
@@ -372,6 +382,9 @@ export function sidecarHeaderValue(lowerName: string, value: string, forward: Si
  *   it is sent upstream in place of piping the request.
  * @param sidecar Set when the upstream is an extension sidecar.
  * @param onUpstreamError Called when the upstream cannot be reached.
+ * @param onUpstreamHeaders Called with the upstream's status line and headers
+ *   before anything is written to the client. Returning true takes the answer
+ *   over: the upstream's response is discarded and nothing is sent to `res`.
  */
 export function proxyHttp(
   req: IncomingMessage,
@@ -383,7 +396,7 @@ export function proxyHttp(
   extraHeaders: OutgoingHttpHeaders = {},
   sidecar?: SidecarForward,
   onUpstreamError?: () => void,
-  onUpstreamHeaders?: (status: number, headers: IncomingHttpHeaders) => void,
+  onUpstreamHeaders?: (status: number, headers: IncomingHttpHeaders) => boolean | void,
 ): void {
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
   // Only the hub states its admission state; a client's copy never reaches the child.
@@ -416,7 +429,10 @@ export function proxyHttp(
   const upstream = httpRequest(
     { host: UPSTREAM_HOST, port, method: req.method, path, headers },
     (upstreamRes) => {
-      onUpstreamHeaders?.(upstreamRes.statusCode ?? 502, upstreamRes.headers);
+      if (onUpstreamHeaders?.(upstreamRes.statusCode ?? 502, upstreamRes.headers) === true) {
+        upstreamRes.resume();
+        return;
+      }
       const outHeaders = { ...upstreamRes.headers };
       // A redirect the project server issues is root-relative from its point
       // of view; the client is under the prefix. A sidecar's may already be
@@ -446,6 +462,16 @@ export function proxyHttp(
   else req.pipe(upstream);
 }
 
+/**
+ * Lets the caller judge the upstream's answer to an upgrade before the client
+ * sees any of it. When `refuses` says yes, the upstream is dropped, the client's
+ * socket is left untouched, and `onRefused` runs.
+ */
+export interface UpgradeGate {
+  refuses(status: number, headers: IncomingHttpHeaders): boolean;
+  onRefused(): void;
+}
+
 /** Forward a WebSocket upgrade: replay the request head upstream, then pipe both sockets. */
 export function proxyUpgrade(
   req: IncomingMessage,
@@ -456,6 +482,7 @@ export function proxyUpgrade(
   prefix: string,
   sidecar?: SidecarForward,
   onUpstreamError?: () => void,
+  gate?: UpgradeGate,
 ): void {
   const upstream = connect(port, UPSTREAM_HOST);
 
@@ -493,14 +520,57 @@ export function proxyUpgrade(
     }
     upstream.write(`${lines.join("\r\n")}\r\n\r\n`);
     if (head.length > 0) upstream.write(head);
-    upstream.pipe(socket);
-    socket.pipe(upstream);
+    if (!gate) {
+      upstream.pipe(socket);
+      socket.pipe(upstream);
+      return;
+    }
+    // Hold the upstream's answer until its head is complete: a refusal is
+    // swallowed, anything else is released to the client and piped from then on.
+    let buffered = Buffer.alloc(0);
+    const onData = (chunk: Buffer): void => {
+      buffered = Buffer.concat([buffered, chunk]);
+      const end = buffered.indexOf("\r\n\r\n");
+      if (end === -1 && buffered.length < MAX_UPGRADE_HEAD_BYTES) return;
+      upstream.off("data", onData);
+      upstream.pause();
+      const { status, headers } = end === -1 ? { status: 0, headers: {} } : parseResponseHead(buffered.subarray(0, end).toString("latin1"));
+      if (gate.refuses(status, headers)) {
+        refused = true;
+        upstream.destroy();
+        gate.onRefused();
+        return;
+      }
+      socket.write(buffered);
+      upstream.pipe(socket);
+      socket.pipe(upstream);
+    };
+    upstream.on("data", onData);
   });
 
-  upstream.once("error", fail);
+  let refused = false;
+  upstream.once("error", () => {
+    if (!refused) fail();
+  });
   socket.once("error", () => upstream.destroy());
   socket.once("close", () => upstream.destroy());
-  upstream.once("close", () => socket.destroy());
+  upstream.once("close", () => {
+    if (!refused) socket.destroy();
+  });
+}
+
+/** Longest response head held back while waiting for its blank line. */
+const MAX_UPGRADE_HEAD_BYTES = 16 * 1024;
+
+/** The status code and lower-cased headers of a response head (without its closing blank line). */
+function parseResponseHead(text: string): { status: number; headers: IncomingHttpHeaders } {
+  const [statusLine, ...rest] = text.split("\r\n");
+  const headers: IncomingHttpHeaders = {};
+  for (const line of rest) {
+    const colon = line.indexOf(":");
+    if (colon > 0) headers[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
+  }
+  return { status: Number(statusLine.split(" ")[1]) || 0, headers };
 }
 
 const NO_HUB_SESSION_HOST = "No registered project server is healthy to host the hub session";
@@ -509,6 +579,93 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(text) });
   res.end(text);
+}
+
+type SessionHost = NonNullable<ReturnType<Hub["sessionHosts"]["pick"]>>;
+
+function isSidecarRefusal(status: number, headers: IncomingHttpHeaders): boolean {
+  return status === 403 && headers[FEATURE_DISABLED_HEADER] === HUB_SESSION_FEATURE;
+}
+
+function writeSidecarOffEverywhere(res: ServerResponse): void {
+  writeJson(res, 403, {
+    error: `The feature "${HUB_SESSION_FEATURE}" is turned off in every healthy project, so the hub session has no host.`,
+    feature: HUB_SESSION_FEATURE,
+    kind: "feature_disabled",
+    suggestion: `Enable ${HUB_SESSION_FEATURE} in one project's feature flags, or set features.${HUB_SESSION_FEATURE} to true in its .n-dx.json.`,
+  });
+}
+
+/**
+ * Forward a hub session request. The body is buffered (up to
+ * {@link MAX_HUB_SESSION_BODY_BYTES}) so a host refusing for web.sidecar can be
+ * passed over and the same request replayed on the next healthy one: the client
+ * sees only the answer of the host that served it, or the 403 when none is left.
+ */
+async function proxyHubSession(req: IncomingMessage, res: ServerResponse, hub: Hub, path: string, first: SessionHost): Promise<void> {
+  const tooLarge = { error: `Hub session request bodies are limited to ${MAX_HUB_SESSION_BODY_BYTES} bytes` };
+  if (Number(req.headers["content-length"]) > MAX_HUB_SESSION_BODY_BYTES) {
+    req.resume();
+    writeJson(res, 413, tooLarge);
+    return;
+  }
+  let body: Buffer;
+  try {
+    body = await readBody(req, MAX_HUB_SESSION_BODY_BYTES, false);
+  } catch {
+    // A chunked body that outgrew the limit; the rest is drained and dropped.
+    writeJson(res, 413, tooLarge);
+    return;
+  }
+  // Each refusal marks one project, so the loop ends after at most one pass per project.
+  let host: SessionHost | null = first;
+  while (host) {
+    const target: SessionHost = host;
+    const refused = await new Promise<boolean>((settle) => {
+      proxyHttp(
+        req, res, target.port, path, "", body, {}, undefined,
+        () => {
+          hub.sessionHosts.markUnreachable(target.project);
+          settle(false);
+        },
+        (status, headers) => {
+          const refusal = isSidecarRefusal(status, headers);
+          if (refusal) hub.sessionHosts.markSidecarOff(target.project);
+          settle(refusal);
+          return refusal;
+        },
+      );
+    });
+    if (!refused) return;
+    host = hub.sessionHosts.pick(hub.listProjects());
+  }
+  writeSidecarOffEverywhere(res);
+}
+
+/** Forward a hub session WebSocket upgrade, retrying on the next healthy host while one refuses for web.sidecar. */
+async function upgradeHubSession(req: IncomingMessage, socket: Duplex, head: Buffer, hub: Hub, path: string): Promise<void> {
+  let host = hub.sessionHosts.pick(hub.listProjects());
+  while (host) {
+    const target: SessionHost = host;
+    const refused = await new Promise<boolean>((settle) => {
+      proxyUpgrade(req, socket, head, target.port, path, "", undefined, () => hub.sessionHosts.markUnreachable(target.project), {
+        refuses: isSidecarRefusal,
+        onRefused: () => {
+          hub.sessionHosts.markSidecarOff(target.project);
+          settle(true);
+        },
+      });
+      // Settled false once the upgrade went through (or failed): the socket is the upstream's from here.
+      socket.once("close", () => settle(false));
+    });
+    if (!refused) return;
+    host = hub.sessionHosts.pick(hub.listProjects());
+  }
+  if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
+    socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+  } else {
+    socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+  }
 }
 
 /** Handle any request that is not `/api/hub/*`. Always responds. */
@@ -536,24 +693,13 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       const host = hub.sessionHosts.pick(hub.listProjects());
       if (!host) {
         if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
-          writeJson(res, 403, {
-            error: `The feature "${HUB_SESSION_FEATURE}" is turned off in every healthy project, so the hub session has no host.`,
-            feature: HUB_SESSION_FEATURE,
-            kind: "feature_disabled",
-            suggestion: `Enable ${HUB_SESSION_FEATURE} in one project's feature flags, or set features.${HUB_SESSION_FEATURE} to true in its .n-dx.json.`,
-          });
+          writeSidecarOffEverywhere(res);
           return;
         }
         writeJson(res, 503, { error: NO_HUB_SESSION_HOST });
         return;
       }
-      proxyHttp(
-        req, res, host.port, decision.path, "", undefined, {}, undefined,
-        () => hub.sessionHosts.markUnreachable(host.project),
-        (status, headers) => {
-          if (status === 403 && headers[FEATURE_DISABLED_HEADER] === HUB_SESSION_FEATURE) hub.sessionHosts.markSidecarOff(host.project);
-        },
-      );
+      await proxyHubSession(req, res, hub, decision.path, host);
       return;
     }
     case "redirect":
@@ -824,12 +970,7 @@ export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: B
     return;
   }
   if (decision.kind === "hub-session") {
-    const host = hub.sessionHosts.pick(hub.listProjects());
-    if (!host) {
-      socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
-      return;
-    }
-    proxyUpgrade(req, socket, head, host.port, decision.path, "", undefined, () => hub.sessionHosts.markUnreachable(host.project));
+    void upgradeHubSession(req, socket, head, hub, decision.path);
     return;
   }
   const status = decision.kind === "json" ? decision.status : 404;
