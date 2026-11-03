@@ -31,6 +31,8 @@ import {
   type SidecarPageSelection,
 } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
+import { openExtensionTab } from "../../../src/viewer/components/sidecar-extension-tabs.js";
+import { installBasePathFetch, setBasePathForTests } from "../../../src/viewer/base-path.js";
 import { useFeatureToggle } from "../../../src/viewer/hooks/use-feature-toggle.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -106,7 +108,8 @@ function cliProbe(vendor: string): { cli?: { found: boolean; version: null; path
 
 function stubServer(): void {
   vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
-    const url = String(input);
+    // The tab's page probe is absolute (it must skip the base-path rewrite).
+    const url = String(input).replace(location.origin, "");
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     server.requests.push({ method, url, ...(body !== undefined && { body }) });
@@ -1560,6 +1563,23 @@ describe("extension tabs", () => {
     await press(root.querySelector(".sidecar-ext-reload")!);
     expect(frameKeyPosts()).toHaveLength(2);
     expect(iframe()).not.toBeNull();
+  });
+
+  it("under /p/<id>/ asks for the key under the prefix but probes the page at the hub's own /x/ mount", async () => {
+    const seen: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      seen.push(String(input));
+      return String(input).includes("/frame") ? json({ url: "/x/alpha/~f/k1/tab" }) : new Response("<p>tab</p>");
+    }));
+    setBasePathForTests("/p/p1");
+    try {
+      installBasePathFetch();
+      const state = await openExtensionTab({ name: "alpha", label: "Alpha" }, "/api/hub/extensions/alpha/frame");
+      expect(state).toEqual({ kind: "ready", url: "/x/alpha/~f/k1/tab" });
+      expect(seen).toEqual(["/p/p1/api/hub/extensions/alpha/frame", `${location.origin}/x/alpha/~f/k1/tab`]);
+    } finally {
+      setBasePathForTests(null);
+    }
   });
 
   it("renders no tab and asks for no key while web.sidecar is off", async () => {

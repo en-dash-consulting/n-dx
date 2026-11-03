@@ -131,7 +131,10 @@ export async function openExtensionTab(
     if (typeof url !== "string" || !url.startsWith("/x/")) {
       return { kind: "error", message: `The hub did not give a page for ${tab.label}` };
     }
-    const page = await doFetch(url);
+    // Absolute, so installBasePathFetch leaves it alone: `/x/` is the hub's
+    // own mount, and under `/p/<id>/` the key is not a credential (401). No
+    // cookie, as for the iframe, so the probe proves what the frame will get.
+    const page = await doFetch(new URL(url, location.origin).href, { credentials: "omit" });
     if (page.status === 401) return { kind: "expired" };
     if (!page.ok) return { kind: "error", message: await refusal(page, `${tab.label} answered ${page.status}`) };
     return { kind: "ready", url };
