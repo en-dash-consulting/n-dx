@@ -213,7 +213,7 @@ describe("API loop authentication and endpoint config", () => {
 
   it("loads all claude config fields together", async () => {
     await writeFile(
-      join(projectDir, ".n-dx.json"),
+      join(projectDir, ".n-dx.local.json"),
       JSON.stringify({
         claude: {
           api_key: "sk-ant-all-fields",
@@ -225,7 +225,7 @@ describe("API loop authentication and endpoint config", () => {
     // Endpoint and CLI path apply from the shared file only once trusted.
     await writeFile(
       join(projectDir, ".n-dx.local.json"),
-      JSON.stringify({ claude: { api_endpoint: "https://proxy.example.com", cli_path: "/opt/claude" } }),
+      JSON.stringify({ claude: { api_key: "sk-ant-all-fields", model: "claude-opus-4-20250514", api_endpoint: "https://proxy.example.com", cli_path: "/opt/claude" } }),
       "utf-8",
     );
 

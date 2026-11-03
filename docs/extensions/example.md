@@ -97,7 +97,7 @@ createServer((req, res) => {
 2. Check it with `ndx extensions doctor`. The command prints one line per problem with its fix, and exits 1 if there is any problem.
 3. Approve it with `ndx extensions enable hello`. Pass `--yes` to skip the prompt.
 4. Run `ndx hello`. Set the greeting with `ndx config extensions.hello.greeting Hi` (or `--user` for every project).
-5. Open the app: `ndx start .`, then `http://localhost:3117/x/hello/`. The hub home shows a Hello card, and the project's dashboard header shows a Hello link.
+5. Open the app: `ndx start .`, then `http://127.0.0.1:3117/x/hello/`. The hub home shows a Hello card, and the project's dashboard header shows a Hello link.
 
 Editing `package.json`'s `ndx.extension` block or bumping `version` asks for approval again. Editing the scripts does not.
 

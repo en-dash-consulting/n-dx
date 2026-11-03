@@ -15,7 +15,7 @@ import { TaskStartControl } from "../components/index.js";
 import { ReorganizePanel, RestorePanel } from "../components/prd-tree/index.js";
 import { HealthGauge } from "../visualization/index.js";
 import { usePolling } from "../hooks/index.js";
-import { itemTypeLabel, itemTypePlural } from "../external.js";
+import { itemTypeLabel, itemTypeOf, itemTypePlural } from "../external.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -52,10 +52,17 @@ interface PriorityDistribution {
   unset: number;
 }
 
+/**
+ * The raw PRD node `/api/rex/dashboard` sends: `type` on a v2 tree, `level` on
+ * a v1 one — read through `itemTypeOf`, never a field the wire does not carry.
+ */
 interface NextTask {
   id: string;
   title: string;
-  itemType: string;
+  type?: string;
+  level?: string;
+  /** Set once a v2 change is placed; an Inbox change has none. */
+  displayId?: string;
   status: string;
   priority?: string;
   description?: string;
@@ -483,6 +490,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
   }
 
   const { stats, percentComplete, epics, nextTask, priorities } = data;
+  const nextType = nextTask ? itemTypeOf(nextTask) : "";
   // v2's root rows are changes; v1's are epics.
   const rootType = data.layout === "v2" ? "change" : "epic";
   const rootLabel = itemTypeLabel(rootType);
@@ -590,9 +598,12 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                     h("span", {
                       class: `prd-status-icon prd-status-${nextTask.status.replace("_", "-")}`,
                     }, STATUS_ICONS[nextTask.status] ?? "○"),
-                    h("span", { class: `prd-level-badge prd-level-${nextTask.itemType}` },
-                      itemTypeLabel(nextTask.itemType),
-                    ),
+                    nextTask.displayId
+                      ? h("span", { class: "ch-display-id" }, nextTask.displayId)
+                      : null,
+                    nextType
+                      ? h("span", { class: `prd-level-badge prd-level-${nextType}` }, itemTypeLabel(nextType))
+                      : null,
                     nextTask.priority
                       ? h("span", { class: `prd-priority-badge prd-priority-${nextTask.priority}` },
                           nextTask.priority,
@@ -602,7 +613,7 @@ export function RexDashboard({ navigateTo }: RexDashboardProps) {
                   h(TaskStartControl, { task: nextTask, onStarted: fetchDashboard, runModes: true, navigateTo }),
                 ),
                 h(RexTaskLink, {
-                  task: { id: nextTask.id, title: nextTask.title, status: nextTask.status, itemType: nextTask.itemType, priority: nextTask.priority },
+                  task: { id: nextTask.id, title: nextTask.title, status: nextTask.status, itemType: nextType, priority: nextTask.priority },
                   navigateTo,
                   showStatus: false,
                   class: "rex-dash-next-link",

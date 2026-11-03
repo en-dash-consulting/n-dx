@@ -1,4 +1,5 @@
-import { exec, execShellCmd } from "../process/exec.js";
+import { exec } from "../process/exec.js";
+import { execRepoShellCmd } from "../guard/sandbox.js";
 import { repoCommandEnv } from "../prd/llm-gateway.js";
 import { BOOKKEEPING_PATHS } from "../store/paths.js";
 import { discoverChangedFiles } from "./changed-files.js";
@@ -138,7 +139,8 @@ export async function validateCompletion(
 
   // Run tests if configured
   if (options?.testCommand) {
-    const { error: testError, stderr: testStderr, launched } = await execShellCmd(
+    // Agent-written tests: confined like the agent's own run_command.
+    const { error: testError, stderr: testStderr, launched } = await execRepoShellCmd(
       options.testCommand,
       { cwd: projectDir, timeout, env: repoCommandEnv(projectDir) },
     );

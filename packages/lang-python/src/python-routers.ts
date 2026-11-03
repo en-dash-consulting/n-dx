@@ -13,7 +13,7 @@
  * @module lang-python/python-routers
  */
 
-import type { RouteFact } from "@n-dx/lang-kit";
+import type { RouteFact, SourcePosition } from "@n-dx/lang-kit";
 import type { Capture, FrameworkContext, FrameworkFacts, PackSourceFile } from "@n-dx/lang-runtime";
 import {
   argument,
@@ -26,6 +26,8 @@ import {
   WebNotes,
   WebProject,
   webValue,
+  within,
+  type DefinedAt,
   type WebCall,
   type WebFile,
 } from "./python-web.js";
@@ -68,11 +70,14 @@ export interface RouterRules {
 
 /** An application or router bound to a name. */
 interface Instance {
+  readonly at: SourcePosition;
   readonly key: string;
   readonly file: string;
   /** The constructor that made it: `APIRouter`, `Blueprint`. */
   readonly madeBy: string;
   readonly prefix?: Capture;
+  /** The innermost `def` or `class` it is made in; absent at module level. */
+  readonly scope?: Capture;
 }
 
 interface Mount {
@@ -95,7 +100,8 @@ export function readRouterRoutes(rules: RouterRules, files: readonly PackSourceF
   const skipped = new WebNotes();
   const unfollowed = new WebNotes();
 
-  const instances = new Map<string, Instance>();
+  /** Each name's instances in a file, in source order. */
+  const instances = new Map<string, Instance[]>();
   for (const web of project.files) {
     for (const assignment of web.assignments) {
       const call = web.callAt(assignment.value);
@@ -103,12 +109,45 @@ export function readRouterRoutes(rules: RouterRules, files: readonly PackSourceF
       if (!call || !constructor) continue;
       const prefix = constructor.prefix === undefined ? undefined : call.keywords.get(constructor.prefix);
       const key = keyOf(web.path, assignment.target);
-      instances.set(key, { key, file: web.path, madeBy: call.callee, ...(prefix ? { prefix } : {}) });
+      const instance: Instance = {
+        key: `${key}@${assignment.targetNode.start.line}:${assignment.targetNode.start.column}`,
+        at: assignment.targetNode.start,
+        file: web.path,
+        madeBy: call.callee,
+        ...(prefix ? { prefix } : {}),
+        ...(assignment.scope ? { scope: assignment.scope } : {}),
+      };
+      const list = instances.get(key);
+      if (list) list.push(instance);
+      else instances.set(key, [instance]);
     }
   }
-  const instanceAt = (file: string, text: string): Instance | undefined => {
-    const found = project.defined(file, text, (f, name) => instances.has(keyOf(f, name)));
-    return found && instances.get(keyOf(found.file, found.name));
+  /**
+   * Of a name's instances in one file, the one `at` means: the instance made
+   * at `exact`; else one made in the innermost `def` holding the use; else
+   * the last made at module level; else the last.
+   */
+  const pick = (list: readonly Instance[], at: DefinedAt): Instance | undefined => {
+    if (at.exact) return list.find((i) => i.at.line === at.exact!.line && i.at.column === at.exact!.column);
+    const from = at.from;
+    if (from) {
+      let inner: Instance | undefined;
+      for (const i of list) {
+        if (i.scope && within(i.scope, from) && (!inner?.scope || within(inner.scope, i.scope.start))) inner = i;
+      }
+      if (inner) return inner;
+    }
+    return list.filter((i) => !i.scope).at(-1) ?? list.at(-1);
+  };
+  const instanceAt = (file: string, text: string, use?: SourcePosition): Instance | undefined => {
+    let chosen: Instance | undefined;
+    const found = project.defined(
+      file,
+      text,
+      (f, name, at) => (chosen = pick(instances.get(keyOf(f, name)) ?? [], at)) !== undefined,
+      use,
+    );
+    return found && chosen;
   };
 
   const mounts: Mount[] = [];
@@ -117,12 +156,12 @@ export function readRouterRoutes(rules: RouterRules, files: readonly PackSourceF
       const rule = rules.mounts.find((m) => m.method === call.callee);
       const childNode = rule && call.receiver !== undefined ? argument(call, rule.child.position, rule.child.keyword) : undefined;
       if (!rule || !childNode) continue;
-      const child = instanceAt(web.path, childNode.text);
+      const child = instanceAt(web.path, childNode.text, childNode.start);
       if (!child || (rule.children && !rule.children.has(child.madeBy))) {
         if (rule.countUnfollowed) unfollowed.add(web.path, childNode, rule.method);
         continue;
       }
-      const parent = instanceAt(web.path, call.receiver!);
+      const parent = instanceAt(web.path, call.receiver!, call.invocation.start);
       const prefix = argument(call, rule.prefix.position, rule.prefix.keyword);
       mounts.push({ file: web.path, child, ...(parent ? { parent } : {}), ...(prefix ? { prefix } : {}) });
     }
@@ -180,7 +219,7 @@ export function readRouterRoutes(rules: RouterRules, files: readonly PackSourceF
       if (!call?.receiver) continue;
       const fixed = rules.verbs.get(call.callee);
       if (fixed === undefined && !rules.anyVerb.has(call.callee)) continue;
-      const instance = instanceAt(web.path, call.receiver);
+      const instance = instanceAt(web.path, call.receiver, decorator.start);
       const pathNode = argument(call, rules.path.position, rules.path.keyword);
       if (!instance || !pathNode) continue;
       const methods = fixed === undefined ? methodsOf(web, call) : [fixed];

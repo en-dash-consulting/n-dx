@@ -52,6 +52,18 @@ describe("renderPlanSummary", () => {
     expect(renderPlanSummary(await plan())).toBe(text);
   });
 
+  it("lists each proposed dependsOn with its shared tests, and the count", async () => {
+    const proposed = await plan();
+    expect(renderPlanSummary(proposed)).not.toContain("## Proposed dependsOn");
+    proposed.entries.f2 = { ...proposed.entries.f2!, dependsOn: [{ capability: "f1", tests: ["tests/a.test.ts", "tests/b.test.ts"] }] };
+    proposed.summary.proposedDependsOn = 1;
+    const text = renderPlanSummary(proposed);
+    expect(text).toContain("## Proposed dependsOn");
+    expect(text).toContain("1 proposal(s), for review");
+    expect(text).toContain("| PRD storage isolation `f2` | Task selection `f1` | tests/a.test.ts, tests/b.test.ts |");
+    expect(text.indexOf("## Proposed dependsOn")).toBeLessThan(text.indexOf("## Items"));
+  });
+
   it("names each dissolved release epic and what it becomes", async () => {
     const text = renderPlanSummary(await plan());
     expect(text).toContain("## Dissolved release epics");

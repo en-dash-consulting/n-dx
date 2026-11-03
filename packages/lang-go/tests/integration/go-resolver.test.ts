@@ -106,6 +106,15 @@ describe("go resolver — root package", () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
+  it("lets a versioned workspace replacement override a versioned module replacement", async (ctx) => {
+    mkdirSync(join(dir, "api"));
+    writeFileSync(join(dir, "go.work"), "go 1.23\nuse ./api\nreplace example.com/lib v1.0.0 => example.com/lib v3.0.0\n");
+    writeFileSync(join(dir, "api/go.mod"), "module example.com/api\nrequire example.com/lib v1.0.0\nreplace example.com/lib v1.0.0 => example.com/lib v2.0.0\n");
+    writeFileSync(join(dir, "api/main.go"), 'package api\nimport "example.com/lib/client"\n');
+    const { resolve } = await resolveProject(ctx, dir);
+    expect(resolve("api/main.go").external).toEqual([{ package: "example.com/lib/client", symbols: ["*"], module: { path: "example.com/lib", version: "v3.0.0" } }]);
+  });
+
   it("targets the root package's non-test files, since a directory edge to the root matches nothing", async (ctx) => {
     mkdirSync(join(dir, "cmd"));
     writeFileSync(join(dir, "go.mod"), "module example.com/root\n");

@@ -7,7 +7,8 @@
  */
 
 import { useEffect, useState } from "preact/hooks";
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
+import { openWebSocket } from "../session.js";
 import { createWSPipeline } from "./use-gateway.js";
 import type { SidecarCard } from "./use-sidecar.js";
 
@@ -50,7 +51,7 @@ export function useSidecarProposals(enabled: boolean): SidecarCard[] {
       coalescerWindowMs: 100,
     });
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
       ws.onmessage = (event) => {
         try {
           pipeline.push(JSON.parse(event.data));

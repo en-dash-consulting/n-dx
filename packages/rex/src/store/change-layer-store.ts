@@ -30,7 +30,7 @@ import { findItem, insertChild, removeFromTree, updateInTree, walkTree } from ".
 import { indexTree, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { join } from "node:path";
 import { projectRootOf } from "@n-dx/llm-client";
-import type { PRDStore, SaveFileReport, StoreCapabilities } from "./contracts.js";
+import type { PRDStore, SaveFileReport, StoreCapabilities, WriteOptions } from "./contracts.js";
 import { buildSaveFileReport, mergeSaveFileReports } from "./contracts.js";
 import { loadPrdModel, prdLayout, type PrdModel } from "./prd-model-reader.js";
 import {
@@ -97,6 +97,11 @@ export class ChangeLayerStore implements PRDStore {
   }
 
   async withTransaction<T>(fn: (doc: PRDDocument) => Promise<T>): Promise<T> {
+    return this.changeLayerTransaction(fn);
+  }
+
+  /** {@link withTransaction}, keeping the existing author of the nodes in `preserveAuthorFor`. */
+  private async changeLayerTransaction<T>(fn: (doc: PRDDocument) => Promise<T>, preserveAuthorFor?: ReadonlySet<string>): Promise<T> {
     const { result } = await this.withModelTransaction(
       async (model) => {
         const doc: PRDDocument = { schema: SCHEMA_VERSION, title: model.title, items: changeLayerItems(model.tree.changes) };
@@ -107,7 +112,7 @@ export class ChangeLayerStore implements PRDStore {
         const tree = { product: model.tree.product, changes };
         const broken = newErrors(model.tree, tree, this.now());
         if (broken.length) throw new ChangeLayerWriteError(broken.map((f) => `the result breaks ${f.rule}: ${f.message}`));
-        return { tree, result: value, removed };
+        return { tree, result: value, removed, preserveAuthorFor };
       },
       { now: this.now },
     );
@@ -142,10 +147,14 @@ export class ChangeLayerStore implements PRDStore {
     });
   }
 
-  async updateItem(id: string, updates: Partial<PRDItem>): Promise<void> {
-    await this.withTransaction(async (doc) => {
-      if (!updateInTree(doc.items, id, updates)) throw new Error(`Item not found: ${id}`);
-    });
+  /** `options.preserveModifiedBy` keeps the node's existing `lastModifiedBy`, as on v1 (GitHub #368). */
+  async updateItem(id: string, updates: Partial<PRDItem>, options?: WriteOptions): Promise<void> {
+    await this.changeLayerTransaction(
+      async (doc) => {
+        if (!updateInTree(doc.items, id, updates)) throw new Error(`Item not found: ${id}`);
+      },
+      options?.preserveModifiedBy ? new Set([id]) : undefined,
+    );
   }
 
   async removeItem(id: string): Promise<void> {

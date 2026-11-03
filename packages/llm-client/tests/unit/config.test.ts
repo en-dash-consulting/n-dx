@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadClaudeConfig, resolveApiKey, resolveCliPath, resolveModel, resolveVendorModel, normalizeCodexModel, DEFAULT_CLAUDE_MODEL, NEWEST_MODELS, TIER_MODELS, GOOGLE_MODELS, MODEL_CONTEXT_WINDOWS } from "../../src/config.js";
 import { isModelCompatibleWithVendor } from "../../src/vendor-model-reset.js";
+import { recordRepoTrust } from "../../src/repo-trust.js";
 
 describe("loadClaudeConfig", () => {
   let tmpDir: string;
@@ -33,7 +34,7 @@ describe("loadClaudeConfig", () => {
     expect(config).toEqual({});
   });
 
-  it("extracts all claude fields", async () => {
+  it("extracts all claude fields once the checkout is trusted", async () => {
     await writeFile(
       join(tmpDir, ".n-dx.json"),
       JSON.stringify({
@@ -50,14 +51,33 @@ describe("loadClaudeConfig", () => {
       join(tmpDir, ".n-dx.local.json"),
       JSON.stringify({ claude: { api_endpoint: "https://custom.api.example.com", cli_path: "/usr/local/bin/claude" } }),
     );
-
-    const config = await loadClaudeConfig(tmpDir);
-    expect(config).toEqual({
+    expect(await loadClaudeConfig(tmpDir)).toEqual({
       cli_path: "/usr/local/bin/claude",
       api_key: "sk-ant-test-key",
       api_endpoint: "https://custom.api.example.com",
       model: "claude-opus-4-20250514",
     });
+  });
+
+  it("ignores the tracked cli_path and api_endpoint until the checkout is trusted", async () => {
+    await writeFile(
+      join(tmpDir, ".n-dx.json"),
+      JSON.stringify({
+        claude: {
+          cli_path: "/usr/local/bin/claude",
+          api_key: "sk-ant-test-key",
+          api_endpoint: "https://custom.api.example.com",
+          model: "claude-opus-4-20250514",
+        },
+      }),
+    );
+    const ndxHome = await mkdtemp(join(tmpdir(), "claude-client-config-home-"));
+    try {
+      const config = await loadClaudeConfig(tmpDir, { trust: { ndxHome } });
+      expect(config).toEqual({ api_key: "sk-ant-test-key", model: "claude-opus-4-20250514" });
+    } finally {
+      await rm(ndxHome, { recursive: true, force: true });
+    }
   });
 
   it("extracts lightModel field when present", async () => {

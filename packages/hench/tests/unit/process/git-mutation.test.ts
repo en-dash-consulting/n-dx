@@ -118,3 +118,52 @@ describe("execCheckedGit / execGitMutation", () => {
     );
   });
 });
+
+describe("repository hooks", () => {
+  afterEach(() => {
+    vi.doUnmock("../../../src/guard/git-hooks.js");
+  });
+
+  async function loadWithHooks(hooks: { hooksPath: string; dispose: () => void } | null) {
+    vi.resetModules();
+    const exec = vi.fn(async () => execResult({}));
+    vi.doMock("../../../src/process/exec.js", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("../../../src/process/exec.js")>()),
+      exec,
+    }));
+    vi.doMock("../../../src/guard/git-hooks.js", () => ({
+      prepareConfinedHooks: vi.fn(async () => hooks && { ...hooks, hooks: ["pre-commit"] }),
+    }));
+    const mod = await import("../../../src/process/git-mutation.js");
+    return { ...mod, exec };
+  }
+
+  it("runs git unchanged, hooks included, when there is nothing to confine", async () => {
+    const { execGitMutation, exec } = await loadWithHooks(null);
+    await execGitMutation("/project", ["commit", "-m", "x"], 1000);
+    expect(exec).toHaveBeenCalledWith("git", ["commit", "-m", "x"], expect.objectContaining({ cwd: "/project" }));
+  });
+
+  it("points git at the confined hook wrappers and removes them afterwards", async () => {
+    const dispose = vi.fn();
+    const { execGitMutation, exec } = await loadWithHooks({ hooksPath: "/tmp/wrappers", dispose });
+    await execGitMutation("/project", ["commit", "-m", "x"], 1000);
+    expect(exec).toHaveBeenCalledWith("git", ["-c", "core.hooksPath=/tmp/wrappers", "commit", "-m", "x"], expect.anything());
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes the wrappers when the hook rejects the commit", async () => {
+    const dispose = vi.fn();
+    vi.resetModules();
+    vi.doMock("../../../src/process/exec.js", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("../../../src/process/exec.js")>()),
+      exec: vi.fn(async () => execResult({ exitCode: 1, stderr: "lint failed", error: new Error("Command failed: git commit") })),
+    }));
+    vi.doMock("../../../src/guard/git-hooks.js", () => ({
+      prepareConfinedHooks: vi.fn(async () => ({ hooksPath: "/tmp/wrappers", hooks: ["pre-commit"], dispose })),
+    }));
+    const { execGitMutation } = await import("../../../src/process/git-mutation.js");
+    await expect(execGitMutation("/project", ["commit", "-m", "x"], 1000)).rejects.toThrow(/lint failed/);
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+});

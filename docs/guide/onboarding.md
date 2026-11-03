@@ -69,7 +69,7 @@ Start the web dashboard to navigate the analysis visually:
 ndx start .
 ```
 
-Open `http://localhost:3117` in your browser. The dashboard has eight views:
+Open `http://127.0.0.1:3117` in your browser. The dashboard has eight views:
 
 | View | What to look at first |
 |------|-----------------------|
@@ -117,8 +117,8 @@ The fastest way to explore architecture interactively is to give Claude Code dir
 With the server running (`ndx start .`):
 
 ```sh
-claude mcp add --transport http sourcevision http://localhost:3117/mcp/sourcevision
-claude mcp add --transport http rex http://localhost:3117/mcp/rex
+claude mcp add --transport http sourcevision http://127.0.0.1:3117/mcp/sourcevision
+claude mcp add --transport http rex http://127.0.0.1:3117/mcp/rex
 ```
 
 Now in any Claude Code conversation you can ask questions like:
@@ -204,7 +204,7 @@ If you need a working mental model quickly:
 ndx init .                # 10 seconds
 ndx analyze --fast .      # 2–5 minutes (no AI enrichment)
 ndx start .               # 5 seconds
-# Open http://localhost:3117 — read Zones and Imports views
+# Open http://127.0.0.1:3117 — read Zones and Imports views
 # Open .sourcevision/CONTEXT.md — read the summary
 ndx plan --accept .       # 3–5 minutes — PRD from findings
 ndx status .              # see the backlog
