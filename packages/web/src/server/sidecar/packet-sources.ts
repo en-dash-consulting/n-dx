@@ -283,6 +283,8 @@ export interface HubSnapshotRead {
   changed: string[];
   /** Items left out to fit the cap. */
   omitted: number;
+  /** Persists the fingerprints this snapshot was built with; call it once the model has received the text. */
+  commit: () => void;
 }
 
 /** Most characters of gate text a {@link TaskRunRead} carries, kept from the end. */

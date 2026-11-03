@@ -868,7 +868,7 @@ describe("lens registry", () => {
   });
 
   describe("hub", () => {
-    const SNAPSHOT = { text: "Projects: 1 registered, 1 reachable.\n## app (app) · healthy", generatedAt: NOW, changed: [], omitted: 0 };
+    const SNAPSHOT = { text: "Projects: 1 registered, 1 reachable.\n## app (app) · healthy", generatedAt: NOW, changed: [], omitted: 0, commit: () => {} };
 
     it("is the hub snapshot under the hub instructions, read fresh on each build", async () => {
       const hubSnapshot = vi.fn(async () => SNAPSHOT);

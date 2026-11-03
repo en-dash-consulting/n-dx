@@ -609,14 +609,27 @@ export function hubSidecarBrokerEndpoint(ctx: ServerContext, sessionId: string):
  * on every turn.
  */
 export function hubSidecarContextOptions(ctx: ServerContext, dir: string, opts: HubSidecarRouteOptions = {}): SidecarContextOptions {
+  // The fingerprints of the snapshot each session's latest packet was built
+  // from, written only once a turn carrying it completes.
+  const pending = new Map<string, () => void>();
   return {
     ceiling: () => resolveContextCeiling(ctx.projectDir, "hub"),
     ledger: (record) => readLedger(dir, record.id),
     packetEveryTurn: true,
+    packetDelivered: (record) => {
+      pending.get(record.id)?.();
+      pending.delete(record.id);
+    },
     packet: async (record, signal) => {
+      pending.delete(record.id);
+      const read = hubSnapshotReader(dir, record.id, { homeDir: opts.homeDir, ...(opts.fetch && { fetch: opts.fetch }) });
       const sources: PacketSources = {
         ...createPacketSources(ctx, prepareReads(ctx)),
-        hubSnapshot: hubSnapshotReader(dir, record.id, { homeDir: opts.homeDir, ...(opts.fetch && { fetch: opts.fetch }) }),
+        hubSnapshot: async (s) => {
+          const got = await read(s);
+          if (typeof got !== "string") pending.set(record.id, got.commit);
+          return got;
+        },
       };
       const built = await buildLensPacket(record.lens ?? HUB_LENS, {}, sources, new Date().toISOString(), signal);
       return built.status === "ready" ? built.packet.text : undefined;

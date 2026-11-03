@@ -148,6 +148,12 @@ export interface SidecarContextOptions {
    * describes a machine that moves between turns.
    */
   packetEveryTurn?: boolean;
+  /**
+   * Called once a turn that carried a packet completes, so state the packet's
+   * build only proposed (the hub snapshot's fingerprints) is committed for
+   * what the model actually received. A failed or stopped turn never calls it.
+   */
+  packetDelivered?: (record: SidecarSessionRecord) => void;
 }
 
 /** What one finished turn spent, checkpoint included. */
@@ -462,6 +468,7 @@ export class SidecarSessionRegistry {
       // An opening turn that failed or was stopped may never have reached
       // the model: the next turn carries the packet again.
       if (opening && !delivered) record.packetDue = true;
+      if ((opening || cold) && delivered) context?.packetDelivered?.(record);
       live.sink = undefined;
       record.lastActivityAt = this.iso();
       this.persist();

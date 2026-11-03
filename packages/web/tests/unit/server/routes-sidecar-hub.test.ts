@@ -38,6 +38,8 @@ let servers: RouteTestServer[];
 let messages: SidecarFramesMessage[];
 /** The project's worktree list the fake hub answers with; a test edits it between turns. */
 let worktrees: unknown[];
+/** While set, the Claude stand-in answers every turn with an error, as a signed-out CLI does. */
+let failTurns = false;
 
 /** Claude stand-in that records each prompt. An operator turn containing BIG reports 50k tokens of context. */
 const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) => {
@@ -57,9 +59,9 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
     const input = prompt.includes("BIG") && !prompt.includes(CHECKPOINT_PROMPT) && !prompt.includes("context was refreshed") ? 50_000 : 100;
     out({ type: "system", subtype: "init", session_id: id });
     out({ type: "assistant", session_id: id, message: { id: `m-${spawns}`, content: [{ type: "text", text: "ok" }], usage: { input_tokens: input, output_tokens: 4 } } });
-    out({ type: "result", session_id: id, result: "ok" });
+    out({ type: "result", session_id: id, result: failTurns ? "not logged in" : "ok", ...(failTurns && { is_error: true }) });
     stdout.end();
-    Object.assign(child, { exitCode: 0 });
+    Object.assign(child, { exitCode: failTurns ? 1 : 0 });
     setImmediate(() => { child.emit("exit", 0, null); child.emit("close", 0, null); });
   });
   return child as unknown as ChildProcess;
@@ -138,6 +140,7 @@ beforeEach(() => {
   spawns = 0;
   messages = [];
   worktrees = [];
+  failTurns = false;
   servers = [];
   alive = new Set([1001, 2002]);
 });
@@ -238,6 +241,24 @@ describe("the hub lens packet", () => {
     expect(prompts[0]).not.toContain("feat/x");
     expect(prompts[1]).toMatch(/Δ.*feat\/x|feat\/x.*Δ/);
     expect(existsSync(join(hubSidecarDir(home), `${session.id}.snapshot.json`))).toBe(true);
+  });
+
+  it("keeps the last delivered fingerprints when a turn fails after its packet was built, so the next turn still marks Δ", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    await turn(host, session.id, "first");
+    const snapshotPath = join(hubSidecarDir(home), `${session.id}.snapshot.json`);
+    const delivered = readFileSync(snapshotPath, "utf-8");
+
+    worktrees = [{ path: "/r/app/wt", branch: "feat/x", isAnchor: false, dirtyFiles: 2, runs: { running: 1, latest: null } }];
+    failTurns = true;
+    await turn(host, session.id, "lost");
+    expect(readFileSync(snapshotPath, "utf-8")).toBe(delivered);
+
+    failTurns = false;
+    await turn(host, session.id, "again");
+    expect(prompts.at(-1)).toMatch(/Δ.*feat\/x|feat\/x.*Δ/);
+    expect(readFileSync(snapshotPath, "utf-8")).not.toBe(delivered);
   });
 });
 

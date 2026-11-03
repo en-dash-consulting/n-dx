@@ -65,7 +65,8 @@ export interface HubSnapshotReaderOptions extends FetchHubSnapshotOptions {
 /**
  * The hub session's snapshot read: fetched through the hub that
  * {@link resolveHubAccess} names, built against the session's last
- * fingerprints, which it then replaces. A string says why there is none.
+ * fingerprints. It replaces them only when the caller runs the read's
+ * `commit`, after the model has received the text. A string says why there is none.
  */
 export function hubSnapshotReader(
   dir: string,
@@ -78,8 +79,10 @@ export function hubSnapshotReader(
     try {
       const input = await fetchHubSnapshotInput(access, { ...opts, ...(signal && { signal }) });
       const snapshot = buildHubSnapshot(input, readSnapshotState(dir, sessionId));
-      writeRunFileAtomic(dir, `${sessionId}.snapshot`, snapshot.state as unknown as Record<string, unknown>);
-      return { text: snapshot.text, generatedAt: input.generatedAt, changed: snapshot.changed, omitted: snapshot.omitted };
+      const commit = (): void => {
+        writeRunFileAtomic(dir, `${sessionId}.snapshot`, snapshot.state as unknown as Record<string, unknown>);
+      };
+      return { text: snapshot.text, generatedAt: input.generatedAt, changed: snapshot.changed, omitted: snapshot.omitted, commit };
     } catch (err) {
       return `the hub snapshot could not be built: ${errorMessage(err)}`;
     }
