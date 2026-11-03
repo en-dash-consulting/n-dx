@@ -11,11 +11,12 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
 import { startHub, isPidAlive, registryPath } from "../../src/hub/index.js";
 import type { HubHandle } from "../../src/hub/index.js";
 
@@ -74,8 +75,8 @@ afterEach(async () => {
   for (const child of strays.splice(0)) if (child.exitCode === null) child.kill("SIGKILL");
 });
 
-afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+afterAll(async () => {
+  await removeTempDir(scratch);
 });
 
 describe("hub registry healing", () => {
