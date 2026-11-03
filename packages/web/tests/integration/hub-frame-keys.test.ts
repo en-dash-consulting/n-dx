@@ -30,6 +30,7 @@ const SIDECAR = [
   `  if (req.url === "/healthz") { res.writeHead(200); res.end("ok"); return; }`,
   `  const own = req.url.startsWith("/own-csp") ? { "Content-Security-Policy": "default-src 'self'", "Referrer-Policy": "unsafe-url" } : {};`,
   `  if (req.url.startsWith("/own-cors")) Object.assign(own, { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Credentials": "true", "Vary": "Accept-Encoding" });`,
+  `  if (req.url.startsWith("/vary-star")) own["Vary"] = "*";`,
   `  if (req.method === "OPTIONS") own["X-Reached-Sidecar"] = "yes";`,
   `  res.writeHead(200, { "Content-Type": "application/json", ...own });`,
   `  res.end(JSON.stringify({ path: req.url, name: process.env.NDX_EXTENSION_NAME, headers: req.headers }));`,
@@ -305,6 +306,12 @@ describe("a keyed request", () => {
     expect(own.headers.get("vary")).toBe("Accept-Encoding, Origin");
     expect(own.headers.get("access-control-allow-credentials")).toBeNull();
     await own.body?.cancel();
+
+    // A sidecar's `Vary: *` is kept, not narrowed to Origin.
+    const star = await fetch(`${base()}/x/recon/~f/${key}/vary-star`, { headers: { Origin: "null" } });
+    expect(star.headers.get("vary")).toBe("*");
+    expect(star.headers.get("access-control-allow-origin")).toBe("null");
+    await star.body?.cancel();
 
     // No Origin: nothing added.
     const none = await fetch(`${base()}/x/recon/~f/${key}/data`);

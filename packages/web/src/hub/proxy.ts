@@ -386,7 +386,9 @@ function withFrameHeaders(headers: IncomingHttpHeaders, opaqueOrigin: boolean): 
   // the sidecar's own allow-origin and credentials headers are replaced.
   const vary = headers.vary;
   out["access-control-allow-origin"] = "null";
-  out.vary = vary && vary !== "*" ? `${vary}, Origin` : "Origin";
+  // `Vary: *` already covers Origin, and narrowing it would let a cache reuse
+  // an answer the sidecar declared unreusable.
+  out.vary = vary === "*" ? "*" : vary ? `${vary}, Origin` : "Origin";
   delete out["access-control-allow-credentials"];
   return out;
 }
