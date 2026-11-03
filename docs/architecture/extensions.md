@@ -103,6 +103,7 @@ Any publisher can ship an extension; nothing in the contract is specific to one 
 | `commands[]` | Each `name` becomes `ndx <name>`; `bin` is a path inside the package, run with the same Node as n-dx |
 | `sidecar` | Optional web server the hub mounts at `/x/<name>/` |
 | `hub`, `projectLinks` | Optional entries on the hub home and on each project's dashboard; `{projectId}` and `{repoRoot}` are the only placeholders |
+| `sidecarTab` | Optional single `{ label, path }` tab in the Sidecar drawer, same path rules as `projectLinks`; needs `sidecar` |
 | `configSchema` | Optional JSON Schema for the extension's config section |
 
 **Where n-dx looks, highest precedence first**
