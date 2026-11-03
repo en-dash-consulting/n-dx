@@ -15,6 +15,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { VendorSessionOptions } from "@n-dx/llm-client";
@@ -66,6 +68,8 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
     // A cold prompt quotes the BIG exchange verbatim; only the operator's own BIG turn is big.
     const input = prompt.includes("BIG") && !prompt.includes(HUB_CHECKPOINT_PROMPT) && !prompt.includes("context was refreshed") ? 50_000 : 100;
     out({ type: "system", subtype: "init", session_id: id });
+    // A HANG turn never ends, so its broker stays open for the test to reach.
+    if (prompt.includes("HANG")) return;
     out({ type: "assistant", session_id: id, message: { id: `m-${spawns}`, content: [{ type: "text", text: "ok" }], usage: { input_tokens: input, output_tokens: 4 } } });
     out({ type: "result", session_id: id, result: failTurns ? "not logged in" : "ok", ...(failTurns && { is_error: true }) });
     stdout.end();
@@ -399,6 +403,21 @@ describe("the hub context ceiling", () => {
     await turn(host, session.id, "BIG question");
     expect(prompts).toHaveLength(1);
     expect((await (await hubApi(host, `/${session.id}`)).json()).session.refresh).toBeUndefined();
+  });
+});
+
+describe("the hub session's broker", () => {
+  it("serves only the hub's four tools on its own mcp route while a turn runs", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    expect((await hubApi(host, `/${session.id}/turns`, { method: "POST", body: { prompt: "HANG" } })).status).toBe(202);
+    await vi.waitFor(() => expect(prompts).toHaveLength(1));
+
+    const client = new Client({ name: "test-cli", version: "0" });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${host.baseUrl}/api/sidecar/hub/sessions/${session.id}/mcp`)));
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name).sort()).toEqual(["draft_github_post", "ledger_append", "run_command", "save_draft"]);
+    await client.close();
   });
 });
 

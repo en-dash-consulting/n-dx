@@ -49,7 +49,14 @@ items:
     lastModified: "2026-11-03T00:25:25.142Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7c678969-1cd3-46f4-a629-1b7e917dba5e":
-    lastModified: "2026-11-03T01:32:24.356Z"
+    status: "completed"
+    startedAt: "2026-11-03T01:34:39.117Z"
+    completedAt: "2026-11-03T01:37:39.192Z"
+    endedAt: "2026-11-03T01:37:39.192Z"
+    activeIntervals: [{"end":"2026-11-03T01:37:39.192Z","start":"2026-11-03T01:34:39.117Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "routes-sidecar-hub.test.ts: fake Claude honours a HANG prompt; new test lists tools over the hub mcp route and asserts exactly the four hub tools. Verified it fails with brokerScope removed."
+    lastModified: "2026-11-03T01:37:39.192Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c32dda8-0714-4aca-ae95-2bdbf601ebb1":
     status: "completed"
