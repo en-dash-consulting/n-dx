@@ -2,7 +2,7 @@
   "name": "ndx-fixture-extension",
   "version": "1.0.0",
   "private": true,
-  "description": "The extension tests/e2e/extension-fixture.test.js installs: one command, one sidecar and one project link.",
+  "description": "The extension tests/e2e/extension-fixture.test.js installs: one command, one sidecar, one project link and one drawer tab.",
   "type": "module",
   "main": "index.js",
   "ndx": {
@@ -17,6 +17,7 @@
       "sidecar": { "bin": "bin/serve.js", "health": "/healthz" },
       "hub": { "label": "Fixture app", "description": "The e2e suite's sidecar" },
       "projectLinks": [{ "label": "Fixture report", "path": "/project/{projectId}" }],
+      "sidecarTab": { "label": "Fixture tab", "path": "/tab?project={projectId}" },
       "configSchema": "schema/config.json"
     }
   }

@@ -441,6 +441,28 @@ describe("the fixture extension behind the hub", { timeout: 180_000 }, () => {
     expect(page.text).toContain('href="/x/fixture/"');
   });
 
+  it("serves its drawer tab through a frame key, and the key is no credential anywhere else", async () => {
+    if (!canBindPorts) return;
+    const tab = (await getJson(`/api/hub/extensions?project=${PROJECT_ID}`)).body.extensions.find((e) => e.name === "fixture").tab;
+    expect(tab).toEqual({ label: "Fixture tab", url: `/x/fixture/tab?project=${PROJECT_ID}` });
+
+    const issued = await hubRequest(port, `/api/hub/extensions/fixture/frame?project=${PROJECT_ID}`, { method: "POST", headers: auth() });
+    expect(issued.status, issued.text).toBe(200);
+    const { url } = JSON.parse(issued.text);
+    const key = /^\/x\/fixture\/~f\/([^/]+)\/tab\?project=fixture-app$/.exec(url)?.[1];
+    expect(key, url).toBeTruthy();
+
+    // No token: the key alone admits the page, which reports the base path it got.
+    const page = await get(url, {});
+    expect(page.status, page.text).toBe(200);
+    expect(page.text).toContain(`/x/fixture/~f/${key}/`);
+    expect(page.headers["content-security-policy"]).toMatch(/\bsandbox\b/);
+
+    const status = await get(`/p/${PROJECT_ID}/api/status`, { "X-Ndx-Token": key });
+    expect(status.status).toBe(401);
+    expect((await get(`/p/${PROJECT_ID}/x/fixture/~f/${key}/tab`, {})).status).toBe(401);
+  });
+
   it("restarts a crashed sidecar on the next request", async () => {
     if (!canBindPorts) return;
     const before = (await echo()).pid;

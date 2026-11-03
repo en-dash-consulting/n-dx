@@ -1,6 +1,7 @@
 // The sidecar the hub mounts at /x/fixture/. Listens on the loopback PORT the
 // hub picks. `/healthz` is the manifest's health path, `/die` answers and then
 // crashes, a WebSocket upgrade is answered with 101 and an echo, and anything
+// `/tab` is the drawer tab page (it shows X-Ndx-Base-Path), anything
 // else echoes the request and the process as JSON.
 import { createServer } from "node:http";
 import { recordLoad } from "../loaded.js";
@@ -25,6 +26,13 @@ const server = createServer((req, res) => {
   if (req.url === "/die") {
     res.writeHead(200);
     res.end("bye", () => process.exit(1));
+    return;
+  }
+  if (req.url.split("?")[0] === "/tab") {
+    // The drawer tab page: shows the base path the hub gave it.
+    const base = String(req.headers["x-ndx-base-path"] ?? "");
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(`<!doctype html><title>Fixture tab</title><p id="base-path">${base.replace(/[<&]/g, "")}</p>`);
     return;
   }
   res.writeHead(200, { "Content-Type": "application/json" });
