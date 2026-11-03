@@ -44,6 +44,36 @@ export function isGitTracked(relPath, cwd) {
 }
 
 /**
+ * Does git ignore `relPath` in `cwd`?
+ *
+ * Three answers, because two of them call for different handling: a path that
+ * is "ignored" or "not-ignored" is a statement about a repository, while
+ * "unknown" means there is no repository (or no git) to ask — a caller writing
+ * a secret should then write normally rather than warn about a `.gitignore`
+ * that cannot exist. `check-ignore` exits 0 / 1 / 128 for the three.
+ *
+ * @param {string} relPath  Path relative to `cwd`; it need not exist yet.
+ * @param {string} cwd
+ * @returns {"ignored" | "not-ignored" | "unknown"}
+ */
+export function gitIgnoreStatus(relPath, cwd) {
+  try {
+    const result = spawnSync("git", ["check-ignore", "-q", "--", relPath], {
+      windowsHide: true,
+      cwd,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: "pipe",
+    });
+    if (result.status === 0) return "ignored";
+    if (result.status === 1) return "not-ignored";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
  * Append `entry` to `<dir>/.gitignore` unless an identical line is already
  * present. Creates the file when missing. Sync I/O, matching cli.js.
  *

@@ -296,6 +296,26 @@ describe("ProposalEditor", () => {
     });
   });
 
+  describe("status pass-through", () => {
+    it("posts a baseline task's completed status so accept does not reopen it", async () => {
+      const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const proposal = makeProposal("E", [{ tasks: [{ title: "Already built" }, { title: "New work" }] }]);
+      Object.assign(proposal.features[0].tasks[0], { status: "completed" });
+      renderEditor([proposal]);
+
+      await act(async () => {
+        root.querySelector<HTMLButtonElement>(".proposal-editor-btn-accept")!.click();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const tasks = JSON.parse(fetchSpy.mock.calls[0][1].body).proposals[0].features[0].tasks;
+      expect(tasks[0].status).toBe("completed");
+      expect(tasks[1].status).toBeUndefined();
+    });
+  });
+
   // ─── Expand/collapse ──────────────────────────────────────────────
 
   describe("expand/collapse", () => {

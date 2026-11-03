@@ -50,6 +50,7 @@ import { mkdir, open } from "node:fs/promises";
 import type { WriteStream } from "node:fs";
 
 import { RUNS_DIRNAME } from "./paths.js";
+import { redactSecrets } from "../prd/llm-gateway.js";
 
 // ---------------------------------------------------------------------------
 // Vocabulary
@@ -164,13 +165,15 @@ function oneLine(text: string): string {
  *         the run.
  */
 export async function openRunEvents(henchDir: string, runId: string): Promise<RunEventWriter> {
-  await mkdir(join(henchDir, RUNS_DIRNAME), { recursive: true });
+  // Owner-only, like the run record beside it: an event's detail is tool
+  // output, and other accounts on the machine have no business reading it.
+  await mkdir(join(henchDir, RUNS_DIRNAME), { recursive: true, mode: 0o700 });
 
   const path = runEventsPath(henchDir, runId);
   // open() first, so an unwritable path rejects here — where the caller can
   // still decide what to do — rather than as an async 'error' event later.
   // Closing the stream closes the handle.
-  const handle = await open(path, "w");
+  const handle = await open(path, "w", 0o600);
   const stream: WriteStream = handle.createWriteStream({ encoding: "utf-8" });
 
   let failure: Error | null = null;
@@ -189,10 +192,13 @@ export async function openRunEvents(henchDir: string, runId: string): Promise<Ru
     if (closed || failure) return;
     let line: string;
     try {
+      // Scrubbed before flattening: the redactor's assignment rule runs to
+      // the end of a line, and a private-key block needs its line breaks to
+      // be recognised. Same pass as the run record, so the two agree.
       line = JSON.stringify({
         ...event,
-        summary: oneLine(event.summary),
-        ...(event.detail !== undefined ? { detail: oneLine(event.detail) } : {}),
+        summary: oneLine(redactSecrets(event.summary)),
+        ...(event.detail !== undefined ? { detail: oneLine(redactSecrets(event.detail)) } : {}),
       });
     } catch {
       // A value that will not serialize is a caller bug, but losing the run to

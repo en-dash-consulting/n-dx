@@ -23,6 +23,7 @@ import { ElapsedTime } from "./elapsed-time.js";
 import { PeekLink } from "./live-tab.js";
 import { livenessBadge, useLive, type LiveRunSummary } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
+import { openWebSocket } from "../session.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -334,7 +335,7 @@ export function ActiveTasksPanel({ runs, navigateTo }: ActiveTasksPanelProps) {
     function connect() {
       if (!mounted) return;
       try {
-        const ws = new WebSocket(wsUrl);
+        const ws = openWebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onmessage = handleMessage;

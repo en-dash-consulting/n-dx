@@ -18,7 +18,7 @@ import { mkdtemp, rm, readFile, readdir, writeFile, mkdir, symlink, realpath } f
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { writePRD } from "../helpers/rex-dir-test-support.js";
 import { PRD_TREE_DIRNAME } from "../../src/store/index.js";
@@ -212,6 +212,45 @@ describe("rex migrate-plan", () => {
       const output = run(["migrate-plan", "--rules-only", `--cut-at=${newCut}`, `--out=${outPath}`, dir]);
 
       expect((await plan()).header.cutAt).toBe(newCut);
+      expect(output).not.toContain("cut time was reset");
+    });
+  });
+
+  describe("commit evidence", () => {
+    const UNRELATED = "77777777-7777-4777-8777-777777777777";
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: dir, encoding: "utf-8" }).trim();
+
+    /** One commit touching `file`, carrying `id` as its N-DX-Item trailer. */
+    async function commitFor(id: string, file: string): Promise<void> {
+      if (!existsSync(join(dir, ".git"))) git("init", "--initial-branch=main");
+      await writeFile(join(dir, file), `// ${id}\n`);
+      git("add", file);
+      git("commit", "-m", `Work\n\nN-DX-Item: ${id}`);
+    }
+
+    it("is reported apart from the analysis, which keeps its run-ndx-analyze hint", async () => {
+      await commitFor(CHANGE_TASK, "priority.ts");
+
+      const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, dir]);
+
+      expect(output).toContain("has no analysis to read");
+      expect(output).toContain("Commit evidence for 1 item(s)");
+      expect(output).not.toMatch(/Code evidence for \d+ item\(s\) from/);
+      const plan = JSON.parse(await readFile(outPath, "utf-8"));
+      expect(plan.summary.codeEvidence).toBeUndefined();
+      expect(plan.summary.commitEvidence).toEqual({ items: 1 });
+    });
+
+    it("ignores a trailer for an item outside the tree, so the cut time is kept", async () => {
+      const OLD_CUT = "2020-01-01T00:00:00.000Z";
+      await commitFor(CHANGE_TASK, "priority.ts");
+      run(["migrate-plan", "--rules-only", `--cut-at=${OLD_CUT}`, `--out=${outPath}`, dir]);
+      await commitFor(UNRELATED, "elsewhere.ts");
+
+      const output = run(["migrate-plan", "--rules-only", `--out=${outPath}`, dir]);
+
+      expect(JSON.parse(await readFile(outPath, "utf-8")).header.cutAt).toBe(OLD_CUT);
       expect(output).not.toContain("cut time was reset");
     });
   });

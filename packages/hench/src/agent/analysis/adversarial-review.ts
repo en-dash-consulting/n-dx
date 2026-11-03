@@ -47,6 +47,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { redactDeep } from "../../prd/llm-gateway.js";
 import type { ReviewModelSource, RunReviewRecord } from "../../schema/index.js";
 
 // ── Report shape ─────────────────────────────────────────────────────────
@@ -886,7 +887,9 @@ export async function carryForwardFindings(previousPath: string, currentPath: st
     if (carried.length === 0) return true;
 
     current.findings.push(...carried);
-    await writeFile(currentPath, `${JSON.stringify(current, null, 2)}\n`, "utf-8");
+    // A finding quotes the diff it is about, and a diff can carry a credential;
+    // what reaches disk gets the same scrub as the run record.
+    await writeFile(currentPath, `${JSON.stringify(redactDeep(current), null, 2)}\n`, { encoding: "utf-8", mode: 0o600 });
     return true;
   } catch {
     return false;
@@ -1047,7 +1050,8 @@ export function mergeDispositionsIntoRaw(
     if (disposition) entry.disposition = disposition;
   }
 
-  return `${JSON.stringify(data, null, 2)}\n`;
+  // The text goes back to `.hench/reviews/`; see carryForwardFindings.
+  return `${JSON.stringify(redactDeep(data), null, 2)}\n`;
 }
 
 /**

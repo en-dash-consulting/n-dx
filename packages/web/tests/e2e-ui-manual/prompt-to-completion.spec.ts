@@ -16,10 +16,11 @@ import {
   startRealDashboard,
   commitAll,
   headSha,
+  workCommitsSince,
   KEEP_FIXTURE,
   type RealVendorProject,
 } from "./helpers/real-vendor-project.js";
-import { readPrdItems, prdItem, openLiveTask, waitForLiveTaskCompleted, attachRunArtifacts } from "./helpers/run-watch.js";
+import { readPrdItems, prdItem, openLiveTask, snapshotRunIds, waitForLiveTaskCompleted, attachRunArtifacts } from "./helpers/run-watch.js";
 import { caption } from "./helpers/caption.js";
 import { hasCli, probeCredentials } from "./helpers/preconditions.js";
 
@@ -39,11 +40,15 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async ({}, testInfo) => {
-  if (!dashboard) return;
-  try {
-    await stopManualDashboard(dashboard);
-  } finally {
-    await attachRunArtifacts(testInfo, project.dir);
+  // beforeAll can create the project and then fail to start its dashboard;
+  // the fixture directory must still be removed.
+  if (!project) return;
+  if (dashboard) {
+    try {
+      await stopManualDashboard(dashboard);
+    } finally {
+      await attachRunArtifacts(testInfo, project.dir);
+    }
   }
   if (KEEP_FIXTURE) {
     console.log(`[e2e-manual] fixture kept at ${project.dir}`);
@@ -55,7 +60,6 @@ test.afterAll(async ({}, testInfo) => {
 test("a typed prompt becomes a task the agent completes", async ({ page }, testInfo) => {
   const tracker = trackConsoleErrors(page);
   const before = new Set(readPrdItems(project.dir).map((i) => i.id));
-  const baseSha = headSha(project.dir);
 
   await page.goto(`${dashboard.baseUrl}/prd`, { waitUntil: "domcontentloaded" });
   await expect(page.locator(".prd-tree-container").getByText("E2E Manual Epic")).toBeVisible({ timeout: 10_000 });
@@ -93,18 +97,20 @@ test("a typed prompt becomes a task the agent completes", async ({ page }, testI
   await page.goto(`${dashboard.baseUrl}/live`, { waitUntil: "domcontentloaded" });
   await caption(page, "4/5 Start the task with the agent");
   await expect(page.locator(".live-idle .live-card-title")).toHaveText(task.title, { timeout: 15_000 });
+  const knownRunIds = await snapshotRunIds(dashboard.baseUrl);
   await page.getByRole("button", { name: /More ways to run/ }).click();
+  const baseSha = headSha(project.dir);
   await page.getByRole("menuitem", { name: /^Start now/ }).click();
 
   // The proposal may hold several tasks; hench starts the highest-priority one.
-  const startedTaskId = await openLiveTask(page, task.id);
+  const startedTaskId = await openLiveTask(page, task.id, knownRunIds);
   expect(created.map((i) => i.id), "the started task should be one the prompt created").toContain(startedTaskId);
   await caption(page, "5/5 Watching the run until it completes");
   await waitForLiveTaskCompleted(page);
 
   // The PRD, the run list and git all agree.
   expect(prdItem(project.dir, startedTaskId).status).toBe("completed");
-  expect(headSha(project.dir)).not.toBe(baseSha);
+  expect(workCommitsSince(project.dir, baseSha), "the agent should commit work outside the n-dx tool directories").not.toEqual([]);
   await page.goto(`${dashboard.baseUrl}/hench-runs`, { waitUntil: "domcontentloaded" });
   await caption(page, "Done — the run is listed as completed");
   await expect(page.locator(".status-badge--completed").first()).toBeVisible({ timeout: 15_000 });

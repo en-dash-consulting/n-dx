@@ -36,6 +36,7 @@ import {
 } from "../../../prd/llm-gateway.js";
 import type { PermissionMode } from "../../../schema/index.js";
 import { AGENT_REX_MCP_TOOLS } from "../../../process/agent-mcp-config.js";
+import { effectiveGitSubcommands } from "../git-subcommands.js";
 
 export { WINDOWS_STDIN_PROMPT_SEPARATOR } from "../../../prd/llm-gateway.js";
 
@@ -53,14 +54,15 @@ const CLI_FILE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep"];
  * tool pattern format (e.g. `["Bash(npm:*)", "Bash(git:*)"]`), and includes
  * file tools that are inherently scoped to `cwd` by Claude CLI.
  *
- * When `allowedGitSubcommands` is provided and non-empty, `git` is granted at
- * subcommand granularity (`Bash(git commit:*)`, `Bash(git status:*)`, …) rather
- * than the blanket `Bash(git:*)`. This mirrors the API-provider guard's
- * `checkGitSubcommand` allowlist, so destructive subcommands not on the list
- * (`reset`, `clean`, `revert`, `push`) are not auto-approved in CLI mode — they
- * fall through to a permission prompt (denied under a non-interactive
- * `acceptEdits` spawn). When the list is omitted/empty, `git` keeps its legacy
- * blanket grant for backward compatibility.
+ * `git` is always granted at subcommand granularity (`Bash(git commit:*)`,
+ * `Bash(git status:*)`, …), never as the blanket `Bash(git:*)`. This mirrors
+ * the API-provider guard's `checkGitSubcommand` allowlist, so destructive
+ * subcommands not on the list (`reset`, `clean`, `revert`, `push`) are not
+ * auto-approved in CLI mode — they fall through to a permission prompt
+ * (denied under a non-interactive `acceptEdits` spawn). An omitted or empty
+ * `allowedGitSubcommands` means the language baseline
+ * ({@link effectiveGitSubcommands}): a guard that names no subcommands gets
+ * the defaults, not every subcommand there is.
  *
  * The list also carries {@link AGENT_REX_MCP_TOOLS} — the rex MCP tools hench's
  * own prompts direct the agent to call, on the rex server hench itself attaches.
@@ -76,10 +78,10 @@ export function buildAllowedTools(
   allowedCommands: ReadonlyArray<string>,
   allowedGitSubcommands?: ReadonlyArray<string>,
 ): string[] {
-  const scopeGit = !!allowedGitSubcommands && allowedGitSubcommands.length > 0;
+  const gitSubcommands = effectiveGitSubcommands(allowedGitSubcommands);
   const bashTools = allowedCommands.flatMap((cmd) =>
-    cmd === "git" && scopeGit
-      ? allowedGitSubcommands!.map((sub) => `Bash(git ${sub}:*)`)
+    cmd === "git"
+      ? gitSubcommands.map((sub) => `Bash(git ${sub}:*)`)
       : [`Bash(${cmd}:*)`],
   );
   return [...bashTools, ...CLI_FILE_TOOLS, ...AGENT_REX_MCP_TOOLS];
@@ -151,6 +153,12 @@ export interface ClaudeCliInput {
    * @see packages/hench/src/process/agent-mcp-config.ts — builds the file
    */
   mcpConfigPath?: string;
+  /**
+   * Turn cap for the session (`--max-turns <n>`). Omitted when undefined, 0 or
+   * not a positive integer, so the CLI's own (unbounded) default applies only
+   * when the run asked for no cap.
+   */
+  maxTurns?: number;
 }
 
 /**
@@ -182,6 +190,7 @@ export function buildClaudeCliArgs(
         effort: input.effort,
         permissionMode: input.permissionMode,
         mcpConfigPath: input.mcpConfigPath,
+        maxTurns: input.maxTurns,
       },
     },
     platform,
@@ -234,6 +243,7 @@ export const claudeCliAdapter: VendorAdapter = {
   vendor: LLM_VENDOR.CLAUDE,
   parseMode: "stream-json",
   resumesUnfinishedSessions: true,
+  enforcesTurnCap: true,
 
   buildSpawnConfig(
     envelope: PromptEnvelope,
@@ -254,6 +264,7 @@ export const claudeCliAdapter: VendorAdapter = {
       resumeSessionId: opts.resumeSessionId,
       forkSession: opts.forkSession,
       mcpConfigPath: opts.mcpConfigPath,
+      maxTurns: opts.maxTurns,
     });
 
     return {

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseGoMod, parseGoVendorModules, readGoBuildModels, readGoWorkFiles } from "../../src/go-build.js";
+import { parseGoMod, parseGoVendorModules, readGoBuildModels, readGoBuildModelsResult, readGoWorkFiles, readGoWorkFilesResult } from "../../src/go-build.js";
 
 const FIXTURES = fileURLToPath(new URL("../fixtures/go-build", import.meta.url));
 const ver = (value: string) => ({ resolved: true, value });
@@ -15,6 +15,22 @@ afterEach(async () => {
 });
 
 describe("go.mod build model", () => {
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)("retains walk notices when no go.mod or go.work was discoverable", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "go-build-empty-"));
+    cleanups.push(dir);
+    await mkdir(join(dir, "locked"));
+    await writeFile(join(dir, "locked/go.mod"), "module example.com/locked\n");
+    await writeFile(join(dir, "locked/go.work"), "go 1.23\n");
+    await chmod(join(dir, "locked"), 0o000);
+    try {
+      const models = await readGoBuildModelsResult(dir);
+      const work = await readGoWorkFilesResult(dir);
+      expect(models.models).toEqual([]);
+      expect(work.files).toEqual([]);
+      expect(models.notices).toEqual(["locked is unreadable (EACCES); skipped"]);
+      expect(work.notices).toEqual(models.notices);
+    } finally { await chmod(join(dir, "locked"), 0o755); }
+  });
   it("reads the module, directives and direct and indirect requires, sorted", async () => {
     const [m] = await readGoBuildModels(join(FIXTURES, "modfile"));
     expect(m).toMatchObject({ module: "github.com/example/app/v2", dir: "", buildSystem: "go", group: ver("github.com/example/app"), notices: [] });

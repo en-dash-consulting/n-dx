@@ -26,6 +26,7 @@ import type { PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
 import { systemClock, type Clock } from "./clock.js";
+import { runBlockRefusalInsideAgentRun } from "../run-block-guard.js";
 
 const ADD_TYPES = ["change", "task", "subtask"] as const satisfies readonly ChangeNodeType[];
 
@@ -60,6 +61,8 @@ export async function handleAddItem(
   clock: Clock = systemClock,
 ): Promise<McpResult> {
   try {
+    const refusal = runBlockRefusalInsideAgentRun(args.run);
+    if (refusal) return textResult(refusal, true);
     const runCheck = validateRunSettings(args.run);
     if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
     if ((await prdLayout(rexDir)) === "v2") return await addV2(store, rexDir, args, runCheck.value, clock);

@@ -144,6 +144,16 @@ export interface VendorSpawnOptions {
    * @see packages/hench/src/process/agent-mcp-config.ts — builds the file
    */
   readonly mcpConfigPath?: string;
+  /**
+   * Turn cap for the session (`hench.maxTurns`, as the run resolved it).
+   *
+   * Honoured natively only by an adapter whose {@link VendorAdapter.enforcesTurnCap}
+   * is true (the Claude CLI's `--max-turns`). For any other adapter the spawn
+   * counts agent steps from the event stream and terminates the process tree
+   * when the cap is passed — see `spawnWithAdapter`'s `maxTurns`. Undefined or
+   * 0 means no cap.
+   */
+  readonly maxTurns?: number;
 }
 
 // ── VendorAdapter ────────────────────────────────────────────────────────
@@ -189,6 +199,15 @@ export interface VendorAdapter {
    * rule. Absent means false.
    */
   readonly resumesUnfinishedSessions?: boolean;
+
+  /**
+   * Whether the vendor CLI stops itself at {@link VendorSpawnOptions.maxTurns}
+   * (the Claude CLI's `--max-turns`). When false or absent, the spawn enforces
+   * the cap itself by counting agent steps — assistant messages and tool
+   * calls — from the event stream and terminating the process tree. Codex
+   * has no turn flag on `codex exec`, so it takes that path.
+   */
+  readonly enforcesTurnCap?: boolean;
 
   /**
    * Output parse mode identifier.

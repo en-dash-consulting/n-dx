@@ -38,7 +38,7 @@ describe("hench init", () => {
     expect(config.schema).toBe("hench/v1");
     expect(config.model).toBe("sonnet");
     expect(config.provider).toBe("cli");
-    expect(config.maxTurns).toBe(50);
+    expect(config.maxTurns).toBe(200);
     expect(config.guard.blockedPaths).toContain(".hench/**");
   });
 

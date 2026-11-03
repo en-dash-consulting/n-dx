@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, symlink, rename } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -470,6 +470,20 @@ describe("n-dx ci", () => {
         );
         gitTrack(dir, ".n-dx.json");
       },
+      "case-variant tracked local file": async (dir) => {
+        await writeFile(join(dir, ".N-DX.local.json"), "{}\n");
+        gitTrack(dir, ".N-DX.local.json");
+      },
+      ...(process.platform === "win32" ? {} : { "symlinked tracked local file": async (dir) => {
+        await mkdir(join(dir, "cfg"));
+        await rename(join(dir, ".rex"), join(dir, "cfg", "rex"));
+        await rename(join(dir, ".sourcevision"), join(dir, "cfg", "sourcevision"));
+        await writeFile(join(dir, "cfg", "config.json"), "{}\n");
+        await writeFile(join(dir, "cfg", "config.local.json"), "{}\n");
+        await symlink("cfg", join(dir, ".ndx"));
+        gitTrack(dir, ".ndx");
+        execFileSync("git", ["add", "cfg/config.local.json"], { cwd: dir });
+      } }),
       "tracked local file": async (dir) => {
         await writeFile(join(dir, ".n-dx.local.json"), JSON.stringify({}) + "\n");
         gitTrack(dir, ".n-dx.local.json");
@@ -527,6 +541,27 @@ describe("n-dx ci", () => {
       for (const { dir } of results.values()) await removeTmpDir(dir);
     });
 
+    it("fails for a tracked case variant on a case-insensitive filesystem and names git's actual path", () => {
+      const { dir, step } = results.get("case-variant tracked local file");
+      // The fixture wrote only `.N-DX.local.json`. Where the filesystem is
+      // case-sensitive (Linux) the name n-dx opens does not exist, so n-dx
+      // never reads the variant and "untracked" is the right answer; the
+      // refusal can only be asserted where the lowercase name resolves to it.
+      if (!existsSync(join(dir, ".n-dx.local.json"))) {
+        expect(step.ok).toBe(true);
+        return;
+      }
+      expect(step.ok).toBe(false);
+      expect(step.detail).toContain(".N-DX.local.json");
+      expect(step.detail).toContain("git rm --cached");
+    });
+    it.skipIf(process.platform === "win32")("fails for a symlinked local config and names the symlink and target", () => {
+      const { step } = results.get("symlinked tracked local file");
+      expect(step.ok).toBe(false);
+      expect(step.detail).toContain("'.ndx'");
+      expect(step.detail).toContain("'cfg/config.local.json'");
+    });
+
     it("passes when .n-dx.json holds no api_key", () => {
       const { code, step } = results.get("clean shared file");
       expect(code).toBe(0);
@@ -553,7 +588,7 @@ describe("n-dx ci", () => {
       // Names the file, says it must stay ignored, and gives both remedies.
       expect(step.detail).toContain(".n-dx.local.json");
       expect(step.detail).toContain(".gitignore");
-      expect(step.detail).toContain("git rm --cached .n-dx.local.json");
+      expect(step.detail).toContain("git rm --cached -- '.n-dx.local.json'");
       expect(step.detail).toContain("rotate");
     });
 

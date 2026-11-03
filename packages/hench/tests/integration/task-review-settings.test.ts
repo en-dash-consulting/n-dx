@@ -104,11 +104,38 @@ describe("a task's saved reviewMode", () => {
     expect(r.warnings).toEqual([]);
   });
 
-  it("outranks the project's mode and the task's own boolean review", () => {
-    expect(resolveFor({ config: withReview({ mode: "self" }), item: task({ reviewMode: "off" }) }).reviewMode)
-      .toEqual({ value: "off", source: "task.run" });
+  it("outranks the project's mode and the task's own boolean review when it reviews harder", () => {
+    expect(resolveFor({ config: withReview({ mode: "self" }), item: task({ reviewMode: "pair" }) }).reviewMode)
+      .toEqual({ value: "pair", source: "task.run" });
     expect(resolveFor({ item: task({ review: false, reviewMode: "self" }) }).reviewMode)
       .toEqual({ value: "self", source: "task.run" });
+  });
+
+  it("never lowers the project's mode: a weaker saved mode is ignored with a warning", () => {
+    const off = resolveFor({ config: withReview({ mode: "self" }), item: task({ reviewMode: "off" }) });
+    expect(off.reviewMode).toEqual({ value: "self", source: "hench.review.mode" });
+    expect(off.review).toEqual({ value: true, source: "hench.review.mode" });
+    expect(codes(off)).toEqual(["saved-setting-widens"]);
+    expect(off.warnings[0].message).toContain("reviewMode");
+
+    const self = resolveFor({ config: withReview({ mode: "pair" }), item: task({ reviewMode: "self" }) });
+    expect(self.reviewMode).toEqual({ value: "pair", source: "hench.review.mode" });
+    expect(codes(self)).toEqual(["saved-setting-widens"]);
+  });
+
+  it("relaxes with reviewOptional only a review the task itself added", () => {
+    const own = resolveFor({ item: task({ reviewMode: "self", reviewOptional: true }) });
+    expect(own.reviewOptional).toEqual({ value: true, source: "task.run" });
+    expect(codes(own)).toEqual([]);
+
+    const operators = resolveFor({ config: withReview({ mode: "self" }), item: task({ reviewOptional: true }) });
+    expect(operators.reviewOptional).toEqual({ value: false, source: "built-in" });
+    expect(codes(operators)).toEqual(["saved-setting-widens"]);
+    expect(operators.warnings[0].message).toContain("reviewOptional");
+
+    // The operator's flag stands either way.
+    expect(resolveFor({ config: withReview({ mode: "self" }), flags: { "review-optional": "true", review: "true" } }).reviewOptional)
+      .toEqual({ value: true, source: "cli-flag" });
   });
 
   it("is overruled by every review flag", () => {

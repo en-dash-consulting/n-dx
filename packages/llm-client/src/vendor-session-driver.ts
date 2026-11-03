@@ -86,6 +86,11 @@ export interface ClaudeTurnFlags {
   readonly permissionMode?: string;
   /** `--mcp-config <file> --strict-mcp-config`. */
   readonly mcpConfigPath?: string;
+  /**
+   * `--max-turns <n>`. Omitted when undefined, 0 or not a positive integer, so
+   * the CLI's own (unbounded) default applies only when no cap was asked for.
+   */
+  readonly maxTurns?: number;
 }
 
 /** Codex-only flags. Other drivers ignore them. */
@@ -197,6 +202,9 @@ function claudeTurnSpawn(
     ...(input.model ? ["--model", input.model] : []),
     ...(flags.effort ? ["--effort", flags.effort] : []),
     ...(flags.permissionMode ? ["--permission-mode", flags.permissionMode] : []),
+    ...(flags.maxTurns !== undefined && Number.isInteger(flags.maxTurns) && flags.maxTurns > 0
+      ? ["--max-turns", String(flags.maxTurns)]
+      : []),
     // A file path, never inline JSON: an inline document would have to survive
     // cmd.exe quoting on Windows. --strict-mcp-config makes the file the
     // session's only source of MCP servers.
@@ -213,14 +221,15 @@ function claudeTurnSpawn(
 /** Tool_use blocks embedded in a Claude assistant event. */
 function extractClaudeToolUseBlocks(
   event: Record<string, unknown>,
-): Array<{ name: string; input: Record<string, unknown> }> {
-  const results: Array<{ name: string; input: Record<string, unknown> }> = [];
+): Array<{ name: string; input: Record<string, unknown>; id?: string }> {
+  const results: Array<{ name: string; input: Record<string, unknown>; id?: string }> = [];
   const collect = (blocks: Array<Record<string, unknown>>): void => {
     for (const block of blocks) {
       if (block.type === "tool_use") {
         results.push({
           name: (block.name as string) || "unknown",
           input: (block.input as Record<string, unknown>) || {},
+          ...(typeof block.id === "string" && block.id ? { id: block.id } : {}),
         });
       }
     }
@@ -234,6 +243,41 @@ function extractClaudeToolUseBlocks(
   const content = event.content;
   if (Array.isArray(content) && !event.message) {
     collect(content as Array<Record<string, unknown>>);
+  }
+  return results;
+}
+
+/** Flatten a `tool_result` block's `content` (a string or an array of text blocks) to text. */
+function claudeToolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part) =>
+      part && typeof part === "object" && (part as Record<string, unknown>).type === "text" &&
+      typeof (part as Record<string, unknown>).text === "string"
+        ? ((part as Record<string, unknown>).text as string)
+        : "",
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** `tool_result` blocks in a Claude stream-json `user` message. */
+function extractClaudeToolResultBlocks(
+  event: Record<string, unknown>,
+): Array<{ toolUseId?: string; output: string; isError: boolean }> {
+  const message = event.message;
+  if (!message || typeof message !== "object") return [];
+  const blocks = (message as Record<string, unknown>).content;
+  if (!Array.isArray(blocks)) return [];
+  const results: Array<{ toolUseId?: string; output: string; isError: boolean }> = [];
+  for (const block of blocks as Array<Record<string, unknown>>) {
+    if (!block || block.type !== "tool_result") continue;
+    results.push({
+      ...(typeof block.tool_use_id === "string" && block.tool_use_id ? { toolUseId: block.tool_use_id } : {}),
+      output: claudeToolResultText(block.content),
+      isError: block.is_error === true,
+    });
   }
   return results;
 }
@@ -298,7 +342,11 @@ export function parseClaudeStreamLine(
           turn,
           timestamp,
           text,
-          toolCall: { tool: firstTool.name, input: firstTool.input },
+          toolCall: {
+            tool: firstTool.name,
+            input: firstTool.input,
+            ...(firstTool.id ? { id: firstTool.id } : {}),
+          },
         };
       }
 
@@ -331,6 +379,30 @@ export function parseClaudeStreamLine(
           tool: "unknown", // Claude's stream carries no tool name on results
           output: output.slice(0, MAX_TOOL_OUTPUT_LENGTH),
           durationMs: 0,
+        },
+      };
+    }
+
+    // Tool results arrive as the `user` side of the conversation: a message
+    // whose content holds `tool_result` blocks, each naming the `tool_use` it
+    // answers. Only the first block is mapped, as only the first `tool_use` of
+    // an assistant line is; the CLI writes one block per line in practice.
+    case "user": {
+      const block = extractClaudeToolResultBlocks(event)[0];
+      if (!block) return null;
+      return {
+        type: "tool_result" as RuntimeEventType,
+        vendor,
+        turn,
+        timestamp,
+        toolResult: {
+          // Empty rather than a guess: the block names the call by id only,
+          // and an empty name is what the accumulator's sequential pairing
+          // accepts when no id matches.
+          tool: "",
+          output: (block.isError ? "[error] " : "") + block.output.slice(0, MAX_TOOL_OUTPUT_LENGTH),
+          durationMs: 0,
+          ...(block.toolUseId ? { id: block.toolUseId } : {}),
         },
       };
     }

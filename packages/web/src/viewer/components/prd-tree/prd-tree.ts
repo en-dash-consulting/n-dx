@@ -28,6 +28,7 @@ import { computeBranchStats, completionRatio, formatTimestamp } from "./compute.
 import { canAddChildType, isWorkItemType, itemTypeLabel, itemTypeOf } from "../../external.js";
 import { defaultStatusFilter } from "../../views/status-filter.js";
 import { InlineAddForm } from "./inline-add-form.js";
+import { parentTypeIn } from "./tree-utils.js";
 import type { InlineAddInput } from "./inline-add-form.js";
 import { InlineStatusPicker } from "./inline-status-picker.js";
 import { resolveTaskUtilization } from "./task-utilization.js";
@@ -1212,6 +1213,7 @@ export function PRDTree({ document: doc, claimsById, taskUsageById, rollupById, 
             ? h(InlineAddForm, {
                 parentType: itemTypeOf(item),
                 parentId: item.id,
+                grandparentType: parentTypeIn(doc.items, item.id),
                 depth,
                 onSubmit: handleInlineAddSubmit,
                 onCancel: handleInlineAddCancel,

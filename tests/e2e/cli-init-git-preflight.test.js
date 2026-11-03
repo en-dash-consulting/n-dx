@@ -16,6 +16,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, rm, writeFile, chmod, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 
 const isWin = process.platform === "win32";
@@ -79,6 +80,25 @@ describe("ndx init: git preflight", { timeout: TEST_TIMEOUT }, () => {
     // Windows may not have released the exited child's handles on the dirs yet (EBUSY).
     await rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     await rm(binDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it("Claude discovery explains an unanswered git check without running the local binary", async () => {
+    execFileSync("git", ["init", "-q"], { cwd: tmpDir });
+    const skipped = await writeFakeBinary(join(binDir, "private-claude"), { stdout: "SHOULD_NOT_RUN" });
+    await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify({ cli: { claudePath: skipped } }));
+    await writeFakeBinary(join(binDir, "git"), { stdout: "fatal: detected dubious ownership", exitCode: 128 });
+    // Only git is broken: on Windows the classifier reaches hench through
+    // cmd.exe, which a real PATH always finds in System32.
+    const system32 = process.platform === "win32" ? `${PATH_SEP}${join(process.env.SystemRoot ?? "C:\\Windows", "System32")}` : "";
+    const env = { ...initEnv, HOME: tmpDir, USERPROFILE: tmpDir, PATH: `${binDir}${system32}` };
+    delete env.CLAUDE_CLI_PATH;
+    const moduleUrl = pathToFileURL(join(import.meta.dirname, "../../packages/core/claude-integration.js")).href;
+    const probe = `import { discoverClaudeCli } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(discoverClaudeCli(${JSON.stringify(tmpDir)})));`;
+    const output = execFileSync(process.execPath, ["--input-type=module", "-e", probe], { env, encoding: "utf8", timeout: SPAWN_TIMEOUT });
+    expect(output).toContain("cli.claudePath in .n-dx.local.json");
+    expect(output).toContain("git could not confirm the local file is untracked");
+    expect(output).not.toContain(skipped);
+    expect(output).not.toContain("SHOULD_NOT_RUN");
   });
 
   it("emits a persistent auto-commit warning when the target is not a git repo (non-interactive)", () => {
