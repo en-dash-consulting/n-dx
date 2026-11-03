@@ -12,8 +12,23 @@ import { tmpdir } from "node:os";
 import { cmdRelease } from "../../src/cli/commands/release.js";
 import { CLIError } from "../../src/cli/errors.js";
 import { computeLandings, resolveShippedIn } from "../../src/core/change-landing.js";
+import { gatherReleaseInputs } from "../../src/core/release-stamp.js";
+import type { V2Tree } from "../../src/schema/v2-rules.js";
 import { loadPrdModel } from "../../src/store/prd-model-reader.js";
 import { V2_FIXTURE, completeFixtureTask, editText } from "../helpers/v2-fixture.js";
+
+/** Every git command `change-landing.ts` runs, by its arguments. */
+const landingGit = vi.hoisted(() => [] as string[][]);
+vi.mock("../../src/core/change-commits.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/core/change-commits.js")>();
+  return {
+    ...actual,
+    git: (repoDir: string, args: string[], input?: string) => {
+      landingGit.push(args);
+      return actual.git(repoDir, args, input);
+    },
+  };
+});
 
 const CHANGE = "c0000000-0000-4000-8000-000000000001";
 const CHANGE_STATE = "changes/add-apple-pay/state.yaml";
@@ -184,6 +199,32 @@ describe("stamping", () => {
     expect(report.stamped).toEqual([]);
     expect(report.skipped).toEqual([{ id: CHANGE, reason: expect.stringMatching(/reachable from main/) }]);
     expect(await snapshot()).toEqual(before);
+  });
+
+  it("checks which landings are released with a fixed number of git commands, however many changes landed", async () => {
+    const ids = ["d0000000-0000-4000-8000-000000000001", "d0000000-0000-4000-8000-000000000002", "d0000000-0000-4000-8000-000000000003"];
+    const tree = {
+      product: [],
+      changes: ids.map((id) => ({ id, type: "change", title: id, slug: id.slice(-1), status: "completed" })),
+    } as unknown as V2Tree;
+    await commit("one.txt", `One\n\nN-DX-Item: ${ids[0]}`);
+    git("tag", "v0.9.0");
+    await commit("two.txt", `Two\n\nN-DX-Item: ${ids[1]}`);
+    await commit("three.txt", `Three\n\nN-DX-Item: ${ids[2]}`);
+    const options = { repoDir: repo, cacheDir: join(rexDir, ".cache") };
+    await computeLandings(tree, options); // warm the landing caches
+
+    landingGit.length = 0;
+    const landings = await computeLandings(tree, options);
+    const forLandings = landingGit.length;
+    expect(ids.every((id) => landings[id].landed)).toBe(true);
+
+    landingGit.length = 0;
+    const { released } = await gatherReleaseInputs(tree, options);
+    expect(landingGit.length - forLandings).toBe(2);
+    expect(landingGit.some((args) => args[0] === "tag")).toBe(false);
+    const commitOf = (id: string) => (landings[id] as { commit: string }).commit;
+    expect([...released]).toEqual([commitOf(ids[0])]);
   });
 
   it("writes nothing on --dry-run", async () => {

@@ -14,7 +14,7 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { addChangeNode, type AddChangeNodeInput } from "../../core/change-add.js";
+import type { AddChangeNodeInput } from "../../core/change-add.js";
 import { suggestPlacement, type PlacementSuggestion } from "../../core/change-place.js";
 import type { Priority } from "../../schema/index.js";
 import type { ChangeNodeType } from "../../schema/v2.js";
@@ -25,6 +25,7 @@ import { withPrdModelTransaction } from "../../store/prd-model-transaction.js";
 import { CLIError } from "../errors.js";
 import { info, result } from "../output.js";
 import { parseCsvList } from "../parse-utils.js";
+import { addProposedChanges, type ProposedChangeInput } from "../../recommend/changes-from-proposals.js";
 import { CAPABILITY_CRITERION_FLAG, REMOVE_CAPABILITY_CRITERION_FLAG, formatPlacementSuggestion, nodeLabel } from "./v2-cli.js";
 
 export const CHANGE_NODE_TYPES: readonly ChangeNodeType[] = ["change", "task", "subtask"];
@@ -113,14 +114,9 @@ export async function cmdAddChangesFromDescriptions(
 }
 
 /** `inputs` added to `tree` in memory, with the placement shortlist for each new change still in the Inbox. */
-function planChanges(start: V2Tree, inputs: AddChangeNodeInput[], now: Date): { tree: V2Tree; added: Added[] } {
-  let tree = start;
-  const ids: string[] = [];
-  for (const input of inputs) {
-    const out = addChangeNode(tree, input, { now });
-    tree = out.tree;
-    ids.push(out.node.id);
-  }
+function planChanges(start: V2Tree, inputs: ProposedChangeInput[], now: Date): { tree: V2Tree; added: Added[] } {
+  const { tree, nodes } = addProposedChanges(start, inputs, { now });
+  const ids = nodes.map((node) => node.id);
   const index = indexTree(tree);
   const added = ids.map((id): Added => {
     const node = index.resolve(id)!;
@@ -141,7 +137,7 @@ function planChanges(start: V2Tree, inputs: AddChangeNodeInput[], now: Date): { 
  * door rather than a second creation pipeline that could place changes
  * differently. See `recommend/changes-from-proposals.ts`.
  */
-export async function addChanges(dir: string, inputs: AddChangeNodeInput[]): Promise<Added[]> {
+export async function addChanges(dir: string, inputs: ProposedChangeInput[]): Promise<Added[]> {
   const rexDir = resolveRexPaths(dir).rexDir;
   let now!: Date;
   const { result: added } = await withPrdModelTransaction(rexDir, (model) => {

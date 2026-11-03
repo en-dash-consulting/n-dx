@@ -169,7 +169,7 @@ describe("the resolution report", () => {
       reviewModel: { value: REVIEW_MODELS.claude, source: "vendor-default", vendorDefault: REVIEW_MODELS.claude },
       reviewOptional: { value: false, source: "built-in" },
       skipTestGate: { value: false, source: "built-in" },
-      maxTurns: { value: 50, source: "hench.maxTurns" },
+      maxTurns: { value: 200, source: "hench.maxTurns" },
       tokenBudget: { value: 0, source: "hench.tokenBudget" },
       fresh: { value: false, source: "built-in" },
       allowDirty: { value: false, source: "built-in" },
@@ -490,7 +490,15 @@ describe("refusals are reported, not thrown", () => {
   });
 
   it("vendor-cli-missing", async () => {
-    await projectConfig({ llm: { vendor: "claude", claude: { cli_path: "/nonexistent/claude" } } });
+    // The operator's own local file names the binary; the tracked file's
+    // cli_path would be ignored until the checkout is trusted.
+    await writeFile(
+      join(projectDir, ".n-dx.local.json"),
+      JSON.stringify({ llm: { claude: { cli_path: "/nonexistent/claude" } } }),
+      "utf-8",
+    );
+    git(projectDir, "add", "-A");
+    git(projectDir, "commit", "-q", "-m", "local config", "--allow-empty");
     expect(codes(await resolve({ task: "t-pending" }))).toEqual(["vendor-cli-missing"]);
   });
 
@@ -592,6 +600,38 @@ describe("on a v2 tree", () => {
     expect(codes(r)).toEqual(["not-actionable"]);
     expect(r.refusals[0].message).toContain("Add Apple Pay");
     expect(codes(await resolve({ task: "CH-1", "reset-deferred": "true" }))).toEqual([]);
+  });
+
+  describe("a change whose only open task is deferred", () => {
+    /** Defer CH-1's task, optionally assigned to `assignee`. */
+    async function deferTask(assignee?: string): Promise<void> {
+      const stateFile = join(rexDir, "changes/add-apple-pay/state.yaml");
+      const row = `  "${WIRE_ID}":\n    status: "deferred"\n${assignee ? `    assignee: ${JSON.stringify(assignee)}\n` : ""}`;
+      await writeFile(stateFile, `${(await readFile(stateFile, "utf-8")).trimEnd()}\n${row}`);
+      git(projectDir, "add", "-A");
+      git(projectDir, "commit", "-q", "-m", "defer task");
+    }
+
+    it("reports that task with no refusal under --reset-deferred, as the run would pick it", async () => {
+      await deferTask();
+      const r = await resolve({ task: "CH-1", "reset-deferred": "true" });
+      expect(codes(r)).toEqual([]);
+      expect(r.task?.id).toBe(WIRE_ID);
+    });
+
+    it("refuses without --reset-deferred, naming the deferred task", async () => {
+      await deferTask();
+      const r = await resolve({ task: "CH-1" });
+      expect(codes(r)).toEqual(["not-actionable"]);
+      expect(r.refusals[0].message).toMatch(/"Wire the button" \(deferred\)/);
+    });
+
+    it("refuses under --mine when the deferred task is someone else's, which the reset leaves deferred", async () => {
+      await deferTask("Someone Else <someone.else@example.invalid>");
+      const r = await resolve({ task: "CH-1", "reset-deferred": "true", mine: "true" });
+      expect(codes(r)).toEqual(["not-actionable"]);
+      expect(r.refusals[0].message).toMatch(/"Wire the button" \(deferred\)/);
+    });
   });
 
   it("reports a task-less change as the unit", async () => {

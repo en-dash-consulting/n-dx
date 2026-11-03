@@ -16,7 +16,7 @@ sourcevision analyze
 sourcevision serve
 ```
 
-Open `http://localhost:3117` to explore results.
+Open `http://127.0.0.1:3117` to explore results.
 
 ## What It Analyzes
 

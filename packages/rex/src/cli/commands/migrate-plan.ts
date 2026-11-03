@@ -51,7 +51,7 @@ import { findTestFiles } from "../../core/verify.js";
 import { findMigration, MIGRATIONS } from "../../migrations/registry.js";
 import { formatPlanFile, readPlanFile, writePlanFile, type PlanFile } from "../../migrations/plan-file.js";
 import { contentHash, sourceDigest, v1TreeSource, V1_TREE_SOURCE_KIND, type V1ToV2Options } from "../../migrations/v1-to-v2/index.js";
-import { readCodeEvidence, readCodeEvidenceProvenance } from "../../migrations/v1-to-v2/code-files.js";
+import { readCommitCodeFiles, readCodeEvidence, readCodeEvidenceProvenance } from "../../migrations/v1-to-v2/code-files.js";
 import { planSeams } from "../../migrations/v1-to-v2/seams.js";
 import { describeSkippedV1Items, skippedV1Items } from "../../migrations/v1-to-v2/v1-tree-read.js";
 import { renderPlanSummary, type V1ToV2Plan } from "../../migrations/v1-to-v2/plan-summary.js";
@@ -262,14 +262,22 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   // never touches the filesystem. Without an analysis the code evidence is
   // empty and the plan is what it was before the reader existed.
   const testFiles = await findTestFiles(dir);
-  const { files: codeFiles, analysisPresent } = await readCodeEvidence(dir, doc.items, { testFiles });
+  const { files: analysisFiles, analysisPresent } = await readCodeEvidence(dir, doc.items, { testFiles });
+  // Only the tree's own ids: trailers and runs name items from all of history,
+  // and one outside the tree would change the digest below (and so reset the
+  // cut time) every time an unrelated commit landed.
+  const commitFiles = await readCommitCodeFiles(dir, { items: doc.items });
+  const codeFiles = Object.fromEntries([...new Set([...Object.keys(analysisFiles), ...Object.keys(commitFiles)])].map((id) => [id, [...new Set([...(analysisFiles[id] ?? []), ...(commitFiles[id] ?? [])])].sort()]));
   // A stale .sourcevision reads exactly like a fresh one — every file parses,
   // every zone has files — so the specs come out looking equally authoritative.
   // Say when the evidence was taken; the operator reviewing the plan cannot
   // tell otherwise, and this repository's own analysis is routinely weeks old.
+  // Commit evidence is reported on its own line: crediting it to an analysis
+  // that may not exist would also hide the "run ndx analyze" hint.
   const layout = resolveLayout(dir);
   const svName = relativeToRoot(layout, layout.sourcevisionDir);
-  const evidenceCount = Object.keys(codeFiles).length;
+  const evidenceCount = Object.keys(analysisFiles).length;
+  const commitEvidenceCount = Object.keys(commitFiles).length;
   let evidenceSummary: V1ToV2Plan["summary"]["codeEvidence"];
 
   if (evidenceCount > 0) {
@@ -298,6 +306,9 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   } else {
     info(`No code evidence: ${svName} has no analysis to read. Run \`ndx analyze .\` first if the specs should cite code.`);
   }
+  if (commitEvidenceCount > 0) {
+    info(`Commit evidence for ${commitEvidenceCount} item(s) from N-DX-Item trailers and hench runs.`);
+  }
   const options: V1ToV2Options = { testFiles, codeFiles };
 
   const evidenceDigest = contentHash(codeFiles);
@@ -315,6 +326,7 @@ export async function cmdMigratePlan(dir: string, flags: Record<string, string>)
   // Recorded on the plan, not just printed: the cut-day apply and anyone
   // reviewing migration-plan.json later need to know how old the evidence is.
   if (evidenceSummary) plan.summary.codeEvidence = evidenceSummary;
+  if (commitEvidenceCount > 0) plan.summary.commitEvidence = { items: commitEvidenceCount };
   plan.summary.evidenceDigest = evidenceDigest;
 
   await mkdir(dirname(outPath), { recursive: true });

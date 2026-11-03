@@ -41,6 +41,7 @@ import { detectBasePath } from "../external.js";
 import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
 import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index.js";
 import { formatSince } from "../utils/format.js";
+import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
 // Wire types
@@ -640,7 +641,7 @@ export function WorkspacesView({ fetcher, socketFactory }: WorkspacesViewProps) 
     if (!anchorKey) return;
     let socket: WebSocket;
     try {
-      socket = socketFactory ? socketFactory(getWebSocketUrl()) : new WebSocket(getWebSocketUrl());
+      socket = socketFactory ? socketFactory(getWebSocketUrl()) : openWebSocket();
     } catch {
       return; // No socket (static export, jsdom): the board stays as loaded.
     }

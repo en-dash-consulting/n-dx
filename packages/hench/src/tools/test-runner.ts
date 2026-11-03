@@ -335,6 +335,7 @@ function goPackagePaths(testFiles: string[]): string[] {
 // ---------------------------------------------------------------------------
 
 import { execShellCmd } from "../process/exec.js";
+import { execRepoShellCmd } from "../guard/sandbox.js";
 // The environment every repository-owned command below runs with (#686).
 import { repoCommandEnv } from "../prd/llm-gateway.js";
 import { parseSelectedSuites, planRerun } from "./test-gate-template.js";
@@ -389,7 +390,8 @@ export async function runPostTaskTests(
   }
 
   const startMs = Date.now();
-  const { stdout, stderr, exitCode, launched, error } = await execShellCmd(
+  // Confined like the agent's own run_command: the suite is agent-written code.
+  const { stdout, stderr, exitCode, launched, error } = await execRepoShellCmd(
     command,
     { cwd: projectDir, timeout, maxBuffer: 2 * 1024 * 1024, env: repoCommandEnv(projectDir) },
   );
@@ -968,7 +970,10 @@ async function runGateCommand(command: string, projectDir: string, timeout: numb
   // tree walk by pid that is best-effort by construction (see
   // llm-client/process-tree.ts). A descendant that daemonizes on purpose
   // (double fork) escapes every strategy.
-  const execResult = await execShellCmd(command, {
+  //
+  // The suite is agent-written code, so it runs inside the same OS sandbox
+  // the agent's run_command does (see execRepoShellCmd).
+  const execResult = await execRepoShellCmd(command, {
     cwd: projectDir,
     timeout,
     env: repoCommandEnv(projectDir),

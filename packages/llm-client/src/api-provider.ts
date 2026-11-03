@@ -33,7 +33,7 @@ import type {
   CompletionResult,
 } from "./types.js";
 import { ClaudeClientError } from "./types.js";
-import { resolveModel } from "./config.js";
+import { resolveApiEndpoint, resolveModel } from "./config.js";
 import { requireVendorApiKey } from "./vendor-auth.js";
 import { parseApiTokenUsage } from "./token-usage.js";
 import { resolveClaudeApiEffort } from "./claude-effort.js";
@@ -119,8 +119,9 @@ export function createApiClient(options: ApiProviderOptions): ClaudeClient & LLM
   ).value;
 
   const clientOpts: Record<string, unknown> = { apiKey };
-  if (options.claudeConfig.api_endpoint) {
-    clientOpts.baseURL = options.claudeConfig.api_endpoint;
+  const baseURL = resolveApiEndpoint(options.claudeConfig, undefined);
+  if (baseURL) {
+    clientOpts.baseURL = baseURL;
   }
 
   const client = new Anthropic(clientOpts as ConstructorParameters<typeof Anthropic>[0]);

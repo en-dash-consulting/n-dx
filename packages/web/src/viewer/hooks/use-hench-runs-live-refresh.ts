@@ -26,9 +26,10 @@
  * events this view cares about.
  */
 
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef } from "preact/hooks";
 import { createWSPipeline } from "./use-gateway.js";
+import { openWebSocket } from "../session.js";
 
 /** Mirrors the server's TaskExecutionStatus (routes-hench.ts). */
 export interface HenchExecutionProgress {
@@ -87,7 +88,7 @@ export function useHenchRunsLiveRefresh(
     });
 
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
       ws.onmessage = (event) => {
         if (!mountedRef.current) return;
         try {

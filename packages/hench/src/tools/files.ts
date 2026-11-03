@@ -1,4 +1,5 @@
-import { readFile, writeFile, readdir, stat, mkdir } from "node:fs/promises";
+import { readFile, readdir, stat, lstat, mkdir, open } from "node:fs/promises";
+import { constants } from "node:fs";
 import { join, dirname } from "node:path";
 import { simpleGlobMatch, GuardError } from "../guard/paths.js";
 import { DEFAULT_WRITE_SHRINK_MIN_BYTES, DEFAULT_WRITE_SHRINK_RATIO } from "../guard/contracts.js";
@@ -17,6 +18,41 @@ export async function toolReadFile(
   }
   guard.recordFileRead(params.path);
   return await readFile(resolved, "utf-8");
+}
+
+/**
+ * Write `content` to `resolved` without following a link at the final segment.
+ *
+ * `checkPath` returns the real location, so a link there means one appeared
+ * after the check. `O_NOFOLLOW` makes the open itself refuse it where the
+ * platform has the flag (POSIX); Windows has none, so the `lstat` refusal
+ * before the open is what stands there, with the race that implies.
+ */
+async function writeNoFollow(resolved: string, content: string, displayPath: string): Promise<void> {
+  try {
+    if ((await lstat(resolved)).isSymbolicLink()) {
+      throw new GuardError(`Refusing to write through a symbolic link: ${displayPath}`);
+    }
+  } catch (err) {
+    if (err instanceof GuardError) throw err;
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") throw err;
+  }
+  const flags = constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW ?? 0);
+  let handle;
+  try {
+    handle = await open(resolved, flags, 0o666);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ELOOP") {
+      throw new GuardError(`Refusing to write through a symbolic link: ${displayPath}`);
+    }
+    throw err;
+  }
+  try {
+    await handle.writeFile(content, "utf-8");
+  } finally {
+    await handle.close();
+  }
 }
 
 /** Size of the existing file at `resolved`, or null when there is none. */
@@ -61,7 +97,7 @@ export async function toolWriteFile(
   }
   guard.recordFileWrite(params.path, contentSize);
   await mkdir(dirname(resolved), { recursive: true });
-  await writeFile(resolved, params.content, "utf-8");
+  await writeNoFollow(resolved, params.content, params.path);
   return `Wrote ${contentSize} bytes to ${params.path}`;
 }
 
@@ -169,7 +205,7 @@ export async function toolEditFile(
     throw new Error(`Content exceeds max size (${size} > ${guard.maxFileSize})`);
   }
   guard.recordFileWrite(params.path, size);
-  await writeFile(resolved, updated, "utf-8");
+  await writeNoFollow(resolved, updated, params.path);
 
   const line = content.slice(0, firstAt).split("\n").length;
   const replaced = params.replace_all === true ? `${count} occurrence${count === 1 ? "" : "s"}` : "1 occurrence";
@@ -186,11 +222,15 @@ export async function toolListDirectory(
   async function listDir(dir: string, prefix: string): Promise<void> {
     const items = await readdir(dir, { withFileTypes: true });
     for (const item of items) {
+      // Every entry passes the checks the top path passed; a refused entry is
+      // left out and never descended into.
+      const path = join(dir, item.name);
+      if (!guard.isPathAllowed(path)) continue;
       const name = prefix ? `${prefix}/${item.name}` : item.name;
       if (item.isDirectory()) {
         entries.push(name + "/");
         if (params.recursive) {
-          await listDir(join(dir, item.name), name);
+          await listDir(path, name);
         }
       } else {
         entries.push(name);
@@ -231,11 +271,14 @@ export async function toolSearchFiles(
     for (const item of items) {
       if (results.length >= MAX_RESULTS) break;
 
+      // Blocked directories and files are skipped by the guard, as they are
+      // when named directly; nothing is read from or below them.
+      const filePath = join(dir, item.name);
+      if (!guard.isPathAllowed(filePath)) continue;
       const name = prefix ? `${prefix}/${item.name}` : item.name;
 
       if (item.isDirectory()) {
-        if (item.name === "node_modules" || item.name === ".git") continue;
-        await searchDir(join(dir, item.name), name);
+        await searchDir(filePath, name);
       } else {
         // Check glob filter if provided
         if (params.glob && !simpleGlobMatch(params.glob, name)) {
@@ -243,7 +286,6 @@ export async function toolSearchFiles(
         }
 
         try {
-          const filePath = join(dir, item.name);
           const s = await stat(filePath);
           if (s.size > guard.maxFileSize) continue;
 

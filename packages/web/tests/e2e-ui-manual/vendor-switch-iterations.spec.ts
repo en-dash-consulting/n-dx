@@ -26,7 +26,7 @@ import {
   type RealVendorProject,
   type Vendor,
 } from "./helpers/real-vendor-project.js";
-import { prdItem, openLiveTask, waitForCompletedRunCount, attachRunArtifacts } from "./helpers/run-watch.js";
+import { prdItem, openLiveTask, snapshotRunIds, waitForCompletedRunCount, attachRunArtifacts } from "./helpers/run-watch.js";
 import { caption } from "./helpers/caption.js";
 import { hasCli, probeCredentials } from "./helpers/preconditions.js";
 
@@ -54,11 +54,15 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async ({}, testInfo) => {
-  if (!dashboard) return;
-  try {
-    await stopManualDashboard(dashboard);
-  } finally {
-    await attachRunArtifacts(testInfo, project.dir);
+  // beforeAll can create the project and then fail to start its dashboard;
+  // the fixture directory must still be removed.
+  if (!project) return;
+  if (dashboard) {
+    try {
+      await stopManualDashboard(dashboard);
+    } finally {
+      await attachRunArtifacts(testInfo, project.dir);
+    }
   }
   if (KEEP_FIXTURE) {
     console.log(`[e2e-manual] fixture kept at ${project.dir}`);
@@ -122,8 +126,9 @@ async function startThreeTasks(page: Page, firstTaskId: string): Promise<void> {
   // its visible text is "Start now · 3 tasks", so locate by that.
   const startNow = page.locator('.ready-menu [role="menuitem"]', { hasText: /^Start now/ });
   await expect(startNow).toContainText("3 tasks");
+  const knownRunIds = await snapshotRunIds(dashboard.baseUrl);
   await startNow.click();
-  await openLiveTask(page, firstTaskId);
+  await openLiveTask(page, firstTaskId, knownRunIds);
 }
 
 async function runLeg(page: Page, vendor: Vendor, taskIds: string[], testInfo: TestInfo): Promise<void> {

@@ -16,8 +16,8 @@
  */
 
 import {readFile, writeFile, stat} from "node:fs/promises";import { join, relative, resolve } from "node:path";
-import { execShellCmd } from "../process/exec.js";
 import { repoCommandEnv } from "../prd/llm-gateway.js";
+import { execRepoShellCmd } from "../guard/sandbox.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -174,7 +174,8 @@ async function runTypecheck(
   projectDir: string,
   timeout: number,
 ): Promise<{ passed: boolean; error?: string }> {
-  const { exitCode, stderr, launched, error } = await execShellCmd("pnpm typecheck", {
+  // Runs the project's own scripts after the agent edited them: confined.
+  const { exitCode, stderr, launched, error } = await execRepoShellCmd("pnpm typecheck", {
     cwd: projectDir,
     timeout,
     env: repoCommandEnv(projectDir),

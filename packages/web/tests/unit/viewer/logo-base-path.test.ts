@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { NdxLogoPng, ProductLogoPng } from "../../../src/viewer/components/logos.js";
-import { updateFavicon } from "../../../src/viewer/components/favicon.js";
+import { resetFavicon, updateFavicon } from "../../../src/viewer/components/favicon.js";
 import { setBasePathForTests } from "../../../src/viewer/base-path.js";
 
+// favicon.ts caches the current product and link per module, and this file can
+// share its module with another viewer test that already set the favicon.
+beforeEach(() => resetFavicon());
 afterEach(() => setBasePathForTests(null));
 
 describe("logos behind the hub", () => {
