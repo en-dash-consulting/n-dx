@@ -32,7 +32,7 @@
  * @module web/hub/sidecars
  */
 
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname } from "node:path";
@@ -117,6 +117,13 @@ export interface SidecarManagerOptions {
   /** Clock for idle and crash bookkeeping. */
   now?: () => number;
   log?: (message: string) => void;
+  /**
+   * Whether each sidecar is mounted under a key (`/x/<name>/~<key>/`) as well
+   * as at `/x/<name>/`. On when the hub requires the per-user token: a
+   * browser loads a page's scripts, styles and images with no custom header,
+   * so the key in the path is what admits them ({@link SidecarManager.mountBase}).
+   */
+  mountKeys?: boolean;
 }
 
 /**
@@ -202,6 +209,8 @@ export class SidecarManager {
   private readonly log: (message: string) => void;
   /** Set by {@link stopAll}: from then on nothing is spawned, or it would outlive the hub. */
   private closed = false;
+  /** One key per sidecar name for the hub's lifetime, so a restart of the sidecar keeps open tabs working. */
+  private readonly mountKeys = new Map<string, string>();
 
   constructor(options: SidecarManagerOptions) {
     this.opts = options;
@@ -247,6 +256,43 @@ export class SidecarManager {
     });
     sidecar.starting = starting;
     return starting;
+  }
+
+  /**
+   * The key `name` is mounted under, minted on first use; null when the hub
+   * runs without the token. The key is a read-write capability for that one
+   * sidecar's mount and nothing else: it is not a hub session, admits no
+   * `/api/hub/*` or `/p/<id>/` request, and dies with the hub.
+   */
+  mountKey(name: string): string | null {
+    if (!this.opts.mountKeys || !SidecarManager.isName(name)) return null;
+    let key = this.mountKeys.get(name);
+    if (!key) {
+      key = randomBytes(24).toString("base64url");
+      this.mountKeys.set(name, key);
+    }
+    return key;
+  }
+
+  /** Whether `key` is `name`'s mount key, compared in constant time. */
+  isMountKey(name: string, key: string): boolean {
+    const expected = this.opts.mountKeys ? this.mountKeys.get(name) : undefined;
+    if (!expected) return false;
+    const a = Buffer.from(key);
+    const b = Buffer.from(expected);
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
+  /**
+   * Where a browser reaches `name`'s app, trailing slash included:
+   * `/x/<name>/~<key>/` with the token, `/x/<name>/` without. Sent to the
+   * sidecar as `NDX_BASE_PATH` at launch and as `X-Ndx-Base-Path` on every
+   * request, so an app that builds absolute links from either keeps them
+   * under the key.
+   */
+  mountBase(name: string): string {
+    const key = this.mountKey(name);
+    return key ? `/x/${name}/~${key}/` : `/x/${name}/`;
   }
 
   /** Only the proxy receives this launch credential; it is never part of status JSON. */
@@ -403,7 +449,7 @@ export class SidecarManager {
     s.secret = randomBytes(32).toString("hex");
     const handle = spawnManaged(plan.execPath, [plan.bin], {
       cwd: plan.cwd,
-      env: { ...plan.env, PORT: String(port), NDX_SIDECAR_SECRET: s.secret },
+      env: { ...plan.env, PORT: String(port), NDX_SIDECAR_SECRET: s.secret, NDX_BASE_PATH: this.mountBase(s.name) },
       keepStdinOpen: true,
       logFile: plan.logFile,
       windowsHide: true,

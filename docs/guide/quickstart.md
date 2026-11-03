@@ -152,7 +152,7 @@ ndx start
 
 ![ndx start example](../../documentation/ndx_start.png)
 
-Opens a web dashboard at `http://localhost:3117` with interactive views of your codebase analysis, your PRD, and agent runs.
+Opens a web dashboard at `http://127.0.0.1:3117` with interactive views of your codebase analysis, your PRD, and agent runs.
 
 ## What's next?
 

@@ -31,6 +31,10 @@ import { parseCodexCliTokenUsage } from "./codex-cli-token-parser.js";
 import { startHeartbeat } from "./heartbeat.js";
 import { emitRunEvent, recordFileWork } from "../../store/run-events.js";
 import { section, subsection, stream, info, detail, withHeartbeat } from "../../types/output.js";
+import { createVendorCliSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
+import { trackVendorProcess, terminateTrackedVendorProcess, describeAbortReason } from "../../process/run-interrupt.js";
+import { createSpendGate, priceRunUsd } from "./spend-cap.js";
+import type { SpendCapExceeded, SpendGate } from "./spend-cap.js";
 import { formatProtectedConfigFinding } from "../../guard/config-backstop.js";
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { isSpinningRun } from "../analysis/spin.js";
@@ -154,7 +158,7 @@ import {
 } from "./prior-attempt-work.js";
 import { extractPromptSectionDiagnostics, logPromptSections } from "./prompt-diagnostics.js";
 import type { PromptSectionDiagnostic, PersistedRuntimeEvent, ReviewerVendor, RunReviewMode } from "../../schema/index.js";
-import { DEFAULT_REVIEW_ROUNDS } from "../../schema/index.js";
+import { DEFAULT_REVIEW_ROUNDS, DEFAULT_SESSION_TIMEOUT_MS } from "../../schema/index.js";
 import { handlePlanModeStall, formatPlanModeAppendix } from "./plan-mode-prompt.js";
 import { startCommitMsgWatcher } from "./commit-msg-watcher.js";
 import {
@@ -205,6 +209,11 @@ export interface CliLoopOptions extends SharedLoopOptions {
    * Codex spawns ignore this field.
    */
   permissionMode?: PermissionMode;
+  /**
+   * Turn cap for the work session, as the run resolved it (flag, saved
+   * `run.maxTurns`, `hench.maxTurns`). Falls back to `config.maxTurns`.
+   */
+  maxTurns?: number;
 }
 
 export interface CliLoopResult {
@@ -269,6 +278,30 @@ export interface SpawnResult {
    * review session.
    */
   sessionId?: string;
+  /**
+   * Set when the spawn was stopped by its abort signal (SIGINT/SIGTERM on the
+   * run), with the reason. The process tree was terminated; the run is
+   * recorded as cancelled, never retried.
+   */
+  aborted?: { reason: string };
+  /**
+   * Set when the session outran `guard.sessionTimeout` and its process tree
+   * was terminated. The run ends with status `timeout`.
+   */
+  timedOut?: { timeoutMs: number };
+  /**
+   * Set when the session reached the turn cap: the Claude CLI reported
+   * `error_max_turns` for its own `--max-turns`, or (for a vendor without a
+   * turn flag) the spawn counted more agent steps than the cap and terminated
+   * the process tree. The run ends with status `timeout`, as the API loop's
+   * "Exceeded max turns" does.
+   */
+  turnCapExceeded?: { maxTurns: number; turns: number };
+  /**
+   * Set when a spend cap was already reached before the spawn, so no process
+   * was started. The run ends with status `budget_exceeded`.
+   */
+  budgetExceeded?: SpendCapExceeded;
 }
 
 export interface SpawnTokenMetadata {
@@ -279,6 +312,11 @@ export interface SpawnTokenMetadata {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const MAX_SUMMARY_LENGTH = 500;
+
+/** `90000` → `"90s"`, for limit messages. */
+function formatSeconds(ms: number): string {
+  return `${Math.round(ms / 1000)}s`;
+}
 
 // ── Transient error detection & retry helpers ─────────────────────────────
 
@@ -395,7 +433,7 @@ function sleep(ms: number): Promise<void> {
  * mutation-based accumulation that the rest of cli-loop expects. It also
  * emits stream output for the dashboard/CLI UI.
  *
- * `callsById` holds this spawn's calls by vendor call id, so a result that
+ * `toolCallsById` holds this spawn's calls by vendor call id, so a result that
  * names its call (Claude `tool_use_id`) lands on that call even when several
  * calls precede their results; a result without one goes to the latest call.
  */
@@ -404,7 +442,8 @@ function applyRuntimeEvent(
   result: SpawnResult,
   turnCounter: { value: number },
   assistantLabel: string,
-  callsById: Map<string, ToolCallRecord> = new Map(),
+  /** Calls by vendor id, so a result that names its call lands on that call. */
+  toolCallsById?: Map<string, ToolCallRecord>,
 ): void {
   switch (event.type) {
     case "assistant": {
@@ -420,15 +459,15 @@ function applyRuntimeEvent(
       const toolName = event.toolCall?.tool ?? "unknown";
       const toolInput = event.toolCall?.input ?? {};
       stream("Tool", `${toolName}(${JSON.stringify(toolInput).slice(0, 100)})`);
-      const call: ToolCallRecord = {
+      const record: ToolCallRecord = {
         turn: turnCounter.value || 1,
         tool: toolName,
         input: toolInput,
         output: "",
         durationMs: 0,
       };
-      result.toolCalls.push(call);
-      if (event.toolCall?.id) callsById.set(event.toolCall.id, call);
+      result.toolCalls.push(record);
+      if (event.toolCall?.id && toolCallsById) toolCallsById.set(event.toolCall.id, record);
       // If the event also carried assistant text, update summary
       if (event.text) {
         result.summary = event.text.slice(0, MAX_SUMMARY_LENGTH);
@@ -438,9 +477,13 @@ function applyRuntimeEvent(
 
     case "tool_result": {
       const output = event.toolResult?.output ?? "";
-      const callId = event.toolResult?.callId;
-      const call = callId ? callsById.get(callId) : result.toolCalls.at(-1);
-      if (call) call.output = output.slice(0, 2000);
+      const resultId = event.toolResult?.id;
+      const answered = resultId ? toolCallsById?.get(resultId) : undefined;
+      if (answered) {
+        answered.output = output.slice(0, 2000);
+      } else if (!resultId && result.toolCalls.length > 0) {
+        result.toolCalls[result.toolCalls.length - 1].output = output.slice(0, 2000);
+      }
       const preview = output.slice(0, 200);
       stream("Result", `${preview}${output.length > 200 ? "..." : ""}`);
       break;
@@ -522,7 +565,7 @@ export function toPersistedEvent(event: RuntimeEvent): PersistedRuntimeEvent {
   }
   if (event.toolResult) {
     persisted.toolResult = { tool: event.toolResult.tool, output: event.toolResult.output, durationMs: event.toolResult.durationMs };
-    if (event.toolResult.callId !== undefined) persisted.toolResult.callId = event.toolResult.callId;
+    if (event.toolResult.id !== undefined) persisted.toolResult.id = event.toolResult.id;
   }
   if (event.tokenUsage) persisted.tokenUsage = { ...event.tokenUsage };
   if (event.failure) {
@@ -738,6 +781,32 @@ export interface SpawnWithAdapterOptions {
    */
   pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
   /**
+   * Aborting it terminates the vendor process tree and resolves the spawn with
+   * {@link SpawnResult.aborted}. `hench run` aborts it on SIGINT/SIGTERM. An
+   * already-aborted signal starts no process.
+   */
+  abortSignal?: AbortSignal;
+  /**
+   * Wall-clock limit in ms (`guard.sessionTimeout`). When it elapses the
+   * process tree is terminated and {@link SpawnResult.timedOut} is set.
+   * Undefined or 0 = no limit.
+   */
+  timeoutMs?: number;
+  /**
+   * Turn cap. Passed to the vendor through {@link VendorSpawnOptions.maxTurns}
+   * by the caller; here it is enforced only for an adapter whose
+   * `enforcesTurnCap` is not true, by counting assistant messages and tool
+   * calls and terminating the tree once the count passes the cap. For the
+   * Claude CLI it is used to label an `error_max_turns` result. Undefined or 0
+   * = no cap.
+   */
+  maxTurns?: number;
+  /**
+   * Checked before the process is started; when it reports a reached cap, no
+   * process is spawned and the result carries {@link SpawnResult.budgetExceeded}.
+   */
+  spendGate?: SpendGate;
+  /**
    * The run's snapshot of n-dx's own config files, put back once the CLI
    * exits. Neither `codex exec` nor an allowed shell command can be denied a
    * path, so this is what keeps their writes from reaching the next spawn,
@@ -807,33 +876,98 @@ export function resetLiveSpawnProgress(progress: LiveSpawnProgress): void {
  * @internal Exported for testing — the livelock and plan-mode intercepts kill a
  *   live child process, which only a real spawn can exercise.
  */
-export function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
-  const spawned = spawnVendorCli(opts);
+export async function spawnWithAdapter(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
+  // Spend caps are checked before anything is started: a session the run
+  // cannot afford is never begun, rather than reported after it finished.
+  if (opts.spendGate) {
+    const exceeded = await opts.spendGate();
+    if (exceeded) {
+      info(`\n${exceeded.message}`);
+      return { ...emptySpawnResult(), error: exceeded.message, budgetExceeded: exceeded };
+    }
+  }
+  if (opts.abortSignal?.aborted) {
+    const reason = describeAbortReason(opts.abortSignal.reason);
+    return { ...emptySpawnResult(), error: reason, aborted: { reason } };
+  }
+  const spawned = spawnVendorProcess(opts);
   const backstop = opts.configBackstop;
   if (!backstop) return spawned;
-  // Settled either way: a spawn that failed may still have written first.
   return spawned.finally(() => {
     const writes = backstop.restore();
     if (writes.length > 0) info(`\n⚠ ${formatProtectedConfigFinding(writes)}`);
   });
 }
 
-function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
+function emptySpawnResult(): SpawnResult {
+  return { turns: 0, toolCalls: [], tokenUsage: { input: 0, output: 0 }, turnTokenUsage: [] };
+}
+
+function spawnVendorProcess(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
   const {
     adapter, spawnConfig, cliBinary, cliEnv, cwd, tokenMetadata,
-    useEventPipeline, accumulator, livelock, liveProgress,
+    useEventPipeline, accumulator, livelock, liveProgress, abortSignal,
   } = opts;
   const pidHolder = liveProgress ?? opts.pidHolder;
+  const timeoutMs = opts.timeoutMs !== undefined && opts.timeoutMs > 0 ? opts.timeoutMs : 0;
+  const maxTurns = opts.maxTurns !== undefined && opts.maxTurns > 0 ? opts.maxTurns : 0;
+  // Vendors without a turn flag are capped here, from the event stream.
+  const countSteps = maxTurns > 0 && adapter.enforcesTurnCap !== true;
 
   return new Promise((resolve, reject) => {
     const stdinMode = spawnConfig.stdinContent !== null ? "pipe" : "ignore";
     // Windows-safe spawn (GH #37/#68/#69): routes .cmd shims through cmd.exe
     // with a self-quoted verbatim command line instead of shell:true+args.
-    const proc = spawnCli(cliBinary, [...spawnConfig.args], {
+    // OS confinement for the vendor CLI and everything it starts; null for
+    // Codex (it confines itself) and when the operator turned the sandbox off
+    // or no backend is usable. The argv passes through verbatim.
+    const sandbox = createVendorCliSandbox(cwd, adapter.vendor, { cliBinary });
+    const inv = sandbox
+      ? sandbox.wrap(cliBinary, [...spawnConfig.args])
+      : { file: cliBinary, args: [...spawnConfig.args], env: {} };
+    const proc = spawnCli(inv.file, inv.args, {
       cwd,
       stdio: [stdinMode as "pipe" | "ignore", "pipe", "pipe"],
-      env: cliEnv,
+      env: { ...cliEnv, ...inv.env },
     });
+    if (sandbox) proc.once("close", () => sandbox.dispose());
+
+    // Registered so a forced exit (a second Ctrl-C) can still reach this tree.
+    const untrack = trackVendorProcess(proc);
+    let stopTimer: ReturnType<typeof setTimeout> | undefined;
+    const onAbort = (): void => {
+      if (stopReason) return;
+      stopReason = "aborted";
+      result.aborted = { reason: describeAbortReason(abortSignal?.reason) };
+      info(`\n${result.aborted.reason}: stopping the ${adapter.vendor} CLI.`);
+      void terminateTrackedVendorProcess(proc);
+    };
+    /** Whichever bound stopped this spawn first; later ones defer to it. */
+    let stopReason: "aborted" | "timeout" | "turn-cap" | undefined;
+    const settle = (): void => {
+      untrack();
+      if (stopTimer) clearTimeout(stopTimer);
+      abortSignal?.removeEventListener("abort", onAbort);
+    };
+    abortSignal?.addEventListener("abort", onAbort, { once: true });
+    if (timeoutMs > 0) {
+      stopTimer = setTimeout(() => {
+        if (stopReason) return;
+        stopReason = "timeout";
+        result.timedOut = { timeoutMs };
+        info(`\nThe ${adapter.vendor} CLI session exceeded guard.sessionTimeout (${formatSeconds(timeoutMs)}); stopping it.`);
+        void terminateTrackedVendorProcess(proc);
+      }, timeoutMs);
+      stopTimer.unref?.();
+    }
+    const stopForTurnCap = (turns: number): void => {
+      if (stopReason) return;
+      stopReason = "turn-cap";
+      result.turnCapExceeded = { maxTurns, turns };
+      info(`\nThe ${adapter.vendor} CLI session passed the turn cap (${maxTurns}); stopping it.`);
+      void terminateTrackedVendorProcess(proc);
+    };
+    let agentSteps = 0;
 
     // proc.pid is undefined when the spawn failed outright (ENOENT); the
     // `error` handler below clears it either way.
@@ -853,6 +987,7 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
     };
 
     const turnCounter = { value: 0 };
+    const toolCallsById = new Map<string, ToolCallRecord>();
     // One per spawn: usage identity is only meaningful within a single
     // vendor conversation, and a filter shared across spawns would suppress a
     // retry's legitimately re-sent opening message.
@@ -861,8 +996,6 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
     let stderr = "";
     let fullStdout = "";
     let eventCount = 0;
-    /** This spawn's tool calls by vendor call id, for the legacy path's result pairing. */
-    const callsById = new Map<string, ToolCallRecord>();
 
     // Event pipeline: track completion metadata from raw JSON since
     // RuntimeEvent doesn't carry num_turns or cost_usd.
@@ -897,6 +1030,7 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
     });
 
     proc.on("error", (err) => {
+      settle();
       if (pidHolder) pidHolder.vendorPid = undefined;
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
         // Keep the vendor-specific prefix (matched by formatCLIError) and
@@ -921,6 +1055,7 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
     });
 
     proc.on("close", (code) => {
+      settle();
       if (pidHolder) pidHolder.vendorPid = undefined;
       // Flush remaining buffered output
       if (lineBuffer.trim()) {
@@ -1142,6 +1277,20 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         result.error = result.livelock.message;
       }
 
+      // The bounds this spawn enforces own the error text for the same reason:
+      // the exit code is our own signal, and "exited with code 143" reads as
+      // transient. The Claude CLI's own --max-turns stop arrives as a result
+      // line rather than a kill, and is labelled the same way.
+      if (result.aborted) {
+        result.error = result.aborted.reason;
+      } else if (result.timedOut) {
+        result.error =
+          `The ${adapter.vendor} CLI session exceeded guard.sessionTimeout ` +
+          `(${formatSeconds(result.timedOut.timeoutMs)}) and was stopped.`;
+      } else if (result.turnCapExceeded) {
+        result.error = `Exceeded max turns (${result.turnCapExceeded.maxTurns})`;
+      }
+
       // Don't synthesize an error when we deliberately killed the spawn to
       // intercept plan mode — the outer loop owns that flow and will either
       // re-spawn with permissionMode=acceptEdits or surface a cancelled status.
@@ -1178,6 +1327,14 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
       if (typeof id === "string" && id) result.sessionId = id;
     }
 
+    /** The Claude CLI's own stop at `--max-turns`: a result line, not a kill. */
+    function noteVendorTurnCap(rawJson: Record<string, unknown>): void {
+      if (rawJson.type !== "result" || rawJson.subtype !== "error_max_turns") return;
+      if (result.turnCapExceeded || stopReason) return;
+      const turns = typeof rawJson.num_turns === "number" ? rawJson.num_turns : maxTurns;
+      result.turnCapExceeded = { maxTurns: maxTurns || turns, turns };
+    }
+
     function processLine(line: string): void {
       // Step 1: Parse the line through the adapter for event classification.
       // One line can carry several events (a Claude `user` line answering two
@@ -1199,7 +1356,7 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         // ── Legacy: inline mutation ──
         for (const event of events) {
           eventCount++;
-          applyRuntimeEvent(event, result, turnCounter, vendorLabel, callsById);
+          applyRuntimeEvent(event, result, turnCounter, vendorLabel, toolCallsById);
         }
         processRawLineLegacy(line, events.length > 0);
       }
@@ -1207,6 +1364,13 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
 
     /** The intercepts and narration a parsed tool call drives. */
     function onToolEvent(event: RuntimeEvent): void {
+      // Turn cap for vendors without a flag for it: every assistant message
+      // and tool call is one agent step.
+      if (countSteps && (event.type === "assistant" || event.type === "tool_use")) {
+        agentSteps++;
+        if (agentSteps > maxTurns) stopForTurnCap(agentSteps);
+      }
+
       // Narrate file work onto the run's structured event stream. Placed here,
       // above the pipeline branches, so it happens once for both of them —
       // and reuses the tool call the adapter has already parsed rather than
@@ -1243,9 +1407,9 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
       // Terminated the same way plan mode is, for the same reason — the outer
       // loop cannot act on something the child will never stop doing.
       //
-      // Recorded at the call, before its result arrives as a later tool_result
-      // event, so the detector sees no output on this path and falls back to
-      // name+arguments identity.
+      // Only invocations feed the detector here: a tool's result arrives on a
+      // later line (Claude's `user` message), after the call has to be judged,
+      // so on this path it falls back to name+arguments identity.
       if (livelock && event.type === "tool_use" && event.toolCall && !result.livelock) {
         const detection = livelock.record({
           tool: event.toolCall.tool,
@@ -1267,6 +1431,7 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
       try {
         const rawJson = JSON.parse(line);
         captureSessionId(rawJson);
+        if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
         const tokenEvent = rawJsonToTokenUsageEvent(rawJson, turnCounter.value || 1, tokenMetadata, usageFilter);
         if (tokenEvent) {
           accumulator.push(tokenEvent);
@@ -1314,6 +1479,7 @@ function spawnVendorCli(opts: SpawnWithAdapterOptions): Promise<SpawnResult> {
         try {
           const rawJson = JSON.parse(line);
           captureSessionId(rawJson);
+          if (rawJson && typeof rawJson === "object") noteVendorTurnCap(rawJson);
           extractTokenUsage(rawJson, result, turnCounter, tokenMetadata, usageFilter);
 
           // Extract completion metadata (num_turns, cost_usd, fallback usage)
@@ -1434,6 +1600,11 @@ export interface ReviewPassContext {
   mcpConfigPath?: string;
   /** Run's heartbeat-visible pid holder, so the record shows the reviewer's pid. */
   pidHolder?: Pick<LiveSpawnProgress, "vendorPid">;
+  /**
+   * The run's interrupt signal, session time limit and spend gate, applied to
+   * every reviewer and fix-round spawn as they are to the work spawn.
+   */
+  spawnBounds?: Pick<SpawnWithAdapterOptions, "abortSignal" | "timeoutMs" | "spendGate">;
   /** See {@link SpawnWithAdapterOptions.configBackstop}; covers the reviewer and fix spawns. */
   configBackstop?: ConfigBackstop;
 }
@@ -1628,6 +1799,7 @@ async function runExecutorFix(
         cwd: inv.projectDir,
         tokenMetadata: { vendor: fix.vendor, model: fix.model },
         pidHolder: ctx.pidHolder,
+        ...ctx.spawnBounds,
         configBackstop: ctx.configBackstop,
       }),
     );
@@ -1682,7 +1854,8 @@ export async function runAdversarialReviewPass(
   // file in place and the run would report the previous pass's findings as
   // if they were this one's.
   await rm(reportPath, { force: true }).catch(() => { /* best effort */ });
-  await mkdir(dirname(reportPath), { recursive: true });
+  // A report quotes diff hunks; owner-only, like the run record.
+  await mkdir(dirname(reportPath), { recursive: true, mode: 0o700 });
 
   const layout = resolveLayout(inv.projectDir);
   const rexRel = relativeToRoot(layout, layout.rexDir);
@@ -1786,6 +1959,7 @@ export async function runAdversarialReviewPass(
           cwd: inv.projectDir,
           tokenMetadata: { vendor: ctx.vendor, model: ctx.reviewModel },
           pidHolder: ctx.pidHolder,
+          ...ctx.spawnBounds,
           configBackstop: ctx.configBackstop,
         }),
       );
@@ -2222,6 +2396,11 @@ async function processSuccessfulResult(ctx: SuccessContext): Promise<SuccessActi
 
 // ── Error result processing ───────────────────────────────────────────────
 
+/** Whether the spawn was stopped by the run's own interrupt, time, turn or spend bound. */
+function stoppedByRunBound(result: SpawnResult): boolean {
+  return Boolean(result.aborted || result.timedOut || result.turnCapExceeded || result.budgetExceeded);
+}
+
 /** Return value from processErrorResult indicating whether the loop should break. */
 type ErrorAction = "break" | "retry";
 
@@ -2242,6 +2421,33 @@ interface ErrorContext {
  */
 async function processErrorResult(ctx: ErrorContext): Promise<ErrorAction> {
   const { run, result, accumulated, attempt, store, taskId, retryConfig, vendor } = ctx;
+
+  // The run's own bounds stopped this spawn. None is transient: the operator
+  // interrupted, or a cap was reached, and a retry would only spend past it.
+  if (result.aborted) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "cancelled";
+    run.summary = result.summary;
+    run.error = result.aborted.reason;
+    await handleRunFailure(store, taskId, "pending", "task_cancelled", run.error);
+    return "break";
+  }
+  if (result.budgetExceeded) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "budget_exceeded";
+    run.summary = result.summary;
+    run.error = result.budgetExceeded.message;
+    await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
+    return "break";
+  }
+  if (result.timedOut || result.turnCapExceeded) {
+    syncRunFromAccumulated(run, accumulated, attempt);
+    run.status = "timeout";
+    run.summary = result.summary;
+    run.error = result.error;
+    await handleRunFailure(store, taskId, "deferred", "task_timeout", run.error!);
+    return "break";
+  }
 
   // A livelock is terminal by construction: the spawn was killed because the
   // agent was repeating itself, and a retry re-enters the same loop with the
@@ -2355,6 +2561,17 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   }
 
   // Shared: transition task to in_progress
+  // Confinement: Codex runs inside its own sandbox; the Claude CLI runs
+  // inside ours, and an autonomous run never runs it unconfined by accident.
+  // Checked before the task is claimed, so a refusal leaves the PRD untouched.
+  if (vendor === LLM_VENDOR.CLAUDE) {
+    const sandboxPosture = resolveSandboxPosture(projectDir).posture;
+    assertSandboxReady(sandboxPosture, autonomous);
+    stream("Guard", formatSandboxPosture(sandboxPosture));
+  } else {
+    stream("Guard", `sandbox: managed by the ${vendor} CLI`);
+  }
+
   await transitionToInProgress(store, taskId, brief.task.status);
 
   // Build the execution policy from guard config (needed for diagnostics at init)
@@ -2464,6 +2681,37 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
   // here rather than at the call site keeps the per-attempt success path free
   // of config resolution, and makes "review is off" a single undefined value.
   const liveProgress = createLiveSpawnProgress();
+
+  // Bounds every vendor spawn in this run carries: the operator's interrupt,
+  // the per-session wall clock, and the USD spend caps. The work spawn adds
+  // the turn cap on top.
+  const maxTurns = opts.maxTurns ?? config.maxTurns;
+  // Declared here, ahead of the attempts that fill it, because the spend gate
+  // reads it and a gate-only retry's review can spawn before the first attempt.
+  const accumulated = createAccumulatedState();
+  const sessionTimeout = config.guard.sessionTimeout ?? DEFAULT_SESSION_TIMEOUT_MS;
+  const spendGate = createSpendGate({
+    limits: { maxCostUsdPerRun: config.maxCostUsdPerRun, maxCostUsdPerDay: config.maxCostUsdPerDay },
+    henchDir,
+    runId: run.id,
+    // Executor attempts so far, plus whatever reviewer and fix spawns have
+    // charged straight to the record (those never pass through `accumulated`).
+    currentRunUsd: () =>
+      priceRunUsd({
+        tokenUsage: accumulated.tokenUsage,
+        turnTokenUsage: accumulated.turnTokenUsage,
+        model: eventModel,
+      }) + (run.reviewSpend ? priceRunUsd({
+        tokenUsage: run.reviewSpend,
+        model: reviewModel ?? eventModel,
+      }) : 0),
+  });
+  const spawnBounds: Pick<SpawnWithAdapterOptions, "abortSignal" | "timeoutMs" | "spendGate"> = {
+    ...(opts.abortSignal ? { abortSignal: opts.abortSignal } : {}),
+    timeoutMs: sessionTimeout,
+    ...(spendGate ? { spendGate } : {}),
+  };
+
   const reviewPassContext: ReviewPassContext | undefined = reviewModel !== undefined
     ? {
         // A pair reviewer is the other vendor's CLI: its own adapter, binary
@@ -2508,6 +2756,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         taskTitle: brief.task.title,
         mcpConfigPath: reviewerMcpConfigPath,
         pidHolder: liveProgress,
+        spawnBounds,
         configBackstop: opts.configBackstop,
       }
     : undefined;
@@ -2571,7 +2820,6 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
     maxDelayMs: 30000,
   };
 
-  const accumulated = createAccumulatedState();
   const tokenMetadata: SpawnTokenMetadata = { vendor, model: eventModel };
   const useEventPipeline = config.useEventPipeline ?? false;
 
@@ -2760,6 +3008,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
           cwd: projectDir,
           tokenMetadata,
           pidHolder: liveProgress,
+          ...spawnBounds,
           configBackstop: opts.configBackstop,
         }),
     });
@@ -2939,6 +3188,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             backgroundResumeSessionId ?? retryResumeSessionId ?? warmParentId ?? batchResumeId,
           forkSession: forkingWarmParent ? true : undefined,
           mcpConfigPath,
+          maxTurns,
         });
 
         // Capture prompt section diagnostics on the first attempt for run-level storage.
@@ -2998,6 +3248,8 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
             accumulator: attemptAccumulator,
             livelock,
             liveProgress,
+            ...spawnBounds,
+            maxTurns,
             configBackstop: opts.configBackstop,
           }),
         );
@@ -3025,7 +3277,7 @@ export async function cliLoop(opts: CliLoopOptions): Promise<CliLoopResult> {
         // A background-wait resume did not fork, so its failure says nothing
         // about the parent.
         if (
-          result.error && !result.livelock && !wasBackgroundResume &&
+          result.error && !result.livelock && !stoppedByRunBound(result) && !wasBackgroundResume &&
           warmParentId && !forkFallbackUsed
         ) {
           forkFallbackUsed = true;

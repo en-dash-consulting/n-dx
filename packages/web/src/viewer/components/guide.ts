@@ -161,13 +161,32 @@ export const GUIDE_VIEWS: ReadonlySet<ViewId> = new Set(
   Object.entries(GUIDE_CONTENT).filter(([, prose]) => prose).map(([view]) => view as ViewId),
 );
 
+export function guideContent(view: ViewId, layout: "v1" | "v2") {
+  const content = GUIDE_CONTENT[view] ?? GUIDE_CONTENT.overview!;
+  if (view !== "analysis" || layout !== "v2") return content;
+  return {
+    description: "Capture a change from a description or import a file into the Inbox.",
+    lookFor: "Changes awaiting placement against the product's capabilities and constraints.",
+    actions: "Use Add to Inbox to capture one change. Open Inbox to review and place it before starting work.",
+  };
+}
+
 export function Guide({ view }: GuideProps) {
   const [open, setOpen] = useState(false);
   // Title and prose are taken for the same view, so a page without its own
   // guide is titled "Overview" — matching the text it is about — rather than
   // carrying its own name over someone else's explanation.
   const key: ViewId = GUIDE_CONTENT[view] ? view : "overview";
-  const content = GUIDE_CONTENT[key]!;
+  const [layout, setLayout] = useState<"v1" | "v2">("v1");
+  useEffect(() => {
+    if (!open || view !== "analysis") return;
+    let cancelled = false;
+    fetch("/api/rex/changes").then((res) => res.ok ? res.json() : null)
+      .then((body: { layout?: string } | null) => { if (!cancelled) setLayout(body?.layout === "v2" ? "v2" : "v1"); })
+      .catch(() => { if (!cancelled) setLayout("v1"); });
+    return () => { cancelled = true; };
+  }, [open, view]);
+  const content = guideContent(key, layout);
   const title = viewLabel(key);
 
   // Close on Escape key

@@ -127,11 +127,11 @@ describe("redirect aliases: full dashboard (no scope)", () => {
   });
 
   it("serves the root and known views with a query string attached", async () => {
-    // "/?ndx_token=…" is the URL `ndx start` prints; matching req.url whole
+    // "/?ndx_nonce=…" is the URL `ndx start` prints; matching req.url whole
     // against "/" answered it with a bare "Not found".
     const { baseUrl, close } = await startFor(baseCtx());
     try {
-      for (const path of ["/?ndx_token=abc", "/index.html?x=1", "/zones?ndx_token=abc"]) {
+      for (const path of ["/?ndx_nonce=abc", "/index.html?x=1", "/zones?ndx_nonce=abc"]) {
         const res = await fetch(`${baseUrl}${path}`, { redirect: "manual" });
         expect(res.status, path).toBe(200);
         expect(await res.text(), path).toContain("viewer");

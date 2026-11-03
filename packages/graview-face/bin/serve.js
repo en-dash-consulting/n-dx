@@ -40,7 +40,13 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 // mount (dev/hub-mount.ts puts back the prefix the hub strips). By hand, or with --port
 // as `ndx graview serve` passes it, the root.
 const hubbed = portFlag === -1 && Boolean(process.env.PORT) && Boolean(process.env.NDX_EXTENSION_NAME);
-const base = hubbed ? `/x/${process.env.NDX_EXTENSION_NAME}/` : "/";
+// With the per-user token on, the hub mounts us under a key as well
+// (`/x/<name>/~<key>/`) and names that mount in NDX_BASE_PATH: a browser's
+// requests for our scripts and styles carry no header, so the key in the path
+// is what lets them through. Only a mount under our own `/x/<name>/` is taken.
+const mount = `/x/${process.env.NDX_EXTENSION_NAME}/`;
+const announced = process.env.NDX_BASE_PATH;
+const base = !hubbed ? "/" : announced && announced.startsWith(mount) && announced.endsWith("/") ? announced : mount;
 
 // A hub launch has no project binding. Give a useful instruction page instead
 // of starting a face against missing or stale public/data from a checkout.

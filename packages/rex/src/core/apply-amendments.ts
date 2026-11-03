@@ -19,7 +19,9 @@
  * - **modified** edits a live capability or constraint: `proposed`, when
  *   present, replaces the statement (it is the reviewed text by the time a
  *   change is applied); `criteria.remove`, `replace` and `add` edit criteria
- *   by id, in that order.
+ *   by id, in that order. A requirement linked to a replaced criterion takes
+ *   its new text, and one linked to a removed criterion goes, so the
+ *   requirements never restate a rule the criteria dropped.
  * - **removed** retires the node: its status becomes `deleted`, the tombstone
  *   status every v2 rule skips. The file stays, with its History. The rules
  *   skip a tombstone's whole subtree, so a node with live descendants is
@@ -60,7 +62,7 @@ import { z } from "zod";
 import type { Requirement } from "../schema/v1.js";
 import { RequirementSchema } from "../schema/validate.js";
 import { isDisplayId, type Amendment, type ChangeNode, type CriteriaDelta, type Criterion } from "../schema/v2.js";
-import { checkV2Rules, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
+import { checkV2Rules, dependsOnCycles, isAppliedChange, isOpenChange, specHash, type RuleFinding, type RuleNode, type V2Tree } from "../schema/v2-rules.js";
 import { isUsableFrozenSlug, slugifyTitle } from "../store/folder-tree-serializer.js";
 import { SUCCESSFUL_CHILD_STATUSES } from "./parent-completion.js";
 
@@ -126,6 +128,10 @@ export function applyAmendments(tree: V2Tree, changeRef: string, options: ApplyA
   const unfinished = options.allowOpenWork ? [] : unfinishedWork(change);
   if (unfinished.length > 0) {
     throw new ApplyAmendmentsError(label, [`${describeWork(unfinished)} not completed; a change applies once its work is done`]);
+  }
+  const unapplied = options.allowOpenWork ? [] : unappliedNestedChanges(change);
+  if (unapplied.length > 0) {
+    throw new ApplyAmendmentsError(label, [`${describeWork(unapplied)} not applied; ${NESTED_FIRST}`]);
   }
 
   const amends = change.amends ?? [];
@@ -248,6 +254,17 @@ export function unfinishedWork(change: RuleNode): RuleNode[] {
   );
 }
 
+/** Why a container waits for the changes nested in it. */
+export const NESTED_FIRST = "a change applies after the changes nested in it";
+
+/**
+ * The live changes nested directly in `change` that are not applied yet. A
+ * container applies only once this is empty, so inner amendments land first.
+ */
+export function unappliedNestedChanges(change: RuleNode): RuleNode[] {
+  return (change.children ?? []).filter((c) => c.type === "change" && c.status !== "deleted" && isOpenChange(c));
+}
+
 /** Names `nodes` for a refusal, with the verb: `task T-1, change CH-2 are`. */
 export function describeWork(nodes: readonly RuleNode[]): string {
   return `${nodes.map((c) => `${c.type} ${c.displayId ?? c.id}`).join(", ")} ${nodes.length > 1 ? "are" : "is"}`;
@@ -357,7 +374,18 @@ export function newErrors(before: V2Tree, after: V2Tree, now: Date): RuleFinding
   const key = (f: RuleFinding): string => `${f.rule}\0${f.nodeId}\0${f.message}`;
   const errors = (t: V2Tree): RuleFinding[] => checkV2Rules(t, { now }).filter((f) => f.severity === "error");
   const had = new Set(errors(before).map(key));
-  return errors(after).filter((f) => !had.has(key(f)));
+  const fresh = errors(after).filter((f) => !had.has(key(f)));
+  if (!fresh.some((f) => f.rule === "depends-on-acyclic")) return fresh;
+  // Retiring a member only shrinks or splits a dependsOn knot, which renames
+  // its finding. A cycle whose members were all in one cycle before is that
+  // knot, not a new one; anything else (a new dependsOn edge) is new.
+  const beforeCycles = dependsOnCycles(before).map((ids) => new Set(ids));
+  const afterCycles = new Map(dependsOnCycles(after).map((ids) => [ids[0], ids]));
+  const preexisting = (f: RuleFinding): boolean => {
+    const members = afterCycles.get(f.nodeId);
+    return members !== undefined && beforeCycles.some((cycle) => members.every((id) => cycle.has(id)));
+  };
+  return fresh.filter((f) => f.rule !== "depends-on-acyclic" || !preexisting(f));
 }
 
 // ── Deltas ───────────────────────────────────────────────────────
@@ -516,12 +544,40 @@ const applyModified: DeltaApply =({ product }, amendment, _options, fail) => {
 
   if (amendment.proposed !== undefined) node.statement = amendment.proposed;
   if (node.type === "capability" && hasCriteriaDelta) {
+    followCriteria(node, node.criteria ?? [], delta!);
     if (criteria.length) node.criteria = criteria;
     else delete node.criteria;
   }
   stampMet(node);
   return node;
 };
+
+/**
+ * Keep a capability's requirements in step with a criteria delta: the
+ * requirement linked to a replaced criterion takes its new text as title and
+ * acceptance criterion (its linked tests and command stay), and the one linked
+ * to a removed criterion goes. A criterion's requirement is the one its
+ * `requirement` field names, else `<capability id>:<criterion id>`, the id the
+ * migration gives it. Requirements linked to no criterion are left alone.
+ */
+function followCriteria(node: RuleNode, before: readonly Criterion[], delta: CriteriaDelta): void {
+  const requirements = node.requirements as Requirement[] | undefined;
+  if (!requirements?.length) return;
+  const linked = (id: string): string => {
+    const named = before.find((c) => c.id === id)?.requirement;
+    return typeof named === "string" ? named : `${node.id}:${id}`;
+  };
+  const removed = new Set((delta.remove ?? []).map(linked));
+  const replaced = new Map((delta.replace ?? []).map((c) => [linked(c.id), c.text] as const));
+  const next = requirements
+    .filter((r) => !removed.has(r.id))
+    .map((r) => {
+      const text = replaced.get(r.id);
+      return text === undefined ? r : { ...r, title: text.trim().replace(/[.;:,]+$/, ""), acceptanceCriteria: [text] };
+    });
+  if (next.length) node.requirements = next;
+  else delete node.requirements;
+}
 
 const applyRemoved: DeltaApply = ({ product }, amendment, { removing }, fail) => {
   // An earlier amendment may have retired an ancestor of a target this change also removes.

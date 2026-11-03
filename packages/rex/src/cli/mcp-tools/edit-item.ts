@@ -7,6 +7,7 @@ import { changeLayerType } from "../../core/layer-projection.js";
 import { isChangeLayerStore, resolveItemRef, type PRDStore } from "../../store/index.js";
 import { textResult, type McpResult } from "./result.js";
 import { defineTool } from "./tool.js";
+import { runBlockRefusalInsideAgentRun } from "../run-block-guard.js";
 
 export async function handleEditItem(
   store: PRDStore,
@@ -65,6 +66,8 @@ export async function handleEditItem(
       updates.assignee = args.assignee.trim() || undefined;
     }
     if (args.run !== undefined) {
+      const refusal = runBlockRefusalInsideAgentRun(args.run);
+      if (refusal) return textResult(refusal, true);
       const runCheck = validateRunSettings(args.run);
       if (!runCheck.ok) return textResult(`Invalid run settings: ${runCheck.error}`, true);
       // Undefined removes the block: the serializer skips an absent `run`.

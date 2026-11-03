@@ -27,7 +27,7 @@ describe("rexMcpEndpoint", () => {
     writeFileSync(join(home, "hub.json"), JSON.stringify({ version: 1, projects: { "my app": { id: "my app", repoRoot: root, worktrees: [root], pid: 123 } } }));
     writeFileSync(join(home, "auth.token"), "secret\n");
     const endpoint = rexMcpEndpoint(resolveLayout(root), { home });
-    expect(endpoint).toEqual({ url: `http://localhost:${DEFAULT_HUB_PORT}/p/my%20app/mcp/rex`, projectId: "my app", tokenFile: join(home, "auth.token"), registered: true });
+    expect(endpoint).toEqual({ url: `http://127.0.0.1:${DEFAULT_HUB_PORT}/p/my%20app/mcp/rex`, projectId: "my app", tokenFile: join(home, "auth.token"), registered: true });
   });
 
   it("marks a worktree of the registered repository, so a writer resolves its workspace key first", () => {
@@ -35,9 +35,9 @@ describe("rexMcpEndpoint", () => {
     mkdirSync(worktree, { recursive: true });
     writeFileSync(join(home, "hub.json"), JSON.stringify({ version: 1, projects: [{ id: "p", repoRoot: "/main", worktrees: ["/main", worktree], pid: null }] }));
     const endpoint = rexMcpEndpoint(resolveLayout(worktree), { home });
-    expect(endpoint?.url).toBe(`http://localhost:${DEFAULT_HUB_PORT}/p/p/mcp/rex`);
+    expect(endpoint?.url).toBe(`http://127.0.0.1:${DEFAULT_HUB_PORT}/p/p/mcp/rex`);
     expect(endpoint?.worktree).toBe(realpathSync(worktree));
-    expect(endpoint?.workspacesUrl).toBe(`http://localhost:${DEFAULT_HUB_PORT}/p/p/api/workspaces`);
+    expect(endpoint?.workspacesUrl).toBe(`http://127.0.0.1:${DEFAULT_HUB_PORT}/p/p/api/workspaces`);
     expect(endpoint?.registered).toBe(false);
     expect(endpoint?.tokenFile).toBeUndefined();
   });
@@ -60,6 +60,6 @@ describe("rexMcpEndpoint", () => {
     expect(hubPort(home)).toBe(5151);
     writeFileSync(join(home, "hub.pid"), JSON.stringify({ pid: 4321, port: 4242 }));
     writeFileSync(join(home, "hub.json"), JSON.stringify({ version: 1, projects: [{ id: "p", repoRoot: root, worktrees: [root], pid: 1 }] }));
-    expect(rexMcpEndpoint(resolveLayout(root), { home })?.url).toBe("http://localhost:4242/p/p/mcp/rex");
+    expect(rexMcpEndpoint(resolveLayout(root), { home })?.url).toBe("http://127.0.0.1:4242/p/p/mcp/rex");
   });
 });

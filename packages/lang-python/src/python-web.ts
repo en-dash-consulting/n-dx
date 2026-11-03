@@ -7,7 +7,7 @@
  * Each framework's query (`queries/<framework>/<framework>.scm`) captures
  * the same parts under its own prefix: `<prefix>.argument`, `.keyword`,
  * `.value`, `.item`, `.sequence`, `.assignment`, `.target`, `.assigned`,
- * `.alias` and `.aliased`. The Python queries supply the rest: `calls`
+ * `.binding`, `.try`, `.tried`, `.excepted`, `.alias` and `.aliased`. The Python queries supply the rest: `calls`
  * (callee, receiver, argument list), `definitions` (decorators and the
  * functions they decorate) and `imports`.
  *
@@ -97,6 +97,10 @@ export interface WebAssignment {
   readonly targetNode: Capture;
   readonly value: Capture;
   readonly augmented: boolean;
+  /** Assignments in a function or class do not bind names in the module. */
+  readonly nested?: true;
+  /** The innermost `def` or `class` holding a nested assignment. */
+  readonly scope?: Capture;
 }
 
 /** A decorator on a function, with the function's name. */
@@ -115,10 +119,22 @@ export interface WebFile {
   /** Every captured sequence (list or tuple). */
   readonly sequences: readonly Capture[];
   readonly assignments: readonly WebAssignment[];
-  /** Imported names by local name; a later import of a name replaces an earlier one. */
+  /**
+   * Imported names by local name; a later import of a name replaces an
+   * earlier one, except that one inside a `def` or `class` never replaces a
+   * module-level one.
+   */
   readonly bindings: ReadonlyMap<string, Binding>;
   /** Where each name is last bound at module level by an assignment, `def` or `class`. */
   readonly moduleBound: ReadonlyMap<string, SourcePosition>;
+  /** Every place each name is bound at module level by an assignment, `def` or `class`, in source order. */
+  readonly moduleBindings: ReadonlyMap<string, readonly SourcePosition[]>;
+  /**
+   * The `except` clause holding `at` when it belongs to a `try` whose body
+   * holds `importAt`: a binding there is the import's fallback, which runs
+   * only when the import fails.
+   */
+  fallbackClause(importAt: SourcePosition, at: SourcePosition): Capture | undefined;
   readonly decorated: readonly Decorated[];
 }
 
@@ -169,13 +185,20 @@ export function readWebFile(file: PackSourceFile, prefix: string): WebFile {
   const items = new Map([...byOwner(sequences, mine("item"))].map(([sequence, entries]) => [spanKey(sequence), entries]));
 
   const assignmentNodes = mine("assignment");
+  const definitions = file.captures.definitions ?? [];
+  const scopes = [...named(definitions, "class.declaration"), ...named(definitions, "function.declaration")];
+  const assignmentScopes = innermostEach(scopes, assignmentNodes);
   const targets = byOwner(assignmentNodes, mine("target"));
   const values = byOwner(assignmentNodes, mine("assigned"));
-  const assignments = assignmentNodes.flatMap((node): WebAssignment[] => {
+  const assignments = assignmentNodes.flatMap((node, i): WebAssignment[] => {
     const target = targets.get(node)?.[0];
     const value = values.get(node)?.[0];
-    return target && value ? [{ target: target.text, targetNode: target, value, augmented: node.nodeType === "augmented_assignment" }] : [];
+    const scope = assignmentScopes[i];
+    return target && value
+      ? [{ target: target.text, targetNode: target, value, augmented: node.nodeType === "augmented_assignment", ...(scope ? { nested: true as const, scope } : {}) }]
+      : [];
   });
+  const moduleBindings = readModuleBound(file, mine("binding"));
 
   return {
     path: file.path,
@@ -185,8 +208,33 @@ export function readWebFile(file: PackSourceFile, prefix: string): WebFile {
     sequences,
     assignments,
     bindings: readBindings(file, mine("aliased"), mine("alias")),
-    moduleBound: readModuleBound(file),
+    moduleBound: new Map([...moduleBindings].map(([name, at]) => [name, at.at(-1)!])),
+    moduleBindings,
+    fallbackClause: readFallbacks(mine("try"), mine("tried"), mine("excepted")),
     decorated: readDecorated(file),
+  };
+}
+
+/** Whether `at` is inside `c`. */
+export const within = (c: Capture, at: SourcePosition): boolean => comparePositions(c.start, at) <= 0 && comparePositions(at, c.end) < 0;
+
+/** {@link WebFile.fallbackClause} over the captured `try` statements, their bodies and `except` clauses. */
+function readFallbacks(
+  tries: readonly Capture[],
+  bodies: readonly Capture[],
+  clauses: readonly Capture[],
+): (importAt: SourcePosition, at: SourcePosition) => Capture | undefined {
+  const bodyOf = innermostEach(tries, bodies, true);
+  const clauseOf = innermostEach(tries, clauses, true);
+  return (importAt, at) => {
+    // The innermost except clause holding `at`, then whether its own try's body holds the import.
+    let clause: Capture | undefined;
+    let owner: Capture | undefined;
+    clauses.forEach((c, i) => {
+      if (within(c, at) && (!clause || contains(clause, c))) [clause, owner] = [c, clauseOf[i]];
+    });
+    if (!clause || !owner) return undefined;
+    return bodies.some((body, i) => bodyOf[i] === owner && within(body, importAt)) ? clause : undefined;
   };
 }
 
@@ -226,7 +274,14 @@ function readBindings(file: PackSourceFile, aliased: readonly Capture[], aliases
   const nested = (at: SourcePosition): boolean =>
     declarations.some((d) => comparePositions(d.start, at) < 0 && comparePositions(at, d.end) < 0);
   entries.sort(([a], [b]) => comparePositions(a, b));
-  return new Map(entries.map(([at, local, binding]) => [local, nested(at) ? { ...binding, nested: true } : binding]));
+  // An import inside a `def` or `class` never hides a module-level import of the same name.
+  const bindings = new Map<string, Binding>();
+  for (const [at, local, binding] of entries) {
+    const earlier = bindings.get(local);
+    if (!nested(at)) bindings.set(local, binding);
+    else if (earlier === undefined || earlier.nested) bindings.set(local, { ...binding, nested: true });
+  }
+  return bindings;
 }
 
 const comparePositions = (a: SourcePosition, b: SourcePosition): number => a.line - b.line || a.column - b.column;
@@ -234,9 +289,10 @@ const comparePositions = (a: SourcePosition, b: SourcePosition): number => a.lin
 /**
  * Names bound at module level other than by import: an assignment the
  * `variables` query captured (an annotation alone binds nothing), and a
- * `def` or `class` inside no other definition. A later one replaces an earlier one.
+ * `def` or `class` inside no other definition. Each name with every place it
+ * is bound, in source order.
  */
-function readModuleBound(file: PackSourceFile): Map<string, SourcePosition> {
+function readModuleBound(file: PackSourceFile, bindings: readonly Capture[]): Map<string, SourcePosition[]> {
   const entries: Array<[string, SourcePosition]> = [];
   const variables = file.captures.variables ?? [];
   const statements = named(variables, "variable.declaration");
@@ -248,6 +304,10 @@ function readModuleBound(file: PackSourceFile): Map<string, SourcePosition> {
   const definitions = file.captures.definitions ?? [];
   const of = (name: string): Capture[] => named(definitions, name);
   const declarations = [...of("class.declaration"), ...of("function.declaration")];
+  const bindingScopes = innermostEach(declarations, bindings);
+  bindings.forEach((binding, i) => {
+    if (!bindingScopes[i]) entries.push([binding.text, binding.start]);
+  });
   const definitionNames = byOwner(declarations, [...of("class.name"), ...of("function.name")]);
   const enclosing = innermostEach(declarations, declarations, true);
   declarations.forEach((declaration, i) => {
@@ -255,7 +315,13 @@ function readModuleBound(file: PackSourceFile): Map<string, SourcePosition> {
     if (name && enclosing[i] === undefined) entries.push([name.text, name.start]);
   });
   entries.sort(([, a], [, b]) => comparePositions(a, b));
-  return new Map(entries);
+  const bound = new Map<string, SourcePosition[]>();
+  for (const [name, at] of entries) {
+    const list = bound.get(name);
+    if (list) list.push(at);
+    else bound.set(name, [at]);
+  }
+  return bound;
 }
 
 /** Each decorator on a function, with the function's name. */
@@ -475,6 +541,37 @@ export interface Defined {
   readonly name: string;
 }
 
+/**
+ * What a `defines` callback is told about the definition it is asked for.
+ * `exact`: the module-level binding that won over an import of the name, so
+ * only a definition made there is the one meant (an assignment that is no
+ * constructor, `app = Wrapper(app)` after `from m import app`, defines nothing).
+ * `from`: where the name is used, when that is in the file asked about, so a
+ * definition in the `def` holding the use can be preferred.
+ */
+export interface DefinedAt {
+  readonly exact?: SourcePosition;
+  readonly from?: SourcePosition;
+}
+
+/** Tells whether `file` defines `name` as the thing a rule follows. */
+export type Defines = (file: string, name: string, at: DefinedAt) => boolean;
+
+/**
+ * The last module-level binding of `name` in `web` that replaces its import
+ * `binding`: one after it, other than a fallback in an `except` clause
+ * guarding the import, which runs only when the import fails. A use inside
+ * that clause (`from`) sees the fallback.
+ */
+function rebinding(web: WebFile, name: string, binding: Binding, from?: SourcePosition): SourcePosition | undefined {
+  const replaces = (at: SourcePosition): boolean => {
+    if (comparePositions(binding.at, at) >= 0) return false;
+    const clause = web.fallbackClause(binding.at, at);
+    return clause === undefined || (from !== undefined && within(clause, from));
+  };
+  return (web.moduleBindings.get(name) ?? []).filter(replaces).at(-1);
+}
+
 /** How far a chain of re-exports is followed. */
 const MAX_REEXPORTS = 8;
 
@@ -518,8 +615,7 @@ export class WebProject {
     const binding = web?.bindings.get(name);
     if (!binding) return undefined;
     // Python's last module-level binding wins: a name bound again after its import is not the imported module.
-    const bound = web!.moduleBound.get(name);
-    if (bound !== undefined && comparePositions(binding.at, bound) < 0) return undefined;
+    if (rebinding(web!, name, binding) !== undefined) return undefined;
     if (binding.name === undefined) return { file, specifier: binding.module };
     const pkg = this.module(file, binding.module);
     if (pkg !== undefined && pkg !== file) {
@@ -539,36 +635,50 @@ export class WebProject {
    * by `defines`: in the file itself, through `from m import name` (and any
    * re-exports after it), or as an attribute of an imported module.
    */
-  defined(from: string, text: string, defines: (file: string, name: string) => boolean): Defined | undefined {
+  defined(from: string, text: string, defines: Defines, at?: SourcePosition): Defined | undefined {
     const segments = dotted(text).split(".");
     if (segments.some((s) => !/^[A-Za-z_]\w*$/.test(s))) return undefined;
-    if (segments.length === 1) return this.follow(from, segments[0]!, defines, 0);
+    if (segments.length === 1) return this.follow(from, segments[0]!, defines, 0, at);
     const module = this.moduleOf(from, segments.slice(0, -1));
     return module === undefined ? undefined : this.follow(module, segments.at(-1)!, defines, 0);
   }
 
-  private follow(file: string, name: string, defines: (file: string, name: string) => boolean, depth: number): Defined | undefined {
-    if (defines(file, name)) return { file, name };
+  /**
+   * `name` in `file`: the file's own definition, or the one its import of
+   * the name leads to. The import wins unless a module-level binding after it
+   * replaces it (Python's last binding wins); then only a definition made at
+   * that binding is the file's (`exact`). Without a contest between an import
+   * and a binding, any definition of the name in the file is the one meant:
+   * `app = create_app()` after a factory's `app = Flask(…)`, or
+   * `app = Wrapper(app)` after `app = FastAPI()`.
+   */
+  private follow(file: string, name: string, defines: Defines, depth: number, from?: SourcePosition): Defined | undefined {
     const web = this.file(file);
-    const binding = web?.bindings.get(name);
-    if (!binding?.name || depth >= MAX_REEXPORTS) return undefined;
-    // Python's last module-level binding wins: a name bound again after its import is not the imported one.
-    const bound = web!.moduleBound.get(name);
-    if (bound !== undefined && comparePositions(binding.at, bound) < 0) return undefined;
+    const found = web?.bindings.get(name);
+    // An import inside a `def` or `class` binds no attribute of the module.
+    const binding = found && (!found.nested || depth === 0) ? found : undefined;
+    if (!binding) {
+      // Factory-local routers remain useful in their own file, but cannot be a package attribute.
+      const bound = web?.moduleBound.get(name) !== undefined;
+      return (depth === 0 || bound) && defines(file, name, from ? { from } : {}) ? { file, name } : undefined;
+    }
+    const exact = rebinding(web!, name, binding, from);
+    if (exact !== undefined) return defines(file, name, { exact }) ? { file, name } : undefined;
+    if (!binding.name || depth >= MAX_REEXPORTS) return undefined;
     // `from pkg import name` gives `pkg`'s attribute: what `pkg/__init__.py` binds to `name`
     // (a re-export of `pkg/name.py`'s object included), and the submodule only when it binds nothing.
     const next = this.module(file, binding.module);
     if (next === undefined) return undefined;
-    if (next === file || !this.binds(next, binding.name, defines)) {
+    if (next === file || !this.binds(next, binding.name)) {
       if (this.module(file, submodule(binding.module, binding.name)) !== undefined) return undefined;
     }
     return this.follow(next, binding.name, defines, depth + 1);
   }
 
   /** Whether `file` binds `name` at module level: a definition `defines` accepts, an import, an assignment, `def` or `class`. */
-  private binds(file: string, name: string, defines: (file: string, name: string) => boolean): boolean {
+  private binds(file: string, name: string): boolean {
     const web = this.file(file);
-    return defines(file, name) || web?.bindings.has(name) === true || web?.moduleBound.has(name) === true;
+    return web?.moduleBound.has(name) === true || (web?.bindings.get(name) !== undefined && !web.bindings.get(name)!.nested);
   }
 }
 
