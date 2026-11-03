@@ -24,7 +24,14 @@ items:
     lastModified: "2026-11-03T17:38:29.172Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9f3e974d-5eea-43c4-8706-0c745d01fcb7":
-    lastModified: "2026-11-03T17:30:12.067Z"
+    status: "completed"
+    startedAt: "2026-11-03T17:42:59.280Z"
+    completedAt: "2026-11-03T17:47:23.883Z"
+    endedAt: "2026-11-03T17:47:23.883Z"
+    activeIntervals: [{"end":"2026-11-03T17:47:23.883Z","start":"2026-11-03T17:42:59.280Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Added a raw-socket chunked POST test to hub-session-proxy.test.ts; asserts 413 status line and no upstream request; fails with ECONNRESET if readBody uses destroyOnLimit true."
+    lastModified: "2026-11-03T17:47:23.883Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b147e397-606d-4194-b556-5324b87a8f49":
     lastModified: "2026-11-03T17:38:29.172Z"

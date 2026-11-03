@@ -267,6 +267,47 @@ describe("/hub/session/ through the hub", () => {
     expect(a.seen).toEqual([]);
   });
 
+  it("answers 413, not a reset, to a chunked body with no Content-Length that outgrows the limit", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    const statusLine = await new Promise<string>((resolve, reject) => {
+      const socket = connect(hubPort, "127.0.0.1", () => {
+        socket.write(
+          `POST /hub/session/sessions/s-1/turns HTTP/1.1\r\nHost: 127.0.0.1:${hubPort}\r\n`
+          + `X-Ndx-Token: ${TOKEN}\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n`,
+        );
+        // Keep streaming past the limit; the hub must drain it and still answer.
+        const chunk = Buffer.alloc(64 * 1024, "x");
+        const frame = Buffer.concat([Buffer.from(`${chunk.length.toString(16)}\r\n`), chunk, Buffer.from("\r\n")]);
+        let sent = 0;
+        const pump = (): void => {
+          while (sent <= MAX_HUB_SESSION_BODY_BYTES + chunk.length) {
+            sent += chunk.length;
+            if (!socket.write(frame)) {
+              socket.once("drain", pump);
+              return;
+            }
+          }
+          socket.write("0\r\n\r\n");
+        };
+        pump();
+      });
+      let buffer = "";
+      socket.on("data", (data) => {
+        buffer += data.toString("latin1");
+        if (buffer.includes("\r\n")) {
+          socket.destroy();
+          resolve(buffer.split("\r\n")[0]);
+        }
+      });
+      // A destroyed request socket surfaces here (reset) or as a close with no answer.
+      socket.on("error", reject);
+      socket.on("close", () => reject(new Error("connection closed before a status line")));
+    });
+    expect(statusLine).toBe("HTTP/1.1 413 Payload Too Large");
+    expect(a.seen).toEqual([]);
+  });
+
   it("retries a WebSocket upgrade a sidecar-off host refused on the next host before answering the client", async () => {
     const a = await startUpstream();
     const b = await startUpstream();
