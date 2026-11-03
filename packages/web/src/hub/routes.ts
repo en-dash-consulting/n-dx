@@ -5,6 +5,7 @@
  *   GET    /api/hub/projects        — registered projects with live child status
  *   GET    /api/hub/queue           — admission limits, what is running, what is waiting
  *   GET    /api/hub/overview        — every project with its child's live status, for the home page
+ *                                     (with ?hubSession=1, whether the hub session can run)
  *   GET    /api/hub/new-project     — where a new project would go: the suggested
  *                                     parent, and (with ?parent=&name=) the exact
  *                                     absolute path those would create
@@ -64,6 +65,7 @@ import { defaultParentDir, deriveProjectId, isReservedProjectId, planNewProject,
 import type { NewProjectPlan } from "./new-project.js";
 import { EXTENSION_API_VERSION, buildExtensionsAnswer } from "./extensions.js";
 import { SidecarManager } from "./sidecars.js";
+import { probeHubLens } from "./session-host.js";
 
 const HUB_PREFIX = "/api/hub";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -449,9 +451,16 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
   // Feeds the home page, and its refresh tick: `html` is the same markup the
   // page was served with, rendered once here rather than a second time in the
   // browser, so there is one renderer and not two that can disagree.
+  // `?hubSession=1` (the deferred home's first read) also asks the hub
+  // session's host whether it can run the hub lens, as the served page does.
   if (path === "/overview" && method === "GET") {
-    const overview = await buildHubOverview(hub.listProjects(), (port) => fetchChildSnapshot(port, 2_000, hub.token));
-    json(res, 200, { ...overview, html: renderCards(overview) });
+    const projects = hub.listProjects();
+    const withSession = new URLSearchParams(rawQuery).get("hubSession") === "1";
+    const [overview, hubSession] = await Promise.all([
+      buildHubOverview(projects, (port) => fetchChildSnapshot(port, 2_000, hub.token)),
+      withSession ? probeHubLens(hub.sessionHosts, projects, { token: hub.token }) : undefined,
+    ]);
+    json(res, 200, { ...overview, html: renderCards(overview), ...(hubSession !== undefined && { hubSession }) });
     return true;
   }
 

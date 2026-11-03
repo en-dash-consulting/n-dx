@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   HubSessionHostPicker,
   MAX_HUB_SESSION_BODY_BYTES,
+  handleHubRoute,
   handleProxyRequest,
   handleProxyUpgrade,
   hubSessionHostLockPath,
@@ -26,7 +27,7 @@ import {
 } from "../../src/hub/index.js";
 import { handlePublicHubRequest } from "../../src/hub/proxy.js";
 import { guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "../../src/hub/request-guard.js";
-import { FEATURE_DISABLED_HEADER } from "../../src/shared/index.js";
+import { FEATURE_DISABLED_HEADER, SAME_ORIGIN_FRAME_PAGE_CSP } from "../../src/shared/index.js";
 
 const TOKEN = "per-user-token";
 
@@ -39,6 +40,8 @@ interface Upstream {
   requests: Array<{ method: string; url: string; headers: IncomingMessage["headers"]; body: string }>;
   /** Answer as a project whose web.sidecar gate is closed. */
   sidecarOff: boolean;
+  /** What the host's hub-lens read reports. */
+  lensAvailable: boolean;
 }
 
 let home: string;
@@ -57,7 +60,7 @@ async function listen(server: Server): Promise<number> {
 async function startUpstream(): Promise<Upstream> {
   const seen: Upstream["seen"] = [];
   const upgrades: string[] = [];
-  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, requests: [], sidecarOff: false };
+  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, requests: [], sidecarOff: false, lensAvailable: false };
   const requests: Upstream["requests"] = [];
   upstream.requests = requests;
   const server = createServer((req: IncomingMessage, res) => {
@@ -71,7 +74,17 @@ async function startUpstream(): Promise<Upstream> {
         res.end(JSON.stringify({ kind: "feature_disabled", feature: "web.sidecar" }));
         return;
       }
+      if (req.url === "/api/sidecar/hub/drawer") {
+        // As the host's drawer route: framable by the hub home's origin only.
+        res.writeHead(200, { "Content-Type": "text/html", "X-Frame-Options": "SAMEORIGIN", "Content-Security-Policy": SAME_ORIGIN_FRAME_PAGE_CSP });
+        res.end("<!doctype html><title>Hub session</title>");
+        return;
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
+      if (req.url === "/api/sidecar/hub/lens") {
+        res.end(JSON.stringify({ lens: { id: "hub", available: upstream.lensAvailable }, ceiling: 1 }));
+        return;
+      }
       res.end(JSON.stringify({ port: (server.address() as { port: number }).port }));
     });
   });
@@ -141,7 +154,9 @@ beforeEach(async () => {
       void handlePublicHubRequest(req, res, hub);
       return;
     }
-    void handleProxyRequest(req, res, hub);
+    void handleHubRoute(req, res, hub).then((handled) => {
+      if (!handled) void handleProxyRequest(req, res, hub);
+    });
   });
   hubServer.on("upgrade", (req, socket, head) => {
     const refusal = upgradeRefusal(req, hubPort, TOKEN);
@@ -168,6 +183,48 @@ describe("/hub/session/ through the hub", () => {
     projects = [project("a", a.port)];
     expect((await hubGet("/hub/session/sessions", null)).status).toBe(401);
     expect(await wsHandshake("/hub/session/ws", null)).toBe("HTTP/1.1 401 Unauthorized");
+    expect(a.seen).toEqual([]);
+    expect(a.upgrades).toEqual([]);
+  });
+
+  it("serves a credential-less navigation to the drawer page from the host, with the per-user token and no query", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    const res = await fetch(`http://127.0.0.1:${hubPort}/hub/session/drawer?x=1`, { headers: { accept: "text/html" } });
+    expect(res.status).toBe(200);
+    expect(a.seen).toEqual([{ url: "/api/sidecar/hub/drawer", token: TOKEN }]);
+    // The host's framing policy wins over the DENY the hub's gate set, or the home's iframe stays blank.
+    expect(res.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(res.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
+  });
+
+  it("says whether the hub session can run only on the overview read that asks, as the host's lens reports", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    expect((await (await hubGet("/api/hub/overview")).json()).hubSession).toBeUndefined();
+    expect(a.seen.some((s) => s.url.endsWith("/lens"))).toBe(false);
+    expect((await (await hubGet("/api/hub/overview?hubSession=1")).json()).hubSession).toBe(false);
+    a.lensAvailable = true;
+    expect((await (await hubGet("/api/hub/overview?hubSession=1")).json()).hubSession).toBe(true);
+    expect((await hubGet("/api/hub/overview?hubSession=1", null)).status).toBe(401);
+  });
+
+  it("refuses every other credential-less hub-session request and forwards nothing", async () => {
+    const a = await startUpstream();
+    projects = [project("a", a.port)];
+    const base = `http://127.0.0.1:${hubPort}`;
+    const html = { accept: "text/html" };
+    const refused = [
+      await fetch(`${base}/hub/session/drawer`), // not a navigation
+      await fetch(`${base}/hub/session/drawer`, { method: "HEAD", headers: html }),
+      await fetch(`${base}/hub/session/drawer/x`, { headers: html }),
+      await fetch(`${base}/hub/session/lens`, { headers: html }),
+      await fetch(`${base}/hub/session/snapshot`),
+      await fetch(`${base}/hub/session`, { headers: html }),
+      await fetch(`${base}/hub/session/sessions`, { method: "POST", headers: { ...html, "content-type": "application/json" }, body: "{}" }),
+    ];
+    expect(refused.map((r) => r.status)).toEqual([401, 401, 401, 401, 401, 401, 401]);
+    expect(await wsHandshake("/hub/session/drawer", null)).toBe("HTTP/1.1 401 Unauthorized");
     expect(a.seen).toEqual([]);
     expect(a.upgrades).toEqual([]);
   });

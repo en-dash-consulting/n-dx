@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -388,6 +388,59 @@ describe("the Hub session toggle", () => {
     expect(drawer.hidden).toBe(false);
     window.dispatchEvent(new MessageEvent("message", { data: close, origin: window.location.origin, source: frame.contentWindow }));
     expect(drawer.hidden).toBe(true);
+  });
+
+  describe("on the deferred page a navigation gets", () => {
+    /** The deferred shell mounted with its refresh and drawer scripts run against a stubbed sign-in and overview. */
+    async function mountDeferred(hubSession: boolean | undefined): Promise<{ toggle: HTMLButtonElement; drawer: HTMLElement; asked: string[] }> {
+      const parsed = renderToDocument(renderHomePage({ projects: [], generatedAt: "t" }, "", [], { deferred: true }));
+      document.body.className = "";
+      document.body.innerHTML = parsed.body.innerHTML;
+      const asked: string[] = [];
+      const fetchStub = (url: string) => {
+        asked.push(url);
+        const body = { projects: [], html: "", ...(hubSession !== undefined && url.includes("hubSession=1") && { hubSession }) };
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
+      };
+      const win = { ndxAuth: { ready: Promise.resolve({ ok: true }) } };
+      const scripts = [...parsed.querySelectorAll("script")].map((s) => s.textContent ?? "");
+      const refresh = scripts.find((text) => text.includes("/api/hub/overview"))!;
+      const drawer = scripts.find((text) => text.includes("hub-session-toggle") && !text.includes("/api/hub/overview"))!;
+      const interval = vi.spyOn(globalThis, "setInterval").mockReturnValue(0 as unknown as ReturnType<typeof setInterval>);
+      try {
+        new Function("document", "window", "fetch", refresh)(document, win, fetchStub);
+      } finally {
+        interval.mockRestore();
+      }
+      new Function("document", "window", "location", drawer)(document, window, window.location);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { toggle: document.getElementById("hub-session-toggle") as HTMLButtonElement, drawer: document.getElementById("hub-session-drawer")!, asked };
+    }
+
+    it("a hidden toggle and an undocked drawer, and still no project, path or count", () => {
+      const html = renderHomePage({ projects: [], generatedAt: "t" }, "", [], { deferred: true });
+      const doc = renderToDocument(html);
+      expect(doc.getElementById("hub-session-toggle")!.hasAttribute("hidden")).toBe(true);
+      expect(doc.getElementById("hub-session-drawer")!.hasAttribute("hidden")).toBe(true);
+      expect(doc.getElementById("project-count")!.textContent).toBe("");
+      expect(html).not.toContain("/repos/");
+    });
+
+    it("shows the toggle once signed in when the host can run the hub lens", async () => {
+      const { toggle, drawer, asked } = await mountDeferred(true);
+      expect(asked).toEqual(["/api/hub/overview?hubSession=1"]);
+      expect(toggle.hidden).toBe(false);
+      toggle.click();
+      expect(drawer.hidden).toBe(false);
+    });
+
+    it("keeps it hidden, and ⌘J inert, when the host cannot", async () => {
+      const { toggle, drawer } = await mountDeferred(false);
+      expect(toggle.hidden).toBe(true);
+      document.dispatchEvent(keyJ({ metaKey: true }));
+      expect(drawer.hidden).toBe(true);
+      expect(document.body.classList.contains("hub-docked")).toBe(false);
+    });
   });
 
   it("keeps the hub home free of Preact and of src/viewer/", () => {

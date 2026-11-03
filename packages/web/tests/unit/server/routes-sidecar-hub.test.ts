@@ -23,6 +23,7 @@ import type { VendorSessionOptions } from "@n-dx/llm-client";
 import { HUB_PID_FILE, hubLedgerPath, hubSessionHostLockPath, hubSidecarDir, hubUsagePath, readHubSessionHostLock } from "../../../src/hub/index.js";
 import { dashboardUsagePath, readDashboardUsage } from "../../../src/server/dashboard-usage.js";
 import { enforceRouteFeatureGate } from "../../../src/server/route-feature-gates.js";
+import { BROWSER_SESSION_SCRIPT } from "../../../src/shared/index.js";
 import {
   createAnnouncingBroker,
   handleSidecarRoute,
@@ -327,8 +328,14 @@ describe("what the hub home and its drawer read", () => {
     const page = await get(built, "/drawer");
     expect(page.status).toBe(200);
     expect(page.headers.get("content-type")).toContain("text/html");
+    // The hub home frames it; nothing of another origin may.
+    expect(page.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
+    expect(page.headers.get("content-security-policy")).not.toContain("frame-ancestors 'none'");
     const html = await page.text();
     expect(html).toContain("<title>Hub session</title>");
+    // Signed in from its tab: fetches carry the session credential, the socket a ticket.
+    expect(html.startsWith(`<script>${BROWSER_SESSION_SCRIPT}</script>`)).toBe(true);
     // The page's paths ride in with it, every one through the hub, ahead of the app root.
     const config = /<body class="hub-session-page"><script type="application\/json" id="hub-session-config">(.*?)<\/script><div id="app">/.exec(html);
     expect(JSON.parse(config![1])).toEqual({

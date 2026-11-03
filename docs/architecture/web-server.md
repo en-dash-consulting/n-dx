@@ -139,7 +139,9 @@ Content-Security-Policy. The built viewer and hub pages ship an inline
 bootstrap script and inline styles, so the page policy keeps `'unsafe-inline'`
 for scripts and styles and is otherwise same-origin (plus `data:`/`blob:`
 images and loopback WebSockets). `/data/*` responses switch to a strict policy
-that allows nothing, because they are data, not documents. The preview server
+that allows nothing, because they are data, not documents. The hub session's
+drawer page alone may be framed, by its own origin (`SAMEORIGIN`,
+`frame-ancestors 'self'`): the hub home docks it in an iframe. The preview server
 adds `https:` sources, since a design document may load from a CDN.
 
 ## Repository trust
@@ -226,7 +228,12 @@ iframe of `/hub/session/drawer`, the drawer-only viewer page the host builds
 beside the dashboard (`viewer/hub-session.ts`). `hub/home.ts` stays
 server-rendered with no Preact; the frame posts `HUB_SESSION_CLOSE_MESSAGE` to
 undock. The host injects the page's paths into it, so they do not cross
-`viewer/external.ts`.
+`viewer/external.ts`, and the session script, so the frame signs in from its
+tab. With auth on, a navigation gets the deferred home with the toggle hidden;
+its first overview read after sign-in (`?hubSession=1`) runs the same probe and
+shows it. The frame's navigation is the one credential-less `/hub/session/`
+request the hub serves: a GET wanting HTML of `/drawer`, fetched from the host
+with the token. That page holds only static paths; everything else there is 401.
 
 ### Hub session: drafts only
 

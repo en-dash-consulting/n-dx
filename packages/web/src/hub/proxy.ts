@@ -73,6 +73,8 @@ import {
   stripWorkspaceSlot,
   checkRunMode,
   hubSessionUpstreamPath,
+  HUB_SESSION_ROUTES,
+  HUB_SIDECAR_API_PREFIX,
   splitQueryParam,
   authRequiredPage,
   wantsHtml,
@@ -641,6 +643,27 @@ function upstreamAuth(hub: Hub): OutgoingHttpHeaders {
   return hub.token ? { "x-ndx-token": hub.token } : {};
 }
 
+/** The host's path for the drawer page: the one hub-session path a navigation may load without a credential. */
+const HUB_DRAWER_UPSTREAM = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.drawer}`;
+
+/**
+ * Route one `/hub/session/…` request: to the host the picker names, through
+ * {@link proxyHubSession} (which moves past a host whose web.sidecar is off),
+ * or a refusal when no project can host.
+ */
+async function routeHubSession(req: IncomingMessage, res: ServerResponse, hub: Hub, path: string): Promise<void> {
+  const host = hub.sessionHosts.pick(hub.listProjects());
+  if (!host) {
+    if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
+      writeSidecarOffEverywhere(res);
+      return;
+    }
+    writeJson(res, 503, { error: NO_HUB_SESSION_HOST });
+    return;
+  }
+  await proxyHubSession(req, res, hub, path, host);
+}
+
 /**
  * Whether `url` addresses a sidecar under its valid mount key — the
  * credential a browser's subresource requests to that sidecar carry. The gate
@@ -704,7 +727,8 @@ function refusePublic(req: IncomingMessage, res: ServerResponse): void {
 /**
  * A request the gate passed without a credential (a GET or HEAD). The hub's
  * own API, and any answer that names projects, needs a credential; the home
- * page is sent as a shell whose script signs in and then loads the cards; a
+ * page is sent as a shell whose script signs in and then loads the cards, and
+ * its drawer frame's page is fetched from the hub session's host; a
  * project path is proxied with no credential at all, so the project server
  * answers it with its own public shell or a 401.
  */
@@ -730,6 +754,19 @@ export async function handlePublicHubRequest(req: IncomingMessage, res: ServerRe
   ) {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
     res.end(req.method === "HEAD" ? undefined : sidecarBootstrapPage(sidecarName));
+    return;
+  }
+  // The hub home's drawer frame: a navigation carries no credential, and the
+  // page holds only its static paths config; its session script signs it in
+  // from the tab before it reads anything. The query is dropped, so only that
+  // one page is reachable this way.
+  if (
+    decision.kind === "hub-session"
+    && decision.path.split("?")[0] === HUB_DRAWER_UPSTREAM
+    && req.method === "GET"
+    && wantsHtml(req.headers)
+  ) {
+    await routeHubSession(req, res, hub, HUB_DRAWER_UPSTREAM);
     return;
   }
   if (decision.kind === "home") {
@@ -855,19 +892,9 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       proxyHttp(req, res, started.port, decision.path, decision.prefix, undefined, {}, sidecarForward(hub, decision));
       return;
     }
-    case "hub-session": {
-      const host = hub.sessionHosts.pick(hub.listProjects());
-      if (!host) {
-        if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
-          writeSidecarOffEverywhere(res);
-          return;
-        }
-        writeJson(res, 503, { error: NO_HUB_SESSION_HOST });
-        return;
-      }
-      await proxyHubSession(req, res, hub, decision.path, host);
+    case "hub-session":
+      await routeHubSession(req, res, hub, decision.path);
       return;
-    }
     case "redirect":
       res.writeHead(308, { Location: decision.location, "Content-Length": 0 });
       res.end();
