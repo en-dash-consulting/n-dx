@@ -11,15 +11,31 @@ items:
   "26ddda60-dd72-4d59-b529-2570bbd13a32":
     lastModified: "2026-11-02T23:09:05.095Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "2b2b2441-2c3d-43c9-85a1-99049f429b7b":
+    lastModified: "2026-11-03T00:02:28.533Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "314d8fa3-ea8c-4950-8a02-bd836a646b39":
+    lastModified: "2026-11-03T00:02:34.404Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "73f42fbb-cc9b-4c44-8798-06959e234fe2":
     issues: ["https://www.notion.so/3f7a80b7192481b59c3ed5aa3573b938","https://www.notion.so/3f7a80b7192481298930ed402a873f0b","https://www.notion.so/3f7a80b719248188879ff674aea13f31"]
-    lastModified: "2026-11-02T23:31:29.406Z"
+    lastModified: "2026-11-03T00:02:34.404Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "771fdf69-d81a-483e-8108-7d1c1be810cb":
+    lastModified: "2026-11-03T00:02:22.145Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c32dda8-0714-4aca-ae95-2bdbf601ebb1":
     lastModified: "2026-11-02T23:09:17.618Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a23d8599-329b-438e-b907-f6370e63e9d2":
-    lastModified: "2026-11-02T23:42:30.336Z"
+    status: "completed"
+    startedAt: "2026-11-02T23:42:50.371Z"
+    completedAt: "2026-11-03T00:07:43.996Z"
+    endedAt: "2026-11-03T00:07:43.996Z"
+    activeIntervals: [{"end":"2026-11-03T00:07:43.996Z","start":"2026-11-02T23:42:50.371Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub session hosted via <ndx home>/hub/sidecar/host.lock (pid, port); hub proxies /hub/session/* to /api/sidecar/hub/* on the picked host (lock holder, else first healthy; unreachable skipped until next health check); hub lens = snapshot packet every turn, gated on web.sidecar; ceiling 40k via web.sidecarContextCeiling.hub; Claude spawn --tools \"\" + broker only; Codex refused; broker actions refuse all."
+    lastModified: "2026-11-03T00:07:43.996Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a5beb47d-a6c2-47da-a926-3078533e060d":
     status: "completed"

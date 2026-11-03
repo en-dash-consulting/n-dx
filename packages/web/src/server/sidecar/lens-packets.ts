@@ -1,7 +1,7 @@
 /**
  * Which packet each Sidecar lens opens a turn with.
  *
- * Six lenses have a builder today. General sends no packet. The rest need a
+ * Seven lenses have a builder today; one of them, hub, only a hub-scope session can open. General sends no packet. The rest need a
  * data source that does not exist yet, so they register as unavailable and
  * name it: a lens never sends a partial packet in place of the real one, and
  * the drawer can say why it is greyed out. When a source lands, its lens
@@ -30,6 +30,7 @@ import {
 } from "./packet-builders.js";
 import type { PacketSources } from "./packet-sources.js";
 import { buildDiagnoseBranchPacket, DIAGNOSE_BRANCH_CAP } from "./branch-packet.js";
+import { buildHubPacket, HUB_PACKET_CAP } from "./hub-packet.js";
 
 export const LENS_IDS = [
   "general",
@@ -60,6 +61,8 @@ export type LensPacketPlan =
       target?: LensTarget;
       /** A dashboard feature the lens needs on: while it is off the lens is unavailable and nothing is read. */
       feature?: LensFeature;
+      /** Only a session of this scope can open the lens; elsewhere it is unavailable. */
+      scope?: "hub";
     }
   | { kind: "unavailable"; needs: string };
 
@@ -97,8 +100,18 @@ export const LENS_PACKETS: Readonly<Record<LensId, LensPacketPlan>> = {
   },
   place: { kind: "unavailable", needs: "the Inbox list read" },
   migrate: { kind: "unavailable", needs: "the migration plan reads" },
-  hub: { kind: "unavailable", needs: "the hub snapshot" },
+  // Rebuilt every turn by the hub session (packetEveryTurn); a worktree session cannot open it.
+  hub: {
+    kind: "packet",
+    cap: HUB_PACKET_CAP,
+    build: buildHubPacket,
+    scope: "hub",
+    feature: { key: "web.sidecar", needs: "web.sidecar turned on in the project hosting the hub session" },
+  },
 };
+
+/** What a hub-only lens waits on in a worktree session. */
+export const HUB_SCOPE_NEEDS = "a hub session, opened from the hub home";
 
 export type LensPacketResult =
   | { status: "none"; lens: LensId }
@@ -125,6 +138,7 @@ export async function buildLensPacket(
   const plan = LENS_PACKETS[lens];
   if (plan.kind === "none") return { status: "none", lens };
   if (plan.kind === "unavailable") return { status: "unavailable", lens, needs: plan.needs };
+  if (plan.scope === "hub" && !sources.hubSnapshot) return { status: "unavailable", lens, needs: HUB_SCOPE_NEEDS };
   if (plan.feature && !sources.featureEnabled(plan.feature.key)) return { status: "unavailable", lens, needs: plan.feature.needs };
   if (plan.target && !target.ref) return { status: "unavailable", lens, needs: plan.target.needs };
   return { status: "ready", lens, packet: await plan.build(sources, target, now, signal) };

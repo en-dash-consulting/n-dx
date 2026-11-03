@@ -32,6 +32,34 @@ export const WORKSPACE_PATH_PREFIX = "/w/";
  */
 export const HUB_PATH = "/hub";
 
+/**
+ * Where the hub serves the hub-scope Sidecar session. The hub proxies
+ * everything under it to the project server hosting the session, at
+ * {@link HUB_SIDECAR_API_PREFIX}: `/hub/session/sessions/<id>/turns` reaches
+ * the host as `/api/sidecar/hub/sessions/<id>/turns`.
+ */
+export const HUB_SESSION_PATH = "/hub/session";
+
+/** The hub-scope Sidecar routes on the hosting project server. */
+export const HUB_SIDECAR_API_PREFIX = "/api/sidecar/hub";
+
+/**
+ * The host lock, as path segments under the per-user directory: the pid and
+ * port of the project server that hosts the hub session. The host writes it,
+ * the hub reads it to keep sending the session to its host.
+ */
+export const HUB_SIDECAR_HOST_LOCK_SEGMENTS = ["hub", "sidecar", "host.lock"] as const;
+
+/**
+ * The host path a `/hub/session/…` pathname is forwarded to, or null for a
+ * pathname outside it. The bare `/hub/session` maps to the prefix itself.
+ */
+export function hubSessionUpstreamPath(pathname: string): string | null {
+  if (pathname === HUB_SESSION_PATH) return HUB_SIDECAR_API_PREFIX;
+  if (!pathname.startsWith(`${HUB_SESSION_PATH}/`)) return null;
+  return `${HUB_SIDECAR_API_PREFIX}${pathname.slice(HUB_SESSION_PATH.length)}`;
+}
+
 const PROJECT_BASE_PATTERN = /^\/p\/([^/?#]+)/;
 const WORKSPACE_SLOT_PATTERN = /^\/w\/([^/?#]+)/;
 

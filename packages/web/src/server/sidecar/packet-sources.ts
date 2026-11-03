@@ -270,6 +270,19 @@ export interface PacketSources {
   featureEnabled(key: string): boolean;
   /** The branch status of the worktree `workspace` names; a string says why there is none. */
   branchHealth(workspace: string, signal?: AbortSignal): Promise<BranchHealthRead | string>;
+  /** The hub snapshot, rebuilt; only a hub-scope session has it. A string says why there is none. */
+  hubSnapshot?(signal?: AbortSignal): Promise<HubSnapshotRead | string>;
+}
+
+/** The hub snapshot one hub-session turn opens with. */
+export interface HubSnapshotRead {
+  text: string;
+  /** When its reads were made. */
+  generatedAt: string;
+  /** Keys of the items marked Δ. */
+  changed: string[];
+  /** Items left out to fit the cap. */
+  omitted: number;
 }
 
 /** Most characters of gate text a {@link TaskRunRead} carries, kept from the end. */

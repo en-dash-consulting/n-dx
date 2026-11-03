@@ -90,5 +90,13 @@ export type {
 export { decideProxy, matchProjectByDir, proxyHttp, proxyUpgrade, handleProxyRequest, handleProxyUpgrade, sidecarHeaderValue, SIDECAR_BASE_PATH_HEADER } from "./proxy.js";
 export type { ProxyDecision, SidecarForward } from "./proxy.js";
 export { buildHubOverview, fetchChildSnapshot, toProjectCard } from "./overview.js";
+export {
+  HubSessionHostPicker,
+  claimHubSessionHost,
+  hubSessionHostLockPath,
+  hubSidecarDir,
+  readHubSessionHostLock,
+} from "./session-host.js";
+export type { ClaimHubSessionHostInput, HubSessionHostClaim, HubSessionHostLock } from "./session-host.js";
 export type { HubOverview, ProjectCard, ChildSnapshot } from "./overview.js";
 export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel, readinessLabel, infrastructureLabel } from "./home.js";

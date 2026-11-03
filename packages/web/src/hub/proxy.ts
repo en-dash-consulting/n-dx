@@ -30,6 +30,11 @@
  * the sole project's dashboard with one registered, the chooser with several
  * — which leaves a dashboard no stable address to link back to.
  *
+ * `/hub/session/…` is the hub-scope Sidecar session: forwarded, HTTP and
+ * WebSocket alike, to `/api/sidecar/hub/…` on the project server hosting it
+ * (session-host.ts). Like everything here it is reached only past the hub's
+ * request guard, so the token and origin checks have already run.
+ *
  * Plain `node:http` and `node:net`: HTTP bodies stream in both directions;
  * a WebSocket upgrade is forwarded by writing the client's request head to
  * the upstream socket and piping the two sockets together.
@@ -57,6 +62,7 @@ import {
   stripBasePath,
   stripWorkspaceSlot,
   checkRunMode,
+  hubSessionUpstreamPath,
   removeTokenParam,
   tokensEqual,
 } from "../shared/index.js";
@@ -95,6 +101,11 @@ export type ProxyDecision =
   | { kind: "proxy"; project: ProjectView; path: string; prefix: string }
   /** An extension sidecar, started on demand by the hub's {@link SidecarManager}. */
   | { kind: "sidecar"; name: string; path: string; prefix: string }
+  /**
+   * `/hub/session/…`: the hub-scope Sidecar, on the project server the hub
+   * picks as its host (session-host.ts). `path` is the host's path for it.
+   */
+  | { kind: "hub-session"; path: string }
   /** The bare `/x/<name>`: the mount with its trailing slash. */
   | { kind: "redirect"; location: string }
   | { kind: "json"; status: number; body: unknown }
@@ -147,6 +158,11 @@ export function decideProxy(hub: Hub, url: string, upgrade = false): ProxyDecisi
     }
     return { kind: "proxy", project, path: stripBasePath(prefix, pathname) + query, prefix };
   }
+
+  // The hub session, above every project like the chooser: forwarded to
+  // whichever project server hosts it, picked when the request is handled.
+  const hubSession = hubSessionUpstreamPath(pathname);
+  if (hubSession !== null) return { kind: "hub-session", path: hubSession + withoutTokenParam(query) };
 
   // The chooser's fixed address, checked before the project rules so it
   // answers the same way at every project count. `/` cannot serve this
@@ -353,6 +369,7 @@ export function sidecarHeaderValue(lowerName: string, value: string, forward: Si
  * @param body When the hub already consumed the request body (to route on it),
  *   it is sent upstream in place of piping the request.
  * @param sidecar Set when the upstream is an extension sidecar.
+ * @param onUpstreamError Called when the upstream cannot be reached.
  */
 export function proxyHttp(
   req: IncomingMessage,
@@ -363,6 +380,7 @@ export function proxyHttp(
   body?: Buffer,
   extraHeaders: OutgoingHttpHeaders = {},
   sidecar?: SidecarForward,
+  onUpstreamError?: () => void,
 ): void {
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
   // Only the hub states its admission state; a client's copy never reaches the child.
@@ -410,6 +428,7 @@ export function proxyHttp(
   );
 
   upstream.on("error", (err) => {
+    onUpstreamError?.();
     if (!res.headersSent) {
       const body = JSON.stringify({ error: `Project server unreachable: ${err.message}` });
       res.writeHead(502, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) });
@@ -432,10 +451,12 @@ export function proxyUpgrade(
   path: string,
   prefix: string,
   sidecar?: SidecarForward,
+  onUpstreamError?: () => void,
 ): void {
   const upstream = connect(port, UPSTREAM_HOST);
 
   const fail = (): void => {
+    onUpstreamError?.();
     if (socket.writable) {
       socket.write("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
     }
@@ -478,6 +499,8 @@ export function proxyUpgrade(
   upstream.once("close", () => socket.destroy());
 }
 
+const NO_HUB_SESSION_HOST = "No registered project server is healthy to host the hub session";
+
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(text) });
@@ -503,6 +526,15 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       }
       res.once("close", hub.sidecars.beginRequest(decision.name));
       proxyHttp(req, res, started.port, decision.path, decision.prefix, undefined, {}, sidecarForward(hub, decision));
+      return;
+    }
+    case "hub-session": {
+      const host = hub.sessionHosts.pick(hub.listProjects());
+      if (!host) {
+        writeJson(res, 503, { error: NO_HUB_SESSION_HOST });
+        return;
+      }
+      proxyHttp(req, res, host.port, decision.path, "", undefined, {}, undefined, () => hub.sessionHosts.markUnreachable(host.project));
       return;
     }
     case "redirect":
@@ -768,6 +800,15 @@ export function handleProxyUpgrade(req: IncomingMessage, socket: Duplex, head: B
   }
   if (decision.kind === "proxy") {
     proxyUpgrade(req, socket, head, decision.project.port!, decision.path, decision.prefix);
+    return;
+  }
+  if (decision.kind === "hub-session") {
+    const host = hub.sessionHosts.pick(hub.listProjects());
+    if (!host) {
+      socket.end("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+      return;
+    }
+    proxyUpgrade(req, socket, head, host.port, decision.path, "", undefined, () => hub.sessionHosts.markUnreachable(host.project));
     return;
   }
   const status = decision.kind === "json" ? decision.status : 404;

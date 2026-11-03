@@ -24,6 +24,12 @@ describe("isSidecarBrokerRequest", () => {
     expect(isSidecarBrokerRequest(req("post", "/api/sidecar/sessions/cred-a/mcp?x=1", key))).toBe(true);
   });
 
+  it("accepts it on the hub session's /mcp too, and nowhere else under the hub prefix", () => {
+    expect(isSidecarBrokerRequest(req("POST", "/api/sidecar/hub/sessions/cred-a/mcp", key))).toBe(true);
+    expect(isSidecarBrokerRequest(req("POST", "/api/sidecar/hub/sessions/cred-a/turns", key))).toBe(false);
+    expect(isSidecarBrokerRequest(req("POST", "/api/sidecar/hub/x/sessions/cred-a/mcp", key))).toBe(false);
+  });
+
   it.each([
     ["GET", "/api/sidecar/sessions/cred-a/mcp"],
     ["POST", "/api/sidecar/sessions/cred-b/mcp"],

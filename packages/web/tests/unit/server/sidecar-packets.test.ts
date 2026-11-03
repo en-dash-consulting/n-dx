@@ -859,12 +859,44 @@ describe("lens registry", () => {
   it.each([
     ["place", "the Inbox list read"],
     ["migrate", "the migration plan reads"],
-    ["hub", "the hub snapshot"],
+    ["hub", "a hub session, opened from the hub home"],
   ])("%s reports itself unavailable, naming %s, and reads nothing", async (lens, needs) => {
     const prd = vi.fn();
     const result = await buildLensPacket(lens, {}, { ...(await sourcesFor("v2")), prd }, NOW);
     expect(result).toEqual({ status: "unavailable", lens, needs });
     expect(prd).not.toHaveBeenCalled();
+  });
+
+  describe("hub", () => {
+    const SNAPSHOT = { text: "Projects: 1 registered, 1 reachable.\n## app (app) · healthy", generatedAt: NOW, changed: [], omitted: 0 };
+
+    it("is the hub snapshot under the hub instructions, read fresh on each build", async () => {
+      const hubSnapshot = vi.fn(async () => SNAPSHOT);
+      const sources = { ...(await sourcesFor("v2", { featureEnabled: () => true })), hubSnapshot };
+      const first = await buildLensPacket("hub", {}, sources, NOW);
+      await buildLensPacket("hub", {}, sources, NOW);
+      expect(hubSnapshot).toHaveBeenCalledTimes(2);
+      expect(first.status).toBe("ready");
+      if (first.status !== "ready") return;
+      expect(first.packet.text).toContain("You cannot read files, repositories or transcripts");
+      expect(first.packet.text).toContain(SNAPSHOT.text);
+      expect(first.packet.cut).toEqual([]);
+    });
+
+    it("says why when the snapshot cannot be read, rather than sending an empty one", async () => {
+      const sources = { ...(await sourcesFor("v2", { featureEnabled: () => true })), hubSnapshot: async () => "no hub is running" };
+      const result = await buildLensPacket("hub", {}, sources, NOW);
+      expect(result.status === "ready" && result.packet.text).toContain("Not available: no hub is running");
+    });
+
+    it("while the host's web.sidecar is off is unavailable, naming it, and reads no snapshot", async () => {
+      const hubSnapshot = vi.fn(async () => SNAPSHOT);
+      const featureEnabled = vi.fn(() => false);
+      const result = await buildLensPacket("hub", {}, { ...(await sourcesFor("v2", { featureEnabled })), hubSnapshot }, NOW);
+      expect(result).toEqual({ status: "unavailable", lens: "hub", needs: "web.sidecar turned on in the project hosting the hub session" });
+      expect(featureEnabled).toHaveBeenCalledWith("web.sidecar");
+      expect(hubSnapshot).not.toHaveBeenCalled();
+    });
   });
 
   it("treats a lens this build does not know as unavailable, never as another lens", async () => {

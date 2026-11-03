@@ -95,3 +95,21 @@ describe("decideProxy: a sidecar never sees ndx_token in the query", () => {
     expect(decideProxy(one, "/x/recon/p?a=%20b&c")).toMatchObject({ kind: "sidecar", path: "/p?a=%20b&c" });
   });
 });
+
+describe("decideProxy: the hub session at /hub/session/", () => {
+  it("maps to the host's /api/sidecar/hub/ routes at every project count, for HTTP and upgrades alike", () => {
+    for (const hub of [none, one, several]) {
+      for (const upgrade of [false, true]) {
+        expect(decideProxy(hub, "/hub/session/sessions/s-1/turns", upgrade)).toEqual({ kind: "hub-session", path: "/api/sidecar/hub/sessions/s-1/turns" });
+      }
+      expect(decideProxy(hub, "/hub/session")).toEqual({ kind: "hub-session", path: "/api/sidecar/hub" });
+    }
+  });
+
+  it("drops the token parameter and leaves the chooser and look-alikes alone", () => {
+    expect(decideProxy(several, "/hub/session/sessions?ndx_token=T&a=1")).toEqual({ kind: "hub-session", path: "/api/sidecar/hub/sessions?a=1" });
+    expect(decideProxy(several, "/hub/").kind).toBe("home");
+    expect(decideProxy(several, "/hub/sessions").kind).not.toBe("hub-session");
+    expect(decideProxy(several, "/p/alpha/hub/session/x")).toMatchObject({ kind: "proxy", path: "/hub/session/x" });
+  });
+});

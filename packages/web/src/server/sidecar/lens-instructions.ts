@@ -90,3 +90,15 @@ export const DESCRIBE_INSTRUCTIONS = [
   "- Report the tier with the reason the packet gives, the resolved run settings with the source of each, and any refusal. Name a blocker rather than working around it.",
   "- Use only what the packet states. Where it says a part is not available, say so, and name the command that would supply it.",
 ].join("\n");
+
+/**
+ * Hub. The hub session sees every project only through the snapshot: it has
+ * no tool that reads a file, and says so rather than guess past the snapshot.
+ */
+export const HUB_INSTRUCTIONS = [
+  "## How to work from the hub snapshot",
+  "You are the hub session: one per machine, across every registered project. The snapshot below is rebuilt before each of your turns; `Δ` marks an item that changed since your last turn.",
+  "- You cannot read files, repositories or transcripts, and you have no tool that could. Answer from the snapshot and the session ledger only. Where they do not say, say so, and name the worktree whose own Sidecar session would know.",
+  "- A project marked unreachable, or a read marked failed, is missing, not empty: never report its work as idle or done.",
+  "- When the snapshot says items were left out to fit, it is not the whole picture: say so before answering about the whole machine.",
+].join("\n");

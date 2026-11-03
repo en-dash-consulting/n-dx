@@ -34,6 +34,16 @@
  * | GET  | `/api/sidecar/settings` | mode, context ceilings, idle window, GitHub reads (`sidecar/settings.ts`) |
  * | PUT  | `/api/sidecar/settings` | save them; `null` resets a value, an invalid one answers 400 and writes nothing |
  *
+ * **The hub session** has the same session routes under
+ * `/api/sidecar/hub/sessions`, which the hub serves at `/hub/session/sessions`
+ * (`GET`/`POST` the collection, then `:id`, `turns`, `frames`, `interrupt`,
+ * `end`, `cards`, `mcp` as above). There is one per machine, under
+ * `<ndx home>/hub/sidecar/`; this server serves it only while it holds the
+ * host lock (`hub/session-host.ts`). A create on Codex is refused, a second
+ * create answers the open session, and it keeps the hub lens, whose packet is
+ * the hub snapshot rebuilt every turn. Its broker carries out nothing
+ * ({@link hubSidecarActions}).
+ *
  * Sessions are the addressed workspace's: `ctx.projectDir` picks the registry
  * and broker (`<henchDir>/sidecar/`) and is the worktree a new session runs in.
  *
@@ -71,26 +81,29 @@ import { resolveContextCeiling } from "./sidecar/context-refresh.js";
 import { readSidecarSettings, resolveSidecarIdleMs, saveSidecarSettings } from "./sidecar/settings.js";
 import { commitSettingsChange } from "./settings-commit.js";
 import { readLedger } from "./sidecar/ledger.js";
-import { buildLensPacket, LENS_IDS, LENS_PACKETS, type LensTarget } from "./sidecar/lens-packets.js";
+import { buildLensPacket, HUB_SCOPE_NEEDS, LENS_IDS, LENS_PACKETS, type LensTarget } from "./sidecar/lens-packets.js";
 import type { PacketTarget } from "./sidecar/packet-builders.js";
-import { createPacketSources, readResolution, type BranchHealthRead, type SpawnedReads } from "./sidecar/packet-sources.js";
+import { createPacketSources, readResolution, type BranchHealthRead, type PacketSources, type SpawnedReads } from "./sidecar/packet-sources.js";
 import { githubFactsBody } from "./sidecar/branch-packet.js";
 import { baseCheckResult, postGithubDraft, readCheckOnBase } from "./sidecar/github.js";
 import { collectProjectBranchHealth } from "./routes-branch-health.js";
 import { NotAGitBranchError, type BranchHealthExec } from "./branch-health/index.js";
 import {
+  createHubSidecarRegistry,
   createWorktreeSidecarRegistry,
+  SidecarSessionRegistry,
   worktreeSidecarDir,
   type SidecarContextOptions,
   type SidecarFrame,
   type SidecarRegistryOptions,
   type SidecarSessionRecord,
   type SidecarTurnOutcome,
-  type SidecarSessionRegistry,
 } from "./sidecar/session-registry.js";
-import type { SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
+import { hubVendorRefusal, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
+import { hubSnapshotReader } from "./sidecar/hub-packet.js";
 import { WORKSPACE_HEADER } from "./workspaces.js";
-import { SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
+import { HUB_SIDECAR_API_PREFIX, SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
+import { claimHubSessionHost, hubSidecarDir, resolveHubHome } from "../hub/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
@@ -106,6 +119,8 @@ function sidecarLenses(ctx: ServerContext): Array<{ id: string; available: boole
   return LENS_IDS.map((id) => {
     const plan = LENS_PACKETS[id];
     if (plan.kind === "unavailable") return { id, available: false, needs: plan.needs };
+    // This listing is a worktree's: a hub-only lens cannot open here.
+    if (plan.kind === "packet" && plan.scope === "hub") return { id, available: false, needs: HUB_SCOPE_NEEDS };
     // Read per request, like every feature gate: turning the feature on or off needs no restart.
     if (plan.kind === "packet" && plan.feature && !isFeatureEnabled(ctx.projectDir, plan.feature.key)) {
       return { id, available: false, needs: plan.feature.needs };
@@ -211,6 +226,25 @@ export interface SidecarRouteOptions {
   brokerFor?: (projectDir: string) => SidecarBroker;
   /** What an approved broker call does. Defaults to {@link sidecarActions}. */
   actionsFor?: (ctx: ServerContext) => SidecarActions;
+  /** The hub-scope session's seams. */
+  hub?: HubSidecarRouteOptions;
+}
+
+export interface HubSidecarRouteOptions {
+  /** The per-user directory; defaults to `resolveNdxHome`'s answer. */
+  homeDir?: string;
+  /** This server's pid as the host lock records it. Defaults to `process.pid`. */
+  pid?: number;
+  /** Injected for tests: whether a lock holder's pid is alive. */
+  isAlive?: (pid: number) => boolean;
+  /** The registry over `dir`, built each time this server takes the host lock. Defaults to {@link createHubSidecarRegistry}. */
+  registryFor?: (dir: string) => SidecarSessionRegistry;
+  /** The broker over `dir`. Defaults to an announcing broker, built with the registry. */
+  brokerFor?: (dir: string) => SidecarBroker;
+  /** What an approved broker call does. Defaults to {@link hubSidecarActions}. */
+  actions?: SidecarActions;
+  /** The snapshot reads' fetch, for tests. */
+  fetch?: typeof fetch;
 }
 
 /**
@@ -534,6 +568,189 @@ function parseAfter(search: string): number | Error {
   return Number.isInteger(after) && after >= 0 ? after : new Error(`"after" must be a non-negative integer, got "${raw}"`);
 }
 
+// ── Hub scope ────────────────────────────────────────────────────────────
+
+const HUB_SESSIONS = `${HUB_SIDECAR_API_PREFIX}/sessions`;
+const HUB_LENS = "hub";
+const HUB_NO_EFFECT = "a hub session drafts and never acts, so this call does nothing from the hub";
+
+/**
+ * What an approved broker call does in the hub session: nothing. Every
+ * effect refuses, naming why, and no network read runs without a card.
+ */
+export function hubSidecarActions(): SidecarActions {
+  const refused = { ok: false, text: `Nothing was done: ${HUB_NO_EFFECT}.` };
+  return {
+    previewWork: async () => HUB_NO_EFFECT,
+    runCommand: () => refused,
+    startWork: async () => refused,
+    reviewChangeSet: async () => HUB_NO_EFFECT,
+    writeChangeSet: async () => refused,
+    readRunPlan: async () => HUB_NO_EFFECT,
+    githubReadsAllowed: () => false,
+    githubRead: async () => refused,
+    postGithub: async () => refused,
+  };
+}
+
+/** Where the hub session reaches its broker: this host's own loopback port, with the session's broker credential only. */
+export function hubSidecarBrokerEndpoint(ctx: ServerContext, sessionId: string): SidecarBrokerEndpoint | undefined {
+  if (!ctx.port) return undefined;
+  return {
+    url: `http://127.0.0.1:${ctx.port}${HUB_SESSIONS}/${sessionId}/mcp`,
+    headers: { [SIDECAR_BROKER_KEY_HEADER]: sidecarBrokerCredential(sessionId) },
+  };
+}
+
+/**
+ * Checkpoint wiring for the hub session: the host project's hub ceiling
+ * (`web.sidecarContextCeiling.hub`, default 40k, read per turn), the
+ * session's ledger, and the hub lens's packet rebuilt from a fresh snapshot
+ * on every turn.
+ */
+export function hubSidecarContextOptions(ctx: ServerContext, dir: string, opts: HubSidecarRouteOptions = {}): SidecarContextOptions {
+  return {
+    ceiling: () => resolveContextCeiling(ctx.projectDir, "hub"),
+    ledger: (record) => readLedger(dir, record.id),
+    packetEveryTurn: true,
+    packet: async (record, signal) => {
+      const sources: PacketSources = {
+        ...createPacketSources(ctx, prepareReads(ctx)),
+        hubSnapshot: hubSnapshotReader(dir, record.id, { homeDir: opts.homeDir, ...(opts.fetch && { fetch: opts.fetch }) }),
+      };
+      const built = await buildLensPacket(record.lens ?? HUB_LENS, {}, sources, new Date().toISOString(), signal);
+      return built.status === "ready" ? built.packet.text : undefined;
+    },
+  };
+}
+
+interface HubHostState {
+  registry: SidecarSessionRegistry;
+  broker: SidecarBroker;
+}
+
+/** This server's view of the hub session while it holds the host lock, by directory and pid. */
+const hubHosts = new Map<string, HubHostState>();
+
+/**
+ * The registry and broker this host serves the hub session with. Rebuilt
+ * from disk whenever the lock was just taken: another host may have run
+ * turns since this server last held it.
+ */
+function hubHostState(
+  ctx: ServerContext,
+  broadcast: WebSocketBroadcaster,
+  opts: HubSidecarRouteOptions,
+  dir: string,
+  pid: number,
+  acquired: boolean,
+): HubHostState {
+  const key = `${dir}\0${pid}`;
+  let state = hubHosts.get(key);
+  if (!state || acquired) {
+    state = {
+      registry: opts.registryFor
+        ? opts.registryFor(dir)
+        : createHubSidecarRegistry({
+            dir,
+            hostProjectDir: ctx.projectDir,
+            broker: (id) => hubSidecarBrokerEndpoint(ctx, id),
+            context: hubSidecarContextOptions(ctx, dir, opts),
+            ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
+            onTurnSpend: sidecarTurnSpendRecorder(ctx),
+          }),
+      broker: opts.brokerFor ? opts.brokerFor(dir) : createAnnouncingBroker(dir, broadcast),
+    };
+    hubHosts.set(key, state);
+  }
+  return state;
+}
+
+/** The machine's open hub session, if there is one. */
+function openHubSession(registry: SidecarSessionRegistry): SidecarSessionRecord | undefined {
+  return registry.list({ scope: "hub" }).find((session) => !session.endedAt);
+}
+
+/**
+ * Create the hub session, or answer the open one: there is one per machine.
+ * Claude only (see `hubVendorRefusal`). `hostedElsewhere` is set when this
+ * server does not hold the host lock: it may name the open session, never
+ * create one.
+ */
+function createHubSession(
+  registry: SidecarSessionRegistry,
+  dir: string,
+  body: Record<string, unknown>,
+  hostedElsewhere?: string,
+): CreateAnswer {
+  const vendor = optionalString(body, "vendor");
+  if (!vendor || vendor instanceof Error) return { status: 400, error: `"vendor" must be "claude"` };
+  const refusal = hubVendorRefusal(vendor);
+  if (refusal) return { status: 400, error: refusal };
+  const fields = readNameAndModel(body);
+  if (fields instanceof Error) return { status: 400, error: fields.message };
+  const lens = optionalString(body, "lens");
+  if (lens instanceof Error) return { status: 400, error: lens.message };
+  if (lens !== undefined && lens !== HUB_LENS) return { status: 400, error: `A hub session runs the ${HUB_LENS} lens, not "${lens}"` };
+  if (body.target !== undefined) return { status: 400, error: "A hub session takes no target" };
+  const open = openHubSession(registry);
+  if (open) return { status: 200, session: open };
+  if (hostedElsewhere) return { status: 409, error: hostedElsewhere };
+  return {
+    status: 201,
+    session: registry.create({ scope: "hub", worktree: dir, vendor, name: fields.name ?? "Hub session", ...(fields.model && { model: fields.model }), lens: HUB_LENS }),
+  };
+}
+
+/**
+ * The hub-scope session routes, `/api/sidecar/hub/sessions…`, which the hub
+ * serves at `/hub/session/sessions…`. The same session routes as a
+ * worktree's, over `<ndx home>/hub/sidecar/`, served only by the server
+ * holding the host lock. Another server answers a create with the open
+ * session (`hostedBy` naming its host) and everything else with 409.
+ */
+async function handleHubSidecarRoute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  ctx: ServerContext,
+  broadcast: WebSocketBroadcaster,
+  opts: HubSidecarRouteOptions = {},
+  pathname: string,
+  search: string,
+): Promise<boolean> {
+  if (!ctx.port) return refuse(res, 503, "This server has no port, so it cannot host the hub session");
+  const home = resolveHubHome(opts.homeDir);
+  const dir = hubSidecarDir(home);
+  const pid = opts.pid ?? process.pid;
+  const claim = claimHubSessionHost(home, { pid, port: ctx.port, ...(opts.isAlive && { isAlive: opts.isAlive }) });
+
+  if (!claim.held) {
+    const { holder } = claim;
+    const hosted = `The hub session is hosted by the project server with pid ${holder.pid} on port ${holder.port}`;
+    if (pathname !== HUB_SESSIONS || (req.method || "GET") !== "POST") return refuse(res, 409, hosted);
+    const body = await readJsonObject(req, res);
+    if (typeof body === "string") return refuse(res, 400, body);
+    // Read from disk, never served: this server's registry would go stale under the host's turns.
+    const onDisk = new SidecarSessionRegistry({ dir, connect: () => { throw new Error(hosted); } });
+    const answer = createHubSession(onDisk, dir, body, hosted);
+    if ("error" in answer) return refuse(res, answer.status, answer.error);
+    jsonResponse(res, 200, { session: answer.session, hostedBy: holder });
+    return true;
+  }
+
+  const { registry, broker } = hubHostState(ctx, broadcast, opts, dir, pid, claim.acquired);
+  return handleSessionRoutes(req, res, pathname, search, {
+    prefix: HUB_SESSIONS,
+    worktree: dir,
+    registry,
+    broker,
+    broadcast,
+    actions: () => opts.actions ?? hubSidecarActions(),
+    create: (body) => createHubSession(registry, dir, body),
+    lens: HUB_LENS,
+  });
+}
+
 export async function handleSidecarRoute(
   req: IncomingMessage,
   res: ServerResponse,
@@ -542,6 +759,9 @@ export async function handleSidecarRoute(
   opts: SidecarRouteOptions = {},
 ): Promise<boolean> {
   const [pathname, search = ""] = (req.url || "/").split("?");
+  if (pathname === HUB_SIDECAR_API_PREFIX || pathname.startsWith(`${HUB_SIDECAR_API_PREFIX}/`)) {
+    return handleHubSidecarRoute(req, res, ctx, broadcast, opts.hub, pathname, search);
+  }
   if (
     pathname !== PREFIX && !pathname.startsWith(`${PREFIX}/`)
     && pathname !== ALLOW_LIST_PATH && pathname !== SETTINGS_PATH && pathname !== LENSES_PATH && pathname !== PROPOSALS_PATH
@@ -613,9 +833,76 @@ export async function handleSidecarRoute(
     return refuse(res, 405, `${method} is not supported on ${ALLOW_LIST_PATH}`);
   }
 
-  if (pathname === PREFIX) {
+  return handleSessionRoutes(req, res, pathname, search, {
+    prefix: PREFIX,
+    worktree: ctx.projectDir,
+    registry,
+    broker,
+    broadcast,
+    actions: () => (opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast, { workspaces: opts.workspaces })),
+    create: (body) => createWorktreeSession(registry, ctx.projectDir, body),
+  });
+}
+
+/** What a create answers: the session and its status, or a refusal. */
+type CreateAnswer = { status: 200 | 201; session: SidecarSessionRecord } | { status: 400 | 409; error: string };
+
+/** One scope's session routes: where they are, whose sessions they serve, and how one is created. */
+interface SessionRouteScope {
+  /** The sessions collection's path. */
+  prefix: string;
+  /** The checkout whose sessions these are; a session of any other is 404. */
+  worktree: string;
+  registry: SidecarSessionRegistry;
+  broker: SidecarBroker;
+  broadcast: WebSocketBroadcaster;
+  /** What an approved broker call does. */
+  actions: () => SidecarActions;
+  create: (body: Record<string, unknown>) => CreateAnswer;
+  /** The one lens this scope's sessions run; a PATCH to another, or to a target, is refused. */
+  lens?: string;
+}
+
+/** The `name` and `model` fields of a create body, each a non-empty string when present. */
+function readNameAndModel(body: Record<string, unknown>): { name?: string; model?: string } | Error {
+  const fields: { name?: string; model?: string } = {};
+  for (const key of ["model", "name"] as const) {
+    const value = optionalString(body, key);
+    if (value instanceof Error) return value;
+    if (value !== undefined) fields[key] = value;
+  }
+  return fields;
+}
+
+function createWorktreeSession(registry: SidecarSessionRegistry, worktree: string, body: Record<string, unknown>): CreateAnswer {
+  const vendor = optionalString(body, "vendor");
+  if (!vendor || vendor instanceof Error || !vendorSessionDriver(vendor)) {
+    return { status: 400, error: `"vendor" must be a vendor with a resumable CLI session (claude, codex)` };
+  }
+  const fields = readNameAndModel(body);
+  if (fields instanceof Error) return { status: 400, error: fields.message };
+  const lens = optionalString(body, "lens");
+  if (lens instanceof Error) return { status: 400, error: lens.message };
+  const target = readTarget(body);
+  if (target instanceof Error) return { status: 400, error: target.message };
+  const session = registry.create({
+    scope: "worktree", worktree, vendor, ...fields, ...(lens && { lens }), ...(target && { target }),
+  });
+  return { status: 201, session };
+}
+
+async function handleSessionRoutes(
+  req: IncomingMessage,
+  res: ServerResponse,
+  pathname: string,
+  search: string,
+  scope: SessionRouteScope,
+): Promise<boolean> {
+  const method = req.method || "GET";
+  const { prefix, registry, broker, broadcast } = scope;
+  if (pathname === prefix) {
     if (method === "GET") {
-      const sessions = registry.list({ worktree: ctx.projectDir })
+      const sessions = registry.list({ worktree: scope.worktree })
         .map((session) => sessionResponse(registry, session));
       jsonResponse(res, 200, { sessions });
       return true;
@@ -623,36 +910,24 @@ export async function handleSidecarRoute(
     if (method === "POST") {
       const body = await readJsonObject(req, res);
       if (typeof body === "string") return refuse(res, 400, body);
-      const vendor = optionalString(body, "vendor");
-      if (!vendor || vendor instanceof Error || !vendorSessionDriver(vendor)) {
-        return refuse(res, 400, `"vendor" must be a vendor with a resumable CLI session (claude, codex)`);
-      }
-      const fields: Record<string, string | undefined> = {};
-      for (const key of ["model", "name", "lens"] as const) {
-        const value = optionalString(body, key);
-        if (value instanceof Error) return refuse(res, 400, value.message);
-        fields[key] = value;
-      }
-      const target = readTarget(body);
-      if (target instanceof Error) return refuse(res, 400, target.message);
-      const session = registry.create({
-        scope: "worktree", worktree: ctx.projectDir, vendor, ...fields, ...(target && { target }),
-      });
-      jsonResponse(res, 201, sessionResponse(registry, session));
+      const created = scope.create(body);
+      if ("error" in created) return refuse(res, created.status, created.error);
+      jsonResponse(res, created.status, sessionResponse(registry, created.session));
       return true;
     }
-    return refuse(res, 405, `${method} is not supported on ${PREFIX}`);
+    return refuse(res, 405, `${method} is not supported on ${prefix}`);
   }
+  if (!pathname.startsWith(`${prefix}/`)) return false;
 
   const match = /^\/([\w-]+)(?:\/(turns|frames|interrupt|end|cards|mcp)(?:\/([\w-]+))?)?$/
-    .exec(pathname.slice(PREFIX.length));
+    .exec(pathname.slice(prefix.length));
   if (!match) return false;
   const [, id, action, cardId] = match;
   if (cardId !== undefined && action !== "cards") return false;
   const session = registry.get(id);
   // One answer for a session this worktree does not hold, whether it does not
   // exist or belongs to another worktree's checkout.
-  if (!session || session.worktree !== ctx.projectDir) return refuse(res, 404, `No Sidecar session ${id}`);
+  if (!session || session.worktree !== scope.worktree) return refuse(res, 404, `No Sidecar session ${id}`);
 
   if (action === undefined && method === "PATCH") {
     const body = await readJsonObject(req, res);
@@ -665,6 +940,9 @@ export async function handleSidecarRoute(
     }
     const target = readTarget(body);
     if (target instanceof Error) return refuse(res, 400, target.message);
+    if (scope.lens && ((fields.lens !== undefined && fields.lens !== scope.lens) || target)) {
+      return refuse(res, 400, `A ${scope.lens} session keeps the ${scope.lens} lens and takes no target`);
+    }
     if ((fields.lens !== undefined || target) && session.endedAt) {
       return refuse(res, 409, `Sidecar session ${id} has ended`);
     }
@@ -759,7 +1037,7 @@ export async function handleSidecarRoute(
       if (session.endedAt || !registry.isRunning(id)) {
         return refuse(res, 409, `Sidecar session ${id} has no running turn`);
       }
-      await handleBrokerMcpRequest(req, res, broker, id, opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast, { workspaces: opts.workspaces }));
+      await handleBrokerMcpRequest(req, res, broker, id, scope.actions());
       return true;
   }
   return false;

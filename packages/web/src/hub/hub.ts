@@ -46,6 +46,7 @@ import { NO_NDX_CLI, SidecarManager, ndxCliPlanner } from "./sidecars.js";
 import { ndxCliLister } from "./extensions.js";
 import type { ListExtensions } from "./extensions.js";
 import type { SidecarManagerOptions } from "./sidecars.js";
+import { HubSessionHostPicker } from "./session-host.js";
 import { ensureAuthToken } from "@n-dx/llm-client";
 
 export const DEFAULT_HUB_PORT = 3117;
@@ -263,6 +264,8 @@ export class Hub {
   readonly token: string | null;
   /** Extension sidecars mounted at `/x/<name>/`. */
   readonly sidecars: SidecarManager;
+  /** Which project server hosts the hub-scope Sidecar session, served at `/hub/session/`. */
+  readonly sessionHosts: HubSessionHostPicker;
   /** Installed extensions as n-dx reports them, for `GET /api/hub/extensions`. */
   readonly listExtensions: ListExtensions;
   private readonly registry: HubRegistry;
@@ -300,6 +303,7 @@ export class Hub {
       drainIntervalMs: options.drainIntervalMs,
       log: this.log,
     });
+    this.sessionHosts = new HubSessionHostPicker(this.hubHome);
     this.sidecars = new SidecarManager({
       plan: options.ndxCli ? ndxCliPlanner(options.ndxCli, this.hubHome) : null,
       memoryFloorBytes: this.admission.limits.memoryFloorBytes,

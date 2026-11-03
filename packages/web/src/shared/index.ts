@@ -12,6 +12,10 @@ export type { FeatureToggle, FeaturesResponse } from "./features.js";
 export type { ViewerScope, SourcevisionScopeViewId } from "./view-routing.js";
 export {
   HUB_PATH,
+  HUB_SESSION_PATH,
+  HUB_SIDECAR_API_PREFIX,
+  HUB_SIDECAR_HOST_LOCK_SEGMENTS,
+  hubSessionUpstreamPath,
   PROJECT_PATH_PREFIX,
   WORKSPACE_PATH_PREFIX,
   detectBasePath,

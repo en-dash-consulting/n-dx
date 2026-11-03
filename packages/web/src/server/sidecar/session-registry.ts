@@ -20,7 +20,9 @@
  * project with no ignore line for it still never commits a transcript.
  *
  * Sessions are keyed by `(scope, worktree, id)`: `worktree` is the checkout a
- * session runs in, `scope` is `worktree` or `hub`.
+ * session runs in, `scope` is `worktree` or `hub`. The hub session's registry
+ * is `<ndx home>/hub/sidecar/` and runs in that directory, in no checkout
+ * ({@link createHubSidecarRegistry}).
  */
 
 import { randomUUID } from "node:crypto";
@@ -49,7 +51,7 @@ import { renderLedger, type LedgerEntry } from "./ledger.js";
 import type { PacketTarget } from "./packet-builders.js";
 import { resolveSidecarSessionEnv } from "./session-env.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
-import { sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
+import { hubVendorRefusal, sidecarSpawnFlags, writeBrokerMcpConfig, type SidecarBrokerEndpoint } from "./spawn-policy.js";
 
 /** Idle time after which a session forgets its resume id. */
 export const DEFAULT_SIDECAR_TTL_MS = 2 * 60 * 60 * 1000;
@@ -140,6 +142,12 @@ export interface SidecarContextOptions {
   ledger: (record: SidecarSessionRecord) => LedgerEntry[];
   /** The lens packet rebuilt fresh; `undefined` for a lens that sends none. */
   packet?: (record: SidecarSessionRecord, signal: AbortSignal) => Promise<string | undefined>;
+  /**
+   * Every turn carries a freshly built packet, not only one that opens a
+   * vendor session or follows a lens change. The hub session's snapshot
+   * describes a machine that moves between turns.
+   */
+  packetEveryTurn?: boolean;
 }
 
 /** What one finished turn spent, checkpoint included. */
@@ -196,17 +204,44 @@ export function createWorktreeSidecarRegistry(
 
 /**
  * What every Sidecar session's vendor CLI is opened with: the filtered
- * environment, the read-only spawn flags and a fresh MCP config naming only
- * the broker.
+ * environment, the read-only spawn flags for the session's scope and a fresh
+ * MCP config naming only the broker.
+ *
+ * @param envDir The project whose env policy and LLM config the session
+ *   takes; defaults to the session's own checkout. A hub session runs in no
+ *   checkout, so it takes its host project's.
  */
 export function sidecarSessionConnect(
   dir: string,
   broker?: WorktreeSidecarRegistryOptions["broker"],
+  envDir?: string,
 ): SidecarSessionConnect {
-  return (record) => ({
-    ...resolveSidecarSessionEnv(record.worktree),
-    ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, broker?.(record.id))),
-  });
+  return (record) => {
+    // Checked again here, past the create route: a hand-edited index must not open a hub session on a vendor that can read repositories.
+    const refusal = record.scope === "hub" ? hubVendorRefusal(record.vendor) : null;
+    if (refusal) throw new Error(refusal);
+    return {
+      ...resolveSidecarSessionEnv(envDir ?? record.worktree),
+      ...sidecarSpawnFlags(writeBrokerMcpConfig(dir, record.id, broker?.(record.id)), record.scope),
+    };
+  };
+}
+
+export interface HubSidecarRegistryOptions extends WorktreeSidecarRegistryOptions {
+  /** `<ndx home>/hub/sidecar/`: the index, transcripts, ledger and cards, and the session's working directory. */
+  dir: string;
+  /** The host project: its env policy and LLM config are the session's. */
+  hostProjectDir: string;
+}
+
+/**
+ * The hub-scope registry: sessions under `<ndx home>/hub/sidecar/`, each
+ * vendor CLI spawned with no built-in tool and the broker as its only MCP
+ * server, in that directory rather than any repository.
+ */
+export function createHubSidecarRegistry(opts: HubSidecarRegistryOptions): SidecarSessionRegistry {
+  const { broker, dir, hostProjectDir, ...rest } = opts;
+  return new SidecarSessionRegistry({ ...rest, dir, connect: sidecarSessionConnect(dir, broker, hostProjectDir) });
 }
 
 /** An open vendor session, and where its running turn's events go. */
@@ -359,7 +394,7 @@ export class SidecarSessionRegistry {
     this.reconcileCursor(record);
     // The packet opens a fresh vendor session and the turn after a lens or
     // target change; a refreshed turn carries it in its cold prompt.
-    const opening = !cold && !!context?.packet && (fresh || record.packetDue === true);
+    const opening = !cold && !!context?.packet && (fresh || record.packetDue === true || context.packetEveryTurn === true);
     // Consumed now, so a lens or target change made while this turn runs
     // stays due for the next one; restored below unless the turn completes.
     let delivered = false;
