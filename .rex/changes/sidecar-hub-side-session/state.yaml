@@ -12,7 +12,14 @@ items:
     lastModified: "2026-11-02T23:09:05.095Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "2b2b2441-2c3d-43c9-85a1-99049f429b7b":
-    lastModified: "2026-11-03T00:02:28.533Z"
+    status: "completed"
+    startedAt: "2026-11-03T00:14:16.235Z"
+    completedAt: "2026-11-03T00:20:08.452Z"
+    endedAt: "2026-11-03T00:20:08.452Z"
+    activeIntervals: [{"end":"2026-11-03T00:20:08.452Z","start":"2026-11-03T00:14:16.235Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub marks a host that answers 403 with x-ndx-feature-disabled: web.sidecar and skips it; refusal naming web.sidecar when all healthy projects are skipped. Tests in hub-session-proxy.test.ts."
+    lastModified: "2026-11-03T00:20:08.452Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "314d8fa3-ea8c-4950-8a02-bd836a646b39":
     lastModified: "2026-11-03T00:02:34.404Z"

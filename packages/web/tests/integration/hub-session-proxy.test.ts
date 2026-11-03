@@ -24,6 +24,7 @@ import {
   type ProjectView,
 } from "../../src/hub/index.js";
 import { guardHubRequest, upgradeRefusal } from "../../src/hub/request-guard.js";
+import { FEATURE_DISABLED_HEADER } from "../../src/shared/index.js";
 
 const TOKEN = "per-user-token";
 
@@ -56,7 +57,7 @@ async function startUpstream(): Promise<Upstream> {
   const server = createServer((req: IncomingMessage, res) => {
     seen.push({ url: req.url ?? "", token: req.headers["x-ndx-token"] as string | undefined });
     if (upstream.sidecarOff) {
-      res.writeHead(403, { "Content-Type": "application/json", "x-ndx-feature-disabled": "web.sidecar" });
+      res.writeHead(403, { "Content-Type": "application/json", [FEATURE_DISABLED_HEADER]: "web.sidecar" });
       res.end(JSON.stringify({ kind: "feature_disabled", feature: "web.sidecar" }));
       return;
     }
