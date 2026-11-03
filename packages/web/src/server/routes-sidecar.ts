@@ -617,8 +617,15 @@ export function hubSidecarContextOptions(ctx: ServerContext, dir: string, opts: 
     ledger: (record) => readLedger(dir, record.id),
     packetEveryTurn: true,
     packetDelivered: (record) => {
-      pending.get(record.id)?.();
+      const commit = pending.get(record.id);
       pending.delete(record.id);
+      // The turn reached the model either way. Unsaved fingerprints only make
+      // the next turn mark Δ against an older snapshot, so the turn stands.
+      try {
+        commit?.();
+      } catch (err) {
+        console.error(`[sidecar] could not save the hub snapshot fingerprints for session ${record.id}: ${errorMessage(err)}`);
+      }
     },
     packet: async (record, signal) => {
       pending.delete(record.id);

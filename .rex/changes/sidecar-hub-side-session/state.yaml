@@ -29,7 +29,14 @@ items:
     lastModified: "2026-11-03T00:02:34.404Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "771fdf69-d81a-483e-8108-7d1c1be810cb":
-    lastModified: "2026-11-03T00:02:22.145Z"
+    status: "completed"
+    startedAt: "2026-11-03T00:20:14.057Z"
+    completedAt: "2026-11-03T00:25:25.142Z"
+    endedAt: "2026-11-03T00:25:25.142Z"
+    activeIntervals: [{"end":"2026-11-03T00:25:25.142Z","start":"2026-11-03T00:20:14.057Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Snapshot fingerprints commit only via new SidecarContextOptions.packetDelivered after a completed turn."
+    lastModified: "2026-11-03T00:25:25.142Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c32dda8-0714-4aca-ae95-2bdbf601ebb1":
     lastModified: "2026-11-02T23:09:17.618Z"

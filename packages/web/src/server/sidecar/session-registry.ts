@@ -468,10 +468,11 @@ export class SidecarSessionRegistry {
       // An opening turn that failed or was stopped may never have reached
       // the model: the next turn carries the packet again.
       if (opening && !delivered) record.packetDue = true;
-      if ((opening || cold) && delivered) context?.packetDelivered?.(record);
       live.sink = undefined;
       record.lastActivityAt = this.iso();
       this.persist();
+      // After the persist, so the turn is saved whatever the hook does.
+      if ((opening || cold) && delivered) context?.packetDelivered?.(record);
     }
   }
 

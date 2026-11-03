@@ -22,7 +22,7 @@ import { HUB_PID_FILE, hubSessionHostLockPath, hubSidecarDir, readHubSessionHost
 import { enforceRouteFeatureGate } from "../../../src/server/route-feature-gates.js";
 import { handleSidecarRoute, hubSidecarContextOptions, type SidecarFramesMessage } from "../../../src/server/routes-sidecar.js";
 import { CHECKPOINT_PROMPT } from "../../../src/server/sidecar/context-refresh.js";
-import { SidecarSessionRegistry } from "../../../src/server/sidecar/session-registry.js";
+import { SidecarSessionRegistry, type SidecarSessionRecord } from "../../../src/server/sidecar/session-registry.js";
 import type { ServerContext } from "../../../src/server/types.js";
 import { removeTestDir, startRouteTestServer, type RouteTestServer } from "../../helpers/server-route-test-support.js";
 
@@ -259,6 +259,23 @@ describe("the hub lens packet", () => {
     await turn(host, session.id, "again");
     expect(prompts.at(-1)).toMatch(/Δ.*feat\/x|feat\/x.*Δ/);
     expect(readFileSync(snapshotPath, "utf-8")).not.toBe(delivered);
+  });
+
+  it("reports, and does not throw, when a delivered snapshot's fingerprints cannot be saved", async () => {
+    const dir = hubSidecarDir(home);
+    mkdirSync(dir, { recursive: true });
+    const options = hubSidecarContextOptions({ ...ctx, port: 4321 }, dir, { homeDir: home, fetch: fakeHubFetch });
+    const record = { id: "s-1", lens: "hub" } as SidecarSessionRecord;
+    expect(await options.packet!(record, new AbortController().signal)).toContain("## Hub snapshot");
+    // Built, then blocked: a non-empty directory where the fingerprints go makes the atomic rename fail.
+    mkdirSync(join(dir, "s-1.snapshot.json", "x"), { recursive: true });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(() => options.packetDelivered!(record)).not.toThrow();
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("could not save the hub snapshot fingerprints for session s-1"));
+    } finally {
+      error.mockRestore();
+    }
   });
 });
 
