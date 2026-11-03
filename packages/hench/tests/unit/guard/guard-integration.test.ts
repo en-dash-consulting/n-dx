@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GuardRails, GuardError } from "../../../src/guard/index.js";
 import { DEFAULT_HENCH_CONFIG } from "../../../src/schema/v1.js";
+import { mkdtemp, mkdir, rm, symlink, writeFile, realpath } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { toolReadFile, toolWriteFile, toolListDirectory, toolSearchFiles } from "../../../src/tools/files.js";
+import { toolRunCommand } from "../../../src/tools/shell.js";
+import { symlinksSupported } from "../../helpers/symlinks.js";
 
 describe("GuardRails integration", () => {
   const projectDir = "/project";
@@ -206,5 +213,69 @@ describe("GuardRails integration", () => {
       expect(() => guard.checkCommand("npm test && rm -rf /")).toThrow(/shell operator/);
       expect(guard.sessionCounters.commandsRun).toBe(0);
     });
+  });
+});
+
+describe.skipIf(!symlinksSupported())("GuardRails link containment through the tools", () => {
+  let base: string;
+  let projectDir: string;
+  let outside: string;
+  let realProject: string;
+  let guard: GuardRails;
+
+  beforeEach(async () => {
+    base = await mkdtemp(join(tmpdir(), "hench-guard-links-"));
+    projectDir = join(base, "project");
+    outside = join(base, "outside");
+    await mkdir(join(projectDir, "src"), { recursive: true });
+    await mkdir(outside, { recursive: true });
+    await writeFile(join(projectDir, "src", "main.ts"), "export const x = 1;\n");
+    await writeFile(join(outside, "secret.txt"), "outside\n");
+    await symlink(outside, join(projectDir, "link-out"), "dir");
+    await symlink(join(outside, "secret.txt"), join(projectDir, "link-file"), "file");
+    await symlink(join(projectDir, "src"), join(projectDir, "link-in"), "dir");
+    realProject = await realpath(projectDir);
+    guard = new GuardRails(projectDir, DEFAULT_HENCH_CONFIG().guard);
+  });
+
+  afterEach(async () => {
+    await rm(base, { recursive: true, force: true });
+  });
+
+  it("read_file refuses a linked directory and a linked file that point outside", async () => {
+    await expect(toolReadFile(guard, { path: "link-out/secret.txt" })).rejects.toThrow(GuardError);
+    await expect(toolReadFile(guard, { path: "link-file" })).rejects.toThrow(GuardError);
+  });
+
+  it("write_file refuses to create a file under a linked directory that points outside", async () => {
+    await expect(
+      toolWriteFile(guard, { path: "link-out/new/file.txt", content: "x" }),
+    ).rejects.toThrow(GuardError);
+    expect(existsSync(join(outside, "new"))).toBe(false);
+  });
+
+  it("list_directory and search_files refuse a linked directory that points outside", async () => {
+    await expect(toolListDirectory(guard, { path: "link-out" })).rejects.toThrow(GuardError);
+    await expect(toolSearchFiles(guard, { pattern: "outside", path: "link-out" })).rejects.toThrow(GuardError);
+  });
+
+  it("run_command refuses a cwd that links outside the project", async () => {
+    await expect(
+      toolRunCommand(guard, projectDir, { command: "node -v", cwd: "link-out" }),
+    ).rejects.toThrow(GuardError);
+  });
+
+  it("follows a link that stays inside the project", async () => {
+    expect(await toolReadFile(guard, { path: "link-in/main.ts" })).toBe("export const x = 1;\n");
+    expect(guard.checkPath("link-in/main.ts")).toBe(join(realProject, "src", "main.ts"));
+  });
+
+  it("creates a new nested file under a real directory, parents included", async () => {
+    await toolWriteFile(guard, { path: "src/deep/nested/new.ts", content: "ok" });
+    expect(readFileSync(join(realProject, "src", "deep", "nested", "new.ts"), "utf-8")).toBe("ok");
+  });
+
+  it("checkPath returns the project directory's real path", () => {
+    expect(guard.checkPath(".")).toBe(realProject);
   });
 });

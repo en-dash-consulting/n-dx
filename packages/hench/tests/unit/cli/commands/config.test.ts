@@ -18,7 +18,7 @@ describe("getConfigValue", () => {
   it("reads top-level values", () => {
     expect(getConfigValue(config, "provider")).toBe("cli");
     expect(getConfigValue(config, "model")).toBe("sonnet");
-    expect(getConfigValue(config, "maxTurns")).toBe(50);
+    expect(getConfigValue(config, "maxTurns")).toBe(200);
   });
 
   it("reads nested values", () => {

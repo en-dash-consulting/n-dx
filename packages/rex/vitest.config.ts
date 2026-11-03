@@ -14,6 +14,7 @@ export default defineConfig({
       { find: /^@n-dx\/claude-client$/, replacement: `${claudeClientRoot}/src/public.ts` },
       // Map @n-dx/llm-client to source public.ts for vitest
       { find: /^@n-dx\/llm-client$/, replacement: `${llmClientRoot}/src/public.ts` },
+      { find: /^@n-dx\/lang-kit$/, replacement: resolve(import.meta.dirname, "../lang-kit/src/index.ts") },
       // Map local .js imports to .ts files (only relative paths)
       { find: /^(\..+)\.js$/, replacement: "$1.ts" },
     ],

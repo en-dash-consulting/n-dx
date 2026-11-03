@@ -379,3 +379,19 @@ describe("met product nodes", () => {
     expect(plan.entries.filter((e) => e.target === "change").every((e) => e.met === undefined)).toBe(true);
   });
 });
+
+
+describe("caller-supplied code evidence", () => {
+  it("places a held change by files realized by applied history, with a named reason", () => {
+    const history = item("task", "Delivered service");
+    const capability = item("feature", "Invoice storage", [history]);
+    const held = item("task", "Polish zebra", [], "pending");
+    const items = [item("epic", "Managing accounts", [capability]), item("epic", "Release 0.9.0", [held])];
+    expect(byTitle(classifyV1Tree(items).entries, held.title).needsPlacement).toBe(true);
+    const filesOf = (id: string) => id === held.id || id === history.id ? ["src/ledger.ts"] : [];
+    const entry = byTitle(classifyV1Tree(items, { filesOf }).entries, held.title);
+    expect(entry.placement).toBe(capability.id);
+    expect(entry.needsPlacement).not.toBe(true);
+    expect(entry.reasons.join(" ")).toContain("file evidence: src/ledger.ts");
+  });
+});

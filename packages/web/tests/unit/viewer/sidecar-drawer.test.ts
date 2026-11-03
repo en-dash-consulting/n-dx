@@ -669,7 +669,7 @@ describe("tool calls", () => {
   });
   const result = (seq: number, tool: string, output: string, callId?: string): SidecarFrame => ({
     seq, at: "t", type: "event",
-    event: { type: "tool_result", toolResult: { tool, output, durationMs: 5, ...(callId ? { callId } : {}) } },
+    event: { type: "tool_result", toolResult: { tool, output, durationMs: 5, ...(callId ? { id: callId } : {}) } },
   });
 
   it("pairs a result naming its call by id with that call, whatever the order", () => {

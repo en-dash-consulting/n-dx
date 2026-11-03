@@ -54,3 +54,6 @@
 
 (field_access
   object: (identifier) @typeref.qualifier)
+
+; The bare receiver of `Type::method` is an identifier, not a type_identifier.
+(method_reference . (identifier) @typeref.qualifier)

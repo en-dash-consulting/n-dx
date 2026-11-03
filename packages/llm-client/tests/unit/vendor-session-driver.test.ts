@@ -170,10 +170,10 @@ describe("claude tool results", () => {
   it("turns a user line into one tool_result per block, each naming its call", () => {
     const events = claudeSessionDriver.parseLineEvents(twoResults, 2);
     expect(events.map((e) => [e.type, e.turn, e.toolResult])).toEqual([
-      ["tool_result", 2, { tool: "unknown", output: "     1\tconst a = 1;", durationMs: 0, callId: "toolu_01A" }],
-      ["tool_result", 2, { tool: "unknown", output: "line one\nline two", durationMs: 0, callId: "toolu_01B" }],
+      ["tool_result", 2, { tool: "", output: "     1\tconst a = 1;", durationMs: 0, id: "toolu_01A" }],
+      ["tool_result", 2, { tool: "", output: "line one\nline two", durationMs: 0, id: "toolu_01B" }],
     ]);
-    expect(claudeSessionDriver.parseLine(twoResults, 2)?.toolResult?.callId).toBe("toolu_01A");
+    expect(claudeSessionDriver.parseLine(twoResults, 2)?.toolResult?.id).toBe("toolu_01A");
   });
 
   it("caps a result's output like any tool output", () => {

@@ -108,6 +108,50 @@ describe("rex.applyOn modes", () => {
   });
 });
 
+describe("a change nested in another", () => {
+  const INNER = "A shopper can pay by card or Apple Pay.";
+  /** OUTER (CH-1) holds INNER (CH-2); both completed and unapplied, both amending A1.1. */
+  function nested(): V2Tree {
+    const t = tree();
+    t.changes[0].children = [
+      {
+        id: "change-2",
+        type: "change",
+        title: "Apple Pay",
+        slug: "apple-pay",
+        displayId: "CH-2",
+        status: "completed",
+        amends: [{ delta: "modified", target: "A1.1", proposed: INNER, summary: "Add Apple Pay" }],
+      } as RuleNode,
+    ];
+    return t;
+  }
+
+  it("changesAwaitingApply returns the nested change before the change that holds it", () => {
+    expect(changesAwaitingApply(nested()).map((c) => c.id)).toEqual(["change-2", "change-1"]);
+  });
+
+  it("refuses a steward apply of the container while its nested change is unapplied, naming it", () => {
+    const t = nested();
+    let error: unknown;
+    try {
+      run("review", "steward", t);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ApplyAmendmentsError);
+    expect((error as Error).message).toMatch(/change CH-2 is not applied; a change applies after the changes nested in it/);
+    expect(statement(t)).toBe(OLD);
+
+    const inner = applyOnTrigger(t, "CH-2", "steward", { ...OPTS, applyOn: "review" });
+    expect(inner.applied).toBe(true);
+    if (!inner.applied) return;
+    const outer = applyOnTrigger(inner.result.tree, "CH-1", "steward", { ...OPTS, applyOn: "review" });
+    expect(outer.applied).toBe(true);
+    if (outer.applied) expect(statement(outer.result.tree)).toBe(NEW);
+  });
+});
+
 describe("rex.applyOn setting", () => {
   it("defaults to complete; an invalid value falls back with a warning", () => {
     expect(parseApplyOn({})).toEqual({ applyOn: "complete", warnings: [] });

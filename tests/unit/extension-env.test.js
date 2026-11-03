@@ -92,14 +92,14 @@ describe("extensionEnvironment", () => {
   it("names a running hub and its token file, never the token", () => {
     const isAlive = startHub();
     const env = build({ isAlive, baseEnv: {} });
-    expect(env.NDX_HUB_URL).toBe("http://localhost:3999");
+    expect(env.NDX_HUB_URL).toBe("http://127.0.0.1:3999");
     expect(env.NDX_TOKEN_FILE).toBe(join(home, "auth.token"));
     for (const value of Object.values(env)) expect(value).not.toContain(TOKEN);
   });
 
   it("omits the token file when the hub runs without one", () => {
     const env = build({ isAlive: startHub({ token: false }) });
-    expect(env.NDX_HUB_URL).toBe("http://localhost:3999");
+    expect(env.NDX_HUB_URL).toBe("http://127.0.0.1:3999");
     expect(env).not.toHaveProperty("NDX_TOKEN_FILE");
   });
 

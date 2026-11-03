@@ -49,6 +49,7 @@ import { isFeatureDisabled, onDegradationChange } from "./performance/index.js";
 import { bootstrap } from "./bootstrap.js";
 import { isDeployedMode, installFetchAdapter } from "./deployed-mode.js";
 import { installBasePathFetch } from "./base-path.js";
+import { waitForSession } from "./session.js";
 import { renderActiveView, renderViewContent, buildValidViews } from "./views/view-registry.js";
 import { isLiveView, isSettingsView, stageForView } from "./views/stages.js";
 import { LiveBar } from "./views/domain-live.js";
@@ -309,12 +310,12 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
           renderViewContent(view, loading, viewCtx),
         )
       : null,
-    (refreshToast && !isFeatureDisabled("autoRefresh"))
-      ? h("div", { class: "refresh-toast", role: "status", "aria-live": "polite" }, "Data updated")
-      : null,
-    h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
-    // One bottom-right row for every floating status pill (styles/status-dock.css).
+    // All persistent and transient notices share flow and one fixed anchor.
     h("div", { class: "status-dock" },
+      (refreshToast && !isFeatureDisabled("autoRefresh"))
+        ? h("div", { class: "refresh-toast", role: "status", "aria-live": "polite" }, "Data updated")
+        : null,
+      h(PollingSuspensionIndicator, { isSuspended: pollingSuspended, suspendedCount: pollingSuspendedCount, onRefresh: handleManualRefresh }),
       h(ActiveOperationsTray, { operations: jobs.operations, navigateTo, onStop: jobs.stop }),
       h(RefreshQueueStatus, { state: refreshQueueState, visible: !isFeatureDisabled("autoRefresh") }),
     ),
@@ -338,8 +339,14 @@ function App({ scope, server = null }: { scope: string | null; server?: ServerId
 
 const root = document.getElementById("app");
 if (root) {
-  // Fetch config before first render to avoid a flash of unscoped content
-  fetchBootConfig().then(({ scope, server }) => {
-    render(h(App, { scope, server }), root);
+  // Signed in first (the page's session script exchanges the landing nonce;
+  // see viewer/session.ts). When it cannot be, the script has put its sign-in
+  // notice up in place of the page, and nothing renders over it.
+  void waitForSession().then(({ ok }) => {
+    if (!ok) return;
+    // Fetch config before first render to avoid a flash of unscoped content
+    return fetchBootConfig().then(({ scope, server }) => {
+      render(h(App, { scope, server }), root);
+    });
   });
 }

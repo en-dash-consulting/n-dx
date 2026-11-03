@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { VendorSessionOptions } from "@n-dx/llm-client";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { handleRequestSecurity } from "../../src/server/request-security.js";
+import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "../../src/server/request-security.js";
 import { createAnnouncingBroker, handleSidecarRoute, sidecarBrokerEndpoint } from "../../src/server/routes-sidecar.js";
 import { isSidecarBrokerRequest } from "../../src/server/sidecar/broker-credential.js";
 import { SidecarSessionRegistry, sidecarSessionConnect } from "../../src/server/sidecar/session-registry.js";
@@ -67,6 +67,11 @@ beforeEach(async () => {
   const broker = createAnnouncingBroker(dir, () => {});
   server = await startRouteTestServer((req, res) => {
     if (handleRequestSecurity(req, res, { token: TOKEN, scopedCredential: isSidecarBrokerRequest })) return true;
+    // As start.ts does: no credential gets the public shell, and this harness serves none.
+    if (isPublicOnlyRequest(req)) {
+      refusePublicOnly(req, res);
+      return true;
+    }
     return handleSidecarRoute(req, res, ctx, () => {}, { registryFor: () => registry, brokerFor: () => broker });
   });
   ctx.port = server.port;
