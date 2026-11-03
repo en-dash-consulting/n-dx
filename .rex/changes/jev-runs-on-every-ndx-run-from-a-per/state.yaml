@@ -1,10 +1,12 @@
 schema: "rex/v2"
 items:
   "0f3163d9-7548-4ff5-abfa-d62d7640c42f":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-03T18:34:02.653Z"
-    activeIntervals: [{"start":"2026-11-03T18:34:02.653Z"}]
-    lastModified: "2026-11-03T18:34:06.845Z"
+    completedAt: "2026-11-03T19:36:04.383Z"
+    endedAt: "2026-11-03T19:36:04.383Z"
+    activeIntervals: [{"end":"2026-11-03T19:07:11.767Z","start":"2026-11-03T18:34:02.653Z"},{"end":"2026-11-03T19:36:04.383Z","start":"2026-11-03T19:36:04.383Z"}]
+    lastModified: "2026-11-03T19:36:04.383Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "10730d82-59f1-4ea2-9594-667318da70d2":
     status: "completed"
@@ -150,8 +152,11 @@ items:
     lastModified: "2026-11-02T23:15:31.974Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f912174e-96e5-41a3-acd9-5c73bae27c5b":
+    status: "completed"
     startedAt: "2026-11-03T17:50:02.094Z"
-    activeIntervals: [{"end":"2026-11-03T18:15:54.465Z","start":"2026-11-03T17:50:02.094Z"},{"end":"2026-11-03T18:18:20.060Z","start":"2026-11-03T18:18:17.187Z"},{"end":"2026-11-03T18:31:46.028Z","start":"2026-11-03T18:19:05.082Z"}]
+    completedAt: "2026-11-03T19:36:13.293Z"
+    endedAt: "2026-11-03T19:36:13.293Z"
+    activeIntervals: [{"end":"2026-11-03T18:15:54.465Z","start":"2026-11-03T17:50:02.094Z"},{"end":"2026-11-03T18:18:20.060Z","start":"2026-11-03T18:18:17.187Z"},{"end":"2026-11-03T18:31:46.028Z","start":"2026-11-03T18:19:05.082Z"},{"end":"2026-11-03T19:36:13.293Z","start":"2026-11-03T19:36:13.293Z"}]
     failureReason: "The messages are done and committed (cfdc67c6c, 1dcedacaf). The test gate failed on one stale assertion: tests/e2e/cli-auth.test.js:185 ('ndx auth does not send the variable an untrusted repository names') still expects 'export GEMINI_API_KEY=', but the Google preflight now prints 'Or set the env var: export GEMINI_API_KEY'. Update that assertion to the new text and also assert stderr does not contain SENTINEL_VAR, which is the point of the test. Do not redo the message work; run tests/e2e/cli-auth.test.js and tests/e2e/key-argv-message-policy.test.js."
-    lastModified: "2026-11-03T18:31:53.837Z"
+    lastModified: "2026-11-03T19:36:13.293Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
