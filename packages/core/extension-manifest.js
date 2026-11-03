@@ -114,6 +114,7 @@ export const EXTENSION_MANIFEST_RULES = Object.freeze({
   "url-path": "use a path starting with /, e.g. /healthz",
   "positive-integer": "use a whole number of minutes, 1 or more",
   "needs-sidecar": "declare a sidecar, or remove the hub, projectLinks and sidecarTab entries",
+  "link-dot-segment": "remove the . and .. segments (raw or %2e) so the path stays under /x/<name>/",
   "link-placeholder": `use only ${PROJECT_LINK_PLACEHOLDERS.map((p) => `{${p}}`).join(" and ")} as placeholders`,
 });
 
@@ -600,6 +601,9 @@ function checkLinkTarget(target, path, report) {
   if (target.path === undefined) report(`${path}.path`, "required", "is missing");
   else if (checkString(target.path, `${path}.path`, report)) {
     if (!target.path.startsWith("/")) report(`${path}.path`, "url-path", `"${target.path}" does not start with /`);
+    if (hasDotSegment(target.path)) {
+      report(`${path}.path`, "link-dot-segment", `"${target.path}" has a . or .. segment, which leaves /x/<name>/`);
+    }
     // `[^{}]`, not `[^}]`: a run of `{` would otherwise rescan to the end from each one.
     for (const [, placeholder] of target.path.matchAll(/\{([^{}]*)\}/g)) {
       if (!PROJECT_LINK_PLACEHOLDERS.includes(placeholder)) {
@@ -607,6 +611,18 @@ function checkLinkTarget(target, path, report) {
       }
     }
   }
+}
+
+/**
+ * True when the path part of a link (before `?` or `#`) has a `.` or `..`
+ * segment. A browser drops `%2e` and treats `\` as `/` before it resolves dot
+ * segments, so both count.
+ *
+ * @param {string} linkPath
+ */
+function hasDotSegment(linkPath) {
+  const pathPart = linkPath.split(/[?#]/, 1)[0];
+  return pathPart.split(/[/\\]/).some((segment) => /^\.{1,2}$/.test(segment.replace(/%2e/gi, ".")));
 }
 
 /**

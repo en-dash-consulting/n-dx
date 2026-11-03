@@ -254,6 +254,16 @@ describe("GET /api/hub/extensions", () => {
     ]);
   });
 
+  it("every tab and link URL stays under /x/<name>/ after URL normalization", () => {
+    const project = { id: "../..", repoRoot: "/../r/%2e%2e" };
+    const answer = buildExtensionsAnswer({ extensions: [listing("recon", "enabled")], errors: [] }, [], project);
+    const urls = answer.extensions.flatMap((e) => [...(e.links ?? []).map((l) => l.url), ...(e.tab ? [e.tab.url] : [])]);
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(new URL(url, "http://hub.test").pathname.startsWith("/x/recon/"), url).toBe(true);
+    }
+  });
+
   it("is 503 with { error } when n-dx cannot be asked", async () => {
     const h = await hub({ listExtensions: undefined });
     const { status, body } = await api(h, "/api/hub/extensions");

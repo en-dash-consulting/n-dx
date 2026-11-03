@@ -93,6 +93,10 @@ const RULE_FIXTURES = {
   "url-path": { fail: (m) => { m.sidecar.health = "healthz"; }, pass: (m) => { m.sidecar.health = "/ready"; } },
   "positive-integer": { fail: (m) => { m.sidecar.idleStopMinutes = 0; }, pass: (m) => { m.sidecar.idleStopMinutes = 1; } },
   "needs-sidecar": { fail: (m) => { delete m.sidecar; }, pass: (m) => { delete m.sidecar; delete m.hub; delete m.projectLinks; delete m.sidecarTab; } },
+  "link-dot-segment": {
+    fail: (m) => { m.projectLinks[0].path = "/../../api/hub/extensions"; },
+    pass: (m) => { m.projectLinks[0].path = "/project/v1.2/..report?root=../x"; },
+  },
   "link-placeholder": {
     fail: (m) => { m.projectLinks[0].path = "/project/{projectName}"; },
     pass: (m) => { m.projectLinks[0].path = "/project/{projectId}"; },
@@ -144,6 +148,13 @@ describe("validateExtensionManifest", () => {
 
     it("refuses a path that does not start with /", () => {
       expect(problems((m) => { m.sidecarTab.path = "tab"; })).toEqual(["ndx.extension.sidecarTab.path url-path"]);
+    });
+
+    it("refuses a dot segment in the tab and link paths, raw or percent-encoded", () => {
+      for (const bad of ["/../../api/hub/extensions", "/%2e%2e/%2E%2e/api", "/a/./b", "/a/..", "/a\\..\\b", "/%2e?x=1"]) {
+        expect(problems((m) => { m.sidecarTab.path = bad; }), bad).toEqual(["ndx.extension.sidecarTab.path link-dot-segment"]);
+        expect(problems((m) => { m.projectLinks[0].path = bad; }), bad).toEqual(["ndx.extension.projectLinks[0].path link-dot-segment"]);
+      }
     });
 
     it("refuses an unknown placeholder", () => {
