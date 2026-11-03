@@ -21,7 +21,14 @@ items:
     lastModified: "2026-11-03T17:34:25.298Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "89e6dabf-b024-45bb-9be1-b09796a724d3":
-    lastModified: "2026-11-03T17:38:29.172Z"
+    status: "completed"
+    startedAt: "2026-11-03T17:53:30.380Z"
+    completedAt: "2026-11-03T17:53:30.380Z"
+    endedAt: "2026-11-03T17:53:30.380Z"
+    activeIntervals: [{"end":"2026-11-03T17:53:30.380Z","start":"2026-11-03T17:53:30.380Z"}]
+    appliedAt: "2026-11-03T17:53:30.380Z"
+    appliedAmendsHash: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    lastModified: "2026-11-03T17:53:30.380Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9f3e974d-5eea-43c4-8706-0c745d01fcb7":
     status: "completed"
@@ -34,5 +41,12 @@ items:
     lastModified: "2026-11-03T17:47:23.883Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b147e397-606d-4194-b556-5324b87a8f49":
-    lastModified: "2026-11-03T17:38:29.172Z"
+    status: "completed"
+    startedAt: "2026-11-03T17:47:52.866Z"
+    completedAt: "2026-11-03T17:53:30.380Z"
+    endedAt: "2026-11-03T17:53:30.380Z"
+    activeIntervals: [{"end":"2026-11-03T17:53:30.380Z","start":"2026-11-03T17:47:52.866Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "registryFor now receives the production registry options as `defaults`; new route-level test posts a hub turn and finds spend in <home>/hub/usage.jsonl, none in the host ledger."
+    lastModified: "2026-11-03T17:53:30.380Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

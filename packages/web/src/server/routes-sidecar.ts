@@ -125,6 +125,7 @@ import {
   type SidecarRegistryOptions,
   type SidecarSessionRecord,
   type SidecarTurnOutcome,
+  type WorktreeSidecarRegistryOptions,
 } from "./sidecar/session-registry.js";
 import { hubVendorRefusal, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
 import { hasHubSnapshotBaseline, hubSnapshotReader } from "./sidecar/hub-packet.js";
@@ -273,8 +274,13 @@ export interface HubSidecarRouteOptions {
   pid?: number;
   /** Injected for tests: whether a lock holder's pid is alive. */
   isAlive?: (pid: number) => boolean;
-  /** The registry over `dir`, built each time this server takes the host lock. Defaults to {@link createHubSidecarRegistry}. */
-  registryFor?: (dir: string) => SidecarSessionRegistry;
+  /**
+   * The registry over `dir`, built each time this server takes the host lock.
+   * Defaults to {@link createHubSidecarRegistry}. `defaults` are the options
+   * production builds it with (context, idle TTL, spend recorder), so a test
+   * that swaps the vendor connection still runs the production ones.
+   */
+  registryFor?: (dir: string, defaults: WorktreeSidecarRegistryOptions) => SidecarSessionRegistry;
   /** The broker over `dir`. Defaults to an announcing broker, built with the registry. */
   brokerFor?: (dir: string) => SidecarBroker;
   /** What an approved broker call does. Defaults to {@link hubSidecarActions}. */
@@ -761,16 +767,19 @@ function hubHostState(
   const key = `${dir}\0${pid}`;
   let state = hubHosts.get(key);
   if (!state || acquired) {
+    const defaults: WorktreeSidecarRegistryOptions = {
+      context: hubSidecarContextOptions(ctx, dir, opts),
+      ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
+      onTurnSpend: hubTurnSpendRecorder(ctx, opts.homeDir),
+    };
     state = {
       registry: opts.registryFor
-        ? opts.registryFor(dir)
+        ? opts.registryFor(dir, defaults)
         : createHubSidecarRegistry({
+            ...defaults,
             dir,
             hostProjectDir: ctx.projectDir,
             broker: (id) => hubSidecarBrokerEndpoint(ctx, id),
-            context: hubSidecarContextOptions(ctx, dir, opts),
-            ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
-            onTurnSpend: hubTurnSpendRecorder(ctx, opts.homeDir),
           }),
       broker: opts.brokerFor ? opts.brokerFor(dir) : createAnnouncingBroker(dir, broadcast, hubLedgerTarget(opts.homeDir), hubDraftsDir(resolveHubHome(opts.homeDir))),
     };
