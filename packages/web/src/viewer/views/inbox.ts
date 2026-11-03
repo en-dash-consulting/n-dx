@@ -27,7 +27,7 @@ import { useRefetchableProductRead } from "../hooks/index.js";
 import type { Load } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
 import { Pending, StaleNotice } from "./product-pages.js";
-import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate, PlacementStrength } from "./product-model.js";
+import type { ChangePlacement, ChangePlacements, ChangeRow, PlacementCandidate } from "./product-model.js";
 
 /** Rows the Plan section shows before linking to the full page. */
 export const INBOX_SECTION_ROWS = 5;

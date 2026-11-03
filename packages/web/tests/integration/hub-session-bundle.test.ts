@@ -14,13 +14,16 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import * as esbuild from "esbuild";
-import { resolve } from "node:path";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 // By URL: the suite's `.js` → `.ts` import rewrite would otherwise miss build.js.
 const buildScript = pathToFileURL(resolve(import.meta.dirname!, "../../build.js")).href;
-const { hubSessionJsOptions } = await import(/* @vite-ignore */ buildScript) as {
+const { hubSessionJsOptions, isEntryScript } = await import(/* @vite-ignore */ buildScript) as {
   hubSessionJsOptions: esbuild.BuildOptions;
+  isEntryScript: (argv1: string | undefined, scriptPath?: string) => boolean;
 };
 
 /** The page's budget; the inlined HTML adds ~15 KB of CSS and markup. */
@@ -51,5 +54,28 @@ describe("hub session drawer bundle", () => {
 
   it("stays under the size budget", () => {
     expect(jsBytes).toBeLessThan(MAX_JS_BYTES);
+  });
+});
+
+describe("build.js entry guard", () => {
+  const buildPath = resolve(import.meta.dirname!, "../../build.js");
+
+  it("builds when run through a symlinked directory", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ndx-build-guard-"));
+    try {
+      const link = join(dir, "web");
+      // A junction on Windows needs no privilege; POSIX ignores the type.
+      symlinkSync(resolve(import.meta.dirname!, "../.."), link, "junction");
+      expect(isEntryScript(join(link, "build.js"))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not build when imported or run as another script", () => {
+    expect(isEntryScript(buildPath)).toBe(true);
+    expect(isEntryScript(undefined)).toBe(false);
+    expect(isEntryScript(resolve(import.meta.dirname!, "../../dev.js"))).toBe(false);
+    expect(isEntryScript(resolve(import.meta.dirname!, "no-such-file.js"))).toBe(false);
   });
 });

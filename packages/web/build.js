@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync, realpathSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -317,9 +317,24 @@ async function buildWatch() {
   console.log("[esbuild] Watching for changes...");
 }
 
+/**
+ * Whether `argv1` names this script. Compared by real path: Node runs the main
+ * module from its real path, so a script reached through a symlink (macOS
+ * `/tmp`, a linked checkout) would otherwise read as imported and skip the
+ * build while exiting 0.
+ */
+export function isEntryScript(argv1, scriptPath = fileURLToPath(import.meta.url)) {
+  if (!argv1) return false;
+  try {
+    return realpathSync(resolve(argv1)) === realpathSync(scriptPath);
+  } catch {
+    return false; // argv1 names no file, so it is not this script
+  }
+}
+
 // Importing this file (tests/integration/hub-session-bundle.test.ts reads
 // `hubSessionJsOptions`) must not start a build.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isEntryScript(process.argv[1])) {
   if (watchMode) {
     buildWatch().catch((err) => {
       console.error("Watch failed:", err);
