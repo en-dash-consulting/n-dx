@@ -6,12 +6,13 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync } from "node:fs";
 import { connect } from "node:net";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { assertFreshServerBuild } from "../helpers/built-server-guard.js";
+import { removeTempDir } from "../helpers/temp-dir.js";
 import { startHub } from "../../src/hub/index.js";
 import type { HubHandle } from "../../src/hub/index.js";
 
@@ -58,7 +59,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await hub?.close({ stopChildren: true });
   // Retry: on Windows a stopped child's handles on the repo dir are not always released when close() resolves (EBUSY).
-  for (const dir of [home, repo]) rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  for (const dir of [home, repo]) await removeTempDir(dir);
 }, 30_000);
 
 describe("hub with a per-user token", () => {
