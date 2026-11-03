@@ -86,6 +86,26 @@ describe("suggestPlacement", () => {
     ]);
     for (const c of suggestPlacement(tree(), "ch").shortlist) expect(c.strength).toBe(placementStrength(c.score));
   });
+
+  it("names the rule that set the relation", () => {
+    expect(suggestPlacement(tree(), "ch").relationRule).toBe('the title opens with the amending verb "add"');
+    expect(suggestPlacement(tree({ title: "Wallets in card payment" }), "ch").relationRule).toMatch(/does not open with an amending verb/);
+    expect(suggestPlacement(tree({ intent: "Relation: touches" }), "ch")).toMatchObject({ relation: "touches", relationRule: 'the intent\'s "Relation: touches" line' });
+    expect(suggestPlacement(tree({ fix: true }), "ch").relationRule).toMatch(/fix: true/);
+    expect(suggestPlacement(tree({ tags: ["code-health"] }), "ch").relationRule).toMatch(/code-health tag/);
+    expect(suggestPlacement(tree(APPLIED), "ch")).toMatchObject({ relation: "touches", relationRule: expect.stringMatching(/applied/) });
+  });
+
+  it("names on each candidate the other open changes that already amend it", () => {
+    const t = tree();
+    t.changes.push(
+      node({ id: "other", type: "change", displayId: "CH-2", title: "Card copy", amends: [{ target: "card", delta: "modified", summary: "s", proposed: "p" }] }),
+      node({ id: "done", type: "change", title: "Old card work", ...APPLIED, amends: [{ target: "card", delta: "modified", summary: "s", proposed: "p" }] }),
+    );
+    const s = suggestPlacement(t, "ch");
+    expect(s.shortlist.find((c) => c.target === "card")?.amendedBy).toEqual(["CH-2"]);
+    for (const c of s.shortlist.filter((c) => c.target !== "card")) expect(c.amendedBy).toEqual([]);
+  });
 });
 
 describe("recordPlacement", () => {

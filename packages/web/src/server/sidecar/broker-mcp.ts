@@ -82,8 +82,33 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
     input: { note: z.string().optional().describe("One line on why this plan, shown on the card") },
   },
   place_change_card: {
-    description: "Propose placing a change on a capability or constraint. Always waits for the operator's placement card.",
-    input: { change: z.string().min(1), target: z.string().min(1), relation: z.string().min(1), amendment: z.string().optional() },
+    description: [
+      "Propose placing a v2 change: on an existing capability or constraint (`target` with `relation`; for amends, `proposed` and/or `criteria`), or as a new capability or constraint under an area (`propose`).",
+      "Always waits for the operator's placement card, which shows rex's dry run of the placement; a refusal names rex's kind.",
+      "A proposed node is recorded on the change only and reaches the product map when the change is applied. Nothing is applied from a card.",
+    ].join(" "),
+    input: {
+      change: z.string().min(1).describe("The change's id or display id"),
+      target: z.string().min(1).optional().describe("A live capability or constraint id; omit when proposing"),
+      relation: z.enum(["touches", "amends"]).optional().describe("Default: the rules' relation for the change"),
+      summary: z.string().optional().describe("The amendment's summary; default the change's title"),
+      proposed: z.string().optional().describe("amends: the target's full replacement statement"),
+      criteria: z.object({
+        add: z.array(z.object({ id: z.string().min(1), text: z.string().min(1) })).optional(),
+        replace: z.array(z.object({ id: z.string().min(1), text: z.string().min(1) })).optional(),
+        remove: z.array(z.string().min(1)).optional(),
+      }).optional().describe("amends: the capability-criteria delta"),
+      propose: z.object({
+        type: z.enum(["capability", "constraint"]),
+        under: z.string().min(1).describe("A live area id"),
+        title: z.string().min(1),
+        summary: z.string().optional(),
+        proposed: z.string().optional().describe("The new node's statement"),
+        criteria: z.object({ add: z.array(z.object({ id: z.string().min(1), text: z.string().min(1) })) }).optional()
+          .describe("A capability's criteria; a constraint has none"),
+      }).optional().describe("Instead of target: a new node, when nothing on the shortlist fits"),
+      reasons: z.array(z.string().min(1)).min(1).describe("Why this placement, one line each, shown on the card"),
+    },
   },
   propose_edit: {
     description: "Propose a source edit as a unified diff. Always waits for the operator's edit card.",
@@ -216,6 +241,13 @@ export function createBrokerMcpServer(
         const changeSet = await actions.reviewChangeSet(input);
         if (typeof changeSet === "string") return text(`No card was raised: ${changeSet}. Nothing was written.`, true);
         annex.changeSet = changeSet;
+      }
+      // A placement card shows rex's dry run; a call naming no change, or unreadable, raises none.
+      if (name === "place_change_card") {
+        if (!actions) return text("No card was raised: this server cannot read the PRD. Nothing was written.", true);
+        const placement = await actions.checkPlacement(input);
+        if (typeof placement === "string") return text(`No card was raised: ${placement}. Nothing was written.`, true);
+        annex.placement = placement;
       }
       // A run-plan card lists the planner's own lanes; with no plan, or no lane, no card is raised.
       if (name === "propose_run_plan") {

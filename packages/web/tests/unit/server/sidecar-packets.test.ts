@@ -857,7 +857,6 @@ describe("lens registry", () => {
   });
 
   it.each([
-    ["place", "the Inbox list read"],
     ["migrate", "the migration plan reads"],
     ["hub", "a hub session, opened from the hub home"],
   ])("%s reports itself unavailable, naming %s, and reads nothing", async (lens, needs) => {

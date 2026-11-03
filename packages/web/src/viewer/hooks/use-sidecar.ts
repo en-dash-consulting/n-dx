@@ -107,6 +107,43 @@ export type SidecarCardKind =
   | "draft-file"
   | "migration-decision";
 
+/** A capability criterion in a placement; mirrors `SidecarCriterion` in shared/sidecar-card.ts. */
+export interface PlacementCriterion { id: string; text: string }
+
+/** What a placement card writes; mirrors `SidecarPlacementRequest` in shared/sidecar-card.ts. */
+export type SidecarPlacementRequest =
+  | {
+      action: "place";
+      target: string;
+      relation?: "touches" | "amends";
+      summary?: string;
+      proposed?: string;
+      criteria?: { add?: PlacementCriterion[]; replace?: PlacementCriterion[]; remove?: string[] };
+    }
+  | {
+      action: "propose";
+      type: "capability" | "constraint";
+      under: string;
+      title: string;
+      summary?: string;
+      proposed?: string;
+      criteria?: { add: PlacementCriterion[] };
+    };
+
+/** Rex's dry run of a placement; mirrors `SidecarPlacementCheck` in shared/sidecar-card.ts. */
+export type SidecarPlacementCheck =
+  | { ok: true; action: "place"; target: string; title: string; relation: "touches" | "amends"; base?: string; warnings: string[] }
+  | { ok: true; action: "propose"; type: "capability" | "constraint"; under: string; title: string; warnings: string[] }
+  | { ok: false; kind: string; error: string };
+
+/** A placement card's placement; mirrors `SidecarPlacement` in shared/sidecar-card.ts. */
+export interface SidecarPlacement {
+  change: string;
+  request: SidecarPlacementRequest;
+  reasons: string[];
+  check: SidecarPlacementCheck;
+}
+
 /** A permission card; mirrors `SidecarCard` in server/sidecar/broker.ts. */
 export interface SidecarCard {
   id: string;
@@ -124,6 +161,8 @@ export interface SidecarCard {
   changeSet?: SidecarChangeSet;
   /** A run-plan card's plan, as the planner printed it when the card was raised. */
   runPlan?: QueuePlan;
+  /** A placement card's placement as approval writes it, with rex's dry run from when the card was raised. */
+  placement?: SidecarPlacement;
   /** The lane (0-based) the operator started from a run-plan card. */
   lane?: number;
   status: "pending" | "approved" | "denied" | "withdrawn";
@@ -138,6 +177,9 @@ export interface SidecarCard {
   carriedOut?: { ok: boolean; ids?: string[] };
 }
 
+/** A placement as one body: the shape `POST /api/rex/changes/:id/placement/check` takes, and a placement approval's edits. */
+export type PlacementEditBody = Record<string, unknown>;
+
 /** The operator's answer to the first waiting card. */
 export interface SidecarCardDecision {
   approve: boolean;
@@ -146,7 +188,7 @@ export interface SidecarCardDecision {
   /** "Always allow": only when the card has an allowListKey. */
   remember?: boolean;
   /** A change-set approval's item edits; the approval writes the edited values. */
-  edits?: SidecarChangeSetEdit[];
+  edits?: SidecarChangeSetEdit[] | PlacementEditBody;
   /** A run-plan card's Start lane: the 0-based lane whose first task to start. */
   lane?: number;
   /** A draft-file approval's path as edited on the card; the draft is saved there. */
@@ -744,7 +786,8 @@ export function useSidecar(
         decision: decision.approve ? "approve" : "deny",
         ...(reason && { reason }),
         ...(decision.remember && { remember: true }),
-        ...(decision.approve && decision.edits?.length && { edits: decision.edits }),
+        // An empty list of change-set edits is no edit; a placement's edit is one object.
+        ...(decision.approve && decision.edits && (!Array.isArray(decision.edits) || decision.edits.length > 0) && { edits: decision.edits }),
         ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
         ...(decision.approve && decision.path !== undefined && { path: decision.path }),
       },

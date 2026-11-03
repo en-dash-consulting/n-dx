@@ -75,7 +75,7 @@ import { dirname, join, resolve } from "node:path";
 import { exec as llmExec, isAuthError, redactSecrets, vendorSessionDriver } from "@n-dx/llm-client";
 import type { SessionTurnStatus } from "@n-dx/llm-client";
 import { SIDECAR_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usage.js";
-import { estimateCostFromTotals, type CostEstimate } from "./rex-gateway.js";
+import { estimateCostFromTotals, prdLayout, type CostEstimate } from "./rex-gateway.js";
 import type { ServerContext } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { errorMessage, errorResponse, jsonResponse, readBody } from "./response-utils.js";
@@ -87,6 +87,7 @@ import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus, type SidecarLedgerTarget } from "./sidecar/broker.js";
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
+import { readPlacementCall, readPlacementEdit, writePlacementCard } from "./sidecar/placement-card.js";
 import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
 import { openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, startTaskExecution } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
@@ -147,7 +148,9 @@ const PROPOSALS_PATH = "/api/sidecar/proposals";
  * The registry as the drawer reads it: every lens, what an unavailable one
  * waits on, and the item kind a lens needs attached.
  */
-function sidecarLenses(ctx: ServerContext): Array<{ id: string; available: boolean; needs?: string; target?: LensTarget }> {
+async function sidecarLenses(ctx: ServerContext): Promise<Array<{ id: string; available: boolean; needs?: string; target?: LensTarget }>> {
+  // Read per request, like the feature gates: a migration needs no restart.
+  const layout = await prdLayout(ctx.rexDir).catch(() => null);
   return LENS_IDS.map((id) => {
     const plan = LENS_PACKETS[id];
     if (plan.kind === "unavailable") return { id, available: false, needs: plan.needs };
@@ -157,6 +160,7 @@ function sidecarLenses(ctx: ServerContext): Array<{ id: string; available: boole
     if (plan.kind === "packet" && plan.feature && !isFeatureEnabled(ctx.projectDir, plan.feature.key)) {
       return { id, available: false, needs: plan.feature.needs };
     }
+    if (plan.kind === "packet" && plan.layout && layout !== plan.layout.layout) return { id, available: false, needs: plan.layout.needs };
     return plan.kind === "packet" && plan.target ? { id, available: true, target: plan.target } : { id, available: true };
   });
 }
@@ -370,7 +374,9 @@ export function sidecarContextOptions(ctx: ServerContext, reads: SpawnedReads = 
  * execute route under `guard.maxConcurrentProcesses`, and a work card's
  * preview is the Prepare route's `ndx work --resolve`. A change-set card is
  * read against the workspace's PRD before it is raised and written there,
- * under the PRD lock, on approval (`sidecar/change-set.ts`).
+ * under the PRD lock, on approval (`sidecar/change-set.ts`). A placement card
+ * is dry-run through rex before it is raised and written through the Inbox
+ * routes' own write on approval (`sidecar/placement-card.ts`).
  */
 export function sidecarActions(
   ctx: ServerContext,
@@ -415,13 +421,19 @@ export function sidecarActions(
     reviewChangeSet(input) {
       return reviewChangeSet(ctx.rexDir, input);
     },
-    async writeChangeSet(changeSet) {
+    async writeChangeSet(changeSet, sessionId) {
       try {
-        const written = await writeChangeSet(ctx, changeSet, broadcast);
+        const written = await writeChangeSet(ctx, changeSet, sessionId, broadcast);
         return { ok: true, text: written.text, ids: written.ids };
       } catch (err) {
         return { ok: false, text: `Nothing was written: ${errorMessage(err)}.` };
       }
+    },
+    checkPlacement(input) {
+      return readPlacementCall(ctx.rexDir, input);
+    },
+    writePlacement(placement, sessionId) {
+      return writePlacementCard(ctx, placement, sessionId, broadcast);
     },
     async startWork(taskId, options) {
       const { inUse, max, holders } = await repositoryRunSlotUsage(ctx);
@@ -1010,7 +1022,7 @@ export async function handleSidecarRoute(
 
   if (pathname === LENSES_PATH) {
     if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${LENSES_PATH}`);
-    jsonResponse(res, 200, { lenses: sidecarLenses(ctx) });
+    jsonResponse(res, 200, { lenses: await sidecarLenses(ctx) });
     return true;
   }
 
@@ -1093,6 +1105,7 @@ export async function handleSidecarRoute(
     broadcast,
     actions: () => (opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast, { workspaces: opts.workspaces })),
     create: (body) => createWorktreeSession(registry, ctx.projectDir, body),
+    readPlacementEdit: (change, edits) => readPlacementEdit(ctx.rexDir, change, edits),
   });
 }
 
@@ -1169,6 +1182,8 @@ interface SessionRouteScope {
   create: (body: Record<string, unknown>) => CreateAnswer;
   /** The one lens this scope's sessions run; a PATCH to another, or to a target, is refused. */
   lens?: string;
+  /** Dry-runs an edited placement; absent where no placement card is offered (the hub). */
+  readPlacementEdit?: (change: string, edits: unknown) => ReturnType<typeof readPlacementEdit>;
 }
 
 /** The `name` and `model` fields of a create body, each a non-empty string when present. */
@@ -1324,12 +1339,20 @@ async function handleSessionRoutes(
       }
       if (body.lane !== undefined && typeof body.lane !== "number") return refuse(res, 400, `"lane" must be a number`);
       if (body.path !== undefined && typeof body.path !== "string") return refuse(res, 400, `"path" must be a string`);
+      // A placement card's edit is a placement: dry-run it before the card is touched.
+      const waiting = broker.cards(id).find((c) => c.id === cardId);
+      let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, string> | undefined;
+      if (body.edits !== undefined && body.decision === "approve" && waiting?.placement && scope.readPlacementEdit) {
+        const read = await scope.readPlacementEdit(waiting.placement.change, body.edits);
+        if (typeof read === "string") return refuse(res, 400, read);
+        placementEdit = read;
+      }
       try {
         const card = broker.decide(id, cardId, {
           approve: body.decision === "approve",
           ...(reason && { reason }),
           ...(body.remember && { remember: true }),
-          ...(body.edits !== undefined && { edits: body.edits }),
+          ...(placementEdit ? { placement: placementEdit } : body.edits !== undefined && { edits: body.edits }),
           ...(body.lane !== undefined && { lane: body.lane }),
           ...(body.path !== undefined && { path: body.path }),
         });

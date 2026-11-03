@@ -734,7 +734,6 @@ describe("tools carried out by a later batch", () => {
   beforeEach(serve);
 
   it.each([
-    ["place_change_card", { change: "CH-1", target: "A1", relation: "amends" }, "the L2 Place lens"],
     ["propose_edit", { path: "a.ts", diff: "-a\n+b" }, "a later batch"],
     ["migration_decision", { entries: [{ id: "x" }] }, "G1"],
   ])("an approved %s reports it is recorded, not carried out yet, and names %s", async (tool, args, batch) => {

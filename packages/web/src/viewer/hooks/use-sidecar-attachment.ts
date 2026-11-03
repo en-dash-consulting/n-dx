@@ -23,7 +23,7 @@ export interface SidecarLensInfo {
   target?: { kind: string; needs: string };
 }
 
-export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree";
+export type SidecarPageItemKind = "task" | "capability" | "zone" | "plan" | "live" | "worktree" | "change";
 
 /** The thing the current page is about. `ref` is what the lens packet is pointed at; Plan and Live have none. */
 export interface SidecarPageItem {
@@ -43,10 +43,14 @@ export interface SidecarPageSelection {
   capabilityId?: string | null;
   /** The worktree card attached on the Workspaces page, by workspace key. */
   worktree?: string | null;
+  /** The change awaiting placement attached by "Place with Sidecar", by id. */
+  changeId?: string | null;
 }
 
 /** The item the page is about; null when it is about none (Home, Files, …). */
 export function pageItemFor(page: SidecarPageSelection): SidecarPageItem | null {
+  // A change the operator sent to Place is what they are asking about, whatever page it was sent from.
+  if (page.changeId) return { kind: "change", ref: page.changeId, label: page.changeId };
   if (page.taskId && (page.view === "prd" || page.view === "live-task" || page.view === "work")) {
     return { kind: "task", ref: page.taskId, label: page.taskId };
   }
@@ -69,6 +73,7 @@ export function wantedLensFor(item: SidecarPageItem | null, lastRunFailed: boole
     case "plan": return "plan";
     case "live": return "guide";
     case "worktree": return "diagnose-branch";
+    case "change": return "place";
     default: return GENERAL_LENS;
   }
 }

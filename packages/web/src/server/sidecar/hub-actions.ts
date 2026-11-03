@@ -66,6 +66,8 @@ export function createHubActions(opts: HubActionsOptions): SidecarActions {
     startWork: async () => refused,
     reviewChangeSet: async () => HUB_NO_EFFECT,
     writeChangeSet: async () => refused,
+    checkPlacement: async () => HUB_NO_EFFECT,
+    writePlacement: async () => refused,
     readRunPlan: async () => HUB_NO_EFFECT,
     githubReadsAllowed: () => false,
     githubRead: async () => refused,

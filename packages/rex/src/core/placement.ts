@@ -177,11 +177,19 @@ function isArchitectureConstraint(node: PlacementNode): boolean {
  * decides it.
  */
 export function placementRelation(change: PlacementChange): PlacementRelation {
-  if (change.fix === true || isCodeHealthChange(change)) return "touches";
+  return placementRelationRule(change).relation;
+}
+
+/** {@link placementRelation}'s answer and, in words, the rule that gave it. */
+export function placementRelationRule(change: PlacementChange): { relation: PlacementRelation; rule: string } {
+  if (change.fix === true) return { relation: "touches", rule: "the change is a fix (fix: true), and a fix always touches" };
+  if (isCodeHealthChange(change)) return { relation: "touches", rule: `the change carries the ${CODE_HEALTH_TAG} tag, and a code-health finding always touches` };
   const marked = RELATION_MARKER.exec(change.intent ?? "")?.[1]?.toLowerCase();
-  if (marked === "amends" || marked === "touches") return marked;
+  if (marked === "amends" || marked === "touches") return { relation: marked, rule: `the intent's "Relation: ${marked}" line` };
   const lead = /^\s*([a-z]+)/i.exec(change.title)?.[1]?.toLowerCase();
-  return lead !== undefined && AMENDING_VERBS.has(lead) ? "amends" : "touches";
+  return lead !== undefined && AMENDING_VERBS.has(lead)
+    ? { relation: "amends", rule: `the title opens with the amending verb "${lead}"` }
+    : { relation: "touches", rule: "the title does not open with an amending verb, and the intent has no Relation line" };
 }
 
 function scoreNode(change: PlacementChange, node: PlacementNode, relation: PlacementRelation): PlacementCandidate {

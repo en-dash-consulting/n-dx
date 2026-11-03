@@ -123,6 +123,7 @@ export { SidecarDock, SidecarDrawer, SidecarButton } from "./sidecar-drawer.js";
 export type { SidecarDockProps, SidecarDrawerProps, SidecarButtonProps } from "./sidecar-drawer.js";
 export { HubSessionDrawer, HubCeilingMeter, formatTokens, snapshotChipLabel } from "./hub-session-drawer.js";
 export type { HubSessionDrawerProps } from "./hub-session-drawer.js";
+export { PlaceWithSidecarContext } from "./place-with-sidecar.js";
 export { BottomBar } from "./bottom-bar.js";
 export type { BottomBarProps } from "./bottom-bar.js";
 export { SettingsOverlay } from "./settings-overlay.js";

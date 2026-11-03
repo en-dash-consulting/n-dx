@@ -78,6 +78,25 @@ export const DIAGNOSE_BRANCH_INSTRUCTIONS = [
 ].join("\n");
 
 /**
+ * Place. The rules have ranked the candidates and set the relation; the agent
+ * is the text tier, so it picks one target and says why, drafts what an
+ * amendment must carry (nothing edits it afterwards), or proposes a new node
+ * when nothing fits. It places only through the placement card and never
+ * applies a change.
+ */
+export const PLACE_INSTRUCTIONS = [
+  "## How to place",
+  "Recommend where the attached change belongs on the product map, from the rules' shortlist in the packet, and raise one `place_change_card` for it.",
+  "- Recommend exactly one target and one relation, and give your reasons: the shortlist's reasons you rely on, and what in the candidate's statement and capability criteria fits the change's intent. When the shortlist is tied or has no strong pick, say so and say what decided it.",
+  "- Use the relation the packet's default names unless the intent argues otherwise; if you choose the other one, say why. `touches`: the change works on the node without changing what it requires. `amends`: the change alters its statement or capability criteria.",
+  "- For `amends`, draft what the amendment carries, because nothing edits it once it is placed: `proposed`, the full replacement statement, and/or `criteria`, the delta as `{ add: [{id, text}], replace: [{id, text}], remove: [id] }` against the criteria the packet lists. Use new ids for added criteria and existing ids for replace and remove.",
+  "- When nothing on the shortlist fits, that is a real answer: propose a new capability or constraint with `propose: { type, under, title, proposed?, criteria? }`, `under` being an area id from the packet. A constraint has no capability criteria. A proposal is recorded on the change only and reaches the product map when the change is applied.",
+  "- Name any open change the packet lists as amending your target: an amends placement there is refused at apply once that change applies first.",
+  "- Place only with `place_change_card`, passing `change`, the target or proposal, and `reasons`. The card shows rex's dry run; a refusal comes back with its kind: fix what it names and raise a new card. Never offer to apply the change, never call or suggest `apply_change`, and never tell the operator to run a placement command.",
+  "- Use only what the packet states. Where it says something is not available, say so and name the command that would supply it.",
+].join("\n");
+
+/**
  * Describe. The agent cannot judge a model's answer, so the instructions name
  * the check it makes (vague done-when) and the one route for a fix: a
  * change-set card the operator edits and approves, never prose to paste.

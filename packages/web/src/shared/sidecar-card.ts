@@ -40,6 +40,52 @@ export interface SidecarChangeSet {
   placement?: SidecarChangeSetPlacement;
 }
 
+/** A capability criterion as a placement adds or replaces it. A type alias, so it fits rex's indexable `Criterion`. */
+export type SidecarCriterion = { id: string; text: string };
+
+/**
+ * What a placement card writes: the change on an existing capability or
+ * constraint (`place`, the body `POST …/place` takes), or a new one proposed
+ * under an area (`propose`, the body `POST …/propose` takes).
+ */
+export type SidecarPlacementRequest =
+  | {
+      action: "place";
+      target: string;
+      relation?: "touches" | "amends";
+      summary?: string;
+      proposed?: string;
+      criteria?: { add?: SidecarCriterion[]; replace?: SidecarCriterion[]; remove?: string[] };
+    }
+  | {
+      action: "propose";
+      type: "capability" | "constraint";
+      under: string;
+      title: string;
+      summary?: string;
+      proposed?: string;
+      criteria?: { add: SidecarCriterion[] };
+    };
+
+/**
+ * Rex's dry run of a placement on the PRD as loaded, which wrote nothing.
+ * `base` is the target's spec hash an amends placement pins: apply refuses it
+ * once that spec moves. `warnings` name the open changes in the way of apply.
+ * A refusal carries rex's kind (`ChangePlacementErrorKind`) and message.
+ */
+export type SidecarPlacementCheck =
+  | { ok: true; action: "place"; target: string; title: string; relation: "touches" | "amends"; base?: string; warnings: string[] }
+  | { ok: true; action: "propose"; type: "capability" | "constraint"; under: string; title: string; warnings: string[] }
+  | { ok: false; kind: string; error: string };
+
+/** A placement card: the change, what approval writes, the agent's reasons and rex's dry run when it was raised. */
+export interface SidecarPlacement {
+  change: string;
+  request: SidecarPlacementRequest;
+  reasons: string[];
+  check: SidecarPlacementCheck;
+}
+
 /** The operator's edit of one item, sent with the approval. */
 export interface SidecarChangeSetEdit {
   index: number;

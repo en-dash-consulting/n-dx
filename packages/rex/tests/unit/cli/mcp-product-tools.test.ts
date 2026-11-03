@@ -203,6 +203,9 @@ describe("place_change", () => {
     expect(item.touches).toEqual([CAPABILITY]);
     expect(item).not.toHaveProperty("needsPlacement");
     expect((await log()).at(-1)).toMatchObject({ event: "change_placed", itemId: id, detail: `touches ${CAPABILITY}` });
+    // Only a placement made through a Sidecar card carries decision fields.
+    expect((await log()).at(-1)).not.toHaveProperty("decidedBy");
+    expect((await log()).at(-1)).not.toHaveProperty("approvedBy");
   });
 
   it("refuses relation or summary without a target, and amends on an applied change", async () => {
@@ -305,6 +308,8 @@ describe("place_change", () => {
         criteria,
       }]);
       expect((await log()).at(-1)).toMatchObject({ event: "change_proposed", itemId: id, detail: `capability under ${AREA}: Refund by card` });
+      expect((await log()).at(-1)).not.toHaveProperty("decidedBy");
+      expect((await log()).at(-1)).not.toHaveProperty("approvedBy");
     });
 
     it("refuses a repeat proposal on the same change, naming the title and area, and writes nothing", async () => {

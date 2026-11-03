@@ -30,6 +30,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { useCliName, useFeatureToggle } from "../../hooks/index.js";
 import { StrengthChip, isAppliedUnplaced, useInbox, type ShortlistRead } from "../../views/inbox.js";
 import { Pending, useProductRead } from "../../views/product-pages.js";
+import { PlaceWithSidecarButton } from "../place-with-sidecar.js";
 import type {
   CapabilityDetail,
   ChangeRow,
@@ -763,6 +764,8 @@ export function ChangePlacementSection({ changeId, changeTitle, onOpenChange, on
   };
 
   return h("section", { class: "task-section cp-section", "aria-label": "Placement", "data-change-placement": another ? "another" : appliedUnplaced ? "applied" : "inbox" },
+    // Only a change still in the Inbox is the Place lens's to draft.
+    inInbox && !another ? h(PlaceWithSidecarButton, { changeId }) : null,
     another
       ? h("div", { class: "cp-placed" },
           written ? h("div", { class: "cp-placed-line" }, written.line) : null,

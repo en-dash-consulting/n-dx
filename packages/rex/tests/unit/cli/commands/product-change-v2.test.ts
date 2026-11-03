@@ -210,6 +210,8 @@ describe("rex change place --propose", () => {
       criteria: { add: [{ id: "c1", text: "A refund reaches the card" }] },
     }]);
     expect((await log()).at(-1)).toMatchObject({ event: "change_proposed", itemId: id, detail: `capability under ${AREA}: Refund by card` });
+    expect((await log()).at(-1)).not.toHaveProperty("decidedBy");
+    expect((await log()).at(-1)).not.toHaveProperty("approvedBy");
   });
 
   it("returns change and proposed with --format=json", async () => {
