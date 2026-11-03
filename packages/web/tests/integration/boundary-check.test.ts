@@ -31,7 +31,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 const WEB_SRC = join(import.meta.dirname!, "..", "..", "src");
 
@@ -112,6 +112,31 @@ describe("server/client boundary", () => {
     } catch {
       // serverDir doesn't exist in test environment — pass
       return;
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("no hub file imports from server or viewer, or imports preact", () => {
+    // src/hub/AGENTS.md "Import surface": the hub daemon reaches project
+    // servers over HTTP and never loads their modules or the UI framework.
+    const hubDir = join(WEB_SRC, "hub");
+    const violations: string[] = [];
+
+    for (const file of collectTsFiles(hubDir)) {
+      const rel = relPosix(file);
+      for (const imp of extractImportPaths(file)) {
+        if (imp === "preact" || imp.startsWith("preact/")) {
+          violations.push(`${rel} imports "${imp}"`);
+        } else if (imp.startsWith(".")) {
+          const target = relative(WEB_SRC, resolve(dirname(file), imp))
+            .split(sep)
+            .join("/");
+          if (/^(server|viewer)(\/|$)/.test(target)) {
+            violations.push(`${rel} imports "${imp}"`);
+          }
+        }
+      }
     }
 
     expect(violations).toEqual([]);
