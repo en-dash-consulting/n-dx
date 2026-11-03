@@ -67,6 +67,8 @@ function spyActions(): SidecarActions & { ran: Array<{ argv: string[]; project?:
     startWork: async () => refused,
     reviewChangeSet: async () => "no",
     writeChangeSet: async () => refused,
+    checkPlacement: async () => "no",
+    writePlacement: async () => refused,
     readRunPlan: async () => "no",
     githubReadsAllowed: () => false,
     githubRead: async () => refused,
@@ -283,7 +285,8 @@ describe("hub actions", () => {
   it("refuses work, edits and PRD writes outright", async () => {
     const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec: vi.fn(), ndx: hostNdx });
     expect((await actions.startWork("t1", undefined)).ok).toBe(false);
-    expect((await actions.writeChangeSet({ items: [] } as never)).ok).toBe(false);
+    expect((await actions.writeChangeSet({ items: [] } as never, "s1")).ok).toBe(false);
+    expect((await actions.writePlacement({} as never, "s1")).ok).toBe(false);
     expect(actions.githubReadsAllowed()).toBe(false);
   });
 });
