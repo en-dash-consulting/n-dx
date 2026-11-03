@@ -780,7 +780,7 @@ describe("hub /x/<name>/", () => {
       expect(asked).toBe(0);
       // Its script is valid JavaScript: a template literal eats backslashes,
       // and a page that fails to parse signs nobody in.
-      const scripts = [...html.matchAll(/<script>([^]*?)<[/]script>/g)].map((m) => m[1]);
+      const scripts = [...html.matchAll(/<script>([^]*?)<[/]script>/gi)].map((m) => m[1]);
       expect(scripts.length).toBe(2);
       for (const script of scripts) expect(() => new Function(script)).not.toThrow();
       // The bare mount gets it too, rather than a redirect to a 401.

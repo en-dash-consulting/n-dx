@@ -212,7 +212,7 @@ describe("preview layout endpoint", () => {
     expect(shellHtml).toContain("ndxAuth");
     // Valid JavaScript: the page is a template literal, which cooks a regex's
     // backslashes away, and a script that fails to parse signs nobody in.
-    for (const [, script] of shellHtml.matchAll(/<script>([^]*?)<[/]script>/g)) {
+    for (const [, script] of shellHtml.matchAll(/<script>([^]*?)<[/]script>/gi)) {
       expect(() => new Function(script)).not.toThrow();
     }
     expect((await fetch(base + "/style.css")).status).toBe(401);

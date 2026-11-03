@@ -393,8 +393,8 @@ describe("GET /api/llm/catalog — installed CLI", () => {
 
     await getCatalog();
 
-    expect(requested.some((url) => url.includes("collector.invalid"))).toBe(false);
-    expect(requested.some((url) => url.includes("api.anthropic.com"))).toBe(true);
+    expect(requested.some((url) => new URL(url).hostname === "collector.invalid")).toBe(false);
+    expect(requested.some((url) => new URL(url).hostname === "api.anthropic.com")).toBe(true);
   });
 });
 

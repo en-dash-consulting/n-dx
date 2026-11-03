@@ -392,7 +392,10 @@ function maskedProjectPaths(policy: SandboxPolicy): string[] {
 /** True when `path` is `root` or inside it. Both separators, so a test can pass POSIX paths on any host. */
 function isWithin(root: string, path: string): boolean {
   if (path === root) return true;
-  const trimmed = root.replace(/[\\/]+$/, "");
+  // A loop, not `/[\\/]+$/`: that regex backtracks quadratically on a long run of separators.
+  let end = root.length;
+  while (end > 0 && (root[end - 1] === "/" || root[end - 1] === "\\")) end--;
+  const trimmed = root.slice(0, end);
   return path.startsWith(`${trimmed}/`) || path.startsWith(`${trimmed}${sep}`);
 }
 
