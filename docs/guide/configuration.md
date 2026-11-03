@@ -137,7 +137,7 @@ ndx config llm.claude.auth api .
 ```
 
 ::: warning Where keys are stored
-API keys live in the per-user credential store, never in `.n-dx.json` and never on a command line. `*.cli_path` values are written to `.n-dx.local.json`, which `ndx init` gitignores — never to the shared `.n-dx.json`. Every reader merges the local file over the shared one, so nothing else changes. If a project configured before this still has a key in `.n-dx.json` or `.n-dx.local.json`, `ndx config` warns on every run and `ndx ci` fails when `.n-dx.json` is git-tracked; run `ndx config credentials --import` to move the key to the store (and rotate it if it was ever committed).
+API keys live in the per-user credential store, never in `.n-dx.json` and never on a command line. `*.cli_path` values are written to `.n-dx.local.json`, which `ndx init` gitignores — never to the shared `.n-dx.json`. Every reader merges the local file over the shared one, so nothing else changes. A key an older version left in `.n-dx.local.json` moves with `ndx config credentials --import .`. One in `.n-dx.json` makes `ndx config` warn on every run and `ndx ci` fail when that file is git-tracked; store it with `ndx config credentials.<vendor>`, delete it from the file, and rotate it if it was ever committed.
 
 A `*.cli_path` or `*.api_endpoint` in the shared `.n-dx.json` (and `llm.google.apiKeyEnv`) applies only once you trust the repository (`ndx trust accept .`): it picks the binary n-dx runs with your environment, or where your key is sent. Until then n-dx ignores it with a warning naming the field. The same keys in `.n-dx.local.json` always apply. `graview.bin`, the binary `ndx graview` runs, and `graview.app`, the product face `ndx graview serve` runs, follow the same rule; `NDX_GRAVIEW_BIN` always applies.
 
@@ -177,7 +177,7 @@ ndx config credentials .                      # backend, source and fingerprint 
 | `cli` | The vendor CLI login; no key is used or passed on |
 | `api` | A key from config, the environment or the store; a run with none stops with an error |
 
-`ndx config credentials.<vendor>` on a project with no `llm.<vendor>.auth` sets it to `api` and says so, so a key you just stored takes effect. An explicit value, `cli` included, is never overwritten, and a tracked `.n-dx.local.json` is left alone with the command to run. `hench.provider` still chooses hench's loop; it refuses `api` under `cli`, and under `auto` with only a stored key.
+`ndx config credentials.<vendor>` changes no project's auth: set `llm.<vendor>.auth api` yourself where the key should be used. `hench.provider` still chooses hench's loop; it refuses `api` under `cli`, and under `auto` with only a stored key.
 
 **Lookup order.** The first of these that has a key wins: the project's configured key, the exported variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `TYPESAFE_API_KEY`…), then the store. An exported `TYPESAFE_API_KEY` therefore overrides the stored one.
 
@@ -189,9 +189,9 @@ ndx config credentials.claude --helper "op read op://vault/item/field"
 
 The command runs without a shell when the key is needed; its single line of output is the value, kept for the process (a failure is retried after 60 s). Quote as in a shell, but nothing expands: `|`, `;`, `&`, `>`, `<`, `$(` and backticks are refused. So is an interpreter given code to run (`bash -c`, `node -e`): an interpreter helper needs a script path, and agent runs are denied that interpreter. `ndx config credentials --check` runs each helper and shows the fingerprint of what it returned.
 
-**`--import`** moves keys an older version wrote to `llm.<vendor>.api_key` in `.n-dx.local.json` into the store without asking (`ndx config credentials --import`). A one-time import also runs the first time such a key is written. Importing replaces a vendor's helper entry with the file key.
+**`--import`** moves keys an older version wrote to `llm.<vendor>.api_key` in `.n-dx.local.json` into the store without asking (`ndx config credentials --import .`). Without the flag, `ndx config credentials` asks on a terminal and otherwise prints that command. A vendor whose store entry is a helper is skipped and its file key stays put, so a plaintext key never replaces a password-manager setup.
 
-Writing `llm.<vendor>.api_key` still works as an alias for `credentials.<vendor>`: the value goes to the store, not the file, and the alias carries the same `auth` side effect above. Agent runs cannot read the store: the Claude CLI gets deny rules for it and hench's guard blocks it.
+Writing `llm.<vendor>.api_key` still works as an alias for `credentials.<vendor>`, but it takes the key as an argument, so prefer `credentials.<vendor>`. The value goes to the store, not the file, and any copy in `.n-dx.json` or `.n-dx.local.json` is removed. The alias and `--import` also set `llm.<vendor>.auth` to `api` when no config file sets it, as writing the key always did. An explicit value, `cli` included, is never overwritten, and a tracked `.n-dx.local.json` is left alone with the command to run. Agent runs cannot read the store: the Claude CLI gets deny rules for it and hench's guard blocks it.
 
 ## Codex Configuration
 
