@@ -1,5 +1,11 @@
 schema: "rex/v2"
 items:
+  "0f3163d9-7548-4ff5-abfa-d62d7640c42f":
+    status: "in_progress"
+    startedAt: "2026-11-03T18:34:02.653Z"
+    activeIntervals: [{"start":"2026-11-03T18:34:02.653Z"}]
+    lastModified: "2026-11-03T18:34:06.845Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "10730d82-59f1-4ea2-9594-667318da70d2":
     status: "completed"
     startedAt: "2026-11-03T15:33:50.948Z"
@@ -65,7 +71,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-03T15:41:10.475Z"
+    lastModified: "2026-11-03T18:32:58.201Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
@@ -144,5 +150,8 @@ items:
     lastModified: "2026-11-02T23:15:31.974Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f912174e-96e5-41a3-acd9-5c73bae27c5b":
-    lastModified: "2026-11-02T18:47:48.407Z"
+    startedAt: "2026-11-03T17:50:02.094Z"
+    activeIntervals: [{"end":"2026-11-03T18:15:54.465Z","start":"2026-11-03T17:50:02.094Z"},{"end":"2026-11-03T18:18:20.060Z","start":"2026-11-03T18:18:17.187Z"},{"end":"2026-11-03T18:31:46.028Z","start":"2026-11-03T18:19:05.082Z"}]
+    failureReason: "The messages are done and committed (cfdc67c6c, 1dcedacaf). The test gate failed on one stale assertion: tests/e2e/cli-auth.test.js:185 ('ndx auth does not send the variable an untrusted repository names') still expects 'export GEMINI_API_KEY=', but the Google preflight now prints 'Or set the env var: export GEMINI_API_KEY'. Update that assertion to the new text and also assert stderr does not contain SENTINEL_VAR, which is the point of the test. Do not redo the message work; run tests/e2e/cli-auth.test.js and tests/e2e/key-argv-message-policy.test.js."
+    lastModified: "2026-11-03T18:31:53.837Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

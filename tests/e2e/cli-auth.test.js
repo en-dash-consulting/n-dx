@@ -182,7 +182,8 @@ describe("ndx auth", () => {
       expect(await requests()).toEqual([]);
       expect(status).not.toBe(0);
       expect(stderr).toContain("No API key configured for Google");
-      expect(stderr).toContain("export GEMINI_API_KEY=");
+      expect(stderr).toContain("export GEMINI_API_KEY");
+      expect(stderr).not.toContain(SENTINEL_VAR);
     });
 
     it("ndx config llm.vendor google does not send the variable an untrusted repository names", async () => {
