@@ -11,8 +11,9 @@
  *   one is replaced. {@link claimHubSessionHost} is the host's side.
  * - **The pick** is the hub's side: the lock's holder while it is a healthy
  *   registered project, else the first healthy registered project. A host
- *   the proxy could not reach is skipped until its next health check
- *   succeeds, so the next request moves on to another one.
+ *   the proxy could not reach, or whose route gate refused for web.sidecar,
+ *   is skipped until its next health check succeeds, so the next request
+ *   moves on to another one.
  *
  * @module web/hub/session-host
  */
@@ -113,8 +114,11 @@ function healthyPort(project: ProjectView): number | null {
  * session nothing, because the next host resumes it from disk.
  */
 export class HubSessionHostPicker {
-  /** Project id → the health stamp it had when the proxy failed to reach it. */
-  private readonly unreachable = new Map<string, string | null>();
+  /**
+   * Project id → the health stamp it had when it was passed over, and why:
+   * the proxy could not reach it, or its route gate refused for web.sidecar.
+   */
+  private readonly unreachable = new Map<string, { stamp: string | null; reason: "unreachable" | "sidecar-off" }>();
 
   constructor(private readonly hubHome: string) {}
 
@@ -133,12 +137,26 @@ export class HubSessionHostPicker {
 
   /** The proxy could not reach `project`: skip it until a newer health check answers. */
   markUnreachable(project: ProjectView): void {
-    this.unreachable.set(project.id, project.status.lastHealthAt);
+    this.unreachable.set(project.id, { stamp: project.status.lastHealthAt, reason: "unreachable" });
+  }
+
+  /**
+   * `project` answered with its web.sidecar gate: skip it like an unreachable
+   * host, so another project that has the Sidecar on can host the session.
+   */
+  markSidecarOff(project: ProjectView): void {
+    this.unreachable.set(project.id, { stamp: project.status.lastHealthAt, reason: "sidecar-off" });
+  }
+
+  /** True when no project can host and a healthy one is skipped for web.sidecar. */
+  sidecarOffEverywhere(projects: readonly ProjectView[]): boolean {
+    if (this.pick(projects)) return false;
+    return projects.some((p) => healthyPort(p) !== null && this.unreachable.get(p.id)?.reason === "sidecar-off");
   }
 
   private skipped(project: ProjectView): boolean {
     if (!this.unreachable.has(project.id)) return false;
-    if (this.unreachable.get(project.id) !== project.status.lastHealthAt) {
+    if (this.unreachable.get(project.id)?.stamp !== project.status.lastHealthAt) {
       this.unreachable.delete(project.id);
       return false;
     }

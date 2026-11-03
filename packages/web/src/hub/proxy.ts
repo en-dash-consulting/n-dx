@@ -43,7 +43,7 @@
  */
 
 import { request as httpRequest } from "node:http";
-import type { IncomingMessage, OutgoingHttpHeaders, ServerResponse } from "node:http";
+import type { IncomingHttpHeaders, IncomingMessage, OutgoingHttpHeaders, ServerResponse } from "node:http";
 import { connect } from "node:net";
 import { realpathSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
@@ -51,6 +51,7 @@ import type { Duplex } from "node:stream";
 import {
   AUTH_COOKIE_NAME,
   AUTH_HEADER_NAME,
+  FEATURE_DISABLED_HEADER,
   HUB_ADMISSION_HEADER,
   HUB_PATH,
   checkRunOptions,
@@ -381,6 +382,7 @@ export function proxyHttp(
   extraHeaders: OutgoingHttpHeaders = {},
   sidecar?: SidecarForward,
   onUpstreamError?: () => void,
+  onUpstreamHeaders?: (status: number, headers: IncomingHttpHeaders) => void,
 ): void {
   const headers: OutgoingHttpHeaders = { ...req.headers, host: `${UPSTREAM_HOST}:${port}` };
   // Only the hub states its admission state; a client's copy never reaches the child.
@@ -413,6 +415,7 @@ export function proxyHttp(
   const upstream = httpRequest(
     { host: UPSTREAM_HOST, port, method: req.method, path, headers },
     (upstreamRes) => {
+      onUpstreamHeaders?.(upstreamRes.statusCode ?? 502, upstreamRes.headers);
       const outHeaders = { ...upstreamRes.headers };
       // A redirect the project server issues is root-relative from its point
       // of view; the client is under the prefix. A sidecar's may already be
@@ -499,6 +502,8 @@ export function proxyUpgrade(
   upstream.once("close", () => socket.destroy());
 }
 
+/** The project feature a host must have on to serve the hub session. */
+const HUB_SESSION_FEATURE = "web.sidecar";
 const NO_HUB_SESSION_HOST = "No registered project server is healthy to host the hub session";
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
@@ -531,10 +536,25 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
     case "hub-session": {
       const host = hub.sessionHosts.pick(hub.listProjects());
       if (!host) {
+        if (hub.sessionHosts.sidecarOffEverywhere(hub.listProjects())) {
+          writeJson(res, 403, {
+            error: `The feature "${HUB_SESSION_FEATURE}" is turned off in every healthy project, so the hub session has no host.`,
+            feature: HUB_SESSION_FEATURE,
+            kind: "feature_disabled",
+            suggestion: `Enable ${HUB_SESSION_FEATURE} in one project's feature flags, or set features.${HUB_SESSION_FEATURE} to true in its .n-dx.json.`,
+          });
+          return;
+        }
         writeJson(res, 503, { error: NO_HUB_SESSION_HOST });
         return;
       }
-      proxyHttp(req, res, host.port, decision.path, "", undefined, {}, undefined, () => hub.sessionHosts.markUnreachable(host.project));
+      proxyHttp(
+        req, res, host.port, decision.path, "", undefined, {}, undefined,
+        () => hub.sessionHosts.markUnreachable(host.project),
+        (status, headers) => {
+          if (status === 403 && headers[FEATURE_DISABLED_HEADER] === HUB_SESSION_FEATURE) hub.sessionHosts.markSidecarOff(host.project);
+        },
+      );
       return;
     }
     case "redirect":

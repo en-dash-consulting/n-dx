@@ -42,6 +42,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerContext } from "./types.js";
+import { FEATURE_DISABLED_HEADER } from "../shared/index.js";
 import { jsonResponse } from "./response-utils.js";
 import { isFeatureEnabled } from "./routes-features.js";
 
@@ -172,6 +173,7 @@ export function enforceRouteFeatureGate(
   if (!gate || gate.selfEnforced) return false;
   if (isFeatureEnabled(ctx.projectDir, gate.feature)) return false;
 
+  res.setHeader(FEATURE_DISABLED_HEADER, gate.feature);
   jsonResponse(res, 403, featureDisabledBody(gate.feature, pathname));
   return true;
 }

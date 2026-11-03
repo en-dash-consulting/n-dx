@@ -18,6 +18,13 @@
 export const HUB_ADMISSION_HEADER = "x-ndx-hub-admission";
 
 /**
+ * A project server's route feature gate names the flag that refused a request
+ * in this response header, so the hub can tell a feature refusal from any
+ * other 403 without reading the body.
+ */
+export const FEATURE_DISABLED_HEADER = "x-ndx-feature-disabled";
+
+/**
  * How many queued entries the header carries.
  *
  * The header travels on every `GET /api/live`, and Node refuses a request

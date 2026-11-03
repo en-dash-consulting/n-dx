@@ -32,6 +32,8 @@ interface Upstream {
   port: number;
   seen: Array<{ url: string; token: string | undefined }>;
   upgrades: string[];
+  /** Answer as a project whose web.sidecar gate is closed. */
+  sidecarOff: boolean;
 }
 
 let home: string;
@@ -50,8 +52,14 @@ async function listen(server: Server): Promise<number> {
 async function startUpstream(): Promise<Upstream> {
   const seen: Upstream["seen"] = [];
   const upgrades: string[] = [];
+  const upstream: Upstream = { server: undefined as unknown as Server, port: 0, seen, upgrades, sidecarOff: false };
   const server = createServer((req: IncomingMessage, res) => {
     seen.push({ url: req.url ?? "", token: req.headers["x-ndx-token"] as string | undefined });
+    if (upstream.sidecarOff) {
+      res.writeHead(403, { "Content-Type": "application/json", "x-ndx-feature-disabled": "web.sidecar" });
+      res.end(JSON.stringify({ kind: "feature_disabled", feature: "web.sidecar" }));
+      return;
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ port: (server.address() as { port: number }).port }));
   });
@@ -59,8 +67,8 @@ async function startUpstream(): Promise<Upstream> {
     upgrades.push(req.url ?? "");
     socket.end("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n");
   });
-  const port = await listen(server);
-  const upstream = { server, port, seen, upgrades };
+  upstream.server = server;
+  upstream.port = await listen(server);
   upstreams.push(upstream);
   return upstream;
 }
@@ -188,6 +196,38 @@ describe("/hub/session/ through the hub", () => {
     projects = [project("a", a.port, "healthy", "t2"), project("b", b.port)];
     await hubGet("/hub/session/sessions");
     expect(a.seen).toHaveLength(2);
+  });
+
+  it("passes over a host whose web.sidecar is off, so the project that has it on hosts the session", async () => {
+    const a = await startUpstream();
+    const b = await startUpstream();
+    a.sidecarOff = true;
+    projects = [project("a", a.port), project("b", b.port)];
+    // The first request is refused by a's gate and marks it; the next moves on.
+    const first = await hubGet("/hub/session/sessions");
+    expect(first.status).toBe(403);
+    expect((await first.json()).feature).toBe("web.sidecar");
+    const second = await hubGet("/hub/session/sessions");
+    expect(second.status).toBe(200);
+    expect(b.seen).toEqual([{ url: "/api/sidecar/hub/sessions", token: TOKEN }]);
+    expect(a.seen).toHaveLength(1);
+  });
+
+  it("answers a refusal naming web.sidecar when no project has it on", async () => {
+    const a = await startUpstream();
+    const b = await startUpstream();
+    a.sidecarOff = true;
+    b.sidecarOff = true;
+    projects = [project("a", a.port), project("b", b.port)];
+    expect((await hubGet("/hub/session/sessions")).status).toBe(403); // a refuses, is marked
+    expect((await hubGet("/hub/session/sessions")).status).toBe(403); // b refuses, is marked
+    const res = await hubGet("/hub/session/sessions");
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.feature).toBe("web.sidecar");
+    expect(body.error).toContain("web.sidecar");
+    expect(a.seen).toHaveLength(1);
+    expect(b.seen).toHaveLength(1);
   });
 
   it("answers 503 when no registered project is healthy", async () => {
