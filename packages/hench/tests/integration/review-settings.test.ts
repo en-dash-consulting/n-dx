@@ -68,22 +68,28 @@ describe("hench.review.mode", () => {
     expect(configured.reviewOptional).toEqual(flagged.reviewOptional);
   });
 
-  it("is overruled by --no-review, --review and a task's saved review", () => {
+  it("is overruled by --no-review and --review, and raised but never lowered by a task's saved review", () => {
     const self = withReview({ mode: "self" });
     expect(resolveFor({ config: self, flags: { "no-review": "true" } }).review).toEqual({
       value: false,
       source: "cli-flag",
     });
-    expect(resolveFor({ config: self, item: savedReview(false) }).review).toEqual({
-      value: false,
-      source: "task.run",
-    });
+    // A saved `review: false` would switch off a review the operator runs: the
+    // agent can write it on the next task, so it is ignored, with a warning.
+    const optedOut = resolveFor({ config: self, item: savedReview(false) });
+    expect(optedOut.review).toEqual({ value: true, source: "hench.review.mode" });
+    expect(optedOut.warnings.map((w) => w.code)).toContain("saved-setting-widens");
     const pair = withReview({ mode: "pair" });
     expect(resolveFor({ config: pair, flags: { review: "true" } }).reviewMode).toEqual({
       value: "self",
       source: "cli-flag",
     });
-    expect(resolveFor({ config: pair, item: savedReview(true) }).review).toEqual({
+    // Self review is weaker than the project's pair review.
+    const weaker = resolveFor({ config: pair, item: savedReview(true) });
+    expect(weaker.reviewMode).toEqual({ value: "pair", source: "hench.review.mode" });
+    expect(weaker.warnings.map((w) => w.code)).toContain("saved-setting-widens");
+    // A saved review on a project that runs none raises it.
+    expect(resolveFor({ config: withReview({ mode: "off" }), item: savedReview(true) }).review).toEqual({
       value: true,
       source: "task.run",
     });

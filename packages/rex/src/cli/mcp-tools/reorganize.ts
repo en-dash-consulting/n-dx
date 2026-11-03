@@ -1,3 +1,4 @@
+import { checkBranchGuard, branchGuardRefusal } from "../../core/branch-guard.js";
 import { z } from "zod";
 import { detectReorganizations } from "../../core/reorganize.js";
 import { applyProposals } from "../../core/reorganize-executor.js";
@@ -10,9 +11,15 @@ import { defineTool } from "./tool.js";
 export async function handleReorganize(
   store: PRDStore,
   dir: string,
-  args: { accept?: string; includeCompleted?: boolean; mode?: string },
+  args: { accept?: string; includeCompleted?: boolean; mode?: string; allowOnBranch?: boolean },
 ): Promise<McpResult> {
   try {
+    if (args.accept) {
+      const guard = checkBranchGuard(dir, { "allow-on-branch": String(args.allowOnBranch === true) });
+      if (guard.blocked) {
+        return textResult(`${branchGuardRefusal("reorganize", guard.branch).message} Set allowOnBranch: true to opt in.`, true);
+      }
+    }
     const doc = await store.loadDocument();
     if (doc.items.length === 0) {
       return textResult(JSON.stringify({ structural: { proposals: [], stats: {} }, llm: [] }, null, 2));
@@ -111,6 +118,7 @@ export const reorganizeTool = defineTool({
   name: "reorganize",
   description: "Detect structural issues in the PRD and propose reorganizations (merge, move, delete, prune, collapse, split). Runs both programmatic detectors and LLM analysis by default.",
   schema: {
+    allowOnBranch: z.boolean().optional().describe("Explicitly allow a whole-tree rewrite off the default branch (default: false)"),
     accept: z.string().optional().describe("Apply proposals: 'low-risk' (default when set), 'all', or comma-separated IDs like '1,3'"),
     includeCompleted: z.boolean().optional().describe("Include completed items in similarity analysis (default: false)"),
     mode: z.enum(["fast", "full"]).optional().describe("Analysis mode: 'fast' (programmatic only) or 'full' (programmatic + LLM, default)"),

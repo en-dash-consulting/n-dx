@@ -51,10 +51,14 @@ function runExpectFail(args: string[], timeout = 15000): { stdout: string; stder
  * SIGTERM only kills the rex process, so on Windows the claude grandchild
  * survived — holding tmpDir handle-locked past cleanup (EBUSY) and leaking an
  * orphan process per test.
+ *
+ * The stub goes in `.n-dx.local.json`: a `cli_path` in the shared
+ * `.n-dx.json` is a repository choosing which binary runs, which the tracked
+ * config clamp drops, so the stub there would be ignored and the real CLI run.
  */
 async function stubLLM(dir: string): Promise<void> {
   await writeFile(
-    join(dir, ".n-dx.json"),
+    join(dir, ".n-dx.local.json"),
     JSON.stringify({ claude: { cli_path: process.execPath } }),
   );
 }

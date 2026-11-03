@@ -106,13 +106,19 @@ function awaitsTarget(change: RuleNode): boolean {
   return change.type === "change" && change.needsPlacement === true && !change.spike && !change.amends?.length && !change.touches?.length;
 }
 
-/** Completed changes not yet applied, depth first: what a steward reviews, or a release stamp applies. An Inbox change with no target waits for placement first. */
+/**
+ * Completed changes not yet applied, depth first and post-order: what a
+ * steward reviews, or a release stamp applies, in the order to apply them. A
+ * change nested in another comes before the change that holds it, because a
+ * container applies after the changes nested in it. An Inbox change with no
+ * target waits for placement first.
+ */
 export function changesAwaitingApply(tree: V2Tree): RuleNode[] {
   const found: RuleNode[] = [];
   const visit = (node: RuleNode): void => {
     if (node.status === "deleted") return;
-    if (node.type === "change" && node.status === "completed" && isOpenChange(node) && !awaitsTarget(node)) found.push(node);
     for (const child of node.children ?? []) visit(child);
+    if (node.type === "change" && node.status === "completed" && isOpenChange(node) && !awaitsTarget(node)) found.push(node);
   };
   for (const node of tree.changes) visit(node);
   return found;

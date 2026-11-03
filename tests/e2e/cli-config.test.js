@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile, mkdir, chmod, stat } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir, writeFile, mkdir, chmod, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, lstatSync, symlinkSync } from "node:fs";
 import { DEFAULT_TIMEOUT } from "./e2e-helpers.js";
 
 const isWin = process.platform === "win32";
@@ -118,7 +119,7 @@ async function setupProject(dir) {
         rexDir: ".rex",
         apiKeyEnv: "ANTHROPIC_API_KEY",
         guard: {
-          blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**"],
+          blockedPaths: [".hench/**", ".rex/**", ".git/**", "node_modules/**", ".env"],
           allowedCommands: ["npm", "npx", "node", "git", "tsc", "vitest"],
           commandTimeout: 30000,
           maxFileSize: 1048576,
@@ -544,7 +545,7 @@ describe("n-dx config", () => {
       expect(output).toContain('default: "file"');
       expect(output).toContain('default: "cli"');
       expect(output).toContain('default: "sonnet"');
-      expect(output).toContain("default: 50");
+      expect(output).toContain("default: 200");
       expect(output).toContain("default: 8192");
       expect(output).toContain("default: 30000");
       expect(output).toContain("default: 1048576");
@@ -754,6 +755,21 @@ describe("n-dx config", () => {
       expect(shared.cli?.claudePath).toBeUndefined();
     });
 
+    it("sets web.auth in .n-dx.local.json and moves a shared copy out of .n-dx.json", async () => {
+      // `ndx start` ignores web.auth=false in the shared file, so writing it
+      // there would leave auth on and warn on every start.
+      await writeFile(
+        SHARED_CONFIG_PATH(tmpDir),
+        JSON.stringify({ web: { auth: false, port: 4000 } }, null, 2) + "\n",
+      );
+      run(["web.auth", "false", tmpDir]);
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.web.auth).toBe(false);
+      const shared = JSON.parse(await readFile(SHARED_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(shared.web.auth).toBeUndefined();
+      expect(shared.web.port).toBe(4000);
+    });
+
     it("sets hench.apiKeyEnv in .n-dx.local.json, so the checkout stays at baseline", async () => {
       // The trust review reads a non-default apiKeyEnv in .hench/config.json
       // or .n-dx.json as the repository's credential routing: written there,
@@ -810,6 +826,51 @@ describe("n-dx config", () => {
       } catch { /* not created — fine */ }
       expect(shared.claude?.api_key).toBeUndefined();
       expect(shared.llm?.claude?.api_key).toBeUndefined();
+    });
+
+    it.skipIf(isWin)("creates .n-dx.local.json owner-only, leaving no temp file behind", async () => {
+      run(["claude.api_key", "sk-ant-test-key", tmpDir]);
+      const { mode } = await stat(LOCAL_CONFIG_PATH(tmpDir));
+      expect(mode & 0o777).toBe(0o600);
+      const leftovers = (await readdir(tmpDir)).filter((name) => name.endsWith(".tmp"));
+      expect(leftovers).toEqual([]);
+      // A second write goes through the same temp-and-rename path.
+      run(["claude.api_key", "sk-ant-test-key-2", tmpDir]);
+      expect((await stat(LOCAL_CONFIG_PATH(tmpDir))).mode & 0o777).toBe(0o600);
+    });
+
+    it("refuses to write an api_key into a file git tracks", async () => {
+      spawnSync("git", ["init", "-q"], { cwd: tmpDir, stdio: "pipe" });
+      await writeFile(LOCAL_CONFIG_PATH(tmpDir), "{}\n");
+      spawnSync("git", ["add", "-f", "--", ".n-dx.local.json"], { cwd: tmpDir, stdio: "pipe" });
+
+      const stderr = runFail(["claude.api_key", "sk-ant-test-key", tmpDir]);
+      expect(stderr).toContain("tracked by git");
+      expect(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8")).toBe("{}\n");
+    });
+
+    it("warns when the key file is not ignored by git, and still writes", async () => {
+      spawnSync("git", ["init", "-q"], { cwd: tmpDir, stdio: "pipe" });
+
+      const result = spawnSync("node", [CLI_PATH, "config", "claude.api_key", "sk-ant-test-key", tmpDir], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+        stdio: "pipe",
+      });
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain("not ignored by git");
+      const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+      expect(local.llm.claude.api_key).toBe("sk-ant-test-key");
+
+      // Once ignored, the write is silent about git.
+      await writeFile(join(tmpDir, ".gitignore"), ".n-dx.local.json\n");
+      const quiet = spawnSync("node", [CLI_PATH, "config", "claude.api_key", "sk-ant-test-key", tmpDir], {
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+        stdio: "pipe",
+      });
+      expect(quiet.status).toBe(0);
+      expect(quiet.stderr).not.toContain("not ignored by git");
     });
 
     it("writes claude.<field> to llm.claude.<field> and notes the redirect on stderr", () => {
@@ -1643,12 +1704,15 @@ describe("n-dx config", () => {
       await expectNotOwnerOnly(join(tmpDir, ".n-dx.json"));
     });
 
-    it("restricts permissions when api_key is added to existing config", async () => {
-      // First set a non-sensitive value
+    it("keeps .n-dx.local.json owner-only before and after an api_key is added", async () => {
+      // The machine-local file is written owner-only from its first byte,
+      // whatever it holds: it is the file every key ends up in, and a key
+      // added later must not land in a file that was created readable.
       run(["claude.cli_path", "/some/path", "--force", tmpDir]);
-      await expectNotOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
+      if (!isWin) await expectOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
 
-      // Now add an API key — same file as cli_path, now owner-only
+      // Adding the key keeps it so — and on Windows, where mode means
+      // nothing, is what applies and verifies the ACL.
       run(["claude.api_key", "sk-ant-secure-key", tmpDir]);
       await expectOwnerOnly(LOCAL_CONFIG_PATH(tmpDir));
     });
@@ -1989,9 +2053,15 @@ describe("n-dx config", () => {
       expect(config.language).toBe("auto");
     });
 
+    it.each(["swift", "python", "java", "csharp"])("sets language to %s", async (language) => {
+      run(["language", language, tmpDir]);
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.language).toBe(language);
+    });
+
     it("rejects invalid language values", async () => {
-      const stderr = runFail(["language", "python", tmpDir]);
-      expect(stderr).toContain('Invalid language "python"');
+      const stderr = runFail(["language", "not-a-language", tmpDir]);
+      expect(stderr).toContain('Invalid language "not-a-language"');
       expect(stderr).toContain("typescript");
       expect(stderr).toContain("javascript");
       expect(stderr).toContain("go");
@@ -2290,5 +2360,68 @@ describe("n-dx config", () => {
       expect(help).toContain("llm.escalation");
       expect(help).toMatch(/llm\.model/);
     });
+  });
+});
+
+
+describe("writes to git-tracked machine-local configuration", () => {
+  let dir;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "ndx-tracked-local-write-"));
+    await setupProject(dir);
+    await writeFile(LOCAL_CONFIG_PATH(dir), "{}\n");
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["add", ".n-dx.local.json"], { cwd: dir });
+  });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
+  it("refuses a credential without printing or persisting its value", async () => {
+    const key = "sk-ant-fixture-never-print";
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.stdout + result.stderr).not.toContain(key);
+    expect(JSON.parse(await readFile(LOCAL_CONFIG_PATH(dir), "utf8"))).toEqual({});
+  });
+  it("warns for a nonsecret local setting", () => {
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "cli.claudePath", "/fixture/claude", dir], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toContain("repository config");
+    expect(result.stderr).toContain("trust-gated");
+  });
+  // Nothing on disk, but git still has the entry: saveJSON would recreate the
+  // committed path holding the key, ready for `git commit -a`.
+  it("refuses a credential when the tracked file was deleted from the work tree", async () => {
+    await rm(LOCAL_CONFIG_PATH(dir));
+    const key = "sk-ant-fixture-deleted-tracked";
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.stdout + result.stderr).not.toContain(key);
+    expect(existsSync(LOCAL_CONFIG_PATH(dir))).toBe(false);
+  });
+});
+
+describe("writes through a committed dangling symlink at the local config path", () => {
+  let dir;
+  let linked = false;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "ndx-dangling-local-write-"));
+    await setupProject(dir);
+    // Windows without Developer Mode cannot create a symlink; the case is then
+    // not reachable on this machine and the test skips itself.
+    try { symlinkSync("missing-target.json", LOCAL_CONFIG_PATH(dir)); linked = true; } catch { linked = false; }
+    if (!linked) return;
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["add", ".n-dx.local.json"], { cwd: dir });
+  });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); });
+  it("refuses a credential and leaves the link in place", async (ctx) => {
+    if (!linked) ctx.skip();
+    const key = "sk-ant-fixture-dangling-link";
+    const result = spawnSync(process.execPath, [CLI_PATH, "config", "llm.claude.api_key", key, dir], { encoding: "utf8" });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toContain("Refusing to write a credential");
+    expect(result.stdout + result.stderr).not.toContain(key);
+    expect(lstatSync(LOCAL_CONFIG_PATH(dir)).isSymbolicLink()).toBe(true);
   });
 });

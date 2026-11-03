@@ -29,13 +29,14 @@
  * @see ../performance/response-buffer-gate.ts
  */
 
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
 import { useEffect } from "preact/hooks";
 import type { PRDDocumentData, PRDItemData } from "../components/prd-tree/types.js";
 import { applyItemUpdate } from "../components/prd-tree/tree-differ.js";
 import { removeItemById } from "../components/prd-tree/tree-utils.js";
 import { createWSPipeline } from "../messaging/index.js";
 import { createUpdateBatcher, createDomUpdateGate, createResponseBufferGate } from "../performance/index.js";
+import { openWebSocket } from "../session.js";
 
 export interface PRDWebSocketDeps {
   /** Setter for PRD document state (supports functional updates). */
@@ -131,7 +132,7 @@ export function usePRDWebSocket({ setData, fetchPRDData, fetchTaskUsage }: PRDWe
     });
 
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);

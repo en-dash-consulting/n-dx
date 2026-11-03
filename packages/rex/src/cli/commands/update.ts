@@ -3,6 +3,7 @@ import { resolveStore, ensureLegacyPrdMigrated, resolveRexPaths, isChangeLayerSt
 
 import { parseCsvList } from "../parse-utils.js";
 import { CLIError, requireRexDir } from "../errors.js";
+import { runBlockRefusalInsideAgentRun } from "../run-block-guard.js";
 import { info, result, warn } from "../output.js";
 import { completeV2Work, type V2Completion } from "../v2-completion.js";
 import { emitMigrationNotification } from "../migration-notification.js";
@@ -196,6 +197,10 @@ export async function cmdUpdate(
         );
       }
     }
+    // The same rule the MCP tools apply: the agent session `ndx work` spawns
+    // does not write the settings its own next run executes under.
+    const refusal = runBlockRefusalInsideAgentRun(parsed);
+    if (refusal) throw new CLIError(refusal, "Run 'rex update --run' from your own shell.");
     const check = validateRunSettings(parsed);
     if (!check.ok) {
       throw new CLIError(

@@ -237,6 +237,59 @@ describe("agentLoop", () => {
     }
   });
 
+  it("persists the guard's audit summary and session counters on the run record", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const { agentLoop } = await import("../../../src/agent/lifecycle/loop.js");
+    const { createStore } = await import("@n-dx/rex/dist/store/index.js");
+    const { loadConfig } = await import("../../../src/store/config.js");
+    const { loadRun } = await import("../../../src/store/runs.js");
+
+    await writeFile(join(projectDir, "notes.txt"), "hello\n", "utf-8");
+    const config = await loadConfig(henchDir);
+    const store = createStore("file", join(projectDir, ".rex"));
+    const usage = { input_tokens: 10, output_tokens: 5 };
+    const responses = [
+      {
+        id: "msg_1", type: "message", role: "assistant", model: "claude-sonnet-4-6",
+        content: [{ type: "tool_use", id: "tu_1", name: "read_file", input: { path: "notes.txt" } }],
+        stop_reason: "tool_use", stop_sequence: null, usage,
+      },
+      {
+        id: "msg_2", type: "message", role: "assistant", model: "claude-sonnet-4-6",
+        content: [{ type: "text", text: "Done." }],
+        stop_reason: "end_turn", stop_sequence: null, usage,
+      },
+    ];
+    const messagesProto = Object.getPrototypeOf(new Anthropic({ apiKey: "test" }).messages);
+    let call = 0;
+    const spy = vi.spyOn(messagesProto, "create").mockImplementation(async () => responses[call++]);
+    const origKey = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = "test-key-12345";
+
+    try {
+      const result = await agentLoop({
+        config: { ...config, planOnlyMaxRetries: 0 },
+        store,
+        projectDir,
+        henchDir,
+        maxTurns: 3,
+      });
+
+      expect(result.run.guardAudit).toBeDefined();
+      expect(result.run.guardAudit?.counters.filesRead).toBe(1);
+      expect(result.run.guardAudit?.denied).toBe(0);
+      expect(result.run.guardAudit?.total).toBeGreaterThan(0);
+
+      // Written to disk and not stripped on load.
+      const saved = await loadRun(henchDir, result.run.id);
+      expect(saved.guardAudit).toEqual(result.run.guardAudit);
+    } finally {
+      spy.mockRestore();
+      if (origKey) process.env.ANTHROPIC_API_KEY = origKey;
+      else delete process.env.ANTHROPIC_API_KEY;
+    }
+  });
+
   it("resets task to pending on cancellation", async () => {
     // Test that when a run is cancelled (SIGINT), the task is reset from in_progress to pending
     const { finalizeRun } = await import("../../../src/agent/lifecycle/shared.js");

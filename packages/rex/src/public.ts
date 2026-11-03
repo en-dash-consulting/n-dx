@@ -121,8 +121,8 @@ export type { PlacementCandidate, PlacementProposal, PlacementStrength } from ".
 // which constraints bind it, what it shares changes with, and (through the
 // N-DX-Item trailers) which commits, files and zones realize a capability.
 
-export { computeEdges, computeRealizedBy, deriveChangeKind, resolveNode, trailerIds, CHANGE_KINDS } from "./core/product-edges.js";
-export type { ProductEdges, CoChange, Realization, RealizedByOptions, ChangeKind } from "./core/product-edges.js";
+export { computeAreaLinks, computeEdges, computeRealizedBy, deriveChangeKind, resolveNode, trailerIds, CHANGE_KINDS } from "./core/product-edges.js";
+export type { AreaLink, ProductEdges, CoChange, Realization, RealizedByOptions, ChangeKind } from "./core/product-edges.js";
 export { loadTrailerCommits, loadCommitFiles } from "./core/change-commits.js";
 export type { ChangeCommitsOptions, TrailerCommit } from "./core/change-commits.js";
 export { computeLandings, listReleaseTags, releasesContaining } from "./core/change-landing.js";
@@ -134,6 +134,7 @@ export type { ChangeLanding, ReleaseTag } from "./core/change-landing.js";
 // them) and the template capability specs. A proposal for review; nothing
 // here writes.
 export { classifyV1Tree, DEFAULT_PRODUCT_NAMES } from "./migrations/v1-to-v2/migration-plan.js";
+export { capabilityCodeFiles } from "./migrations/v1-to-v2/migration-plan.js";
 export type { MigrationPlan, PlanEntry, PlanTargetType, ProposedArea, ProposedConstraint, ClassifyOptions } from "./migrations/v1-to-v2/migration-plan.js";
 export { draftCapabilitySpecs } from "./migrations/v1-to-v2/capability-spec.js";
 export type { CapabilitySpecDraft, SpecCriterion, SpecDraftOptions } from "./migrations/v1-to-v2/capability-spec.js";
@@ -713,6 +714,10 @@ export type { ApplyOn } from "./core/apply-policy.js";
 // Adding a node to the change layer: the rule MCP add_item and `rex add` run.
 export { addChangeNode, AddChangeNodeError } from "./core/change-add.js";
 export type { AddChangeNodeInput, AddChangeNodeResult } from "./core/change-add.js";
+// Accepted analyze proposals as changes: the mapping `rex analyze --accept`
+// runs on a v2 tree, so the dashboard's accept routes create the same changes.
+export { changeInputsFromProposals, addProposedChanges } from "./recommend/changes-from-proposals.js";
+export type { ProposedWork, ProposedChangeInput } from "./recommend/changes-from-proposals.js";
 export { completeV2Work } from "./cli/v2-completion.js";
 export type { V2Completion, V2CompletionOptions } from "./cli/v2-completion.js";
 export { ChangeLayerStore, isChangeLayerStore } from "./store/change-layer-store.js";
@@ -720,3 +725,6 @@ export { ChangeLayerStore, isChangeLayerStore } from "./store/change-layer-store
 // Brief
 export { buildChangeBrief, renderChangeBrief } from "./core/change-brief.js";
 export type { ChangeBrief, ChangeBriefOptions, BriefCommands, BriefLogEntry } from "./core/change-brief.js";
+
+// Whole-tree write policy, shared by CLI, MCP and dashboard bulk routes.
+export { checkBranchGuard, branchGuardRefusal } from "./core/branch-guard.js";

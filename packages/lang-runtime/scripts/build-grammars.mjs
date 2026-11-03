@@ -35,7 +35,7 @@
 
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -182,24 +182,40 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-/** Download `url` once into the cache, refusing bytes whose SHA-256 differs from `expected`. */
-async function fetchVerified(url, expected, cacheName) {
-  const cached = join(CACHE_DIR, cacheName);
-  if (existsSync(cached)) {
-    const bytes = readFileSync(cached);
+/** The bytes of `path`, or undefined when it is missing (another build may have just removed it). */
+function readIfPresent(path) {
+  try {
+    return readFileSync(path);
+  } catch (error) {
+    if (error?.code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+/**
+ * Download `url` once into the cache, refusing bytes whose SHA-256 differs from `expected`.
+ * The cached copy is written under a per-process name and renamed into place, so
+ * a build running beside this one never reads half a file.
+ */
+async function fetchVerified(url, expected, cacheName, cacheDir = CACHE_DIR) {
+  const cached = join(cacheDir, cacheName);
+  const bytes = readIfPresent(cached);
+  if (bytes) {
     if (sha256(bytes) === expected) return bytes;
-    rmSync(cached);
+    rmSync(cached, { force: true });
   }
   const response = await fetch(url);
   if (!response.ok) throw new Error(`GET ${url} failed: ${response.status} ${response.statusText}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
-  const actual = sha256(bytes);
+  const downloaded = Buffer.from(await response.arrayBuffer());
+  const actual = sha256(downloaded);
   if (actual !== expected) {
     throw new Error(`Checksum mismatch for ${url}\n  expected ${expected}\n  actual   ${actual}`);
   }
-  mkdirSync(CACHE_DIR, { recursive: true });
-  writeFileSync(cached, bytes);
-  return bytes;
+  mkdirSync(cacheDir, { recursive: true });
+  const partial = `${cached}.${process.pid}.partial`;
+  writeFileSync(partial, downloaded);
+  renameSync(partial, cached);
+  return downloaded;
 }
 
 async function installCli() {
@@ -222,26 +238,58 @@ async function installCli() {
  * unless it records the verified archive's SHA-256. Extraction uses the system
  * `tar`, as the CLI does: the archives hold symlinks (`bin/clang`) and are too
  * large to unpack in memory.
+ *
+ * Several packs may build at once (`pnpm -r run build:grammars` without
+ * `--workspace-concurrency=1`) over this one cache. So the archive tar reads is
+ * this process's own copy, the extraction goes to a per-process directory that
+ * is renamed into place only once complete, and a directory another build has
+ * verified in the meantime is used as it is, never replaced under it.
  */
-async function installToolchain(name, cliKey) {
+export async function installToolchain(name, cliKey, cacheDir = CACHE_DIR) {
   const platform = TOOLCHAIN_PLATFORM[cliKey];
   if (!platform) throw new Error(`tree-sitter cannot build WASM on ${process.platform}/${process.arch}: it has no wasi-sdk for it`);
   const { version, sha256: pins, url } = WASM_TOOLCHAIN[name];
   const expected = pins[platform];
   const base = `${name}-${version}-${platform}`;
   const archive = `${base}.tar.gz`;
-  await fetchVerified(url(version, platform), expected, archive);
-
-  const dir = join(CACHE_DIR, base);
+  const dir = join(cacheDir, base);
   const marker = join(dir, ".n-dx-sha256");
-  if (existsSync(marker) && readFileSync(marker, "utf8") === expected) return dir;
-  rmSync(dir, { recursive: true, force: true });
-  mkdirSync(dir, { recursive: true });
-  // Paths relative to the cache: GNU tar on Windows reads `C:...` as a remote host.
-  const extracted = spawnSync("tar", ["-xzf", archive, "--strip-components=1", "-C", base], { cwd: CACHE_DIR, stdio: "inherit" });
-  if (extracted.error) throw extracted.error;
-  if (extracted.status !== 0) throw new Error(`tar failed to extract ${archive} (exit ${extracted.status})`);
-  writeFileSync(marker, expected);
+  if (existsSync(marker) && readFileSync(marker, "utf8") === expected) {
+    rmSync(join(cacheDir, archive), { force: true });
+    return dir;
+  }
+  const verified = () => readIfPresent(marker)?.toString("utf8") === expected;
+  const bytes = await fetchVerified(url(version, platform), expected, archive, cacheDir);
+  if (verified()) {
+    rmSync(join(cacheDir, archive), { force: true });
+    return dir;
+  }
+  const own = `${base}.${process.pid}`;
+  const ownArchive = `${own}.tar.gz`;
+  const staging = join(cacheDir, own);
+  rmSync(staging, { recursive: true, force: true });
+  mkdirSync(staging, { recursive: true });
+  writeFileSync(join(cacheDir, ownArchive), bytes);
+  try {
+    // Paths relative to the cache: GNU tar on Windows reads `C:...` as a remote host.
+    const extracted = spawnSync("tar", ["-xzf", ownArchive, "--strip-components=1", "-C", own], { cwd: cacheDir, stdio: "inherit" });
+    if (extracted.error) throw extracted.error;
+    if (extracted.status !== 0) throw new Error(`tar failed to extract ${archive} (exit ${extracted.status})`);
+    writeFileSync(join(staging, ".n-dx-sha256"), expected);
+    if (!verified()) {
+      rmSync(dir, { recursive: true, force: true });
+      try {
+        renameSync(staging, dir);
+      } catch (error) {
+        // Another build renamed its verified copy into place first.
+        if (!verified()) throw error;
+      }
+    }
+  } finally {
+    rmSync(join(cacheDir, ownArchive), { force: true });
+    rmSync(staging, { recursive: true, force: true });
+  }
+  rmSync(join(cacheDir, archive), { force: true });
   return dir;
 }
 
