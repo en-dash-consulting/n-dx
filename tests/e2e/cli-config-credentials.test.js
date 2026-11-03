@@ -214,6 +214,8 @@ describe("ndx config credentials.<name> --helper", () => {
     const r = config(["credentials.typesafe", "--helper", command]);
     expect(r.code).toBe(2);
     expect(r.err).toMatch(/is a shell, not a helper/);
+    expect(r.err.trim().split("\n")).toHaveLength(1);
+    expect(r.err).not.toMatch(/usage/i);
     expect(existsSync(join(home, "credentials.json"))).toBe(false);
   }, DEFAULT_TIMEOUT);
 

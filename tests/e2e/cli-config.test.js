@@ -1061,7 +1061,7 @@ describe("n-dx config", () => {
     it("includes claude config examples", () => {
       const output = helpOutput;
       expect(output).toContain("n-dx config claude.cli_path");
-      expect(output).toContain("n-dx config claude.api_key");
+      expect(output).toContain("n-dx config credentials.claude");
     });
   });
 
@@ -2131,7 +2131,8 @@ describe("n-dx config", () => {
       });
 
       expect(stderr).toContain("No API key configured for Google");
-      expect(stderr).toContain("ndx config llm.google.api_key <KEY>");
+      expect(stderr).toContain("ndx config credentials.google");
+      expect(stderr).toContain("ndx config llm.google.auth api");
       expect(stderr).toContain("GEMINI_API_KEY");
       expect(stderr).not.toContain("{");
       expect(stderr).toContain("[NDX_GOOGLE_PREFLIGHT_NO_KEY]");

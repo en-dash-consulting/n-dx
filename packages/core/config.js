@@ -884,8 +884,8 @@ async function runGoogleApiPreflight(dir) {
       vendor: LLM_VENDOR.GOOGLE,
       apiKeyEnv: apiKeyEnvVar,
       detail:
-        `No API key found. Set the ${apiKeyEnvVar} environment variable or store the key with: ` +
-        "n-dx config llm.google.api_key <key>",
+        `No API key found. Export ${apiKeyEnvVar} or store the key with: ndx config credentials.google. ` +
+        "Storing it does not switch modes; ndx config llm.google.auth api does.",
       errorCode: "NDX_GOOGLE_PREFLIGHT_NO_KEY",
     };
   }
@@ -1937,8 +1937,8 @@ async function printVendorPreflightFailure(vendor, preflight, llmConfig) {
     // No key configured yet → distinct "missing API key" root cause.
     if (errorCode === "NDX_GOOGLE_PREFLIGHT_NO_KEY") {
       console.error(red("✗ No API key configured for Google."));
-      console.error(yellow("  Set your API key: ndx config llm.google.api_key <KEY>"));
-      console.error(yellow(`  Or set the env var: export ${apiKeyEnvVar}=<KEY>`));
+      console.error(yellow("  Store your API key: ndx config credentials.google (storing it does not switch modes; ndx config llm.google.auth api does)"));
+      console.error(yellow(`  Or set the env var: export ${apiKeyEnvVar}`));
       console.error("  Get a key: https://aistudio.google.com/apikey");
       console.error(dim(`  [${errorCode}]`));
       return;
@@ -2775,7 +2775,6 @@ Examples:
   n-dx config claude.cli_path /usr/local/bin/claude
                                                Set Claude CLI binary path (validates path)
   n-dx config claude.cli_path /path --force    Set without validation
-  n-dx config claude.api_key sk-ant-...        Set Anthropic API key (validates format)
   n-dx config claude.api_endpoint https://proxy.example.com
                                                Set custom API endpoint
   n-dx config claude.model claude-opus-5-5     Set default model for API calls
@@ -2789,7 +2788,6 @@ Examples:
   n-dx config llm.local.timeoutMs 7200000      Allow 2 hours per local request (0 = no limit)
   n-dx config llm.local.maxRetries 10          Wait longer for a restarting local server
   n-dx config llm.local.maxFormatRetries 5     Resend malformed model replies more often
-  n-dx config llm.claude.api_key sk-ant-...    Set Claude API key (llm namespace)
   n-dx config credentials                      Show stored credentials (no values)
   n-dx config credentials.typesafe             Store the Jev key (hidden prompt)
   n-dx config credentials.claude               Store a Claude API key (hidden prompt)
@@ -3091,7 +3089,7 @@ async function handleTestConnection(dir) {
   const claudeConfig = await loadClaudeConfig(dir);
   if (Object.keys(claudeConfig).length === 0) {
     console.error(
-      "No Claude configuration set. Use 'n-dx config claude.api_key <key>' or 'n-dx config claude.cli_path <path>' first.",
+      "No Claude configuration set. Run 'claude login', or use 'ndx config credentials.claude' for a key or 'ndx config claude.cli_path <path>' for the binary first.",
     );
     process.exit(1);
   }

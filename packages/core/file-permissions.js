@@ -267,8 +267,8 @@ export function describeUnrestrictedFile(path, result, platform = process.platfo
   if (result.restricted) return null;
 
   const alternative = platform === "win32"
-    ? "Prefer the ANTHROPIC_API_KEY environment variable, or Windows Credential Manager."
-    : "Prefer the ANTHROPIC_API_KEY environment variable.";
+    ? "Prefer the vendor's CLI login, or the ANTHROPIC_API_KEY environment variable."
+    : "Prefer the vendor's CLI login, or the ANTHROPIC_API_KEY environment variable.";
 
   return (
     `Warning: could not restrict permissions on ${path}\n` +

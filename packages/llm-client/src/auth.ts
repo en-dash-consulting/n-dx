@@ -139,8 +139,8 @@ export async function detectAvailableAuth(
   // Neither method is available
   throw new ClaudeClientError(
     "No authentication method available. Either:\n" +
-      `  - Use an API key: export ${apiKeyEnv}=<key>, or store one with 'ndx config credentials.claude' and set 'ndx config llm.claude.auth api'\n` +
-      "  - Install the Claude Code CLI: npm install -g @anthropic-ai/claude-code",
+      "  - Install the Claude Code CLI and log in: npm install -g @anthropic-ai/claude-code, then claude login\n" +
+      `  - Use an API key: export ${apiKeyEnv}, or store one with 'ndx config credentials.claude'. Storing a key does not switch modes; 'ndx config llm.claude.auth api' does.`,
     "auth",
     false,
   );
@@ -198,7 +198,7 @@ export async function diagnoseAuth(
 
   messages.push(`Auth: llm.claude.auth ${decision.auth} → ${decision.mode}`);
   if (keySource === "config") {
-    messages.push(`API key: found in .n-dx.json (claude.api_key)`);
+    messages.push(`API key: found in the project config (claude.api_key); move it with 'ndx config credentials.claude --import'`);
   } else if (keySource === "env") {
     messages.push(`API key: found in environment (${apiKeyEnv})`);
   } else if (keySource === "file") {
@@ -249,7 +249,7 @@ export async function diagnoseAuth(
     messages.push(
       decision.auth === "api"
         ? "No authentication method available: llm.claude.auth is api and no usable API key resolves."
-        : "No authentication method available. Set an API key or install the Claude Code CLI.",
+        : "No authentication method available. Install the Claude Code CLI and run 'claude login', or store a key with 'ndx config credentials.claude' (then 'ndx config llm.claude.auth api' to use it).",
     );
   } else {
     messages.push(`Recommended mode: ${recommendedMode}`);

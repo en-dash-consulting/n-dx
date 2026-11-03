@@ -62,8 +62,8 @@ export function authFailureGuidance(vendor: LLMVendor | string | undefined): Aut
         provider: "Google",
         headline: `Authentication failed for Google — ${CANONICAL_CAUSE}.`,
         remediation: [
-          "Update your API key: ndx config llm.google.api_key <KEY>",
-          "Or set the env var: export GEMINI_API_KEY=<KEY>",
+          "Update your API key: ndx config credentials.google (prompts for it; storing it does not switch modes, 'ndx config llm.google.auth api' does)",
+          "Or set the env var: export GEMINI_API_KEY",
           "Get a key: https://aistudio.google.com/apikey",
           VERIFY_CREDENTIALS_STEP,
         ],

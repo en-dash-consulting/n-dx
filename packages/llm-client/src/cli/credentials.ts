@@ -166,7 +166,10 @@ export async function runCredentialsCli(argv: readonly string[], io: Credentials
           return usage("The argv on stdin is not valid JSON: it must be a JSON array of strings.");
         }
         const argvError = helperArgvError(argv) ?? interpreterHelperError(argv as string[]);
-        if (argvError) return usage(`Refusing the helper: ${argvError}`);
+        if (argvError) {
+          io.stderr(`Refusing --helper: ${argvError}\n`);
+          return 2;
+        }
         setHelperCredential(name!, argv as string[], store);
         io.stdout(`Stored ${name}: helper (${(argv as string[])[0]}).\n`);
         const interpreted = interpreterHelperPrefix(argv as string[]);
