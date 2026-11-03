@@ -182,6 +182,30 @@ describe("getJudgmentRoute", () => {
     }
   });
 
+  it("leaves llm.typesafe.required's one warning as the only one for explicit routes", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { getJudgmentRoute } = await import("../../../src/analyzers/claude-client.js");
+      setLLMConfig({
+        vendor: "claude",
+        typesafe: { required: true },
+        routes: { "zone.judge-req-a": "typesafe", "zone.judge-req-b": "typesafe" },
+      });
+      expect(getJudgmentRoute("zone.judge-req-a")).toBeUndefined();
+      expect(getJudgmentRoute("zone.judge-req-b")).toBeUndefined();
+      const all = [...warn.mock.calls, ...error.mock.calls].map((c) => String(c[0]));
+      const naming = all.filter((m) => m.includes("ndx config credentials.typesafe"));
+      expect(naming).toHaveLength(1);
+      expect(naming[0]).toContain("llm.typesafe.required");
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("routes on a key held only in the per-user credential store", async () => {
     const home = mkdtempSync(join(tmpdir(), "sv-judgment-store-"));
     vi.stubEnv("TYPESAFE_API_KEY", "");

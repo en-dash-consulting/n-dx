@@ -116,10 +116,14 @@ items:
     lastModified: "2026-11-03T16:29:52.353Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e5def056-c6ed-4484-978e-6f4e174bd8bf":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-03T17:08:59.840Z"
-    activeIntervals: [{"start":"2026-11-03T17:08:59.840Z"}]
-    lastModified: "2026-11-03T17:09:00.436Z"
+    completedAt: "2026-11-03T17:28:25.718Z"
+    endedAt: "2026-11-03T17:28:25.718Z"
+    activeIntervals: [{"end":"2026-11-03T17:28:25.718Z","start":"2026-11-03T17:08:59.840Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "ndx status jev line, jev {available, source} in get_capabilities and manifest lastAnalysis, llm.typesafe.required warn-once, credentials.typesafe --test via mocked fetch"
+    lastModified: "2026-11-03T17:28:25.718Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5efde56-48b6-4a78-a891-fcda1d312e46":
     status: "completed"

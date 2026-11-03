@@ -151,8 +151,10 @@ export function getJudgmentRoute(taskClass: string): JudgmentRoute | undefined {
     // If config asks for Jev, the only thing keeping this class on text
     // completion is the missing key. Say so once — a silent fallback on an
     // explicitly configured route is a support call.
+    // Under llm.typesafe.required, resolveJudgmentRoute has already warned,
+    // once per process; a per-class notice here would repeat it.
     const wanted = configuredJudgmentRoute(taskClass, config);
-    if (wanted === "typesafe" && config.routes && Object.values(config.routes).includes("typesafe")) {
+    if (wanted === "typesafe" && !config.typesafe?.required && config.routes && Object.values(config.routes).includes("typesafe")) {
       console.warn(`  [llm] ${taskClass} is routed to typesafe but no TypeSafe key is set (run \`ndx config credentials.typesafe\`, or export ${TYPESAFE_API_KEY_ENV}) — using the ${resolveVendor()} vendor instead`);
     }
     _judgmentFallbackNoticed.add(taskClass);
