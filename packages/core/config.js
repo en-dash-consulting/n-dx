@@ -4139,24 +4139,42 @@ async function storeVendorApiKey(dir, vendor, value, keyArg) {
   await setApiAuthIfUnset(dir, vendor);
 }
 
-/** `ndx config llm.<vendor>.api_key` with no value: source and fingerprint, never the value. */
-function showVendorApiKey(vendor, flags) {
+/**
+ * `ndx config llm.<vendor>.api_key` with no value: source and fingerprint,
+ * never the value. A key still in a config file outranks the store, so the
+ * file that holds one is named too.
+ */
+async function showVendorApiKey(dir, vendor, flags) {
   const result = spawnCredentialsCli(["status", ...(flags.json ? ["--json"] : [])]);
   if (result.code !== 0) {
     console.error(result.stderr.trim() || "Could not read the credential store.");
     process.exit(1);
   }
+  const shadowedBy = [];
+  for (const which of [PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE]) {
+    if ((await fileApiKeys(dir, which)).some((k) => k.vendor === vendor)) shadowedBy.push(which);
+  }
   if (flags.json) {
     const { name, source, backend, fingerprint } = JSON.parse(result.stdout).find((s) => s.name === vendor);
-    console.log(JSON.stringify({ name, source, backend, fingerprint }));
+    const configFiles = shadowedBy.map((which) => projectConfigLabel(dir, which));
+    console.log(JSON.stringify({ name, source, backend, fingerprint, configFiles }));
     return;
   }
   console.log(result.stdout.split("\n").find((l) => l.startsWith(`${vendor}: `)) ?? `${vendor}: not set`);
+  for (const which of shadowedBy) {
+    const move = which === LOCAL_CONFIG_FILE ? "ndx config credentials --import" : `ndx config llm.${vendor}.api_key <key>`;
+    console.log(`${projectConfigLabel(dir, which)} also holds a ${vendor} key, which is used instead. Move it: ${move}`);
+  }
 }
 
 /** The vendor keys `.n-dx.local.json` holds, as `{ vendor, value }`. */
-async function localFileApiKeys(dir) {
-  const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
+function localFileApiKeys(dir) {
+  return fileApiKeys(dir, LOCAL_CONFIG_FILE);
+}
+
+/** The vendor keys one project config file holds, as `{ vendor, value }`. */
+async function fileApiKeys(dir, which) {
+  const local = await loadProjectConfigFile(dir, which);
   const found = [];
   for (const vendor of ["claude", "codex", "google"]) {
     const candidates = [local.llm?.[vendor]?.api_key, vendor === "claude" ? local.claude?.api_key : undefined];
@@ -4410,7 +4428,7 @@ export async function runConfig(args, deps = {}) {
 
   // GET mode: a vendor key is in the credential store, and its value is never shown.
   if (keyArg && vendorOfApiKey(keyArg)) {
-    showVendorApiKey(vendorOfApiKey(keyArg), flags);
+    await showVendorApiKey(dir, vendorOfApiKey(keyArg), flags);
     return;
   }
 

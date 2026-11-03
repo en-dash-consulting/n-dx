@@ -281,6 +281,15 @@ describe("ndx config llm.<vendor>.api_key", () => {
     }
   }, DEFAULT_TIMEOUT);
 
+  it("names a config file whose key outranks the store when showing the key", async () => {
+    await writeFile(localPath(), JSON.stringify({ llm: { claude: { api_key: KEY } } }));
+    const show = config(["llm.claude.api_key", cwd]);
+    expect(show.code).toBe(0);
+    expect(show.out).toMatch(/^claude: not set$/m);
+    expect(show.out).toMatch(/\.n-dx\.local\.json also holds a claude key, which is used instead.*--import/);
+    expect(show.out + show.err).not.toContain(KEY);
+  }, DEFAULT_TIMEOUT);
+
   it("removes an older key from the config files once the store holds the new one", async () => {
     await writeFile(localPath(), JSON.stringify({ llm: { claude: { api_key: "sk-ant-old" } } }));
     expect(config(["llm.claude.api_key", KEY, cwd]).code).toBe(0);
