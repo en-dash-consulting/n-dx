@@ -78,7 +78,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-03T18:32:58.201Z"
+    lastModified: "2026-11-03T20:31:27.817Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
@@ -135,6 +135,16 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "Option A: importLocalApiKeys skips vendors whose store entry is a helper, keeps the file key, prints one line naming vendor and file."
     lastModified: "2026-11-03T16:29:52.353Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "dbc9c046-3fcc-43bc-a290-87d7ab5f4565":
+    status: "completed"
+    startedAt: "2026-11-03T20:31:38.268Z"
+    completedAt: "2026-11-03T20:33:31.565Z"
+    endedAt: "2026-11-03T20:33:31.565Z"
+    activeIntervals: [{"end":"2026-11-03T20:33:31.565Z","start":"2026-11-03T20:31:38.268Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "docs/guide/configuration.md: --helper paragraph says agents are denied the helper's script and keep the interpreter; store paragraph names the deny rules, hench's guard and both gaps (node -e, Codex CLI)."
+    lastModified: "2026-11-03T20:33:31.565Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e5def056-c6ed-4484-978e-6f4e174bd8bf":
     status: "completed"
