@@ -13,6 +13,14 @@ const cssEntryPoint = resolve(__dirname, "src/viewer/styles/index.css");
 const htmlTemplatePath = resolve(__dirname, "src/viewer/index.html");
 const outDir = resolve(__dirname, "dist/viewer");
 
+// ── Hub session drawer entry points ───────────────────────────────────────────
+// The drawer-only page the hub home frames (src/viewer/hub-session.ts). Part of
+// the viewer — same components, same tokens — but its own page, so the hub home
+// stays server-rendered with no Preact. Built beside dist/viewer/index.html.
+const hubSessionJsEntryPoint = resolve(__dirname, "src/viewer/hub-session.ts");
+const hubSessionCssEntryPoint = resolve(__dirname, "src/viewer/hub-session.css");
+const hubSessionHtmlTemplatePath = resolve(__dirname, "src/viewer/hub-session.html");
+
 // ── Landing page entry points ─────────────────────────────────────────────────
 // The landing page is a self-contained vanilla-JS feature with no Preact
 // dependency.  All source files (landing.ts, landing.css, index.html) are
@@ -77,6 +85,34 @@ async function bundleCss() {
     minify: !watchMode,
   });
   return result.outputFiles[0].text;
+}
+
+// ── Hub session drawer build helpers ──
+
+const hubSessionJsOptions = { ...commonJsOptions, entryPoints: [hubSessionJsEntryPoint] };
+
+function buildHubSessionHtml(jsCode, cssCode) {
+  const inlinedHtml = readFileSync(hubSessionHtmlTemplatePath, "utf-8")
+    .replace('<link rel="stylesheet" href="./hub-session.css">', () => `<style>${cssCode}</style>`)
+    .replace('<script type="module" src="./hub-session.ts"></script>', () => `<script type="module">${jsCode}</script>`);
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(resolve(outDir, "hub-session.html"), inlinedHtml);
+}
+
+async function bundleHubSessionCss() {
+  const result = await esbuild.build({
+    entryPoints: [hubSessionCssEntryPoint],
+    bundle: true,
+    write: false,
+    minify: !watchMode,
+  });
+  return result.outputFiles[0].text;
+}
+
+async function buildHubSession() {
+  const jsResult = await esbuild.build({ ...hubSessionJsOptions, write: false, minify: true });
+  buildHubSessionHtml(jsResult.outputFiles[0].text, await bundleHubSessionCss());
+  console.log("Built hub session drawer: dist/viewer/hub-session.html");
 }
 
 // ── Landing page build helpers ──
@@ -173,8 +209,10 @@ async function buildProduction() {
     await buildLanding();
   } else if (viewerOnly) {
     await buildViewer();
+    await buildHubSession();
   } else {
     await buildViewer();
+    await buildHubSession();
     await buildLanding();
   }
 }
@@ -234,12 +272,35 @@ async function buildWatch() {
     }],
   });
 
+  // Hub session drawer JS context for watching
+  const hubSessionJsCtx = await esbuild.context({
+    ...hubSessionJsOptions,
+    write: false,
+    plugins: [{
+      name: "rebuild-hub-session-html",
+      setup(build) {
+        build.onEnd(async (result) => {
+          if (result.errors.length > 0) return;
+          try {
+            buildHubSessionHtml(result.outputFiles?.[0]?.text ?? "", await bundleHubSessionCss());
+            console.log("[esbuild] Rebuilt hub session drawer: dist/viewer/hub-session.html");
+          } catch (err) {
+            console.error("[esbuild] Hub session drawer rebuild failed:", err.message);
+          }
+        });
+      },
+    }],
+  });
+
   // Initial build — viewer
   const jsResult = await jsCtx.rebuild();
   const jsCode = jsResult.outputFiles?.[0]?.text ?? "";
   const cssCode = await bundleCss();
   buildHtml(jsCode, cssCode);
   console.log("[esbuild] Initial build complete: dist/viewer/index.html");
+
+  // Initial build — hub session drawer (onEnd writes the page)
+  await hubSessionJsCtx.rebuild();
 
   // Initial build — landing
   const landingJsResult = await landingJsCtx.rebuild();
@@ -251,6 +312,7 @@ async function buildWatch() {
   // Start watching all
   await cssCtx.watch();
   await jsCtx.watch();
+  await hubSessionJsCtx.watch();
   await landingJsCtx.watch();
   console.log("[esbuild] Watching for changes...");
 }

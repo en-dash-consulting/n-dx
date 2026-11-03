@@ -67,6 +67,26 @@ export interface SidecarRuntimeEvent {
   toolCall?: { tool: string; input: Record<string, unknown>; id?: string };
   toolResult?: { tool: string; output: string; durationMs: number; callId?: string };
   failure?: { message?: string };
+  /** On `token_usage`: what the call sent in and got back. */
+  tokenUsage?: { input: number; output: number; cacheCreationInput?: number; cacheReadInput?: number };
+}
+
+/**
+ * The context the session's next turn resumes with: what the last call of its
+ * last turn sent in, the measure the server holds against the ceiling
+ * (`contextTokens` in server/sidecar/context-refresh.ts). A refresh starts the
+ * next turn cold, so nothing carries over it; the checkpoint turn's own calls
+ * are not the conversation's.
+ */
+export function latestContextTokens(frames: readonly SidecarFrame[]): number {
+  for (let i = frames.length - 1; i >= 0; i -= 1) {
+    const frame = frames[i];
+    if (frame.type === "context-refreshed") return 0;
+    if (frame.type !== "event" || frame.checkpoint) continue;
+    const usage = frame.event.type === "token_usage" ? frame.event.tokenUsage : undefined;
+    if (usage) return usage.input + (usage.cacheCreationInput ?? 0) + (usage.cacheReadInput ?? 0);
+  }
+  return 0;
 }
 
 export type SidecarFrame =
@@ -192,6 +212,26 @@ export function sidecarSetupNeed(
 }
 
 const SESSIONS = "/api/sidecar/sessions";
+
+/**
+ * Where a drawer's sessions live and how it hears about them. The worktree's
+ * by default; the hub drawer's are reached through the hub at `/hub/session/`.
+ */
+export interface SidecarEndpoint {
+  /** The session routes' collection path. */
+  sessions: string;
+  /** The socket that announces the sessions' frames and cards. */
+  socketUrl: () => string;
+  /**
+   * A vendor and lens the session is created with and keeps: there is no
+   * picker to read a catalog for and no page item to attach.
+   */
+  fixed?: { vendor: string; lens: string };
+}
+
+/** This worktree's sessions on this viewer's own server. */
+export const WORKTREE_SIDECAR: SidecarEndpoint = { sessions: SESSIONS, socketUrl: getWebSocketUrl };
+
 /**
  * Vendors with a resumable CLI session, in picker order. A resume id belongs
  * to one vendor CLI, so these are the only vendors Sidecar can offer.
@@ -418,8 +458,18 @@ interface Tail {
 
 const newTail = (sessionId: string | null): Tail => ({ sessionId, cursor: 0, inFlight: false, again: false });
 
-export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSelection): SidecarState {
-  const attachment = useSidecarAttachment(enabled, open, page);
+export function useSidecar(
+  enabled: boolean,
+  open: boolean,
+  page: SidecarPageSelection,
+  endpoint: SidecarEndpoint = WORKTREE_SIDECAR,
+): SidecarState {
+  // Read through a ref: a caller passing a fresh object each render must not re-run every effect.
+  const endpointRef = useRef(endpoint);
+  endpointRef.current = endpoint;
+  const sessionsPath = useCallback(() => endpointRef.current.sessions, []);
+  const fixed = endpoint.fixed ?? null;
+  const attachment = useSidecarAttachment(enabled && !fixed, open, page);
   const attachmentRef = useRef(attachment);
   attachmentRef.current = attachment;
   const [session, setSession] = useState<SidecarSession | null>(null);
@@ -456,7 +506,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     tail.inFlight = true;
     const sessionId = tail.sessionId;
     const body = await getJson<{ frames: SidecarFrame[]; cursor: number; running: boolean }>(
-      `${SESSIONS}/${encodeURIComponent(sessionId)}/frames?after=${tail.cursor}`,
+      `${sessionsPath()}/${encodeURIComponent(sessionId)}/frames?after=${tail.cursor}`,
     );
     // A switch of session while this was in flight started a new tail.
     if (tailRef.current !== tail) return;
@@ -493,12 +543,12 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   const fetchWaiting = useCallback(async () => {
     const reads = cardReadsRef.current;
     const read = ++reads.started;
-    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(SESSIONS);
+    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(sessionsPath());
     if (!list || !mountedRef.current) return;
     const open = tailRef.current.sessionId;
     const ids = list.sessions.filter((e) => !e.session.endedAt || e.session.id === open).map((e) => e.session.id);
     const cards = await Promise.all(ids.map(async (id) => {
-      const body = await getJson<{ cards: SidecarCard[] }>(`${SESSIONS}/${encodeURIComponent(id)}/cards`);
+      const body = await getJson<{ cards: SidecarCard[] }>(`${sessionsPath()}/${encodeURIComponent(id)}/cards`);
       return [id, body ? orderCards(body.cards) : []] as const;
     }));
     if (!mountedRef.current || read < reads.applied) return;
@@ -507,7 +557,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   }, []);
 
   const loadSessions = useCallback(async () => {
-    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(SESSIONS);
+    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(sessionsPath());
     if (!list || !mountedRef.current) return;
     // Keep the open session while it is still open; otherwise take the latest.
     const current = tailRef.current.sessionId;
@@ -553,7 +603,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
       coalescerWindowMs: 100,
     });
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = new WebSocket(endpointRef.current.socketUrl());
       ws.onmessage = (event) => {
         try {
           pipeline.push(JSON.parse(event.data));
@@ -576,6 +626,12 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     if (!enabled || !open) return;
     if (tailRef.current.sessionId) void fetchFrames();
     void loadSessions();
+    const pinned = endpointRef.current.fixed;
+    if (pinned) {
+      // No picker: the server's default model for the one vendor the session runs on.
+      setPicked((prev) => prev ?? { vendor: pinned.vendor, model: "" });
+      return;
+    }
     void (async () => {
       // The server caches the CLI probe for minutes; a CLI last seen missing is
       // probed again, so installing it and reopening the drawer clears state A.
@@ -590,11 +646,16 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   /** Create a session on `agent` and follow it; null, with the error set, when the server refuses. */
   const createSession = useCallback(async (agent: SidecarAgent): Promise<SidecarSession | null> => {
     const { lens, item } = attachmentRef.current;
-    const created = await postJson<SidecarSessionEntry>(SESSIONS, {
+    const fixedLens = endpointRef.current.fixed?.lens;
+    const created = await postJson<SidecarSessionEntry>(sessionsPath(), {
       vendor: agent.vendor,
       ...(agent.model && { model: agent.model }),
-      ...(lens.running !== GENERAL_LENS && { lens: lens.running }),
-      ...(item?.ref && { target: { ref: item.ref } }),
+      ...(fixedLens
+        ? { lens: fixedLens }
+        : {
+            ...(lens.running !== GENERAL_LENS && { lens: lens.running }),
+            ...(item?.ref && { target: { ref: item.ref } }),
+          }),
     });
     if (!created.ok) { setError(created.error); return null; }
     follow(created.data.session, created.data.running);
@@ -618,11 +679,12 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     try {
       let id = tailRef.current.sessionId;
       if (!id) {
-        const created = await createSession(pickedRef.current ?? { vendor: await defaultVendor(), model: "" });
+        const vendor = endpointRef.current.fixed?.vendor ?? await defaultVendor();
+        const created = await createSession(pickedRef.current ?? { vendor, model: "" });
         if (!created) return false;
         id = created.id;
       }
-      const started = await postJson<SidecarSessionEntry>(`${SESSIONS}/${encodeURIComponent(id)}/turns`, { prompt: text });
+      const started = await postJson<SidecarSessionEntry>(`${sessionsPath()}/${encodeURIComponent(id)}/turns`, { prompt: text });
       if (!started.ok) { setError(started.error); return false; }
       setSession(started.data.session);
       setRunning(true);
@@ -637,7 +699,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   const stop = useCallback(async () => {
     const id = tailRef.current.sessionId;
     if (!id) return;
-    const res = await postJson<{ interrupted: boolean }>(`${SESSIONS}/${encodeURIComponent(id)}/interrupt`, {});
+    const res = await postJson<{ interrupted: boolean }>(`${sessionsPath()}/${encodeURIComponent(id)}/interrupt`, {});
     if (!res.ok) setError(res.error);
   }, []);
 
@@ -646,7 +708,8 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   // available yet). One PATCH per change; an ended session is left alone.
   // Not before the registry answers: until then every lens reads as
   // unavailable, and the session would be re-lensed to General and back.
-  const asks = attachment.asks && attachment.ready;
+  // A fixed lens is the session's for good: nothing on the page re-lenses it.
+  const asks = !fixed && attachment.asks && attachment.ready;
   const wantLens = attachment.lens.running;
   const wantRef = attachment.item?.ref ?? "";
   const heldLens = session?.lens ?? GENERAL_LENS;
@@ -661,7 +724,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     if (wantLens !== heldLens) fields.lens = wantLens;
     if (wantRef !== heldRef) fields.target = wantRef ? { ref: wantRef } : {};
     if (Object.keys(fields).length === 0) return;
-    void patchJson<SidecarSessionEntry>(`${SESSIONS}/${encodeURIComponent(openId)}`, fields).then((res) => {
+    void patchJson<SidecarSessionEntry>(`${sessionsPath()}/${encodeURIComponent(openId)}`, fields).then((res) => {
       if (!mountedRef.current) return;
       if (!res.ok) { setError(res.error); return; }
       if (res.data.session.id === tailRef.current.sessionId) setSession(res.data.session);
@@ -673,7 +736,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
     if (!id) return;
     const reason = decision.reason?.trim();
     const res = await postJson<{ card: SidecarCard }>(
-      `${SESSIONS}/${encodeURIComponent(id)}/cards/${encodeURIComponent(cardId)}`,
+      `${sessionsPath()}/${encodeURIComponent(id)}/cards/${encodeURIComponent(cardId)}`,
       {
         decision: decision.approve ? "approve" : "deny",
         ...(reason && { reason }),
@@ -691,7 +754,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
   }, [fetchWaiting]);
 
   const openSession = useCallback(async (id: string): Promise<boolean> => {
-    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(SESSIONS);
+    const list = await getJson<{ sessions: SidecarSessionEntry[] }>(sessionsPath());
     if (!mountedRef.current) return false;
     const entry = list?.sessions.find((e) => e.session.id === id);
     if (!entry) { setError(`Session ${id} is no longer available`); return false; }

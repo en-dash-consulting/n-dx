@@ -37,6 +37,8 @@ export interface StaticAssets {
   resolvedPackageRoot: string;
   getViewerHtml: () => string;
   getLandingHtml: () => string | null;
+  /** The drawer-only hub session page, built beside the viewer; null when it is not there. */
+  getHubSessionHtml: () => string | null;
   findAssetPath: (filename: string) => string | null;
 }
 
@@ -110,6 +112,16 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     return cachedLandingHtml;
   }
 
+  // Beside whichever index.html was found: built in dist/viewer/, the unbuilt template in src/viewer/.
+  const hubSessionPath = resolve(viewerDir, "hub-session.html");
+  let cachedHubSessionHtml: string | null | undefined;
+  function getHubSessionHtml(): string | null {
+    if (dev || cachedHubSessionHtml === undefined) {
+      cachedHubSessionHtml = existsSync(hubSessionPath) ? readFileSync(hubSessionPath, "utf-8") : null;
+    }
+    return cachedHubSessionHtml;
+  }
+
   function findAssetPath(filename: string): string | null {
     const inViewer = resolve(resolvedViewerDir, filename);
     const inRoot = resolve(resolvedPackageRoot, filename);
@@ -123,6 +135,7 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     resolvedPackageRoot,
     getViewerHtml,
     getLandingHtml,
+    getHubSessionHtml,
     findAssetPath,
   };
 }

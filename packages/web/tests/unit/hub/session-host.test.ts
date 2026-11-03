@@ -8,7 +8,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { claimHubSessionHost, hubSessionHostLockPath, readHubSessionHostLock } from "../../../src/hub/index.js";
+import {
+  claimHubSessionHost,
+  HubSessionHostPicker,
+  hubSessionHostLockPath,
+  probeHubLens,
+  readHubSessionHostLock,
+  type ProjectView,
+} from "../../../src/hub/index.js";
+import { FEATURE_DISABLED_HEADER } from "../../../src/shared/index.js";
 
 let home: string;
 const alive = new Set<number>();
@@ -43,5 +51,61 @@ describe("claimHubSessionHost", () => {
   it("moves its own lock to a new port without counting it as newly acquired", () => {
     claimHubSessionHost(home, { pid: 11, port: 4000, isAlive });
     expect(claimHubSessionHost(home, { pid: 11, port: 4100, isAlive })).toMatchObject({ held: true, acquired: false, lock: { port: 4100 } });
+  });
+});
+
+/** A healthy registered project on `port`. Only what the picker reads is real. */
+function project(id: string, port: number): ProjectView {
+  return {
+    id, port,
+    status: { state: "healthy", pid: null, port, attached: false, respawns: 0, lastHealthAt: "t1", lastError: null },
+  } as unknown as ProjectView;
+}
+
+const lensAnswer = (available: boolean): Response =>
+  new Response(JSON.stringify({ lens: { id: "hub", available }, ceiling: 40_000 }), { status: 200 });
+
+describe("probeHubLens", () => {
+  it("asks the picked host's lens route with the hub token, and offers the session only when the hub lens is available", async () => {
+    const seen: Array<{ url: string; token: string | null }> = [];
+    const fetch = (async (url: string, init?: RequestInit) => {
+      seen.push({ url, token: new Headers(init?.headers).get("X-Ndx-Token") });
+      return lensAnswer(true);
+    }) as typeof globalThis.fetch;
+    expect(await probeHubLens(new HubSessionHostPicker(home), [project("a", 4001)], { token: "tok", fetch })).toBe(true);
+    expect(seen).toEqual([{ url: "http://127.0.0.1:4001/api/sidecar/hub/lens", token: "tok" }]);
+
+    const unavailable = (async () => lensAnswer(false)) as unknown as typeof globalThis.fetch;
+    expect(await probeHubLens(new HubSessionHostPicker(home), [project("a", 4001)], { fetch: unavailable })).toBe(false);
+  });
+
+  it("is false with no healthy project to ask", async () => {
+    const fetch = (async () => { throw new Error("must not be asked"); }) as typeof globalThis.fetch;
+    expect(await probeHubLens(new HubSessionHostPicker(home), [], { fetch })).toBe(false);
+  });
+
+  it("passes over a host with web.sidecar off, and one that does not answer, as the proxy does", async () => {
+    const asked: number[] = [];
+    const fetch = (async (url: string) => {
+      const port = Number(new URL(url).port);
+      asked.push(port);
+      if (port === 4001) return new Response("{}", { status: 403, headers: { [FEATURE_DISABLED_HEADER]: "web.sidecar" } });
+      if (port === 4002) throw new TypeError("fetch failed");
+      return lensAnswer(true);
+    }) as typeof globalThis.fetch;
+    const picker = new HubSessionHostPicker(home);
+    const projects = [project("a", 4001), project("b", 4002), project("c", 4003)];
+    expect(await probeHubLens(picker, projects, { fetch })).toBe(true);
+    expect(asked).toEqual([4001, 4002, 4003]);
+    // The skips stick until a newer health check, so the session's own requests go to the same host.
+    expect(picker.pick(projects)?.port).toBe(4003);
+  });
+
+  it("is false when every host has web.sidecar off", async () => {
+    const fetch = (async () => new Response("{}", { status: 403, headers: { [FEATURE_DISABLED_HEADER]: "web.sidecar" } })) as unknown as typeof globalThis.fetch;
+    const picker = new HubSessionHostPicker(home);
+    const projects = [project("a", 4001), project("b", 4002)];
+    expect(await probeHubLens(picker, projects, { fetch })).toBe(false);
+    expect(picker.sidecarOffEverywhere(projects)).toBe(true);
   });
 });

@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { renderHomePage, renderCard, renderExtensionCard, homeExtensions, HOME_EXTENSIONS_WAIT_MS, cardFacts, dirtyLabel, progressLabel, runningLabel, repoLabel, readinessLabel, infrastructureLabel } from "../../../src/hub/home.js";
 import type { HubOverview, ProjectCard } from "../../../src/hub/overview.js";
 import type { ExtensionView } from "../../../src/hub/extensions.js";
@@ -295,6 +298,106 @@ describe("themes", () => {
     expect(doc.documentElement.getAttribute("data-theme")).toBe("light");
     button.dispatchEvent(new Event("click"));
     expect(doc.documentElement.getAttribute("data-theme")).toBe("dark");
+  });
+});
+
+describe("the Hub session toggle", () => {
+  /**
+   * The page's markup moved into the test document, where an iframe has a
+   * window, and the drawer's script run against it — the parsed document has
+   * no script runtime of its own.
+   */
+  function mountHome(): { toggle: HTMLButtonElement; drawer: HTMLElement; frame: HTMLIFrameElement } {
+    const parsed = renderToDocument(renderHomePage(TWO_PROJECTS, "", [], { hubSession: true }));
+    document.body.className = "";
+    document.body.innerHTML = parsed.body.innerHTML;
+    const script = [...parsed.querySelectorAll("script")]
+      .map((s) => s.textContent ?? "")
+      .find((text) => text.includes("hub-session-toggle"))!;
+    new Function("document", "window", "location", script)(document, window, window.location);
+    return {
+      toggle: document.getElementById("hub-session-toggle") as HTMLButtonElement,
+      drawer: document.getElementById("hub-session-drawer")!,
+      frame: document.getElementById("hub-session-frame") as HTMLIFrameElement,
+    };
+  }
+
+  const keyJ = (over: KeyboardEventInit): KeyboardEvent => new KeyboardEvent("keydown", { key: "j", bubbles: true, cancelable: true, ...over });
+
+  it("is not offered when the host does not report the hub lens available", () => {
+    for (const html of [renderHomePage(TWO_PROJECTS), renderHomePage(TWO_PROJECTS, "", [], { hubSession: false })]) {
+      const doc = renderToDocument(html);
+      expect(doc.getElementById("hub-session-toggle")).toBeNull();
+      expect(doc.getElementById("hub-session-drawer")).toBeNull();
+      expect(html).not.toContain("/hub/session/");
+    }
+  });
+
+  it("is a header button bound to ⌘J when the hub lens is available, with the drawer undocked and not yet loaded", () => {
+    const doc = renderToDocument(renderHomePage(TWO_PROJECTS, "", [], { hubSession: true }));
+    const toggle = doc.querySelector("header #hub-session-toggle")!;
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle.textContent).toContain("Hub session");
+    expect(toggle.textContent).toContain("⌘J");
+    expect(toggle.getAttribute("aria-keyshortcuts")).toBe("Meta+J Control+J");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-controls")).toBe("hub-session-drawer");
+
+    const drawer = doc.getElementById("hub-session-drawer")!;
+    expect(drawer.hasAttribute("hidden")).toBe(true);
+    const frame = drawer.querySelector("iframe")!;
+    // The drawer-only viewer page, on the hub's own origin through /hub/session/.
+    expect(frame.getAttribute("data-src")).toBe("/hub/session/drawer");
+    expect(frame.hasAttribute("src")).toBe(false);
+  });
+
+  it("docks the drawer beside the page when pressed, loading the drawer page, and undocks it when pressed again", () => {
+    const { toggle, drawer, frame } = mountHome();
+    toggle.click();
+    expect(drawer.hidden).toBe(false);
+    expect(document.body.classList.contains("hub-docked")).toBe(true);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(frame.getAttribute("src")).toBe("/hub/session/drawer");
+
+    toggle.click();
+    expect(drawer.hidden).toBe(true);
+    expect(document.body.classList.contains("hub-docked")).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("toggles on ⌘J and Ctrl+J, and leaves other chords alone", () => {
+    const { drawer } = mountHome();
+    const open = keyJ({ metaKey: true });
+    document.dispatchEvent(open);
+    expect(drawer.hidden).toBe(false);
+    expect(open.defaultPrevented).toBe(true);
+    document.dispatchEvent(keyJ({ ctrlKey: true }));
+    expect(drawer.hidden).toBe(true);
+    document.dispatchEvent(keyJ({ metaKey: true, shiftKey: true }));
+    document.dispatchEvent(keyJ({}));
+    expect(drawer.hidden).toBe(true);
+  });
+
+  it("undocks when its own frame asks, from the hub's origin only", () => {
+    const { toggle, drawer, frame } = mountHome();
+    toggle.click();
+    const close = { type: "ndx:hub-session:close" };
+    window.dispatchEvent(new MessageEvent("message", { data: close, origin: "http://elsewhere.test", source: frame.contentWindow }));
+    expect(drawer.hidden).toBe(false);
+    window.dispatchEvent(new MessageEvent("message", { data: close, origin: window.location.origin, source: window }));
+    expect(drawer.hidden).toBe(false);
+    window.dispatchEvent(new MessageEvent("message", { data: close, origin: window.location.origin, source: frame.contentWindow }));
+    expect(drawer.hidden).toBe(true);
+  });
+
+  it("keeps the hub home free of Preact and of src/viewer/", () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../../src/hub/home.ts"), "utf-8");
+    const imports = [...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((m) => m[1]);
+    expect(imports.length).toBeGreaterThan(0);
+    for (const spec of imports) {
+      expect(spec).not.toMatch(/preact/);
+      expect(spec).not.toMatch(/viewer\//);
+    }
   });
 });
 

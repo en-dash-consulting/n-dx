@@ -525,8 +525,16 @@ export interface SidecarCardsProps {
   send?: SidecarState["send"];
 }
 
-export function SidecarCards({ cards, manifest, decide, send }: SidecarCardsProps) {
-  const cliName = useCliName();
+/** The cards with the project's CLI name, read from `/api/project`. */
+export function SidecarCards(props: SidecarCardsProps) {
+  return h(SidecarCardList, { ...props, cliName: useCliName() });
+}
+
+/**
+ * The cards with the CLI name given. The hub session's drawer belongs to no
+ * project, so it has no `/api/project` to read one from.
+ */
+export function SidecarCardList({ cards, manifest, decide, send, cliName }: SidecarCardsProps & { cliName: string }) {
   const first = cards.find((c) => c.status === "pending") ?? null;
   const [note, setNote] = useState("");
   const [drafts, setDrafts] = useState<Record<number, ChangeSetDraft>>({});

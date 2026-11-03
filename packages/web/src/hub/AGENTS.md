@@ -70,6 +70,13 @@ mapping and the lock's location are in `src/shared/base-path.ts`, which the
 host's routes (`server/routes-sidecar.ts`) read too. Like every route here it
 is reached only past `guardHubRequest`; add no path that skips it.
 
+The home offers it only when `probeHubLens` (session-host.ts) gets a yes from
+the host it would pick (`/lens`): a header toggle (⌘J) docks an iframe of
+`/hub/session/drawer`, the drawer-only viewer page the host builds beside the
+dashboard (`viewer/hub-session.ts`). `home.ts` stays server-rendered with no
+Preact; the frame posts `HUB_SESSION_CLOSE_MESSAGE` to undock. The host
+injects the page's paths into it, so they do not cross `viewer/external.ts`.
+
 ## Proxy and base path
 
 `hub/proxy.ts` forwards `/p/<id>/…` to that project's server with the prefix

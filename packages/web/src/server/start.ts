@@ -906,7 +906,10 @@ async function handleApiRoutes(
   if (isInScope(ctx.scope, "rex") && handleValidationRoute(req, res, ctx)) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleTokenUsageRoute(req, res, ctx))) return true;
   if (await handleScopedRoute(isInScope(ctx.scope, "rex"), () => handleMergeGraphRoute(req, res, ctx))) return true;
-  if (await handleScopedRoute(true, () => handleSidecarRoute(req, res, ctx, broadcast, { workspaces: sidecarWorkspacesOf(registry) }))) return true;
+  if (await handleScopedRoute(true, () => handleSidecarRoute(req, res, ctx, broadcast, {
+    workspaces: sidecarWorkspacesOf(registry),
+    hub: { drawerHtml: () => assets?.getHubSessionHtml() ?? null },
+  }))) return true;
   if (handleDataRoute(req, res, ctx, watcher)) return true;
   if (assets && handleStaticRoute(req, res, ctx, assets)) return true;
   return false;

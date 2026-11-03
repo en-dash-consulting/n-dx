@@ -20,7 +20,7 @@
 
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { HUB_SIDECAR_HOST_LOCK_SEGMENTS } from "../shared/index.js";
+import { FEATURE_DISABLED_HEADER, HUB_SESSION_ROUTES, HUB_SIDECAR_API_PREFIX, HUB_SIDECAR_HOST_LOCK_SEGMENTS } from "../shared/index.js";
 import type { ProjectView } from "./hub.js";
 import { isPidAlive } from "./registry.js";
 
@@ -162,4 +162,52 @@ export class HubSessionHostPicker {
     }
     return true;
   }
+}
+
+/** The project feature a host must have on to serve the hub session. */
+export const HUB_SESSION_FEATURE = "web.sidecar";
+
+export interface HubLensProbeOptions {
+  /** The hub's token, which a child started with `--token-file` requires. */
+  token?: string | null;
+  timeoutMs?: number;
+  /** Injected for tests. */
+  fetch?: typeof fetch;
+}
+
+/**
+ * Whether the hub home offers the hub session: the host the picker names
+ * says it can run the hub lens. A host that does not answer, or whose route
+ * gate refuses for web.sidecar, is passed over exactly as the proxy passes
+ * it over, and the next pick is asked. False when no host says yes.
+ */
+export async function probeHubLens(
+  picker: HubSessionHostPicker,
+  projects: readonly ProjectView[],
+  opts: HubLensProbeOptions = {},
+): Promise<boolean> {
+  const fetchImpl = opts.fetch ?? fetch;
+  // Each pass that continues marks one project, so one pass per project ends it.
+  for (let attempt = 0; attempt <= projects.length; attempt += 1) {
+    const host = picker.pick(projects);
+    if (!host) return false;
+    let res: Response;
+    try {
+      res = await fetchImpl(`http://127.0.0.1:${host.port}${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.lens}`, {
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 2_000),
+        headers: opts.token ? { "X-Ndx-Token": opts.token } : {},
+      });
+    } catch {
+      picker.markUnreachable(host.project);
+      continue;
+    }
+    if (res.status === 403 && res.headers.get(FEATURE_DISABLED_HEADER) === HUB_SESSION_FEATURE) {
+      picker.markSidecarOff(host.project);
+      continue;
+    }
+    if (!res.ok) return false;
+    const body = (await res.json().catch(() => null)) as { lens?: { available?: unknown } } | null;
+    return body?.lens?.available === true;
+  }
+  return false;
 }

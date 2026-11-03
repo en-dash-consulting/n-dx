@@ -50,6 +50,11 @@ function snapshotStatePath(dir: string, sessionId: string): string {
   return join(dir, `${sessionId}.snapshot.json`);
 }
 
+/** A turn has delivered a snapshot to the session, so the next one marks Δ against it. */
+export function hasHubSnapshotBaseline(dir: string, sessionId: string): boolean {
+  return existsSync(snapshotStatePath(dir, sessionId));
+}
+
 function readSnapshotState(dir: string, sessionId: string): HubSnapshotState | null {
   const path = snapshotStatePath(dir, sessionId);
   if (!existsSync(path)) return null;

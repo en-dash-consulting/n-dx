@@ -76,6 +76,7 @@ import { buildExtensionsAnswer } from "./extensions.js";
 import type { ExtensionView } from "./extensions.js";
 import { defaultParentDir } from "./new-project.js";
 import { SidecarManager } from "./sidecars.js";
+import { HUB_SESSION_FEATURE, probeHubLens } from "./session-host.js";
 import type { EnsureResult } from "./sidecars.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
@@ -502,8 +503,6 @@ export function proxyUpgrade(
   upstream.once("close", () => socket.destroy());
 }
 
-/** The project feature a host must have on to serve the hub session. */
-const HUB_SESSION_FEATURE = "web.sidecar";
 const NO_HUB_SESSION_HOST = "No registered project server is healthy to host the hub session";
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
@@ -578,13 +577,15 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       // `/api/hub/overview` does it: a child started with `--token-file`
       // answers 401 without it, and every card would render "unreachable"
       // until the page's first client-side refresh corrected itself.
-      const [overview, extensions] = await Promise.all([
+      const [overview, extensions, hubSession] = await Promise.all([
         buildHubOverview(projects, (port) => fetchChildSnapshot(port, 2_000, hub.token)),
         homeExtensionViews(hub),
+        // The Hub session toggle shows only when the host the session would go to can run the hub lens.
+        probeHubLens(hub.sessionHosts, projects, { token: hub.token }),
       ]);
       // Where the "New project" form offers to create: wherever most of the
       // registered projects already live, else the user's home.
-      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions);
+      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions, { hubSession });
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
       res.end(html);
       return;

@@ -42,7 +42,11 @@
  * host lock (`hub/session-host.ts`). A create on Codex is refused, a second
  * create answers the open session, and it keeps the hub lens, whose packet is
  * the hub snapshot rebuilt every turn. Its broker carries out nothing
- * ({@link hubSidecarActions}).
+ * ({@link hubSidecarActions}). Beside them, any project server answers
+ * `GET /api/sidecar/hub/drawer` (the drawer-only viewer page the hub home
+ * docks) and `GET /api/sidecar/hub/lens` (whether it can run the hub lens,
+ * and the hub ceiling); the host answers `GET /api/sidecar/hub/snapshot`, how
+ * many snapshot items the open session's next turn marks Δ.
  *
  * Sessions are the addressed workspace's: `ctx.projectDir` picks the registry
  * and broker (`<henchDir>/sidecar/`) and is the worktree a new session runs in.
@@ -100,9 +104,15 @@ import {
   type SidecarTurnOutcome,
 } from "./sidecar/session-registry.js";
 import { hubVendorRefusal, type SidecarBrokerEndpoint } from "./sidecar/spawn-policy.js";
-import { hubSnapshotReader } from "./sidecar/hub-packet.js";
+import { hasHubSnapshotBaseline, hubSnapshotReader } from "./sidecar/hub-packet.js";
 import { WORKSPACE_HEADER } from "./workspaces.js";
-import { HUB_SIDECAR_API_PREFIX, SIDECAR_SESSION_ENDED_REASON } from "../shared/index.js";
+import {
+  HUB_SESSION_CLOSE_MESSAGE,
+  HUB_SESSION_PATH,
+  HUB_SESSION_ROUTES,
+  HUB_SIDECAR_API_PREFIX,
+  SIDECAR_SESSION_ENDED_REASON,
+} from "../shared/index.js";
 import { claimHubSessionHost, hubSidecarDir, resolveHubHome } from "../hub/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
@@ -245,6 +255,8 @@ export interface HubSidecarRouteOptions {
   actions?: SidecarActions;
   /** The snapshot reads' fetch, for tests. */
   fetch?: typeof fetch;
+  /** The built drawer-only viewer page (`dist/viewer/hub-session.html`); null when it was not built. */
+  drawerHtml?: () => string | null;
 }
 
 /**
@@ -570,7 +582,10 @@ function parseAfter(search: string): number | Error {
 
 // ── Hub scope ────────────────────────────────────────────────────────────
 
-const HUB_SESSIONS = `${HUB_SIDECAR_API_PREFIX}/sessions`;
+const HUB_SESSIONS = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.sessions}`;
+const HUB_DRAWER = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.drawer}`;
+const HUB_LENS_PATH = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.lens}`;
+const HUB_SNAPSHOT = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.snapshot}`;
 const HUB_LENS = "hub";
 const HUB_NO_EFFECT = "a hub session drafts and never acts, so this call does nothing from the hub";
 
@@ -686,6 +701,86 @@ function hubHostState(
   return state;
 }
 
+/**
+ * Where the drawer page reaches the hub session, and what it posts to close.
+ * Mirrored by `HubSessionPageConfig` in viewer/hooks/use-hub-session.ts.
+ *
+ * The page is served here, so the paths ride in with it rather than through
+ * the viewer's gateway: the hub owns them (`src/shared/base-path.ts`), and the
+ * page needs them nowhere else.
+ */
+export interface HubSessionPageConfig {
+  sessions: string;
+  lens: string;
+  snapshot: string;
+  /** The WebSocket path: the hub forwards an upgrade under it to the host. */
+  socket: string;
+  closeMessage: string;
+}
+
+export const HUB_SESSION_PAGE_CONFIG_ID = "hub-session-config";
+
+export function hubSessionPageConfig(): HubSessionPageConfig {
+  return {
+    sessions: `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.sessions}`,
+    lens: `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.lens}`,
+    snapshot: `${HUB_SESSION_PATH}${HUB_SESSION_ROUTES.snapshot}`,
+    socket: HUB_SESSION_PATH,
+    closeMessage: HUB_SESSION_CLOSE_MESSAGE,
+  };
+}
+
+/** The drawer page with its config as a JSON block ahead of the app root. `<` is escaped so the JSON cannot close the script. */
+function withHubSessionPageConfig(html: string): string {
+  const json = JSON.stringify(hubSessionPageConfig()).replace(/</g, "\\u003c");
+  const block = `<script type="application/json" id="${HUB_SESSION_PAGE_CONFIG_ID}">${json}</script>`;
+  return html.includes("<body") ? html.replace(/<body([^>]*)>/, (tag) => `${tag}${block}`) : `${block}${html}`;
+}
+
+/** `GET /api/sidecar/hub/lens`: whether this server can run the hub lens, and the hub ceiling it would hold the session to. */
+export interface HubLensResponse {
+  lens: { id: string; available: boolean; needs?: string };
+  ceiling: number;
+}
+
+/** The hub lens on this server: unavailable while its feature is off here, read per request like every gate. */
+function hubLensInfo(ctx: ServerContext): HubLensResponse["lens"] {
+  const plan = LENS_PACKETS[HUB_LENS];
+  if (plan.kind !== "packet") return { id: HUB_LENS, available: false, ...(plan.kind === "unavailable" && { needs: plan.needs }) };
+  if (plan.feature && !isFeatureEnabled(ctx.projectDir, plan.feature.key)) {
+    return { id: HUB_LENS, available: false, needs: plan.feature.needs };
+  }
+  return { id: HUB_LENS, available: true };
+}
+
+/**
+ * `GET /api/sidecar/hub/snapshot`: how many snapshot items the open session's
+ * next turn marks Δ. Built like the turn's packet but never committed, so
+ * reading it moves nothing. `changed` is null with no open session, before
+ * its first delivered turn, or with `error` naming why there is no snapshot.
+ */
+export interface HubSnapshotDeltaResponse {
+  session: string | null;
+  changed: number | null;
+  omitted?: number;
+  generatedAt?: string;
+  error?: string;
+}
+
+async function hubSnapshotDelta(
+  registry: SidecarSessionRegistry,
+  dir: string,
+  opts: HubSidecarRouteOptions,
+): Promise<HubSnapshotDeltaResponse> {
+  const open = openHubSession(registry);
+  if (!open) return { session: null, changed: null };
+  // Before a turn has delivered one there is nothing to be Δ against: the first turn reads the snapshot whole.
+  if (!hasHubSnapshotBaseline(dir, open.id)) return { session: open.id, changed: null };
+  const read = await hubSnapshotReader(dir, open.id, { homeDir: opts.homeDir, ...(opts.fetch && { fetch: opts.fetch }) })();
+  if (typeof read === "string") return { session: open.id, changed: null, error: read };
+  return { session: open.id, changed: read.changed.length, omitted: read.omitted, generatedAt: read.generatedAt };
+}
+
 /** The machine's open hub session, if there is one. */
 function openHubSession(registry: SidecarSessionRegistry): SidecarSessionRecord | undefined {
   return registry.list({ scope: "hub" }).find((session) => !session.endedAt);
@@ -738,6 +833,20 @@ async function handleHubSidecarRoute(
   pathname: string,
   search: string,
 ): Promise<boolean> {
+  const method = req.method || "GET";
+  // Read by any project server, host or not: what the page and the hub home need before a session exists.
+  if (pathname === HUB_DRAWER || pathname === HUB_LENS_PATH) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    if (pathname === HUB_LENS_PATH) {
+      jsonResponse(res, 200, { lens: hubLensInfo(ctx), ceiling: resolveContextCeiling(ctx.projectDir, "hub") } satisfies HubLensResponse);
+      return true;
+    }
+    const html = opts.drawerHtml?.() ?? null;
+    if (html === null) return refuse(res, 404, "The hub session drawer is not built; run the web package's build");
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+    res.end(withHubSessionPageConfig(html));
+    return true;
+  }
   if (!ctx.port) return refuse(res, 503, "This server has no port, so it cannot host the hub session");
   const home = resolveHubHome(opts.homeDir);
   const dir = hubSidecarDir(home);
@@ -759,6 +868,11 @@ async function handleHubSidecarRoute(
   }
 
   const { registry, broker } = hubHostState(ctx, broadcast, opts, dir, pid, claim.acquired);
+  if (pathname === HUB_SNAPSHOT) {
+    if (method !== "GET") return refuse(res, 405, `${method} is not supported on ${pathname}`);
+    jsonResponse(res, 200, await hubSnapshotDelta(registry, dir, opts));
+    return true;
+  }
   return handleSessionRoutes(req, res, pathname, search, {
     prefix: HUB_SESSIONS,
     worktree: dir,

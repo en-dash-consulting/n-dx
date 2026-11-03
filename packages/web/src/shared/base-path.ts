@@ -44,6 +44,29 @@ export const HUB_SESSION_PATH = "/hub/session";
 export const HUB_SIDECAR_API_PREFIX = "/api/sidecar/hub";
 
 /**
+ * The hub session's routes below either prefix: `/hub/session/drawer` on the
+ * hub is `/api/sidecar/hub/drawer` on the host.
+ *
+ * - `drawer`: the drawer-only viewer page the hub home docks.
+ * - `lens`: whether the host can run the hub lens, and its context ceiling.
+ * - `snapshot`: how many snapshot items changed since the session's last turn.
+ * - `sessions`: the session routes.
+ */
+export const HUB_SESSION_ROUTES = {
+  drawer: "/drawer",
+  lens: "/lens",
+  snapshot: "/snapshot",
+  sessions: "/sessions",
+} as const;
+
+/**
+ * What the drawer page posts to the hub home that frames it when its close
+ * button or ⌘J is pressed: the keystroke lands in the frame, and only the
+ * home can undock it. Same-origin only; both sides check.
+ */
+export const HUB_SESSION_CLOSE_MESSAGE = "ndx:hub-session:close";
+
+/**
  * The host lock, as path segments under the per-user directory: the pid and
  * port of the project server that hosts the hub session. The host writes it,
  * the hub reads it to keep sending the session to its host.

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hub session | n-dx</title>
+  <!--
+    The drawer-only page the hub home docks (hub-session.ts). Built by
+    build.js with the script and stylesheet inlined; nothing external.
+  -->
+  <script>
+    (function(){
+      // Theme before first paint: the same key the hub home and the dashboard use.
+      var s = null;
+      try { s = localStorage.getItem("sv-theme"); } catch (e) { /* private mode: follow the OS */ }
+      var pinned = s === "light" || s === "dark";
+      document.documentElement.setAttribute("data-theme", pinned ? s : (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+    })();
+  </script>
+  <link rel="stylesheet" href="./hub-session.css">
+</head>
+<body class="hub-session-page">
+  <div id="app"></div>
+  <script type="module" src="./hub-session.ts"></script>
+</body>
+</html>

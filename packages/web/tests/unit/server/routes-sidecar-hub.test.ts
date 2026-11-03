@@ -11,7 +11,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -89,7 +89,7 @@ function writeProjectConfig(config: Record<string, unknown>): void {
 }
 
 /** A project server whose hub-session routes run as `pid` on `port`. */
-async function startHost(pid: number, port: number): Promise<RouteTestServer> {
+async function startHost(pid: number, port: number, drawerHtml?: () => string | null): Promise<RouteTestServer> {
   const hostCtx: ServerContext = { ...ctx, port };
   const server = await startRouteTestServer((req: IncomingMessage, res: ServerResponse) => {
     // As start.ts does: the feature gate runs before any route.
@@ -100,6 +100,7 @@ async function startHost(pid: number, port: number): Promise<RouteTestServer> {
         pid,
         isAlive: (p) => alive.has(p),
         fetch: fakeHubFetch,
+        ...(drawerHtml && { drawerHtml }),
         registryFor: (dir) => new SidecarSessionRegistry({
           dir,
           connect: () => ({ spawn: fakeSpawn }),
@@ -276,6 +277,82 @@ describe("the hub lens packet", () => {
     } finally {
       error.mockRestore();
     }
+  });
+});
+
+describe("what the hub home and its drawer read", () => {
+  const get = (server: RouteTestServer, path: string): Promise<Response> => fetch(`${server.baseUrl}/api/sidecar/hub${path}`);
+
+  it("serves the drawer-only page from any project server, and says so when it was not built", async () => {
+    const built = await startHost(1001, 4321, () => '<!doctype html><title>Hub session</title><body class="hub-session-page"><div id="app"></div></body>');
+    const page = await get(built, "/drawer");
+    expect(page.status).toBe(200);
+    expect(page.headers.get("content-type")).toContain("text/html");
+    const html = await page.text();
+    expect(html).toContain("<title>Hub session</title>");
+    // The page's paths ride in with it, every one through the hub, ahead of the app root.
+    const config = /<body class="hub-session-page"><script type="application\/json" id="hub-session-config">(.*?)<\/script><div id="app">/.exec(html);
+    expect(JSON.parse(config![1])).toEqual({
+      sessions: "/hub/session/sessions",
+      lens: "/hub/session/lens",
+      snapshot: "/hub/session/snapshot",
+      socket: "/hub/session",
+      closeMessage: "ndx:hub-session:close",
+    });
+
+    const unbuilt = await startHost(2002, 5555, () => null);
+    const missing = await get(unbuilt, "/drawer");
+    expect(missing.status).toBe(404);
+    expect((await missing.json()).error).toContain("not built");
+    // Neither read takes the host lock: no session was asked for.
+    expect(readHubSessionHostLock(home)).toBeNull();
+  });
+
+  it("reports the hub lens available with the hub ceiling, following the host's config", async () => {
+    const host = await startHost(1001, 4321);
+    expect(await (await get(host, "/lens")).json()).toEqual({ lens: { id: "hub", available: true }, ceiling: 40_000 });
+
+    writeProjectConfig({ features: { web: { sidecar: true } }, web: { sidecarContextCeiling: { hub: 60_000 } } });
+    expect((await (await get(host, "/lens")).json()).ceiling).toBe(60_000);
+  });
+
+  it("refuses the lens read through the web.sidecar gate while the host has it off, as the hub's probe expects", async () => {
+    writeProjectConfig({ features: { web: { sidecar: false } } });
+    const host = await startHost(1001, 4321);
+    const res = await get(host, "/lens");
+    expect(res.status).toBe(403);
+    expect(res.headers.get("x-ndx-feature-disabled")).toBe("web.sidecar");
+  });
+
+  it("counts the snapshot items the next turn marks Δ, without moving the session's fingerprints", async () => {
+    const host = await startHost(1001, 4321);
+    expect(await (await get(host, "/snapshot")).json()).toEqual({ session: null, changed: null });
+
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    // Nothing to be Δ against until a turn has delivered a snapshot.
+    expect(await (await get(host, "/snapshot")).json()).toEqual({ session: session.id, changed: null });
+
+    await turn(host, session.id, "first");
+    expect(await (await get(host, "/snapshot")).json()).toMatchObject({ session: session.id, changed: 0, omitted: 0 });
+
+    worktrees = [{ path: "/r/app/wt", branch: "feat/x", isAnchor: false, dirtyFiles: 2, runs: { running: 1, latest: null } }];
+    const snapshotPath = join(hubSidecarDir(home), `${session.id}.snapshot.json`);
+    const delivered = readFileSync(snapshotPath, "utf-8");
+    const changed = (await (await get(host, "/snapshot")).json()).changed;
+    expect(changed).toBeGreaterThan(0);
+    // Reading it is not a turn: the same Δ is still there to read, and to send.
+    expect((await (await get(host, "/snapshot")).json()).changed).toBe(changed);
+    expect(readFileSync(snapshotPath, "utf-8")).toBe(delivered);
+  });
+
+  it("names why there is no snapshot when no hub is running", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    await turn(host, session.id, "first");
+    rmSync(join(home, HUB_PID_FILE));
+    const body = await (await get(host, "/snapshot")).json();
+    expect(body.changed).toBeNull();
+    expect(body.error).toContain("no hub is running");
   });
 });
 
