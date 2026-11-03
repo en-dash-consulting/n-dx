@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -10,6 +10,16 @@ import {
   clearConfigCaches,
 } from "../../../src/server/routes-config.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
+
+// The footer resolves Claude's auth like `ndx work` does, so an exported
+// ANTHROPIC_API_KEY selects the API under `auto`. Blank it so a developer's
+// own key cannot change what these tests see.
+beforeEach(() => {
+  vi.stubEnv("ANTHROPIC_API_KEY", "");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 /** Start a test server that only runs config routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
