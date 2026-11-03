@@ -45,6 +45,7 @@ export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>>
   edit: "Edit",
   "network-read": "Network read",
   "draft-post": "Draft post",
+  "draft-file": "Draft file",
   "migration-decision": "Migration decision",
 };
 
@@ -71,7 +72,11 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
   const { input } = card;
   const title = ((): string => {
     switch (card.kind) {
-      case "command": return Array.isArray(input.argv) ? input.argv.map(String).join(" ") : "";
+      // A hub call names its project: the title says whose repository it runs in.
+      case "command": {
+        const argv = Array.isArray(input.argv) ? input.argv.map(String).join(" ") : "";
+        return str(input.project) && argv ? `${str(input.project)}: ${argv}` : argv;
+      }
       case "work": {
         // The execute route's own argv builder over the options the server will start with
         // (defaults applied), so the title is the command approval spawns. A card without them
@@ -86,7 +91,8 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       case "placement": return str(input.change) && str(input.target) ? `${str(input.change)} → ${str(input.target)}` : "";
       case "edit": return str(input.path);
       case "network-read": return [str(input.kind), str(input.ref)].filter(Boolean).join(" ");
-      case "draft-post": return [str(input.kind), str(input.target)].filter(Boolean).join(" · ");
+      case "draft-post": return [str(input.project), str(input.kind), str(input.target)].filter(Boolean).join(" · ");
+      case "draft-file": return [str(input.kind), str(input.path)].filter(Boolean).join(" · ");
       case "migration-decision": return count(input.entries, "decision", "decisions");
     }
   })();
@@ -349,8 +355,32 @@ export const DRAFT_COPIED_REASON = "Copied, not posted";
 /** A draft card's body: where it would go and the text exactly as it would be posted. */
 function DraftPostBody({ card }: { card: SidecarCard }) {
   return h("div", { class: "sidecar-draft-post" },
-    h("p", { class: "sidecar-draft-target" }, `${str(card.input.kind) === "review" ? "Review comment" : "Comment"} on ${str(card.input.target)}`),
+    h("p", { class: "sidecar-draft-target" },
+      `${str(card.input.kind) === "review" ? "Review comment" : "Comment"} on ${str(card.input.target)}`
+      + (str(card.input.project) ? ` in project ${str(card.input.project)}` : "")),
     h("pre", { class: "sidecar-draft-text", "aria-label": "The draft as it would be posted" }, str(card.input.body)),
+  );
+}
+
+/**
+ * A draft-file card's body: the path the file would be saved at, editable
+ * while the card waits, and the content as it would be written. Nothing is
+ * written before Approve.
+ */
+function DraftFileBody({ card, editable, path, onPath }: { card: SidecarCard; editable: boolean; path: string; onPath: (path: string) => void }) {
+  return h("div", { class: "sidecar-draft-file" },
+    editable
+      ? h("label", { class: "sidecar-draft-path" },
+          "Save to ",
+          h("input", {
+            type: "text",
+            class: "sidecar-draft-path-input",
+            "aria-label": "Path the draft is saved to",
+            value: path,
+            onInput: (e: Event) => onPath((e.target as HTMLInputElement).value),
+          }))
+      : h("p", { class: "sidecar-draft-path" }, `Saved to ${str(card.input.path)}`),
+    h("pre", { class: "sidecar-draft-text", "aria-label": "The file as it would be written" }, str(card.input.content)),
   );
 }
 
@@ -436,10 +466,13 @@ interface CardProps {
   /** The first waiting change-set card's edits, by item index. */
   drafts: Readonly<Record<number, ChangeSetDraft>>;
   onDraft: (index: number, draft: ChangeSetDraft) => void;
+  /** The first waiting draft-file card's path as the operator is editing it. */
+  path: string;
+  onPath: (path: string) => void;
   onRestartLane?: (lane: number) => void;
 }
 
-function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, onRestartLane }: CardProps) {
+function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, deciding, onDecide, drafts, onDraft, path, onPath, onRestartLane }: CardProps) {
   const state = sidecarCardState(card);
   const input = h("pre", { class: "sidecar-card-input" }, JSON.stringify(card.input, null, 2));
   const editable = first && state === "pending";
@@ -451,9 +484,13 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
       ]
     : card.runPlan
       ? h(RunPlanBody, { card, cards, decidable: editable, deciding, onStartLane: (lane) => onDecide({ approve: true, lane }), onRestartLane })
-      : card.kind === "draft-post" || card.kind === "network-read"
+      : card.kind === "draft-post" || card.kind === "network-read" || card.kind === "draft-file"
       ? [
-          card.kind === "draft-post" ? h(DraftPostBody, { card }) : h(NetworkReadBody, { card }),
+          card.kind === "draft-post"
+            ? h(DraftPostBody, { card })
+            : card.kind === "draft-file"
+              ? h(DraftFileBody, { card, editable, path, onPath })
+              : h(NetworkReadBody, { card }),
           h("details", { class: "sidecar-card-details" }, h("summary", null, "Input"), input),
         ]
       : state === "pending"
@@ -489,7 +526,7 @@ function SidecarCardView({ card, cards, cliName, first, manifest, note, onNote, 
                 : h("button", { type: "button", class: "sidecar-card-approve", disabled: deciding, onClick: () => onDecide({ approve: true }) },
                     card.changeSet
                       ? `Approve and write ${card.changeSet.items.length} ${card.changeSet.items.length === 1 ? "item" : "items"}`
-                      : draft ? "Post under your gh login" : "Approve"),
+                      : draft ? "Post under your gh login" : card.kind === "draft-file" ? "Save file" : "Approve"),
               // Copy hands the draft to the operator and posts nothing: it settles the card as denied.
               draft ? h(DraftCopyButton, { text: str(card.input.body), deciding, onCopied: () => onDecide({ approve: false, reason: DRAFT_COPIED_REASON }) }) : null,
               h("button", { type: "button", class: "sidecar-card-deny", disabled: deciding, onClick: () => onDecide({ approve: false, reason: note }) },
@@ -539,10 +576,12 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
   const [note, setNote] = useState("");
   const [drafts, setDrafts] = useState<Record<number, ChangeSetDraft>>({});
   const [deciding, setDeciding] = useState(false);
+  const [path, setPath] = useState("");
   const firstId = first?.id ?? null;
+  const firstPath = first?.kind === "draft-file" ? str(first.input.path) : "";
 
-  // A note, and a change set's edits, belong to the card they were typed on.
-  useEffect(() => { setNote(""); setDrafts({}); }, [firstId]);
+  // A note, a change set's edits and a draft's path belong to the card they were typed on.
+  useEffect(() => { setNote(""); setDrafts({}); setPath(firstPath); }, [firstId]);
 
   const answer = async (decision: SidecarCardDecision) => {
     if (!first || deciding) return;
@@ -552,7 +591,9 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.
       const edits = decision.approve && first.changeSet ? changeSetEdits(first, drafts) : [];
-      await decide(first.id, edits.length > 0 ? { ...decision, edits } : decision);
+      // The path the operator left on a draft-file card is where an approval saves it.
+      const edited = edits.length > 0 ? { ...decision, edits } : decision;
+      await decide(first.id, decision.approve && first.kind === "draft-file" && path.trim() ? { ...edited, path } : edited);
     } finally {
       setDeciding(false);
     }
@@ -592,6 +633,8 @@ export function SidecarCardList({ cards, manifest, decide, send, cliName }: Side
       onDecide: (decision: SidecarCardDecision) => { void answer(decision); },
       drafts,
       onDraft: (index: number, draft: ChangeSetDraft) => setDrafts((prev) => ({ ...prev, [index]: draft })),
+      path,
+      onPath: setPath,
       onRestartLane: send ? (lane: number) => { void send(runPlanRestartPrompt(card, lane)); } : undefined,
     })),
   );

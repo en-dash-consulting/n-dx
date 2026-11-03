@@ -32,6 +32,7 @@ import {
 import type { QueuePlan, SidecarChangeSet } from "../../shared/index.js";
 import { applyChangeSetEdits } from "./change-set.js";
 import { appendLedgerEntryAt, sessionLedgerPath, WORKTREE_LEDGER_TYPES, type LedgerEntry, type LedgerEntryType } from "./ledger.js";
+import { resolveDraftPath } from "./draft-file.js";
 import { ensureSidecarDir } from "./sidecar-dir.js";
 
 export type SidecarCardStatus = "pending" | "approved" | "denied" | "withdrawn";
@@ -61,7 +62,7 @@ export interface SidecarCard {
   reason?: string;
   /** Approved with "always allow": its rule went onto the allow-list. */
   remembered?: true;
-  /** The operator edited the change set before approving it. */
+  /** The operator edited the change set, or a draft file's path, before approving it. */
   edited?: true;
   /** How the approved call's effect ended; `ids` are the PRD items a change-set card wrote. */
   carriedOut?: { ok: boolean; ids?: string[] };
@@ -89,6 +90,8 @@ export interface CardDecision {
   edits?: unknown;
   /** A run-plan card's Start lane: the lane (0-based) whose first task is to be started. Only on a run-plan approval, and required there. */
   lane?: number;
+  /** A draft-file card's path as the operator edited it; the approval saves there. Only on a draft-file approval. */
+  path?: string;
 }
 
 /** A refused decision; `status` is the HTTP status a route answers with. */
@@ -109,6 +112,8 @@ export interface SidecarBrokerOptions {
    * to a worktree's: `<dir>/<session>.ledger.jsonl`, {@link WORKTREE_LEDGER_TYPES}.
    */
   ledger?: SidecarLedgerTarget;
+  /** Where a draft-file card's relative path lands. Defaults to `<dir>/drafts`. */
+  draftsDir?: string;
 }
 
 export interface SidecarLedgerTarget {
@@ -135,12 +140,19 @@ export class SidecarBroker {
   /** Per session, the decided calls still carrying out their effect; `withdraw` aborts them. */
   private readonly carrying = new Map<string, Set<AbortController>>();
   private readonly ledger: SidecarLedgerTarget;
+  private readonly draftsDirPath: string;
 
   constructor(opts: SidecarBrokerOptions) {
     this.dir = opts.dir;
+    this.draftsDirPath = opts.draftsDir ?? join(opts.dir, "drafts");
     this.onCard = opts.onCard;
     this.now = opts.now ?? Date.now;
     this.ledger = opts.ledger ?? { path: (sessionId) => sessionLedgerPath(opts.dir, sessionId), types: WORKTREE_LEDGER_TYPES };
+  }
+
+  /** Where a draft file's relative path lands. */
+  get draftsDir(): string {
+    return this.draftsDirPath;
   }
 
   /** The types a session's agent may write through `ledger_append`. */
@@ -261,6 +273,14 @@ export class SidecarBroker {
     } else if (decision.lane !== undefined) {
       throw new BrokerDecisionError(409, card.kind === "run-plan" ? "Only an approval chooses a lane" : `A ${card.kind} card takes no lane`);
     }
+    let editedPath: string | undefined;
+    if (decision.path !== undefined) {
+      if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval carries a path");
+      if (card.kind !== "draft-file") throw new BrokerDecisionError(409, `A ${card.kind} card takes no path`);
+      const resolved = resolveDraftPath(decision.path, this.draftsDirPath);
+      if (!resolved.ok) throw new BrokerDecisionError(400, resolved.error);
+      editedPath = resolved.path;
+    }
     if (decision.remember) {
       if (!decision.approve) throw new BrokerDecisionError(409, "Only an approval can be remembered");
       if (card.allowListKey === null) {
@@ -271,6 +291,10 @@ export class SidecarBroker {
     }
     if (edited) {
       card.changeSet = edited;
+      card.edited = true;
+    }
+    if (editedPath !== undefined && editedPath !== card.input.path) {
+      card.input = { ...card.input, path: editedPath };
       card.edited = true;
     }
     if (decision.lane !== undefined) card.lane = decision.lane;
@@ -326,7 +350,7 @@ export class SidecarBroker {
       const r = rule as Partial<AllowListRule> | null;
       return !!r && typeof r.tool === "string" && isBrokerTool(r.tool) && typeof r.key === "string"
         && BROKER_TOOL_POLICY[r.tool].allowList === "per-call"
-        && allowListKey(r.tool, { argv: parseArgv(r.key) }) === r.key;
+        && allowListKey(r.tool, ruleInput(r.key)) === r.key;
     });
   }
 
@@ -413,11 +437,15 @@ export class SidecarBroker {
   }
 }
 
-/** A rule key's argv; `undefined` for a key that is not JSON, which {@link allowListKey} then rejects. */
-function parseArgv(key: string): unknown {
+/**
+ * The call a rule key stands for: a bare argv, or a hub rule's `{ project, argv }`.
+ * A key that is not JSON stands for no call, which {@link allowListKey} then rejects.
+ */
+function ruleInput(key: string): Record<string, unknown> {
   try {
-    return JSON.parse(key);
+    const parsed: unknown = JSON.parse(key);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : { argv: parsed };
   } catch {
-    return undefined;
+    return { argv: undefined };
   }
 }

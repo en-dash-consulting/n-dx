@@ -955,6 +955,47 @@ describe("permission cards", () => {
       await settle();
       expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny" }]);
     });
+
+    it("a hub draft names its project in the title and on the card", async () => {
+      await openWith([card("d2", 1, { kind: "draft-post", tool: "draft_github_post", input: { project: "app", kind: "review", target: "931", body: "x" } })]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("app · review · 931");
+      expect(root.querySelector(".sidecar-draft-target")?.textContent).toBe("Review comment on 931 in project app");
+    });
+  });
+
+  describe("draft-file card", () => {
+    const file = (): SidecarCard => card("f1", 1, { kind: "draft-file", tool: "save_draft", input: { kind: "restack-plan", path: "/h/hub/drafts/restack.md", content: "1. rebase #12" } });
+    const pathInput = () => root.querySelector<HTMLInputElement>(".sidecar-draft-path-input")!;
+
+    it("shows the path and the content, offers no always-allow, and Save approves at the shown path", async () => {
+      await openWith([file()]);
+      expect(root.querySelector(".sidecar-card-title")?.textContent).toBe("restack-plan · /h/hub/drafts/restack.md");
+      expect(pathInput().value).toBe("/h/hub/drafts/restack.md");
+      expect(root.querySelector(".sidecar-draft-text")?.textContent).toBe("1. rebase #12");
+      expect(root.querySelector(".sidecar-card-always")).toBeNull();
+      expect(root.querySelector(".sidecar-card-approve")?.textContent).toBe("Save file");
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve", path: "/h/hub/drafts/restack.md" }]);
+    });
+
+    it("saves at the path the operator edited, and a denial carries no path", async () => {
+      await openWith([file()]);
+      await act(async () => {
+        pathInput().value = "/tmp/plan.md";
+        pathInput().dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-approve")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "approve", path: "/tmp/plan.md" }]);
+    });
+
+    it("Deny sends no path", async () => {
+      await openWith([file()]);
+      await act(async () => { root.querySelector<HTMLButtonElement>(".sidecar-card-deny")!.click(); });
+      await settle();
+      expect(decisions().map((r) => r.body)).toEqual([{ decision: "deny" }]);
+    });
   });
 
   it("a network-read card names what gh reads, and \"Allow GitHub reads for this project\" approves it and turns the setting on", async () => {
@@ -980,6 +1021,7 @@ describe("permission cards", () => {
     edit: { tool: "propose_edit", input: { path: "src/a.ts", diff: "-a\n+b" }, title: "src/a.ts" },
     "network-read": { tool: "github_read", input: { kind: "pr", ref: "#901" }, title: "pr #901" },
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
+    "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },
     "migration-decision": { tool: "migration_decision", input: { entries: [{ id: "x" }] }, title: "1 decision" },
   };
   it("titles a work card from the run options the server attached, not the call's own", async () => {

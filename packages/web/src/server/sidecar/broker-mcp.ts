@@ -14,7 +14,16 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { GITHUB_READS_SETTING, SIDECAR_BROKER_NAME, type BrokerToolName } from "./broker-policy.js";
+import {
+  BROKER_SCOPE_TOOLS,
+  GITHUB_READS_SETTING,
+  HUB_COMMAND_ARGV,
+  hubCommandRefusal,
+  SIDECAR_BROKER_NAME,
+  type BrokerScope,
+  type BrokerToolName,
+} from "./broker-policy.js";
+import { DRAFT_FILE_KINDS, DRAFT_FILE_MAX_CHARS, resolveDraftPath } from "./draft-file.js";
 import type { CardAnnex, SidecarBroker } from "./broker.js";
 import {
   carryOutDecision,
@@ -105,7 +114,65 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
     description: "Record decisions for a v1 to v2 PRD migration. Always waits for the operator's migration-decision card.",
     input: { entries: objects },
   },
+  save_draft: {
+    description: "Hub session only.",
+    input: {},
+  },
 };
+
+const projectField = z.string().min(1).describe("The registered project's id, as the snapshot names it");
+
+/**
+ * The hub session's versions of the tools it shares with a worktree's, and its
+ * own `save_draft`: every call names its project, and none acts.
+ */
+const HUB_CARD_TOOLS: Partial<Record<BrokerToolName, { description: string; input: z.ZodRawShape }>> = {
+  run_command: {
+    description: `Run one read-only command at a project's repository root: ${HUB_COMMAND_ARGV.map((argv) => "`" + argv.join(" ") + "`").join(", ")}. Any other command is refused with no card. Waits for the operator's command card unless that exact command is allow-listed for that project.`,
+    input: { project: projectField, argv: z.array(z.string()).min(1).describe("One of the commands above, one token each") },
+  },
+  draft_github_post: {
+    description: "Draft a PR comment (`comment`) or review comment (`review`) on `target` (a PR number, URL or branch) of `project`. Always waits for the operator's draft card naming the project and target; it is posted under the operator's gh login, with the project's repository root as its working directory, only on Approve. Copy or Discard posts nothing.",
+    input: {
+      project: projectField,
+      kind: z.enum(GITHUB_POST_KINDS),
+      target: z.string().regex(/^[^-\s]\S*$/, "a PR number, URL or branch, not a flag").describe("A PR number, URL or branch"),
+      body: z.string().min(1),
+    },
+  },
+  save_draft: {
+    description: "Draft a file for the operator: a side-session prompt, a restack plan or a release checklist. Always waits for the operator's draft-file card, which shows the path and lets the operator change it; nothing is written before Approve, and an existing file is never overwritten. A relative path lands in the hub's drafts directory.",
+    input: {
+      kind: z.enum(DRAFT_FILE_KINDS),
+      path: z.string().min(1).describe("Where to save it; the operator can change this on the card"),
+      content: z.string().min(1).max(DRAFT_FILE_MAX_CHARS),
+    },
+  },
+};
+
+/** The tools a scope's session is offered that raise a card, each with its own input. */
+function cardToolsFor(scope: BrokerScope): Array<[BrokerToolName, { description: string; input: z.ZodRawShape }]> {
+  return BROKER_SCOPE_TOOLS[scope]
+    .filter((name): name is Exclude<BrokerToolName, "ledger_append"> => name !== "ledger_append")
+    .map((name) => [name, (scope === "hub" ? HUB_CARD_TOOLS[name] : undefined) ?? CARD_TOOLS[name]]);
+}
+
+/** A hub call's refusal before any card: its project must be one the hub names, and run_command a fixed read-only argv. */
+async function hubCallRefusal(
+  name: BrokerToolName,
+  input: Record<string, unknown>,
+  actions: SidecarActions | undefined,
+  signal: AbortSignal,
+): Promise<string | null> {
+  if (name === "run_command") {
+    const refusal = hubCommandRefusal((input.argv as unknown[]).map(String));
+    if (refusal) return refusal;
+  }
+  if (name === "save_draft") return null;
+  if (!actions?.projectRepoRoot) return "this server cannot name the hub's projects";
+  const root = await actions.projectRepoRoot(String(input.project), signal);
+  return root.ok ? null : root.error;
+}
 
 function text(message: string, isError = false): CallToolResult {
   return { content: [{ type: "text", text: message }], ...(isError && { isError: true }) };
@@ -116,13 +183,29 @@ function text(message: string, isError = false): CallToolResult {
  * approved call (see `carry-out.ts`); without it an approved call that has
  * an effect reports that nothing ran.
  */
-export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, actions?: SidecarActions): McpServer {
+export function createBrokerMcpServer(
+  broker: SidecarBroker,
+  sessionId: string,
+  actions?: SidecarActions,
+  scope: BrokerScope = "worktree",
+): McpServer {
   const server = new McpServer({ name: SIDECAR_BROKER_NAME, version: BROKER_VERSION });
 
-  for (const [name, tool] of Object.entries(CARD_TOOLS) as Array<[keyof typeof CARD_TOOLS, (typeof CARD_TOOLS)[keyof typeof CARD_TOOLS]]>) {
+  for (const [name, tool] of cardToolsFor(scope)) {
     server.registerTool(name, { description: tool.description, inputSchema: tool.input }, async (args, extra) => {
-      const input = args as Record<string, unknown>;
+      let input = args as Record<string, unknown>;
       const annex: CardAnnex = {};
+      if (scope === "hub") {
+        // Refused here, so a call the hub never carries out raises no card for the operator to decide in vain.
+        const refusal = await hubCallRefusal(name, input, actions, extra.signal);
+        if (refusal) return text(`No card was raised: ${refusal}. Nothing ran.`, true);
+        if (name === "save_draft") {
+          // The card shows the absolute path the draft would land at.
+          const resolved = resolveDraftPath(input.path, broker.draftsDir);
+          if (!resolved.ok) return text(`No card was raised: ${resolved.error}. Nothing was saved.`, true);
+          input = { ...input, path: resolved.path };
+        }
+      }
       // A work card shows what the run would be before the operator decides it, from the options start will use.
       if (name === "start_work") {
         annex.runOptions = workOptions(input);
@@ -194,8 +277,9 @@ export async function handleBrokerMcpRequest(
   broker: SidecarBroker,
   sessionId: string,
   actions?: SidecarActions,
+  scope: BrokerScope = "worktree",
 ): Promise<void> {
-  const server = createBrokerMcpServer(broker, sessionId, actions);
+  const server = createBrokerMcpServer(broker, sessionId, actions, scope);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on("close", () => {
     void transport.close();

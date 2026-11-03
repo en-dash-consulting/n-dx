@@ -104,6 +104,7 @@ export type SidecarCardKind =
   | "edit"
   | "network-read"
   | "draft-post"
+  | "draft-file"
   | "migration-decision";
 
 /** A permission card; mirrors `SidecarCard` in server/sidecar/broker.ts. */
@@ -148,6 +149,8 @@ export interface SidecarCardDecision {
   edits?: SidecarChangeSetEdit[];
   /** A run-plan card's Start lane: the 0-based lane whose first task to start. */
   lane?: number;
+  /** A draft-file approval's path as edited on the card; the draft is saved there. */
+  path?: string;
 }
 
 /**
@@ -743,6 +746,7 @@ export function useSidecar(
         ...(decision.remember && { remember: true }),
         ...(decision.approve && decision.edits?.length && { edits: decision.edits }),
         ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
+        ...(decision.approve && decision.path !== undefined && { path: decision.path }),
       },
     );
     if (!mountedRef.current) return;

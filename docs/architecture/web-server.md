@@ -96,6 +96,25 @@ allowed without its card: Approve posts the card's own input under the
 operator's gh login (`gh pr comment` or `gh pr review --comment`, body on
 stdin); Copy and Discard deny it.
 
+### Hub session: drafts only
+
+The hub session's broker is scoped (`BROKER_SCOPE_TOOLS` in
+`sidecar/broker-policy.ts`): it is offered `run_command`, `draft_github_post`,
+`save_draft` and `ledger_append`, and never `start_work`, `propose_edit`,
+`propose_prd_change`, `place_change_card` or `migration_decision`. Calls name a
+`project`, resolved to its repository root through the hub's overview
+(`sidecar/hub-actions.ts`), never from a path the agent gives.
+
+- `run_command` accepts only `HUB_COMMAND_ARGV` (`ndx status`,
+  `git worktree list`, `git status --short --branch`). Any other argv, or a
+  project the hub does not name, is refused before a card is raised. The
+  allow-list key is `{ project, argv }`, so a rule covers one project.
+- `draft_github_post` posts only on Approve, with cwd at the project's
+  repository root.
+- `save_draft` writes nothing before Approve. The card shows the absolute path
+  (a relative one lands in `<ndx home>/hub/drafts/`), the operator can change
+  it, an existing file is never overwritten, and it is never allow-listable.
+
 ## Sidecar Guide and the run-plan card
 
 The Guide packet (6k cap) is the queue planner's plan as hench printed it:

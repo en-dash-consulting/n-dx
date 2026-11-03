@@ -38,7 +38,7 @@ export interface SidecarActions {
   /** A work card's preview: the task's `ndx work --resolve`, rendered. Never throws. */
   previewWork(taskId: string, options: Record<string, unknown> | undefined): Promise<string>;
   /** Runs the command and waits for it (see {@link awaitSidecarCommand}); `signal` aborts the wait, never the command. */
-  runCommand(argv: string[], signal?: AbortSignal): Promise<CarryOutResult> | CarryOutResult;
+  runCommand(argv: string[], signal?: AbortSignal, project?: string): Promise<CarryOutResult> | CarryOutResult;
   startWork(taskId: string, options: Record<string, unknown> | undefined): Promise<CarryOutResult>;
   /** A proposal read against the PRD for its change-set card, or why it cannot be written. */
   reviewChangeSet(input: Record<string, unknown>): Promise<SidecarChangeSet | string>;
@@ -52,6 +52,13 @@ export interface SidecarActions {
   githubRead(read: GithubRead, signal?: AbortSignal): Promise<CarryOutResult>;
   /** An approved draft, posted under the operator's gh login. Never throws. */
   postGithub(draft: GithubDraft): Promise<CarryOutResult>;
+  /**
+   * The hub session's project ids: the repository root a hub call runs in, or
+   * why the project is not one. Only the hub's actions answer.
+   */
+  projectRepoRoot?(project: string, signal?: AbortSignal): Promise<{ ok: true; repoRoot: string } | { ok: false; error: string }>;
+  /** An approved draft file, written at the path its card showed. Never throws. */
+  saveDraft?(path: string, content: string): CarryOutResult;
 }
 
 /** `pr`: the worktree a workspace key names, its PR and checks. `check`: one check's newest run on a base branch. */
@@ -64,6 +71,8 @@ export type GithubRead = { kind: "pr"; ref: string } | { kind: "check"; ref: str
 
 /** A `draft_github_post` call: a PR comment, or a review comment, with its body. */
 export interface GithubDraft {
+  /** The hub session's project: gh runs with cwd at its repository root. */
+  project?: string;
   kind: (typeof GITHUB_POST_KINDS)[number];
   target: string;
   body: string;
@@ -102,7 +111,7 @@ export async function carryOutDecision(
   if (outcome.decidedBy === "operator" || outcome.decidedBy === "withdrawn") {
     const { card } = outcome;
     const note = card.reason ? ` Operator's note: ${card.reason}` : "";
-    const nothing = tool === "draft_github_post" ? "Nothing was posted." : "Nothing ran.";
+    const nothing = tool === "draft_github_post" ? "Nothing was posted." : tool === "save_draft" ? "Nothing was saved." : "Nothing ran.";
     if (outcome.decidedBy === "withdrawn") {
       return { ok: false, text: `Card ${card.id} was withdrawn: ${card.reason ?? "the turn stopped"}. ${nothing}` };
     }
@@ -135,7 +144,7 @@ async function carryOut(
   const card = cardOf(outcome);
   switch (tool) {
     case "run_command":
-      return actions.runCommand((input.argv as unknown[]).map(String), signal);
+      return actions.runCommand((input.argv as unknown[]).map(String), signal, typeof input.project === "string" ? input.project : undefined);
     case "start_work":
       return actions.startWork(String(input.taskId), workOptions(input));
     case "propose_prd_change": {
@@ -158,12 +167,28 @@ async function carryOut(
     case "draft_github_post": {
       // Posted only from an approved card, and exactly the draft the operator read on it.
       if (!card) return { ok: false, text: "A draft is posted only from an approved card; nothing was posted." };
-      const { kind, target, body } = card.input;
+      const { kind, target, body, project } = card.input;
       // A target gh would read as a flag is never passed to it, whatever raised the card.
       if (!(GITHUB_POST_KINDS as readonly unknown[]).includes(kind) || typeof target !== "string" || !/^[^-\s]\S*$/.test(target) || typeof body !== "string") {
         return { ok: false, text: "The card carried no draft to post; nothing was posted." };
       }
-      return actions.postGithub({ kind: kind as GithubDraft["kind"], target, body });
+      return actions.postGithub({
+        ...(typeof project === "string" && { project }),
+        kind: kind as GithubDraft["kind"],
+        target,
+        body,
+      });
+    }
+    case "save_draft": {
+      // Saved only from an approved card, at the path the card showed (as the operator edited it).
+      if (!card) return { ok: false, text: "A draft file is saved only from an approved card; nothing was saved." };
+      const { path, content } = card.input;
+      if (typeof path !== "string" || typeof content !== "string" || !actions.saveDraft) {
+        return { ok: false, text: "The card carried no draft file to save; nothing was saved." };
+      }
+      const saved = actions.saveDraft(path, content);
+      const edited = saved.ok && card.edited ? " The operator changed the path before approving; it was saved at the new path." : "";
+      return { ...saved, text: `${saved.text}${edited}` };
     }
     default:
       return { ok: false, text: `${tool} has no effect to carry out; nothing ran.` };

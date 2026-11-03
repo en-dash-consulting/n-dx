@@ -25,6 +25,7 @@ export const BROKER_TOOL_NAMES = [
   "github_read",
   "draft_github_post",
   "migration_decision",
+  "save_draft",
   "ledger_append",
 ] as const;
 
@@ -40,6 +41,7 @@ export type SidecarCardKind =
   | "edit"
   | "network-read"
   | "draft-post"
+  | "draft-file"
   | "migration-decision";
 
 /**
@@ -71,8 +73,43 @@ export const BROKER_TOOL_POLICY: Readonly<Record<BrokerToolName, BrokerToolPolic
   github_read: { card: "network-read", allowList: "per-project" },
   draft_github_post: { card: "draft-post", allowList: "never" },
   migration_decision: { card: "migration-decision", allowList: "never" },
+  // A file the operator reads and may re-path on its card; nothing is written before Approve.
+  save_draft: { card: "draft-file", allowList: "never" },
   ledger_append: { card: null, allowList: "never" },
 };
+
+/** Where a session runs: a worktree's own, or the machine's hub session. */
+export type BrokerScope = "worktree" | "hub";
+
+/**
+ * The tools each scope is offered. The hub session drafts and never acts, so
+ * it gets no work, edit, PRD write, placement or migration tool, nor the run
+ * plan (its start is work) or a worktree's `github_read`; what it can ask for
+ * is a fixed read-only command, a draft post, a draft file and its ledger.
+ */
+export const BROKER_SCOPE_TOOLS: Readonly<Record<BrokerScope, readonly BrokerToolName[]>> = {
+  worktree: BROKER_TOOL_NAMES.filter((tool) => tool !== "save_draft"),
+  hub: ["run_command", "draft_github_post", "save_draft", "ledger_append"],
+};
+
+/**
+ * The only commands the hub session may ask for, each run with cwd at one
+ * project's repository root: ndx status, the worktree list and the branch's
+ * status. Anything else is refused without a card.
+ */
+export const HUB_COMMAND_ARGV: readonly (readonly string[])[] = [
+  ["ndx", "status"],
+  ["git", "worktree", "list"],
+  ["git", "worktree", "list", "--porcelain"],
+  ["git", "status", "--short", "--branch"],
+];
+
+/** Why `argv` is not one of {@link HUB_COMMAND_ARGV}; null when it is. */
+export function hubCommandRefusal(argv: readonly string[]): string | null {
+  if (HUB_COMMAND_ARGV.some((allowed) => allowed.length === argv.length && allowed.every((token, i) => token === argv[i]))) return null;
+  const offered = HUB_COMMAND_ARGV.map((allowed) => "`" + allowed.join(" ") + "`").join(", ");
+  return `the hub session runs only these read-only commands: ${offered}`;
+}
 
 /** One Sidecar allow-list rule. */
 export interface AllowListRule {
@@ -98,8 +135,10 @@ function commandNeverAllowListed(argv: readonly string[]): boolean {
 /**
  * The allow-list key for a call, or `null` when the call can never be
  * allow-listed. A `per-call` key is the exact argv, JSON-encoded so a token
- * with a space cannot alias two commands. A `per-project` tool has none: its
- * project setting is its allowance.
+ * with a space cannot alias two commands. A hub call names a project, and its
+ * key is `{ project, argv }`, so allowing `ndx status` in one project allows
+ * it nowhere else; a command outside {@link HUB_COMMAND_ARGV} has none. A
+ * `per-project` tool has none: its project setting is its allowance.
  */
 export function allowListKey(tool: BrokerToolName, input: Readonly<Record<string, unknown>>): string | null {
   switch (BROKER_TOOL_POLICY[tool].allowList) {
@@ -109,7 +148,11 @@ export function allowListKey(tool: BrokerToolName, input: Readonly<Record<string
     case "per-call": {
       const argv = input.argv;
       if (!Array.isArray(argv) || argv.length === 0 || !argv.every((t) => typeof t === "string")) return null;
-      return commandNeverAllowListed(argv) ? null : JSON.stringify(argv);
+      if (commandNeverAllowListed(argv)) return null;
+      const { project } = input;
+      if (project === undefined) return JSON.stringify(argv);
+      if (typeof project !== "string" || project === "" || hubCommandRefusal(argv) !== null) return null;
+      return JSON.stringify({ project, argv });
     }
   }
 }

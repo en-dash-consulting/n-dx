@@ -43,7 +43,10 @@
  * `<ndx home>/hub/sidecar/`; this server serves it only while it holds the
  * host lock (`hub/session-host.ts`). A create on Codex is refused, a second
  * create answers the open session, and it keeps the hub lens, whose packet is
- * the hub snapshot rebuilt every turn. Its broker carries out nothing
+ * the hub snapshot rebuilt every turn. It drafts and never acts: its broker
+ * offers only `run_command` (a fixed read-only set per project), a
+ * `draft_github_post` naming its project, `save_draft` and `ledger_append`
+ * (`BROKER_SCOPE_TOOLS`), and carries out each only on an approved card
  * ({@link hubSidecarActions}). Beside them, any project server answers
  * `GET /api/sidecar/hub/drawer` (the drawer-only viewer page the hub home
  * docks) and `GET /api/sidecar/hub/lens` (whether it can run the hub lens,
@@ -68,7 +71,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { exec as llmExec, isAuthError, redactSecrets, vendorSessionDriver } from "@n-dx/llm-client";
 import type { SessionTurnStatus } from "@n-dx/llm-client";
 import { SIDECAR_COMMAND, recordDashboardUsage, tokenFields } from "./dashboard-usage.js";
@@ -78,6 +81,8 @@ import type { WebSocketBroadcaster } from "./websocket.js";
 import { errorMessage, errorResponse, jsonResponse, readBody } from "./response-utils.js";
 import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/broker-credential.js";
 import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
+import type { BrokerScope } from "./sidecar/broker-policy.js";
+import { createHubActions } from "./sidecar/hub-actions.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus, type SidecarLedgerTarget } from "./sidecar/broker.js";
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
@@ -272,6 +277,8 @@ export interface HubSidecarRouteOptions {
   actions?: SidecarActions;
   /** The snapshot reads' fetch, for tests. */
   fetch?: typeof fetch;
+  /** Runs the hub's commands and gh posts; defaults to the llm-client `exec`. */
+  exec?: BranchHealthExec;
   /** The built drawer-only viewer page (`dist/viewer/hub-session.html`); null when it was not built. */
   drawerHtml?: () => string | null;
 }
@@ -466,10 +473,16 @@ function defaultRegistryFor(ctx: ServerContext, workspaces: SidecarWorkspaces | 
 }
 
 /** Build a broker for `dir` that announces its cards through `broadcast`; `ledger` defaults to a worktree's. */
-export function createAnnouncingBroker(dir: string, broadcast: WebSocketBroadcaster, ledger?: SidecarLedgerTarget): SidecarBroker {
+export function createAnnouncingBroker(
+  dir: string,
+  broadcast: WebSocketBroadcaster,
+  ledger?: SidecarLedgerTarget,
+  draftsDir?: string,
+): SidecarBroker {
   return new SidecarBroker({
     dir,
     ...(ledger && { ledger }),
+    ...(draftsDir && { draftsDir }),
     onCard: (card: SidecarCard) => {
       const message: SidecarCardMessage = {
         type: "sidecar:card",
@@ -606,25 +619,15 @@ const HUB_LENS_PATH = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.lens}`;
 const HUB_SNAPSHOT = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.snapshot}`;
 const HUB_HANDOFF = `${HUB_SIDECAR_API_PREFIX}${HUB_SESSION_ROUTES.handoff}`;
 const HUB_LENS = "hub";
-const HUB_NO_EFFECT = "a hub session drafts and never acts, so this call does nothing from the hub";
 
 /**
- * What an approved broker call does in the hub session: nothing. Every
- * effect refuses, naming why, and no network read runs without a card.
+ * What an approved broker call does in the hub session: a fixed read-only
+ * command or a GitHub post at one project's repository root, or a saved draft
+ * file. Everything else refuses, and no network read runs without a card
+ * (`sidecar/hub-actions.ts`).
  */
-export function hubSidecarActions(): SidecarActions {
-  const refused = { ok: false, text: `Nothing was done: ${HUB_NO_EFFECT}.` };
-  return {
-    previewWork: async () => HUB_NO_EFFECT,
-    runCommand: () => refused,
-    startWork: async () => refused,
-    reviewChangeSet: async () => HUB_NO_EFFECT,
-    writeChangeSet: async () => refused,
-    readRunPlan: async () => HUB_NO_EFFECT,
-    githubReadsAllowed: () => false,
-    githubRead: async () => refused,
-    postGithub: async () => refused,
-  };
+export function hubSidecarActions(opts: HubSidecarRouteOptions = {}, exec: BranchHealthExec = llmExec): SidecarActions {
+  return createHubActions({ homeDir: opts.homeDir, ...(opts.fetch && { fetch: opts.fetch }), exec });
 }
 
 /** Where the hub session reaches its broker: this host's own loopback port, with the session's broker credential only. */
@@ -641,6 +644,11 @@ export function hubSidecarBrokerEndpoint(ctx: ServerContext, sessionId: string):
  * rather than one session's, written only by the agent's `ledger_append`,
  * which may also record a `decision-needed`.
  */
+/** `<ndx home>/hub/drafts/`: where a relative `save_draft` path lands. */
+export function hubDraftsDir(hubHome: string): string {
+  return join(dirname(hubSidecarDir(hubHome)), "drafts");
+}
+
 export function hubLedgerTarget(homeDir?: string): SidecarLedgerTarget {
   const path = hubLedgerPath(resolveHubHome(homeDir));
   return { path: () => path, types: HUB_LEDGER_TYPES };
@@ -725,7 +733,7 @@ function hubHostState(
             ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
             onTurnSpend: sidecarTurnSpendRecorder(ctx),
           }),
-      broker: opts.brokerFor ? opts.brokerFor(dir) : createAnnouncingBroker(dir, broadcast, hubLedgerTarget(opts.homeDir)),
+      broker: opts.brokerFor ? opts.brokerFor(dir) : createAnnouncingBroker(dir, broadcast, hubLedgerTarget(opts.homeDir), hubDraftsDir(resolveHubHome(opts.homeDir))),
     };
     hubHosts.set(key, state);
   }
@@ -966,7 +974,8 @@ async function handleHubSidecarRoute(
     registry,
     broker,
     broadcast,
-    actions: () => opts.actions ?? hubSidecarActions(),
+    actions: () => opts.actions ?? hubSidecarActions(opts, opts.exec),
+    brokerScope: "hub",
     create: (body) => createHubSession(registry, dir, body),
     lens: HUB_LENS,
   });
@@ -1150,6 +1159,8 @@ interface SessionRouteScope {
   broadcast: WebSocketBroadcaster;
   /** What an approved broker call does. */
   actions: () => SidecarActions;
+  /** Which tools the session's broker offers; a worktree's by default. */
+  brokerScope?: BrokerScope;
   create: (body: Record<string, unknown>) => CreateAnswer;
   /** The one lens this scope's sessions run; a PATCH to another, or to a target, is refused. */
   lens?: string;
@@ -1307,6 +1318,7 @@ async function handleSessionRoutes(
         return refuse(res, 400, `"remember" must be a boolean`);
       }
       if (body.lane !== undefined && typeof body.lane !== "number") return refuse(res, 400, `"lane" must be a number`);
+      if (body.path !== undefined && typeof body.path !== "string") return refuse(res, 400, `"path" must be a string`);
       try {
         const card = broker.decide(id, cardId, {
           approve: body.decision === "approve",
@@ -1314,6 +1326,7 @@ async function handleSessionRoutes(
           ...(body.remember && { remember: true }),
           ...(body.edits !== undefined && { edits: body.edits }),
           ...(body.lane !== undefined && { lane: body.lane }),
+          ...(body.path !== undefined && { path: body.path }),
         });
         jsonResponse(res, 200, { card });
       } catch (err) {
@@ -1329,7 +1342,7 @@ async function handleSessionRoutes(
       if (session.endedAt || !registry.isRunning(id)) {
         return refuse(res, 409, `Sidecar session ${id} has no running turn`);
       }
-      await handleBrokerMcpRequest(req, res, broker, id, scope.actions());
+      await handleBrokerMcpRequest(req, res, broker, id, scope.actions(), scope.brokerScope);
       return true;
   }
   return false;
