@@ -157,7 +157,7 @@ The hub (`packages/web/src/hub/`) gains extension sidecars as a second kind of c
 **Proxy and auth**
 
 - `proxy.ts` forwards `/x/<name>/...` to the sidecar with the prefix stripped, streaming HTTP and piping WebSockets as it does for `/p/<id>/`.
-- The hub checks the per-user token before proxying, so a sidecar authenticates every request with its per-launch secret. It adds `X-Ndx-Base-Path: /x/<name>/` so the app builds correct links, and drops the token cookie and header from the forwarded request. It sends a per-launch `X-Ndx-Sidecar-Secret` on every request, upgrade and health probe; sidecars must reject missing or incorrect secrets. Loopback alone is not authentication. The hub keeps stdin open as a lifetime channel; sidecars must exit when it closes. Running sidecars revalidate approval on requests and periodic sweeps, and stop on disable or removal.
+- The hub checks the per-user token before proxying, so a sidecar authenticates every request with its per-launch secret. It adds `X-Ndx-Base-Path` (`/x/<name>/`, or the keyed `/x/<name>/~<key>/` a browser uses when the token is on, also given at launch as `NDX_BASE_PATH`) so the app builds correct links, and drops the token cookie and header from the forwarded request. It sends a per-launch `X-Ndx-Sidecar-Secret` on every request, upgrade and health probe; sidecars must reject missing or incorrect secrets. Loopback alone is not authentication. The hub keeps stdin open as a lifetime channel; sidecars must exit when it closes. Running sidecars revalidate approval on requests and periodic sweeps, and stop on disable or removal.
 - `/x/` is a reserved prefix: no project id or route may start with it.
 
 **Where extensions show up**

@@ -372,7 +372,8 @@ describe("the fixture extension behind the hub", { timeout: 180_000 }, () => {
     if (!canBindPorts) return;
     const body = await echo("/x/fixture/echo?q=1", { ...auth(), Cookie: `ndx_token=${token}; theme=dark` });
     expect(body.path).toBe("/echo?q=1");
-    expect(body.headers["x-ndx-base-path"]).toBe("/x/fixture/");
+    // The keyed mount a browser reaches it under, since the token is on.
+    expect(body.headers["x-ndx-base-path"]).toMatch(/^[/]x[/]fixture[/]~[A-Za-z0-9_-]{16,}[/]$/);
     expect(body.headers).not.toHaveProperty("x-ndx-token");
     expect(body.headers.cookie).toBe("theme=dark");
     expect(Number(body.port)).not.toBe(port);
@@ -399,7 +400,7 @@ describe("the fixture extension behind the hub", { timeout: 180_000 }, () => {
     expect(answer).toMatch(/^HTTP\/1\.1 101 /);
     const echoed = JSON.parse(answer.slice(answer.indexOf("\r\n\r\n") + 4));
     expect(echoed.path).toBe("/socket");
-    expect(echoed.headers["x-ndx-base-path"]).toBe("/x/fixture/");
+    expect(echoed.headers["x-ndx-base-path"]).toMatch(/^[/]x[/]fixture[/]~[A-Za-z0-9_-]{16,}[/]$/);
     expect(echoed.headers).not.toHaveProperty("x-ndx-token");
   });
 

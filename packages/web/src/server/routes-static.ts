@@ -8,6 +8,7 @@ import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerContext } from "./types.js";
 import { isKnownViewPath, resolveViewAlias, buildValidViews } from "../shared/view-routing.js";
+import { injectSessionScript } from "../shared/index.js";
 
 const LIVE_RELOAD_SNIPPET = `<script>
 (function(){
@@ -15,6 +16,12 @@ const LIVE_RELOAD_SNIPPET = `<script>
   var url = proto + "//" + location.host;
   var reconnectDelay = 1000;
   function connect() {
+    // The handshake needs a ticket on a token-protected server (see
+    // shared/browser-session.ts); without the helper the plain URL is used.
+    var withTicket = window.ndxAuth ? window.ndxAuth.socketUrl(url) : Promise.resolve(url);
+    withTicket.then(open);
+  }
+  function open(url) {
     var ws = new WebSocket(url);
     ws.onmessage = function(e) {
       try {
@@ -72,14 +79,17 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
   const resolvedViewerDir = resolveDirRealpath(viewerDir);
   const resolvedPackageRoot = resolveDirRealpath(packageRoot);
 
-  let cachedViewerHtml: string | null = dev ? null : readFileSync(viewerPath, "utf-8");
+  // Every document this server sends signs itself in first: the session
+  // script goes at the top of <head>, ahead of the bundle (see
+  // shared/browser-session.ts).
+  let cachedViewerHtml: string | null = dev ? null : injectSessionScript(readFileSync(viewerPath, "utf-8"));
 
   const vp = viewerPath;
   function getViewerHtml(): string {
     if (dev) {
       let html = readFileSync(vp, "utf-8");
       html = html.replace("</body>", `${LIVE_RELOAD_SNIPPET}</body>`);
-      return html;
+      return injectSessionScript(html);
     }
     return cachedViewerHtml!;
   }
@@ -97,7 +107,7 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     }
   }
 
-  let cachedLandingHtml: string | null = landingPath && !dev ? readFileSync(landingPath, "utf-8") : null;
+  let cachedLandingHtml: string | null = landingPath && !dev ? injectSessionScript(readFileSync(landingPath, "utf-8")) : null;
 
   const lp = landingPath;
   function getLandingHtml(): string | null {
@@ -105,7 +115,7 @@ export function resolveStaticAssets(dev: boolean): StaticAssets | null {
     if (dev) {
       let html = readFileSync(lp, "utf-8");
       html = html.replace("</body>", `${LIVE_RELOAD_SNIPPET}</body>`);
-      return html;
+      return injectSessionScript(html);
     }
     return cachedLandingHtml;
   }
@@ -145,9 +155,8 @@ export function handleStaticRoute(
 ): boolean {
   const url = req.url || "/";
   // Every match below is on the pathname: a query string must not turn a
-  // known path into a 404. `/?ndx_token=…` is the URL `ndx start` prints, and
-  // a browser that already holds the cookie is let through the token gate
-  // with the parameter still attached.
+  // known path into a 404. `/?ndx_nonce=…` is the URL `ndx start` prints; the
+  // page's session script exchanges the nonce and drops it from the address.
   const [pathOnly, queryString] = url.split("?");
 
   // Root: dashboard if initialized, landing page otherwise

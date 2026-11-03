@@ -63,6 +63,29 @@ describe("planReleaseStamp", () => {
     expect(tree).toEqual(before);
   });
 
+  it("under applyOn release applies a nested change before its container, leaving the container's amendment on the product layer", () => {
+    const OUTER = "A shopper can pay by card or wallet.";
+    const INNER = "A shopper can pay by card or Apple Pay.";
+    const amend = (proposed: string) => [{ delta: "modified", target: "cap", proposed, summary: proposed }];
+    const tree = {
+      product: [node("area", { type: "area", children: [node("cap", { type: "capability", statement: "A shopper can pay by card." })] })],
+      changes: [
+        node("outer", {
+          type: "change",
+          status: "completed",
+          amends: amend(OUTER),
+          children: [node("inner", { type: "change", status: "completed", amends: amend(INNER) })],
+        }),
+      ],
+    } as unknown as V2Tree;
+
+    const plan = planReleaseStamp(tree, inputs({ applyOn: "release", landings: { outer: landed("a"), inner: landed("b") } }));
+
+    expect(plan.report.applied).toEqual(["inner", "outer"]);
+    expect(plan.tree.product[0].children?.[0].statement).toBe(OUTER);
+    expect(plan.report.stamped.sort()).toEqual(["inner", "outer"]);
+  });
+
   it("reports no change when nothing is stamped", () => {
     const tree = { product: [], changes: [node("stamped", { type: "change", status: "completed", shippedIn: "1.0.0" })] } as unknown as V2Tree;
     const plan = planReleaseStamp(tree, inputs({ landings: { stamped: landed("c") } }));

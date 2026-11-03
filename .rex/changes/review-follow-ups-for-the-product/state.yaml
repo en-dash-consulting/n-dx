@@ -111,13 +111,23 @@ items:
     lastModified: "2026-10-07T21:53:42.383Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "648d1971-3e33-41e6-a94a-12c9cc984ff9":
+    status: "completed"
+    startedAt: "2026-10-28T01:31:14.210Z"
+    completedAt: "2026-10-28T01:31:14.210Z"
+    endedAt: "2026-10-28T01:31:14.210Z"
+    activeIntervals: [{"end":"2026-10-28T01:31:14.210Z","start":"2026-10-28T01:31:14.210Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-09T14:52:34.967Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-28T01:31:14.210Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "6d47c2af-7982-4e36-82c6-15c7e2b2bacf":
+    status: "completed"
+    startedAt: "2026-10-28T00:01:32.150Z"
+    completedAt: "2026-10-28T00:01:32.150Z"
+    endedAt: "2026-10-28T00:01:32.150Z"
+    activeIntervals: [{"end":"2026-10-28T00:01:32.150Z","start":"2026-10-28T00:01:32.150Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-16T22:02:53.965Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T00:01:32.150Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "8405e8d9-ebb3-450a-96da-d5938efd8456":
     status: "completed"
     startedAt: "2026-10-14T14:41:24.608Z"
@@ -139,9 +149,14 @@ items:
     lastModified: "2026-10-16T20:28:42.829Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "8729e623-60fc-4a33-b433-6514a50885c0":
+    status: "completed"
+    startedAt: "2026-10-28T00:07:38.050Z"
+    completedAt: "2026-10-28T00:07:38.050Z"
+    endedAt: "2026-10-28T00:07:38.050Z"
+    activeIntervals: [{"end":"2026-10-28T00:07:38.050Z","start":"2026-10-28T00:07:38.050Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-15T06:43:59.867Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T00:07:38.050Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "92f9ca10-b796-4e0c-9ace-890b766afcf1":
     status: "completed"
     startedAt: "2026-10-16T20:46:58.782Z"
@@ -199,17 +214,32 @@ items:
     lastModified: "2026-10-09T14:52:34.967Z"
     lastModifiedBy: "Sterling H <sterling.h@endash.us>"
   "b1f05a4d-4947-4a7c-b2b5-e3bbed289b76":
+    status: "completed"
+    startedAt: "2026-10-28T01:41:55.788Z"
+    completedAt: "2026-10-28T01:41:55.788Z"
+    endedAt: "2026-10-28T01:41:55.788Z"
+    activeIntervals: [{"end":"2026-10-28T01:41:55.788Z","start":"2026-10-28T01:41:55.788Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-15T05:20:30.892Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T01:41:55.788Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "c0463256-664c-4757-aa13-b2de127f51f3":
+    status: "completed"
+    startedAt: "2026-10-28T01:23:38.856Z"
+    completedAt: "2026-10-28T01:23:38.856Z"
+    endedAt: "2026-10-28T01:23:38.856Z"
+    activeIntervals: [{"end":"2026-10-28T01:23:38.856Z","start":"2026-10-28T01:23:38.856Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-16T20:46:42.138Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T01:23:38.856Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "c75b557e-f70c-4fe3-b5ad-d85516be4dbd":
+    status: "completed"
+    startedAt: "2026-10-28T01:35:45.338Z"
+    completedAt: "2026-10-28T01:35:45.338Z"
+    endedAt: "2026-10-28T01:35:45.338Z"
+    activeIntervals: [{"end":"2026-10-28T01:35:45.338Z","start":"2026-10-28T01:35:45.338Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-11T21:01:40.896Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-28T01:35:45.338Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "c7d2cf2c-9333-4a42-a0cc-201338744f93":
     status: "completed"
     startedAt: "2026-10-07T19:42:17.403Z"
@@ -245,9 +275,14 @@ items:
     lastModified: "2026-10-07T19:56:35.844Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d9c3f156-0101-4845-bfd5-630b7689f4b2":
+    status: "completed"
+    startedAt: "2026-10-28T00:00:48.954Z"
+    completedAt: "2026-10-28T00:00:48.954Z"
+    endedAt: "2026-10-28T00:00:48.954Z"
+    activeIntervals: [{"end":"2026-10-28T00:00:48.954Z","start":"2026-10-28T00:00:48.954Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-13T19:52:28.420Z"
-    lastModifiedBy: "Sterling H <sterling.h@endash.us>"
+    lastModified: "2026-10-28T00:00:48.954Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "db4f7321-0e69-4105-b159-f9f0e862df8b":
     status: "completed"
     startedAt: "2026-10-10T05:54:41.313Z"
@@ -290,9 +325,14 @@ items:
     lastModified: "2026-10-07T21:53:46.932Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f21cf509-f646-454c-bb66-4b80ac6c9bdc":
+    status: "completed"
+    startedAt: "2026-10-28T00:08:31.551Z"
+    completedAt: "2026-10-28T00:08:31.551Z"
+    endedAt: "2026-10-28T00:08:31.551Z"
+    activeIntervals: [{"end":"2026-10-28T00:08:31.551Z","start":"2026-10-28T00:08:31.551Z"}]
     assignee: "Ryan Keith <ryan.k@endash.us>"
-    lastModified: "2026-10-12T09:52:46.126Z"
-    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+    lastModified: "2026-10-28T00:08:31.551Z"
+    lastModifiedBy: "sterling.h@endash.us <sterling.h@endash.us>"
   "f7af456c-cc9d-4464-ac95-cb04572405db":
     assignee: "Ryan Keith <ryan.k@endash.us>"
     lastModified: "2026-10-13T19:52:30.050Z"

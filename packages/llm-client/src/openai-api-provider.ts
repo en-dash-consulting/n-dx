@@ -29,6 +29,7 @@ import type { CompletionRequest, CompletionResult, TokenUsage } from "./types.js
 import { ClaudeClientError } from "./types.js";
 import { LLM_VENDOR, type LLMProvider, type ProviderInfo, type StreamChunk } from "./provider-interface.js";
 import type { CodexConfig } from "./llm-types.js";
+import { resolveApiEndpoint } from "./config.js";
 
 const RETRY_STATUS_CODES = new Set([429, 500, 502, 503]);
 const DEFAULT_MAX_RETRIES = 3;
@@ -108,7 +109,7 @@ function classifyAndThrow(status: number, message: string): never {
 
 /** Build the base URL for OpenAI API requests. */
 function resolveBaseUrl(codexConfig?: CodexConfig): string {
-  return codexConfig?.api_endpoint ?? DEFAULT_BASE_URL;
+  return resolveApiEndpoint(codexConfig, DEFAULT_BASE_URL);
 }
 
 /** Build common headers for OpenAI API requests. */

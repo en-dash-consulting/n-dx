@@ -31,12 +31,13 @@
  * instead (elapsed time, last output line, phase, iteration count).
  */
 
-import { getWebSocketUrl, getWorkspaceKey } from "../base-path.js";
+import { getWorkspaceKey } from "../base-path.js";
 import { useEffect, useRef, useState, useCallback, useMemo } from "preact/hooks";
 import { usePolling } from "../views/use-polling.js";
 import { createWSPipeline } from "./use-gateway.js";
 import { useCliName, resolveCliLabel } from "./use-project-metadata.js";
 import type { ViewId } from "../types.js";
+import { openWebSocket } from "../session.js";
 
 export type ActiveOperationKind =
   | "hench" | "sv-analyze" | "self-heal" | "ci" | "reshape" | "refresh" | "analyze" | "recommend";
@@ -346,7 +347,7 @@ export function useActiveOperations(): JobTray {
     });
 
     try {
-      ws = new WebSocket(getWebSocketUrl());
+      ws = openWebSocket();
       ws.onmessage = (event) => {
         if (!mountedRef.current) return;
         try {

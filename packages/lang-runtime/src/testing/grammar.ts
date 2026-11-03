@@ -29,7 +29,7 @@ export function skipUnlessGrammar(
   env: NodeJS.ProcessEnv = process.env,
 ): void {
   if (existsSync(wasmPath)) return;
-  const message = `${wasmPath} is not built — run \`pnpm -r run build:grammars\` (each package's build-grammars.mjs script)`;
+  const message = `${wasmPath} is not built — run \`pnpm -r --workspace-concurrency=1 run build:grammars\` (each package's build-grammars.mjs script; one pack at a time, as CI does)`;
   if (grammarsRequired(env)) throw new Error(`${message} (${REQUIRE_GRAMMARS_ENV}=1 forbids skipping)`);
   ctx.skip(message);
 }

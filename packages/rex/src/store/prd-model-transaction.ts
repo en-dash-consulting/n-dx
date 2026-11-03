@@ -38,6 +38,14 @@ export interface PrdModelEdit<T> {
   result: T;
   /** Ids of nodes the mutation deliberately removed; see `WritePrdModelOptions.removed`. */
   removed?: ReadonlySet<string>;
+  /**
+   * Ids of nodes whose existing `lastModifiedBy` survives the stamp: a node
+   * the write changed only as a cascade (a change auto-completed with its
+   * last task) keeps its author, as v1's `WriteOptions.preserveModifiedBy`
+   * (GitHub #368). Its `lastModified` still moves; a node with no author yet
+   * gets the actor.
+   */
+  preserveAuthorFor?: ReadonlySet<string>;
 }
 
 export interface PrdModelTransactionOptions {
@@ -79,7 +87,12 @@ export async function withPrdModelTransaction<T>(
       // Signatured before `mutate` runs: a mutation may edit the loaded tree in place.
       const before = signTree(model.tree);
       const edit = await mutate(model);
-      stampChangedNodes(edit.tree, before, { lastModified: (options.now?.() ?? new Date()).toISOString(), lastModifiedBy: actor });
+      stampChangedNodes(
+        edit.tree,
+        before,
+        { lastModified: (options.now?.() ?? new Date()).toISOString(), lastModifiedBy: actor },
+        edit.preserveAuthorFor,
+      );
       const written = await writePrdModel(rexDir, { ...model, tree: edit.tree }, { removed: edit.removed, now: options.now });
       return { result: edit.result, written };
     },
@@ -126,13 +139,21 @@ function signTree(tree: V2Tree): Map<string, string> {
  * `stampChangedItems`, with the same rules. A node unchanged is left alone, so
  * a write that changes nothing stamps nothing. A new node gets the timestamp
  * when it has none, and the author only when it brought none: an import or a
- * caller that set them keeps its provenance.
+ * caller that set them keeps its provenance. A changed node named in
+ * `preserveAuthorFor` takes the timestamp but keeps the author it has.
  */
-function stampChangedNodes(tree: V2Tree, before: ReadonlyMap<string, string>, stamp: { lastModified: string; lastModifiedBy: string }): void {
+function stampChangedNodes(
+  tree: V2Tree,
+  before: ReadonlyMap<string, string>,
+  stamp: { lastModified: string; lastModifiedBy: string },
+  preserveAuthorFor?: ReadonlySet<string>,
+): void {
   for (const { node, parentId } of walkNodes(tree)) {
     const previous = before.get(node.id);
     if (previous !== undefined) {
-      if (previous !== nodeSignature(node, parentId)) Object.assign(node, stamp);
+      if (previous === nodeSignature(node, parentId)) continue;
+      node.lastModified = stamp.lastModified;
+      if (!(preserveAuthorFor?.has(node.id) && node.lastModifiedBy)) node.lastModifiedBy = stamp.lastModifiedBy;
       continue;
     }
     if (node.lastModified) continue;

@@ -40,6 +40,16 @@ import { readSelfHealAutoConfirm } from "../../packages/core/self-heal-confirm.j
 import { renderAgentsMd } from "../../packages/core/assistant-assets.js";
 import { readPidFile, removePortFile } from "../../packages/core/web.js";
 
+const { recordRepoTrust } = await import("../../packages/llm-client/dist/public.js");
+
+/**
+ * Each fixture's tracked config names a vendor CLI binary and its rex config
+ * a test command, both of which core reads only from a trusted checkout; the
+ * trust store lives here rather than in the user's real ndx home.
+ */
+let ndxHome;
+const trust = () => ({ trust: { ndxHome } });
+
 /**
  * Where each fixture keeps the four things these tests touch.
  *
@@ -100,12 +110,15 @@ beforeAll(() => {
     write(root, at.webPid, JSON.stringify({ pid: 4242, port: 3117 }));
     write(root, at.webPort, "3117\n");
   }
+  ndxHome = mkdtempSync(join(tmpdir(), "ndx-core-routing-home-"));
+  for (const root of Object.values(roots)) recordRepoTrust(root, { ndxHome });
 });
 
 afterAll(() => {
   for (const root of Object.values(roots)) {
     rmSync(root, { recursive: true, force: true });
   }
+  rmSync(ndxHome, { recursive: true, force: true });
 });
 
 /** Runs `assert` once per layout, with that layout's populated root. */
@@ -144,10 +157,10 @@ describe("sourcevision reads", () => {
 });
 
 describe("rex reads", () => {
-  it("find the configured test command under either layout", () => {
-    forEachLayout((root, name) => {
-      expect(readRexTestCommand(root), name).toBe(`test-${name}`);
-    });
+  it("find the configured test command under either layout", async () => {
+    for (const name of Object.keys(LAYOUTS)) {
+      expect(await readRexTestCommand(roots[name], trust()), name).toBe(`test-${name}`);
+    }
   });
 });
 

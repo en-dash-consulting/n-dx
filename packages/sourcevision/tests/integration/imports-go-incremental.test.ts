@@ -100,7 +100,7 @@ describe("Go pack in the imports phase", () => {
     expect(imports.external).toEqual(EXTERNAL);
   });
 
-  it("keeps the imports of a Go file over the pack's size limit through the regex parser", async (ctx) => {
+  it("keeps the imports of a Go file over the pack's size limit from its import prefix, naming the skipped structure", async (ctx) => {
     await skipUnlessPackRuns(ctx, "go");
     // Generated code (zz_generated.openapi.go, .pb.go, bindata) passes the runner's 1 MB limit.
     const padding = `// ${"x".repeat(1024 * 1024)}\n`;
@@ -111,7 +111,9 @@ describe("Go pack in the imports phase", () => {
     await mkdir(join(dir, "other"));
     await writeFile(join(dir, "other", "other.go"), "package other\n");
     const { imports, messages } = await analyze();
-    expect(messages).toEqual([]);
+    // The pack parses the import prefix and resolves it, rather than leaving the
+    // file to the regex parser, and names the structure it skipped.
+    expect(messages).toEqual(["util/zz_generated.go exceeds the parser size limit; imports read from its declaration prefix, structure skipped"]);
     expect(edgeKeys(imports)).toEqual([...EDGES, "util/zz_generated.go -> other [*]"]);
     expect(imports.external.find((e) => e.package === "stdlib:strings")).toEqual({
       package: "stdlib:strings",

@@ -1,14 +1,6 @@
-/* Status dock — one bottom-right row for the floating status pills:
- * sessions, uncommitted files, running operations, refresh queue.
- *
- * Each pill used to be fixed at its own hard-coded offset, so they collided
- * whenever one was absent, wrapped or opened. In one flex row they are laid
- * out by flow, and each pill's popover opens upward from that pill, so an
- * open popover covers page content, never another pill.
- *
- * Bottom-right because .sidebar is a full-height normal-flow column: a fixed
- * bottom-left element would sit on its nav items and take their clicks.
- */
+/* All persistent pills and transient notices share this fixed anchor.
+ * Children take space in flow, including expanded panels, so no notice
+ * covers another one. Only the stack is fixed to the viewport. */
 
 .status-dock {
   position: fixed;
@@ -16,12 +8,14 @@
   bottom: calc(1rem + var(--bottombar-h, 0px));
   z-index: var(--z-tray);
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap-reverse;
+  flex-direction: column-reverse;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   align-items: flex-end;
   gap: 0.5rem;
   max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - var(--bottombar-h, 0px) - 2rem);
+  overflow-y: auto;
   /* The row is wider than its pills; let clicks through the gaps. */
   pointer-events: none;
 }
@@ -34,9 +28,8 @@
 .status-dock .active-operations-list,
 .status-dock .git-status-panel,
 .status-dock .sessions-list {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  right: 0;
+  position: static;
+  margin-bottom: 0.5rem;
   max-width: calc(100vw - 2rem);
 }
 
@@ -49,3 +42,10 @@
   box-sizing: border-box;
   white-space: nowrap;
 }
+
+/* Panels take their own space in the stack when open, leaving every other
+   notice visible and clickable. */
+.status-dock .active-operations-tray,
+.status-dock .git-status-banner,
+.status-dock .sessions-panel { display: flex; flex-direction: column-reverse; align-items: flex-end; max-width: 100%; }
+.status-dock > * { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }

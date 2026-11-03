@@ -343,6 +343,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
         version: 1.32.1(zod@4.6.7)
+      '@n-dx/lang-kit':
+        specifier: workspace:*
+        version: link:../lang-kit
       '@n-dx/llm-client':
         specifier: workspace:*
         version: link:../llm-client

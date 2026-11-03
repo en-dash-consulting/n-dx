@@ -149,7 +149,8 @@ function readUrlConf(web: WebFile, selves: readonly Capture[], splats: readonly 
   let urlpatterns: Capture[] | undefined;
   const lists = new Map<string, Capture>();
   const routers = new Set<string>();
-  for (const { target, value, augmented } of web.assignments) {
+  for (const { target, value, augmented, nested } of web.assignments) {
+    if (nested) continue;
     if (target === URLPATTERNS) {
       const earlier = urlpatterns ?? [];
       const read = patternLists(web, value).map((list) => spliceSelf(web, list, splats, earlier));
