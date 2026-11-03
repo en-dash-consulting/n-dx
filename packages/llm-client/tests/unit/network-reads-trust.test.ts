@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { collectRepoExecutionConfig, evaluateRepoTrust, recordRepoTrust, repoTrustStateOf } from "../../src/repo-trust.js";
+import { collectRepoExecutionConfig, evaluateRepoTrust, isRepoRestricted, recordRepoTrust } from "../../src/repo-trust.js";
 
 // Pass-through readdirSync spy: the inventory walk is the only directory
-// listing under .rex/ and .hench/ that a trust evaluation makes.
+// listing under .hench/ that a trust evaluation makes. (.rex/ is listed by
+// both, since saved run blocks are part of the digest.)
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
   return { ...actual, readdirSync: vi.fn(actual.readdirSync) };
@@ -55,29 +56,32 @@ describe("web.sidecarGithubReads in the project config", () => {
     expect(collectRepoExecutionConfig(repo).digest).not.toBe(before);
   });
 
-  it("reports the same state through repoTrustStateOf as the full evaluation", () => {
+  it("restricts through isRepoRestricted exactly when the full evaluation does", () => {
     writeProject({ web: { sidecarGithubReads: false } });
-    expect(repoTrustStateOf(repo)).toBe("baseline");
+    expect(isRepoRestricted(repo)).toBe(false);
+    expect(evaluateRepoTrust(repo).restricted).toBe(false);
     writeProject({ web: { sidecarGithubReads: true } });
-    expect(repoTrustStateOf(repo)).toBe("untrusted");
+    expect(isRepoRestricted(repo)).toBe(true);
+    expect(evaluateRepoTrust(repo).restricted).toBe(true);
     recordRepoTrust(repo);
-    expect(repoTrustStateOf(repo)).toBe("trusted");
+    expect(isRepoRestricted(repo)).toBe(false);
+    expect(evaluateRepoTrust(repo).restricted).toBe(false);
   });
 
-  it("lists no PRD or run directory in repoTrustStateOf, unlike the full evaluation", () => {
+  it("lists no run directory in isRepoRestricted, unlike the full evaluation", () => {
     mkdirSync(join(repo, ".rex", "changes", "a-change"), { recursive: true });
     mkdirSync(join(repo, ".hench", "runs"), { recursive: true });
     writeProject({ web: { sidecarGithubReads: true } });
     const listed = () => vi.mocked(readdirSync).mock.calls
       .map(([path]) => String(path))
-      .filter((path) => path.startsWith(join(repo, ".rex")) || path.startsWith(join(repo, ".hench")));
+      .filter((path) => path.startsWith(join(repo, ".hench")));
 
     vi.mocked(readdirSync).mockClear();
     evaluateRepoTrust(repo);
     expect(listed()).not.toEqual([]);
 
     vi.mocked(readdirSync).mockClear();
-    repoTrustStateOf(repo);
+    isRepoRestricted(repo);
     expect(listed()).toEqual([]);
   });
 

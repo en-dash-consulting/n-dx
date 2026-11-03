@@ -475,8 +475,6 @@ export {
   recordRepoTrust,
   clearRepoTrust,
   evaluateRepoTrust,
-  repoTrustStateOf,
-  isRestrictedState,
   isRepoRestricted,
   scanFrontMatterRunBlock,
   formatRepoTrustReport,
