@@ -192,6 +192,35 @@ describe("status", () => {
   });
 });
 
+describe("test typesafe", () => {
+  const withFetch = (status: number) => (argv: string[]) =>
+    runCredentialsCli(argv, {
+      readStdin: async () => null,
+      stdout: (t) => { out += t; },
+      stderr: (t) => { err += t; },
+      store: { ndxHome: home, env: {} },
+      fetchImpl: (async () => new Response("{}", { status })) as unknown as typeof fetch,
+    });
+
+  it.each([
+    [200, 0, "ok"],
+    [401, 1, "rejected"],
+    [503, 1, "unreachable"],
+  ])("HTTP %i exits %i and reports %s with the fingerprint, never the key", async (status, code, word) => {
+    await run(["set", "typesafe"], VALUE);
+    out = "";
+    expect(await withFetch(status)(["test", "typesafe"])).toBe(code);
+    expect(out + err).toContain(`typesafe: ${word} (fingerprint ${credentialFingerprint(VALUE)})`);
+    expect(out + err).not.toContain(VALUE);
+  });
+
+  it("reports no key without a request, and refuses a vendor name", async () => {
+    expect(await withFetch(200)(["test", "typesafe"])).toBe(1);
+    expect(err).toContain("no key");
+    expect(await withFetch(200)(["test", "claude"])).toBe(2);
+  });
+});
+
 describe("usage", () => {
   it("exits 2 on an unknown command or none", async () => {
     expect(await run(["get", "typesafe"])).toBe(2);

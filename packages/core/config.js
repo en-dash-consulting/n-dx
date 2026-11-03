@@ -1467,6 +1467,11 @@ const LLM_VALIDATORS = {
     }
   },
   autoFailover: validateAutoFailover,
+  "typesafe.required": (v) => {
+    if (v !== true && v !== false && v !== "true" && v !== "false") {
+      throw new Error(`Invalid llm.typesafe.required "${v}". Expected true or false.`);
+    }
+  },
   "escalation.enabled": (v) => {
     if (v !== true && v !== false && v !== "true" && v !== "false") {
       throw new Error(
@@ -2481,6 +2486,10 @@ LLM vendor settings (.n-dx.json / .n-dx.local.json — preferred for multi-vendo
   llm.local.profiles       array     Saved local-server connection profiles, managed entirely
                                     by the web dashboard's LLM Provider page — not read by
                                     hench/rex/any CLI at runtime. Not meant to be hand-edited.
+  llm.typesafe.required    boolean   Warn once per process when a Jev-routed call falls back
+                                    to a text model because no TypeSafe key is available
+                                    (default: unset, silent). Store a key with
+                                    ndx config credentials.typesafe
   llm.autoFailover         boolean   Enable automatic model/vendor failover on errors (default: false)
                                     When true, hench retries failed runs on fallback models
                                     before surfacing the original error. Disabled by default
@@ -2733,6 +2742,8 @@ Options:
   --json                   Output as JSON
   --stdin                  With credentials.<name>: read the value from stdin
   --unset                  With credentials.<name>: remove the stored value
+  --test                   With credentials.typesafe: make one request and report ok,
+                           rejected or unreachable with the key's fingerprint
   --helper "<cmd>"         With credentials.<name>: store a helper command (above)
   --check                  With credentials: run each helper to fingerprint its value
   --import                 With credentials: move API keys from .n-dx.local.json to the
@@ -4288,6 +4299,16 @@ async function handleCredentials(positional, flags) {
     return fail(
       `Unknown credential "${name}". Known: ${[...CREDENTIAL_NAMES].map((n) => `credentials.${n}`).join(", ")}.`,
     );
+  }
+
+  if (flags.test === "true") {
+    if (name !== "typesafe") return usageFail(`--test checks the TypeSafe key only: ndx config credentials.typesafe --test`);
+    const result = spawnCredentialsCli(["test", name]);
+    // The spawned CLI reports ok on stdout and every failure on stderr.
+    const text = (result.stdout || result.stderr).trim();
+    if (result.code !== 0) return fail(text);
+    console.log(text);
+    return;
   }
 
   if (flags.unset === "true") {

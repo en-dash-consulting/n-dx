@@ -293,6 +293,8 @@ export function parseLLMConfig(root: Record<string, unknown>): LLMConfig {
   if (effort) config.effort = effort;
   const escalation = extractEscalation(llm?.escalation);
   if (escalation) config.escalation = escalation;
+  const typesafe = asRecord(llm?.typesafe);
+  if (typeof typesafe?.required === "boolean") config.typesafe = { required: typesafe.required };
   return config;
 }
 

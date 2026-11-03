@@ -37,6 +37,7 @@
 import { spawn, execFileSync } from "child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from "fs";
 import { createRequire } from "module";
+import { execFileSyncCli } from "./win-spawn.js";
 import { basename, dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createInterface } from "readline/promises";
@@ -2466,12 +2467,35 @@ function printWorkIdentity(dir) {
   }
 }
 
+/**
+ * The `jev:` line of `ndx status`: whether TypeSafe's key resolves and from
+ * where (env, file or helper), never the value. Asks llm-client's credential
+ * CLI, which owns the store; a helper is reported, not run.
+ *
+ * @returns {string}
+ */
+function formatJevLine() {
+  const unavailable = "jev: unavailable (store a key: ndx config credentials.typesafe)";
+  try {
+    const script = _require.resolve("@n-dx/llm-client/dist/cli/credentials.js");
+    const out = execFileSyncCli(process.execPath, [script, "status", "--json"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const typesafe = JSON.parse(out).find((s) => s.name === "typesafe");
+    return typesafe?.source ? `jev: available (${typesafe.source})` : unavailable;
+  } catch {
+    return "jev: unknown (could not read the credential store; ndx config credentials)";
+  }
+}
+
 async function handleStatus(rest) {
   const dir = resolveDir(rest);
   requireInit(dir, ["rex"]);
   const flags = extractFlags(rest);
   await runOrDie(tools.rex, ["status", ...flags, dir]);
   if (!flags.some((f) => f.startsWith("--format="))) {
+    console.log(`\n${formatJevLine()}`);
     const narration = formatNarrationStatus(readNarrationState(dir));
     if (narration) console.log(`\n${narration}`);
   }

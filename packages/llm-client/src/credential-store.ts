@@ -579,6 +579,19 @@ export function credentialStatus(name: string, options: CredentialStatusOptions 
     : { ...base, source: null, fingerprint: null, helperResult: "failed" };
 }
 
+/** Whether Jev's key resolves and from where; never the value. */
+export interface JevAvailability {
+  available: boolean;
+  /** Where the key comes from; null when unavailable. A helper is not run. */
+  source: CredentialSource | null;
+}
+
+/** {@link credentialStatus} for the TypeSafe key, reduced to what a status line shows. */
+export function jevAvailability(options: CredentialStoreOptions = {}): JevAvailability {
+  const { source } = credentialStatus(TYPESAFE_CREDENTIAL, options);
+  return { available: source !== null, source };
+}
+
 // ── Agent denials ────────────────────────────────────────────────────────────
 
 /** What an agent must not reach: the store file and the commands that read a credential. */

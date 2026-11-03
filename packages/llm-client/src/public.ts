@@ -508,6 +508,7 @@ export {
   setHelperCredential,
   unsetCredential,
   credentialStatus,
+  jevAvailability,
   storedCredential,
   hasStoredCredential,
   agentCredentialDenials,
@@ -519,6 +520,7 @@ export type {
   CredentialStatusOptions,
   CredentialStoreOptions,
   CredentialWriteOptions,
+  JevAvailability,
   ResolvedCredential,
 } from "./credential-store.js";
 
@@ -786,6 +788,7 @@ export type {
 // import each other; per-call accounting is inverted through setJevObserver.
 export {
   askJev,
+  probeJevKey,
   choice,
   noul,
   score,
@@ -800,6 +803,7 @@ export type {
   JevAnswer,
   JevCallRecord,
   JevObserver,
+  JevProbeResult,
   JevQuestion,
   JevRequest,
   JevResponse,

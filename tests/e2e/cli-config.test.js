@@ -1790,6 +1790,19 @@ describe("n-dx config", () => {
     });
   });
 
+  describe("llm.typesafe.required config", () => {
+    it("is a validated boolean key written to .n-dx.json", async () => {
+      const out = run(["llm.typesafe.required", "true", tmpDir]);
+      expect(out).toContain("llm.typesafe.required = true");
+      const config = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(config.llm.typesafe.required).toBe(true);
+    });
+
+    it("rejects a non-boolean value", () => {
+      expect(runFail(["llm.typesafe.required", "yes", tmpDir])).toContain("Expected true or false");
+    });
+  });
+
   // ── LLM autoFailover config ────────────────────────────────────────────────
 
   describe("llm.autoFailover config", () => {

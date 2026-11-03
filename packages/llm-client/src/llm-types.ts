@@ -281,6 +281,12 @@ export interface LLMConfig {
    * is implemented by the callers that validate light-tier output.
    */
   escalation?: { enabled?: boolean; maxSteps?: number };
+  /**
+   * TypeSafe (Jev) policy (`llm.typesafe.*`). `required: true` makes a
+   * Jev-routed call that falls back to a text model warn once per process;
+   * unset, the fallback is silent.
+   */
+  typesafe?: { required?: boolean };
 }
 
 /** Alias that preserves migration ergonomics for downstream packages. */

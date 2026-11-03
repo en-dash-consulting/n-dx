@@ -7,6 +7,8 @@
  *   set <name>         value read from stdin, never from argv
  *   set-helper <name>  a helper command's argv, as a JSON string array on stdin
  *   unset <name>
+ *   test typesafe      one request with the resolved key: ok, rejected or
+ *                      unreachable, with the fingerprint; never the key
  *   status [--json] [--project=<dir>] [--check]
  *                      source, backend and fingerprint; never the value. With
  *                      a project, each vendor's `llm.<vendor>.auth` mode and
@@ -34,6 +36,7 @@ import {
   type CredentialStatus,
   type CredentialWriteOptions,
 } from "../credential-store.js";
+import { probeJevKey } from "../jev-client.js";
 import { loadLLMConfig } from "../llm-config.js";
 import type { LLMConfig } from "../llm-types.js";
 import {
@@ -56,6 +59,7 @@ const USAGE = [
   "  set-helper <name> store a helper command: its argv as a JSON string",
   "                    array on stdin, run without a shell when needed",
   "  unset <name>      remove a stored credential",
+  "  test typesafe     make one request to prove the key (never prints it)",
   "  status [--json] [--project=<dir>] [--check]",
   "                    show where each credential resolves from; with a",
   "                    project, each vendor's auth mode and the key it uses;",
@@ -71,6 +75,8 @@ export interface CredentialsCliIo {
   stderr: (text: string) => void;
   /** Store options (tests point these at a temp ndx home). */
   store?: CredentialWriteOptions;
+  /** The request `test` makes (tests inject a mock; no suite reaches TypeSafe). */
+  fetchImpl?: typeof fetch;
 }
 
 /** One vendor's auth line for `status --project`, never the value. */
@@ -179,6 +185,30 @@ export async function runCredentialsCli(argv: readonly string[], io: Credentials
         const removed = unsetCredential(name!, store);
         io.stdout(removed ? `Removed ${name}.\n` : `${name} was not stored.\n`);
         return 0;
+      }
+      case "test": {
+        const [name, ...extra] = rest;
+        const nameError = checkName(name);
+        if (nameError) return usage(nameError);
+        if (name !== "typesafe") return usage(`test supports typesafe only; ${name} has no key check.`);
+        if (extra.length > 0) return usage("test takes one name.");
+        const probe = await probeJevKey({ ndxHome: store.ndxHome, ...(io.fetchImpl ? { fetchImpl: io.fetchImpl } : {}) });
+        const print = (text: string) => (probe.outcome === "ok" ? io.stdout(text) : io.stderr(text));
+        const fp = probe.fingerprint ? ` (fingerprint ${probe.fingerprint})` : "";
+        switch (probe.outcome) {
+          case "ok":
+            print(`typesafe: ok${fp}\n`);
+            return 0;
+          case "rejected":
+            print(`typesafe: rejected${fp}: TypeSafe refused the key (HTTP ${probe.status}). Store a valid one: ndx config credentials.typesafe\n`);
+            return 1;
+          case "unreachable":
+            print(`typesafe: unreachable${fp}: ${probe.detail ?? "no answer"}. The key was not judged.\n`);
+            return 1;
+          default:
+            print("typesafe: no key. Store one: ndx config credentials.typesafe\n");
+            return 1;
+        }
       }
       case "status": {
         const json = rest.includes("--json");

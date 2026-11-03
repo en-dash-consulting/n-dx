@@ -28,7 +28,7 @@
  * @module llm-client/jev-client
  */
 
-import { resolveCredential, TYPESAFE_API_KEY_ENV, TYPESAFE_CREDENTIAL } from "./credential-store.js";
+import { credentialFingerprint, resolveCredential, TYPESAFE_API_KEY_ENV, TYPESAFE_CREDENTIAL } from "./credential-store.js";
 import { ClaudeClientError } from "./types.js";
 import type { TokenUsage } from "./types.js";
 import { isJudgmentCacheConfigured, lookupJudgments, storeJudgments } from "./judgment-cache.js";
@@ -406,4 +406,51 @@ async function safeText(res: Response): Promise<string> {
   } catch {
     return "";
   }
+}
+
+// ── Key check ────────────────────────────────────────────────────────────────
+
+/** What one live request says about the resolved key. */
+export interface JevProbeResult {
+  /**
+   * `ok`: TypeSafe accepted the key. `rejected`: 401/403. `unreachable`: no
+   * answer, or a 429/5xx. `no-key`: nothing resolved.
+   */
+  outcome: "ok" | "rejected" | "unreachable" | "no-key";
+  /** HTTP status when one came back. */
+  status?: number;
+  /** First 8 hex characters of the key's SHA-256; never the key. */
+  fingerprint?: string;
+  /** Why the request failed; never contains the key. */
+  detail?: string;
+}
+
+/**
+ * Make one minimal request to prove the resolved key. No retries and no
+ * judgment cache: the answer is about the key, not about a question.
+ */
+export async function probeJevKey(opts: AskJevOptions = {}): Promise<JevProbeResult> {
+  const apiKey = resolveCredential(TYPESAFE_CREDENTIAL, { env: opts.env, ndxHome: opts.ndxHome })?.value;
+  if (!apiKey) return { outcome: "no-key" };
+  const fingerprint = credentialFingerprint(apiKey);
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  let res: Response;
+  try {
+    res = await fetchImpl(JEV_ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        state: { text: "ndx credential check" },
+        model: JEV_MODEL,
+        questions: { ping: noul("Is the text a short sentence?") },
+      }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const detail = err instanceof Error && err.name === "TimeoutError" ? "timed out" : "network error";
+    return { outcome: "unreachable", fingerprint, detail };
+  }
+  if (res.ok) return { outcome: "ok", status: res.status, fingerprint };
+  if (res.status === 401 || res.status === 403) return { outcome: "rejected", status: res.status, fingerprint };
+  return { outcome: "unreachable", status: res.status, fingerprint, detail: `HTTP ${res.status}` };
 }

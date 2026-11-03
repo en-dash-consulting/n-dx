@@ -7,6 +7,7 @@
 
 import { readFile, access } from "node:fs/promises";
 import { resolveLayout } from "./layout.js";
+import { warn } from "./output.js";
 import { deepMerge } from "./project-config.js";
 import { trustedLocalConfig, trustedProjectConfig } from "./credential-routing.js";
 import type { ClaudeConfig } from "./types.js";
@@ -722,8 +723,30 @@ export function resolveJudgmentRoute(
   config?: LLMConfig,
   options: CredentialStoreOptions = {},
 ): JudgmentRoute | undefined {
-  if (!resolveCredential(TYPESAFE_CREDENTIAL, options)) return undefined;
+  if (!resolveCredential(TYPESAFE_CREDENTIAL, options)) {
+    if (config?.typesafe?.required && configuredJudgmentRoute(taskClass, config)) {
+      warnJevUnavailableOnce(taskClass, options.warn);
+    }
+    return undefined;
+  }
   return configuredJudgmentRoute(taskClass, config);
+}
+
+let jevFallbackWarned = false;
+
+/** `llm.typesafe.required`: one warning per process, however many calls fall back. */
+function warnJevUnavailableOnce(taskClass: string, emit: ((message: string) => void) | undefined): void {
+  if (jevFallbackWarned) return;
+  jevFallbackWarned = true;
+  (emit ?? warn)(
+    `[llm] ${taskClass} is routed to TypeSafe Jev but no TypeSafe key is available (llm.typesafe.required is set), ` +
+      `so the text model answers. Store a key: ndx config credentials.typesafe`,
+  );
+}
+
+/** Forget that the fallback warning was shown (tests). */
+export function resetJevFallbackWarning(): void {
+  jevFallbackWarned = false;
 }
 
 /**
