@@ -36,7 +36,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "73f42fbb-cc9b-4c44-8798-06959e234fe2":
     issues: ["https://www.notion.so/3f7a80b7192481b59c3ed5aa3573b938","https://www.notion.so/3f7a80b7192481298930ed402a873f0b","https://www.notion.so/3f7a80b719248188879ff674aea13f31"]
-    lastModified: "2026-11-03T01:17:18.963Z"
+    lastModified: "2026-11-03T01:32:24.356Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "771fdf69-d81a-483e-8108-7d1c1be810cb":
     status: "completed"
@@ -48,11 +48,18 @@ items:
     resolutionDetail: "Snapshot fingerprints commit only via new SidecarContextOptions.packetDelivered after a completed turn."
     lastModified: "2026-11-03T00:25:25.142Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7c678969-1cd3-46f4-a629-1b7e917dba5e":
+    lastModified: "2026-11-03T01:32:24.356Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c32dda8-0714-4aca-ae95-2bdbf601ebb1":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-03T01:21:57.799Z"
-    activeIntervals: [{"start":"2026-11-03T01:21:57.799Z"}]
-    lastModified: "2026-11-03T01:21:58.381Z"
+    completedAt: "2026-11-03T01:34:13.759Z"
+    endedAt: "2026-11-03T01:34:13.759Z"
+    activeIntervals: [{"end":"2026-11-03T01:34:13.759Z","start":"2026-11-03T01:21:57.799Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub broker scoped to run_command (fixed read-only set per project), draft_github_post (project + target, cwd repoRoot), new never-allow-listable save_draft, ledger_append; acting tools not offered."
+    lastModified: "2026-11-03T01:34:13.759Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a23d8599-329b-438e-b907-f6370e63e9d2":
     status: "completed"

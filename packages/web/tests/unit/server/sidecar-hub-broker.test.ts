@@ -235,6 +235,7 @@ describe("hub draft_github_post", () => {
 describe("hub actions", () => {
   const execResult = (over: Partial<ExecResult> = {}): ExecResult => ({ stdout: "", stderr: "", exitCode: 0, error: null, launched: true, ...over } as ExecResult);
   let hubHome: string;
+  const hostNdx = (): { bin: string; args: string[] } => ({ bin: "node", args: ["/host/core/cli.js"] });
 
   beforeEach(() => {
     hubHome = join(root, "home");
@@ -249,7 +250,7 @@ describe("hub actions", () => {
 
   it("posts with gh under the operator's login, with cwd at the named project's repository root", async () => {
     const exec = vi.fn(async () => execResult({ stdout: "https://github.com/o/r/pull/42#issuecomment-1\n" }));
-    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec });
+    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec, ndx: hostNdx });
     const result = await actions.postGithub({ project: "lib", kind: "comment", target: "42", body: "hello" });
     expect(result.ok).toBe(true);
     expect(exec).toHaveBeenCalledWith("gh", ["pr", "comment", "42", "--body-file", "-"], expect.objectContaining({ cwd: "/r/lib", input: "hello" }));
@@ -257,7 +258,7 @@ describe("hub actions", () => {
 
   it("posts nothing for a draft without a project or with one the hub does not name", async () => {
     const exec = vi.fn(async () => execResult());
-    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec });
+    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec, ndx: hostNdx });
     expect((await actions.postGithub({ kind: "comment", target: "1", body: "x" })).ok).toBe(false);
     expect((await actions.postGithub({ project: "ghost", kind: "comment", target: "1", body: "x" })).ok).toBe(false);
     expect(exec).not.toHaveBeenCalled();
@@ -265,15 +266,22 @@ describe("hub actions", () => {
 
   it("runs a command with cwd at the project's repository root and reports its output", async () => {
     const exec = vi.fn(async () => execResult({ stdout: "/r/app  abc [main]\n" }));
-    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec });
+    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec, ndx: hostNdx });
     const result = await actions.runCommand(["git", "worktree", "list"], undefined, "app");
     expect(exec).toHaveBeenCalledWith("git", ["worktree", "list"], expect.objectContaining({ cwd: "/r/app" }));
     expect(result).toMatchObject({ ok: true });
     expect(result.text).toContain("/r/app  abc [main]");
   });
 
+  it("starts ndx as the host's own CLI, never a bare ndx from PATH", async () => {
+    const exec = vi.fn(async () => execResult({ stdout: "ok\n" }));
+    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec, ndx: () => ({ bin: "node", args: ["/host/core/cli.js"] }) });
+    expect((await actions.runCommand(["ndx", "status"], undefined, "lib")).ok).toBe(true);
+    expect(exec).toHaveBeenCalledWith("node", ["/host/core/cli.js", "status"], expect.objectContaining({ cwd: "/r/lib" }));
+  });
+
   it("refuses work, edits and PRD writes outright", async () => {
-    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec: vi.fn() });
+    const actions = createHubActions({ homeDir: hubHome, fetch: overview, exec: vi.fn(), ndx: hostNdx });
     expect((await actions.startWork("t1", undefined)).ok).toBe(false);
     expect((await actions.writeChangeSet({ items: [] } as never)).ok).toBe(false);
     expect(actions.githubReadsAllowed()).toBe(false);

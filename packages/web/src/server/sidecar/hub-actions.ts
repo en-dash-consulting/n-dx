@@ -32,6 +32,8 @@ export interface HubActionsOptions {
   fetch?: typeof fetch;
   /** Runs a command; defaults to the llm-client `exec`. */
   exec: BranchHealthExec;
+  /** How `ndx` is started: the host's own CLI (`resolveNdxBin`), so a bare `ndx` never comes from PATH. */
+  ndx: () => { bin: string; args: string[] };
 }
 
 /** A project's repository root, from the hub's own overview. */
@@ -72,10 +74,13 @@ export function createHubActions(opts: HubActionsOptions): SidecarActions {
       if (!project) return { ok: false, text: "Nothing ran: a hub command names its project." };
       const root = await projectRepoRoot(opts, project, signal);
       if (!root.ok) return { ok: false, text: `Nothing ran: ${root.error}.` };
-      const [cmd = "", ...args] = argv;
+      const [program = "", ...rest] = argv;
+      const ndx = program === "ndx" ? opts.ndx() : null;
+      const cmd = ndx ? ndx.bin : program;
+      const args = ndx ? [...ndx.args, ...rest] : rest;
       const result = await opts.exec(cmd, args, { cwd: root.repoRoot, timeout: COMMAND_TIMEOUT_MS });
       const line = `\`${argv.join(" ")}\` in ${project}`;
-      if (!result.launched) return { ok: false, text: `Nothing ran: ${cmd} could not be started.` };
+      if (!result.launched) return { ok: false, text: `Nothing ran: ${program} could not be started.` };
       const tail = outputTail(`${result.stdout}${result.stderr}`);
       const ended = result.exitCode === null ? `ended without an exit code: ${result.error?.message ?? "timed out"}` : `exited with code ${result.exitCode}`;
       return { ok: result.exitCode === 0, text: `${line} ${ended}.\n${tail.text ? `Output:\n${tail.text}` : "It printed nothing."}` };

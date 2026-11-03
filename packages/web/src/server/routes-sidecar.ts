@@ -87,7 +87,7 @@ import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus, type SidecarLedgerTarget } from "./sidecar/broker.js";
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
-import { startSidecarCommand } from "./routes-commands.js";
+import { resolveNdxBin, startSidecarCommand } from "./routes-commands.js";
 import { openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, startTaskExecution } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
@@ -626,8 +626,13 @@ const HUB_LENS = "hub";
  * file. Everything else refuses, and no network read runs without a card
  * (`sidecar/hub-actions.ts`).
  */
-export function hubSidecarActions(opts: HubSidecarRouteOptions = {}, exec: BranchHealthExec = llmExec): SidecarActions {
-  return createHubActions({ homeDir: opts.homeDir, ...(opts.fetch && { fetch: opts.fetch }), exec });
+export function hubSidecarActions(
+  ctx: ServerContext,
+  opts: HubSidecarRouteOptions = {},
+  exec: BranchHealthExec = llmExec,
+): SidecarActions {
+  // `ndx` is this host's own CLI, as a worktree's Sidecar command resolves it, never a PATH lookup.
+  return createHubActions({ homeDir: opts.homeDir, ...(opts.fetch && { fetch: opts.fetch }), exec, ndx: () => resolveNdxBin(ctx) });
 }
 
 /** Where the hub session reaches its broker: this host's own loopback port, with the session's broker credential only. */
@@ -974,7 +979,7 @@ async function handleHubSidecarRoute(
     registry,
     broker,
     broadcast,
-    actions: () => opts.actions ?? hubSidecarActions(opts, opts.exec),
+    actions: () => opts.actions ?? hubSidecarActions(ctx, opts, opts.exec),
     brokerScope: "hub",
     create: (body) => createHubSession(registry, dir, body),
     lens: HUB_LENS,
