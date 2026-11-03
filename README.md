@@ -209,11 +209,15 @@ The hub's chooser at `http://127.0.0.1:3117/hub` lists every registered project 
 **Claude (recommended):**
 ```sh
 ndx config llm.vendor claude .
-# API mode (recommended):
-ndx config llm.claude.api_key sk-ant-... .
-# CLI mode (no API key):
+# CLI login (default): sign in with the vendor CLI
+claude login
 ndx config llm.claude.cli_path claude .
+# API key, only if you want API mode: hidden prompt, stored per user
+ndx config credentials.claude
+ndx config llm.claude.auth api .
 ```
+
+A key never goes on the command line. See [API keys and auth modes](docs/guide/configuration.md#api-keys-and-auth-modes).
 
 **Codex:**
 ```sh

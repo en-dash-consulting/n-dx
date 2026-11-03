@@ -124,20 +124,20 @@ ndx config llm.vendor claude .    # or: codex
 ## Claude Configuration
 
 ```sh
-# API mode (recommended)
-ndx config llm.claude.api_key sk-ant-... .
-# or via environment variable:
-export ANTHROPIC_API_KEY=sk-ant-...
+# CLI login (default)
+claude login
+ndx config llm.claude.cli_path /path/to/claude .
 
 # Pin a model (default: claude-sonnet-5-5)
 ndx config llm.claude.model claude-opus-5-5 .
 
-# CLI mode
-ndx config llm.claude.cli_path /path/to/claude .
+# API mode, optional: see "API keys and auth modes" below
+ndx config credentials.claude
+ndx config llm.claude.auth api .
 ```
 
 ::: warning Where keys are stored
-`*.api_key` and `*.cli_path` values are written to `.n-dx.local.json`, which `ndx init` gitignores — never to the shared `.n-dx.json`. Every reader merges the local file over the shared one, so nothing else changes. If a project configured before this routing still has a key in `.n-dx.json`, `ndx config` warns on every run and `ndx ci` fails when that file is git-tracked; re-run `ndx config <key> <value>` to move it (and rotate the key if it was ever committed).
+API keys live in the per-user credential store, never in `.n-dx.json` and never on a command line. `*.cli_path` values are written to `.n-dx.local.json`, which `ndx init` gitignores — never to the shared `.n-dx.json`. Every reader merges the local file over the shared one, so nothing else changes. If a project configured before this still has a key in `.n-dx.json` or `.n-dx.local.json`, `ndx config` warns on every run and `ndx ci` fails when `.n-dx.json` is git-tracked; run `ndx config credentials --import` to move the key to the store (and rotate it if it was ever committed).
 
 A `*.cli_path` or `*.api_endpoint` in the shared `.n-dx.json` (and `llm.google.apiKeyEnv`) applies only once you trust the repository (`ndx trust accept .`): it picks the binary n-dx runs with your environment, or where your key is sent. Until then n-dx ignores it with a warning naming the field. The same keys in `.n-dx.local.json` always apply. `graview.bin`, the binary `ndx graview` runs, and `graview.app`, the product face `ndx graview serve` runs, follow the same rule; `NDX_GRAVIEW_BIN` always applies.
 
@@ -158,6 +158,41 @@ Hench's `apiKeyEnv`, the variable the API loop sends as the Anthropic key, follo
 
 With no matching rule, `claude-opus-5-5` gets `high` (Opus 5's API default; Opus 5.5's own is `medium`) and every other model gets the API default. A model that does not accept effort, such as `claude-haiku-4-5`, never receives it, and an unknown value is never sent; both print a warning. CLI mode (Claude Code) does not apply `llm.effort` yet.
 
+## API keys and auth modes
+
+n-dx holds the keys it needs in one owner-only file, `credentials.json` in the ndx home, shared by every project and worktree. Nothing in a repository carries a key, and no command takes one as an argument (it would land in shell history and the process list).
+
+```sh
+ndx config credentials.claude                 # hidden prompt on a terminal
+printf %s "$KEY" | ndx config credentials.claude --stdin
+ndx config credentials.claude --unset         # remove it
+ndx config credentials .                      # backend, source and fingerprint per credential; never a value
+```
+
+**`llm.<vendor>.auth`** (in `.n-dx.local.json`) picks the credential a vendor runs on:
+
+| Value | Meaning |
+|---|---|
+| `auto` (default) | API when a key is configured or exported, else the CLI login. A key held only in the store is not used: storing a key never moves a vendor off its CLI login. Google has no CLI, so for it `auto` also uses a stored key |
+| `cli` | The vendor CLI login; no key is used or passed on |
+| `api` | A key from config, the environment or the store; a run with none stops with an error |
+
+`ndx config credentials.<vendor>` on a project with no `llm.<vendor>.auth` sets it to `api` and says so, so a key you just stored takes effect. An explicit value, `cli` included, is never overwritten, and a tracked `.n-dx.local.json` is left alone with the command to run. `hench.provider` still chooses hench's loop; it refuses `api` under `cli`, and under `auto` with only a stored key.
+
+**Lookup order.** The first of these that has a key wins: the project's configured key, the exported variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `TYPESAFE_API_KEY`…), then the store. An exported `TYPESAFE_API_KEY` therefore overrides the stored one.
+
+**`--helper`** stores a password-manager command instead of a value:
+
+```sh
+ndx config credentials.claude --helper "op read op://vault/item/field"
+```
+
+The command runs without a shell when the key is needed; its single line of output is the value, kept for the process (a failure is retried after 60 s). Quote as in a shell, but nothing expands: `|`, `;`, `&`, `>`, `<`, `$(` and backticks are refused. So is an interpreter given code to run (`bash -c`, `node -e`): an interpreter helper needs a script path, and agent runs are denied that interpreter. `ndx config credentials --check` runs each helper and shows the fingerprint of what it returned.
+
+**`--import`** moves keys an older version wrote to `llm.<vendor>.api_key` in `.n-dx.local.json` into the store without asking (`ndx config credentials --import`). A one-time import also runs the first time such a key is written. Importing replaces a vendor's helper entry with the file key.
+
+Writing `llm.<vendor>.api_key` still works as an alias for `credentials.<vendor>`: the value goes to the store, not the file, and the alias carries the same `auth` side effect above. Agent runs cannot read the store: the Claude CLI gets deny rules for it and hench's guard blocks it.
+
 ## Codex Configuration
 
 ```sh
@@ -167,7 +202,7 @@ ndx config rex.model gpt-5.6-terra .
 
 ## TypeSafe Jev for Judgment Calls
 
-Some sourcevision calls are judgments, not text generation, and those go to [TypeSafe's Jev](https://docs.typesafe.ai), which answers typed questions with a probability per option instead of free-text JSON. Setting `TYPESAFE_API_KEY` opts in; without it every prompt and output is exactly as before.
+Some sourcevision calls are judgments, not text generation, and those go to [TypeSafe's Jev](https://docs.typesafe.ai), which answers typed questions with a probability per option instead of free-text JSON. Storing a key opts in (`ndx config credentials.typesafe`, then `--test` to prove it; an exported `TYPESAFE_API_KEY` overrides the stored one); without a key every prompt and output is exactly as before.
 
 | Task class | Judgment | What changes |
 |---|---|---|
@@ -190,7 +225,7 @@ Two more judgments run over the heuristics on every keyed run, whichever mode: e
 `--narrate` keeps the multi-pass generative machinery (`--full`, `--target-pass`, the meta pass); it is the whole pipeline for repositories without a key, so it is not reduced to the cascade's per-zone prompt.
 
 ```sh
-export TYPESAFE_API_KEY=...
+ndx config credentials.typesafe   # once per user; hidden prompt
 ndx analyze .              # cascade: judgments first, narration in the background
 ndx analyze --wait .       # cascade, narration before returning
 ndx analyze --narrate .    # the full generative pass over every zone, as before the key
@@ -213,7 +248,7 @@ A second `ndx analyze` on a changed codebase does not start over. Which zones ar
 
 Both questions go in one request per batch over one shared state, so a finding references the same `zones.<id>` evidence the zone's own question does — and when a zone is being re-narrated anyway, any finding Jev could not decide is named in that same narration call to confirm or refute, rather than costing a call of its own.
 
-The counts land on `manifest.lastAnalysis.rerun` (`zonesJudged`, `refreshed`, `findingsJudged`, `carried`, `resolved`, `uncertain`) and in `analyses.jsonl`, and the CLI prints one `[rerun]` line. Without `TYPESAFE_API_KEY` none of this runs and the hash rules decide exactly as they did before. Thresholds — the 0.3/0.7 refresh bands and the 0.3/0.7 still-holds bands — live in code, not config.
+The counts land on `manifest.lastAnalysis.rerun` (`zonesJudged`, `refreshed`, `findingsJudged`, `carried`, `resolved`, `uncertain`) and in `analyses.jsonl`, and the CLI prints one `[rerun]` line. Without a TypeSafe key none of this runs and the hash rules decide exactly as they did before. Thresholds — the 0.3/0.7 refresh bands and the 0.3/0.7 still-holds bands — live in code, not config.
 
 ### What a run records
 
