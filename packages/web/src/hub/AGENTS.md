@@ -61,26 +61,22 @@ twin, pinned by the root `extension-api-version-parity` test.
 
 `/hub/session/…` is the hub-scope Sidecar session, one per machine. The hub
 spawns no vendor CLI for it: `proxy.ts` forwards it, HTTP and WebSocket, to
-`/api/sidecar/hub/…` on the project server `hub/session-host.ts` picks — the
-host lock's holder (`<ndx home>/hub/sidecar/host.lock`, pid and port) while it
-is healthy, else the first healthy registered project, skipping one the proxy
-just failed to reach until its next health check. The session's state is all
-under `<ndx home>/hub/sidecar/`, so a new host resumes it from disk. The path
-mapping and the lock's location are in `src/shared/base-path.ts`, which the
-host's routes (`server/routes-sidecar.ts`) read too. Like every route here it
-is reached only past `guardHubRequest`; add no path that skips it.
+`/api/sidecar/hub/…` on the host `hub/session-host.ts` picks — the holder of
+`<ndx home>/hub/sidecar/host.lock` while healthy, else the first healthy
+project, skipping one it just failed to reach. State lives under
+`<ndx home>/hub/sidecar/`, so a new host resumes it; the paths are in
+`src/shared/base-path.ts`, shared with `server/routes-sidecar.ts`. Every route
+here is reached only past `guardHubRequest`; add no path that skips it.
 
-Its spend is the machine's, not the host project's: a host appends each finished
-turn to `<ndx home>/hub/usage.jsonl` (`hub/usage-ledger.ts`,
-`hubTurnSpendRecorder`), never to its own dashboard usage ledger, and the home
-reads the total back from that file.
+Its spend is the machine's: hosts append each turn to `<ndx home>/hub/usage.jsonl`
+(`hub/usage-ledger.ts`), never their own usage ledger, and the home shows the total.
 
 The home offers it only when `probeHubLens` (session-host.ts) gets a yes from
-the host it would pick (`/lens`): a header toggle (⌘J) docks an iframe of
-`/hub/session/drawer`, the drawer-only viewer page the host builds beside the
-dashboard (`viewer/hub-session.ts`). `home.ts` stays server-rendered with no
-Preact; the frame posts `HUB_SESSION_CLOSE_MESSAGE` to undock. The host
-injects the page's paths into it, so they do not cross `viewer/external.ts`.
+the host it would pick: a toggle (⌘J) docks an iframe of `/hub/session/drawer`,
+the drawer-only page the host builds (`viewer/hub-session.ts`). `home.ts` stays
+server-rendered with no Preact; the frame posts `HUB_SESSION_CLOSE_MESSAGE` to
+undock. The host injects the page's paths, so they do not cross
+`viewer/external.ts`.
 
 ## Proxy and base path
 
