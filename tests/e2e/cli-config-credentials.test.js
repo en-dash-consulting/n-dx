@@ -326,6 +326,23 @@ describe("ndx config credentials --import", () => {
     expect(status).toMatch(/^codex: credential store/m);
   }, DEFAULT_TIMEOUT);
 
+  it("skips a vendor whose store entry is a helper and leaves its file key in place", async () => {
+    const helper = config(["credentials.claude", "--helper", "op read op://vault/claude/key"]);
+    expect(helper.code, helper.err).toBe(0);
+    const storePath = join(home, "credentials.json");
+    const before = JSON.parse(await readFile(storePath, "utf-8")).entries.claude;
+    await seed({ claude: { api_key: KEY } });
+
+    const r = config(["credentials", "--import", cwd]);
+    expect(r.code, r.err).toBe(0);
+    expect(JSON.parse(await readFile(storePath, "utf-8")).entries.claude).toEqual(before);
+    expect(await readFile(localPath(), "utf-8")).toContain(KEY);
+    const skipped = (r.out + r.err).split("\n").filter((l) => /Skipped the claude key/.test(l));
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0]).toContain(".n-dx.local.json");
+    expect(r.out + r.err).not.toContain(KEY);
+  }, DEFAULT_TIMEOUT);
+
   it("removes a key from the file only after the store write succeeded", async () => {
     await seed({ claude: { api_key: KEY } });
     // A file where the ndx home should be: the store cannot be written.

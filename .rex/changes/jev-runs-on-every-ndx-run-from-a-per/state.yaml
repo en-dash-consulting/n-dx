@@ -106,7 +106,14 @@ items:
     lastModified: "2026-10-30T15:44:38.472Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bfee741f-343a-4a2c-b12f-50aa262811ef":
-    lastModified: "2026-11-03T15:41:10.475Z"
+    status: "completed"
+    startedAt: "2026-11-03T16:24:28.530Z"
+    completedAt: "2026-11-03T16:29:52.353Z"
+    endedAt: "2026-11-03T16:29:52.353Z"
+    activeIntervals: [{"end":"2026-11-03T16:29:52.353Z","start":"2026-11-03T16:24:28.530Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Option A: importLocalApiKeys skips vendors whose store entry is a helper, keeps the file key, prints one line naming vendor and file."
+    lastModified: "2026-11-03T16:29:52.353Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e5def056-c6ed-4484-978e-6f4e174bd8bf":
     lastModified: "2026-11-02T18:47:34.394Z"

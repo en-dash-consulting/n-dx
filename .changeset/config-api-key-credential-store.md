@@ -14,7 +14,9 @@ shows its source and fingerprint, never the value.
 `ndx config credentials` finds API keys already in `.n-dx.local.json`: on a
 terminal it offers to move them, `--import` moves them without a prompt, and
 otherwise it names the flag. A key leaves the file only after the store write
-succeeds, and the same `auth` rule applies per vendor.
+succeeds, and the same `auth` rule applies per vendor. A vendor whose store
+entry is a helper is skipped, never overwritten: its key stays in the file and
+one line names the vendor and the file to remove it from.
 
 Soft freeze: this is a behaviour change to an existing `ndx config` key.
 `llm.<vendor>.api_key` no longer reads back the value, and a key no longer

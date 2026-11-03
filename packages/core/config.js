@@ -4187,13 +4187,28 @@ async function fileApiKeys(dir, which) {
 /**
  * Move `.n-dx.local.json`'s API keys into the credential store. Each key is
  * written to the store first and removed from the file only after that write
- * succeeded, so a failed write loses nothing. Never prints a value. Returns
- * whether every key moved.
+ * succeeded, so a failed write loses nothing. A vendor whose store entry is a
+ * helper is skipped: the password-manager setup outranks a plaintext file key,
+ * and overwriting it would put that key in the store as plaintext. Never
+ * prints a value. Returns whether nothing failed.
  */
 async function importLocalApiKeys(dir) {
   const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
+  const status = spawnCredentialsCli(["status", "--json"]);
+  if (status.code !== 0) {
+    console.error(`Could not read the credential store; nothing imported: ${status.stderr.trim()}`);
+    return false;
+  }
+  const helperVendors = new Set(JSON.parse(status.stdout).filter((s) => s.backend === "helper").map((s) => s.name));
   let allMoved = true;
   for (const { vendor, value } of await localFileApiKeys(dir)) {
+    if (helperVendors.has(vendor)) {
+      console.log(
+        `Skipped the ${vendor} key: the credential store runs a helper for ${vendor}. ` +
+          `The key stays in ${label}; remove it there by hand.`,
+      );
+      continue;
+    }
     const result = spawnCredentialsCli(["set", vendor], value);
     if (result.code !== 0) {
       allMoved = false;
