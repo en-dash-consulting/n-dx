@@ -19,6 +19,7 @@ import { LLM_VENDOR, loadLLMConfig, resolveLayout, resolveClaudeConfig, resolveV
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import {jsonResponse} from "./response-utils.js";
+import { isForeignSiteRequest, refuseForeignSite } from "./request-security.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -257,6 +258,9 @@ export async function handleConfigRoute(
 
   // GET /api/ndx-config — configuration summary
   if (method === "GET" && url === CONFIG_PREFIX) {
+    // Reading the config summary does work on the server; a foreign page's
+    // <img src> must not be able to trigger it.
+    if (isForeignSiteRequest(req)) return refuseForeignSite(res);
     const now = Date.now();
     const slot = configCaches.get(ctx);
     if (slot.entry && slot.entry.projectDir === ctx.projectDir && now - slot.entry.timestamp < CONFIG_CACHE_TTL_MS) {

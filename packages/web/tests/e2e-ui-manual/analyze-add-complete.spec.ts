@@ -17,12 +17,13 @@ import {
   startRealDashboard,
   commitAll,
   headSha,
+  workCommitsSince,
   moduleTask,
   toolDir,
   KEEP_FIXTURE,
   type RealVendorProject,
 } from "./helpers/real-vendor-project.js";
-import { readPrdItems, prdItem, openLiveTask, waitForLiveTaskCompleted, attachRunArtifacts } from "./helpers/run-watch.js";
+import { readPrdItems, prdItem, openLiveTask, snapshotRunIds, waitForLiveTaskCompleted, attachRunArtifacts } from "./helpers/run-watch.js";
 import { caption } from "./helpers/caption.js";
 import { hasCli, probeCredentials } from "./helpers/preconditions.js";
 
@@ -40,11 +41,15 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async ({}, testInfo) => {
-  if (!dashboard) return;
-  try {
-    await stopManualDashboard(dashboard);
-  } finally {
-    await attachRunArtifacts(testInfo, project.dir);
+  // beforeAll can create the project and then fail to start its dashboard;
+  // the fixture directory must still be removed.
+  if (!project) return;
+  if (dashboard) {
+    try {
+      await stopManualDashboard(dashboard);
+    } finally {
+      await attachRunArtifacts(testInfo, project.dir);
+    }
   }
   if (KEEP_FIXTURE) {
     console.log(`[e2e-manual] fixture kept at ${project.dir}`);
@@ -91,13 +96,20 @@ async function addTaskThroughForm(page: Page, title: string, description: string
 test("full analysis, then a task added through the form, completed by the agent", async ({ page }, testInfo) => {
   const tracker = trackConsoleErrors(page);
   const stampBefore = await manifestStamp(project.dir);
-  const baseSha = headSha(project.dir);
 
   await page.goto(`${dashboard.baseUrl}/analyze`, { waitUntil: "domcontentloaded" });
   await caption(page, "1/5 Run the full SourceVision analysis");
   const full = page.getByRole("button", { name: "Full analysis" }).first();
   await expect(full).toBeEnabled({ timeout: 15_000 });
+  // Leaving the page before the start POST is sent cancels it, and the
+  // status route would then read idle at once.
+  const started = page.waitForResponse(
+    (res) => res.request().method() === "POST" && new URL(res.url()).pathname === "/api/commands/sv-analyze",
+    { timeout: 15_000 },
+  );
   await full.click();
+  const startResponse = await started;
+  expect(startResponse.ok(), `starting the analysis returned HTTP ${startResponse.status()}`).toBe(true);
 
   await page.goto(`${dashboard.baseUrl}/live/analyze`, { waitUntil: "domcontentloaded" });
   await caption(page, "2/5 Following the analysis on the Live page");
@@ -119,15 +131,17 @@ test("full analysis, then a task added through the form, completed by the agent"
   await page.goto(`${dashboard.baseUrl}/live`, { waitUntil: "domcontentloaded" });
   await caption(page, "4/5 Start the task with the agent");
   await expect(page.locator(".live-idle .live-card-title")).toHaveText(task.title, { timeout: 15_000 });
+  const knownRunIds = await snapshotRunIds(dashboard.baseUrl);
   await page.getByRole("button", { name: /More ways to run/ }).click();
+  const baseSha = headSha(project.dir);
   await page.getByRole("menuitem", { name: /^Start now/ }).click();
-  const startedTaskId = await openLiveTask(page, task.id);
+  const startedTaskId = await openLiveTask(page, task.id, knownRunIds);
   expect(startedTaskId).toBe(task.id);
 
   await caption(page, "5/5 Watching the run until it completes");
   await waitForLiveTaskCompleted(page);
   expect(prdItem(project.dir, task.id).status).toBe("completed");
-  expect(headSha(project.dir)).not.toBe(baseSha);
+  expect(workCommitsSince(project.dir, baseSha), "the agent should commit work outside the n-dx tool directories").not.toEqual([]);
 
   await page.goto(`${dashboard.baseUrl}/hench-runs`, { waitUntil: "domcontentloaded" });
   await caption(page, "Done — the run is listed as completed");

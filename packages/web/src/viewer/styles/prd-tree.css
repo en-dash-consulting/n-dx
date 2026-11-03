@@ -2040,10 +2040,6 @@
 /* ── Rex Toast ─────────────────────────────────────────────────────── */
 
 .rex-toast {
-  position: fixed;
-  bottom: calc(var(--space-5) + var(--bottombar-h, 0px));
-  left: 50%;
-  transform: translateX(-50%);
   background: var(--green);
   color: #fff;
   padding: var(--space-2) var(--space-5);
@@ -2051,7 +2047,6 @@
   font-size: var(--font-base);
   font-weight: var(--weight-medium);
   z-index: var(--z-toast);
-  animation: rex-toast-in 0.2s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 

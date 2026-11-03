@@ -79,6 +79,42 @@ export function headSha(dir: string): string {
   return git(dir, ["rev-parse", "HEAD"]).trim();
 }
 
+/** Top-level directories n-dx itself writes; a commit touching only these is bookkeeping. */
+const TOOL_DIRS = [".ndx", ".rex", ".hench", ".sourcevision"];
+
+function isToolPath(path: string): boolean {
+  const top = path.split("/")[0];
+  return TOOL_DIRS.includes(top);
+}
+
+/**
+ * Commits in `baseSha..HEAD` that change at least one file outside the n-dx
+ * tool directories. HEAD moving is not enough to prove an agent's work
+ * landed: when the agent makes no commit, hench still writes its own
+ * `chore(prd): … (task X completed)` record of the tracked PRD state, which
+ * touches only the rex directory.
+ */
+export function workCommitsSince(dir: string, baseSha: string): string[] {
+  const out = git(dir, ["log", "--format=commit %H", "--name-only", `${baseSha}..HEAD`]);
+  const commits: string[] = [];
+  let current: string | null = null;
+  let counted = false;
+  for (const line of out.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("commit ")) {
+      current = trimmed.slice("commit ".length);
+      counted = false;
+      continue;
+    }
+    if (!trimmed || current === null || counted) continue;
+    if (!isToolPath(trimmed)) {
+      commits.push(current);
+      counted = true;
+    }
+  }
+  return commits;
+}
+
 async function seedNodeProject(dir: string): Promise<void> {
   const pkg = {
     name: "e2e-manual-fixture",

@@ -44,7 +44,93 @@ const targets = (refs: FileReferences): Record<string, readonly string[]> =>
 const externals = (refs: FileReferences): Record<string, readonly string[]> =>
   Object.fromEntries(refs.external.map((e) => [e.package, e.symbols]));
 
+async function resolveSources(ctx: Parameters<typeof skipUnlessGrammar>[0], sources: Record<string, string>, path: string): Promise<FileReferences> {
+  skipUnlessGrammar(ctx, JAVA_WASM);
+  const runner = createTreeSitterRunner();
+  try {
+    const files: PackSourceFile[] = [];
+    for (const [name, source] of Object.entries(sources)) {
+      const result = await runner.parseSource({ pack: javaPack, grammarPath: JAVA_WASM }, name, source);
+      if (result.status !== "parsed") throw new Error(`could not parse ${name}`);
+      files.push(result);
+    }
+    return javaPack.resolver!.prepare(files).resolve(path);
+  } finally { runner.dispose(); }
+}
+
 describe("java resolver", () => {
+  it("resolves inherited nested types through superclass and interface chains, scoped to the owning type", async (ctx) => {
+    const sources = {
+      "src/base/Root.java": "package base; public class Root { public static class Token {} }",
+      "src/base/Middle.java": "package base; public class Middle extends Root {}",
+      "src/base/Options.java": "package base; public interface Options { class Setting {} }",
+      "src/use/Child.java": "package use; import base.Middle; import base.Options; class Child extends Middle implements Options { Token t = new Token(); Setting s; } class Unrelated { Token nope; }",
+      "src/use/Other.java": "package use; class Other { Token nope; }",
+      "src/use/Container.java": "package use; import base.Root; class Container { static class Base extends Root {} static class Child extends Base { Token token; } }",
+    };
+    expect(targets(await resolveSources(ctx, sources, "src/use/Child.java"))).toEqual({
+      "src/base/Middle.java": ["Middle"], "src/base/Options.java": ["Options", "Setting"], "src/base/Root.java": ["Token"],
+    });
+    expect(targets(await resolveSources(ctx, sources, "src/use/Other.java"))).toEqual({});
+    expect(targets(await resolveSources(ctx, sources, "src/use/Container.java"))).toEqual({ "src/base/Root.java": ["Root", "Token"] });
+  });
+
+  it("follows only the supertypes of the declaration in the referencing file when two modules declare the same type", async (ctx) => {
+    const sources = {
+      "svc-a/src/main/java/com/acme/Application.java": "package com.acme; public class Application extends BaseA { Config c; }",
+      "svc-a/src/main/java/com/acme/BaseA.java": "package com.acme; public class BaseA {}",
+      "svc-a/src/main/java/com/acme/Config.java": "package com.acme; class Config {}",
+      "svc-b/src/main/java/com/acme/Application.java": "package com.acme; public class Application extends BaseB { Config c; }",
+      "svc-b/src/main/java/com/acme/BaseB.java": "package com.acme; public class BaseB extends RootB { public static class Config {} }",
+      "svc-b/src/main/java/com/acme/RootB.java": "package com.acme; public class RootB { public static class Token {} }",
+      // A supertype declared in two modules: only the copy this module sees gives members or is followed.
+      "svc-a/src/main/java/com/acme/Shared.java": "package com.acme; public class Shared {}",
+      "svc-b/src/main/java/com/acme/Shared.java": "package com.acme; public class Shared extends RootB {}",
+      "svc-a/src/main/java/com/acme/Token.java": "package com.acme; class Token {}",
+      "svc-a/src/main/java/com/acme/Sub.java": "package com.acme; class Sub extends Shared { Token t; }",
+    };
+    expect(targets(await resolveSources(ctx, sources, "svc-a/src/main/java/com/acme/Application.java"))).toEqual({
+      "svc-a/src/main/java/com/acme/BaseA.java": ["BaseA"],
+      "svc-a/src/main/java/com/acme/Config.java": ["Config"],
+    });
+    expect(targets(await resolveSources(ctx, sources, "svc-b/src/main/java/com/acme/Application.java"))).toEqual({
+      "svc-b/src/main/java/com/acme/BaseB.java": ["BaseB", "Config"],
+    });
+    expect(targets(await resolveSources(ctx, sources, "svc-a/src/main/java/com/acme/Sub.java"))).toEqual({
+      "svc-a/src/main/java/com/acme/Shared.java": ["Shared"],
+      "svc-a/src/main/java/com/acme/Token.java": ["Token"],
+    });
+  });
+
+  it.each(["main", "test"])("falls through invisible same-package declarations to wildcard imports from %s", async (set, ctx) => {
+    const path = `svc-a/src/${set}/java/a/Use.java`;
+    const refs = await resolveSources(ctx, {
+      [path]: "package a; import b.*; class Use { Helper h; }",
+      "svc-b/src/test/java/a/Helper.java": "package a; class Helper {}",
+      "svc-a/src/main/java/b/Helper.java": "package b; public class Helper {}",
+    }, path);
+    expect(targets(refs)).toEqual({ "svc-a/src/main/java/b/Helper.java": ["Helper"] });
+  });
+
+  it("resolves a method-reference qualifier in the same package", async (ctx) => {
+    const refs = await resolveSources(ctx, {
+      "src/a/Use.java": "package a; class Use { Object f() { return CacheSpecs::ttl; } }",
+      "src/a/CacheSpecs.java": "package a; class CacheSpecs {}",
+    }, "src/a/Use.java");
+    expect(targets(refs)).toEqual({ "src/a/CacheSpecs.java": ["CacheSpecs"] });
+  });
+
+  it("names non-javax JDK packages as stdlib while preserving third-party com.sun packages", async (ctx) => {
+    const refs = await resolveSources(ctx, { "Uses.java": "import org.w3c.dom.Document; import org.xml.sax.SAXException; import org.ietf.jgss.GSSContext; import com.sun.net.httpserver.HttpServer; import sun.misc.Unsafe; import com.sun.mail.Mail; import org.w3c.dom.svg.SVGDocument; import org.w3c.dom.smil.ElementTimeControl; import org.w3c.dom.events.Event; class Uses {}" }, "Uses.java");
+    expect(externals(refs)).toEqual({
+      "java:stdlib:org.w3c.dom": ["Document"], "java:stdlib:org.xml.sax": ["SAXException"],
+      "java:stdlib:org.ietf.jgss": ["GSSContext"], "java:stdlib:com.sun.net.httpserver": ["HttpServer"],
+      "java:stdlib:sun.misc": ["Unsafe"], "java:com.sun.mail": ["Mail"],
+      // SVG and SMIL DOM: xml-apis-ext and Batik, not packages the JDK exports.
+      "java:org.w3c.dom.svg": ["SVGDocument"], "java:org.w3c.dom.smil": ["ElementTimeControl"],
+      "java:stdlib:org.w3c.dom.events": ["Event"],
+    });
+  });
   it("resolves every import form and bare name in Java's lookup order", async (ctx) => {
     const resolve = await resolveFixture(ctx);
     expect(targets(resolve(`${APP}/Checkout.java`))).toEqual({
@@ -315,6 +401,15 @@ describe("java resolver", () => {
       });
       expect(targets(resolve(APP_TEST))).toEqual({ [DAO_FIXTURE]: ["DaoFixture"] });
       expect(targets(resolve(APP_MAIN))).toEqual({});
+    });
+
+    it("links Gradle fixtures through a type-safe project accessor", async (ctx) => {
+      const resolve = await resolveProject(ctx, {
+        "settings.gradle.kts": 'include(":app", ":dao")\n',
+        "dao/build.gradle.kts": 'plugins { `java-test-fixtures` }\n',
+        "app/build.gradle.kts": "dependencies { testImplementation(testFixtures(projects.dao)) }\n",
+      });
+      expect(targets(resolve(APP_TEST))).toEqual({ [DAO_FIXTURE]: ["DaoFixture"] });
     });
 
     it("links a test to a Gradle test-configuration dependency's test classes", async (ctx) => {

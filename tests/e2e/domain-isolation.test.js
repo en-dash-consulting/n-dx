@@ -450,7 +450,11 @@ describe("architecture policy: orchestration tier boundary", () => {
       //    on its own and disagreeing with every package that asks the
       //    resolver. It is the hand-written twin of the foundation module for
       //    exactly this reason — see packages/core/layout.js.
-      const allowedLocalHelpers = new Set(["./win-spawn.js", "./layout.js"]);
+      //  - gitignore.js — the "is this path tracked / ignored by git" question,
+      //    shared with cli.js and export.js. config.js asks it before writing
+      //    an API key; restating the two spawns here would be a second copy of
+      //    the same git invocation to keep in step.
+      const allowedLocalHelpers = new Set(["./win-spawn.js", "./layout.js", "./gitignore.js"]);
       if (!source.startsWith("node:") && !allowedLocalHelpers.has(source)) {
         violations.push(`line ${i + 1}: import from "${source}"`);
       }
@@ -460,7 +464,7 @@ describe("architecture policy: orchestration tier boundary", () => {
       expect.fail(
         [
           "config.js is spawn-exempt but must only import from node: builtins",
-          "or permitted same-package helpers (./win-spawn.js, ./layout.js).",
+          "or permitted same-package helpers (./win-spawn.js, ./layout.js, ./gitignore.js).",
           "It should not accumulate library imports beyond config I/O.",
           "",
           "Non-node: imports found:",

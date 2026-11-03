@@ -1,10 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { PRDStore } from "../../prd/rex-gateway.js";
 import type { HenchConfig, RunRecord, TaskBrief, TurnTokenUsage } from "../../schema/index.js";
-import { GuardRails } from "../../guard/index.js";
+import { GuardRails, createToolSandbox, resolveSandboxPosture, assertSandboxReady, formatSandboxPosture } from "../../guard/index.js";
 import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { TOOL_DEFINITIONS, TOOL_DEFINITIONS_NEUTRAL, TOOL_DEFINITIONS_GEMINI, dispatchTool } from "../../tools/dispatch.js";
 import type { ToolContext } from "../../tools/contracts.js";
+import { RUN_GUARD_AUDIT_MAX_DENIALS } from "../../schema/index.js";
 import { rexToolHandlers } from "../../tools/rex.js";
 import { saveRun } from "../../store/runs.js";
 import { recordFileWork } from "../../store/run-events.js";
@@ -29,6 +30,8 @@ import type {
 } from "../../prd/llm-gateway.js";
 import type { TokenUsage } from "../../schema/index.js";
 import { checkTokenBudget } from "./token-budget.js";
+import { createSpendGate, priceRunUsd } from "./spend-cap.js";
+import type { SpendGate } from "./spend-cap.js";
 import { buildCachedMessageRequest } from "./prompt-cache.js";
 import { resolveAgentApiEffort } from "./agent-effort.js";
 import {
@@ -327,7 +330,7 @@ async function initApiResources(
   }
   const client = new Anthropic(anthropicOpts as ConstructorParameters<typeof Anthropic>[0]);
 
-  const guard = new GuardRails(projectDir, config.guard);
+  const guard = new GuardRails(projectDir, config.guard, { sandbox: createToolSandbox(projectDir) });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
   const toolCtx: ToolContext = {
@@ -418,6 +421,48 @@ async function failOnLivelock(
   run.error = detection.message;
   stream("Warning", run.error);
   await handleRunFailure(store, taskId, "deferred", "livelock_detected", run.error);
+  return true;
+}
+
+/**
+ * The USD spend gate for an API, Gemini or local run: the same
+ * `hench.maxCostUsdPerRun` / `hench.maxCostUsdPerDay` check the CLI loop runs
+ * before each vendor spawn, run here before each model request. Without it a
+ * task moved to an API provider (a saved `run.provider`, which PRD content can
+ * set) escaped the operator's caps. This run's spend is priced from its own
+ * record, which every turn updates; undefined when neither cap is set.
+ */
+function apiSpendGate(
+  config: HenchConfig,
+  henchDir: string,
+  run: RunRecord,
+  model: string,
+): SpendGate | undefined {
+  return createSpendGate({
+    limits: { maxCostUsdPerRun: config.maxCostUsdPerRun, maxCostUsdPerDay: config.maxCostUsdPerDay },
+    henchDir,
+    runId: run.id,
+    currentRunUsd: () => priceRunUsd({ tokenUsage: run.tokenUsage, turnTokenUsage: run.turnTokenUsage, model }),
+  });
+}
+
+/**
+ * Stop the run when a spend cap is reached, before the next request is sent.
+ * Returns true if it did, so callers read as `if (await stopOnSpendCap(...)) break;`.
+ */
+async function stopOnSpendCap(
+  gate: SpendGate | undefined,
+  run: RunRecord,
+  store: PRDStore,
+  taskId: string,
+): Promise<boolean> {
+  if (!gate) return false;
+  const exceeded = await gate();
+  if (!exceeded) return false;
+  run.status = "budget_exceeded";
+  run.error = exceeded.message;
+  stream("Budget", run.error);
+  await handleRunFailure(store, taskId, "pending", "budget_exceeded", run.error);
   return true;
 }
 
@@ -517,7 +562,7 @@ function initGoogleApiResources(
   startingHead: string | undefined,
   configBackstop: ConfigBackstop | undefined,
 ): ToolContext {
-  const guard = new GuardRails(projectDir, config.guard);
+  const guard = new GuardRails(projectDir, config.guard, { sandbox: createToolSandbox(projectDir) });
   const memoryMonitor = new SystemMemoryMonitor(config.guard.memoryMonitor);
 
   return {
@@ -802,6 +847,9 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
   };
   process.on("SIGINT", handleSignal);
 
+  // The guard the tool loop ran under, for the record's audit summary.
+  let auditedGuard: ToolContext["guard"] | undefined;
+
   try {
     if (!hasToolCalling) {
       // Graceful degradation: single-turn completion when the provider does
@@ -818,6 +866,7 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       const toolCtx = initGoogleApiResources(
         config, projectDir, store, taskId, testCommand, startingHead, opts.configBackstop,
       );
+      auditedGuard = toolCtx.guard;
       const tools = [{ functionDeclarations: TOOL_DEFINITIONS_GEMINI }];
       const contents: GeminiContent[] = [
         { role: "user", parts: [{ text: briefText }] },
@@ -834,12 +883,14 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
         config.prune,
       );
 
+      const spendGate = apiSpendGate(config, henchDir, run, model);
       for (let turn = 0; turn < maxTurns; turn++) {
         if (cancelled) {
           run.status = "cancelled";
           stream("Cancelled", "Run interrupted by user");
           break;
         }
+        if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
         run.turns = turn + 1;
         subsection(`Turn ${turn + 1}/${maxTurns}`);
@@ -949,6 +1000,10 @@ async function runGeminiToolLoop(params: GeminiToolLoopParams): Promise<AgentLoo
       baselineUntracked,
     });
   }
+
+  // The guard's decisions outlive the process only if they are on the record.
+  const auditedPolicy = auditedGuard?.policy;
+  if (auditedPolicy) run.guardAudit = auditedPolicy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
 
   await finalizeRun({
     claims: opts.claims,
@@ -1522,6 +1577,7 @@ async function runLocalToolLoop(params: {
     }
   }
 
+  const spendGate = apiSpendGate(config, henchDir, run, model);
   try {
     for (let turn = 0; turn < maxTurns; turn++) {
       if (cancelled) {
@@ -1529,6 +1585,7 @@ async function runLocalToolLoop(params: {
         stream("Cancelled", "Run interrupted by user");
         break;
       }
+      if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
       run.turns = turn + 1;
       subsection(`Turn ${turn + 1}/${maxTurns}`);
@@ -1786,6 +1843,9 @@ async function runLocalToolLoop(params: {
     });
   }
 
+  // The guard's decisions outlive the process only if they are on the record.
+  if (toolCtx.guard.policy) run.guardAudit = toolCtx.guard.policy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
+
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,
@@ -1845,6 +1905,13 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
     });
     return { run };
   }
+
+  // Confinement: an autonomous run never executes agent commands unconfined
+  // by accident. Checked before the task is claimed, so a refusal leaves the
+  // PRD untouched; the posture line says what every later command runs under.
+  const sandboxPosture = resolveSandboxPosture(projectDir).posture;
+  assertSandboxReady(sandboxPosture, opts.autonomous === true || config.autonomous === true);
+  stream("Guard", formatSandboxPosture(sandboxPosture));
 
   // Shared: transition task to in_progress
   await transitionToInProgress(store, taskId, brief.task.status);
@@ -2042,6 +2109,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   const heartbeat = startHeartbeat(henchDir, run);
 
   // API-specific: turn-based execution loop
+  const spendGate = apiSpendGate(config, henchDir, run, model);
   let consecutiveEmptyTurns = 0;
   let planOnlyRetryCount = 0;
   const planOnlyMaxRetries = config.planOnlyMaxRetries ?? 2;
@@ -2065,6 +2133,7 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
         stream("Cancelled", "Run interrupted by user");
         break;
       }
+      if (await stopOnSpendCap(spendGate, run, store, taskId)) break;
 
       run.turns = turn + 1;
 
@@ -2252,6 +2321,9 @@ export async function agentLoop(opts: AgentLoopOptions): Promise<AgentLoopResult
   }
 
   // Shared: finalize run (build summary, memory stats, post-task tests, save)
+  // The guard's decisions outlive the process only if they are on the record.
+  if (toolCtx.guard.policy) run.guardAudit = toolCtx.guard.policy.runAudit(RUN_GUARD_AUDIT_MAX_DENIALS);
+
   await finalizeRun({
     claims: opts.claims,
     configBackstop: opts.configBackstop,

@@ -38,6 +38,7 @@ export default defineConfig({
       // Required by tests/e2e/credential-isolation-setup-policy.test.js.
       "../../tests/setup-ndx-home.js",
       "../../tests/setup-judgment-env.js",
+      "../../tests/setup-sandbox-env.js",
     ],
     include: ["tests/**/*.test.ts"],
     // Raised from 5000ms: integration tests that spawn mocked CLIs, do dynamic

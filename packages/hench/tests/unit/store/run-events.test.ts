@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -107,6 +107,34 @@ describe("openRunEvents", () => {
     const events = await eventsIn(writer.path);
     expect(events).toHaveLength(1);
     expect(events[0].detail).toBe("line one line two line three");
+  });
+
+  it("scrubs credential-shaped text from summary and detail before it reaches disk", async () => {
+    const key = "sk-ant-api03-" + "A".repeat(40);
+    const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----";
+    const writer = await openRunEvents(henchDir, "run-6");
+    writer.append({
+      kind: "retry",
+      at: "2026-01-01T00:00:00.000Z",
+      summary: `curl failed with x-api-key: ${key}`,
+      detail: `cat id_rsa\n${pem}`,
+    });
+    await writer.close();
+
+    const raw = await readFile(writer.path, "utf-8");
+    expect(raw).not.toContain(key);
+    expect(raw).not.toContain("MIIEow");
+    const events = await eventsIn(writer.path);
+    expect(events[0].summary).toBe("curl failed with x-api-key: [redacted:token]");
+    // Redacted before flattening, so the key block was still recognisable.
+    expect(events[0].detail).toBe("cat id_rsa [redacted:private-key]");
+  });
+
+  it.skipIf(process.platform === "win32")("creates the runs directory and the file owner-only", async () => {
+    const writer = await openRunEvents(henchDir, "run-7");
+    await writer.close();
+    expect((await stat(join(henchDir, "runs"))).mode & 0o777).toBe(0o700);
+    expect((await stat(writer.path)).mode & 0o777).toBe(0o600);
   });
 
   it("never throws from append once the file is closed", async () => {

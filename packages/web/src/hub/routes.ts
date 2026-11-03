@@ -8,7 +8,7 @@
  *   GET    /api/hub/new-project     — where a new project would go: the suggested
  *                                     parent, and (with ?parent=&name=) the exact
  *                                     absolute path those would create
- *   POST   /api/hub/projects        — register { id, repoRoot, ndxBin, worktree?, name? } and start its server
+ *   POST   /api/hub/projects        — register { id, repoRoot, worktree?, name? } and start its server (always from the hub's own binary)
  *   POST   /api/hub/projects/new    — create { parent, name } as a folder, register it,
  *                                     and answer with the URL of its setup page
  *   DELETE /api/hub/projects/:id    — stop the server and forget the project
@@ -22,6 +22,9 @@
  *                                     its resolved dashboard links
  *   POST   /api/hub/extensions/:name/stop
  *                                   — stop that extension's sidecar
+ *   POST   /api/hub/mounts/:name    — where a browser opens that sidecar:
+ *                                     `/x/<name>/~<key>/` with the token on
+ *                                     (the sign-in page asks for it)
  *
  * **Versioned.** `GET`/`POST /projects` and both `/extensions` routes are the
  * extension API (docs/architecture/extensions.md, "Versioned hub API"): each
@@ -147,7 +150,6 @@ function isNdxWebPackage(pkgRoot: string): boolean {
   }
 }
 
-/** Validate a registration body. Returns the input or the first problem. */
 /**
  * Whether `ndxBin` is something the hub should spawn.
  *
@@ -172,7 +174,11 @@ export function isAcceptableNdxBin(path: string): boolean {
   return /^(ndx|n-dx)(\.(cmd|exe|ps1))?$/.test(base);
 }
 
-export function parseRegisterInput(body: unknown): { input: RegisterProjectInput } | { problem: string } {
+/**
+ * Validate a registration body. The project server is always spawned from
+ * `selfBin` — the hub's own entry point — whatever the body says.
+ */
+export function parseRegisterInput(body: unknown, selfBin: string): { input: RegisterProjectInput } | { problem: string } {
   if (!body || typeof body !== "object") return { problem: "body must be a JSON object" };
   const b = body as Record<string, unknown>;
 
@@ -186,12 +192,11 @@ export function parseRegisterInput(body: unknown): { input: RegisterProjectInput
     return { problem: "repoRoot must be an absolute path" };
   }
   if (!isDirectory(b.repoRoot)) return { problem: `repoRoot is not a directory: ${b.repoRoot}` };
-  if (typeof b.ndxBin !== "string" || !isAbsolute(b.ndxBin)) {
-    return { problem: "ndxBin must be an absolute path" };
-  }
-  if (!existsSync(b.ndxBin)) return { problem: `ndxBin does not exist: ${b.ndxBin}` };
-  if (!isAcceptableNdxBin(b.ndxBin)) {
-    return { problem: "ndxBin must be @n-dx/web's own CLI entry point (…/dist/cli/index.js in a package whose package.json names @n-dx/web) or an ndx launcher" };
+  // The binary is the hub's own, never the caller's: a body's `ndxBin` (sent
+  // by older `ndx start` versions) is ignored, so nothing a request carries
+  // chooses what the hub executes.
+  if (!selfBin || !isAcceptableNdxBin(selfBin)) {
+    return { problem: "The hub cannot tell which n-dx binary to run; restart it with `ndx start`." };
   }
   if (b.worktree !== undefined) {
     if (typeof b.worktree !== "string" || !isAbsolute(b.worktree)) {
@@ -207,7 +212,6 @@ export function parseRegisterInput(body: unknown): { input: RegisterProjectInput
     input: {
       id: b.id,
       repoRoot: b.repoRoot,
-      ndxBin: b.ndxBin,
       worktree: typeof b.worktree === "string" ? b.worktree : undefined,
       name: typeof b.name === "string" ? b.name.trim() : undefined,
     },
@@ -295,7 +299,7 @@ async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: 
     return true;
   }
 
-  // The same rule `parseRegisterInput` applies to a caller-supplied `ndxBin`.
+  // The same rule `parseRegisterInput` applies before every registration.
   // Nothing a client sends reaches `selfBin` — it is resolved from this
   // process's own entry point — so this is an assertion, not a filter, and
   // it is here because this is the other place the hub decides what to spawn.
@@ -320,7 +324,6 @@ async function handleNewProject(req: IncomingMessage, res: ServerResponse, hub: 
   const { project } = await hub.registerProject({
     id,
     repoRoot: plan.path,
-    ndxBin: hub.selfBin,
     worktree: plan.path,
     name: plan.name,
   });
@@ -429,6 +432,20 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
     return true;
   }
 
+  // The sign-in page at `/x/<name>/` asks for the keyed mount here, with the
+  // session it holds. Not part of the versioned extension API: it is the
+  // browser's route into a sidecar, and a script with the token needs none.
+  const mountMatch = path.match(/^\/mounts\/([^/]+)$/);
+  if (mountMatch && method === "POST") {
+    const name = safeDecodeSegment(mountMatch[1]);
+    if (!SidecarManager.isName(name)) {
+      error(res, 404, `No extension is named "${name}"`);
+      return true;
+    }
+    json(res, 200, { name, path: hub.sidecars.mountBase(name) });
+    return true;
+  }
+
   // Feeds the home page, and its refresh tick: `html` is the same markup the
   // page was served with, rendered once here rather than a second time in the
   // browser, so there is one renderer and not two that can disagree.
@@ -463,7 +480,7 @@ export async function handleHubRoute(req: IncomingMessage, res: ServerResponse, 
       error(res, 400, (err as Error).message);
       return true;
     }
-    const parsed = parseRegisterInput(body);
+    const parsed = parseRegisterInput(body, hub.selfBin);
     if ("problem" in parsed) {
       error(res, 400, parsed.problem);
       return true;

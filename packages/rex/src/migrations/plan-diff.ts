@@ -123,7 +123,7 @@ export function diffPlanFiles(before: PlanFile, after: PlanFile): string {
     const parsed = z.record(z.string(), z.unknown()).safeParse(plan.summary);
     if (!parsed.success) throw new Error("Cannot diff plan summary: expected an object.");
     const { counts: _counts, corrupt: _corrupt, flagCounts: _flags, legacyLoe: _loe, evidenceDigest: _digest, codeEvidence: _evidence,
-      reviewQueue: _queue, jevReview: _jev, dissolvedReleases: _dissolved, ...rest } = parsed.data;
+      commitEvidence: _commitEvidence, reviewQueue: _queue, jevReview: _jev, dissolvedReleases: _dissolved, ...rest } = parsed.data;
     return rest;
   };
   const summaryFields = changedKeys(summaryDecisions(before), summaryDecisions(after));

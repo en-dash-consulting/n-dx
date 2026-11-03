@@ -16,8 +16,9 @@ import {
   stat,
   mkdir,
   rename,
+  rm,
 } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { execFileSyncCli } from "./win-spawn.js";
 import { relativeToRoot, resolveLayout, resolveNdxHome } from "./layout.js";
@@ -25,6 +26,7 @@ import {
   describeUnrestrictedFile,
   restrictFileToOwner,
 } from "./file-permissions.js";
+import { gitIgnoreStatus, isGitTracked } from "./gitignore.js";
 export { quoteWindowsToken, buildWindowsCliCommandLine } from "./win-spawn.js";
 
 /**
@@ -123,6 +125,11 @@ const API_KEY_PERMISSION_NOTE = process.platform === "win32"
  *   routing too (it sends the user's stored key), so it goes where the
  *   user's other credential settings go.
  *
+ * - **Security posture** (`web.auth`): whether the dashboard requires the
+ *   per-user token is the user's decision, not the repository's, so `ndx
+ *   start` ignores `web.auth: false` in the shared file. Writing it there
+ *   would leave auth on and print a warning on every start.
+ *
  * Keyed by section, then by the setting path within that section. `llm`
  * entries are matched by suffix so `llm.claude.api_key`, `llm.codex.api_key`
  * and `llm.google.api_key` all route without listing each vendor. `hench` is
@@ -135,6 +142,7 @@ const LOCAL_ONLY_SETTINGS = {
   claude: new Set(["cli_path", "api_key", "api_endpoint"]),
   llm: { suffixes: [".cli_path", ".api_key", ".api_endpoint", ".apiKeyEnv", ".auth"] },
   hench: new Set(["apiKeyEnv", "claudePath"]),
+  web: new Set(["auth"]),
 };
 
 /**
@@ -195,7 +203,7 @@ const PROJECT_SECTIONS = new Set([
  * Valid values for the top-level `language` field in .n-dx.json.
  * "auto" (or omitting the field) triggers marker-based detection.
  */
-const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "auto"]);
+const VALID_LANGUAGES = new Set(["typescript", "javascript", "go", "swift", "python", "csharp", "java", "auto"]);
 
 /**
  * Regex matching integer or simple decimal strings (positive or negative).
@@ -229,33 +237,93 @@ async function loadOptionalJSON(path) {
   }
 }
 
-async function saveJSON(path, data) {
-  await writeFile(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
+/**
+ * Write `data` as JSON. With `ownerOnly`, the file is created owner-readable
+ * from its first byte: the content goes to a sibling temp file opened with
+ * mode 0600 and is renamed into place, so there is no window in which the
+ * file exists at the default umask, and a reader never sees a partial file.
+ * (Node's `writeFile` applies `mode` only when it creates the file, which is
+ * why the temp file — always new — is the one that carries it.)
+ */
+async function saveJSON(path, data, { ownerOnly = false } = {}) {
+  const text = JSON.stringify(data, null, 2) + "\n";
+  if (!ownerOnly) {
+    await writeFile(path, text, "utf-8");
+    return;
+  }
+  const tmp = `${path}.${process.pid}.tmp`;
+  try {
+    await writeFile(tmp, text, { encoding: "utf-8", mode: 0o600 });
+    await rename(tmp, path);
+  } catch (err) {
+    await rm(tmp, { force: true }).catch(() => {});
+    throw err;
+  }
 }
 
 /**
- * Save .n-dx.json restricted to its owner when it contains sensitive data like
- * API keys. Otherwise uses standard permissions.
+ * Save a project config file, restricted to its owner when it is the local
+ * file or contains sensitive data like API keys. Otherwise uses standard
+ * permissions.
  *
  * Restriction is attempted AND verified (see file-permissions.js): on Windows a
  * bare `chmod(path, 0o600)` changes nothing about who can read the file, so a
  * silent chmod would have left the key exposed while appearing to protect it.
  * When verification fails the user is told, because a false assurance about an
- * API key is worse than a stated limitation.
+ * API key is worse than a stated limitation. The POSIX mode is already set
+ * by the write itself (see saveJSON); this pass is what covers Windows and
+ * what verifies.
+ *
+ * @param {string} path
+ * @param {object} data
+ * @param {{ ownerOnly?: boolean }} [options]  `ownerOnly` for the machine-local
+ *   file, which is never shared whatever it holds.
  */
-async function saveProjectJSON(path, data) {
-  await saveJSON(path, data);
+async function saveProjectJSON(path, data, { ownerOnly = false } = {}) {
   const hasSensitiveData =
     (data?.claude?.api_key && typeof data.claude.api_key === "string") ||
     (data?.llm?.claude?.api_key &&
       typeof data.llm.claude.api_key === "string") ||
     (data?.llm?.codex?.api_key && typeof data.llm.codex.api_key === "string") ||
     (data?.llm?.google?.api_key && typeof data.llm.google.api_key === "string");
+  await saveJSON(path, data, { ownerOnly: ownerOnly || Boolean(hasSensitiveData) });
   if (!hasSensitiveData) return;
 
   const result = await restrictFileToOwner(path);
   const warning = describeUnrestrictedFile(path, result);
   if (warning) process.stderr.write(`${warning}\n`);
+}
+
+/**
+ * Check, before an API key is written to a project file, that git will not
+ * commit it. Returns an error message when the file is tracked (the key would
+ * land in the next commit) and a warning when it is merely not ignored; null
+ * when it is ignored or when `dir` is not in a git repository at all.
+ *
+ * `ndx init` adds the local file to `.gitignore` once, but the line can be
+ * removed, the file can be force-added, or the project can have been set up
+ * without init — so the question is asked again at the moment it matters.
+ *
+ * @param {string} dir   Project root.
+ * @param {string} path  The file about to receive the key.
+ * @returns {{ error: string } | { warning: string } | null}
+ */
+function describeKeyFileExposure(dir, path) {
+  const relPath = relative(dir, path);
+  const status = gitIgnoreStatus(relPath, dir);
+  if (status !== "not-ignored") return null;
+  if (isGitTracked(relPath, dir)) {
+    return {
+      error:
+        `Refusing to write an API key to ${relPath}: the file is tracked by git, so the key would be committed.\n` +
+        `  Untrack it first (git rm --cached ${relPath}), add it to .gitignore, then retry.`,
+    };
+  }
+  return {
+    warning:
+      `Warning: ${relPath} is not ignored by git. The API key written to it could be committed.\n` +
+      `  Add ${relPath} to .gitignore.`,
+  };
 }
 
 /**
@@ -2105,10 +2173,18 @@ Hench settings (.hench/config.json):
   hench.provider           string    API provider: "cli" or "api" (default: "cli")
   hench.model              string    Deprecated and ignored (default: "sonnet"); use hench.models.<vendor>
   hench.models.<vendor>    string    Agent-only model for claude, codex, google or local
-  hench.maxTurns           number    Max conversation turns per run (default: 50)
+  hench.maxTurns           number    Max conversation turns per run (default: 200)
   hench.maxTokens          number    Max tokens per API request (default: 8192)
   hench.tokenBudget        number    Total tokens per run, input+cached+output (default: 0 —
                                      unlimited). A run stops once it crosses this.
+  hench.maxCostUsdPerRun   number    USD spend cap for one run, priced from its tokens with the
+                                     model table ndx usage quotes (default: 0 — unlimited).
+                                     Checked before every vendor spawn; a run that has reached
+                                     it stops with status budget_exceeded. A task's saved run
+                                     block cannot set or raise it.
+  hench.maxCostUsdPerDay   number    USD spend cap across runs started today (local day), read
+                                     from .hench/runs before every vendor spawn (default: 0 —
+                                     unlimited). Same status and saved-block rule as PerRun.
   hench.rexDir             string    Path to the rex PRD directory (default: the project's
                                      resolved rex directory — .rex, or .ndx/rex on the new layout)
   hench.apiKeyEnv          string    Env variable for API key (default: "ANTHROPIC_API_KEY").
@@ -2330,6 +2406,10 @@ Hench guard settings (security boundaries):
                                            the shrink check (default: 1024)
   hench.guard.spawnTimeout       number    Timeout for a spawned vendor process in ms
                                            (default: 300000)
+  hench.guard.sessionTimeout     number    Wall-clock limit for one vendor CLI session in ms
+                                           (default: 7200000 — two hours; 0 disables). The
+                                           session's process tree is stopped and the run ends
+                                           with status timeout.
   hench.guard.maxConcurrentProcesses
                                  number    Simultaneous hench processes allowed (default: 3)
   hench.guard.allowedGitSubcommands
@@ -2638,8 +2718,11 @@ Web dashboard settings (.n-dx.json):
   web.auth                 boolean   Require the per-user dashboard token on the hub,
                                     dashboard and preview servers (default: true).
                                     'ndx start' creates <ndx home>/auth.token and prints
-                                    a URL that sets it as a cookie once; false, or
-                                    --no-auth, runs the servers without it
+                                    a one-time sign-in URL (never the token); false,
+                                    or --no-auth, runs the servers without it.
+                                    Stored in .n-dx.local.json (or set web.auth in
+                                    <ndx home>/config.json for every project); a
+                                    false in .n-dx.json is ignored with a warning
   web.mode                 string    "here" makes 'ndx start' run the single-project
                                     server that owns the port; "hub" registers with
                                     the per-user hub (served at /p/<id>/) — the
@@ -2676,7 +2759,7 @@ Extension settings (<ndx home>/config.json and .n-dx.json):
 
 Language detection override (.n-dx.json):
   language                 string    Primary project language (default: "auto")
-                                    Valid values: typescript, javascript, go, auto
+                                    Valid values: typescript, javascript, go, swift, python, csharp, java, auto
                                     When set to a specific language, overrides
                                     marker-based auto-detection in sourcevision.
                                     Use "auto" (or omit) to use the detection chain.
@@ -2702,8 +2785,9 @@ Local overrides (.n-dx.local.json):
   settings without conflicts. Deep-merged over .n-dx.json (local wins).
 
   Machine-specific keys (claude.cli_path, llm.claude.cli_path, llm.codex.cli_path)
-  are automatically written to .n-dx.local.json instead of .n-dx.json. A
-  cli_path in .n-dx.json applies only once the repository is trusted.
+  and web.auth are automatically written to .n-dx.local.json instead of
+  .n-dx.json. A cli_path in .n-dx.json applies only once the repository is
+  trusted; web.auth there is ignored.
 
 Credentials (per-user, not per-project):
   credentials [dir]        Show each credential's backend, source in effect and
@@ -3014,6 +3098,22 @@ async function loadLocalEnvAllow(dir) {
   return Array.isArray(allow) ? allow.filter((entry) => typeof entry === "string") : [];
 }
 
+/**
+ * Whether readers of the checkout's tracked config should clamp what they
+ * read: the repository's execution config deviates from the baseline and the
+ * user has not accepted its current digest. Same decision as hench's
+ * `applyRepoTrust` and llm-client's loaders, through the same function.
+ * Loaded dynamically: config.js may not import packages statically.
+ *
+ * @param {string} dir
+ * @param {import("@n-dx/llm-client").RepoTrustStoreOptions} [trust]
+ * @returns {Promise<boolean>}
+ */
+export async function isRepoRestricted(dir, trust) {
+  const { isRepoRestricted: restricted } = await import("@n-dx/llm-client");
+  return restricted(dir, trust);
+}
+
 /** The project's `hench.guard.env` policy, `.hench/config.json` merged with `.n-dx.json`. */
 async function loadProjectEnvPolicy(dir) {
   const { configs, projectConfig } = await loadAllConfigs(dir);
@@ -3028,8 +3128,8 @@ async function loadProjectEnvPolicy(dir) {
  * once the checkout is trusted.
  *
  * `repoCommandEnv` skips a malformed policy list without saying so, so the
- * policy is compiled here first; when that fails, the default deny policy
- * applies and `policyError` says why, so the caller can report it.
+ * policy is compiled here first; when that fails, only malformed fields
+ * are ignored and valid user denies still apply and `policyError` says why, so the caller can report it.
  * Never returns the unfiltered parent environment.
  *
  * @param {string} dir
@@ -3038,12 +3138,12 @@ async function loadProjectEnvPolicy(dir) {
  * @returns {Promise<{ env: NodeJS.ProcessEnv; policyError?: string }>}
  */
 export async function loadShellTestEnv(dir, options = {}) {
-  const { compileEnvPolicy, repoCommandEnv, sanitizeChildEnv } = await import("@n-dx/llm-client");
+  const { compileEnvPolicy, repoCommandEnv } = await import("@n-dx/llm-client");
   try {
     compileEnvPolicy(await loadProjectEnvPolicy(dir));
   } catch (err) {
     return {
-      env: sanitizeChildEnv(process.env, compileEnvPolicy(undefined)),
+      env: repoCommandEnv(dir, { trust: options.trust }),
       policyError: err instanceof Error ? err.message : String(err),
     };
   }
@@ -3331,6 +3431,17 @@ async function handleSetProjectSection(
     ? LOCAL_CONFIG_FILE
     : PROJECT_CONFIG_FILE;
   const configPath = projectConfigPath(dir, targetFile);
+  if (targetFile === LOCAL_CONFIG_FILE) {
+    const status = await localConfigTrackedStatus(dir);
+    if (status.tracked) {
+      const label = projectConfigLabel(dir, LOCAL_CONFIG_FILE);
+      const reason = status.reason;
+      if (storageSettingPath.split(".").at(-1) === SECRET_SETTING_LEAF) {
+        throw new Error(`Refusing to write a credential to ${label}: ${reason}. Untrack the local config before storing credentials.`);
+      }
+      console.error(`Warning: ${label} is repository config (${reason}); this setting may be shared and execution settings remain trust-gated.`);
+    }
+  }
   const current = await loadProjectConfigFile(dir, targetFile);
   if (!current[storagePkg] || typeof current[storagePkg] !== "object") {
     current[storagePkg] = {};
@@ -3387,8 +3498,17 @@ async function handleSetProjectSection(
   // to be wrong. Existing `claude.*` values are deliberately left where they
   // are — they are still read until 1.0.0.
 
-  // Write back to the appropriate file (local or project)
-  await saveProjectJSON(configPath, current);
+  // Write back to the appropriate file (local or project). A key is only ever
+  // written to a file git will not commit — see describeKeyFileExposure.
+  if (storageSettingPath.endsWith(SECRET_SETTING_LEAF)) {
+    const exposure = describeKeyFileExposure(dir, configPath);
+    if (exposure?.error) {
+      console.error(exposure.error);
+      process.exit(1);
+    }
+    if (exposure?.warning) console.error(exposure.warning);
+  }
+  await saveProjectJSON(configPath, current, { ownerOnly: targetFile === LOCAL_CONFIG_FILE });
   console.log(`${keyArg} = ${formatValue(coerced)}`);
 
   // `ndx config claude.<field>` itself is deprecated — surfaced on stderr,
@@ -4093,16 +4213,26 @@ const CLI_VENDORS = new Set(["claude", "codex"]);
  * say so. A store-only key never selects the API (auth `auto`), but writing
  * `llm.<vendor>.api_key` always has, so the alias keeps that effect visible.
  * An explicit auth, `cli` included, is never overwritten. google has no CLI
- * login, so there is no mode to switch.
+ * login, so there is no mode to switch. When git tracks the local file, the
+ * switch is not written as a side effect: it would reach everyone who checks
+ * the repository out, so the user is told to set it.
  */
 async function setApiAuthIfUnset(dir, vendor) {
   if (!CLI_VENDORS.has(vendor)) return;
   for (const which of [PROJECT_CONFIG_FILE, LOCAL_CONFIG_FILE]) {
     if ((await loadProjectConfigFile(dir, which)).llm?.[vendor]?.auth !== undefined) return;
   }
+  const status = await localConfigTrackedStatus(dir);
+  if (status.tracked) {
+    console.log(
+      `llm.${vendor}.auth is unset and left so: ${projectConfigLabel(dir, LOCAL_CONFIG_FILE)} is not machine-local (${status.reason}). ` +
+        `To use the stored key in this checkout: ndx config llm.${vendor}.auth api`,
+    );
+    return;
+  }
   const local = await loadProjectConfigFile(dir, LOCAL_CONFIG_FILE);
   setByPath(local, `llm.${vendor}.auth`, "api", "llm");
-  await saveProjectJSON(projectConfigPath(dir, LOCAL_CONFIG_FILE), local);
+  await saveProjectJSON(projectConfigPath(dir, LOCAL_CONFIG_FILE), local, { ownerOnly: true });
   console.log(
     `llm.${vendor}.auth = api (it was unset, so ${vendor} now uses the stored key; set it to cli or auto to change that)`,
   );
@@ -4121,8 +4251,30 @@ async function removeFileApiKey(dir, which, vendor) {
       changed = true;
     }
   }
-  if (changed) await saveProjectJSON(projectConfigPath(dir, which), data);
+  if (changed) await saveProjectJSON(projectConfigPath(dir, which), data, { ownerOnly: which === LOCAL_CONFIG_FILE });
   return changed;
+}
+
+/**
+ * Whether git tracks `.n-dx.local.json`, which makes it repository config
+ * rather than machine-local. The reader's answer covers what is on disk; a
+ * write must also ask git when nothing is: a deleted tracked file or a sparse
+ * checkout still has the index entry, and saveJSON's rename would put the
+ * path back, ready for `git commit -a`.
+ *
+ * @param {string} dir
+ * @returns {Promise<{ tracked: boolean, reason: string }>}
+ */
+async function localConfigTrackedStatus(dir) {
+  // config.js already uses this foundation reader for trust-aware config I/O.
+  const { collectRepoExecutionConfig, isLocalConfigTracked } = await import("@n-dx/llm-client");
+  const config = collectRepoExecutionConfig(dir);
+  const tracked = config.localConfigTracked || isLocalConfigTracked(dir, { evenIfAbsent: true });
+  const unanswered = Boolean(config.localConfigTracked && config.localConfigUnanswered);
+  return {
+    tracked: Boolean(tracked),
+    reason: unanswered ? "git could not confirm it is untracked" : "the file is repository config tracked by git",
+  };
 }
 
 /**

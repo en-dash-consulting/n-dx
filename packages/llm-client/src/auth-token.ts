@@ -5,8 +5,9 @@
  * loopback is shared by every account on a host. The token is what tells
  * the user's own browser and CLI apart from another account's process: it
  * lives in `<ndx home>/auth.token` with owner-only modes, `ndx start` hands
- * it to the hub, the hub hands it to the project servers it spawns, and the
- * URL `ndx start` prints carries it once so the browser can set its cookie.
+ * it to the hub, and the hub hands it to the project servers it spawns. A
+ * browser never holds it: the URL `ndx start` prints carries a single-use
+ * nonce the page exchanges for a session credential of its own.
  *
  * This module only manages the file. Checking a request against the token
  * is the web package's job (`shared/auth.ts`), and nothing here is secret
