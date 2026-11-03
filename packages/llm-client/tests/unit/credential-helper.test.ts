@@ -19,6 +19,7 @@ import {
   clearCredentialHelperCache,
   credentialStatus,
   hasStoredCredential,
+  interpreterHelperPrefix,
   resolveCredential,
   setCredential,
   setHelperCredential,
@@ -330,6 +331,17 @@ describe("an interpreter helper denies its script, not the interpreter", () => {
     [["bash", "-x"]],
   ])("refuses to store %j, which has no script", (argv) => {
     expect(() => setHelperCredential("typesafe", argv, options)).toThrow(/is a shell, not a helper/);
+  });
+
+  // CodeQL js/polynomial-redos: the cluster check is one linear match, so a
+  // long letter run with no inline-code letter is an option, not inline code.
+  it("reads a long option cluster with no inline-code letter as an option", () => {
+    expect(interpreterHelperPrefix(["sh", `-${"x".repeat(50_000)}`, "/x/get-key.sh"])?.prefix).toEqual([
+      "sh",
+      `-${"x".repeat(50_000)}`,
+      "/x/get-key.sh",
+    ]);
+    expect(interpreterHelperPrefix(["perl", `-${"l".repeat(50_000)}`, "/x/get-key.pl"])?.prefix).toHaveLength(3);
   });
 
   it("an older store's scriptless interpreter helper still denies the bare interpreter", () => {

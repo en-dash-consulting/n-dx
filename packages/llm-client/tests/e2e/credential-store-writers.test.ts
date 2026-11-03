@@ -59,8 +59,15 @@ function startWriter(id: string): { ready: Promise<void>; go: () => void; exit: 
   return { ready, exit, go: () => child.stdin!.write("go\n") };
 }
 
+/**
+ * The writers' 50 updates run one at a time under the lock, and on Windows
+ * each one also spawns icacls for the owner-only ACL: a few hundred
+ * milliseconds a write on a CI runner, well past vitest's 5 s default.
+ */
+const WRITERS_TIMEOUT_MS = 60_000;
+
 describe("credential store across processes", () => {
-  it("two concurrent writers lose no update", async () => {
+  it("two concurrent writers lose no update", { timeout: WRITERS_TIMEOUT_MS }, async () => {
     const writers = [startWriter("a"), startWriter("b")];
     await Promise.all(writers.map((w) => w.ready));
     for (const w of writers) w.go();

@@ -344,16 +344,19 @@ function interpreterFamily(command: string): InterpreterFamily | undefined {
   return INTERPRETERS[name] ?? (/^python\d+(\.\d+)?$/.test(name) ? "python" : undefined);
 }
 
+/** A single-dash cluster of letters (`-c`, `-xc`, `-nE`). One pass: no backtracking on a long option. */
+const OPTION_CLUSTER = /^-[A-Za-z]+$/;
+
 /** Whether `option` runs code given on the command line rather than a script. */
 function isInlineCodeOption(family: InterpreterFamily, option: string): boolean {
   switch (family) {
     // `-c`, also inside a cluster (`-xc`, `-Ic`).
     case "shell":
     case "python":
-      return /^-[A-Za-z]*c[A-Za-z]*$/.test(option);
+      return OPTION_CLUSTER.test(option) && option.includes("c");
     // `-e`/`-E`, also inside a cluster (`-le`, `-nE`).
     case "perl":
-      return /^-[A-Za-z]*[eE][A-Za-z]*$/.test(option);
+      return OPTION_CLUSTER.test(option) && (option.includes("e") || option.includes("E"));
     case "js":
       return /^(-e|-p|-pe|--eval|--print)(=|$)/.test(option);
     // `-Command`, `-EncodedCommand`, `-CommandWithArgs` and their abbreviations.
