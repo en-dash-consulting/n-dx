@@ -46,6 +46,16 @@ items:
     resolutionDetail: "llm-client src/credential-store.ts (resolve/set/unset/status, v1 format, O_EXCL pid lock with dead-holder takeover, temp+rename, POSIX 0600/0700 + refusal, win32 icacls port) and src/cli/credentials.ts (set via stdin, unset, status [--json], typesafe only); re-exported from public.ts. No hench gateway change."
     lastModified: "2026-10-30T16:13:02.576Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3da75c2f-d41c-42dd-8e42-4d80380aa796":
+    status: "completed"
+    startedAt: "2026-11-03T20:34:51.348Z"
+    completedAt: "2026-11-03T20:35:43.178Z"
+    endedAt: "2026-11-03T20:35:43.178Z"
+    activeIntervals: [{"end":"2026-11-03T20:35:43.178Z","start":"2026-11-03T20:34:51.348Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Soft freeze paragraph appended to the three PR 3 changesets (commit 1e7d9402d); frontmatter untouched, all bumps patch. changeset status not run locally (approval denied)."
+    lastModified: "2026-11-03T20:35:43.178Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "534debf3-0b82-43af-adf5-be497be7b85f":
     status: "completed"
     startedAt: "2026-11-02T20:29:39.083Z"
@@ -78,7 +88,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-03T20:31:27.817Z"
+    lastModified: "2026-11-03T20:34:37.959Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
