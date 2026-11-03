@@ -2,7 +2,7 @@
  * REQUIRED TEST — the extensions contract across every process boundary.
  *
  * The fixture package in tests/e2e/fixture-extension/ (one command, one
- * sidecar, one project link, a config schema) is copied to a temp directory
+ * sidecar, one project link, one drawer tab, a config schema) is copied to a temp directory
  * and listed in `extensions.paths`, the development source, of an n-dx home
  * of the test's own. It is then driven only through the real CLI and a real
  * hub started by `ndx start`: discovery, approval, dispatch, the environment

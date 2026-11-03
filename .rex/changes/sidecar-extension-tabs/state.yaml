@@ -24,7 +24,14 @@ items:
     lastModified: "2026-11-03T17:51:13.796Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bad7db13-1603-40a6-95cc-a436d40eafa9":
-    lastModified: "2026-11-03T17:25:28.243Z"
+    status: "completed"
+    startedAt: "2026-11-03T19:37:43.657Z"
+    completedAt: "2026-11-03T19:46:33.202Z"
+    endedAt: "2026-11-03T19:46:33.202Z"
+    activeIntervals: [{"end":"2026-11-03T19:46:33.202Z","start":"2026-11-03T19:37:43.657Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Fixture declares sidecarTab; serve.js serves /tab showing X-Ndx-Base-Path; e2e in extension-fixture.test.js issues a frame key, loads the tab keyed without a token, and sees 401 for the key on /p/<id>/api/status. Commit 5884e89c6."
+    lastModified: "2026-11-03T19:46:33.202Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bb7ecdb1-ded5-41ed-9469-ee8fe7253d7a":
     status: "completed"
