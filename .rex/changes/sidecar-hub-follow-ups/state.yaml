@@ -1,7 +1,14 @@
 schema: "rex/v2"
 items:
   "314d8fa3-ea8c-4950-8a02-bd836a646b39":
-    lastModified: "2026-11-03T16:50:55.164Z"
+    status: "completed"
+    startedAt: "2026-11-03T17:35:27.450Z"
+    completedAt: "2026-11-03T17:42:31.812Z"
+    endedAt: "2026-11-03T17:42:31.812Z"
+    activeIntervals: [{"end":"2026-11-03T17:42:31.812Z","start":"2026-11-03T17:35:27.450Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Hub turns append to <ndx home>/hub/usage.jsonl via hubTurnSpendRecorder; hub home reads the total through hub/usage-ledger.ts; test covers two hosts."
+    lastModified: "2026-11-03T17:42:31.812Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "87b82506-45db-4b52-bd8c-30e1c46807d2":
     status: "completed"
@@ -14,8 +21,11 @@ items:
     lastModified: "2026-11-03T17:34:25.298Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "89e6dabf-b024-45bb-9be1-b09796a724d3":
-    lastModified: "2026-11-03T17:30:12.067Z"
+    lastModified: "2026-11-03T17:38:29.172Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9f3e974d-5eea-43c4-8706-0c745d01fcb7":
     lastModified: "2026-11-03T17:30:12.067Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "b147e397-606d-4194-b556-5324b87a8f49":
+    lastModified: "2026-11-03T17:38:29.172Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

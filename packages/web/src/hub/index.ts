@@ -101,5 +101,7 @@ export {
   readHubSessionHostLock,
 } from "./session-host.js";
 export type { ClaimHubSessionHostInput, HubLensProbeOptions, HubSessionHostClaim, HubSessionHostLock } from "./session-host.js";
+export { hubUsagePath, recordHubUsage, readHubUsageTotals } from "./usage-ledger.js";
+export type { HubUsageRecord, HubUsageTotals } from "./usage-ledger.js";
 export type { HubOverview, ProjectCard, ChildSnapshot } from "./overview.js";
 export { renderHomePage, renderCard, renderCards, cardFacts, dirtyLabel, progressLabel, runningLabel, readinessLabel, infrastructureLabel } from "./home.js";

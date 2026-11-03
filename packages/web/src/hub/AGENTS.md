@@ -70,6 +70,11 @@ mapping and the lock's location are in `src/shared/base-path.ts`, which the
 host's routes (`server/routes-sidecar.ts`) read too. Like every route here it
 is reached only past `guardHubRequest`; add no path that skips it.
 
+Its spend is the machine's, not the host project's: a host appends each finished
+turn to `<ndx home>/hub/usage.jsonl` (`hub/usage-ledger.ts`,
+`hubTurnSpendRecorder`), never to its own dashboard usage ledger, and the home
+reads the total back from that file.
+
 The home offers it only when `probeHubLens` (session-host.ts) gets a yes from
 the host it would pick (`/lens`): a header toggle (⌘J) docks an iframe of
 `/hub/session/drawer`, the drawer-only viewer page the host builds beside the

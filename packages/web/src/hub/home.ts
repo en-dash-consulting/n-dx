@@ -37,6 +37,7 @@
 import { HUB_SESSION_CLOSE_MESSAGE, HUB_SESSION_PATH, HUB_SESSION_ROUTES } from "../shared/index.js";
 import type { ExtensionView } from "./extensions.js";
 import type { HubOverview, ProjectCard } from "./overview.js";
+import type { HubUsageTotals } from "./usage-ledger.js";
 
 export function escapeHtml(value: string): string {
   return value
@@ -591,6 +592,21 @@ export function renderExtensionsSection(extensions: ExtensionView[]): string {
 
 export interface HomePageOptions {
   hubSession?: boolean;
+  /** The hub session's spend so far, from `<ndx home>/hub/usage.jsonl`; shown once it has a turn. */
+  hubSpend?: HubUsageTotals;
+}
+
+function compactTokens(n: number): string {
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
+}
+
+/** The header's hub-session spend, or nothing before the first turn. */
+export function renderHubSpend(spend: HubUsageTotals | undefined): string {
+  if (!spend || spend.turns === 0) return "";
+  const turns = spend.turns === 1 ? "1 turn" : `${spend.turns} turns`;
+  const cache = spend.cacheCreationTokens + spend.cacheReadTokens;
+  const detail = `${compactTokens(spend.inputTokens)} in / ${compactTokens(spend.outputTokens)} out${cache > 0 ? ` / ${compactTokens(cache)} cache` : ""}`;
+  return `<span class="count" id="hub-spend" title="Hub session spend, all hosts">Hub session: ${escapeHtml(turns)}, ${escapeHtml(detail)}</span>`;
 }
 
 /**
@@ -643,6 +659,7 @@ export function renderHomePage(
   <header>
     <h1>n-dx hub</h1>
     <span class="count">${escapeHtml(count)}</span>
+    ${renderHubSpend(options.hubSpend)}
     <button class="new-btn" type="button" id="new-toggle" aria-expanded="false" aria-controls="new-panel">New project</button>
     ${renderHubSessionToggle(hubSession)}
     <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle colour theme">Theme</button>

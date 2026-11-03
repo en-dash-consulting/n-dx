@@ -77,6 +77,7 @@ import type { ExtensionView } from "./extensions.js";
 import { defaultParentDir } from "./new-project.js";
 import { SidecarManager } from "./sidecars.js";
 import { HUB_SESSION_FEATURE, probeHubLens } from "./session-host.js";
+import { readHubUsageTotals } from "./usage-ledger.js";
 import type { EnsureResult } from "./sidecars.js";
 
 const UPSTREAM_HOST = "127.0.0.1";
@@ -731,7 +732,10 @@ export async function handleProxyRequest(req: IncomingMessage, res: ServerRespon
       ]);
       // Where the "New project" form offers to create: wherever most of the
       // registered projects already live, else the user's home.
-      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions, { hubSession });
+      const html = renderHomePage(overview, defaultParentDir(projects.map((p) => p.repoRoot), homedir()), extensions, {
+        hubSession,
+        hubSpend: readHubUsageTotals(hub.hubHome),
+      });
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
       res.end(html);
       return;

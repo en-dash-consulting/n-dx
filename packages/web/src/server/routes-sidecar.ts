@@ -136,7 +136,7 @@ import {
   HUB_SIDECAR_API_PREFIX,
   SIDECAR_SESSION_ENDED_REASON,
 } from "../shared/index.js";
-import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, resolveHubHome } from "../hub/index.js";
+import { claimHubSessionHost, hubLedgerPath, hubSidecarDir, recordHubUsage, resolveHubHome } from "../hub/index.js";
 
 const PREFIX = "/api/sidecar/sessions";
 const ALLOW_LIST_PATH = "/api/sidecar/allow-list";
@@ -467,6 +467,28 @@ export function sidecarTurnSpendRecorder(ctx: ServerContext): NonNullable<Sideca
   };
 }
 
+/**
+ * Appends each finished hub turn to `<ndx home>/hub/usage.jsonl`, never to the
+ * host project's ledger: the hub session is the machine's, and whichever
+ * project happens to host it did not spend this.
+ */
+export function hubTurnSpendRecorder(ctx: ServerContext, homeDir?: string): NonNullable<SidecarRegistryOptions["onTurnSpend"]> {
+  return ({ record, status, tokens }) => {
+    if (status === "interrupted" && tokens.input === 0 && tokens.output === 0) return;
+    recordHubUsage(resolveHubHome(homeDir), {
+      timestamp: new Date().toISOString(),
+      command: SIDECAR_COMMAND,
+      vendor: record.vendor,
+      model: record.model ?? "unknown",
+      ...tokenFields(tokens),
+      calls: 1,
+      outcome: status === "completed" ? "success" : "error",
+      ...(record.lens && { lens: record.lens }),
+      host: ctx.projectDir,
+    });
+  };
+}
+
 const registries = new Map<string, SidecarSessionRegistry>();
 const brokers = new Map<string, SidecarBroker>();
 
@@ -748,7 +770,7 @@ function hubHostState(
             broker: (id) => hubSidecarBrokerEndpoint(ctx, id),
             context: hubSidecarContextOptions(ctx, dir, opts),
             ttlMs: () => resolveSidecarIdleMs(ctx.projectDir),
-            onTurnSpend: sidecarTurnSpendRecorder(ctx),
+            onTurnSpend: hubTurnSpendRecorder(ctx, opts.homeDir),
           }),
       broker: opts.brokerFor ? opts.brokerFor(dir) : createAnnouncingBroker(dir, broadcast, hubLedgerTarget(opts.homeDir), hubDraftsDir(resolveHubHome(opts.homeDir))),
     };
