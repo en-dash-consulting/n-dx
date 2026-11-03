@@ -239,3 +239,97 @@ describe("ndx config credentials.<name> --helper", () => {
     expect(existsSync(join(home, "credentials.json"))).toBe(false);
   }, DEFAULT_TIMEOUT);
 });
+
+describe("ndx config llm.<vendor>.api_key", () => {
+  const KEY = "sk-ant-placeholder-0123456789";
+  const localPath = () => join(cwd, ".n-dx.local.json");
+  const readLocal = async () => JSON.parse(await readFile(localPath(), "utf-8"));
+
+  it("writes the store with a history warning, never a config file, and never prints the value", async () => {
+    const set = config(["llm.claude.api_key", KEY, cwd]);
+    expect(set.code).toBe(0);
+    expect(set.err).toMatch(/shell history/);
+    expect(JSON.parse(await readFile(join(home, "credentials.json"), "utf-8")).entries.claude).toBeDefined();
+    expect((await readLocal()).llm.claude.api_key).toBeUndefined();
+    expect(existsSync(join(cwd, ".n-dx.json"))).toBe(false);
+
+    const show = config(["llm.claude.api_key", cwd]);
+    expect(show.out).toMatch(/^claude: credential store \(file\), fingerprint [0-9a-f]{8}$/m);
+    for (const text of [set.out, set.err, show.out, show.err]) expect(text).not.toContain(KEY);
+  }, DEFAULT_TIMEOUT);
+
+  it("takes the legacy claude.api_key too", async () => {
+    expect(config(["claude.api_key", KEY, cwd]).code).toBe(0);
+    expect(config(["llm.claude.api_key", cwd]).out).toMatch(/^claude: credential store/m);
+    expect((await readLocal()).llm.claude.auth).toBe("api");
+  }, DEFAULT_TIMEOUT);
+
+  it("sets llm.<vendor>.auth to api when it is unset, and says so", async () => {
+    const set = config(["llm.claude.api_key", KEY, cwd]);
+    expect((await readLocal()).llm.claude.auth).toBe("api");
+    expect(set.out).toMatch(/llm\.claude\.auth = api \(it was unset/);
+    expect(config(["credentials", cwd]).out).toContain("claude: api (llm.claude.auth api; key from the credential store)");
+  }, DEFAULT_TIMEOUT);
+
+  it("never overwrites an explicit auth", async () => {
+    for (const auth of ["cli", "auto"]) {
+      expect(config(["llm.claude.auth", auth, cwd]).code).toBe(0);
+      const set = config(["llm.claude.api_key", KEY, cwd]);
+      expect(set.code).toBe(0);
+      expect((await readLocal()).llm.claude.auth).toBe(auth);
+      expect(set.out).not.toContain("llm.claude.auth =");
+    }
+  }, DEFAULT_TIMEOUT);
+
+  it("removes an older key from the config files once the store holds the new one", async () => {
+    await writeFile(localPath(), JSON.stringify({ llm: { claude: { api_key: "sk-ant-old" } } }));
+    expect(config(["llm.claude.api_key", KEY, cwd]).code).toBe(0);
+    expect(await readFile(localPath(), "utf-8")).not.toContain("sk-ant-old");
+  }, DEFAULT_TIMEOUT);
+});
+
+describe("ndx config credentials --import", () => {
+  const KEY = "sk-ant-placeholder-0123456789";
+  const localPath = () => join(cwd, ".n-dx.local.json");
+  const seed = (llm) => writeFile(localPath(), JSON.stringify({ llm }));
+
+  it("only says how, without --import and without a terminal", async () => {
+    await seed({ claude: { api_key: KEY } });
+    const r = config(["credentials", cwd]);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/holds an API key \(claude\).*credentials --import/);
+    expect(r.out).not.toContain(KEY);
+    expect(await readFile(localPath(), "utf-8")).toContain(KEY);
+    expect(existsSync(join(home, "credentials.json"))).toBe(false);
+  }, DEFAULT_TIMEOUT);
+
+  it("moves every key without a prompt and applies the auth rule per vendor", async () => {
+    await seed({ claude: { api_key: KEY }, codex: { api_key: "sk-codex-placeholder", auth: "cli" } });
+    const r = config(["credentials", "--import", cwd]);
+    expect(r.code).toBe(0);
+    for (const text of [r.out, r.err]) expect(text).not.toContain(KEY);
+
+    const local = JSON.parse(await readFile(localPath(), "utf-8"));
+    expect(local.llm.claude).toEqual({ auth: "api" });
+    expect(local.llm.codex).toEqual({ auth: "cli" });
+    const status = config(["credentials", cwd]).out;
+    expect(status).toMatch(/^claude: credential store/m);
+    expect(status).toMatch(/^codex: credential store/m);
+  }, DEFAULT_TIMEOUT);
+
+  it("removes a key from the file only after the store write succeeded", async () => {
+    await seed({ claude: { api_key: KEY } });
+    // A file where the ndx home should be: the store cannot be written.
+    const blocked = join(root, "blocked");
+    await writeFile(blocked, "");
+    const r = spawnSync(process.execPath, [CLI_PATH, "config", "credentials", "--import", cwd], {
+      env: { ...process.env, NDX_HOME: join(blocked, "home") },
+      encoding: "utf-8",
+      timeout: DEFAULT_TIMEOUT,
+    });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/Could not store the claude key; it stays in/);
+    expect(await readFile(localPath(), "utf-8")).toContain(KEY);
+    expect(r.stdout + r.stderr).not.toContain(KEY);
+  }, DEFAULT_TIMEOUT);
+});
