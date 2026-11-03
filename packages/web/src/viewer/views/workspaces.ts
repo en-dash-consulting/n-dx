@@ -44,6 +44,7 @@ import { ElapsedTime, TaskStartControl, GlossaryLine } from "../components/index
 import { formatSince } from "../utils/format.js";
 import { useFeatureToggle } from "../hooks/index.js";
 import { BRANCH_HEALTH_FEATURE, BranchHealthStrip } from "./workspace-branch-health.js";
+import { openWebSocket } from "../session.js";
 
 // ---------------------------------------------------------------------------
 // Wire types
@@ -678,7 +679,7 @@ export function WorkspacesView({ fetcher, socketFactory, onAttachSidecar, attach
     if (!anchorKey) return;
     let socket: WebSocket;
     try {
-      socket = socketFactory ? socketFactory(getWebSocketUrl()) : new WebSocket(getWebSocketUrl());
+      socket = socketFactory ? socketFactory(getWebSocketUrl()) : openWebSocket();
     } catch {
       return; // No socket (static export, jsdom): the board stays as loaded.
     }

@@ -21,7 +21,7 @@ import { settleContextNotesRemovals, sweepStaleContextNotes } from "./run-option
 import { handleHenchRoute, startHeartbeatMonitor, startConcurrencyMonitor, startMemoryMonitor, shutdownActiveExecutions, closeWorktreeRunWatchers, getAggregator } from "./routes-hench.js";
 import { registerUsageScheduler, type CollectAllIdsFn, type RegisterSchedulerOptions } from "./task-usage.js";
 import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON, V2_PRODUCT_DIRNAME, V2_CHANGES_DIRNAME } from "./prd-io.js";
-import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION, prdLayout, resolveStore } from "./rex-gateway.js";
+import { collectAllIds, createRexMcpServer, parseDocument, parseFolderTree, PRD_TREE_DIRNAME, SCHEMA_VERSION, prdLayout, resolveStore, loadPrdModel, type V2Tree } from "./rex-gateway.js";
 import { handleWorkflowRoute } from "./routes-workflow.js";
 import { handleAdaptiveRoute } from "./routes-adaptive.js";
 import { handleMcpRoute, initMcpRoutes } from "./routes-mcp.js";
@@ -62,10 +62,10 @@ import { handleProjectSettingsRoute } from "./routes-project-settings.js";
 import { handleRexSettingsRoute } from "./routes-rex-settings.js";
 import { createWebSocketManager, WsHealthTracker, tagBroadcaster, BROADCAST_ALL_WORKSPACES } from "./websocket.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
-import { ALL_DATA_FILES, stripWorkspaceSlot, urlWithToken } from "../shared/index.js";
+import { ALL_DATA_FILES, CredentialStore, stripWorkspaceSlot, urlWithNonce } from "../shared/index.js";
 import { findAvailablePort } from "./port.js";
 import { resolveWebPaths } from "./paths.js";
-import { handleRequestSecurity } from "./request-security.js";
+import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "./request-security.js";
 
 /**
  * The port marker's name on the legacy layout.
@@ -335,12 +335,12 @@ export async function refreshPRDCache(rexDir: string): Promise<void> {
   const treeRoot = join(rexDir, PRD_TREE_DIRNAME);
   const prdMdPath = join(rexDir, "prd.md");
 
-  let doc: { schema: string; title: string; items: unknown[] } | null = null;
+  let doc: { schema: string; title: string; items: unknown[]; product?: V2Tree["product"] } | null = null;
 
   if (await prdLayout(rexDir) === "v2") {
     // v2: the cache is the change layer projected as v1 items.
     try {
-      doc = await (await resolveStore(rexDir)).loadDocument();
+      doc = { ...await (await resolveStore(rexDir)).loadDocument(), product: (await loadPrdModel(rexDir)).tree.product };
     } catch (err) {
       console.warn(`[prd-cache] v2 projection error: ${(err as Error).message}`);
     }
@@ -967,11 +967,22 @@ function createHttpServer(
   assets: ReturnType<typeof resolveStaticAssets>,
   wsHealthTracker: WsHealthTracker,
   token: string | null,
+  credentials: CredentialStore | null,
 ) {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
       // A Sidecar session's CLI presents its own broker credential, valid on its /mcp route only.
-      if (handleRequestSecurity(req, res, { token, scopedCredential: isSidecarBrokerRequest })) return;
+      if (handleRequestSecurity(req, res, { token, credentials, scopedCredential: isSidecarBrokerRequest })) return;
+      // No credential: the public shell (viewer HTML, landing page, images),
+      // which signs itself in, and nothing else — not even the unknown-
+      // workspace page, which lists worktree names.
+      if (isPublicOnlyRequest(req)) {
+        req.url = stripWorkspaceSlot(req.url || "/").url;
+        const { ctx } = registry.resolveWorkspace(req);
+        if (assets && handleStaticRoute(req, res, ctx, assets)) return;
+        refusePublicOnly(req, res);
+        return;
+      }
       // Request-scoped context. Two things can name a worktree and they do not
       // rank equally: `X-Ndx-Workspace` wins over a leading `/w/<key>/`.
       //
@@ -1049,10 +1060,13 @@ function logStartup(
   ctx: ServerContext,
   henchRunsDir: string,
   token: string | null = null,
+  credentials: CredentialStore | null = null,
 ): void {
   const label = ctx.scope ? `${ctx.scope} viewer` : "n-dx dashboard";
-  // With a token the URL carries it once so the browser sets its cookie.
-  console.log(`${label} running at ${token ? urlWithToken(`http://localhost:${actualPort}/`, token) : `http://localhost:${actualPort}`}`);
+  // With a token the URL carries a single-use landing nonce — never the token.
+  const base = `http://127.0.0.1:${actualPort}/`;
+  console.log(`${label} running at ${token && credentials ? urlWithNonce(base, credentials.mintNonce().nonce) : `http://127.0.0.1:${actualPort}`}`);
+  if (token) console.log("  The link signs in one browser tab, once, within a minute; run `ndx start` again for a fresh one.");
   if (isInScope(ctx.scope, "sourcevision")) {
     console.log(`Serving data from: ${ctx.svDir}`);
   }
@@ -1074,16 +1088,16 @@ function logStartup(
   } catch {
     // Never block startup on the trust store.
   }
-  console.log(`MCP (rex):          http://localhost:${actualPort}/mcp/rex`);
-  console.log(`MCP (sourcevision): http://localhost:${actualPort}/mcp/sourcevision`);
-  console.log(`WebSocket available at ws://localhost:${actualPort}`);
+  console.log(`MCP (rex):          http://127.0.0.1:${actualPort}/mcp/rex`);
+  console.log(`MCP (sourcevision): http://127.0.0.1:${actualPort}/mcp/sourcevision`);
+  console.log(`WebSocket available at ws://127.0.0.1:${actualPort}`);
   if (ctx.scope) console.log(`Scope: ${ctx.scope} (standalone mode)`);
   if (ctx.dev) console.log("Dev mode: live reload enabled");
   console.log("");
   console.log("MCP setup:");
   const headerFlag = token ? ' --header "X-Ndx-Token: <token from <ndx home>/auth.token>"' : "";
-  console.log("  Claude:  claude mcp add --transport http rex http://localhost:" + actualPort + "/mcp/rex" + headerFlag);
-  console.log("           claude mcp add --transport http sourcevision http://localhost:" + actualPort + "/mcp/sourcevision" + headerFlag);
+  console.log("  Claude:  claude mcp add --transport http rex http://127.0.0.1:" + actualPort + "/mcp/rex" + headerFlag);
+  console.log("           claude mcp add --transport http sourcevision http://127.0.0.1:" + actualPort + "/mcp/sourcevision" + headerFlag);
   console.log("  Codex:   configured automatically via .codex/config.toml (stdio)");
   console.log("");
   console.log("Press Ctrl+C to stop.");
@@ -1214,7 +1228,10 @@ export async function startServer(
   // Per-user token: created on first use, shared by every server this user
   // starts, required on every request and handshake once configured.
   const token = opts.tokenFile ? ensureAuthToken(opts.tokenFile) : null;
-  const ws = createWebSocketManager({ healthTracker: wsHealthTracker, token });
+  // Browser sessions, landing nonces and WebSocket tickets this process
+  // issues; in memory, so a restart revokes them (shared/auth.ts).
+  const credentials = token ? new CredentialStore() : null;
+  const ws = createWebSocketManager({ healthTracker: wsHealthTracker, token, credentials });
   const watcherHandles = registerWatchers(ctx, watcher, ws, assets.viewerPath);
 
   // Start heartbeat monitor — periodically checks for unresponsive tasks and
@@ -1290,7 +1307,7 @@ export async function startServer(
     await refreshPRDCache(rexDir);
   }
 
-  const server = createHttpServer(registry, ws, assets, wsHealthTracker, token);
+  const server = createHttpServer(registry, ws, assets, wsHealthTracker, token, credentials);
 
   return new Promise<StartResult>((resolvePromise, rejectPromise) => {
     server.once("error", (err: NodeJS.ErrnoException) => {
@@ -1324,7 +1341,7 @@ export async function startServer(
         // Non-fatal: port file is a convenience, not a requirement
       }
 
-      logStartup(actualPort, ctx, watcherHandles.henchRunsDir, token);
+      logStartup(actualPort, ctx, watcherHandles.henchRunsDir, token, credentials);
 
       // ── Graceful shutdown ───────────────────────────────────────────────
       // Single handler coordinates cleanup in dependency order:

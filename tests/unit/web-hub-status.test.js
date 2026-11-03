@@ -74,9 +74,9 @@ describe("formatHubStatus", () => {
     expect(text).toContain("Repository: /repos/alpha");
     expect(text).toContain("Worktrees:  2 registered");
     expect(text).toContain("    /repos/alpha/.wt/feature");
-    expect(text).toContain("URL: http://localhost:3117/p/alpha-app/");
-    expect(text).toContain("MCP (rex):          http://localhost:3117/p/alpha-app/mcp/rex");
-    expect(text).toContain("MCP (sourcevision): http://localhost:3117/p/alpha-app/mcp/sourcevision");
+    expect(text).toContain("URL: http://127.0.0.1:3117/p/alpha-app/");
+    expect(text).toContain("MCP (rex):          http://127.0.0.1:3117/p/alpha-app/mcp/rex");
+    expect(text).toContain("MCP (sourcevision): http://127.0.0.1:3117/p/alpha-app/mcp/sourcevision");
   });
 
   it("carries the failure reason for a project whose server is not up", () => {
@@ -159,7 +159,7 @@ describe("formatUnregister", () => {
       result: { projectRemoved: false, worktreeKnown: true, remaining: ["/repos/alpha"], hubExiting: false },
     }).join("\n");
     expect(text).toContain('unregistered /repos/alpha/.wt/feature from project "alpha-app"');
-    expect(text).toContain("Still served for 1 worktree(s) at http://localhost:3117/p/alpha-app/");
+    expect(text).toContain("Still served for 1 worktree(s) at http://127.0.0.1:3117/p/alpha-app/");
     expect(text).toContain("    /repos/alpha");
   });
 

@@ -15,8 +15,8 @@ import type { Hub, ProjectView } from "../../../src/hub/index.js";
 
 function view(id: string): ProjectView {
   return {
-    id, name: id, repoRoot: `/repo/${id}`, worktrees: [`/repo/${id}`], ndxBin: "/x.js",
-    port: 4000, pid: 1, lastSeen: null,
+    id, name: id, repoRoot: `/repo/${id}`, worktrees: [`/repo/${id}`], 
+    port: 4000, pid: 1, lastSeen: null, ndxBin: "/hub/ndx.js",
     status: { state: "healthy", pid: 1, port: 4000, attached: false, respawns: 0, lastHealthAt: null, lastError: null },
   };
 }
@@ -111,5 +111,29 @@ describe("decideProxy: the hub session at /hub/session/", () => {
     expect(decideProxy(several, "/hub/").kind).toBe("home");
     expect(decideProxy(several, "/hub/sessions").kind).not.toBe("hub-session");
     expect(decideProxy(several, "/p/alpha/hub/session/x")).toMatchObject({ kind: "proxy", path: "/hub/session/x" });
+  });
+});
+
+describe("decideProxy: a sidecar under its mount key", () => {
+  const one = hubWith(view("alpha"));
+  const key = "k".repeat(32);
+
+  it("strips the key with the mount, and names it for the gate to check", () => {
+    expect(decideProxy(one, `/x/recon/~${key}/assets/a.js?v=1`)).toEqual({
+      kind: "sidecar",
+      name: "recon",
+      path: "/assets/a.js?v=1",
+      prefix: `/x/recon/~${key}`,
+      mountKey: key,
+    });
+    expect(decideProxy(one, `/x/recon/~${key}`, true)).toMatchObject({ kind: "sidecar", path: "/", mountKey: key });
+  });
+
+  it("redirects the keyed mount without its slash to the keyed mount", () => {
+    expect(decideProxy(one, `/x/recon/~${key}?a=1`)).toEqual({ kind: "redirect", location: `/x/recon/~${key}/?a=1` });
+  });
+
+  it("treats a short or odd `~` segment as an ordinary path of the app", () => {
+    expect(decideProxy(one, "/x/recon/~short/a")).toMatchObject({ kind: "sidecar", path: "/~short/a", prefix: "/x/recon" });
   });
 });

@@ -207,3 +207,37 @@ describe("the projectless environment supplied by the hub", () => {
     expect(child.exitCode).toBe(0);
   });
 });
+
+describe("bin/serve.js under the keyed mount the hub announces", () => {
+  const KEYED = "/x/graview-face/~testmountkey0123456789/";
+  let child: ChildProcess;
+  let origin: string;
+  let scratch: string;
+
+  beforeAll(async () => {
+    scratch = mkdtempSync(join(tmpdir(), "graview-face-keyed-"));
+    writeFileSync(join(scratch, "document.json"), JSON.stringify({ name: "hub-mounted" }));
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      NDX_EXTENSION_NAME: "graview-face",
+      NDX_SIDECAR_SECRET: "test-launch-secret",
+      NDX_GRAVIEW_DIR: scratch,
+      NDX_BASE_PATH: KEYED,
+    };
+    delete env["NDX_REX_MCP_URL"];
+    ({ child, origin } = await startServe(env, "127.0.0.1"));
+  }, 90_000);
+
+  afterAll(() => {
+    child?.kill();
+    rmSync(scratch, { recursive: true, force: true });
+  });
+
+  it("asks for every script under the key, since a browser's script requests carry no header", async () => {
+    const html = await (await sidecarFetch(`${origin}/`)).text();
+    expect(html).toContain(`src="${KEYED}src/main.tsx"`);
+    const main = await sidecarFetch(`${origin}/src/main.tsx`);
+    expect(main.status).toBe(200);
+    expect(await main.text()).toContain(`from "${KEYED}src/app.ts"`);
+  });
+});

@@ -47,6 +47,25 @@ function trackLocal(): void {
   git("add", "-f", ".n-dx.local.json");
 }
 
+describe("committed local endpoint changes", () => {
+  it.each([
+    ["host", { host: "localhost", port: 1234 }, { host: "other.example", port: 1234 }],
+    ["port", { host: "localhost", port: 1234 }, { host: "localhost", port: 4321 }],
+    ["verifier host", { verifier: { host: "localhost", port: 1234 } }, { verifier: { host: "other.example", port: 1234 } }],
+    ["verifier port", { verifier: { host: "localhost", port: 1234 } }, { verifier: { host: "localhost", port: 4321 } }],
+  ])("invalidates acceptance when the %s changes", async (_name, before, after) => {
+    writeLocal({ llm: { vendor: "local", local: before } });
+    trackLocal();
+    recordRepoTrust(repo, { ndxHome: home });
+    expect(evaluateRepoTrust(repo, { ndxHome: home }).state).toBe("trusted");
+    writeLocal({ llm: { vendor: "local", local: after } });
+    expect(evaluateRepoTrust(repo, { ndxHome: home }).state).toBe("changed");
+    const loaded = await loadLLMConfig(repo);
+    expect(loaded.local?.host).toBeUndefined();
+    expect(loaded.local?.verifier?.host).toBeUndefined();
+  });
+});
+
 function parent(): NodeJS.ProcessEnv {
   return { PATH: process.env.PATH, [SENTINEL]: "sentinel" };
 }
@@ -110,6 +129,38 @@ describe("isLocalConfigTracked", () => {
       expect(isLocalConfigTracked(repo)).toBe(true);
     },
   );
+});
+
+describe("a tracked local config path with no file behind it", () => {
+  /** False where this machine cannot create a symlink (Windows without Developer Mode). */
+  function danglingLink(): boolean {
+    try {
+      symlinkSync("missing-target.json", join(repo, ".n-dx.local.json"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  it("counts a committed dangling symlink as tracked", (ctx) => {
+    if (!danglingLink()) ctx.skip();
+    git("init", "-q");
+    git("add", "-f", ".n-dx.local.json");
+    expect(isLocalConfigTracked(repo)).toBe(true);
+  });
+
+  it("asks git for a deleted tracked file only when a writer says evenIfAbsent", () => {
+    writeLocal();
+    trackLocal();
+    rmSync(join(repo, ".n-dx.local.json"));
+    expect(isLocalConfigTracked(repo)).toBe(false);
+    expect(isLocalConfigTracked(repo, { evenIfAbsent: true })).toBe(true);
+  });
+
+  it("with evenIfAbsent, an untracked or never-written path stays the user's", () => {
+    git("init", "-q");
+    expect(isLocalConfigTracked(repo, { evenIfAbsent: true })).toBe(false);
+  });
 });
 
 describe("a tracked .n-dx.local.json in an untrusted checkout", () => {

@@ -43,7 +43,7 @@ beforeEach(async () => {
   // ignored .n-dx.local.json, where `ndx config` writes it, always applies.
   await writeFile(
     join(projectDir, ".n-dx.local.json"),
-    JSON.stringify({ llm: { claude: { cli_path: process.execPath } } }),
+    JSON.stringify({ llm: { vendor: "claude", claude: { cli_path: process.execPath } } }),
     "utf-8",
   );
   await writeFile(join(projectDir, ".gitignore"), ".n-dx.local.json\n", "utf-8");

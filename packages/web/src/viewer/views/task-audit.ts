@@ -1,3 +1,5 @@
+import { FloatingNotice } from "../components/index.js";
+import { useToast } from "../hooks/index.js";
 /**
  * Task Audit view — detailed execution information and administrative controls.
  *
@@ -15,6 +17,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { BrandedHeader, RexTaskLink, ElapsedTime } from "../components/index.js";
 import { useCliName } from "../hooks/index.js";
 import type { NavigateTo } from "../types.js";
+import { openWebSocket } from "../session.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -437,7 +440,7 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
   const [error, setError] = useState<string | null>(null);
   const [terminatingTasks, setTerminatingTasks] = useState<Set<string>>(new Set());
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
+  const { toast, showToast: setToast } = useToast();
   const wsRef = useRef<WebSocket | null>(null);
 
   // Fetch audit data
@@ -470,7 +473,7 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
     const wsUrl = `${protocol}//${window.location.host}`;
 
     try {
-      const ws = new WebSocket(wsUrl);
+      const ws = openWebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {
@@ -549,13 +552,6 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
       return next;
     });
   }, []);
-
-  // Toast auto-dismiss
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 3000);
-    return () => clearTimeout(timer);
-  }, [toast]);
 
   // ── Loading state ──
   if (loading) {
@@ -637,7 +633,7 @@ export function TaskAuditView({ navigateTo }: TaskAuditViewProps = {}) {
 
     // Toast notification
     toast
-      ? h("div", { class: "audit-toast", role: "status", "aria-live": "polite" }, toast)
+      ? h(FloatingNotice, null, h("div", { class: "audit-toast", role: "status", "aria-live": "polite" }, toast))
       : null,
   );
 }

@@ -37,6 +37,7 @@
 import { HUB_SESSION_CLOSE_MESSAGE, HUB_SESSION_PATH, HUB_SESSION_ROUTES } from "../shared/index.js";
 import type { ExtensionView } from "./extensions.js";
 import type { HubOverview, ProjectCard } from "./overview.js";
+import { injectSessionScript } from "../shared/index.js";
 
 export function escapeHtml(value: string): string {
   return value
@@ -256,16 +257,27 @@ const REFRESH_SCRIPT = `
 (function () {
   var list = document.getElementById("cards");
   if (!list) return;
+  var count = document.getElementById("project-count");
   function tick() {
     fetch("/api/hub/overview", { headers: { accept: "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
-        if (!data || !data.html) return;
+        if (!data || typeof data.html !== "string") return;
+        if (count && data.projects) {
+          var n = data.projects.length;
+          count.textContent = n === 1 ? "1 project" : n + " projects";
+        }
         // Never yank focus out from under someone mid-keyboard-navigation.
         if (list.contains(document.activeElement)) return;
-        list.innerHTML = data.html;
+        list.innerHTML = data.html || '<li class="empty">No project is registered yet.</li>';
       })
       .catch(function () {});
+  }
+  // A deferred page (sent to a navigation, which carries no credential) has
+  // no cards yet: load them as soon as the session script has signed in.
+  if (list.hasAttribute("data-deferred")) {
+    var ready = window.ndxAuth ? window.ndxAuth.ready : Promise.resolve({ ok: true });
+    ready.then(function (state) { if (state.ok) tick(); });
   }
   setInterval(tick, 5000);
 })();
@@ -591,6 +603,12 @@ export function renderExtensionsSection(extensions: ExtensionView[]): string {
 
 export interface HomePageOptions {
   hubSession?: boolean;
+  /**
+   * Send the shell only: no project, path or count is in the markup, and
+   * the page's script loads the cards once it has signed in. What a browser
+   * navigation gets, since it carries no credential (see shared/auth.ts).
+   */
+  deferred?: boolean;
 }
 
 /**
@@ -613,13 +631,15 @@ export function renderHomePage(
 ): string {
   const hubSession = options.hubSession === true;
   const { projects } = overview;
-  const body = projects.length === 0
-    ? `<p class="empty">No project is registered yet. Create one above, or run <code>ndx start</code> in a repository you already have.</p>`
-    : `<ul class="cards" id="cards">${renderCards(overview)}</ul>`;
+  const body = options.deferred
+    ? `<ul class="cards" id="cards" data-deferred><li class="empty">Loading…</li></ul>`
+    : projects.length === 0
+      ? `<p class="empty">No project is registered yet. Create one above, or run <code>ndx start</code> in a repository you already have.</p>`
+      : `<ul class="cards" id="cards">${renderCards(overview)}</ul>`;
 
-  const count = projects.length === 1 ? "1 project" : `${projects.length} projects`;
+  const count = options.deferred ? "" : projects.length === 1 ? "1 project" : `${projects.length} projects`;
 
-  return `<!doctype html>
+  return injectSessionScript(`<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
@@ -642,7 +662,7 @@ export function renderHomePage(
 <div class="wrap">
   <header>
     <h1>n-dx hub</h1>
-    <span class="count">${escapeHtml(count)}</span>
+    <span class="count" id="project-count">${escapeHtml(count)}</span>
     <button class="new-btn" type="button" id="new-toggle" aria-expanded="false" aria-controls="new-panel">New project</button>
     ${renderHubSessionToggle(hubSession)}
     <button class="theme-toggle" type="button" id="theme-toggle" aria-label="Toggle colour theme">Theme</button>
@@ -666,5 +686,5 @@ ${renderHubSessionDrawer(hubSession)}
 <script>${REFRESH_SCRIPT}</script>
 <script>${NEW_PROJECT_SCRIPT}</script>
 </body>
-</html>`;
+</html>`);
 }

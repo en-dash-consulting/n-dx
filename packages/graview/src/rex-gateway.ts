@@ -30,6 +30,7 @@ export {
   listReleaseTags,
   releasesContaining,
   classifyV1Tree,
+  capabilityCodeFiles,
   draftCapabilitySpecs,
   deriveChangeKind,
   specHash,

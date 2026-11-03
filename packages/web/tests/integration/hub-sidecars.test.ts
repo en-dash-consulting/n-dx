@@ -50,7 +50,7 @@ const FIXTURE = [
   `    if (req.url.startsWith("/redirect?to=")) { res.writeHead(302, { Location: decodeURIComponent(req.url.slice(13)) }); res.end(); return; }`,
   `    if (req.url === "/hold") { res.writeHead(200); res.write("held"); return; }`,
   `    res.writeHead(200, { "Content-Type": "application/json" });`,
-  `    res.end(JSON.stringify({ path: req.url, port: process.env.PORT, name: process.env.NDX_EXTENSION_NAME, headers: req.headers }));`,
+  `    res.end(JSON.stringify({ path: req.url, port: process.env.PORT, name: process.env.NDX_EXTENSION_NAME, basePath: process.env.NDX_BASE_PATH, headers: req.headers }));`,
   `  });`,
   `  server.on("upgrade", (req, socket) => {`,
   `    if (!admitted(req)) { socket.end("HTTP/1.1 403 Forbidden\\r\\nConnection: close\\r\\n\\r\\n"); return; }`,
@@ -65,6 +65,8 @@ const FIXTURE = [
 let dir: string;
 let bin: string;
 const managers: SidecarManager[] = [];
+/** `/x/recon/~<key>/`: the mount a browser reaches a sidecar under when the token is on. */
+const KEYED_MOUNT = /^[/]x[/]recon[/]~[A-Za-z0-9_-]{16,}[/]$/;
 const hubs: HubHandle[] = [];
 
 beforeEach(() => {
@@ -724,6 +726,13 @@ describe("hub /x/<name>/", () => {
       });
     }
 
+    /** The keyed mount the sign-in page would move to, asked for with the token. */
+    async function mountPath(name = "recon"): Promise<string> {
+      const res = await fetch(`http://127.0.0.1:${hub.port}/api/hub/mounts/${name}`, { method: "POST", headers: { "X-Ndx-Token": token } });
+      expect(res.status).toBe(200);
+      return ((await res.json()) as { path: string }).path;
+    }
+
     it("refuses a request without the token before the sidecar is started", async () => {
       expect((await fetch(`http://127.0.0.1:${hub.port}/x/recon/`)).status).toBe(401);
       expect((await handshake("/x/recon/ws", "")).split("\r\n")[0]).toBe("HTTP/1.1 401 Unauthorized");
@@ -739,7 +748,8 @@ describe("hub /x/<name>/", () => {
       const seen = (await viaHeader.json()).headers as Record<string, string>;
       expect(seen["x-ndx-token"]).toBeUndefined();
       expect(seen.cookie).toBe("theme=dark; sid=7");
-      expect(seen["x-ndx-base-path"]).toBe("/x/recon/");
+      // The keyed mount, so links built from it work in a browser.
+      expect(seen["x-ndx-base-path"]).toMatch(KEYED_MOUNT);
 
       const viaBearer = await fetch(`http://127.0.0.1:${hub.port}/x/recon/`, { headers: { Authorization: `Bearer ${token}`, Cookie: `ndx_token=${token}` } });
       const bearerSeen = (await viaBearer.json()).headers as Record<string, string>;
@@ -756,8 +766,64 @@ describe("hub /x/<name>/", () => {
       expect(seen.path).toBe("/ws?a=1");
       expect(seen.headers["x-ndx-token"]).toBeUndefined();
       expect(seen.headers.cookie).toBe("sid=7");
-      expect(seen.headers["x-ndx-base-path"]).toBe("/x/recon/");
+      expect(seen.headers["x-ndx-base-path"]).toMatch(KEYED_MOUNT);
       expect(JSON.stringify(seen.headers)).not.toContain(token);
+    });
+
+    it("answers a page navigation without a credential with the hub's sign-in page, not the extension's", async () => {
+      const res = await fetch(`http://127.0.0.1:${hub.port}/x/recon/deep/page?tab=2`, { headers: { Accept: "text/html", "Sec-Fetch-Mode": "navigate" } });
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain("window.ndxAuth");
+      expect(html).toContain("/api/hub/mounts/");
+      // The sidecar was neither asked for nor started.
+      expect(asked).toBe(0);
+      // Its script is valid JavaScript: a template literal eats backslashes,
+      // and a page that fails to parse signs nobody in.
+      const scripts = [...html.matchAll(/<script>([^]*?)<[/]script>/gi)].map((m) => m[1]);
+      expect(scripts.length).toBe(2);
+      for (const script of scripts) expect(() => new Function(script)).not.toThrow();
+      // The bare mount gets it too, rather than a redirect to a 401.
+      const bare = await fetch(`http://127.0.0.1:${hub.port}/x/recon`, { headers: { Accept: "text/html" }, redirect: "manual" });
+      expect(bare.status).toBe(200);
+      expect(await bare.text()).toContain("/api/hub/mounts/");
+    });
+
+    it("hands out the keyed mount only for a credential, and the key reaches that sidecar with no header", async () => {
+      expect((await fetch(`http://127.0.0.1:${hub.port}/api/hub/mounts/recon`, { method: "POST" })).status).toBe(401);
+      const path = await mountPath();
+      expect(path).toMatch(KEYED_MOUNT);
+      // Stable for the hub's lifetime, so a sidecar restart keeps tabs working.
+      expect(await mountPath()).toBe(path);
+
+      // A stylesheet, a script, an image: no header at all.
+      const asset = await fetch(`http://127.0.0.1:${hub.port}${path}assets/app.js?v=1`);
+      expect(asset.status).toBe(200);
+      const seen = (await asset.json()) as { path: string; basePath: string; headers: Record<string, string> };
+      expect(seen.path).toBe("/assets/app.js?v=1");
+      expect(seen.headers["x-ndx-base-path"]).toBe(path);
+      // Announced at launch too, for an app whose base is fixed when it starts.
+      expect(seen.basePath).toBe(path);
+
+      // A mutation from the hub's own origin, and a WebSocket, under the key.
+      const posted = await fetch(`http://127.0.0.1:${hub.port}${path}save`, { method: "POST", headers: { Origin: `http://127.0.0.1:${hub.port}` }, body: "{}" });
+      expect(posted.status).toBe(200);
+      expect((await handshake(`${path}ws`, "")).split("\r\n")[0]).toBe("HTTP/1.1 101 Switching Protocols");
+    });
+
+    it("admits nothing with a wrong key, another sidecar's key, or a key outside its own mount", async () => {
+      const path = await mountPath();
+      const key = path.split("/")[3];
+      const wrong = `/x/recon/~${"A".repeat(key.length - 1)}/page`;
+      expect((await fetch(`http://127.0.0.1:${hub.port}${wrong}`)).status).toBe(401);
+      expect((await fetch(`http://127.0.0.1:${hub.port}/x/other/${key}/page`)).status).toBe(401);
+      expect((await fetch(`http://127.0.0.1:${hub.port}/x/other/~${key.slice(1)}/page`)).status).toBe(401);
+      // The key is not a hub credential.
+      expect((await fetch(`http://127.0.0.1:${hub.port}/api/hub/projects`, { headers: { "X-Ndx-Token": key } })).status).toBe(401);
+      expect((await fetch(`http://127.0.0.1:${hub.port}/api/hub/projects?k=${path}`)).status).toBe(401);
+      // A mutation under the key from a foreign origin is still refused.
+      const foreign = await fetch(`http://127.0.0.1:${hub.port}${path}save`, { method: "POST", headers: { Origin: "https://example.com" }, body: "{}" });
+      expect(foreign.status).toBe(403);
     });
   });
 });

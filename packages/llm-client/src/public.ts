@@ -379,6 +379,39 @@ export type {
   CliInvocationDiagnosis,
 } from "./exec.js";
 
+// OS-level confinement for agent child processes (Seatbelt on macOS, bubblewrap on Linux).
+export {
+  detectSandboxBackend,
+  buildSeatbeltProfile,
+  buildBwrapArgs,
+  wrapInSandbox,
+  wrapShellInSandbox,
+  nodeToolchainRoots,
+  resolveSandboxSetting,
+  SANDBOX_MODE_ENV,
+  SANDBOX_NETWORK_ENV,
+  HOME_SECRET_DIRS,
+  maskedProjectPathsFor,
+  readOnlyProjectPathsFor,
+  gitControlPathsFor,
+  removeSandboxPlaceholders,
+  SANDBOX_MACH_SERVICES,
+  SANDBOX_MACH_SERVICES_DNS,
+  SANDBOX_MACH_SERVICES_VENDOR,
+} from "./sandbox.js";
+export type {
+  SandboxPolicy,
+  SandboxBackend,
+  SandboxBackendName,
+  SandboxNetwork,
+  SandboxSpawnKind,
+  SandboxedInvocation,
+  OsSandboxMode,
+  SandboxSetting,
+  SandboxPathKind,
+  GitControlPaths,
+} from "./sandbox.js";
+
 // Process-tree termination — a kill that reaches descendants, not just the child.
 export {
   terminateProcessTree,
@@ -442,19 +475,25 @@ export {
   recordRepoTrust,
   clearRepoTrust,
   evaluateRepoTrust,
-  repoTrustStateOf,
-  isRestrictedState,
+  isRepoRestricted,
+  scanFrontMatterRunBlock,
   formatRepoTrustReport,
   escapeTerminalControls,
   isLocalConfigTracked,
   HENCH_OVERRIDE_FIELD_CHECKS,
 } from "./repo-trust.js";
 export type {
+  LocalConfigTrackOptions,
   GuardBaseline,
   DetectedRepoLanguage,
   RepoMcpServer,
   RepoGateTestCommand,
   RepoExecutionConfig,
+  RepoRunPosture,
+  RepoLlmEndpoints,
+  RepoAssistantFile,
+  RepoClaudeSettings,
+  RepoPrdRunBlock,
   RepoTrustFindingCode,
   RepoTrustFinding,
   RepoInventory,
@@ -464,6 +503,12 @@ export type {
   RepoTrustEvaluation,
   RepoTrustReportOptions,
 } from "./repo-trust.js";
+// What readers of the tracked project config ignore while the repository is
+// not trusted, and the loader hook that applies it
+export { stripTrackedExecutionConfig } from "./tracked-config-clamp.js";
+export type { TrackedConfigClamp } from "./tracked-config-clamp.js";
+export { clampTrackedProjectConfig, resolveApiEndpoint } from "./config.js";
+export type { LoadProjectConfigOptions } from "./config.js";
 // Project and local config with the trust-gated fields (API endpoints, key
 // variables, binary paths) removed while the repository is untrusted
 export { trustedProjectConfig, trustedLocalConfig } from "./credential-routing.js";

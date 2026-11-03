@@ -1,11 +1,14 @@
+import { execFileSync } from "node:child_process";
+import { gzipSync } from "node:zlib";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { ItemLevel, ItemStatus, PRDItem } from "../../../../src/schema/v1.js";
 import { classifyV1Tree } from "../../../../src/migrations/v1-to-v2/migration-plan.js";
 import { draftCapabilitySpecs } from "../../../../src/migrations/v1-to-v2/capability-spec.js";
-import { readCapabilityCodeFiles, readCodeEvidence } from "../../../../src/migrations/v1-to-v2/code-files.js";
+import { readCapabilityCodeFiles, readCodeEvidence, readCommitCodeFiles } from "../../../../src/migrations/v1-to-v2/code-files.js";
 
 let seq = 0;
 function item(level: ItemLevel, title: string, children: PRDItem[] = [], status: ItemStatus = "completed", extra: Partial<PRDItem> = {}): PRDItem {
@@ -94,6 +97,65 @@ describe("readCapabilityCodeFiles", () => {
   afterEach(async () => {
     await rm(tempDir, { recursive: true, force: true });
   });
+
+  it("collects trailer and compressed run commits without dropping evidence for an unavailable SHA", async () => {
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: tempDir, encoding: "utf-8" }).trim();
+    git("init", "--initial-branch=main");
+    await writeFile(join(tempDir, "ledger.ts"), "export const total = 1;\n");
+    git("add", "ledger.ts");
+    git("commit", "-m", "Build ledger\n\nN-DX-Item: 11111111-1111-4111-8111-111111111111");
+    const sha = git("rev-parse", "HEAD");
+    await mkdir(join(tempDir, ".hench/runs"), { recursive: true });
+    await writeFile(join(tempDir, ".hench/runs/run.json.gz"), gzipSync(JSON.stringify({ taskId: "run-task", commits: [{ sha }, { sha: "f".repeat(40) }] })));
+    const files = await readCommitCodeFiles(tempDir);
+    expect(files["11111111-1111-4111-8111-111111111111"]).toEqual(["ledger.ts"]);
+    expect(files["run-task"]).toEqual(["ledger.ts"]);
+  });
+
+  /** One commit carrying `id` as its N-DX-Item trailer and touching `files`. */
+  async function commitFor(id: string, files: Record<string, string>): Promise<void> {
+    const git = (...args: string[]) => execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: tempDir, encoding: "utf-8" }).trim();
+    if (!existsSync(join(tempDir, ".git"))) git("init", "--initial-branch=main");
+    for (const [path, content] of Object.entries(files)) {
+      await mkdir(dirname(join(tempDir, path)), { recursive: true });
+      await writeFile(join(tempDir, path), content);
+    }
+    git("add", "-A");
+    git("commit", "-m", `Work on ${id}\n\nN-DX-Item: ${id}`);
+  }
+
+  it("drops lockfiles, manifests, changelogs, changesets and tool state from commit evidence", async () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    await commitFor(id, {
+      "src/ledger.ts": "export const total = 1;\n",
+      "package.json": "{}\n",
+      "pnpm-lock.yaml": "lockfileVersion: 9\n",
+      "CHANGELOG.md": "# Changes\n",
+      ".changeset/ledger.md": "---\n---\n",
+      ".rex/prd_tree/ledger/index.md": "# Ledger\n",
+      "packages/app/package.json": "{}\n",
+    });
+    expect((await readCommitCodeFiles(tempDir))[id]).toEqual(["src/ledger.ts"]);
+  });
+
+  it("collects evidence only for the ids it is asked about", async () => {
+    const inTree = "11111111-1111-4111-8111-111111111111";
+    const elsewhere = "22222222-2222-4222-8222-222222222222";
+    await commitFor(inTree, { "src/a.ts": "a\n" });
+    await commitFor(elsewhere, { "src/b.ts": "b\n" });
+    const files = await readCommitCodeFiles(tempDir, { items: [item("epic", "Ledger", [{ ...item("task", "Build it"), id: inTree }])] });
+    expect(Object.keys(files)).toEqual([inTree]);
+  });
+
+  it("drops a file most items' histories share, keeping each item's own files", async () => {
+    const ids = ["a", "b", "c", "d", "e"].map((c) => `${c.repeat(8)}-1111-4111-8111-111111111111`);
+    for (const [n, id] of ids.entries()) {
+      await commitFor(id, { [`src/own-${n}.ts`]: `${n}\n`, "src/index.ts": `export * from "./own-${n}.js";\n` });
+    }
+    const files = await readCommitCodeFiles(tempDir);
+    for (const [n, id] of ids.entries()) expect(files[id]).toEqual([`src/own-${n}.ts`]);
+  });
+
 
   it("builds the map from zones and the files a capability's tests exercise, and the drafter's specs carry it", async () => {
     await writeAnalysis(tempDir, { "zones.json": ZONES, "imports.json": IMPORTS });

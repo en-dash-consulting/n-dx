@@ -2,7 +2,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer, type Server } from "node:http";
 import { connect } from "node:net";
 import { describe, expect, it } from "vitest";
-import { handleRequestSecurity } from "../../src/server/request-security.js";
+import { handleRequestSecurity, isPublicOnlyRequest, refusePublicOnly } from "../../src/server/request-security.js";
+import { CredentialStore } from "../../src/shared/index.js";
 import { MAX_REQUEST_BODY_BYTES, errorResponse, readBody } from "../../src/server/response-utils.js";
 
 interface MockResponse {
@@ -136,8 +137,8 @@ describe("HTTP request token (per-user)", () => {
     expect(handleRequestSecurity(req, res.response, { token: null })).toBe(false);
   });
 
-  it("answers 401 with WWW-Authenticate to a request that presents nothing", () => {
-    const req = makeRequest("GET");
+  it("answers 401 with WWW-Authenticate to a mutation that presents nothing", () => {
+    const req = makeRequest("POST");
     const res = makeResponse();
     expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
     expect(res.status()).toBe(401);
@@ -146,10 +147,36 @@ describe("HTTP request token (per-user)", () => {
     expect(JSON.parse(res.body() ?? "{}").error).toBe("Authentication required");
   });
 
+  it("passes a GET without a credential on, marked public-only, for the shell to answer", () => {
+    const req = makeRequest("GET");
+    const res = makeResponse();
+    expect(handleRequestSecurity(req, res.response, opts)).toBe(false);
+    expect(res.status()).toBeUndefined();
+    expect(isPublicOnlyRequest(req)).toBe(true);
+
+    const authed = makeRequest("GET", { "X-Ndx-Token": TOKEN });
+    expect(handleRequestSecurity(authed, makeResponse().response, opts)).toBe(false);
+    expect(isPublicOnlyRequest(authed)).toBe(false);
+  });
+
+  it("refusePublicOnly sends a sign-in page to a navigation and JSON to a fetch", () => {
+    const nav = makeRequest("GET", { Accept: "text/html,application/xhtml+xml", "Sec-Fetch-Mode": "navigate" });
+    const page = makeResponse();
+    refusePublicOnly(nav, page.response);
+    expect(page.status()).toBe(401);
+    expect(page.headers.get("content-type")).toContain("text/html");
+    expect(page.body()).toContain("ndx start");
+
+    const api = makeRequest("GET", { Accept: "application/json" });
+    const json = makeResponse();
+    refusePublicOnly(api, json.response);
+    expect(json.status()).toBe(401);
+    expect(JSON.parse(json.body() ?? "{}").error).toBe("Authentication required");
+  });
+
   it.each<[string, Record<string, string>]>([
     ["bearer header", { Authorization: `Bearer ${TOKEN}` }],
     ["X-Ndx-Token header", { "X-Ndx-Token": TOKEN }],
-    ["cookie", { Cookie: `theme=dark; ndx_token=${TOKEN}` }],
   ])("lets a request through that presents the token as a %s", (_label, headers) => {
     const req = makeRequest("POST", headers);
     const res = makeResponse();
@@ -157,75 +184,66 @@ describe("HTTP request token (per-user)", () => {
     expect(res.status()).toBeUndefined();
   });
 
-  it("refuses a wrong token in every place", () => {
+  it("refuses a wrong token, and the old cookie, on a mutation", () => {
     const wrong: Array<Record<string, string>> = [
       { Authorization: `Bearer ${TOKEN}x` },
       { "X-Ndx-Token": TOKEN.slice(1) },
-      { Cookie: "ndx_token=nope" },
+      // The cookie a dashboard on another loopback port could receive: no
+      // longer a credential anywhere.
+      { Cookie: `ndx_token=${TOKEN}` },
       { Authorization: `Basic ${TOKEN}` },
     ];
     for (const headers of wrong) {
-      const req = makeRequest("GET", headers);
+      const req = makeRequest("POST", headers);
       const res = makeResponse();
       expect(handleRequestSecurity(req, res.response, opts), JSON.stringify(headers)).toBe(true);
       expect(res.status(), JSON.stringify(headers)).toBe(401);
     }
   });
 
-  it("turns a GET navigation carrying ?ndx_token= into a cookie and a redirect without it", () => {
+  it("does not honour ?ndx_token= any more: no cookie, no redirect", () => {
     const req = makeRequest("GET");
     (req as { url?: string }).url = `/p/app/prd?view=tree&ndx_token=${TOKEN}`;
     const res = makeResponse();
-    expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
-    expect(res.status()).toBe(302);
-    expect(res.headers.get("location")).toBe("/p/app/prd?view=tree");
-    expect(res.headers.get("set-cookie")).toContain(`ndx_token=${TOKEN}`);
-    expect(res.headers.get("set-cookie")).toContain("HttpOnly");
-    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(handleRequestSecurity(req, res.response, opts)).toBe(false);
+    expect(isPublicOnlyRequest(req)).toBe(true);
+    expect(res.headers.get("set-cookie")).toBeUndefined();
   });
 
-  it("sends the cookie redirect to the root when the request-target is scheme-relative", () => {
-    // `GET //evil.com/?ndx_token=T` reaches req.url verbatim; the redirect
-    // must stay on this origin even though the token itself was correct.
-    const req = makeRequest("GET");
-    (req as { url?: string }).url = `//evil.com/?ndx_token=${TOKEN}`;
-    const res = makeResponse();
-    expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
-    expect(res.status()).toBe(302);
-    expect(res.headers.get("location")).toBe("/");
-    expect(res.headers.get("set-cookie")).toContain(`ndx_token=${TOKEN}`);
-  });
+  it("accepts a session credential from the store, and answers the credential routes", () => {
+    const credentials = new CredentialStore();
+    const withStore = { token: TOKEN, credentials };
 
-  it("does not accept the query token on a mutation, or a wrong query token at all", () => {
-    const post = makeRequest("POST");
-    (post as { url?: string }).url = `/api/x?ndx_token=${TOKEN}`;
-    const out = makeResponse();
-    expect(handleRequestSecurity(post, out.response, opts)).toBe(true);
-    expect(out.status()).toBe(401);
+    // The CLI mints a nonce with the per-user token…
+    const mint = makeRequest("POST", { "X-Ndx-Token": TOKEN });
+    (mint as { url?: string }).url = "/api/auth/nonce";
+    const minted = makeResponse();
+    expect(handleRequestSecurity(mint, minted.response, withStore)).toBe(true);
+    expect(minted.status()).toBe(200);
+    const { nonce } = JSON.parse(minted.body() ?? "{}");
 
-    const wrong = makeRequest("GET");
-    (wrong as { url?: string }).url = `/?ndx_token=${TOKEN}x`;
-    const out2 = makeResponse();
-    expect(handleRequestSecurity(wrong, out2.response, opts)).toBe(true);
-    expect(out2.status()).toBe(401);
-  });
+    // …the landing page exchanges it, once, with no other credential…
+    const exchange = () => {
+      const req = makeRequest("POST", { "X-Ndx-Nonce": nonce, Origin: "http://localhost:3117" });
+      (req as { url?: string }).url = "/w/feature/api/auth/session";
+      const res = makeResponse();
+      expect(handleRequestSecurity(req, res.response, withStore)).toBe(true);
+      return res;
+    };
+    const first = exchange();
+    expect(first.status()).toBe(200);
+    const { credential } = JSON.parse(first.body() ?? "{}");
+    expect(credential).not.toBe(TOKEN);
+    expect(exchange().status()).toBe(401);
 
-  it("still strips ?ndx_token= from a navigation the cookie already authenticates", () => {
-    // The printed URL is reopened on every `ndx start`. Letting it through
-    // unredirected left the token in the address bar and handed the static
-    // route "/?ndx_token=…", which it did not match — a bare "Not found".
-    const req = makeRequest("GET", { Cookie: `ndx_token=${TOKEN}` });
-    (req as { url?: string }).url = `/?ndx_token=${TOKEN}`;
-    const res = makeResponse();
-    expect(handleRequestSecurity(req, res.response, opts)).toBe(true);
-    expect(res.status()).toBe(302);
-    expect(res.headers.get("location")).toBe("/");
-
-    // A wrong query token on an authenticated request is ignored, not a 401.
-    const stale = makeRequest("GET", { Cookie: `ndx_token=${TOKEN}` });
-    (stale as { url?: string }).url = `/prd?ndx_token=${TOKEN}x`;
-    const out = makeResponse();
-    expect(handleRequestSecurity(stale, out.response, opts)).toBe(false);
+    // …and the session then authenticates requests, but cannot mint nonces.
+    const post = makeRequest("POST", { "X-Ndx-Token": credential });
+    expect(handleRequestSecurity(post, makeResponse().response, withStore)).toBe(false);
+    const mintAgain = makeRequest("POST", { "X-Ndx-Token": credential });
+    (mintAgain as { url?: string }).url = "/api/auth/nonce";
+    const refused = makeResponse();
+    expect(handleRequestSecurity(mintAgain, refused.response, withStore)).toBe(true);
+    expect(refused.status()).toBe(401);
   });
 
   it("checks Host before the token, so a valid token on a foreign Host is still 421", () => {

@@ -54,6 +54,14 @@ describe("Claude config inheritance (rex)", () => {
       expect(config.cli_path).toBe("/usr/local/bin/claude");
     });
 
+    it("ignores cli_path in the tracked .n-dx.json until the checkout is trusted", async () => {
+      await writeFile(
+        join(tmpDir, ".n-dx.json"),
+        JSON.stringify({ claude: { cli_path: "/usr/local/bin/claude", model: "m" } }),
+      );
+      expect(await loadClaudeConfig(rexDir)).toEqual({ model: "m" });
+    });
+
     it("loads api_key from .n-dx.json claude section", async () => {
       await writeFile(
         join(tmpDir, ".n-dx.json"),

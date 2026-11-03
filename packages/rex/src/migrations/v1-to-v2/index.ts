@@ -7,7 +7,9 @@
  * item. Then, in order: the text and Jev passes place the changes the rules
  * hold (`./placement-pass.ts`); the template specs are drafted again from the
  * settled placements; the text pass redrafts them (`./spec-pass.ts`); Jev
- * reviews the plan (`./jev-review-pass.ts`). The caller supplies the seams
+ * reviews the plan (`./jev-review-pass.ts`); last, each capability is proposed
+ * a `dependsOn` on every earlier capability it shares a linked test file with,
+ * a test too many capabilities link aside ({@link proposeDependsOn}). The caller supplies the seams
  * with `planSeams` (`./seams.ts`). The summary ends with the review queue.
  * `./apply.ts` applies a reviewed plan (`rex migrate-apply`).
  *
@@ -19,7 +21,7 @@ import { contentHash, type MigrationSource, type PlanContext, type PlanStage, ty
 import { defineMigration, sourceDigest } from "../pipeline.js";
 import { draftCapabilitySpecs, type CapabilitySpecDraft, type SpecDraftOptions } from "./capability-spec.js";
 import { buildPlanData, stampReview, type ItemPlanData, type PlanData, type PlanDataOptions } from "./migration-plan-data.js";
-import { classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
+import { capabilityCodeFiles, classifyV1Tree, type ClassifyOptions, type MigrationPlan, type PlanEntry } from "./migration-plan.js";
 import {
   jevHeldPass,
   flagThresholdOf,
@@ -34,6 +36,7 @@ import {
 } from "./jev-review-pass.js";
 import { placementTextPass, type PlacementFields, type PlacementPassOptions } from "./placement-pass.js";
 import { specTextPass } from "./spec-pass.js";
+import { sharedFilePairs } from "../../core/product-edges.js";
 
 // Re-exported so the CLI reaches the digest and its hash through this module.
 export { contentHash, sourceDigest };
@@ -59,9 +62,19 @@ export function v1TreeSource(items: readonly PRDItem[]): MigrationSource<readonl
   return { kind: V1_TREE_SOURCE_KIND, read: () => ({ data: items, items: sourceItems(items, undefined, []) }) };
 }
 
+/** A `dependsOn` the plan proposes for review, and why. */
+export interface ProposedDependency {
+  /** v1 id of the capability depended on. */
+  capability: string;
+  /** Test files both capabilities' specs link, sorted. */
+  tests: string[];
+}
+
 export interface V1ToV2Entry extends PlanEntry, PlacementFields, JevReviewFields {
   data?: ItemPlanData;
   spec?: CapabilitySpecDraft;
+  /** Capabilities only: proposed `dependsOn`, one per earlier capability it shares a linked test with. Absent when it shares none. */
+  dependsOn?: ProposedDependency[];
 }
 
 /** A release epic that dissolved into its changes' `plannedRelease`; its id aliases no child. */
@@ -98,6 +111,14 @@ export interface V1ToV2Summary {
     offHistory?: boolean;
   };
   /**
+   * Items the commit evidence covered: files changed by the commits their
+   * N-DX-Item trailers and hench runs name. Kept apart from `codeEvidence`,
+   * which is the analysis's and carries its date. Absent when there was none.
+   */
+  commitEvidence?: {
+    items: number;
+  };
+  /**
    * Hash of the code evidence the plan read, empty evidence included. The
    * source digest covers PRD items only, so a re-analysis changes this alone;
    * a re-plan compares it before reusing the earlier cut time.
@@ -105,6 +126,8 @@ export interface V1ToV2Summary {
   evidenceDigest?: string;
   /** Held items first, then entries Jev judged by ascending confidence: reviewers start with the weakest calls. */
   reviewQueue: ReviewQueueItem[];
+  /** How many `dependsOn` the plan proposes for review (each entry's `dependsOn`); absent when none. */
+  proposedDependsOn?: number;
   /** What the Jev review flagged and dropped; absent when Jev reviewed nothing. */
   jevReview?: JevReviewSummary;
 }
@@ -127,11 +150,48 @@ function draftSettledSpecs(
   context: PlanContext<V1ToV2Options>,
 ): Record<string, V1ToV2Entry> {
   const { testFiles = [], codeFiles, testCommand, minTestScore } = context.options ?? {};
-  const specs = draftCapabilitySpecs({ entries: Object.values(entries) }, items, { testFiles, codeFiles, testCommand, minTestScore });
+  const plan = { entries: Object.values(entries) };
+  const filesOf = context.options?.filesOf ?? ((id: string) => codeFiles?.[id] ?? []);
+  const specs = draftCapabilitySpecs(plan, items, { testFiles, codeFiles: capabilityCodeFiles(plan, filesOf), testCommand, minTestScore });
   const out = { ...entries };
   for (const spec of specs) {
     const entry = out[spec.capability]!;
     out[spec.capability] = { ...entry, spec, ...(entry.data ? { data: stampReview(entry.data, spec) } : {}) };
+  }
+  return out;
+}
+
+/**
+ * A test file more capabilities than this link is broad (a suite-wide or
+ * integration test), not evidence that two of them depend on each other: it
+ * proposes no `dependsOn`, as a test matching too many criteria links none.
+ * k holders would otherwise yield k(k-1)/2 proposals and bury the useful ones.
+ */
+export const MAX_DEPENDS_ON_TEST_HOLDERS = 3;
+
+/**
+ * Propose `dependsOn` where two capabilities' settled specs link a test file
+ * in common: a shared test exercises both, so a change to one can break the
+ * other. Shared tests are symmetric and `dependsOn` is not, so the capability
+ * later in plan order depends on the earlier one; every edge points back in
+ * plan order, so the proposals cannot form a cycle. A test linked by more than
+ * {@link MAX_DEPENDS_ON_TEST_HOLDERS} capabilities proposes nothing. A
+ * proposal for review: the apply does not write it. Re-derived from scratch
+ * on every run.
+ */
+export function proposeDependsOn(entries: Readonly<Record<string, V1ToV2Entry>>): Record<string, V1ToV2Entry> {
+  const out: Record<string, V1ToV2Entry> = {};
+  for (const [id, entry] of Object.entries(entries)) {
+    const { dependsOn: _stale, ...rest } = entry;
+    out[id] = rest;
+  }
+  const linked = Object.values(out).filter((e) => e.target === "capability" && e.spec !== undefined);
+  const holders = new Map<string, number>();
+  for (const e of linked) for (const file of new Set(e.spec!.tests)) holders.set(file, (holders.get(file) ?? 0) + 1);
+  const tests = new Map(linked.map((e) => [e.id, e.spec!.tests.filter((f) => holders.get(f)! <= MAX_DEPENDS_ON_TEST_HOLDERS)] as const));
+  for (const { a, b, files } of sharedFilePairs(tests)) {
+    const entry = out[b]!;
+    out[b] = { ...entry, dependsOn: [...(entry.dependsOn ?? []), { capability: a, tests: files }] };
   }
   return out;
 }
@@ -149,6 +209,7 @@ const stages: readonly PlanStage<readonly PRDItem[], V1ToV2Entry, V1ToV2Options>
   { derive: draftSettledSpecs },
   { model: "text", ...specTextPass },
   { model: "jev", ...jevReviewPass },
+  { derive: proposeDependsOn },
 ];
 
 export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Summary, V1ToV2Options>({
@@ -157,8 +218,9 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
   to: "v2",
   rules(items, { cutAt, options = {} }) {
     const { testFiles = [], codeFiles, testCommand, minTestScore, reviewed, releases, prMerges, productNames } = options;
-    const plan = classifyV1Tree(items, { productNames });
-    const specs = draftCapabilitySpecs(plan, items, { testFiles, codeFiles, testCommand, minTestScore });
+    const filesOf = options.filesOf ?? ((id: string) => codeFiles?.[id] ?? []);
+    const plan = classifyV1Tree(items, { productNames, filesOf });
+    const specs = draftCapabilitySpecs(plan, items, { testFiles, codeFiles: capabilityCodeFiles(plan, filesOf), testCommand, minTestScore });
     const data = buildPlanData(items, plan, { cutAt, specs, reviewed, releases, prMerges });
     const specById = new Map(specs.map((s) => [s.capability, s]));
 
@@ -188,8 +250,10 @@ export const v1ToV2 = defineMigration<readonly PRDItem[], V1ToV2Entry, V1ToV2Sum
   summarize(entries, summary, context) {
     const threshold = flagThresholdOf(context.options);
     const jevReview = jevReviewSummary(entries, threshold);
+    const proposedDependsOn = Object.values(entries).reduce((n, e) => n + (e.dependsOn?.length ?? 0), 0);
     return {
       ...summary,
+      ...(proposedDependsOn > 0 ? { proposedDependsOn } : {}),
       areas: summary.areas.map((a) => withJevArea(a, Object.hasOwn(entries, a.id) ? entries[a.id] : undefined, threshold)),
       reviewQueue: reviewQueue(entries, threshold),
       ...(jevReview ? { jevReview } : {}),

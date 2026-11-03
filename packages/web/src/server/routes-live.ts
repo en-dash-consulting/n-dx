@@ -75,9 +75,8 @@ import { commandJobsOf, type CommandJobKind } from "./routes-commands.js";
 import { rexAnalyzeJobStatus } from "./routes-rex-analysis.js";
 import { lastActiveAgentModel, resolveActiveAgentModel } from "./routes-llm.js";
 import { analyzeProgressPath, readAnalyzeProgress, type AnalyzeProgressReport, type ProcessCommandLine } from "./domain-gateway.js";
-import { collectCompletedIds, estimateCostFromTotals, findNextTask, walkTree } from "./rex-gateway.js";
-import type { PRDDocument } from "./rex-gateway.js";
-import { loadPRDSync, PRD_CACHE_DIR, PRD_CACHE_JSON } from "./prd-io.js";
+import { collectCompletedIds, estimateCostFromTotals, findNextTask, findNextWorkTask, walkTree, type V2Tree } from "./rex-gateway.js";
+import { loadPRDSync, isV2Tree, PRD_CACHE_DIR, PRD_CACHE_JSON, type CachedPRDDocument } from "./prd-io.js";
 import { readLastEvent, resolveRunEventsFile } from "./run-tail.js";
 import { hubConfigPath, readHubConfig, resolveHubHome } from "../hub/index.js";
 import { HUB_ADMISSION_HEADER, itemTypeOf, parseHubAdmissionHeader, type HubAdmissionHeader, type HubQueuedRequest } from "../shared/index.js";
@@ -332,6 +331,7 @@ export interface LiveSources {
 }
 
 interface PrdIndex {
+  v2: boolean;
   /** The cache file's `mtimeMs:size` when parsed; "absent" when there was none. */
   signature: string;
   chains: Map<string, LiveChainLink[]>;
@@ -339,7 +339,7 @@ interface PrdIndex {
   titles: Map<string, string>;
   /** Acceptance criteria per item, for items that list any. */
   criteria: Map<string, number>;
-  doc: PRDDocument | null;
+  doc: CachedPRDDocument | null;
   completedIds: Set<string>;
   /**
    * Next-task rankings already computed for this parse, keyed by the sorted
@@ -402,7 +402,7 @@ function prdIndexFor(rexDir: string): PrdIndex {
   const cached = prdIndexes.get(rexDir);
   if (cached && cached.signature === signature) return cached;
   const doc = signature === "absent" ? null : loadPRDSync(rexDir);
-  const index: PrdIndex = { signature, chains: new Map(), titles: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set(), nextByExcluded: new Map() };
+  const index: PrdIndex = { signature, v2: isV2Tree(rexDir), chains: new Map(), titles: new Map(), criteria: new Map(), doc, completedIds: doc ? collectCompletedIds(doc.items) : new Set(), nextByExcluded: new Map() };
   if (doc) {
     for (const { item, parents } of walkTree(doc.items)) {
       index.chains.set(item.id, parents.map((p) => ({ id: p.id, title: p.title, itemType: itemTypeOf(p) })));
@@ -430,11 +430,14 @@ function nextTasks(index: PrdIndex, excluded: ReadonlySet<string>): LiveNextTask
   return next;
 }
 
-function rankNextTasks(index: PrdIndex, doc: PRDDocument, excluded: ReadonlySet<string>): LiveNextTask[] {
+function rankNextTasks(index: PrdIndex, doc: CachedPRDDocument, excluded: ReadonlySet<string>): LiveNextTask[] {
   const excludeIds = new Set(excluded);
   const next: LiveNextTask[] = [];
+  // Rex's change-layer projection retains each node's v2 fields. Selection
+  // needs only that layer, so the monitor keeps using its watcher-owned cache.
+  const tree: V2Tree | null = index.v2 ? { product: doc.product ?? [], changes: doc.items as unknown as V2Tree["changes"] } : null;
   while (next.length < NEXT_TASK_LIMIT) {
-    const entry = findNextTask(doc.items, index.completedIds, { excludeIds });
+    const entry = tree ? findNextWorkTask(tree, { excludeIds }) : findNextTask(doc.items, index.completedIds, { excludeIds });
     if (!entry) break;
     excludeIds.add(entry.item.id);
     next.push({
