@@ -32,7 +32,7 @@ export {
   webSocketUrl,
 } from "./base-path.js";
 export { isLoopbackHostOnPort, isLoopbackOriginOnPort, loopbackOrigin } from "./origin.js";
-export { PAGE_CSP, STRICT_CSP, applySecurityHeaders, applyStrictContentPolicy } from "./response-headers.js";
+export { PAGE_CSP, SAME_ORIGIN_FRAME_PAGE_CSP, STRICT_CSP, applySameOriginFramePolicy, applySecurityHeaders, applyStrictContentPolicy } from "./response-headers.js";
 export type { HeaderSink } from "./response-headers.js";
 export {
   V1_LEVELS,

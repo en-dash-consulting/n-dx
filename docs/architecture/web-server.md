@@ -139,7 +139,9 @@ Content-Security-Policy. The built viewer and hub pages ship an inline
 bootstrap script and inline styles, so the page policy keeps `'unsafe-inline'`
 for scripts and styles and is otherwise same-origin (plus `data:`/`blob:`
 images and loopback WebSockets). `/data/*` responses switch to a strict policy
-that allows nothing, because they are data, not documents. The preview server
+that allows nothing, because they are data, not documents. The hub session's
+drawer page alone may be framed, by its own origin (`SAMEORIGIN`,
+`frame-ancestors 'self'`): the hub home docks it in an iframe. The preview server
 adds `https:` sources, since a design document may load from a CDN.
 
 ## Repository trust

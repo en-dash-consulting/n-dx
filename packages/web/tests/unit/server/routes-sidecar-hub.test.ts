@@ -312,6 +312,10 @@ describe("what the hub home and its drawer read", () => {
     const page = await get(built, "/drawer");
     expect(page.status).toBe(200);
     expect(page.headers.get("content-type")).toContain("text/html");
+    // The hub home frames it; nothing of another origin may.
+    expect(page.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
+    expect(page.headers.get("content-security-policy")).not.toContain("frame-ancestors 'none'");
     const html = await page.text();
     expect(html).toContain("<title>Hub session</title>");
     // Signed in from its tab: fetches carry the session credential, the socket a ticket.

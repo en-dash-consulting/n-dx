@@ -26,7 +26,7 @@ import {
 } from "../../src/hub/index.js";
 import { handlePublicHubRequest } from "../../src/hub/proxy.js";
 import { guardHubRequest, isPublicOnlyHubRequest, upgradeRefusal } from "../../src/hub/request-guard.js";
-import { FEATURE_DISABLED_HEADER } from "../../src/shared/index.js";
+import { FEATURE_DISABLED_HEADER, SAME_ORIGIN_FRAME_PAGE_CSP } from "../../src/shared/index.js";
 
 const TOKEN = "per-user-token";
 
@@ -63,6 +63,12 @@ async function startUpstream(): Promise<Upstream> {
     if (upstream.sidecarOff) {
       res.writeHead(403, { "Content-Type": "application/json", [FEATURE_DISABLED_HEADER]: "web.sidecar" });
       res.end(JSON.stringify({ kind: "feature_disabled", feature: "web.sidecar" }));
+      return;
+    }
+    if (req.url === "/api/sidecar/hub/drawer") {
+      // As the host's drawer route: framable by the hub home's origin only.
+      res.writeHead(200, { "Content-Type": "text/html", "X-Frame-Options": "SAMEORIGIN", "Content-Security-Policy": SAME_ORIGIN_FRAME_PAGE_CSP });
+      res.end("<!doctype html><title>Hub session</title>");
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -170,6 +176,9 @@ describe("/hub/session/ through the hub", () => {
     const res = await fetch(`http://127.0.0.1:${hubPort}/hub/session/drawer?x=1`, { headers: { accept: "text/html" } });
     expect(res.status).toBe(200);
     expect(a.seen).toEqual([{ url: "/api/sidecar/hub/drawer", token: TOKEN }]);
+    // The host's framing policy wins over the DENY the hub's gate set, or the home's iframe stays blank.
+    expect(res.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(res.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
   });
 
   it("says whether the hub session can run only on the overview read that asks, as the host's lens reports", async () => {

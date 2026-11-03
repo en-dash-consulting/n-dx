@@ -76,7 +76,14 @@ items:
     lastModified: "2026-11-03T01:34:13.759Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9d5af533-0705-482b-bc9f-031f9460bd9c":
-    lastModified: "2026-11-03T22:05:30.695Z"
+    status: "completed"
+    startedAt: "2026-11-03T22:05:49.566Z"
+    completedAt: "2026-11-03T22:15:54.221Z"
+    endedAt: "2026-11-03T22:15:54.221Z"
+    activeIntervals: [{"end":"2026-11-03T22:15:54.221Z","start":"2026-11-03T22:05:49.566Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Deferred home renders a hidden toggle shown by ?hubSession=1 overview read; hub serves credential-less GET text/html /hub/session/drawer from host with token; host injects session script into drawer page."
+    lastModified: "2026-11-03T22:15:54.221Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a23d8599-329b-438e-b907-f6370e63e9d2":
     status: "completed"
