@@ -30,7 +30,7 @@
  *                                     `/x/<name>/~<key>/` with the token on
  *                                     (the sign-in page asks for it)
  *
- * **Versioned.** `GET`/`POST /projects` and both `/extensions` routes are the
+ * **Versioned.** `GET`/`POST /projects` and the `/extensions` routes are the
  * extension API (docs/architecture/extensions.md, "Versioned hub API"): each
  * answer carries `apiVersion`, and a breaking change to any of them bumps it.
  * Their contract tests are packages/web/tests/integration/hub-extension-api.test.ts.
