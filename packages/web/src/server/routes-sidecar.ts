@@ -230,8 +230,8 @@ export function sidecarActions(
       const read = await resolveTaskRun(ctx, taskId, options);
       return read.ok ? renderWorkPreview(read.resolution) : `ndx work --resolve did not answer: ${read.failure}`;
     },
-    runCommand(argv, signal) {
-      const started = startSidecarCommand(ctx, argv, broadcast);
+    async runCommand(argv, signal) {
+      const started = await startSidecarCommand(ctx, argv, broadcast);
       return started.started
         ? awaitSidecarCommand(started, commandWaitMs, signal)
         : { ok: false, text: `Nothing ran: ${started.reason}.` };
