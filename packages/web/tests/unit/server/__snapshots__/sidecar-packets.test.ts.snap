@@ -136,6 +136,42 @@ _source: .hench/runs/ · generated: 2026-10-28T12:00:00.000Z · fresh_
 - 22222222 2026-10-09T08:00 failed"
 `;
 
+exports[`Explain > constraint: states its statement, requirements, appliesTo and derived status, not the v1 item view 1`] = `
+"# Sidecar context packet: explain · d0000000-0000-4000-8000-000000000009
+Built by code from the repository's own records. No model wrote it.
+
+## How to explain
+Explain the target for someone who has not seen it: what it is, where it stands, what backs it.
+- Label every capability criterion you mention \`met\`, \`not met\` or \`not verified\`, exactly as the packet does, and cite its evidence. Never upgrade \`not verified\` to \`met\`; say what evidence is missing.
+- Say "capability criteria" for the standing requirements on the product layer (areas and capabilities). Say "done when" for a change's or task's acceptance criteria. They are different things: never call one by the other's name.
+- Use only what the packet states. Where it says something is not available, say so rather than guess, and name the command that would supply it.
+
+## Constraint
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+K1 No card storage
+Statement: Card numbers are never stored.
+Applies to: all
+Requirements (standing, not done-when):
+- Tokenise at the edge: Only provider tokens reach our database.
+
+## Derived status and health
+_source: .rex/ (live read) · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+status proposed, health ok (rex's derivation, not stored)
+
+## Trailer-commit evidence
+_source: git history, N-DX-Item trailers · generated: 2026-10-28T12:00:00.000Z · fresh_
+
+- aaaaaaaaa 2026-10-20 feat(web): wallet button (2 files)
+- bbbbbbbbb 2026-10-22 fix(web): safari only (1 file)
+
+## Sourcevision zones for the touched files
+_source: .sourcevision/zones.json · generated: 2026-10-21T00:00:00.000Z · stale: analysis 2026-10-21 predates the newest evidence commit 2026-10-22_
+
+- pay (Payments): 2 of 2 touched files; cohesion 0.8, coupling 0.2. Card and wallet payment."
+`;
+
 exports[`Explain > v1: states the epic with its acceptance criteria, evidence and zone 1`] = `
 "# Sidecar context packet: explain · 11111111-1111-1111-1111-111111111111
 Built by code from the repository's own records. No model wrote it.

@@ -273,6 +273,40 @@ describe("Explain", () => {
     expect(deleted.text).not.toContain("[met]");
   });
 
+  it("constraint: states its statement, requirements, appliesTo and derived status, not the v1 item view", async () => {
+    const sources = await sourcesFor("v2");
+    const tree = (await sources.prd())!.tree;
+    const area = indexTree(tree).resolve(AREA)!;
+    area.children = [
+      ...(area.children ?? []),
+      {
+        id: "d0000000-0000-4000-8000-000000000009",
+        slug: "no-card-storage",
+        displayId: "K1",
+        type: "constraint",
+        title: "No card storage",
+        statement: "Card numbers are never stored.",
+        appliesTo: "all",
+        requirements: [
+          {
+            id: "d0000000-0000-4000-8000-00000000000a",
+            title: "Tokenise at the edge",
+            description: "Only provider tokens reach our database.",
+            category: "security",
+            validationType: "manual",
+            acceptanceCriteria: [],
+          },
+        ],
+      } as never,
+    ];
+    const packet = await buildExplainPacket(sources, { ref: "d0000000-0000-4000-8000-000000000009" }, NOW);
+    expect(packet.text).not.toContain("Done when (acceptance criteria");
+    expect(packet.text).toContain("Statement: Card numbers are never stored.");
+    expect(packet.text).toContain("Tokenise at the edge");
+    expect(packet.text).toContain("Derived status and health");
+    expect(packet.text).toMatchSnapshot();
+  });
+
   it("zone: carries the zone's summary, metrics, entry points and insights", async () => {
     const packet = await buildExplainPacket(await sourcesFor("v2"), { ref: "pay" }, NOW);
     expect(packet.text).toContain("pay (Payments)");
