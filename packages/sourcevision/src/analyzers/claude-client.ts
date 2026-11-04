@@ -20,6 +20,7 @@ import {
   resolveVendorModel,
   resolveTaskModel,
   resolveJudgmentRoute,
+  configuredJudgmentRoute,
   TYPESAFE_API_KEY_ENV,
 } from "@n-dx/llm-client";
 import type { TokenUsage } from "../schema/index.js";
@@ -147,12 +148,14 @@ export function getJudgmentRoute(taskClass: string): JudgmentRoute | undefined {
   const config = _llmConfig ?? {};
   const route = resolveJudgmentRoute(taskClass, config);
   if (route === undefined && !_judgmentFallbackNoticed.has(taskClass)) {
-    // Re-resolve with a stand-in key: if that says "typesafe", the only thing
-    // keeping this class on text completion is the missing key. Say so once —
-    // a silent fallback on an explicitly configured route is a support call.
-    const wanted = resolveJudgmentRoute(taskClass, config, { [TYPESAFE_API_KEY_ENV]: "x" } as NodeJS.ProcessEnv);
-    if (wanted === "typesafe" && config.routes && Object.values(config.routes).includes("typesafe")) {
-      console.warn(`  [llm] ${taskClass} is routed to typesafe but ${TYPESAFE_API_KEY_ENV} is not set — using the ${resolveVendor()} vendor instead`);
+    // If config asks for Jev, the only thing keeping this class on text
+    // completion is the missing key. Say so once — a silent fallback on an
+    // explicitly configured route is a support call.
+    // Under llm.typesafe.required, resolveJudgmentRoute has already warned,
+    // once per process; a per-class notice here would repeat it.
+    const wanted = configuredJudgmentRoute(taskClass, config);
+    if (wanted === "typesafe" && !config.typesafe?.required && config.routes && Object.values(config.routes).includes("typesafe")) {
+      console.warn(`  [llm] ${taskClass} is routed to typesafe but no TypeSafe key is set (run \`ndx config credentials.typesafe\`, or export ${TYPESAFE_API_KEY_ENV}) — using the ${resolveVendor()} vendor instead`);
     }
     _judgmentFallbackNoticed.add(taskClass);
   }

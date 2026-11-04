@@ -1,14 +1,25 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, type Server } from "node:http";
+import { setCredential, unsetCredential } from "@n-dx/llm-client";
 import type { ServerContext } from "../../../src/server/types.js";
 import {
   handleConfigRoute,
   clearConfigCaches,
 } from "../../../src/server/routes-config.js";
 import { closeRouteTestServer } from "../../helpers/server-route-test-support.js";
+
+// The footer resolves Claude's auth like `ndx work` does, so an exported
+// ANTHROPIC_API_KEY selects the API under `auto`. Blank it so a developer's
+// own key cannot change what these tests see.
+beforeEach(() => {
+  vi.stubEnv("ANTHROPIC_API_KEY", "");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 /** Start a test server that only runs config routes. */
 function startTestServer(ctx: ServerContext): Promise<{ server: Server; port: number }> {
@@ -317,5 +328,53 @@ describe("GET /api/ndx-config on the .ndx/ layout", () => {
       await closeRouteTestServer(server);
       await rm(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("GET /api/ndx-config with a key in the credential store", () => {
+  // The suite's setup file points the ndx home at a temp directory, so this
+  // never touches the developer's real store.
+  const STORED = "sk-ant-placeholder-stored";
+  let tmpDir: string;
+  let server: Server;
+  let port: number;
+
+  // `auth: api` is trust-gated in the shared project config, so it goes in the
+  // user's own .n-dx.local.json, as `ndx config` writes it.
+  async function start(config: Record<string, unknown> | null) {
+    clearConfigCaches();
+    tmpDir = await mkdtemp(join(tmpdir(), "config-api-store-"));
+    const svDir = join(tmpDir, ".sourcevision");
+    const rexDir = join(tmpDir, ".rex");
+    await mkdir(svDir, { recursive: true });
+    await mkdir(rexDir, { recursive: true });
+    if (config) await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify(config));
+    ({ server, port } = await startTestServer({ projectDir: tmpDir, svDir, rexDir, dev: false }));
+  }
+
+  const authMethod = async () =>
+    ((await (await fetch(`http://127.0.0.1:${port}/api/ndx-config`)).json()) as { authMethod: string }).authMethod;
+
+  afterEach(async () => {
+    unsetCredential("claude");
+    await closeRouteTestServer(server);
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("reports api-key under llm.claude.auth api", async () => {
+    setCredential("claude", STORED);
+    await start({ llm: { vendor: "claude", claude: { auth: "api" } } });
+    expect(await authMethod()).toBe("api-key");
+  });
+
+  it("does not let a stored key move an auto project off its CLI login", async () => {
+    setCredential("claude", STORED);
+    await start({ llm: { vendor: "claude", claude: { cli_path: "claude" } } });
+    expect(await authMethod()).toBe("cli");
+  });
+
+  it("is unchanged with nothing stored", async () => {
+    await start(null);
+    expect(await authMethod()).toBe("none");
   });
 });

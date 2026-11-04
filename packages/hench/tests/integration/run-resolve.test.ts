@@ -176,6 +176,8 @@ describe("the resolution report", () => {
       allowDirty: { value: false, source: "built-in" },
       resetDeferred: { value: false, source: "built-in" },
     });
+    // llm.<vendor>.auth has no per-run flag, so it sits beside `resolved`.
+    expect(r.auth).toEqual({ value: "auto", source: "built-in" });
     expect(r.command).toBe(`ndx work --task=t-pending --auto ${projectDir}`);
   });
 

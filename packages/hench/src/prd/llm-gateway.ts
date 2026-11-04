@@ -42,7 +42,7 @@
 export {
   loadClaudeConfig,
   loadLLMConfig,
-  resolveApiKey,
+  resolveVendorAuth,
   resolveCliPath,
   deepMerge,
   loadProjectOverrides,
@@ -109,6 +109,12 @@ export type {
 // a PEM key spans lines, so per-line redactSecrets cannot see one.
 export { redactDeep, redactSecrets, createLineRedactor } from "@n-dx/llm-client";
 export type { LineRedactor } from "@n-dx/llm-client";
+
+// ---- Credential store -------------------------------------------------------
+// Where the per-user store lives and which commands read a credential (the
+// Keychain read, each configured helper), so the agent's tools and the Claude
+// CLI's deny rules can keep the agent away from both. hench never reads a value.
+export { agentCredentialDenials } from "@n-dx/llm-client";
 
 // ---- CLI output control -----------------------------------------------------
 export {

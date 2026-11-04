@@ -489,6 +489,23 @@ export const CREDENTIAL_ROUTING_FIELDS: readonly (readonly string[])[] = [
 ];
 
 /**
+ * `llm.<vendor>.auth` fields. Only the value `api` routes a credential: it
+ * sends the user's stored vendor key to the vendor's API and into the vendor
+ * CLI's environment. `cli` and `auto` never widen what the user's defaults
+ * send, so they apply whether or not the repository is trusted.
+ */
+export const VENDOR_AUTH_FIELDS: readonly (readonly string[])[] = [
+  // Both loaders read the legacy top-level `claude` block too.
+  ["claude", "auth"],
+  ["llm", "claude", "auth"],
+  ["llm", "codex", "auth"],
+  ["llm", "google", "auth"],
+];
+
+/** The value of a {@link VENDOR_AUTH_FIELDS} entry that is credential routing. */
+export const ROUTING_VENDOR_AUTH = "api";
+
+/**
  * The variable hench's API loop sends as the Anthropic key when nothing
  * chooses another. A different hench `apiKeyEnv` from the repository is
  * credential routing: hench applies it only once the repository is trusted.
@@ -531,9 +548,14 @@ export const VENDOR_CLI_PATH_FIELDS: readonly (readonly string[])[] = [
   ["llm", "codex", "cli_path"],
 ];
 
-/** The {@link CREDENTIAL_ROUTING_FIELDS} a config object sets, as sorted `path = value` lines. */
+/**
+ * The {@link CREDENTIAL_ROUTING_FIELDS} a config object sets, and each
+ * {@link VENDOR_AUTH_FIELDS} entry set to {@link ROUTING_VENDOR_AUTH}, as
+ * sorted `path = value` lines.
+ */
 export function credentialRoutingIn(config: Record<string, unknown> | null): string[] {
-  return fieldsSetIn(config, CREDENTIAL_ROUTING_FIELDS);
+  const auth = fieldsSetIn(config, VENDOR_AUTH_FIELDS).filter((line) => line.endsWith(` = ${ROUTING_VENDOR_AUTH}`));
+  return [...fieldsSetIn(config, CREDENTIAL_ROUTING_FIELDS), ...auth].sort();
 }
 
 /** The {@link VENDOR_CLI_PATH_FIELDS} a config object sets, as sorted `path = value` lines. */

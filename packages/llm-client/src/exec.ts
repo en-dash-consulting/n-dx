@@ -1902,6 +1902,22 @@ export function assertNoWindowsEnvExpansion(tokens: readonly string[], env: Node
 }
 
 /**
+ * Run `binary` with `args` synchronously and with no shell on any platform:
+ * `shell` is forced off, so on Windows there is no cmd.exe and `binary` must
+ * be an executable (a `.cmd` shim fails). For a program whose argv the user
+ * supplied, such as a credential helper, where {@link execFileSyncCli}'s cmd.exe
+ * recipe would be a shell the user never asked for. Nothing is logged: the
+ * argv may name a secret's location.
+ */
+export function execFileSyncNoShell(
+  binary: string,
+  args: readonly string[],
+  options: Omit<ExecFileSyncOptions, "shell"> = {},
+): string | Buffer {
+  return execFileSync(binary, args, { windowsHide: true, ...options, shell: false });
+}
+
+/**
  * Synchronous twin of {@link spawnCli}: run a CLI and return its stdout, with
  * the same Windows recipe and the same refusal. For callers that need the
  * output before they can continue — sourcevision reads `rex tree` this way.
