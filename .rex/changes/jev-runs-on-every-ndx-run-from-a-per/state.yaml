@@ -93,6 +93,9 @@ items:
     resolutionDetail: "importLocalApiKeys compares fingerprints: a matching stored key is only removed from .n-dx.local.json; a different one needs a terminal confirmation naming both fingerprints, else skipped. offerKeyImport refuses a tracked/untellable local file as repository config."
     lastModified: "2026-11-04T20:03:03.351Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5f3e5940-8d9d-46ba-b1b3-f88fc4bb26cd":
+    lastModified: "2026-11-04T21:11:27.273Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "68b2709d-174e-4ec2-bf3f-163fdda6115c":
     status: "deferred"
     lastModified: "2026-10-30T14:44:19.737Z"
@@ -138,7 +141,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-04T20:36:30.385Z"
+    lastModified: "2026-11-04T21:11:27.273Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
     status: "completed"
@@ -306,7 +309,14 @@ items:
     lastModified: "2026-11-04T19:47:10.790Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5330af8-f470-4d06-bf27-55c21e9f2efc":
-    lastModified: "2026-11-04T17:25:53.374Z"
+    status: "completed"
+    startedAt: "2026-11-04T21:04:42.445Z"
+    completedAt: "2026-11-04T21:32:49.269Z"
+    endedAt: "2026-11-04T21:32:49.269Z"
+    activeIntervals: [{"end":"2026-11-04T21:32:49.269Z","start":"2026-11-04T21:04:42.445Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "jevAvailability reports an unrun helper as available:null; analyze records the run's cached helper result; status prints 'unverified'; manifest schema accepts null."
+    lastModified: "2026-11-04T21:32:49.269Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "f5efde56-48b6-4a78-a891-fcda1d312e46":
     status: "completed"

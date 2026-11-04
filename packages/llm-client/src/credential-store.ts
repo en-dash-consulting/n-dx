@@ -157,7 +157,8 @@ export interface CredentialStatus {
   /** A helper entry's command (`argv[0]`); null for any other entry. */
   helperCommand: string | null;
   /**
-   * A helper's outcome: `not-run` without `check`, `ok` or `failed` with it.
+   * A helper's outcome: `not-run` without `check` (or with `check: "cached"`
+   * before it has run), `ok` or `failed` with it.
    * Null when no helper entry is in play.
    */
   helperResult: "not-run" | "ok" | "failed" | null;
@@ -511,6 +512,16 @@ function runHelper(name: string, argv: string[], options: CredentialStoreOptions
   return undefined;
 }
 
+/**
+ * What this process's last run of the helper gave, without running it:
+ * the value, `failed`, or undefined when it has not run.
+ */
+function cachedHelperResult(name: string, argv: string[]): { value: string } | "failed" | undefined {
+  const cached = helperCache.get(JSON.stringify([name, argv]));
+  if (!cached) return undefined;
+  return "value" in cached ? { value: cached.value } : "failed";
+}
+
 /** A helper's failure as an exit code, a timeout or a launch error — never its output. */
 function helperFailure(err: unknown): string {
   const e = err as (NodeJS.ErrnoException & { status?: number | null; signal?: string | null }) | null;
@@ -569,8 +580,12 @@ export function hasStoredCredential(name: string, options: CredentialStoreOption
 }
 
 export interface CredentialStatusOptions extends CredentialStoreOptions {
-  /** Run a helper entry to fingerprint its value. Off: a helper is reported, not run. */
-  check?: boolean;
+  /**
+   * Run a helper entry to fingerprint its value. Off: a helper is reported,
+   * not run. `cached`: report what this process's last run of it gave, and
+   * `not-run` when it has not run; never runs it.
+   */
+  check?: boolean | "cached";
 }
 
 /** What {@link resolveCredential} would find for `name`, without the value. */
@@ -593,8 +608,16 @@ export function credentialStatus(name: string, options: CredentialStatusOptions 
   const value = fileValue(entry);
   if (value) return { ...base, source: "file", fingerprint: credentialFingerprint(value), helperResult: null };
   if (!argv) return { ...base, source: null, fingerprint: null, helperResult: null };
-  if (!options.check) return { ...base, source: "helper", fingerprint: null, helperResult: "not-run" };
-  const fromHelper = runHelper(name, argv, options);
+  const notRun = { ...base, source: "helper", fingerprint: null, helperResult: "not-run" } as const;
+  if (!options.check) return notRun;
+  let fromHelper: string | undefined;
+  if (options.check === "cached") {
+    const cached = cachedHelperResult(name, argv);
+    if (cached === undefined) return notRun;
+    fromHelper = cached === "failed" ? undefined : cached.value;
+  } else {
+    fromHelper = runHelper(name, argv, options);
+  }
   return fromHelper
     ? { ...base, source: "helper", fingerprint: credentialFingerprint(fromHelper), helperResult: "ok" }
     : { ...base, source: null, fingerprint: null, helperResult: "failed" };
@@ -602,15 +625,24 @@ export function credentialStatus(name: string, options: CredentialStatusOptions 
 
 /** Whether Jev's key resolves and from where; never the value. */
 export interface JevAvailability {
-  available: boolean;
-  /** Where the key comes from; null when unavailable. A helper is not run. */
+  /**
+   * True when the key resolved, false when it did not, null when it comes
+   * from a helper that was not run, so whether it resolves is unknown.
+   */
+  available: boolean | null;
+  /** Where the key comes from; null when unavailable (a helper that failed included). */
   source: CredentialSource | null;
 }
 
-/** {@link credentialStatus} for the TypeSafe key, reduced to what a status line shows. */
-export function jevAvailability(options: CredentialStoreOptions = {}): JevAvailability {
-  const { source } = credentialStatus(TYPESAFE_CREDENTIAL, options);
-  return { available: source !== null, source };
+/**
+ * {@link credentialStatus} for the TypeSafe key, reduced to what a status
+ * line shows. A helper runs only with `check: true`; without `check` it is
+ * reported unknown, and with `check: "cached"` by what this process's last
+ * run of it gave (unknown when it has not run).
+ */
+export function jevAvailability(options: CredentialStatusOptions = {}): JevAvailability {
+  const { source, helperResult } = credentialStatus(TYPESAFE_CREDENTIAL, options);
+  return { available: helperResult === "not-run" ? null : source !== null, source };
 }
 
 // ── Agent denials ────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { chmod, mkdtemp, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTmpDir, removeTmpDir, runResult, setupRexDir } from "./e2e-helpers.js";
@@ -52,6 +53,17 @@ describe("ndx status jev line", () => {
     const { stdout } = status();
     expect(stdout).toContain("jev: available (file)");
     expect(stdout).not.toContain(SECRET);
+  });
+
+  it("reports a helper entry as unverified, not available, without running it", async () => {
+    const ran = join(home, "helper-ran");
+    const script = join(home, "helper.cjs");
+    await writeFile(script, `require("node:fs").writeFileSync(${JSON.stringify(ran)}, "");`);
+    expect(config(["credentials.typesafe", "--helper", `"${process.execPath}" "${script}"`]).code).toBe(0);
+    const { stdout } = status();
+    expect(stdout).toContain("jev: unverified (helper, not run");
+    expect(stdout).not.toContain("jev: available");
+    expect(existsSync(ran)).toBe(false);
   });
 
   it.skipIf(process.platform === "win32")(

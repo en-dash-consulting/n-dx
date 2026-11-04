@@ -61,7 +61,7 @@ const AnalysisRunSchema = z.object({
   partition: PartitionReviewSchema.extend({ reused: z.boolean() }).optional(),
   outcome: AnalysisOutcomeSchema.optional(),
   jev: z.object({
-    available: z.boolean(),
+    available: z.boolean().nullable(),
     source: z.enum(["env", "file", "helper"]).nullable(),
   }).optional(),
   rerun: z.object({

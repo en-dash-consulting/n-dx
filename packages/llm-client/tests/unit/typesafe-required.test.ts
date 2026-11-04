@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetJevFallbackWarning, resolveJudgmentRoute } from "../../src/config.js";
-import { jevAvailability, setCredential } from "../../src/credential-store.js";
+import {
+  clearCredentialHelperCache,
+  jevAvailability,
+  resolveCredential,
+  setCredential,
+  setHelperCredential,
+  type CredentialStoreOptions,
+} from "../../src/credential-store.js";
 import { probeJevKey } from "../../src/jev-client.js";
 import { loadLLMConfig } from "../../src/llm-config.js";
 import type { LLMConfig } from "../../src/llm-types.js";
@@ -65,6 +72,47 @@ describe("jevAvailability", () => {
     expect(jevAvailability({ ndxHome: home, env: { TYPESAFE_API_KEY: KEY } })).toEqual({ available: true, source: "env" });
     setCredential("typesafe", KEY, { ndxHome: home });
     expect(jevAvailability({ ndxHome: home, env: {} })).toEqual({ available: true, source: "file" });
+  });
+
+  describe("with a helper entry", () => {
+    let runs: number;
+    const helperExec = (ok: boolean) => (() => {
+      runs++;
+      if (!ok) throw Object.assign(new Error("locked"), { status: 1 });
+      return `${KEY}\n`;
+    }) as unknown as CredentialStoreOptions["helperExec"];
+    const opts = (ok: boolean) => ({ ndxHome: home, env: {}, helperExec: helperExec(ok), warn: () => {} });
+
+    beforeEach(() => {
+      runs = 0;
+      clearCredentialHelperCache();
+      setHelperCredential("typesafe", ["op", "read", "op://v/i/f"], { ndxHome: home });
+    });
+    afterEach(() => clearCredentialHelperCache());
+
+    it("is unknown without check, and runs nothing", () => {
+      expect(jevAvailability(opts(true))).toEqual({ available: null, source: "helper" });
+      expect(runs).toBe(0);
+    });
+
+    it("cached: unknown before the helper ran, then what its run gave, never running it", () => {
+      expect(jevAvailability({ ...opts(false), check: "cached" })).toEqual({ available: null, source: "helper" });
+      expect(resolveCredential("typesafe", opts(false))).toBeUndefined();
+      expect(runs).toBe(1);
+      expect(jevAvailability({ ...opts(true), check: "cached" })).toEqual({ available: false, source: null });
+      expect(runs).toBe(1);
+
+      clearCredentialHelperCache();
+      expect(resolveCredential("typesafe", opts(true))?.source).toBe("helper");
+      expect(jevAvailability({ ...opts(false), check: "cached" })).toEqual({ available: true, source: "helper" });
+      expect(runs).toBe(2);
+    });
+
+    it("check: runs the helper and reports its result", () => {
+      expect(jevAvailability({ ...opts(false), check: true })).toEqual({ available: false, source: null });
+      clearCredentialHelperCache();
+      expect(jevAvailability({ ...opts(true), check: true })).toEqual({ available: true, source: "helper" });
+    });
   });
 });
 

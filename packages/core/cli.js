@@ -2493,7 +2493,8 @@ function printWorkIdentity(dir) {
  * where (env, file or helper), never the value. Asks llm-client's credential
  * CLI, which owns the store; a helper is reported, not run. A store that was
  * not read (refused for its mode, invalid, unknown version) is named with its
- * fix, not reported as a missing key.
+ * fix, not reported as a missing key. A helper entry is `unverified`, not
+ * `available`: only running it shows whether it resolves.
  *
  * @returns {string}
  */
@@ -2505,6 +2506,9 @@ function formatJevLine() {
       stdio: ["ignore", "pipe", "pipe"],
     });
     const typesafe = JSON.parse(out).find((s) => s.name === "typesafe");
+    if (typesafe?.helperResult === "not-run") {
+      return "jev: unverified (helper, not run; ndx config credentials --check runs it)";
+    }
     if (typesafe?.source) return `jev: available (${typesafe.source})`;
     if (typesafe?.storeProblem) return `jev: unavailable (${typesafe.storeProblem})`;
     return "jev: unavailable (store a key: ndx config credentials.typesafe)";
