@@ -11,7 +11,14 @@ items:
     lastModified: "2026-11-04T20:47:22.011Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "1ec42c31-1ed5-4989-881c-3368dc86b8aa":
-    lastModified: "2026-11-04T19:07:37.486Z"
+    status: "completed"
+    startedAt: "2026-11-04T21:04:55.831Z"
+    completedAt: "2026-11-04T21:13:16.820Z"
+    endedAt: "2026-11-04T21:13:16.820Z"
+    activeIntervals: [{"end":"2026-11-04T21:13:16.820Z","start":"2026-11-04T21:04:55.831Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Workspaces card renders \"Task taken over by <worktree>\" from latest run's claimLostTo; viewer test added."
+    lastModified: "2026-11-04T21:13:16.820Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "3c8644ac-bc07-41bd-ad8d-029f08a807f8":
     lastModified: "2026-11-04T20:55:00.118Z"
