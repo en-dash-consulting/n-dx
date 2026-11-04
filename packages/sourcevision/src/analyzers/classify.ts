@@ -615,7 +615,7 @@ async function classifyBatchWithJev(
     if (err instanceof ClaudeClientError) {
       accumulateTokenUsage(tokenUsage, undefined);
       if (err.reason === "auth") {
-        console.warn("  [classify] TypeSafe authentication error — check TYPESAFE_API_KEY");
+        console.warn("  [classify] TypeSafe authentication error — check the key (`ndx config credentials.typesafe`, or an exported TYPESAFE_API_KEY)");
         console.warn(`  [classify]   ${err.message.slice(0, 200)}`);
         return "auth-error";
       }

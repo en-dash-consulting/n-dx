@@ -88,6 +88,12 @@ export interface AnalysisRun {
   partition?: PartitionReview & { reused: boolean };
   /** What this run left in `.sourcevision/`, for the next run to be measured against. */
   outcome?: AnalysisOutcome;
+  /**
+   * Whether Jev's key resolved when the run ended and where from (`env`,
+   * `file` or `helper`); never the key. Absent on manifests written before it
+   * existed, so a reader treats a missing field as unknown, not unavailable.
+   */
+  jev?: { available: boolean; source: "env" | "file" | "helper" | null };
   /** What the re-run judgments decided, when a previous run existed. */
   rerun?: RerunSummary;
 }

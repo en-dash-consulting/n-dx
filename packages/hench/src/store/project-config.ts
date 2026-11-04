@@ -13,11 +13,14 @@ import {
   DEFAULT_LLM_VENDOR,
   LLM_VENDOR,
   projectRootOf,
-  resolveApiKey as sharedResolveApiKey,
+  resolveVendorAuth as sharedResolveVendorAuth,
   resolveCliPath as sharedResolveCliPath,
   resolveVendorCliEnv as sharedResolveVendorCliEnv,
 } from "../prd/llm-gateway.js";
 import type { ClaudeConfig, LLMConfig, LLMVendor } from "../prd/llm-gateway.js";
+
+/** `llm.<vendor>.auth`'s decision for one vendor (llm-client's `VendorAuthDecision`). */
+export type VendorAuthDecision = ReturnType<typeof sharedResolveVendorAuth>;
 import type { HenchConfig } from "../schema/index.js";
 import type { EnvPolicyConfig } from "../prd/llm-gateway.js";
 
@@ -138,17 +141,28 @@ export function cliEnvReportLine(label: string, names: readonly string[], kind: 
 }
 
 /**
- * Resolve the API key with the following priority:
+ * `llm.claude.auth`'s decision for hench's API loop: the key it sends
+ * (`claude.api_key`, then the variable `apiKeyEnv` names, then the credential
+ * store under `auth: api`), or `apiRefusal` when the loop may not start.
+ */
+export function resolveClaudeApiAuth(claudeConfig: ClaudeConfig, apiKeyEnv: string): VendorAuthDecision {
+  return sharedResolveVendorAuth(LLM_VENDOR.CLAUDE, { claude: claudeConfig }, { apiKeyEnv });
+}
+
+/**
+ * The API key hench's API loop sends under `llm.claude.auth`:
  * 1. claude.api_key from unified config (.n-dx.json)
  * 2. Environment variable specified by config.apiKeyEnv (default: ANTHROPIC_API_KEY)
+ * 3. The credential store, only under `llm.claude.auth api`
  *
- * @returns The resolved API key, or undefined if not found.
+ * @returns The resolved API key, or undefined when none may be used.
  */
 export function resolveApiKey(
   claudeConfig: ClaudeConfig,
   apiKeyEnv: string,
 ): string | undefined {
-  return sharedResolveApiKey(claudeConfig, apiKeyEnv);
+  const decision = resolveClaudeApiAuth(claudeConfig, apiKeyEnv);
+  return decision.mode === "api" ? decision.key?.value : undefined;
 }
 
 /**

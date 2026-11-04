@@ -195,7 +195,8 @@ describe("createGoogleApiProvider — construction", () => {
       const clientErr = err as ClaudeClientError;
       expect(clientErr.reason).toBe("auth");
       expect(clientErr.retryable).toBe(false);
-      expect(clientErr.message).toContain("Google API key not found");
+      expect(clientErr.message).toContain("ndx config credentials.google");
+      expect(clientErr.message).toContain("llm.google.auth");
     }
   });
 

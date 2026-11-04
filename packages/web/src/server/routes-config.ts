@@ -15,7 +15,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
-import { LLM_VENDOR, resolveLayout, resolveClaudeConfig } from "@n-dx/llm-client";
+import { LLM_VENDOR, loadLLMConfig, resolveLayout, resolveClaudeConfig, resolveVendorAuth } from "@n-dx/llm-client";
 import type { ServerContext } from "./types.js";
 import { WorkspaceScoped } from "./workspace-scoped.js";
 import {jsonResponse} from "./response-utils.js";
@@ -196,7 +196,10 @@ async function extractConfig(ctx: ServerContext): Promise<NdxConfigSummary> {
   // Auth method detection. Reads the resolved view, so a credential set under
   // the modern `llm.claude.*` keys counts — checking only the legacy block
   // reported "none" for a perfectly configured project.
-  const hasApiKey = Boolean(claude?.api_key);
+  // The key comes from the same decision the vendor cards use, so a key held
+  // only in the credential store counts under `llm.claude.auth api`.
+  const claudeAuth = resolveVendorAuth(LLM_VENDOR.CLAUDE, await loadLLMConfig(ctx.projectDir));
+  const hasApiKey = claudeAuth.mode === "api" && claudeAuth.key !== undefined;
   const hasCliPath = Boolean(claude?.cli_path);
 
   let authMethod: "api-key" | "cli" | "none" = "none";

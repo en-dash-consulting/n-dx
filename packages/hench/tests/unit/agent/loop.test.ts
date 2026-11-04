@@ -101,7 +101,7 @@ describe("agentLoop", () => {
     try {
       await expect(
         agentLoop({ config, store, projectDir, henchDir }),
-      ).rejects.toThrow("API key not found");
+      ).rejects.toThrow("ndx config credentials.claude");
     } finally {
       if (origKey) process.env.ANTHROPIC_API_KEY = origKey;
     }
