@@ -10,6 +10,6 @@ acceptanceCriteria:
 touches:
   - "6b0c3873-5607-4adc-9027-abd8d70ab0e3"
 priority: "low"
-source: "pr-review"
 discoveredFrom: {"item":"eef3d129-ffc2-4598-bfce-a30c88faf4ef"}
+source: "pr-review"
 ---
