@@ -392,12 +392,14 @@ describe("Describe", () => {
     expect(text).toContain("## Task");
   });
 
-  it("tells the agent to flag vague done-when and propose tightened ones through a change-set card", async () => {
+  it("tells the agent to flag vague done-when and give tightened wording as text, not a change set", async () => {
     const text = (await buildDescribePacket(await sourcesFor("v2"), { ref: CHANGE_TASK }, NOW)).text;
     expect(text).toContain(DESCRIBE_INSTRUCTIONS);
     expect(DESCRIBE_INSTRUCTIONS).toMatch(/flag any that is vague/);
-    expect(DESCRIBE_INSTRUCTIONS).toContain("propose_prd_change");
-    expect(DESCRIBE_INSTRUCTIONS).toContain("change-set card");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("quote it and give the tightened wording in your reply");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("`rex update` or the item editor");
+    expect(DESCRIBE_INSTRUCTIONS).toContain("Do not call `propose_prd_change` for an existing task");
+    expect(DESCRIBE_INSTRUCTIONS).not.toContain("change-set card");
   });
 
   it("names each refusal and marks an unanswered resolve as unavailable", async () => {

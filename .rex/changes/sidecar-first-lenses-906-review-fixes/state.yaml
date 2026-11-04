@@ -1,7 +1,10 @@
 schema: "rex/v2"
 items:
   "26484fd2-3324-4090-8f12-ca63cafcd659":
-    lastModified: "2026-11-04T19:11:00.873Z"
+    lastModified: "2026-11-04T19:37:14.178Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "5117c0f4-6547-4140-8dae-dc14970ce123":
+    lastModified: "2026-11-04T19:37:14.178Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "adafce1f-9a8f-4308-8ad3-34a2550f7479":
     lastModified: "2026-11-04T19:09:52.844Z"
@@ -10,5 +13,12 @@ items:
     lastModified: "2026-11-04T19:11:00.873Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e66d734c-3552-4d0d-84eb-6c222c600d19":
-    lastModified: "2026-11-04T19:10:24.189Z"
+    status: "completed"
+    startedAt: "2026-11-04T19:30:34.753Z"
+    completedAt: "2026-11-04T19:50:24.621Z"
+    endedAt: "2026-11-04T19:50:24.621Z"
+    activeIntervals: [{"end":"2026-11-04T19:50:24.621Z","start":"2026-11-04T19:30:34.753Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "DESCRIBE_INSTRUCTIONS now has the agent quote each vague check and give tightened wording in its reply (operator applies via rex update or the item editor), and forbids propose_prd_change for an existing task. Test and snapshots updated."
+    lastModified: "2026-11-04T19:50:24.621Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
