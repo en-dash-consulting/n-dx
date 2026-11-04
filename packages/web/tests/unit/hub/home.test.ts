@@ -36,6 +36,7 @@ function card(overrides: Partial<ProjectCard> = {}): ProjectCard {
     remoteHost: "github.com",
     readiness: null,
     infrastructure: null,
+    initialized: true,
     ...overrides,
   };
 }
@@ -415,6 +416,48 @@ describe("extensions on the home page", () => {
     }));
     expect(html).not.toContain("<b>x</b>");
     expect(html).not.toContain("<script>");
+  });
+});
+
+describe("an uninitialized project's card", () => {
+  const fresh = card({
+    id: "gamma", name: "Gamma", repoRoot: "/repos/gamma", url: "/p/gamma/",
+    initialized: false, percentComplete: null, nextTaskTitle: null, repoName: null, remoteHost: null,
+  });
+
+  it("offers Initialize as its only action, with no Start working or dashboard link", () => {
+    const doc = renderToDocument(renderHomePage({ generatedAt: "t", projects: [fresh] }));
+    const li = doc.querySelector(".card")!;
+    expect(li.classList.contains("card-uninitialized")).toBe(true);
+    expect(li.querySelectorAll("a")).toHaveLength(0);
+    expect(li.textContent).not.toContain("Start working");
+    expect(li.textContent).not.toContain("Open dashboard");
+    const buttons = [...li.querySelectorAll(".actions button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["Initialize"]);
+    expect(buttons[0]!.classList.contains("action-primary")).toBe(true);
+    expect(li.getAttribute("data-init-base")).toBe("/p/gamma/");
+  });
+
+  it("says it is not initialized, and starts with its overlay and error hidden", () => {
+    const li = renderToDocument(renderCard(fresh)).querySelector(".card")!;
+    expect(cardFacts(fresh)[0]).toBe("not initialized");
+    expect(li.querySelector(".facts")!.textContent).toContain("not initialized");
+    expect((li.querySelector(".init-overlay") as HTMLElement).hidden).toBe(true);
+    expect(li.querySelector(".init-overlay")!.getAttribute("role")).toBe("status");
+    expect((li.querySelector(".init-error") as HTMLElement).hidden).toBe(true);
+  });
+
+  it("keeps the normal actions when initialization is unknown or the child is unreachable", () => {
+    for (const c of [card({ initialized: null }), card({ initialized: false, reachable: false })]) {
+      const html = renderCard(c);
+      expect(html).not.toContain("card-uninitialized");
+      expect(html).toContain("Open dashboard");
+    }
+  });
+
+  it("escapes the project id it carries for the init script", () => {
+    const html = renderCard({ ...fresh, id: `x"><script>` });
+    expect(html).not.toContain(`x"><script>`);
   });
 });
 
