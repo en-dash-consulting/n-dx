@@ -81,7 +81,7 @@ import type { ConfigBackstop } from "../../guard/config-backstop.js";
 import { displayTaskInfo } from "./task-display.js";
 import type { SelectionReason, PriorAttemptInfo } from "./task-display.js";
 import type { Heartbeat } from "./heartbeat.js";
-import { fetchCodexTokenUsage, validateRunTokensPostRun } from "../../quota/index.js";
+import { fetchCodexTokenUsage, resolveCodexQuotaKey, validateRunTokensPostRun } from "../../quota/index.js";
 import { loadLLMConfig, resolveLLMVendor } from "../../store/project-config.js";
 import { validateTaskCompletion } from "./task-completion-gate.js";
 import { V2_CHANGES_DIRNAME, V2_INBOX_DIRNAME, V2_PRODUCT_DIRNAME, V2_STATE_FILENAME } from "../../store/paths.js";
@@ -1273,7 +1273,7 @@ async function retrieveCodexTokensIfNeeded(run: RunRecord, projectDir: string): 
 
   try {
     const llmConfig = await loadLLMConfig(projectDir);
-    const codexApiKey = llmConfig.codex?.api_key ?? process.env["OPENAI_API_KEY"];
+    const codexApiKey = resolveCodexQuotaKey(llmConfig).key;
 
     if (!codexApiKey || !run.model) {
       // Silent skip: no API key available or model not set

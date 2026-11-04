@@ -39,7 +39,7 @@ function colorFor(percentRemaining: number): string {
  *   "\x1b[33mcodex / gpt-5.6-sol: 7% remaining\x1b[0m"
  *   "claude / claude-sonnet-5: 42% remaining"
  *   "google / gemini-3.7-flash: quota unavailable"
- *   "codex / gpt-5.6-terra: quota unavailable — codex login (session auth) — set OPENAI_API_KEY or llm.codex.api_key for quota"
+ *   "codex / gpt-5.6-terra: quota unavailable — codex login (llm.codex.auth cli) — quota needs an API key: …"
  */
 function formatEntry(entry: QuotaRemaining): string {
   if (entry.unavailable) {

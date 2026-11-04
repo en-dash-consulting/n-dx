@@ -217,7 +217,14 @@ items:
     lastModified: "2026-11-04T18:30:29.855Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "aba3a023-d594-4962-9d63-a0be5775bb20":
-    lastModified: "2026-11-04T17:25:54.539Z"
+    status: "completed"
+    startedAt: "2026-11-04T21:33:51.131Z"
+    completedAt: "2026-11-04T21:44:35.287Z"
+    endedAt: "2026-11-04T21:44:35.287Z"
+    activeIntervals: [{"end":"2026-11-04T21:44:35.287Z","start":"2026-11-04T21:33:51.131Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Codex quota and post-run token retrieval resolve the key via resolveVendorAuth (llm.codex.auth, store included); notice matches the auth mode."
+    lastModified: "2026-11-04T21:44:35.287Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "afd1638b-3f09-4e88-b50b-f09ecdd7b774":
     status: "completed"
