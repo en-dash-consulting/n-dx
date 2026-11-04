@@ -3195,15 +3195,21 @@ async function resolveClaudeSettings(configs) {
 /**
  * Handle --test-connection mode.
  *
- * Reads Claude settings through llm-client's `loadClaudeConfig`, not the raw
+ * Reads Claude settings through llm-client's `loadLLMConfig`, not the raw
  * merged config: this call sends the API key, and a shared `.n-dx.json`
  * `api_endpoint` may choose its destination only once the repository is
- * trusted (llm-client `credential-routing.ts`).
+ * trusted (llm-client `credential-routing.ts`). The key is the one the API
+ * provider would send (`resolveVendorApiKey`): under `llm.claude.auth api` it
+ * may come from the credential store; under `cli` none is tested. The key
+ * value is never printed.
  */
 async function handleTestConnection(dir) {
-  const { loadClaudeConfig } = await import("@n-dx/llm-client");
-  const claudeConfig = await loadClaudeConfig(dir);
-  if (Object.keys(claudeConfig).length === 0) {
+  const { loadLLMConfig, resolveVendorAuth } = await import("@n-dx/llm-client");
+  const llmConfig = await loadLLMConfig(dir);
+  const claudeConfig = llmConfig.claude ?? {};
+  const auth = resolveVendorAuth(LLM_VENDOR.CLAUDE, llmConfig);
+  const apiKey = auth.mode === "api" ? auth.key?.value : undefined;
+  if (Object.keys(claudeConfig).length === 0 && !apiKey && !auth.storedKeyHeld) {
     console.error(
       "No Claude configuration set. Run 'claude login', or use 'ndx config credentials.claude' for a key or 'ndx config claude.cli_path <path>' for the binary first.",
     );
@@ -3213,10 +3219,10 @@ async function handleTestConnection(dir) {
   let tested = false;
   let hasFailure = false;
 
-  if (claudeConfig.api_key) {
+  if (apiKey) {
     tested = true;
     const result = await testApiConnection(
-      claudeConfig.api_key,
+      apiKey,
       claudeConfig.api_endpoint,
       claudeConfig.model,
     );
@@ -3229,6 +3235,16 @@ async function handleTestConnection(dir) {
       console.error("Testing API key... ✗ " + result.error);
       hasFailure = true;
     }
+  } else if (auth.auth !== "api" && (auth.storedKeyHeld || claudeConfig.api_key)) {
+    // auto never selects the API for a store-only key; cli never uses a key.
+    console.error(
+      `llm.claude.auth is "${auth.auth}": the API key is not used, so it is not tested. ` +
+        "Set 'ndx config llm.claude.auth api' to use and test it.",
+    );
+  } else if (auth.auth === "api") {
+    console.error("Testing API key... ✗ " + auth.apiRefusal.message);
+    hasFailure = true;
+    tested = true;
   }
 
   if (claudeConfig.cli_path) {
@@ -3245,7 +3261,7 @@ async function handleTestConnection(dir) {
   }
 
   if (!tested) {
-    console.error("No claude.api_key or claude.cli_path configured to test.");
+    console.error("No API key or claude.cli_path to test.");
     process.exit(1);
   }
   if (hasFailure) {

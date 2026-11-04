@@ -1441,6 +1441,48 @@ describe("n-dx config", () => {
         expect(await requests()).toEqual([{ host: "user-proxy.invalid", carriesKey: true }]);
         expect(output).toContain(`endpoint: ${USER_PROXY}`);
       });
+
+      describe("a key held in the credential store", () => {
+        // `claude.api_key` writes the store and leaves only
+        // `llm.claude.auth: api` in .n-dx.local.json, so the test must resolve
+        // the key the way the API provider does.
+        function config(args) {
+          return run([...args, tmpDir], { env: { ...process.env, NDX_HOME: ndxHome } });
+        }
+
+        function testConnectionFail() {
+          try {
+            testConnection();
+          } catch (err) {
+            return { stdout: err.stdout, stderr: err.stderr };
+          }
+          throw new Error("Expected --test-connection to fail");
+        }
+
+        it("tests the stored key under auth api", async () => {
+          config(["claude.api_key", SENTINEL_KEY]);
+          const local = JSON.parse(await readFile(LOCAL_CONFIG_PATH(tmpDir), "utf-8"));
+          expect(local.llm?.claude?.api_key).toBeUndefined();
+          expect(local.llm?.claude?.auth).toBe("api");
+
+          const output = testConnection();
+
+          expect(await requests()).toEqual([{ host: "api.anthropic.com", carriesKey: true }]);
+          expect(output).toContain("Testing API key... ✓");
+          expect(output).not.toContain(SENTINEL_KEY);
+        });
+
+        it("does not test a stored key under auth cli", async () => {
+          config(["claude.api_key", SENTINEL_KEY]);
+          config(["llm.claude.auth", "cli"]);
+
+          const { stdout, stderr } = testConnectionFail();
+
+          expect(await requests()).toEqual([]);
+          expect(stderr).toContain("llm.claude.auth is \"cli\"");
+          expect(stdout + stderr).not.toContain(SENTINEL_KEY);
+        });
+      });
     });
   });
 

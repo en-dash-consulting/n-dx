@@ -88,7 +88,14 @@ items:
     lastModified: "2026-10-30T14:44:19.737Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6c539e7a-ae0b-4a82-955d-313f596add75":
-    lastModified: "2026-11-04T17:25:43.889Z"
+    status: "completed"
+    startedAt: "2026-11-04T18:32:45.746Z"
+    completedAt: "2026-11-04T18:38:28.135Z"
+    endedAt: "2026-11-04T18:38:28.135Z"
+    activeIntervals: [{"end":"2026-11-04T18:38:28.135Z","start":"2026-11-04T18:32:45.746Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "handleTestConnection resolves the Claude key via llm-client resolveVendorAuth (store under auth api; nothing under cli or store-only auto); key never printed; e2e tests added."
+    lastModified: "2026-11-04T18:38:28.135Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "6d70bab8-a6c6-4839-9520-08d407116c79":
     status: "completed"
