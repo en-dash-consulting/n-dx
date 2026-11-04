@@ -332,7 +332,7 @@ const ANALYSIS_HISTORY_MAX = 200;
  * and record the run — per phase and per task class — on the manifest and
  * in the machine-local history.
  */
-function finalizeTokenUsage(
+export function finalizeTokenUsage(
   ctx: AnalyzeContext,
   llmConfig: Awaited<ReturnType<typeof loadLLMConfig>>,
 ): void {

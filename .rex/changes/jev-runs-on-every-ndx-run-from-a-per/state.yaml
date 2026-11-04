@@ -116,7 +116,14 @@ items:
     lastModified: "2026-11-04T20:03:03.351Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "5f3e5940-8d9d-46ba-b1b3-f88fc4bb26cd":
-    lastModified: "2026-11-04T21:11:27.273Z"
+    status: "completed"
+    startedAt: "2026-11-04T23:00:01.038Z"
+    completedAt: "2026-11-04T23:06:46.952Z"
+    endedAt: "2026-11-04T23:06:46.952Z"
+    activeIntervals: [{"end":"2026-11-04T23:06:46.952Z","start":"2026-11-04T23:00:01.038Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sourcevision test drives exported finalizeTokenUsage with a real failing node helper in a temp NDX_HOME; catches both jevAvailability() and check:true regressions."
+    lastModified: "2026-11-04T23:06:46.952Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "68b2709d-174e-4ec2-bf3f-163fdda6115c":
     status: "deferred"
