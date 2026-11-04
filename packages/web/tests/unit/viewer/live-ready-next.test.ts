@@ -44,7 +44,7 @@ describe("Live Ready next", () => {
   let root: HTMLDivElement;
   let urls: string[];
 
-  function stub(readyNext: boolean): void {
+  function stub(readyNext: boolean, plan: object = PLAN): void {
     vi.stubGlobal("WebSocket", class { onmessage = null; onopen = null; onclose = null; close() {} });
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       urls.push(String(url));
@@ -53,7 +53,7 @@ describe("Live Ready next", () => {
         : String(url).includes("/api/live")
           ? SNAPSHOT
           : String(url).includes("/api/hench/plan-queue")
-            ? PLAN
+            ? plan
             : {};
       return { ok: true, status: 200, json: async () => body };
     }));
@@ -91,6 +91,25 @@ describe("Live Ready next", () => {
     expect(side.textContent).toContain("lane 1, step 2 of 2: change c1, tier light, after t1");
     expect(side.textContent).toContain("tagged migration: cold-only");
     expect(side.textContent).toContain(PLAN.summary);
+  });
+
+  it("tells every lane after the first to run in its own worktree, and lane 1 nothing", async () => {
+    stub(true, {
+      ...PLAN,
+      lanes: [
+        { ...PLAN.lanes[0], ownWorktree: false },
+        { command: "ndx work --task=t4 --auto .", changeId: "c2", ownWorktree: true, tasks: [{ id: "t4", title: "Other", reason: "lane 2, step 1 of 1" }] },
+        { command: "ndx work --task=t5 --auto .", changeId: "c3", ownWorktree: true, tasks: [{ id: "t5", title: "Third", reason: "lane 3, step 1 of 1" }] },
+      ],
+    });
+    await mount();
+    const lanes = [...root.querySelectorAll(".live-ready-lane")];
+    expect(lanes).toHaveLength(3);
+    expect(lanes.map((l) => l.querySelector(".live-ready-worktree")?.textContent ?? null)).toEqual([
+      null,
+      expect.stringContaining("Run in its own worktree"),
+      expect.stringContaining("Run in its own worktree"),
+    ]);
   });
 
   it("links each task title to its task, as Up next items do", async () => {

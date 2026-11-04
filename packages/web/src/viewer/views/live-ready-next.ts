@@ -26,7 +26,8 @@ interface PlanTask {
 
 /** What `ndx work --plan-queue --format=json` prints. Mirrors hench's `QueuePlan`. */
 export interface QueuePlan {
-  lanes: Array<{ command: string; changeId: string; tasks: PlanTask[] }>;
+  /** `ownWorktree`: the lane must run in a worktree of its own (every lane after the first). */
+  lanes: Array<{ command: string; changeId: string; ownWorktree?: boolean; tasks: PlanTask[] }>;
   excluded: PlanTask[];
   activeRuns: number;
   runLimit: number;
@@ -80,6 +81,10 @@ export function ReadyNext({ refreshKey, navigateTo }: { refreshKey: string; navi
             ? h("ol", { key: "l", class: "live-ready-lanes" }, plan.lanes.map((lane, i) =>
               h("li", { key: lane.changeId, class: "live-ready-lane" },
                 h("span", { class: "live-side-title" }, `Lane ${i + 1}`),
+                // Every command targets `.`; a later lane in this checkout collides with lane 1.
+                lane.ownWorktree
+                  ? h("p", { class: "live-ready-worktree" }, "Run in its own worktree: this command targets the current checkout, which lane 1 uses.")
+                  : null,
                 h("code", { class: "live-ready-command" }, lane.command),
                 h("ul", null, lane.tasks.map((t) => h(TaskLine, { key: t.id, task: t, navigateTo }))))))
             : null,
