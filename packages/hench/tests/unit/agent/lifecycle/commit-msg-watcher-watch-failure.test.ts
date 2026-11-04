@@ -14,13 +14,14 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { RM_RETRY } from "../../../helpers/index.js";
 
-const watchMode = vi.hoisted(() => ({ mode: "emit-error" as "emit-error" | "throw" }));
+const watchMode = vi.hoisted(() => ({ mode: "emit-error" as "emit-error" | "throw", calls: 0 }));
 
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
   return {
     ...actual,
     watch: () => {
+      watchMode.calls++;
       if (watchMode.mode === "throw") {
         throw Object.assign(new Error("EMFILE: too many open files, watch"), { code: "EMFILE" });
       }
@@ -74,4 +75,14 @@ describe("startCommitMsgWatcher — fs.watch failure", () => {
       watcher.cancel();
     });
   }
+
+  it("opens no watch when the timer is off (the default)", async () => {
+    watchMode.calls = 0;
+    const { startCommitMsgWatcher } = await import(
+      "../../../../src/agent/lifecycle/commit-msg-watcher.js"
+    );
+    const watcher = startCommitMsgWatcher({ projectDir, timeoutMs: 0 });
+    expect(watchMode.calls).toBe(0);
+    watcher.cancel();
+  });
 });
