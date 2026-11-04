@@ -510,6 +510,115 @@ describe("ndx auth", () => {
     });
   });
 
+  describe("llm.<vendor>.auth api with no usable key", () => {
+    // The preflight reports the missing key instead of throwing, and a
+    // `--version` probe, which needs no credential, neither fails nor runs a
+    // key helper. The stubs leave a marker when they run.
+    let env;
+
+    async function writeMarkerBinary(filePath, marker) {
+      if (isWin) {
+        const cmdPath = filePath + ".cmd";
+        await writeFile(cmdPath, `@echo off\r\necho ran> "${marker}"\r\necho 1.0.0\r\n`);
+        return cmdPath;
+      }
+      await writeFile(filePath, `#!/bin/sh\necho ran > '${marker}'\necho '1.0.0'\n`);
+      await chmod(filePath, 0o755);
+      return filePath;
+    }
+
+    async function ran(name) {
+      return readFile(join(tmpDir, `${name}.ran`), "utf-8").then(() => true, () => false);
+    }
+
+    async function writeLocal(local) {
+      await writeFile(join(tmpDir, ".n-dx.local.json"), JSON.stringify(local) + "\n");
+    }
+
+    /** A locked password manager: leaves a marker and exits non-zero. */
+    async function storeLockedHelper(vendor) {
+      const script = join(tmpDir, "locked-helper.mjs");
+      await writeFile(
+        script,
+        `import { writeFileSync } from "node:fs";\n` +
+          `writeFileSync(${JSON.stringify(join(tmpDir, "helper.ran"))}, "ran");\n` +
+          `process.exit(1);\n`,
+      );
+      const { status, stderr } = runNdx(
+        ["config", `credentials.${vendor}`, "--helper", `'${process.execPath}' '${script}'`, tmpDir],
+        env,
+      );
+      expect(status, stderr).toBe(0);
+    }
+
+    beforeEach(async () => {
+      const pathDir = join(tmpDir, "path-bin");
+      await mkdir(pathDir);
+      await writeMarkerBinary(join(pathDir, "claude"), join(tmpDir, "claude.ran"));
+      await writeMarkerBinary(join(pathDir, "codex"), join(tmpDir, "codex.ran"));
+      env = {
+        ...process.env,
+        NDX_HOME: join(tmpDir, "ndx-home"),
+        PATH: `${pathDir}${delimiter}${process.env.PATH ?? ""}`,
+      };
+      for (const name of Object.keys(env)) {
+        if (/^(ANTHROPIC_API_KEY|OPENAI_API_KEY|CODEX_API_KEY)$/i.test(name)) delete env[name];
+      }
+    });
+
+    it.each([
+      ["claude", "Claude", "NDX_CLAUDE_PREFLIGHT_NO_KEY"],
+      ["codex", "OpenAI (Codex)", "NDX_CODEX_PREFLIGHT_NO_KEY"],
+    ])("ndx auth reports the missing %s key instead of throwing", async (vendor, label, code) => {
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor } }) + "\n");
+      await writeLocal({ llm: { [vendor]: { auth: "api" } } });
+
+      const { stderr, status } = runNdx(["auth", tmpDir], env);
+
+      expect(status).toBe(1);
+      expect(stderr).toContain(`The ${label} API needs a key`);
+      expect(stderr).toContain(code);
+      expect(stderr).toContain("Re-run 'ndx auth'");
+      expect(stderr).not.toMatch(/\n\s+at /);
+      expect(await ran(vendor)).toBe(false);
+    });
+
+    it("ndx config llm.vendor --soft-preflight (ndx init) proceeds and persists the vendor", async () => {
+      await writeLocal({ llm: { codex: { auth: "api" } } });
+
+      const { stdout, stderr, status } = runNdx(["config", "llm.vendor", "codex", tmpDir, "--soft-preflight"], env);
+
+      expect(status).toBe(0);
+      expect(stderr).toContain("The OpenAI (Codex) API needs a key");
+      expect(stderr).toContain("Proceeding anyway");
+      expect(stdout).toContain("llm.vendor = codex");
+      const shared = JSON.parse(await readFile(join(tmpDir, ".n-dx.json"), "utf-8"));
+      expect(shared.llm.vendor).toBe("codex");
+    });
+
+    it("ndx config llm.codex.cli_path validates the command and runs no key helper", async () => {
+      await storeLockedHelper("codex");
+      await writeLocal({ llm: { codex: { auth: "api" } } });
+
+      const { stderr, status } = runNdx(["config", "llm.codex.cli_path", "codex", tmpDir], env);
+
+      expect(status, stderr).toBe(0);
+      expect(await ran("codex")).toBe(true);
+      expect(await ran("helper")).toBe(false);
+    });
+
+    it("ndx config --test-connection passes the claude cli_path check under a locked helper", async () => {
+      await storeLockedHelper("claude");
+      const bin = await writeMarkerBinary(join(tmpDir, "local-claude"), join(tmpDir, "local-claude.ran"));
+      await writeLocal({ llm: { claude: { auth: "api", cli_path: bin } } });
+
+      const { stdout } = runNdx(["config", "--test-connection", tmpDir], env);
+
+      expect(stdout).toContain("Testing CLI path... ✓ 1.0.0");
+      expect(await ran("local-claude")).toBe(true);
+    });
+  });
+
   it("appears in 'ndx --help' output", () => {
     const { stdout, status } = runNdx(["--help"]);
     expect(status).toBe(0);

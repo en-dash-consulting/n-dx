@@ -1140,10 +1140,11 @@ function validateGoogleApiKeyEnv(value) {
 /**
  * Validate CLI path by trying to run `<binary> --version`, with the vendor's
  * filtered environment ({@link loadVendorCliEnv}), never the whole parent one.
+ * Under `auth api` it resolves no key ({@link vendorEnvConfig}).
  * Returns { ok, version?, error? }.
  */
 async function testCliPath(cliPath, dir, vendor) {
-  const env = await loadVendorCheckEnv(dir, vendor);
+  const env = await loadVendorCheckEnv(dir, vendor, { versionProbe: true });
   try {
     const output = execFileSyncCli(cliPath, ["--version"], {
       encoding: "utf-8",
@@ -1849,7 +1850,14 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig) {
   const binary = await loadVendorCliPath(dir, cliVendor);
   const args = vendorAuthPreflightArgs(vendor);
   // The agent loop's vendor environment: no credential outside the vendor's mode.
-  const env = await loadVendorCheckEnv(dir, cliVendor);
+  let env;
+  try {
+    env = await loadVendorCheckEnv(dir, cliVendor);
+  } catch (err) {
+    // llm.<vendor>.auth "api" with no usable key: a failed preflight, not a crash.
+    if (err?.reason !== "auth") throw err;
+    return { ok: false, binary, args, detail: err.message, errorCode: preflightNoKeyCode(cliVendor) };
+  }
   try {
     // Windows-safe: routes .cmd shims through cmd.exe with a self-quoted
     // verbatim command line (GH #37/#68/#69) — see execFileSyncCli.
@@ -1890,6 +1898,11 @@ async function runVendorAuthPreflight(dir, vendor, llmConfig) {
       errorCode: typeof err?.code === "string" ? err.code : undefined,
     };
   }
+}
+
+/** The preflight error code for `llm.<vendor>.auth api` with no usable key. */
+function preflightNoKeyCode(vendor) {
+  return `NDX_${vendor.toUpperCase()}_PREFLIGHT_NO_KEY`;
 }
 
 function isBareCommand(binary) {
@@ -2030,6 +2043,14 @@ async function printVendorPreflightFailure(vendor, preflight, llmConfig) {
     }
     console.error(yellow("  Retry after resolving the issue: ndx config llm.vendor google"));
     console.error(dim(`  [${errorCode}]`));
+    return;
+  }
+
+  // CLI-based vendors under auth api with no usable key: the detail names the
+  // key and how to store it; login guidance would not help.
+  if (preflight.errorCode === preflightNoKeyCode(vendor)) {
+    console.error(red(`✗ ${preflight.detail}`));
+    console.error(dim(`  [${preflight.errorCode}]`));
     return;
   }
 
@@ -3035,10 +3056,11 @@ async function loadAllConfigs(dir) {
  * Config I/O and foundation loading stay in the spawn-exempt config module.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
- * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions, subject?: string }} [options]
+ * @param {{ trust?: import("@n-dx/llm-client").RepoTrustStoreOptions, subject?: string, versionProbe?: boolean }} [options]
  *   `trust` relocates the repository-trust store (e.g. `{ ndxHome }`); callers
  *   that omit it use the user's real store. `subject` names the caller in the
- *   untrusted-allow warning (default "the reviewer CLI").
+ *   untrusted-allow warning (default "the reviewer CLI"). `versionProbe`: see
+ *   {@link vendorEnvConfig}.
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
 export async function loadVendorCliEnv(dir, vendor, options = {}) {
@@ -3046,7 +3068,19 @@ export async function loadVendorCliEnv(dir, vendor, options = {}) {
   const envPolicy = await loadProjectEnvPolicy(dir);
   const llmConfig = await loadLLMConfig(dir);
   const policy = await applyRepoTrustToEnvPolicy(dir, envPolicy, options.trust, options.subject);
-  return resolveVendorCliEnv({ ...llmConfig, vendor }, policy);
+  return resolveVendorCliEnv(vendorEnvConfig(llmConfig, vendor, options.versionProbe), policy);
+}
+
+/**
+ * `llmConfig` for `vendor`'s child environment. A `--version` probe needs no
+ * credential, so there `llm.<vendor>.auth api` resolves as `cli`: the probe
+ * neither fails for a missing key nor runs a key helper. `auto` and `cli` stay
+ * as configured, so the probe still gets what the vendor's runs get.
+ */
+function vendorEnvConfig(llmConfig, vendor, versionProbe = false) {
+  const config = { ...llmConfig, vendor };
+  if (!versionProbe || llmConfig[vendor]?.auth !== "api") return config;
+  return { ...config, [vendor]: { ...llmConfig[vendor], auth: "cli" } };
 }
 
 /**
@@ -3057,12 +3091,13 @@ export async function loadVendorCliEnv(dir, vendor, options = {}) {
  * valid deny list, the user's local one included — never the parent environment.
  * @param {string} dir
  * @param {"claude" | "codex"} vendor
+ * @param {{ versionProbe?: boolean }} [options] see {@link vendorEnvConfig}
  * @returns {Promise<NodeJS.ProcessEnv>}
  */
-async function loadVendorCheckEnv(dir, vendor) {
+async function loadVendorCheckEnv(dir, vendor, { versionProbe = false } = {}) {
   const subject = `the ${vendor} CLI check`;
   try {
-    return await loadVendorCliEnv(dir, vendor, { subject });
+    return await loadVendorCliEnv(dir, vendor, { subject, versionProbe });
   } catch (err) {
     // llm.<vendor>.auth "api" with no key: a credential problem the check
     // reports as one, not a malformed env policy.
@@ -3070,7 +3105,7 @@ async function loadVendorCheckEnv(dir, vendor) {
     const { loadLLMConfig, repoEnvPolicy, resolveVendorCliEnv } = await import("@n-dx/llm-client");
     const reason = err instanceof Error ? err.message : String(err);
     console.warn(`hench.guard.env is not a usable policy (${reason}); ${subject} ignores the malformed field.`);
-    return resolveVendorCliEnv({ ...(await loadLLMConfig(dir)), vendor }, repoEnvPolicy(dir));
+    return resolveVendorCliEnv(vendorEnvConfig(await loadLLMConfig(dir), vendor, versionProbe), repoEnvPolicy(dir));
   }
 }
 
