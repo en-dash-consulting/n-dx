@@ -20,7 +20,7 @@ import {
 } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { execFileSyncCli } from "./win-spawn.js";
+import { execFileSyncCli, spawnSyncCli } from "./win-spawn.js";
 import { relativeToRoot, resolveLayout, resolveNdxHome } from "./layout.js";
 import {
   describeUnrestrictedFile,
@@ -4147,26 +4147,26 @@ const CREDENTIAL_NAMES = new Set(["typesafe", "claude", "codex", "google"]);
  * only spawns it, and a value travels on stdin — never argv, so it is in no
  * process list and no spawn log.
  *
+ * On success, what the child wrote to stderr — a warning such as a Windows
+ * ACL it could not restrict — is forwarded to this process's stderr, since
+ * the command still did what was asked. On failure the caller reports
+ * `stderr`. The CLI never writes a credential value to either stream.
+ *
  * @returns {{ code: number, stdout: string, stderr: string }}
  */
 function spawnCredentialsCli(args, input) {
   const script = createRequire(import.meta.url).resolve(
     "@n-dx/llm-client/dist/cli/credentials.js",
   );
-  try {
-    const stdout = execFileSyncCli(process.execPath, [script, ...args], {
-      encoding: "utf-8",
-      input: input ?? "",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return { code: 0, stdout, stderr: "" };
-  } catch (err) {
-    return {
-      code: typeof err.status === "number" ? err.status : 1,
-      stdout: String(err.stdout ?? ""),
-      stderr: String(err.stderr ?? err.message ?? ""),
-    };
-  }
+  const result = spawnSyncCli(process.execPath, [script, ...args], {
+    encoding: "utf-8",
+    input: input ?? "",
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const code = typeof result.status === "number" ? result.status : 1;
+  const stderr = String(result.stderr || result.error?.message || "");
+  if (code === 0 && stderr) process.stderr.write(stderr);
+  return { code, stdout: String(result.stdout ?? ""), stderr };
 }
 
 /**
@@ -4397,12 +4397,16 @@ async function showVendorApiKey(dir, vendor, flags) {
     if ((await fileApiKeys(dir, which)).some((k) => k.vendor === vendor)) shadowedBy.push(which);
   }
   if (flags.json) {
-    const { name, source, backend, fingerprint } = JSON.parse(result.stdout).find((s) => s.name === vendor);
+    const { name, source, backend, fingerprint, storeProblem } = JSON.parse(result.stdout).find((s) => s.name === vendor);
     const configFiles = shadowedBy.map((which) => projectConfigLabel(dir, which));
-    console.log(JSON.stringify({ name, source, backend, fingerprint, configFiles }));
+    console.log(JSON.stringify({ name, source, backend, fingerprint, storeProblem, configFiles }));
     return;
   }
-  console.log(result.stdout.split("\n").find((l) => l.startsWith(`${vendor}: `)) ?? `${vendor}: not set`);
+  const lines = result.stdout.split("\n");
+  console.log(lines.find((l) => l.startsWith(`${vendor}: `)) ?? `${vendor}: not set`);
+  // Why the store was not read, with the fix (status reports it, not stderr).
+  const notRead = lines.find((l) => l.startsWith("Store not read: "));
+  if (notRead) console.log(notRead);
   for (const which of shadowedBy) {
     const move = which === LOCAL_CONFIG_FILE ? "ndx config credentials --import" : `ndx config credentials.${vendor}, then delete llm.${vendor}.api_key from that file`;
     console.log(`${projectConfigLabel(dir, which)} also holds a ${vendor} key, which is used instead. Move it: ${move}`);

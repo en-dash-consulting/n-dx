@@ -3,6 +3,9 @@ items:
   "03dd62b9-6298-4938-b35e-70e3394c6b28":
     lastModified: "2026-11-04T18:06:23.682Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "0e7c49f6-104a-4db7-83f1-7c1397cc7ba7":
+    lastModified: "2026-11-04T20:36:30.385Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0f3163d9-7548-4ff5-abfa-d62d7640c42f":
     status: "completed"
     startedAt: "2026-11-03T18:34:02.653Z"
@@ -130,9 +133,12 @@ items:
     resolutionDetail: "fad4416e5 (run 857125af): the codex registry entry decides API vs CLI with resolveVendorAuth (helpers not run); Google mode detection uses the same decision; new hench failover-codex-auth integration test. Gate: root-policy, root-drift, graview, hench, llm-client, rex, sourcevision passed; web failed only throttle-controls.test.ts 'sends PUT request when concurrency slider changes' (known load-timing flake), which passes alone (14/14). Review: nothing to fix. Note: AC 'hench failover to codex succeeds' holds via the codex CLI provider; hench's API loop (initApiResources, loop.ts) still rejects non-Claude API providers, as on main."
     lastModified: "2026-11-04T17:50:46.336Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "7ce15d95-320b-40e1-a256-28757ff37f89":
+    lastModified: "2026-11-04T20:36:23.972Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-04T18:30:29.855Z"
+    lastModified: "2026-11-04T20:36:30.385Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "82ff7e46-365c-4284-a74d-83753ed94067":
     status: "completed"
@@ -211,7 +217,14 @@ items:
     lastModified: "2026-11-04T17:25:54.539Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "afd1638b-3f09-4e88-b50b-f09ecdd7b774":
-    lastModified: "2026-11-04T17:25:42.527Z"
+    status: "completed"
+    startedAt: "2026-11-04T20:25:52.274Z"
+    completedAt: "2026-11-04T21:04:02.242Z"
+    endedAt: "2026-11-04T21:04:02.242Z"
+    activeIntervals: [{"end":"2026-11-04T21:04:02.242Z","start":"2026-11-04T20:25:52.274Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "credentialStatus carries storeProblem; status prints it instead of 'not set'; core forwards success stderr via new spawnSyncCli; ndx status jev line names the refusal"
+    lastModified: "2026-11-04T21:04:02.242Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b52513b3-58a0-4a2b-9e36-d116bdcf6a54":
     status: "completed"

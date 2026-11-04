@@ -2491,12 +2491,13 @@ function printWorkIdentity(dir) {
 /**
  * The `jev:` line of `ndx status`: whether TypeSafe's key resolves and from
  * where (env, file or helper), never the value. Asks llm-client's credential
- * CLI, which owns the store; a helper is reported, not run.
+ * CLI, which owns the store; a helper is reported, not run. A store that was
+ * not read (refused for its mode, invalid, unknown version) is named with its
+ * fix, not reported as a missing key.
  *
  * @returns {string}
  */
 function formatJevLine() {
-  const unavailable = "jev: unavailable (store a key: ndx config credentials.typesafe)";
   try {
     const script = _require.resolve("@n-dx/llm-client/dist/cli/credentials.js");
     const out = execFileSyncCli(process.execPath, [script, "status", "--json"], {
@@ -2504,7 +2505,9 @@ function formatJevLine() {
       stdio: ["ignore", "pipe", "pipe"],
     });
     const typesafe = JSON.parse(out).find((s) => s.name === "typesafe");
-    return typesafe?.source ? `jev: available (${typesafe.source})` : unavailable;
+    if (typesafe?.source) return `jev: available (${typesafe.source})`;
+    if (typesafe?.storeProblem) return `jev: unavailable (${typesafe.storeProblem})`;
+    return "jev: unavailable (store a key: ndx config credentials.typesafe)";
   } catch {
     return "jev: unknown (could not read the credential store; ndx config credentials)";
   }

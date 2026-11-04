@@ -181,6 +181,8 @@ ndx config credentials .                      # backend, source and fingerprint 
 
 **Lookup order.** The first of these that has a key wins: the project's configured key, the exported variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `TYPESAFE_API_KEY`…), then the store. An exported `TYPESAFE_API_KEY` therefore overrides the stored one.
 
+**A store n-dx will not read.** On macOS and Linux a store other users can read is refused, and a file that is not valid JSON or has an unknown version is ignored. `ndx config credentials` and the `jev:` line of `ndx status` name the problem and its fix (`chmod 600 <path>`) instead of reporting no key. Storing a key into a store other users could read makes it owner-only and warns you to rotate any key it held.
+
 **`--helper`** stores a password-manager command instead of a value:
 
 ```sh

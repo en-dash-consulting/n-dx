@@ -273,6 +273,7 @@ describe("credentialStatus", () => {
       helperResult: null,
       envVar: "TYPESAFE_API_KEY",
       storePath: storePath(),
+      storeProblem: null,
     });
     expect(JSON.stringify(status)).not.toContain(PLACEHOLDER);
   });

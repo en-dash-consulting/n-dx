@@ -164,6 +164,12 @@ export interface CredentialStatus {
   /** The environment variable that overrides the store, when there is one. */
   envVar: string | null;
   storePath: string;
+  /**
+   * Why the store was not read — refused for its mode, unreadable, invalid
+   * JSON or an unknown version — naming the fix. Null when it was read or is
+   * absent. Never holds a value.
+   */
+  storeProblem: string | null;
 }
 
 interface StoreEntry {
@@ -210,7 +216,14 @@ const defaultWarn = (message: string): void => {
  * size: a rewrite changes the first, a chmod the second, so fixing a refused
  * store's mode is seen without a restart. A cached refusal does not warn again.
  */
-const readCache = new Map<string, { key: string; store: StoreFile | undefined }>();
+const readCache = new Map<string, { key: string } & StoreRead>();
+
+/** The store's contents, or why a store that is present was not read. */
+interface StoreRead {
+  store: StoreFile | undefined;
+  /** Names the file and the fix, never its contents; null when read or absent. */
+  problem: string | null;
+}
 
 function statKey(stats: Stats): string {
   return `${stats.mtimeMs}:${stats.ctimeMs}:${stats.size}`;
@@ -218,6 +231,14 @@ function statKey(stats: Stats): string {
 
 /** The store's contents, or undefined when it is missing, refused or unreadable. */
 function readStore(path: string, options: CredentialStoreOptions): StoreFile | undefined {
+  return readStoreChecked(path, options).store;
+}
+
+/**
+ * {@link readStore} with the reason a present store was not read. A new
+ * reason is warned once, and the warning's text is the reason.
+ */
+function readStoreChecked(path: string, options: CredentialStoreOptions): StoreRead {
   const warn = options.warn ?? defaultWarn;
   let stats: Stats | undefined;
   try {
@@ -227,37 +248,37 @@ function readStore(path: string, options: CredentialStoreOptions): StoreFile | u
     // sudo run) must not crash the caller: a key lookup is optional, and Jev
     // routing calls it on every analysis. Read as empty, warn once per cause.
     const key = `error:${errorCode(err) ?? "unknown"}`;
-    if (readCache.get(path)?.key !== key) {
-      warn(`Ignoring the credential store ${path}: it cannot be read (${errorCode(err) ?? "unknown error"}).`);
-      readCache.set(path, { key, store: undefined });
-    }
-    return undefined;
+    const cached = readCache.get(path);
+    if (cached?.key === key) return cached;
+    const read: StoreRead = {
+      store: undefined,
+      problem: `Ignoring the credential store ${path}: it cannot be read (${errorCode(err) ?? "unknown error"}).`,
+    };
+    warn(read.problem!);
+    readCache.set(path, { key, ...read });
+    return read;
   }
   if (!stats) {
     readCache.delete(path);
-    return undefined;
+    return { store: undefined, problem: null };
   }
   const key = statKey(stats);
   const cached = readCache.get(path);
-  if (cached?.key === key) return cached.store;
+  if (cached?.key === key) return cached;
 
-  const store = loadStore(path, stats, options.platform ?? process.platform, warn);
-  readCache.set(path, { key, store });
-  return store;
+  const read = loadStore(path, stats, options.platform ?? process.platform);
+  if (read.problem) warn(read.problem);
+  readCache.set(path, { key, ...read });
+  return read;
 }
 
-function loadStore(
-  path: string,
-  stats: Stats,
-  platform: NodeJS.Platform,
-  warn: (message: string) => void,
-): StoreFile | undefined {
+function loadStore(path: string, stats: Stats, platform: NodeJS.Platform): StoreRead {
+  const notRead = (problem: string): StoreRead => ({ store: undefined, problem });
   if (platform !== "win32" && (stats.mode & 0o077) !== 0) {
-    warn(
+    return notRead(
       `Refusing to read the credential store ${path}: it is readable by other users ` +
         `(mode 0${(stats.mode & 0o777).toString(8)}). Fix it with: chmod 600 ${path}`,
     );
-    return undefined;
   }
   let parsed: unknown;
   try {
@@ -265,15 +286,11 @@ function loadStore(
   } catch (err) {
     // The message names the file, never its contents: a JSON parse error can
     // quote the text around the fault, which may be part of a key.
-    warn(`Ignoring the credential store ${path}: it is not valid JSON (${errorCode(err) ?? "parse error"}).`);
-    return undefined;
+    return notRead(`Ignoring the credential store ${path}: it is not valid JSON (${errorCode(err) ?? "parse error"}).`);
   }
   const versionError = checkVersion(parsed);
-  if (versionError) {
-    warn(`Ignoring the credential store ${path}: ${versionError}`);
-    return undefined;
-  }
-  return parsed as StoreFile;
+  if (versionError) return notRead(`Ignoring the credential store ${path}: ${versionError}`);
+  return { store: parsed as StoreFile, problem: null };
 }
 
 /** Why `parsed` is not a store this version understands, or null when it is. */
@@ -560,7 +577,8 @@ export interface CredentialStatusOptions extends CredentialStoreOptions {
 export function credentialStatus(name: string, options: CredentialStatusOptions = {}): CredentialStatus {
   assertCredentialName(name);
   const storePath = credentialStorePath(options);
-  const entry = readStore(storePath, options)?.entries?.[name];
+  const { store, problem } = readStoreChecked(storePath, options);
+  const entry = store?.entries?.[name];
   const argv = helperArgv(entry);
   const base = {
     name,
@@ -568,6 +586,7 @@ export function credentialStatus(name: string, options: CredentialStatusOptions 
     helperCommand: argv ? argv[0]! : null,
     envVar: options.envVar ?? CREDENTIAL_ENV_VARS[name] ?? null,
     storePath,
+    storeProblem: problem,
   };
   const fromEnv = envCredential(name, options);
   if (fromEnv) return { ...base, source: "env", fingerprint: credentialFingerprint(fromEnv), helperResult: null };
@@ -718,7 +737,14 @@ function updateStore(options: CredentialWriteOptions, mutate: (store: StoreFile)
   withStoreLock(path, options.lockTimeoutMs ?? 10_000, () => {
     const store = readStoreForWrite(path);
     if (!mutate(store)) return;
+    const exposedMode = platform === "win32" ? 0 : (statSync(path, { throwIfNoEntry: false })?.mode ?? 0) & 0o777;
     writeStoreAtomic(path, store, options);
+    if (exposedMode & 0o077) {
+      (options.warn ?? defaultWarn)(
+        `The credential store ${path} was readable by other users (mode 0${exposedMode.toString(8)}); ` +
+          `it is now 0600. Rotate any key it held before this write.`,
+      );
+    }
   });
   readCache.delete(path);
 }

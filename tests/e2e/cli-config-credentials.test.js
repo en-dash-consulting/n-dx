@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -414,5 +414,46 @@ describe("ndx config credentials --import", () => {
     expect(r.stderr).toMatch(/Could not store the claude key; it stays in/);
     expect(await readFile(localPath(), "utf-8")).toContain(KEY);
     expect(r.stdout + r.stderr).not.toContain(KEY);
+  }, DEFAULT_TIMEOUT);
+});
+
+// A group- or world-readable store is refused on POSIX; Windows has no mode bits.
+describe.skipIf(isWin)("ndx config credentials with a store readable by others", () => {
+  const VENDOR_KEY = "sk-ant-placeholder-exposed-0123456789";
+  const storePath = () => join(home, "credentials.json");
+
+  beforeEach(async () => {
+    expect(config(["credentials.typesafe", "--stdin"], SECRET).code).toBe(0);
+    await chmod(storePath(), 0o644);
+  });
+
+  it("names the refusal and the chmod fix instead of not set", () => {
+    const r = config(["credentials"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("typesafe: unknown, the store was not read");
+    expect(r.out).not.toMatch(/typesafe: not set/);
+    expect(r.out).toContain(`Refusing to read the credential store ${storePath()}`);
+    expect(r.out).toContain(`chmod 600 ${storePath()}`);
+    expect(r.out + r.err).not.toContain(SECRET);
+  }, DEFAULT_TIMEOUT);
+
+  it("names the refusal when showing a vendor key", () => {
+    const r = config(["llm.claude.api_key", cwd]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("claude: unknown, the store was not read");
+    expect(r.out).toContain(`chmod 600 ${storePath()}`);
+    expect(r.out + r.err).not.toContain(SECRET);
+  }, DEFAULT_TIMEOUT);
+
+  it("forwards the credential CLI's warning from a successful set, never a value", async () => {
+    const r = config(["credentials.claude", "--stdin"], VENDOR_KEY);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/Stored claude/);
+    expect(r.err).toContain(`The credential store ${storePath()} was readable by other users (mode 0644)`);
+    expect((await stat(storePath())).mode & 0o777).toBe(0o600);
+    for (const text of [r.out, r.err]) {
+      expect(text).not.toContain(SECRET);
+      expect(text).not.toContain(VENDOR_KEY);
+    }
   }, DEFAULT_TIMEOUT);
 });
