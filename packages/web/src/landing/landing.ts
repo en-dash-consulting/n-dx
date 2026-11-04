@@ -105,6 +105,8 @@ interface InitStatusResponse {
   gitRequested?: boolean;
   /** Whether the folder is a repository now — null until a git run finishes. */
   gitInitialized?: boolean | null;
+  /** Init succeeded but the Google key was not stored: why, and how to store it. */
+  credentialWarning?: string | null;
 }
 
 /** GET /api/commands/init/preflight — what this folder looks like pre-init. */
@@ -134,6 +136,7 @@ function initSetupWizard(): void {
   const progressEl = document.getElementById("wizard-progress");
   const errorEl = document.getElementById("wizard-error");
   const successEl = document.getElementById("wizard-success");
+  const warningEl = document.getElementById("wizard-warning");
   const googleFields = form.querySelector<HTMLElement>('.wizard-vendor-fields[data-for="google"]');
   const localFields = form.querySelector<HTMLElement>('.wizard-vendor-fields[data-for="local"]');
   const googleKeyInput = document.getElementById("wizard-google-key") as HTMLInputElement | null;
@@ -236,6 +239,22 @@ function initSetupWizard(): void {
           successEl.append(" Git repository created.");
         }
         successEl.hidden = false;
+      }
+      if (data.credentialWarning) {
+        // The typed key is lost unless the operator stores it by hand, so the
+        // page stays put — a redirect would take the warning with it.
+        if (warningEl) {
+          warningEl.textContent = data.credentialWarning;
+          warningEl.hidden = false;
+        }
+        const label = successEl?.querySelector<HTMLElement>(".wizard-success-label");
+        if (label) {
+          const link = document.createElement("a");
+          link.href = apiUrl("/");
+          link.textContent = "Open your dashboard";
+          label.replaceChildren("Ready — ", link);
+        }
+        return;
       }
       // The server now sees .rex/.sourcevision/.hench on disk, so the next
       // request to "/" serves the real dashboard instead of this page.

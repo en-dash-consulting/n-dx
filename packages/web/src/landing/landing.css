@@ -1300,6 +1300,7 @@ section.in-view .section-subtitle {
 
 .wizard-progress,
 .wizard-error,
+.wizard-warning,
 .wizard-success {
   margin: 0;
   font-size: var(--font-sm);
@@ -1310,7 +1311,8 @@ section.in-view .section-subtitle {
   color: var(--text-dim);
 }
 
-.wizard-error {
+.wizard-error,
+.wizard-warning {
   color: var(--error, #e5484d);
 }
 

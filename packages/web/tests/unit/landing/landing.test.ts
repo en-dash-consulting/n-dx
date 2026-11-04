@@ -182,13 +182,20 @@ function setupWizardDOM(): void {
       </button>
       <p id="wizard-progress" hidden></p>
       <p id="wizard-error" hidden></p>
-      <p id="wizard-success" hidden></p>
+      <p id="wizard-warning" hidden></p>
+      <p id="wizard-success" hidden><span class="wizard-success-label">Ready — opening your dashboard…</span></p>
     </form>
   `;
 }
 
-/** Stub `fetch` for the preflight call, plus a capture of any POSTed init. */
-function stubPreflight(preflight: { isRepo: boolean; gitAvailable: boolean } | "error") {
+/**
+ * Stub `fetch` for the preflight call, plus a capture of any POSTed init.
+ * `status` answers the init status poll (default: still running).
+ */
+function stubPreflight(
+  preflight: { isRepo: boolean; gitAvailable: boolean } | "error",
+  status: Record<string, unknown> = { running: true },
+) {
   const initBodies: Record<string, unknown>[] = [];
   const fetchMock = vi.fn(async (url: string, opts?: { method?: string; body?: string }) => {
     // Served at "/" standalone and "/p/<id>/" behind the hub — match on the
@@ -201,7 +208,7 @@ function stubPreflight(preflight: { isRepo: boolean; gitAvailable: boolean } | "
       initBodies.push(JSON.parse(opts.body ?? "{}") as Record<string, unknown>);
       return { ok: true, status: 202, json: async () => ({ ok: true }) } as Response;
     }
-    return { ok: true, status: 200, json: async () => ({ running: true }) } as Response;
+    return { ok: true, status: 200, json: async () => status } as Response;
   });
   vi.stubGlobal("fetch", fetchMock);
   return { initBodies };
@@ -301,5 +308,64 @@ describe("landing.ts setup wizard — git question", () => {
 
     expect(initBodies).toHaveLength(1);
     expect("git" in initBodies[0]).toBe(false);
+  });
+});
+
+describe("landing.ts setup wizard — Google key store result", () => {
+  const finished = {
+    running: false,
+    startedAt: "2026-11-04T00:00:00.000Z",
+    finishedAt: "2026-11-04T00:00:05.000Z",
+    output: "",
+    error: null,
+  };
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllGlobals();
+    window.history.replaceState({}, "", "/");
+    setupWizardDOM();
+    installBrowserStubs();
+  });
+
+  /** Submit the wizard and let one status poll (1.5 s interval) complete. */
+  async function submitAndPoll(): Promise<void> {
+    vi.useFakeTimers();
+    try {
+      await import("../../../src/landing/landing.js");
+      await vi.advanceTimersByTimeAsync(0);
+      (document.getElementById("setup-wizard") as HTMLFormElement).dispatchEvent(
+        new Event("submit", { cancelable: true }),
+      );
+      await vi.advanceTimersByTimeAsync(1600);
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it("shows the store failure and keeps the page open so it can be read", async () => {
+    const warning = "Google API key was not stored (store locked). Store it with: ndx config credentials.google";
+    stubPreflight({ isRepo: true, gitAvailable: true }, { ...finished, credentialWarning: warning });
+    await submitAndPoll();
+
+    const warningEl = document.getElementById("wizard-warning")!;
+    expect(warningEl.hidden).toBe(false);
+    expect(warningEl.textContent).toBe(warning);
+
+    const successEl = document.getElementById("wizard-success")!;
+    expect(successEl.hidden).toBe(false);
+    expect(successEl.textContent).not.toContain("opening your dashboard");
+    expect(successEl.querySelector("a")?.getAttribute("href")).toBe("/");
+  });
+
+  it("leaves a successful run unchanged", async () => {
+    stubPreflight({ isRepo: true, gitAvailable: true }, { ...finished, credentialWarning: null });
+    await submitAndPoll();
+
+    expect(document.getElementById("wizard-warning")!.hidden).toBe(true);
+    const successEl = document.getElementById("wizard-success")!;
+    expect(successEl.hidden).toBe(false);
+    expect(successEl.textContent).toContain("opening your dashboard");
+    expect(successEl.querySelector("a")).toBeNull();
   });
 });

@@ -15,7 +15,14 @@ items:
     lastModified: "2026-11-03T19:36:04.383Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "0fa67da8-bc41-44c8-9584-7aabe786e413":
-    lastModified: "2026-11-04T17:25:56.257Z"
+    status: "completed"
+    startedAt: "2026-11-04T21:45:24.601Z"
+    completedAt: "2026-11-04T22:00:57.061Z"
+    endedAt: "2026-11-04T22:00:57.061Z"
+    activeIntervals: [{"end":"2026-11-04T22:00:57.061Z","start":"2026-11-04T21:45:24.601Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Init wizard checks the Google key store's exit code; a failed store sets InitStatus.credentialWarning (reason with the key cut out and redacted, plus the ndx config credentials.google hint) and the landing page shows it without redirecting."
+    lastModified: "2026-11-04T22:00:57.061Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "10730d82-59f1-4ea2-9594-667318da70d2":
     status: "completed"
