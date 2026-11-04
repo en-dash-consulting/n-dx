@@ -138,6 +138,14 @@ describe("toProjectCard", () => {
     });
   });
 
+  it("reports whether the child says n-dx is initialized, and null when it cannot say", () => {
+    expect(toProjectCard(project("a"), { ...HEALTHY, status: { ...HEALTHY.status, initialized: false } }).initialized).toBe(false);
+    expect(toProjectCard(project("a"), { ...HEALTHY, status: { ...HEALTHY.status, initialized: true } }).initialized).toBe(true);
+    // An older child build, and an unreachable one, do not report it.
+    expect(toProjectCard(project("a"), HEALTHY).initialized).toBeNull();
+    expect(toProjectCard(project("a"), { status: null, git: null, error: "ECONNREFUSED" }).initialized).toBeNull();
+  });
+
   it("renders a card for an unreachable child from the registry alone", () => {
     const card = toProjectCard(
       project("beta", { status: { state: "unreachable", pid: null, port: null, attached: false, respawns: 1, lastHealthAt: null, lastError: null } as never }),
