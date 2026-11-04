@@ -41,7 +41,7 @@
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { TYPESAFE_API_KEY_ENV, askJev, exec, resolveLayout, relativeToRoot, routesToTier } from "@n-dx/llm-client";
+import { TYPESAFE_CREDENTIAL, askJev, exec, resolveCredential, resolveLayout, relativeToRoot, routesToTier } from "@n-dx/llm-client";
 import type { LLMConfig } from "../../store/project-config.js";
 import { MIGRATION_JUDGE_TASK_CLASS } from "../../migrations/v1-to-v2/jev-review-pass.js";
 import { prdLockPath, resolveRexPaths, resolveStore, withLock } from "../../store/index.js";
@@ -165,7 +165,8 @@ async function buildSeams(dir: string, rexDir: string, flags: Record<string, str
       text: createTextPlacementModel(model),
       spec: createTextSpecModel(model),
       jev: { model: JEV_PLAN_MODEL, judge: askJev },
-      jevAvailable: Boolean(process.env[TYPESAFE_API_KEY_ENV]),
+      // askJev resolves the same way: exported key first, then the store.
+      jevAvailable: resolveCredential(TYPESAFE_CREDENTIAL) !== undefined,
       jevReview: wantsJevReview(flags, llmConfig),
       warn,
     });

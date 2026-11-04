@@ -69,20 +69,22 @@ Running `ndx init` again detects existing assistant surfaces and reuses them. If
 ```sh
 ndx config llm.vendor claude .
 
-# API mode (recommended — best token accounting and reliability)
-ndx config llm.claude.api_key sk-ant-... .
-# or set the environment variable:
-export ANTHROPIC_API_KEY=sk-ant-...
+# CLI login (default, no key needed)
+claude login
+ndx config llm.claude.cli_path claude .
 
 # Optionally pin a model (default: claude-sonnet-5-5)
 ndx config llm.claude.model claude-opus-5-5 .
 ```
 
 ```sh
-# CLI mode (no API key required)
-ndx config llm.claude.cli_path claude .
-claude login
+# API mode (optional, best token accounting): the key goes in the per-user
+# credential store through a hidden prompt, never on the command line
+ndx config credentials.claude
+ndx config llm.claude.auth api .
 ```
+
+See [API keys and auth modes](./configuration.md#api-keys-and-auth-modes).
 
 ### Codex
 

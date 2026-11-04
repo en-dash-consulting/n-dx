@@ -18,7 +18,9 @@
  * ## Provider selection strategy
  *
  * 1. If `mode` is explicitly set → use that provider (throw if unavailable).
- * 2. If an API key exists (config or env) → API provider.
+ * 2. Otherwise `llm.claude.auth` decides ({@link detectAuthMode}): `cli` and
+ *    `api` name the provider; `auto` takes the API when a key is configured
+ *    or exported, never for a key held only in the credential store.
  * 3. Otherwise → CLI provider (graceful fallback, no credentials needed).
  *
  * This ensures the client always works in any environment: a developer
@@ -28,8 +30,8 @@
  */
 
 import type { AuthMode, ClaudeClient, ClaudeClientOptions } from "./types.js";
-import { ClaudeClientError } from "./types.js";
-import { resolveApiKey } from "./config.js";
+import { resolveVendorAuth } from "./vendor-auth.js";
+import { LLM_VENDOR } from "./provider-interface.js";
 import { createApiClient, type ApiProviderOptions } from "./api-provider.js";
 import { createCliClient, type CliProviderOptions } from "./cli-provider.js";
 import type { LLMProvider } from "./provider-interface.js";
@@ -45,16 +47,19 @@ export interface CreateClientOptions extends ClaudeClientOptions {
 }
 
 /**
- * Detect which authentication mode is available.
- *
- * Priority:
- * 1. API key present (from config or env) → "api"
- * 2. Fall back to CLI
+ * Detect which authentication mode `llm.claude.auth` selects
+ * ({@link resolveVendorAuth}):
+ * - `cli` → "cli", even when a key resolves
+ * - `api` → "api" (the API provider refuses when no key resolves)
+ * - `auto` → "api" when a key is configured or exported, else "cli"; a key
+ *   held only in the credential store never selects the API
  */
 export function detectAuthMode(options: ClaudeClientOptions): AuthMode {
-  const apiKeyEnv = options.apiKeyEnv ?? "ANTHROPIC_API_KEY";
-  const apiKey = resolveApiKey(options.claudeConfig, apiKeyEnv);
-  return apiKey ? "api" : "cli";
+  return resolveVendorAuth(
+    LLM_VENDOR.CLAUDE,
+    { claude: options.claudeConfig },
+    { apiKeyEnv: options.apiKeyEnv ?? "ANTHROPIC_API_KEY" },
+  ).mode;
 }
 
 /**

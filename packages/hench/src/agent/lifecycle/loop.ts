@@ -17,7 +17,7 @@ import { SystemMemoryMonitor } from "../../process/memory-monitor.js";
 import {
   loadClaudeConfig,
   loadLLMConfig,
-  resolveApiKey,
+  resolveClaudeApiAuth,
   resolveLLMVendor,
   withVendorOverride,
 } from "../../store/project-config.js";
@@ -316,12 +316,13 @@ async function initApiResources(
   }
 
   const claudeConfig = await loadClaudeConfig(henchDir);
-  const apiKey = resolveApiKey(claudeConfig, config.apiKeyEnv);
-  if (!apiKey) {
-    throw new Error(
-      `API key not found. Set it via 'n-dx config claude.api_key <key>' or the ${config.apiKeyEnv} environment variable.`,
-    );
+  // llm.claude.auth decides: a configured or exported key, the credential
+  // store under `api`, or a refusal naming both (`cli`, or no usable key).
+  const auth = resolveClaudeApiAuth(claudeConfig, config.apiKeyEnv);
+  if (auth.apiRefusal || !auth.key) {
+    throw auth.apiRefusal ?? new Error(`No Claude API key resolves from ${config.apiKeyEnv}.`);
   }
+  const apiKey = auth.key.value;
 
   const anthropicOpts: Record<string, unknown> = { apiKey };
   if (claudeConfig.api_endpoint) {

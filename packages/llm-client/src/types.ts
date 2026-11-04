@@ -55,12 +55,22 @@ export interface ClaudeConfig {
    * default in `REVIEW_MODELS`. The `--review-model` CLI flag outranks it.
    */
   reviewModel?: string;
+  /** `llm.claude.auth`: which credential Claude gets. See {@link VendorAuth}. */
+  auth?: VendorAuth;
 }
 
 // ── Provider types ───────────────────────────────────────────────────────────
 
 /** Authentication mode the client is operating in. */
 export type AuthMode = "api" | "cli";
+
+/**
+ * `llm.<vendor>.auth`: which credential a vendor gets. `cli` is the vendor
+ * CLI's own login, `api` an API key from config, the environment or the
+ * credential store, and `auto` (the default) the API only when a key is
+ * configured or exported — a key held only in the store never selects it.
+ */
+export type VendorAuth = "cli" | "api" | "auto";
 
 /** Options for creating a Claude client. */
 export interface ClaudeClientOptions {

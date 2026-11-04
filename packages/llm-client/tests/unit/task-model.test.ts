@@ -1,9 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { setCredential } from "../../src/credential-store.js";
 import {
   resolveTaskModel,
   resolveVendorModel,
   resolveModel,
   resolveJudgmentRoute,
+  configuredJudgmentRoute,
   routesToTier,
   DEFAULT_ROUTES,
   DEFAULT_JUDGMENT_ROUTES,
@@ -218,13 +223,42 @@ describe("resolveTaskModel — effort", () => {
 /**
  * resolveJudgmentRoute sits beside resolveTaskModel for calls whose answer
  * is a typed judgment rather than generated text. Its gate is the TypeSafe
- * API key: without it the helper is inert and every call site keeps using
- * the vendor tier resolveTaskModel picks, so an exported key is the only
- * thing that changes analysis behavior.
+ * API key, resolved env first, then the per-user credential store: without
+ * a key the helper is inert and every call site keeps using the vendor tier
+ * resolveTaskModel picks. Every case names an empty temp ndx home, so the
+ * developer's real store never decides a result.
  */
 describe("resolveJudgmentRoute", () => {
-  const withKey = { TYPESAFE_API_KEY: "tsk_test" } as NodeJS.ProcessEnv;
-  const noKey = {} as NodeJS.ProcessEnv;
+  let ndxHome: string;
+  let withKey: { env: NodeJS.ProcessEnv; ndxHome: string };
+  let noKey: { env: NodeJS.ProcessEnv; ndxHome: string };
+
+  beforeEach(() => {
+    ndxHome = mkdtempSync(join(tmpdir(), "ndx-judgment-route-"));
+    withKey = { env: { TYPESAFE_API_KEY: "tsk_test" }, ndxHome };
+    noKey = { env: {}, ndxHome };
+  });
+  afterEach(() => rmSync(ndxHome, { recursive: true, force: true }));
+
+  it("routes on a key held only in the credential store", () => {
+    setCredential("typesafe", "tsk_placeholder_store", { ndxHome });
+    expect(resolveJudgmentRoute("code.classify", {}, noKey)).toBe("typesafe");
+    expect(resolveJudgmentRoute("prd.assess", {}, noKey)).toBeUndefined();
+  });
+
+  it("keeps prd.place.judge and prd.migrate.judge opt-in: neither is a default judgment route", () => {
+    for (const cls of ["prd.place.judge", "prd.migrate.judge"]) {
+      expect(DEFAULT_JUDGMENT_ROUTES.has(cls), cls).toBe(false);
+      expect(resolveJudgmentRoute(cls, {}, withKey), cls).toBeUndefined();
+      expect(configuredJudgmentRoute(cls, {}), cls).toBeUndefined();
+    }
+  });
+
+  it("configuredJudgmentRoute reports the route config asks for without a key", () => {
+    expect(configuredJudgmentRoute("code.classify", {})).toBe("typesafe");
+    expect(configuredJudgmentRoute("code.classify", { routes: { "*": "light" } })).toBeUndefined();
+    expect(configuredJudgmentRoute("prd.assess", { routes: { "prd.assess": "typesafe" } })).toBe("typesafe");
+  });
 
   it("routes a default judgment class to typesafe when the key is present", () => {
     expect(resolveJudgmentRoute("code.classify", {}, withKey)).toBe("typesafe");
@@ -236,7 +270,7 @@ describe("resolveJudgmentRoute", () => {
 
   it("returns undefined for every class when the key is absent or blank", () => {
     expect(resolveJudgmentRoute("code.classify", {}, noKey)).toBeUndefined();
-    expect(resolveJudgmentRoute("code.classify", {}, { TYPESAFE_API_KEY: "  " } as NodeJS.ProcessEnv)).toBeUndefined();
+    expect(resolveJudgmentRoute("code.classify", {}, { env: { TYPESAFE_API_KEY: "  " }, ndxHome })).toBeUndefined();
     const explicit: LLMConfig = { routes: { "zone.enrich-scan": "typesafe" } };
     expect(resolveJudgmentRoute("zone.enrich-scan", explicit, noKey)).toBeUndefined();
   });

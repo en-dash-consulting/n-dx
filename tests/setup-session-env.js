@@ -39,6 +39,13 @@ delete process.env.CLAUDE_CONFIG_DIR;
 // the refusal set the variable on the spawn (tests/e2e/cli-agent-run-env.test.js).
 delete process.env.NDX_AGENT_RUN;
 
+// `packages/core/cli.js` exports NDX_CLI_PATH and hench's test gate inherits it.
+// graview's planProductFace then asks that real CLI for the graview-face
+// sidecar, is refused, and `serve` exits 2, so graview-app-trust.test.ts fails
+// inside a gate while passing in CI. Tests that need the variable set it on
+// their own spawn.
+delete process.env.NDX_CLI_PATH;
+
 // `rex init` (and so `ndx init`) gives a new project an empty v2 tree. Most
 // fixtures init a project and then build a v1 PRD on it with `rex add epic`,
 // so the suites keep v1 as their init default. Tests of the v2 default delete
