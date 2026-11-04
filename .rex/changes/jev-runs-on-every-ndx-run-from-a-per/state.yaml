@@ -99,7 +99,14 @@ items:
     lastModified: "2026-10-30T18:32:00.867Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "742cfeea-b375-443a-b72e-af34a87ef364":
-    lastModified: "2026-11-04T17:23:53.314Z"
+    status: "completed"
+    startedAt: "2026-11-04T17:37:59.568Z"
+    completedAt: "2026-11-04T17:50:46.336Z"
+    endedAt: "2026-11-04T17:50:46.336Z"
+    activeIntervals: [{"end":"2026-11-04T17:50:09.261Z","start":"2026-11-04T17:37:59.568Z"},{"end":"2026-11-04T17:50:46.336Z","start":"2026-11-04T17:50:46.336Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "fad4416e5 (run 857125af): the codex registry entry decides API vs CLI with resolveVendorAuth (helpers not run); Google mode detection uses the same decision; new hench failover-codex-auth integration test. Gate: root-policy, root-drift, graview, hench, llm-client, rex, sourcevision passed; web failed only throttle-controls.test.ts 'sends PUT request when concurrency slider changes' (known load-timing flake), which passes alone (14/14). Review: nothing to fix. Note: AC 'hench failover to codex succeeds' holds via the codex CLI provider; hench's API loop (initApiResources, loop.ts) still rejects non-Claude API providers, as on main."
+    lastModified: "2026-11-04T17:50:46.336Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
