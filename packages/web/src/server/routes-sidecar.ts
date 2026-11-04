@@ -62,7 +62,7 @@ import { isBrokerTool } from "./sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard, type SidecarCardStatus } from "./sidecar/broker.js";
 import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type SidecarActions } from "./sidecar/carry-out.js";
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
-import { readPlacementCall, readPlacementEdit, writePlacementCard } from "./sidecar/placement-card.js";
+import { readPlacementCall, readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { startSidecarCommand } from "./routes-commands.js";
 import { openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, startTaskExecution } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
@@ -749,12 +749,12 @@ export async function handleSidecarRoute(
         return refuse(res, 400, `"remember" must be a boolean`);
       }
       if (body.lane !== undefined && typeof body.lane !== "number") return refuse(res, 400, `"lane" must be a number`);
-      // A placement card's edit is a placement: dry-run it before the card is touched.
+      // A placement card's edit is a placement: dry-run it, against the dry run the operator reviewed, before the card is touched.
       const waiting = broker.cards(id).find((c) => c.id === cardId);
-      let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, string> | undefined;
+      let placementEdit: Exclude<Awaited<ReturnType<typeof readPlacementEdit>>, PlacementEditRefusal> | undefined;
       if (body.edits !== undefined && body.decision === "approve" && waiting?.placement) {
-        const read = await readPlacementEdit(ctx.rexDir, waiting.placement.change, body.edits);
-        if (typeof read === "string") return refuse(res, 400, read);
+        const read = await readPlacementEdit(ctx.rexDir, waiting.placement, body.edits, body.reviewed);
+        if ("error" in read) return refuse(res, read.status, read.error);
         placementEdit = read;
       }
       try {

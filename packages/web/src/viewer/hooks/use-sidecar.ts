@@ -169,6 +169,8 @@ export interface SidecarCardDecision {
   remember?: boolean;
   /** A change-set approval's item edits; the approval writes the edited values. */
   edits?: SidecarChangeSetEdit[] | PlacementEditBody;
+  /** A placement edit's dry run as the operator reviewed it; the server refuses the approval when its re-check moved from it. */
+  reviewed?: SidecarPlacementCheck;
   /** A run-plan card's Start lane: the 0-based lane whose first task to start. */
   lane?: number;
 }
@@ -723,6 +725,7 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
         ...(decision.remember && { remember: true }),
         // An empty list of change-set edits is no edit; a placement's edit is one object.
         ...(decision.approve && decision.edits && (!Array.isArray(decision.edits) || decision.edits.length > 0) && { edits: decision.edits }),
+        ...(decision.approve && decision.reviewed && { reviewed: decision.reviewed }),
         ...(decision.approve && decision.lane !== undefined && { lane: decision.lane }),
       },
     );

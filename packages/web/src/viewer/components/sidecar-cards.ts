@@ -570,8 +570,9 @@ export function SidecarCards({ cards, manifest, decide, send }: SidecarCardsProp
     setDeciding(true);
     try {
       // An approval writes the operator's edits; a denial writes nothing, so it sends none.
+      // An edited placement goes with the dry run the operator read, so the server writes nothing if the PRD moved since.
       if (decision.approve && first.placement && placementEdit?.cardId === first.id) {
-        await decide(first.id, { ...decision, edits: placementEdit.body });
+        await decide(first.id, { ...decision, edits: placementEdit.body, ...(placementEdit.check && { reviewed: placementEdit.check }) });
         return;
       }
       const edits = decision.approve && first.changeSet ? changeSetEdits(first, drafts) : [];

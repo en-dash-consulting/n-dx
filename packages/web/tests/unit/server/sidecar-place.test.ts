@@ -251,6 +251,15 @@ async function raise(args: Record<string, unknown>) {
   return { client, call, card };
 }
 
+/** A teammate rewords the capability's c2, so its spec hash moves. */
+async function rewordCriterion(): Promise<void> {
+  await withPrdModelTransaction(rexDir, ({ tree }) => {
+    const capability = indexTree(tree).resolve(CAPABILITY_ID)! as RuleNode & { criteria: Array<{ id: string; text: string }> };
+    capability.criteria = capability.criteria.map((c) => (c.id === "c2" ? { ...c, text: "A declined card names the decline code" } : c));
+    return { tree, result: undefined };
+  });
+}
+
 describe("place_change_card", () => {
   beforeEach(async () => {
     messages = [];
@@ -355,11 +364,7 @@ describe("place_change_card", () => {
     const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "amends", criteria });
     expect(card.placement?.check).toMatchObject({ ok: true, base: expect.any(String) });
     // Someone rewords the capability's criteria while the operator reads the card.
-    await withPrdModelTransaction(rexDir, ({ tree }) => {
-      const capability = indexTree(tree).resolve(CAPABILITY_ID)! as RuleNode & { criteria: Array<{ id: string; text: string }> };
-      capability.criteria = capability.criteria.map((c) => (c.id === "c2" ? { ...c, text: "A declined card names the decline code" } : c));
-      return { tree, result: undefined };
-    });
+    await rewordCriterion();
     const before = treeHash();
 
     await decide(card.id, { decision: "approve" });
@@ -425,7 +430,8 @@ describe("place_change_card", () => {
     const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "touches" });
     const criteria = { add: [{ id: "c3", text: "A declined card can be retried" }] };
 
-    const res = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "amends", criteria } });
+    const reviewed = { ok: true, action: "place", target: CAPABILITY_ID, title: "Pay by card", relation: "amends", base, warnings: [] };
+    const res = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "amends", criteria }, reviewed });
     expect(res.status).toBe(200);
     const result = await call;
     expect(result.isError).toBeFalsy();
@@ -455,6 +461,95 @@ describe("place_change_card", () => {
     await decide(card.id, { decision: "deny", reason: "Left in the Inbox" });
     expect((await call).isError).toBe(true);
     expect(treeHash()).toBe(before);
+    await client.close();
+  });
+
+  it("an edited approval without the dry run the operator reviewed is a 400 that writes nothing", async () => {
+    const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "touches" });
+    const before = treeHash();
+    const criteria = { add: [{ id: "c3", text: "A declined card can be retried" }] };
+    for (const reviewed of [undefined, { ok: false, kind: "x", error: "y" }, { ok: true, action: "place" }]) {
+      const res = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "amends", criteria }, reviewed });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toContain("the dry run the operator reviewed");
+    }
+    expect(treeHash()).toBe(before);
+    expect(broker.cards(SESSION).find((c) => c.id === card.id)!.status).toBe("pending");
+    await decide(card.id, { decision: "deny" });
+    await call;
+    await client.close();
+  });
+
+  it("amends edited in: a spec reworded after the operator's check is a 409 that writes nothing", async () => {
+    const { tree } = await changeNode();
+    const base = specHash(nodeSpec(indexTree(tree).resolve(CAPABILITY_ID)!));
+    const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "touches" });
+    // The operator edits the card to amends and reads its dry run, pinned to today's spec...
+    const reviewed = { ok: true, action: "place", target: CAPABILITY_ID, title: "Pay by card", relation: "amends", base, warnings: [] };
+    // ...then someone rewords the capability before Place is pressed.
+    await rewordCriterion();
+    const before = treeHash();
+
+    const criteria = { add: [{ id: "c3", text: "A declined card can be retried" }] };
+    const res = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "amends", criteria }, reviewed });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toMatch(/^Nothing was written: the spec of "Pay by card" changed/);
+    expect(treeHash()).toBe(before);
+    expect(broker.cards(SESSION).find((c) => c.id === card.id)!.status).toBe("pending");
+
+    // A reviewed check naming another relation is the same refusal.
+    const touches = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "touches" }, reviewed });
+    expect(touches.status).toBe(409);
+    expect(((await touches.json()) as { error: string }).error).toContain("the relation is now touches, not amends");
+    expect(treeHash()).toBe(before);
+    await decide(card.id, { decision: "deny" });
+    await call;
+    await client.close();
+  });
+
+  it("an edit that keeps the card's target and relation is refused when the spec moved since the card was raised", async () => {
+    const criteria = { add: [{ id: "c3", text: "A declined card can be retried" }] };
+    const { client, call, card } = await raise({ target: CAPABILITY_ID, relation: "amends", criteria });
+    await rewordCriterion();
+    // The operator's check comes after the reword, so it agrees with the server; the card's own draft does not.
+    const { tree } = await changeNode();
+    const fresh = specHash(nodeSpec(indexTree(tree).resolve(CAPABILITY_ID)!));
+    expect(card.placement?.check).toMatchObject({ ok: true, base: expect.not.stringMatching(fresh) });
+    const reviewed = { ok: true, action: "place", target: CAPABILITY_ID, title: "Pay by card", relation: "amends", base: fresh, warnings: [] };
+    const before = treeHash();
+
+    const edited = { add: [{ id: "c3", text: "A declined card can be retried once" }] };
+    const res = await decide(card.id, { decision: "approve", edits: { target: CAPABILITY_ID, relation: "amends", criteria: edited }, reviewed });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toContain('the spec of "Pay by card" changed since the card was raised');
+    expect(treeHash()).toBe(before);
+    expect((await changeNode()).change.amends ?? []).toEqual([]);
+    await decide(card.id, { decision: "deny" });
+    await call;
+    await client.close();
+  });
+
+  it("a card raised with a refusal writes nothing on approval, even once rex would accept it", async () => {
+    const LATER_ID = "a0000000-0000-4000-8000-0000000000aa";
+    const { client, call, card } = await raise({ target: LATER_ID, relation: "touches" });
+    expect(card.placement?.check).toMatchObject({ ok: false, kind: "not-a-target" });
+    const refusal = card.placement!.check as { kind: string; error: string };
+    // The target is created while the card waits: rex would place it now.
+    await withPrdModelTransaction(rexDir, ({ tree }) => {
+      const area = indexTree(tree).resolve(AREA_ID)! as RuleNode & { children: RuleNode[] };
+      const capability = indexTree(tree).resolve(CAPABILITY_ID)!;
+      area.children.push({ ...capability, id: LATER_ID, slug: "retry-a-declined-card", title: "Retry a declined card", children: undefined } as RuleNode);
+      return { tree, result: undefined };
+    });
+    expect(indexTree((await changeNode()).tree).resolve(LATER_ID)).toBeDefined();
+    const before = treeHash();
+
+    await decide(card.id, { decision: "approve" });
+    const result = await call;
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain(`Rex refused the placement (kind: not-a-target): ${refusal.error}. Nothing was written.`);
+    expect(treeHash()).toBe(before);
+    expect((await changeNode()).change.touches ?? []).toEqual([]);
     await client.close();
   });
 

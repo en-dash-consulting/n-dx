@@ -200,7 +200,12 @@ describe("placement card", () => {
     expect(checks.at(-1)).toEqual(edited);
     expect(button(el, "sidecar-card-approve").disabled).toBe(false);
     await click(button(el, "sidecar-card-approve"));
-    expect(decide).toHaveBeenCalledWith("p1", { approve: true, edits: edited });
+    // The dry run the operator read goes with it, so the server can refuse a PRD that moved since.
+    expect(decide).toHaveBeenCalledWith("p1", {
+      approve: true,
+      edits: edited,
+      reviewed: { ok: true, action: "place", target: "cap-pay", title: "Pay by card", relation: "amends", base: "4f1c9", warnings: [] },
+    });
   });
 
   it("proposing a new node takes a type, an area and a title, and sends them as a propose body", async () => {
@@ -219,7 +224,11 @@ describe("placement card", () => {
     await recheck();
     expect(checks.at(-1)).toEqual({ propose: { type: "capability", under: "area-pay", title: "Retry a declined card" } });
     await click(button(el, "sidecar-card-approve"));
-    expect(decide).toHaveBeenCalledWith("p1", { approve: true, edits: { propose: { type: "capability", under: "area-pay", title: "Retry a declined card" } } });
+    expect(decide).toHaveBeenCalledWith("p1", {
+      approve: true,
+      edits: { propose: { type: "capability", under: "area-pay", title: "Retry a declined card" } },
+      reviewed: { ok: true, action: "propose", type: "capability", under: "area-pay", title: "Retry a declined card", warnings: [] },
+    });
   });
 
   it("a refusal for the edited placement keeps Place disabled and shows rex's kind", async () => {
