@@ -208,6 +208,104 @@ describe("ndx auth", () => {
     });
   });
 
+  describe("Google preflight: a key held in the credential store", () => {
+    // `ndx config credentials.google` and `llm.google.api_key` write the
+    // per-user store, so the preflight must find the key there. A preloaded
+    // fetch stub records which key each request sent, by label, never by value.
+    const STORED_KEY = "AIza" + "s".repeat(35);
+    const EXPORTED_KEY = "AIza" + "e".repeat(35);
+    let requestsPath;
+    let env;
+
+    beforeEach(async () => {
+      requestsPath = join(tmpDir, "requests.jsonl");
+      const stubPath = join(tmpDir, "fetch-stub.mjs");
+      await writeFile(
+        stubPath,
+        [
+          'import { appendFileSync } from "node:fs";',
+          "globalThis.fetch = async (url, init = {}) => {",
+          "  const sent = init.headers?.['x-goog-api-key'];",
+          "  const key = sent === process.env.STORED_KEY_LABEL_VALUE ? 'stored' : sent === process.env.EXPORTED_KEY_LABEL_VALUE ? 'exported' : 'other';",
+          "  appendFileSync(process.env.REQUESTS_PATH, JSON.stringify({ host: new URL(String(url)).host, key }) + '\\n');",
+          "  return new Response('{}', { status: 200 });",
+          "};",
+        ].join("\n") + "\n",
+      );
+      env = {
+        ...process.env,
+        NDX_HOME: join(tmpDir, "ndx-home"),
+        NODE_OPTIONS: `--import=${pathToFileURL(stubPath).href}`,
+        REQUESTS_PATH: requestsPath,
+        STORED_KEY_LABEL_VALUE: STORED_KEY,
+        EXPORTED_KEY_LABEL_VALUE: EXPORTED_KEY,
+      };
+      delete env.N_DX_HOME;
+      delete env.GEMINI_API_KEY;
+      delete env.NDX_TEST_GOOGLE_PREFLIGHT;
+    });
+
+    async function requests() {
+      const raw = await readFile(requestsPath, "utf-8").catch((err) => {
+        if (err.code === "ENOENT") return "";
+        throw err;
+      });
+      return raw.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+    }
+
+    function storeGoogleKey() {
+      const res = spawnSync("node", [CLI_PATH, "config", "credentials.google", "--stdin"], {
+        cwd: tmpDir,
+        env,
+        input: `${STORED_KEY}\n`,
+        encoding: "utf-8",
+        timeout: DEFAULT_TIMEOUT,
+      });
+      expect(res.status, res.stderr).toBe(0);
+    }
+
+    it("ndx config llm.vendor google passes with the key only in the store", async () => {
+      storeGoogleKey();
+
+      const { stdout, stderr, status } = runNdx(["config", "llm.vendor", "google", tmpDir], env);
+
+      expect(status, stderr).toBe(0);
+      expect(await requests()).toEqual([{ host: "generativelanguage.googleapis.com", key: "stored" }]);
+      expect(stdout + stderr).not.toContain(STORED_KEY);
+    });
+
+    it("ndx auth reports Google authenticated with the key only in the store", async () => {
+      storeGoogleKey();
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "google" } }) + "\n");
+
+      const { stdout, stderr, status } = runNdx(["auth", tmpDir], env);
+
+      expect(status, stderr).toBe(0);
+      expect(stdout).toMatch(/credentials valid/i);
+      expect(await requests()).toEqual([{ host: "generativelanguage.googleapis.com", key: "stored" }]);
+      expect(stdout + stderr).not.toContain(STORED_KEY);
+    });
+
+    it("an exported GEMINI_API_KEY takes precedence over the stored key", async () => {
+      storeGoogleKey();
+      await writeFile(join(tmpDir, ".n-dx.json"), JSON.stringify({ llm: { vendor: "google" } }) + "\n");
+
+      const { status, stderr } = runNdx(["auth", tmpDir], { ...env, GEMINI_API_KEY: EXPORTED_KEY });
+
+      expect(status, stderr).toBe(0);
+      expect(await requests()).toEqual([{ host: "generativelanguage.googleapis.com", key: "exported" }]);
+    });
+
+    it("with no key anywhere the preflight fails with NDX_GOOGLE_PREFLIGHT_NO_KEY and names the store command", async () => {
+      const { stderr, status } = runNdx(["config", "llm.vendor", "google", tmpDir], env);
+
+      expect(status).not.toBe(0);
+      expect(await requests()).toEqual([]);
+      expect(stderr).toContain("NDX_GOOGLE_PREFLIGHT_NO_KEY");
+      expect(stderr).toContain("ndx config credentials.google");
+    });
+  });
+
   describe("vendor CLI binary: a shared cli_path applies only once the repository is trusted", () => {
     // Each fake binary records that it ran by creating its own marker file.
     // The PATH ones stand in for the real `claude` / `codex`, so the fallback

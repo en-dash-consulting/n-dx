@@ -181,13 +181,20 @@ beforeAll(() => {
 
 describe("n-dx config", () => {
   let tmpDir;
+  let savedNdxHome;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), "ndx-config-e2e-"));
     await setupProject(tmpDir);
+    // A per-test ndx home: `llm.<vendor>.api_key` writes the credential store,
+    // which the Google preflight reads, so a key one test stores must not
+    // reach the next test's preflight through the worker's shared home.
+    savedNdxHome = process.env.N_DX_HOME;
+    process.env.N_DX_HOME = join(tmpDir, ".test-ndx-home");
   });
 
   afterEach(async () => {
+    process.env.N_DX_HOME = savedNdxHome;
     await rm(tmpDir, { recursive: true, force: true });
   });
 

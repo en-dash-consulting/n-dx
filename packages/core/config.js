@@ -927,8 +927,9 @@ function isValidGoogleApiKeyFormat(value) {
 /**
  * Run a lightweight preflight call to the Gemini API to validate the API key.
  *
- * Reads the API key from `api_key` or the variable `apiKeyEnv` names
- * (default GEMINI_API_KEY). The settings come from llm-client's
+ * Reads the API key through llm-client's `resolveVendorKey`: `api_key`, then
+ * the variable `apiKeyEnv` names (default GEMINI_API_KEY), then the per-user
+ * credential store. The settings come from llm-client's
  * `loadLLMConfig`, not the raw merged config: `apiKeyEnv` picks which variable
  * is sent, and a shared `.n-dx.json` may choose it only once the repository is
  * trusted (llm-client `credential-routing.ts`).
@@ -947,10 +948,10 @@ async function runGoogleApiPreflight(dir) {
     return { ok: true, vendor: LLM_VENDOR.GOOGLE };
   }
 
-  const { loadLLMConfig } = await import("@n-dx/llm-client");
-  const google = (await loadLLMConfig(dir)).google;
-  const apiKeyEnvVar = google?.apiKeyEnv || "GEMINI_API_KEY";
-  const apiKey = google?.api_key || process.env[apiKeyEnvVar];
+  const { loadLLMConfig, resolveVendorKey, vendorKeyEnv } = await import("@n-dx/llm-client");
+  const llmConfig = await loadLLMConfig(dir);
+  const apiKeyEnvVar = vendorKeyEnv(LLM_VENDOR.GOOGLE, llmConfig);
+  const apiKey = resolveVendorKey(LLM_VENDOR.GOOGLE, llmConfig)?.value;
 
   if (!apiKey) {
     return {
@@ -2646,7 +2647,7 @@ Claude preflight error codes:
   NDX_CLAUDE_PREFLIGHT_INVOKE_FAILED  Claude appears authenticated/installed, but ndx cannot launch a usable executable
 
 Google preflight error codes:
-  NDX_GOOGLE_PREFLIGHT_NO_KEY           No GEMINI_API_KEY env var or llm.google.api_key in config
+  NDX_GOOGLE_PREFLIGHT_NO_KEY           No GEMINI_API_KEY env var, llm.google.api_key, or stored key (ndx config credentials.google)
   NDX_GOOGLE_PREFLIGHT_INVALID_KEY_FORMAT  Key does not match expected format (starts with "AIza" or "AQ", ≥30 chars)
   NDX_GOOGLE_PREFLIGHT_AUTH_FAILED      Gemini API rejected the key (HTTP 400 or 403)
   NDX_GOOGLE_PREFLIGHT_HTTP_ERROR       Gemini API returned an unexpected HTTP error
