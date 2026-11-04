@@ -31,6 +31,8 @@ let startResponse: { status: number; body: Record<string, unknown> };
 let statuses: InitStatus[];
 let posted: Array<{ url: string; body: unknown }>;
 let overviewCard: ProjectCard;
+let preflight: { ok: boolean; body: Record<string, unknown> };
+let statusFails: boolean;
 
 function mountPage(): void {
   const html = renderHomePage(overview(card()));
@@ -53,7 +55,12 @@ describe("Initialize on an uninitialized card, running", () => {
     statuses = [];
     posted = [];
     overviewCard = card();
+    preflight = { ok: true, body: { isRepo: true, gitAvailable: true } };
+    statusFails = false;
     vi.stubGlobal("fetch", vi.fn(async (url: string, opts?: { method?: string; body?: string }) => {
+      if (url === "/p/gamma/api/commands/init/preflight") {
+        return { ok: preflight.ok, status: preflight.ok ? 200 : 500, json: async () => preflight.body } as unknown as Response;
+      }
       if (url === "/api/hub/overview") {
         const ov = overview(overviewCard);
         return { ok: true, json: async () => ({ ...ov, html: renderCards(ov) }) } as unknown as Response;
@@ -63,6 +70,7 @@ describe("Initialize on an uninitialized card, running", () => {
         return { status: startResponse.status, json: async () => startResponse.body } as unknown as Response;
       }
       if (url === "/p/gamma/api/commands/init/status") {
+        if (statusFails) throw new Error("connection refused");
         const next = statuses.length > 1 ? statuses.shift()! : statuses[0]!;
         return { ok: true, status: 200, json: async () => next } as unknown as Response;
       }
@@ -165,5 +173,71 @@ describe("Initialize on an uninitialized card, running", () => {
     expect(overlay()!.hidden).toBe(true);
     expect(errorLine()!.textContent).toContain("did not finish in time");
     expect(button()!.disabled).toBe(false);
+  });
+
+  it("asks for a git repository when the folder is not in one, as the wizard's default does", async () => {
+    preflight = { ok: true, body: { isRepo: false, gitAvailable: true } };
+    statuses = [{ running: true, finishedAt: null, output: "", error: null }];
+    mountPage();
+    button()!.click();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(posted).toEqual([{ url: "/p/gamma/api/commands/init", body: { provider: "claude", git: true } }]);
+  });
+
+  it("leaves git out when git is missing or the preflight fails", async () => {
+    statuses = [{ running: true, finishedAt: null, output: "", error: null }];
+    preflight = { ok: true, body: { isRepo: false, gitAvailable: false } };
+    mountPage();
+    button()!.click();
+    await vi.advanceTimersByTimeAsync(10);
+
+    preflight = { ok: false, body: {} };
+    mountPage();
+    button()!.click();
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(posted.map((p) => p.body)).toEqual([{ provider: "claude" }, { provider: "claude" }]);
+  });
+
+  it("watches a run that is already going (409) instead of failing", async () => {
+    startResponse = { status: 409, body: { error: "Init is already running" } };
+    statuses = [{ running: true, finishedAt: null, output: "Scanning…", error: null }];
+    mountPage();
+    button()!.click();
+    await vi.advanceTimersByTimeAsync(1600);
+
+    expect(overlay()!.hidden).toBe(false);
+    expect(errorLine()!.hidden).toBe(true);
+    expect(cardEl().querySelector(".init-phase")!.textContent).toMatch(/^Scanning… \(\d+s\)$/);
+  });
+
+  it("unlocks with an error when the project's server stops answering", async () => {
+    statuses = [{ running: true, finishedAt: null, output: "", error: null }];
+    mountPage();
+    button()!.click();
+    await vi.advanceTimersByTimeAsync(10);
+    statusFails = true;
+    await vi.advanceTimersByTimeAsync(1500 * 21);
+
+    expect(overlay()!.hidden).toBe(true);
+    expect(errorLine()!.textContent).toContain("Lost contact with the project's server");
+    expect(button()!.disabled).toBe(false);
+  });
+
+  it("stays locked through a refresh that shows the project unreachable mid-run", async () => {
+    statuses = [{ running: true, finishedAt: null, output: "", error: null }];
+    mountPage();
+    button()!.click();
+    await vi.advanceTimersByTimeAsync(10);
+
+    overviewCard = card({ reachable: false, error: "timeout" });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(cardEl().classList.contains("card-uninitialized")).toBe(true);
+    expect(overlay()!.hidden).toBe(false);
+
+    overviewCard = card();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(overlay()!.hidden).toBe(false);
+    expect(button()!.disabled).toBe(true);
   });
 });

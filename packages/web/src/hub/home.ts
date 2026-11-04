@@ -105,7 +105,8 @@ export function needsInit(card: ProjectCard): boolean {
  * What the card's Initialize button posts to the project's own
  * `POST /api/commands/init` — the setup wizard's route, so the hub runs the
  * same `ndx init` the wizard does. These are the wizard's defaults (Claude,
- * both assistants); `git` is left out so `ndx init` keeps its own default.
+ * both assistants). `git` is added per run from the wizard's preflight — see
+ * `initBody` in the init script.
  */
 export const HUB_INIT_REQUEST = { provider: "claude" } as const;
 
@@ -279,16 +280,21 @@ const REFRESH_SCRIPT = `
   var count = document.getElementById("project-count");
   // A card mid-init (or showing an init failure) is kept as it is: swapping it
   // would drop its overlay or its error. It yields once the server's card for
-  // that project is no longer an uninitialized one.
+  // that project is an initialized one. A running card also survives a tick
+  // that shows its project unreachable — one status poll timing out while
+  // init analyzes — or the card would come back unlocked mid-run.
   function keepInitCards(stale) {
-    var fresh = list.querySelectorAll(".card-uninitialized[data-project-id]");
+    var fresh = list.querySelectorAll(".card[data-project-id]");
     for (var i = 0; i < stale.length; i++) {
       var id = stale[i].getAttribute("data-project-id");
+      var running = stale[i].getAttribute("data-init-state") === "running";
       for (var j = 0; j < fresh.length; j++) {
-        if (fresh[j].getAttribute("data-project-id") === id) {
+        if (fresh[j].getAttribute("data-project-id") !== id) continue;
+        var cls = fresh[j].classList;
+        if (cls.contains("card-uninitialized") || (running && cls.contains("card-unreachable"))) {
           list.replaceChild(stale[i], fresh[j]);
-          break;
         }
+        break;
       }
     }
   }
@@ -550,16 +556,32 @@ const INIT_SCRIPT = `
     }, POLL_MS);
   }
 
+  // The route runs \`ndx init\` without a TTY, so its "Initialize git?" prompt
+  // never fires and an empty folder would stay outside version control, with
+  // hench's auto-commit off. The wizard asks, its box ticked by default; the
+  // card has no question to ask, so it takes that default from the wizard's
+  // own preflight. No preflight answer leaves \`git\` out, as the wizard does.
+  function initBody(preflight) {
+    var body = ${JSON.stringify(HUB_INIT_REQUEST)};
+    if (preflight && preflight.isRepo === false && preflight.gitAvailable === true) body.git = true;
+    return body;
+  }
+
   function start(card) {
     if (card.getAttribute("data-init-state") === "running") return;
     var base = card.getAttribute("data-init-base");
     var startedAt = Date.now();
     lock(card, "Starting initialization…");
-    fetch(base + "api/commands/init", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: ${JSON.stringify(JSON.stringify(HUB_INIT_REQUEST))}
-    })
+    fetch(base + "api/commands/init/preflight", { headers: { accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (preflight) {
+        return fetch(base + "api/commands/init", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(initBody(preflight))
+        });
+      })
       .then(function (r) {
         return r.json().catch(function () { return {}; })
           .then(function (body) { return { status: r.status, body: body }; });
@@ -675,7 +697,7 @@ export function renderCard(card: ProjectCard): string {
     </div>`
     : `<div class="actions"><a class="action" href="${escapeHtml(card.url)}">Open dashboard</a></div>`;
 
-  return `<li class="card${card.reachable ? "" : " card-unreachable"}">
+  return `<li class="card${card.reachable ? "" : " card-unreachable"}" data-project-id="${escapeHtml(card.id)}">
     <div class="card-title">${statusDot(card)}<a href="${escapeHtml(card.url)}">${escapeHtml(card.name)}</a></div>
     ${repoLine}
     <p class="path">${escapeHtml(card.repoRoot)}</p>
