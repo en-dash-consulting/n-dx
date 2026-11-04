@@ -251,6 +251,44 @@ describe("resolveVendorCliEnv", () => {
     expect(Object.values(env)).not.toContain("placeholder-other-vendor");
   });
 
+  describe("the agent's own commands never see a key n-dx hands the Claude CLI", () => {
+    const SCRUB = "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB";
+    const bare = (extra: Record<string, string> = {}) => ({ PATH: "/bin", NDX_HOME: home, ...extra });
+    afterEach(() => clearCredentialHelperCache());
+
+    it("api with a stored key: the CLI gets the key and scrubs it from its subprocesses", () => {
+      store("claude");
+      const env = resolveVendorCliEnv(withAuth("claude", "api"), undefined, bare());
+      expect(env.ANTHROPIC_API_KEY).toBe(STORED);
+      expect(env[SCRUB]).toBe("1");
+    });
+
+    it("api with a helper key: the same", () => {
+      // resolveVendorCliEnv takes no helperExec, so the helper really runs.
+      setHelperCredential("claude", ["echo", HELPER], { ndxHome: home });
+      const env = resolveVendorCliEnv(withAuth("claude", "api"), undefined, bare());
+      expect(env.ANTHROPIC_API_KEY).toBe(HELPER);
+      expect(env[SCRUB]).toBe("1");
+    });
+
+    it("a scrub the environment turned off, in any casing, is turned back on", () => {
+      store("claude");
+      const env = resolveVendorCliEnv(withAuth("claude", "api"), undefined, bare({ [SCRUB]: "0", claude_code_subprocess_env_scrub: "0" }));
+      expect(Object.entries(env).filter(([k]) => k.toUpperCase() === SCRUB)).toEqual([[SCRUB, "1"]]);
+    });
+
+    it("a configured key under auto is scrubbed too", () => {
+      expect(resolveVendorCliEnv({ vendor: "claude", claude: { api_key: CONFIGURED } }, undefined, bare())[SCRUB]).toBe("1");
+    });
+
+    it("cli and a codex child are left alone", () => {
+      store("claude");
+      store("codex");
+      expect(resolveVendorCliEnv(withAuth("claude", "cli"), undefined, bare())[SCRUB]).toBeUndefined();
+      expect(resolveVendorCliEnv(withAuth("codex", "api"), undefined, bare())[SCRUB]).toBeUndefined();
+    });
+  });
+
   it("api: no key from any source is a loud error naming the store and the setting", () => {
     const run = () => resolveVendorCliEnv(withAuth("codex", "api"), undefined, { PATH: "/bin", NDX_HOME: home });
     expect(run).toThrow("ndx config credentials.codex");

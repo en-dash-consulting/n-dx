@@ -261,7 +261,7 @@ describe("resolveVendorCliEnv", () => {
     const env = resolveVendorCliEnv({ claude: { api_key: "configured" } }, undefined, {
       anthropic_api_key: "old", github_token: "secret", claudecode: "nested",
     });
-    expect(env).toEqual({ ANTHROPIC_API_KEY: "configured" });
+    expect(env).toEqual({ ANTHROPIC_API_KEY: "configured", CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1" });
   });
 });
 

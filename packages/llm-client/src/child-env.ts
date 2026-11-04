@@ -255,6 +255,22 @@ const VENDOR_ENV: Record<LLMVendor, VendorEnvSpec> = {
 };
 
 /**
+ * Claude Code passes its environment to the commands it runs (Bash tool, hooks,
+ * stdio MCP servers) unless this is `1`; with it, those subprocesses lose
+ * ANTHROPIC_API_KEY and other credentials while Claude Code keeps them for its
+ * own API calls: https://code.claude.com/docs/en/env-vars
+ */
+const CLAUDE_SUBPROCESS_ENV_SCRUB = "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB";
+
+/** Turn the scrub on, replacing any casing of the name the environment set. */
+function scrubAgentSubprocesses(env: NodeJS.ProcessEnv): void {
+  for (const name of Object.keys(env)) {
+    if (name.toUpperCase() === CLAUDE_SUBPROCESS_ENV_SCRUB) delete env[name];
+  }
+  env[CLAUDE_SUBPROCESS_ENV_SCRUB] = "1";
+}
+
+/**
  * Filter a vendor CLI's environment without exposing unrelated credentials.
  * `onStripped` receives names only, never values: once for the names removed,
  * and once more (kind `missing-credentials`) when a mode in `VENDOR_MODES` is
@@ -265,6 +281,9 @@ const VENDOR_ENV: Record<LLMVendor, VendorEnvSpec> = {
  * the environment or the credential store, and throws when none holds one;
  * `auto` sets a configured key and passes an exported one through, never a
  * stored one. Bedrock and Vertex credentials are untouched in every mode.
+ * Whenever this function sets the Claude key itself, it also sets
+ * `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`, so the agent's own commands cannot
+ * read it; an exported key passed through under `auto` is not scrubbed.
  *
  * @throws {ClaudeClientError} reason `auth` when `auth` is `api` and no key resolves.
  */
@@ -301,6 +320,11 @@ export function resolveVendorCliEnv(
         if (name.toUpperCase() === keyName.toUpperCase()) delete env[name];
       }
     };
+    const setKey = (value: string): void => {
+      dropKeyName();
+      env[keyName] = value;
+      if (vendor === LLM_VENDOR.CLAUDE) scrubAgentSubprocesses(env);
+    };
     const auth = vendorAuthSetting(vendor, config);
     if (auth === "cli") {
       // The CLI login, and nothing that would outrank it.
@@ -311,15 +335,11 @@ export function resolveVendorCliEnv(
       // carries it.
       const key = resolveVendorKey(vendor, config, { env: source });
       if (!key) throw missingVendorKeyError(vendor, config);
-      dropKeyName();
-      env[keyName] = key.value;
+      setKey(key.value);
     } else {
       // auto: a configured key, else whatever was exported. Never the store.
       const apiKey = spec.configKey(config);
-      if (apiKey) {
-        dropKeyName();
-        env[keyName] = apiKey;
-      }
+      if (apiKey) setKey(apiKey);
     }
   }
   for (const name of Object.keys(env)) {
