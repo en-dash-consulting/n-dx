@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { hostname, tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 
 import type { PRDStore } from "../../../src/prd/rex-gateway.js";
 import type { RunRecord } from "../../../src/schema/index.js";
@@ -229,5 +230,26 @@ describe("hench runs diagnose", () => {
 
   it("an unknown subcommand is an error", async () => {
     await expect(cmdRuns(projectDir, ["explain", "run-001"], {})).rejects.toThrow("Unknown runs subcommand");
+  });
+
+  it("classifies a running record whose process is gone as ending it records it, and saves nothing", async () => {
+    const dead = spawnSync(process.execPath, ["-e", ""]).pid!;
+    const running = makeRun({ status: "running", finishedAt: undefined, host: hostname(), pid: dead, lastActivityAt: "2026-10-28T10:05:00.000Z" });
+    await saveRun(henchDir, running);
+    await cmdRuns(projectDir, ["diagnose", "run-001"], { format: "json" });
+    const out = JSON.parse(printed());
+    expect(out).toMatchObject({ runId: "run-001", attempt: { n: 1 } });
+    expect(out.evidence.join("\n")).toContain(`Hench process ${dead} is no longer running`);
+    expect((await loadRun(henchDir, "run-001")).status).toBe("running");
+  });
+
+  it("refuses a running record whose process is alive", async () => {
+    await saveRun(henchDir, makeRun({ status: "running", finishedAt: undefined, host: hostname(), pid: process.pid, lastActivityAt: new Date().toISOString() }));
+    await expect(cmdRuns(projectDir, ["diagnose", "run-001"], {})).rejects.toThrow("Run run-001 is running");
+  });
+
+  it("refuses a completed run", async () => {
+    await saveRun(henchDir, makeRun({ status: "completed" }));
+    await expect(cmdRuns(projectDir, ["diagnose", "run-001"], {})).rejects.toThrow("Run run-001 is completed");
   });
 });

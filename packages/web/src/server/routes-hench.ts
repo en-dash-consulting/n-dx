@@ -2603,24 +2603,26 @@ function computeHeartbeatStatus(
   return { status, missedHeartbeats };
 }
 
-/** One worktree's runs, for the routes that sweep every worktree. */
-interface RunTarget {
+/** One worktree's runs, for the routes that sweep every worktree and the Sidecar Diagnose run lens. */
+export interface RunTarget {
   root: string;
   runsDir: string;
   /** Absent outside a git repository, where the served directory is the only target. */
   worktree?: RunWorktree;
+  /** The worktree this server serves. */
+  served: boolean;
 }
 
 /** Every worktree of the repository, or the served directory alone outside one. */
-async function resolveRunTargets(ctx: ServerContext): Promise<RunTarget[]> {
+export async function resolveRunTargets(ctx: ServerContext): Promise<RunTarget[]> {
   const sources = await resolveRunSources(ctx);
   return sources.length > 0
-    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree }))
-    : [{ root: ctx.projectDir, runsDir: runsDirOf(ctx) }];
+    ? sources.map((s) => ({ root: s.worktree.path, runsDir: s.runsDir, worktree: s.worktree, served: s.served }))
+    : [{ root: ctx.projectDir, runsDir: runsDirOf(ctx), served: true }];
 }
 
 /** Judge a run against its worktree's lock files and this dashboard's children, read now. */
-function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: number) {
+export function judgeRunInTarget(target: RunTarget, run: Record<string, unknown>, now: number) {
   const liveLocks = collectLiveLocks(locksDirOf(resolveLayout(target.root).henchDir));
   return judgeRunLiveness(livenessInputOf(run), { liveLocks, now }, dashboardExecutionsFor(target.root));
 }

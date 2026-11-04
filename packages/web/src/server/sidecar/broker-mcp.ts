@@ -24,6 +24,7 @@ import {
   workOptions,
   type SidecarActions,
 } from "./carry-out.js";
+import { BRANCH_HEALTH_OFF_READ, CLASS_FAILING_ON_MAIN, classFailingOnBase } from "./github.js";
 import { LEDGER_ENTRY_MAX_CHARS, LEDGER_ENTRY_TYPES } from "./ledger.js";
 
 const BROKER_VERSION = "1.0.0";
@@ -107,8 +108,8 @@ const CARD_TOOLS: Record<Exclude<BrokerToolName, "ledger_append">, { description
   },
   github_read: {
     description: [
-      "Read from GitHub with gh. `pr`: the PR of the worktree the workspace key `ref` names, its checks, each failing check's class and log tail.",
-      "`check`: the newest run of the check named `ref` on branch `base`, which decides whether a failing check is failing on main.",
+      "Read from GitHub with gh. `pr`: the PR of the worktree the workspace key `ref` names, its checks, each failing check's class and log tail; it reads nothing while the git.branchHealth feature is off.",
+      `\`check\`: the newest run of the check named \`ref\` on branch \`base\`, which decides whether a failing check is ${CLASS_FAILING_ON_MAIN} (\`base\` is the repository's default branch) or ${classFailingOnBase("<base>")} (any other base).`,
       "Runs at once while GitHub reads are on for this project (web.sidecarGithubReads); otherwise waits for the operator's network-read card.",
     ].join(" "),
     input: {
@@ -178,6 +179,8 @@ export function createBrokerMcpServer(broker: SidecarBroker, sessionId: string, 
         // A read that cannot be carried out raises no card for the operator to approve in vain.
         const read = githubReadOf(input);
         if (typeof read === "string") return text(`No card was raised: ${read}. Nothing was read.`, true);
+        // Branch health is off: the read would be refused, so the operator is not asked to approve it.
+        if (read.kind === "pr" && actions && !actions.branchHealthEnabled()) return text(BRANCH_HEALTH_OFF_READ, true);
         // GitHub reads have one allowance, the project's setting: on, the read runs without a card.
         if (actions?.githubReadsAllowed()) {
           const allowed = { approved: true as const, decidedBy: "project-allowance" as const, setting: GITHUB_READS_SETTING };

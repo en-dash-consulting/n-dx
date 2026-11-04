@@ -428,6 +428,9 @@ function failedRun(overrides: Partial<TaskRunRead> = {}): TaskRunRead {
       error: null,
       path: ".hench/runs/run-0001.json",
     },
+    worktree: null,
+    dir: "/repo",
+    liveness: null,
     diagnosis: null,
     settings: {},
     gate: { ran: true, passed: true, command: "pnpm test", note: null, textKind: null, text: null, cutChars: 0 },
@@ -567,7 +570,7 @@ describe("Diagnose run", () => {
   it("with no run of the task, carries a gap naming hench runs diagnose", async () => {
     const packet = await buildDiagnoseRunPacket(await sourcesFor("v2", { taskRun: async () => null }), { ref: CHANGE_TASK }, NOW);
     const verdict = packet.sections.find((s) => s.id === "verdict")!;
-    expect(verdict.body).toContain("Not available: no run of this task is recorded");
+    expect(verdict.body).toContain("Not available: no run of this task is recorded in any worktree of this repository");
     expect(verdict.body).toContain("hench runs diagnose <run-id>");
     expect(verdict.staleness.state).toBe("unknown");
   });
@@ -586,7 +589,7 @@ describe("Diagnose run", () => {
       NOW,
       controller.signal,
     );
-    expect(diagnose).toHaveBeenCalledWith("run-0001", controller.signal);
+    expect(diagnose).toHaveBeenCalledWith("run-0001", "/repo", controller.signal);
     const verdict = packet.sections.find((s) => s.id === "verdict")!;
     expect(verdict.body).toContain("Class: test-gate-new");
     expect(verdict.provenance.source).toBe("`hench runs diagnose run-0001 --format=json`");
@@ -604,15 +607,63 @@ describe("Diagnose run", () => {
     expect(verdict.staleness.state).toBe("unknown");
   });
 
-  it.each(["running", "completed"])("never classifies a %s run", async (status) => {
+  const LIVE = { liveness: "live" as const, reason: "Hench process 4242 is running and reporting.", canEnd: false };
+  const ORPHANED = { liveness: "orphaned" as const, reason: "Hench process 4242 is no longer running on this host.", canEnd: true };
+  const running = (liveness: TaskRunRead["liveness"]) =>
+    failedRun({ run: { ...failedRun().run, status: "running", finishedAt: null }, liveness });
+
+  it.each([
+    ["live running", running(LIVE)],
+    ["unjudged running", running(null)],
+    ["completed", failedRun({ run: { ...failedRun().run, status: "completed" } })],
+  ])("never classifies a %s run", async (_name, read) => {
     const diagnose = vi.fn(async () => DIAGNOSE_FIXTURES[0]![1].diagnosis!);
+    const packet = await buildDiagnoseRunPacket(await sourcesFor("v2", { taskRun: async () => read, diagnose }), { ref: CHANGE_TASK }, NOW);
+    expect(diagnose).not.toHaveBeenCalled();
+    expect(packet.sections.find((s) => s.id === "verdict")!.body).toMatch(/^Not available: /);
+  });
+
+  it("says a live running run is still running, and names its process", async () => {
+    const packet = await buildDiagnoseRunPacket(await sourcesFor("v2", { taskRun: async () => running(LIVE) }), { ref: CHANGE_TASK }, NOW);
+    expect(packet.sections.find((s) => s.id === "verdict")!.body).toContain("has no recorded verdict: it is still running");
+    expect(packet.sections.find((s) => s.id === "run")!.body).toContain(`Process: live (${LIVE.reason})`);
+  });
+
+  it("classifies a running record whose process is gone, saying so and that ending it from Live records the end", async () => {
+    const diagnose = vi.fn(async () => DIAGNOSE_FIXTURES[0]![1].diagnosis!);
+    const packet = await buildDiagnoseRunPacket(await sourcesFor("v2", { taskRun: async () => running(ORPHANED), diagnose }), { ref: CHANGE_TASK }, NOW);
+    expect(diagnose).toHaveBeenCalledWith("run-0001", "/repo", undefined);
+    const verdict = packet.sections.find((s) => s.id === "verdict")!;
+    expect(verdict.body).toContain(`Run run-0001 is recorded as running, but its process is gone: ${ORPHANED.reason}`);
+    expect(verdict.body).toContain("Ending it from Live records the end");
+    expect(verdict.body).toContain("Class: test-gate-new");
+    expect(packet.sections.find((s) => s.id === "run")!.body).toContain(`Process: orphaned (${ORPHANED.reason})`);
+  });
+
+  it("says an orphaned run is recorded as running when its spawned verdict fails too", async () => {
     const packet = await buildDiagnoseRunPacket(
-      await sourcesFor("v2", { taskRun: async () => failedRun({ run: { ...failedRun().run, status } }), diagnose }),
+      await sourcesFor("v2", { taskRun: async () => running(ORPHANED), diagnose: async () => null }),
       { ref: CHANGE_TASK },
       NOW,
     );
-    expect(diagnose).not.toHaveBeenCalled();
-    expect(packet.sections.find((s) => s.id === "verdict")!.body).toMatch(/^Not available: /);
+    const verdict = packet.sections.find((s) => s.id === "verdict")!.body;
+    expect(verdict).toMatch(/^Not available: Run run-0001 is recorded as running, but its process is gone/);
+    expect(verdict).toContain("its record says running, but its process is gone");
+    expect(verdict).toContain("`hench runs diagnose run-0001 --format=json` failed or timed out");
+  });
+
+  it("names the worktree a sibling's run came from and diagnoses it in that worktree", async () => {
+    const diagnose = vi.fn(async () => DIAGNOSE_FIXTURES[0]![1].diagnosis!);
+    const sibling = failedRun({
+      run: { ...failedRun().run, path: "../sibling/.hench/runs/run-0001.json" },
+      worktree: { name: "sibling", path: "/repos/sibling", branch: "feat/x", own: false },
+      dir: "/repos/sibling",
+    });
+    const packet = await buildDiagnoseRunPacket(await sourcesFor("v2", { taskRun: async () => sibling, diagnose }), { ref: CHANGE_TASK }, NOW);
+    expect(diagnose).toHaveBeenCalledWith("run-0001", "/repos/sibling", undefined);
+    const run = packet.sections.find((s) => s.id === "run")!;
+    expect(run.body).toContain("Worktree: sibling on feat/x (/repos/sibling), not this session's");
+    expect(run.provenance.source).toBe("../sibling/.hench/runs/run-0001.json");
   });
 
   it("does not spawn when the run already carries its verdict", async () => {

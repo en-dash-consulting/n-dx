@@ -64,7 +64,7 @@ import { awaitSidecarCommand, renderWorkPreview, SIDECAR_COMMAND_WAIT_MS, type S
 import { reviewChangeSet, writeChangeSet } from "./sidecar/change-set.js";
 import { readPlacementCall, readPlacementEdit, writePlacementCard, type PlacementEditRefusal } from "./sidecar/placement-card.js";
 import { startSidecarCommand } from "./routes-commands.js";
-import { openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, startTaskExecution } from "./routes-hench.js";
+import { judgeRunInTarget, openTaskBlockers, readQueuePlan, repositoryRunSlotUsage, resolveRunTargets, startTaskExecution } from "./routes-hench.js";
 import { isFeatureEnabled } from "./routes-features.js";
 import { diagnoseTaskRun, previewTaskRun, resolveTaskRun } from "./routes-hench-prep.js";
 import { readDiagnosis } from "./run-diagnosis.js";
@@ -76,7 +76,7 @@ import { buildLensPacket, LENS_IDS, LENS_PACKETS, type LensTarget } from "./side
 import type { PacketTarget } from "./sidecar/packet-builders.js";
 import { createPacketSources, readResolution, type BranchHealthRead, type SpawnedReads } from "./sidecar/packet-sources.js";
 import { githubFactsBody } from "./sidecar/branch-packet.js";
-import { baseCheckResult, postGithubDraft, readCheckOnBase } from "./sidecar/github.js";
+import { BRANCH_HEALTH_FEATURE_KEY, BRANCH_HEALTH_OFF_READ, baseCheckResult, postGithubDraft, readCheckOnBase, readDefaultBranchName } from "./sidecar/github.js";
 import { collectProjectBranchHealth } from "./routes-branch-health.js";
 import { NotAGitBranchError, type BranchHealthExec } from "./branch-health/index.js";
 import {
@@ -247,11 +247,13 @@ export function prepareReads(
     preview: typeof previewTaskRun;
     diagnose: typeof diagnoseTaskRun;
     queuePlan: typeof readQueuePlan;
+    runTargets: typeof resolveRunTargets;
   } = {
     resolve: resolveTaskRun,
     preview: previewTaskRun,
     diagnose: diagnoseTaskRun,
     queuePlan: readQueuePlan,
+    runTargets: resolveRunTargets,
   },
   workspaces?: SidecarWorkspaces,
 ): SpawnedReads {
@@ -263,10 +265,13 @@ export function prepareReads(
       const read = await reads.queuePlan(ctx, signal).catch(() => null);
       return read?.ok ? read.plan : null;
     },
-    async diagnose(runId, signal) {
-      const read = await reads.diagnose(ctx, runId, signal).catch(() => null);
+    async diagnose(runId, dir, signal) {
+      const read = await reads.diagnose(ctx, runId, dir, signal).catch(() => null);
       return read?.ok ? readDiagnosis(read.diagnosis) ?? null : null;
     },
+    // Runs (`?scope=repo`) and Live read these same worktrees and judge with the same mirror.
+    runTargets: () => reads.runTargets(ctx),
+    judgeRun: (target, run) => judgeRunInTarget(target, run, Date.now()),
     async resolve(taskId, signal) {
       const read = await reads.resolve(ctx, taskId, {}, signal).catch(() => null);
       return read?.ok ? readResolution(read.resolution) : null;
@@ -319,8 +324,17 @@ export function sidecarActions(
 ): SidecarActions {
   return {
     githubReadsAllowed: () => readSidecarSettings(ctx.projectDir).githubReads,
+    branchHealthEnabled: () => isFeatureEnabled(ctx.projectDir, BRANCH_HEALTH_FEATURE_KEY),
     async githubRead(read) {
-      if (read.kind === "check") return baseCheckResult(await readCheckOnBase(exec, ctx.projectDir, read.ref, read.base), read.ref, read.base);
+      if (read.kind === "check") {
+        const [run, defaultBranch] = await Promise.all([
+          readCheckOnBase(exec, ctx.projectDir, read.ref, read.base),
+          readDefaultBranchName(exec, ctx.projectDir),
+        ]);
+        return baseCheckResult(run, read.ref, read.base, defaultBranch);
+      }
+      // The same gate as GET /api/branch-health, also for a card approved before the feature was turned off.
+      if (!isFeatureEnabled(ctx.projectDir, BRANCH_HEALTH_FEATURE_KEY)) return { ok: false, text: BRANCH_HEALTH_OFF_READ };
       const health = await readWorktreeBranchHealth(ctx, workspaces, read.ref, true, exec);
       if (typeof health === "string") return { ok: false, text: `Nothing was read: ${health}.` };
       const { github, githubReason } = health.health;

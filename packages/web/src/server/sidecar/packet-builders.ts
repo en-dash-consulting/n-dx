@@ -15,7 +15,17 @@ import { capabilityReport, indexTree, isAppliedChange, productReport } from "../
 import type { RuleNode, V2Tree } from "../rex-gateway.js";
 import { assemblePacket, type Packet, type PacketSection, type Staleness } from "./packet.js";
 import { DESCRIBE_INSTRUCTIONS, DIAGNOSE_RUN_INSTRUCTIONS, EXPLAIN_INSTRUCTIONS, GUIDE_INSTRUCTIONS } from "./lens-instructions.js";
-import type { PacketSources, PrdRead, ResolveRead, RunGateRead, RunReviewRead, RunSettingsRead, RunVerdictRead } from "./packet-sources.js";
+import type {
+  PacketSources,
+  PrdRead,
+  ResolveRead,
+  RunGateRead,
+  RunLivenessRead,
+  RunReviewRead,
+  RunSettingsRead,
+  RunVerdictRead,
+  TaskRunRead,
+} from "./packet-sources.js";
 
 export const EXPLAIN_CAP = 8_000;
 export const DESCRIBE_CAP = 8_000;
@@ -563,11 +573,28 @@ function verdictBody(diagnosis: RunVerdictRead, settings: RunSettingsRead): stri
   ].join("\n");
 }
 
-/** Why a run carries no verdict, as far as its status says. */
-function noVerdictReason(status: string): string {
-  if (status === "completed") return "it completed, and hench classifies only runs that did not";
-  if (status === "running") return "it is still running";
+/** Why a run carries no verdict, as far as its status and liveness say. */
+function noVerdictReason(run: TaskRunRead["run"], liveness: RunLivenessRead | null): string {
+  if (run.status === "completed") return "it completed, and hench classifies only runs that did not";
+  if (run.status === "running") {
+    if (liveness?.liveness === "orphaned") return "its record says running, but its process is gone";
+    return liveness && liveness.liveness !== "live"
+      ? `it is recorded as running and its process could not be confirmed gone (${oneLine(liveness.reason, 200)})`
+      : "it is still running";
+  }
   return "it ended without one, most likely before hench classified runs";
+}
+
+/** What the verdict section says first about a run recorded as running whose process is gone. */
+function orphanNote(runId: string, liveness: RunLivenessRead): string {
+  return `Run ${runId} is recorded as running, but its process is gone: ${oneLine(liveness.reason, 300)} Ending it from Live records the end; hench classifies it as that end would record it.`;
+}
+
+/** Where the run was made: its worktree, and whether it is the session's own. */
+function worktreeLine(worktree: TaskRunRead["worktree"]): string[] {
+  if (!worktree) return [];
+  const branch = worktree.branch ? ` on ${worktree.branch}` : "";
+  return [`Worktree: ${worktree.name}${branch} (${worktree.path})${worktree.own ? ", this session's" : ", not this session's"}`];
 }
 
 function gateBody(gate: RunGateRead): string {
@@ -640,7 +667,7 @@ export async function buildDiagnoseRunPacket(
   if (!read) {
     return done([
       ...sections,
-      gap("verdict", "Run verdict", "no run of this task is recorded, so there is nothing to diagnose. Once a run has ended, `hench runs diagnose <run-id>` classifies it", now, runsSource),
+      gap("verdict", "Run verdict", "no run of this task is recorded in any worktree of this repository, so there is nothing to diagnose. Once a run has ended, `hench runs diagnose <run-id>` classifies it", now, runsSource),
     ]);
   }
 
@@ -654,29 +681,39 @@ export async function buildDiagnoseRunPacket(
     staleness: FRESH,
   });
   // A run from a hench that predates the classifier records no verdict, and `hench runs
-  // diagnose` prints one without writing it. Ask for it once the run has ended; a run that
-  // is running or completed is never classified.
+  // diagnose` prints one without writing it. Ask for it once the run has ended, in the
+  // worktree that holds it. A record left running by a process that died (Live's verdict,
+  // `orphaned`) has ended too; a completed run, or a running one whose process may be
+  // alive, is never classified.
   const diagnoseCommand = `hench runs diagnose ${run.id} --format=json`;
-  const classifiable = run.status !== "running" && run.status !== "completed";
-  const spawned = !read.diagnosis && classifiable ? await sources.diagnose(run.id, signal) : null;
+  const orphaned = run.status === "running" && read.liveness?.liveness === "orphaned";
+  const classifiable = run.status !== "completed" && (run.status !== "running" || orphaned);
+  const spawned = !read.diagnosis && classifiable ? await sources.diagnose(run.id, read.dir, signal) : null;
   const diagnosis = read.diagnosis ?? spawned;
+  const note = orphaned && read.liveness ? `${orphanNote(run.id, read.liveness)}\n` : "";
   sections.push(
     runSection(
       "run",
       "Newest run",
-      [`Run ${run.id}: ${run.status}`, `Started ${run.startedAt}${run.finishedAt ? `, finished ${run.finishedAt}` : ""}`, ...(run.error ? [`Error: ${oneLine(run.error, 300)}`] : [])].join("\n"),
+      [
+        `Run ${run.id}: ${run.status}`,
+        ...worktreeLine(read.worktree),
+        `Started ${run.startedAt}${run.finishedAt ? `, finished ${run.finishedAt}` : ""}`,
+        ...(read.liveness ? [`Process: ${read.liveness.liveness} (${oneLine(read.liveness.reason, 300)})`] : []),
+        ...(run.error ? [`Error: ${oneLine(run.error, 300)}`] : []),
+      ].join("\n"),
     ),
     diagnosis
       ? runSection(
           "verdict",
           "Run verdict (the run classifier)",
-          verdictBody(diagnosis, read.settings),
+          `${note}${verdictBody(diagnosis, read.settings)}`,
           read.diagnosis ? `${run.path} (diagnosis)` : `\`${diagnoseCommand}\``,
         )
       : gap(
           "verdict",
           "Run verdict",
-          `run ${run.id} has no recorded verdict: ${noVerdictReason(run.status)}. ${
+          `${note}run ${run.id} has no recorded verdict: ${noVerdictReason(run, read.liveness)}. ${
             classifiable ? `Running \`${diagnoseCommand}\` failed or timed out` : `\`hench runs diagnose ${run.id}\` classifies it once it has ended`
           }`,
           now,

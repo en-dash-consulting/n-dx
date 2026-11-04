@@ -162,26 +162,27 @@ describe("hench prep routes", () => {
   describe("in-process reads (Sidecar Diagnose run)", () => {
     const DIAGNOSIS = { verdict: "test-gate-failed", reason: "tests failed" };
 
-    it("spawns `ndx hench runs diagnose <id> --format=json <dir>` and returns the parsed object", async () => {
+    it("spawns `ndx hench runs diagnose <id> --format=json <dir>` in the run's worktree and returns the parsed object", async () => {
       execMock.mockResolvedValue({ stdout: JSON.stringify(DIAGNOSIS), stderr: "", exitCode: 0, error: null, started: true });
-      const result = await diagnoseTaskRun(ctx, "run-1");
+      const sibling = join(tmpDir, "sibling-worktree");
+      const result = await diagnoseTaskRun(ctx, "run-1", sibling);
       expect(result).toEqual({ ok: true, diagnosis: DIAGNOSIS });
       expect(execMock).toHaveBeenCalledTimes(1);
       const [, args, opts] = execMock.mock.calls[0] as [string, string[], { cwd: string; timeout: number }];
-      expect(args.slice(-6)).toEqual(["hench", "runs", "diagnose", "run-1", "--format=json", tmpDir]);
+      expect(args.slice(-6)).toEqual(["hench", "runs", "diagnose", "run-1", "--format=json", sibling]);
       expect(opts.timeout).toBe(PREP_RESOLVE_TIMEOUT_MS);
     });
 
     it("fails, naming the stderr tail, when ndx exits non-zero", async () => {
       execMock.mockResolvedValue({ stdout: "", stderr: "Run not found", exitCode: 1, error: null, started: true });
-      const result = await diagnoseTaskRun(ctx, "run-1");
+      const result = await diagnoseTaskRun(ctx, "run-1", tmpDir);
       expect(result.ok).toBe(false);
       expect(!result.ok && result.failure).toContain("Run not found");
     });
 
     it.each(["hello", "[1]", "null"])("fails when stdout is not a JSON object (%s)", async (stdout) => {
       execMock.mockResolvedValue({ stdout, stderr: "", exitCode: 0, error: null, started: true });
-      expect(await diagnoseTaskRun(ctx, "run-1")).toEqual({ ok: false, failure: expect.any(String) });
+      expect(await diagnoseTaskRun(ctx, "run-1", tmpDir)).toEqual({ ok: false, failure: expect.any(String) });
     });
 
     it("refuses without spawning once the in-flight cap is reached", async () => {
@@ -196,7 +197,7 @@ describe("hench prep routes", () => {
       for (let i = 0; i < 50 && execMock.mock.calls.length < PREP_MAX_IN_FLIGHT; i++) await new Promise((r) => setImmediate(r));
       expect(execMock).toHaveBeenCalledTimes(PREP_MAX_IN_FLIGHT);
 
-      const over = await diagnoseTaskRun(ctx, "run-1");
+      const over = await diagnoseTaskRun(ctx, "run-1", tmpDir);
       expect(over.ok).toBe(false);
       expect(!over.ok && over.failure).toContain("too many");
       expect(execMock).toHaveBeenCalledTimes(PREP_MAX_IN_FLIGHT);

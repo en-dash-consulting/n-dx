@@ -221,6 +221,9 @@ describe("the Diagnose branch packet", () => {
     expect(lines[1]).toContain("feat/other (/repo/.claude/worktrees/other)");
     expect(lines.join("\n")).not.toMatch(/run_command|propose_edit|propose_prd_change/);
     expect(DIAGNOSE_BRANCH_INSTRUCTIONS).toContain("A source conflict is never fixed from a card");
+    expect(DIAGNOSE_BRANCH_INSTRUCTIONS).toContain('"failing on main"');
+    expect(DIAGNOSE_BRANCH_INSTRUCTIONS).toContain('"failing on the base (<base>)"');
+    expect(DIAGNOSE_BRANCH_INSTRUCTIONS).toContain("main only when the base is the repository's default branch");
   });
 
   it("offers no fix card for a worktree that is not the session's", async () => {

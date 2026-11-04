@@ -116,6 +116,20 @@ function narrowToWorktree(all: WorktreeInfo[], requested: string): WorktreeInfo[
   return [match];
 }
 
+/**
+ * A running record as ending it writes it: failed, with the verdict's reason
+ * as its error, finished at `finishedAt`. Returns a copy; the caller saves it
+ * (`endRun`) or only reads it (`hench runs diagnose` on an orphaned run).
+ */
+export function endedRecord(run: RunRecord, verdict: LivenessVerdict, finishedAt: string): RunRecord {
+  return { ...run, status: "failed", error: `${RUN_END_ERROR_PREFIX}: ${verdict.reason}`, finishedAt };
+}
+
+/** The liveness verdict on a running record, against its own worktree's live locks. */
+export function judgeRunRecord(run: RunRecord, henchDir: string): LivenessVerdict {
+  return judge(run, collectLiveLocks(locksDirOf(henchDir)));
+}
+
 function judge(run: RunRecord, liveLocks: ReturnType<typeof collectLiveLocks>): LivenessVerdict {
   return classifyRunLiveness(
     {
@@ -140,12 +154,9 @@ async function endRun(
 ): Promise<boolean> {
   const fresh = await loadRun(henchDir, id);
   if (fresh.status !== "running") return false;
-  const verdict = judge(fresh, collectLiveLocks(locksDirOf(henchDir)));
+  const verdict = judgeRunRecord(fresh, henchDir);
   if (!endable(verdict)) return false;
-  fresh.status = "failed";
-  fresh.error = `${RUN_END_ERROR_PREFIX}: ${verdict.reason}`;
-  fresh.finishedAt = new Date().toISOString();
-  await saveRun(henchDir, fresh);
+  await saveRun(henchDir, endedRecord(fresh, verdict, new Date().toISOString()));
   return true;
 }
 

@@ -23,6 +23,7 @@ import type { Manifest, Zones } from "../domain-gateway.js";
 import type { BranchHealth } from "../branch-health/index.js";
 import { readLiveReviewReport } from "../live-review-report.js";
 import { readDiagnosis, type RunDiagnosisSummary } from "../run-diagnosis.js";
+import type { LivenessVerdict } from "../run-liveness.js";
 import { readLogTailLines, resolveRunEventsFile } from "../run-tail.js";
 import type { ServerContext } from "../types.js";
 
@@ -221,9 +222,15 @@ export interface TaskRunRead {
     finishedAt: string | null;
     /** First line of the run's recorded error. */
     error: string | null;
-    /** Project-relative path of the run record. */
+    /** Path of the run record, relative to the session's worktree (`../` for a sibling's). */
     path: string;
   };
+  /** The worktree the run was made in; null outside a git repository. */
+  worktree: { name: string; path: string; branch: string | null; own: boolean } | null;
+  /** The root of the worktree the run was made in, where `hench runs diagnose` reads it. */
+  dir: string;
+  /** Live's verdict on a run recorded as running; null for a run that ended. */
+  liveness: RunLivenessRead | null;
   /** Null when the run carries no verdict: it completed, is running, or predates the classifier. */
   diagnosis: RunVerdictRead | null;
   /** What the run was launched with, as `start_work` options for a re-run or `--fresh`; empty when it recorded nothing to carry. */
@@ -234,6 +241,19 @@ export interface TaskRunRead {
   review: RunReviewRead | null;
   /** Null when the run has no event stream; otherwise its last {@link RUN_EVENTS_SHOWN} events. */
   events: { path: string; last: RunEventRead[] } | null;
+}
+
+/** Whether a run recorded as running still has its process, as Live judges it. */
+export type RunLivenessRead = Pick<LivenessVerdict, "liveness" | "reason" | "canEnd">;
+
+/** One worktree's runs directory, from the list Runs (`?scope=repo`) and Live read. */
+export interface RunTargetRead {
+  root: string;
+  runsDir: string;
+  /** Absent outside a git repository, where the served directory is the only target. */
+  worktree?: { name: string; path: string; branch: string | null };
+  /** The worktree this server serves: the session's own. */
+  served: boolean;
 }
 
 /** One worktree's branch status, read for the Diagnose branch lens. */
@@ -260,10 +280,10 @@ export interface PacketSources {
   /** `ndx work --task=<id> --dry-run` output: the brief hench would send. */
   preview(taskId: string, signal?: AbortSignal): Promise<string | null>;
   runs(taskId: string): Promise<RunStatusRead[] | null>;
-  /** The task's newest run with its verdict, gate, review and last events; `null` when no run of it is recorded. */
+  /** The task's newest run in any worktree, with its verdict, gate, review and last events; `null` when no worktree records a run of it. */
   taskRun(taskId: string): Promise<TaskRunRead | null>;
-  /** The classifier's verdict for an ended run whose record carries none, spawned; `null` when that fails. */
-  diagnose(runId: string, signal?: AbortSignal): Promise<RunVerdictRead | null>;
+  /** The classifier's verdict for a run whose record carries none, spawned in the worktree `dir`; `null` when that fails. */
+  diagnose(runId: string, dir: string, signal?: AbortSignal): Promise<RunVerdictRead | null>;
   /** The queue planner's plan (`ndx work --plan-queue`), spawned; `null` when that fails. */
   queuePlan(signal?: AbortSignal): Promise<QueuePlan | null>;
   /** Whether the dashboard feature `key` is on; a lens behind a feature builds no packet while it is off. */
@@ -286,8 +306,12 @@ export const RUN_EVENTS_SHOWN = 12;
 export interface SpawnedReads {
   /** Whether the dashboard feature `key` is on, read per call. */
   featureEnabled(key: string): boolean;
-  /** `hench runs diagnose <run-id> --format=json`: the verdict for a run whose record has none; `null` when the spawn fails or times out. */
-  diagnose(runId: string, signal?: AbortSignal): Promise<RunVerdictRead | null>;
+  /** `hench runs diagnose <run-id> --format=json <dir>`: the verdict for a run whose record has none; `null` when the spawn fails or times out. */
+  diagnose(runId: string, dir: string, signal?: AbortSignal): Promise<RunVerdictRead | null>;
+  /** Every worktree's runs directory, the list Runs and Live read; the served directory alone outside a repository. */
+  runTargets(): Promise<RunTargetRead[]>;
+  /** Live's liveness verdict on a running record of `target`: its locks, and the runs this dashboard holds. */
+  judgeRun(target: RunTargetRead, run: Record<string, unknown>): RunLivenessRead;
   /** `work --plan-queue --format=json`, the way `GET /api/hench/plan-queue` reads it; `null` when the spawn fails. */
   queuePlan(signal?: AbortSignal): Promise<QueuePlan | null>;
   /** Aborting `signal` kills the spawned `ndx`. */
@@ -533,7 +557,7 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
     resolve: (taskId, signal) => spawned.resolve(taskId, signal),
     preview: (taskId, signal) => spawned.preview(taskId, signal),
     // The classifier's evidence quotes the run's error, and this text goes to the vendor.
-    diagnose: async (runId, signal) => redactDeep(await spawned.diagnose(runId, signal)),
+    diagnose: async (runId, dir, signal) => redactDeep(await spawned.diagnose(runId, dir, signal)),
     // Task titles and reasons come from the PRD, and this text goes to the vendor.
     queuePlan: async (signal) => redactDeep(await spawned.queuePlan(signal)),
     featureEnabled: (key) => spawned.featureEnabled(key),
@@ -549,14 +573,20 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
     },
 
     async taskRun(taskId) {
-      const runsDir = join(layout.henchDir, "runs");
-      const newest = taskRunRecords(runsDir, taskId)[0];
+      // Every worktree, as Runs and Live read them: a run made in a sibling
+      // worktree is the task's newest run as much as one made here.
+      const newest = (await spawned.runTargets())
+        .flatMap((target) => taskRunRecords(target.runsDir, taskId).slice(0, 1).map((found) => ({ ...found, target })))
+        .sort((a, b) => String(b.record.startedAt).localeCompare(String(a.record.startedAt)))[0];
       if (!newest) return null;
+      const { target } = newest;
+      const runsDir = target.runsDir;
+      const verdict = newest.record.status === "running" ? spawned.judgeRun(target, newest.record) : null;
       // A record written before hench scrubbed at save time may still hold a
       // secret a tool printed, and this text goes to the vendor.
       const run = redactDeep(newest.record);
       const id = run.id as string;
-      const events = resolveRunEventsFile({ run, runsDir, worktreeRoot: ctx.projectDir }, [ctx.projectDir]);
+      const events = resolveRunEventsFile({ run, runsDir, worktreeRoot: target.root }, [target.root]);
       return {
         run: {
           id,
@@ -566,10 +596,13 @@ export function createPacketSources(ctx: ServerContext, spawned: SpawnedReads): 
           error: str(run.error)?.split("\n")[0] ?? null,
           path: display(newest.path),
         },
+        worktree: target.worktree ? { ...target.worktree, own: target.served } : null,
+        dir: target.root,
+        liveness: verdict && { liveness: verdict.liveness, reason: verdict.reason, canEnd: verdict.canEnd },
         diagnosis: readDiagnosis(run.diagnosis) ?? null,
         settings: readRunSettings(run),
         gate: readGate(run),
-        review: redactDeep(readReview(layout.henchDir, id, display)),
+        review: redactDeep(readReview(resolveLayout(target.root).henchDir, id, display)),
         events: events.kind === "file"
           ? {
               // The recorded path, not the resolved real one, which may sit under a symlinked temp root.
