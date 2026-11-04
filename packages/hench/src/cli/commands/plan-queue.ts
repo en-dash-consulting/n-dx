@@ -21,7 +21,7 @@ import { loadV2Tree } from "../../agent/planning/work-selection.js";
 import { resolveProjectCliName } from "../../agent/planning/cli-identity.js";
 import { TaskClaims } from "../../process/task-claims.js";
 import { countActiveLocksReadOnly } from "../../process/limiter.js";
-import { planQueue } from "../../queue/plan-queue.js";
+import { OWN_WORKTREE_NOTE, planQueue } from "../../queue/plan-queue.js";
 import type { ActiveRunCount, QueueChange, QueuePlan, QueueTask } from "../../queue/plan-queue.js";
 import { CLIError } from "../errors.js";
 import { result as output, warn } from "../output.js";
@@ -111,7 +111,9 @@ export function queueInputFromTree(
 }
 
 /**
- * The command a lane runs: its tasks one after another, in this worktree.
+ * The command a lane runs: its tasks one after another, in the current
+ * checkout. Every lane's command targets `.`, so a lane after the first must
+ * be pasted into a worktree of its own (`PlannedLane.ownWorktree`).
  * `&&` alone does not keep dependency order — an explicit `--task` ignores
  * blockers, and a run can exit 0 without completing its task (a transient
  * vendor error) — so a step for a task in `blocked` also passes
@@ -126,7 +128,10 @@ export function laneCommand(cliName: string, taskIds: readonly string[], blocked
 export function formatPlan(plan: QueuePlan): string[] {
   const lines = [plan.summary];
   plan.lanes.forEach((lane, i) => {
-    lines.push("", `Lane ${i + 1} (change ${lane.changeId}):`, `  ${lane.command}`);
+    lines.push("", `Lane ${i + 1} (change ${lane.changeId}):`);
+    if (lane.ownWorktree) lines.push(`  ${OWN_WORKTREE_NOTE}`);
+    else if (plan.lanes.length > 1) lines.push("  Runs in this worktree.");
+    lines.push(`  ${lane.command}`);
     for (const t of lane.tasks) lines.push(`  • ${t.title} (${t.id}): ${t.reason}`);
   });
   if (plan.excluded.length > 0) {

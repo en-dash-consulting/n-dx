@@ -14,7 +14,7 @@ export type BranchHealthExec = (cmd: string, args: string[], opts: ExecOptions) 
 
 /**
  * Where `base` came from, in precedence order. `pr-cached` is the PR base an
- * earlier GitHub read found, reused by a local-only answer.
+ * earlier GitHub read found, reused by a local-only answer or when gh fails.
  */
 export type BaseSource = "pr" | "pr-cached" | "upstream" | "default";
 
