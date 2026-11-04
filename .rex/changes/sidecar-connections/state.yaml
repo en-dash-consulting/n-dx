@@ -10,17 +10,22 @@ items:
     lastModified: "2026-11-04T17:39:20.554Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "991e785d-b0f2-4893-bcf8-1dc135f7ba16":
-    status: "in_progress"
+    status: "completed"
     startedAt: "2026-11-04T19:00:26.601Z"
-    activeIntervals: [{"start":"2026-11-04T19:00:26.601Z"}]
-    lastModified: "2026-11-04T19:00:31.590Z"
+    completedAt: "2026-11-04T19:54:53.567Z"
+    endedAt: "2026-11-04T19:54:53.567Z"
+    activeIntervals: [{"end":"2026-11-04T19:49:04.704Z","start":"2026-11-04T19:00:26.601Z"},{"end":"2026-11-04T19:54:53.567Z","start":"2026-11-04T19:54:53.567Z"}]
+    lastModified: "2026-11-04T19:54:53.567Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "a23959f9-b72d-4d98-ba2e-7e8e49853788":
     issues: ["https://www.notion.so/3f7a80b71924811aafc7edb86c8706cc","https://www.notion.so/3f7a80b7192481a398e1cb38f63618a8","https://www.notion.so/3f7a80b7192481f7ad52e6a9e7739ce4","https://www.notion.so/3f7a80b719248169970dd9029aff5e07"]
-    lastModified: "2026-11-04T17:40:03.535Z"
+    lastModified: "2026-11-04T19:30:11.655Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b59456bd-36ac-4409-9707-6f30c2844f89":
     lastModified: "2026-11-04T17:39:25.942Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "cd5defa2-2edd-43e1-9de4-768a1584e660":
+    lastModified: "2026-11-04T19:30:11.655Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "d1e807c8-af53-438c-9b13-a7153e3c48bb":
     lastModified: "2026-11-04T17:39:02.989Z"
