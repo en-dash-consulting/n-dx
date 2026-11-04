@@ -230,7 +230,14 @@ items:
     lastModified: "2026-10-30T15:44:38.472Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bb93e6fd-fe6a-418e-975c-746b0afacbd0":
-    lastModified: "2026-11-04T17:25:41.135Z"
+    status: "completed"
+    startedAt: "2026-11-04T20:03:11.088Z"
+    completedAt: "2026-11-04T20:25:34.641Z"
+    endedAt: "2026-11-04T20:25:34.641Z"
+    activeIntervals: [{"end":"2026-11-04T20:25:34.641Z","start":"2026-11-04T20:03:11.088Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Stale-lock takeover in llm-client credential-store.ts now uses a per-lock O_EXCL guard file and removes the lock only if its identity (ino, mtime, content) is unchanged and it is still stale; a lock left empty is stale after 5 s."
+    lastModified: "2026-11-04T20:25:34.641Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "bfee741f-343a-4a2c-b12f-50aa262811ef":
     status: "completed"

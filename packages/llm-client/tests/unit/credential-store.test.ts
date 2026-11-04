@@ -9,13 +9,18 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { platform, tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
+  EMPTY_LOCK_STALE_MS,
+  TAKEOVER_GUARD_STALE_MS,
   credentialStatus,
   credentialStorePath,
+  inspectLock,
   parseIcaclsOutput,
+  takeOverStaleLock,
+  takeoverGuardPath,
   resolveCredential,
   restrictToOwnerWindows,
   setCredential,
@@ -301,6 +306,51 @@ describe("cross-process lock", () => {
     setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000 });
     expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
     expect(existsSync(lockPath())).toBe(false);
+  });
+
+  it("takes over an empty lock older than the threshold", () => {
+    writeFileSync(lockPath(), "");
+    const old = (Date.now() - EMPTY_LOCK_STALE_MS - 1_000) / 1_000;
+    utimesSync(lockPath(), old, old);
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000 });
+    expect(resolveCredential("typesafe", options)?.value).toBe(PLACEHOLDER);
+    expect(existsSync(lockPath())).toBe(false);
+  });
+
+  it("waits for a fresh empty lock: its writer is still writing it", () => {
+    writeFileSync(lockPath(), "");
+    expect(() => setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 100 })).toThrow(/Timed out/);
+    expect(existsSync(lockPath())).toBe(true);
+  });
+
+  it("never removes a live lock that replaced the one judged stale", () => {
+    const dead = spawnSync(process.execPath, ["-e", ""]);
+    writeFileSync(lockPath(), JSON.stringify({ pid: dead.pid, token: "dead", since: "2026-01-01T00:00:00.000Z" }));
+    const judged = inspectLock(lockPath());
+    expect(judged).toBeDefined();
+    // Another writer takes the dead lock over and creates its own live lock.
+    expect(takeOverStaleLock(lockPath(), judged!)).toBe(true);
+    const live = JSON.stringify({ pid: process.pid, token: "live", since: "2026-01-01T00:00:00.000Z" });
+    writeFileSync(lockPath(), live, { flag: "wx" });
+    // A second writer acting on its earlier judgement leaves the live lock in place.
+    expect(takeOverStaleLock(lockPath(), judged!)).toBe(false);
+    expect(readFileSync(lockPath(), "utf-8")).toBe(live);
+    expect(readdirSync(dirname(lockPath())).filter((f) => f.endsWith(".takeover"))).toEqual([]);
+  });
+
+  it("waits while another writer holds the takeover guard, and reclaims an abandoned one", () => {
+    const dead = spawnSync(process.execPath, ["-e", ""]);
+    writeFileSync(lockPath(), JSON.stringify({ pid: dead.pid, token: "dead", since: "2026-01-01T00:00:00.000Z" }));
+    const judged = inspectLock(lockPath())!;
+    const guard = takeoverGuardPath(lockPath(), judged);
+    writeFileSync(guard, "");
+    expect(takeOverStaleLock(lockPath(), judged)).toBe(false);
+    expect(existsSync(lockPath())).toBe(true);
+    const old = (Date.now() - TAKEOVER_GUARD_STALE_MS - 1_000) / 1_000;
+    utimesSync(guard, old, old);
+    setCredential("typesafe", PLACEHOLDER, { ...options, lockTimeoutMs: 1_000 });
+    expect(existsSync(lockPath())).toBe(false);
+    expect(existsSync(guard)).toBe(false);
   });
 });
 
