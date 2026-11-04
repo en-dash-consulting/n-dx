@@ -231,11 +231,11 @@ with no model call. `hench runs diagnose <run-id> [--format=json]` prints it.
 | Class | Signal | First action |
 |-------|--------|--------------|
 | `test-gate-new` | The gate's failure digest names a file the run changed; an absolute digest path under the run's worktree is read repo-relative | Follow-up run with the digest, then re-run |
-| `test-gate-preexisting` | The digest names only files the run did not change | Verify on main, then close as verified |
+| `test-gate-preexisting` | The digest names only files the run did not change. No baseline runs, so the verdict says the failure is in tests the run did not edit and was not checked on main; it never asserts the failure predates the run | Run the failing tests on main |
 | `completion-held` | `completionHold` with outcome `not-applied` (`applied` and `bypassed` are not holds), or `gateOnlyRetry` | `--fresh`, or fix by hand and verify |
 | `completion-held` | The completion gate refused on uncommitted work; outranks every rule but `claim-lost` | Commit or discard the uncommitted paths, then verify |
 | `review-blocked` | The review left a must-fix finding unrepaired | Follow-up run with the findings |
-| `claim-lost` | `claimLost` or `readOnlyRefusal` | Release the claim or clean the tree, then re-run |
+| `claim-lost` | `claimLost`: another worktree took the task. A `readOnlyRefusal` (the forked attempt made no edits and the task re-ran cold) is never a class; it is one evidence line on the class the rest of the record gives | Release the claim, then re-run |
 | `budget-timeout` | `budget_exceeded`, `timeout`, or a brief too large for the context window | Split the task, or raise its tier |
 | `vendor-transient` | `error_transient`, or an auth or rate-limit failure | Retry later |
 | `no-changes` | No commits, or only PRD files changed | Tighten the done-when |

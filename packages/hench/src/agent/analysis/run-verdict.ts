@@ -122,6 +122,11 @@ function collapseSuffixPaths(paths: readonly string[]): string[] {
   return paths.filter((p) => !paths.some((q) => q !== p && q.endsWith(`/${p}`)));
 }
 
+/** A test file by name (`*.test.*`, `*.spec.*`) or by directory (`test/`, `tests/`, `__tests__/`). */
+function isTestFile(path: string): boolean {
+  return /\.(?:test|spec)\.[^/]+$/.test(path) || /(?:^|\/)(?:tests?|__tests__)\//.test(path);
+}
+
 function vendorFailureCategories(run: RunRecord): string[] {
   return [...new Set((run.events ?? []).map((e) => e.failure?.category).filter((c): c is string => !!c && VENDOR_CATEGORIES.has(c)))];
 }
@@ -142,30 +147,23 @@ interface Verdict {
 
 type Rule = (input: RunVerdictInput, changed: string[]) => Verdict | null;
 
+/**
+ * Only another worktree's claim. `readOnlyRefusal` is not a class: cli-loop
+ * sets it when the forked attempt made no edits and then retries cold, so the
+ * record's other signals describe what the retry did. It is evidence only
+ * (see {@link classifyRun}).
+ */
 const claimLost: Rule = ({ run }) => {
-  if (run.claimLost) {
-    return {
-      class: "claim-lost",
-      summary: `Another worktree took the task over mid-run (${run.claimLost.holderWorktree}).`,
-      evidence: [`claimLost: held by ${run.claimLost.holderWorktree} since ${run.claimLost.at}`],
-      actions: [
-        { kind: "release-claim", label: "Release the claim, or let the other worktree finish the task" },
-        { kind: "re-run", label: "Re-run the task" },
-      ],
-    };
-  }
-  if (run.readOnlyRefusal) {
-    return {
-      class: "claim-lost",
-      summary: "The agent refused to edit and made no changes.",
-      evidence: [`readOnlyRefusal: ${run.readOnlyRefusal.reason}`],
-      actions: [
-        { kind: "release-claim", label: "Release the claim or clean the tree" },
-        { kind: "re-run", label: "Re-run the task" },
-      ],
-    };
-  }
-  return null;
+  if (!run.claimLost) return null;
+  return {
+    class: "claim-lost",
+    summary: `Another worktree took the task over mid-run (${run.claimLost.holderWorktree}).`,
+    evidence: [`claimLost: held by ${run.claimLost.holderWorktree} since ${run.claimLost.at}`],
+    actions: [
+      { kind: "release-claim", label: "Release the claim, or let the other worktree finish the task" },
+      { kind: "re-run", label: "Re-run the task" },
+    ],
+  };
 };
 
 /** The completion gate refused on uncommitted work: a held completion, not a lost claim. */
@@ -264,17 +262,21 @@ const testGate: Rule = ({ run }, changed) => {
       ],
     };
   }
-  const unchanged = collapseSuffixPaths(named);
+  // No baseline was run, so this cannot claim the failure predates the run: a
+  // run usually breaks a test by changing the source under it. It says where
+  // the failure is and leaves the main-branch check to the operator.
+  const tests = named.filter(isTestFile);
+  const shown = collapseSuffixPaths(tests.length > 0 ? tests : named);
+  const where = tests.length > 0 ? "tests" : "files";
   return {
     class: "test-gate-preexisting",
-    summary: `The test gate failed only in files this run did not change: ${list(unchanged)}.`,
+    summary: `The test gate failed in ${where} this run did not edit (${list(shown)}); not checked on main.`,
     evidence: [
-      `Gate failure names only unchanged file(s): ${list(unchanged)}`,
-      "Not verified on main",
+      `Gate failure names only unedited ${where}: ${list(shown)}`,
+      "Not checked on main",
     ],
     actions: [
-      { kind: "verify-on-main", label: "Run the failing tests on main to confirm they fail there" },
-      { kind: "close-verified", label: "Then close the task as verified" },
+      { kind: "verify-on-main", label: "Run the failing tests on main to see whether they fail there" },
     ],
   };
 };
@@ -347,11 +349,12 @@ export function classifyRun(input: RunVerdictInput): RunDiagnosis {
     evidence: [`status: ${input.run.status}`, ...(input.run.error ? [`error: ${input.run.error.split("\n")[0]}`] : [])],
     actions: [{ kind: "hand-fix", label: "Read the run log and decide by hand" }],
   };
+  const refusal = input.run.readOnlyRefusal;
   const n = Math.min(Math.max(input.attempt, 1), MAX_VERDICT_ATTEMPTS);
   return {
     class: verdict.class,
     summary: verdict.summary,
-    evidence: verdict.evidence,
+    evidence: refusal ? [...verdict.evidence, `readOnlyRefusal: ${refusal.reason}`] : verdict.evidence,
     actions: n >= MAX_VERDICT_ATTEMPTS ? lastAttemptActions(verdict.actions) : verdict.actions,
     attempt: { n, of: MAX_VERDICT_ATTEMPTS },
   };

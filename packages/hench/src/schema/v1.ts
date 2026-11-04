@@ -2155,7 +2155,6 @@ export type RunVerdictActionKind =
   | "follow-up-run"
   | "re-run"
   | "verify-on-main"
-  | "close-verified"
   | "fresh"
   | "hand-fix"
   | "release-claim"
