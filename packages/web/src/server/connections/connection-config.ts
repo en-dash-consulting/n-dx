@@ -24,6 +24,11 @@ interface ConnectionBase {
   /** What the operator calls it; the id when unset. */
   label: string;
   auth: ConnectionAuth;
+  /**
+   * Per-tool class and policy overrides, as written. tool-policy.ts checks them
+   * against the server's tool list and warns about each bad entry.
+   */
+  tools?: unknown;
 }
 
 /** A streamable HTTP server. */
@@ -104,7 +109,7 @@ function parseConnection(id: string, raw: unknown): ConnectionConfig | string {
     }
     if (url.protocol !== "http:" && url.protocol !== "https:") return "its url must be http or https";
     if (url.username || url.password) return "its url must not carry credentials; use auth \"token\"";
-    return { id, label, auth, transport: "http", url: url.href };
+    return { id, label, auth, tools: entry.tools, transport: "http", url: url.href };
   }
 
   if (entry.transport === "stdio") {
@@ -115,7 +120,7 @@ function parseConnection(id: string, raw: unknown): ConnectionConfig | string {
     if (!Array.isArray(args) || !args.every((arg) => typeof arg === "string")) return "args must be a list of strings";
     const env = entry.env === undefined ? {} : stringRecord(entry.env);
     if (!env) return "env must map names to string values";
-    return { id, label, auth: "none", transport: "stdio", command: entry.command, args, env };
+    return { id, label, auth: "none", tools: entry.tools, transport: "stdio", command: entry.command, args, env };
   }
 
   return `transport must be "http" or "stdio"`;

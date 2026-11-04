@@ -33,6 +33,22 @@ class, the run/ask/never policy and the form card for writes.
 - `auth` is `none` (default), `token` or `oauth`. `token` and `oauth` are
   HTTP-only, because MCP authorization is HTTP-only.
 - An invalid entry is skipped with a warning naming it.
+- `tools` (optional) overrides one tool at a time:
+  `"tools": { "delete_item": { "class": "write", "policy": "never" } }`.
+
+## Tool class and policy
+
+`tool-policy.ts` (pure) gives each listed tool a class and a policy, and the
+service's tool list reports both with their source (`annotation`, `default` or
+`override`).
+
+- **Class.** `readOnlyHint: true` is a read. `destructiveHint: true` or no
+  annotation is a write, so an unannotated tool errs toward write.
+- **Policy.** A read defaults to `run`, a write to `ask`. `run` on a write
+  needs an explicit `policy` override. `never` removes the tool from the session.
+- **Overrides** (`class`: `read`/`write`; `policy`: `run`/`ask`/`never`) win over
+  the defaults. An unknown class or policy, or a tool the server does not list,
+  is ignored with a warning naming it; a valid half of an entry still applies.
 
 ## Decisions
 

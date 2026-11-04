@@ -30,6 +30,7 @@ import { compileEnvPolicy, sanitizeChildEnv, type CredentialStoreOptions } from 
 import { errorMessage } from "../response-utils.js";
 import { loadConnections, type ConnectionConfig } from "./connection-config.js";
 import { connectionToken } from "./connection-credentials.js";
+import { resolveToolPolicies, type ToolPolicy } from "./tool-policy.js";
 
 /** The longest tool name the Claude and OpenAI tool APIs accept. */
 export const MAX_WIRE_NAME_LENGTH = 64;
@@ -61,6 +62,8 @@ export interface ConnectionTool {
   description: string;
   inputSchema: Tool["inputSchema"];
   annotations: Tool["annotations"];
+  /** Read/write class and run/ask/never policy, each with where it came from. */
+  policy: ToolPolicy;
 }
 
 /** Thrown by {@link ConnectionService.callTool} when the connection cannot be reached. */
@@ -283,7 +286,7 @@ export class ConnectionService {
   }
 
   private async readTools(connection: string, client: Client): Promise<ConnectionTool[]> {
-    const tools: ConnectionTool[] = [];
+    const found: Tool[] = [];
     let cursor: string | undefined;
     do {
       const page = await client.listTools(cursor ? { cursor } : undefined, { timeout: this.connectTimeoutMs });
@@ -299,18 +302,27 @@ export class ConnectionService {
           }
           continue;
         }
-        tools.push({
-          connection,
-          tool: tool.name,
-          displayName: `${connection}.${tool.name}`,
-          wireName,
-          description: tool.description ?? "",
-          inputSchema: tool.inputSchema,
-          annotations: tool.annotations,
-        });
+        found.push(tool);
       }
       cursor = page.nextCursor;
     } while (cursor);
-    return tools;
+    const overrides = this.slots.get(connection)?.config.tools;
+    const policies = resolveToolPolicies(found, overrides, (message) => this.warnOnce(message));
+    return found.map((tool) => ({
+      connection,
+      tool: tool.name,
+      displayName: `${connection}.${tool.name}`,
+      wireName: connectionWireName(connection, tool.name),
+      description: tool.description ?? "",
+      inputSchema: tool.inputSchema,
+      annotations: tool.annotations,
+      policy: policies.get(tool.name)!,
+    }));
+  }
+
+  private warnOnce(message: string): void {
+    if (this.warnedNames.has(message)) return;
+    this.warnedNames.add(message);
+    this.warn(message);
   }
 }

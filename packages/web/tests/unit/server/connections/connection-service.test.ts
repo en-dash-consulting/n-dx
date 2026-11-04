@@ -96,6 +96,21 @@ describe("ConnectionService", () => {
     expect(text(await svc.callTool("local", "update_item", { id: "7", title: "t" }))).toBe("updated 7: t");
   });
 
+  it("lists each tool's class and policy with their sources, honouring config overrides and warning on bad ones", async () => {
+    const { svc, warnings } = service({
+      local: {
+        ...stdio(),
+        tools: { read_item: { policy: "never" }, update_item: { class: "read" }, delete_item: { class: "nope" }, ghost: { policy: "run" } },
+      },
+    });
+    const by = Object.fromEntries((await svc.listTools()).map((t) => [t.tool, t.policy]));
+    expect(by.read_item).toEqual({ class: "read", classSource: "annotation", policy: "never", policySource: "override" });
+    expect(by.update_item).toEqual({ class: "read", classSource: "override", policy: "run", policySource: "default" });
+    expect(by.delete_item).toEqual({ class: "write", classSource: "annotation", policy: "ask", policySource: "default" });
+    expect(warnings.filter((w) => w.includes('"ghost"'))).toHaveLength(1);
+    expect(warnings.filter((w) => w.includes('"delete_item"'))).toHaveLength(1);
+  });
+
   it("sends the stored connection:<id> token as a Bearer header", async () => {
     const http = await httpServer();
     http.requireToken = "tok-abc";
