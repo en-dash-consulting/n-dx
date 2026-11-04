@@ -26,6 +26,9 @@ items:
     resolutionDetail: "resolveJudgmentRoute (options: env/ndxHome) and askJev resolve the typesafe credential env-first then store; new configuredJudgmentRoute replaces sourcevision's fake-env probe; rex migrate-plan jevAvailable via resolver; messages and README name ndx config credentials.typesafe."
     lastModified: "2026-10-30T16:40:18.734Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1ef2f885-15d8-454a-839a-19c2a1f6422f":
+    lastModified: "2026-11-04T17:23:54.671Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "250e6c57-54a5-4d31-815c-720ea268e972":
     status: "completed"
     startedAt: "2026-10-30T14:52:34.980Z"
@@ -86,9 +89,12 @@ items:
     activeIntervals: [{"end":"2026-10-30T18:32:00.867Z","start":"2026-10-30T18:21:31.342Z"}]
     lastModified: "2026-10-30T18:32:00.867Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "742cfeea-b375-443a-b72e-af34a87ef364":
+    lastModified: "2026-11-04T17:23:53.314Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "7d8853e2-2aaa-4ee5-aa15-9d4d14400905":
     issues: ["https://www.notion.so/3f7a80b71924812199fbd28780bf4cb3"]
-    lastModified: "2026-11-03T20:34:37.959Z"
+    lastModified: "2026-11-04T17:23:54.671Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "94e25654-bb3c-4203-a1ab-49267e0ad734":
     status: "completed"
