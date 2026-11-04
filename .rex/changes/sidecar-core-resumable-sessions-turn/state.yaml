@@ -175,7 +175,14 @@ items:
     lastModified: "2026-11-04T20:22:17.303Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "b9161bd9-3d30-46d4-b54b-bd9b1e81f544":
-    lastModified: "2026-11-04T19:03:53.881Z"
+    status: "completed"
+    startedAt: "2026-11-04T20:22:45.107Z"
+    completedAt: "2026-11-04T20:31:27.302Z"
+    endedAt: "2026-11-04T20:31:27.302Z"
+    activeIntervals: [{"end":"2026-11-04T20:31:27.302Z","start":"2026-11-04T20:22:45.107Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "broker-policy.ts: run_command allow-list inverted to an explicit READ_ONLY_COMMAND_PREFIXES list (ndx status/usage, git status/log/diff/show) matched token-for-token from argv[0]; git --output rejected. Old on-disk rules drop on read via existing re-validation."
+    lastModified: "2026-11-04T20:31:27.302Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "e18b93c0-a4b0-4f46-b4d9-9ce2d4ef0d6c":
     status: "completed"

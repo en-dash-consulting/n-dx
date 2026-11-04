@@ -13,6 +13,7 @@ import {
   BROKER_TOOL_NAMES,
   BROKER_TOOL_POLICY,
   type BrokerToolName,
+  READ_ONLY_COMMAND_PREFIXES,
 } from "../../../src/server/sidecar/broker-policy.js";
 import { BrokerDecisionError, SidecarBroker, type SidecarCard } from "../../../src/server/sidecar/broker.js";
 import { removeTestDir } from "../../helpers/server-route-test-support.js";
@@ -68,11 +69,28 @@ describe("allow-listability", () => {
     expect(listable.sort()).toEqual(["github_read", "run_command"]);
   });
 
-  it("never allow-lists a command that works, resets or pushes", () => {
+  it("allow-lists a command only when its argv begins with a read-only prefix", () => {
     for (const argv of [
-      ["ndx", "work", "."], ["git", "reset", "--hard"], ["git", "push"], ["ndx", "ship", "--push=origin"],
-      // Wrapped in a shell string, the words are inside one token.
-      ["sh", "-c", "ndx work ."], ["bash", "-lc", "git fetch && git push origin HEAD"], ["cmd", "/c", "git reset --hard"],
+      ["ndx", "status"], ["ndx", "status", "--format=json", "."], ["ndx", "usage", "."],
+      ["git", "status"], ["git", "log", "--oneline", "-5"], ["git", "diff", "main"], ["git", "show", "HEAD"],
+    ]) {
+      expect(allowListKey("run_command", { argv })).toBe(JSON.stringify(argv));
+    }
+    expect(READ_ONLY_COMMAND_PREFIXES.map((p) => p.join(" ")))
+      .toEqual(expect.arrayContaining(["ndx status", "ndx usage", "git status", "git log", "git diff", "git show"]));
+  });
+
+  it("never allow-lists a command off the read-only list", () => {
+    for (const argv of [
+      // #901 F2: each of these slipped past the old work/reset/push word list.
+      ["ndx", "hench", "run", "--task=abc", "."], ["ndx", "self-heal", "."], ["ndx", "rex", "add", "task", "x", "."],
+      ["git", "clean", "-fdx"], ["ndx", "work", "."], ["git", "push"], ["ndx", "analyze", "."],
+      ["git", "reset", "--hard"],
+      // A read-only word that is not the prefix, or a prefix reached through a wrapper or global option.
+      ["ndx", "plan", "status"], ["sh", "-c", "git status"], ["git", "-C", "..", "status"], ["npx", "ndx", "status"],
+      // git writes a file through --output.
+      ["git", "diff", "--output=patch.diff"], ["git", "log", "--output", "log.txt"],
+      ["ndx"], ["git"],
     ]) {
       expect(allowListKey("run_command", { argv })).toBeNull();
     }
@@ -125,6 +143,29 @@ describe("cards", () => {
     expect(await isPending(broker.request("s1", "start_work", SAMPLE.start_work))).toBe(true);
     expect(await isPending(broker.request("s2", "run_command", { argv: ["ndx", "work", "."] }))).toBe(true);
     expect(await broker.request("s3", "github_read", SAMPLE.github_read)).toEqual({ approved: true, decidedBy: "allow-list" });
+  });
+
+  it("drops a remembered command off the read-only list when the allow-list is read", async () => {
+    // Rules the old deny list let an operator remember (#901 F2).
+    writeFileSync(join(dir, "allow-list.json"), JSON.stringify({
+      schema: "ndx/sidecar-allow-list/v1",
+      rules: [
+        { tool: "run_command", key: '["ndx","hench","run","--task=abc","."]' },
+        { tool: "run_command", key: '["git","clean","-fdx"]' },
+        { tool: "run_command", key: '["ndx","status","."]' },
+      ],
+    }));
+    expect(broker.allowList()).toEqual([{ tool: "run_command", key: '["ndx","status","."]' }]);
+    expect(await isPending(broker.request("s1", "run_command", { argv: ["git", "clean", "-fdx"] }))).toBe(true);
+    expect(await broker.request("s2", "run_command", { argv: ["ndx", "status", "."] }))
+      .toEqual({ approved: true, decidedBy: "allow-list" });
+  });
+
+  it("refuses to remember a command off the read-only list", async () => {
+    const call = broker.request("s1", "run_command", { argv: ["ndx", "self-heal", "."] });
+    expect(() => broker.decide("s1", raised[0].id, { approve: true, remember: true })).toThrow(BrokerDecisionError);
+    expect(broker.allowList()).toEqual([]);
+    expect(await isPending(call)).toBe(true);
   });
 
   it("decides cards in order", async () => {
