@@ -1,5 +1,8 @@
 schema: "rex/v2"
 items:
+  "1240c8fa-201e-4663-9f91-384aadd9402f":
+    lastModified: "2026-11-04T19:10:01.086Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "255ac873-9d63-4e5f-988a-9955cf807a00":
     status: "completed"
     startedAt: "2026-11-02T23:35:12.119Z"
@@ -31,6 +34,9 @@ items:
   "314d8fa3-ea8c-4950-8a02-bd836a646b39":
     lastModified: "2026-11-03T00:02:34.404Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "4704cdf5-d927-44d5-aea8-0147a5bce9f1":
+    lastModified: "2026-11-04T19:10:30.450Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "702e743b-b4b4-4956-b7c3-9672a024963f":
     status: "completed"
     startedAt: "2026-11-03T01:37:44.731Z"
@@ -43,7 +49,7 @@ items:
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "73f42fbb-cc9b-4c44-8798-06959e234fe2":
     issues: ["https://www.notion.so/3f7a80b7192481b59c3ed5aa3573b938","https://www.notion.so/3f7a80b7192481298930ed402a873f0b","https://www.notion.so/3f7a80b719248188879ff674aea13f31"]
-    lastModified: "2026-11-03T22:05:30.695Z"
+    lastModified: "2026-11-04T19:10:30.450Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "771fdf69-d81a-483e-8108-7d1c1be810cb":
     status: "completed"
@@ -64,6 +70,9 @@ items:
     resolutionType: "code-change"
     resolutionDetail: "routes-sidecar-hub.test.ts: fake Claude honours a HANG prompt; new test lists tools over the hub mcp route and asserts exactly the four hub tools. Verified it fails with brokerScope removed."
     lastModified: "2026-11-03T01:37:39.192Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "8981254d-f128-4a04-9b3a-fc06ca075754":
+    lastModified: "2026-11-04T19:09:20.459Z"
     lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
   "9c32dda8-0714-4aca-ae95-2bdbf601ebb1":
     status: "completed"
