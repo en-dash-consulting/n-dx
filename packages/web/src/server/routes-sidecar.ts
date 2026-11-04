@@ -81,7 +81,8 @@ import type { ServerContext } from "./types.js";
 import type { WebSocketBroadcaster } from "./websocket.js";
 import { errorMessage, errorResponse, jsonResponse, readBody } from "./response-utils.js";
 import { SIDECAR_BROKER_KEY_HEADER, sidecarBrokerCredential } from "./sidecar/broker-credential.js";
-import { handleBrokerMcpRequest } from "./sidecar/broker-mcp.js";
+import { handleBrokerMcpRequest, type BrokerConnections } from "./sidecar/broker-mcp.js";
+import { ConnectionService } from "./connections/connection-service.js";
 import type { BrokerScope } from "./sidecar/broker-policy.js";
 import { createHubActions } from "./sidecar/hub-actions.js";
 import { isBrokerTool } from "./sidecar/broker-policy.js";
@@ -278,6 +279,12 @@ export interface SidecarRouteOptions {
   brokerFor?: (projectDir: string) => SidecarBroker;
   /** What an approved broker call does. Defaults to {@link sidecarActions}. */
   actionsFor?: (ctx: ServerContext) => SidecarActions;
+  /**
+   * The servers the operator connected, whose tools a worktree session's
+   * broker re-exposes. Defaults to one {@link ConnectionService} per
+   * directory over its `.n-dx.local.json`, kept for the server's life.
+   */
+  connectionsFor?: (projectDir: string) => BrokerConnections;
   /** The hub-scope session's seams. */
   hub?: HubSidecarRouteOptions;
 }
@@ -528,6 +535,21 @@ export function hubTurnSpendRecorder(ctx: ServerContext, homeDir?: string): NonN
 
 const registries = new Map<string, SidecarSessionRegistry>();
 const brokers = new Map<string, SidecarBroker>();
+const connectionServices = new Map<string, ConnectionService>();
+
+/**
+ * The workspace's connections, read from its `.n-dx.local.json` on first use
+ * and kept for the server's life: a connection added later needs a restart
+ * until the Settings page manages them.
+ */
+function defaultConnectionsFor(projectDir: string): ConnectionService {
+  let service = connectionServices.get(projectDir);
+  if (!service) {
+    service = new ConnectionService({ projectDir });
+    connectionServices.set(projectDir, service);
+  }
+  return service;
+}
 
 function defaultRegistryFor(ctx: ServerContext, workspaces: SidecarWorkspaces | undefined): SidecarSessionRegistry {
   let registry = registries.get(ctx.projectDir);
@@ -1272,6 +1294,7 @@ export async function handleSidecarRoute(
     broker,
     broadcast,
     actions: () => (opts.actionsFor ? opts.actionsFor(ctx) : sidecarActions(ctx, broadcast, { workspaces: opts.workspaces })),
+    connections: () => (opts.connectionsFor ? opts.connectionsFor(ctx.projectDir) : defaultConnectionsFor(ctx.projectDir)),
     create: (body) => createWorktreeSession(registry, ctx.projectDir, body),
     readPlacementEdit: (placement, edits, reviewed) => readPlacementEdit(ctx.rexDir, placement, edits, reviewed),
   });
@@ -1349,6 +1372,8 @@ interface SessionRouteScope {
   actions: () => SidecarActions;
   /** Which tools the session's broker offers; a worktree's by default. */
   brokerScope?: BrokerScope;
+  /** The connections whose tools the broker re-exposes; absent where none are offered (the hub). */
+  connections?: () => BrokerConnections;
   create: (body: Record<string, unknown>) => CreateAnswer;
   /** The one lens this scope's sessions run; a PATCH to another, or to a target, is refused. */
   lens?: string;
@@ -1544,7 +1569,7 @@ async function handleSessionRoutes(
       if (session.endedAt || !registry.isRunning(id)) {
         return refuse(res, 409, `Sidecar session ${id} has no running turn`);
       }
-      await handleBrokerMcpRequest(req, res, broker, id, scope.actions(), scope.brokerScope);
+      await handleBrokerMcpRequest(req, res, broker, id, scope.actions(), scope.brokerScope, scope.connections?.());
       return true;
   }
   return false;

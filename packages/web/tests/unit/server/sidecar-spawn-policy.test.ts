@@ -7,7 +7,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -156,6 +156,46 @@ describe("hub-scope Claude spawn", () => {
   it("refuses to open a hub session on Codex, naming that its sandbox can still read repositories", () => {
     const connect = sidecarSessionConnect(join(root, "hub", "sidecar"), undefined, root);
     expect(() => connect(hubRecord("codex"))).toThrow(/read-only sandbox can still read repositories/);
+  });
+});
+
+describe("with an operator's connections declared", () => {
+  /** A project whose .n-dx.local.json declares an http and a stdio connection. */
+  function declareConnections(): void {
+    writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({
+      connections: {
+        docs: { transport: "http", url: "http://127.0.0.1:9/docs-mcp", auth: "none" },
+        local: { transport: "stdio", command: "local-mcp-server", args: [] },
+      },
+    }));
+  }
+  const brokerEndpoint = (id: string) => ({
+    url: `http://127.0.0.1:3117/api/sidecar/sessions/${id}/mcp`,
+    headers: { "x-ndx-sidecar-key": "key" },
+  });
+
+  it("Claude's MCP config still names only the ndx-sidecar broker", async () => {
+    declareConnections();
+    const dir = join(root, ".hench", "sidecar");
+    const session = startVendorSession({ ...sidecarSessionConnect(dir, brokerEndpoint)(record("claude")), vendor: "claude", cwd: root, spawn: recordingSpawn });
+    await session.sendTurn("one");
+    const config = readFileSync(join(dir, "sess-1.mcp.json"), "utf-8");
+    expect(Object.keys(JSON.parse(config).mcpServers)).toEqual(["ndx-sidecar"]);
+    expect(flagValue(spawned[0].args, "--allowed-tools")).toBe("mcp__ndx-sidecar");
+    for (const text of [config, spawned[0].args.join(" ")]) {
+      expect(text).not.toContain("docs-mcp");
+      expect(text).not.toContain("local-mcp-server");
+    }
+  });
+
+  it("Codex's spawn names no connection: no MCP server override and neither server's address", async () => {
+    declareConnections();
+    const session = startVendorSession({ ...sidecarSessionConnect(join(root, "sidecar"), brokerEndpoint)(record("codex")), vendor: "codex", cwd: root, spawn: recordingSpawn });
+    await session.sendTurn("one");
+    const { args } = spawned[0];
+    expect(args.filter((a) => a.startsWith("mcp_servers.") && !a.startsWith("mcp_servers.ndx-sidecar"))).toEqual([]);
+    expect(args.join(" ")).not.toContain("docs-mcp");
+    expect(args.join(" ")).not.toContain("local-mcp-server");
   });
 });
 

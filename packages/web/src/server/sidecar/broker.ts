@@ -26,7 +26,7 @@ import {
   BROKER_TOOL_POLICY,
   isBrokerTool,
   type AllowListRule,
-  type BrokerToolName,
+  type BrokerCardTool,
   type SidecarCardKind,
 } from "./broker-policy.js";
 import type { QueuePlan, SidecarChangeSet, SidecarPlacement } from "../../shared/index.js";
@@ -40,7 +40,7 @@ export type SidecarCardStatus = "pending" | "approved" | "denied" | "withdrawn";
 export interface SidecarCard {
   id: string;
   sessionId: string;
-  tool: BrokerToolName;
+  tool: BrokerCardTool;
   kind: SidecarCardKind;
   input: Record<string, unknown>;
   /** The rule "always allow" would add; `null` when the call can never be allow-listed. */
@@ -177,7 +177,7 @@ export class SidecarBroker {
    */
   request(
     sessionId: string,
-    tool: BrokerToolName,
+    tool: BrokerCardTool,
     input: Record<string, unknown>,
     signal?: AbortSignal,
     annex: CardAnnex = {},
@@ -378,14 +378,14 @@ export class SidecarBroker {
    * editor. Refused for a call that can never be allow-listed (work, reset,
    * push, writes); returns the rule, which is already on the list if it was.
    */
-  allow(tool: BrokerToolName, input: Record<string, unknown>): AllowListRule {
+  allow(tool: BrokerCardTool, input: Record<string, unknown>): AllowListRule {
     const rule = this.checkAllow(tool, input);
     this.addRule(rule);
     return rule;
   }
 
   /** The rule {@link allow} would add, or the same refusal; writes nothing. */
-  checkAllow(tool: BrokerToolName, input: Record<string, unknown>): AllowListRule {
+  checkAllow(tool: BrokerCardTool, input: Record<string, unknown>): AllowListRule {
     const key = allowListKey(tool, input);
     if (key === null) throw new BrokerDecisionError(409, `A ${tool} call like this can never be allow-listed`);
     return { tool, key };

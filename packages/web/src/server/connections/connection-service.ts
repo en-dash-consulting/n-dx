@@ -111,6 +111,8 @@ interface Live {
 interface Slot {
   config: ConnectionConfig;
   live?: Live;
+  /** The tools last listed while connected, kept while the connection is unavailable. */
+  known?: ConnectionTool[];
   connecting?: Promise<Live | undefined>;
   status: ConnectionState;
 }
@@ -123,6 +125,17 @@ function definedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
 function isConnectionFailure(err: unknown): boolean {
   if (err instanceof McpError) return err.code === ErrorCode.ConnectionClosed || err.code === ErrorCode.RequestTimeout;
   return !(err instanceof Error && err.name === "AbortError");
+}
+
+/** Why a connection failed: a 401 means sign in (again), anything else unavailable. */
+function failureStatus(config: ConnectionConfig, err: unknown): Exclude<ConnectionState, { state: "connected" }> {
+  if (err instanceof StreamableHTTPError && err.code === 401) {
+    return {
+      state: "needs-sign-in",
+      reason: config.auth === "none" ? "the server requires sign-in; set auth to \"token\" or \"oauth\"" : "the server refused the stored token",
+    };
+  }
+  return { state: "unavailable", reason: errorMessage(err) };
 }
 
 export class ConnectionService {
@@ -155,16 +168,47 @@ export class ConnectionService {
     }));
   }
 
-  /** Every reachable connection's tools; an unavailable connection contributes none. */
+  /** Whether any connection is declared. */
+  hasConnections(): boolean {
+    return this.slots.size > 0;
+  }
+
+  /**
+   * Every connection's tools, connecting any that is not live. A connection
+   * that went unavailable keeps the tools it last listed, so a session's tool
+   * list does not shift under it and a call reads why it cannot run; one that
+   * was never reached contributes none.
+   */
   async listTools(): Promise<ConnectionTool[]> {
-    const lives = await Promise.all([...this.slots.values()].map((slot) => this.ensure(slot)));
-    return lives.flatMap((live) => live?.tools ?? []);
+    const slots = [...this.slots.values()];
+    await Promise.all(slots.map((slot) => this.ensure(slot)));
+    return slots.flatMap((slot) => slot.live?.tools ?? slot.known ?? []);
+  }
+
+  /**
+   * Whether `connection` answers now: connects it if it is not live, else
+   * pings it, so a server that went away since the last call reads
+   * unavailable before anything is asked of the operator.
+   */
+  async check(connection: string, signal?: AbortSignal): Promise<ConnectionState> {
+    const slot = this.slots.get(connection);
+    if (!slot) return { state: "unavailable", reason: `no connection named ${connection}` };
+    const live = await this.ensure(slot);
+    if (!live) return slot.status;
+    try {
+      await live.client.ping({ signal, timeout: this.connectTimeoutMs });
+    } catch (err) {
+      if (!isConnectionFailure(err)) throw err;
+      this.fail(slot, live, err);
+    }
+    return slot.status;
   }
 
   /**
    * Call `tool` on `connection`. Throws {@link ConnectionUnavailableError} when
    * the connection cannot be reached; a failure mid-call marks it unavailable
-   * so the next call reconnects. A tool's own error is its result's `isError`.
+   * (needs-sign-in for a refused token) so the next call reconnects. A tool's
+   * own error is its result's `isError`.
    */
   async callTool(
     connection: string,
@@ -183,7 +227,7 @@ export class ConnectionService {
       })) as CallToolResult;
     } catch (err) {
       if (isConnectionFailure(err)) {
-        this.fail(slot, live, errorMessage(err));
+        this.fail(slot, live, err);
         throw new ConnectionUnavailableError(connection, slot.status as Exclude<ConnectionState, { state: "connected" }>);
       }
       throw err;
@@ -253,6 +297,7 @@ export class ConnectionService {
       client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
         try {
           live.tools = await this.readTools(config.id, client);
+          if (slot.live === live) slot.known = live.tools;
         } catch (err) {
           this.fail(slot, live, errorMessage(err));
         }
@@ -262,25 +307,21 @@ export class ConnectionService {
         return undefined;
       }
       slot.live = live;
+      slot.known = live.tools;
       slot.status = { state: "connected" };
       return live;
     } catch (err) {
       await client.close().catch(() => undefined);
-      slot.status =
-        err instanceof StreamableHTTPError && err.code === 401
-          ? {
-              state: "needs-sign-in",
-              reason: config.auth === "none" ? "the server requires sign-in; set auth to \"token\" or \"oauth\"" : "the server refused the stored token",
-            }
-          : { state: "unavailable", reason: errorMessage(err) };
+      slot.status = failureStatus(config, err);
       return undefined;
     }
   }
 
-  private fail(slot: Slot, live: Live, reason: string): void {
+  /** Drop a live client that failed; `failure` is the error or a reason. A refused token reads needs-sign-in. */
+  private fail(slot: Slot, live: Live, failure: unknown): void {
     if (slot.live !== live) return;
     slot.live = undefined;
-    slot.status = { state: "unavailable", reason };
+    slot.status = typeof failure === "string" ? { state: "unavailable", reason: failure } : failureStatus(slot.config, failure);
     live.client.onclose = undefined;
     void live.client.close().catch(() => undefined);
   }

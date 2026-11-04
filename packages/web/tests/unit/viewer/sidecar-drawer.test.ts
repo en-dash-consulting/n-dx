@@ -1154,6 +1154,11 @@ describe("permission cards", () => {
     "draft-post": { tool: "draft_github_post", input: { kind: "comment", target: "#901", body: "hi" }, title: "comment · #901" },
     "draft-file": { tool: "save_draft", input: { kind: "prompt", path: "/h/p.md", content: "go" }, title: "prompt · /h/p.md" },
     "migration-decision": { tool: "migration_decision", input: { entries: [{ id: "x" }] }, title: "1 decision" },
+    "external-call": {
+      tool: "external_call",
+      input: { connection: "docs", tool: "docs.update_item", class: "write", arguments: { id: "7", title: "t" } },
+      title: "docs.update_item · write",
+    },
   };
   it("titles a work card from the run options the server attached, not the call's own", async () => {
     const titleOf = async (input: Record<string, unknown>, runOptions: Record<string, unknown>): Promise<string> => {

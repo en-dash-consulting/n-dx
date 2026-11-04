@@ -7,15 +7,30 @@
  * transport is stateless (a server per request, JSON responses): a tool call
  * is one POST whose response waits until the card settles, and closing that
  * request (the CLI was stopped) withdraws the card.
+ *
+ * A worktree session also gets the tools of the servers the operator connected
+ * (`../connections/`), under their wire names: a run-policy call goes straight
+ * through, an ask-policy call waits on an external-call card. That is the only
+ * way an external server reaches either vendor's session; see
+ * docs/architecture/sidecar-connections.md.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import {
+  ConnectionUnavailableError,
+  parseConnectionWireName,
+  type ConnectionService,
+  type ConnectionState,
+  type ConnectionTool,
+} from "../connections/connection-service.js";
+import { readBody } from "../response-utils.js";
+import {
   BROKER_SCOPE_TOOLS,
+  EXTERNAL_CALL_TOOL,
   GITHUB_READS_SETTING,
   HUB_COMMAND_ARGV,
   hubCommandRefusal,
@@ -204,16 +219,105 @@ function text(message: string, isError = false): CallToolResult {
   return { content: [{ type: "text", text: message }], ...(isError && { isError: true }) };
 }
 
+/** The connection gateway as the broker uses it. */
+export type BrokerConnections = Pick<ConnectionService, "hasConnections" | "listTools" | "check" | "callTool">;
+
+/** The external tools one broker server re-exposes, and the gateway that carries out their calls. */
+export interface BrokerExternalTools {
+  tools: readonly ConnectionTool[];
+  connections: BrokerConnections;
+}
+
+/**
+ * An input schema the broker accepts any object under, whose tools/list JSON
+ * Schema is the external server's own: validation stays with that server. An
+ * `id` key is left out because zod reads it as a definition id, not schema.
+ */
+function externalInputSchema(schema: Tool["inputSchema"]): z.ZodType<Record<string, unknown>> {
+  const json = Object.fromEntries(Object.entries(schema).filter(([key]) => key !== "id"));
+  return z.looseObject({}).meta(json);
+}
+
+/** Why a connection that is not connected cannot carry out a call; the session reads it and keeps working. */
+function unavailableText(tool: ConnectionTool, status: Exclude<ConnectionState, { state: "connected" }>): CallToolResult {
+  return text(
+    status.state === "needs-sign-in"
+      ? `sign in again: connection ${tool.connection} needs sign-in (${status.reason}). ${tool.displayName} did not run.`
+      : `connection unavailable: ${status.reason}. ${tool.displayName} did not run.`,
+    true,
+  );
+}
+
+/** Register a worktree session's external tools: every tool whose policy is not `never`, under its wire name. */
+function registerExternalTools(
+  server: McpServer,
+  broker: SidecarBroker,
+  sessionId: string,
+  external: BrokerExternalTools,
+): void {
+  const { connections } = external;
+  for (const tool of external.tools) {
+    if (tool.policy.policy === "never") continue;
+    server.registerTool(
+      tool.wireName,
+      {
+        description: tool.description ? `${tool.displayName}: ${tool.description}` : tool.displayName,
+        inputSchema: externalInputSchema(tool.inputSchema),
+        ...(tool.annotations && { annotations: tool.annotations }),
+      },
+      async (args, extra) => {
+        const input = args as Record<string, unknown>;
+        let cardId: string | undefined;
+        if (tool.policy.policy === "ask") {
+          // A connection that cannot carry the call out raises no card for the operator to approve in vain.
+          const status = await connections.check(tool.connection, extra.signal);
+          if (status.state !== "connected") return unavailableText(tool, status);
+          const outcome = await broker.request(sessionId, EXTERNAL_CALL_TOOL, {
+            connection: tool.connection,
+            tool: tool.displayName,
+            class: tool.policy.class,
+            arguments: input,
+          }, extra.signal);
+          if (outcome.decidedBy === "allow-list") throw new Error("An external call is never allow-listed");
+          const { card } = outcome;
+          const note = card.reason ? ` Operator's note: ${card.reason}` : "";
+          if (outcome.decidedBy === "withdrawn") {
+            return text(`Card ${card.id} was withdrawn: ${card.reason ?? "the turn stopped"}. ${tool.displayName} did not run.`, true);
+          }
+          if (!outcome.approved) return text(`The operator denied card ${card.id}. ${tool.displayName} did not run.${note}`, true);
+          cardId = card.id;
+        }
+        // A stopped turn ends the wait on the external server, as it does a command's.
+        const carrying = broker.carryOutSignal(sessionId, extra.signal);
+        try {
+          // The server's own result, isError included, goes back unchanged.
+          const result = await connections.callTool(tool.connection, tool.tool, input, carrying.signal);
+          if (cardId) broker.recordCarriedOut(sessionId, cardId, { ok: !result.isError });
+          return result;
+        } catch (err) {
+          if (!(err instanceof ConnectionUnavailableError)) throw err;
+          if (cardId) broker.recordCarriedOut(sessionId, cardId, { ok: false });
+          return unavailableText(tool, err.status);
+        } finally {
+          carrying.release();
+        }
+      },
+    );
+  }
+}
+
 /**
  * The broker MCP server for one Sidecar session. `actions` carries out an
  * approved call (see `carry-out.ts`); without it an approved call that has
- * an effect reports that nothing ran.
+ * an effect reports that nothing ran. `external` are the connections' tools a
+ * worktree session is offered; a hub session is offered none.
  */
 export function createBrokerMcpServer(
   broker: SidecarBroker,
   sessionId: string,
   actions?: SidecarActions,
   scope: BrokerScope = "worktree",
+  external?: BrokerExternalTools,
 ): McpServer {
   const server = new McpServer({ name: SIDECAR_BROKER_NAME, version: BROKER_VERSION });
 
@@ -302,10 +406,28 @@ export function createBrokerMcpServer(
     },
   );
 
+  // After the broker's own tools; a wire name holds "__", which none of theirs does.
+  if (external && scope === "worktree") registerExternalTools(server, broker, sessionId, external);
+
   return server;
 }
 
-/** Serve one broker MCP request for `sessionId`. */
+/** Whether a JSON-RPC body lists tools or calls an external one: only then are the connections read. */
+function needsExternalTools(body: unknown): boolean {
+  return (Array.isArray(body) ? body : [body]).some((message) => {
+    if (!message || typeof message !== "object") return false;
+    const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
+    if (method === "tools/list") return true;
+    return method === "tools/call" && typeof params?.name === "string" && parseConnectionWireName(params.name) !== undefined;
+  });
+}
+
+/**
+ * Serve one broker MCP request for `sessionId`. With `connections` declared,
+ * a worktree session's tools/list and external calls read their tools first;
+ * every other request is served without touching a connection, so a slow or
+ * missing server never holds up the broker's own tools.
+ */
 export async function handleBrokerMcpRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -313,13 +435,34 @@ export async function handleBrokerMcpRequest(
   sessionId: string,
   actions?: SidecarActions,
   scope: BrokerScope = "worktree",
+  connections?: BrokerConnections,
 ): Promise<void> {
-  const server = createBrokerMcpServer(broker, sessionId, actions, scope);
+  let parsedBody: unknown;
+  let external: BrokerExternalTools | undefined;
+  if (scope === "worktree" && connections?.hasConnections() && req.method === "POST") {
+    // Read here to see what the request asks; the transport is handed the body. readBody has
+    // answered 413 to a body over the cap; any other failure is a broken request stream.
+    let raw: string;
+    try {
+      raw = await readBody(req, res);
+    } catch {
+      if (!res.writableEnded) res.destroy();
+      return;
+    }
+    try {
+      parsedBody = JSON.parse(raw);
+    } catch {
+      // Not JSON: the transport answers its own parse error for it.
+      parsedBody = raw;
+    }
+    if (needsExternalTools(parsedBody)) external = { tools: await connections.listTools(), connections };
+  }
+  const server = createBrokerMcpServer(broker, sessionId, actions, scope, external);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on("close", () => {
     void transport.close();
     void server.close();
   });
   await server.connect(transport);
-  await transport.handleRequest(req, res);
+  await transport.handleRequest(req, res, parsedBody);
 }

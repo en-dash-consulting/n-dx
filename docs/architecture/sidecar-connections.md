@@ -50,6 +50,42 @@ service's tool list reports both with their source (`annotation`, `default` or
   the defaults. An unknown class or policy, or a tool the server does not list,
   is ignored with a warning naming it; a valid half of an entry still applies.
 
+## Through the broker
+
+`createBrokerMcpServer` (`src/server/sidecar/broker-mcp.ts`) gives a
+**worktree** session every external tool whose policy is not `never`, under its
+wire name, after the broker's own tools. A hub session gets none.
+
+- **Listing.** The description is the server's, prefixed `<id>.<tool>: `. The
+  input schema is the server's JSON Schema, passed through (the broker accepts
+  any object; validation stays with the server). A connection that went
+  unavailable keeps its last-listed tools, so the session's list does not shift
+  and a call reads why it cannot run.
+- **run** calls the server at once and returns its result unchanged, `isError`
+  included. **ask** first checks the connection is up (a ping), then raises an
+  `external-call` card showing the connection, the tool's display name, its
+  class and the arguments; the server is called only on Approve. Deny or a
+  withdrawn card calls nothing. External calls are never allow-listable: the
+  broker cannot know what another server's write does.
+- **Unavailable.** A call to a connection that is down returns `isError` text
+  `connection unavailable: <reason>`, or `sign in again: …` when the server
+  refuses the token, with no card. The broker's own tools keep answering.
+- **Only when asked.** The broker is stateless, one server per request. With
+  connections declared, it reads the request body first and touches the
+  connections only for `tools/list` or a call to an external tool, so a slow
+  server never holds up the broker's own tools. Without connections the
+  request path is as before.
+- **One per project.** The routes keep one `ConnectionService` per project for
+  the server's life; a connection added to `.n-dx.local.json` takes effect on
+  restart until the Settings page manages connections.
+- **Vendors.** The broker is the only MCP server a Sidecar spawn names, so an
+  external server never reaches a vendor's own MCP config. The external tools
+  are part of the broker's MCP surface, which a client reaches over Streamable
+  HTTP with the session's URL and headers; the integration test drives it with
+  the SDK client. Claude's spawn is given that endpoint (`--mcp-config`).
+  Codex's spawn does not name the broker yet, so a Codex session has neither
+  the broker's tools nor the external ones until it does.
+
 ## Decisions
 
 - **Only the user's own config declares a connection.** A connection names a

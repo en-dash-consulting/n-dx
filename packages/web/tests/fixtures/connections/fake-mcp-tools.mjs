@@ -17,7 +17,11 @@ export function createFakeMcpServer(name = "fake-connection") {
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async ({ id }) => ({ content: [{ type: "text", text: `item ${id}` }] }),
+    // "missing" answers the server's own tool error, which a caller must pass back unchanged.
+    async ({ id }) =>
+      id === "missing"
+        ? { content: [{ type: "text", text: "no item missing" }], isError: true }
+        : { content: [{ type: "text", text: `item ${id}` }] },
   );
   server.registerTool(
     "delete_item",

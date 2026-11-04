@@ -106,7 +106,8 @@ export type SidecarCardKind =
   | "network-read"
   | "draft-post"
   | "draft-file"
-  | "migration-decision";
+  | "migration-decision"
+  | "external-call";
 
 /** A capability criterion in a placement; mirrors `SidecarCriterion` in shared/sidecar-card.ts. */
 export interface PlacementCriterion { id: string; text: string }

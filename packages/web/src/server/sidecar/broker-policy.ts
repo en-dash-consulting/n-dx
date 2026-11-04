@@ -32,6 +32,16 @@ export const BROKER_TOOL_NAMES = [
 
 export type BrokerToolName = (typeof BROKER_TOOL_NAMES)[number];
 
+/**
+ * What a card records as its tool when an external tool (a connection's,
+ * re-exposed under its wire name) asks: the card's input names the connection
+ * and tool. Not a tool the broker offers by this name.
+ */
+export const EXTERNAL_CALL_TOOL = "external_call";
+
+/** Every tool a card can record: the broker's own, or an external call. */
+export type BrokerCardTool = BrokerToolName | typeof EXTERNAL_CALL_TOOL;
+
 /** The card a tool raises; `null` for a session-local tool that raises none. */
 export type SidecarCardKind =
   | "command"
@@ -43,7 +53,8 @@ export type SidecarCardKind =
   | "network-read"
   | "draft-post"
   | "draft-file"
-  | "migration-decision";
+  | "migration-decision"
+  | "external-call";
 
 /**
  * How a tool may be allow-listed:
@@ -63,7 +74,7 @@ export interface BrokerToolPolicy {
   allowList: AllowListability;
 }
 
-export const BROKER_TOOL_POLICY: Readonly<Record<BrokerToolName, BrokerToolPolicy>> = {
+export const BROKER_TOOL_POLICY: Readonly<Record<BrokerCardTool, BrokerToolPolicy>> = {
   run_command: { card: "command", allowList: "per-call" },
   start_work: { card: "work", allowList: "never" },
   propose_prd_change: { card: "change-set", allowList: "never" },
@@ -77,6 +88,8 @@ export const BROKER_TOOL_POLICY: Readonly<Record<BrokerToolName, BrokerToolPolic
   // A file the operator reads and may re-path on its card; nothing is written before Approve.
   save_draft: { card: "draft-file", allowList: "never" },
   ledger_append: { card: null, allowList: "never" },
+  // Another server's write: the broker cannot know what it does, so it is decided card by card.
+  [EXTERNAL_CALL_TOOL]: { card: "external-call", allowList: "never" },
 };
 
 /** Where a session runs: a worktree's own, or the machine's hub session. */
@@ -114,7 +127,7 @@ export function hubCommandRefusal(argv: readonly string[]): string | null {
 
 /** One Sidecar allow-list rule. */
 export interface AllowListRule {
-  tool: BrokerToolName;
+  tool: BrokerCardTool;
   /** Which calls the rule covers; see {@link allowListKey}. */
   key: string;
 }
@@ -153,7 +166,7 @@ function commandAllowListable(argv: readonly string[]): boolean {
  * nowhere else; a command outside {@link HUB_COMMAND_ARGV} has none. A
  * `per-project` tool has none: its project setting is its allowance.
  */
-export function allowListKey(tool: BrokerToolName, input: Readonly<Record<string, unknown>>): string | null {
+export function allowListKey(tool: BrokerCardTool, input: Readonly<Record<string, unknown>>): string | null {
   switch (BROKER_TOOL_POLICY[tool].allowList) {
     case "never":
     case "per-project":

@@ -52,6 +52,7 @@ export const SIDECAR_CARD_KIND_LABELS: Readonly<Record<SidecarCardKind, string>>
   "draft-post": "Draft post",
   "draft-file": "Draft file",
   "migration-decision": "Migration decision",
+  "external-call": "External call",
 };
 
 export type SidecarCardState = "pending" | "approved" | "denied" | "allow-listed" | "withdrawn";
@@ -101,6 +102,8 @@ export function sidecarCardTitle(card: SidecarCard, cliName: string): string {
       case "draft-post": return [str(input.project), str(input.kind), str(input.target)].filter(Boolean).join(" · ");
       case "draft-file": return [str(input.kind), str(input.path)].filter(Boolean).join(" · ");
       case "migration-decision": return count(input.entries, "decision", "decisions");
+      // The tool's display name (`<connection>.<tool>`) and its class; the input shows the arguments.
+      case "external-call": return [str(input.tool), str(input.class)].filter(Boolean).join(" · ");
     }
   })();
   return title || card.tool;
