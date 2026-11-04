@@ -18,6 +18,7 @@ import type {
   RunVerdictClass,
 } from "../../schema/index.js";
 import type { RunEvent } from "../../store/run-events.js";
+import { classifyVendorError } from "../../prd/llm-gateway.js";
 import { classifyUnresolved, type ReviewReport } from "./adversarial-review.js";
 
 /** How many attempts a task gets before the verdict stops recommending a re-run. */
@@ -69,7 +70,7 @@ const DIRTY_TREE_REFUSAL = /Refusing to mark this task completed: .*uncommitted/
 const OVERSIZED = /Brief too large for configured context window/;
 
 /** Vendor failure categories that mean "the vendor, not the task". */
-const VENDOR_CATEGORIES = new Set(["auth", "rate_limit"]);
+const VENDOR_CATEGORIES = new Set(["auth", "rate_limit", "transient_exhausted"]);
 
 /**
  * File-like tokens in a failure digest: a path ending in a source extension.
@@ -127,8 +128,20 @@ function isTestFile(path: string): boolean {
   return /\.(?:test|spec)\.[^/]+$/.test(path) || /(?:^|\/)(?:tests?|__tests__)\//.test(path);
 }
 
+/**
+ * Vendor categories from the event pipeline's failure events and from
+ * `run.error`. The events are filled only with `hench.useEventPipeline` on, so
+ * `run.error` is the signal a default-config run carries.
+ */
 function vendorFailureCategories(run: RunRecord): string[] {
-  return [...new Set((run.events ?? []).map((e) => e.failure?.category).filter((c): c is string => !!c && VENDOR_CATEGORIES.has(c)))];
+  const categories = (run.events ?? []).map((e) => e.failure?.category);
+  if (run.error) categories.push(classifyVendorError(run.error));
+  return [...new Set(categories.filter((c): c is string => !!c && VENDOR_CATEGORIES.has(c)))];
+}
+
+/** Tool calls the agent made: the recorded calls, or the summary's count. */
+function toolCallCount(run: RunRecord): number {
+  return Math.max(run.toolCalls?.length ?? 0, run.structuredSummary?.counts.toolCallsTotal ?? 0);
 }
 
 function list(paths: readonly string[], max = 3): string {
@@ -184,9 +197,14 @@ const uncommittedRefusal: Rule = ({ run }) => {
   };
 };
 
+/**
+ * The vendor, not the task. An auth failure does not pass with time: its
+ * action is to log the vendor CLI back in, not to wait.
+ */
 const vendorTransient: Rule = ({ run }) => {
   const categories = vendorFailureCategories(run);
   if (run.status !== "error_transient" && categories.length === 0) return null;
+  const auth = categories.includes("auth");
   return {
     class: "vendor-transient",
     summary: categories.length > 0
@@ -197,7 +215,9 @@ const vendorTransient: Rule = ({ run }) => {
       ...categories.map((c) => `failure category: ${c}`),
       ...(run.error ? [`error: ${run.error.split("\n")[0]}`] : []),
     ],
-    actions: [{ kind: "retry-later", label: "Retry later, once the vendor recovers" }],
+    actions: auth
+      ? [{ kind: "re-authenticate", label: "Re-authenticate the vendor CLI, then re-run the task" }]
+      : [{ kind: "retry-later", label: "Retry later, once the vendor recovers" }],
   };
 };
 
@@ -300,10 +320,11 @@ const completionHeld: Rule = ({ run }) => {
 };
 
 const noChanges: Rule = ({ run, rexDir }, changed) => {
-  // A record written before `commits` existed says nothing about them, and a
-  // run the operator cancelled made no commits because it was stopped — not
-  // because the task was too vague to act on.
-  if (!run.commits || run.status === "cancelled") return null;
+  // A record written before `commits` existed says nothing about them; a run
+  // the operator cancelled made no commits because it was stopped; and an
+  // agent that made no tool call died before it acted (a vendor or CLI error
+  // on turn 1). None of them failed because the task was too vague.
+  if (!run.commits || run.status === "cancelled" || toolCallCount(run) === 0) return null;
   const isPrd = (p: string): boolean => isUnder(normalizePath(p, run.worktreeRoot), rexDir);
   const commits = run.commits;
   const leftBehind = (run.uncommittedPaths ?? []).filter((p) => !isPrd(p));

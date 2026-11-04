@@ -2162,6 +2162,7 @@ export type RunVerdictActionKind =
   | "split-task"
   | "raise-tier"
   | "retry-later"
+  | "re-authenticate"
   | "tighten-done-when";
 
 /** One ranked next action. */

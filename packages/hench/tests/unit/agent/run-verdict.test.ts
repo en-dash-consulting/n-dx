@@ -30,7 +30,7 @@ function run(over: Partial<RunRecord> = {}): RunRecord {
     status: "failed",
     turns: 4,
     tokenUsage: { input: 10, output: 10 },
-    toolCalls: [],
+    toolCalls: [{ turn: 1, tool: "read_file", input: {}, output: "", durationMs: 1 }],
     model: "sonnet",
     worktreeRoot: ROOT,
     commits: [{ sha: "a".repeat(40), subject: "feat: work" }],
@@ -278,6 +278,39 @@ describe("classifyRun — one fixture per class", () => {
       const r = run({ events: [{ type: "failure", vendor: "claude", turn: 1, timestamp: "t", failure: { category, message: "x" } }] });
       expect(classify(r).class).toBe("vendor-transient");
     }
+  });
+
+  it("vendor-transient: with the event pipeline off, run.error that maps to rate_limit or transient_exhausted", () => {
+    for (const error of ["HTTP 429 Too Many Requests", "API Error: 529 Overloaded", "You've hit your session limit · resets 3pm"]) {
+      const d = classify(run({ error, events: undefined }));
+      expect(d.class).toBe("vendor-transient");
+      expect(d.actions.map((a) => a.kind)).toEqual(["retry-later"]);
+    }
+  });
+
+  it("vendor-transient: an auth failure in run.error re-authenticates rather than retrying later", () => {
+    const d = classify(run({ error: "HTTP 401 Unauthorized", events: undefined }));
+    expect(d.class).toBe("vendor-transient");
+    expect(d.evidence).toContain("failure category: auth");
+    expect(d.actions.map((a) => a.kind)).toEqual(["re-authenticate"]);
+  });
+
+  it("a turn-1 vendor failure with no tool calls and no commits is not no-changes", () => {
+    const dead = { turns: 1, toolCalls: [], commits: [] };
+    const limit = classify(run({ ...dead, error: "You've hit your session limit · resets 3pm" }));
+    expect(limit.class).toBe("vendor-transient");
+    const model = classify(run({ ...dead, error: "The model claude-x does not support this model's tools" }));
+    expect(model.class).not.toBe("no-changes");
+    expect(model.actions.map((a) => a.kind)).not.toContain("tighten-done-when");
+  });
+
+  it("no-changes needs a tool call: the summary count counts when no calls are recorded", () => {
+    const counts = { filesRead: 0, filesChanged: 0, commandsExecuted: 0, testsRun: 0 };
+    const summary = (toolCallsTotal: number) => ({
+      filesChanged: [], filesRead: [], commandsExecuted: [], testsRun: [], counts: { ...counts, toolCallsTotal },
+    });
+    expect(classify(run({ turns: 1, toolCalls: [], commits: [], structuredSummary: summary(0) })).class).toBe("unclassified");
+    expect(classify(run({ toolCalls: [], commits: [], structuredSummary: summary(3) })).class).toBe("no-changes");
   });
 
   it("no-changes: no commits", () => {

@@ -237,8 +237,8 @@ with no model call. `hench runs diagnose <run-id> [--format=json]` prints it.
 | `review-blocked` | The review left a must-fix finding unrepaired | Follow-up run with the findings |
 | `claim-lost` | `claimLost`: another worktree took the task. A `readOnlyRefusal` (the forked attempt made no edits and the task re-ran cold) is never a class; it is one evidence line on the class the rest of the record gives | Release the claim, then re-run |
 | `budget-timeout` | `budget_exceeded`, `timeout`, or a brief too large for the context window | Split the task, or raise its tier |
-| `vendor-transient` | `error_transient`, or an auth or rate-limit failure | Retry later |
-| `no-changes` | No commits, or only PRD files changed | Tighten the done-when |
+| `vendor-transient` | `error_transient`, or an auth, rate-limit (a CLI session limit included) or transient failure, read from failure events or from `run.error`, so it fires with the event pipeline off | Retry later; for auth, re-authenticate the vendor CLI and re-run |
+| `no-changes` | The agent made at least one tool call, and made no commits or changed only PRD files. A run that dies before its first tool call is not `no-changes` | Tighten the done-when |
 | `unclassified` | None of the above; never guessed | Read the run log |
 
 `attempt` counts the task's finished runs that did not complete, capped at 2. On
