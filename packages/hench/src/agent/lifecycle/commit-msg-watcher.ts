@@ -20,7 +20,7 @@
  * @module
  */
 
-import { watch as fsWatch } from "node:fs";
+import { watch as fsWatch, type FSWatcher } from "node:fs";
 import { readFileSync, existsSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execGitMutation } from "../../process/git-mutation.js";
@@ -83,8 +83,8 @@ export interface CommitMsgWatcherOptions {
  *     logs a distinct line so operators know the skip was intentional.
  * - Returns `{ cancel }` for callers to disarm when the run ends normally.
  *
- * When `timeoutMs` is 0 the watcher still runs (tracking the file) but the
- * timer is never set, making the function a no-op for the commit path.
+ * When `timeoutMs` is 0 nothing is watched or polled and the timer is never
+ * set, making the function a no-op for the commit path.
  */
 export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgWatcher {
   const { projectDir, timeoutMs, origin, trailers } = opts;
@@ -95,6 +95,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   let timerArmed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let pollTimer: ReturnType<typeof setInterval> | undefined;
+  let watcher: FSWatcher | undefined;
   let watcherClosed = false;
   let autoCommitted = false;
 
@@ -109,7 +110,7 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
     if (!watcherClosed) {
       watcherClosed = true;
       try {
-        watcher.close();
+        watcher?.close();
       } catch {
         // already closed or never opened
       }
@@ -223,15 +224,35 @@ export function startCommitMsgWatcher(opts: CommitMsgWatcherOptions): CommitMsgW
   // Watch the project directory for filesystem events. The `filename` argument
   // carries the base name on platforms that support it (Linux, macOS); on
   // others it may be null — in that case we check unconditionally.
-  const watcher = fsWatch(projectDir, (event, filename) => {
-    if (filename === PENDING_COMMIT_FILE || filename === null) {
-      checkFile();
+  //
+  // The watcher is only a fast path: the poll below detects the file on its
+  // own. So a watch that cannot start (sync throw) or fails later (an 'error'
+  // event, e.g. EMFILE when the process is out of descriptors) degrades to
+  // polling. Without the listener, Node rethrows the 'error' event as an
+  // uncaught exception and the whole run dies before the agent starts.
+  //
+  // Nothing is watched when the timer is off (`timeoutMs` 0, the default) or
+  // already armed: the watch exists only to arm the timer, so in those cases
+  // it would hold a descriptor for nothing.
+  if (timeoutMs > 0 && !timerArmed) {
+    try {
+      watcher = fsWatch(projectDir, (_event, filename) => {
+        if (filename === PENDING_COMMIT_FILE || filename === null) {
+          checkFile();
+        }
+      });
+      watcher.on("error", () => {
+        closeWatcher();
+      });
+      // Prevent the watcher from keeping the process alive after the run ends.
+      if (typeof watcher.unref === "function") {
+        watcher.unref();
+      }
+    } catch {
+      watcherClosed = true;
     }
-  });
-
-  // Prevent the watcher from keeping the process alive after the run ends.
-  if (typeof watcher.unref === "function") {
-    watcher.unref();
+  } else {
+    watcherClosed = true;
   }
 
   // Fallback poll in case fs.watch never delivers an event (see
