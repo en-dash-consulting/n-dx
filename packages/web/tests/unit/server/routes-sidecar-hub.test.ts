@@ -66,7 +66,9 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
   const stdin = new PassThrough();
   const stdout = new PassThrough();
   const out = (o: unknown): void => { stdout.write(JSON.stringify(o) + "\n"); };
-  Object.assign(child, { stdin, stdout, stderr: new PassThrough(), pid: undefined, exitCode: null, signalCode: null, kill: () => true });
+  /** What a kill does: nothing, except to a STOPPABLE turn, which it ends. */
+  let onKill = (): void => {};
+  Object.assign(child, { stdin, stdout, stderr: new PassThrough(), pid: undefined, exitCode: null, signalCode: null, kill: () => { onKill(); return true; } });
   let prompt = "";
   stdin.on("data", (chunk: Buffer) => { prompt += chunk.toString(); });
   stdin.on("end", () => {
@@ -84,8 +86,10 @@ const fakeSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args) =>
       setImmediate(() => { child.emit("exit", 0, null); child.emit("close", 0, null); });
     };
     // A HOLD turn ends when the test calls the finisher it leaves in `held`.
-    if (prompt.includes("HOLD")) held.push(finish);
-    else finish();
+    if (prompt.includes("HOLD")) {
+      held.push(finish);
+      if (prompt.includes("STOPPABLE")) onKill = () => { onKill = () => {}; finish(); };
+    } else finish();
   });
   return child as unknown as ChildProcess;
 };
@@ -310,6 +314,17 @@ describe("one hub session per machine", () => {
     expect(got.status).toBe(200);
     expect((await got.json()).session).toMatchObject({ id: session.id, turns: 1 });
     expect(readHubSessionHostLock(home)).toMatchObject({ pid: 2002, port: 5555 });
+  });
+
+  it("on shutdown, interrupts the running hub turn and releases the lock once it stops", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    expect((await hubApi(host, `/${session.id}/turns`, { method: "POST", body: { prompt: "HOLD STOPPABLE" } })).status).toBe(202);
+    await vi.waitFor(() => expect(held).toHaveLength(1));
+
+    // Nothing but the interrupt ends this turn inside the wait.
+    expect(await releaseHubSessionHostOnShutdown(4321, { homeDir: home, pid: 1001, waitMs: 2_000 })).toBe(true);
+    expect(readHubSessionHostLock(home)).toBeNull();
   });
 
   it("on shutdown, leaves the lock to dead-pid takeover when the hub turn outlasts the wait", async () => {
