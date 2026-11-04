@@ -307,7 +307,8 @@ export class ConnectionService {
       cursor = page.nextCursor;
     } while (cursor);
     const overrides = this.slots.get(connection)?.config.tools;
-    const policies = resolveToolPolicies(found, overrides, (message) => this.warnOnce(message));
+    // The connection is named so the same bad override on two connections warns for each.
+    const policies = resolveToolPolicies(found, overrides, (message) => this.warnOnce(`${message} (connection ${connection})`));
     return found.map((tool) => ({
       connection,
       tool: tool.name,

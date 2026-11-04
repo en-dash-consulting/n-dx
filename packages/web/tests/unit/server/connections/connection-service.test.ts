@@ -111,6 +111,17 @@ describe("ConnectionService", () => {
     expect(warnings.filter((w) => w.includes('"delete_item"'))).toHaveLength(1);
   });
 
+  it("warns about the same bad override once per connection, naming each", async () => {
+    const tools = { ghost: { policy: "run" } };
+    const { svc, warnings } = service({ one: { ...stdio(), tools }, two: { ...stdio(), tools } });
+    await svc.listTools();
+    await svc.listTools();
+    const ghost = warnings.filter((w) => w.includes('"ghost"'));
+    expect(ghost).toHaveLength(2);
+    expect(ghost.some((w) => w.includes("connection one"))).toBe(true);
+    expect(ghost.some((w) => w.includes("connection two"))).toBe(true);
+  });
+
   it("sends the stored connection:<id> token as a Bearer header", async () => {
     const http = await httpServer();
     http.requireToken = "tok-abc";
