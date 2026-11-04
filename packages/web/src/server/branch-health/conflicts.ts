@@ -356,11 +356,56 @@ export function parseConflictHunks(result: string): ConflictHunk[] | null {
   return segs ? segs.flatMap((s) => (s.kind === "hunk" ? [s.hunk] : [])) : null;
 }
 
-/** The result with every hunk replaced by this branch's lines, then the base's. */
+/**
+ * The result with every hunk replaced by this branch's lines, then the base's
+ * entries this branch did not also add. diff3 style never factors out lines
+ * both sides added, so without the filter a shared entry is offered twice.
+ */
 function unionResult(result: string): string {
   return segments(result)!
-    .flatMap((s) => (s.kind === "text" ? s.lines : [...s.hunk.branch, ...s.hunk.base]))
+    .flatMap((s) => {
+      if (s.kind === "text") return s.lines;
+      const ours = new Set(listElements(s.hunk.branch).map(entryKey));
+      const theirs = listElements(s.hunk.base).filter((e) => entryKey(e) === "" || !ours.has(entryKey(e)));
+      return [...s.hunk.branch, ...theirs.flat()];
+    })
     .join("\n");
+}
+
+/** An entry's text for comparison: each line trimmed, one trailing comma dropped. Blank is "". */
+function entryKey(lines: readonly string[]): string {
+  return lines.map((l) => l.trim()).join("\n").replace(/,$/, "");
+}
+
+/**
+ * A hunk side's lines grouped into list entries: a line where bracket depth
+ * (outside strings) is back to zero ends one, so a multi-line JSON element is
+ * one entry and its brace lines are never compared alone.
+ */
+function listElements(lines: readonly string[]): string[][] {
+  const out: string[][] = [];
+  let current: string[] = [];
+  let depth = 0;
+  for (const line of lines) {
+    current.push(line);
+    let quote: string | null = null;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (quote) {
+        if (ch === "\\") i++;
+        else if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'" || ch === "`") quote = ch;
+      else if (ch === "[" || ch === "{") depth++;
+      else if (ch === "]" || ch === "}") depth--;
+    }
+    if (depth <= 0) {
+      out.push(current);
+      current = [];
+      depth = 0;
+    }
+  }
+  if (current.length) out.push(current);
+  return out;
 }
 
 /**

@@ -12,7 +12,7 @@ Each predicted conflict is classified by fixed rules and carries a fix that a pe
 - `prd-children-table` (a v1 PRD `index.md` whose conflicts are all `## Children` rows): `git checkout --ours`, `rex validate --post-merge --repair`, `git add`, `rex validate`.
 - `prd-state` (a v2 `state.yaml` while the rex-state merge driver is unregistered): register the driver and redo that file's merge.
 - `duplicate-capture` (both sides added the same PRD item under different ids): keep the base's id, then `rex validate --post-merge --repair` prunes what still names the dropped id, `git add -u` stages it and `rex validate --post-merge` checks.
-- `allowlist-union` (both sides only added list entries: YAML `- ` items, quoted strings, one-line array rows or JSON array elements; never a lockfile, and an added code block or mapping is `source`): a unified diff holding both additions, this branch's first.
+- `allowlist-union` (both sides only added list entries: YAML `- ` items, quoted strings, one-line array rows or JSON array elements; never a lockfile, and an added code block or mapping is `source`): a unified diff holding both additions, this branch's first, with an entry both sides added listed once.
 - `generated` (a path in the new `web.generatedFiles` setting, `[{ paths, command }]`): take the base's copy, run the declared command, `git add`, after every other fix.
 - `source` (everything else): no fix; names the other local worktrees whose branch changed the same file (the card shows three and counts the rest). Each worktree's diff is kept server-wide by base and tip commit, so opening the board runs it once, not once per card.
 

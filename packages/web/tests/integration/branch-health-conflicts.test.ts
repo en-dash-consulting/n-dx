@@ -249,6 +249,21 @@ describe("allowlist-union on a real merge", () => {
     expect(readFileSync(join(repo, "gates.test.ts"), "utf-8")).toBe(gates(FEAT_ROW, MAIN_ROW));
   });
 
+  it("lists an entry both sides added once, keeping ours then theirs (Hal's #930 F4 fixture)", async () => {
+    const list = (...entries: string[]) => ["[", ...entries.map((e) => `  "${e}",`), '  "z"', "]", ""].join("\n");
+    diverge("allow.json", list("a", "b"), list("a", "b", "shared", "mine"), list("a", "b", "shared", "theirs"));
+
+    const [conflict] = await predict();
+    expect(conflict.class).toBe("allowlist-union");
+
+    mergeBase();
+    runSteps([["git", "checkout", "--ours", "--", "allow.json"]]);
+    const patch = join(root, "fix.diff");
+    writeFileSync(patch, (conflict.fix as { diff: string }).diff);
+    runSteps([["git", "apply", patch]]);
+    expect(readFileSync(join(repo, "allow.json"), "utf-8")).toBe(list("a", "b", "shared", "mine", "theirs"));
+  });
+
   it("is source when both sides add a code block", async () => {
     const fn = (name: string) => [`export function ${name}() {`, "  return 1;", "}"].join("\n");
     diverge("code.ts", "// start\n// end\n", `// start\n${fn("feat")}\n// end\n`, `// start\n${fn("main")}\n// end\n`);
