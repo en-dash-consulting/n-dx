@@ -572,6 +572,10 @@ describe("classifyVendorError", () => {
     expect(classifyVendorError(new Error("HTTP 429 Too Many Requests"))).toBe("rate_limit");
   });
 
+  it("classifies a CLI session limit as rate_limit", () => {
+    expect(classifyVendorError(new Error("You've hit your session limit · resets 3pm"))).toBe("rate_limit");
+  });
+
   it("classifies plain Error with timeout pattern", () => {
     expect(classifyVendorError(new Error("request timed out"))).toBe("timeout");
   });

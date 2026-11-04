@@ -98,7 +98,7 @@ describe("run verdict banner", () => {
       labels.add(label.textContent!);
     }
     expect(labels.size).toBe(classes.length);
-    expect(RUN_VERDICT_CLASS_LABELS["test-gate-preexisting"]).toBe("Pre-existing test failure");
+    expect(RUN_VERDICT_CLASS_LABELS["test-gate-preexisting"]).toBe("Failure in tests the run did not edit");
   });
 
   it("shows an unknown class as its id", () => {

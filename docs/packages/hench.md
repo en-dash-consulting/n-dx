@@ -231,14 +231,14 @@ with no model call. `hench runs diagnose <run-id> [--format=json]` prints it.
 | Class | Signal | First action |
 |-------|--------|--------------|
 | `test-gate-new` | The gate's failure digest names a file the run changed; an absolute digest path under the run's worktree is read repo-relative | Follow-up run with the digest, then re-run |
-| `test-gate-preexisting` | The digest names only files the run did not change | Verify on main, then close as verified |
+| `test-gate-preexisting` | The digest names only files the run did not change. No baseline runs, so the verdict says the failure is in tests the run did not edit and was not checked on main; it never asserts the failure predates the run | Run the failing tests on main |
 | `completion-held` | `completionHold` with outcome `not-applied` (`applied` and `bypassed` are not holds), or `gateOnlyRetry` | `--fresh`, or fix by hand and verify |
 | `completion-held` | The completion gate refused on uncommitted work; outranks every rule but `claim-lost` | Commit or discard the uncommitted paths, then verify |
 | `review-blocked` | The review left a must-fix finding unrepaired | Follow-up run with the findings |
-| `claim-lost` | `claimLost` or `readOnlyRefusal` | Release the claim or clean the tree, then re-run |
+| `claim-lost` | `claimLost`: another worktree took the task. A `readOnlyRefusal` (the forked attempt made no edits and the task re-ran cold) is never a class; it is one evidence line on the class the rest of the record gives | Release the claim, then re-run |
 | `budget-timeout` | `budget_exceeded`, `timeout`, or a brief too large for the context window | Split the task, or raise its tier |
-| `vendor-transient` | `error_transient`, or an auth or rate-limit failure | Retry later |
-| `no-changes` | No commits, or only PRD files changed | Tighten the done-when |
+| `vendor-transient` | `error_transient`, or an auth, rate-limit (a CLI session limit included) or transient failure, read from failure events or from `run.error`, so it fires with the event pipeline off | Retry later; for auth, re-authenticate the vendor CLI and re-run |
+| `no-changes` | The agent made at least one tool call, and made no commits or changed only PRD files. A run that dies before its first tool call is not `no-changes` | Tighten the done-when |
 | `unclassified` | None of the above; never guessed | Read the run log |
 
 `attempt` counts the task's finished runs that did not complete, capped at 2. On
@@ -269,13 +269,20 @@ no run, takes no claim and writes no file.
   git fails, only this worktree is counted and the summary says so. The run
   limiter itself still counts per worktree.
 
-A lane's command runs its tasks one after another in this worktree
-(`ndx work --task=a --auto . && ndx work --task=b --auto .`). An explicit
+A lane's command runs its tasks one after another in the current checkout
+(`ndx work --task=a --auto . && ndx work --task=b --auto .`). Every lane's
+command targets `.`, so lane 1 runs here and **each later lane must run in its
+own worktree**: two lanes in one checkout collide, the later one meeting the
+earlier one's uncommitted edits. While a run is live in this worktree, lane 1
+needs its own worktree too. The summary, each such lane's text block and Live's
+Ready next say so. An explicit
 `--task` ignores blockers, and a run can exit 0 without completing its task (a
 transient vendor error), so the step for a blocked task adds
 `--require-unblocked`: it refuses to start while any blocker is not completed.
 The JSON has
-`lanes [{command, changeId, tasks [{id, title, reason}]}]`, `excluded
+`lanes [{command, changeId, ownWorktree, tasks [{id, title, reason}]}]`
+(`ownWorktree` is true for every lane after the first, and for lane 1 while a
+run is live in this worktree), `excluded
 [{id, title, reason}]`, `activeRuns`, `activeRunsByWorktree [{path, runs}]`,
 `runLimit` and `summary`; every ready task
 appears once, with its reason. Live shows the plan as Ready next behind the

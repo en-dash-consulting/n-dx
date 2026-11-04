@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { V2Tree } from "@n-dx/rex";
-import { planQueue, COLD_ONLY_TAGS } from "../../../src/queue/plan-queue.js";
+import { planQueue, COLD_ONLY_TAGS, OWN_WORKTREE_NOTE } from "../../../src/queue/plan-queue.js";
 import type { ActiveRunCount, QueuePlan } from "../../../src/queue/plan-queue.js";
-import { laneCommand, queueInputFromTree } from "../../../src/cli/commands/plan-queue.js";
+import { formatPlan, laneCommand, queueInputFromTree } from "../../../src/cli/commands/plan-queue.js";
 
 type Node = V2Tree["changes"][number];
 
@@ -173,7 +173,7 @@ describe("planQueue", () => {
     expect(p.activeRuns).toBe(2);
     expect(p.activeRunsByWorktree).toEqual(byWorktree);
     expect(p.lanes).toHaveLength(1);
-    expect(p.summary).toMatch(/\(2 active of 3\)\. 1 live run in other worktrees\.$/);
+    expect(p.summary).toMatch(/\(2 active of 3\)\..* 1 live run in other worktrees\.$/);
   });
 
   it("says when git could not list the worktrees, so only this one was counted", () => {
@@ -189,5 +189,73 @@ describe("planQueue", () => {
       { excludeIds: new Set(["t-a1"]), defaultTier: "standard" },
     );
     expect(input.tasks.map((t) => t.id)).toEqual(["t-a2"]);
+  });
+});
+
+describe("lanes after the first need their own worktree", () => {
+  const twoLanes = (): QueuePlan =>
+    plan([
+      change("A", [task("a1")], { touches: ["cap-1"], priority: "high" }),
+      change("B", [task("b1")], { touches: ["cap-2"], priority: "low" }),
+    ]);
+
+  it("marks every lane after the first in the JSON, leaving the existing fields as they were", () => {
+    const p = twoLanes();
+    expect(p.lanes.map((l) => l.ownWorktree)).toEqual([false, true]);
+    expect(Object.keys(p.lanes[0]).sort()).toEqual(["changeId", "command", "ownWorktree", "tasks"]);
+    expect(Object.keys(p).sort()).toEqual(["activeRuns", "activeRunsByWorktree", "excluded", "lanes", "runLimit", "summary"]);
+    expect(p.lanes[1].command).toBe("ndx work --task=t-b1 --auto .");
+  });
+
+  it("says so in the summary and in each later lane's text block, and that lane 1 runs here", () => {
+    const p = twoLanes();
+    expect(p.summary).toBe(
+      "2 lanes for 3 free run slots (0 active of 3). Lane 1 runs in this worktree; every later lane must run in its own worktree. 0 live runs in other worktrees.",
+    );
+    const text = formatPlan(p).join("\n");
+    expect(text).toContain(`Lane 1 (change A):\n  Runs in this worktree.\n  ndx work --task=t-a1 --auto .`);
+    expect(text).toContain(`Lane 2 (change B):\n  ${OWN_WORKTREE_NOTE}\n  ndx work --task=t-b1 --auto .`);
+  });
+
+  it("sends lane 1 to its own worktree too while a run is live in this one", () => {
+    const busy = (runs: number): ActiveRunCount => ({
+      scope: "repository",
+      worktreePath: "/repo",
+      byWorktree: [{ path: "/repo", runs }, { path: "/repo-y", runs: 0 }],
+    });
+    const changes = [
+      change("A", [task("a1")], { touches: ["cap-1"], priority: "high" }),
+      change("B", [task("b1")], { touches: ["cap-2"], priority: "low" }),
+    ];
+    const two = plan(changes, { activeRunCount: busy(1) });
+    expect(two.lanes.map((l) => l.ownWorktree)).toEqual([true, true]);
+    expect(two.summary).toContain("A run is live in this worktree, so every lane must run in its own worktree.");
+    const text = formatPlan(two).join("\n");
+    expect(text).toContain(`Lane 1 (change A):\n  ${OWN_WORKTREE_NOTE}`);
+    expect(text).not.toContain("Runs in this worktree.");
+
+    const one = plan([changes[0]], { activeRunCount: busy(1) });
+    expect(one.lanes.map((l) => l.ownWorktree)).toEqual([true]);
+    expect(formatPlan(one)).toContain(`  ${OWN_WORKTREE_NOTE}`);
+
+    // A run in another worktree does not take this checkout.
+    const elsewhere = plan(changes, {
+      activeRunCount: { scope: "repository", worktreePath: "/repo", byWorktree: [{ path: "/repo", runs: 0 }, { path: "/repo-y", runs: 1 }] },
+    });
+    expect(elsewhere.lanes.map((l) => l.ownWorktree)).toEqual([false, true]);
+  });
+
+  it("leaves a one-lane plan's text and summary as they were, with the field false", () => {
+    const p = plan([change("A", [task("a1"), task("a2")], { touches: ["cap-1"] })]);
+    expect(p.lanes.map((l) => l.ownWorktree)).toEqual([false]);
+    expect(p.summary).toBe("1 lane for 3 free run slots (0 active of 3). 0 live runs in other worktrees.");
+    expect(formatPlan(p)).toEqual([
+      p.summary,
+      "",
+      "Lane 1 (change A):",
+      "  ndx work --task=t-a1 --auto . && ndx work --task=t-a2 --auto .",
+      "  • a1 (t-a1): lane 1, step 1 of 2: change A, tier standard",
+      "  • a2 (t-a2): lane 1, step 2 of 2: change A, tier standard",
+    ]);
   });
 });
