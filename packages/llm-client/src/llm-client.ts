@@ -11,7 +11,7 @@ import type { AuthMode, ClaudeClient, ClaudeConfig } from "./types.js";
 import { DEFAULT_LLM_VENDOR, LLM_VENDOR, type LLMVendor, type LLMConfig } from "./llm-types.js";
 import { createCodexCliClient } from "./codex-cli-provider.js";
 import { resolveVendorAuth } from "./vendor-auth.js";
-import { createGoogleApiProvider, resolveGoogleApiKey } from "./google-api-provider.js";
+import { createGoogleApiProvider } from "./google-api-provider.js";
 import { createLocalApiProvider } from "./local-api-provider.js";
 
 /**
@@ -52,15 +52,11 @@ export function detectLLMAuthMode(options: CreateLLMClientOptions): AuthMode {
   }
 
   if (vendor === LLM_VENDOR.GOOGLE) {
-    const googleConfig = options.llmConfig?.google;
-    const apiKey = resolveGoogleApiKey(
-      googleConfig,
-      options.apiKeyEnv ?? googleConfig?.apiKeyEnv ?? "GEMINI_API_KEY",
-    );
-    // Google only supports API mode — return "api" when key is present, "cli" as
-    // a sentinel for "no key" (callers may check mode === "api" to decide whether
-    // to surface auth errors eagerly).
-    return apiKey ? "api" : "cli";
+    // Google only supports API mode — return "api" when a key may be used, "cli"
+    // as a sentinel for "no key" (callers may check mode === "api" to decide
+    // whether to surface auth errors eagerly).
+    const decision = resolveVendorAuth(vendor, options.llmConfig ?? {}, { apiKeyEnv: options.apiKeyEnv });
+    return decision.key ? "api" : "cli";
   }
 
   if (vendor === LLM_VENDOR.LOCAL) {
