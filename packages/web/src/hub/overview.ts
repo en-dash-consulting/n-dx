@@ -68,6 +68,13 @@ export interface ProjectCard {
    * child is a build that does not report the count; zero when it found none.
    */
   infrastructure: number | null;
+  /**
+   * Whether n-dx is set up in the project — the child's own
+   * `isProjectInitialized`, the check that decides whether it serves its
+   * dashboard or its setup wizard. Null when the child is unreachable or a
+   * build that does not report it; only `false` makes the card offer Initialize.
+   */
+  initialized: boolean | null;
 }
 
 export interface HubOverview {
@@ -87,6 +94,8 @@ export interface HubOverview {
  */
 export interface ChildSnapshot {
   status: {
+    /** See {@link ProjectCard.initialized}. */
+    initialized?: boolean;
     rex?: { exists?: boolean; percentComplete?: number; nextTaskTitle?: string | null };
     hench?: { activeRuns?: number };
     sv?: {
@@ -162,6 +171,7 @@ export function toProjectCard(project: ProjectView, snapshot: ChildSnapshot | nu
     remoteHost: repo?.remoteHost || null,
     readiness: typeof status?.sv?.readiness?.overall === "number" ? status.sv.readiness.overall : null,
     infrastructure: typeof status?.sv?.infrastructure === "number" ? status.sv.infrastructure : null,
+    initialized: typeof status?.initialized === "boolean" ? status.initialized : null,
   };
 }
 
