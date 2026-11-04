@@ -800,13 +800,42 @@ export function releaseHubSessionHostForSidecarOff(ctx: ServerContext, opts: Pic
   return release;
 }
 
+/** Host keys whose server is shutting down: their hub session routes refuse, so nothing claims the lock again or starts a turn. */
+const hubShuttingDown = new Set<string>();
+
+/** How long shutdown waits for an interrupted hub turn to settle before it leaves the lock to dead-pid takeover. */
+export const HUB_SHUTDOWN_TURN_WAIT_MS = 5_000;
+
 /**
- * Give up the hub session host lock on shutdown, without waiting: the
- * shutdown ends this server's turns anyway. A lock another server holds is
- * left alone.
+ * Give up the hub session host lock on shutdown. Hub session routes on this
+ * server refuse from now on; its running hub turns are interrupted, and the
+ * lock goes only once they have settled, so no other host resumes the
+ * session while a turn here still writes it. A turn that outlasts `waitMs`
+ * keeps the lock, which the next host takes once this process has exited.
+ * A lock another server holds is left alone.
+ *
+ * @returns true when this call removed the lock.
  */
-export function releaseHubSessionHostOnShutdown(port: number, opts: Pick<HubSidecarRouteOptions, "homeDir" | "pid"> = {}): boolean {
-  return releaseHubSessionHost(resolveHubHome(opts.homeDir), { pid: opts.pid ?? process.pid, port });
+export async function releaseHubSessionHostOnShutdown(
+  port: number,
+  opts: Pick<HubSidecarRouteOptions, "homeDir" | "pid"> & { waitMs?: number } = {},
+): Promise<boolean> {
+  const home = resolveHubHome(opts.homeDir);
+  const pid = opts.pid ?? process.pid;
+  const key = `${hubSidecarDir(home)}\0${pid}`;
+  hubShuttingDown.add(key);
+  const registry = hubHosts.get(key)?.registry;
+  if (registry) {
+    await registry.interruptAll();
+    let timer: NodeJS.Timeout | undefined;
+    const settled = await Promise.race([
+      registry.whenIdle().then(() => true),
+      new Promise<false>((resolve) => { timer = setTimeout(() => resolve(false), opts.waitMs ?? HUB_SHUTDOWN_TURN_WAIT_MS); }),
+    ]);
+    clearTimeout(timer);
+    if (!settled) return false;
+  }
+  return releaseHubSessionHost(home, { pid, port });
 }
 
 /**
@@ -1015,6 +1044,7 @@ async function handleHubSidecarRoute(
   const home = resolveHubHome(opts.homeDir);
   const dir = hubSidecarDir(home);
   const pid = opts.pid ?? process.pid;
+  if (hubShuttingDown.has(`${dir}\0${pid}`)) return refuse(res, 503, "This server is shutting down; the hub session moves to another project server");
   const claim = claimHubSessionHost(home, { pid, port: ctx.port, ...(opts.isAlive && { isAlive: opts.isAlive }) });
 
   if (!claim.held) {

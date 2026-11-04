@@ -168,9 +168,11 @@ export function registerShutdownHandlers(
     closeWorktreeRunWatchers();
     // Leases taken by GET /api/hench/runs/:id/log|events.
     stopRunTailWatches();
-    // The hub session host lock, if this server holds it: the hub's next pick claims it at once.
+    // The hub session host lock, if this server holds it: released once its
+    // interrupted hub turns settle, so the hub's next pick claims it at once
+    // without two servers writing the session.
     try {
-      if (releaseHubSessionHostOnShutdown(actualPort)) console.log("[shutdown] hub session host lock released");
+      if (await releaseHubSessionHostOnShutdown(actualPort)) console.log("[shutdown] hub session host lock released");
     } catch (err) {
       console.error(`[shutdown] failed to release the hub session host lock: ${(err as Error).message}`);
     }

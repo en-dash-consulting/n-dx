@@ -587,6 +587,11 @@ export class SidecarSessionRegistry {
     return true;
   }
 
+  /** {@link interrupt} every session's running turn. */
+  async interruptAll(): Promise<void> {
+    await Promise.all([...this.turnOpen].map((id) => this.interrupt(id)));
+  }
+
   /** Stop any running turn; the session keeps its record and transcript but never resumes. */
   async end(id: string): Promise<void> {
     const record = this.records.get(id);

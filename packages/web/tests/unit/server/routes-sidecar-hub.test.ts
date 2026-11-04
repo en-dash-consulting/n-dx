@@ -30,6 +30,7 @@ import {
   hubSidecarContextOptions,
   isHubSidecarPath,
   releaseHubSessionHostForSidecarOff,
+  releaseHubSessionHostOnShutdown,
   type SidecarFramesMessage,
 } from "../../../src/server/routes-sidecar.js";
 import { SidecarBroker } from "../../../src/server/sidecar/broker.js";
@@ -285,6 +286,48 @@ describe("one hub session per machine", () => {
     expect(got.status).toBe(200);
     expect((await got.json()).session).toMatchObject({ id: session.id, turns: 1 });
     expect(readHubSessionHostLock(home)).toMatchObject({ pid: 2002, port: 5555 });
+  });
+
+  it("on shutdown mid-turn, keeps the lock until the hub turn settles, refusing new hub requests meanwhile", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    expect((await hubApi(host, `/${session.id}/turns`, { method: "POST", body: { prompt: "HOLD" } })).status).toBe(202);
+    await vi.waitFor(() => expect(held).toHaveLength(1));
+    const other = await startHost(2002, 5555);
+
+    let released: boolean | undefined;
+    const release = releaseHubSessionHostOnShutdown(4321, { homeDir: home, pid: 1001 }).then((r) => { released = r; });
+    // The stand-in ignores the interrupt, so the turn is still writing the session.
+    expect((await hubApi(other, "")).status).toBe(409);
+    expect((await hubApi(host, "")).status).toBe(503);
+    expect(released).toBeUndefined();
+    expect(readHubSessionHostLock(home)).toMatchObject({ pid: 1001, port: 4321 });
+
+    held[0]();
+    await release;
+    expect(released).toBe(true);
+    const got = await hubApi(other, `/${session.id}`);
+    expect(got.status).toBe(200);
+    expect((await got.json()).session).toMatchObject({ id: session.id, turns: 1 });
+    expect(readHubSessionHostLock(home)).toMatchObject({ pid: 2002, port: 5555 });
+  });
+
+  it("on shutdown, leaves the lock to dead-pid takeover when the hub turn outlasts the wait", async () => {
+    const host = await startHost(1001, 4321);
+    const { session } = await (await hubApi(host, "", { method: "POST", body: { vendor: "claude" } })).json();
+    expect((await hubApi(host, `/${session.id}/turns`, { method: "POST", body: { prompt: "HOLD" } })).status).toBe(202);
+    await vi.waitFor(() => expect(held).toHaveLength(1));
+
+    expect(await releaseHubSessionHostOnShutdown(4321, { homeDir: home, pid: 1001, waitMs: 20 })).toBe(false);
+    expect(readHubSessionHostLock(home)).toMatchObject({ pid: 1001, port: 4321 });
+    held[0]();
+  });
+
+  it("on shutdown with no hub turn running, releases the lock at once", async () => {
+    const host = await startHost(1001, 4321);
+    await hubApi(host, "", { method: "POST", body: { vendor: "claude" } });
+    expect(await releaseHubSessionHostOnShutdown(4321, { homeDir: home, pid: 1001 })).toBe(true);
+    expect(readHubSessionHostLock(home)).toBeNull();
   });
 
   it("keeps the lock when web.sidecar is back on by the time its turn finishes", async () => {
