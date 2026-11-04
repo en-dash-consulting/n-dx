@@ -52,11 +52,12 @@ describe("ndx work --plan-queue", () => {
     expect(result.code, result.stderr).toBe(0);
     const plan = JSON.parse(result.stdout);
     expect(plan).toMatchObject({ activeRuns: 0, runLimit: 3 });
-    // CH-1 has no touches, so its one ready task runs alone.
+    // CH-1 has no touches, so its one ready task runs alone, here.
     expect(plan.lanes).toEqual([
       {
         command: "n-dx work --task=c0000000-0000-4000-8000-000000000002 --auto .",
         changeId: "c0000000-0000-4000-8000-000000000001",
+        ownWorktree: false,
         tasks: [expect.objectContaining({ id: "c0000000-0000-4000-8000-000000000002", title: "Wire the button" })],
       },
     ]);

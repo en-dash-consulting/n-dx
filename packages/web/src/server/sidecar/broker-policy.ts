@@ -5,9 +5,10 @@
  * Every side effect a Sidecar session can cause is one of these tools; the
  * vendor's own write tools are off (see `spawn-policy.ts`). A write tool
  * raises a permission card and returns only once the operator decides it,
- * unless the call matches a rule on the Sidecar allow-list. Most actions can
- * never be allow-listed: work, edits, PRD writes, placements, migration
- * decisions and posts are decided card by card, every time.
+ * unless the call matches a rule on the Sidecar allow-list. Only GitHub reads
+ * and read-only commands can be allow-listed: work, edits, PRD writes,
+ * placements, migration decisions and posts are decided card by card, every
+ * time.
  *
  * Design: local-design-workshop/docs/analysis/sidecar/README.md §4.3.
  */
@@ -82,24 +83,36 @@ export interface AllowListRule {
 }
 
 /**
- * A command that starts work, resets state or pushes is never allow-listed,
- * however the operator answers its card. The rule is on the words inside
- * every argv token, not the tokens alone, so a command wrapped in a shell
- * string (`sh -c "ndx work ."`) is caught as well as `ndx work`, `git reset`
- * and `git push`. It errs toward asking: a token that merely contains one of
- * the words (`work.md`) is never allow-listed either.
+ * The commands an operator may allow-list: an argv must begin with one of
+ * these prefixes, token for token. Each only reads. Anything else — work, a
+ * PRD write, `ndx hench`, `git clean`, a shell wrapper — asks every time,
+ * since a deny list misses the next command that writes.
  */
-function commandNeverAllowListed(argv: readonly string[]): boolean {
-  return argv
-    .flatMap((token) => token.toLowerCase().split(/[^a-z0-9-]+/))
-    .some((word) => word === "work" || word === "reset" || word === "push" || word.startsWith("--push"));
+export const READ_ONLY_COMMAND_PREFIXES: readonly (readonly string[])[] = [
+  ["ndx", "status"],
+  ["ndx", "usage"],
+  ["git", "status"],
+  ["git", "log"],
+  ["git", "diff"],
+  ["git", "show"],
+];
+
+/** Git's `--output=<file>` writes a file, so a read-only git command carrying it is not. */
+function writesThroughOption(argv: readonly string[]): boolean {
+  return argv.some((token) => token === "--output" || token.startsWith("--output="));
+}
+
+function commandAllowListable(argv: readonly string[]): boolean {
+  return READ_ONLY_COMMAND_PREFIXES.some((prefix) => prefix.every((token, i) => argv[i] === token))
+    && !writesThroughOption(argv);
 }
 
 /**
  * The allow-list key for a call, or `null` when the call can never be
- * allow-listed. A `per-call` key is the exact argv, JSON-encoded so a token
- * with a space cannot alias two commands. A `per-project` tool has none: its
- * project setting is its allowance.
+ * allow-listed. A `per-call` key is the exact argv of a read-only command
+ * ({@link READ_ONLY_COMMAND_PREFIXES}), JSON-encoded so a token with a space
+ * cannot alias two commands. A `per-project` tool has none: its project
+ * setting is its allowance.
  */
 export function allowListKey(tool: BrokerToolName, input: Readonly<Record<string, unknown>>): string | null {
   switch (BROKER_TOOL_POLICY[tool].allowList) {
@@ -109,7 +122,7 @@ export function allowListKey(tool: BrokerToolName, input: Readonly<Record<string
     case "per-call": {
       const argv = input.argv;
       if (!Array.isArray(argv) || argv.length === 0 || !argv.every((t) => typeof t === "string")) return null;
-      return commandNeverAllowListed(argv) ? null : JSON.stringify(argv);
+      return commandAllowListable(argv) ? JSON.stringify(argv) : null;
     }
   }
 }

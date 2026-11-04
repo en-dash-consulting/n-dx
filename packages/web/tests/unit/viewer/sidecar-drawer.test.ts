@@ -31,6 +31,7 @@ import {
   type SidecarPageSelection,
 } from "../../../src/viewer/hooks/use-sidecar-attachment.js";
 import { SidecarCards } from "../../../src/viewer/components/sidecar-cards.js";
+import { SettingsOverlay } from "../../../src/viewer/components/settings-overlay.js";
 import { useFeatureToggle } from "../../../src/viewer/hooks/use-feature-toggle.js";
 import { buildValidViews } from "../../../src/shared/index.js";
 import { clearProjectMetadataCache } from "../../../src/viewer/hooks/use-project-metadata.js";
@@ -513,6 +514,63 @@ describe("the composer", () => {
   });
 });
 
+// ── Socket reconnect ───────────────────────────────────────────────────────
+
+describe("the socket", () => {
+  /** The server goes away: every open socket closes. */
+  function dropSockets(): void {
+    for (const socket of [...FakeSocket.open]) { FakeSocket.open.delete(socket); socket.onclose?.(); }
+  }
+
+  it("reconnects after a drop and catches up on cards and frames", async () => {
+    server.sessions = [{ session: session(), running: false }];
+    await mount();
+    await pressCmdJ();
+    const input = () => root.querySelector<HTMLTextAreaElement>(".sidecar-input")!;
+    await act(async () => {
+      input().value = "Explain zone 3";
+      input().dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      root.querySelector("form.sidecar-composer")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await settle();
+    expect(input().disabled).toBe(true);
+
+    // The socket drops mid-turn; while it is down a card is raised and the turn ends.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    dropSockets();
+    server.cards.push(card("c1", 1));
+    server.frames.push(said(1, "Zone 3 is…"));
+    server.running = false;
+    expect(root.querySelector(".sidecar-card")).toBeNull();
+
+    // Before the first backoff step nothing reopens; at it, the hook reopens through openWebSocket.
+    vi.advanceTimersByTime(999);
+    expect(FakeSocket.open.size).toBe(0);
+    vi.advanceTimersByTime(1);
+    vi.useRealTimers();
+    // Other listeners in the shell reconnect too; only Sidecar's catches up on cards and frames below.
+    expect(FakeSocket.open.size).toBeGreaterThan(0);
+    await act(async () => { for (const socket of FakeSocket.open) socket.onopen?.(); });
+    await settle();
+
+    expect(root.querySelector(".sidecar-card")).not.toBeNull();
+    expect(rows()).toEqual(["Zone 3 is…"]);
+    expect(input().disabled).toBe(false);
+  });
+
+  it("stops retrying once unmounted", async () => {
+    await mount();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    dropSockets();
+    await unmount();
+    vi.advanceTimersByTime(60_000);
+    vi.useRealTimers();
+    expect(FakeSocket.open.size).toBe(0);
+  });
+});
+
 // ── Agent picker ───────────────────────────────────────────────────────────
 
 describe("the agent picker", () => {
@@ -843,6 +901,35 @@ describe("permission cards", () => {
     root.appendChild(select);
     await key(select, { key: "Enter", metaKey: true });
     expect(decisions()).toHaveLength(0);
+  });
+
+  it("ignores a held key's auto-repeat, so the next card waits for a fresh press", async () => {
+    await openWith([card("c1", 1), card("c2", 2)]);
+    await key(document.body, { key: "Enter", metaKey: true });
+    await announce({ type: "sidecar:card", sessionId: "s1", cardId: "c1", status: "approved", timestamp: "t" });
+    await key(document.body, { key: "Enter", metaKey: true, repeat: true });
+    await key(document.body, { key: "Backspace", metaKey: true, repeat: true });
+    expect(decisions().map((r) => r.url)).toEqual(["/api/sidecar/sessions/s1/cards/c1"]);
+    expect(cardEls().find((el) => el.dataset.card === "c2")?.querySelector(".sidecar-card-approve")).not.toBeNull();
+  });
+
+  it("decides no card while the Settings overlay covers the drawer", async () => {
+    await openWith([card("c1", 1)]);
+    const overlayHost = document.createElement("div");
+    document.body.appendChild(overlayHost);
+    await act(async () => {
+      render(h(SettingsOverlay, { view: "analyze", validViews: VALID, onNavigate: () => {}, onClose: () => {} }), overlayHost);
+    });
+    await settle();
+    const close = overlayHost.querySelector<HTMLButtonElement>(".settings-overlay-close")!;
+    await key(close, { key: "Enter", metaKey: true });
+    await key(document.body, { key: "Backspace", metaKey: true });
+    expect(decisions()).toHaveLength(0);
+
+    await act(async () => { render(null, overlayHost); });
+    overlayHost.remove();
+    await key(document.body, { key: "Enter", metaKey: true });
+    expect(decisions().map((r) => r.url)).toEqual(["/api/sidecar/sessions/s1/cards/c1"]);
   });
 
   it("does not answer the same card twice while its decision is still being read back", async () => {

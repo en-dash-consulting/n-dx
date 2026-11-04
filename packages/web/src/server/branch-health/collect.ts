@@ -6,13 +6,15 @@
  * (the PR, its checks, failed-check logs) come from `gh` and are read only
  * when the caller says GitHub reads are allowed; without them no gh command
  * runs and `github` is null with a reason. A GitHub read remembers each PR
- * base it finds in a {@link PrBaseCache}; a local-only read uses those for the
- * base and the stack, and says so when it has none.
+ * base it finds in a {@link PrBaseCache}; a local-only read, or one whose gh
+ * failed, uses those for the base and the stack, and a local-only read says so
+ * when it has none. A branch gh reports has no PR never uses its cached base.
  *
  * Each predicted conflict is classified with a deterministic fix
  * (`conflicts.ts`) from its merge-tree stages and conflicted result, the
  * project's `web.generatedFiles`, whether the rex-state driver is registered,
- * and the paths other local worktrees' branches changed.
+ * and the paths other local worktrees' branches changed. Those diffs are kept
+ * across requests by base and tip commit (`diff-cache.ts`).
  *
  * Nothing here changes the worktree, the index or HEAD. `git merge-tree
  * --write-tree` computes the merge in the object store only.
@@ -31,6 +33,7 @@ import {
   parseRollup,
 } from "./checks.js";
 import { classifyConflicts, type ConflictSides, type WorktreeChanges } from "./conflicts.js";
+import { worktreeDiffs, type WorktreeDiffCache } from "./diff-cache.js";
 import type {
   BaseSource,
   BranchHealth,
@@ -57,6 +60,8 @@ export interface CollectOptions {
    * local-only read uses it for the base and the stack before upstreams.
    */
   prBases?: PrBaseCache;
+  /** Other worktrees' diffs by commit; defaults to the one this server shares across requests. */
+  worktreeDiffs?: WorktreeDiffCache;
   /** `web.generatedFiles`: conflicts in these paths are regenerated. None when undeclared. */
   generatedFiles?: readonly GeneratedFileRule[];
   /** Injected for tests; defaults to the llm-client `exec`. */
@@ -102,6 +107,8 @@ interface Run {
   exitCode: number | null;
   stdout: string;
   stderr: string;
+  /** exec's error: with `exitCode: null`, a timeout (`code: "ETIMEDOUT"`) or a kill. */
+  error: Error | null;
 }
 
 class Runner {
@@ -129,6 +136,7 @@ class Runner {
       exitCode: result.exitCode,
       stdout: result.stdout,
       stderr: result.stderr,
+      error: result.error,
     };
   }
 }
@@ -217,9 +225,19 @@ async function readSides(git: Runner, tree: string, file: MergeTreeFile): Promis
   return { path: file.path, stages: file.stages, ancestor, base, branch, result };
 }
 
-/** Every other local worktree on a branch, with the paths that branch changed against `base`. */
-async function readOtherWorktrees(git: Runner, base: string): Promise<WorktreeChanges[]> {
-  const [list, top] = await Promise.all([git.git(["worktree", "list", "--porcelain", "-z"]), git.git(["rev-parse", "--show-toplevel"])]);
+/**
+ * Every other local worktree on a branch, with the paths that branch changed
+ * against `base`. Each diff is looked up in `diffs` by the base and branch tip
+ * commits, so it runs once however many cards ask; a ref that does not resolve
+ * to a commit is diffed by name and not kept.
+ */
+async function readOtherWorktrees(git: Runner, base: string, diffs: WorktreeDiffCache): Promise<WorktreeChanges[]> {
+  const [list, top, baseCommit, tips] = await Promise.all([
+    git.git(["worktree", "list", "--porcelain", "-z"]),
+    git.git(["rev-parse", "--show-toplevel"]),
+    git.git(["rev-parse", "--verify", "--quiet", `${base}^{commit}`]),
+    git.git(["for-each-ref", "--format=%(objectname)%00%(refname)", "refs/heads"]),
+  ]);
   if (!list.ok) return [];
   const self = top.ok ? top.stdout.trim() : null;
   const worktrees: WorktreeRef[] = [];
@@ -230,9 +248,23 @@ async function readOtherWorktrees(git: Runner, base: string): Promise<WorktreeCh
       worktrees.push({ path, branch: field.slice("branch refs/heads/".length) });
     }
   }
+  const baseId = baseCommit.ok ? baseCommit.stdout.trim() : "";
+  const tipOf = new Map<string, string>();
+  if (tips.ok) {
+    for (const line of tips.stdout.split("\n")) {
+      const [id, ref] = line.split("\0");
+      if (id && ref) tipOf.set(ref, id);
+    }
+  }
+  const diff = async (from: string, to: string): Promise<string[] | null> => {
+    const out = await git.git(["diff", "--name-only", "-z", `${from}...${to}`]);
+    return out.ok ? out.stdout.split("\0").filter(Boolean) : null;
+  };
   return mapLimit(worktrees, GIT_CONCURRENCY, async (w) => {
-    const out = await git.git(["diff", "--name-only", "-z", `${base}...refs/heads/${w.branch}`]);
-    return { ...w, changed: out.ok ? out.stdout.split("\0").filter(Boolean) : [] };
+    const ref = `refs/heads/${w.branch}`;
+    const tip = tipOf.get(ref);
+    const changed = baseId && tip ? await diffs.changed(baseId, tip, () => diff(baseId, tip)) : await diff(base, ref);
+    return { ...w, changed: changed ? [...changed] : [] };
   });
 }
 
@@ -254,6 +286,7 @@ async function predictConflicts(
   git: Runner,
   base: string,
   generatedFiles: readonly GeneratedFileRule[],
+  diffs: WorktreeDiffCache,
 ): Promise<{ conflicts: PredictedConflict[]; unavailable: string | null }> {
   // diff3 style puts the ancestor's lines in each hunk, which tells an
   // add-only hunk from one that changes a line.
@@ -274,12 +307,22 @@ async function predictConflicts(
     // Other worktrees only matter to a source conflict, and a repository can
     // have dozens of them: read their changes only when one needs naming.
     if (!conflicts.some((c) => c.class === "source")) return { conflicts, unavailable: null };
-    return { conflicts: classifyConflicts(sides, { ...ctx, worktrees: await readOtherWorktrees(git, base) }), unavailable: null };
+    return { conflicts: classifyConflicts(sides, { ...ctx, worktrees: await readOtherWorktrees(git, base, diffs) }), unavailable: null };
   }
-  return {
-    conflicts: [],
-    unavailable: `git merge-tree could not predict the merge: ${out.stderr.trim() || "no output"}. It needs git 2.38 or newer.`,
-  };
+  return { conflicts: [], unavailable: mergeTreeFailure(out) };
+}
+
+/** Why merge-tree gave no prediction. The git 2.38 hint only when git says it lacks `--write-tree`. */
+function mergeTreeFailure(out: Run): string {
+  if (out.exitCode === null) {
+    const timedOut = (out.error as NodeJS.ErrnoException | null)?.code === "ETIMEDOUT";
+    return timedOut
+      ? `git merge-tree timed out after ${MERGE_TREE_TIMEOUT_MS / 1000} s, so the merge was not predicted.`
+      : `git merge-tree was stopped before it finished: ${out.error?.message ?? "no reason given"}.`;
+  }
+  const said = out.stderr.trim() || out.error?.message || `exit ${out.exitCode}`;
+  const tooOld = out.exitCode === 129 || out.stderr.includes("--write-tree");
+  return `git merge-tree could not predict the merge: ${said}.${tooOld ? " It needs git 2.38 or newer." : ""}`;
 }
 
 async function aheadBehind(git: Runner, base: string): Promise<{ ahead: number | null; behind: number | null }> {
@@ -288,32 +331,48 @@ async function aheadBehind(git: Runner, base: string): Promise<{ ahead: number |
   return Number.isInteger(ahead) && Number.isInteger(behind) ? { ahead, behind } : { ahead: null, behind: null };
 }
 
-/** gh's answer for one branch's PR, or the reason there is none. */
-type PrLookup = { pr: Record<string, unknown> } | { reason: string };
+/**
+ * gh's answer for one branch's PR, or the reason there is none. `noPr` marks
+ * gh answering that the branch has no PR, as opposed to gh failing (offline,
+ * an expired token): only a failure leaves a cached PR base worth reusing.
+ */
+type PrLookup = { pr: Record<string, unknown> } | { reason: string; noPr: boolean };
+
+/** What gh prints when it ran and the branch has no PR. */
+const NO_PR = /no pull requests found/i;
 
 async function viewPr(git: Runner, branch: string | null, fields: string): Promise<PrLookup> {
   const out = await git.gh(["pr", "view", ...(branch ? [branch] : []), "--json", fields]);
-  if (!out.launched) return { reason: "gh is not installed, so no GitHub facts were read." };
+  if (!out.launched) return { reason: "gh is not installed, so no GitHub facts were read.", noPr: false };
   if (!out.ok) {
     const said = out.stderr.trim().split("\n")[0] || `gh exited ${out.exitCode ?? "on a timeout"}`;
-    return { reason: `gh pr view answered: ${said}` };
+    return { reason: `gh pr view answered: ${said}`, noPr: NO_PR.test(out.stderr) };
   }
   let pr: unknown;
   try {
     pr = JSON.parse(out.stdout);
   } catch (err) {
-    return { reason: `gh pr view returned output that is not JSON: ${errorMessage(err)}` };
+    return { reason: `gh pr view returned output that is not JSON: ${errorMessage(err)}`, noPr: false };
   }
   if (pr && typeof pr === "object" && !Array.isArray(pr)) return { pr: pr as Record<string, unknown> };
-  return { reason: "gh pr view returned JSON that is not an object." };
+  return { reason: "gh pr view returned JSON that is not an object.", noPr: false };
+}
+
+/**
+ * Whether a cached PR base stands in for gh's answer: when gh was not asked
+ * (`found` null) or failed. Not when gh found no PR — it may have merged or
+ * closed — and not when gh returned the PR.
+ */
+function mayUseCachedBase(found: PrLookup | null): boolean {
+  return found === null || ("reason" in found && !found.noPr);
 }
 
 /**
  * The layers below `base` in this branch's base chain, each checked against HEAD.
  *
  * A layer's own base is its PR base when GitHub reads are on, else the PR
- * base an earlier read cached, else its upstream when that names another
- * branch. The chain stops at origin's default branch (the trunk is not a
+ * base an earlier read cached (when reads are off or gh failed, never when gh
+ * found no PR), else its upstream when that names another branch. The chain stops at origin's default branch (the trunk is not a
  * layer), at a branch with no base, at a cycle, or after
  * {@link MAX_STACK_DEPTH} layers.
  */
@@ -350,14 +409,12 @@ async function nextLayer(
   prBases: PrBaseLookup,
 ): Promise<{ ref: string; branch: string } | null> {
   let baseRefName: string | undefined;
-  if (prBases.gh) {
-    const found = await viewPr(git, branch, "baseRefName");
-    const named = "pr" in found ? found.pr.baseRefName : null;
-    if (typeof named === "string" && named) {
-      baseRefName = named;
-      prBases.cache?.set(prBases.projectDir, branch, named);
-    }
-  } else {
+  const found = prBases.gh ? await viewPr(git, branch, "baseRefName") : null;
+  const named = found && "pr" in found ? found.pr.baseRefName : null;
+  if (typeof named === "string" && named) {
+    baseRefName = named;
+    prBases.cache?.set(prBases.projectDir, branch, named);
+  } else if (mayUseCachedBase(found)) {
     baseRefName = prBases.cache?.get(prBases.projectDir, branch);
   }
   if (baseRefName) {
@@ -436,6 +493,8 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
   // GitHub first, because the PR base outranks every local guess.
   let pr: Record<string, unknown> | null = null;
   let githubReason: string | null = null;
+  // gh's answer for this branch; null when no gh command ran.
+  let lookup: PrLookup | null = null;
   if (!options.githubReads) {
     githubReason = "GitHub reads are off for this project (web.sidecarGithubReads), so no gh command ran.";
   } else if (options.localOnly) {
@@ -443,17 +502,17 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
   } else if (!branch) {
     githubReason = "HEAD is detached, so there is no branch to find a PR for.";
   } else {
-    const found = await viewPr(git, null, PR_FIELDS);
-    if ("pr" in found) pr = found.pr;
-    else githubReason = found.reason;
+    lookup = await viewPr(git, null, PR_FIELDS);
+    if ("pr" in lookup) pr = lookup.pr;
+    else githubReason = lookup.reason;
   }
 
   let base: { ref: string; branch: string } | null = null;
   let baseSource: BaseSource | null = null;
   const prBase = pr && typeof pr.baseRefName === "string" && pr.baseRefName ? pr.baseRefName : null;
   if (prBase && branch) options.prBases?.set(projectDir, branch, prBase);
-  // A local-only read reuses the PR base the last GitHub read found.
-  const cachedBase = !ghAllowed && branch ? options.prBases?.get(projectDir, branch) ?? null : null;
+  // A local-only read, or one whose gh failed, reuses the PR base the last GitHub read found.
+  const cachedBase = branch && !pr && mayUseCachedBase(lookup) ? options.prBases?.get(projectDir, branch) ?? null : null;
   const prBaseRef = prBase ? await resolveBranchRef(git, prBase) : null;
   const cachedBaseRef = cachedBase ? await resolveBranchRef(git, cachedBase) : null;
   const upstream = branch ? upstreams.get(branch) : undefined;
@@ -472,7 +531,7 @@ export async function collectBranchHealth(projectDir: string, options: CollectOp
   }
 
   const counts = base ? await aheadBehind(git, base.ref) : { ahead: null, behind: null };
-  const predicted = base ? await predictConflicts(git, base.ref, options.generatedFiles ?? []) : { conflicts: [], unavailable: "There is no base to merge with." };
+  const predicted = base ? await predictConflicts(git, base.ref, options.generatedFiles ?? [], options.worktreeDiffs ?? worktreeDiffs) : { conflicts: [], unavailable: "There is no base to merge with." };
   const prBases: PrBaseLookup = { gh: ghAllowed, projectDir, cache: options.prBases };
   const stack = base ? await readStack(git, base, upstreams, defaultBranch?.branch ?? null, prBases) : [];
   const github = pr ? await readGithubFacts(git, pr, base?.ref ?? null, stack) : null;

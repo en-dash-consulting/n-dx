@@ -1,0 +1,48 @@
+schema: "rex/v2"
+items:
+  "16422d4f-4145-4008-b53e-a4a6ec5d745f":
+    status: "completed"
+    startedAt: "2026-11-04T20:34:04.810Z"
+    completedAt: "2026-11-04T20:47:22.011Z"
+    endedAt: "2026-11-04T20:47:22.011Z"
+    activeIntervals: [{"end":"2026-11-04T20:47:22.011Z","start":"2026-11-04T20:34:04.810Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "useSidecar reconnects its socket with 1s→30s backoff, catches up cards and frames on reopen, stops on unmount."
+    lastModified: "2026-11-04T20:47:22.011Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "1ec42c31-1ed5-4989-881c-3368dc86b8aa":
+    status: "completed"
+    startedAt: "2026-11-04T21:04:55.831Z"
+    completedAt: "2026-11-04T21:13:16.820Z"
+    endedAt: "2026-11-04T21:13:16.820Z"
+    activeIntervals: [{"end":"2026-11-04T21:13:16.820Z","start":"2026-11-04T21:04:55.831Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "Workspaces card renders \"Task taken over by <worktree>\" from latest run's claimLostTo; viewer test added."
+    lastModified: "2026-11-04T21:13:16.820Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "3c8644ac-bc07-41bd-ad8d-029f08a807f8":
+    lastModified: "2026-11-04T20:55:00.118Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "63e72261-cf9f-44c2-a845-f600903a6ad2":
+    status: "completed"
+    startedAt: "2026-11-04T20:26:06.926Z"
+    completedAt: "2026-11-04T20:33:43.402Z"
+    endedAt: "2026-11-04T20:33:43.402Z"
+    activeIntervals: [{"end":"2026-11-04T20:33:43.402Z","start":"2026-11-04T20:26:06.926Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "sidecar-cards.ts shortcut handler returns on e.repeat and while any [aria-modal=\"true\"] is in the document; two tests in sidecar-drawer.test.ts."
+    lastModified: "2026-11-04T20:33:43.402Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "6fb793c3-adec-4532-bce2-a190545601b9":
+    lastModified: "2026-11-04T20:55:00.118Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"
+  "e6dc973a-e7fd-49cc-92f9-45f675c5c0d7":
+    status: "completed"
+    startedAt: "2026-11-04T20:48:23.340Z"
+    completedAt: "2026-11-04T21:04:19.550Z"
+    endedAt: "2026-11-04T21:04:19.550Z"
+    activeIntervals: [{"end":"2026-11-04T21:04:19.550Z","start":"2026-11-04T20:48:23.340Z"}]
+    resolutionType: "code-change"
+    resolutionDetail: "git-status.css: below 700px the panel is position fixed, right 1rem, above the bottom bar. shell.spec.ts opens the chip at 390px and asserts the panel is in the viewport; stacking test no longer injects .sessions-panel."
+    lastModified: "2026-11-04T21:04:19.550Z"
+    lastModifiedBy: "Ryan Keith <ryan.k@endash.us>"

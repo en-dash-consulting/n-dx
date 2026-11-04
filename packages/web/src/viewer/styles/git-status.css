@@ -19,6 +19,17 @@
   right: 0;
 }
 
+/* Below ~700px the chip sits too far from the right edge for a 420px panel
+   to open leftward from it (it ran off the left edge). Anchor to the viewport
+   instead, just above the bottom bar. */
+@media (max-width: 700px) {
+  .git-status-chip .git-status-panel {
+    position: fixed;
+    right: 1rem;
+    bottom: calc(var(--bottombar-h) + 0.5rem);
+  }
+}
+
 .git-status-toggle {
   display: flex;
   align-items: center;

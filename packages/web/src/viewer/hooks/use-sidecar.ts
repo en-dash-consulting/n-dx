@@ -417,6 +417,10 @@ interface Tail {
   again: boolean;
 }
 
+/** The socket's reconnect delay doubles from the first to the cap, and resets once it opens (as use-live.ts). */
+const RECONNECT_FIRST_MS = 1_000;
+const RECONNECT_MAX_MS = 30_000;
+
 const newTail = (sessionId: string | null): Tail => ({ sessionId, cursor: 0, inFlight: false, again: false });
 
 export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSelection): SidecarState {
@@ -553,8 +557,30 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
       throttledTypes: [],
       coalescerWindowMs: 100,
     });
-    try {
-      ws = openWebSocket();
+    let stopped = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectDelay = RECONNECT_FIRST_MS;
+
+    const connect = (isReconnect: boolean): void => {
+      if (typeof WebSocket === "undefined") return; // no socket: the drawer still reads when it opens
+      try {
+        ws = openWebSocket();
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      ws.onopen = () => {
+        reconnectDelay = RECONNECT_FIRST_MS;
+        // Announcements sent while the socket was down are gone: catch up now.
+        if (isReconnect && mountedRef.current) {
+          void fetchWaiting();
+          void fetchFrames();
+        }
+      };
+      ws.onclose = () => {
+        ws = null;
+        if (!stopped) scheduleReconnect();
+      };
       ws.onmessage = (event) => {
         try {
           pipeline.push(JSON.parse(event.data));
@@ -562,13 +588,29 @@ export function useSidecar(enabled: boolean, open: boolean, page: SidecarPageSel
           // A malformed frame: the next announcement carries the cursor again.
         }
       };
-    } catch {
-      // No socket: the drawer still reads the transcript when it opens.
-    }
+    };
+
+    const scheduleReconnect = (): void => {
+      if (stopped || reconnectTimer !== null) return;
+      const delay = reconnectDelay;
+      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect(true);
+      }, delay);
+    };
+
+    connect(false);
     return () => {
+      stopped = true;
       mountedRef.current = false;
       pipeline.dispose();
-      ws?.close();
+      if (reconnectTimer !== null) clearTimeout(reconnectTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+        ws = null;
+      }
     };
   }, [enabled, fetchWaiting, fetchFrames]);
 

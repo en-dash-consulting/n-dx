@@ -44,7 +44,7 @@ export function latestRunVerdict(runs: readonly VerdictRun[]): RunVerdict | null
  */
 export const RUN_VERDICT_CLASS_LABELS: Readonly<Record<string, string>> = {
   "test-gate-new": "New test failure",
-  "test-gate-preexisting": "Pre-existing test failure",
+  "test-gate-preexisting": "Failure in tests the run did not edit",
   "completion-held": "Completion held",
   "review-blocked": "Blocked by review",
   "claim-lost": "Claim lost",
