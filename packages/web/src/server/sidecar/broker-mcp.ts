@@ -412,14 +412,20 @@ export function createBrokerMcpServer(
   return server;
 }
 
-/** Whether a JSON-RPC body lists tools or calls an external one: only then are the connections read. */
-function needsExternalTools(body: unknown): boolean {
-  return (Array.isArray(body) ? body : [body]).some((message) => {
-    if (!message || typeof message !== "object") return false;
+/**
+ * Which connections a JSON-RPC body needs read: every one for a tools/list,
+ * else the ones its external calls name; `null` when it needs none.
+ */
+function connectionsNeeded(body: unknown): "all" | string[] | null {
+  const named = new Set<string>();
+  for (const message of Array.isArray(body) ? body : [body]) {
+    if (!message || typeof message !== "object") continue;
     const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
-    if (method === "tools/list") return true;
-    return method === "tools/call" && typeof params?.name === "string" && parseConnectionWireName(params.name) !== undefined;
-  });
+    if (method === "tools/list") return "all";
+    const wire = method === "tools/call" && typeof params?.name === "string" ? parseConnectionWireName(params.name) : undefined;
+    if (wire) named.add(wire.connection);
+  }
+  return named.size > 0 ? [...named] : null;
 }
 
 /**
@@ -455,7 +461,8 @@ export async function handleBrokerMcpRequest(
       // Not JSON: the transport answers its own parse error for it.
       parsedBody = raw;
     }
-    if (needsExternalTools(parsedBody)) external = { tools: await connections.listTools(), connections };
+    const needed = connectionsNeeded(parsedBody);
+    if (needed) external = { tools: await connections.listTools(needed === "all" ? undefined : needed), connections };
   }
   const server = createBrokerMcpServer(broker, sessionId, actions, scope, external);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });

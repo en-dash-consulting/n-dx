@@ -13,6 +13,8 @@
 import type { ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -67,9 +69,9 @@ const holdingSpawn: NonNullable<VendorSessionOptions["spawn"]> = (_binary, args)
 };
 
 /** Start the dashboard over `root` whose `.n-dx.local.json` declares `connections` (none: no file). */
-async function startDashboard(connections?: Record<string, unknown>): Promise<void> {
+async function startDashboard(connections?: Record<string, unknown>, options: { connectTimeoutMs?: number } = {}): Promise<void> {
   if (connections) writeFileSync(join(root, ".n-dx.local.json"), JSON.stringify({ connections }));
-  service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {} });
+  service = new ConnectionService({ projectDir: root, credentials: { ndxHome }, warn: () => {}, ...options });
   const dir = join(root, ".hench", "sidecar");
   const ctx: ServerContext = { projectDir: root, svDir: join(root, ".sourcevision"), rexDir: join(root, ".rex"), dev: false };
   const connect = sidecarSessionConnect(dir, (id) => sidecarBrokerEndpoint(ctx, id));
@@ -227,6 +229,28 @@ describe("a worktree session's broker and the operator's connections", () => {
     expect((await client.listTools()).tools.map((t) => t.name)).toContain("docs__update_item");
     expect(text(await client.callTool({ name: "ledger_append", arguments: { type: "decision", text: "kept going" } })))
       .toBe("Noted in the session ledger.");
+  });
+
+  it("calls a healthy connection without trying to reach another connection that never answers", async () => {
+    // Accepts each request and never answers; counts them.
+    let silentRequests = 0;
+    const silent = createServer(() => { silentRequests += 1; });
+    await new Promise<void>((done) => silent.listen(0, "127.0.0.1", done));
+    try {
+      const url = `http://127.0.0.1:${(silent.address() as AddressInfo).port}/mcp`;
+      await startDashboard({ docs: docs(), silent: { transport: "http", url } }, { connectTimeoutMs: 500 });
+      const { client } = await sessionClient();
+      await client.listTools();
+      const before = silentRequests;
+      expect(before).toBeGreaterThan(0);
+
+      // A call names its connection: only that one is read, so the silent one costs it no connect wait.
+      expect(text(await client.callTool({ name: "docs__read_item", arguments: { id: "7" } }))).toBe("item 7");
+      expect(silentRequests).toBe(before);
+    } finally {
+      silent.closeAllConnections();
+      await new Promise<void>((done) => silent.close(() => done()));
+    }
   });
 
   it("reads 'sign in again' with no card when the server starts refusing the stored token", async () => {

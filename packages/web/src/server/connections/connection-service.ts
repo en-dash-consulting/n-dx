@@ -177,10 +177,11 @@ export class ConnectionService {
    * Every connection's tools, connecting any that is not live. A connection
    * that went unavailable keeps the tools it last listed, so a session's tool
    * list does not shift under it and a call reads why it cannot run; one that
-   * was never reached contributes none.
+   * was never reached contributes none. `only` limits it to those connections,
+   * so a call to one never waits on connecting another.
    */
-  async listTools(): Promise<ConnectionTool[]> {
-    const slots = [...this.slots.values()];
+  async listTools(only?: readonly string[]): Promise<ConnectionTool[]> {
+    const slots = [...this.slots.values()].filter((slot) => !only || only.includes(slot.config.id));
     await Promise.all(slots.map((slot) => this.ensure(slot)));
     return slots.flatMap((slot) => slot.live?.tools ?? slot.known ?? []);
   }

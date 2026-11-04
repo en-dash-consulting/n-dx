@@ -72,8 +72,9 @@ wire name, after the broker's own tools. A hub session gets none.
   refuses the token, with no card. The broker's own tools keep answering.
 - **Only when asked.** The broker is stateless, one server per request. With
   connections declared, it reads the request body first and touches the
-  connections only for `tools/list` or a call to an external tool, so a slow
-  server never holds up the broker's own tools. Without connections the
+  connections only for `tools/list` (all of them) or a call to an external
+  tool (only the connection it names), so a slow server never holds up the
+  broker's own tools or another connection's calls. Without connections the
   request path is as before.
 - **One per project.** The routes keep one `ConnectionService` per project for
   the server's life; a connection added to `.n-dx.local.json` takes effect on
