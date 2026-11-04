@@ -44,6 +44,9 @@ const WIRE_SEPARATOR = "__";
 
 export const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 export const DEFAULT_CALL_TIMEOUT_MS = 60_000;
+/** After a failed connect, a listing waits this long before reconnecting; it doubles per failure up to the cap. */
+export const DEFAULT_LIST_RETRY_MS = 30_000;
+export const MAX_LIST_RETRY_MS = 300_000;
 
 export type ConnectionState =
   | { state: "connected" }
@@ -92,6 +95,10 @@ export interface ConnectionServiceOptions {
   credentials?: CredentialStoreOptions;
   connectTimeoutMs?: number;
   callTimeoutMs?: number;
+  /** First wait before a listing reconnects a connection that failed to connect. */
+  listRetryMs?: number;
+  /** The clock for that wait, in ms (tests). */
+  now?: () => number;
   /** Where warnings go. Defaults to stderr. Never receives a credential value. */
   warn?: (message: string) => void;
 }
@@ -120,6 +127,10 @@ interface Slot {
   known?: ConnectionTool[];
   connecting?: Promise<Live | undefined>;
   status: ConnectionState;
+  /** Consecutive failed connects; reset by a successful one. */
+  failures: number;
+  /** Until this time (ms) a listing serves the slot as it is instead of reconnecting. */
+  retryAt?: number;
 }
 
 function definedEnv(env: NodeJS.ProcessEnv): Record<string, string> {
@@ -140,6 +151,8 @@ export class ConnectionService {
   private readonly warn: (message: string) => void;
   private readonly connectTimeoutMs: number;
   private readonly callTimeoutMs: number;
+  private readonly listRetryMs: number;
+  private readonly now: () => number;
   private readonly warnedNames = new Set<string>();
   private closed = false;
 
@@ -147,9 +160,11 @@ export class ConnectionService {
     this.warn = options.warn ?? ((message: string) => process.stderr.write(message + "\n"));
     this.connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
     this.callTimeoutMs = options.callTimeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
+    this.listRetryMs = options.listRetryMs ?? DEFAULT_LIST_RETRY_MS;
+    this.now = options.now ?? Date.now;
     const configs = options.connections ?? loadConnections(options.projectDir, { warn: this.warn });
     for (const config of configs) {
-      this.slots.set(config.id, { config, status: { state: "unavailable", reason: "not connected yet" } });
+      this.slots.set(config.id, { config, status: { state: "unavailable", reason: "not connected yet" }, failures: 0 });
     }
   }
 
@@ -175,11 +190,14 @@ export class ConnectionService {
    * that went unavailable keeps the tools it last listed, so a session's tool
    * list does not shift under it and a call reads why it cannot run; one that
    * was never reached contributes none. `only` limits it to those connections,
-   * so a call to one never waits on connecting another.
+   * so a call to one never waits on connecting another. A connection whose
+   * connect failed is not retried until its retry interval has passed (30 s,
+   * doubling to 5 min), so a server that hangs does not delay every listing by
+   * the connect timeout; a call to it still reconnects at once.
    */
   async listTools(only?: readonly string[]): Promise<ConnectionTool[]> {
     const slots = [...this.slots.values()].filter((slot) => !only || only.includes(slot.config.id));
-    await Promise.all(slots.map((slot) => this.ensure(slot)));
+    await Promise.all(slots.map((slot) => (this.backingOff(slot) ? undefined : this.ensure(slot))));
     return slots.flatMap((slot) => slot.live?.tools ?? slot.known ?? []);
   }
 
@@ -241,6 +259,10 @@ export class ConnectionService {
       return live ? [live] : [];
     });
     await Promise.all(lives.map((live) => live.client.close().catch(() => undefined)));
+  }
+
+  private backingOff(slot: Slot): boolean {
+    return !slot.live && !slot.connecting && slot.retryAt !== undefined && this.now() < slot.retryAt;
   }
 
   private ensure(slot: Slot): Promise<Live | undefined> {
@@ -334,10 +356,14 @@ export class ConnectionService {
       slot.live = live;
       slot.known = live.tools;
       slot.status = { state: "connected" };
+      slot.failures = 0;
+      slot.retryAt = undefined;
       return live;
     } catch (err) {
       await client.close().catch(() => undefined);
       slot.status = this.failureStatus(config, err);
+      slot.failures += 1;
+      slot.retryAt = this.now() + Math.min(this.listRetryMs * 2 ** (slot.failures - 1), MAX_LIST_RETRY_MS);
       return undefined;
     }
   }

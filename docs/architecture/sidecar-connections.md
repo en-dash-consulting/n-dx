@@ -107,7 +107,10 @@ wire name, after the broker's own tools. A hub session gets none.
   kept for the server's life. Refused, timed out, exited or closed reads
   `unavailable` with its reason, leaves the other connections working, and the
   next use reconnects. `tools/list` is cached and re-read on reconnect and on
-  `notifications/tools/list_changed`.
+  `notifications/tools/list_changed`. After a failed connect a tool *listing*
+  serves the last-known tools without reconnecting for 30 s (doubling to 5 min),
+  so a hung server does not delay every turn by the connect timeout; a call to
+  it still reconnects at once.
 - **Wire names use `__`.** A tool is shown as `<id>.<tool>` and carried as
   `<id>__<tool>`, because the Claude and OpenAI tool-name patterns reject dots.
   An id holds no `_`, so the first `__` splits a wire name. A wire name over 64

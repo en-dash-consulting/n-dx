@@ -16,6 +16,8 @@ export interface FakeMcpHttpServer {
   authorizations: Array<string | undefined>;
   /** Every tools/call the server received, in order. */
   calls: Array<{ name: string; arguments: Record<string, unknown> }>;
+  /** Accept every request and never answer it while set; `authorizations` still counts them. */
+  silent?: boolean;
   /** Answer 401 to every request while set. */
   requireToken?: string;
   /**
@@ -40,6 +42,7 @@ export async function startFakeMcpHttpServer(): Promise<FakeMcpHttpServer> {
   };
   const server: Server = createServer(async (req, res) => {
     fake.authorizations.push(req.headers.authorization);
+    if (fake.silent) return;
     if (fake.requireToken && req.headers.authorization !== `Bearer ${fake.requireToken}`) {
       res.writeHead(401).end();
       return;

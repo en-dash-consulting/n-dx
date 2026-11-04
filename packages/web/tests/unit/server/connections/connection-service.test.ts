@@ -267,6 +267,63 @@ describe("ConnectionService", () => {
     expect(text(await svc.callTool("local", "read_item", { id: "9" }))).toBe("item 9");
   });
 
+  describe("listing a connection that does not answer", () => {
+    const RETRY_MS = 1_000;
+
+    function clocked(url: string) {
+      let time = 0;
+      const made = service(
+        { docs: { transport: "http", url } },
+        { connectTimeoutMs: 300, callTimeoutMs: 300, listRetryMs: RETRY_MS, now: () => time },
+      );
+      return { ...made, advance: (ms: number) => void (time += ms) };
+    }
+
+    it("does not send the server a request again within the retry interval, but a call reconnects", async () => {
+      const http = await httpServer();
+      http.silent = true;
+      const { svc, advance } = clocked(http.url);
+
+      expect(await svc.listTools()).toEqual([]);
+      const afterFirst = http.authorizations.length;
+      expect(afterFirst).toBeGreaterThan(0);
+
+      advance(RETRY_MS - 1);
+      expect(await svc.listTools()).toEqual([]);
+      expect(http.authorizations.length).toBe(afterFirst);
+
+      await expect(svc.callTool("docs", "read_item", { id: "1" })).rejects.toBeInstanceOf(ConnectionUnavailableError);
+      expect(http.authorizations.length).toBeGreaterThan(afterFirst);
+    });
+
+    it("lists a server that recovers once the interval passes", async () => {
+      const http = await httpServer();
+      http.silent = true;
+      const { svc, advance } = clocked(http.url);
+      await svc.listTools();
+
+      http.silent = false;
+      expect(await svc.listTools()).toEqual([]);
+      advance(RETRY_MS);
+      expect((await svc.listTools()).map((t) => t.tool).sort()).toEqual([...SHARED_TOOLS].sort());
+    });
+
+    it("keeps the last-listed tools while backing off after a connection that was up goes silent", async () => {
+      const http = await httpServer();
+      const { svc, advance } = clocked(http.url);
+      expect((await svc.listTools()).length).toBe(SHARED_TOOLS.length);
+
+      http.silent = true;
+      await expect(svc.callTool("docs", "read_item", { id: "1" })).rejects.toBeInstanceOf(ConnectionUnavailableError);
+      expect((await svc.listTools()).length).toBe(SHARED_TOOLS.length); // reconnect fails, backoff starts
+      const requests = http.authorizations.length;
+
+      advance(RETRY_MS - 1);
+      expect((await svc.listTools()).length).toBe(SHARED_TOOLS.length);
+      expect(http.authorizations.length).toBe(requests);
+    });
+  });
+
   it("refreshes the cached tool list on notifications/tools/list_changed", async () => {
     const { svc } = service({ local: stdio() });
     expect((await svc.listTools()).some((t) => t.tool === "fresh_tool")).toBe(false);
